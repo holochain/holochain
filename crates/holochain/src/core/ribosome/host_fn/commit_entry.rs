@@ -235,7 +235,7 @@ pub mod wasm_test {
     }
 
     #[tokio::test(threaded_scheduler)]
-    async fn ribosome_commit_entry_test() {
+    async fn ribosome_commit_entry_test<'a>() {
         holochain_types::observability::test_run().ok();
         // test workspace boilerplate
         let env = holochain_state::test_utils::test_cell_env();
@@ -254,8 +254,34 @@ pub mod wasm_test {
             let output: CommitEntryOutput = {
                 let (_g, raw_workspace) = crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(&mut workspace);
                 let mut host_access = fixt!(ZomeCallHostAccess);
-                host_access.workspace = raw_workspace;
-                crate::call_test_ribosome!(host_access, TestWasm::CommitEntry, "commit_entry", ())
+                host_access.workspace = raw_workspace.clone();
+                let output: CommitEntryOutput = crate::call_test_ribosome!(
+                    host_access,
+                    TestWasm::CommitEntry,
+                    "commit_entry",
+                    ()
+                );
+
+                // the chain head should be the committed entry header
+                let call =
+                    |workspace: &'a mut CallZomeWorkspace| -> BoxFuture<'a, SourceChainResult<HeaderHash>> {
+                        async move {
+                            let source_chain = &mut workspace.source_chain;
+                            Ok(source_chain.chain_head()?.to_owned())
+                        }
+                        .boxed()
+                    };
+                let chain_head =
+                    tokio_safe_block_on::tokio_safe_block_forever_on(tokio::task::spawn(
+                        async move { unsafe { raw_workspace.apply_mut(call).await } },
+                    ))
+                    .unwrap()
+                    .unwrap()
+                    .unwrap();
+
+                assert_eq!(&chain_head, output.inner_ref(),);
+
+                output
             };
 
             // Write the database to file
@@ -265,16 +291,6 @@ pub mod wasm_test {
             .unwrap();
             output
         };
-
-        // // this should be the hash of the newly committed entry
-        // assert_eq!(
-        //     vec![
-        //         62, 54, 23, 199, 14, 51, 180, 172, 119, 192, 27, 49, 206, 111, 170, 221, 23, 232,
-        //         203, 86, 215, 89, 178, 16, 162, 24, 159, 168, 45, 255, 28, 217, 94, 223, 228, 142
-        //     ]
-        //     .as_slice(),
-        //     output.into_inner().get_raw(),
-        // );
 
         // Needs metadata to return get
         {
