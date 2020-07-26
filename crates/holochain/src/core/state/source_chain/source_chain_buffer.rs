@@ -13,7 +13,7 @@ use holochain_state::{
 };
 use holochain_types::{
     dht_op::{ops_from_element, DhtOp},
-    element::{Element, SignedHeaderHashed},
+    element::{Element, SignedHeaderHashed, SignedHeaderHashedExt},
     entry::EntryHashed,
     prelude::*,
     HeaderHashed,
