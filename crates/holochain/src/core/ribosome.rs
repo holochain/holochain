@@ -434,7 +434,8 @@ pub mod wasm_test {
 
     #[macro_export]
     macro_rules! call_test_ribosome {
-        ( $host_access:ident, $test_wasm:expr, $fn_name:literal, $input:expr ) => {
+        ( $host_access:expr, $test_wasm:expr, $fn_name:literal, $input:expr ) => {{
+            let host_access = $host_access.clone();
             tokio::task::spawn(async move {
                 // ensure type of test wasm
                 use crate::core::ribosome::RibosomeT;
@@ -462,7 +463,7 @@ pub mod wasm_test {
                 .next()
                 .unwrap();
                 let zome_invocation_response =
-                    match ribosome.call_zome_function($host_access, invocation.clone()) {
+                    match ribosome.call_zome_function(host_access, invocation.clone()) {
                         Ok(v) => v,
                         Err(e) => {
                             dbg!("call_zome_function error", &invocation, &e);
@@ -486,8 +487,8 @@ pub mod wasm_test {
                 output
             })
             .await
-            .unwrap();
-        };
+            .unwrap()
+        }};
     }
 
     #[test]
