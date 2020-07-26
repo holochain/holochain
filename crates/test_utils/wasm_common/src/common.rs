@@ -1,7 +1,7 @@
 use hdk3::prelude::link::LinkTag;
 use hdk3::prelude::*;
 
-#[derive(Debug, Serialize, Deserialize, SerializedBytes)]
+#[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes)]
 #[repr(transparent)]
 #[serde(transparent)]
 pub struct TestString(pub String);
@@ -33,7 +33,7 @@ impl From<bool> for TestBool {
     }
 }
 
-#[derive(serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(Clone, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct AnchorInput(pub String, pub String);
 
 #[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]

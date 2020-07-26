@@ -2,6 +2,7 @@ use crate::core::SourceChainError;
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_state::error::DatabaseError;
+use holochain_types::dht_op::error::DhtOpError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -28,6 +29,8 @@ pub enum DhtOpConvertError {
     HeaderMismatch(String, String),
     #[error(transparent)]
     SourceChainError(#[from] SourceChainError),
+    #[error(transparent)]
+    DhtOpError(#[from] DhtOpError),
 }
 
 pub type DhtOpConvertResult<T> = Result<T, DhtOpConvertError>;

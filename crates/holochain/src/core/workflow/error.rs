@@ -12,7 +12,7 @@ use crate::{
 };
 use holochain_p2p::HolochainP2pError;
 use holochain_state::error::DatabaseError;
-use holochain_types::prelude::*;
+use holochain_types::{dht_op::error::DhtOpError, prelude::*};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -52,6 +52,9 @@ pub enum WorkflowError {
 
     #[error(transparent)]
     HolochainP2pError(#[from] HolochainP2pError),
+
+    #[error(transparent)]
+    DhtOpError(#[from] DhtOpError),
 }
 
 /// Internal type to handle running workflows

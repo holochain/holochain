@@ -12,7 +12,7 @@ use holochain_state::{
     prelude::{Reader, Writer},
 };
 use holochain_types::{
-    dht_op::{ops_from_element, DhtOp},
+    dht_op::{produce_ops_from_element, DhtOp},
     element::{ChainElement, SignedHeaderHashed},
     entry::EntryHashed,
     prelude::*,
@@ -86,7 +86,7 @@ impl<'env> SourceChainBuf<'env> {
             .get_items_with_incomplete_dht_ops()?
             .collect::<Vec<_>>();
         for (i, header) in ops_headers {
-            let op = ops_from_element(
+            let op = produce_ops_from_element(
                 &self
                     .get_element(&header)
                     .await?
