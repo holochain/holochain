@@ -436,6 +436,7 @@ pub mod wasm_test {
     macro_rules! call_test_ribosome {
         ( $host_access:expr, $test_wasm:expr, $fn_name:literal, $input:expr ) => {{
             let host_access = $host_access.clone();
+            let input = $input.clone();
             tokio::task::spawn(async move {
                 // ensure type of test wasm
                 use crate::core::ribosome::RibosomeT;
@@ -457,7 +458,7 @@ pub mod wasm_test {
                             .unwrap(),
                         $test_wasm.into(),
                         $fn_name.into(),
-                        holochain_zome_types::HostInput::new($input.try_into().unwrap()),
+                        holochain_zome_types::HostInput::new(input.try_into().unwrap()),
                     ),
                 )
                 .next()

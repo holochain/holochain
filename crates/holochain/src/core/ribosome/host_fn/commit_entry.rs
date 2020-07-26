@@ -247,13 +247,8 @@ pub mod wasm_test {
         host_access.workspace = raw_workspace;
 
         // get the result of a commit entry
-        let commit_host_access = host_access.clone();
-        let output: CommitEntryOutput = crate::call_test_ribosome!(
-            commit_host_access,
-            TestWasm::CommitEntry,
-            "commit_entry",
-            ()
-        );
+        let output: CommitEntryOutput =
+            crate::call_test_ribosome!(host_access, TestWasm::CommitEntry, "commit_entry", ());
 
         // this should be the hash of the newly committed entry
         assert_eq!(
