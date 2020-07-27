@@ -4,7 +4,10 @@ use crate::{
     core::{
         ribosome::{host_fn, wasm_ribosome::WasmRibosome, CallContext, ZomeCallHostAccess},
         state::workspace::Workspace,
-        workflow::{unsafe_call_zome_workspace::UnsafeCallZomeWorkspace, CallZomeWorkspace},
+        workflow::{
+            integrate_dht_ops_workflow::integrate_to_cache,
+            unsafe_call_zome_workspace::UnsafeCallZomeWorkspace, CallZomeWorkspace,
+        },
     },
     test_utils::test_network,
 };
@@ -83,7 +86,7 @@ async fn get_updates_cache() {
 
         // Call fetch element
         cascade
-            .fetch_single_element(expected.0.clone().into(), Default::default())
+            .fetch_element_via_header(expected.0.clone().into(), Default::default())
             .await
             .unwrap()
             .unwrap()
@@ -232,14 +235,36 @@ async fn get_from_another_agent() {
         };
         let env_ref = bob_env.guard().await;
         let dbs = bob_env.dbs().await;
-        commit_entry(
+        let entry_hash = commit_entry(
             &env_ref,
             &dbs,
-            call_data,
+            call_data.clone(),
             entry.clone().try_into().unwrap(),
             "post".into(),
         )
-        .await
+        .await;
+
+        // Bob is not an authority yet
+
+        // Check bob can get the entry
+        let element = get_entry(&env_ref, &dbs, call_data, entry_hash.clone(), GetOptions)
+            .await
+            .unwrap();
+        let (signed_header, ret_entry) = element.clone().into_inner();
+
+        // TODO: Check signed header is the same header
+
+        // Check Bob is the author
+        assert_eq!(*signed_header.header().author(), bob_agent_id);
+
+        // Check entry is the same
+        let ret_entry: Post = ret_entry.unwrap().try_into().unwrap();
+        assert_eq!(entry, ret_entry);
+
+        // Make Bob an "authority"
+        fake_authority(&env_ref, &dbs, element).await;
+
+        entry_hash
     };
 
     // Alice get element from bob
@@ -299,6 +324,7 @@ impl TryFrom<Entry> for Post {
     }
 }
 
+#[derive(Clone)]
 struct CallData {
     ribosome: WasmRibosome,
     zome_name: ZomeName,
@@ -485,7 +511,7 @@ async fn get_entry<'env>(
     let reader = env_ref.reader().unwrap();
     let mut workspace = CallZomeWorkspace::new(&reader, dbs).unwrap();
 
-    let cascade = workspace.cascade(call_data.network);
+    let mut cascade = workspace.cascade(call_data.network);
     cascade.dht_get(entry_hash.into()).await.unwrap()
 
     // TODO: use the real get entry when element in zome types pr lands
@@ -500,4 +526,22 @@ async fn get_entry<'env>(
     //     host_fn::get_entry::get_entry(ribosome.clone(), call_context.clone(), input).unwrap()
     // };
     // output.into_inner().try_into().unwrap()
+}
+
+async fn fake_authority<'env>(
+    env_ref: &'env EnvironmentWriteRef<'env>,
+    dbs: &impl GetDb,
+    element: ChainElement,
+) {
+    let reader = env_ref.reader().unwrap();
+    let mut workspace = CallZomeWorkspace::new(&reader, dbs).unwrap();
+
+    // Write to the meta vault to fake being an authority
+    integrate_to_cache(&element, &mut workspace.cache_cas, &mut workspace.meta)
+        .await
+        .unwrap();
+
+    env_ref
+        .with_commit(|writer| workspace.flush_to_txn(writer))
+        .unwrap();
 }

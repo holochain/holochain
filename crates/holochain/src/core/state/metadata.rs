@@ -594,7 +594,7 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
         Ok(self
             .status_meta
             .get(entry_hash)?
-            .unwrap_or(EntryDhtStatus::Live))
+            .unwrap_or(EntryDhtStatus::Dead))
     }
 
     fn get_canonical_entry_hash(&self, _entry_hash: EntryHash) -> DatabaseResult<EntryHash> {

@@ -74,6 +74,8 @@ pub struct RawGetEntryResponse {
     pub entry: Entry,
     /// The entry_type shared across all headers
     pub entry_type: EntryType,
+    /// The entry hash shared across all headers
+    pub entry_hash: EntryHash,
 }
 
 impl RawGetEntryResponse {
@@ -92,39 +94,44 @@ impl RawGetEntryResponse {
         let mut elements = elements.into_iter();
         elements.next().map(|element| {
             let mut live_headers = BTreeSet::new();
-            let (new_entry_header, entry_type, entry) = Self::from_element(element);
+            let (new_entry_header, entry_type, entry, entry_hash) = Self::from_element(element);
             live_headers.insert(new_entry_header);
             let r = Self {
                 live_headers,
                 deletes,
                 entry,
                 entry_type,
+                entry_hash,
             };
             elements.fold(r, |mut response, element| {
-                let (new_entry_header, entry_type, entry) = Self::from_element(element);
+                let (new_entry_header, entry_type, entry, entry_hash) = Self::from_element(element);
                 debug_assert_eq!(response.entry, entry);
                 debug_assert_eq!(response.entry_type, entry_type);
+                debug_assert_eq!(response.entry_hash, entry_hash);
                 response.live_headers.insert(new_entry_header);
                 response
             })
         })
     }
 
-    fn from_element(element: ChainElement) -> (WireNewEntryHeader, EntryType, Entry) {
+    fn from_element(element: ChainElement) -> (WireNewEntryHeader, EntryType, Entry, EntryHash) {
         let (shh, entry) = element.into_inner();
         let entry = entry.expect("Get entry responses cannot be created without entries");
         let (header, signature) = shh.into_header_and_signature();
-        let (new_entry_header, entry_type) = match header.into_content() {
+        let (new_entry_header, entry_type, entry_hash) = match header.into_content() {
             Header::EntryCreate(ec) => {
                 let et = ec.entry_type.clone();
-                (WireNewEntryHeader::Create((ec, signature).into()), et)
+                let eh = ec.entry_hash.clone();
+                (WireNewEntryHeader::Create((ec, signature).into()), et, eh)
             }
             Header::EntryUpdate(eu) => {
                 let replaces_address = eu.replaces_address.clone();
+                let eh = eu.entry_hash.clone();
                 let et = eu.entry_type.clone();
                 (
                     WireNewEntryHeader::Update(((eu, signature).into(), replaces_address)),
                     et,
+                    eh,
                 )
             }
             h @ _ => panic!(
@@ -134,7 +141,7 @@ impl RawGetEntryResponse {
                 h
             ),
         };
-        (new_entry_header, entry_type, entry)
+        (new_entry_header, entry_type, entry, entry_hash)
     }
 }
 

@@ -1,3 +1,4 @@
+use crate::core::SourceChainError;
 use holochain_p2p::HolochainP2pError;
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_state::error::DatabaseError;
@@ -7,6 +8,9 @@ use thiserror::Error;
 pub enum CascadeError {
     #[error(transparent)]
     DatabaseError(#[from] DatabaseError),
+
+    #[error(transparent)]
+    SourceChainError(#[from] SourceChainError),
 
     #[error(transparent)]
     NetworkError(#[from] HolochainP2pError),

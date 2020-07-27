@@ -1,8 +1,8 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::{CallContext, RibosomeT};
+use crate::core::state::cascade::error::CascadeResult;
 use crate::core::workflow::CallZomeWorkspace;
 use futures::future::FutureExt;
-use holochain_state::error::DatabaseResult;
 use holochain_zome_types::Entry;
 use holochain_zome_types::GetEntryInput;
 use holochain_zome_types::GetEntryOutput;
@@ -21,9 +21,9 @@ pub fn get_entry<'a>(
     let network = call_context.host_access.network().clone();
 
     let call =
-        |workspace: &'a mut CallZomeWorkspace| -> MustBoxFuture<'a, DatabaseResult<Option<Entry>>> {
+        |workspace: &'a mut CallZomeWorkspace| -> MustBoxFuture<'a, CascadeResult<Option<Entry>>> {
             async move {
-                let cascade = workspace.cascade(network);
+                let mut cascade = workspace.cascade(network);
                 // safe block on
                 let maybe_entry = cascade
                     .dht_get(hash.clone().into())

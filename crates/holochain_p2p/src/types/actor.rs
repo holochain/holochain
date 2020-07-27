@@ -13,6 +13,7 @@ pub struct GetValidationPackage {
     // TODO - parameters
 }
 
+#[derive(Clone)]
 /// Get options help control how the get is processed at various levels.
 /// Fields tagged with `[Network]` are network-level controls.
 /// Fields tagged with `[Remote]` are controls that will be forwarded to the

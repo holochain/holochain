@@ -122,14 +122,14 @@ async fn live_local_return() -> SourceChainResult<()> {
     let (_n, _r, cell_network) = test_network().await;
 
     // call dht_get with above address
-    let cascade = Cascade::new(
+    let mut cascade = Cascade::new(
         &source_chain.cas(),
         &mock_meta_vault,
         &mut cache,
         &mut mock_meta_cache,
         cell_network,
     );
-    let entry = cascade.dht_get(address.clone().into()).await?;
+    let entry = cascade.dht_get(address.clone().into()).await.unwrap();
     // check it returns
     assert_eq!(entry.unwrap().into_inner().1.unwrap(), *jimbo_entry);
     // check it doesn't hit the cache
@@ -168,14 +168,14 @@ async fn dead_local_none() -> SourceChainResult<()> {
 
     let (_n, _r, cell_network) = test_network().await;
     // call dht_get with above address
-    let cascade = Cascade::new(
+    let mut cascade = Cascade::new(
         &source_chain.cas(),
         &mock_meta_vault,
         &mut cache,
         &mut mock_meta_cache,
         cell_network,
     );
-    let entry = cascade.dht_get(address.clone().into()).await?;
+    let entry = cascade.dht_get(address.clone().into()).await.unwrap();
     // check it returns none
     assert_eq!(entry, None);
     // check it doesn't hit the cache
@@ -214,14 +214,14 @@ async fn notfound_goto_cache_live() -> SourceChainResult<()> {
 
     let (_n, _r, cell_network) = test_network().await;
     // call dht_get with above address
-    let cascade = Cascade::new(
+    let mut cascade = Cascade::new(
         &source_chain.cas(),
         &mock_meta_vault,
         &mut cache,
         &mut mock_meta_cache,
         cell_network,
     );
-    let _entry = cascade.dht_get(address.clone().into()).await?;
+    let _entry = cascade.dht_get(address.clone().into()).await.unwrap();
     // check it returns
 
     // FIXME!
@@ -252,14 +252,14 @@ async fn notfound_cache() -> DatabaseResult<()> {
 
     let (_n, _r, cell_network) = test_network().await;
     // call dht_get with above address
-    let cascade = Cascade::new(
+    let mut cascade = Cascade::new(
         &source_chain.cas(),
         &mock_meta_vault,
         &mut cache,
         &mut mock_meta_cache,
         cell_network,
     );
-    let entry = cascade.dht_get(address.clone().into()).await?;
+    let entry = cascade.dht_get(address.clone().into()).await.unwrap();
     // check it returns
     assert_eq!(entry, None);
     // check it doesn't hit the primary

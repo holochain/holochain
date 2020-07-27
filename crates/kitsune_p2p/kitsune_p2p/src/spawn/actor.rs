@@ -173,7 +173,11 @@ impl KitsuneP2pActor {
                 // calculate the time to wait based on our barriers
                 let elapsed = start.elapsed().as_millis() as u64;
                 let mut time_remaining = if elapsed > race_timeout_ms {
-                    timeout_ms - elapsed
+                    if elapsed >= timeout_ms {
+                        1
+                    } else {
+                        timeout_ms - elapsed
+                    }
                 } else {
                     race_timeout_ms - elapsed
                 };

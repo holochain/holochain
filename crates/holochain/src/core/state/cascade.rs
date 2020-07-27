@@ -48,18 +48,22 @@ use holo_hash::{
     hash_type::{self, AnyDht},
     AnyDhtHash, EntryHash, HeaderHash,
 };
+use holochain_keystore::Signature;
 use holochain_p2p::{
     actor::{GetMetaOptions, GetOptions},
     HolochainP2pCell,
 };
 use holochain_state::error::DatabaseResult;
 use holochain_types::{
-    element::{ChainElement, GetElementResponse, SignedHeaderHashed, WireElement},
-    header::WireDelete,
+    element::{
+        ChainElement, GetElementResponse, RawGetEntryResponse, SignedHeaderHashed, WireElement,
+    },
+    header::{NewEntryHeader, WireDelete},
     metadata::{EntryDhtStatus, MetadataSet},
-    EntryHashed,
+    Entry, EntryHashed, HeaderHashed,
 };
 use holochain_zome_types::link::Link;
+use std::collections::{BTreeSet, HashMap};
 use tracing::*;
 
 #[cfg(test)]
@@ -67,7 +71,7 @@ mod network_tests;
 #[cfg(test)]
 mod test;
 
-mod error;
+pub mod error;
 
 pub struct Cascade<'env: 'a, 'a, M = MetadataBuf<'env>, C = MetadataBuf<'env>>
 where
@@ -89,7 +93,7 @@ enum Search {
     Found(ChainElement),
     /// We haven't found the entry yet and should
     /// continue searching down the cascade
-    Continue,
+    Continue(HeaderHash),
     /// We haven't found the entry and should
     /// not continue searching down the cascade
     // TODO This information is currently not passed back to
@@ -121,14 +125,12 @@ where
         }
     }
 
-    // TODO: Remove when used
-    #[allow(dead_code)]
-    async fn fetch_single_element(
+    async fn fetch_element_via_header(
         &mut self,
-        hash: AnyDhtHash,
+        hash: HeaderHash,
         options: GetOptions,
     ) -> CascadeResult<Option<ChainElement>> {
-        let elements = self.network.get(hash, options).await?;
+        let elements = self.network.get(hash.into(), options).await?;
 
         let mut element: Option<Box<WireElement>> = None;
         let proof_of_delete = elements.into_iter().find_map(|response| match response {
@@ -145,7 +147,10 @@ where
             // Doesn't have header but not because it was deleted
             GetElementResponse::GetHeader(None) => None,
             r @ _ => {
-                error!(msg = "Got an invalid response to fetch single element", ?r);
+                error!(
+                    msg = "Got an invalid response to fetch element via header",
+                    ?r
+                );
                 None
             }
         });
@@ -191,6 +196,66 @@ where
             (None, None) => None,
         };
         Ok(ret)
+    }
+
+    async fn fetch_element_via_entry(
+        &mut self,
+        hash: EntryHash,
+        options: GetOptions,
+    ) -> CascadeResult<Option<(HashMap<HeaderHash, (NewEntryHeader, Signature)>, Entry)>> {
+        let elements = self.network.get(hash.into(), options).await?;
+
+        let mut ret_live_headers = HashMap::new();
+        let mut ret_entry = None;
+        debug!(num_ret_elements = elements.len());
+
+        for element in elements {
+            match element {
+                GetElementResponse::GetEntryFull(Some(raw)) => {
+                    let RawGetEntryResponse {
+                        live_headers,
+                        deletes,
+                        entry,
+                        entry_type,
+                        entry_hash,
+                    } = *raw;
+                    if ret_entry.is_none() {
+                        ret_entry = Some(entry);
+                    }
+                    for entry_header in live_headers {
+                        let (new_entry_header, hash, signature) = entry_header
+                            .create_new_entry_header(entry_type.clone(), entry_hash.clone())
+                            .await;
+                        ret_live_headers.insert(hash, (new_entry_header.clone(), signature));
+                        self.meta_cache.register_header(new_entry_header).await?;
+                    }
+                    for WireDelete {
+                        element_delete_address,
+                        removes_address,
+                    } in deletes
+                    {
+                        self.meta_cache.register_raw_on_header(
+                            removes_address,
+                            SysMetaVal::Delete(element_delete_address.clone()),
+                        );
+                        self.meta_cache.register_raw_on_entry(
+                            entry_hash.clone(),
+                            SysMetaVal::Delete(element_delete_address),
+                        )?;
+                    }
+                }
+                // Authority didn't have any headers for this entry
+                GetElementResponse::GetEntryFull(None) => (),
+                r @ GetElementResponse::GetHeader(_) => {
+                    error!(
+                        msg = "Got an invalid response to fetch element via entry",
+                        ?r
+                    );
+                }
+                r @ _ => unimplemented!("{:?} is unimplemented for fetching via entry", r),
+            }
+        }
+        Ok(ret_entry.map(|e| (ret_live_headers, e)))
     }
 
     // TODO: Remove when used
@@ -252,17 +317,30 @@ where
         }
     }
 
+    async fn get_element_local(&self, hash: &HeaderHash) -> CascadeResult<Option<ChainElement>> {
+        match self.element_vault.get_element(hash).await? {
+            None => Ok(self.element_cache.get_element(hash).await?),
+            r => Ok(r),
+        }
+    }
+
     /// Returns the oldest live [ChainElement] for this [EntryHash] by getting the
     /// latest available metadata from authorities combined with this agents authored data.
     pub async fn dht_get_entry(
-        &self,
+        &mut self,
         entry_hash: EntryHash,
-    ) -> DatabaseResult<Option<ChainElement>> {
-        // TODO: Update the cache from the network
-        // TODO: Fetch the EntryDhtStatus
-        // TODO: Fetch the headers on this entry
-        // TODO: Fetch the deletes on this entry
-        // TODO: Update the meta cache
+    ) -> CascadeResult<Option<ChainElement>> {
+        // Update the cache from the network
+        let options = GetOptions {
+            remote_agent_count: None,
+            timeout_ms: None,
+            as_race: false,
+            race_timeout_ms: None,
+            follow_redirects: false,
+        };
+        let result = self
+            .fetch_element_via_entry(entry_hash.clone(), options.clone())
+            .await?;
 
         // Meta Cache
         let oldest_live_element = match self.meta_cache.get_dht_status(&entry_hash)? {
@@ -272,37 +350,42 @@ where
                 let headers = self
                     .meta_cache
                     .get_headers(entry_hash)?
-                    .collect::<Vec<_>>()?;
-                let mut oldest = None;
-                let mut result = None;
-                for hash in headers {
-                    // Element Vault
-                    // TODO: Handle error
-                    let element = match self
-                        .element_vault
-                        .get_element(&hash.header_hash)
-                        .await
-                        .unwrap()
-                    {
-                        // Element Cache
-                        // TODO: Handle error
-                        None => self
-                            .element_cache
-                            .get_element(&hash.header_hash)
-                            .await
-                            .unwrap(),
-                        e => e,
-                    };
-                    if let Some(element) = element {
-                        let t = element.header().timestamp();
-                        let o = oldest.get_or_insert(t);
-                        if t < *o {
-                            *o = t;
-                            result = Some(element);
+                    .collect::<BTreeSet<_>>()?;
+                let oldest_live_header = headers
+                    .into_iter()
+                    .next()
+                    .expect("Status is live but no headers?");
+
+                match result {
+                    Some((authority_headers, entry)) => {
+                        match authority_headers.get(&oldest_live_header.header_hash) {
+                            // Found the oldest header in the authorities data
+                            Some((new_entry_header, signature)) => {
+                                let header =
+                                    HeaderHashed::from_content(new_entry_header.clone().into())
+                                        .await;
+                                Search::Found(ChainElement::new(
+                                    SignedHeaderHashed::with_presigned(header, signature.clone()),
+                                    Some(entry),
+                                ))
+                            }
+                            // We have an oldest live header but it's not in the authorities data
+                            None => self
+                                .get_element_local(&oldest_live_header.header_hash)
+                                .await?
+                                .map(Search::Found)
+                                .unwrap_or(Search::Continue(oldest_live_header.header_hash)),
                         }
                     }
+                    // Not on network but we have live headers local
+                    None => {
+                        // Either we found it locally or we don't have it
+                        self.get_element_local(&oldest_live_header.header_hash)
+                            .await?
+                            .map(Search::Found)
+                            .unwrap_or(Search::NotInCascade)
+                    }
                 }
-                result.map(Search::Found).unwrap_or(Search::Continue)
             }
             EntryDhtStatus::Dead
             | EntryDhtStatus::Pending
@@ -316,11 +399,9 @@ where
         // Network
         match oldest_live_element {
             Search::Found(element) => Ok(Some(element)),
-            Search::Continue => {
-                // TODO: Fetch the element from the network
-                // TODO: Update the element cache
-                // TODO: Return the element
-                todo!("Fetch from network")
+            Search::Continue(oldest_live_header) => {
+                self.fetch_element_via_header(oldest_live_header, options)
+                    .await
             }
             Search::NotInCascade => Ok(None),
         }
@@ -331,9 +412,9 @@ where
     /// combined with this agents authored data.
     /// _Note: Deleted headers are a tombstone set_
     pub async fn dht_get_header(
-        &self,
+        &mut self,
         header_hash: HeaderHash,
-    ) -> DatabaseResult<Option<ChainElement>> {
+    ) -> CascadeResult<Option<ChainElement>> {
         // Meta Cache
         if let Some(_) = self
             .meta_cache
@@ -351,30 +432,9 @@ where
             // Final tombstone found
             return Ok(None);
         }
-        // TODO: Network
-        // TODO: Fetches any deletes on this header.
-        // TODO: If found updates the meta cache and returns none.
-
-        // Element Vault
-        // Checks the element vault for this header element.
-        // TODO: Handle error
-        let element = match self.element_vault.get_element(&header_hash).await.unwrap() {
-            // Element Cache
-            // If not found checks the element cache
-            // TODO: Handle error
-            None => self.element_cache.get_element(&header_hash).await.unwrap(),
-            e => e,
-        };
-
         // Network
-        match element {
-            None => {
-                // TODO: If not found fetches this element from the network.
-                // TODO: Update the element cache.
-                todo!("Fetch element from the network")
-            }
-            e => Ok(e),
-        }
+        self.fetch_element_via_header(header_hash, GetOptions::default())
+            .await
     }
 
     #[instrument(skip(self))]
@@ -382,7 +442,7 @@ where
     // and returns what is in the cache.
     // This gives you the latest possible picture of the current dht state.
     // Data from your zome call is also added to the cache.
-    pub async fn dht_get(&self, hash: AnyDhtHash) -> DatabaseResult<Option<ChainElement>> {
+    pub async fn dht_get(&mut self, hash: AnyDhtHash) -> CascadeResult<Option<ChainElement>> {
         match *hash.hash_type() {
             AnyDht::Entry(e) => {
                 let hash = hash.retype(e);

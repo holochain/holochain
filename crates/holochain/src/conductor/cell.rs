@@ -16,7 +16,11 @@ use crate::{
     conductor::{api::CellConductorApi, cell::error::CellResult},
     core::ribosome::{guest_callback::init::InitResult, wasm_ribosome::WasmRibosome},
     core::{
-        state::source_chain::SourceChainBuf,
+        state::{
+            chain_cas::ChainCasBuf,
+            metadata::{MetadataBuf, MetadataBufT},
+            source_chain::SourceChainBuf,
+        },
         workflow::{
             call_zome_workflow, error::WorkflowError, genesis_workflow::genesis_workflow,
             initialize_zomes_workflow, CallZomeWorkflowArgs, CallZomeWorkspace,
@@ -26,18 +30,26 @@ use crate::{
     },
 };
 use error::CellError;
+use fallible_iterator::FallibleIterator;
 use futures::future::FutureExt;
+use hash_type::AnyDht;
 use holo_hash::*;
 use holochain_keystore::KeystoreSender;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::env::{EnvironmentKind, EnvironmentWrite, ReadManager};
 use holochain_types::{
-    autonomic::AutonomicProcess, cell::CellId, element::GetElementResponse, metadata::MetadataSet,
+    autonomic::AutonomicProcess,
+    cell::CellId,
+    element::{GetElementResponse, RawGetEntryResponse, WireElement},
+    header::WireDelete,
+    metadata::MetadataSet,
 };
 use holochain_zome_types::capability::CapSecret;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::HostInput;
 use std::{
+    collections::{BTreeSet, HashSet},
+    convert::TryInto,
     hash::{Hash, Hasher},
     path::Path,
 };
@@ -405,13 +417,118 @@ impl Cell {
         unimplemented!()
     }
 
+    #[instrument(skip(self, _options))]
     /// a remote node is asking us for entry data
     async fn handle_get(
         &self,
-        _dht_hash: holo_hash::AnyDhtHash,
+        dht_hash: holo_hash::AnyDhtHash,
         _options: holochain_p2p::event::GetOptions,
     ) -> CellResult<GetElementResponse> {
-        unimplemented!()
+        match *dht_hash.hash_type() {
+            AnyDht::Entry(et) => self.handle_get_entry(dht_hash.retype(et)).await,
+            AnyDht::Header => {
+                self.handle_get_element(dht_hash.retype(hash_type::Header))
+                    .await
+            }
+        }
+    }
+
+    async fn handle_get_entry(&self, hash: EntryHash) -> CellResult<GetElementResponse> {
+        debug!("get_entry");
+        let env_ref = self.state_env.guard().await;
+        let dbs = self.state_env.dbs().await;
+        let reader = env_ref.reader()?;
+        let element_vault = ChainCasBuf::vault(&reader, &dbs, false)?;
+        let meta_vault = MetadataBuf::vault(&reader, &dbs)?;
+        let mut entry = None;
+        let mut entry_type = None;
+        let mut entry_hash = None;
+        let mut deletes = HashSet::new();
+        let mut live_headers = BTreeSet::new();
+        let results = meta_vault
+            .get_headers(hash)?
+            .filter_map(|header_hash| {
+                let header_hash = header_hash.header_hash;
+                match meta_vault
+                    .get_deletes_on_header(header_hash.clone())?
+                    .next()?
+                {
+                    // Header is dead
+                    Some(delete) => {
+                        debug!(dead_header = ?header_hash);
+                        deletes.insert(WireDelete {
+                            element_delete_address: delete,
+                            removes_address: header_hash,
+                        });
+                        Ok(None)
+                    }
+                    None => {
+                        debug!(live_header = ?header_hash);
+                        Ok(Some(header_hash))
+                    }
+                }
+            })
+            // TODO: PERF: Remove this collect by fixing thread safety await issue
+            .collect::<Vec<_>>()?;
+        debug!(len = results.len(), agent = ?self.id.agent_pubkey());
+        for live_header in results {
+            let header = match element_vault.get_header(&live_header).await? {
+                Some(header) => {
+                    if let (None, None, None) = (&entry, &entry_type, &entry_hash) {
+                        if let Some((eh, et)) = header.header().entry_data() {
+                            if let Some(e) = element_vault.get_entry(&eh).await? {
+                                entry = Some(e.into_content());
+                                entry_type = Some(et.clone());
+                                entry_hash = Some(eh.clone());
+                            }
+                        }
+                    }
+                    header
+                }
+                None => {
+                    error!(msg = "Authority is missing data for held metadata", metadata = ?live_header);
+                    continue;
+                }
+            };
+            live_headers.insert(header.try_into()?);
+        }
+        let r = match (entry, entry_type, entry_hash) {
+            (Some(entry), Some(entry_type), Some(entry_hash)) => {
+                let r = RawGetEntryResponse {
+                    live_headers,
+                    deletes,
+                    entry,
+                    entry_type,
+                    entry_hash,
+                };
+                Some(Box::new(r))
+            }
+            _ => None,
+        };
+        Ok(GetElementResponse::GetEntryFull(r))
+    }
+
+    async fn handle_get_element(&self, hash: HeaderHash) -> CellResult<GetElementResponse> {
+        debug!("get_element");
+        let env_ref = self.state_env.guard().await;
+        let dbs = self.state_env.dbs().await;
+        let reader = env_ref.reader()?;
+        let element_vault = ChainCasBuf::vault(&reader, &dbs, false)?;
+        let meta_vault = MetadataBuf::vault(&reader, &dbs)?;
+        let deleted = match meta_vault.get_deletes_on_header(hash.clone())?.next()? {
+            Some(delete_header) => Some(WireDelete {
+                element_delete_address: delete_header,
+                removes_address: hash.clone(),
+            }),
+            None => None,
+        };
+        let r = element_vault
+            .get_element(&hash)
+            .await?
+            .map(|e| WireElement::from_element(e, deleted))
+            .map(Box::new);
+
+        Ok(GetElementResponse::GetHeader(r))
     }
 
     /// a remote node is asking us for metadata

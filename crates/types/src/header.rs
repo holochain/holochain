@@ -6,14 +6,18 @@
 
 #![allow(missing_docs)]
 
-use crate::{metadata::TimedHeaderHash, prelude::*};
+use crate::{element::SignedHeaderHashed, metadata::TimedHeaderHash, prelude::*};
 use holo_hash::EntryHash;
 use holochain_zome_types::entry_def::EntryVisibility;
 use holochain_zome_types::header::*;
 
+use error::*;
+
+pub mod error;
+
 pub type HeaderHashed = HoloHashed<Header>;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 /// A header of one of the two types that create a new entry.
 pub enum NewEntryHeader {
     /// A header which simply creates a new entry
@@ -104,6 +108,78 @@ impl From<(EntryUpdate, Signature)> for MinNewEntryHeader {
         }
     }
 }
+
+impl WireNewEntryHeader {
+    pub async fn create_new_entry_header(
+        self,
+        entry_type: EntryType,
+        entry_hash: EntryHash,
+    ) -> (NewEntryHeader, HeaderHash, Signature) {
+        match self {
+            WireNewEntryHeader::Create(ec) => {
+                let signature = ec.signature;
+                let ec = EntryCreate {
+                    author: ec.author,
+                    timestamp: ec.timestamp,
+                    header_seq: ec.header_seq,
+                    prev_header: ec.prev_header,
+                    entry_type,
+                    entry_hash,
+                };
+                let (h, hash) = HeaderHashed::from_content(Header::EntryCreate(ec))
+                    .await
+                    .into_inner();
+                let ec = match h {
+                    Header::EntryCreate(ec) => ec,
+                    _ => unreachable!(),
+                };
+                (NewEntryHeader::Create(ec), hash, signature)
+            }
+            WireNewEntryHeader::Update((eu, replaces_address)) => {
+                let signature = eu.signature;
+                let eu = EntryUpdate {
+                    author: eu.author,
+                    timestamp: eu.timestamp,
+                    header_seq: eu.header_seq,
+                    prev_header: eu.prev_header,
+                    // TODO: This could be wrong.
+                    // Are EntryUpdates that are intended for the header
+                    // registered onto the entry in the MetadataBuf?
+                    // Should they be?
+                    intended_for: IntendedFor::Entry,
+                    replaces_address,
+                    entry_type,
+                    entry_hash,
+                };
+                let (h, hash) = HeaderHashed::from_content(Header::EntryUpdate(eu))
+                    .await
+                    .into_inner();
+                let eu = match h {
+                    Header::EntryUpdate(eu) => eu,
+                    _ => unreachable!(),
+                };
+                (NewEntryHeader::Update(eu), hash, signature)
+            }
+        }
+    }
+}
+
+impl TryFrom<SignedHeaderHashed> for WireNewEntryHeader {
+    type Error = HeaderError;
+    fn try_from(shh: SignedHeaderHashed) -> Result<Self, Self::Error> {
+        let (sh, _) = shh.into_inner();
+        let (header, s) = sh.into();
+        match header {
+            Header::EntryCreate(ec) => Ok(Self::Create((ec, s).into())),
+            Header::EntryUpdate(eu) => {
+                let rep = eu.replaces_address.clone();
+                Ok(Self::Update(((eu, s).into(), rep)))
+            }
+            _ => return Err(HeaderError::NotNewEntry),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

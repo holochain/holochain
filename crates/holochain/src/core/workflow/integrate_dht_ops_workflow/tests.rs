@@ -1349,7 +1349,8 @@ mod slow_tests {
 
             let (cas, _metadata, mut cache, mut metadata_cache) = test_dbs_and_mocks(&reader, &dbs);
             let (_n, _r, cell_network) = test_network().await;
-            let cascade = Cascade::new(&cas, &meta, &mut cache, &mut metadata_cache, cell_network);
+            let mut cascade =
+                Cascade::new(&cas, &meta, &mut cache, &mut metadata_cache, cell_network);
 
             let links = cascade.dht_get_links(&key).await.unwrap();
             let link = links[0].clone();
