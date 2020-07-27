@@ -59,7 +59,7 @@ use holochain_types::{
         ChainElement, GetElementResponse, RawGetEntryResponse, SignedHeaderHashed, WireElement,
     },
     header::{NewEntryHeader, WireDelete},
-    metadata::{EntryDhtStatus, MetadataSet},
+    metadata::{EntryDhtStatus, MetadataSet, TimedHeaderHash},
     Entry, EntryHashed, HeaderHashed,
 };
 use holochain_zome_types::link::Link;
@@ -137,7 +137,7 @@ where
             // Has header
             GetElementResponse::GetHeader(Some(we)) => match we.deleted() {
                 // Has proof of deleted entry
-                Some(deleted) => Some((deleted.clone(), we.entry_hash().cloned())),
+                Some(deleted) => Some((deleted.clone(), we)),
                 // No proof of delete so this is a live element
                 None => {
                     element = Some(we);
@@ -163,13 +163,31 @@ where
                         element_delete_address,
                         removes_address,
                     },
-                    entry_hash,
+                    element,
                 )),
                 _,
             ) => {
+                let entry_hash = element
+                    .entry_hash()
+                    .cloned()
+                    .expect("Deletes don't make sense on headers without entires");
+                // TODO: Should / could we just do an integrate_to_cache here?
+                // Add the header metadata
+                let timed_header_hash: TimedHeaderHash = element
+                    .into_element()
+                    .await?
+                    .into_inner()
+                    .0
+                    .into_header_and_signature()
+                    .0
+                    .into();
+                self.meta_cache.register_raw_on_entry(
+                    entry_hash.clone(),
+                    SysMetaVal::NewEntry(timed_header_hash),
+                )?;
                 // Need to hash the entry here to add the delete
                 self.meta_cache.register_raw_on_entry(
-                    entry_hash.expect("Deletes don't make sense on headers without entires"),
+                    entry_hash,
                     SysMetaVal::Delete(element_delete_address.clone()),
                 )?;
                 self.meta_cache.register_raw_on_header(
@@ -345,13 +363,10 @@ where
         // Meta Cache
         let oldest_live_element = match self.meta_cache.get_dht_status(&entry_hash)? {
             EntryDhtStatus::Live => {
-                let headers = self
+                let oldest_live_header = self
                     .meta_cache
                     .get_headers(entry_hash)?
-                    .collect::<BTreeSet<_>>()?;
-                let oldest_live_header = headers
-                    .into_iter()
-                    .next()
+                    .min()?
                     .expect("Status is live but no headers?");
 
                 match result {
