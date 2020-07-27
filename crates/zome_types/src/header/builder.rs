@@ -2,14 +2,14 @@ use super::{EntryType, Timestamp};
 use crate::header::{self, HeaderInner, IntendedFor, ZomeId};
 use crate::link::LinkTag;
 use header::Dna;
-use holo_hash_core::{AgentPubKey, DnaHash, EntryHash, HeaderAddress, HeaderHash};
+use holo_hash::{AgentPubKey, DnaHash, EntryHash, HeaderHash};
 use holochain_serialized_bytes::SerializedBytes;
 
 pub struct HeaderBuilderCommon {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub header_seq: u32,
-    pub prev_header: HeaderAddress,
+    pub prev_header: HeaderHash,
 }
 
 impl HeaderBuilderCommon {
@@ -17,7 +17,7 @@ impl HeaderBuilderCommon {
         author: AgentPubKey,
         timestamp: Timestamp,
         header_seq: u32,
-        prev_header: HeaderAddress,
+        prev_header: HeaderHash,
     ) -> Self {
         Self {
             author,

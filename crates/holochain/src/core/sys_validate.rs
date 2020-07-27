@@ -1,5 +1,5 @@
 pub use crate::core::state::source_chain::{SourceChainError, SourceChainResult};
-pub use holo_hash_core::*;
+pub use holo_hash::*;
 pub use holochain_types::{element::ChainElement, HeaderHashed, Timestamp};
 
 /// Ensure that a given pre-fetched element is actually valid on this chain.
@@ -122,7 +122,7 @@ mod tests {
     use holochain_zome_types::header::InitZomesComplete;
     use std::convert::TryInto;
 
-    async fn test_gen(ts: Timestamp, seq: u32, prev: HeaderAddress) -> ChainElement {
+    async fn test_gen(ts: Timestamp, seq: u32, prev: HeaderHash) -> ChainElement {
         let keystore = holochain_state::test_utils::test_keystore();
 
         let header = InitZomesComplete {
@@ -132,7 +132,7 @@ mod tests {
             prev_header: prev,
         };
 
-        let hashed = HeaderHashed::with_data(header.into()).await.unwrap();
+        let hashed = HeaderHashed::from_content(header.into()).await;
         let signed = SignedHeaderHashed::new(&keystore, hashed).await.unwrap();
         ChainElement::new(signed, None)
     }

@@ -36,8 +36,8 @@ struct Chains<'env> {
     jessy_id: AgentPubKey,
     jessy_header: Header,
     jessy_entry: EntryHashed,
-    mock_primary_meta: MockMetadataBuf,
-    mock_cache_meta: MockMetadataBuf,
+    mock_meta_vault: MockMetadataBuf,
+    mock_meta_cache: MockMetadataBuf,
 }
 
 fn setup_env<'env>(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Chains<'env>> {
@@ -48,12 +48,8 @@ fn setup_env<'env>(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResu
     let (jimbo_entry, jessy_entry) = tokio_safe_block_on::tokio_safe_block_on(
         async {
             (
-                EntryHashed::with_data(Entry::Agent(jimbo_id.clone().into()))
-                    .await
-                    .unwrap(),
-                EntryHashed::with_data(Entry::Agent(jessy_id.clone().into()))
-                    .await
-                    .unwrap(),
+                EntryHashed::from_content(Entry::Agent(jimbo_id.clone().into())).await,
+                EntryHashed::from_content(Entry::Agent(jessy_id.clone().into())).await,
             )
         },
         std::time::Duration::from_secs(1),
@@ -80,8 +76,8 @@ fn setup_env<'env>(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResu
 
     let source_chain = SourceChainBuf::new(reader, dbs)?;
     let cache = ChainCasBuf::cache(reader, dbs)?;
-    let mock_primary_meta = MockMetadataBuf::new();
-    let mock_cache_meta = MockMetadataBuf::new();
+    let mock_meta_vault = MockMetadataBuf::new();
+    let mock_meta_cache = MockMetadataBuf::new();
     Ok(Chains {
         source_chain,
         cache,
@@ -91,8 +87,8 @@ fn setup_env<'env>(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResu
         jessy_id,
         jessy_header,
         jessy_entry,
-        mock_primary_meta,
-        mock_cache_meta,
+        mock_meta_vault,
+        mock_meta_cache,
     })
 }
 
@@ -108,8 +104,8 @@ async fn live_local_return() -> SourceChainResult<()> {
         mut cache,
         jimbo_header,
         jimbo_entry,
-        mut mock_primary_meta,
-        mut mock_cache_meta,
+        mut mock_meta_vault,
+        mut mock_meta_cache,
         ..
     } = setup_env(&reader, &dbs)?;
     source_chain
@@ -118,7 +114,7 @@ async fn live_local_return() -> SourceChainResult<()> {
     let address = jimbo_entry.as_hash();
 
     // set it's metadata to LIVE
-    mock_primary_meta
+    mock_meta_vault
         .expect_get_dht_status()
         .with(predicate::eq(address.clone()))
         .returning(|_| Ok(EntryDhtStatus::Live));
@@ -128,9 +124,9 @@ async fn live_local_return() -> SourceChainResult<()> {
     // call dht_get with above address
     let cascade = Cascade::new(
         &source_chain.cas(),
-        &mock_primary_meta,
+        &mock_meta_vault,
         &mut cache,
-        &mut mock_cache_meta,
+        &mut mock_meta_cache,
         cell_network,
     );
     let entry = cascade.dht_get(address.clone().into()).await?;
@@ -155,8 +151,8 @@ async fn dead_local_none() -> SourceChainResult<()> {
         jimbo_id: _,
         jimbo_header,
         jimbo_entry,
-        mut mock_primary_meta,
-        mut mock_cache_meta,
+        mut mock_meta_vault,
+        mut mock_meta_cache,
         ..
     } = setup_env(&reader, &dbs)?;
     source_chain
@@ -165,7 +161,7 @@ async fn dead_local_none() -> SourceChainResult<()> {
     let address = jimbo_entry.as_hash();
 
     // set it's metadata to Dead
-    mock_primary_meta
+    mock_meta_vault
         .expect_get_dht_status()
         .with(predicate::eq(address.clone()))
         .returning(|_| Ok(EntryDhtStatus::Dead));
@@ -174,9 +170,9 @@ async fn dead_local_none() -> SourceChainResult<()> {
     // call dht_get with above address
     let cascade = Cascade::new(
         &source_chain.cas(),
-        &mock_primary_meta,
+        &mock_meta_vault,
         &mut cache,
-        &mut mock_cache_meta,
+        &mut mock_meta_cache,
         cell_network,
     );
     let entry = cascade.dht_get(address.clone().into()).await?;
@@ -201,17 +197,17 @@ async fn notfound_goto_cache_live() -> SourceChainResult<()> {
         jimbo_id: _,
         jimbo_header,
         jimbo_entry,
-        mock_primary_meta,
-        mut mock_cache_meta,
+        mock_meta_vault,
+        mut mock_meta_cache,
         ..
     } = setup_env(&reader, &dbs)?;
-    let h = HeaderHashed::with_data(jimbo_header.clone()).await.unwrap();
+    let h = HeaderHashed::from_content(jimbo_header.clone()).await;
     let h = SignedHeaderHashed::with_presigned(h, fixt!(Signature));
     cache.put(h, Some(jimbo_entry.clone()))?;
     let address = jimbo_entry.as_hash();
 
     // set it's metadata to Live
-    mock_cache_meta
+    mock_meta_cache
         .expect_get_dht_status()
         .with(predicate::eq(address.clone()))
         .returning(|_| Ok(EntryDhtStatus::Live));
@@ -220,9 +216,9 @@ async fn notfound_goto_cache_live() -> SourceChainResult<()> {
     // call dht_get with above address
     let cascade = Cascade::new(
         &source_chain.cas(),
-        &mock_primary_meta,
+        &mock_meta_vault,
         &mut cache,
-        &mut mock_cache_meta,
+        &mut mock_meta_cache,
         cell_network,
     );
     let _entry = cascade.dht_get(address.clone().into()).await?;
@@ -248,8 +244,8 @@ async fn notfound_cache() -> DatabaseResult<()> {
         mut cache,
         jimbo_header: _,
         jimbo_entry,
-        mock_primary_meta,
-        mut mock_cache_meta,
+        mock_meta_vault,
+        mut mock_meta_cache,
         ..
     } = setup_env(&reader, &dbs)?;
     let address = jimbo_entry.as_hash();
@@ -258,9 +254,9 @@ async fn notfound_cache() -> DatabaseResult<()> {
     // call dht_get with above address
     let cascade = Cascade::new(
         &source_chain.cas(),
-        &mock_primary_meta,
+        &mock_meta_vault,
         &mut cache,
-        &mut mock_cache_meta,
+        &mut mock_meta_cache,
         cell_network,
     );
     let entry = cascade.dht_get(address.clone().into()).await?;
@@ -289,8 +285,8 @@ async fn links_local_return() -> SourceChainResult<()> {
         jessy_id: _,
         jessy_header,
         jessy_entry,
-        mut mock_primary_meta,
-        mut mock_cache_meta,
+        mut mock_meta_vault,
+        mut mock_meta_cache,
     } = setup_env(&reader, &dbs)?;
     source_chain
         .put_raw(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
@@ -312,7 +308,7 @@ async fn links_local_return() -> SourceChainResult<()> {
 
     // Return a link between entries
     let link_return = vec![link.clone()];
-    mock_primary_meta
+    mock_meta_vault
         .expect_get_links()
         .withf({
             let base = base.clone();
@@ -334,9 +330,9 @@ async fn links_local_return() -> SourceChainResult<()> {
     // call dht_get_links with above base
     let cascade = Cascade::new(
         &source_chain.cas(),
-        &mock_primary_meta,
+        &mock_meta_vault,
         &mut cache,
-        &mut mock_cache_meta,
+        &mut mock_meta_cache,
         cell_network,
     );
     let links = cascade.dht_get_links(&key).await?;
@@ -364,8 +360,8 @@ async fn links_cache_return() -> SourceChainResult<()> {
         jessy_id: _,
         jessy_header,
         jessy_entry,
-        mut mock_primary_meta,
-        mut mock_cache_meta,
+        mut mock_meta_vault,
+        mut mock_meta_cache,
     } = setup_env(&reader, &dbs)?;
     source_chain
         .put_raw(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
@@ -387,7 +383,7 @@ async fn links_cache_return() -> SourceChainResult<()> {
 
     let link_return = vec![];
     // Return empty links
-    mock_primary_meta
+    mock_meta_vault
         .expect_get_links()
         .withf({
             let base = base.clone();
@@ -407,7 +403,7 @@ async fn links_cache_return() -> SourceChainResult<()> {
 
     let link_return = vec![link.clone()];
     // Return a link between entries
-    mock_cache_meta
+    mock_meta_cache
         .expect_get_links()
         .withf({
             let base = base.clone();
@@ -429,9 +425,9 @@ async fn links_cache_return() -> SourceChainResult<()> {
     // call dht_get_links with above base
     let cascade = Cascade::new(
         &source_chain.cas(),
-        &mock_primary_meta,
+        &mock_meta_vault,
         &mut cache,
-        &mut mock_cache_meta,
+        &mut mock_meta_cache,
         cell_network,
     );
     let links = cascade.dht_get_links(&key).await?;
@@ -456,8 +452,8 @@ async fn links_notauth_cache() -> DatabaseResult<()> {
         jessy_id: _,
         jessy_header: _,
         jessy_entry,
-        mock_primary_meta,
-        mut mock_cache_meta,
+        mock_meta_vault,
+        mut mock_meta_cache,
         ..
     } = setup_env(&reader, &dbs)?;
 
@@ -476,7 +472,7 @@ async fn links_notauth_cache() -> DatabaseResult<()> {
     let link_return = vec![link.clone()];
 
     // Return empty links
-    mock_cache_meta
+    mock_meta_cache
         .expect_get_links()
         .withf({
             let base = base.clone();
@@ -499,9 +495,9 @@ async fn links_notauth_cache() -> DatabaseResult<()> {
     // call dht_get_links with above base
     let cascade = Cascade::new(
         &source_chain.cas(),
-        &mock_primary_meta,
+        &mock_meta_vault,
         &mut cache,
-        &mut mock_cache_meta,
+        &mut mock_meta_cache,
         cell_network,
     );
     let links = cascade.dht_get_links(&key).await?;

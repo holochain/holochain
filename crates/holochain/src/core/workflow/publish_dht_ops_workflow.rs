@@ -131,7 +131,7 @@ impl<'env> PublishDhtOpsWorkspace<'env> {
         let db = dbs.get_db(&*AUTHORED_DHT_OPS)?;
         let authored_dht_ops = KvBuf::new(reader, db)?;
         // Note that this must always be false as we don't want private entries being published
-        let cas = ChainCasBuf::primary(reader, dbs, false)?;
+        let cas = ChainCasBuf::vault(reader, dbs, false)?;
         let db = dbs.get_db(&*INTEGRATED_DHT_OPS)?;
         let integrated_dht_ops = KvBuf::new(reader, db)?;
         Ok(Self {
@@ -482,10 +482,8 @@ mod tests {
             let sig = sig_fixt.next().unwrap();
             let original_entry = fixt!(Entry);
             let new_entry = fixt!(Entry);
-            let original_entry_hashed = EntryHashed::with_data(original_entry.clone())
-                .await
-                .unwrap();
-            let new_entry_hashed = EntryHashed::with_data(new_entry.clone()).await.unwrap();
+            let original_entry_hashed = EntryHashed::from_content(original_entry.clone()).await;
+            let new_entry_hashed = EntryHashed::from_content(new_entry.clone()).await;
 
             // Create StoreElement
             // Create the headers
@@ -512,11 +510,9 @@ mod tests {
             {
                 let reader = env_ref.reader().unwrap();
 
-                let mut cas = ChainCasBuf::primary(&reader, &dbs, true).unwrap();
+                let mut cas = ChainCasBuf::vault(&reader, &dbs, true).unwrap();
 
-                let header_hash = HeaderHashed::with_data(entry_create_header.clone())
-                    .await
-                    .unwrap();
+                let header_hash = HeaderHashed::from_content(entry_create_header.clone()).await;
 
                 // Update the replaces to the header of the original
                 entry_update.replaces_address = header_hash.as_hash().clone();
@@ -526,7 +522,7 @@ mod tests {
                 cas.put(signed_header, Some(original_entry_hashed)).unwrap();
 
                 let entry_update_header = Header::EntryUpdate(entry_update.clone());
-                let header_hash = HeaderHashed::with_data(entry_update_header).await.unwrap();
+                let header_hash = HeaderHashed::from_content(entry_update_header).await;
                 let signed_header = SignedHeaderHashed::with_presigned(header_hash, sig.clone());
                 cas.put(signed_header, Some(new_entry_hashed)).unwrap();
                 env_ref
@@ -539,7 +535,7 @@ mod tests {
             let (store_element, store_entry, register_replaced_by) = {
                 let reader = env_ref.reader().unwrap();
                 // Create easy way to create test cascade
-                let cas = ChainCasBuf::primary(&reader, &dbs, true).unwrap();
+                let cas = ChainCasBuf::vault(&reader, &dbs, true).unwrap();
 
                 let op = DhtOp::StoreElement(
                     sig.clone(),

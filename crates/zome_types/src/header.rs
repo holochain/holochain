@@ -1,8 +1,7 @@
 use crate::{entry_def::EntryVisibility, link::LinkTag, timestamp::Timestamp};
 pub use builder::{HeaderBuilder, HeaderBuilderCommon};
-use holo_hash_core::{
-    impl_hashable_content, AgentPubKey, DnaHash, EntryHash, HashableContent, HeaderAddress,
-    HeaderHash,
+use holo_hash::{
+    impl_hashable_content, AgentPubKey, DnaHash, EntryHash, HashableContent, HeaderHash,
 };
 use holochain_serialized_bytes::prelude::*;
 
@@ -133,7 +132,7 @@ impl Header {
     }
 
     /// returns the previous header except for the DNA header which doesn't have a previous
-    pub fn prev_header(&self) -> Option<&HeaderAddress> {
+    pub fn prev_header(&self) -> Option<&HeaderHash> {
         Some(match self {
             Self::Dna(Dna { .. }) => return None,
             Self::AgentValidationPkg(AgentValidationPkg { prev_header, .. }) => prev_header,
@@ -184,7 +183,7 @@ pub struct AgentValidationPkg {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub header_seq: u32,
-    pub prev_header: HeaderAddress,
+    pub prev_header: HeaderHash,
 
     pub membrane_proof: Option<SerializedBytes>,
 }
@@ -196,7 +195,7 @@ pub struct InitZomesComplete {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub header_seq: u32,
-    pub prev_header: HeaderAddress,
+    pub prev_header: HeaderHash,
 }
 
 /// Declares that a metadata Link should be made between two EntryHashes
@@ -205,7 +204,7 @@ pub struct LinkAdd {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub header_seq: u32,
-    pub prev_header: HeaderAddress,
+    pub prev_header: HeaderHash,
 
     pub base_address: EntryHash,
     pub target_address: EntryHash,
@@ -219,10 +218,10 @@ pub struct LinkRemove {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub header_seq: u32,
-    pub prev_header: HeaderAddress,
+    pub prev_header: HeaderHash,
     pub base_address: EntryHash,
     /// The address of the `LinkAdd` being reversed
-    pub link_add_address: HeaderAddress,
+    pub link_add_address: HeaderHash,
 }
 
 /// When migrating to a new version of a DNA, this header is committed to the
@@ -232,7 +231,7 @@ pub struct ChainOpen {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub header_seq: u32,
-    pub prev_header: HeaderAddress,
+    pub prev_header: HeaderHash,
 
     pub prev_dna_hash: DnaHash,
 }
@@ -244,7 +243,7 @@ pub struct ChainClose {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub header_seq: u32,
-    pub prev_header: HeaderAddress,
+    pub prev_header: HeaderHash,
 
     pub new_dna_hash: DnaHash,
 }
@@ -256,7 +255,7 @@ pub struct EntryCreate {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub header_seq: u32,
-    pub prev_header: HeaderAddress,
+    pub prev_header: HeaderHash,
 
     pub entry_type: EntryType,
     pub entry_hash: EntryHash,
@@ -275,7 +274,7 @@ pub struct EntryUpdate {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub header_seq: u32,
-    pub prev_header: HeaderAddress,
+    pub prev_header: HeaderHash,
 
     pub intended_for: IntendedFor,
     pub replaces_address: HeaderHash,
@@ -295,10 +294,10 @@ pub struct ElementDelete {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub header_seq: u32,
-    pub prev_header: HeaderAddress,
+    pub prev_header: HeaderHash,
 
     /// Address of the Element being deleted
-    pub removes_address: HeaderAddress,
+    pub removes_address: HeaderHash,
 }
 
 /// Allows Headers which reference Entries to know what type of Entry it is

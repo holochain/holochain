@@ -17,7 +17,6 @@ failure = "0.1.6"
 fixt = { version = "0.0.1", path = "../fixt" }
 futures = "0.3.1"
 holo_hash = { path = "../holo_hash" }
-holo_hash_core = { path = "../holo_hash_core" }
 holochain_crypto = { version = "0.0.1", path = "../crypto" }
 holochain_keystore = { version = "0.0.1", path = "../keystore" }
 holochain_types = { path = "../types" }

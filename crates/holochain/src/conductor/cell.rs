@@ -18,10 +18,10 @@ use crate::{
     core::{
         state::source_chain::SourceChainBuf,
         workflow::{
-            error::WorkflowError, genesis_workflow::genesis_workflow, initialize_zomes_workflow,
-            invoke_zome_workflow, GenesisWorkflowArgs, GenesisWorkspace,
-            InitializeZomesWorkflowArgs, InitializeZomesWorkspace, InvokeZomeWorkflowArgs,
-            InvokeZomeWorkspace, ZomeCallInvocationResult,
+            call_zome_workflow, error::WorkflowError, genesis_workflow::genesis_workflow,
+            initialize_zomes_workflow, CallZomeWorkflowArgs, CallZomeWorkspace,
+            GenesisWorkflowArgs, GenesisWorkspace, InitializeZomesWorkflowArgs,
+            InitializeZomesWorkspace, ZomeCallInvocationResult,
         },
     },
 };
@@ -341,7 +341,7 @@ impl Cell {
         &self,
         from_agent: AgentPubKey,
         _request_validation_receipt: bool,
-        _dht_hash: holo_hash_core::AnyDhtHash,
+        _dht_hash: holo_hash::AnyDhtHash,
         ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     ) -> CellResult<()> {
         if from_agent == *self.id().agent_pubkey() {
@@ -408,7 +408,7 @@ impl Cell {
     /// a remote node is asking us for entry data
     async fn handle_get(
         &self,
-        _dht_hash: holo_hash_core::AnyDhtHash,
+        _dht_hash: holo_hash::AnyDhtHash,
         _options: holochain_p2p::event::GetOptions,
     ) -> CellResult<WireElement> {
         unimplemented!()
@@ -426,7 +426,7 @@ impl Cell {
     /// a remote node is asking us for links
     async fn handle_get_links(
         &self,
-        _dht_hash: holo_hash_core::AnyDhtHash,
+        _dht_hash: holo_hash::AnyDhtHash,
         _options: holochain_p2p::event::GetLinksOptions,
     ) -> CellResult<SerializedBytes> {
         tracing::warn!("handle get links is unimplemented");
@@ -501,13 +501,13 @@ impl Cell {
         let keystore = arc.keystore().clone();
         let env = arc.guard().await;
         let reader = env.reader()?;
-        let workspace = InvokeZomeWorkspace::new(&reader, &env)?;
+        let workspace = CallZomeWorkspace::new(&reader, &env)?;
 
-        let args = InvokeZomeWorkflowArgs {
+        let args = CallZomeWorkflowArgs {
             ribosome: self.get_ribosome().await?,
             invocation,
         };
-        Ok(invoke_zome_workflow(
+        Ok(call_zome_workflow(
             workspace,
             self.holochain_p2p_cell.clone(),
             keystore,
@@ -529,7 +529,7 @@ impl Cell {
         let env_ref = state_env.guard().await;
         let reader = env_ref.reader()?;
         // Create the workspace
-        let workspace = InvokeZomeWorkspace::new(&reader, &env_ref)
+        let workspace = CallZomeWorkspace::new(&reader, &env_ref)
             .map_err(WorkflowError::from)
             .map_err(Box::new)?;
         let workspace = InitializeZomesWorkspace(workspace);

@@ -26,7 +26,7 @@ use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 use crate::core::ribosome::guest_callback::CallIterator;
-use crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace;
+use crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace;
 use crate::fixt::HostInputFixturator;
 use crate::fixt::ZomeNameFixturator;
 use ::fixt::prelude::*;
@@ -105,7 +105,7 @@ impl From<&HostAccess> for HostFnAccess {
 
 impl HostAccess {
     /// Get the workspace, panics if none was provided
-    pub fn workspace(&self) -> &UnsafeInvokeZomeWorkspace {
+    pub fn workspace(&self) -> &UnsafeCallZomeWorkspace {
         match self {
             Self::ZomeCall(ZomeCallHostAccess{workspace, .. }) |
             Self::Init(InitHostAccess{workspace, .. }) |
@@ -319,7 +319,7 @@ pub enum ZomeCallInvocationResponse {
 
 #[derive(Clone, Constructor)]
 pub struct ZomeCallHostAccess {
-    pub workspace: UnsafeInvokeZomeWorkspace,
+    pub workspace: UnsafeCallZomeWorkspace,
     keystore: KeystoreSender,
     network: HolochainP2pCell,
 }
@@ -434,7 +434,9 @@ pub mod wasm_test {
 
     #[macro_export]
     macro_rules! call_test_ribosome {
-        ( $host_access:ident, $test_wasm:expr, $fn_name:literal, $input:expr ) => {
+        ( $host_access:expr, $test_wasm:expr, $fn_name:literal, $input:expr ) => {{
+            let host_access = $host_access.clone();
+            let input = $input.clone();
             tokio::task::spawn(async move {
                 // ensure type of test wasm
                 use crate::core::ribosome::RibosomeT;
@@ -456,13 +458,13 @@ pub mod wasm_test {
                             .unwrap(),
                         $test_wasm.into(),
                         $fn_name.into(),
-                        holochain_zome_types::HostInput::new($input.try_into().unwrap()),
+                        holochain_zome_types::HostInput::new(input.try_into().unwrap()),
                     ),
                 )
                 .next()
                 .unwrap();
                 let zome_invocation_response =
-                    match ribosome.call_zome_function($host_access, invocation.clone()) {
+                    match ribosome.call_zome_function(host_access, invocation.clone()) {
                         Ok(v) => v,
                         Err(e) => {
                             dbg!("call_zome_function error", &invocation, &e);
@@ -486,8 +488,8 @@ pub mod wasm_test {
                 output
             })
             .await
-            .unwrap();
-        };
+            .unwrap()
+        }};
     }
 
     #[test]

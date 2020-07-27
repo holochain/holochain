@@ -1,4 +1,4 @@
-use holo_hash_core::HeaderHash;
+use holo_hash::HeaderHash;
 use holochain_wasmer_guest::*;
 use holochain_zome_types::post_commit::PostCommitCallbackResult;
 use holochain_zome_types::*;

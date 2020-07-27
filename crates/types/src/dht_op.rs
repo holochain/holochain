@@ -7,7 +7,7 @@
 use crate::element::ChainElement;
 use crate::{header::NewEntryHeader, prelude::*};
 use error::{DhtOpError, DhtOpResult};
-use holo_hash_core::{hash_type, HashableContentBytes};
+use holo_hash::{hash_type, HashableContentBytes};
 use holochain_zome_types::{header, Entry, Header};
 use serde::{Deserialize, Serialize};
 
@@ -112,8 +112,8 @@ enum UniqueForm<'a> {
     RegisterRemoveLink(&'a header::LinkRemove),
 }
 
-/// Turn a chain element into a DhtOp
-pub fn ops_from_element(element: &ChainElement) -> DhtOpResult<Vec<DhtOp>> {
+/// Produce all DhtOps for a ChainElement
+pub fn produce_ops_from_element(element: &ChainElement) -> DhtOpResult<Vec<DhtOp>> {
     // TODO: avoid cloning everything
 
     let (signed_header, maybe_entry) = element.clone().into_inner();

@@ -17,31 +17,31 @@ use std::path::{Path, PathBuf};
 /// Enumeration of all databases needed by Holochain
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Display)]
 pub enum DbName {
-    /// Primary database: KV store of chain entries, keyed by address
-    PrimaryChainPublicEntries,
-    /// Primary database: KV store of chain entries, keyed by address
-    PrimaryChainPrivateEntries,
-    /// Primary database: KV store of chain headers, keyed by address
-    PrimaryChainHeaders,
-    /// Primary database: KVV store of chain metadata, storing relationships
-    PrimaryMetadata,
-    /// Primary database: Kv store of links
-    PrimaryLinksMeta,
-    /// Primary database: Kv store of entry dht status
-    PrimaryStatusMeta,
+    /// Vault database: KV store of chain entries, keyed by address
+    ElementVaultPublicEntries,
+    /// Vault database: KV store of chain entries, keyed by address
+    ElementVaultPrivateEntries,
+    /// Vault database: KV store of chain headers, keyed by address
+    ElementVaultHeaders,
+    /// Vault database: KVV store of chain metadata, storing relationships
+    MetaVaultSys,
+    /// Vault database: Kv store of links
+    MetaVaultLinks,
+    /// Vault database: Kv store of entry dht status
+    MetaVaultStatus,
     /// int KV store storing the sequence of committed headers,
     /// most notably allowing access to the chain head
     ChainSequence,
     /// Cache database: KV store of chain entries, keyed by address
-    CacheChainEntries,
+    ElementCacheEntries,
     /// Cache database: KV store of chain headers, keyed by address
-    CacheChainHeaders,
+    ElementCacheHeaders,
     /// Cache database: KVV store of chain metadata, storing relationships
-    CacheMetadata,
-    /// Cachedatabase: Kv store of links
-    CacheLinksMeta,
-    /// Primary database: Kv store of entry dht status
-    CacheStatusMeta,
+    MetaCacheSys,
+    /// Cache database: Kv store of links
+    MetaCacheLinks,
+    /// Vault database: Kv store of entry dht status
+    MetaCacheStatus,
     /// database which stores a single key-value pair, encoding the
     /// mutable state for the entire Conductor
     ConductorState,
@@ -67,18 +67,18 @@ impl DbName {
         use DbKind::*;
         use DbName::*;
         match self {
-            PrimaryChainPublicEntries => Single,
-            PrimaryChainPrivateEntries => Single,
-            PrimaryChainHeaders => Single,
-            PrimaryMetadata => Multi,
-            PrimaryLinksMeta => Single,
-            PrimaryStatusMeta => Single,
+            ElementVaultPublicEntries => Single,
+            ElementVaultPrivateEntries => Single,
+            ElementVaultHeaders => Single,
+            MetaVaultSys => Multi,
+            MetaVaultLinks => Single,
+            MetaVaultStatus => Single,
             ChainSequence => SingleInt,
-            CacheChainEntries => Single,
-            CacheChainHeaders => Single,
-            CacheMetadata => Multi,
-            CacheLinksMeta => Single,
-            CacheStatusMeta => Single,
+            ElementCacheEntries => Single,
+            ElementCacheHeaders => Single,
+            MetaCacheSys => Multi,
+            MetaCacheLinks => Single,
+            MetaCacheStatus => Single,
             ConductorState => Single,
             Wasm => Single,
             DnaDef => Single,
@@ -110,34 +110,34 @@ type DbMap = UniversalMap<DbName>;
 
 lazy_static! {
     /// The key to access the ChainEntries database
-    pub static ref PRIMARY_CHAIN_PUBLIC_ENTRIES: DbKey<SingleStore> =
-    DbKey::<SingleStore>::new(DbName::PrimaryChainPublicEntries);
+    pub static ref ELEMENT_VAULT_PUBLIC_ENTRIES: DbKey<SingleStore> =
+    DbKey::<SingleStore>::new(DbName::ElementVaultPublicEntries);
     /// The key to access the PrivateChainEntries database
-    pub static ref PRIMARY_CHAIN_PRIVATE_ENTRIES: DbKey<SingleStore> =
-    DbKey::<SingleStore>::new(DbName::PrimaryChainPrivateEntries);
+    pub static ref ELEMENT_VAULT_PRIVATE_ENTRIES: DbKey<SingleStore> =
+    DbKey::<SingleStore>::new(DbName::ElementVaultPrivateEntries);
     /// The key to access the ChainHeaders database
-    pub static ref PRIMARY_CHAIN_HEADERS: DbKey<SingleStore> =
-    DbKey::<SingleStore>::new(DbName::PrimaryChainHeaders);
-    /// The key to access the Metadata database
-    pub static ref PRIMARY_SYSTEM_META: DbKey<MultiStore> = DbKey::new(DbName::PrimaryMetadata);
-    /// The key to access the links database
-    pub static ref PRIMARY_LINKS_META: DbKey<SingleStore> = DbKey::new(DbName::PrimaryLinksMeta);
-    /// The key to access the entry status database
-    pub static ref PRIMARY_STATUS_META: DbKey<SingleStore> = DbKey::new(DbName::PrimaryStatusMeta);
+    pub static ref ELEMENT_VAULT_HEADERS: DbKey<SingleStore> =
+    DbKey::<SingleStore>::new(DbName::ElementVaultHeaders);
+    /// The key to access the Metadata database of the Vault
+    pub static ref META_VAULT_SYS: DbKey<MultiStore> = DbKey::new(DbName::MetaVaultSys);
+    /// The key to access the links database of the Vault
+    pub static ref META_VAULT_LINKS: DbKey<SingleStore> = DbKey::new(DbName::MetaVaultLinks);
+    /// The key to access the entry status database of the Vault
+    pub static ref META_VAULT_STATUS: DbKey<SingleStore> = DbKey::new(DbName::MetaVaultStatus);
     /// The key to access the ChainSequence database
     pub static ref CHAIN_SEQUENCE: DbKey<IntegerStore<u32>> = DbKey::new(DbName::ChainSequence);
     /// The key to access the ChainEntries database
-    pub static ref CACHE_CHAIN_ENTRIES: DbKey<SingleStore> =
-    DbKey::<SingleStore>::new(DbName::CacheChainEntries);
+    pub static ref ELEMENT_CACHE_ENTRIES: DbKey<SingleStore> =
+    DbKey::<SingleStore>::new(DbName::ElementCacheEntries);
     /// The key to access the ChainHeaders database
-    pub static ref CACHE_CHAIN_HEADERS: DbKey<SingleStore> =
-    DbKey::<SingleStore>::new(DbName::CacheChainHeaders);
-    /// The key to access the Metadata database
-    pub static ref CACHE_SYSTEM_META: DbKey<MultiStore> = DbKey::new(DbName::CacheMetadata);
-    /// The key to access the cache links database
-    pub static ref CACHE_LINKS_META: DbKey<SingleStore> = DbKey::new(DbName::CacheLinksMeta);
-    /// The key to access the entry status database
-    pub static ref CACHE_STATUS_META: DbKey<SingleStore> = DbKey::new(DbName::CacheStatusMeta);
+    pub static ref ELEMENT_CACHE_HEADERS: DbKey<SingleStore> =
+    DbKey::<SingleStore>::new(DbName::ElementCacheHeaders);
+    /// The key to access the Metadata database of the Cache
+    pub static ref CACHE_SYSTEM_META: DbKey<MultiStore> = DbKey::new(DbName::MetaCacheSys);
+    /// The key to access the links database of the Cache
+    pub static ref CACHE_LINKS_META: DbKey<SingleStore> = DbKey::new(DbName::MetaCacheLinks);
+    /// The key to access the status database of the Cache
+    pub static ref CACHE_STATUS_META: DbKey<SingleStore> = DbKey::new(DbName::MetaCacheStatus);
     /// The key to access the ConductorState database
     pub static ref CONDUCTOR_STATE: DbKey<SingleStore> = DbKey::new(DbName::ConductorState);
     /// The key to access the Wasm database
@@ -195,15 +195,15 @@ pub(super) fn get_db<V: 'static + Copy + Send + Sync>(
 fn register_databases(env: &Rkv, kind: &EnvironmentKind, um: &mut DbMap) -> DatabaseResult<()> {
     match kind {
         EnvironmentKind::Cell(_) => {
-            register_db(env, um, &*PRIMARY_CHAIN_PUBLIC_ENTRIES)?;
-            register_db(env, um, &*PRIMARY_CHAIN_PRIVATE_ENTRIES)?;
-            register_db(env, um, &*PRIMARY_CHAIN_HEADERS)?;
-            register_db(env, um, &*PRIMARY_SYSTEM_META)?;
-            register_db(env, um, &*PRIMARY_LINKS_META)?;
-            register_db(env, um, &*PRIMARY_STATUS_META)?;
+            register_db(env, um, &*ELEMENT_VAULT_PUBLIC_ENTRIES)?;
+            register_db(env, um, &*ELEMENT_VAULT_PRIVATE_ENTRIES)?;
+            register_db(env, um, &*ELEMENT_VAULT_HEADERS)?;
+            register_db(env, um, &*META_VAULT_SYS)?;
+            register_db(env, um, &*META_VAULT_LINKS)?;
+            register_db(env, um, &*META_VAULT_STATUS)?;
             register_db(env, um, &*CHAIN_SEQUENCE)?;
-            register_db(env, um, &*CACHE_CHAIN_ENTRIES)?;
-            register_db(env, um, &*CACHE_CHAIN_HEADERS)?;
+            register_db(env, um, &*ELEMENT_CACHE_ENTRIES)?;
+            register_db(env, um, &*ELEMENT_CACHE_HEADERS)?;
             register_db(env, um, &*CACHE_SYSTEM_META)?;
             register_db(env, um, &*CACHE_LINKS_META)?;
             register_db(env, um, &*CACHE_STATUS_META)?;

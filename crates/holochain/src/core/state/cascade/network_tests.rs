@@ -5,8 +5,8 @@ use fallible_iterator::FallibleIterator;
 use futures::future::{Either, FutureExt};
 use ghost_actor::GhostControlSender;
 use hdk3::prelude::EntryVisibility;
+use holo_hash::hash_type::{self, AnyDht};
 use holo_hash::*;
-use holo_hash_core::hash_type::{self, AnyDht};
 use holochain_p2p::{actor::GetMetaOptions, HolochainP2pCell, HolochainP2pRef};
 use holochain_state::{env::ReadManager, test_utils::test_cell_env};
 use holochain_types::{
@@ -248,10 +248,7 @@ async fn generate_fixt_store() -> (
     let mut store = BTreeMap::new();
     let mut meta_store = BTreeMap::new();
     let entry = fixt!(Entry);
-    let entry_hash = EntryHashed::with_data(entry.clone())
-        .await
-        .unwrap()
-        .into_hash();
+    let entry_hash = EntryHashed::from_content(entry.clone()).await.into_hash();
     let mut element_create = fixt!(EntryCreate);
     let entry_type = AppEntryTypeFixturator::new(EntryVisibility::Public)
         .map(EntryType::App)
@@ -259,9 +256,7 @@ async fn generate_fixt_store() -> (
         .unwrap();
     element_create.entry_type = entry_type;
     element_create.entry_hash = entry_hash.clone();
-    let header = HeaderHashed::with_data(Header::EntryCreate(element_create))
-        .await
-        .unwrap();
+    let header = HeaderHashed::from_content(Header::EntryCreate(element_create)).await;
     let hash = header.as_hash().clone();
     let signed_header = SignedHeaderHashed::with_presigned(header, fixt!(Signature));
     meta_store.insert(

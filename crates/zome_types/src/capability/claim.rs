@@ -1,5 +1,5 @@
 use super::CapSecret;
-use holo_hash_core::*;
+use holo_hash::*;
 use serde::{Deserialize, Serialize};
 
 /// System entry to hold a capability token claim for use as a caller

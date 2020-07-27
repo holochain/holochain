@@ -1,12 +1,13 @@
 use crate::core::ribosome::error::{RibosomeError, RibosomeResult};
+use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_cache;
 use crate::core::{
     ribosome::{CallContext, RibosomeT},
-    workflow::InvokeZomeWorkspace,
+    workflow::CallZomeWorkspace,
     SourceChainResult,
 };
 use futures::future::BoxFuture;
 use futures::future::FutureExt;
-use holo_hash_core::HeaderAddress;
+use holo_hash::HeaderHash;
 use holochain_zome_types::header::builder;
 use holochain_zome_types::LinkEntriesInput;
 use holochain_zome_types::LinkEntriesOutput;
@@ -35,14 +36,27 @@ pub fn link_entries<'a>(
     // Construct the link add
     let header_builder = builder::LinkAdd::new(base_address, target_address, zome_id, tag);
 
-    let call = |workspace: &'a mut InvokeZomeWorkspace| -> BoxFuture<'a, SourceChainResult<HeaderAddress>> {
-        async move {
-            let source_chain = &mut workspace.source_chain;
-            // push the header into the source chain
-            source_chain.put(header_builder, None).await
-        }
-        .boxed()
-    };
+    let call =
+        |workspace: &'a mut CallZomeWorkspace| -> BoxFuture<'a, SourceChainResult<HeaderHash>> {
+            async move {
+                let source_chain = &mut workspace.source_chain;
+                // push the header into the source chain
+                let header_hash = source_chain.put(header_builder, None).await?;
+                let element = source_chain
+                    .get_element(&header_hash)
+                    .await?
+                    .expect("Element we just put in SourceChain must be gettable");
+                integrate_to_cache(
+                    &element,
+                    &mut workspace.cache_cas,
+                    &mut workspace.cache_meta,
+                )
+                .await
+                .map_err(Box::new)?;
+                Ok(header_hash)
+            }
+            .boxed()
+        };
     let header_hash =
         tokio_safe_block_on::tokio_safe_block_forever_on(tokio::task::spawn(async move {
             unsafe { call_context.host_access.workspace().apply_mut(call).await }

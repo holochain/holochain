@@ -1,5 +1,5 @@
 use crate::zome::ZomeName;
-use holo_hash_core::DnaHash;
+use holo_hash::DnaHash;
 use holochain_serialized_bytes::prelude::*;
 
 /// The struct containing all global zome values accessible to a zome

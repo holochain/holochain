@@ -9,7 +9,7 @@ use crate::{
     core::{
         ribosome::{guest_callback::entry_defs::EntryDefsResult, host_fn, MockRibosomeT},
         state::{metadata::LinkMetaKey, workspace::WorkspaceError},
-        workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace,
+        workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace,
     },
     fixt::*,
 };
@@ -746,7 +746,7 @@ async fn produce_dht_ops<'env>(
 /// Run genesis on the source chain
 async fn genesis<'env>(env_ref: &'env EnvironmentWriteRef<'env>, dbs: &impl GetDb) {
     let reader = env_ref.reader().unwrap();
-    let mut workspace = InvokeZomeWorkspace::new(&reader, dbs).unwrap();
+    let mut workspace = CallZomeWorkspace::new(&reader, dbs).unwrap();
     fake_genesis(&mut workspace.source_chain).await.unwrap();
     env_ref
         .with_commit(|writer| workspace.flush_to_txn(writer))
@@ -760,7 +760,7 @@ async fn commit_entry<'env>(
     zome_name: ZomeName,
 ) -> EntryHash {
     let reader = env_ref.reader().unwrap();
-    let mut workspace = InvokeZomeWorkspace::new(&reader, dbs).unwrap();
+    let mut workspace = CallZomeWorkspace::new(&reader, dbs).unwrap();
 
     // Create entry def with the correct zome name
     let entry_def_id = fixt!(EntryDefId);
@@ -809,7 +809,7 @@ async fn commit_entry<'env>(
     let input = CommitEntryInput::new((entry_def_id.clone(), entry.clone()));
 
     let output = {
-        let (_g, raw_workspace) = UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+        let (_g, raw_workspace) = UnsafeCallZomeWorkspace::from_mut(&mut workspace);
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = raw_workspace;
         call_context.host_access = host_access.into();
@@ -832,7 +832,7 @@ async fn get_entry<'env>(
     entry_hash: EntryHash,
 ) -> Option<Entry> {
     let reader = env_ref.reader().unwrap();
-    let mut workspace = InvokeZomeWorkspace::new(&reader, dbs).unwrap();
+    let mut workspace = CallZomeWorkspace::new(&reader, dbs).unwrap();
 
     // Create ribosome mock to return fixtures
     // This is a lot faster then compiling a zome
@@ -843,7 +843,7 @@ async fn get_entry<'env>(
     let input = GetEntryInput::new((entry_hash.clone().into(), GetOptions));
 
     let output = {
-        let (_g, raw_workspace) = UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+        let (_g, raw_workspace) = UnsafeCallZomeWorkspace::from_mut(&mut workspace);
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = raw_workspace;
         call_context.host_access = host_access.into();
@@ -863,7 +863,7 @@ async fn link_entries<'env>(
     link_tag: LinkTag,
 ) -> HeaderHash {
     let reader = env_ref.reader().unwrap();
-    let mut workspace = InvokeZomeWorkspace::new(&reader, dbs).unwrap();
+    let mut workspace = CallZomeWorkspace::new(&reader, dbs).unwrap();
 
     // Create data for calls
     let mut dna_file = DnaFileFixturator::new(Empty).next().unwrap();
@@ -885,7 +885,7 @@ async fn link_entries<'env>(
     let input = LinkEntriesInput::new((base_address.into(), target_address.into(), link_tag));
 
     let output = {
-        let (_g, raw_workspace) = UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+        let (_g, raw_workspace) = UnsafeCallZomeWorkspace::from_mut(&mut workspace);
 
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = raw_workspace;
@@ -913,7 +913,7 @@ async fn get_links<'env>(
     link_tag: LinkTag,
 ) -> Links {
     let reader = env_ref.reader().unwrap();
-    let mut workspace = InvokeZomeWorkspace::new(&reader, dbs).unwrap();
+    let mut workspace = CallZomeWorkspace::new(&reader, dbs).unwrap();
 
     // Create data for calls
     let mut dna_file = DnaFileFixturator::new(Empty).next().unwrap();
@@ -935,7 +935,7 @@ async fn get_links<'env>(
     let input = GetLinksInput::new((base_address.into(), Some(link_tag)));
 
     let output = {
-        let (_g, raw_workspace) = UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
+        let (_g, raw_workspace) = UnsafeCallZomeWorkspace::from_mut(&mut workspace);
 
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = raw_workspace;
@@ -1106,7 +1106,7 @@ async fn test_wasm_api_without_integration_delete() {
 
     {
         let reader = env_ref.reader().unwrap();
-        let mut workspace = InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
+        let mut workspace = CallZomeWorkspace::new(&reader, &dbs).unwrap();
         let entry_header = workspace
             .meta
             .get_headers(base_address.clone())
@@ -1341,7 +1341,7 @@ mod slow_tests {
             debug!(?ops);
             assert!(!ops.is_empty());
 
-            let meta = MetadataBuf::primary(&reader, &dbs).unwrap();
+            let meta = MetadataBuf::vault(&reader, &dbs).unwrap();
             let key = LinkMetaKey::Base(&base_entry_hash);
             let links = meta.get_links(&key).unwrap().collect::<Vec<_>>().unwrap();
             let link = links[0].clone();

@@ -178,7 +178,7 @@ mod tests {
 
         let header_hash = holo_hash::AnyDhtHash::from_raw_bytes_and_type(
             b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
-            holo_hash_core::hash_type::AnyDht::Header,
+            holo_hash::hash_type::AnyDht::Header,
         );
 
         p2p.publish(dna, a1, true, header_hash, vec![], Some(20))
@@ -237,7 +237,7 @@ mod tests {
 
         let hash = holo_hash::AnyDhtHash::from_raw_bytes_and_type(
             b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
-            holo_hash_core::hash_type::AnyDht::Header,
+            holo_hash::hash_type::AnyDht::Header,
         );
 
         let res = p2p
@@ -283,7 +283,7 @@ mod tests {
 
         let hash = holo_hash::AnyDhtHash::from_raw_bytes_and_type(
             b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
-            holo_hash_core::hash_type::AnyDht::Header,
+            holo_hash::hash_type::AnyDht::Header,
         );
 
         let res = p2p

@@ -1,4 +1,4 @@
-use holo_hash_core::AgentPubKey;
+use holo_hash::AgentPubKey;
 use holochain_serialized_bytes::prelude::*;
 
 /// The struct containing all global agent values accessible to a zome

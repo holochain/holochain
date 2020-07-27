@@ -44,9 +44,9 @@ use super::{
 };
 use error::CascadeResult;
 use fallible_iterator::FallibleIterator;
-use holo_hash_core::{
+use holo_hash::{
     hash_type::{self, AnyDht},
-    AnyDhtHash, EntryHash, HeaderAddress, HeaderHash,
+    AnyDhtHash, EntryHash, HeaderHash,
 };
 use holochain_p2p::{
     actor::{GetMetaOptions, GetOptions},
@@ -73,11 +73,11 @@ where
     M: MetadataBufT,
     C: MetadataBufT,
 {
-    primary: &'a ChainCasBuf<'env>,
-    primary_meta: &'a M,
+    element_vault: &'a ChainCasBuf<'env>,
+    meta_vault: &'a M,
 
-    cache: &'a mut ChainCasBuf<'env>,
-    cache_meta: &'a mut C,
+    element_cache: &'a mut ChainCasBuf<'env>,
+    meta_cache: &'a mut C,
 
     network: HolochainP2pCell,
 }
@@ -103,19 +103,19 @@ where
     C: MetadataBufT,
     M: MetadataBufT,
 {
-    /// Constructs a [Cascade], taking references to a CAS and a cache
+    /// Constructs a [Cascade], taking references to all necessary databases
     pub fn new(
-        primary: &'a ChainCasBuf<'env>,
-        primary_meta: &'a M,
-        cache: &'a mut ChainCasBuf<'env>,
-        cache_meta: &'a mut C,
+        element_vault: &'a ChainCasBuf<'env>,
+        meta_vault: &'a M,
+        element_cache: &'a mut ChainCasBuf<'env>,
+        meta_cache: &'a mut C,
         network: HolochainP2pCell,
     ) -> Self {
         Cascade {
-            primary,
-            primary_meta,
-            cache,
-            cache_meta,
+            element_vault,
+            meta_vault,
+            element_cache,
+            meta_cache,
             network,
         }
     }
@@ -139,12 +139,12 @@ where
 
                 // Hash entry
                 let entry = match maybe_entry {
-                    Some(entry) => Some(EntryHashed::with_data(entry).await?),
+                    Some(entry) => Some(EntryHashed::from_content(entry).await),
                     None => None,
                 };
 
-                // Put in element cache
-                self.cache.put(signed_header, entry)?;
+                // Put in element element_cache
+                self.element_cache.put(signed_header, entry)?;
                 Some(element)
             }
             None => None,
@@ -161,10 +161,10 @@ where
     ) -> CascadeResult<Vec<MetadataSet>> {
         let all_metadata = self.network.get_meta(hash.clone(), options).await?;
 
-        // Only put raw meta data in cache and combine all results
+        // Only put raw meta data in element_cache and combine all results
         for metadata in all_metadata.iter().cloned() {
             let hash = hash.clone();
-            // Put in meta cache
+            // Put in meta element_cache
             let values = metadata
                 .headers
                 .into_iter()
@@ -175,13 +175,13 @@ where
                 hash_type::AnyDht::Entry(e) => {
                     let basis = hash.retype(e);
                     for v in values {
-                        self.cache_meta.register_raw_on_entry(basis.clone(), v)?;
+                        self.meta_cache.register_raw_on_entry(basis.clone(), v)?;
                     }
                 }
                 hash_type::AnyDht::Header => {
                     let basis = hash.retype(hash_type::Header);
                     for v in values {
-                        self.cache_meta.register_raw_on_header(basis.clone(), v);
+                        self.meta_cache.register_raw_on_header(basis.clone(), v);
                     }
                 }
             }
@@ -192,10 +192,10 @@ where
     /// Get a header without checking its metadata
     pub async fn dht_get_header_raw(
         &self,
-        header_address: &HeaderAddress,
+        header_address: &HeaderHash,
     ) -> DatabaseResult<Option<SignedHeaderHashed>> {
-        match self.primary.get_header(header_address).await? {
-            None => self.cache.get_header(header_address).await,
+        match self.element_vault.get_header(header_address).await? {
+            None => self.element_cache.get_header(header_address).await,
             r => Ok(r),
         }
     }
@@ -205,8 +205,8 @@ where
         &self,
         entry_hash: &EntryHash,
     ) -> DatabaseResult<Option<EntryHashed>> {
-        match self.primary.get_entry(entry_hash).await? {
-            None => self.cache.get_entry(entry_hash).await,
+        match self.element_vault.get_entry(entry_hash).await? {
+            None => self.element_cache.get_entry(entry_hash).await,
             r => Ok(r),
         }
     }
@@ -224,12 +224,12 @@ where
         // TODO: Update the meta cache
 
         // Meta Cache
-        let oldest_live_element = match self.cache_meta.get_dht_status(&entry_hash)? {
+        let oldest_live_element = match self.meta_cache.get_dht_status(&entry_hash)? {
             EntryDhtStatus::Live => {
                 // TODO: PERF: Firstly probably do this on writes not reads to meta cache
                 // Secondly figure out how to allow these iterators to cross awaits to avoid collecting
                 let headers = self
-                    .cache_meta
+                    .meta_cache
                     .get_headers(entry_hash)?
                     .collect::<Vec<_>>()?;
                 let mut oldest = None;
@@ -237,10 +237,19 @@ where
                 for hash in headers {
                     // Element Vault
                     // TODO: Handle error
-                    let element = match self.primary.get_element(&hash.header_hash).await.unwrap() {
+                    let element = match self
+                        .element_vault
+                        .get_element(&hash.header_hash)
+                        .await
+                        .unwrap()
+                    {
                         // Element Cache
                         // TODO: Handle error
-                        None => self.cache.get_element(&hash.header_hash).await.unwrap(),
+                        None => self
+                            .element_cache
+                            .get_element(&hash.header_hash)
+                            .await
+                            .unwrap(),
                         e => e,
                     };
                     if let Some(element) = element {
@@ -286,7 +295,7 @@ where
     ) -> DatabaseResult<Option<ChainElement>> {
         // Meta Cache
         if let Some(_) = self
-            .cache_meta
+            .meta_cache
             .get_deletes_on_header(header_hash.clone())?
             .next()?
         {
@@ -294,7 +303,7 @@ where
             return Ok(None);
         // Meta Vault
         } else if let Some(_) = self
-            .primary_meta
+            .meta_vault
             .get_deletes_on_header(header_hash.clone())?
             .next()?
         {
@@ -308,11 +317,11 @@ where
         // Element Vault
         // Checks the element vault for this header element.
         // TODO: Handle error
-        let element = match self.primary.get_element(&header_hash).await.unwrap() {
+        let element = match self.element_vault.get_element(&header_hash).await.unwrap() {
             // Element Cache
             // If not found checks the element cache
             // TODO: Handle error
-            None => self.cache.get_element(&header_hash).await.unwrap(),
+            None => self.element_cache.get_element(&header_hash).await.unwrap(),
             e => e,
         };
 
@@ -354,7 +363,7 @@ where
     ) -> DatabaseResult<Vec<Link>> {
         // Meta Cache
         // Return any links from the meta cache that don't have removes.
-        self.cache_meta
+        self.meta_cache
             .get_links(key)?
             .map(|l| Ok(l.into_link()))
             .collect()
@@ -372,9 +381,9 @@ pub fn test_dbs_and_mocks<'env>(
     ChainCasBuf<'env>,
     super::metadata::MockMetadataBuf,
 ) {
-    let cas = ChainCasBuf::primary(&reader, dbs, true).unwrap();
-    let cache = ChainCasBuf::cache(&reader, dbs).unwrap();
+    let cas = ChainCasBuf::vault(&reader, dbs, true).unwrap();
+    let element_cache = ChainCasBuf::cache(&reader, dbs).unwrap();
     let metadata = super::metadata::MockMetadataBuf::new();
     let metadata_cache = super::metadata::MockMetadataBuf::new();
-    (cas, metadata, cache, metadata_cache)
+    (cas, metadata, element_cache, metadata_cache)
 }

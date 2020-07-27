@@ -139,6 +139,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serialized-bytes")]
     fn test_serialized_bytes_roundtrip() {
         use holochain_serialized_bytes::SerializedBytes;
         use std::convert::TryInto;

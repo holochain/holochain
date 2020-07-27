@@ -2,7 +2,7 @@ use crate::core::ribosome::error::{RibosomeError, RibosomeResult};
 use crate::core::{
     ribosome::{CallContext, RibosomeT},
     state::metadata::LinkMetaKey,
-    workflow::InvokeZomeWorkspace,
+    workflow::CallZomeWorkspace,
 };
 use futures::future::FutureExt;
 use holochain_state::error::DatabaseResult;
@@ -36,7 +36,7 @@ pub fn get_links<'a>(
     let network = call_context.host_access.network().clone();
 
     let call =
-        |workspace: &'a mut InvokeZomeWorkspace| -> MustBoxFuture<'a, DatabaseResult<Vec<Link>>> {
+        |workspace: &'a mut CallZomeWorkspace| -> MustBoxFuture<'a, DatabaseResult<Vec<Link>>> {
             async move {
                 let cascade = workspace.cascade(network);
 
@@ -63,14 +63,7 @@ pub fn get_links<'a>(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod slow_tests {
-    use crate::core::queue_consumer::TriggerSender;
     use crate::core::state::workspace::Workspace;
-    use crate::core::workflow::integrate_dht_ops_workflow::{
-        integrate_dht_ops_workflow, IntegrateDhtOpsWorkspace,
-    };
-    use crate::core::workflow::produce_dht_ops_workflow::{
-        produce_dht_ops_workflow, ProduceDhtOpsWorkspace,
-    };
     use crate::fixt::ZomeCallHostAccessFixturator;
     use fixt::prelude::*;
     use hdk3::prelude::*;
@@ -84,162 +77,74 @@ pub mod slow_tests {
         let dbs = env.dbs().await;
         let env_ref = env.guard().await;
 
-        {
-            let reader = env_ref.reader().unwrap();
-            let mut workspace =
-                crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
+        let reader = env_ref.reader().unwrap();
+        let mut workspace = crate::core::workflow::CallZomeWorkspace::new(&reader, &dbs).unwrap();
 
-            // commits fail validation if we don't do genesis
-            crate::core::workflow::fake_genesis(&mut workspace.source_chain)
-                .await
-                .unwrap();
-
-            // ensure foo.bar twice to ensure idempotency
-            let _: () = {
-                let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
-                let mut host_access = fixt!(ZomeCallHostAccess);
-                host_access.workspace = raw_workspace;
-                crate::call_test_ribosome!(
-                    host_access,
-                    TestWasm::HashPath,
-                    "ensure",
-                    TestString::from("foo.bar".to_string())
-                )
-            };
-            let _: () = {
-                let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
-                let mut host_access = fixt!(ZomeCallHostAccess);
-                host_access.workspace = raw_workspace;
-                crate::call_test_ribosome!(
-                    host_access,
-                    TestWasm::HashPath,
-                    "ensure",
-                    TestString::from("foo.bar".to_string())
-                )
-            };
-
-            // ensure foo.baz
-            let _: () = {
-                let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
-                let mut host_access = fixt!(ZomeCallHostAccess);
-                host_access.workspace = raw_workspace;
-                crate::call_test_ribosome!(
-                    host_access,
-                    TestWasm::HashPath,
-                    "ensure",
-                    TestString::from("foo.baz".to_string())
-                )
-            };
-
-            // Write the database to file
-            holochain_state::env::WriteManager::with_commit(&env_ref, |writer| {
-                crate::core::state::workspace::Workspace::flush_to_txn(workspace, writer)
-            })
+        // commits fail validation if we don't do genesis
+        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+            .await
             .unwrap();
-        };
 
-        // Needs metadata to return get
-        {
-            use crate::core::state::workspace::Workspace;
-            use holochain_state::env::ReadManager;
+        // ensure foo.bar twice to ensure idempotency
+        let (_g, raw_workspace) =
+            crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
+                &mut workspace,
+            );
+        let mut host_access = fixt!(ZomeCallHostAccess);
+        host_access.workspace = raw_workspace;
 
-            // Produce the ops
-            let (mut qt, mut rx) = TriggerSender::new();
-            {
-                let reader = env_ref.reader().unwrap();
-                let workspace = ProduceDhtOpsWorkspace::new(&reader, &dbs).unwrap();
-                produce_dht_ops_workflow(workspace, env.env.clone().into(), &mut qt)
-                    .await
-                    .unwrap();
-                // await the workflow finishing
-                rx.listen().await.unwrap();
-            }
-            // Integrate the ops
-            {
-                let reader = env_ref.reader().unwrap();
-                let workspace = IntegrateDhtOpsWorkspace::new(&reader, &dbs).unwrap();
-                integrate_dht_ops_workflow(workspace, env.env.clone().into(), &mut qt)
-                    .await
-                    .unwrap();
-                rx.listen().await.unwrap();
-            }
-        }
+        let _: () = crate::call_test_ribosome!(
+            host_access,
+            TestWasm::HashPath,
+            "ensure",
+            TestString::from("foo.bar".to_string())
+        );
+        let _: () = crate::call_test_ribosome!(
+            host_access,
+            TestWasm::HashPath,
+            "ensure",
+            TestString::from("foo.bar".to_string())
+        );
 
-        let exists_output = {
-            let reader = env_ref.reader().unwrap();
-            let mut workspace =
-                crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
+        // ensure foo.baz
+        let _: () = crate::call_test_ribosome!(
+            host_access,
+            TestWasm::HashPath,
+            "ensure",
+            TestString::from("foo.baz".to_string())
+        );
 
-            let output: TestBool = {
-                let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
-                let mut host_access = fixt!(ZomeCallHostAccess);
-                host_access.workspace = raw_workspace;
-                crate::call_test_ribosome!(
-                    host_access,
-                    TestWasm::HashPath,
-                    "exists",
-                    TestString::from("foo".to_string())
-                )
-            };
-
-            output
-        };
+        let exists_output: TestBool = crate::call_test_ribosome!(
+            host_access,
+            TestWasm::HashPath,
+            "exists",
+            TestString::from("foo".to_string())
+        );
 
         assert_eq!(TestBool(true), exists_output,);
 
-        let (foo_bar, foo_baz) = {
-            let reader = env_ref.reader().unwrap();
-            let mut workspace =
-                crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
+        let foo_bar: holo_hash::EntryHash = crate::call_test_ribosome!(
+            host_access,
+            TestWasm::HashPath,
+            "hash",
+            TestString::from("foo.bar".to_string())
+        );
 
-            let foo_bar: holo_hash_core::EntryHash = {
-                let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
-                let mut host_access = fixt!(ZomeCallHostAccess);
-                host_access.workspace = raw_workspace;
-                crate::call_test_ribosome!(
-                    host_access,
-                    TestWasm::HashPath,
-                    "hash",
-                    TestString::from("foo.bar".to_string())
-                )
-            };
+        let foo_baz: holo_hash::EntryHash = crate::call_test_ribosome!(
+            host_access,
+            TestWasm::HashPath,
+            "hash",
+            TestString::from("foo.baz".to_string())
+        );
 
-            let foo_baz: holo_hash_core::EntryHash = {
-                let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
-                let mut host_access = fixt!(ZomeCallHostAccess);
-                host_access.workspace = raw_workspace;
-                crate::call_test_ribosome!(
-                    host_access,
-                    TestWasm::HashPath,
-                    "hash",
-                    TestString::from("foo.baz".to_string())
-                )
-            };
+        let children_output: holochain_zome_types::link::Links = crate::call_test_ribosome!(
+            host_access,
+            TestWasm::HashPath,
+            "children",
+            TestString::from("foo".to_string())
+        );
 
-            (foo_bar, foo_baz)
-        };
-
-        let ls_output = {
-            let reader = env_ref.reader().unwrap();
-            let mut workspace =
-                crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
-
-            let output: holochain_zome_types::link::Links = {
-                let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
-                let mut host_access = fixt!(ZomeCallHostAccess);
-                host_access.workspace = raw_workspace;
-                crate::call_test_ribosome!(
-                    host_access,
-                    TestWasm::HashPath,
-                    "children",
-                    TestString::from("foo".to_string())
-                )
-            };
-
-            output
-        };
-
-        let links = ls_output.into_inner();
+        let links = children_output.into_inner();
         assert_eq!(2, links.len());
         assert_eq!(links[0].target, foo_baz,);
         assert_eq!(links[1].target, foo_bar,);
@@ -251,111 +156,61 @@ pub mod slow_tests {
         let dbs = env.dbs().await;
         let env_ref = env.guard().await;
 
-        let (anchor_address_one, anchor_address_two) = {
-            let reader = env_ref.reader().unwrap();
-            let mut workspace =
-                crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
+        let reader = env_ref.reader().unwrap();
+        let mut workspace = crate::core::workflow::CallZomeWorkspace::new(&reader, &dbs).unwrap();
 
-            // commits fail validation if we don't do genesis
-            crate::core::workflow::fake_genesis(&mut workspace.source_chain)
-                .await
-                .unwrap();
-
-            // anchor foo bar
-            let anchor_address_one: EntryHash = {
-                let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
-                let mut host_access = fixt!(ZomeCallHostAccess);
-                host_access.workspace = raw_workspace;
-                crate::call_test_ribosome!(
-                    host_access,
-                    TestWasm::Anchor,
-                    "anchor",
-                    AnchorInput("foo".to_string(), "bar".to_string())
-                )
-            };
-
-            assert_eq!(
-                anchor_address_one.get_raw().to_vec(),
-                vec![
-                    138, 240, 209, 89, 206, 160, 42, 131, 107, 63, 111, 243, 67, 8, 24, 48, 151,
-                    62, 108, 99, 102, 109, 57, 253, 219, 26, 255, 164, 83, 134, 245, 254, 186, 50,
-                    192, 174
-                ],
-            );
-
-            // anchor foo baz
-            let anchor_address_two: EntryHash = {
-                let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
-                let mut host_access = fixt!(ZomeCallHostAccess);
-                host_access.workspace = raw_workspace;
-                crate::call_test_ribosome!(
-                    host_access,
-                    TestWasm::Anchor,
-                    "anchor",
-                    AnchorInput("foo".to_string(), "baz".to_string())
-                )
-            };
-
-            assert_eq!(
-                anchor_address_two.get_raw().to_vec(),
-                vec![
-                    175, 176, 111, 101, 56, 12, 198, 140, 48, 157, 209, 87, 118, 124, 157, 94, 234,
-                    232, 82, 136, 228, 219, 237, 221, 195, 225, 98, 177, 76, 26, 126, 6, 26, 90,
-                    146, 169
-                ],
-            );
-
-            // Write the database to file
-            holochain_state::env::WriteManager::with_commit(&env_ref, |writer| {
-                crate::core::state::workspace::Workspace::flush_to_txn(workspace, writer)
-            })
+        // commits fail validation if we don't do genesis
+        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+            .await
             .unwrap();
 
-            (anchor_address_one, anchor_address_two)
-        };
+        let (_g, raw_workspace) =
+            crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
+                &mut workspace,
+            );
+        let mut host_access = fixt!(ZomeCallHostAccess);
+        host_access.workspace = raw_workspace;
 
-        // Needs metadata to return get
-        {
-            use crate::core::state::workspace::Workspace;
-            use holochain_state::env::ReadManager;
+        // anchor foo bar
+        let anchor_address_one: EntryHash = crate::call_test_ribosome!(
+            host_access,
+            TestWasm::Anchor,
+            "anchor",
+            AnchorInput("foo".to_string(), "bar".to_string())
+        );
 
-            // Produce the ops
-            let (mut qt, mut rx) = TriggerSender::new();
-            {
-                let reader = env_ref.reader().unwrap();
-                let workspace = ProduceDhtOpsWorkspace::new(&reader, &dbs).unwrap();
-                produce_dht_ops_workflow(workspace, env.env.clone().into(), &mut qt)
-                    .await
-                    .unwrap();
-                // await the workflow finishing
-                rx.listen().await.unwrap();
-            }
-            // Integrate the ops
-            {
-                let reader = env_ref.reader().unwrap();
-                let workspace = IntegrateDhtOpsWorkspace::new(&reader, &dbs).unwrap();
-                integrate_dht_ops_workflow(workspace, env.env.clone().into(), &mut qt)
-                    .await
-                    .unwrap();
-                rx.listen().await.unwrap();
-            }
-        }
+        assert_eq!(
+            anchor_address_one.get_raw().to_vec(),
+            vec![
+                138, 240, 209, 89, 206, 160, 42, 131, 107, 63, 111, 243, 67, 8, 24, 48, 151, 62,
+                108, 99, 102, 109, 57, 253, 219, 26, 255, 164, 83, 134, 245, 254, 186, 50, 192,
+                174
+            ],
+        );
 
-        let get_output = {
-            let reader = env_ref.reader().unwrap();
-            let mut workspace =
-                crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
+        // anchor foo baz
+        let anchor_address_two: EntryHash = crate::call_test_ribosome!(
+            host_access,
+            TestWasm::Anchor,
+            "anchor",
+            AnchorInput("foo".to_string(), "baz".to_string())
+        );
 
-            let input = anchor_address_one.clone();
-            let output: MaybeAnchor = {
-                let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
-                let mut host_access = fixt!(ZomeCallHostAccess);
-                host_access.workspace = raw_workspace;
-                crate::call_test_ribosome!(host_access, TestWasm::Anchor, "get_anchor", input)
-            };
+        assert_eq!(
+            anchor_address_two.get_raw().to_vec(),
+            vec![
+                175, 176, 111, 101, 56, 12, 198, 140, 48, 157, 209, 87, 118, 124, 157, 94, 234,
+                232, 82, 136, 228, 219, 237, 221, 195, 225, 98, 177, 76, 26, 126, 6, 26, 90, 146,
+                169
+            ],
+        );
 
-            output
-        };
+        let get_output: MaybeAnchor = crate::call_test_ribosome!(
+            host_access,
+            TestWasm::Anchor,
+            "get_anchor",
+            anchor_address_one
+        );
 
         assert_eq!(
             MaybeAnchor(Some(Anchor {
@@ -365,25 +220,12 @@ pub mod slow_tests {
             get_output,
         );
 
-        let list_anchor_type_addresses_output = {
-            let reader = env_ref.reader().unwrap();
-            let mut workspace =
-                crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
-
-            let output: EntryHashes = {
-                let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
-                let mut host_access = fixt!(ZomeCallHostAccess);
-                host_access.workspace = raw_workspace;
-                crate::call_test_ribosome!(
-                    host_access,
-                    TestWasm::Anchor,
-                    "list_anchor_type_addresses",
-                    ()
-                )
-            };
-
-            output
-        };
+        let list_anchor_type_addresses_output: EntryHashes = crate::call_test_ribosome!(
+            host_access,
+            TestWasm::Anchor,
+            "list_anchor_type_addresses",
+            ()
+        );
 
         // should be 1 anchor type, "foo"
         assert_eq!(list_anchor_type_addresses_output.0.len(), 1,);
@@ -395,24 +237,13 @@ pub mod slow_tests {
             ],
         );
 
-        let list_anchor_addresses_output = {
-            let reader = env_ref.reader().unwrap();
-            let mut workspace =
-                crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
-
-            let output: EntryHashes = {
-                let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
-                let mut host_access = fixt!(ZomeCallHostAccess);
-                host_access.workspace = raw_workspace;
-                crate::call_test_ribosome!(
-                    host_access,
-                    TestWasm::Anchor,
-                    "list_anchor_addresses",
-                    TestString("foo".into())
-                )
-            };
-
-            output
+        let list_anchor_addresses_output: EntryHashes = {
+            crate::call_test_ribosome!(
+                host_access,
+                TestWasm::Anchor,
+                "list_anchor_addresses",
+                TestString("foo".into())
+            )
         };
 
         // should be 2 anchors under "foo" sorted by hash
@@ -426,25 +257,12 @@ pub mod slow_tests {
             anchor_address_two.get_raw().to_vec(),
         );
 
-        let list_anchor_tags_output = {
-            let reader = env_ref.reader().unwrap();
-            let mut workspace =
-                crate::core::workflow::InvokeZomeWorkspace::new(&reader, &dbs).unwrap();
-
-            let output: AnchorTags = {
-                let (_g, raw_workspace) = crate::core::workflow::unsafe_invoke_zome_workspace::UnsafeInvokeZomeWorkspace::from_mut(&mut workspace);
-                let mut host_access = fixt!(ZomeCallHostAccess);
-                host_access.workspace = raw_workspace;
-                crate::call_test_ribosome!(
-                    host_access,
-                    TestWasm::Anchor,
-                    "list_anchor_tags",
-                    TestString("foo".into())
-                )
-            };
-
-            output
-        };
+        let list_anchor_tags_output: AnchorTags = crate::call_test_ribosome!(
+            host_access,
+            TestWasm::Anchor,
+            "list_anchor_tags",
+            TestString("foo".into())
+        );
 
         assert_eq!(
             AnchorTags(vec!["bar".to_string(), "baz".to_string()]),

@@ -79,10 +79,7 @@ impl Anchor {
 
 /// simple string interface to simple string based paths
 /// a.k.a "the anchor pattern" that predates paths by a few years
-pub fn anchor(
-    anchor_type: String,
-    anchor_text: String,
-) -> Result<holo_hash_core::EntryHash, WasmError> {
+pub fn anchor(anchor_type: String, anchor_text: String) -> Result<holo_hash::EntryHash, WasmError> {
     let path: Path = (&Anchor {
         anchor_type,
         anchor_text: Some(anchor_text),
@@ -92,7 +89,7 @@ pub fn anchor(
     Ok(path.hash()?)
 }
 
-pub fn get_anchor(anchor_address: holo_hash_core::EntryHash) -> Result<Option<Anchor>, WasmError> {
+pub fn get_anchor(anchor_address: holo_hash::EntryHash) -> Result<Option<Anchor>, WasmError> {
     Ok(match get_entry!(anchor_address)? {
         Some(Entry::App(sb)) => {
             let path = Path::try_from(sb)?;
@@ -102,7 +99,7 @@ pub fn get_anchor(anchor_address: holo_hash_core::EntryHash) -> Result<Option<An
     })
 }
 
-pub fn list_anchor_type_addresses() -> Result<Vec<holo_hash_core::EntryHash>, WasmError> {
+pub fn list_anchor_type_addresses() -> Result<Vec<holo_hash::EntryHash>, WasmError> {
     let links = Path::from(ROOT)
         .children()?
         .into_inner()
@@ -112,9 +109,7 @@ pub fn list_anchor_type_addresses() -> Result<Vec<holo_hash_core::EntryHash>, Wa
     Ok(links)
 }
 
-pub fn list_anchor_addresses(
-    anchor_type: String,
-) -> Result<Vec<holo_hash_core::EntryHash>, WasmError> {
+pub fn list_anchor_addresses(anchor_type: String) -> Result<Vec<holo_hash::EntryHash>, WasmError> {
     let path: Path = (&Anchor {
         anchor_type: anchor_type,
         anchor_text: None,
