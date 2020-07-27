@@ -112,8 +112,8 @@ enum UniqueForm<'a> {
     RegisterRemoveLink(&'a header::LinkRemove),
 }
 
-/// Turn a chain element into a DhtOp
-pub fn ops_from_element(element: &Element) -> DhtOpResult<Vec<DhtOp>> {
+/// Produce all DhtOps for a ChainElement
+pub fn produce_ops_from_element(element: &Element) -> DhtOpResult<Vec<DhtOp>> {
     // TODO: avoid cloning everything
 
     let (signed_header, maybe_entry) = element.clone().into_inner();

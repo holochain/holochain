@@ -8,8 +8,9 @@ use holochain_p2p::{
 };
 use holochain_serialized_bytes::UnsafeBytes;
 use holochain_types::{
-    element::{SignedHeaderHashedExt, SignedHeaderHashed}, test_utils::fake_header_hash, Entry, EntryHashed, HeaderHashed,
-    Timestamp,
+    element::{SignedHeaderHashed, SignedHeaderHashedExt},
+    test_utils::fake_header_hash,
+    Entry, EntryHashed, HeaderHashed, Timestamp,
 };
 use holochain_zome_types::entry_def::EntryVisibility;
 use holochain_zome_types::header::{EntryCreate, EntryType, Header};
@@ -29,7 +30,7 @@ pub async fn fake_unique_element(
     visibility: EntryVisibility,
 ) -> anyhow::Result<(SignedHeaderHashed, EntryHashed)> {
     let content = UnsafeBytes::from(nanoid::nanoid!().as_bytes().to_owned());
-    let entry = EntryHashed::with_data(Entry::App(content.try_into().unwrap())).await?;
+    let entry = EntryHashed::from_content(Entry::App(content.try_into().unwrap())).await;
     let app_entry_type = holochain_types::fixt::AppEntryTypeFixturator::new(visibility)
         .next()
         .unwrap();
@@ -44,7 +45,7 @@ pub async fn fake_unique_element(
     });
 
     Ok((
-        SignedHeaderHashed::new(&keystore, HeaderHashed::with_data(header_1).await?).await?,
+        SignedHeaderHashed::new(&keystore, HeaderHashed::from_content(header_1).await).await?,
         entry,
     ))
 }

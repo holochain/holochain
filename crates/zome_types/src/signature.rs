@@ -1,18 +1,8 @@
-//! Signature for authenticity of data 
+//! Signature for authenticity of data
 use holochain_serialized_bytes::prelude::*;
 
 /// The raw bytes of a signature.
-#[derive(
-    Clone,
-    Serialize,
-    Deserialize,
-    SerializedBytes,
-    Hash,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-)]
+#[derive(Clone, Serialize, Deserialize, SerializedBytes, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Signature(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
 impl std::fmt::Debug for Signature {

@@ -36,17 +36,12 @@ impl ElementExt for Element {
     }
 }
 
-
 /// Extension trait to keep zome types minimal
 #[async_trait::async_trait]
 pub trait SignedHeaderHashedExt {
     /// Create a hash from data
-    fn with_data(
-        signed_header: SignedHeader,
-    ) -> MustBoxFuture<'static, Result<SignedHeaderHashed, SerializedBytesError>>;
-    // where
-    //     S: Sized;
-    /// Sign sme content
+    fn from_content(signed_header: SignedHeader) -> MustBoxFuture<'static, SignedHeaderHashed>;
+    /// Sign some content
     async fn new(
         keystore: &KeystoreSender,
         header: HeaderHashed,
@@ -58,18 +53,13 @@ pub trait SignedHeaderHashedExt {
 #[allow(missing_docs)]
 #[async_trait::async_trait]
 impl SignedHeaderHashedExt for SignedHeaderHashed {
-    fn with_data(
-        signed_header: SignedHeader,
-    ) -> MustBoxFuture<'static, Result<Self, SerializedBytesError>>
+    fn from_content(signed_header: SignedHeader) -> MustBoxFuture<'static, Self>
     where
         Self: Sized,
     {
         async move {
             let (header, signature) = signed_header.into();
-            Ok(Self::with_presigned(
-                HeaderHashed::with_data(header.clone()).await?,
-                signature,
-            ))
+            Self::with_presigned(HeaderHashed::from_content(header).await, signature)
         }
         .boxed()
         .into()
@@ -99,11 +89,11 @@ impl SignedHeaderHashedExt for SignedHeaderHashed {
 
 impl WireElement {
     /// Convert into a [Element] when receiving from the network
-    pub async fn into_element(self) -> Result<Element, SerializedBytesError> {
-        Ok(Element::new(
-            SignedHeaderHashed::with_data(self.signed_header).await?,
+    pub async fn into_element(self) -> Element {
+        Element::new(
+            SignedHeaderHashed::from_content(self.signed_header).await,
             self.maybe_entry,
-        ))
+        )
     }
     /// Convert from a [Element] when sending to the network
     pub fn from_element(e: Element) -> Self {

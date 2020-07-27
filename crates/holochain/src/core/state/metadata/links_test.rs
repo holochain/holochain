@@ -43,9 +43,8 @@ async fn fixtures(n: usize) -> Vec<TestData> {
 
         // Create the expected link result
         let (_, link_add_hash): (_, HeaderHash) =
-            HeaderHashed::with_data(Header::LinkAdd(link_add.clone()))
+            HeaderHashed::from_content(Header::LinkAdd(link_add.clone()))
                 .await
-                .unwrap()
                 .into();
 
         let expected_link = LinkMetaVal {
@@ -78,9 +77,8 @@ impl TestData {
     /// Create the same test data with a new timestamp
     async fn with_same_keys(mut td: Self) -> Self {
         td.link_add.timestamp = Timestamp::now().into();
-        let link_add_hash = HeaderHashed::with_data(Header::LinkAdd(td.link_add.clone()))
+        let link_add_hash = HeaderHashed::from_content(Header::LinkAdd(td.link_add.clone()))
             .await
-            .unwrap()
             .into_hash();
         td.link_remove.link_add_address = link_add_hash.clone();
         td.expected_link.timestamp = td.link_add.timestamp.clone().into();
@@ -323,7 +321,7 @@ async fn can_add_and_remove_link() {
 
     // Check it's empty
     env.with_reader(|reader| {
-        let meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
+        let meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
         td.empty(here!("empty at start"), &meta_buf);
         DatabaseResult::Ok(())
     })
@@ -332,7 +330,7 @@ async fn can_add_and_remove_link() {
     // Add a link
     {
         let reader = env.reader().unwrap();
-        let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
+        let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
         // Add
         td.add_link(&mut meta_buf).await;
         // Is in scratch
@@ -359,7 +357,7 @@ async fn can_add_and_remove_link() {
 
     // Check it's in db
     env.with_reader(|reader| {
-        let meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
+        let meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
         td.only_on_full_key(here!("It's in the db"), &meta_buf);
         DatabaseResult::Ok(())
     })
@@ -368,7 +366,7 @@ async fn can_add_and_remove_link() {
     // Remove the link
     {
         let reader = env.reader().unwrap();
-        let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
+        let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
         td.remove_link(&mut meta_buf).await;
         // Is empty
         td.empty(here!("empty after remove"), &meta_buf);
@@ -378,7 +376,7 @@ async fn can_add_and_remove_link() {
 
     // Check it's empty
     env.with_reader(|reader| {
-        let meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
+        let meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
         // Is empty
         td.empty(here!("empty after remove in db"), &meta_buf);
         DatabaseResult::Ok(())
@@ -388,7 +386,7 @@ async fn can_add_and_remove_link() {
     // Add a link
     {
         let reader = env.reader().unwrap();
-        let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
+        let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
         let new_td = TestData::with_same_keys(td.clone()).await;
         td = new_td;
         // Add
@@ -407,7 +405,7 @@ async fn can_add_and_remove_link() {
 
     // Partial matching
     env.with_reader(|reader| {
-        let meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
+        let meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
         td.only_on_full_key(here!("db"), &meta_buf);
         // No zome, no tag
         td.only_on_base(here!("db"), &meta_buf);
@@ -430,7 +428,7 @@ async fn multiple_links() {
     // Add links
     {
         let reader = env.reader().unwrap();
-        let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
+        let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
         // Add
         for d in td.iter() {
             d.add_link(&mut meta_buf).await;
@@ -468,7 +466,7 @@ async fn multiple_links() {
 
     {
         let reader = env.reader().unwrap();
-        let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
+        let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
         for d in td.iter() {
             d.only_on_full_key(here!("all in db"), &meta_buf);
         }
@@ -484,7 +482,7 @@ async fn multiple_links() {
     }
 
     env.with_reader(|reader| {
-        let meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
+        let meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
         for d in &td[1..] {
             d.only_on_full_key(here!("all except 0"), &meta_buf);
         }
@@ -503,7 +501,7 @@ async fn duplicate_links() {
     // Add to db then the same to scratch and expect on one result
     {
         let reader = env.reader().unwrap();
-        let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
+        let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
         // Add
         for d in td.iter() {
             d.add_link(&mut meta_buf).await;
@@ -537,7 +535,7 @@ async fn duplicate_links() {
     }
     {
         let reader = env.reader().unwrap();
-        let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
+        let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
         // Add
         for d in td.iter() {
             d.add_link(&mut meta_buf).await;
@@ -556,7 +554,7 @@ async fn duplicate_links() {
             .unwrap();
     }
     env.with_reader(|reader| {
-        let meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
+        let meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
         // Is in db
         for d in td.iter() {
             d.only_on_full_key(here!("re add"), &meta_buf);
@@ -586,16 +584,15 @@ async fn links_on_same_base() {
         d.link_add.base_address = base_hash.clone();
         // Create the new hash
         let (_, link_add_hash): (_, HeaderHash) =
-            HeaderHashed::with_data(Header::LinkAdd(d.link_add.clone()))
+            HeaderHashed::from_content(Header::LinkAdd(d.link_add.clone()))
                 .await
-                .unwrap()
                 .into();
         d.expected_link.link_add_hash = link_add_hash.clone();
         d.link_remove.link_add_address = link_add_hash;
     }
     {
         let reader = env.reader().unwrap();
-        let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
+        let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
         // Add
         for d in td.iter() {
             d.add_link(&mut meta_buf).await;
@@ -612,7 +609,7 @@ async fn links_on_same_base() {
             .unwrap();
     }
     env.with_reader(|reader| {
-        let meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
+        let meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
         // In db
         for d in td.iter() {
             d.only_on_full_key(here!("same base"), &meta_buf);
@@ -629,7 +626,7 @@ async fn links_on_same_base() {
         let span = debug_span!("check_remove");
         let _g = span.enter();
         let reader = env.reader().unwrap();
-        let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
+        let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
         td[0].remove_link(&mut meta_buf).await;
         for d in &td[1..] {
             d.only_on_full_key(here!("same base"), &meta_buf);
@@ -643,7 +640,7 @@ async fn links_on_same_base() {
             .unwrap();
     }
     env.with_reader(|reader| {
-        let meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
+        let meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
         for d in &td[1..] {
             d.only_on_full_key(here!("same base"), &meta_buf);
             d.only_on_zome_id(here!("same base"), &meta_buf);
@@ -673,9 +670,8 @@ async fn links_on_same_zome_id() {
         d.link_add.zome_id = zome_id;
         // Create the new hash
         let (_, link_add_hash): (_, HeaderHash) =
-            HeaderHashed::with_data(Header::LinkAdd(d.link_add.clone()))
+            HeaderHashed::from_content(Header::LinkAdd(d.link_add.clone()))
                 .await
-                .unwrap()
                 .into();
         d.expected_link.link_add_hash = link_add_hash.clone();
         d.expected_link.zome_id = zome_id;
@@ -685,7 +681,7 @@ async fn links_on_same_zome_id() {
         let span = debug_span!("check_zome_id");
         let _g = span.enter();
         let reader = env.reader().unwrap();
-        let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
+        let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
         // Add
         for d in td.iter() {
             d.add_link(&mut meta_buf).await;
@@ -702,7 +698,7 @@ async fn links_on_same_zome_id() {
             .unwrap();
     }
     env.with_reader(|reader| {
-        let meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
+        let meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
         // In db
         for d in td.iter() {
             d.only_on_full_key(here!("same base"), &meta_buf);
@@ -719,7 +715,7 @@ async fn links_on_same_zome_id() {
         let span = debug_span!("check_remove");
         let _g = span.enter();
         let reader = env.reader().unwrap();
-        let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
+        let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
         td[9].remove_link(&mut meta_buf).await;
         for d in &td[..9] {
             d.only_on_full_key(here!("same base"), &meta_buf);
@@ -737,7 +733,7 @@ async fn links_on_same_zome_id() {
             .unwrap();
     }
     env.with_reader(|reader| {
-        let meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
+        let meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
         for d in &td[..9] {
             d.only_on_full_key(here!("same base"), &meta_buf);
             // Half the tag
@@ -776,9 +772,8 @@ async fn links_on_same_tag() {
 
         // Create the new hash
         let (_, link_add_hash): (_, HeaderHash) =
-            HeaderHashed::with_data(Header::LinkAdd(d.link_add.clone()))
+            HeaderHashed::from_content(Header::LinkAdd(d.link_add.clone()))
                 .await
-                .unwrap()
                 .into();
         d.expected_link.link_add_hash = link_add_hash.clone();
         d.expected_link.zome_id = zome_id;
@@ -787,7 +782,7 @@ async fn links_on_same_tag() {
     }
     {
         let reader = env.reader().unwrap();
-        let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
+        let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
         // Add
         for d in td.iter() {
             d.add_link(&mut meta_buf).await;
@@ -808,7 +803,7 @@ async fn links_on_same_tag() {
             .unwrap();
     }
     env.with_reader(|reader| {
-        let meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
+        let meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
         // In db
         TestData::only_these_on_base(&td[..], here!("check all return on same base"), &meta_buf);
         TestData::only_these_on_zome_id(&td[..], here!("check all return on same base"), &meta_buf);
@@ -830,7 +825,7 @@ async fn links_on_same_tag() {
         let span = debug_span!("check_remove");
         let _g = span.enter();
         let reader = env.reader().unwrap();
-        let mut meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
+        let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
         td[5].remove_link(&mut meta_buf).await;
         td[6].remove_link(&mut meta_buf).await;
         let partial_td = &td[..5].iter().chain(&td[7..]).cloned().collect::<Vec<_>>();
@@ -858,7 +853,7 @@ async fn links_on_same_tag() {
             .unwrap();
     }
     env.with_reader(|reader| {
-        let meta_buf = MetadataBuf::primary(&reader, &env).unwrap();
+        let meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
         let partial_td = &td[..5].iter().chain(&td[7..]).cloned().collect::<Vec<_>>();
         TestData::only_these_on_base(
             &partial_td[..],

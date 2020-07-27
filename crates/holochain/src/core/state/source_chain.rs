@@ -41,7 +41,7 @@ impl<'env> SourceChain<'env> {
             ))
     }
 
-    pub fn chain_head(&self) -> SourceChainResult<&HeaderAddress> {
+    pub fn chain_head(&self) -> SourceChainResult<&HeaderHash> {
         self.0.chain_head().ok_or(SourceChainError::ChainEmpty)
     }
 
@@ -58,7 +58,7 @@ impl<'env> SourceChain<'env> {
         &mut self,
         header_builder: B,
         maybe_entry: Option<Entry>,
-    ) -> SourceChainResult<HeaderAddress> {
+    ) -> SourceChainResult<HeaderHash> {
         let common = HeaderBuilderCommon {
             author: self.agent_pubkey().await?,
             timestamp: Timestamp::now().into(),
@@ -73,9 +73,9 @@ impl<'env> SourceChain<'env> {
     pub async fn put_cap_grant(
         &mut self,
         grant_entry: CapGrantEntry,
-    ) -> SourceChainResult<HeaderAddress> {
-        let (entry, entry_hash) = EntryHashed::with_data(Entry::CapGrant(grant_entry))
-            .await?
+    ) -> SourceChainResult<HeaderHash> {
+        let (entry, entry_hash) = EntryHashed::from_content(Entry::CapGrant(grant_entry))
+            .await
             .into_inner();
         let header_builder = builder::EntryCreate {
             entry_type: EntryType::CapGrant,
@@ -88,9 +88,9 @@ impl<'env> SourceChain<'env> {
     pub async fn put_cap_claim(
         &mut self,
         claim_entry: CapClaimEntry,
-    ) -> SourceChainResult<HeaderAddress> {
-        let (entry, entry_hash) = EntryHashed::with_data(Entry::CapClaim(claim_entry))
-            .await?
+    ) -> SourceChainResult<HeaderHash> {
+        let (entry, entry_hash) = EntryHashed::from_content(Entry::CapClaim(claim_entry))
+            .await
             .into_inner();
         let header_builder = builder::EntryCreate {
             entry_type: EntryType::CapClaim,

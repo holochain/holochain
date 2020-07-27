@@ -8,7 +8,7 @@
 /// When committing the ChainSequence db, a special step is taken to ensure source chain consistency.
 /// If the chain head has moved since the db was created, committing the transaction fails with a special error type.
 use crate::core::state::source_chain::{SourceChainError, SourceChainResult};
-use holo_hash::HeaderAddress;
+use holo_hash::HeaderHash;
 use holochain_state::{
     buffer::{BufferedStore, IntKvBuf},
     db::{GetDb, CHAIN_SEQUENCE},
@@ -21,7 +21,7 @@ use tracing::*;
 /// A Value in the ChainSequence database.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ChainSequenceItem {
-    header_address: HeaderAddress,
+    header_address: HeaderHash,
     tx_seq: u32,
     dht_transforms_complete: bool,
 }
@@ -33,8 +33,8 @@ pub struct ChainSequenceBuf<'env, R: Readable = Reader<'env>> {
     db: Store<'env, R>,
     next_index: u32,
     tx_seq: u32,
-    current_head: Option<HeaderAddress>,
-    persisted_head: Option<HeaderAddress>,
+    current_head: Option<HeaderHash>,
+    persisted_head: Option<HeaderHash>,
 }
 
 impl<'env, R: Readable> ChainSequenceBuf<'env, R> {
@@ -74,7 +74,7 @@ impl<'env> ChainSequenceBuf<'env, Reader<'env>> {
     }
 
     /// Get the chain head, AKA top chain header. None if the chain is empty.
-    pub fn chain_head(&self) -> Option<&HeaderAddress> {
+    pub fn chain_head(&self) -> Option<&HeaderHash> {
         self.current_head.as_ref()
     }
 
@@ -84,7 +84,7 @@ impl<'env> ChainSequenceBuf<'env, Reader<'env>> {
     }
 
     /// Get a header at an index
-    pub fn get(&self, i: u32) -> DatabaseResult<Option<HeaderAddress>> {
+    pub fn get(&self, i: u32) -> DatabaseResult<Option<HeaderHash>> {
         self.db
             .get(i)
             .map(|seq_item| seq_item.map(|si| si.header_address))
@@ -93,7 +93,7 @@ impl<'env> ChainSequenceBuf<'env, Reader<'env>> {
     /// Add a header to the chain, setting all other values automatically.
     /// This is intentionally the only way to modify this database.
     #[instrument(skip(self))]
-    pub fn put_header(&mut self, header_address: HeaderAddress) {
+    pub fn put_header(&mut self, header_address: HeaderHash) {
         self.db.put(
             self.next_index,
             ChainSequenceItem {
@@ -109,7 +109,7 @@ impl<'env> ChainSequenceBuf<'env, Reader<'env>> {
 
     pub fn get_items_with_incomplete_dht_ops(
         &self,
-    ) -> SourceChainResult<Box<dyn Iterator<Item = (u32, HeaderAddress)> + 'env>> {
+    ) -> SourceChainResult<Box<dyn Iterator<Item = (u32, HeaderHash)> + 'env>> {
         if !self.db.is_scratch_fresh() {
             return Err(SourceChainError::ScratchNotFresh);
         }

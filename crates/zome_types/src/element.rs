@@ -3,7 +3,6 @@
 use crate::{
     entry_def::EntryVisibility, header::HeaderHashed, signature::Signature, Entry, Header,
 };
-use holo_hash::HeaderAddress;
 use holo_hash::{
     hash_type, HasHash, HashableContent, HashableContentBytes, HeaderHash, HoloHashed,
 };
@@ -44,7 +43,7 @@ impl Element {
     }
 
     /// Access the header address
-    pub fn header_address(&self) -> &HeaderAddress {
+    pub fn header_address(&self) -> &HeaderHash {
         self.signed_header.header_address()
     }
 
@@ -138,25 +137,10 @@ impl HashableContent for SignedHeader {
     }
 }
 
-// HACK: In this representation, we have to clone the Header and store it twice,
-// once in the HeaderHashed, and once in the SignedHeader. The reason is that
-// the API currently requires references to both types, and it was easier to
-// do a simple clone than to refactor the entire struct and API to remove the
-// need for one of those references. We probably SHOULD do that refactor at
-// some point.
-// FIXME: refactor so that HeaderHashed is not stored, and then remove the
-// header_hashed method which returns a reference to HeaderHashed.
-// BTW, I tried to think about the possibility of the following, but none were easy:
-// - Having a lazily instantiable SignedHeader, so we only have to clone if needed
-// - Having HeaderHashed take AsRefs for its arguments, so you can have a
-//    HeaderHashed of references instead of values
-// FIXME: OR, even better yet, do away with this struct and just use
-// HoloHashed<SignedHeader> instead, if possible and expedient
 /// The header and the signature that signed it
 #[derive(Clone, Debug, PartialEq)]
 pub struct SignedHeaderHashed {
     header: HeaderHashed,
-    // signed_header: SignedHeader,
     signature: Signature,
 }
 
@@ -167,11 +151,6 @@ impl SignedHeaderHashed {
         let (header, hash) = self.header.into_inner();
         ((header, self.signature).into(), hash)
     }
-
-    // /// Access the main item stored in this wrapper type.
-    // pub fn as_content(&self) -> &SignedHeader {
-    //     &self.signed_header
-    // }
 
     /// Access the already-calculated hash stored in this wrapper type.
     pub fn as_hash(&self) -> &HeaderHash {
@@ -188,7 +167,7 @@ impl SignedHeaderHashed {
     }
 
     /// Access the Header Hash.
-    pub fn header_address(&self) -> &HeaderAddress {
+    pub fn header_address(&self) -> &HeaderHash {
         self.header.as_hash()
     }
 

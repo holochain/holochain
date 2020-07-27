@@ -12,7 +12,7 @@ use holochain_state::{
     prelude::{Reader, Writer},
 };
 use holochain_types::{
-    dht_op::{ops_from_element, DhtOp},
+    dht_op::{produce_ops_from_element, DhtOp},
     element::{Element, SignedHeaderHashed, SignedHeaderHashedExt},
     entry::EntryHashed,
     prelude::*,
@@ -30,7 +30,7 @@ pub struct SourceChainBuf<'env> {
 impl<'env> SourceChainBuf<'env> {
     pub fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Self> {
         Ok(Self {
-            cas: ChainCasBuf::primary(reader, dbs, true)?,
+            cas: ChainCasBuf::vault(reader, dbs, true)?,
             sequence: ChainSequenceBuf::new(reader, dbs)?,
             keystore: dbs.keystore(),
         })
@@ -47,7 +47,7 @@ impl<'env> SourceChainBuf<'env> {
         })
     }
 
-    pub fn chain_head(&self) -> Option<&HeaderAddress> {
+    pub fn chain_head(&self) -> Option<&HeaderHash> {
         self.sequence.chain_head()
     }
 
@@ -69,15 +69,12 @@ impl<'env> SourceChainBuf<'env> {
         }
     }
 
-    pub async fn get_element(&self, k: &HeaderAddress) -> SourceChainResult<Option<Element>> {
+    pub async fn get_element(&self, k: &HeaderHash) -> SourceChainResult<Option<Element>> {
         debug!("GET {:?}", k);
         self.cas.get_element(k).await
     }
 
-    pub async fn get_header(
-        &self,
-        k: &HeaderAddress,
-    ) -> DatabaseResult<Option<SignedHeaderHashed>> {
+    pub async fn get_header(&self, k: &HeaderHash) -> DatabaseResult<Option<SignedHeaderHashed>> {
         self.cas.get_header(k).await
     }
 
@@ -89,7 +86,7 @@ impl<'env> SourceChainBuf<'env> {
             .get_items_with_incomplete_dht_ops()?
             .collect::<Vec<_>>();
         for (i, header) in ops_headers {
-            let op = ops_from_element(
+            let op = produce_ops_from_element(
                 &self
                     .get_element(&header)
                     .await?
@@ -117,13 +114,13 @@ impl<'env> SourceChainBuf<'env> {
         &mut self,
         header: Header,
         maybe_entry: Option<Entry>,
-    ) -> SourceChainResult<HeaderAddress> {
-        let header = HeaderHashed::with_data(header).await?;
+    ) -> SourceChainResult<HeaderHash> {
+        let header = HeaderHashed::from_content(header).await;
         let header_address = header.as_hash().to_owned();
         let signed_header = SignedHeaderHashed::new(&self.keystore, header).await?;
         let maybe_entry = match maybe_entry {
             None => None,
-            Some(entry) => Some(EntryHashed::with_data(entry).await?),
+            Some(entry) => Some(EntryHashed::from_content(entry).await),
         };
 
         /*
@@ -174,7 +171,7 @@ impl<'env> SourceChainBuf<'env> {
         #[derive(Serialize, Deserialize)]
         struct JsonElement {
             pub signature: Signature,
-            pub header_address: HeaderAddress,
+            pub header_address: HeaderHash,
             pub header: Header,
             pub entry: Option<Entry>,
         }
@@ -269,7 +266,7 @@ impl<'env> BufferedStore<'env> for SourceChainBuf<'env> {
 /// starting with the head, moving back to the origin (Dna) header.
 pub struct SourceChainBackwardIterator<'env> {
     store: &'env SourceChainBuf<'env>,
-    current: Option<HeaderAddress>,
+    current: Option<HeaderHash>,
 }
 
 impl<'env> SourceChainBackwardIterator<'env> {
@@ -341,7 +338,7 @@ pub mod tests {
                     header_seq: 0,
                     hash: dna.dna_hash().clone(),
                 });
-                let dna_header = HeaderHashed::with_data(dna_header).await.unwrap();
+                let dna_header = HeaderHashed::from_content(dna_header).await;
 
                 let agent_header = Header::EntryCreate(header::EntryCreate {
                     author: agent_pubkey.clone(),
@@ -351,7 +348,7 @@ pub mod tests {
                     entry_type: header::EntryType::AgentPubKey,
                     entry_hash: agent_pubkey.clone().into(),
                 });
-                let agent_header = HeaderHashed::with_data(agent_header).await.unwrap();
+                let agent_header = HeaderHashed::from_content(agent_header).await;
 
                 (dna_header, agent_header)
             },
@@ -495,7 +492,7 @@ pub mod tests {
         let (_, hashed, _, _, _) = fixtures();
         let header = hashed.into_content();
         let hash = HeaderHash::with_data(&header).await;
-        let hashed = HeaderHashed::with_data(header.clone()).await.unwrap();
+        let hashed = HeaderHashed::from_content(header.clone()).await;
         assert_eq!(hash, *hashed.as_hash());
 
         store.put_raw(header, None).await.unwrap();
