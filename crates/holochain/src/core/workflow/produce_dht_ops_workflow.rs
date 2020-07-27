@@ -105,7 +105,7 @@ mod tests {
         test_utils::test_cell_env,
     };
     use holochain_types::{
-        dht_op::{ops_from_element, DhtOp, DhtOpHashed},
+        dht_op::{produce_ops_from_element, DhtOp, DhtOpHashed},
         observability, Entry, EntryHashed,
     };
     use holochain_zome_types::{
@@ -150,7 +150,7 @@ mod tests {
                 .await
                 .unwrap()
                 .unwrap();
-            ops_from_element(&element).unwrap()
+            produce_ops_from_element(&element).unwrap()
         }
     }
 
@@ -178,7 +178,7 @@ mod tests {
             let mut all_ops = Vec::new();
             // Collect the ops from genesis
             for h in headers {
-                let ops = ops_from_element(
+                let ops = produce_ops_from_element(
                     &source_chain
                         .get_element(h.as_hash())
                         .await
