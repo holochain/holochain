@@ -124,6 +124,8 @@ pub mod wasm_test {
     use crate::core::ribosome::error::RibosomeError;
     use crate::core::state::source_chain::ChainInvalidReason;
     use crate::core::state::source_chain::SourceChainError;
+    use crate::core::state::source_chain::SourceChainResult;
+    use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
     use crate::fixt::CallContextFixturator;
     use crate::fixt::EntryFixturator;
     use crate::fixt::WasmRibosomeFixturator;
@@ -259,21 +261,31 @@ pub mod wasm_test {
                 &mut workspace,
             );
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = raw_workspace;
+        host_access.workspace = raw_workspace.clone();
 
         // get the result of a commit entry
         let output: CommitEntryOutput =
             crate::call_test_ribosome!(host_access, TestWasm::CommitEntry, "commit_entry", ());
 
-        // this should be the hash of the newly committed entry
-        assert_eq!(
-            vec![
-                62, 54, 23, 199, 14, 51, 180, 172, 119, 192, 27, 49, 206, 111, 170, 221, 23, 232,
-                203, 86, 215, 89, 178, 16, 162, 24, 159, 168, 45, 255, 28, 217, 94, 223, 228, 142
-            ]
-            .as_slice(),
-            output.into_inner().get_raw(),
-        );
+        // the chain head should be the committed entry header
+        let call =
+            |workspace: &'a mut CallZomeWorkspace| -> BoxFuture<'a, SourceChainResult<HeaderHash>> {
+                async move {
+                    let source_chain = &mut workspace.source_chain;
+                    Ok(source_chain.chain_head()?.to_owned())
+                }
+                .boxed()
+            };
+        let cloned_workspace = raw_workspace.clone();
+        let chain_head =
+            tokio_safe_block_on::tokio_safe_block_forever_on(tokio::task::spawn(async move {
+                unsafe { cloned_workspace.apply_mut(call).await }
+            }))
+            .unwrap()
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(&chain_head, output.inner_ref());
 
         let round: GetEntryOutput =
             crate::call_test_ribosome!(host_access, TestWasm::CommitEntry, "get_entry", ());
