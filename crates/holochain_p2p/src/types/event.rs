@@ -104,12 +104,12 @@ ghost_actor::ghost_chan! {
 
         /// The p2p module wishes to query our DhtOpHash store.
         fn list_dht_op_hashes(
-            // The dna_hash / space_hash context.
             dna_hash: DnaHash,
-            // The agent_id / agent_pub_key context.
             to_agent: AgentPubKey,
-            // TODO - parameters
-        ) -> (); // TODO - proper return type
+            dht_arc: kitsune_p2p::dht_arc::DhtArc,
+            since: holochain_types::Timestamp,
+            until: holochain_types::Timestamp,
+        ) -> Vec<holo_hash::DhtOpHash>;
 
         /// The p2p module needs access to the content for a given set of DhtOpHashes.
         fn fetch_dht_ops(

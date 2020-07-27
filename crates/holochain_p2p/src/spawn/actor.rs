@@ -4,7 +4,7 @@ use futures::future::FutureExt;
 
 use crate::types::AgentPubKeyExt;
 
-use holochain_types::element::WireElement;
+use holochain_types::{element::WireElement, Timestamp};
 use kitsune_p2p::actor::KitsuneP2pSender;
 
 pub(crate) struct HolochainP2pActor {
@@ -249,14 +249,31 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
 
     fn handle_fetch_op_hashes_for_constraints(
         &mut self,
-        _input: kitsune_p2p::event::FetchOpHashesForConstraintsEvt,
-    ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<
-        Vec<(
-            kitsune_p2p::KitsuneDataHash,
-            Vec<kitsune_p2p::KitsuneOpHash>,
-        )>,
-    > {
-        unimplemented!()
+        input: kitsune_p2p::event::FetchOpHashesForConstraintsEvt,
+    ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<Vec<kitsune_p2p::KitsuneOpHash>> {
+        let kitsune_p2p::event::FetchOpHashesForConstraintsEvt {
+            space,
+            agent,
+            dht_arc,
+            since_utc_epoch_s,
+            until_utc_epoch_s,
+        } = input;
+        let space = DnaHash::from_kitsune(&space);
+        let agent = AgentPubKey::from_kitsune(&agent);
+        let since = Timestamp(since_utc_epoch_s, 0);
+        let until = Timestamp(until_utc_epoch_s, 0);
+
+        let evt_sender = self.evt_sender.clone();
+        Ok(async move {
+            Ok(evt_sender
+                .list_dht_op_hashes(space, agent, dht_arc, since, until)
+                .await?
+                .into_iter()
+                .map(|h| h.into_kitsune_raw())
+                .collect())
+        }
+        .boxed()
+        .into())
     }
 
     fn handle_fetch_op_hash_data(

@@ -3,6 +3,7 @@
 use crate::core::workflow::produce_dht_ops_workflow::dht_op_light::DhtOpLight;
 use fallible_iterator::FallibleIterator;
 use holo_hash::*;
+use holochain_p2p::dht_arc::DhtArc;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::{
     buffer::KvBuf,
@@ -11,8 +12,7 @@ use holochain_state::{
     prelude::{BufferedStore, GetDb, Reader},
 };
 use holochain_types::{
-    dht_arc::DhtArc, dht_op::DhtOp, timestamp::TS_SIZE, validate::ValidationStatus, Timestamp,
-    TimestampKey,
+    dht_op::DhtOp, timestamp::TS_SIZE, validate::ValidationStatus, Timestamp, TimestampKey,
 };
 
 /// Database type for AuthoredDhtOps

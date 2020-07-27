@@ -22,15 +22,15 @@ pub const MAX_HALF_LENGTH: u32 = (u32::MAX / 2) + 1 + 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 /// Represents how much of a dht arc is held
-/// dht_arc is where the hash is.
-/// The dht_arc is the center of the arc
+/// center_loc is where the hash is.
+/// The center_loc is the center of the arc
 /// The half length is the length of items held
 /// from the center in both directions
 /// half_length 0 means nothing is held
-/// half_length 1 means just the dht_arc is held
+/// half_length 1 means just the center_loc is held
 /// half_length n where n > 1 will hold those positions out
 /// half_length u32::MAX / 2 + 1 covers all positions
-/// on either side of dht_arc.
+/// on either side of center_loc.
 /// Imagine an bidirectional array:
 /// ```text
 /// [4][3][2][1][0][1][2][3][4]
@@ -38,24 +38,20 @@ pub const MAX_HALF_LENGTH: u32 = (u32::MAX / 2) + 1 + 1;
 /// [2][1][0][1][2]
 /// ```
 pub struct DhtArc {
-    dht_arc: DhtLocation,
-    half_length: u32,
-}
+    /// The center location of this dht arc
+    pub center_loc: DhtLocation,
 
-#[derive(Debug, Clone, Eq, PartialEq)]
-/// This represents the range of values covered by an arc
-pub struct ArcRange {
-    start: Bound<u32>,
-    end: Bound<u32>,
+    /// The "half-length" of this dht arc
+    pub half_length: u32,
 }
 
 impl DhtArc {
     /// Create an Arc from a hash location plus a length on either side
     /// half length is (0..(u32::Max / 2 + 1))
-    pub fn new<I: Into<DhtLocation>>(dht_arc: I, half_length: u32) -> Self {
+    pub fn new<I: Into<DhtLocation>>(center_loc: I, half_length: u32) -> Self {
         let half_length = std::cmp::min(half_length, MAX_HALF_LENGTH);
         Self {
-            dht_arc: dht_arc.into(),
+            center_loc: center_loc.into(),
             half_length,
         }
     }
@@ -64,9 +60,9 @@ impl DhtArc {
     pub fn contains<I: Into<DhtLocation>>(&self, other_location: I) -> bool {
         let other_location = other_location.into();
         let do_hold_something = self.half_length != 0;
-        let only_hold_self = self.half_length == 1 && self.dht_arc == other_location;
+        let only_hold_self = self.half_length == 1 && self.center_loc == other_location;
         // Add one to convert to "array length" from math distance
-        let dist_as_array_len = shortest_arc_distance(self.dht_arc, other_location.0) + 1;
+        let dist_as_array_len = shortest_arc_distance(self.center_loc, other_location.0) + 1;
         // Check for any other dist and the special case of the maximum array len
         let within_range = self.half_length > 1 && dist_as_array_len <= self.half_length;
         // Have to hold something and hold ourself or something within range
@@ -77,30 +73,30 @@ impl DhtArc {
     pub fn range(&self) -> ArcRange {
         if self.half_length == 0 {
             ArcRange {
-                start: Bound::Excluded(self.dht_arc.into()),
-                end: Bound::Excluded(self.dht_arc.into()),
+                start: Bound::Excluded(self.center_loc.into()),
+                end: Bound::Excluded(self.center_loc.into()),
             }
         } else if self.half_length == 1 {
             ArcRange {
-                start: Bound::Included(self.dht_arc.into()),
-                end: Bound::Included(self.dht_arc.into()),
+                start: Bound::Included(self.center_loc.into()),
+                end: Bound::Included(self.center_loc.into()),
             }
         } else if self.half_length == MAX_HALF_LENGTH {
             ArcRange {
                 start: Bound::Included(
-                    (self.dht_arc.0 - DhtLocation::from(MAX_HALF_LENGTH - 1).0).0,
+                    (self.center_loc.0 - DhtLocation::from(MAX_HALF_LENGTH - 1).0).0,
                 ),
                 end: Bound::Included(
-                    (self.dht_arc.0 + DhtLocation::from(MAX_HALF_LENGTH).0 - Wrapping(2)).0,
+                    (self.center_loc.0 + DhtLocation::from(MAX_HALF_LENGTH).0 - Wrapping(2)).0,
                 ),
             }
         } else {
             ArcRange {
                 start: Bound::Included(
-                    (self.dht_arc.0 - DhtLocation::from(self.half_length - 1).0).0,
+                    (self.center_loc.0 - DhtLocation::from(self.half_length - 1).0).0,
                 ),
                 end: Bound::Included(
-                    (self.dht_arc.0 + DhtLocation::from(self.half_length).0 - Wrapping(1)).0,
+                    (self.center_loc.0 + DhtLocation::from(self.half_length).0 - Wrapping(1)).0,
                 ),
             }
         }
@@ -119,6 +115,24 @@ impl From<DhtLocation> for u32 {
     }
 }
 
+/// Finds the shortest distance between two points on a circle
+fn shortest_arc_distance<A: Into<DhtLocation>, B: Into<DhtLocation>>(a: A, b: B) -> u32 {
+    // Turn into wrapped u32s
+    let a = a.into().0;
+    let b = b.into().0;
+    std::cmp::min(a - b, b - a).0
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+/// This represents the range of values covered by an arc
+pub struct ArcRange {
+    /// The start bound of an arc range
+    pub start: Bound<u32>,
+
+    /// The end bound of an arc range
+    pub end: Bound<u32>,
+}
+
 impl ArcRange {
     /// Show if the bound is empty
     /// Useful before using as an index
@@ -128,6 +142,7 @@ impl ArcRange {
             _ => false,
         }
     }
+
     #[cfg(test)]
     fn to_inc(self: ArcRange) -> RangeInclusive<usize> {
         match self {
@@ -152,6 +167,7 @@ impl RangeBounds<u32> for ArcRange {
             Bound::Unbounded => unreachable!("No unbounded ranges for arcs"),
         }
     }
+
     fn end_bound(&self) -> Bound<&u32> {
         match &self.end {
             Bound::Included(i) => Bound::Included(i),
@@ -159,14 +175,6 @@ impl RangeBounds<u32> for ArcRange {
             Bound::Unbounded => unreachable!("No unbounded ranges for arcs"),
         }
     }
-}
-
-/// Finds the shortest distance between two points on a circle
-fn shortest_arc_distance<A: Into<DhtLocation>, B: Into<DhtLocation>>(a: A, b: B) -> u32 {
-    // Turn into wrapped u32s
-    let a = a.into().0;
-    let b = b.into().0;
-    std::cmp::min(a - b, b - a).0
 }
 
 #[cfg(test)]

@@ -33,6 +33,7 @@ use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::env::{EnvironmentKind, EnvironmentWrite, ReadManager};
 use holochain_types::{
     autonomic::AutonomicProcess, cell::CellId, element::WireElement, metadata::MetadataSet,
+    Timestamp,
 };
 use holochain_zome_types::capability::CapSecret;
 use holochain_zome_types::zome::ZomeName;
@@ -308,10 +309,17 @@ impl Cell {
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
-            ListDhtOpHashes { span, respond, .. } => {
+            ListDhtOpHashes {
+                span,
+                respond,
+                dht_arc,
+                since,
+                until,
+                ..
+            } => {
                 let _g = span.enter();
                 let res = self
-                    .handle_list_dht_op_hashes()
+                    .handle_list_dht_op_hashes(dht_arc, since, until)
                     .await
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
@@ -439,7 +447,12 @@ impl Cell {
     }
 
     /// the network module is requesting a list of dht op hashes
-    async fn handle_list_dht_op_hashes(&self) -> CellResult<()> {
+    async fn handle_list_dht_op_hashes(
+        &self,
+        _dht_arc: holochain_p2p::dht_arc::DhtArc,
+        _since: Timestamp,
+        _until: Timestamp,
+    ) -> CellResult<Vec<DhtOpHash>> {
         unimplemented!()
     }
 

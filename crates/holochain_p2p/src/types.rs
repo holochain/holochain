@@ -101,6 +101,7 @@ macro_rules! to_and_from_kitsune {
         $(
             pub(crate) trait $i: ::std::clone::Clone + Sized {
                 fn into_kitsune(self) -> ::std::sync::Arc<$k>;
+                fn into_kitsune_raw(self) -> $k;
                 fn to_kitsune(&self) -> ::std::sync::Arc<$k> {
                     self.clone().into_kitsune()
                 }
@@ -109,7 +110,11 @@ macro_rules! to_and_from_kitsune {
 
             impl $i for $h {
                 fn into_kitsune(self) -> ::std::sync::Arc<$k> {
-                    ::std::sync::Arc::new(self.into_inner().into())
+                    ::std::sync::Arc::new(self.into_kitsune_raw())
+                }
+
+                fn into_kitsune_raw(self) -> $k {
+                    self.into_inner().into()
                 }
 
                 fn from_kitsune(k: &::std::sync::Arc<$k>) -> Self {
@@ -125,6 +130,7 @@ to_and_from_kitsune! {
     AgentPubKeyExt<
         holo_hash::AgentPubKey
     > -> kitsune_p2p::KitsuneAgent,
+    DhtOpHashExt<holo_hash::DhtOpHash> -> kitsune_p2p::KitsuneOpHash,
 }
 
 macro_rules! to_kitsune {

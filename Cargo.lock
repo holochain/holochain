@@ -1534,6 +1534,7 @@ dependencies = [
  "derive_more",
  "futures",
  "ghost_actor",
+ "kitsune_p2p_types",
  "shrinkwraprs",
  "thiserror",
  "tokio",
@@ -1557,6 +1558,7 @@ dependencies = [
 name = "kitsune_p2p_types"
 version = "0.0.1"
 dependencies = [
+ "derive_more",
  "futures",
  "ghost_actor",
  "thiserror",

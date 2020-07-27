@@ -8,14 +8,12 @@ pub struct FetchOpHashesForConstraintsEvt {
     pub space: Arc<super::KitsuneSpace>,
     /// The "agent" context.
     pub agent: Arc<super::KitsuneAgent>,
-    /// The start point on the dht arc to query.
-    pub dht_arc_start_loc: u32,
-    /// The arc-length to query.
-    pub dht_arc_length: u64,
-    /// If specified, only retreive items received since this time.
-    pub since: Option<std::time::SystemTime>,
-    /// If specified, only retreive items received until this time.
-    pub until: Option<std::time::SystemTime>,
+    /// The dht arc to query.
+    pub dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
+    /// Only retreive items received since this time (INCLUSIVE).
+    pub since_utc_epoch_s: i64,
+    /// Only retreive items received until this time (EXCLUSIVE).
+    pub until_utc_epoch_s: i64,
 }
 
 /// Gather all op-hash data for a list of op-hashes from our implementor.
@@ -25,7 +23,7 @@ pub struct FetchOpHashDataEvt {
     /// The "agent" context.
     pub agent: Arc<super::KitsuneAgent>,
     /// The op-hashes to fetch
-    pub op_hashes: Arc<Vec<Arc<super::KitsuneOpHash>>>,
+    pub op_hashes: Vec<Arc<super::KitsuneOpHash>>,
 }
 
 /// Request that our implementor sign some data on behalf of an agent.
@@ -49,7 +47,7 @@ ghost_actor::ghost_chan! {
         fn notify(space: Arc<super::KitsuneSpace>, agent: Arc<super::KitsuneAgent>, payload: Vec<u8>) -> ();
 
         /// Gather a list of op-hashes from our implementor that meet criteria.
-        fn fetch_op_hashes_for_constraints(input: FetchOpHashesForConstraintsEvt) -> Vec<(super::KitsuneDataHash, Vec<super::KitsuneOpHash>)>;
+        fn fetch_op_hashes_for_constraints(input: FetchOpHashesForConstraintsEvt) -> Vec<super::KitsuneOpHash>;
 
         /// Gather all op-hash data for a list of op-hashes from our implementor.
         fn fetch_op_hash_data(input: FetchOpHashDataEvt) -> Vec<(super::KitsuneOpHash, Vec<u8>)>;
