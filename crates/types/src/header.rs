@@ -6,7 +6,7 @@
 
 #![allow(missing_docs)]
 
-use crate::prelude::*;
+use crate::{metadata::TimedHeaderHash, prelude::*};
 use holo_hash::EntryHash;
 use holochain_zome_types::entry_def::EntryVisibility;
 use holochain_zome_types::header::*;
@@ -21,6 +21,37 @@ pub enum NewEntryHeader {
     /// A header which creates a new entry that is semantically related to a
     /// previously created entry or header
     Update(EntryUpdate),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Ord, PartialOrd)]
+/// A header of one of the two types that create a new entry.
+pub enum WireNewEntryHeader {
+    /// A header which simply creates a new entry
+    Create(MinNewEntryHeader),
+    /// A pair containing the minimum data which creates a new entry
+    /// and the header it updates.
+    /// Note: IntendedFor::Entry is implied.
+    Update((MinNewEntryHeader, HeaderHash)),
+}
+
+/// The minimum unique data for new entry header
+/// that share a common entry
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Ord, PartialOrd)]
+pub struct MinNewEntryHeader {
+    /// Timestamp is first so that deriving Ord results in
+    /// order by time
+    pub timestamp: holochain_zome_types::timestamp::Timestamp,
+    pub author: AgentPubKey,
+    pub header_seq: u32,
+    pub prev_header: HeaderHash,
+    pub signature: Signature,
+}
+
+/// A element delete hash pair for sending over the network
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
+pub struct WireDelete {
+    pub element_delete_address: TimedHeaderHash,
+    pub removes_address: HeaderHash,
 }
 
 impl NewEntryHeader {
@@ -50,6 +81,29 @@ impl From<NewEntryHeader> for Header {
     }
 }
 
+impl From<(EntryCreate, Signature)> for MinNewEntryHeader {
+    fn from((ec, signature): (EntryCreate, Signature)) -> Self {
+        Self {
+            timestamp: ec.timestamp,
+            author: ec.author,
+            header_seq: ec.header_seq,
+            prev_header: ec.prev_header,
+            signature,
+        }
+    }
+}
+
+impl From<(EntryUpdate, Signature)> for MinNewEntryHeader {
+    fn from((eu, signature): (EntryUpdate, Signature)) -> Self {
+        Self {
+            timestamp: eu.timestamp,
+            author: eu.author,
+            header_seq: eu.header_seq,
+            prev_header: eu.prev_header,
+            signature,
+        }
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;

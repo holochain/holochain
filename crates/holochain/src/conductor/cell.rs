@@ -32,7 +32,7 @@ use holochain_keystore::KeystoreSender;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::env::{EnvironmentKind, EnvironmentWrite, ReadManager};
 use holochain_types::{
-    autonomic::AutonomicProcess, cell::CellId, element::WireElement, metadata::MetadataSet,
+    autonomic::AutonomicProcess, cell::CellId, element::GetElementResponse, metadata::MetadataSet,
 };
 use holochain_zome_types::capability::CapSecret;
 use holochain_zome_types::zome::ZomeName;
@@ -410,7 +410,7 @@ impl Cell {
         &self,
         _dht_hash: holo_hash::AnyDhtHash,
         _options: holochain_p2p::event::GetOptions,
-    ) -> CellResult<WireElement> {
+    ) -> CellResult<GetElementResponse> {
         unimplemented!()
     }
 

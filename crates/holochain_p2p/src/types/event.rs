@@ -77,7 +77,7 @@ ghost_actor::ghost_chan! {
             to_agent: AgentPubKey,
             dht_hash: holo_hash::AnyDhtHash,
             options: GetOptions,
-        ) -> WireElement;
+        ) -> GetElementResponse;
 
         /// A remote node is requesting metadata from us.
         fn get_meta(

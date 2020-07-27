@@ -54,7 +54,8 @@ use holochain_p2p::{
 };
 use holochain_state::error::DatabaseResult;
 use holochain_types::{
-    element::{ChainElement, SignedHeaderHashed},
+    element::{ChainElement, GetElementResponse, SignedHeaderHashed, WireElement},
+    header::WireDelete,
     metadata::{EntryDhtStatus, MetadataSet},
     EntryHashed,
 };
@@ -122,19 +123,59 @@ where
 
     // TODO: Remove when used
     #[allow(dead_code)]
-    async fn fetch_element(
+    async fn fetch_single_element(
         &mut self,
         hash: AnyDhtHash,
         options: GetOptions,
     ) -> CascadeResult<Option<ChainElement>> {
         let elements = self.network.get(hash, options).await?;
 
-        // TODO: handle case of multiple elements returned
-        // Get the first returned element
-        let element = match elements.into_iter().next() {
-            Some(chain_element_data) => {
-                // Deserialize to type and hash
-                let element = chain_element_data.into_element().await?;
+        let mut element: Option<Box<WireElement>> = None;
+        let proof_of_delete = elements.into_iter().find_map(|response| match response {
+            // Has header
+            GetElementResponse::GetHeader(Some(we)) => match we.deleted() {
+                // Has proof of deleted entry
+                Some(deleted) => Some((deleted.clone(), we.entry_hash().cloned())),
+                // No proof of delete so this is a live element
+                None => {
+                    element = Some(we);
+                    None
+                }
+            },
+            // Doesn't have header but not because it was deleted
+            GetElementResponse::GetHeader(None) => None,
+            r @ _ => {
+                error!(msg = "Got an invalid response to fetch single element", ?r);
+                None
+            }
+        });
+        let ret = match (proof_of_delete, element) {
+            // Found a delete.
+            // Add it to the cache for future calls.
+            (
+                Some((
+                    WireDelete {
+                        element_delete_address,
+                        removes_address,
+                    },
+                    entry_hash,
+                )),
+                _,
+            ) => {
+                // Need to hash the entry here to add the delete
+                self.meta_cache.register_raw_on_entry(
+                    entry_hash.expect("Deletes don't make sense on headers without entires"),
+                    SysMetaVal::Delete(element_delete_address.clone()),
+                )?;
+                self.meta_cache.register_raw_on_header(
+                    removes_address,
+                    SysMetaVal::Delete(element_delete_address),
+                );
+                None
+            }
+            // No deletes found, return the element if there was on
+            (None, Some(element)) => {
+                let element = element.into_element().await?;
                 let (signed_header, maybe_entry) = element.clone().into_inner();
 
                 // Hash entry
@@ -147,9 +188,9 @@ where
                 self.element_cache.put(signed_header, entry)?;
                 Some(element)
             }
-            None => None,
+            (None, None) => None,
         };
-        Ok(element)
+        Ok(ret)
     }
 
     // TODO: Remove when used

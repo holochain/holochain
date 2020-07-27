@@ -1,5 +1,13 @@
 use super::*;
-use crate::test_utils::test_network;
+use crate::{
+    conductor::{dna_store::MockDnaStore, interface::websocket::test::setup_app},
+    core::{
+        ribosome::{host_fn, wasm_ribosome::WasmRibosome, CallContext, ZomeCallHostAccess},
+        state::workspace::Workspace,
+        workflow::{unsafe_call_zome_workspace::UnsafeCallZomeWorkspace, CallZomeWorkspace},
+    },
+    test_utils::test_network,
+};
 use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
 use futures::future::{Either, FutureExt};
@@ -7,19 +15,40 @@ use ghost_actor::GhostControlSender;
 use hdk3::prelude::EntryVisibility;
 use holo_hash::hash_type::{self, AnyDht};
 use holo_hash::*;
-use holochain_p2p::{actor::GetMetaOptions, HolochainP2pCell, HolochainP2pRef};
-use holochain_state::{env::ReadManager, test_utils::test_cell_env};
+use holochain_keystore::KeystoreSender;
+use holochain_p2p::{
+    actor::{GetMetaOptions, HolochainP2pRefToCell},
+    HolochainP2pCell, HolochainP2pRef,
+};
+use holochain_serialized_bytes::prelude::*;
+use holochain_serialized_bytes::SerializedBytes;
+use holochain_state::{
+    env::{EnvironmentWriteRef, ReadManager},
+    prelude::{GetDb, WriteManager},
+    test_utils::test_cell_env,
+};
 use holochain_types::{
-    element::{ChainElement, WireElement},
+    app::InstalledCell,
+    cell::CellId,
+    dna::{DnaDef, DnaFile},
+    element::{ChainElement, GetElementResponse, WireElement},
     fixt::*,
     metadata::TimedHeaderHash,
-    observability, HeaderHashed, Timestamp,
+    observability,
+    test_utils::{fake_agent_pubkey_1, fake_agent_pubkey_2},
+    Entry, HeaderHashed, Timestamp,
 };
-use holochain_zome_types::header::*;
+use holochain_wasm_test_utils::TestWasm;
+use holochain_zome_types::entry::GetOptions;
+use holochain_zome_types::{entry_def, header::*, zome::ZomeName, CommitEntryInput};
 use maplit::btreeset;
 use std::collections::BTreeMap;
-use std::convert::TryInto;
+use std::{
+    convert::{TryFrom, TryInto},
+    sync::Arc,
+};
 use tokio::{sync::oneshot, task::JoinHandle};
+use unwrap_to::unwrap_to;
 
 #[tokio::test(threaded_scheduler)]
 async fn get_updates_cache() {
@@ -54,7 +83,7 @@ async fn get_updates_cache() {
 
         // Call fetch element
         cascade
-            .fetch_element(expected.0.clone().into(), Default::default())
+            .fetch_single_element(expected.0.clone().into(), Default::default())
             .await
             .unwrap()
             .unwrap()
@@ -142,6 +171,141 @@ async fn get_meta_updates_meta_cache() {
     shutdown.clean().await;
 }
 
+#[tokio::test(threaded_scheduler)]
+async fn get_from_another_agent() {
+    observability::test_run().ok();
+    let dna_file = DnaFile::new(
+        DnaDef {
+            name: "dht_get_test".to_string(),
+            uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
+            properties: SerializedBytes::try_from(()).unwrap(),
+            zomes: vec![TestWasm::CommitEntry.into()].into(),
+        },
+        vec![TestWasm::CommitEntry.into()],
+    )
+    .await
+    .unwrap();
+    let zome_name: ZomeName = TestWasm::CommitEntry.into();
+
+    let alice_agent_id = fake_agent_pubkey_1();
+    let alice_cell_id = CellId::new(dna_file.dna_hash().to_owned(), alice_agent_id.clone());
+    let alice_installed_cell = InstalledCell::new(alice_cell_id.clone(), "alice_handle".into());
+
+    let bob_agent_id = fake_agent_pubkey_2();
+    let bob_cell_id = CellId::new(dna_file.dna_hash().to_owned(), bob_agent_id.clone());
+    let bob_installed_cell = InstalledCell::new(bob_cell_id.clone(), "bob_handle".into());
+
+    let mut dna_store = MockDnaStore::new();
+
+    dna_store.expect_get().return_const(Some(dna_file.clone()));
+    dna_store
+        .expect_add_dnas::<Vec<_>>()
+        .times(2)
+        .return_const(());
+    dna_store
+        .expect_add_entry_defs::<Vec<_>>()
+        .times(2)
+        .return_const(());
+
+    let (_tmpdir, _app_api, handle) = setup_app(
+        vec![(alice_installed_cell, None), (bob_installed_cell, None)],
+        dna_store,
+    )
+    .await;
+
+    // Bob store element
+    let entry = Post("Bananas are good for you".into());
+    let entry_hash = {
+        let bob_env = handle.get_cell_env(&bob_cell_id).await.unwrap();
+        let keystore = bob_env.keystore().clone();
+        let network = handle.holochain_p2p().to_cell(
+            bob_cell_id.dna_hash().clone(),
+            bob_cell_id.agent_pubkey().clone(),
+        );
+
+        let ribosome = WasmRibosome::new(dna_file.clone());
+        let call_data = CallData {
+            ribosome,
+            zome_name: zome_name.clone(),
+            network,
+            keystore,
+        };
+        let env_ref = bob_env.guard().await;
+        let dbs = bob_env.dbs().await;
+        commit_entry(
+            &env_ref,
+            &dbs,
+            call_data,
+            entry.clone().try_into().unwrap(),
+            "post".into(),
+        )
+        .await
+    };
+
+    // Alice get element from bob
+    let element = {
+        let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
+        let keystore = alice_env.keystore().clone();
+        let network = handle.holochain_p2p().to_cell(
+            alice_cell_id.dna_hash().clone(),
+            alice_cell_id.agent_pubkey().clone(),
+        );
+
+        let ribosome = WasmRibosome::new(dna_file);
+        let call_data = CallData {
+            ribosome,
+            zome_name,
+            network,
+            keystore,
+        };
+        let env_ref = alice_env.guard().await;
+        let dbs = alice_env.dbs().await;
+        get_entry(&env_ref, &dbs, call_data, entry_hash, GetOptions).await
+    };
+
+    let (signed_header, ret_entry) = element.unwrap().into_inner();
+
+    // TODO: Check signed header is the same header
+
+    // Check Bob is the author
+    assert_eq!(*signed_header.header().author(), bob_agent_id);
+
+    // Check entry is the same
+    let ret_entry: Post = ret_entry.unwrap().try_into().unwrap();
+    assert_eq!(entry, ret_entry);
+
+    let shutdown = handle.take_shutdown_handle().await.unwrap();
+    handle.shutdown().await;
+    shutdown.await.unwrap();
+}
+
+#[derive(Default, SerializedBytes, Serialize, Deserialize, Eq, PartialEq, Clone, Debug)]
+#[repr(transparent)]
+#[serde(transparent)]
+struct Post(String);
+
+impl TryFrom<Post> for Entry {
+    type Error = SerializedBytesError;
+    fn try_from(post: Post) -> Result<Self, Self::Error> {
+        Ok(Entry::App(post.try_into()?))
+    }
+}
+
+impl TryFrom<Entry> for Post {
+    type Error = SerializedBytesError;
+    fn try_from(entry: Entry) -> Result<Self, Self::Error> {
+        let entry = unwrap_to!(entry => Entry::App).clone();
+        Ok(Post::try_from(entry)?)
+    }
+}
+
+struct CallData {
+    ribosome: WasmRibosome,
+    zome_name: ZomeName,
+    network: HolochainP2pCell,
+    keystore: KeystoreSender,
+}
+
 struct Shutdown {
     handle: JoinHandle<()>,
     kill: oneshot::Sender<()>,
@@ -203,7 +367,13 @@ async fn run_fixt_network(
                         let chain_element = element_fixt_store
                             .get(&dht_hash)
                             .cloned()
-                            .map(|element| WireElement::from_element(element).try_into().unwrap())
+                            .map(|element| {
+                                GetElementResponse::GetHeader(Some(Box::new(
+                                    WireElement::from_element(element, None),
+                                )))
+                                .try_into()
+                                .unwrap()
+                            })
                             .unwrap();
                         respond.respond(Ok(async move { Ok(chain_element) }.boxed().into()));
                     }
@@ -268,4 +438,66 @@ async fn generate_fixt_store() -> (
     );
     store.insert(hash, ChainElement::new(signed_header, Some(entry)));
     (store, meta_store)
+}
+
+async fn commit_entry<'env>(
+    env_ref: &'env EnvironmentWriteRef<'env>,
+    dbs: &impl GetDb,
+    call_data: CallData,
+    entry: Entry,
+    entry_def_id: entry_def::EntryDefId,
+) -> EntryHash {
+    let CallData {
+        network,
+        keystore,
+        ribosome,
+        zome_name,
+    } = call_data;
+    let reader = env_ref.reader().unwrap();
+    let mut workspace = CallZomeWorkspace::new(&reader, dbs).unwrap();
+
+    let input = CommitEntryInput::new((entry_def_id.clone(), entry.clone()));
+
+    let output = {
+        let (_g, raw_workspace) = UnsafeCallZomeWorkspace::from_mut(&mut workspace);
+        let host_access = ZomeCallHostAccess::new(raw_workspace, keystore, network);
+        let call_context = CallContext::new(zome_name, host_access.into());
+        let ribosome = Arc::new(ribosome);
+        let call_context = Arc::new(call_context);
+        host_fn::commit_entry::commit_entry(ribosome.clone(), call_context.clone(), input).unwrap()
+    };
+
+    // Write
+    env_ref
+        .with_commit(|writer| workspace.flush_to_txn(writer))
+        .unwrap();
+
+    output.into_inner().try_into().unwrap()
+}
+
+async fn get_entry<'env>(
+    env_ref: &'env EnvironmentWriteRef<'env>,
+    dbs: &impl GetDb,
+    call_data: CallData,
+    entry_hash: EntryHash,
+    _get_options: GetOptions,
+) -> Option<ChainElement> {
+    let reader = env_ref.reader().unwrap();
+    let mut workspace = CallZomeWorkspace::new(&reader, dbs).unwrap();
+
+    let cascade = workspace.cascade(call_data.network);
+    cascade.dht_get(entry_hash.into()).await.unwrap()
+
+    // TODO: use the real get entry when element in zome types pr lands
+    // let input = GetEntryInput::new((entry_hash.clone().into(), GetOptions));
+
+    // let output = {
+    //     let (_g, raw_workspace) = UnsafeCallZomeWorkspace::from_mut(&mut workspace);
+    //     let host_access = ZomeCallHostAccess::new(raw_workspace, keystore, network);
+    //     let call_context = CallContext::new(zome_name, host_access);
+    //     let ribosome = Arc::new(ribosome);
+    //     let call_context = Arc::new(call_context);
+    //     host_fn::get_entry::get_entry(ribosome.clone(), call_context.clone(), input).unwrap()
+    // };
+    // output.into_inner().try_into().unwrap()
 }

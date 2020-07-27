@@ -165,7 +165,7 @@ ghost_actor::ghost_chan! {
             from_agent: AgentPubKey,
             dht_hash: holo_hash::AnyDhtHash,
             options: GetOptions,
-        ) -> Vec<WireElement>;
+        ) -> Vec<GetElementResponse>;
 
         /// Get metadata from the DHT.
         fn get_meta(

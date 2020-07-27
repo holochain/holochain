@@ -41,7 +41,7 @@ mod tests {
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
     use ghost_actor::GhostControlSender;
-    use holochain_types::element::{ChainElement, SignedHeaderHashed};
+    use holochain_types::element::{ChainElement, SignedHeaderHashed, WireElement};
     use holochain_types::fixt::*;
 
     macro_rules! newhash {
@@ -197,20 +197,26 @@ mod tests {
 
         let (p2p, mut evt) = spawn_holochain_p2p().await.unwrap();
 
-        let test_1 = WireElement::from_element(ChainElement::new(
-            SignedHeaderHashed::with_presigned(
-                HoloHashed::from_content(fixt!(Header)).await,
-                fixt!(Signature),
+        let test_1 = GetElementResponse::GetHeader(Some(Box::new(WireElement::from_element(
+            ChainElement::new(
+                SignedHeaderHashed::with_presigned(
+                    HoloHashed::from_content(fixt!(Header)).await,
+                    fixt!(Signature),
+                ),
+                None,
             ),
             None,
-        ));
-        let test_2 = WireElement::from_element(ChainElement::new(
-            SignedHeaderHashed::with_presigned(
-                HoloHashed::from_content(fixt!(Header)).await,
-                fixt!(Signature),
+        ))));
+        let test_2 = GetElementResponse::GetHeader(Some(Box::new(WireElement::from_element(
+            ChainElement::new(
+                SignedHeaderHashed::with_presigned(
+                    HoloHashed::from_content(fixt!(Header)).await,
+                    fixt!(Signature),
+                ),
+                None,
             ),
             None,
-        ));
+        ))));
 
         let mut respond_queue = vec![test_1.clone(), test_2.clone()];
         let r_task = tokio::task::spawn(async move {
