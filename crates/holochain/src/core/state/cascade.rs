@@ -345,8 +345,6 @@ where
         // Meta Cache
         let oldest_live_element = match self.meta_cache.get_dht_status(&entry_hash)? {
             EntryDhtStatus::Live => {
-                // TODO: PERF: Firstly probably do this on writes not reads to meta cache
-                // Secondly figure out how to allow these iterators to cross awaits to avoid collecting
                 let headers = self
                     .meta_cache
                     .get_headers(entry_hash)?
