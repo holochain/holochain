@@ -264,5 +264,5 @@ async fn get_entry_hash_for_header(
         .get_header(header_hash)
         .await?
         .and_then(|e| e.header().entry_data().map(|(hash, _)| hash.clone()));
-    entry.ok_or_else(|| DhtOpConvertError::MissingHeaderEntry(header_hash.clone()))
+    entry.ok_or_else(|| DhtOpConvertError::MissingEntryDataForHeader(header_hash.clone()))
 }

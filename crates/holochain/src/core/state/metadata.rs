@@ -160,8 +160,14 @@ pub trait MetadataBufT {
         entry: Option<EntryHash>,
     ) -> DatabaseResult<()>;
 
-    /// Registers a [Header::ElementDelete] on the Header of an Entry
-    async fn register_delete(
+    /// Registers a [Header::ElementDelete] on the deleted Header
+    async fn register_delete_on_header(
+        &mut self,
+        delete: header::ElementDelete,
+    ) -> DatabaseResult<()>;
+
+    /// Registers a [Header::ElementDelete] on the Entry of the deleted Header
+    async fn register_delete_on_entry(
         &mut self,
         delete: header::ElementDelete,
         entry_hash: EntryHash,
@@ -455,9 +461,9 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
     async fn register_update(
         &mut self,
         update: header::EntryUpdate,
-        entry: Option<EntryHash>,
+        entry_hash: Option<EntryHash>,
     ) -> DatabaseResult<()> {
-        match (&update.intended_for, entry) {
+        match (&update.intended_for, entry_hash) {
             (header::IntendedFor::Header, None) => {
                 let basis: AnyDhtHash = update.replaces_address.clone().into();
                 self.register_header_on_basis(basis, update).await?;
@@ -480,15 +486,20 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
         Ok(())
     }
 
-    #[allow(clippy::needless_lifetimes)]
-    async fn register_delete(
+    async fn register_delete_on_header(
+        &mut self,
+        delete: header::ElementDelete,
+    ) -> DatabaseResult<()> {
+        let header_basis = delete.removes_address.to_owned();
+        self.register_header_on_basis(header_basis, delete.clone())
+            .await
+    }
+
+    async fn register_delete_on_entry(
         &mut self,
         delete: header::ElementDelete,
         entry_hash: EntryHash,
     ) -> DatabaseResult<()> {
-        let remove = delete.removes_address.to_owned();
-        self.register_header_on_basis(remove, delete.clone())
-            .await?;
         self.register_header_on_basis(entry_hash.clone(), delete)
             .await?;
         self.update_entry_dht_status(entry_hash)

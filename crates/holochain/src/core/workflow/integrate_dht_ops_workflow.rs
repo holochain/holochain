@@ -234,21 +234,32 @@ async fn integrate_single_dht_op(
                     .register_update(entry_update, old_entry_hash)
                     .await?;
             }
-            DhtOp::RegisterDeletedEntryHeader(_, entry_delete)
-            | DhtOp::RegisterDeletedBy(_, entry_delete) => {
-                let entry_hash = match element_store
-                    .get_header(&entry_delete.removes_address)
-                    .await?
-                    // Handle missing entry header. Same reason as below
-                    .and_then(|e| e.header().entry_data().map(|(hash, _)| hash.clone()))
-                {
-                    Some(hash) => hash,
-                    // TODO: VALIDATION: This could also be an invalid delete on a header without a delete
-                    // Handle missing Entry (Probably StoreEntry hasn't arrived been processed)
-                    // This is put the op back in the integration queue to try again later
+            DhtOp::RegisterDeletedBy(_, element_delete) => {
+                meta_store.register_delete_on_header(element_delete).await?
+            }
+            DhtOp::RegisterDeletedEntryHeader(_, element_delete) => {
+                let header_hash = &element_delete.removes_address;
+                let entry_hash = match element_store.get_header(header_hash).await? {
+                    Some(e) => {
+                        // Get the hash of the entry of the removed header
+                        e.header()
+                            .entry_data()
+                            .ok_or_else(|| {
+                                // This is not a NewEntryHeader: cannot continue
+                                DhtOpConvertError::MissingEntryDataForHeader(header_hash.clone())
+                            })?
+                            .0
+                            .clone()
+                    }
+                    // The basis entry has not yet been processed, so
+                    // for authorities, put the op back in the integration queue
+                    // to try again later, and for authors, we sadly must skip
+                    // this integration
                     None => return Outcome::deferred(op, validation_status),
                 };
-                meta_store.register_delete(entry_delete, entry_hash).await?
+                meta_store
+                    .register_delete_on_entry(element_delete, entry_hash)
+                    .await?
             }
             DhtOp::RegisterAddLink(signature, link_add) => {
                 if context == Authority {
@@ -298,7 +309,7 @@ async fn integrate_single_dht_op(
         // TODO: PERF: Avoid this clone by returning the op on error
         let (op, basis) = match dht_op_to_light_basis(op.clone(), element_store).await {
             Ok(l) => l,
-            Err(DhtOpConvertError::MissingHeaderEntry(_)) => {
+            Err(DhtOpConvertError::MissingEntryDataForHeader(_)) => {
                 return Outcome::deferred(op, validation_status)
             }
             Err(e) => return Err(e),

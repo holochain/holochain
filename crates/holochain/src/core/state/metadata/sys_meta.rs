@@ -459,12 +459,11 @@ mod tests {
     }
 
     #[tokio::test(threaded_scheduler)]
-    async fn add_entry_get_deletes() {
+    async fn add_entry_get_deletes_on_header() {
         let arc = test_cell_env();
         let env = arc.guard().await;
         let mut fx = TestFixtures::new();
         let header_hash = fx.header_hash();
-        let entry_hash = fx.entry_hash();
         let mut expected: Vec<TimedHeaderHash> = Vec::new();
         let mut entry_deletes = Vec::new();
         for _ in 0..10 {
@@ -478,10 +477,7 @@ mod tests {
             let reader = env.reader().unwrap();
             let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
             for delete in entry_deletes {
-                meta_buf
-                    .register_delete(delete, entry_hash.clone())
-                    .await
-                    .unwrap();
+                meta_buf.register_delete_on_header(delete).await.unwrap();
             }
             let mut headers = meta_buf
                 .get_deletes_on_header(header_hash.clone().into())
@@ -506,6 +502,55 @@ mod tests {
         }
     }
 
+    /// Near duplicate of add_entry_get_deletes_on_header
+    #[tokio::test(threaded_scheduler)]
+    async fn add_entry_get_deletes_on_entry() {
+        let arc = test_cell_env();
+        let env = arc.guard().await;
+        let mut fx = TestFixtures::new();
+        let header_hash = fx.header_hash();
+        let entry_hash = fx.entry_hash();
+        let mut expected: Vec<TimedHeaderHash> = Vec::new();
+        let mut entry_deletes = Vec::new();
+        for _ in 0..10 {
+            let (e, hash) = test_delete(header_hash.clone(), &mut fx).await;
+            expected.push(hash.into());
+            entry_deletes.push(e)
+        }
+
+        expected.sort_by_key(|h| h.header_hash.clone());
+        {
+            let reader = env.reader().unwrap();
+            let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
+            for delete in entry_deletes {
+                meta_buf
+                    .register_delete_on_entry(delete, entry_hash.clone())
+                    .await
+                    .unwrap();
+            }
+            let mut headers = meta_buf
+                .get_deletes_on_header(header_hash.clone().into())
+                .unwrap()
+                .collect::<Vec<_>>()
+                .unwrap();
+            headers.sort_by_key(|h| h.header_hash.clone());
+            assert_eq!(headers, expected);
+            env.with_commit(|writer| meta_buf.flush_to_txn(writer))
+                .unwrap();
+        }
+        {
+            let reader = env.reader().unwrap();
+            let meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
+            let mut headers = meta_buf
+                .get_deletes_on_entry(entry_hash.clone().into())
+                .unwrap()
+                .collect::<Vec<_>>()
+                .unwrap();
+            headers.sort_by_key(|h| h.header_hash.clone());
+            assert_eq!(headers, expected);
+        }
+    }
+
     async fn update_dbs(
         new_entries: &[NewEntryHeader],
         entry_deletes: &[ElementDelete],
@@ -519,7 +564,11 @@ mod tests {
         }
         for delete in entry_deletes.iter().chain(delete_updates.iter()) {
             meta_buf
-                .register_delete(delete.clone(), entry_hash.clone())
+                .register_delete_on_header(delete.clone())
+                .await
+                .unwrap();
+            meta_buf
+                .register_delete_on_entry(delete.clone(), entry_hash.clone())
                 .await
                 .unwrap();
         }
