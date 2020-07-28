@@ -138,6 +138,7 @@ macro_rules! to_kitsune {
         $(
             pub(crate) trait $i: ::std::clone::Clone + Sized {
                 fn into_kitsune(self) -> ::std::sync::Arc<$k>;
+                fn into_kitsune_raw(self) -> $k;
                 fn to_kitsune(&self) -> ::std::sync::Arc<$k> {
                     self.clone().into_kitsune()
                 }
@@ -145,7 +146,11 @@ macro_rules! to_kitsune {
 
             impl $i for $h {
                 fn into_kitsune(self) -> ::std::sync::Arc<$k> {
-                    ::std::sync::Arc::new(self.into_inner().into())
+                    ::std::sync::Arc::new(self.into_kitsune_raw())
+                }
+
+                fn into_kitsune_raw(self) -> $k {
+                    self.into_inner().into()
                 }
             }
         )*

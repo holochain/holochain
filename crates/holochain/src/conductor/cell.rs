@@ -313,7 +313,7 @@ impl Cell {
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
-            ListDhtOpHashes {
+            FetchOpHashesForConstraints {
                 span,
                 respond,
                 dht_arc,
@@ -323,15 +323,15 @@ impl Cell {
             } => {
                 let _g = span.enter();
                 let res = self
-                    .handle_list_dht_op_hashes(dht_arc, since, until)
+                    .handle_fetch_op_hashes_for_constraints(dht_arc, since, until)
                     .await
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
-            FetchDhtOps { span, respond, .. } => {
+            FetchOpHashData { span, respond, .. } => {
                 let _g = span.enter();
                 let res = self
-                    .handle_fetch_dht_ops()
+                    .handle_fetch_op_hash_data()
                     .await
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
@@ -451,7 +451,7 @@ impl Cell {
     }
 
     /// the network module is requesting a list of dht op hashes
-    async fn handle_list_dht_op_hashes(
+    async fn handle_fetch_op_hashes_for_constraints(
         &self,
         dht_arc: holochain_p2p::dht_arc::DhtArc,
         since: Timestamp,
@@ -468,7 +468,7 @@ impl Cell {
     }
 
     /// the network module is requesting the content for dht ops
-    async fn handle_fetch_dht_ops(&self) -> CellResult<()> {
+    async fn handle_fetch_op_hash_data(&self) -> CellResult<()> {
         unimplemented!()
     }
 

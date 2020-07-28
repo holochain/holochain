@@ -141,6 +141,9 @@ make_kitsune_bin_type! {
     "The basis hash/coordinate when identifying a neighborhood.",
     KitsuneBasis,
 
+    "The unique address of an item of distributed data accessible on the Kitsune network.",
+    KitsuneDataHash,
+
     r#"Top-level "KitsuneDataHash" items are buckets of related meta-data.
 These metadata "Operations" each also have unique OpHashes."#,
     KitsuneOpHash,

@@ -247,10 +247,24 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         }
     }
 
+    fn handle_gossip(
+        &mut self,
+        space: Arc<kitsune_p2p::KitsuneSpace>,
+        agent: Arc<kitsune_p2p::KitsuneAgent>,
+        op_hash: Arc<kitsune_p2p::KitsuneOpHash>,
+        _op_data: Vec<u8>,
+    ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<()> {
+        let _space = DnaHash::from_kitsune(&space);
+        let _agent = AgentPubKey::from_kitsune(&agent);
+        let _op_hash = DhtOpHash::from_kitsune(&op_hash);
+        unimplemented!()
+    }
+
     fn handle_fetch_op_hashes_for_constraints(
         &mut self,
         input: kitsune_p2p::event::FetchOpHashesForConstraintsEvt,
-    ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<Vec<kitsune_p2p::KitsuneOpHash>> {
+    ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<Vec<Arc<kitsune_p2p::KitsuneOpHash>>>
+    {
         let kitsune_p2p::event::FetchOpHashesForConstraintsEvt {
             space,
             agent,
@@ -266,10 +280,10 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         let evt_sender = self.evt_sender.clone();
         Ok(async move {
             Ok(evt_sender
-                .list_dht_op_hashes(space, agent, dht_arc, since, until)
+                .fetch_op_hashes_for_constraints(space, agent, dht_arc, since, until)
                 .await?
                 .into_iter()
-                .map(|h| h.into_kitsune_raw())
+                .map(|h| h.into_kitsune())
                 .collect())
         }
         .boxed()
@@ -279,8 +293,9 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
     fn handle_fetch_op_hash_data(
         &mut self,
         _input: kitsune_p2p::event::FetchOpHashDataEvt,
-    ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<Vec<(kitsune_p2p::KitsuneOpHash, Vec<u8>)>>
-    {
+    ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<
+        Vec<(Arc<kitsune_p2p::KitsuneOpHash>, Vec<u8>)>,
+    > {
         unimplemented!()
     }
 

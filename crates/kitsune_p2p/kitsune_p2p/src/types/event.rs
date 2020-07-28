@@ -46,11 +46,19 @@ ghost_actor::ghost_chan! {
         /// We are receiving a notification from a remote node.
         fn notify(space: Arc<super::KitsuneSpace>, agent: Arc<super::KitsuneAgent>, payload: Vec<u8>) -> ();
 
+        /// We are receiving a dht op we may need to hold distributed via gossip.
+        fn gossip(
+            space: Arc<super::KitsuneSpace>,
+            agent: Arc<super::KitsuneAgent>,
+            op_hash: Arc<super::KitsuneOpHash>,
+            op_data: Vec<u8>,
+        ) -> ();
+
         /// Gather a list of op-hashes from our implementor that meet criteria.
-        fn fetch_op_hashes_for_constraints(input: FetchOpHashesForConstraintsEvt) -> Vec<super::KitsuneOpHash>;
+        fn fetch_op_hashes_for_constraints(input: FetchOpHashesForConstraintsEvt) -> Vec<Arc<super::KitsuneOpHash>>;
 
         /// Gather all op-hash data for a list of op-hashes from our implementor.
-        fn fetch_op_hash_data(input: FetchOpHashDataEvt) -> Vec<(super::KitsuneOpHash, Vec<u8>)>;
+        fn fetch_op_hash_data(input: FetchOpHashDataEvt) -> Vec<(Arc<super::KitsuneOpHash>, Vec<u8>)>;
 
         /// Request that our implementor sign some data on behalf of an agent.
         fn sign_network_data(input: SignNetworkDataEvt) -> super::KitsuneSignature;
