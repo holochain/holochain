@@ -113,12 +113,10 @@ ghost_actor::ghost_chan! {
 
         /// The p2p module needs access to the content for a given set of DhtOpHashes.
         fn fetch_op_hash_data(
-            // The dna_hash / space_hash context.
             dna_hash: DnaHash,
-            // The agent_id / agent_pub_key context.
             to_agent: AgentPubKey,
-            // TODO - parameters
-        ) -> (); // TODO - proper return type
+            op_hashes: Vec<holo_hash::DhtOpHash>,
+        ) -> Vec<(holo_hash::AnyDhtHash, holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>;
 
         /// P2p operations require cryptographic signatures and validation.
         fn sign_network_data(

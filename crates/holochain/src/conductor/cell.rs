@@ -328,10 +328,15 @@ impl Cell {
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
-            FetchOpHashData { span, respond, .. } => {
+            FetchOpHashData {
+                span,
+                respond,
+                op_hashes,
+                ..
+            } => {
                 let _g = span.enter();
                 let res = self
-                    .handle_fetch_op_hash_data()
+                    .handle_fetch_op_hash_data(op_hashes)
                     .await
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
@@ -468,7 +473,16 @@ impl Cell {
     }
 
     /// the network module is requesting the content for dht ops
-    async fn handle_fetch_op_hash_data(&self) -> CellResult<()> {
+    async fn handle_fetch_op_hash_data(
+        &self,
+        _op_hashes: Vec<holo_hash::DhtOpHash>,
+    ) -> CellResult<
+        Vec<(
+            holo_hash::AnyDhtHash,
+            holo_hash::DhtOpHash,
+            holochain_types::dht_op::DhtOp,
+        )>,
+    > {
         unimplemented!()
     }
 

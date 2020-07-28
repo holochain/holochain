@@ -252,12 +252,21 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         space: Arc<kitsune_p2p::KitsuneSpace>,
         agent: Arc<kitsune_p2p::KitsuneAgent>,
         op_hash: Arc<kitsune_p2p::KitsuneOpHash>,
-        _op_data: Vec<u8>,
+        op_data: Vec<u8>,
     ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<()> {
-        let _space = DnaHash::from_kitsune(&space);
-        let _agent = AgentPubKey::from_kitsune(&agent);
-        let _op_hash = DhtOpHash::from_kitsune(&op_hash);
-        unimplemented!()
+        let space = DnaHash::from_kitsune(&space);
+        let agent = AgentPubKey::from_kitsune(&agent);
+        let op_hash = DhtOpHash::from_kitsune(&op_hash);
+        let op_data =
+            crate::wire::WireDhtOpData::decode(op_data).map_err(HolochainP2pError::from)?;
+        self.handle_incoming_publish(
+            space,
+            agent,
+            op_data.from_agent,
+            false,
+            op_data.dht_hash,
+            vec![(op_hash, op_data.op_data)],
+        )
     }
 
     fn handle_fetch_op_hashes_for_constraints(
@@ -292,11 +301,44 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
 
     fn handle_fetch_op_hash_data(
         &mut self,
-        _input: kitsune_p2p::event::FetchOpHashDataEvt,
+        input: kitsune_p2p::event::FetchOpHashDataEvt,
     ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<
         Vec<(Arc<kitsune_p2p::KitsuneOpHash>, Vec<u8>)>,
     > {
-        unimplemented!()
+        let kitsune_p2p::event::FetchOpHashDataEvt {
+            space,
+            agent,
+            op_hashes,
+        } = input;
+        let space = DnaHash::from_kitsune(&space);
+        let agent = AgentPubKey::from_kitsune(&agent);
+        let op_hashes = op_hashes
+            .into_iter()
+            .map(|h| DhtOpHash::from_kitsune(&h))
+            .collect::<Vec<_>>();
+
+        let evt_sender = self.evt_sender.clone();
+        Ok(async move {
+            let mut out = vec![];
+            for (dht_hash, op_hash, dht_op) in evt_sender
+                .fetch_op_hash_data(space, agent.clone(), op_hashes)
+                .await?
+            {
+                out.push((
+                    op_hash.into_kitsune(),
+                    crate::wire::WireDhtOpData {
+                        from_agent: agent.clone(),
+                        dht_hash,
+                        op_data: dht_op,
+                    }
+                    .encode()
+                    .map_err(kitsune_p2p::KitsuneP2pError::other)?,
+                ));
+            }
+            Ok(out)
+        }
+        .boxed()
+        .into())
     }
 
     fn handle_sign_network_data(
