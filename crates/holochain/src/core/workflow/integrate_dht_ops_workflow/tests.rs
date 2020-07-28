@@ -1155,7 +1155,7 @@ async fn test_integrate_single_register_replaced_by_for_entry() {
 
 #[tokio::test(threaded_scheduler)]
 #[ignore]
-async fn test_integrate_single_register_delete_on_headerd_by() {
+async fn test_integrate_single_register_delete_on_header_by() {
     // For RegisterDeletedBy
     // metadata has ElementDelete on HeaderHash
     todo!()

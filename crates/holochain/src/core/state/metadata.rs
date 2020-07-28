@@ -491,8 +491,7 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
         delete: header::ElementDelete,
     ) -> DatabaseResult<()> {
         let header_basis = delete.removes_address.to_owned();
-        self.register_header_on_basis(header_basis, delete.clone())
-            .await
+        self.register_header_on_basis(header_basis, delete).await
     }
 
     async fn register_delete_on_entry(
