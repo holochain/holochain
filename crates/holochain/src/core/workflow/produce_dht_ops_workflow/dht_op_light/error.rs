@@ -11,10 +11,8 @@ pub enum DhtOpConvertError {
     DatabaseError(#[from] DatabaseError),
     #[error(transparent)]
     SerializedBytesError(#[from] SerializedBytesError),
-    #[error(
-        "The replaced header could not be found to find the entry hash for a RegisterReplacedBy that is IntendedFor an entry Entry"
-    )]
-    MissingHeaderEntry(HeaderHash),
+    #[error("The header is expected to contain EntryData, but doesn't: {0}")]
+    MissingEntryDataForHeader(HeaderHash),
     #[error("Data for a DhtOp was missing from the source chain")]
     MissingData,
     #[error("Tried to create a StoreEntry with a header that is not EntryCreate or EntryUpdate")]

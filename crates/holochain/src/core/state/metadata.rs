@@ -455,9 +455,9 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
     async fn register_update(
         &mut self,
         update: header::EntryUpdate,
-        entry: Option<EntryHash>,
+        entry_hash: Option<EntryHash>,
     ) -> DatabaseResult<()> {
-        match (&update.intended_for, entry) {
+        match (&update.intended_for, entry_hash) {
             (header::IntendedFor::Header, None) => {
                 let basis: AnyDhtHash = update.replaces_address.clone().into();
                 self.register_header_on_basis(basis, update).await?;
