@@ -813,9 +813,7 @@ async fn commit_entry<'env>(
         .with_commit(|writer| workspace.flush_to_txn(writer))
         .unwrap();
 
-    let entry_hash = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-        holochain_types::entry::EntryHashed::from_content(entry).await
-    })
+    let entry_hash = holochain_types::entry::EntryHashed::from_content(entry).await;
     .into_hash();
 
     (entry_hash, output.into_inner().try_into().unwrap())
