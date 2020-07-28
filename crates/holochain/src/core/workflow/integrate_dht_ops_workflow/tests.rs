@@ -748,7 +748,7 @@ async fn commit_entry<'env>(
     env_ref: &'env EnvironmentWriteRef<'env>,
     dbs: &impl GetDb,
     zome_name: ZomeName,
-) -> EntryHash {
+) -> (EntryHash, HeaderHash) {
     let reader = env_ref.reader().unwrap();
     let mut workspace = CallZomeWorkspace::new(&reader, dbs).unwrap();
 
@@ -813,7 +813,11 @@ async fn commit_entry<'env>(
         .with_commit(|writer| workspace.flush_to_txn(writer))
         .unwrap();
 
-    output.into_inner().try_into().unwrap()
+    let entry_hash = holochain_types::entry::EntryHashed::from_content(entry)
+        .await
+        .into_hash();
+
+    (entry_hash, output.into_inner().try_into().unwrap())
 }
 
 async fn get_entry<'env>(
@@ -967,7 +971,9 @@ async fn test_metadata_from_wasm_api() {
     genesis(&env_ref, &dbs).await;
 
     // Commit the base
-    let base_address = commit_entry(pre_state, &env_ref, &dbs, zome_name.clone()).await;
+    let base_address = commit_entry(pre_state, &env_ref, &dbs, zome_name.clone())
+        .await
+        .0;
 
     // Link the base to the target
     let _link_add_address = link_entries(
@@ -1034,7 +1040,9 @@ async fn test_wasm_api_without_integration_links() {
     genesis(&env_ref, &dbs).await;
 
     // Commit the base
-    let base_address = commit_entry(pre_state, &env_ref, &dbs, zome_name.clone()).await;
+    let base_address = commit_entry(pre_state, &env_ref, &dbs, zome_name.clone())
+        .await
+        .0;
 
     // Link the base to the target
     let _link_add_address = link_entries(
@@ -1086,7 +1094,9 @@ async fn test_wasm_api_without_integration_delete() {
     genesis(&env_ref, &dbs).await;
 
     // Commit the base
-    let base_address = commit_entry(pre_state.clone(), &env_ref, &dbs, zome_name.clone()).await;
+    let base_address = commit_entry(pre_state.clone(), &env_ref, &dbs, zome_name.clone())
+        .await
+        .0;
 
     // Trigger the produce workflow
     produce_dht_ops(&env_ref, env.clone().into(), &dbs).await;
@@ -1118,7 +1128,9 @@ async fn test_wasm_api_without_integration_delete() {
     // Call integrate
     call_workflow(&env_ref, &dbs, env.clone()).await;
     assert_eq!(get_entry(&env_ref, &dbs, base_address.clone()).await, None);
-    let base_address = commit_entry(pre_state, &env_ref, &dbs, zome_name.clone()).await;
+    let base_address = commit_entry(pre_state, &env_ref, &dbs, zome_name.clone())
+        .await
+        .0;
     assert_eq!(
         get_entry(&env_ref, &dbs, base_address.clone()).await,
         Some(original_entry)
