@@ -92,8 +92,13 @@ pub async fn integrate_dht_ops_workflow(
             // only integrate this op if it hasn't been integrated already!
             // TODO: test for this [ B-01894 ]
             if workspace.integrated_dht_ops.get(&op_hash)?.is_none() {
-                match integrate_single_dht_op(value, &mut workspace.cas, &mut workspace.meta, true)
-                    .await?
+                match integrate_single_dht_op(
+                    value,
+                    &mut workspace.cas,
+                    &mut workspace.meta,
+                    IntegrationContext::Authority,
+                )
+                .await?
                 {
                     Outcome::Integrated(integrated) => {
                         workspace.integrated_dht_ops.put(op_hash, integrated)?;
@@ -218,7 +223,7 @@ async fn integrate_single_dht_op(
                             // Handle missing old entry header. Same reason as below
                             .and_then(|e| e.header().entry_data().map(|(hash, _)| hash.clone()))
                         {
-                            Some(e) => Some(e),
+                            Some(hash) => Some(hash),
                             // Handle missing old Entry (Probably StoreEntry hasn't arrived been processed)
                             // This is put the op back in the integration queue to try again later
                             None => return Outcome::deferred(op, validation_status),
@@ -237,7 +242,7 @@ async fn integrate_single_dht_op(
                     // Handle missing entry header. Same reason as below
                     .and_then(|e| e.header().entry_data().map(|(hash, _)| hash.clone()))
                 {
-                    Some(e) => e,
+                    Some(hash) => hash,
                     // TODO: VALIDATION: This could also be an invalid delete on a header without a delete
                     // Handle missing Entry (Probably StoreEntry hasn't arrived been processed)
                     // This is put the op back in the integration queue to try again later
@@ -246,31 +251,39 @@ async fn integrate_single_dht_op(
                 meta_store.register_delete(entry_delete, entry_hash).await?
             }
             DhtOp::RegisterAddLink(signature, link_add) => {
-                meta_store.add_link(link_add.clone()).await?;
-                // Store add Header
-                let header = HeaderHashed::from_content(link_add.into()).await;
-                debug!(link_add = ?header.as_hash());
                 if context == Authority {
+                    // Check whether we have the base address in the Vault.
+                    // If not then this should put the op back on the queue.
+                    if element_store
+                        .get_entry(&link_add.base_address)
+                        .await?
+                        .is_none()
+                    {
+                        return Outcome::deferred(op, validation_status);
+                    }
+
+                    // Store add Header
+                    let header = HeaderHashed::from_content(link_add.into()).await;
+                    debug!(link_add = ?header.as_hash());
+
                     let signed_header = SignedHeaderHashed::with_presigned(header, signature);
                     element_store.put(signed_header, None)?;
                 }
+
+                meta_store.add_link(link_add.clone()).await?;
             }
             DhtOp::RegisterRemoveLink(signature, link_remove) => {
-                // Check whether they have the base address in the cas.
-                // If not then this should put the op back on the queue with a
-                // warning that it's unimplemented and later add this to the cache meta.
-                // TODO: Base might be in cas due to this agent being an authority for a
-                // header on the Base
-                if let None = element_store.get_entry(&link_remove.base_address).await? {
-                    warn!(
-                        "Storing link data when not an author or authority requires the
-                         cache metadata store.
-                         The cache metadata store is currently unimplemented"
-                    );
-                    return Outcome::deferred(op, validation_status);
-                }
-
                 if context == Authority {
+                    // Check whether we have the base address in the Vault.
+                    // If not then this should put the op back on the queue.
+                    if element_store
+                        .get_entry(&link_remove.base_address)
+                        .await?
+                        .is_none()
+                    {
+                        return Outcome::deferred(op, validation_status);
+                    }
+
                     // Store link delete Header
                     let header = HeaderHashed::from_content(link_remove.clone().into()).await;
                     let signed_header = SignedHeaderHashed::with_presigned(header, signature);
@@ -301,6 +314,7 @@ async fn integrate_single_dht_op(
     }
 }
 
+#[derive(PartialEq)]
 /// Specifies my role when integrating
 enum IntegrationContext {
     /// I am integrating DhtOps which I authored
@@ -324,10 +338,17 @@ pub async fn integrate_to_cache(
             validation_status: ValidationStatus::Valid,
         };
         // we don't integrate element data, because it is already in our vault.
-        match integrate_single_dht_op(value, element_store, meta_store, false).await? {
+        match integrate_single_dht_op(value, element_store, meta_store, IntegrationContext::Author)
+            .await?
+        {
             Outcome::Integrated(_) => {}
             Outcome::Deferred(v) => {
-                warn!("An inline-integrated DhtOp was deferred, meaning that not all data was integrated to the cache: {:?}", v)
+                // FIXME: if inline integration is deferred for any reason, we
+                // expect sys validation to fail. Since sys validation is not
+                // implemented, we panic here instead. When sys validation
+                // lands, make this a warning
+                // TODO: make this a panic after @freesig's dht_get work is in (B-01478)
+                error!("An inline-integrated DhtOp was deferred. We expect sys validation to fail: {:?}", v)
             }
         }
     }
