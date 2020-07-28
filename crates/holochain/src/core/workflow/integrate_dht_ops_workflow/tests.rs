@@ -12,6 +12,7 @@ use crate::{
         workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace,
     },
     fixt::*,
+    test_utils::test_network,
 };
 use ::fixt::prelude::*;
 use holo_hash::*;
@@ -923,6 +924,8 @@ async fn get_links<'env>(
         .zomes
         .push((zome_name.clone().into(), fixt!(Zome)));
 
+    let (_network, _r, cell_network) = test_network(Some(dna_file.dna_hash().clone()), None).await;
+
     // Create ribosome mock to return fixtures
     // This is a lot faster then compiling a zome
     let mut ribosome = MockRibosomeT::new();
@@ -939,6 +942,7 @@ async fn get_links<'env>(
 
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = raw_workspace;
+        host_access.network = cell_network;
         call_context.host_access = host_access.into();
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
@@ -1187,12 +1191,10 @@ mod slow_tests {
         ConductorBuilder,
     };
     use crate::core::ribosome::{NamedInvocation, ZomeCallInvocationFixturator};
-    use crate::{
-        core::state::cascade::{test_dbs_and_mocks, Cascade},
-        test_utils::test_network,
-    };
+    use crate::core::state::cascade::{test_dbs_and_mocks, Cascade};
+    use hdk3::prelude::EntryVisibility;
+    use holochain_p2p::actor::HolochainP2pRefToCell;
     use holochain_state::{
-        buffer::BufferedStore,
         env::{ReadManager, WriteManager},
         test_utils::{test_conductor_env, test_wasm_env, TestEnvironment},
     };
@@ -1203,7 +1205,7 @@ mod slow_tests {
         Entry, EntryHashed,
     };
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::header::{builder, EntryType};
+    use holochain_zome_types::header::{builder, AppEntryType, EntryType};
     use holochain_zome_types::HostInput;
     use matches::assert_matches;
     use unwrap_to::unwrap_to;
@@ -1215,8 +1217,6 @@ mod slow_tests {
     // Integration
     #[tokio::test(threaded_scheduler)]
     async fn commit_entry_add_link() {
-        observability::test_run().ok();
-
         observability::test_run().ok();
         let test_env = test_conductor_env();
         let _tmpdir = test_env.tmpdir.clone();
@@ -1278,23 +1278,81 @@ mod slow_tests {
             let env_ref = cell_env.guard().await;
 
             let reader = env_ref.reader().unwrap();
-            let mut sc = crate::core::state::source_chain::SourceChain::new(&reader, &dbs).unwrap();
+            let mut workspace = CallZomeWorkspace::new(&reader, &dbs).unwrap();
 
             let header_builder = builder::EntryCreate {
-                entry_type: EntryType::App(fixt!(AppEntryType)),
+                entry_type: EntryType::App(AppEntryType::new(
+                    0.into(),
+                    0.into(),
+                    EntryVisibility::Public,
+                )),
                 entry_hash: base_entry_hash.clone(),
             };
-            sc.put(header_builder, Some(base_entry.clone()))
+            workspace
+                .source_chain
+                .put(header_builder, Some(base_entry.clone()))
                 .await
                 .unwrap();
 
+            // Commit the target
             let header_builder = builder::EntryCreate {
-                entry_type: EntryType::App(fixt!(AppEntryType)),
+                entry_type: EntryType::App(AppEntryType::new(
+                    1.into(),
+                    0.into(),
+                    EntryVisibility::Public,
+                )),
                 entry_hash: target_entry_hash.clone(),
             };
-            sc.put(header_builder, Some(target_entry.clone()))
+            let hh = workspace
+                .source_chain
+                .put(header_builder, Some(target_entry.clone()))
                 .await
                 .unwrap();
+
+            // Integrate the ops to cache
+            let element = workspace
+                .source_chain
+                .get_element(&hh)
+                .await
+                .unwrap()
+                .unwrap();
+            integrate_to_cache(
+                &element,
+                &mut workspace.cache_cas,
+                &mut workspace.cache_meta,
+            )
+            .await
+            .unwrap();
+
+            // Commit the base
+            let header_builder = builder::EntryCreate {
+                entry_type: EntryType::App(AppEntryType::new(
+                    2.into(),
+                    0.into(),
+                    EntryVisibility::Public,
+                )),
+                entry_hash: base_entry_hash.clone(),
+            };
+            let hh = workspace
+                .source_chain
+                .put(header_builder, Some(base_entry.clone()))
+                .await
+                .unwrap();
+
+            // Integrate the ops to cache
+            let element = workspace
+                .source_chain
+                .get_element(&hh)
+                .await
+                .unwrap()
+                .unwrap();
+            integrate_to_cache(
+                &element,
+                &mut workspace.cache_cas,
+                &mut workspace.cache_meta,
+            )
+            .await
+            .unwrap();
 
             let header_builder = builder::LinkAdd {
                 base_address: base_entry_hash.clone(),
@@ -1302,10 +1360,30 @@ mod slow_tests {
                 zome_id: 0.into(),
                 tag: BytesFixturator::new(Unpredictable).next().unwrap().into(),
             };
-            sc.put(header_builder, None).await.unwrap();
+            let hh = workspace
+                .source_chain
+                .put(header_builder, None)
+                .await
+                .unwrap();
+
+            // Integrate the ops to cache
+            let element = workspace
+                .source_chain
+                .get_element(&hh)
+                .await
+                .unwrap()
+                .unwrap();
+            integrate_to_cache(
+                &element,
+                &mut workspace.cache_cas,
+                &mut workspace.cache_meta,
+            )
+            .await
+            .unwrap();
+
             env_ref
                 .with_commit::<crate::core::state::source_chain::SourceChainError, _, _>(|writer| {
-                    sc.flush_to_txn(writer)?;
+                    workspace.flush_to_txn(writer).unwrap();
                     Ok(())
                 })
                 .unwrap();
@@ -1323,8 +1401,7 @@ mod slow_tests {
             .unwrap(),
         );
         let request = AppRequest::ZomeCallInvocation(request);
-        let r = app_interface.handle_app_request(request).await;
-        debug!(?r);
+        let _r = app_interface.handle_app_request(request).await;
 
         tokio::time::delay_for(std::time::Duration::from_secs(4)).await;
 
@@ -1342,15 +1419,17 @@ mod slow_tests {
             assert!(!ops.is_empty());
 
             let meta = MetadataBuf::vault(&reader, &dbs).unwrap();
+            let mut meta_cache = MetadataBuf::cache(&reader, &dbs).unwrap();
             let key = LinkMetaKey::Base(&base_entry_hash);
             let links = meta.get_links(&key).unwrap().collect::<Vec<_>>().unwrap();
             let link = links[0].clone();
             assert_eq!(link.target, target_entry_hash);
 
-            let (cas, _metadata, mut cache, mut metadata_cache) = test_dbs_and_mocks(&reader, &dbs);
-            let (_n, _r, cell_network) = test_network().await;
-            let mut cascade =
-                Cascade::new(&cas, &meta, &mut cache, &mut metadata_cache, cell_network);
+            let (cas, _metadata, mut cache, _metadata_cache) = test_dbs_and_mocks(&reader, &dbs);
+            let cell_network = conductor
+                .holochain_p2p()
+                .to_cell(cell_id.dna_hash().clone(), cell_id.agent_pubkey().clone());
+            let mut cascade = Cascade::new(&cas, &meta, &mut cache, &mut meta_cache, cell_network);
 
             let links = cascade
                 .dht_get_links(&key, Default::default())

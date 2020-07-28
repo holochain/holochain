@@ -68,19 +68,12 @@ async fn get_updates_cache() {
         .unwrap();
 
     // Create the cascade
-    let (element_vault, meta_vault, mut element_cache, mut meta_cache) =
-        test_dbs_and_mocks(&reader, &dbs);
+    let mut workspace = CallZomeWorkspace::new(&reader, &dbs).unwrap();
     let (network, shutdown) = run_fixt_network(element_fixt_store, BTreeMap::new()).await;
 
     {
         // Construct the cascade with a network
-        let mut cascade = Cascade::new(
-            &element_vault,
-            &meta_vault,
-            &mut element_cache,
-            &mut meta_cache,
-            network,
-        );
+        let mut cascade = workspace.cascade(network);
 
         // Call fetch element
         cascade
@@ -90,7 +83,8 @@ async fn get_updates_cache() {
     }
 
     // Check the cache has been updated
-    let result = element_cache
+    let result = workspace
+        .cache_cas
         .get_element(&expected.0)
         .await
         .unwrap()
@@ -120,19 +114,12 @@ async fn get_meta_updates_meta_cache() {
         .unwrap();
 
     // Create the cascade
-    let mut meta_cache = MetadataBuf::cache(&reader, &dbs).unwrap();
-    let (element_vault, meta_vault, mut element_cache, _) = test_dbs_and_mocks(&reader, &dbs);
+    let mut workspace = CallZomeWorkspace::new(&reader, &dbs).unwrap();
     let (network, shutdown) = run_fixt_network(BTreeMap::new(), meta_fixt_store).await;
 
     let returned = {
         // Construct the cascade with a network
-        let mut cascade = Cascade::new(
-            &element_vault,
-            &meta_vault,
-            &mut element_cache,
-            &mut meta_cache,
-            network,
-        );
+        let mut cascade = workspace.cascade(network);
 
         // Create GetMetaOptions
         let options = GetMetaOptions::default();
@@ -152,7 +139,8 @@ async fn get_meta_updates_meta_cache() {
     assert_eq!(returned.headers.into_iter().next().unwrap(), expected.1);
 
     // Check the cache has been updated
-    let result = meta_cache
+    let result = workspace
+        .cache_meta
         .get_headers(match expected.0.hash_type().clone() {
             hash_type::AnyDht::Entry(e) => expected.0.clone().retype(e),
             _ => unreachable!(),
@@ -375,7 +363,7 @@ async fn run_fixt_network(
     meta_fixt_store: BTreeMap<AnyDhtHash, TimedHeaderHash>,
 ) -> (HolochainP2pCell, Shutdown) {
     // Create the network
-    let (network, mut recv, cell_network) = test_network().await;
+    let (network, mut recv, cell_network) = test_network(None, None).await;
     let (kill, killed) = tokio::sync::oneshot::channel();
 
     // Return fixt store data to gets

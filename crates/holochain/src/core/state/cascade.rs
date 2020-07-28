@@ -84,6 +84,7 @@ where
     network: HolochainP2pCell,
 }
 
+#[derive(Debug)]
 /// The state of the cascade search
 enum Search {
     /// The entry is found and we can stop
@@ -214,6 +215,7 @@ where
         Ok(())
     }
 
+    #[instrument(skip(self, options))]
     async fn fetch_element_via_entry(
         &mut self,
         hash: EntryHash,

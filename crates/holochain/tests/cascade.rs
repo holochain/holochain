@@ -90,7 +90,7 @@ async fn get_links() -> SourceChainResult<()> {
         .put_raw(jessy_header, Some(jessy_entry.as_content().clone()))
         .await?;
 
-    let (_n, _r, cell_network) = test_network().await;
+    let (_n, _r, cell_network) = test_network(None, None).await;
 
     // Pass in stores as references
     let mut cascade = Cascade::new(
