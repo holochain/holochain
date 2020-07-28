@@ -1,6 +1,9 @@
 pub use crate::core::state::source_chain::{SourceChainError, SourceChainResult};
 pub use holo_hash::*;
-pub use holochain_types::{element::ChainElement, HeaderHashed, Timestamp};
+pub use holochain_types::{
+    element::{Element, ElementExt},
+    HeaderHashed, Timestamp,
+};
 
 /// Ensure that a given pre-fetched element is actually valid on this chain.
 ///
@@ -13,8 +16,8 @@ pub use holochain_types::{element::ChainElement, HeaderHashed, Timestamp};
 /// - @TODO - The serialized entry content is < 100MB.
 pub async fn sys_validate_element(
     author: &AgentPubKey,
-    element: &ChainElement,
-    prev_element: Option<&ChainElement>,
+    element: &Element,
+    prev_element: Option<&Element>,
 ) -> SourceChainResult<()> {
     // The header signature is valid.
     element.validate().await?;
@@ -115,14 +118,14 @@ pub async fn sys_validate_header(
 mod tests {
     use super::*;
     use holochain_types::{
-        element::SignedHeaderHashed,
+        element::{SignedHeaderHashed, SignedHeaderHashedExt},
         test_utils::{fake_agent_pubkey_1, fake_header_hash},
         Timestamp,
     };
     use holochain_zome_types::header::InitZomesComplete;
     use std::convert::TryInto;
 
-    async fn test_gen(ts: Timestamp, seq: u32, prev: HeaderHash) -> ChainElement {
+    async fn test_gen(ts: Timestamp, seq: u32, prev: HeaderHash) -> Element {
         let keystore = holochain_state::test_utils::test_keystore();
 
         let header = InitZomesComplete {
@@ -134,7 +137,7 @@ mod tests {
 
         let hashed = HeaderHashed::from_content(header.into()).await;
         let signed = SignedHeaderHashed::new(&keystore, hashed).await.unwrap();
-        ChainElement::new(signed, None)
+        Element::new(signed, None)
     }
 
     #[tokio::test(threaded_scheduler)]

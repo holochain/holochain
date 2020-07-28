@@ -1,7 +1,7 @@
 use crate::{entry_def::EntryVisibility, link::LinkTag, timestamp::Timestamp};
 pub use builder::{HeaderBuilder, HeaderBuilderCommon};
 use holo_hash::{
-    impl_hashable_content, AgentPubKey, DnaHash, EntryHash, HashableContent, HeaderHash,
+    impl_hashable_content, AgentPubKey, DnaHash, EntryHash, HashableContent, HeaderHash, HoloHashed,
 };
 use holochain_serialized_bytes::prelude::*;
 
@@ -39,6 +39,8 @@ pub enum Header {
     EntryUpdate(EntryUpdate),
     ElementDelete(ElementDelete),
 }
+
+pub type HeaderHashed = HoloHashed<Header>;
 
 /// a utility wrapper to write intos for our data types
 macro_rules! write_into_header {

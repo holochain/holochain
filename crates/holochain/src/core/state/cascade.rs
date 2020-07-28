@@ -50,7 +50,7 @@ use holochain_p2p::{
 };
 use holochain_state::error::DatabaseResult;
 use holochain_types::{
-    element::{ChainElement, SignedHeaderHashed},
+    element::{Element, SignedHeaderHashed},
     metadata::{EntryDhtStatus, MetadataSet},
     EntryHashed,
 };
@@ -121,7 +121,7 @@ where
         &mut self,
         hash: AnyDhtHash,
         options: GetOptions,
-    ) -> CascadeResult<Option<ChainElement>> {
+    ) -> CascadeResult<Option<Element>> {
         let elements = self.network.get(hash, options).await?;
 
         // TODO: handle case of multiple elements returned
@@ -129,7 +129,7 @@ where
         let element = match elements.into_iter().next() {
             Some(chain_element_data) => {
                 // Deserialize to type and hash
-                let element = chain_element_data.into_element().await?;
+                let element = chain_element_data.into_element().await;
                 let (signed_header, maybe_entry) = element.clone().into_inner();
 
                 // Hash entry
