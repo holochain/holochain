@@ -267,7 +267,10 @@ mod tests {
 
         let (p2p, mut evt) = spawn_holochain_p2p().await.unwrap();
 
-        let test_1 = SerializedBytes::from(UnsafeBytes::from(b"resp-1".to_vec()));
+        let test_1 = GetLinksResponse {
+            link_adds: vec![(fixt!(LinkAdd), fixt!(Signature))],
+            link_removes: vec![(fixt!(LinkRemove), fixt!(Signature))],
+        };
 
         let test_1_clone = test_1.clone();
         let r_task = tokio::task::spawn(async move {
@@ -287,13 +290,14 @@ mod tests {
         p2p.join(dna.clone(), a1.clone()).await.unwrap();
         p2p.join(dna.clone(), a2.clone()).await.unwrap();
 
-        let hash = holo_hash::AnyDhtHash::from_raw_bytes_and_type(
+        let hash = holo_hash::EntryHash::from_raw_bytes_and_type(
             b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
-            holo_hash::hash_type::AnyDht::Header,
+            holo_hash::hash_type::Entry::Content,
         );
+        let link_key = WireLinkMetaKey::Base(hash);
 
         let res = p2p
-            .get_links(dna, a1, hash, actor::GetLinksOptions::default())
+            .get_links(dna, a1, link_key, actor::GetLinksOptions::default())
             .await
             .unwrap();
 

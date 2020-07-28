@@ -18,7 +18,7 @@ use crate::{
     core::{
         state::{
             chain_cas::ChainCasBuf,
-            metadata::{MetadataBuf, MetadataBufT},
+            metadata::{LinkMetaKey, MetadataBuf, MetadataBufT},
             source_chain::SourceChainBuf,
         },
         workflow::{
@@ -42,11 +42,12 @@ use holochain_types::{
     cell::CellId,
     element::{GetElementResponse, RawGetEntryResponse, WireElement},
     header::WireDelete,
+    link::{GetLinksResponse, WireLinkMetaKey},
     metadata::MetadataSet,
 };
 use holochain_zome_types::capability::CapSecret;
 use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::HostInput;
+use holochain_zome_types::{Header, HostInput};
 use std::{
     collections::{BTreeSet, HashSet},
     convert::TryInto,
@@ -296,13 +297,13 @@ impl Cell {
             GetLinks {
                 span,
                 respond,
-                dht_hash,
+                link_key,
                 options,
                 ..
             } => {
                 let _g = span.enter();
                 let res = self
-                    .handle_get_links(dht_hash, options)
+                    .handle_get_links(link_key, options)
                     .await
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
@@ -543,11 +544,67 @@ impl Cell {
     /// a remote node is asking us for links
     async fn handle_get_links(
         &self,
-        _dht_hash: holo_hash::AnyDhtHash,
+        link_key: WireLinkMetaKey,
         _options: holochain_p2p::event::GetLinksOptions,
-    ) -> CellResult<SerializedBytes> {
-        tracing::warn!("handle get links is unimplemented");
-        Err(CellError::Todo)
+    ) -> CellResult<GetLinksResponse> {
+        let env_ref = self.state_env.guard().await;
+        let dbs = self.state_env.dbs().await;
+        let reader = env_ref.reader()?;
+        let element_vault = ChainCasBuf::vault(&reader, &dbs, false)?;
+        let meta_vault = MetadataBuf::vault(&reader, &dbs)?;
+        let key = LinkMetaKey::from(&link_key);
+        let mut lr: Vec<HeaderHash> = Vec::new();
+        // TODO: Maybe don't need to send back add links with removes
+        let la = meta_vault
+            .get_links(&key)?
+            .map(|link| {
+                lr.extend(
+                    meta_vault
+                        .get_link_removes_on_link_add(link.link_add_hash.clone())?
+                        .map(|l| Ok(l.header_hash))
+                        .iterator()
+                        .filter_map(Result::ok),
+                );
+                Ok(link.link_add_hash)
+            })
+            .collect::<Vec<_>>()?;
+        let mut link_removes = Vec::with_capacity(lr.len());
+        for link_remove in lr {
+            if let Some(l) = element_vault.get_header(&link_remove).await?.and_then(|d| {
+                let (h, s) = d.into_inner().0.into();
+                match h {
+                    Header::LinkRemove(lr) => Some((lr, s)),
+                    _ => None,
+                }
+            }) {
+                link_removes.push(l);
+            }
+        }
+        let mut link_adds = Vec::with_capacity(la.len());
+        for link_add in la {
+            if let Some(l) = element_vault.get_header(&link_add).await?.and_then(|d| {
+                let (h, s) = d.into_inner().0.into();
+                match h {
+                    Header::LinkAdd(la) => Some((la, s)),
+                    _ => None,
+                }
+            }) {
+                link_adds.push(l);
+            }
+        }
+        // element_vault
+        //     .get_header(&link.link_add_hash).await?
+        //     .filter_map(|d| {
+        //         let (h, s) = d.into_inner().1.into();
+        //         Ok(match h {
+        //             Header::LinkAdd(lr) => Some((lr, s)),
+        //             _ => None,
+        //         })
+        //     })
+        Ok(GetLinksResponse {
+            link_adds,
+            link_removes,
+        })
     }
 
     /// a remote agent is sending us a validation receipt.

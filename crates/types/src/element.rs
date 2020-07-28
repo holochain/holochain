@@ -32,7 +32,7 @@ pub struct ChainElement {
 pub struct WireElement {
     /// The signed header for this element
     signed_header: SignedHeader,
-    /// If there is an entry associated with this header it will be here
+    /// If there is an entry associated with this header it will be her
     maybe_entry: Option<Entry>,
     /// If this element is deleted then we require a single delete
     /// in the cache as proof of the tombstone
@@ -69,6 +69,8 @@ pub struct RawGetEntryResponse {
     // header being deleted but we would need to only ever store
     // if there was a header delete in our MetadataBuf and
     // not the delete header hash as we do now.
+    // TODO: We should think about getting the whole ElementDelete
+    // so we can validate the delete hash is correct
     pub deletes: HashSet<WireDelete>,
     /// The entry shared across all headers
     pub entry: Entry,
@@ -125,14 +127,9 @@ impl RawGetEntryResponse {
                 (WireNewEntryHeader::Create((ec, signature).into()), et, eh)
             }
             Header::EntryUpdate(eu) => {
-                let replaces_address = eu.replaces_address.clone();
                 let eh = eu.entry_hash.clone();
                 let et = eu.entry_type.clone();
-                (
-                    WireNewEntryHeader::Update(((eu, signature).into(), replaces_address)),
-                    et,
-                    eh,
-                )
+                (WireNewEntryHeader::Update((eu, signature).into()), et, eh)
             }
             h @ _ => panic!(
                 "Get entry responses cannot be created from headers

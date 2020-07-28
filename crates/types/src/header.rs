@@ -30,24 +30,35 @@ pub enum NewEntryHeader {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Ord, PartialOrd)]
 /// A header of one of the two types that create a new entry.
 pub enum WireNewEntryHeader {
-    /// A header which simply creates a new entry
-    Create(MinNewEntryHeader),
-    /// A pair containing the minimum data which creates a new entry
-    /// and the header it updates.
-    /// Note: IntendedFor::Entry is implied.
-    Update((MinNewEntryHeader, HeaderHash)),
+    Create(WireEntryCreate),
+    Update(WireEntryUpdate),
 }
 
 /// The minimum unique data for new entry header
 /// that share a common entry
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Ord, PartialOrd)]
-pub struct MinNewEntryHeader {
+pub struct WireEntryCreate {
     /// Timestamp is first so that deriving Ord results in
     /// order by time
     pub timestamp: holochain_zome_types::timestamp::Timestamp,
     pub author: AgentPubKey,
     pub header_seq: u32,
     pub prev_header: HeaderHash,
+    pub signature: Signature,
+}
+
+/// The minimum unique data for new entry header
+/// that share a common entry
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Ord, PartialOrd)]
+pub struct WireEntryUpdate {
+    /// Timestamp is first so that deriving Ord results in
+    /// order by time
+    pub timestamp: holochain_zome_types::timestamp::Timestamp,
+    pub author: AgentPubKey,
+    pub header_seq: u32,
+    pub prev_header: HeaderHash,
+    pub intended_for: IntendedFor,
+    pub replaces_address: HeaderHash,
     pub signature: Signature,
 }
 
@@ -85,7 +96,7 @@ impl From<NewEntryHeader> for Header {
     }
 }
 
-impl From<(EntryCreate, Signature)> for MinNewEntryHeader {
+impl From<(EntryCreate, Signature)> for WireEntryCreate {
     fn from((ec, signature): (EntryCreate, Signature)) -> Self {
         Self {
             timestamp: ec.timestamp,
@@ -97,13 +108,15 @@ impl From<(EntryCreate, Signature)> for MinNewEntryHeader {
     }
 }
 
-impl From<(EntryUpdate, Signature)> for MinNewEntryHeader {
+impl From<(EntryUpdate, Signature)> for WireEntryUpdate {
     fn from((eu, signature): (EntryUpdate, Signature)) -> Self {
         Self {
             timestamp: eu.timestamp,
             author: eu.author,
             header_seq: eu.header_seq,
             prev_header: eu.prev_header,
+            intended_for: eu.intended_for,
+            replaces_address: eu.replaces_address,
             signature,
         }
     }
@@ -135,19 +148,15 @@ impl WireNewEntryHeader {
                 };
                 (NewEntryHeader::Create(ec), hash, signature)
             }
-            WireNewEntryHeader::Update((eu, replaces_address)) => {
+            WireNewEntryHeader::Update(eu) => {
                 let signature = eu.signature;
                 let eu = EntryUpdate {
                     author: eu.author,
                     timestamp: eu.timestamp,
                     header_seq: eu.header_seq,
                     prev_header: eu.prev_header,
-                    // TODO: This could be wrong.
-                    // Are EntryUpdates that are intended for the header
-                    // registered onto the entry in the MetadataBuf?
-                    // Should they be?
-                    intended_for: IntendedFor::Entry,
-                    replaces_address,
+                    intended_for: eu.intended_for,
+                    replaces_address: eu.replaces_address,
                     entry_type,
                     entry_hash,
                 };
@@ -171,10 +180,7 @@ impl TryFrom<SignedHeaderHashed> for WireNewEntryHeader {
         let (header, s) = sh.into();
         match header {
             Header::EntryCreate(ec) => Ok(Self::Create((ec, s).into())),
-            Header::EntryUpdate(eu) => {
-                let rep = eu.replaces_address.clone();
-                Ok(Self::Update(((eu, s).into(), rep)))
-            }
+            Header::EntryUpdate(eu) => Ok(Self::Update((eu, s).into())),
             _ => return Err(HeaderError::NotNewEntry),
         }
     }

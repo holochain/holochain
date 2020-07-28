@@ -1,11 +1,11 @@
 use crate::core::ribosome::error::{RibosomeError, RibosomeResult};
 use crate::core::{
     ribosome::{CallContext, RibosomeT},
-    state::metadata::LinkMetaKey,
+    state::{cascade::error::CascadeResult, metadata::LinkMetaKey},
     workflow::CallZomeWorkspace,
 };
 use futures::future::FutureExt;
-use holochain_state::error::DatabaseResult;
+use holochain_p2p::actor::GetLinksOptions;
 use holochain_zome_types::link::Link;
 use holochain_zome_types::GetLinksInput;
 use holochain_zome_types::GetLinksOutput;
@@ -36,9 +36,9 @@ pub fn get_links<'a>(
     let network = call_context.host_access.network().clone();
 
     let call =
-        |workspace: &'a mut CallZomeWorkspace| -> MustBoxFuture<'a, DatabaseResult<Vec<Link>>> {
+        |workspace: &'a mut CallZomeWorkspace| -> MustBoxFuture<'a, CascadeResult<Vec<Link>>> {
             async move {
-                let cascade = workspace.cascade(network);
+                let mut cascade = workspace.cascade(network);
 
                 // Create the key
                 let key = match tag.as_ref() {
@@ -47,7 +47,9 @@ pub fn get_links<'a>(
                 };
 
                 // Get te links from the dht
-                cascade.dht_get_links(&key).await
+                cascade
+                    .dht_get_links(&key, GetLinksOptions::default())
+                    .await
             }
             .boxed()
             .into()

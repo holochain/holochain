@@ -17,7 +17,6 @@ use futures::future::{Either, FutureExt};
 use ghost_actor::GhostControlSender;
 use hdk3::prelude::EntryVisibility;
 use holo_hash::hash_type::{self, AnyDht};
-use holo_hash::*;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::{
     actor::{GetMetaOptions, HolochainP2pRefToCell},
@@ -42,7 +41,6 @@ use holochain_types::{
     Entry, HeaderHashed, Timestamp,
 };
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::entry::GetOptions;
 use holochain_zome_types::{entry_def, header::*, zome::ZomeName, CommitEntryInput};
 use maplit::btreeset;
 use std::collections::BTreeMap;
@@ -74,7 +72,7 @@ async fn get_updates_cache() {
         test_dbs_and_mocks(&reader, &dbs);
     let (network, shutdown) = run_fixt_network(element_fixt_store, BTreeMap::new()).await;
 
-    let returned_element = {
+    {
         // Construct the cascade with a network
         let mut cascade = Cascade::new(
             &element_vault,
@@ -88,13 +86,8 @@ async fn get_updates_cache() {
         cascade
             .fetch_element_via_header(expected.0.clone().into(), Default::default())
             .await
-            .unwrap()
-            .unwrap()
-    };
-
-    // Check the returned element is correct
-    assert_eq!(returned_element.header(), expected.1.header());
-    assert_eq!(returned_element.entry(), expected.1.entry());
+            .unwrap();
+    }
 
     // Check the cache has been updated
     let result = element_cache
@@ -216,6 +209,14 @@ async fn get_from_another_agent() {
     )
     .await;
 
+    let options = GetOptions {
+        remote_agent_count: None,
+        timeout_ms: None,
+        as_race: false,
+        race_timeout_ms: None,
+        follow_redirects: false,
+    };
+
     // Bob store element
     let entry = Post("Bananas are good for you".into());
     let entry_hash = {
@@ -247,9 +248,15 @@ async fn get_from_another_agent() {
         // Bob is not an authority yet
 
         // Check bob can get the entry
-        let element = get_entry(&env_ref, &dbs, call_data, entry_hash.clone(), GetOptions)
-            .await
-            .unwrap();
+        let element = get_entry(
+            &env_ref,
+            &dbs,
+            call_data,
+            entry_hash.clone(),
+            options.clone(),
+        )
+        .await
+        .unwrap();
         let (signed_header, ret_entry) = element.clone().into_inner();
 
         // TODO: Check signed header is the same header
@@ -285,7 +292,7 @@ async fn get_from_another_agent() {
         };
         let env_ref = alice_env.guard().await;
         let dbs = alice_env.dbs().await;
-        get_entry(&env_ref, &dbs, call_data, entry_hash, GetOptions).await
+        get_entry(&env_ref, &dbs, call_data, entry_hash, options.clone()).await
     };
 
     let (signed_header, ret_entry) = element.unwrap().into_inner();
@@ -506,13 +513,13 @@ async fn get_entry<'env>(
     dbs: &impl GetDb,
     call_data: CallData,
     entry_hash: EntryHash,
-    _get_options: GetOptions,
+    options: GetOptions,
 ) -> Option<ChainElement> {
     let reader = env_ref.reader().unwrap();
     let mut workspace = CallZomeWorkspace::new(&reader, dbs).unwrap();
 
     let mut cascade = workspace.cascade(call_data.network);
-    cascade.dht_get(entry_hash.into()).await.unwrap()
+    cascade.dht_get(entry_hash.into(), options).await.unwrap()
 
     // TODO: use the real get entry when element in zome types pr lands
     // let input = GetEntryInput::new((entry_hash.clone().into(), GetOptions));

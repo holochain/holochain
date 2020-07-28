@@ -1352,19 +1352,22 @@ mod slow_tests {
             let mut cascade =
                 Cascade::new(&cas, &meta, &mut cache, &mut metadata_cache, cell_network);
 
-            let links = cascade.dht_get_links(&key).await.unwrap();
+            let links = cascade
+                .dht_get_links(&key, Default::default())
+                .await
+                .unwrap();
             let link = links[0].clone();
             assert_eq!(link.target, target_entry_hash);
 
             let e = cascade
-                .dht_get(target_entry_hash.into())
+                .dht_get(target_entry_hash.into(), Default::default())
                 .await
                 .unwrap()
                 .unwrap();
             assert_eq!(e.into_inner().1.unwrap(), target_entry);
 
             let e = cascade
-                .dht_get(base_entry_hash.into())
+                .dht_get(base_entry_hash.into(), Default::default())
                 .await
                 .unwrap()
                 .unwrap();

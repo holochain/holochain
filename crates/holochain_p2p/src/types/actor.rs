@@ -13,7 +13,7 @@ pub struct GetValidationPackage {
     // TODO - parameters
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 /// Get options help control how the get is processed at various levels.
 /// Fields tagged with `[Network]` are network-level controls.
 /// Fields tagged with `[Remote]` are controls that will be forwarded to the
@@ -58,6 +58,12 @@ impl Default for GetOptions {
             race_timeout_ms: None,
             follow_redirects: true,
         }
+    }
+}
+
+impl From<holochain_zome_types::entry::GetOptions> for GetOptions {
+    fn from(_: holochain_zome_types::entry::GetOptions) -> Self {
+        Self::default()
     }
 }
 
@@ -180,9 +186,9 @@ ghost_actor::ghost_chan! {
         fn get_links(
             dna_hash: DnaHash,
             from_agent: AgentPubKey,
-            dht_hash: holo_hash::AnyDhtHash,
+            link_key: WireLinkMetaKey,
             options: GetLinksOptions,
-        ) -> Vec<SerializedBytes>;
+        ) -> Vec<GetLinksResponse>;
 
         /// Send a validation receipt to a remote node.
         fn send_validation_receipt(dna_hash: DnaHash, agent_pub_key: AgentPubKey, receipt: SerializedBytes) -> ();

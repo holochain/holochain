@@ -15,7 +15,7 @@ pub fn get_entry<'a>(
     call_context: Arc<CallContext>,
     input: GetEntryInput,
 ) -> RibosomeResult<GetEntryOutput> {
-    let (hash, _options) = input.into_inner();
+    let (hash, options) = input.into_inner();
 
     // Get the network from the context
     let network = call_context.host_access.network().clone();
@@ -26,7 +26,7 @@ pub fn get_entry<'a>(
                 let mut cascade = workspace.cascade(network);
                 // safe block on
                 let maybe_entry = cascade
-                    .dht_get(hash.clone().into())
+                    .dht_get(hash.clone().into(), options.into())
                     .await?
                     .and_then(|e| e.into_inner().1);
                 Ok(maybe_entry)

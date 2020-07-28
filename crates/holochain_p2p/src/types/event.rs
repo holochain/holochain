@@ -91,9 +91,9 @@ ghost_actor::ghost_chan! {
         fn get_links(
             dna_hash: DnaHash,
             to_agent: AgentPubKey,
-            dht_hash: holo_hash::AnyDhtHash,
+            link_key: WireLinkMetaKey,
             options: GetLinksOptions,
-        ) -> SerializedBytes;
+        ) -> GetLinksResponse;
 
         /// A remote node has sent us a validation receipt.
         fn validation_receipt_received(

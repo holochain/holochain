@@ -160,7 +160,9 @@ pub struct ZomeId(u8);
 pub struct EntryDefId(u8);
 
 /// Specifies whether an [EntryUpdate] refers to an [Entry] or a [Header]
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
+#[derive(
+    Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash, Ord, PartialOrd,
+)]
 pub enum IntendedFor {
     Header,
     Entry,

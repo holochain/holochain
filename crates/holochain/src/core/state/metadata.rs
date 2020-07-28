@@ -26,7 +26,7 @@ use std::fmt::Debug;
 pub use sys_meta::*;
 use tracing::*;
 
-use holochain_types::header::NewEntryHeader;
+use holochain_types::{header::NewEntryHeader, link::WireLinkMetaKey};
 
 #[cfg(test)]
 pub use mock::MockMetadataBuf;
@@ -105,6 +105,28 @@ impl<'a> From<(&'a LinkAdd, &'a HeaderHash)> for LinkMetaKey<'a> {
             &link_add.tag,
             hash,
         )
+    }
+}
+
+impl<'a> From<&'a WireLinkMetaKey> for LinkMetaKey<'a> {
+    fn from(w: &'a WireLinkMetaKey) -> Self {
+        match w {
+            WireLinkMetaKey::Base(b) => Self::Base(b),
+            WireLinkMetaKey::BaseZome(b, z) => Self::BaseZome(b, *z),
+            WireLinkMetaKey::BaseZomeTag(b, z, t) => Self::BaseZomeTag(b, *z, t),
+            WireLinkMetaKey::Full(b, z, t, l) => Self::Full(b, *z, t, l),
+        }
+    }
+}
+
+impl From<&LinkMetaKey<'_>> for WireLinkMetaKey {
+    fn from(k: &LinkMetaKey) -> Self {
+        match k.clone() {
+            LinkMetaKey::Base(b) => Self::Base(b.clone()),
+            LinkMetaKey::BaseZome(b, z) => Self::BaseZome(b.clone(), z),
+            LinkMetaKey::BaseZomeTag(b, z, t) => Self::BaseZomeTag(b.clone(), z, t.clone()),
+            LinkMetaKey::Full(b, z, t, l) => Self::Full(b.clone(), z, t.clone(), l.clone()),
+        }
     }
 }
 
