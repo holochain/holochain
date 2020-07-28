@@ -12,13 +12,13 @@
 
 use super::{
     error::WorkflowResult,
-    produce_dht_ops_workflow::dht_op_light::{error::DhtOpConvertError, light_to_op},
+    produce_dht_ops_workflow::dht_op_light::{dht_basis, error::DhtOpConvertError, light_to_op},
 };
 use crate::core::{
     queue_consumer::{OneshotWriter, WorkComplete},
     state::{
         chain_cas::ChainCasBuf,
-        dht_op_integration::{AuthoredDhtOpsStore, IntegratedDhtOpsStore, IntegratedDhtOpsValue},
+        dht_op_integration::AuthoredDhtOpsStore,
         workspace::{Workspace, WorkspaceResult},
     },
 };
@@ -34,7 +34,6 @@ use holochain_state::{
 use holochain_types::{dht_op::DhtOp, Timestamp};
 use std::collections::HashMap;
 use std::time;
-use tracing::*;
 
 /// Default redundancy factor for validation receipts
 // TODO: Pull this from the wasm entry def and only use this if it's missing
@@ -49,12 +48,10 @@ pub const MIN_PUBLISH_INTERVAL: time::Duration = time::Duration::from_secs(5);
 
 /// Database buffers required for publishing [DhtOp]s
 pub struct PublishDhtOpsWorkspace<'env> {
-    /// Database of authored [DhtOpHash]
+    /// Database of authored DhtOps, with data about prior publishing
     authored_dht_ops: AuthoredDhtOpsStore<'env>,
     /// Cas for looking up data to construct ops
     cas: ChainCasBuf<'env>,
-    // Integrated Ops database for looking up [DhtOp]s
-    integrated_dht_ops: IntegratedDhtOpsStore<'env>,
 }
 
 pub async fn publish_dht_ops_workflow(
@@ -120,25 +117,17 @@ pub async fn publish_dht_ops_workflow_inner(
 
     for (op_hash, value) in values {
         // Insert updated values into database for items about to be published
+        let op = value.op.clone();
         workspace.authored().put(op_hash.clone(), value)?;
 
-        // Reconstruct the DhtOp
-        let op = match workspace.integrated().get(&op_hash)? {
-            Some(op) => op,
-            None => {
-                trace!(
-                    "DhtOpHash {:?} in authored but not yet in integrated",
-                    op_hash
-                );
-                continue;
-            }
-        };
-        let IntegratedDhtOpsValue { basis, op, .. } = op;
         let op = match light_to_op(op, workspace.cas()).await {
             // Ignore StoreEntry ops on private
             Err(DhtOpConvertError::StoreEntryOnPrivate) => continue,
             r => r?,
         };
+
+        // TODO: consider storing basis on AuthoredDhtOpsValue
+        let basis = dht_basis(&op, workspace.cas()).await?;
 
         // For every op publish a request
         // Collect and sort ops by basis
@@ -157,12 +146,10 @@ impl<'env> Workspace<'env> for PublishDhtOpsWorkspace<'env> {
         let authored_dht_ops = KvBuf::new(reader, db)?;
         // Note that this must always be false as we don't want private entries being published
         let cas = ChainCasBuf::vault(reader, dbs, false)?;
-        let db = dbs.get_db(&*INTEGRATED_DHT_OPS)?;
-        let integrated_dht_ops = KvBuf::new(reader, db)?;
+        let _db = dbs.get_db(&*INTEGRATED_DHT_OPS)?;
         Ok(Self {
             authored_dht_ops,
             cas,
-            integrated_dht_ops,
         })
     }
 
@@ -175,10 +162,6 @@ impl<'env> Workspace<'env> for PublishDhtOpsWorkspace<'env> {
 impl<'env> PublishDhtOpsWorkspace<'env> {
     fn authored(&mut self) -> &mut AuthoredDhtOpsStore<'env> {
         &mut self.authored_dht_ops
-    }
-
-    fn integrated(&self) -> &IntegratedDhtOpsStore<'env> {
-        &self.integrated_dht_ops
     }
 
     fn cas(&self) -> &ChainCasBuf<'env> {
@@ -215,9 +198,7 @@ mod tests {
         element::SignedHeaderHashed,
         fixt::{AppEntryTypeFixturator, SignatureFixturator},
         header::NewEntryHeader,
-        observability,
-        validate::ValidationStatus,
-        EntryHashed, HeaderHashed, Timestamp,
+        observability, EntryHashed, HeaderHashed,
     };
     use holochain_zome_types::entry_def::EntryVisibility;
     use holochain_zome_types::header::{EntryType, Header, IntendedFor};
@@ -262,30 +243,20 @@ mod tests {
             let op_hashed = DhtOpHashed::from_content(op.clone()).await;
             // Convert op to DhtOpLight
             let header_hash = HeaderHashed::from_content(Header::LinkAdd(link_add.clone())).await;
-            let value = IntegratedDhtOpsValue {
-                validation_status: ValidationStatus::Valid,
-                basis: link_add.base_address.into(),
-                op: DhtOpLight::RegisterAddLink(header_hash.as_hash().clone()),
-                when_integrated: Timestamp::now().into(),
-            };
-            data.push((sig, op_hashed, value, header_hash));
+            let op_light = DhtOpLight::RegisterAddLink(header_hash.as_hash().clone());
+            data.push((sig, op_hashed, op_light, header_hash));
         }
 
         // Create and fill authored ops db in the workspace
         {
             let reader = env_ref.reader().unwrap();
             let mut workspace = PublishDhtOpsWorkspace::new(&reader, dbs).unwrap();
-            for (sig, op_hashed, integrated_value, header_hash) in data {
+            for (sig, op_hashed, op_light, header_hash) in data {
                 let op_hash = op_hashed.as_hash().clone();
-                let authored_value = AuthoredDhtOpsValue::from_light(integrated_value.op.clone());
+                let authored_value = AuthoredDhtOpsValue::from_light(op_light);
                 workspace
                     .authored_dht_ops
                     .put(op_hash.clone(), authored_value)
-                    .unwrap();
-                // Put DhtOpLight into the integrated db
-                workspace
-                    .integrated_dht_ops
-                    .put(op_hash, integrated_value)
                     .unwrap();
                 // Put data into cas
                 let signed_header = SignedHeaderHashed::with_presigned(header_hash, sig);
@@ -295,7 +266,6 @@ mod tests {
             env_ref
                 .with_commit::<DatabaseError, _, _>(|writer| {
                     workspace.authored_dht_ops.flush_to_txn(writer)?;
-                    workspace.integrated_dht_ops.flush_to_txn(writer)?;
                     workspace.cas.flush_to_txn(writer)?;
                     Ok(())
                 })
@@ -636,61 +606,28 @@ mod tests {
             {
                 let reader = env_ref.reader().unwrap();
                 let mut workspace = PublishDhtOpsWorkspace::new(&reader, &dbs).unwrap();
-                let (op_hash, light, basis, _) = store_element;
-                let integration = IntegratedDhtOpsValue {
-                    validation_status: ValidationStatus::Valid,
-                    op: light.clone(),
-                    basis,
-                    when_integrated: Timestamp::now().into(),
-                };
+                let (op_hash, light, _, _) = store_element;
                 workspace
                     .authored_dht_ops
                     .put(op_hash.clone(), AuthoredDhtOpsValue::from_light(light))
-                    .unwrap();
-                // Put DhtOpLight into the integrated db
-                workspace
-                    .integrated_dht_ops
-                    .put(op_hash, integration)
                     .unwrap();
 
-                let (op_hash, light, basis) = store_entry;
-                let integration = IntegratedDhtOpsValue {
-                    validation_status: ValidationStatus::Valid,
-                    op: light.clone(),
-                    basis,
-                    when_integrated: Timestamp::now().into(),
-                };
+                let (op_hash, light, _) = store_entry;
                 workspace
                     .authored_dht_ops
                     .put(op_hash.clone(), AuthoredDhtOpsValue::from_light(light))
-                    .unwrap();
-                // Put DhtOpLight into the integrated db
-                workspace
-                    .integrated_dht_ops
-                    .put(op_hash, integration)
                     .unwrap();
 
-                let (op_hash, light, basis, _) = register_replaced_by;
-                let integration = IntegratedDhtOpsValue {
-                    validation_status: ValidationStatus::Valid,
-                    op: light.clone(),
-                    basis,
-                    when_integrated: Timestamp::now().into(),
-                };
+                let (op_hash, light, _, _) = register_replaced_by;
                 workspace
                     .authored_dht_ops
                     .put(op_hash.clone(), AuthoredDhtOpsValue::from_light(light))
-                    .unwrap();
-                // Put DhtOpLight into the integrated db
-                workspace
-                    .integrated_dht_ops
-                    .put(op_hash, integration)
                     .unwrap();
                 // Manually commit because this workspace doesn't commit to all dbs
                 env_ref
                     .with_commit::<DatabaseError, _, _>(|writer| {
                         workspace.authored_dht_ops.flush_to_txn(writer)?;
-                        workspace.integrated_dht_ops.flush_to_txn(writer)?;
+                        workspace.cas.flush_to_txn(writer)?;
                         Ok(())
                     })
                     .unwrap();
@@ -725,8 +662,8 @@ mod tests {
                                 ..
                             } => {
                                 let _g = span.enter();
-                                debug!(?dht_hash);
-                                debug!(?ops);
+                                tracing::debug!(?dht_hash);
+                                tracing::debug!(?ops);
 
                                 // Check the ops are correct
                                 for (op_hash, op) in ops {
