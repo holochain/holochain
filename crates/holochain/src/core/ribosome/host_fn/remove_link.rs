@@ -4,7 +4,7 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use crate::core::state::source_chain::SourceChainResult;
 use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
-// use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_cache;
+use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_cache;
 use futures::future::BoxFuture;
 use futures::future::FutureExt;
 use holo_hash::HeaderHash;
@@ -78,17 +78,17 @@ pub fn remove_link<'a>(
                     base_address: base_address,
                 };
                 let header_hash = source_chain.put(header_builder, None).await?;
-                // let element = source_chain
-                //     .get_element(&header_hash)
-                //     .await?
-                //     .expect("Element we just put in SourceChain must be gettable");
-                // integrate_to_cache(
-                //     &element,
-                //     &mut workspace.cache_cas,
-                //     &mut workspace.cache_meta,
-                // )
-                // .await
-                // .map_err(Box::new)?;
+                let element = source_chain
+                    .get_element(&header_hash)
+                    .await?
+                    .expect("Element we just put in SourceChain must be gettable");
+                integrate_to_cache(
+                    &element,
+                    &mut workspace.cache_cas,
+                    &mut workspace.cache_meta,
+                )
+                .await
+                .map_err(Box::new)?;
                 Ok(header_hash)
             }
             .boxed()
