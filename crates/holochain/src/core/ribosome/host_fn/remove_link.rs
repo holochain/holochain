@@ -53,7 +53,7 @@ pub fn remove_link<'a>(
 
     let base_address = match maybe_add_link {
         Some(add_link_signed_header_hash) => {
-            match add_link_signed_header_hash.as_content().header() {
+            match add_link_signed_header_hash.header() {
                 Header::LinkAdd(link_add_header) => Ok(link_add_header.base_address.clone()),
                 // the add link header hash provided was found but didn't point to an AddLink
                 // header (it is something else) so we cannot proceed
