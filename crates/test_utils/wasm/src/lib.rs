@@ -15,12 +15,13 @@ pub enum TestWasm {
     Foo,
     HashPath,
     Imports,
-    InitPass,
     InitFail,
-    MigrateAgentPass,
+    InitPass,
+    Link,
     MigrateAgentFail,
-    PostCommitSuccess,
+    MigrateAgentPass,
     PostCommitFail,
+    PostCommitSuccess,
     Validate,
     ValidateInvalid,
     ValidateValid,
@@ -40,12 +41,13 @@ impl From<TestWasm> for ZomeName {
             TestWasm::Foo => "foo",
             TestWasm::HashPath => "hash_path",
             TestWasm::Imports => "imports",
-            TestWasm::InitPass => "init_pass",
             TestWasm::InitFail => "init_fail",
-            TestWasm::MigrateAgentPass => "migrate_agent_pass",
+            TestWasm::InitPass => "init_pass",
+            TestWasm::Link => "link",
             TestWasm::MigrateAgentFail => "migrate_agent_fail",
-            TestWasm::PostCommitSuccess => "post_commit_success",
+            TestWasm::MigrateAgentPass => "migrate_agent_pass",
             TestWasm::PostCommitFail => "post_commit_fail",
+            TestWasm::PostCommitSuccess => "post_commit_success",
             TestWasm::Validate => "validate",
             TestWasm::ValidateInvalid => "validate_invalid",
             TestWasm::ValidateValid => "validate_valid",
@@ -99,19 +101,19 @@ impl From<TestWasm> for DnaWasm {
                 "/wasm32-unknown-unknown/release/test_wasm_imports.wasm"
             ))
             .to_vec(),
-            TestWasm::InitPass => include_bytes!(concat!(
-                env!("OUT_DIR"),
-                "/wasm32-unknown-unknown/release/test_wasm_init_pass.wasm"
-            ))
-            .to_vec(),
             TestWasm::InitFail => include_bytes!(concat!(
                 env!("OUT_DIR"),
                 "/wasm32-unknown-unknown/release/test_wasm_init_fail.wasm"
             ))
             .to_vec(),
-            TestWasm::MigrateAgentPass => include_bytes!(concat!(
+            TestWasm::InitPass => include_bytes!(concat!(
                 env!("OUT_DIR"),
-                "/wasm32-unknown-unknown/release/test_wasm_migrate_agent_pass.wasm"
+                "/wasm32-unknown-unknown/release/test_wasm_init_pass.wasm"
+            ))
+            .to_vec(),
+            TestWasm::Link => include_bytes!(concat!(
+                env!("OUT_DIR"),
+                "/wasm32-unknown-unknown/release/test_wasm_link.wasm"
             ))
             .to_vec(),
             TestWasm::MigrateAgentFail => include_bytes!(concat!(
@@ -119,14 +121,19 @@ impl From<TestWasm> for DnaWasm {
                 "/wasm32-unknown-unknown/release/test_wasm_migrate_agent_fail.wasm"
             ))
             .to_vec(),
-            TestWasm::PostCommitSuccess => include_bytes!(concat!(
+            TestWasm::MigrateAgentPass => include_bytes!(concat!(
                 env!("OUT_DIR"),
-                "/wasm32-unknown-unknown/release/test_wasm_post_commit_success.wasm"
+                "/wasm32-unknown-unknown/release/test_wasm_migrate_agent_pass.wasm"
             ))
             .to_vec(),
             TestWasm::PostCommitFail => include_bytes!(concat!(
                 env!("OUT_DIR"),
                 "/wasm32-unknown-unknown/release/test_wasm_post_commit_fail.wasm"
+            ))
+            .to_vec(),
+            TestWasm::PostCommitSuccess => include_bytes!(concat!(
+                env!("OUT_DIR"),
+                "/wasm32-unknown-unknown/release/test_wasm_post_commit_success.wasm"
             ))
             .to_vec(),
             TestWasm::Validate => include_bytes!(concat!(

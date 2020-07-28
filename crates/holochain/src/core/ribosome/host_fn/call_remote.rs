@@ -1,13 +1,13 @@
 use crate::core::ribosome::error::RibosomeResult;
-use crate::core::ribosome::wasm_ribosome::WasmRibosome;
 use crate::core::ribosome::CallContext;
+use crate::core::ribosome::RibosomeT;
 use holochain_wasmer_host::prelude::SerializedBytes;
 use holochain_zome_types::CallRemoteInput;
 use holochain_zome_types::CallRemoteOutput;
 use std::sync::Arc;
 
 pub fn call_remote(
-    _ribosome: Arc<WasmRibosome>,
+    _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: CallRemoteInput,
 ) -> RibosomeResult<CallRemoteOutput> {
