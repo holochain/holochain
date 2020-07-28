@@ -18,6 +18,7 @@ pub mod capability;
 #[allow(missing_docs)]
 pub mod crdt;
 pub mod debug;
+pub mod element;
 pub mod entry;
 #[allow(missing_docs)]
 pub mod entry_def;
@@ -31,6 +32,7 @@ pub mod link;
 pub mod migrate_agent;
 #[allow(missing_docs)]
 pub mod post_commit;
+pub mod signature;
 pub mod timestamp;
 #[allow(missing_docs)]
 pub mod validate;
