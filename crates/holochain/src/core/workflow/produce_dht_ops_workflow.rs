@@ -1,9 +1,12 @@
 use super::{error::WorkflowResult, CallZomeWorkspace};
 use crate::core::queue_consumer::{OneshotWriter, TriggerSender, WorkComplete};
 use crate::core::state::{
-    dht_op_integration::{AuthoredDhtOpsStore, IntegrationQueueStore, IntegrationQueueValue},
+    dht_op_integration::{
+        AuthoredDhtOpsStore, AuthoredDhtOpsValue, IntegrationQueueStore, IntegrationQueueValue,
+    },
     workspace::{Workspace, WorkspaceResult},
 };
+use dht_op_light::op_to_light;
 use holochain_state::{
     buffer::KvBuf,
     db::{AUTHORED_DHT_OPS, INTEGRATION_QUEUE},
@@ -49,6 +52,11 @@ async fn produce_dht_ops_workflow_inner(
         for op in ops {
             let (op, hash) = DhtOpHashed::from_content(op).await.into_inner();
             debug!(?hash);
+            let value = AuthoredDhtOpsValue {
+                op: op_to_light(op.clone()).await?,
+                receipt_count: 0,
+                last_publish_time: None,
+            };
             workspace.integration_queue.put(
                 (TimestampKey::now(), hash.clone()).into(),
                 IntegrationQueueValue {
@@ -56,7 +64,7 @@ async fn produce_dht_ops_workflow_inner(
                     op,
                 },
             )?;
-            workspace.authored_dht_ops.put(hash, 0)?;
+            workspace.authored_dht_ops.put(hash, value)?;
         }
         // Mark the dht op as complete
         call_zome_workspace.source_chain.complete_dht_op(index)?;
@@ -259,7 +267,11 @@ mod tests {
                 .iter()
                 .unwrap()
                 .map(|(k, v)| {
-                    assert_eq!(v, 0);
+                    assert_matches!(v, AuthoredDhtOpsValue {
+                        receipt_count: 0,
+                        last_publish_time: None,
+                        ..
+                    });
                     Ok(DhtOpHash::with_pre_hashed(k.to_vec()))
                 })
                 .collect::<Vec<_>>()

@@ -17,7 +17,33 @@ use holochain_types::{
 
 /// Database type for AuthoredDhtOps
 /// Buffer for accessing [DhtOp]s that you authored and finding the amount of validation receipts
-pub type AuthoredDhtOpsStore<'env> = KvBuf<'env, DhtOpHash, u32, Reader<'env>>;
+pub type AuthoredDhtOpsStore<'env> =
+    KvBuf<'env, AuthoredDhtOpsKey, AuthoredDhtOpsValue, Reader<'env>>;
+
+/// The key type for the AuthoredDhtOps db: a DhtOpHash
+pub type AuthoredDhtOpsKey = DhtOpHash;
+
+/// A type for storing in databases that only need the hashes.
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub struct AuthoredDhtOpsValue {
+    /// Signatures and hashes of the op
+    pub op: DhtOpLight,
+    /// Validation receipts received
+    pub receipt_count: u32,
+    /// Time last published, None if never published
+    pub last_publish_time: Option<Timestamp>,
+}
+
+impl AuthoredDhtOpsValue {
+    /// Create a new value from a DhtOpLight with no receipts and no timestamp
+    pub fn from_light(op: DhtOpLight) -> Self {
+        Self {
+            op,
+            receipt_count: 0,
+            last_publish_time: None,
+        }
+    }
+}
 
 /// Database type for IntegrationQueue
 /// Queue of ops ready to be integrated
@@ -120,7 +146,7 @@ pub struct IntegratedDhtOpsValue {
 pub struct IntegrationQueueValue {
     /// The op's validation status
     pub validation_status: ValidationStatus,
-    /// Signatures and hashes of the op
+    /// The op
     pub op: DhtOp,
 }
 

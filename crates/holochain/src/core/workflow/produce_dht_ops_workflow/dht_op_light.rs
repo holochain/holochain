@@ -32,50 +32,56 @@ pub enum DhtOpLight {
     RegisterRemoveLink(HeaderHash),
 }
 
-#[instrument(skip(cas))]
+#[instrument()]
+/// Convert a [DhtOp] to a [DhtOpLight]
+pub async fn op_to_light(op: DhtOp) -> DhtOpConvertResult<DhtOpLight> {
+    match op {
+        DhtOp::StoreElement(_, h, _) => {
+            let e = h.entry_data().map(|(e, _)| e.clone());
+            let (_, h) = HeaderHashed::from_content(h).await.into();
+            Ok(DhtOpLight::StoreElement(h, e))
+        }
+        DhtOp::StoreEntry(_, h, _) => {
+            let e = h.entry().clone();
+            let (_, h) = HeaderHashed::from_content(h.into()).await.into();
+            Ok(DhtOpLight::StoreEntry(h, e))
+        }
+        DhtOp::RegisterAgentActivity(_, h) => {
+            let (_, h) = HeaderHashed::from_content(h).await.into();
+            Ok(DhtOpLight::RegisterAgentActivity(h))
+        }
+        DhtOp::RegisterReplacedBy(_, h, _) => {
+            let e = h.entry_hash.clone();
+            let (_, h) = HeaderHashed::from_content(h.into()).await.into();
+            Ok(DhtOpLight::RegisterReplacedBy(h, e))
+        }
+        DhtOp::RegisterDeletedBy(_, h) => {
+            let (_, h) = HeaderHashed::from_content(h.into()).await.into();
+            Ok(DhtOpLight::RegisterDeletedBy(h))
+        }
+        DhtOp::RegisterDeletedEntryHeader(_, h) => {
+            let (_, h) = HeaderHashed::from_content(h.into()).await.into();
+            Ok(DhtOpLight::RegisterDeletedEntryHeader(h))
+        }
+        DhtOp::RegisterAddLink(_, h) => {
+            let (_, h) = HeaderHashed::from_content(h.into()).await.into();
+            Ok(DhtOpLight::RegisterAddLink(h))
+        }
+        DhtOp::RegisterRemoveLink(_, h) => {
+            let (_, h) = HeaderHashed::from_content(h.into()).await.into();
+            Ok(DhtOpLight::RegisterRemoveLink(h))
+        }
+    }
+}
+
 /// Convert a [DhtOp] to a [DhtOpLight] and basis
+#[instrument(skip(cas))]
 pub async fn dht_op_to_light_basis(
     op: DhtOp,
     cas: &ChainCasBuf<'_>,
 ) -> DhtOpConvertResult<(DhtOpLight, AnyDhtHash)> {
     let basis = dht_basis(&op, &cas).await?;
-    match op {
-        DhtOp::StoreElement(_, h, _) => {
-            let e = h.entry_data().map(|(e, _)| e.clone());
-            let (_, h) = HeaderHashed::from_content(h).await.into();
-            Ok((DhtOpLight::StoreElement(h, e), basis))
-        }
-        DhtOp::StoreEntry(_, h, _) => {
-            let e = h.entry().clone();
-            let (_, h) = HeaderHashed::from_content(h.into()).await.into();
-            Ok((DhtOpLight::StoreEntry(h, e), basis))
-        }
-        DhtOp::RegisterAgentActivity(_, h) => {
-            let (_, h) = HeaderHashed::from_content(h).await.into();
-            Ok((DhtOpLight::RegisterAgentActivity(h), basis))
-        }
-        DhtOp::RegisterReplacedBy(_, h, _) => {
-            let e = h.entry_hash.clone();
-            let (_, h) = HeaderHashed::from_content(h.into()).await.into();
-            Ok((DhtOpLight::RegisterReplacedBy(h, e), basis))
-        }
-        DhtOp::RegisterDeletedBy(_, h) => {
-            let (_, h) = HeaderHashed::from_content(h.into()).await.into();
-            Ok((DhtOpLight::RegisterDeletedBy(h), basis))
-        }
-        DhtOp::RegisterDeletedEntryHeader(_, h) => {
-            let (_, h) = HeaderHashed::from_content(h.into()).await.into();
-            Ok((DhtOpLight::RegisterDeletedEntryHeader(h), basis))
-        }
-        DhtOp::RegisterAddLink(_, h) => {
-            let (_, h) = HeaderHashed::from_content(h.into()).await.into();
-            Ok((DhtOpLight::RegisterAddLink(h), basis))
-        }
-        DhtOp::RegisterRemoveLink(_, h) => {
-            let (_, h) = HeaderHashed::from_content(h.into()).await.into();
-            Ok((DhtOpLight::RegisterRemoveLink(h), basis))
-        }
-    }
+    Ok((op_to_light(op).await?, basis))
 }
 
 /// Convert a DhtOpLight into a DhtOp (render all the hashes to values)

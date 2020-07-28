@@ -15,23 +15,25 @@ use super::{
     produce_dht_ops_workflow::dht_op_light::{error::DhtOpConvertError, light_to_op},
 };
 use crate::core::{
-    queue_consumer::WorkComplete,
+    queue_consumer::{OneshotWriter, WorkComplete},
     state::{
         chain_cas::ChainCasBuf,
         dht_op_integration::{AuthoredDhtOpsStore, IntegratedDhtOpsStore, IntegratedDhtOpsValue},
+        workspace::{Workspace, WorkspaceResult},
     },
 };
 use fallible_iterator::FallibleIterator;
 use holo_hash::*;
 use holochain_p2p::HolochainP2pCell;
 use holochain_state::{
-    buffer::KvBuf,
+    buffer::{BufferedStore, KvBuf},
     db::{AUTHORED_DHT_OPS, INTEGRATED_DHT_OPS},
-    error::DatabaseResult,
     prelude::{GetDb, Reader},
+    transaction::Writer,
 };
-use holochain_types::dht_op::DhtOp;
+use holochain_types::{dht_op::DhtOp, Timestamp};
 use std::collections::HashMap;
+use std::time;
 use tracing::*;
 
 /// Default redundancy factor for validation receipts
@@ -39,6 +41,11 @@ use tracing::*;
 // TODO: Put a default in the DnaBundle
 // TODO: build zome_types/entry_def map to get the (AppEntryType map to entry def)
 pub const DEFAULT_RECEIPT_BUNDLE_SIZE: u32 = 5;
+
+/// Don't publish a DhtOp more than once during this interval.
+/// This allows us to trigger the publish workflow as often as we like, without
+/// flooding the network with spurious publishes.
+pub const MIN_PUBLISH_INTERVAL: time::Duration = time::Duration::from_secs(5);
 
 /// Database buffers required for publishing [DhtOp]s
 pub struct PublishDhtOpsWorkspace<'env> {
@@ -51,10 +58,11 @@ pub struct PublishDhtOpsWorkspace<'env> {
 }
 
 pub async fn publish_dht_ops_workflow(
-    workspace: PublishDhtOpsWorkspace<'_>,
+    mut workspace: PublishDhtOpsWorkspace<'_>,
+    writer: OneshotWriter,
     network: &mut HolochainP2pCell,
 ) -> WorkflowResult<WorkComplete> {
-    let to_publish = publish_dht_ops_workflow_inner(&workspace).await?;
+    let to_publish = publish_dht_ops_workflow_inner(&mut workspace).await?;
 
     // Commit to the network
     for (basis, ops) in to_publish {
@@ -62,27 +70,45 @@ pub async fn publish_dht_ops_workflow(
     }
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
-    // This workflow doesn't commit anything.
-    // Instead it publishes to the network.
-    // trigger other workflows
-    // (n/a)
+    // commit the workspace
+    writer
+        .with_writer(|writer| workspace.flush_to_txn(writer).expect("TODO"))
+        .await?;
 
     Ok(WorkComplete::Complete)
 }
 
 /// Read the authored for ops with receipt count < R
 pub async fn publish_dht_ops_workflow_inner(
-    workspace: &PublishDhtOpsWorkspace<'_>,
+    workspace: &mut PublishDhtOpsWorkspace<'_>,
 ) -> WorkflowResult<HashMap<AnyDhtHash, Vec<(DhtOpHash, DhtOp)>>> {
     // TODO: PERF: We need to check all ops every time this runs
     // instead we could have a queue of ops where count < R and a kv for count > R.
     // Then if the count for an ops reduces below R move it to the queue.
-    let ops = workspace
+    let now_ts = Timestamp::now();
+    let now: chrono::DateTime<chrono::Utc> = now_ts.into();
+    // chrono cannot create const durations
+    let interval =
+        chrono::Duration::from_std(MIN_PUBLISH_INTERVAL).expect("const interval must be positive");
+
+    let values = workspace
         .authored()
         .iter()?
-        .filter_map(|(k, r)| {
-            Ok(if r < DEFAULT_RECEIPT_BUNDLE_SIZE {
-                Some(k)
+        .filter_map(|(k, mut r)| {
+            Ok(if r.receipt_count < DEFAULT_RECEIPT_BUNDLE_SIZE {
+                let needs_publish = r
+                    .last_publish_time
+                    .map(|last| {
+                        let duration = now.signed_duration_since(last.into());
+                        duration > interval
+                    })
+                    .unwrap_or(true);
+                if needs_publish {
+                    r.last_publish_time = Some(now_ts);
+                    Some((DhtOpHash::with_pre_hashed(k.to_vec()), r))
+                } else {
+                    None
+                }
             } else {
                 None
             })
@@ -92,9 +118,9 @@ pub async fn publish_dht_ops_workflow_inner(
     // Ops to publish by basis
     let mut to_publish = HashMap::new();
 
-    for op in ops {
-        // Deserialize DhtOpHash
-        let op_hash = DhtOpHash::with_pre_hashed(op.to_vec());
+    for (op_hash, value) in values {
+        // Insert updated values into database for items about to be published
+        workspace.authored().put(op_hash.clone(), value)?;
 
         // Reconstruct the DhtOp
         let op = match workspace.integrated().get(&op_hash)? {
@@ -125,9 +151,8 @@ pub async fn publish_dht_ops_workflow_inner(
     Ok(to_publish)
 }
 
-impl<'env> PublishDhtOpsWorkspace<'env> {
-    // Create a constructor that only has gives access to public entries
-    pub fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Self> {
+impl<'env> Workspace<'env> for PublishDhtOpsWorkspace<'env> {
+    fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self> {
         let db = dbs.get_db(&*AUTHORED_DHT_OPS)?;
         let authored_dht_ops = KvBuf::new(reader, db)?;
         // Note that this must always be false as we don't want private entries being published
@@ -141,8 +166,15 @@ impl<'env> PublishDhtOpsWorkspace<'env> {
         })
     }
 
-    fn authored(&self) -> &AuthoredDhtOpsStore<'env> {
-        &self.authored_dht_ops
+    fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
+        self.authored_dht_ops.flush_to_txn(writer)?;
+        Ok(())
+    }
+}
+
+impl<'env> PublishDhtOpsWorkspace<'env> {
+    fn authored(&mut self) -> &mut AuthoredDhtOpsStore<'env> {
+        &mut self.authored_dht_ops
     }
 
     fn integrated(&self) -> &IntegratedDhtOpsStore<'env> {
@@ -158,8 +190,9 @@ impl<'env> PublishDhtOpsWorkspace<'env> {
 mod tests {
     use super::*;
     use crate::{
-        core::workflow::produce_dht_ops_workflow::dht_op_light::{
-            dht_op_to_light_basis, DhtOpLight,
+        core::{
+            state::dht_op_integration::AuthoredDhtOpsValue,
+            workflow::produce_dht_ops_workflow::dht_op_light::{dht_op_to_light_basis, DhtOpLight},
         },
         fixt::{EntryCreateFixturator, EntryFixturator, EntryUpdateFixturator, LinkAddFixturator},
     };
@@ -173,7 +206,7 @@ mod tests {
     };
     use holochain_state::{
         buffer::BufferedStore,
-        env::{EnvironmentWriteRef, ReadManager, WriteManager},
+        env::{EnvironmentWrite, EnvironmentWriteRef, ReadManager, WriteManager},
         error::DatabaseError,
         test_utils::test_cell_env,
     };
@@ -229,24 +262,31 @@ mod tests {
             let op_hashed = DhtOpHashed::from_content(op.clone()).await;
             // Convert op to DhtOpLight
             let header_hash = HeaderHashed::from_content(Header::LinkAdd(link_add.clone())).await;
-            let light = IntegratedDhtOpsValue {
+            let value = IntegratedDhtOpsValue {
                 validation_status: ValidationStatus::Valid,
                 basis: link_add.base_address.into(),
                 op: DhtOpLight::RegisterAddLink(header_hash.as_hash().clone()),
                 when_integrated: Timestamp::now().into(),
             };
-            data.push((sig, op_hashed, light, header_hash));
+            data.push((sig, op_hashed, value, header_hash));
         }
 
         // Create and fill authored ops db in the workspace
         {
             let reader = env_ref.reader().unwrap();
             let mut workspace = PublishDhtOpsWorkspace::new(&reader, dbs).unwrap();
-            for (sig, op_hashed, light, header_hash) in data {
+            for (sig, op_hashed, integrated_value, header_hash) in data {
                 let op_hash = op_hashed.as_hash().clone();
-                workspace.authored_dht_ops.put(op_hash.clone(), 0).unwrap();
+                let authored_value = AuthoredDhtOpsValue::from_light(integrated_value.op.clone());
+                workspace
+                    .authored_dht_ops
+                    .put(op_hash.clone(), authored_value)
+                    .unwrap();
                 // Put DhtOpLight into the integrated db
-                workspace.integrated_dht_ops.put(op_hash, light).unwrap();
+                workspace
+                    .integrated_dht_ops
+                    .put(op_hash, integrated_value)
+                    .unwrap();
                 // Put data into cas
                 let signed_header = SignedHeaderHashed::with_presigned(header_hash, sig);
                 workspace.cas.put(signed_header, None).unwrap();
@@ -316,20 +356,13 @@ mod tests {
     }
 
     /// Call the workflow
-    async fn call_workflow<'env>(
-        env_ref: &EnvironmentWriteRef<'env>,
-        dbs: &impl GetDb,
-        mut cell_network: HolochainP2pCell,
-    ) {
+    async fn call_workflow<'env>(env: EnvironmentWrite, mut cell_network: HolochainP2pCell) {
+        let env_ref = env.guard().await;
         let reader = env_ref.reader().unwrap();
-        let mut workspace = PublishDhtOpsWorkspace::new(&reader, dbs).unwrap();
-        let to_publish = publish_dht_ops_workflow_inner(&mut workspace)
+        let workspace = PublishDhtOpsWorkspace::new(&reader, &env_ref).unwrap();
+        publish_dht_ops_workflow(workspace, env.clone().into(), &mut cell_network)
             .await
             .unwrap();
-
-        for (basis, ops) in to_publish {
-            cell_network.publish(true, basis, ops, None).await.unwrap();
-        }
     }
 
     /// There is a test that shows that network messages would be sent to all agents via broadcast.
@@ -342,7 +375,6 @@ mod tests {
     #[test_case(100, 1)]
     #[test_case(100, 10)]
     #[test_case(100, 100)]
-    #[ignore] // david.b doesn't run locally - disabling until fixed
     fn test_sent_to_r_nodes(num_agents: u32, num_hash: u32) {
         crate::conductor::tokio_runtime().block_on(async {
             observability::test_run().ok();
@@ -356,7 +388,7 @@ mod tests {
             let (network, cell_network, recv_task, rx_complete) =
                 setup(&env_ref, &dbs, num_agents, num_hash, false).await;
 
-            call_workflow(&env_ref, &dbs, cell_network).await;
+            call_workflow(env.env.clone(), cell_network).await;
 
             // Wait for expected # of responses, or timeout
             tokio::select! {
@@ -366,11 +398,21 @@ mod tests {
                 }
             };
 
+            let check = async move {
+                recv_task.await.unwrap();
+                let reader = env_ref.reader().unwrap();
+                let mut workspace = PublishDhtOpsWorkspace::new(&reader, &dbs).unwrap();
+                for i in workspace.authored().iter().unwrap().iterator() {
+                    // Check that each item now has a publish time
+                    assert!(i.expect("can iterate").1.last_publish_time.is_some())
+                }
+            };
+
             // Shutdown
             tokio::time::timeout(Duration::from_secs(10), network.ghost_actor_shutdown())
                 .await
                 .ok();
-            tokio::time::timeout(Duration::from_secs(10), recv_task)
+            tokio::time::timeout(Duration::from_secs(10), check)
                 .await
                 .ok();
         });
@@ -406,19 +448,19 @@ mod tests {
                 let mut workspace = PublishDhtOpsWorkspace::new(&reader, &dbs).unwrap();
 
                 // Update authored to R
-                let ops = workspace
+                let values = workspace
                     .authored_dht_ops
                     .iter()
                     .unwrap()
-                    .map(|(k, _)| Ok(DhtOpHash::with_pre_hashed(k.to_vec())))
+                    .map(|(k, mut v)| {
+                        v.receipt_count = DEFAULT_RECEIPT_BUNDLE_SIZE;
+                        Ok((DhtOpHash::with_pre_hashed(k.to_vec()), v))
+                    })
                     .collect::<Vec<_>>()
                     .unwrap();
 
-                for op in ops {
-                    workspace
-                        .authored_dht_ops
-                        .put(op, DEFAULT_RECEIPT_BUNDLE_SIZE)
-                        .unwrap();
+                for (hash, v) in values.into_iter() {
+                    workspace.authored_dht_ops.put(hash, v).unwrap();
                 }
 
                 // Manually commit because this workspace doesn't commit to all dbs
@@ -431,7 +473,7 @@ mod tests {
             }
 
             // Call the workflow
-            call_workflow(&env_ref, &dbs, cell_network).await;
+            call_workflow(env.env.clone(), cell_network).await;
 
             // If we can wait a while without receiving any publish, we have succeeded
             tokio::time::delay_for(Duration::from_millis(
@@ -597,11 +639,14 @@ mod tests {
                 let (op_hash, light, basis, _) = store_element;
                 let integration = IntegratedDhtOpsValue {
                     validation_status: ValidationStatus::Valid,
-                    op: light,
+                    op: light.clone(),
                     basis,
                     when_integrated: Timestamp::now().into(),
                 };
-                workspace.authored_dht_ops.put(op_hash.clone(), 0).unwrap();
+                workspace
+                    .authored_dht_ops
+                    .put(op_hash.clone(), AuthoredDhtOpsValue::from_light(light))
+                    .unwrap();
                 // Put DhtOpLight into the integrated db
                 workspace
                     .integrated_dht_ops
@@ -611,11 +656,14 @@ mod tests {
                 let (op_hash, light, basis) = store_entry;
                 let integration = IntegratedDhtOpsValue {
                     validation_status: ValidationStatus::Valid,
-                    op: light,
+                    op: light.clone(),
                     basis,
                     when_integrated: Timestamp::now().into(),
                 };
-                workspace.authored_dht_ops.put(op_hash.clone(), 0).unwrap();
+                workspace
+                    .authored_dht_ops
+                    .put(op_hash.clone(), AuthoredDhtOpsValue::from_light(light))
+                    .unwrap();
                 // Put DhtOpLight into the integrated db
                 workspace
                     .integrated_dht_ops
@@ -625,11 +673,14 @@ mod tests {
                 let (op_hash, light, basis, _) = register_replaced_by;
                 let integration = IntegratedDhtOpsValue {
                     validation_status: ValidationStatus::Valid,
-                    op: light,
+                    op: light.clone(),
                     basis,
                     when_integrated: Timestamp::now().into(),
                 };
-                workspace.authored_dht_ops.put(op_hash.clone(), 0).unwrap();
+                workspace
+                    .authored_dht_ops
+                    .put(op_hash.clone(), AuthoredDhtOpsValue::from_light(light))
+                    .unwrap();
                 // Put DhtOpLight into the integrated db
                 workspace
                     .integrated_dht_ops
@@ -707,7 +758,7 @@ mod tests {
                 network.join(dna.clone(), agent).await.unwrap();
             }
 
-            call_workflow(&env_ref, &dbs, cell_network).await;
+            call_workflow(env.env.clone(), cell_network).await;
 
             // Wait for expected # of responses, or timeout
             tokio::select! {
