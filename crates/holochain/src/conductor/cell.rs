@@ -16,7 +16,7 @@ use crate::{
     conductor::{api::CellConductorApi, cell::error::CellResult},
     core::ribosome::{guest_callback::init::InitResult, wasm_ribosome::WasmRibosome},
     core::{
-        state::source_chain::SourceChainBuf,
+        state::{dht_op_integration::IntegratedDhtOpsBuf, source_chain::SourceChainBuf},
         workflow::{
             call_zome_workflow, error::WorkflowError, genesis_workflow::genesis_workflow,
             initialize_zomes_workflow, CallZomeWorkflowArgs, CallZomeWorkspace,
@@ -26,11 +26,15 @@ use crate::{
     },
 };
 use error::CellError;
+use fallible_iterator::FallibleIterator;
 use futures::future::FutureExt;
 use holo_hash::*;
 use holochain_keystore::KeystoreSender;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_state::env::{EnvironmentKind, EnvironmentWrite, ReadManager};
+use holochain_state::{
+    db::GetDb,
+    env::{EnvironmentKind, EnvironmentWrite, ReadManager},
+};
 use holochain_types::{
     autonomic::AutonomicProcess, cell::CellId, element::WireElement, metadata::MetadataSet,
     Timestamp,
@@ -449,11 +453,18 @@ impl Cell {
     /// the network module is requesting a list of dht op hashes
     async fn handle_list_dht_op_hashes(
         &self,
-        _dht_arc: holochain_p2p::dht_arc::DhtArc,
-        _since: Timestamp,
-        _until: Timestamp,
+        dht_arc: holochain_p2p::dht_arc::DhtArc,
+        since: Timestamp,
+        until: Timestamp,
     ) -> CellResult<Vec<DhtOpHash>> {
-        unimplemented!()
+        let env_ref = self.state_env.guard().await;
+        let reader = env_ref.reader()?;
+        let integrated_dht_ops = IntegratedDhtOpsBuf::new(&reader, &env_ref)?;
+        let result: Vec<DhtOpHash> = integrated_dht_ops
+            .query(Some(since), Some(until), Some(dht_arc))?
+            .map(|(k, _)| Ok(k))
+            .collect()?;
+        Ok(result)
     }
 
     /// the network module is requesting the content for dht ops

@@ -142,24 +142,28 @@ impl<'env> IntegratedDhtOpsBuf<'env> {
         to: Option<Timestamp>,
         dht_arc: Option<DhtArc>,
     ) -> DatabaseResult<
-        Box<dyn FallibleIterator<Item = IntegratedDhtOpsValue, Error = DatabaseError> + 'env>,
+        Box<
+            dyn FallibleIterator<Item = (DhtOpHash, IntegratedDhtOpsValue), Error = DatabaseError>
+                + 'env,
+        >,
     > {
         Ok(Box::new(
             self.store
                 .iter()?
-                .filter_map(move |(_, v)| match from {
-                    Some(time) if v.when_integrated >= time => Ok(Some(v)),
-                    None => Ok(Some(v)),
+                .map(move |(k, v)| Ok((DhtOpHash::with_pre_hashed(k.to_vec()), v)))
+                .filter_map(move |(k, v)| match from {
+                    Some(time) if v.when_integrated >= time => Ok(Some((k, v))),
+                    None => Ok(Some((k, v))),
                     _ => Ok(None),
                 })
-                .filter_map(move |v| match to {
-                    Some(time) if v.when_integrated < time => Ok(Some(v)),
-                    None => Ok(Some(v)),
+                .filter_map(move |(k, v)| match to {
+                    Some(time) if v.when_integrated < time => Ok(Some((k, v))),
+                    None => Ok(Some((k, v))),
                     _ => Ok(None),
                 })
-                .filter_map(move |v| match dht_arc {
-                    Some(dht_arc) if dht_arc.contains(v.basis.get_loc()) => Ok(Some(v)),
-                    None => Ok(Some(v)),
+                .filter_map(move |(k, v)| match dht_arc {
+                    Some(dht_arc) if dht_arc.contains(v.basis.get_loc()) => Ok(Some((k, v))),
+                    None => Ok(Some((k, v))),
                     _ => Ok(None),
                 }),
         ))
@@ -230,6 +234,7 @@ mod tests {
             let mut r = buf
                 .query(None, None, None)
                 .unwrap()
+                .map(|(_, v)| Ok(v))
                 .collect::<Vec<_>>()
                 .unwrap();
             r.sort_by_key(|v| v.when_integrated.clone());
@@ -238,6 +243,7 @@ mod tests {
             let mut r = buf
                 .query(Some(times_exp[1].clone().into()), None, None)
                 .unwrap()
+                .map(|(_, v)| Ok(v))
                 .collect::<Vec<_>>()
                 .unwrap();
             r.sort_by_key(|v| v.when_integrated.clone());
@@ -252,6 +258,7 @@ mod tests {
             let mut r = buf
                 .query(Some(ages_ago.into()), Some(future.into()), None)
                 .unwrap()
+                .map(|(_, v)| Ok(v))
                 .collect::<Vec<_>>()
                 .unwrap();
             r.sort_by_key(|v| v.when_integrated.clone());
@@ -271,6 +278,7 @@ mod tests {
                     Some(DhtArc::new(same_basis.get_loc(), 1)),
                 )
                 .unwrap()
+                .map(|(_, v)| Ok(v))
                 .collect::<Vec<_>>()
                 .unwrap();
             r.sort_by_key(|v| v.when_integrated.clone());
@@ -281,6 +289,7 @@ mod tests {
             let mut r = buf
                 .query(None, None, Some(DhtArc::new(same_basis.get_loc(), 1)))
                 .unwrap()
+                .map(|(_, v)| Ok(v))
                 .collect::<Vec<_>>()
                 .unwrap();
             r.sort_by_key(|v| v.when_integrated.clone());
