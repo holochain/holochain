@@ -1,7 +1,7 @@
 //! A Cell is an "instance" of Holochain DNA.
 //!
 //! It combines an AgentPubKey with a Dna to create a SourceChain, upon which
-//! ChainElements can be added. A constructed Cell is guaranteed to have a valid
+//! Elements can be added. A constructed Cell is guaranteed to have a valid
 //! SourceChain which has already undergone Genesis.
 
 use super::manager::ManagedTaskAdd;

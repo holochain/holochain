@@ -33,7 +33,7 @@ use holochain_types::{
     app::InstalledCell,
     cell::CellId,
     dna::{DnaDef, DnaFile},
-    element::{ChainElement, GetElementResponse, WireElement},
+    element::{Element, GetElementResponse, WireElement},
     fixt::*,
     metadata::TimedHeaderHash,
     observability,
@@ -367,11 +367,11 @@ impl Shutdown {
 }
 /// Run a test network handler which accepts two data sources to draw from.
 /// It only handles Get and GetMeta requests.
-/// - When handling a Get, it pulls the corresponding ChainElement from the `element_fixt_store`
+/// - When handling a Get, it pulls the corresponding Element from the `element_fixt_store`
 /// - When handling a GetMeta, it pulls the corresponding `TimedHeaderHash` from the `meta_fixt_store
 ///    and constructs a `MetadataSet` containing only that single `TimedHeaderHash`
 async fn run_fixt_network(
-    element_fixt_store: BTreeMap<HeaderHash, ChainElement>,
+    element_fixt_store: BTreeMap<HeaderHash, Element>,
     meta_fixt_store: BTreeMap<AnyDhtHash, TimedHeaderHash>,
 ) -> (HolochainP2pCell, Shutdown) {
     // Create the network
@@ -445,7 +445,7 @@ async fn run_fixt_network(
 }
 
 async fn generate_fixt_store() -> (
-    BTreeMap<HeaderHash, ChainElement>,
+    BTreeMap<HeaderHash, Element>,
     BTreeMap<AnyDhtHash, TimedHeaderHash>,
 ) {
     let mut store = BTreeMap::new();
@@ -469,7 +469,7 @@ async fn generate_fixt_store() -> (
             header_hash: hash.clone(),
         },
     );
-    store.insert(hash, ChainElement::new(signed_header, Some(entry)));
+    store.insert(hash, Element::new(signed_header, Some(entry)));
     (store, meta_store)
 }
 
@@ -514,7 +514,7 @@ async fn get_entry<'env>(
     call_data: CallData,
     entry_hash: EntryHash,
     options: GetOptions,
-) -> Option<ChainElement> {
+) -> Option<Element> {
     let reader = env_ref.reader().unwrap();
     let mut workspace = CallZomeWorkspace::new(&reader, dbs).unwrap();
 
@@ -538,7 +538,7 @@ async fn get_entry<'env>(
 async fn fake_authority<'env>(
     env_ref: &'env EnvironmentWriteRef<'env>,
     dbs: &impl GetDb,
-    element: ChainElement,
+    element: Element,
 ) {
     let reader = env_ref.reader().unwrap();
     let mut workspace = CallZomeWorkspace::new(&reader, dbs).unwrap();

@@ -9,13 +9,12 @@
 use crate::{element::SignedHeaderHashed, metadata::TimedHeaderHash, prelude::*};
 use holo_hash::EntryHash;
 use holochain_zome_types::entry_def::EntryVisibility;
+pub use holochain_zome_types::header::HeaderHashed;
 use holochain_zome_types::header::*;
 
 use error::*;
 
 pub mod error;
-
-pub type HeaderHashed = HoloHashed<Header>;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 /// A header of one of the two types that create a new entry.

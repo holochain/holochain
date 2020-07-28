@@ -20,7 +20,7 @@ use holochain_state::{
     prelude::{Reader, Writer},
 };
 use holochain_types::{
-    element::{ChainElement, SignedHeader, SignedHeaderHashed},
+    element::{Element, SignedHeader, SignedHeaderHashed},
     entry::EntryHashed,
 };
 use holochain_zome_types::entry_def::EntryVisibility;
@@ -155,10 +155,10 @@ impl<'env> ChainCasBuf<'env> {
     pub async fn get_element(
         &self,
         header_address: &HeaderHash,
-    ) -> SourceChainResult<Option<ChainElement>> {
+    ) -> SourceChainResult<Option<Element>> {
         if let Some(signed_header) = self.get_header(header_address).await? {
             let maybe_entry = self.get_entry_from_header(signed_header.header()).await?;
-            Ok(Some(ChainElement::new(signed_header, maybe_entry)))
+            Ok(Some(Element::new(signed_header, maybe_entry)))
         } else {
             Ok(None)
         }

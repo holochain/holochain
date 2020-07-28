@@ -24,7 +24,7 @@ use holochain_state::{
 };
 use holochain_types::{
     dht_op::{produce_ops_from_element, DhtOp, DhtOpHashed},
-    element::{ChainElement, SignedHeaderHashed},
+    element::{Element, SignedHeaderHashed},
     validate::ValidationStatus,
     EntryHashed, HeaderHashed, Timestamp, TimestampKey,
 };
@@ -328,7 +328,7 @@ enum IntegrationContext {
 /// NB: We skip integrating the element data, since it is already available in
 /// our vault.
 pub async fn integrate_to_cache(
-    element: &ChainElement,
+    element: &Element,
     element_store: &mut ChainCasBuf<'_>,
     meta_store: &mut MetadataBuf<'_>,
 ) -> DhtOpConvertResult<()> {

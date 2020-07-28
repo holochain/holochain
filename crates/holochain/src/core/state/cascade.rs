@@ -54,9 +54,7 @@ use holochain_p2p::{
 };
 use holochain_state::error::DatabaseResult;
 use holochain_types::{
-    element::{
-        ChainElement, GetElementResponse, RawGetEntryResponse, SignedHeaderHashed, WireElement,
-    },
+    element::{Element, GetElementResponse, RawGetEntryResponse, SignedHeaderHashed, WireElement},
     header::WireDelete,
     link::{GetLinksResponse, WireLinkMetaKey},
     metadata::{EntryDhtStatus, MetadataSet, TimedHeaderHash},
@@ -89,7 +87,7 @@ where
 /// The state of the cascade search
 enum Search {
     /// The entry is found and we can stop
-    Found(ChainElement),
+    Found(Element),
     /// We haven't found the entry yet and should
     /// continue searching down the cascade
     Continue(HeaderHash),
@@ -166,7 +164,7 @@ where
 
         // Add the element data to the caches if there was some
         if let Some(element) = element {
-            let element = element.into_element().await?;
+            let element = element.into_element().await;
             let (signed_header, maybe_entry) = element.clone().into_inner();
             let timed_header_hash: TimedHeaderHash = signed_header.header_hashed().clone().into();
 
@@ -383,23 +381,20 @@ where
         }
     }
 
-    async fn get_element_local_raw(
-        &self,
-        hash: &HeaderHash,
-    ) -> CascadeResult<Option<ChainElement>> {
+    async fn get_element_local_raw(&self, hash: &HeaderHash) -> CascadeResult<Option<Element>> {
         match self.element_vault.get_element(hash).await? {
             None => Ok(self.element_cache.get_element(hash).await?),
             r => Ok(r),
         }
     }
 
-    /// Returns the oldest live [ChainElement] for this [EntryHash] by getting the
+    /// Returns the oldest live [Element] for this [EntryHash] by getting the
     /// latest available metadata from authorities combined with this agents authored data.
     pub async fn dht_get_entry(
         &mut self,
         entry_hash: EntryHash,
         options: GetOptions,
-    ) -> CascadeResult<Option<ChainElement>> {
+    ) -> CascadeResult<Option<Element>> {
         // Update the cache from the network
         self.fetch_element_via_entry(entry_hash.clone(), options.clone())
             .await?;
@@ -450,7 +445,7 @@ where
         }
     }
 
-    /// Returns the [ChainElement] for this [HeaderHash] if it is live
+    /// Returns the [Element] for this [HeaderHash] if it is live
     /// by getting the latest available metadata from authorities
     /// combined with this agents authored data.
     /// _Note: Deleted headers are a tombstone set_
@@ -458,7 +453,7 @@ where
         &mut self,
         header_hash: HeaderHash,
         options: GetOptions,
-    ) -> CascadeResult<Option<ChainElement>> {
+    ) -> CascadeResult<Option<Element>> {
         // Meta Cache
         if let Some(_) = self
             .meta_cache
@@ -503,7 +498,7 @@ where
         &mut self,
         hash: AnyDhtHash,
         options: GetOptions,
-    ) -> CascadeResult<Option<ChainElement>> {
+    ) -> CascadeResult<Option<Element>> {
         match *hash.hash_type() {
             AnyDht::Entry(e) => {
                 let hash = hash.retype(e);
