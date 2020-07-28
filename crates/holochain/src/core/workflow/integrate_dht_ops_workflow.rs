@@ -151,15 +151,16 @@ pub async fn integrate_dht_ops_workflow(
 /// The two stores are intended to be either the pair of Vaults,
 /// or the pair of Caches, but never a mixture of the two.
 ///
-/// We can skip integrating element data, specified by the last parameter,
-/// when doing inline integration into the cache after authoring an element.
-#[instrument(skip(element_store, meta_store, value))]
+/// We can skip integrating element data when integrating data as an Author
+/// rather than as an Authority, hence the last parameter.
+#[instrument(skip(value, element_store, meta_store))]
 async fn integrate_single_dht_op(
     value: IntegrationQueueValue,
     element_store: &mut ChainCasBuf<'_>,
     meta_store: &mut MetadataBuf<'_>,
-    integrate_element_data: bool,
+    context: IntegrationContext,
 ) -> DhtOpConvertResult<Outcome> {
+    use IntegrationContext::Authority;
     debug!("Starting integrate dht ops workflow");
     {
         // Process each op
@@ -172,7 +173,7 @@ async fn integrate_single_dht_op(
         // return the full op as it's not consumed when making hashes
         match op.clone() {
             DhtOp::StoreElement(signature, header, maybe_entry) => {
-                if integrate_element_data {
+                if context == Authority {
                     let header = HeaderHashed::from_content(header).await;
                     let signed_header = SignedHeaderHashed::with_presigned(header, signature);
                     let maybe_entry_hashed = match maybe_entry {
@@ -187,7 +188,7 @@ async fn integrate_single_dht_op(
                 // Reference to headers
                 meta_store.register_header(new_entry_header.clone()).await?;
 
-                if integrate_element_data {
+                if context == Authority {
                     let header = HeaderHashed::from_content(new_entry_header.into()).await;
                     let signed_header = SignedHeaderHashed::with_presigned(header, signature);
                     let entry = EntryHashed::from_content(*entry).await;
@@ -196,7 +197,7 @@ async fn integrate_single_dht_op(
                 }
             }
             DhtOp::RegisterAgentActivity(signature, header) => {
-                if integrate_element_data {
+                if context == Authority {
                     // Store header
                     let header_hashed = HeaderHashed::from_content(header.clone()).await;
                     let signed_header =
@@ -249,7 +250,7 @@ async fn integrate_single_dht_op(
                 // Store add Header
                 let header = HeaderHashed::from_content(link_add.into()).await;
                 debug!(link_add = ?header.as_hash());
-                if integrate_element_data {
+                if context == Authority {
                     let signed_header = SignedHeaderHashed::with_presigned(header, signature);
                     element_store.put(signed_header, None)?;
                 }
@@ -269,7 +270,7 @@ async fn integrate_single_dht_op(
                     return Outcome::deferred(op, validation_status);
                 }
 
-                if integrate_element_data {
+                if context == Authority {
                     // Store link delete Header
                     let header = HeaderHashed::from_content(link_remove.clone().into()).await;
                     let signed_header = SignedHeaderHashed::with_presigned(header, signature);
@@ -300,6 +301,14 @@ async fn integrate_single_dht_op(
     }
 }
 
+/// Specifies my role when integrating
+enum IntegrationContext {
+    /// I am integrating DhtOps which I authored
+    Author,
+    /// I am integrating DhtOps which were published to me as an authority
+    Authority,
+}
+
 /// After writing an Element to our chain, we want to integrate the meta ops
 /// inline, so that they are immediately available in the meta cache.
 /// NB: We skip integrating the element data, since it is already available in
@@ -318,7 +327,7 @@ pub async fn integrate_to_cache(
         match integrate_single_dht_op(value, element_store, meta_store, false).await? {
             Outcome::Integrated(_) => {}
             Outcome::Deferred(v) => {
-                unreachable!("An inline-integrated DhtOp cannot be deferred: {:?}", v)
+                warn!("An inline-integrated DhtOp was deferred, meaning that not all data was integrated to the cache: {:?}", v)
             }
         }
     }
