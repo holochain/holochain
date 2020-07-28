@@ -263,14 +263,14 @@ async fn integrate_single_dht_op(
                     }
 
                     // Store add Header
-                    let header = HeaderHashed::from_content(link_add.into()).await;
+                    let header = HeaderHashed::from_content(link_add.clone().into()).await;
                     debug!(link_add = ?header.as_hash());
 
                     let signed_header = SignedHeaderHashed::with_presigned(header, signature);
                     element_store.put(signed_header, None)?;
                 }
 
-                meta_store.add_link(link_add.clone()).await?;
+                meta_store.add_link(link_add).await?;
             }
             DhtOp::RegisterRemoveLink(signature, link_remove) => {
                 if context == Authority {
@@ -314,7 +314,7 @@ async fn integrate_single_dht_op(
     }
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, std::fmt::Debug)]
 /// Specifies my role when integrating
 enum IntegrationContext {
     /// I am integrating DhtOps which I authored
