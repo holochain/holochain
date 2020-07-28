@@ -221,6 +221,10 @@ pub struct LinkRemove {
     pub timestamp: Timestamp,
     pub header_seq: u32,
     pub prev_header: HeaderHash,
+
+    /// this is redundant with the `LinkAdd` header but needs to be included to facilitate DHT ops
+    /// this is NOT exposed to wasm developers and is validated by the subconscious to ensure that
+    /// it always matches the `base_address` of the `LinkAdd`
     pub base_address: EntryHash,
     /// The address of the `LinkAdd` being reversed
     pub link_add_address: HeaderHash,
