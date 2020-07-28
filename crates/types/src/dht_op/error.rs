@@ -4,9 +4,7 @@ use thiserror::Error;
 
 #[derive(Clone, Debug, Error)]
 pub enum DhtOpError {
-    #[error(
-        "Tried to create a DhtOp from a ChainElement that requires an Entry. Header type {0:?}"
-    )]
+    #[error("Tried to create a DhtOp from a Element that requires an Entry. Header type {0:?}")]
     HeaderWithoutEntry(Header),
     #[error(transparent)]
     SerializedBytesError(#[from] SerializedBytesError),

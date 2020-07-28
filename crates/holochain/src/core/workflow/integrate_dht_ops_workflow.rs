@@ -24,7 +24,7 @@ use holochain_state::{
 };
 use holochain_types::{
     dht_op::{produce_ops_from_element, DhtOp, DhtOpHashed},
-    element::{ChainElement, SignedHeaderHashed},
+    element::{Element, SignedHeaderHashed},
     validate::ValidationStatus,
     EntryHashed, HeaderHashed, Timestamp, TimestampKey,
 };
@@ -92,8 +92,13 @@ pub async fn integrate_dht_ops_workflow(
             // only integrate this op if it hasn't been integrated already!
             // TODO: test for this [ B-01894 ]
             if workspace.integrated_dht_ops.get(&op_hash)?.is_none() {
-                match integrate_single_dht_op(value, &mut workspace.cas, &mut workspace.meta, true)
-                    .await?
+                match integrate_single_dht_op(
+                    value,
+                    &mut workspace.cas,
+                    &mut workspace.meta,
+                    IntegrationContext::Authority,
+                )
+                .await?
                 {
                     Outcome::Integrated(integrated) => {
                         workspace.integrated_dht_ops.put(op_hash, integrated)?;
@@ -151,15 +156,16 @@ pub async fn integrate_dht_ops_workflow(
 /// The two stores are intended to be either the pair of Vaults,
 /// or the pair of Caches, but never a mixture of the two.
 ///
-/// We can skip integrating element data, specified by the last parameter,
-/// when doing inline integration into the cache after authoring an element.
-#[instrument(skip(element_store, meta_store, value))]
+/// We can skip integrating element data when integrating data as an Author
+/// rather than as an Authority, hence the last parameter.
+#[instrument(skip(value, element_store, meta_store))]
 async fn integrate_single_dht_op(
     value: IntegrationQueueValue,
     element_store: &mut ChainCasBuf<'_>,
     meta_store: &mut MetadataBuf<'_>,
-    integrate_element_data: bool,
+    context: IntegrationContext,
 ) -> DhtOpConvertResult<Outcome> {
+    use IntegrationContext::Authority;
     debug!("Starting integrate dht ops workflow");
     {
         // Process each op
@@ -172,7 +178,7 @@ async fn integrate_single_dht_op(
         // return the full op as it's not consumed when making hashes
         match op.clone() {
             DhtOp::StoreElement(signature, header, maybe_entry) => {
-                if integrate_element_data {
+                if context == Authority {
                     let header = HeaderHashed::from_content(header).await;
                     let signed_header = SignedHeaderHashed::with_presigned(header, signature);
                     let maybe_entry_hashed = match maybe_entry {
@@ -187,7 +193,7 @@ async fn integrate_single_dht_op(
                 // Reference to headers
                 meta_store.register_header(new_entry_header.clone()).await?;
 
-                if integrate_element_data {
+                if context == Authority {
                     let header = HeaderHashed::from_content(new_entry_header.into()).await;
                     let signed_header = SignedHeaderHashed::with_presigned(header, signature);
                     let entry = EntryHashed::from_content(*entry).await;
@@ -196,7 +202,7 @@ async fn integrate_single_dht_op(
                 }
             }
             DhtOp::RegisterAgentActivity(signature, header) => {
-                if integrate_element_data {
+                if context == Authority {
                     // Store header
                     let header_hashed = HeaderHashed::from_content(header.clone()).await;
                     let signed_header =
@@ -217,7 +223,7 @@ async fn integrate_single_dht_op(
                             // Handle missing old entry header. Same reason as below
                             .and_then(|e| e.header().entry_data().map(|(hash, _)| hash.clone()))
                         {
-                            Some(e) => Some(e),
+                            Some(hash) => Some(hash),
                             // Handle missing old Entry (Probably StoreEntry hasn't arrived been processed)
                             // This is put the op back in the integration queue to try again later
                             None => return Outcome::deferred(op, validation_status),
@@ -236,7 +242,7 @@ async fn integrate_single_dht_op(
                     // Handle missing entry header. Same reason as below
                     .and_then(|e| e.header().entry_data().map(|(hash, _)| hash.clone()))
                 {
-                    Some(e) => e,
+                    Some(hash) => hash,
                     // TODO: VALIDATION: This could also be an invalid delete on a header without a delete
                     // Handle missing Entry (Probably StoreEntry hasn't arrived been processed)
                     // This is put the op back in the integration queue to try again later
@@ -245,31 +251,39 @@ async fn integrate_single_dht_op(
                 meta_store.register_delete(entry_delete, entry_hash).await?
             }
             DhtOp::RegisterAddLink(signature, link_add) => {
-                meta_store.add_link(link_add.clone()).await?;
-                // Store add Header
-                let header = HeaderHashed::from_content(link_add.into()).await;
-                debug!(link_add = ?header.as_hash());
-                if integrate_element_data {
+                if context == Authority {
+                    // Check whether we have the base address in the Vault.
+                    // If not then this should put the op back on the queue.
+                    if element_store
+                        .get_entry(&link_add.base_address)
+                        .await?
+                        .is_none()
+                    {
+                        return Outcome::deferred(op, validation_status);
+                    }
+
+                    // Store add Header
+                    let header = HeaderHashed::from_content(link_add.clone().into()).await;
+                    debug!(link_add = ?header.as_hash());
+
                     let signed_header = SignedHeaderHashed::with_presigned(header, signature);
                     element_store.put(signed_header, None)?;
                 }
+
+                meta_store.add_link(link_add).await?;
             }
             DhtOp::RegisterRemoveLink(signature, link_remove) => {
-                // Check whether they have the base address in the cas.
-                // If not then this should put the op back on the queue with a
-                // warning that it's unimplemented and later add this to the cache meta.
-                // TODO: Base might be in cas due to this agent being an authority for a
-                // header on the Base
-                if let None = element_store.get_entry(&link_remove.base_address).await? {
-                    warn!(
-                        "Storing link data when not an author or authority requires the
-                         cache metadata store.
-                         The cache metadata store is currently unimplemented"
-                    );
-                    return Outcome::deferred(op, validation_status);
-                }
+                if context == Authority {
+                    // Check whether we have the base address in the Vault.
+                    // If not then this should put the op back on the queue.
+                    if element_store
+                        .get_entry(&link_remove.base_address)
+                        .await?
+                        .is_none()
+                    {
+                        return Outcome::deferred(op, validation_status);
+                    }
 
-                if integrate_element_data {
                     // Store link delete Header
                     let header = HeaderHashed::from_content(link_remove.clone().into()).await;
                     let signed_header = SignedHeaderHashed::with_presigned(header, signature);
@@ -300,12 +314,21 @@ async fn integrate_single_dht_op(
     }
 }
 
+#[derive(PartialEq, std::fmt::Debug)]
+/// Specifies my role when integrating
+enum IntegrationContext {
+    /// I am integrating DhtOps which I authored
+    Author,
+    /// I am integrating DhtOps which were published to me as an authority
+    Authority,
+}
+
 /// After writing an Element to our chain, we want to integrate the meta ops
 /// inline, so that they are immediately available in the meta cache.
 /// NB: We skip integrating the element data, since it is already available in
 /// our vault.
 pub async fn integrate_to_cache(
-    element: &ChainElement,
+    element: &Element,
     element_store: &mut ChainCasBuf<'_>,
     meta_store: &mut MetadataBuf<'_>,
 ) -> DhtOpConvertResult<()> {
@@ -315,10 +338,17 @@ pub async fn integrate_to_cache(
             validation_status: ValidationStatus::Valid,
         };
         // we don't integrate element data, because it is already in our vault.
-        match integrate_single_dht_op(value, element_store, meta_store, false).await? {
+        match integrate_single_dht_op(value, element_store, meta_store, IntegrationContext::Author)
+            .await?
+        {
             Outcome::Integrated(_) => {}
             Outcome::Deferred(v) => {
-                unreachable!("An inline-integrated DhtOp cannot be deferred: {:?}", v)
+                // FIXME: if inline integration is deferred for any reason, we
+                // expect sys validation to fail. Since sys validation is not
+                // implemented, we panic here instead. When sys validation
+                // lands, make this a warning
+                // TODO: make this a panic after @freesig's dht_get work is in (B-01478)
+                error!("An inline-integrated DhtOp was deferred. We expect sys validation to fail: {:?}", v)
             }
         }
     }
