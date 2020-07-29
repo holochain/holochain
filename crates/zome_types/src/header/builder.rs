@@ -141,6 +141,7 @@ builder_variant!(EntryUpdate {
 
 builder_variant!(ElementDelete {
     removes_address: HeaderHash,
+    removes_entry_address: EntryHash,
 });
 
 builder_variant!(AgentValidationPkg {

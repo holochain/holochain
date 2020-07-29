@@ -33,7 +33,7 @@ use holochain_types::{
 use holochain_zome_types::{
     entry::GetOptions,
     entry_def::EntryDefs,
-    header::{builder, ElementDelete, EntryUpdate, LinkAdd, LinkRemove},
+    header::{builder, ElementDelete, EntryUpdate, IntendedFor, LinkAdd, LinkRemove},
     link::{LinkTag, Links},
     zome::ZomeName,
     CommitEntryInput, GetEntryInput, GetLinksInput, Header, LinkEntriesInput,
@@ -109,7 +109,7 @@ impl TestData {
         // Entry update for entry
         let mut entry_update_entry = fixt!(EntryUpdate);
         entry_update_entry.entry_hash = new_entry_hash.clone();
-        entry_update_entry.intended_for = IntendedFor::Entry;
+        entry_update_entry.intended_for = IntendedFor::Entry(original_entry_hash.clone());
         entry_update_entry.replaces_address = original_header_hash.clone();
 
         // Entry delete
@@ -189,17 +189,9 @@ impl Db {
             match expect {
                 Db::Integrated(op) => {
                     let op_hash = DhtOpHashed::from_content(op.clone()).await.into_hash();
-                    let (op, basis) =
-                        dht_op_to_light_basis(op, &workspace.cas)
-                            .await
-                            .expect(&format!(
-                                "Failed to generate light {} for {}",
-                                op_hash, here
-                            ));
                     let value = IntegratedDhtOpsValue {
                         validation_status: ValidationStatus::Valid,
-                        basis,
-                        op,
+                        op: op.to_light().await,
                         when_integrated: Timestamp::now().into(),
                     };
                     let mut r = workspace.integrated_dht_ops.get(&op_hash).unwrap().unwrap();
@@ -576,22 +568,6 @@ fn register_replaced_by_for_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static st
     (pre_state, expect, "register replaced by for entry")
 }
 
-// Register replaced by without store entry
-fn register_replaced_by_missing_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-    let op = DhtOp::RegisterReplacedBy(
-        a.signature.clone(),
-        a.entry_update_entry.clone(),
-        Some(a.new_entry.clone().into()),
-    );
-    let pre_state = vec![Db::IntQueue(op.clone())];
-    let expect = vec![Db::IntegratedEmpty, Db::IntQueue(op.clone()), Db::MetaEmpty];
-    (
-        pre_state,
-        expect,
-        "register replaced by for entry missing entry",
-    )
-}
-
 fn register_deleted_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let op = DhtOp::RegisterDeletedEntryHeader(a.signature.clone(), a.entry_delete.clone());
     let pre_state = vec![
@@ -700,7 +676,6 @@ async fn test_ops_state() {
         register_agent_activity,
         register_replaced_by_for_header,
         register_replaced_by_for_entry,
-        register_replaced_by_missing_entry,
         register_deleted_by,
         register_deleted_by_missing_entry,
         register_deleted_header_by,
@@ -1116,6 +1091,7 @@ async fn test_wasm_api_without_integration_delete() {
             .unwrap();
         let delete = builder::ElementDelete {
             removes_address: entry_header.header_hash,
+            removes_entry_address: base_address.clone(),
         };
         workspace.source_chain.put(delete, None).await.unwrap();
         env_ref

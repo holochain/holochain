@@ -499,11 +499,7 @@ impl Cell {
                         val.op, &cas,
                     )
                     .await?;
-                let basis =
-                    crate::core::workflow::produce_dht_ops_workflow::dht_op_light::dht_basis(
-                        &full_op, &cas,
-                    )
-                    .await?;
+                let basis = full_op.dht_basis().await;
                 out.push((basis, op_hash, full_op));
             }
         }
