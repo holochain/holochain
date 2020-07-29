@@ -8,8 +8,9 @@ use holochain_p2p::{
 };
 use holochain_serialized_bytes::UnsafeBytes;
 use holochain_types::{
-    element::SignedHeaderHashed, test_utils::fake_header_hash, Entry, EntryHashed, HeaderHashed,
-    Timestamp,
+    element::{SignedHeaderHashed, SignedHeaderHashedExt},
+    test_utils::fake_header_hash,
+    Entry, EntryHashed, HeaderHashed, Timestamp,
 };
 use holochain_zome_types::entry_def::EntryVisibility;
 use holochain_zome_types::header::{EntryCreate, EntryType, Header};

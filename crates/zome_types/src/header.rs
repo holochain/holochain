@@ -1,7 +1,7 @@
 use crate::{entry_def::EntryVisibility, link::LinkTag, timestamp::Timestamp};
 pub use builder::{HeaderBuilder, HeaderBuilderCommon};
 use holo_hash::{
-    impl_hashable_content, AgentPubKey, DnaHash, EntryHash, HashableContent, HeaderHash,
+    impl_hashable_content, AgentPubKey, DnaHash, EntryHash, HashableContent, HeaderHash, HoloHashed,
 };
 use holochain_serialized_bytes::prelude::*;
 
@@ -39,6 +39,8 @@ pub enum Header {
     EntryUpdate(EntryUpdate),
     ElementDelete(ElementDelete),
 }
+
+pub type HeaderHashed = HoloHashed<Header>;
 
 /// a utility wrapper to write intos for our data types
 macro_rules! write_into_header {
@@ -219,6 +221,10 @@ pub struct LinkRemove {
     pub timestamp: Timestamp,
     pub header_seq: u32,
     pub prev_header: HeaderHash,
+
+    /// this is redundant with the `LinkAdd` header but needs to be included to facilitate DHT ops
+    /// this is NOT exposed to wasm developers and is validated by the subconscious to ensure that
+    /// it always matches the `base_address` of the `LinkAdd`
     pub base_address: EntryHash,
     /// The address of the `LinkAdd` being reversed
     pub link_add_address: HeaderHash,

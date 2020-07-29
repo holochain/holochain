@@ -9,9 +9,8 @@
 use crate::prelude::*;
 use holo_hash::EntryHash;
 use holochain_zome_types::entry_def::EntryVisibility;
+pub use holochain_zome_types::header::HeaderHashed;
 use holochain_zome_types::header::*;
-
-pub type HeaderHashed = HoloHashed<Header>;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 /// A header of one of the two types that create a new entry.

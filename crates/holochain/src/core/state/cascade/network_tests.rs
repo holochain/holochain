@@ -10,7 +10,7 @@ use holo_hash::*;
 use holochain_p2p::{actor::GetMetaOptions, HolochainP2pCell, HolochainP2pRef};
 use holochain_state::{env::ReadManager, test_utils::test_cell_env};
 use holochain_types::{
-    element::{ChainElement, WireElement},
+    element::{Element, WireElement},
     fixt::*,
     metadata::TimedHeaderHash,
     observability, HeaderHashed, Timestamp,
@@ -170,11 +170,11 @@ impl Shutdown {
 }
 /// Run a test network handler which accepts two data sources to draw from.
 /// It only handles Get and GetMeta requests.
-/// - When handling a Get, it pulls the corresponding ChainElement from the `element_fixt_store`
+/// - When handling a Get, it pulls the corresponding Element from the `element_fixt_store`
 /// - When handling a GetMeta, it pulls the corresponding `TimedHeaderHash` from the `meta_fixt_store
 ///    and constructs a `MetadataSet` containing only that single `TimedHeaderHash`
 async fn run_fixt_network(
-    element_fixt_store: BTreeMap<HeaderHash, ChainElement>,
+    element_fixt_store: BTreeMap<HeaderHash, Element>,
     meta_fixt_store: BTreeMap<AnyDhtHash, TimedHeaderHash>,
 ) -> (HolochainP2pCell, Shutdown) {
     // Create the network
@@ -242,7 +242,7 @@ async fn run_fixt_network(
 }
 
 async fn generate_fixt_store() -> (
-    BTreeMap<HeaderHash, ChainElement>,
+    BTreeMap<HeaderHash, Element>,
     BTreeMap<AnyDhtHash, TimedHeaderHash>,
 ) {
     let mut store = BTreeMap::new();
@@ -266,6 +266,6 @@ async fn generate_fixt_store() -> (
             header_hash: hash.clone(),
         },
     );
-    store.insert(hash, ChainElement::new(signed_header, Some(entry)));
+    store.insert(hash, Element::new(signed_header, Some(entry)));
     (store, meta_store)
 }

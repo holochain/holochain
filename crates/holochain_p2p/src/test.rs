@@ -41,7 +41,7 @@ mod tests {
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
     use ghost_actor::GhostControlSender;
-    use holochain_types::element::{ChainElement, SignedHeaderHashed};
+    use holochain_types::element::{Element, SignedHeaderHashed};
     use holochain_types::fixt::*;
 
     macro_rules! newhash {
@@ -197,14 +197,14 @@ mod tests {
 
         let (p2p, mut evt) = spawn_holochain_p2p().await.unwrap();
 
-        let test_1 = WireElement::from_element(ChainElement::new(
+        let test_1 = WireElement::from_element(Element::new(
             SignedHeaderHashed::with_presigned(
                 HoloHashed::from_content(fixt!(Header)).await,
                 fixt!(Signature),
             ),
             None,
         ));
-        let test_2 = WireElement::from_element(ChainElement::new(
+        let test_2 = WireElement::from_element(Element::new(
             SignedHeaderHashed::with_presigned(
                 HoloHashed::from_content(fixt!(Header)).await,
                 fixt!(Signature),

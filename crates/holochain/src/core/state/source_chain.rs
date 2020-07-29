@@ -53,7 +53,7 @@ impl<'env> SourceChain<'env> {
         self.0
     }
 
-    /// Add a ChainElement to the source chain, using a HeaderBuilder
+    /// Add a Element to the source chain, using a HeaderBuilder
     pub async fn put<H: HeaderInner, B: HeaderBuilder<H>>(
         &mut self,
         header_builder: B,
