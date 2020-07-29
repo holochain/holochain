@@ -16,7 +16,10 @@ use crate::{
     conductor::{api::CellConductorApi, cell::error::CellResult},
     core::ribosome::{guest_callback::init::InitResult, wasm_ribosome::WasmRibosome},
     core::{
-        state::source_chain::SourceChainBuf,
+        state::{
+            chain_cas::ChainCasBuf, dht_op_integration::IntegratedDhtOpsBuf,
+            source_chain::SourceChainBuf,
+        },
         workflow::{
             call_zome_workflow, error::WorkflowError, genesis_workflow::genesis_workflow,
             initialize_zomes_workflow, CallZomeWorkflowArgs, CallZomeWorkspace,
@@ -26,13 +29,18 @@ use crate::{
     },
 };
 use error::CellError;
+use fallible_iterator::FallibleIterator;
 use futures::future::FutureExt;
 use holo_hash::*;
 use holochain_keystore::KeystoreSender;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_state::env::{EnvironmentKind, EnvironmentWrite, ReadManager};
+use holochain_state::{
+    db::GetDb,
+    env::{EnvironmentKind, EnvironmentWrite, ReadManager},
+};
 use holochain_types::{
     autonomic::AutonomicProcess, cell::CellId, element::WireElement, metadata::MetadataSet,
+    Timestamp,
 };
 use holochain_zome_types::capability::CapSecret;
 use holochain_zome_types::zome::ZomeName;
@@ -308,18 +316,30 @@ impl Cell {
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
-            ListDhtOpHashes { span, respond, .. } => {
+            FetchOpHashesForConstraints {
+                span,
+                respond,
+                dht_arc,
+                since,
+                until,
+                ..
+            } => {
                 let _g = span.enter();
                 let res = self
-                    .handle_list_dht_op_hashes()
+                    .handle_fetch_op_hashes_for_constraints(dht_arc, since, until)
                     .await
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
-            FetchDhtOps { span, respond, .. } => {
+            FetchOpHashData {
+                span,
+                respond,
+                op_hashes,
+                ..
+            } => {
                 let _g = span.enter();
                 let res = self
-                    .handle_fetch_dht_ops()
+                    .handle_fetch_op_hash_data(op_hashes)
                     .await
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
@@ -439,13 +459,51 @@ impl Cell {
     }
 
     /// the network module is requesting a list of dht op hashes
-    async fn handle_list_dht_op_hashes(&self) -> CellResult<()> {
-        unimplemented!()
+    async fn handle_fetch_op_hashes_for_constraints(
+        &self,
+        dht_arc: holochain_p2p::dht_arc::DhtArc,
+        since: Timestamp,
+        until: Timestamp,
+    ) -> CellResult<Vec<DhtOpHash>> {
+        let env_ref = self.state_env.guard().await;
+        let reader = env_ref.reader()?;
+        let integrated_dht_ops = IntegratedDhtOpsBuf::new(&reader, &env_ref)?;
+        let result: Vec<DhtOpHash> = integrated_dht_ops
+            .query(Some(since), Some(until), Some(dht_arc))?
+            .map(|(k, _)| Ok(k))
+            .collect()?;
+        Ok(result)
     }
 
     /// the network module is requesting the content for dht ops
-    async fn handle_fetch_dht_ops(&self) -> CellResult<()> {
-        unimplemented!()
+    async fn handle_fetch_op_hash_data(
+        &self,
+        op_hashes: Vec<holo_hash::DhtOpHash>,
+    ) -> CellResult<
+        Vec<(
+            holo_hash::AnyDhtHash,
+            holo_hash::DhtOpHash,
+            holochain_types::dht_op::DhtOp,
+        )>,
+    > {
+        let env_ref = self.state_env.guard().await;
+        let reader = env_ref.reader()?;
+        let integrated_dht_ops = IntegratedDhtOpsBuf::new(&reader, &env_ref)?;
+        let cas = ChainCasBuf::vault(&reader, &env_ref, false)?;
+        let mut out = vec![];
+        for op_hash in op_hashes {
+            let val = integrated_dht_ops.get(&op_hash)?;
+            if let Some(val) = val {
+                let full_op =
+                    crate::core::workflow::produce_dht_ops_workflow::dht_op_light::light_to_op(
+                        val.op, &cas,
+                    )
+                    .await?;
+                let basis = full_op.dht_basis().await;
+                out.push((basis, op_hash, full_op));
+            }
+        }
+        Ok(out)
     }
 
     /// the network module would like this cell/agent to sign some data

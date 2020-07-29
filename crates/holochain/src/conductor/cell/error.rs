@@ -37,6 +37,11 @@ pub enum CellError {
     HolochainP2pError(#[from] HolochainP2pError),
     #[error(transparent)]
     SerializedBytesError(#[from] holochain_serialized_bytes::SerializedBytesError),
+    #[error(transparent)]
+    DhtOpConvertError(
+        #[from]
+        crate::core::workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError,
+    ),
     #[error("Todo")]
     Todo,
 }
