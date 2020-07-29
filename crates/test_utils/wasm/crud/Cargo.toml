@@ -1,14 +1,8 @@
 [package]
-name = "test_wasm_debug"
+name = "test_wasm_crud"
 version = "0.0.1"
 authors = [ "thedavidmeister", "thedavidmeister@gmail.com" ]
 edition = "2018"
-
-[profile.dev]
-opt-level = "z"
-
-[profile.release]
-opt-level = "z"
 
 # Ensure that this is not inside of any other workspace.
 # This crate should be an implementation detail of test_utils_wasm and
@@ -16,13 +10,14 @@ opt-level = "z"
 [workspace]
 
 [lib]
-name = "test_wasm_debug"
+name = "test_wasm_crud"
 crate-type = [ "cdylib", "rlib" ]
 
 [dependencies]
 holochain_serialized_bytes = "=0.0.40"
 holochain_wasmer_guest = "=0.0.36"
 holochain_zome_types = { version = "=0.0.1", path = "../../../zome_types" }
-serde = "=1.0.104"
+hdk3 = { path = "../../../hdk" }
 
-[patch.crates-io]
+serde = "=1.0.104"
+test_wasm_common = { version = "=0.0.1", path = "../../wasm_common" }

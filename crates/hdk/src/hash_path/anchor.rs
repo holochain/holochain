@@ -12,6 +12,8 @@ pub struct Anchor {
     pub anchor_text: Option<String>,
 }
 
+entry_def!(Anchor Path::entry_def());
+
 impl From<&Anchor> for Path {
     fn from(anchor: &Anchor) -> Self {
         Self::from(&format!(
@@ -52,28 +54,6 @@ impl TryFrom<&Path> for Anchor {
                 components.len()
             )))
         }
-    }
-}
-
-impl Anchor {
-    pub fn entry_def_id() -> EntryDefId {
-        Path::entry_def_id()
-    }
-
-    pub fn crdt_type() -> CrdtType {
-        Path::crdt_type()
-    }
-
-    pub fn required_validations() -> RequiredValidations {
-        Path::required_validations()
-    }
-
-    pub fn entry_visibility() -> EntryVisibility {
-        Path::entry_visibility()
-    }
-
-    pub fn entry_def() -> EntryDef {
-        Path::entry_def()
     }
 }
 

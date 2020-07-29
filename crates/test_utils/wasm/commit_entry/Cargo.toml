@@ -26,3 +26,4 @@ holochain_zome_types = { version = "=0.0.1", path = "../../../zome_types" }
 holo_hash = { version = "=0.0.1", path = "../../../holo_hash" }
 serde = "=1.0.104"
 test_wasm_common = { version = "=0.0.1", path = "../../wasm_common" }
+hdk3 = { path = "../../../hdk" }

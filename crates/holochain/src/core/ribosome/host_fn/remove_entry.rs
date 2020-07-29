@@ -50,3 +50,40 @@ pub fn remove_entry<'a>(
 
     Ok(RemoveEntryOutput::new(header_address))
 }
+
+#[cfg(test)]
+#[cfg(feature = "slow_tests")]
+pub mod slow_tests {
+
+    use crate::core::state::workspace::Workspace;
+    use crate::fixt::ZomeCallHostAccessFixturator;
+    use fixt::prelude::*;
+    use holo_hash::HeaderHash;
+    use holochain_state::env::ReadManager;
+    use holochain_wasm_test_utils::TestWasm;
+
+    #[tokio::test(threaded_scheduler)]
+    async fn ribosome_remove_entry_add_remove() {
+        let env = holochain_state::test_utils::test_cell_env();
+        let dbs = env.dbs().await;
+        let env_ref = env.guard().await;
+
+        let reader = env_ref.reader().unwrap();
+        let mut workspace = crate::core::workflow::CallZomeWorkspace::new(&reader, &dbs).unwrap();
+
+        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+            .await
+            .unwrap();
+
+        let (_g, raw_workspace) =
+            crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
+                &mut workspace,
+            );
+        let mut host_access = fixt!(ZomeCallHostAccess);
+        host_access.workspace = raw_workspace;
+
+        // should be able to create and get an entry
+        let _create_header_hash: HeaderHash =
+            crate::call_test_ribosome!(host_access, TestWasm::Crud, "create", ());
+    }
+}

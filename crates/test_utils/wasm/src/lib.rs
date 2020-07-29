@@ -10,6 +10,7 @@ pub enum TestWasm {
     Anchor,
     Bench,
     CommitEntry,
+    Crud,
     Debug,
     EntryDefs,
     Foo,
@@ -36,6 +37,7 @@ impl From<TestWasm> for ZomeName {
             TestWasm::Anchor => "anchor",
             TestWasm::Bench => "bench",
             TestWasm::CommitEntry => "commit_entry",
+            TestWasm::Crud => "crud",
             TestWasm::Debug => "debug",
             TestWasm::EntryDefs => "entry_defs",
             TestWasm::Foo => "foo",
@@ -74,6 +76,11 @@ impl From<TestWasm> for DnaWasm {
             TestWasm::CommitEntry => include_bytes!(concat!(
                 env!("OUT_DIR"),
                 "/wasm32-unknown-unknown/release/test_wasm_commit_entry.wasm"
+            ))
+            .to_vec(),
+            TestWasm::Crud => include_bytes!(concat!(
+                env!("OUT_DIR"),
+                "/wasm32-unknown-unknown/release/test_wasm_crud.wasm"
             ))
             .to_vec(),
             TestWasm::Debug => include_bytes!(concat!(
