@@ -1,11 +1,8 @@
 use crate::{
     conductor::manager::spawn_task_manager,
-    core::{
-        state::{
-            dht_op_integration::{IntegratedDhtOpsValue, IntegrationQueueValue},
-            workspace::Workspace,
-        },
-        workflow::produce_dht_ops_workflow::dht_op_light::DhtOpLight,
+    core::state::{
+        dht_op_integration::{IntegratedDhtOpsValue, IntegrationQueueValue},
+        workspace::Workspace,
     },
     fixt::{DnaFileFixturator, SignatureFixturator},
 };
@@ -18,7 +15,7 @@ use holochain_state::{
     test_utils::{test_conductor_env, TestEnvironment},
 };
 use holochain_types::{
-    dht_op::{DhtOp, DhtOpHashed},
+    dht_op::{DhtOp, DhtOpHashed, DhtOpLight},
     test_utils::{fake_agent_pubkey_2, fake_cell_id},
     HeaderHashed, Timestamp,
 };
@@ -136,6 +133,7 @@ async fn test_cell_handle_publish() {
                 IntegratedDhtOpsValue {
                     op: DhtOpLight::StoreElement(
                         hash,
+                        _,
                         _
                     ),
                     ..

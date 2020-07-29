@@ -7,6 +7,7 @@
 use crate::element::Element;
 use crate::{header::NewEntryHeader, prelude::*};
 use error::{DhtOpError, DhtOpResult};
+use header::{HeaderHashed, IntendedFor};
 use holo_hash::{hash_type, HashableContentBytes};
 use holochain_zome_types::{header, Entry, Header};
 use serde::{Deserialize, Serialize};
@@ -80,6 +81,24 @@ pub enum DhtOp {
     RegisterRemoveLink(Signature, header::LinkRemove),
 }
 
+/// Show that this type is used as the basis
+type DhtBasis = AnyDhtHash;
+
+/// A type for storing in databases that don't need the actual
+/// data. Everything is a hash of the type except the signatures.
+#[allow(missing_docs)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub enum DhtOpLight {
+    StoreElement(HeaderHash, Option<EntryHash>, DhtBasis),
+    StoreEntry(HeaderHash, EntryHash, DhtBasis),
+    RegisterAgentActivity(HeaderHash, DhtBasis),
+    RegisterReplacedBy(HeaderHash, EntryHash, DhtBasis),
+    RegisterDeletedBy(HeaderHash, DhtBasis),
+    RegisterDeletedEntryHeader(HeaderHash, DhtBasis),
+    RegisterAddLink(HeaderHash, DhtBasis),
+    RegisterRemoveLink(HeaderHash, DhtBasis),
+}
+
 impl DhtOp {
     fn as_unique_form(&self) -> UniqueForm<'_> {
         match self {
@@ -93,6 +112,91 @@ impl DhtOp {
             }
             Self::RegisterAddLink(_, header) => UniqueForm::RegisterAddLink(header),
             Self::RegisterRemoveLink(_, header) => UniqueForm::RegisterRemoveLink(header),
+        }
+    }
+
+    /// Returns the basis hash which determines which agents will receive this DhtOp
+    pub async fn dht_basis(&self) -> AnyDhtHash {
+        match self {
+            DhtOp::StoreElement(_, header, _) => {
+                let (_, hash): (_, HeaderHash) =
+                    HeaderHashed::from_content(header.clone()).await.into();
+                hash.into()
+            }
+            DhtOp::StoreEntry(_, header, _) => header.entry().clone().into(),
+            DhtOp::RegisterAgentActivity(_, header) => header.author().clone().into(),
+            DhtOp::RegisterReplacedBy(_, header, _) => match &header.intended_for {
+                IntendedFor::Header => header.replaces_address.clone().into(),
+                IntendedFor::Entry(basis) => basis.clone().into(),
+            },
+            DhtOp::RegisterDeletedBy(_, header) => header.removes_address.clone().into(),
+            DhtOp::RegisterDeletedEntryHeader(_, header) => {
+                header.removes_entry_address.clone().into()
+            }
+            DhtOp::RegisterAddLink(_, header) => header.base_address.clone().into(),
+            DhtOp::RegisterRemoveLink(_, header) => header.base_address.clone().into(),
+        }
+    }
+
+    /// Convert a [DhtOp] to a [DhtOpLight] and basis
+    pub async fn to_light(
+        // Hoping one day we can work out how to go from `&EntryCreate`
+        // to `&Header::EntryCreate(EntryCreate)` so punting on a reference
+        &self,
+    ) -> DhtOpLight {
+        let basis = self.dht_basis().await;
+        match self {
+            DhtOp::StoreElement(_, h, _) => {
+                let e = h.entry_data().map(|(e, _)| e.clone());
+                let h = HeaderHash::with_data(h).await;
+                DhtOpLight::StoreElement(h, e, basis)
+            }
+            DhtOp::StoreEntry(_, h, _) => {
+                let e = h.entry().clone();
+                let h = HeaderHash::with_data(&Header::from(h.clone())).await;
+                DhtOpLight::StoreEntry(h, e, basis)
+            }
+            DhtOp::RegisterAgentActivity(_, h) => {
+                let h = HeaderHash::with_data(h).await;
+                DhtOpLight::RegisterAgentActivity(h, basis)
+            }
+            DhtOp::RegisterReplacedBy(_, h, _) => {
+                let e = h.entry_hash.clone();
+                let h = HeaderHash::with_data(&Header::from(h.clone())).await;
+                DhtOpLight::RegisterReplacedBy(h, e, basis)
+            }
+            DhtOp::RegisterDeletedBy(_, h) => {
+                let h = HeaderHash::with_data(&Header::from(h.clone())).await;
+                DhtOpLight::RegisterDeletedBy(h, basis)
+            }
+            DhtOp::RegisterDeletedEntryHeader(_, h) => {
+                let h = HeaderHash::with_data(&Header::from(h.clone())).await;
+                DhtOpLight::RegisterDeletedEntryHeader(h, basis)
+            }
+            DhtOp::RegisterAddLink(_, h) => {
+                let h = HeaderHash::with_data(&Header::from(h.clone())).await;
+                DhtOpLight::RegisterAddLink(h, basis)
+            }
+            DhtOp::RegisterRemoveLink(_, h) => {
+                let h = HeaderHash::with_data(&Header::from(h.clone())).await;
+                DhtOpLight::RegisterRemoveLink(h, basis)
+            }
+        }
+    }
+}
+
+impl DhtOpLight {
+    /// Get the dht basis for where to send this op
+    pub fn dht_basis(&self) -> &AnyDhtHash {
+        match self {
+            DhtOpLight::StoreElement(_, _, b)
+            | DhtOpLight::StoreEntry(_, _, b)
+            | DhtOpLight::RegisterAgentActivity(_, b)
+            | DhtOpLight::RegisterReplacedBy(_, _, b)
+            | DhtOpLight::RegisterDeletedBy(_, b)
+            | DhtOpLight::RegisterDeletedEntryHeader(_, b)
+            | DhtOpLight::RegisterAddLink(_, b)
+            | DhtOpLight::RegisterRemoveLink(_, b) => b,
         }
     }
 }

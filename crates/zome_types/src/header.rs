@@ -167,7 +167,7 @@ pub struct EntryDefId(u8);
 )]
 pub enum IntendedFor {
     Header,
-    Entry,
+    Entry(EntryHash),
 }
 
 /// The Dna Header is always the first header in a source chain
@@ -223,6 +223,10 @@ pub struct LinkRemove {
     pub timestamp: Timestamp,
     pub header_seq: u32,
     pub prev_header: HeaderHash,
+
+    /// this is redundant with the `LinkAdd` header but needs to be included to facilitate DHT ops
+    /// this is NOT exposed to wasm developers and is validated by the subconscious to ensure that
+    /// it always matches the `base_address` of the `LinkAdd`
     pub base_address: EntryHash,
     /// The address of the `LinkAdd` being reversed
     pub link_add_address: HeaderHash,
@@ -302,6 +306,7 @@ pub struct ElementDelete {
 
     /// Address of the Element being deleted
     pub removes_address: HeaderHash,
+    pub removes_entry_address: EntryHash,
 }
 
 /// Allows Headers which reference Entries to know what type of Entry it is

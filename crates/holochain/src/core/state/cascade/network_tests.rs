@@ -207,7 +207,8 @@ async fn get_from_another_agent() {
 
     // Bob store element
     let entry = Post("Bananas are good for you".into());
-    let entry_hash = {
+    let entry_hash = EntryHash::with_data(&Entry::try_from(entry.clone()).unwrap()).await;
+    {
         let bob_env = handle.get_cell_env(&bob_cell_id).await.unwrap();
         let keystore = bob_env.keystore().clone();
         let network = handle.holochain_p2p().to_cell(
@@ -224,7 +225,7 @@ async fn get_from_another_agent() {
         };
         let env_ref = bob_env.guard().await;
         let dbs = bob_env.dbs().await;
-        let entry_hash = commit_entry(
+        commit_entry(
             &env_ref,
             &dbs,
             call_data.clone(),
@@ -245,6 +246,7 @@ async fn get_from_another_agent() {
         )
         .await
         .unwrap();
+
         let (signed_header, ret_entry) = element.clone().into_inner();
 
         // TODO: Check signed header is the same header
@@ -258,9 +260,7 @@ async fn get_from_another_agent() {
 
         // Make Bob an "authority"
         fake_authority(&env_ref, &dbs, element).await;
-
-        entry_hash
-    };
+    }
 
     // Alice get element from bob
     let element = {
@@ -467,7 +467,7 @@ async fn commit_entry<'env>(
     call_data: CallData,
     entry: Entry,
     entry_def_id: entry_def::EntryDefId,
-) -> EntryHash {
+) -> HeaderHash {
     let CallData {
         network,
         keystore,
@@ -493,7 +493,7 @@ async fn commit_entry<'env>(
         .with_commit(|writer| workspace.flush_to_txn(writer))
         .unwrap();
 
-    output.into_inner().try_into().unwrap()
+    output.into_inner()
 }
 
 async fn get_entry<'env>(

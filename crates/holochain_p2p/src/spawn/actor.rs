@@ -4,7 +4,7 @@ use futures::future::FutureExt;
 
 use crate::types::AgentPubKeyExt;
 
-use holochain_types::element::GetElementResponse;
+use holochain_types::{element::GetElementResponse, Timestamp};
 use kitsune_p2p::actor::KitsuneP2pSender;
 
 pub(crate) struct HolochainP2pActor {
@@ -248,24 +248,98 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         }
     }
 
+    fn handle_gossip(
+        &mut self,
+        space: Arc<kitsune_p2p::KitsuneSpace>,
+        agent: Arc<kitsune_p2p::KitsuneAgent>,
+        op_hash: Arc<kitsune_p2p::KitsuneOpHash>,
+        op_data: Vec<u8>,
+    ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<()> {
+        let space = DnaHash::from_kitsune(&space);
+        let agent = AgentPubKey::from_kitsune(&agent);
+        let op_hash = DhtOpHash::from_kitsune(&op_hash);
+        let op_data =
+            crate::wire::WireDhtOpData::decode(op_data).map_err(HolochainP2pError::from)?;
+        self.handle_incoming_publish(
+            space,
+            agent,
+            op_data.from_agent,
+            false,
+            op_data.dht_hash,
+            vec![(op_hash, op_data.op_data)],
+        )
+    }
+
     fn handle_fetch_op_hashes_for_constraints(
         &mut self,
-        _input: kitsune_p2p::event::FetchOpHashesForConstraintsEvt,
-    ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<
-        Vec<(
-            kitsune_p2p::KitsuneDataHash,
-            Vec<kitsune_p2p::KitsuneOpHash>,
-        )>,
-    > {
-        unimplemented!()
+        input: kitsune_p2p::event::FetchOpHashesForConstraintsEvt,
+    ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<Vec<Arc<kitsune_p2p::KitsuneOpHash>>>
+    {
+        let kitsune_p2p::event::FetchOpHashesForConstraintsEvt {
+            space,
+            agent,
+            dht_arc,
+            since_utc_epoch_s,
+            until_utc_epoch_s,
+        } = input;
+        let space = DnaHash::from_kitsune(&space);
+        let agent = AgentPubKey::from_kitsune(&agent);
+        let since = Timestamp(since_utc_epoch_s, 0);
+        let until = Timestamp(until_utc_epoch_s, 0);
+
+        let evt_sender = self.evt_sender.clone();
+        Ok(async move {
+            Ok(evt_sender
+                .fetch_op_hashes_for_constraints(space, agent, dht_arc, since, until)
+                .await?
+                .into_iter()
+                .map(|h| h.into_kitsune())
+                .collect())
+        }
+        .boxed()
+        .into())
     }
 
     fn handle_fetch_op_hash_data(
         &mut self,
-        _input: kitsune_p2p::event::FetchOpHashDataEvt,
-    ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<Vec<(kitsune_p2p::KitsuneOpHash, Vec<u8>)>>
-    {
-        unimplemented!()
+        input: kitsune_p2p::event::FetchOpHashDataEvt,
+    ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<
+        Vec<(Arc<kitsune_p2p::KitsuneOpHash>, Vec<u8>)>,
+    > {
+        let kitsune_p2p::event::FetchOpHashDataEvt {
+            space,
+            agent,
+            op_hashes,
+        } = input;
+        let space = DnaHash::from_kitsune(&space);
+        let agent = AgentPubKey::from_kitsune(&agent);
+        let op_hashes = op_hashes
+            .into_iter()
+            .map(|h| DhtOpHash::from_kitsune(&h))
+            .collect::<Vec<_>>();
+
+        let evt_sender = self.evt_sender.clone();
+        Ok(async move {
+            let mut out = vec![];
+            for (dht_hash, op_hash, dht_op) in evt_sender
+                .fetch_op_hash_data(space, agent.clone(), op_hashes)
+                .await?
+            {
+                out.push((
+                    op_hash.into_kitsune(),
+                    crate::wire::WireDhtOpData {
+                        from_agent: agent.clone(),
+                        dht_hash,
+                        op_data: dht_op,
+                    }
+                    .encode()
+                    .map_err(kitsune_p2p::KitsuneP2pError::other)?,
+                ));
+            }
+            Ok(out)
+        }
+        .boxed()
+        .into())
     }
 
     fn handle_sign_network_data(

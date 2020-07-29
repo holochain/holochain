@@ -24,16 +24,15 @@ pub fn get_entry<'a>(
         |workspace: &'a mut CallZomeWorkspace| -> MustBoxFuture<'a, CascadeResult<Option<Entry>>> {
             async move {
                 let mut cascade = workspace.cascade(network);
-                // safe block on
-                let maybe_entry = cascade
-                    .dht_get(hash.clone().into(), options.into())
+                Ok(cascade
+                    .dht_get(hash.into(), options.into())
                     .await?
-                    .and_then(|e| e.into_inner().1);
-                Ok(maybe_entry)
+                    .and_then(|e| e.into_inner().1))
             }
             .boxed()
             .into()
         };
+    // timeouts must be handled by the network
     let maybe_entry: Option<Entry> =
         tokio_safe_block_on::tokio_safe_block_forever_on(async move {
             unsafe { call_context.host_access.workspace().apply_mut(call).await }

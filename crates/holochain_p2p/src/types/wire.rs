@@ -1,6 +1,24 @@
 use crate::*;
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+pub(crate) struct WireDhtOpData {
+    pub from_agent: holo_hash::AgentPubKey,
+    pub dht_hash: holo_hash::AnyDhtHash,
+    pub op_data: holochain_types::dht_op::DhtOp,
+}
+
+impl WireDhtOpData {
+    pub fn encode(self) -> Result<Vec<u8>, SerializedBytesError> {
+        Ok(UnsafeBytes::from(SerializedBytes::try_from(self)?).into())
+    }
+
+    pub fn decode(data: Vec<u8>) -> Result<Self, SerializedBytesError> {
+        let request: SerializedBytes = UnsafeBytes::from(data).into();
+        Ok(request.try_into()?)
+    }
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(tag = "type", content = "content")]
 pub(crate) enum WireMessage {
     CallRemote {
