@@ -9,6 +9,80 @@ const NET_CONNECT_INTERVAL_MS: u64 = 20;
 /// Max amount of time we should wait for connections to be established.
 const NET_CONNECT_MAX_MS: u64 = 2000;
 
+pub(crate) async fn spawn_space(
+    space: Arc<KitsuneSpace>,
+    internal_sender: ghost_actor::GhostSender<Internal>,
+    evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
+) -> KitsuneP2pResult<(
+    ghost_actor::GhostSender<KitsuneP2p>,
+    KitsuneP2pEventReceiver,
+)> {
+    let (_evt_send, evt_recv) = futures::channel::mpsc::channel(10);
+
+    let builder = ghost_actor::actor_builder::GhostActorBuilder::new();
+
+    let sender = builder
+        .channel_factory()
+        .create_channel::<KitsuneP2p>()
+        .await?;
+
+    tokio::task::spawn(builder.spawn(Space::new(space, internal_sender, evt_sender)));
+
+    Ok((sender, evt_recv))
+}
+
+impl ghost_actor::GhostControlHandler for Space {}
+
+impl ghost_actor::GhostHandler<KitsuneP2p> for Space {}
+
+impl KitsuneP2pHandler for Space {
+    fn handle_join(
+        &mut self,
+        _space: Arc<KitsuneSpace>,
+        agent: Arc<KitsuneAgent>,
+    ) -> KitsuneP2pHandlerResult<()> {
+        match self.agents.entry(agent.clone()) {
+            Entry::Occupied(_) => (),
+            Entry::Vacant(entry) => {
+                entry.insert(AgentInfo { agent });
+            }
+        }
+        Ok(async move { Ok(()) }.boxed().into())
+    }
+
+    fn handle_leave(
+        &mut self,
+        _space: Arc<KitsuneSpace>,
+        agent: Arc<KitsuneAgent>,
+    ) -> KitsuneP2pHandlerResult<()> {
+        self.agents.remove(&agent);
+        Ok(async move { Ok(()) }.boxed().into())
+    }
+
+    fn handle_rpc_single(
+        &mut self,
+        _space: Arc<KitsuneSpace>,
+        _agent: Arc<KitsuneAgent>,
+        _payload: Vec<u8>,
+    ) -> KitsuneP2pHandlerResult<Vec<u8>> {
+        unimplemented!()
+    }
+
+    fn handle_rpc_multi(
+        &mut self,
+        mut _input: actor::RpcMulti,
+    ) -> KitsuneP2pHandlerResult<Vec<actor::RpcMultiResponse>> {
+        unimplemented!()
+    }
+
+    fn handle_notify_multi(
+        &mut self,
+        mut _input: actor::NotifyMulti,
+    ) -> KitsuneP2pHandlerResult<u8> {
+        unimplemented!()
+    }
+}
+
 /// Local helper struct for associating info with a connected agent.
 struct AgentInfo {
     #[allow(dead_code)]
@@ -48,6 +122,7 @@ impl Space {
         self.agents.keys().cloned().collect()
     }
 
+    /*
     /// process an incoming join request for an agent -- add them to the space
     pub fn handle_join(&mut self, agent: Arc<KitsuneAgent>) -> KitsuneP2pHandlerResult<()> {
         match self.agents.entry(agent.clone()) {
@@ -58,12 +133,15 @@ impl Space {
         }
         Ok(async move { Ok(()) }.boxed().into())
     }
+    */
 
+    /*
     /// process an incoming leave request for an agent -- remove them from the space
     pub fn handle_leave(&mut self, agent: Arc<KitsuneAgent>) -> KitsuneP2pHandlerResult<()> {
         self.agents.remove(&agent);
         Ok(async move { Ok(()) }.boxed().into())
     }
+    */
 
     /// process an "immediate" request
     /// that is - attempt to send a request and return an error on failure
