@@ -1,4 +1,3 @@
-use super::dht_basis;
 use crate::{
     core::state::chain_cas::ChainCasBuf,
     fixt::{
@@ -147,7 +146,8 @@ impl ElementTest {
 
     fn entry_delete(mut self) -> (Element, Vec<DhtOp>) {
         let entry_delete = builder::ElementDelete {
-            removes_address: self.header_hash.clone().into(),
+            removes_address: self.header_hash.clone(),
+            removes_entry_address: self.entry_hash.clone(),
         }
         .build(self.commons.next().unwrap());
         let element = self.to_element(entry_delete.clone().into(), None);
@@ -258,7 +258,7 @@ async fn test_dht_basis() {
         let expected_entry_hash: AnyDhtHash = original_header.entry_hash.clone().into();
 
         let original_header_hash =
-            HeaderHashed::from_content(Header::EntryCreate(original_header)).await;
+            HeaderHashed::from_content(Header::EntryCreate(original_header.clone())).await;
         let signed_header =
             SignedHeaderHashed::with_presigned(original_header_hash.clone(), fixt!(Signature));
         let original_header_hash = original_header_hash.into_inner().1;
@@ -274,14 +274,14 @@ async fn test_dht_basis() {
 
         // Create the update header with the same hash
         let mut entry_update = fixt!(EntryUpdate);
-        entry_update.intended_for = IntendedFor::Entry;
+        entry_update.intended_for = IntendedFor::Entry(original_header.entry_hash.clone());
         entry_update.replaces_address = original_header_hash;
 
         // Create the op
         let op = DhtOp::RegisterReplacedBy(fixt!(Signature), entry_update, Some(new_entry.into()));
 
         // Get the basis
-        let result = dht_basis(&op, &cas).await.unwrap();
+        let result = op.dht_basis().await;
 
         // Check the hash matches
         assert_eq!(expected_entry_hash, result);

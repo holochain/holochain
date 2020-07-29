@@ -107,7 +107,7 @@ pub async fn publish_dht_ops_workflow_inner(
                 continue;
             }
         };
-        let IntegratedDhtOpsValue { basis, op, .. } = op;
+        let IntegratedDhtOpsValue { op, .. } = op;
         let op = match light_to_op(op, workspace.cas()).await {
             // Ignore StoreEntry ops on private
             Err(DhtOpConvertError::StoreEntryOnPrivate) => continue,
@@ -117,7 +117,7 @@ pub async fn publish_dht_ops_workflow_inner(
         // For every op publish a request
         // Collect and sort ops by basis
         to_publish
-            .entry(basis)
+            .entry(op.dht_basis().await)
             .or_insert_with(Vec::new)
             .push((op_hash, op));
     }
@@ -157,11 +157,8 @@ impl<'env> PublishDhtOpsWorkspace<'env> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        core::workflow::produce_dht_ops_workflow::dht_op_light::{
-            dht_op_to_light_basis, DhtOpLight,
-        },
-        fixt::{EntryCreateFixturator, EntryFixturator, EntryUpdateFixturator, LinkAddFixturator},
+    use crate::fixt::{
+        EntryCreateFixturator, EntryFixturator, EntryUpdateFixturator, LinkAddFixturator,
     };
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
@@ -178,7 +175,7 @@ mod tests {
         test_utils::test_cell_env,
     };
     use holochain_types::{
-        dht_op::{DhtOp, DhtOpHashed},
+        dht_op::{DhtOp, DhtOpHashed, DhtOpLight},
         element::SignedHeaderHashed,
         fixt::{AppEntryTypeFixturator, SignatureFixturator},
         header::NewEntryHeader,
@@ -231,8 +228,10 @@ mod tests {
             let header_hash = HeaderHashed::from_content(Header::LinkAdd(link_add.clone())).await;
             let light = IntegratedDhtOpsValue {
                 validation_status: ValidationStatus::Valid,
-                basis: link_add.base_address.into(),
-                op: DhtOpLight::RegisterAddLink(header_hash.as_hash().clone()),
+                op: DhtOpLight::RegisterAddLink(
+                    header_hash.as_hash().clone(),
+                    link_add.base_address.into(),
+                ),
                 when_integrated: Timestamp::now().into(),
             };
             data.push((sig, op_hashed, light, header_hash));
@@ -533,10 +532,6 @@ mod tests {
                     .unwrap();
             }
             let (store_element, store_entry, register_replaced_by) = {
-                let reader = env_ref.reader().unwrap();
-                // Create easy way to create test cascade
-                let cas = ChainCasBuf::vault(&reader, &dbs, true).unwrap();
-
                 let op = DhtOp::StoreElement(
                     sig.clone(),
                     entry_create_header.clone(),
@@ -544,16 +539,16 @@ mod tests {
                 );
                 // Op is expected to not contain the Entry even though the above contains the entry
                 let expected_op = DhtOp::StoreElement(sig.clone(), entry_create_header, None);
-                let (light, basis) = dht_op_to_light_basis(op.clone(), &cas).await.unwrap();
+                let light = op.to_light().await;
                 let op_hash = DhtOpHashed::from_content(op.clone()).await.into_hash();
-                let store_element = (op_hash, light, basis, expected_op);
+                let store_element = (op_hash, light, expected_op);
 
                 // Create StoreEntry
                 let header = NewEntryHeader::Create(entry_create.clone());
                 let op = DhtOp::StoreEntry(sig.clone(), header, original_entry.clone().into());
-                let (light, basis) = dht_op_to_light_basis(op.clone(), &cas).await.unwrap();
+                let light = op.to_light().await;
                 let op_hash = DhtOpHashed::from_content(op.clone()).await.into_hash();
-                let store_entry = (op_hash, light, basis);
+                let store_entry = (op_hash, light);
 
                 // Create RegisterReplacedBy
                 let op = DhtOp::RegisterReplacedBy(
@@ -564,9 +559,9 @@ mod tests {
                 // Op is expected to not contain the Entry even though the above contains the entry
                 let expected_op =
                     DhtOp::RegisterReplacedBy(sig.clone(), entry_update.clone(), None);
-                let (light, basis) = dht_op_to_light_basis(op.clone(), &cas).await.unwrap();
+                let light = op.to_light().await;
                 let op_hash = DhtOpHashed::from_content(op.clone()).await.into_hash();
-                let register_replaced_by = (op_hash, light, basis, expected_op);
+                let register_replaced_by = (op_hash, light, expected_op);
 
                 (store_element, store_entry, register_replaced_by)
             };
@@ -578,15 +573,13 @@ mod tests {
             let expected = {
                 let mut map = HashMap::new();
                 let op_hash = store_element.0.clone();
-                let expected_op = store_element.3.clone();
-                let basis = store_element.2.clone();
+                let expected_op = store_element.2.clone();
                 let store_element_count = store_element_count.clone();
-                map.insert(op_hash, (expected_op, basis, store_element_count));
+                map.insert(op_hash, (expected_op, store_element_count));
                 let op_hash = register_replaced_by.0.clone();
-                let expected_op = register_replaced_by.3.clone();
-                let basis = register_replaced_by.2.clone();
+                let expected_op = register_replaced_by.2.clone();
                 let register_replaced_by_count = register_replaced_by_count.clone();
-                map.insert(op_hash, (expected_op, basis, register_replaced_by_count));
+                map.insert(op_hash, (expected_op, register_replaced_by_count));
                 map
             };
 
@@ -594,11 +587,10 @@ mod tests {
             {
                 let reader = env_ref.reader().unwrap();
                 let mut workspace = PublishDhtOpsWorkspace::new(&reader, &dbs).unwrap();
-                let (op_hash, light, basis, _) = store_element;
+                let (op_hash, light, _) = store_element;
                 let integration = IntegratedDhtOpsValue {
                     validation_status: ValidationStatus::Valid,
                     op: light,
-                    basis,
                     when_integrated: Timestamp::now().into(),
                 };
                 workspace.authored_dht_ops.put(op_hash.clone(), 0).unwrap();
@@ -608,11 +600,10 @@ mod tests {
                     .put(op_hash, integration)
                     .unwrap();
 
-                let (op_hash, light, basis) = store_entry;
+                let (op_hash, light) = store_entry;
                 let integration = IntegratedDhtOpsValue {
                     validation_status: ValidationStatus::Valid,
                     op: light,
-                    basis,
                     when_integrated: Timestamp::now().into(),
                 };
                 workspace.authored_dht_ops.put(op_hash.clone(), 0).unwrap();
@@ -622,11 +613,10 @@ mod tests {
                     .put(op_hash, integration)
                     .unwrap();
 
-                let (op_hash, light, basis, _) = register_replaced_by;
+                let (op_hash, light, _) = register_replaced_by;
                 let integration = IntegratedDhtOpsValue {
                     validation_status: ValidationStatus::Valid,
                     op: light,
-                    basis,
                     when_integrated: Timestamp::now().into(),
                 };
                 workspace.authored_dht_ops.put(op_hash.clone(), 0).unwrap();
@@ -680,9 +670,9 @@ mod tests {
                                 // Check the ops are correct
                                 for (op_hash, op) in ops {
                                     match expected.get(&op_hash) {
-                                        Some((expected_op, expected_basis, count)) => {
+                                        Some((expected_op, count)) => {
                                             assert_eq!(&op, expected_op);
-                                            assert_eq!(&dht_hash, expected_basis);
+                                            assert_eq!(dht_hash, expected_op.dht_basis().await);
                                             count.fetch_add(1, Ordering::SeqCst);
                                         }
                                         None => {
