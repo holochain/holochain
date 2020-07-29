@@ -134,7 +134,7 @@ impl<'env> IntegratedDhtOpsBuf<'env> {
     }
 
     /// simple get by dht_op_hash
-    pub fn get(&'env self, op_hash: &DhtOpHash) -> DatabaseResult<Option<IntegratedDhtOpsValue>> {
+    pub fn get(&'_ self, op_hash: &DhtOpHash) -> DatabaseResult<Option<IntegratedDhtOpsValue>> {
         self.store.get(op_hash)
     }
 
