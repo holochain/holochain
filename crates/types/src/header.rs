@@ -7,6 +7,7 @@
 #![allow(missing_docs)]
 
 use crate::prelude::*;
+use conversions::WrongHeaderError;
 use holo_hash::EntryHash;
 use holochain_zome_types::entry_def::EntryVisibility;
 pub use holochain_zome_types::header::HeaderHashed;
@@ -45,6 +46,17 @@ impl From<NewEntryHeader> for Header {
         match h {
             NewEntryHeader::Create(h) => Header::EntryCreate(h),
             NewEntryHeader::Update(h) => Header::EntryUpdate(h),
+        }
+    }
+}
+
+impl TryFrom<Header> for NewEntryHeader {
+    type Error = WrongHeaderError;
+    fn try_from(value: Header) -> Result<Self, Self::Error> {
+        match value {
+            Header::EntryCreate(h) => Ok(NewEntryHeader::Create(h)),
+            Header::EntryUpdate(h) => Ok(NewEntryHeader::Update(h)),
+            _ => Err(WrongHeaderError),
         }
     }
 }

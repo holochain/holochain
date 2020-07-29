@@ -13,11 +13,7 @@ mock! {
             header: Header,
         ) -> DatabaseResult<()>;
         fn sync_register_update(&mut self, update: header::EntryUpdate) -> DatabaseResult<()>;
-        fn sync_register_delete(
-            &mut self,
-            delete: header::ElementDelete,
-            entry_hash: EntryHash,
-        ) -> DatabaseResult<()>;
+        fn sync_register_delete(&mut self, delete: header::ElementDelete) -> DatabaseResult<()>;
         fn register_raw_on_entry(&mut self, entry_hash: EntryHash, value: SysMetaVal) -> DatabaseResult<()>;
         fn register_raw_on_header(&mut self, header_hash: HeaderHash, value: SysMetaVal);
         fn get_dht_status(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus>;
@@ -136,12 +132,8 @@ impl MetadataBufT for MockMetadataBuf {
         self.sync_register_update(update)
     }
 
-    async fn register_delete(
-        &mut self,
-        delete: header::ElementDelete,
-        entry_hash: EntryHash,
-    ) -> DatabaseResult<()> {
-        self.sync_register_delete(delete, entry_hash)
+    async fn register_delete(&mut self, delete: header::ElementDelete) -> DatabaseResult<()> {
+        self.sync_register_delete(delete)
     }
 
     fn register_raw_on_entry(
