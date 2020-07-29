@@ -103,22 +103,20 @@ ghost_actor::ghost_chan! {
         ) -> ();
 
         /// The p2p module wishes to query our DhtOpHash store.
-        fn list_dht_op_hashes(
-            // The dna_hash / space_hash context.
+        fn fetch_op_hashes_for_constraints(
             dna_hash: DnaHash,
-            // The agent_id / agent_pub_key context.
             to_agent: AgentPubKey,
-            // TODO - parameters
-        ) -> (); // TODO - proper return type
+            dht_arc: kitsune_p2p::dht_arc::DhtArc,
+            since: holochain_types::Timestamp,
+            until: holochain_types::Timestamp,
+        ) -> Vec<holo_hash::DhtOpHash>;
 
         /// The p2p module needs access to the content for a given set of DhtOpHashes.
-        fn fetch_dht_ops(
-            // The dna_hash / space_hash context.
+        fn fetch_op_hash_data(
             dna_hash: DnaHash,
-            // The agent_id / agent_pub_key context.
             to_agent: AgentPubKey,
-            // TODO - parameters
-        ) -> (); // TODO - proper return type
+            op_hashes: Vec<holo_hash::DhtOpHash>,
+        ) -> Vec<(holo_hash::AnyDhtHash, holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>;
 
         /// P2p operations require cryptographic signatures and validation.
         fn sign_network_data(
@@ -143,8 +141,8 @@ macro_rules! match_p2p_evt {
             HolochainP2pEvent::GetMeta { $i, .. } => { $($t)* }
             HolochainP2pEvent::GetLinks { $i, .. } => { $($t)* }
             HolochainP2pEvent::ValidationReceiptReceived { $i, .. } => { $($t)* }
-            HolochainP2pEvent::ListDhtOpHashes { $i, .. } => { $($t)* }
-            HolochainP2pEvent::FetchDhtOps { $i, .. } => { $($t)* }
+            HolochainP2pEvent::FetchOpHashesForConstraints { $i, .. } => { $($t)* }
+            HolochainP2pEvent::FetchOpHashData { $i, .. } => { $($t)* }
             HolochainP2pEvent::SignNetworkData { $i, .. } => { $($t)* }
         }
     };
