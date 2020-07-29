@@ -165,7 +165,7 @@ pub struct EntryDefId(u8);
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub enum IntendedFor {
     Header,
-    Entry,
+    Entry(EntryHash),
 }
 
 /// The Dna Header is always the first header in a source chain
@@ -304,6 +304,7 @@ pub struct ElementDelete {
 
     /// Address of the Element being deleted
     pub removes_address: HeaderHash,
+    pub removes_entry_address: EntryHash,
 }
 
 /// Allows Headers which reference Entries to know what type of Entry it is

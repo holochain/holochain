@@ -130,7 +130,16 @@ newtype_fixturator!(Signature<Bytes>);
 
 fixturator!(
     IntendedFor;
-    unit variants [ Entry Header ] empty Entry;
+    enum [ Entry Header ];
+    curve Empty IntendedFor::Header;
+    curve Unpredictable match IntendedForVariant::random() {
+        IntendedForVariant::Header => IntendedFor::Header,
+        IntendedForVariant::Entry => IntendedFor::Entry(fixt!(EntryHash)),
+    };
+    curve Predictable match IntendedForVariant::nth(self.0.index) {
+        IntendedForVariant::Header => IntendedFor::Header,
+        IntendedForVariant::Entry => IntendedFor::Entry(EntryHashFixturator::new_indexed(Predictable, self.0.index).next().unwrap()),
+    };
 );
 
 fixturator!(
@@ -500,7 +509,7 @@ fixturator!(
 
 fixturator!(
     ElementDelete;
-    constructor fn from_builder(HeaderBuilderCommon, HeaderHash);
+    constructor fn from_builder(HeaderBuilderCommon, HeaderHash, EntryHash);
 );
 
 fixturator!(

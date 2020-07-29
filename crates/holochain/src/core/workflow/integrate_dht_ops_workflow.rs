@@ -28,11 +28,7 @@ use holochain_types::{
     validate::ValidationStatus,
     EntryHashed, HeaderHashed, Timestamp, TimestampKey,
 };
-use holochain_zome_types::header::IntendedFor;
-use produce_dht_ops_workflow::dht_op_light::{
-    dht_op_to_light_basis,
-    error::{DhtOpConvertError, DhtOpConvertResult},
-};
+use produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertResult;
 use tracing::*;
 
 mod tests;
@@ -214,25 +210,7 @@ async fn integrate_single_dht_op(
                 meta_store.register_activity(header).await?;
             }
             DhtOp::RegisterReplacedBy(_, entry_update, _) => {
-                let old_entry_hash = match entry_update.intended_for {
-                    IntendedFor::Header => None,
-                    IntendedFor::Entry => {
-                        match element_store
-                            .get_header(&entry_update.replaces_address)
-                            .await?
-                            // Handle missing old entry header. Same reason as below
-                            .and_then(|e| e.header().entry_data().map(|(hash, _)| hash.clone()))
-                        {
-                            Some(hash) => Some(hash),
-                            // Handle missing old Entry (Probably StoreEntry hasn't arrived been processed)
-                            // This is put the op back in the integration queue to try again later
-                            None => return Outcome::deferred(op, validation_status),
-                        }
-                    }
-                };
-                meta_store
-                    .register_update(entry_update, old_entry_hash)
-                    .await?;
+                meta_store.register_update(entry_update).await?;
             }
             DhtOp::RegisterDeletedEntryHeader(_, entry_delete)
             | DhtOp::RegisterDeletedBy(_, entry_delete) => {
@@ -295,18 +273,9 @@ async fn integrate_single_dht_op(
             }
         }
 
-        // TODO: PERF: Avoid this clone by returning the op on error
-        let (op, basis) = match dht_op_to_light_basis(op.clone(), element_store).await {
-            Ok(l) => l,
-            Err(DhtOpConvertError::MissingHeaderEntry(_)) => {
-                return Outcome::deferred(op, validation_status)
-            }
-            Err(e) => return Err(e),
-        };
         let value = IntegratedDhtOpsValue {
             validation_status,
-            basis,
-            op,
+            op: op.to_light().await,
             when_integrated: Timestamp::now(),
         };
         debug!("integrating");

@@ -6,7 +6,6 @@ use crate::core::state::{
     },
     workspace::{Workspace, WorkspaceResult},
 };
-use dht_op_light::op_to_light;
 use holochain_state::{
     buffer::KvBuf,
     db::{AUTHORED_DHT_OPS, INTEGRATION_QUEUE},
@@ -53,7 +52,7 @@ async fn produce_dht_ops_workflow_inner(
             let (op, hash) = DhtOpHashed::from_content(op).await.into_inner();
             debug!(?hash);
             let value = AuthoredDhtOpsValue {
-                op: op_to_light(op.clone()).await?,
+                op: op.to_light().await,
                 receipt_count: 0,
                 last_publish_time: None,
             };
