@@ -6,13 +6,17 @@
 
 #![allow(missing_docs)]
 
-use crate::prelude::*;
+use crate::{element::SignedHeaderHashed, metadata::TimedHeaderHash, prelude::*};
 use holo_hash::EntryHash;
 use holochain_zome_types::entry_def::EntryVisibility;
 pub use holochain_zome_types::header::HeaderHashed;
 use holochain_zome_types::header::*;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+use error::*;
+
+pub mod error;
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 /// A header of one of the two types that create a new entry.
 pub enum NewEntryHeader {
     /// A header which simply creates a new entry
@@ -20,6 +24,48 @@ pub enum NewEntryHeader {
     /// A header which creates a new entry that is semantically related to a
     /// previously created entry or header
     Update(EntryUpdate),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Ord, PartialOrd)]
+/// A header of one of the two types that create a new entry.
+pub enum WireNewEntryHeader {
+    Create(WireEntryCreate),
+    Update(WireEntryUpdate),
+}
+
+/// The minimum unique data for new entry header
+/// that share a common entry
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Ord, PartialOrd)]
+pub struct WireEntryCreate {
+    /// Timestamp is first so that deriving Ord results in
+    /// order by time
+    pub timestamp: holochain_zome_types::timestamp::Timestamp,
+    pub author: AgentPubKey,
+    pub header_seq: u32,
+    pub prev_header: HeaderHash,
+    pub signature: Signature,
+}
+
+/// The minimum unique data for new entry header
+/// that share a common entry
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Ord, PartialOrd)]
+pub struct WireEntryUpdate {
+    /// Timestamp is first so that deriving Ord results in
+    /// order by time
+    pub timestamp: holochain_zome_types::timestamp::Timestamp,
+    pub author: AgentPubKey,
+    pub header_seq: u32,
+    pub prev_header: HeaderHash,
+    pub intended_for: IntendedFor,
+    pub replaces_address: HeaderHash,
+    pub signature: Signature,
+}
+
+/// A element delete hash pair for sending over the network
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
+pub struct WireDelete {
+    pub element_delete_address: TimedHeaderHash,
+    pub removes_address: HeaderHash,
 }
 
 impl NewEntryHeader {
@@ -45,6 +91,96 @@ impl From<NewEntryHeader> for Header {
         match h {
             NewEntryHeader::Create(h) => Header::EntryCreate(h),
             NewEntryHeader::Update(h) => Header::EntryUpdate(h),
+        }
+    }
+}
+
+impl From<(EntryCreate, Signature)> for WireEntryCreate {
+    fn from((ec, signature): (EntryCreate, Signature)) -> Self {
+        Self {
+            timestamp: ec.timestamp,
+            author: ec.author,
+            header_seq: ec.header_seq,
+            prev_header: ec.prev_header,
+            signature,
+        }
+    }
+}
+
+impl From<(EntryUpdate, Signature)> for WireEntryUpdate {
+    fn from((eu, signature): (EntryUpdate, Signature)) -> Self {
+        Self {
+            timestamp: eu.timestamp,
+            author: eu.author,
+            header_seq: eu.header_seq,
+            prev_header: eu.prev_header,
+            intended_for: eu.intended_for,
+            replaces_address: eu.replaces_address,
+            signature,
+        }
+    }
+}
+
+impl WireNewEntryHeader {
+    pub async fn create_new_entry_header(
+        self,
+        entry_type: EntryType,
+        entry_hash: EntryHash,
+    ) -> (NewEntryHeader, HeaderHash, Signature) {
+        match self {
+            WireNewEntryHeader::Create(ec) => {
+                let signature = ec.signature;
+                let ec = EntryCreate {
+                    author: ec.author,
+                    timestamp: ec.timestamp,
+                    header_seq: ec.header_seq,
+                    prev_header: ec.prev_header,
+                    entry_type,
+                    entry_hash,
+                };
+                let (h, hash) = HeaderHashed::from_content(Header::EntryCreate(ec))
+                    .await
+                    .into_inner();
+                let ec = match h {
+                    Header::EntryCreate(ec) => ec,
+                    _ => unreachable!(),
+                };
+                (NewEntryHeader::Create(ec), hash, signature)
+            }
+            WireNewEntryHeader::Update(eu) => {
+                let signature = eu.signature;
+                let eu = EntryUpdate {
+                    author: eu.author,
+                    timestamp: eu.timestamp,
+                    header_seq: eu.header_seq,
+                    prev_header: eu.prev_header,
+                    intended_for: eu.intended_for,
+                    replaces_address: eu.replaces_address,
+                    entry_type,
+                    entry_hash,
+                };
+                let (h, hash) = HeaderHashed::from_content(Header::EntryUpdate(eu))
+                    .await
+                    .into_inner();
+                let eu = match h {
+                    Header::EntryUpdate(eu) => eu,
+                    _ => unreachable!(),
+                };
+                (NewEntryHeader::Update(eu), hash, signature)
+            }
+        }
+    }
+}
+
+impl TryFrom<SignedHeaderHashed> for WireNewEntryHeader {
+    type Error = HeaderError;
+    fn try_from(shh: SignedHeaderHashed) -> Result<Self, Self::Error> {
+        let (sh, _) = shh.into_inner();
+        let (header, s) = sh.into();
+        match header {
+            Header::EntryCreate(ec) => Ok(Self::Create((ec, s).into())),
+            Header::EntryUpdate(eu) => Ok(Self::Update((eu, s).into())),
+            _ => return Err(HeaderError::NotNewEntry),
         }
     }
 }

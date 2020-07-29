@@ -3,11 +3,12 @@ use crate::{
     core::{
         ribosome::{error::RibosomeError, guest_callback::init::InitResult},
         workflow::error::WorkflowError,
+        SourceChainError,
     },
 };
 use holochain_p2p::HolochainP2pError;
 use holochain_state::error::DatabaseError;
-use holochain_types::cell::CellId;
+use holochain_types::{cell::CellId, header::error::HeaderError};
 use std::path::PathBuf;
 use thiserror::Error;
 
@@ -21,6 +22,8 @@ pub enum CellError {
     JoinError(#[from] tokio::task::JoinError),
     #[error("Genesis failed: {0}")]
     Genesis(#[from] Box<ConductorApiError>),
+    #[error(transparent)]
+    HeaderError(#[from] HeaderError),
     #[error("This cell has not had a successful genesis and cannot be created")]
     CellWithoutGenesis(CellId),
     #[error("The cell failed to cleanup its environment because: {0}. Recommend manually deleting the database at: {1}")]
@@ -31,6 +34,8 @@ pub enum CellError {
     WorkspaceError(#[from] crate::core::state::workspace::WorkspaceError),
     #[error(transparent)]
     RibosomeError(#[from] RibosomeError),
+    #[error(transparent)]
+    SourceChainError(#[from] SourceChainError),
     #[error("The cell tried to run the initialize zomes callback but failed because {0:?}")]
     InitFailed(InitResult),
     #[error(transparent)]

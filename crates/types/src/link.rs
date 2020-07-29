@@ -1,8 +1,12 @@
 //! Links interrelate entries in a source chain.
 
-use holo_hash::EntryHash;
+use holo_hash::{AnyDhtHash, EntryHash, HeaderHash};
+use holochain_keystore::Signature;
 use holochain_serialized_bytes::prelude::*;
-use holochain_zome_types::link::LinkTag;
+use holochain_zome_types::{
+    header::{LinkAdd, LinkRemove, ZomeId},
+    link::LinkTag,
+};
 use regex::Regex;
 
 /// Links interrelate entries in a source chain.
@@ -11,6 +15,41 @@ pub struct Link {
     base: EntryHash,
     target: EntryHash,
     tag: LinkTag,
+}
+
+/// Owned link key for sending across networks
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+pub enum WireLinkMetaKey {
+    /// Search for all links on a base
+    Base(EntryHash),
+    /// Search for all links on a base, for a zome
+    BaseZome(EntryHash, ZomeId),
+    /// Search for all links on a base, for a zome and with a tag
+    BaseZomeTag(EntryHash, ZomeId, LinkTag),
+    /// This will match only the link created with a certain [LinkAdd] hash
+    Full(EntryHash, ZomeId, LinkTag, HeaderHash),
+}
+
+// TODO: Probably don't want to send the whole headers.
+// We could probably come up with a more compact
+// network Wire type in the future
+/// Link response to get links
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+pub struct GetLinksResponse {
+    /// All the link adds on the key you searched for
+    pub link_adds: Vec<(LinkAdd, Signature)>,
+    /// All the link removes on the key you searched for
+    pub link_removes: Vec<(LinkRemove, Signature)>,
+}
+
+impl WireLinkMetaKey {
+    /// Get the basis of this key
+    pub fn basis(&self) -> AnyDhtHash {
+        use WireLinkMetaKey::*;
+        match self {
+            Base(b) | BaseZome(b, _) | BaseZomeTag(b, _, _) | Full(b, _, _, _) => b.clone().into(),
+        }
+    }
 }
 
 impl Link {

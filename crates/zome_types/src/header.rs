@@ -162,7 +162,9 @@ pub struct ZomeId(u8);
 pub struct EntryDefId(u8);
 
 /// Specifies whether an [EntryUpdate] refers to an [Entry] or a [Header]
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+#[derive(
+    Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash, Ord, PartialOrd,
+)]
 pub enum IntendedFor {
     Header,
     Entry,
@@ -256,7 +258,7 @@ pub struct ChainClose {
 
 /// A header which "speaks" Entry content into being. The same content can be
 /// referenced by multiple such headers.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 pub struct EntryCreate {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
@@ -275,7 +277,7 @@ pub struct EntryCreate {
 /// intended target, the result of which is is that both Headers and Entries can
 /// have a tree of such metadata update references. Entries get "updated" to
 /// other entries, and Headers get "updated" to other headers.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 pub struct EntryUpdate {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
@@ -309,7 +311,7 @@ pub struct ElementDelete {
 /// Allows Headers which reference Entries to know what type of Entry it is
 /// referencing. Useful for examining Headers without needing to fetch the
 /// corresponding Entries.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 pub enum EntryType {
     /// An AgentPubKey
     AgentPubKey,
@@ -333,7 +335,7 @@ impl EntryType {
 }
 
 /// Information about a class of Entries provided by the DNA
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 pub struct AppEntryType {
     /// u8 identifier of what entry type this is
     /// this needs to match the position of the entry type returned by entry defs

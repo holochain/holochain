@@ -112,7 +112,7 @@ enum UniqueForm<'a> {
     RegisterRemoveLink(&'a header::LinkRemove),
 }
 
-/// Produce all DhtOps for a ChainElement
+/// Produce all DhtOps for a Element
 pub fn produce_ops_from_element(element: &Element) -> DhtOpResult<Vec<DhtOp>> {
     // TODO: avoid cloning everything
 

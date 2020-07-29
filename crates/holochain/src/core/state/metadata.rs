@@ -26,7 +26,7 @@ use std::fmt::Debug;
 pub use sys_meta::*;
 use tracing::*;
 
-use holochain_types::header::NewEntryHeader;
+use holochain_types::{header::NewEntryHeader, link::WireLinkMetaKey};
 
 #[cfg(test)]
 pub use mock::MockMetadataBuf;
@@ -108,6 +108,28 @@ impl<'a> From<(&'a LinkAdd, &'a HeaderHash)> for LinkMetaKey<'a> {
     }
 }
 
+impl<'a> From<&'a WireLinkMetaKey> for LinkMetaKey<'a> {
+    fn from(w: &'a WireLinkMetaKey) -> Self {
+        match w {
+            WireLinkMetaKey::Base(b) => Self::Base(b),
+            WireLinkMetaKey::BaseZome(b, z) => Self::BaseZome(b, *z),
+            WireLinkMetaKey::BaseZomeTag(b, z, t) => Self::BaseZomeTag(b, *z, t),
+            WireLinkMetaKey::Full(b, z, t, l) => Self::Full(b, *z, t, l),
+        }
+    }
+}
+
+impl From<&LinkMetaKey<'_>> for WireLinkMetaKey {
+    fn from(k: &LinkMetaKey) -> Self {
+        match k.clone() {
+            LinkMetaKey::Base(b) => Self::Base(b.clone()),
+            LinkMetaKey::BaseZome(b, z) => Self::BaseZome(b.clone(), z),
+            LinkMetaKey::BaseZomeTag(b, z, t) => Self::BaseZomeTag(b.clone(), z, t.clone()),
+            LinkMetaKey::Full(b, z, t, l) => Self::Full(b.clone(), z, t.clone(), l.clone()),
+        }
+    }
+}
+
 impl LinkMetaVal {
     /// Turn into a zome friendly type
     pub fn into_link(self) -> holochain_zome_types::link::Link {
@@ -126,7 +148,10 @@ impl LinkMetaVal {
 pub trait MetadataBufT {
     // Links
     /// Get all the links on this base that match the tag
-    fn get_links<'a>(&self, key: &'a LinkMetaKey) -> DatabaseResult<Vec<LinkMetaVal>>;
+    fn get_links<'a>(
+        &self,
+        key: &'a LinkMetaKey,
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError> + '_>>;
 
     /// Add a link
     async fn add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()>;
@@ -383,20 +408,25 @@ impl<'env> MetadataBuf<'env> {
 
 #[async_trait::async_trait]
 impl<'env> MetadataBufT for MetadataBuf<'env> {
-    fn get_links<'a>(&self, key: &'a LinkMetaKey) -> DatabaseResult<Vec<LinkMetaVal>> {
-        self.links_meta
-            .iter_all_key_matches(key.to_key())?
-            .filter_map(|(_, link)| {
-                // Check if link has been removed
-                match self
-                    .get_link_removes_on_link_add(link.link_add_hash.clone())?
-                    .next()?
-                {
-                    Some(_) => Ok(None),
-                    None => Ok(Some(link)),
-                }
-            })
-            .collect()
+    fn get_links<'a>(
+        &self,
+        key: &'a LinkMetaKey,
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError> + '_>>
+    {
+        Ok(Box::new(
+            self.links_meta
+                .iter_all_key_matches(key.to_key())?
+                .filter_map(move |(_, link)| {
+                    // Check if link has been removed
+                    match self
+                        .get_link_removes_on_link_add(link.link_add_hash.clone())?
+                        .next()?
+                    {
+                        Some(_) => Ok(None),
+                        None => Ok(Some(link)),
+                    }
+                }),
+        ))
     }
 
     #[allow(clippy::needless_lifetimes)]
@@ -586,7 +616,7 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
         Ok(self
             .status_meta
             .get(entry_hash)?
-            .unwrap_or(EntryDhtStatus::Live))
+            .unwrap_or(EntryDhtStatus::Dead))
     }
 
     fn get_canonical_entry_hash(&self, _entry_hash: EntryHash) -> DatabaseResult<EntryHash> {

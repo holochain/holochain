@@ -4,7 +4,7 @@ use futures::future::FutureExt;
 
 use crate::types::AgentPubKeyExt;
 
-use holochain_types::element::WireElement;
+use holochain_types::element::GetElementResponse;
 use kitsune_p2p::actor::KitsuneP2pSender;
 
 pub(crate) struct HolochainP2pActor {
@@ -98,15 +98,16 @@ impl HolochainP2pActor {
         &mut self,
         dna_hash: DnaHash,
         to_agent: AgentPubKey,
-        dht_hash: holo_hash::AnyDhtHash,
+        link_key: WireLinkMetaKey,
         options: event::GetLinksOptions,
     ) -> kitsune_p2p::actor::KitsuneP2pHandlerResult<Vec<u8>> {
         let evt_sender = self.evt_sender.clone();
         Ok(async move {
             let res = evt_sender
-                .get_links(dna_hash, to_agent, dht_hash, options)
+                .get_links(dna_hash, to_agent, link_key, options)
                 .await;
-            res.map_err(kitsune_p2p::KitsuneP2pError::from)
+            res.and_then(|r| Ok(SerializedBytes::try_from(r)?))
+                .map_err(kitsune_p2p::KitsuneP2pError::from)
                 .map(|res| UnsafeBytes::from(res).into())
         }
         .boxed()
@@ -191,8 +192,8 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
             crate::wire::WireMessage::GetMeta { dht_hash, options } => {
                 self.handle_incoming_get_meta(space, agent, dht_hash, options)
             }
-            crate::wire::WireMessage::GetLinks { dht_hash, options } => {
-                self.handle_incoming_get_links(space, agent, dht_hash, options)
+            crate::wire::WireMessage::GetLinks { link_key, options } => {
+                self.handle_incoming_get_links(space, agent, link_key, options)
             }
             // holochain_p2p never publishes via request
             // these only occur on broadcasts
@@ -382,7 +383,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         from_agent: AgentPubKey,
         dht_hash: holo_hash::AnyDhtHash,
         options: actor::GetOptions,
-    ) -> HolochainP2pHandlerResult<Vec<WireElement>> {
+    ) -> HolochainP2pHandlerResult<Vec<GetElementResponse>> {
         let space = dna_hash.into_kitsune();
         let from_agent = from_agent.into_kitsune();
         let basis = dht_hash.to_kitsune();
@@ -462,15 +463,15 @@ impl HolochainP2pHandler for HolochainP2pActor {
         &mut self,
         dna_hash: DnaHash,
         from_agent: AgentPubKey,
-        dht_hash: holo_hash::AnyDhtHash,
+        link_key: WireLinkMetaKey,
         options: actor::GetLinksOptions,
-    ) -> HolochainP2pHandlerResult<Vec<SerializedBytes>> {
+    ) -> HolochainP2pHandlerResult<Vec<GetLinksResponse>> {
         let space = dna_hash.into_kitsune();
         let from_agent = from_agent.into_kitsune();
-        let basis = dht_hash.to_kitsune();
+        let basis = link_key.basis().to_kitsune();
         let r_options: event::GetLinksOptions = (&options).into();
 
-        let payload = crate::wire::WireMessage::get_links(dht_hash, r_options).encode()?;
+        let payload = crate::wire::WireMessage::get_links(link_key, r_options).encode()?;
 
         let kitsune_p2p = self.kitsune_p2p.clone();
         Ok(async move {
@@ -493,7 +494,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
             let mut out = Vec::new();
             for item in result {
                 let kitsune_p2p::actor::RpcMultiResponse { response, .. } = item;
-                out.push(UnsafeBytes::from(response).into());
+                out.push(SerializedBytes::from(UnsafeBytes::from(response)).try_into()?);
             }
 
             Ok(out)
