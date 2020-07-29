@@ -7,6 +7,7 @@
 #![allow(missing_docs)]
 
 use crate::{element::SignedHeaderHashed, metadata::TimedHeaderHash, prelude::*};
+use conversions::WrongHeaderError;
 use holo_hash::EntryHash;
 use holochain_zome_types::entry_def::EntryVisibility;
 pub use holochain_zome_types::header::HeaderHashed;
@@ -181,6 +182,17 @@ impl TryFrom<SignedHeaderHashed> for WireNewEntryHeader {
             Header::EntryCreate(ec) => Ok(Self::Create((ec, s).into())),
             Header::EntryUpdate(eu) => Ok(Self::Update((eu, s).into())),
             _ => return Err(HeaderError::NotNewEntry),
+        }
+    }
+}
+
+impl TryFrom<Header> for NewEntryHeader {
+    type Error = WrongHeaderError;
+    fn try_from(value: Header) -> Result<Self, Self::Error> {
+        match value {
+            Header::EntryCreate(h) => Ok(NewEntryHeader::Create(h)),
+            Header::EntryUpdate(h) => Ok(NewEntryHeader::Update(h)),
+            _ => Err(WrongHeaderError),
         }
     }
 }

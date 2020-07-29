@@ -3,6 +3,7 @@ use holo_hash::HeaderHash;
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_state::error::DatabaseError;
 use holochain_types::dht_op::error::DhtOpError;
+use holochain_zome_types::header::conversions::WrongHeaderError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -15,7 +16,7 @@ pub enum DhtOpConvertError {
         "The replaced header could not be found to find the entry hash for a RegisterReplacedBy that is IntendedFor an entry Entry"
     )]
     MissingHeaderEntry(HeaderHash),
-    #[error("Data for a DhtOp was missing from the source chain")]
+    #[error("Data for a DhtOp was missing from the source chain. Make sure that elements are always integrated before metadata")]
     MissingData,
     #[error("Tried to create a StoreEntry with a header that is not EntryCreate or EntryUpdate")]
     HeaderEntryMismatch,
@@ -31,6 +32,8 @@ pub enum DhtOpConvertError {
     SourceChainError(#[from] SourceChainError),
     #[error(transparent)]
     DhtOpError(#[from] DhtOpError),
+    #[error("Tried to use the wrong header for this op")]
+    WrongHeaderError(#[from] WrongHeaderError),
 }
 
 pub type DhtOpConvertResult<T> = Result<T, DhtOpConvertError>;
