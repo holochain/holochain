@@ -4,6 +4,7 @@ use std::{
     collections::{hash_map::Entry, HashMap, HashSet},
     sync::Arc,
 };
+use kitsune_p2p_types::async_lazy::AsyncLazy;
 
 mod space;
 use space::*;
@@ -47,6 +48,7 @@ pub(crate) struct KitsuneP2pActor {
     #[allow(dead_code)]
     evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     spaces: HashMap<Arc<KitsuneSpace>, Space>,
+    gossip_loops: HashMap<Arc<KitsuneSpace>, AsyncLazy<bool>>,
 }
 
 impl KitsuneP2pActor {
@@ -60,6 +62,7 @@ impl KitsuneP2pActor {
             internal_sender,
             evt_sender,
             spaces: HashMap::new(),
+            gossip_loops: HashMap::new(),
         })
     }
 

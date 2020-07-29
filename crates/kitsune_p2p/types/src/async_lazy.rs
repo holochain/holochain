@@ -1,7 +1,7 @@
 //! utility for lazy init-ing things
 
 /// utility for lazy init-ing things
-/// note how send is not async so we can do it in an actor handler
+/// note how new is not async so we can do it in an actor handler
 pub struct AsyncLazy<O: 'static + Clone + Send + Sync>(
     tokio::sync::watch::Receiver<Option<O>>,
 );
