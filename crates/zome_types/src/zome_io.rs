@@ -83,9 +83,10 @@ wasm_io_types!(
     // @TODO
     pub struct EmitSignalInput(());
     pub struct EmitSignalOutput(());
-    // @TODO
-    pub struct RemoveEntryInput(());
-    pub struct RemoveEntryOutput(());
+    // the element to remove
+    pub struct RemoveEntryInput(holo_hash::HeaderHash);
+    // the remove element's hash
+    pub struct RemoveEntryOutput(holo_hash::HeaderHash);
     // create link entries
     pub struct LinkEntriesInput(
         (
