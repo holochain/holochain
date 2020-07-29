@@ -8,6 +8,8 @@ use std::{
 mod space;
 use space::*;
 
+mod gossip;
+
 /// if the user specifies None or zero (0) for remote_agent_count
 const DEFAULT_NOTIFY_REMOTE_AGENT_COUNT: u8 = 5;
 
@@ -39,6 +41,8 @@ ghost_actor::ghost_chan! {
 
 pub(crate) struct KitsuneP2pActor {
     #[allow(dead_code)]
+    channel_factory: ghost_actor::actor_builder::GhostActorChannelFactory<Self>,
+    #[allow(dead_code)]
     internal_sender: ghost_actor::GhostSender<Internal>,
     #[allow(dead_code)]
     evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
@@ -47,10 +51,12 @@ pub(crate) struct KitsuneP2pActor {
 
 impl KitsuneP2pActor {
     pub fn new(
+        channel_factory: ghost_actor::actor_builder::GhostActorChannelFactory<Self>,
         internal_sender: ghost_actor::GhostSender<Internal>,
         evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     ) -> KitsuneP2pResult<Self> {
         Ok(Self {
+            channel_factory,
             internal_sender,
             evt_sender,
             spaces: HashMap::new(),
@@ -360,11 +366,18 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
     ) -> KitsuneP2pHandlerResult<()> {
         let space = match self.spaces.entry(space.clone()) {
             Entry::Occupied(entry) => entry.into_mut(),
-            Entry::Vacant(entry) => entry.insert(Space::new(
-                space,
-                self.internal_sender.clone(),
-                self.evt_sender.clone(),
-            )),
+            Entry::Vacant(entry) => {
+                let out = entry.insert(Space::new(
+                    space.clone(),
+                    self.internal_sender.clone(),
+                    self.evt_sender.clone(),
+                ));
+                let _gossip_evt_recv = gossip::spawn_gossip_module(
+                    space,
+                ); //.await?;
+                //self.channel_factory.attach_receiver(gossip_evt_recv);
+                out
+            }
         };
         space.handle_join(agent)
     }

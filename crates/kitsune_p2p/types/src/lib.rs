@@ -11,6 +11,7 @@ pub mod dependencies {
 }
 
 pub mod dht_arc;
+pub mod async_lazy;
 
 /// A collection of definitions related to remote communication.
 pub mod transport {
