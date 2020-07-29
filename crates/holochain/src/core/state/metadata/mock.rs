@@ -12,7 +12,7 @@ mock! {
             &mut self,
             header: Header,
         ) -> DatabaseResult<()>;
-        fn sync_register_update(&mut self, update: header::EntryUpdate, entry: Option<EntryHash>) -> DatabaseResult<()>;
+        fn sync_register_update(&mut self, update: header::EntryUpdate) -> DatabaseResult<()>;
         fn sync_register_delete(
             &mut self,
             delete: header::ElementDelete,
@@ -132,12 +132,8 @@ impl MetadataBufT for MockMetadataBuf {
         self.sync_register_activity(header)
     }
 
-    async fn register_update(
-        &mut self,
-        update: header::EntryUpdate,
-        entry: Option<EntryHash>,
-    ) -> DatabaseResult<()> {
-        self.sync_register_update(update, entry)
+    async fn register_update(&mut self, update: header::EntryUpdate) -> DatabaseResult<()> {
+        self.sync_register_update(update)
     }
 
     async fn register_delete(
