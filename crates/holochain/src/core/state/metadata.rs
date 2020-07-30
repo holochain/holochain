@@ -182,11 +182,7 @@ pub trait MetadataBufT {
     async fn register_update(&mut self, update: header::EntryUpdate) -> DatabaseResult<()>;
 
     /// Registers a [Header::ElementDelete] on the Header of an Entry
-    async fn register_delete(
-        &mut self,
-        delete: header::ElementDelete,
-        entry_hash: EntryHash,
-    ) -> DatabaseResult<()>;
+    async fn register_delete(&mut self, delete: header::ElementDelete) -> DatabaseResult<()>;
 
     /// Returns all the [HeaderHash]es of headers that created this [Entry]
     fn get_headers(
@@ -492,12 +488,9 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
     }
 
     #[allow(clippy::needless_lifetimes)]
-    async fn register_delete(
-        &mut self,
-        delete: header::ElementDelete,
-        entry_hash: EntryHash,
-    ) -> DatabaseResult<()> {
+    async fn register_delete(&mut self, delete: header::ElementDelete) -> DatabaseResult<()> {
         let remove = delete.removes_address.to_owned();
+        let entry_hash = delete.removes_entry_address.clone();
         self.register_header_on_basis(remove, delete.clone())
             .await?;
         self.register_header_on_basis(entry_hash.clone(), delete)

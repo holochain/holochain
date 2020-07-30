@@ -84,7 +84,7 @@ pub fn remove_link<'a>(
                     .expect("Element we just put in SourceChain must be gettable");
                 integrate_to_cache(
                     &element,
-                    &mut workspace.cache_cas,
+                    workspace.source_chain.cas(),
                     &mut workspace.cache_meta,
                 )
                 .await

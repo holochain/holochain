@@ -1,5 +1,5 @@
 use holochain_serialized_bytes::SerializedBytesError;
-use holochain_zome_types::Header;
+use holochain_zome_types::{header::conversions::WrongHeaderError, Header};
 use thiserror::Error;
 
 #[derive(Clone, Debug, Error)]
@@ -8,6 +8,8 @@ pub enum DhtOpError {
     HeaderWithoutEntry(Header),
     #[error(transparent)]
     SerializedBytesError(#[from] SerializedBytesError),
+    #[error(transparent)]
+    WrongHeaderError(#[from] WrongHeaderError),
 }
 
 pub type DhtOpResult<T> = Result<T, DhtOpError>;
