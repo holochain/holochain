@@ -1,6 +1,7 @@
 //! The workflow and queue consumer for sys validation
 
 use super::*;
+use crate::core::state::workspace::Workspace;
 use crate::{
     conductor::manager::ManagedTaskResult,
     core::workflow::publish_dht_ops_workflow::{publish_dht_ops_workflow, PublishDhtOpsWorkspace},
@@ -30,9 +31,10 @@ pub fn spawn_publish_dht_ops_consumer(
             let reader = env_ref.reader().expect("Could not create LMDB reader");
             let workspace =
                 PublishDhtOpsWorkspace::new(&reader, &env_ref).expect("Could not create Workspace");
-            if let WorkComplete::Incomplete = publish_dht_ops_workflow(workspace, &mut cell_network)
-                .await
-                .expect("Error running Workflow")
+            if let WorkComplete::Incomplete =
+                publish_dht_ops_workflow(workspace, env.clone().into(), &mut cell_network)
+                    .await
+                    .expect("Error running Workflow")
             {
                 trigger_self.trigger()
             };
