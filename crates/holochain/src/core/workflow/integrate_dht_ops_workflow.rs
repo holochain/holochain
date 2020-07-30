@@ -15,7 +15,8 @@ use crate::core::{
 };
 use error::WorkflowResult;
 use fallible_iterator::FallibleIterator;
-use holo_hash::HasHash;
+use holo_hash::HeaderHash;
+use holochain_keystore::Signature;
 use holochain_state::{
     buffer::BufferedStore,
     buffer::KvBuf,
@@ -24,10 +25,11 @@ use holochain_state::{
 };
 use holochain_types::{
     dht_op::{produce_ops_from_element, DhtOp, DhtOpHashed, DhtOpLight},
-    element::{Element, SignedHeaderHashed},
+    element::{Element, SignedHeaderHashed, SignedHeaderHashedExt},
     validate::ValidationStatus,
-    EntryHashed, HeaderHashed, Timestamp, TimestampKey,
+    Entry, EntryHashed, Timestamp, TimestampKey,
 };
+use holochain_zome_types::{element::SignedHeader, header::IntendedFor, Header};
 use produce_dht_ops_workflow::dht_op_light::error::{DhtOpConvertError, DhtOpConvertResult};
 use std::convert::TryInto;
 use tracing::*;
@@ -160,9 +162,9 @@ async fn integrate_single_dht_op(
     value: IntegrationQueueValue,
     element_store: &mut ChainCasBuf<'_>,
     meta_store: &mut MetadataBuf<'_>,
-    _context: IntegrationContext,
+    context: IntegrationContext,
 ) -> DhtOpConvertResult<Outcome> {
-    match integrate_single_element(value, element_store).await? {
+    match integrate_single_element(value, element_store, context).await? {
         Outcome::Integrated(v) => {
             integrate_single_metadata(v.op.clone(), element_store, meta_store).await?;
             debug!("integrating");
@@ -175,6 +177,7 @@ async fn integrate_single_dht_op(
 async fn integrate_single_element(
     value: IntegrationQueueValue,
     element_store: &mut ChainCasBuf<'_>,
+    context: IntegrationContext,
 ) -> DhtOpConvertResult<Outcome> {
     {
         // Process each op
@@ -184,85 +187,165 @@ async fn integrate_single_element(
         } = value;
         let light_op = op.to_light().await;
 
+        async fn put_data(
+            signature: Signature,
+            header: Header,
+            maybe_entry: Option<Entry>,
+            element_store: &mut ChainCasBuf<'_>,
+        ) -> DhtOpConvertResult<()> {
+            let signed_header =
+                SignedHeaderHashed::from_content(SignedHeader(header, signature)).await;
+            let maybe_entry_hashed = match maybe_entry {
+                Some(entry) => Some(EntryHashed::from_content(entry).await),
+                None => None,
+            };
+            element_store.put(signed_header, maybe_entry_hashed)?;
+            Ok(())
+        }
+
+        async fn header_with_entry_is_stored(
+            hash: &HeaderHash,
+            element_store: &ChainCasBuf<'_>,
+            context: IntegrationContext,
+        ) -> DhtOpConvertResult<bool> {
+            // If we are the author we don't defer on missing dependencies
+            if let IntegrationContext::Author = context {
+                return Ok(true);
+            }
+            match element_store.get_header(hash).await?.map(|e| {
+                e.header()
+                    .entry_data()
+                    .map(|(h, _)| h.clone())
+                    .ok_or_else(|| {
+                        // This is not a NewEntryHeader: cannot continue
+                        DhtOpConvertError::MissingEntryDataForHeader(hash.clone())
+                    })
+            }) {
+                Some(r) => Ok(element_store.contains_entry(&r?)?),
+                None => Ok(false),
+            }
+        }
+
+        let entry_is_stored = |hash| {
+            // If we are the author we don't defer on missing dependencies
+            if let IntegrationContext::Author = context {
+                return Ok(true);
+            }
+            element_store.contains_entry(hash)
+        };
+
+        let header_is_stored = |hash| {
+            // If we are the author we don't defer on missing dependencies
+            if let IntegrationContext::Author = context {
+                return Ok(true);
+            }
+            element_store.contains_header(hash)
+        };
+
         match op {
             DhtOp::StoreElement(signature, header, maybe_entry) => {
-                let header = HeaderHashed::from_content(header).await;
-                let signed_header = SignedHeaderHashed::with_presigned(header, signature);
-                let maybe_entry_hashed = match maybe_entry {
-                    Some(entry) => Some(EntryHashed::from_content(*entry).await),
-                    None => None,
-                };
-                // Store the entry
-                element_store.put(signed_header, maybe_entry_hashed)?;
+                put_data(signature, header, maybe_entry.map(|e| *e), element_store).await?;
             }
             DhtOp::StoreEntry(signature, new_entry_header, entry) => {
-                let header = HeaderHashed::from_content(new_entry_header.into()).await;
-                let signed_header = SignedHeaderHashed::with_presigned(header, signature);
-                let entry = EntryHashed::from_content(*entry).await;
-                // Store Header and Entry
-                element_store.put(signed_header, Some(entry))?;
+                put_data(
+                    signature,
+                    new_entry_header.into(),
+                    Some(*entry),
+                    element_store,
+                )
+                .await?;
             }
             DhtOp::RegisterAgentActivity(signature, header) => {
-                // Store header
-                let header_hashed = HeaderHashed::from_content(header).await;
-                let signed_header = SignedHeaderHashed::with_presigned(header_hashed, signature);
-                element_store.put(signed_header, None)?;
+                put_data(signature, header, None, element_store).await?;
             }
             DhtOp::RegisterReplacedBy(signature, entry_update, maybe_entry) => {
-                let header = HeaderHashed::from_content(entry_update.into()).await;
-                let signed_header = SignedHeaderHashed::with_presigned(header, signature);
-                let maybe_entry_hashed = match maybe_entry {
-                    Some(entry) => Some(EntryHashed::from_content(*entry).await),
-                    None => None,
-                };
-                // Store the entry
-                element_store.put(signed_header, maybe_entry_hashed)?;
+                match entry_update.intended_for {
+                    IntendedFor::Header => {
+                        // Check if we have the header that we are updating in the vault
+                        // or defer the op.
+                        if !header_is_stored(&entry_update.replaces_address)? {
+                            let op =
+                                DhtOp::RegisterReplacedBy(signature, entry_update, maybe_entry);
+                            return Outcome::deferred(op, validation_status);
+                        }
+                    }
+                    IntendedFor::Entry(_) => {
+                        // Check if we have the header with entry that we are updating in the vault
+                        // or defer the op.
+                        if !header_with_entry_is_stored(
+                            &entry_update.replaces_address,
+                            element_store,
+                            context,
+                        )
+                        .await?
+                        {
+                            let op =
+                                DhtOp::RegisterReplacedBy(signature, entry_update, maybe_entry);
+                            return Outcome::deferred(op, validation_status);
+                        }
+                    }
+                }
+                put_data(
+                    signature,
+                    entry_update.into(),
+                    maybe_entry.map(|e| *e),
+                    element_store,
+                )
+                .await?;
             }
-            DhtOp::RegisterDeletedEntryHeader(signature, entry_delete)
-            | DhtOp::RegisterDeletedBy(signature, entry_delete) => {
-                let header_hashed = HeaderHashed::from_content(entry_delete.into()).await;
-                let signed_header = SignedHeaderHashed::with_presigned(header_hashed, signature);
-                element_store.put(signed_header, None)?;
+            DhtOp::RegisterDeletedEntryHeader(signature, element_delete) => {
+                // Check if we have the header with the entry that we are removing in the vault
+                // or defer the op.
+                if !header_with_entry_is_stored(
+                    &element_delete.removes_address,
+                    element_store,
+                    context,
+                )
+                .await?
+                {
+                    // Can't combine the two delete match arms without cloning the op
+                    let op = DhtOp::RegisterDeletedEntryHeader(signature, element_delete);
+                    return Outcome::deferred(op, validation_status);
+                }
+                put_data(signature, element_delete.into(), None, element_store).await?;
+            }
+            DhtOp::RegisterDeletedBy(signature, element_delete) => {
+                // Check if we have the header with the entry that we are removing in the vault
+                // or defer the op.
+                if !header_with_entry_is_stored(
+                    &element_delete.removes_address,
+                    element_store,
+                    context,
+                )
+                .await?
+                {
+                    let op = DhtOp::RegisterDeletedBy(signature, element_delete);
+                    return Outcome::deferred(op, validation_status);
+                }
+                put_data(signature, element_delete.into(), None, element_store).await?;
             }
             DhtOp::RegisterAddLink(signature, link_add) => {
                 // Check whether we have the base address in the Vault.
                 // If not then this should put the op back on the queue.
-                // TODO: Do we actually want to handle this here?
-                // Maybe we should let validation handle it?
-                if element_store
-                    .get_entry(&link_add.base_address)
-                    .await?
-                    .is_none()
-                {
+                if !entry_is_stored(&link_add.base_address)? {
                     let op = DhtOp::RegisterAddLink(signature, link_add);
                     return Outcome::deferred(op, validation_status);
                 }
 
-                // Store add Header
-                let header = HeaderHashed::from_content(link_add.clone().into()).await;
-                debug!(link_add = ?header.as_hash());
-
-                let signed_header = SignedHeaderHashed::with_presigned(header, signature);
-                element_store.put(signed_header, None)?;
+                put_data(signature, link_add.into(), None, element_store).await?;
             }
             DhtOp::RegisterRemoveLink(signature, link_remove) => {
-                // Check whether we have the base address in the Vault.
+                // Check whether we have the base address and link add address
+                // are in the Vault.
                 // If not then this should put the op back on the queue.
-                // TODO: Do we actually want to handle this here?
-                // Maybe we should let validation handle it?
-                if element_store
-                    .get_entry(&link_remove.base_address)
-                    .await?
-                    .is_none()
+                if !entry_is_stored(&link_remove.base_address)?
+                    || !header_is_stored(&link_remove.link_add_address)?
                 {
                     let op = DhtOp::RegisterRemoveLink(signature, link_remove);
                     return Outcome::deferred(op, validation_status);
                 }
 
-                // Store link delete Header
-                let header = HeaderHashed::from_content(link_remove.clone().into()).await;
-                let signed_header = SignedHeaderHashed::with_presigned(header, signature);
-                element_store.put(signed_header, None)?;
+                put_data(signature, link_remove.into(), None, element_store).await?;
             }
         }
 
@@ -280,75 +363,46 @@ pub async fn integrate_single_metadata(
     element_store: &ChainCasBuf<'_>,
     meta_store: &mut MetadataBuf<'_>,
 ) -> DhtOpConvertResult<()> {
+    async fn get_header(
+        hash: HeaderHash,
+        element_store: &ChainCasBuf<'_>,
+    ) -> DhtOpConvertResult<Header> {
+        Ok(element_store
+            .get_header(&hash)
+            .await?
+            .ok_or(DhtOpConvertError::MissingData)?
+            .into_header_and_signature()
+            .0
+            .into_content())
+    }
+
     match op {
         DhtOpLight::StoreElement(_, _, _) => (),
-        DhtOpLight::StoreEntry(new_entry_header_hash, _, _) => {
-            let new_entry_header = element_store
-                .get_header(&new_entry_header_hash)
-                .await?
-                .ok_or(DhtOpConvertError::MissingData)?
-                .into_header_and_signature()
-                .0
-                .into_content()
-                .try_into()?;
+        DhtOpLight::StoreEntry(hash, _, _) => {
+            let new_entry_header = get_header(hash, element_store).await?.try_into()?;
             // Reference to headers
             meta_store.register_header(new_entry_header).await?;
         }
-        DhtOpLight::RegisterAgentActivity(header_hash, _) => {
-            let header = element_store
-                .get_header(&header_hash)
-                .await?
-                .ok_or(DhtOpConvertError::MissingData)?
-                .into_header_and_signature()
-                .0
-                .into_content();
+        DhtOpLight::RegisterAgentActivity(hash, _) => {
+            let header = get_header(hash, element_store).await?;
             // register agent activity on this agents pub key
             meta_store.register_activity(header).await?;
         }
-        DhtOpLight::RegisterReplacedBy(entry_update_hash, _, _) => {
-            let header = element_store
-                .get_header(&entry_update_hash)
-                .await?
-                .ok_or(DhtOpConvertError::MissingData)?
-                .into_header_and_signature()
-                .0
-                .into_content()
-                .try_into()?;
+        DhtOpLight::RegisterReplacedBy(hash, _, _) => {
+            let header = get_header(hash, element_store).await?.try_into()?;
             meta_store.register_update(header).await?;
         }
-        DhtOpLight::RegisterDeletedEntryHeader(entry_delete_hash, _)
-        | DhtOpLight::RegisterDeletedBy(entry_delete_hash, _) => {
-            let header = element_store
-                .get_header(&entry_delete_hash)
-                .await?
-                .ok_or(DhtOpConvertError::MissingData)?
-                .into_header_and_signature()
-                .0
-                .into_content()
-                .try_into()?;
+        DhtOpLight::RegisterDeletedEntryHeader(hash, _)
+        | DhtOpLight::RegisterDeletedBy(hash, _) => {
+            let header = get_header(hash, element_store).await?.try_into()?;
             meta_store.register_delete(header).await?
         }
-        DhtOpLight::RegisterAddLink(link_add_hash, _) => {
-            let header = element_store
-                .get_header(&link_add_hash)
-                .await?
-                .ok_or(DhtOpConvertError::MissingData)?
-                .into_header_and_signature()
-                .0
-                .into_content()
-                .try_into()?;
+        DhtOpLight::RegisterAddLink(hash, _) => {
+            let header = get_header(hash, element_store).await?.try_into()?;
             meta_store.add_link(header).await?;
         }
-        DhtOpLight::RegisterRemoveLink(link_remove_hash, _) => {
-            let header = element_store
-                .get_header(&link_remove_hash)
-                .await?
-                .ok_or(DhtOpConvertError::MissingData)?
-                .into_header_and_signature()
-                .0
-                .into_content()
-                .try_into()?;
-            // Remove the link
+        DhtOpLight::RegisterRemoveLink(hash, _) => {
+            let header = get_header(hash, element_store).await?.try_into()?;
             meta_store.remove_link(header).await?;
         }
     }
