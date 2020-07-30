@@ -31,11 +31,23 @@ where
     }
 
     /// Fetch data from DB, deserialize into V type
-    pub fn get<R: Readable>(&self, reader: &R, k: &K) -> DatabaseResult<Option<V>> {
+    pub fn get_bytes<'env, R: Readable>(
+        &self,
+        reader: &'env R,
+        k: &K,
+    ) -> DatabaseResult<Option<&'env [u8]>> {
         match self.db.get(reader, k)? {
-            Some(rkv::Value::Blob(buf)) => Ok(Some(rmp_serde::from_read_ref(buf)?)),
+            Some(rkv::Value::Blob(buf)) => Ok(Some(buf)),
             None => Ok(None),
             Some(_) => Err(DatabaseError::InvalidValue),
+        }
+    }
+
+    /// Fetch data from DB, deserialize into V type
+    pub fn get<R: Readable>(&self, reader: &R, k: &K) -> DatabaseResult<Option<V>> {
+        match self.get_bytes(reader, k)? {
+            Some(bytes) => Ok(Some(rmp_serde::from_read_ref(bytes)?)),
+            None => Ok(None),
         }
     }
 
