@@ -1,7 +1,7 @@
 //! Defines a Element, the basic unit of Holochain data.
 
 use crate::{
-    header::{WireDelete, WireNewEntryHeader},
+    header::{WireElementDelete, WireNewEntryHeader},
     prelude::*,
     HeaderHashed,
 };
@@ -12,7 +12,7 @@ pub use holochain_zome_types::element::*;
 use holochain_zome_types::entry::Entry;
 use holochain_zome_types::header::{EntryType, Header};
 use must_future::MustBoxFuture;
-use std::collections::{BTreeSet, HashSet};
+use std::collections::BTreeSet;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 /// Element without the hashes for sending across the network
@@ -23,7 +23,7 @@ pub struct WireElement {
     maybe_entry: Option<Entry>,
     /// If this element is deleted then we require a single delete
     /// in the cache as proof of the tombstone
-    deleted: Option<WireDelete>,
+    deleted: Option<WireElementDelete>,
 }
 
 /// Responses from a dht get.
@@ -56,15 +56,11 @@ pub struct RawGetEntryResponse {
     // header being deleted but we would need to only ever store
     // if there was a header delete in our MetadataBuf and
     // not the delete header hash as we do now.
-    // TODO: We should think about getting the whole ElementDelete
-    // so we can validate the delete hash is correct
-    pub deletes: HashSet<WireDelete>,
+    pub deletes: Vec<WireElementDelete>,
     /// The entry shared across all headers
     pub entry: Entry,
     /// The entry_type shared across all headers
     pub entry_type: EntryType,
-    /// The entry hash shared across all headers
-    pub entry_hash: EntryHash,
 }
 
 impl RawGetEntryResponse {
@@ -76,47 +72,43 @@ impl RawGetEntryResponse {
     /// ### Panics
     /// If the elements are not a header of EntryCreate or EntryDelete
     /// or there is no entry or the entry hash is different
-    pub fn from_elements<E>(elements: E, deletes: HashSet<WireDelete>) -> Option<Self>
+    pub fn from_elements<E>(elements: E, deletes: Vec<WireElementDelete>) -> Option<Self>
     where
         E: IntoIterator<Item = Element>,
     {
         let mut elements = elements.into_iter();
         elements.next().map(|element| {
             let mut live_headers = BTreeSet::new();
-            let (new_entry_header, entry_type, entry, entry_hash) = Self::from_element(element);
+            let (new_entry_header, entry_type, entry) = Self::from_element(element);
             live_headers.insert(new_entry_header);
             let r = Self {
                 live_headers,
                 deletes,
                 entry,
                 entry_type,
-                entry_hash,
             };
             elements.fold(r, |mut response, element| {
-                let (new_entry_header, entry_type, entry, entry_hash) = Self::from_element(element);
+                let (new_entry_header, entry_type, entry) = Self::from_element(element);
                 debug_assert_eq!(response.entry, entry);
                 debug_assert_eq!(response.entry_type, entry_type);
-                debug_assert_eq!(response.entry_hash, entry_hash);
                 response.live_headers.insert(new_entry_header);
                 response
             })
         })
     }
 
-    fn from_element(element: Element) -> (WireNewEntryHeader, EntryType, Entry, EntryHash) {
+    fn from_element(element: Element) -> (WireNewEntryHeader, EntryType, Entry) {
         let (shh, entry) = element.into_inner();
         let entry = entry.expect("Get entry responses cannot be created without entries");
         let (header, signature) = shh.into_header_and_signature();
-        let (new_entry_header, entry_type, entry_hash) = match header.into_content() {
+        let (new_entry_header, entry_type) = match header.into_content() {
             Header::EntryCreate(ec) => {
                 let et = ec.entry_type.clone();
-                let eh = ec.entry_hash.clone();
-                (WireNewEntryHeader::Create((ec, signature).into()), et, eh)
+                (WireNewEntryHeader::Create((ec, signature).into()), et)
             }
             Header::EntryUpdate(eu) => {
-                let eh = eu.entry_hash.clone();
                 let et = eu.entry_type.clone();
-                (WireNewEntryHeader::Update((eu, signature).into()), et, eh)
+                (WireNewEntryHeader::Update((eu, signature).into()), et)
             }
             h @ _ => panic!(
                 "Get entry responses cannot be created from headers
@@ -125,7 +117,7 @@ impl RawGetEntryResponse {
                 h
             ),
         };
-        (new_entry_header, entry_type, entry, entry_hash)
+        (new_entry_header, entry_type, entry)
     }
 }
 
@@ -200,20 +192,20 @@ impl SignedHeaderHashedExt for SignedHeaderHashed {
 }
 
 impl WireElement {
-    /// Has this element been deleted according to the authority
-    pub fn deleted(&self) -> &Option<WireDelete> {
-        &self.deleted
-    }
-
     /// Convert into a [Element] when receiving from the network
-    pub async fn into_element(self) -> Element {
-        Element::new(
+    pub async fn into_element_and_delete(self) -> (Element, Option<Element>) {
+        let header = Element::new(
             SignedHeaderHashed::from_content(self.signed_header).await,
             self.maybe_entry,
-        )
+        );
+        let deleted = match self.deleted {
+            Some(deleted) => Some(deleted.into_element().await),
+            None => None,
+        };
+        (header, deleted)
     }
     /// Convert from a [Element] when sending to the network
-    pub fn from_element(e: Element, deleted: Option<WireDelete>) -> Self {
+    pub fn from_element(e: Element, deleted: Option<WireElementDelete>) -> Self {
         let (signed_header, maybe_entry) = e.into_inner();
         Self {
             signed_header: signed_header.into_inner().0,

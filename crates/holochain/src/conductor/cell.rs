@@ -30,7 +30,7 @@ use crate::{
         },
     },
 };
-use error::CellError;
+use error::{AuthorityDataError, CellError};
 use fallible_iterator::FallibleIterator;
 use futures::future::FutureExt;
 use hash_type::AnyDht;
@@ -45,16 +45,15 @@ use holochain_types::{
     autonomic::AutonomicProcess,
     cell::CellId,
     element::{GetElementResponse, RawGetEntryResponse, WireElement},
-    header::WireDelete,
     link::{GetLinksResponse, WireLinkMetaKey},
     metadata::MetadataSet,
     Timestamp,
 };
 use holochain_zome_types::capability::CapSecret;
 use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::{Header, HostInput};
+use holochain_zome_types::{header::conversions::WrongHeaderError, Header, HostInput};
 use std::{
-    collections::{BTreeSet, HashSet},
+    collections::BTreeSet,
     convert::TryInto,
     hash::{Hash, Hasher},
     path::Path,
@@ -451,9 +450,10 @@ impl Cell {
 
         // The data we want to collect
         let mut entry_data = None;
-        let mut deletes = HashSet::new();
+        let mut deletes = Vec::new();
         let mut live_headers = BTreeSet::new();
 
+        let mut delete_headers = Vec::new();
         // Get the live header hashes and collect any deletes
         let results = meta_vault
             .get_headers(hash)?
@@ -466,10 +466,7 @@ impl Cell {
                 {
                     // Header is dead so don't return but collect the deleted header
                     Some(delete) => {
-                        deletes.insert(WireDelete {
-                            element_delete_address: delete,
-                            removes_address: header_hash,
-                        });
+                        delete_headers.push(delete.header_hash);
                         Ok(None)
                     }
                     // Header is alive so return
@@ -494,46 +491,53 @@ impl Cell {
                                 match element_vault.get_entry(&eh).await? {
                                     // Found so everything is ok
                                     Some(e) => {
-                                        entry_data =
-                                            Some((e.into_content(), et.clone(), eh.clone()));
+                                        entry_data = Some((e.into_content(), et.clone()));
                                     }
                                     // Missing the entry
-                                    // TODO: This is bad and probably a good place to exit early with an error
                                     None => {
-                                        error!(msg = "Authority is missing the entry for held metadata entry", metadata = ?live_header);
-                                        continue;
+                                        return Err(AuthorityDataError::missing_data_entry(
+                                            live_header,
+                                        ));
                                     }
                                 }
                             }
                         }
                         // No entry data so don't return this header
                         None => {
-                            error!(msg = "Authority is missing entry data for held metadata entry", metadata = ?live_header);
-                            continue;
+                            return Err(AuthorityDataError::WrongHeaderError(WrongHeaderError(
+                                format!("Header should have entry data: {:?}", live_header),
+                            ))
+                            .into());
                         }
                     }
                     header
                 }
                 // Missing the header
-                // TODO: Probably also an error
                 None => {
-                    error!(msg = "Authority is missing data for held metadata", metadata = ?live_header);
-                    continue;
+                    return Err(AuthorityDataError::missing_data(live_header));
                 }
             };
             // Collect the actual live header
             live_headers.insert(header.try_into()?);
         }
 
+        for delete in delete_headers {
+            match element_vault.get_header(&delete).await? {
+                Some(delete) => deletes.push(delete.try_into().map_err(AuthorityDataError::from)?),
+                None => {
+                    return Err(AuthorityDataError::missing_data(delete));
+                }
+            }
+        }
+
         // Construct the return type
         let r = match entry_data {
-            Some((entry, entry_type, entry_hash)) => {
+            Some((entry, entry_type)) => {
                 let r = RawGetEntryResponse {
                     live_headers,
                     deletes,
                     entry,
                     entry_type,
-                    entry_hash,
                 };
                 Some(Box::new(r))
             }
@@ -551,11 +555,17 @@ impl Cell {
         let meta_vault = MetadataBuf::vault(&reader, &dbs)?;
 
         // Look for a delete on the header and collect it
-        let deleted = match meta_vault.get_deletes_on_header(hash.clone())?.next()? {
-            Some(delete_header) => Some(WireDelete {
-                element_delete_address: delete_header,
-                removes_address: hash.clone(),
-            }),
+        let deleted = meta_vault.get_deletes_on_header(hash.clone())?.next()?;
+        let deleted = match deleted {
+            Some(delete_header) => {
+                let delete = delete_header.header_hash;
+                match element_vault.get_header(&delete).await? {
+                    Some(delete) => Some(delete.try_into().map_err(AuthorityDataError::from)?),
+                    None => {
+                        return Err(AuthorityDataError::missing_data(delete));
+                    }
+                }
+            }
             None => None,
         };
 

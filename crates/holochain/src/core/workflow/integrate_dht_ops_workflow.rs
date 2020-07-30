@@ -275,10 +275,10 @@ async fn integrate_single_element(
     }
 }
 
-pub async fn integrate_single_metadata(
+pub async fn integrate_single_metadata<C: MetadataBufT>(
     op: DhtOpLight,
     element_store: &ChainCasBuf<'_>,
-    meta_store: &mut MetadataBuf<'_>,
+    meta_store: &mut C,
 ) -> DhtOpConvertResult<()> {
     match op {
         DhtOpLight::StoreElement(_, _, _) => (),
@@ -369,10 +369,10 @@ enum IntegrationContext {
 /// inline, so that they are immediately available in the meta cache.
 /// NB: We skip integrating the element data, since it is already available in
 /// our vault.
-pub async fn integrate_to_cache(
+pub async fn integrate_to_cache<C: MetadataBufT>(
     element: &Element,
     element_store: &ChainCasBuf<'_>,
-    meta_store: &mut MetadataBuf<'_>,
+    meta_store: &mut C,
 ) -> DhtOpConvertResult<()> {
     // TODO: Just produce the light directly
     for op in produce_ops_from_element(element)? {

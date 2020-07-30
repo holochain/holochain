@@ -16,7 +16,10 @@ use fallible_iterator::FallibleIterator;
 use futures::future::{Either, FutureExt};
 use ghost_actor::GhostControlSender;
 use hdk3::prelude::EntryVisibility;
-use holo_hash::hash_type::{self, AnyDht};
+use holo_hash::{
+    hash_type::{self, AnyDht},
+    HasHash,
+};
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::{
     actor::{GetMetaOptions, HolochainP2pRefToCell},
@@ -26,7 +29,7 @@ use holochain_serialized_bytes::prelude::*;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::{
     env::{EnvironmentWriteRef, ReadManager},
-    prelude::{GetDb, WriteManager},
+    prelude::{BufferedStore, GetDb, WriteManager},
     test_utils::test_cell_env,
 };
 use holochain_types::{
@@ -529,14 +532,23 @@ async fn fake_authority<'env>(
     element: Element,
 ) {
     let reader = env_ref.reader().unwrap();
-    let mut workspace = CallZomeWorkspace::new(&reader, dbs).unwrap();
+    let mut element_vault = ChainCasBuf::vault(&reader, dbs, false).unwrap();
+    let mut meta_vault = MetadataBuf::vault(&reader, dbs).unwrap();
 
     // Write to the meta vault to fake being an authority
-    integrate_to_cache(&element, &mut workspace.cache_cas, &mut workspace.meta)
+    let (shh, e) = element.clone().into_inner();
+    element_vault
+        .put(shh, option_entry_hashed(e).await)
+        .unwrap();
+
+    integrate_to_cache(&element, &element_vault, &mut meta_vault)
         .await
         .unwrap();
 
     env_ref
-        .with_commit(|writer| workspace.flush_to_txn(writer))
+        .with_commit(|writer| {
+            element_vault.flush_to_txn(writer)?;
+            meta_vault.flush_to_txn(writer)
+        })
         .unwrap();
 }

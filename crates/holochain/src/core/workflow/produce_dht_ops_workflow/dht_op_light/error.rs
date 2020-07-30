@@ -32,7 +32,7 @@ pub enum DhtOpConvertError {
     SourceChainError(#[from] SourceChainError),
     #[error(transparent)]
     DhtOpError(#[from] DhtOpError),
-    #[error("Tried to use the wrong header for this op")]
+    #[error("Tried to use the wrong header for this op: {0}")]
     WrongHeaderError(#[from] WrongHeaderError),
 }
 

@@ -6,12 +6,19 @@
 
 #![allow(missing_docs)]
 
-use crate::{element::SignedHeaderHashed, metadata::TimedHeaderHash, prelude::*};
+use crate::{
+    element::{SignedHeaderHashed, SignedHeaderHashedExt},
+    prelude::*,
+};
 use conversions::WrongHeaderError;
 use holo_hash::EntryHash;
 use holochain_zome_types::entry_def::EntryVisibility;
 pub use holochain_zome_types::header::HeaderHashed;
-use holochain_zome_types::header::*;
+use holochain_zome_types::{
+    element::{Element, SignedHeader},
+    header::*,
+    Entry,
+};
 
 use error::*;
 
@@ -62,11 +69,10 @@ pub struct WireEntryUpdate {
     pub signature: Signature,
 }
 
-/// A element delete hash pair for sending over the network
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
-pub struct WireDelete {
-    pub element_delete_address: TimedHeaderHash,
-    pub removes_address: HeaderHash,
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+pub struct WireElementDelete {
+    pub delete: ElementDelete,
+    pub signature: Signature,
 }
 
 impl NewEntryHeader {
@@ -122,12 +128,30 @@ impl From<(EntryUpdate, Signature)> for WireEntryUpdate {
     }
 }
 
+impl WireElementDelete {
+    pub async fn into_element(self) -> Element {
+        Element::new(
+            SignedHeaderHashed::from_content(SignedHeader(self.delete.into(), self.signature))
+                .await,
+            None,
+        )
+    }
+}
+
+impl TryFrom<SignedHeaderHashed> for WireElementDelete {
+    type Error = WrongHeaderError;
+    fn try_from(shh: SignedHeaderHashed) -> Result<Self, Self::Error> {
+        let (h, signature) = shh.into_header_and_signature();
+        Ok(Self {
+            delete: h.into_content().try_into()?,
+            signature,
+        })
+    }
+}
+
 impl WireNewEntryHeader {
-    pub async fn create_new_entry_header(
-        self,
-        entry_type: EntryType,
-        entry_hash: EntryHash,
-    ) -> (NewEntryHeader, HeaderHash, Signature) {
+    pub async fn into_element(self, entry_type: EntryType, entry: Entry) -> Element {
+        let entry_hash = EntryHash::with_data(&entry).await;
         match self {
             WireNewEntryHeader::Create(ec) => {
                 let signature = ec.signature;
@@ -139,14 +163,10 @@ impl WireNewEntryHeader {
                     entry_type,
                     entry_hash,
                 };
-                let (h, hash) = HeaderHashed::from_content(Header::EntryCreate(ec))
-                    .await
-                    .into_inner();
-                let ec = match h {
-                    Header::EntryCreate(ec) => ec,
-                    _ => unreachable!(),
-                };
-                (NewEntryHeader::Create(ec), hash, signature)
+                Element::new(
+                    SignedHeaderHashed::from_content(SignedHeader(ec.into(), signature)).await,
+                    Some(entry),
+                )
             }
             WireNewEntryHeader::Update(eu) => {
                 let signature = eu.signature;
@@ -160,14 +180,10 @@ impl WireNewEntryHeader {
                     entry_type,
                     entry_hash,
                 };
-                let (h, hash) = HeaderHashed::from_content(Header::EntryUpdate(eu))
-                    .await
-                    .into_inner();
-                let eu = match h {
-                    Header::EntryUpdate(eu) => eu,
-                    _ => unreachable!(),
-                };
-                (NewEntryHeader::Update(eu), hash, signature)
+                Element::new(
+                    SignedHeaderHashed::from_content(SignedHeader(eu.into(), signature)).await,
+                    Some(entry),
+                )
             }
         }
     }
@@ -192,7 +208,7 @@ impl TryFrom<Header> for NewEntryHeader {
         match value {
             Header::EntryCreate(h) => Ok(NewEntryHeader::Create(h)),
             Header::EntryUpdate(h) => Ok(NewEntryHeader::Update(h)),
-            _ => Err(WrongHeaderError),
+            _ => Err(WrongHeaderError(format!("{:?}", value))),
         }
     }
 }

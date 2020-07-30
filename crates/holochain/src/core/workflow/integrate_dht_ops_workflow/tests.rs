@@ -1300,7 +1300,7 @@ mod slow_tests {
                 .unwrap();
             integrate_to_cache(
                 &element,
-                &mut workspace.cache_cas,
+                workspace.source_chain.cas(),
                 &mut workspace.cache_meta,
             )
             .await
@@ -1330,7 +1330,7 @@ mod slow_tests {
                 .unwrap();
             integrate_to_cache(
                 &element,
-                &mut workspace.cache_cas,
+                workspace.source_chain.cas(),
                 &mut workspace.cache_meta,
             )
             .await
@@ -1357,7 +1357,7 @@ mod slow_tests {
                 .unwrap();
             integrate_to_cache(
                 &element,
-                &mut workspace.cache_cas,
+                workspace.source_chain.cas(),
                 &mut workspace.cache_meta,
             )
             .await

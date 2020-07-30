@@ -25,7 +25,7 @@ impl From<u8> for EntryDefId {
 }
 
 #[derive(Debug, Clone)]
-pub struct WrongHeaderError;
+pub struct WrongHeaderError(pub String);
 
 impl std::fmt::Display for WrongHeaderError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -40,7 +40,7 @@ impl TryFrom<Header> for EntryUpdate {
     fn try_from(value: Header) -> Result<Self, Self::Error> {
         match value {
             Header::EntryUpdate(h) => Ok(h),
-            _ => Err(WrongHeaderError),
+            _ => Err(WrongHeaderError(format!("{:?}", value))),
         }
     }
 }
@@ -50,7 +50,7 @@ impl TryFrom<Header> for ElementDelete {
     fn try_from(value: Header) -> Result<Self, Self::Error> {
         match value {
             Header::ElementDelete(h) => Ok(h),
-            _ => Err(WrongHeaderError),
+            _ => Err(WrongHeaderError(format!("{:?}", value))),
         }
     }
 }
@@ -60,7 +60,7 @@ impl TryFrom<Header> for LinkAdd {
     fn try_from(value: Header) -> Result<Self, Self::Error> {
         match value {
             Header::LinkAdd(h) => Ok(h),
-            _ => Err(WrongHeaderError),
+            _ => Err(WrongHeaderError(format!("{:?}", value))),
         }
     }
 }
@@ -70,7 +70,7 @@ impl TryFrom<Header> for LinkRemove {
     fn try_from(value: Header) -> Result<Self, Self::Error> {
         match value {
             Header::LinkRemove(h) => Ok(h),
-            _ => Err(WrongHeaderError),
+            _ => Err(WrongHeaderError(format!("{:?}", value))),
         }
     }
 }

@@ -42,11 +42,12 @@ use super::{
     chain_cas::ChainCasBuf,
     metadata::{LinkMetaKey, MetadataBuf, MetadataBufT, SysMetaVal},
 };
+use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_cache;
 use error::CascadeResult;
 use fallible_iterator::FallibleIterator;
 use holo_hash::{
     hash_type::{self, AnyDht},
-    AnyDhtHash, EntryHash, HasHash, HeaderHash,
+    AnyDhtHash, EntryHash, HeaderHash,
 };
 use holochain_p2p::{
     actor::{GetLinksOptions, GetMetaOptions, GetOptions},
@@ -54,10 +55,10 @@ use holochain_p2p::{
 };
 use holochain_state::error::DatabaseResult;
 use holochain_types::{
-    element::{Element, GetElementResponse, RawGetEntryResponse, SignedHeaderHashed, WireElement},
-    header::WireDelete,
+    element::{Element, GetElementResponse, RawGetEntryResponse, SignedHeaderHashed},
+    entry::option_entry_hashed,
     link::{GetLinksResponse, WireLinkMetaKey},
-    metadata::{EntryDhtStatus, MetadataSet, TimedHeaderHash},
+    metadata::{EntryDhtStatus, MetadataSet},
     EntryHashed, HeaderHashed,
 };
 use holochain_zome_types::{link::Link, Header};
@@ -129,88 +130,31 @@ where
         options: GetOptions,
     ) -> CascadeResult<()> {
         let results = self.network.get(hash.into(), options).await?;
-
-        // The element that we want to store
-        let mut element: Option<Box<WireElement>> = None;
-
         // Search through the returns for the first delete
-        let proof_of_delete = results.into_iter().find_map(|response| match response {
-            // Has header
-            GetElementResponse::GetHeader(Some(we)) => {
-                let deleted = we.deleted().clone();
-                // Store the first found element
-                if element.is_none() {
-                    // TODO: Validate that this is the same element across all returns
-                    // TODO: Validate that the entry hash matches
-                    // TODO: Check all headers have the correct hash
-                    element = Some(we);
-                }
-                match deleted {
-                    // Has proof of deleted entry
-                    Some(deleted) => Some(deleted),
-                    // No proof of delete so this is a live element
-                    None => None,
-                }
-            }
-            // Doesn't have header but not because it was deleted
-            GetElementResponse::GetHeader(None) => None,
-            r @ _ => {
-                error!(
-                    msg = "Got an invalid response to fetch element via header",
-                    ?r
-                );
-                None
-            }
-        });
+        for response in results.into_iter() {
+            match response {
+                // Has header
+                GetElementResponse::GetHeader(Some(we)) => {
+                    let (element, delete) = we.into_element_and_delete().await;
+                    let (shh, e) = element.clone().into_inner();
+                    self.element_cache.put(shh, option_entry_hashed(e).await)?;
+                    integrate_to_cache(&element, &self.element_cache, self.meta_cache).await?;
 
-        // Add the element data to the caches if there was some
-        if let Some(element) = element {
-            let element = element.into_element().await;
-            let (signed_header, maybe_entry) = element.clone().into_inner();
-            let timed_header_hash: TimedHeaderHash = signed_header.header_hashed().clone().into();
-
-            // If there is an entry we want to check the hash
-            let entry = match maybe_entry {
-                Some(entry) => {
-                    let eh = EntryHashed::from_content(entry).await;
-                    match signed_header.header().entry_data() {
-                        // Entry hash matches
-                        Some((hash, _)) if eh.as_hash() == hash => Some(eh),
-                        // Entry hash doesn't match so don't store any metadata
-                        None => None,
-                        _ => {
-                            warn!("Entry hash doesn't match header");
-                            // Return before storing metadata
-                            return Ok(());
-                        }
+                    if let Some(delete) = delete {
+                        let (shh, _) = delete.into_inner();
+                        self.element_cache.put(shh, None)?;
+                        integrate_to_cache(&element, &self.element_cache, self.meta_cache).await?;
                     }
                 }
-                None => None,
-            };
-            if let Some(entry) = &entry {
-                let entry_hash = entry.as_hash().clone();
-                // TODO: [B-02052] Should / could we just do an integrate_to_cache here?
-                // Found a delete, add it to the cache.
-                if let Some(WireDelete {
-                    element_delete_address,
-                    removes_address,
-                }) = proof_of_delete
-                {
-                    self.meta_cache.register_raw_on_entry(
-                        entry_hash.clone(),
-                        SysMetaVal::Delete(element_delete_address.clone()),
-                    )?;
-                    self.meta_cache.register_raw_on_header(
-                        removes_address,
-                        SysMetaVal::Delete(element_delete_address),
+                // Doesn't have header but not because it was deleted
+                GetElementResponse::GetHeader(None) => (),
+                r @ _ => {
+                    error!(
+                        msg = "Got an invalid response to fetch element via header",
+                        ?r
                     );
                 }
-                self.meta_cache
-                    .register_raw_on_entry(entry_hash, SysMetaVal::NewEntry(timed_header_hash))?;
             }
-
-            // Put in element element_cache
-            self.element_cache.put(signed_header, entry)?;
         }
         Ok(())
     }
@@ -221,64 +165,30 @@ where
         hash: EntryHash,
         options: GetOptions,
     ) -> CascadeResult<()> {
-        let elements = self.network.get(hash.clone().into(), options).await?;
+        let results = self.network.get(hash.clone().into(), options).await?;
 
-        let mut maybe_entry_hashed: Option<EntryHashed> = None;
-
-        for element in elements {
-            match element {
+        for response in results {
+            match response {
                 GetElementResponse::GetEntryFull(Some(raw)) => {
                     let RawGetEntryResponse {
                         live_headers,
                         deletes,
                         entry,
                         entry_type,
-                        entry_hash,
                     } = *raw;
-                    // We don't want to hash every entry so just hash one but check
-                    // all the hashes match
-                    let entry_hashed = match &maybe_entry_hashed {
-                        Some(eh) => eh.clone(),
-                        None => {
-                            let eh = EntryHashed::from_content(entry).await;
-                            maybe_entry_hashed = Some(eh.clone());
-                            eh
-                        }
-                    };
-                    // Check the hash matches
-                    if entry_hash != *entry_hashed.as_hash() && entry_hash == hash {
-                        warn!("Received element with hash that doesn't match");
-                        maybe_entry_hashed = None;
-                        continue;
-                    }
                     for entry_header in live_headers {
-                        let (new_entry_header, header_hash, signature) = entry_header
-                            .create_new_entry_header(entry_type.clone(), entry_hash.clone())
+                        let element = entry_header
+                            .into_element(entry_type.clone(), entry.clone())
                             .await;
-                        self.meta_cache
-                            .register_header(new_entry_header.clone())
-                            .await?;
-                        let header =
-                            HeaderHashed::with_pre_hashed(new_entry_header.into(), header_hash);
-                        // Add elements to element_cache
-                        self.element_cache.put(
-                            SignedHeaderHashed::with_presigned(header, signature),
-                            Some(entry_hashed.clone()),
-                        )?;
+                        let (shh, e) = element.clone().into_inner();
+                        self.element_cache.put(shh, option_entry_hashed(e).await)?;
+                        integrate_to_cache(&element, &self.element_cache, self.meta_cache).await?;
                     }
-                    for WireDelete {
-                        element_delete_address,
-                        removes_address,
-                    } in deletes
-                    {
-                        self.meta_cache.register_raw_on_header(
-                            removes_address,
-                            SysMetaVal::Delete(element_delete_address.clone()),
-                        );
-                        self.meta_cache.register_raw_on_entry(
-                            entry_hash.clone(),
-                            SysMetaVal::Delete(element_delete_address),
-                        )?;
+                    for delete in deletes {
+                        let element = delete.into_element().await;
+                        let (shh, e) = element.clone().into_inner();
+                        self.element_cache.put(shh, option_entry_hashed(e).await)?;
+                        integrate_to_cache(&element, &self.element_cache, self.meta_cache).await?;
                     }
                 }
                 // Authority didn't have any headers for this entry
