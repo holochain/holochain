@@ -262,7 +262,7 @@ where
         // Am I an authority?
         // TODO: Not a good check for authority as the base could be in the cas because
         // you authored it.
-        let authority = self.element_vault.contains(&key.base()).await?;
+        let authority = self.element_vault.contains_entry(&key.base())?;
         if authority {
             // Cas
             let links = self.meta_vault.get_links(key)?;

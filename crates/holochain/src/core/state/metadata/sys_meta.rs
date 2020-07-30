@@ -484,10 +484,7 @@ mod tests {
             let reader = env.reader().unwrap();
             let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
             for delete in entry_deletes {
-                meta_buf
-                    .register_delete(delete, entry_hash.clone())
-                    .await
-                    .unwrap();
+                meta_buf.register_delete(delete).await.unwrap();
             }
             let mut headers = meta_buf
                 .get_deletes_on_header(header_hash.clone().into())
@@ -517,17 +514,14 @@ mod tests {
         entry_deletes: &[ElementDelete],
         update_entries: &[NewEntryHeader],
         delete_updates: &[ElementDelete],
-        entry_hash: &EntryHash,
+        _entry_hash: &EntryHash,
         meta_buf: &mut MetadataBuf<'_>,
     ) {
         for e in new_entries.iter().chain(update_entries.iter()) {
             meta_buf.register_header(e.clone()).await.unwrap();
         }
         for delete in entry_deletes.iter().chain(delete_updates.iter()) {
-            meta_buf
-                .register_delete(delete.clone(), entry_hash.clone())
-                .await
-                .unwrap();
+            meta_buf.register_delete(delete.clone()).await.unwrap();
         }
     }
 

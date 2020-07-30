@@ -28,7 +28,7 @@ use holochain_types::{
     metadata::TimedHeaderHash,
     observability,
     validate::ValidationStatus,
-    Entry, EntryHashed,
+    Entry, EntryHashed, HeaderHashed,
 };
 use holochain_zome_types::{
     entry::GetOptions,
@@ -39,7 +39,11 @@ use holochain_zome_types::{
     CommitEntryInput, GetEntryInput, GetLinksInput, Header, LinkEntriesInput,
 };
 use produce_dht_ops_workflow::{produce_dht_ops_workflow, ProduceDhtOpsWorkspace};
-use std::{collections::BTreeMap, convert::TryInto, sync::Arc};
+use std::{
+    collections::BTreeMap,
+    convert::{TryFrom, TryInto},
+    sync::Arc,
+};
 
 #[derive(Clone)]
 struct TestData {
@@ -169,7 +173,7 @@ enum Db {
     MetaHeader(Entry, Header),
     MetaActivity(Header),
     MetaUpdate(AnyDhtHash, Header),
-    MetaDelete(EntryHash, HeaderHash, Header),
+    MetaDelete(HeaderHash, Header),
     MetaLink(LinkAdd, EntryHash),
     MetaLinkEmpty(LinkAdd),
 }
@@ -280,12 +284,16 @@ impl Db {
                     let exp = [header_hash];
                     assert_eq!(&res[..], &exp[..], "{}", here,);
                 }
-                Db::MetaDelete(base, deleted_header_hash, header) => {
+                Db::MetaDelete(deleted_header_hash, header) => {
                     let header_hash = HeaderHashed::from_content(header.clone()).await;
                     let header_hash = TimedHeaderHash::from(header_hash);
                     let res = workspace
                         .meta
-                        .get_deletes_on_entry(base)
+                        .get_deletes_on_entry(
+                            ElementDelete::try_from(header)
+                                .unwrap()
+                                .removes_entry_address,
+                        )
                         .unwrap()
                         .collect::<Vec<_>>()
                         .unwrap();
@@ -433,7 +441,7 @@ impl Db {
                 Db::MetaUpdate(_, _) => {}
                 Db::IntegratedEmpty => {}
                 Db::MetaEmpty => {}
-                Db::MetaDelete(_, _, _) => {}
+                Db::MetaDelete(_, _) => {}
                 Db::MetaLink(link_add, _) => {
                     workspace.meta.add_link(link_add).await.unwrap();
                 }
@@ -537,7 +545,10 @@ fn register_replaced_by_for_header(a: TestData) -> (Vec<Db>, Vec<Db>, &'static s
         a.entry_update_header.clone(),
         Some(a.new_entry.clone().into()),
     );
-    let pre_state = vec![Db::IntQueue(op.clone())];
+    let pre_state = vec![
+        Db::IntQueue(op.clone()),
+        Db::CasHeader(a.original_header.clone().into(), Some(a.signature.clone())),
+    ];
     let expect = vec![
         Db::Integrated(op.clone()),
         Db::MetaUpdate(
@@ -556,7 +567,11 @@ fn register_replaced_by_for_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static st
     );
     let pre_state = vec![
         Db::IntQueue(op.clone()),
-        Db::CasHeader(a.original_header.clone().into(), Some(a.signature.clone())),
+        Db::CasEntry(
+            a.original_entry.clone(),
+            Some(a.original_header.clone().into()),
+            Some(a.signature.clone()),
+        ),
     ];
     let expect = vec![
         Db::Integrated(op.clone()),
@@ -572,13 +587,16 @@ fn register_deleted_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let op = DhtOp::RegisterDeletedEntryHeader(a.signature.clone(), a.entry_delete.clone());
     let pre_state = vec![
         Db::IntQueue(op.clone()),
-        Db::CasHeader(a.original_header.clone().into(), Some(a.signature.clone())),
+        Db::CasEntry(
+            a.original_entry.clone(),
+            Some(a.original_header.clone().into()),
+            Some(a.signature.clone()),
+        ),
     ];
     let expect = vec![
         Db::IntQueueEmpty,
         Db::Integrated(op.clone()),
         Db::MetaDelete(
-            a.original_entry_hash.clone().into(),
             a.original_header_hash.clone().into(),
             a.entry_delete.clone().into(),
         ),
@@ -586,27 +604,19 @@ fn register_deleted_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     (pre_state, expect, "register deleted by")
 }
 
-fn register_deleted_by_missing_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-    let op = DhtOp::RegisterDeletedEntryHeader(a.signature.clone(), a.entry_delete.clone());
-    let pre_state = vec![Db::IntQueue(op.clone())];
-    let expect = vec![Db::IntegratedEmpty, Db::IntQueue(op.clone()), Db::MetaEmpty];
-    (
-        pre_state,
-        expect,
-        "register deleted by for entry missing entry",
-    )
-}
-
 fn register_deleted_header_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let op = DhtOp::RegisterDeletedBy(a.signature.clone(), a.entry_delete.clone());
     let pre_state = vec![
         Db::IntQueue(op.clone()),
-        Db::CasHeader(a.original_header.clone().into(), Some(a.signature.clone())),
+        Db::CasEntry(
+            a.original_entry.clone(),
+            Some(a.original_header.clone().into()),
+            Some(a.signature.clone()),
+        ),
     ];
     let expect = vec![
         Db::Integrated(op.clone()),
         Db::MetaDelete(
-            a.original_entry_hash.clone().into(),
             a.original_header_hash.clone().into(),
             a.entry_delete.clone().into(),
         ),
@@ -677,7 +687,6 @@ async fn test_ops_state() {
         register_replaced_by_for_header,
         register_replaced_by_for_entry,
         register_deleted_by,
-        register_deleted_by_missing_entry,
         register_deleted_header_by,
         register_add_link,
         register_remove_link,
