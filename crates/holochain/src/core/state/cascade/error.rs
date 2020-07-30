@@ -4,13 +4,16 @@ use crate::core::{
 use holochain_p2p::HolochainP2pError;
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_state::error::DatabaseError;
-use holochain_types::dht_op::error::DhtOpError;
+use holochain_types::{dht_op::error::DhtOpError, element::error::ElementGroupError};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum CascadeError {
     #[error(transparent)]
     DatabaseError(#[from] DatabaseError),
+
+    #[error(transparent)]
+    ElementGroupError(#[from] ElementGroupError),
 
     #[error(transparent)]
     DhtOpConvertError(#[from] DhtOpConvertError),

@@ -3,16 +3,23 @@
 use crate::{
     header::{WireElementDelete, WireNewEntryHeader},
     prelude::*,
-    HeaderHashed,
+    EntryHashed, HeaderHashed,
 };
+use error::{ElementGroupError, ElementGroupResult};
 use futures::future::FutureExt;
 use holochain_keystore::KeystoreError;
 use holochain_serialized_bytes::prelude::*;
 pub use holochain_zome_types::element::*;
 use holochain_zome_types::entry::Entry;
-use holochain_zome_types::header::{EntryType, Header};
+use holochain_zome_types::{
+    entry_def::EntryVisibility,
+    header::{EntryType, Header},
+};
 use must_future::MustBoxFuture;
-use std::collections::BTreeSet;
+use std::{borrow::Cow, collections::BTreeSet};
+
+#[allow(missing_docs)]
+pub mod error;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 /// Element without the hashes for sending across the network
@@ -24,6 +31,83 @@ pub struct WireElement {
     /// If this element is deleted then we require a single delete
     /// in the cache as proof of the tombstone
     deleted: Option<WireElementDelete>,
+}
+
+/// A group of elements with a common entry
+#[derive(Debug, Clone)]
+pub struct ElementGroup<'a> {
+    headers: Vec<Cow<'a, SignedHeaderHashed>>,
+    entry: Cow<'a, EntryHashed>,
+}
+
+impl<'a> ElementGroup<'a> {
+    /// Get the headers and header hashes
+    pub fn headers_and_hashes(&self) -> impl Iterator<Item = (&HeaderHash, &Header)> {
+        self.headers
+            .iter()
+            .map(|shh| shh.header_address())
+            .zip(self.headers.iter().map(|shh| shh.header()))
+    }
+    /// Amount of headers
+    pub fn len(&self) -> usize {
+        self.headers.len()
+    }
+    /// The entries visibility
+    pub fn visibility(&self) -> ElementGroupResult<&EntryVisibility> {
+        self.headers
+            .first()
+            .ok_or(ElementGroupError::Empty)?
+            .header()
+            .entry_data()
+            .map(|(_, et)| et.visibility())
+            .ok_or(ElementGroupError::MissingEntryData)
+    }
+    /// The entry hash
+    pub fn entry_hash(&self) -> &EntryHash {
+        self.entry.as_hash()
+    }
+    /// The entry with hash
+    pub fn entry_hashed(&self) -> EntryHashed {
+        self.entry.clone().into_owned()
+    }
+    /// Get owned iterator of signed headers
+    pub fn owned_signed_headers(&self) -> impl Iterator<Item = SignedHeaderHashed> + 'a {
+        self.headers.clone().into_iter().map(|shh| shh.into_owned())
+    }
+
+    /// Create an element group from wire headers and an entry
+    pub async fn from_wire_elements<I: IntoIterator<Item = WireNewEntryHeader>>(
+        headers_iter: I,
+        entry_type: EntryType,
+        entry: Entry,
+    ) -> ElementGroupResult<ElementGroup<'a>> {
+        let iter = headers_iter.into_iter();
+        let mut headers = Vec::with_capacity(iter.size_hint().0);
+        let entry = EntryHashed::from_content(entry).await;
+        let entry_hash = entry.as_hash().clone();
+        let entry = Cow::Owned(entry);
+        for header in iter {
+            headers.push(Cow::Owned(
+                header
+                    .into_header(entry_type.clone(), entry_hash.clone())
+                    .await,
+            ))
+        }
+
+        Ok(Self { headers, entry })
+    }
+
+    // pub fn try_from_element(e: &'a Element) -> Result<ElementGroup<'a>, ElementGroupError> {
+    //     let ssh = e.signed_header();
+    //     let entry = e
+    //         .entry()
+    //         .as_option()
+    //         .ok_or(ElementGroupError::MissingEntry)?;
+    //     Ok(Self {
+    //         headers: vec![Cow::Borrowed(ssh)],
+    //         entry: Cow::Borrowed(entry),
+    //     })
+    // }
 }
 
 /// Responses from a dht get.

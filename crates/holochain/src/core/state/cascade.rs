@@ -55,9 +55,10 @@ use holochain_p2p::{
 };
 use holochain_state::error::DatabaseResult;
 use holochain_types::{
-    dht_op::produce_op_lights_from_element,
+    dht_op::{produce_op_lights_from_element_group, produce_op_lights_from_elements},
     element::{
-        Element, GetElementResponse, RawGetEntryResponse, SignedHeaderHashed, SignedHeaderHashedExt,
+        Element, ElementGroup, GetElementResponse, RawGetEntryResponse, SignedHeaderHashed,
+        SignedHeaderHashedExt,
     },
     entry::option_entry_hashed,
     link::{GetLinksResponse, WireLinkMetaKey},
@@ -128,9 +129,21 @@ where
     }
 
     async fn update_stores(&mut self, element: Element) -> CascadeResult<()> {
-        let op_lights = produce_op_lights_from_element(&element).await?;
+        let op_lights = produce_op_lights_from_elements(vec![&element]).await?;
         let (shh, e) = element.into_inner();
         self.element_cache.put(shh, option_entry_hashed(e).await)?;
+        for op in op_lights {
+            integrate_single_metadata(op, &self.element_cache, self.meta_cache).await?
+        }
+        Ok(())
+    }
+
+    async fn update_stores_with_element_group(
+        &mut self,
+        elements: ElementGroup<'_>,
+    ) -> CascadeResult<()> {
+        let op_lights = produce_op_lights_from_element_group(&elements).await?;
+        self.element_cache.put_element_group(elements)?;
         for op in op_lights {
             integrate_single_metadata(op, &self.element_cache, self.meta_cache).await?
         }
@@ -185,12 +198,9 @@ where
                         entry,
                         entry_type,
                     } = *raw;
-                    for entry_header in live_headers {
-                        let element = entry_header
-                            .into_element(entry_type.clone(), entry.clone())
-                            .await;
-                        self.update_stores(element).await?;
-                    }
+                    let elements =
+                        ElementGroup::from_wire_elements(live_headers, entry_type, entry).await?;
+                    self.update_stores_with_element_group(elements).await?;
                     for delete in deletes {
                         let element = delete.into_element().await;
                         self.update_stores(element).await?;

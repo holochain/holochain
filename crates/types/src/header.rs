@@ -152,6 +152,14 @@ impl TryFrom<SignedHeaderHashed> for WireElementDelete {
 impl WireNewEntryHeader {
     pub async fn into_element(self, entry_type: EntryType, entry: Entry) -> Element {
         let entry_hash = EntryHash::with_data(&entry).await;
+        Element::new(self.into_header(entry_type, entry_hash).await, Some(entry))
+    }
+
+    pub async fn into_header(
+        self,
+        entry_type: EntryType,
+        entry_hash: EntryHash,
+    ) -> SignedHeaderHashed {
         match self {
             WireNewEntryHeader::Create(ec) => {
                 let signature = ec.signature;
@@ -163,10 +171,7 @@ impl WireNewEntryHeader {
                     entry_type,
                     entry_hash,
                 };
-                Element::new(
-                    SignedHeaderHashed::from_content(SignedHeader(ec.into(), signature)).await,
-                    Some(entry),
-                )
+                SignedHeaderHashed::from_content(SignedHeader(ec.into(), signature)).await
             }
             WireNewEntryHeader::Update(eu) => {
                 let signature = eu.signature;
@@ -180,10 +185,7 @@ impl WireNewEntryHeader {
                     entry_type,
                     entry_hash,
                 };
-                Element::new(
-                    SignedHeaderHashed::from_content(SignedHeader(eu.into(), signature)).await,
-                    Some(entry),
-                )
+                SignedHeaderHashed::from_content(SignedHeader(eu.into(), signature)).await
             }
         }
     }
