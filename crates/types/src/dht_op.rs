@@ -7,7 +7,7 @@
 use crate::element::Element;
 use crate::{header::NewEntryHeader, prelude::*};
 use error::{DhtOpError, DhtOpResult};
-use header::{HeaderHashed, IntendedFor};
+use header::IntendedFor;
 use holo_hash::{hash_type, HashableContentBytes};
 use holochain_zome_types::{header, Entry, Header};
 use serde::{Deserialize, Serialize};
@@ -117,25 +117,8 @@ impl DhtOp {
 
     /// Returns the basis hash which determines which agents will receive this DhtOp
     pub async fn dht_basis(&self) -> AnyDhtHash {
-        match self {
-            DhtOp::StoreElement(_, header, _) => {
-                let (_, hash): (_, HeaderHash) =
-                    HeaderHashed::from_content(header.clone()).await.into();
-                hash.into()
-            }
-            DhtOp::StoreEntry(_, header, _) => header.entry().clone().into(),
-            DhtOp::RegisterAgentActivity(_, header) => header.author().clone().into(),
-            DhtOp::RegisterReplacedBy(_, header, _) => match &header.intended_for {
-                IntendedFor::Header => header.replaces_address.clone().into(),
-                IntendedFor::Entry(basis) => basis.clone().into(),
-            },
-            DhtOp::RegisterDeletedBy(_, header) => header.removes_address.clone().into(),
-            DhtOp::RegisterDeletedEntryHeader(_, header) => {
-                header.removes_entry_address.clone().into()
-            }
-            DhtOp::RegisterAddLink(_, header) => header.base_address.clone().into(),
-            DhtOp::RegisterRemoveLink(_, header) => header.base_address.clone().into(),
-        }
+        let basis = self.as_unique_form().basis().await;
+        basis
     }
 
     /// Convert a [DhtOp] to a [DhtOpLight] and basis
@@ -216,63 +199,149 @@ enum UniqueForm<'a> {
     RegisterRemoveLink(&'a header::LinkRemove),
 }
 
+impl<'a> UniqueForm<'a> {
+    async fn basis(&'a self) -> AnyDhtHash {
+        match self {
+            UniqueForm::StoreElement(header) => HeaderHash::with_data(*header).await.into(),
+            UniqueForm::StoreEntry(header) => header.entry().clone().into(),
+            UniqueForm::RegisterAgentActivity(header) => header.author().clone().into(),
+            UniqueForm::RegisterReplacedBy(header) => match &header.intended_for {
+                IntendedFor::Header => header.replaces_address.clone().into(),
+                IntendedFor::Entry(basis) => basis.clone().into(),
+            },
+            UniqueForm::RegisterDeletedBy(header) => header.removes_address.clone().into(),
+            UniqueForm::RegisterDeletedEntryHeader(header) => {
+                header.removes_entry_address.clone().into()
+            }
+            UniqueForm::RegisterAddLink(header) => header.base_address.clone().into(),
+            UniqueForm::RegisterRemoveLink(header) => header.base_address.clone().into(),
+        }
+    }
+}
+
 /// Produce all DhtOps for a Element
-pub fn produce_ops_from_element(element: &Element) -> DhtOpResult<Vec<DhtOp>> {
-    // TODO: avoid cloning everything
+pub async fn produce_ops_from_element(element: &Element) -> DhtOpResult<Vec<DhtOp>> {
+    let op_lights = produce_op_lights_from_element(element).await?;
+    let (shh, maybe_entry) = element.clone().into_inner();
+    let (header, signature): (Header, Signature) = shh.into_inner().0.into();
 
-    let (signed_header, maybe_entry) = element.clone().into_inner();
-    let (header, sig) = signed_header.into_header_and_signature();
-    let header: Header = header.into_content();
+    let mut ops = Vec::with_capacity(op_lights.len());
 
-    // TODO: avoid allocation, we have a static maximum of four items and
-    // callers simply want to iterate over the ops.
-    //
-    // Maybe use `ArrayVec`?
+    for op_light in op_lights {
+        let signature = signature.clone();
+        let header = header.clone();
+        let op = match op_light {
+            DhtOpLight::StoreElement(_, _, _) => {
+                let maybe_entry_box = maybe_entry.clone().map(Box::new);
+                DhtOp::StoreElement(signature, header, maybe_entry_box)
+            }
+            DhtOpLight::StoreEntry(_, _, _) => {
+                let new_entry_header = header.clone().try_into()?;
+                let box_entry = maybe_entry
+                    .clone()
+                    .map(Box::new)
+                    .ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.clone().into()))?;
+                DhtOp::StoreEntry(signature, new_entry_header, box_entry)
+            }
+            DhtOpLight::RegisterAgentActivity(_, _) => {
+                DhtOp::RegisterAgentActivity(signature, header)
+            }
+            DhtOpLight::RegisterReplacedBy(_, _, _) => {
+                let entry_update = header.try_into()?;
+                let maybe_entry_box = maybe_entry.clone().map(Box::new);
+                DhtOp::RegisterReplacedBy(signature, entry_update, maybe_entry_box)
+            }
+            DhtOpLight::RegisterDeletedEntryHeader(_, _) => {
+                let element_delete = header.try_into()?;
+                DhtOp::RegisterDeletedEntryHeader(signature, element_delete)
+            }
+            DhtOpLight::RegisterDeletedBy(_, _) => {
+                let element_delete = header.try_into()?;
+                DhtOp::RegisterDeletedBy(signature, element_delete)
+            }
+            DhtOpLight::RegisterAddLink(_, _) => {
+                let link_add = header.try_into()?;
+                DhtOp::RegisterAddLink(signature, link_add)
+            }
+            DhtOpLight::RegisterRemoveLink(_, _) => {
+                let link_remove = header.try_into()?;
+                DhtOp::RegisterRemoveLink(signature, link_remove)
+            }
+        };
+        ops.push(op);
+    }
+    Ok(ops)
+}
+
+/// Data minimal clone (no cloning entries) cheap &Element to DhtOpLight conversion
+pub async fn produce_op_lights_from_element(element: &Element) -> DhtOpResult<Vec<DhtOpLight>> {
+    let header_hash = element.header_address().clone();
+    let maybe_entry_hash = element.header().entry_data().map(|(h, _)| h.clone());
+    let header = element.header();
+
     let mut ops = vec![
-        DhtOp::StoreElement(
-            sig.clone(),
-            header.clone(),
-            maybe_entry.clone().map(Box::new),
+        DhtOpLight::StoreElement(
+            header_hash.clone(),
+            maybe_entry_hash.clone(),
+            UniqueForm::StoreElement(header).basis().await,
         ),
-        DhtOp::RegisterAgentActivity(sig.clone(), header.clone()),
+        DhtOpLight::RegisterAgentActivity(
+            header_hash.clone(),
+            UniqueForm::RegisterAgentActivity(header).basis().await,
+        ),
     ];
 
-    match &header {
+    match header {
         Header::Dna(_)
         | Header::ChainOpen(_)
         | Header::ChainClose(_)
         | Header::AgentValidationPkg(_)
         | Header::InitZomesComplete(_) => {}
-        Header::LinkAdd(link_add) => ops.push(DhtOp::RegisterAddLink(sig, link_add.clone())),
-        Header::LinkRemove(link_remove) => {
-            ops.push(DhtOp::RegisterRemoveLink(sig, link_remove.clone()))
-        }
-        Header::EntryCreate(header) => ops.push(DhtOp::StoreEntry(
-            sig,
-            NewEntryHeader::Create(header.clone()),
-            Box::new(
-                maybe_entry.ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.clone().into()))?,
-            ),
+        Header::LinkAdd(link_add) => ops.push(DhtOpLight::RegisterAddLink(
+            header_hash,
+            UniqueForm::RegisterAddLink(link_add).basis().await,
+        )),
+        Header::LinkRemove(link_remove) => ops.push(DhtOpLight::RegisterRemoveLink(
+            header_hash,
+            UniqueForm::RegisterRemoveLink(link_remove).basis().await,
+        )),
+        Header::EntryCreate(entry_create) => ops.push(DhtOpLight::StoreEntry(
+            header_hash,
+            maybe_entry_hash
+                .ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.clone().into()))?,
+            UniqueForm::StoreEntry(&NewEntryHeader::Create(entry_create.clone()))
+                .basis()
+                .await,
         )),
         Header::EntryUpdate(entry_update) => {
-            let entry = maybe_entry
-                .ok_or_else(|| DhtOpError::HeaderWithoutEntry(entry_update.clone().into()))?;
-            ops.push(DhtOp::StoreEntry(
-                sig.clone(),
-                NewEntryHeader::Update(entry_update.clone()),
-                Box::new(entry.clone()),
+            let entry_hash = maybe_entry_hash
+                .ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.clone().into()))?;
+            ops.push(DhtOpLight::StoreEntry(
+                header_hash.clone(),
+                entry_hash.clone(),
+                UniqueForm::StoreEntry(&NewEntryHeader::Update(entry_update.clone()))
+                    .basis()
+                    .await,
             ));
-            ops.push(DhtOp::RegisterReplacedBy(
-                sig,
-                entry_update.clone(),
-                Some(Box::new(entry)),
+            ops.push(DhtOpLight::RegisterReplacedBy(
+                header_hash,
+                entry_hash,
+                UniqueForm::RegisterReplacedBy(entry_update).basis().await,
             ));
         }
         Header::ElementDelete(entry_delete) => {
             // TODO: VALIDATION: This only works if entry_delete.remove_address is either EntryCreate
             // or EntryUpdate
-            ops.push(DhtOp::RegisterDeletedBy(sig.clone(), entry_delete.clone()));
-            ops.push(DhtOp::RegisterDeletedEntryHeader(sig, entry_delete.clone()));
+            ops.push(DhtOpLight::RegisterDeletedBy(
+                header_hash.clone(),
+                UniqueForm::RegisterDeletedBy(entry_delete).basis().await,
+            ));
+            ops.push(DhtOpLight::RegisterDeletedEntryHeader(
+                header_hash,
+                UniqueForm::RegisterDeletedEntryHeader(entry_delete)
+                    .basis()
+                    .await,
+            ));
         }
     }
     Ok(ops)

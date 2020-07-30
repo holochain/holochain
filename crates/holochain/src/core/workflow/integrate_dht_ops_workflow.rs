@@ -24,7 +24,7 @@ use holochain_state::{
     prelude::{GetDb, Reader, Writer},
 };
 use holochain_types::{
-    dht_op::{produce_ops_from_element, DhtOp, DhtOpHashed, DhtOpLight},
+    dht_op::{produce_op_lights_from_element, DhtOp, DhtOpHashed, DhtOpLight},
     element::{Element, SignedHeaderHashed, SignedHeaderHashedExt},
     validate::ValidationStatus,
     Entry, EntryHashed, Timestamp, TimestampKey,
@@ -428,10 +428,10 @@ pub async fn integrate_to_cache<C: MetadataBufT>(
     element_store: &ChainCasBuf<'_>,
     meta_store: &mut C,
 ) -> DhtOpConvertResult<()> {
-    // TODO: Just produce the light directly
-    for op in produce_ops_from_element(element)? {
+    // Produce the light directly
+    for op in produce_op_lights_from_element(element).await? {
         // we don't integrate element data, because it is already in our vault.
-        integrate_single_metadata(op.to_light().await, element_store, meta_store).await?
+        integrate_single_metadata(op, element_store, meta_store).await?
     }
     Ok(())
 }

@@ -42,7 +42,7 @@ use super::{
     chain_cas::ChainCasBuf,
     metadata::{LinkMetaKey, MetadataBuf, MetadataBufT, SysMetaVal},
 };
-use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_cache;
+use crate::core::workflow::integrate_dht_ops_workflow::integrate_single_metadata;
 use error::CascadeResult;
 use fallible_iterator::FallibleIterator;
 use holo_hash::{
@@ -55,13 +55,16 @@ use holochain_p2p::{
 };
 use holochain_state::error::DatabaseResult;
 use holochain_types::{
-    element::{Element, GetElementResponse, RawGetEntryResponse, SignedHeaderHashed},
+    dht_op::produce_op_lights_from_element,
+    element::{
+        Element, GetElementResponse, RawGetEntryResponse, SignedHeaderHashed, SignedHeaderHashedExt,
+    },
     entry::option_entry_hashed,
     link::{GetLinksResponse, WireLinkMetaKey},
     metadata::{EntryDhtStatus, MetadataSet},
-    EntryHashed, HeaderHashed,
+    EntryHashed,
 };
-use holochain_zome_types::{link::Link, Header};
+use holochain_zome_types::{element::SignedHeader, link::Link};
 use tracing::*;
 
 #[cfg(test)]
@@ -124,6 +127,16 @@ where
         }
     }
 
+    async fn update_stores(&mut self, element: Element) -> CascadeResult<()> {
+        let op_lights = produce_op_lights_from_element(&element).await?;
+        let (shh, e) = element.into_inner();
+        self.element_cache.put(shh, option_entry_hashed(e).await)?;
+        for op in op_lights {
+            integrate_single_metadata(op, &self.element_cache, self.meta_cache).await?
+        }
+        Ok(())
+    }
+
     async fn fetch_element_via_header(
         &mut self,
         hash: HeaderHash,
@@ -136,14 +149,10 @@ where
                 // Has header
                 GetElementResponse::GetHeader(Some(we)) => {
                     let (element, delete) = we.into_element_and_delete().await;
-                    let (shh, e) = element.clone().into_inner();
-                    self.element_cache.put(shh, option_entry_hashed(e).await)?;
-                    integrate_to_cache(&element, &self.element_cache, self.meta_cache).await?;
+                    self.update_stores(element).await?;
 
                     if let Some(delete) = delete {
-                        let (shh, _) = delete.into_inner();
-                        self.element_cache.put(shh, None)?;
-                        integrate_to_cache(&element, &self.element_cache, self.meta_cache).await?;
+                        self.update_stores(delete).await?;
                     }
                 }
                 // Doesn't have header but not because it was deleted
@@ -180,15 +189,11 @@ where
                         let element = entry_header
                             .into_element(entry_type.clone(), entry.clone())
                             .await;
-                        let (shh, e) = element.clone().into_inner();
-                        self.element_cache.put(shh, option_entry_hashed(e).await)?;
-                        integrate_to_cache(&element, &self.element_cache, self.meta_cache).await?;
+                        self.update_stores(element).await?;
                     }
                     for delete in deletes {
                         let element = delete.into_element().await;
-                        let (shh, e) = element.clone().into_inner();
-                        self.element_cache.put(shh, option_entry_hashed(e).await)?;
-                        integrate_to_cache(&element, &self.element_cache, self.meta_cache).await?;
+                        self.update_stores(element).await?;
                     }
                 }
                 // Authority didn't have any headers for this entry
@@ -255,17 +260,20 @@ where
             } = links;
 
             for (link_add, signature) in link_adds {
-                let header = HeaderHashed::from_content(Header::LinkAdd(link_add.clone())).await;
-                self.element_cache
-                    .put(SignedHeaderHashed::with_presigned(header, signature), None)?;
-                self.meta_cache.add_link(link_add).await?;
+                let element = Element::new(
+                    SignedHeaderHashed::from_content(SignedHeader(link_add.into(), signature))
+                        .await,
+                    None,
+                );
+                self.update_stores(element).await?;
             }
             for (link_remove, signature) in link_removes {
-                let header =
-                    HeaderHashed::from_content(Header::LinkRemove(link_remove.clone())).await;
-                self.element_cache
-                    .put(SignedHeaderHashed::with_presigned(header, signature), None)?;
-                self.meta_cache.remove_link(link_remove).await?;
+                let element = Element::new(
+                    SignedHeaderHashed::from_content(SignedHeader(link_remove.into(), signature))
+                        .await,
+                    None,
+                );
+                self.update_stores(element).await?;
             }
         }
         Ok(())
