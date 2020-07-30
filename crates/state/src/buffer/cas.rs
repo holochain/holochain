@@ -57,6 +57,15 @@ where
         self.0.delete(k).expect("Hash key is empty");
     }
 
+    /// Check if a value is stored at this key
+    pub fn contains(&self, k: &HoloHashOf<C>) -> DatabaseResult<bool> {
+        Ok(if let Some(_) = self.0.get(k)? {
+            true
+        } else {
+            false
+        })
+    }
+
     /// Iterate over the underlying persisted data taking the scratch space into consideration
     pub fn iter_fail(
         &'env self,

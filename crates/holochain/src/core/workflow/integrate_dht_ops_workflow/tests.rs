@@ -29,7 +29,7 @@ use holochain_types::{
     metadata::TimedHeaderHash,
     observability,
     validate::ValidationStatus,
-    Entry, EntryHashed,
+    Entry, EntryHashed, HeaderHashed,
 };
 use holochain_zome_types::{
     entry::GetOptions,
@@ -556,7 +556,10 @@ fn register_replaced_by_for_header(a: TestData) -> (Vec<Db>, Vec<Db>, &'static s
         a.entry_update_header.clone(),
         Some(a.new_entry.clone().into()),
     );
-    let pre_state = vec![Db::IntQueue(op.clone())];
+    let pre_state = vec![
+        Db::IntQueue(op.clone()),
+        Db::CasHeader(a.original_header.clone().into(), Some(a.signature.clone())),
+    ];
     let expect = vec![
         Db::Integrated(op.clone()),
         Db::MetaUpdate(
@@ -575,7 +578,11 @@ fn register_replaced_by_for_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static st
     );
     let pre_state = vec![
         Db::IntQueue(op.clone()),
-        Db::CasHeader(a.original_header.clone().into(), Some(a.signature.clone())),
+        Db::CasEntry(
+            a.original_entry.clone(),
+            Some(a.original_header.clone().into()),
+            Some(a.signature.clone()),
+        ),
     ];
     let expect = vec![
         Db::Integrated(op.clone()),
@@ -591,7 +598,11 @@ fn register_deleted_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let op = DhtOp::RegisterDeletedEntryHeader(a.signature.clone(), a.entry_delete.clone());
     let pre_state = vec![
         Db::IntQueue(op.clone()),
-        Db::CasHeader(a.original_header.clone().into(), Some(a.signature.clone())),
+        Db::CasEntry(
+            a.original_entry.clone(),
+            Some(a.original_header.clone().into()),
+            Some(a.signature.clone()),
+        ),
     ];
     let expect = vec![
         Db::IntQueueEmpty,
@@ -608,7 +619,11 @@ fn register_deleted_header_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let op = DhtOp::RegisterDeletedBy(a.signature.clone(), a.entry_delete.clone());
     let pre_state = vec![
         Db::IntQueue(op.clone()),
-        Db::CasHeader(a.original_header.clone().into(), Some(a.signature.clone())),
+        Db::CasEntry(
+            a.original_entry.clone(),
+            Some(a.original_header.clone().into()),
+            Some(a.signature.clone()),
+        ),
     ];
     let expect = vec![
         Db::Integrated(op.clone()),

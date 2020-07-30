@@ -101,8 +101,21 @@ impl<'env> ChainCasBuf<'env> {
         }
     }
 
-    pub async fn contains(&self, entry_hash: &EntryHash) -> DatabaseResult<bool> {
-        self.get_entry(entry_hash).await.map(|e| e.is_some())
+    pub fn contains_entry(&self, entry_hash: &EntryHash) -> DatabaseResult<bool> {
+        Ok(if self.public_entries.contains(entry_hash)? {
+            true
+        } else {
+            // Potentially avoid this let Some if the above branch is hit first
+            if let Some(private) = &self.private_entries {
+                private.contains(entry_hash)?
+            } else {
+                false
+            }
+        })
+    }
+
+    pub fn contains_header(&self, header_hash: &HeaderHash) -> DatabaseResult<bool> {
+        self.headers.contains(header_hash)
     }
 
     pub async fn get_header(
