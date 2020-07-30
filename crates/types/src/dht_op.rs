@@ -240,7 +240,7 @@ pub async fn produce_ops_from_element(element: &Element) -> DhtOpResult<Vec<DhtO
                 let box_entry = maybe_entry
                     .clone()
                     .map(Box::new)
-                    .ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.clone().into()))?;
+                    .ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.clone()))?;
                 DhtOp::StoreEntry(signature, new_entry_header, box_entry)
             }
             DhtOpLight::RegisterAgentActivity(_, _) => {
@@ -279,16 +279,15 @@ pub async fn produce_op_lights_from_element(element: &Element) -> DhtOpResult<Ve
     let maybe_entry_hash = element.header().entry_data().map(|(h, _)| h.clone());
     let header = element.header();
 
+    let store_element_basis = UniqueForm::StoreElement(header).basis().await;
+    let register_activity_basis = UniqueForm::RegisterAgentActivity(header).basis().await;
     let mut ops = vec![
         DhtOpLight::StoreElement(
             header_hash.clone(),
             maybe_entry_hash.clone(),
-            UniqueForm::StoreElement(header).basis().await,
+            store_element_basis,
         ),
-        DhtOpLight::RegisterAgentActivity(
-            header_hash.clone(),
-            UniqueForm::RegisterAgentActivity(header).basis().await,
-        ),
+        DhtOpLight::RegisterAgentActivity(header_hash.clone(), register_activity_basis),
     ];
 
     match header {
@@ -307,15 +306,14 @@ pub async fn produce_op_lights_from_element(element: &Element) -> DhtOpResult<Ve
         )),
         Header::EntryCreate(entry_create) => ops.push(DhtOpLight::StoreEntry(
             header_hash,
-            maybe_entry_hash
-                .ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.clone().into()))?,
+            maybe_entry_hash.ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.clone()))?,
             UniqueForm::StoreEntry(&NewEntryHeader::Create(entry_create.clone()))
                 .basis()
                 .await,
         )),
         Header::EntryUpdate(entry_update) => {
-            let entry_hash = maybe_entry_hash
-                .ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.clone().into()))?;
+            let entry_hash =
+                maybe_entry_hash.ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.clone()))?;
             ops.push(DhtOpLight::StoreEntry(
                 header_hash.clone(),
                 entry_hash.clone(),
