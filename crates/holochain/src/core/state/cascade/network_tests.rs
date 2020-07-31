@@ -41,7 +41,7 @@ use holochain_types::{
     metadata::TimedHeaderHash,
     observability,
     test_utils::{fake_agent_pubkey_1, fake_agent_pubkey_2},
-    Entry, HeaderHashed, Timestamp,
+    Entry, EntryHashed, HeaderHashed, Timestamp,
 };
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::{entry_def, header::*, zome::ZomeName, CommitEntryInput};

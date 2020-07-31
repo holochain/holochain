@@ -2,12 +2,13 @@ use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use crate::core::state::source_chain::SourceChainResult;
+use crate::core::state::{cascade::error::CascadeResult, source_chain::SourceChainResult};
 use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
 use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_cache;
 use futures::future::BoxFuture;
 use futures::future::FutureExt;
 use holo_hash::HeaderHash;
+use holochain_p2p::actor::GetOptions;
 use holochain_types::element::SignedHeaderHashed;
 use holochain_zome_types::header::builder;
 use holochain_zome_types::Header;
@@ -30,11 +31,11 @@ pub fn remove_link<'a>(
     // include it in the remove link header
     let network = call_context.host_access.network().clone();
     let address = link_add_address.clone();
-    let add_link_get_call = |workspace: &'a mut CallZomeWorkspace| -> BoxFuture<'a, SourceChainResult<Option<SignedHeaderHashed>>> {
+    let add_link_get_call = |workspace: &'a mut CallZomeWorkspace| -> BoxFuture<'a, CascadeResult<Option<SignedHeaderHashed>>> {
         async move {
-            let cascade = workspace.cascade(network);
-            // @todo use .dht_get() once it supports header hashes
-            Ok(cascade.dht_get_header_raw(&address).await?)
+            let mut cascade = workspace.cascade(network);
+            // TODO: Think about what options to use here
+            Ok(cascade.dht_get(address.into(), GetOptions::default()).await?.map(|el| el.into_inner().0))
         }
         .boxed()
     };

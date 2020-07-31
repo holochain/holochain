@@ -91,13 +91,8 @@ pub async fn integrate_dht_ops_workflow(
             // only integrate this op if it hasn't been integrated already!
             // TODO: test for this [ B-01894 ]
             if workspace.integrated_dht_ops.get(&op_hash)?.is_none() {
-                match integrate_single_dht_op(
-                    value,
-                    &mut workspace.cas,
-                    &mut workspace.meta,
-                    IntegrationContext::Authority,
-                )
-                .await?
+                match integrate_single_dht_op(value, &mut workspace.cas, &mut workspace.meta)
+                    .await?
                 {
                     Outcome::Integrated(integrated) => {
                         workspace.integrated_dht_ops.put(op_hash, integrated)?;
@@ -162,9 +157,8 @@ async fn integrate_single_dht_op(
     value: IntegrationQueueValue,
     element_store: &mut ChainCasBuf<'_>,
     meta_store: &mut MetadataBuf<'_>,
-    context: IntegrationContext,
 ) -> DhtOpConvertResult<Outcome> {
-    match integrate_single_element(value, element_store, context).await? {
+    match integrate_single_element(value, element_store).await? {
         Outcome::Integrated(v) => {
             integrate_single_metadata(v.op.clone(), element_store, meta_store).await?;
             debug!("integrating");
@@ -177,7 +171,6 @@ async fn integrate_single_dht_op(
 async fn integrate_single_element(
     value: IntegrationQueueValue,
     element_store: &mut ChainCasBuf<'_>,
-    context: IntegrationContext,
 ) -> DhtOpConvertResult<Outcome> {
     {
         // Process each op
@@ -206,12 +199,7 @@ async fn integrate_single_element(
         async fn header_with_entry_is_stored(
             hash: &HeaderHash,
             element_store: &ChainCasBuf<'_>,
-            context: IntegrationContext,
         ) -> DhtOpConvertResult<bool> {
-            // If we are the author we don't defer on missing dependencies
-            if let IntegrationContext::Author = context {
-                return Ok(true);
-            }
             match element_store.get_header(hash).await?.map(|e| {
                 e.header()
                     .entry_data()
@@ -226,21 +214,9 @@ async fn integrate_single_element(
             }
         }
 
-        let entry_is_stored = |hash| {
-            // If we are the author we don't defer on missing dependencies
-            if let IntegrationContext::Author = context {
-                return Ok(true);
-            }
-            element_store.contains_entry(hash)
-        };
+        let entry_is_stored = |hash| element_store.contains_entry(hash);
 
-        let header_is_stored = |hash| {
-            // If we are the author we don't defer on missing dependencies
-            if let IntegrationContext::Author = context {
-                return Ok(true);
-            }
-            element_store.contains_header(hash)
-        };
+        let header_is_stored = |hash| element_store.contains_header(hash);
 
         match op {
             DhtOp::StoreElement(signature, header, maybe_entry) => {
@@ -275,7 +251,6 @@ async fn integrate_single_element(
                         if !header_with_entry_is_stored(
                             &entry_update.replaces_address,
                             element_store,
-                            context,
                         )
                         .await?
                         {
@@ -296,12 +271,8 @@ async fn integrate_single_element(
             DhtOp::RegisterDeletedEntryHeader(signature, element_delete) => {
                 // Check if we have the header with the entry that we are removing in the vault
                 // or defer the op.
-                if !header_with_entry_is_stored(
-                    &element_delete.removes_address,
-                    element_store,
-                    context,
-                )
-                .await?
+                if !header_with_entry_is_stored(&element_delete.removes_address, element_store)
+                    .await?
                 {
                     // Can't combine the two delete match arms without cloning the op
                     let op = DhtOp::RegisterDeletedEntryHeader(signature, element_delete);
@@ -312,12 +283,8 @@ async fn integrate_single_element(
             DhtOp::RegisterDeletedBy(signature, element_delete) => {
                 // Check if we have the header with the entry that we are removing in the vault
                 // or defer the op.
-                if !header_with_entry_is_stored(
-                    &element_delete.removes_address,
-                    element_store,
-                    context,
-                )
-                .await?
+                if !header_with_entry_is_stored(&element_delete.removes_address, element_store)
+                    .await?
                 {
                     let op = DhtOp::RegisterDeletedBy(signature, element_delete);
                     return Outcome::deferred(op, validation_status);
@@ -407,16 +374,6 @@ pub async fn integrate_single_metadata<C: MetadataBufT>(
         }
     }
     Ok(())
-}
-
-#[derive(PartialEq, std::fmt::Debug)]
-/// Specifies my role when integrating
-enum IntegrationContext {
-    /// I am integrating DhtOps which I authored
-    #[allow(dead_code)]
-    Author,
-    /// I am integrating DhtOps which were published to me as an authority
-    Authority,
 }
 
 /// After writing an Element to our chain, we want to integrate the meta ops

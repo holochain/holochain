@@ -87,11 +87,11 @@ pub extern "C" fn commit_entry(_: GuestPtr) -> GuestPtr {
 }
 
 fn _get_entry() -> Result<GetEntryOutput, WasmError> {
-    let hash = host_call!(
+    let hash: EntryHash = host_call!(
         __entry_hash,
         EntryHashInput::new((&Post("foo".into())).try_into()?)
     )?;
-    let output: GetEntryOutput = host_call!(__get_entry, GetEntryInput::new((hash, GetOptions)))?;
+    let output: GetEntryOutput = host_call!(__get_entry, GetEntryInput::new((hash.into(), GetOptions)))?;
     Ok(output)
 }
 
