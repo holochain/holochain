@@ -1,3 +1,4 @@
+use holo_hash::EntryHash;
 use holochain_wasmer_guest::*;
 use holochain_zome_types::crdt::CrdtType;
 use holochain_zome_types::entry::GetOptions;
@@ -91,7 +92,8 @@ fn _get_entry() -> Result<GetEntryOutput, WasmError> {
         __entry_hash,
         EntryHashInput::new((&Post("foo".into())).try_into()?)
     )?;
-    let output: GetEntryOutput = host_call!(__get_entry, GetEntryInput::new((hash.into(), GetOptions)))?;
+    let output: GetEntryOutput =
+        host_call!(__get_entry, GetEntryInput::new((hash.into(), GetOptions)))?;
     Ok(output)
 }
 
