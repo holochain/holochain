@@ -157,7 +157,7 @@ mod tests {
                 .await
                 .unwrap()
                 .unwrap();
-            produce_ops_from_element(&element).unwrap()
+            produce_ops_from_element(&element).await.unwrap()
         }
     }
 
@@ -192,6 +192,7 @@ mod tests {
                         .unwrap()
                         .unwrap(),
                 )
+                .await
                 .unwrap();
                 all_ops.push(ops);
             }

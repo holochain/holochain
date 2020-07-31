@@ -320,8 +320,8 @@ pub enum ZomeCallInvocationResponse {
 #[derive(Clone, Constructor)]
 pub struct ZomeCallHostAccess {
     pub workspace: UnsafeCallZomeWorkspace,
-    keystore: KeystoreSender,
-    network: HolochainP2pCell,
+    pub keystore: KeystoreSender,
+    pub network: HolochainP2pCell,
 }
 
 impl From<ZomeCallHostAccess> for HostAccess {
@@ -435,7 +435,7 @@ pub mod wasm_test {
     #[macro_export]
     macro_rules! call_test_ribosome {
         ( $host_access:expr, $test_wasm:expr, $fn_name:literal, $input:expr ) => {{
-            let host_access = $host_access.clone();
+            let mut host_access = $host_access.clone();
             let input = $input.clone();
             tokio::task::spawn(async move {
                 // ensure type of test wasm
@@ -449,6 +449,13 @@ pub mod wasm_test {
                     .next()
                     .unwrap();
 
+                // Required because otherwise the network will return routing errors
+                let (_network, _r, cell_network) = crate::test_utils::test_network(
+                    Some(ribosome.dna_file().dna_hash().clone()),
+                    None,
+                )
+                .await;
+                host_access.network = cell_network;
                 let timeout = $crate::start_hard_timeout!();
 
                 let invocation = $crate::core::ribosome::ZomeCallInvocationFixturator::new(

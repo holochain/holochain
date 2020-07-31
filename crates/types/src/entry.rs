@@ -10,3 +10,12 @@ pub use holochain_zome_types::entry::Entry;
 
 /// An Entry paired with its EntryHash
 pub type EntryHashed = HoloHashed<Entry>;
+
+/// Convenience function for when you have an Option Entry but need
+/// a Option EntryHashed
+pub async fn option_entry_hashed(entry: Option<Entry>) -> Option<EntryHashed> {
+    match entry {
+        Some(e) => Some(EntryHashed::from_content(e).await),
+        None => None,
+    }
+}

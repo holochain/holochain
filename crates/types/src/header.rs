@@ -6,14 +6,25 @@
 
 #![allow(missing_docs)]
 
-use crate::prelude::*;
+use crate::{
+    element::{SignedHeaderHashed, SignedHeaderHashedExt},
+    prelude::*,
+};
 use conversions::WrongHeaderError;
 use holo_hash::EntryHash;
 use holochain_zome_types::entry_def::EntryVisibility;
 pub use holochain_zome_types::header::HeaderHashed;
-use holochain_zome_types::header::*;
+use holochain_zome_types::{
+    element::{Element, SignedHeader},
+    header::*,
+    Entry,
+};
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+use error::*;
+
+pub mod error;
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 /// A header of one of the two types that create a new entry.
 pub enum NewEntryHeader {
     /// A header which simply creates a new entry
@@ -21,6 +32,47 @@ pub enum NewEntryHeader {
     /// A header which creates a new entry that is semantically related to a
     /// previously created entry or header
     Update(EntryUpdate),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Ord, PartialOrd)]
+/// A header of one of the two types that create a new entry.
+pub enum WireNewEntryHeader {
+    Create(WireEntryCreate),
+    Update(WireEntryUpdate),
+}
+
+/// The minimum unique data for EntryCreate headers
+/// that share a common entry
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Ord, PartialOrd)]
+pub struct WireEntryCreate {
+    /// Timestamp is first so that deriving Ord results in
+    /// order by time
+    pub timestamp: holochain_zome_types::timestamp::Timestamp,
+    pub author: AgentPubKey,
+    pub header_seq: u32,
+    pub prev_header: HeaderHash,
+    pub signature: Signature,
+}
+
+/// The minimum unique data for EntryUpdate headers
+/// that share a common entry
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Ord, PartialOrd)]
+pub struct WireEntryUpdate {
+    /// Timestamp is first so that deriving Ord results in
+    /// order by time
+    pub timestamp: holochain_zome_types::timestamp::Timestamp,
+    pub author: AgentPubKey,
+    pub header_seq: u32,
+    pub prev_header: HeaderHash,
+    pub intended_for: IntendedFor,
+    pub replaces_address: HeaderHash,
+    pub signature: Signature,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+pub struct WireElementDelete {
+    pub delete: ElementDelete,
+    pub signature: Signature,
 }
 
 impl NewEntryHeader {
@@ -50,13 +102,115 @@ impl From<NewEntryHeader> for Header {
     }
 }
 
+impl From<(EntryCreate, Signature)> for WireEntryCreate {
+    fn from((ec, signature): (EntryCreate, Signature)) -> Self {
+        Self {
+            timestamp: ec.timestamp,
+            author: ec.author,
+            header_seq: ec.header_seq,
+            prev_header: ec.prev_header,
+            signature,
+        }
+    }
+}
+
+impl From<(EntryUpdate, Signature)> for WireEntryUpdate {
+    fn from((eu, signature): (EntryUpdate, Signature)) -> Self {
+        Self {
+            timestamp: eu.timestamp,
+            author: eu.author,
+            header_seq: eu.header_seq,
+            prev_header: eu.prev_header,
+            intended_for: eu.intended_for,
+            replaces_address: eu.replaces_address,
+            signature,
+        }
+    }
+}
+
+impl WireElementDelete {
+    pub async fn into_element(self) -> Element {
+        Element::new(
+            SignedHeaderHashed::from_content(SignedHeader(self.delete.into(), self.signature))
+                .await,
+            None,
+        )
+    }
+}
+
+impl TryFrom<SignedHeaderHashed> for WireElementDelete {
+    type Error = WrongHeaderError;
+    fn try_from(shh: SignedHeaderHashed) -> Result<Self, Self::Error> {
+        let (h, signature) = shh.into_header_and_signature();
+        Ok(Self {
+            delete: h.into_content().try_into()?,
+            signature,
+        })
+    }
+}
+
+impl WireNewEntryHeader {
+    pub async fn into_element(self, entry_type: EntryType, entry: Entry) -> Element {
+        let entry_hash = EntryHash::with_data(&entry).await;
+        Element::new(self.into_header(entry_type, entry_hash).await, Some(entry))
+    }
+
+    pub async fn into_header(
+        self,
+        entry_type: EntryType,
+        entry_hash: EntryHash,
+    ) -> SignedHeaderHashed {
+        match self {
+            WireNewEntryHeader::Create(ec) => {
+                let signature = ec.signature;
+                let ec = EntryCreate {
+                    author: ec.author,
+                    timestamp: ec.timestamp,
+                    header_seq: ec.header_seq,
+                    prev_header: ec.prev_header,
+                    entry_type,
+                    entry_hash,
+                };
+                SignedHeaderHashed::from_content(SignedHeader(ec.into(), signature)).await
+            }
+            WireNewEntryHeader::Update(eu) => {
+                let signature = eu.signature;
+                let eu = EntryUpdate {
+                    author: eu.author,
+                    timestamp: eu.timestamp,
+                    header_seq: eu.header_seq,
+                    prev_header: eu.prev_header,
+                    intended_for: eu.intended_for,
+                    replaces_address: eu.replaces_address,
+                    entry_type,
+                    entry_hash,
+                };
+                SignedHeaderHashed::from_content(SignedHeader(eu.into(), signature)).await
+            }
+        }
+    }
+}
+
+impl TryFrom<SignedHeaderHashed> for WireNewEntryHeader {
+    type Error = HeaderError;
+    fn try_from(shh: SignedHeaderHashed) -> Result<Self, Self::Error> {
+        let (sh, _) = shh.into_inner();
+        let (header, s) = sh.into();
+        match header {
+            Header::EntryCreate(ec) => Ok(Self::Create((ec, s).into())),
+            Header::EntryUpdate(eu) => Ok(Self::Update((eu, s).into())),
+            _ => return Err(HeaderError::NotNewEntry),
+        }
+    }
+}
+
 impl TryFrom<Header> for NewEntryHeader {
     type Error = WrongHeaderError;
     fn try_from(value: Header) -> Result<Self, Self::Error> {
         match value {
             Header::EntryCreate(h) => Ok(NewEntryHeader::Create(h)),
             Header::EntryUpdate(h) => Ok(NewEntryHeader::Update(h)),
-            _ => Err(WrongHeaderError),
+            _ => Err(WrongHeaderError(format!("{:?}", value))),
         }
     }
 }
