@@ -46,6 +46,10 @@ pub(crate) async fn spawn_space(
 
     let builder = ghost_actor::actor_builder::GhostActorBuilder::new();
 
+    // initialize gossip module
+    let gossip_recv = gossip::spawn_gossip_module();
+    builder.channel_factory().attach_receiver(gossip_recv).await?;
+
     let internal_sender = builder
         .channel_factory()
         .create_channel::<SpaceInternal>()
@@ -59,6 +63,18 @@ pub(crate) async fn spawn_space(
     tokio::task::spawn(builder.spawn(Space::new(space, internal_sender, evt_send)));
 
     Ok((sender, evt_recv))
+}
+
+impl ghost_actor::GhostHandler<gossip::GossipEvent> for Space {}
+
+impl gossip::GossipEventHandler for Space {
+    fn handle_list_neighbor_agents(
+        &mut self,
+    ) -> gossip::GossipEventHandlerResult<Vec<Arc<KitsuneAgent>>> {
+        // while full-sync this is just a clone of list_by_basis
+        let res = self.agents.keys().cloned().collect();
+        Ok(async move { Ok(res) }.boxed().into())
+    }
 }
 
 impl ghost_actor::GhostHandler<SpaceInternal> for Space {}
