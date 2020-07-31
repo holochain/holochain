@@ -32,7 +32,8 @@ pub type EntryCas<'env> = CasBuf<'env, Entry>;
 /// A CasBuf with SignedHeaders for values
 pub type HeaderCas<'env> = CasBuf<'env, SignedHeader>;
 
-/// The representation of an Element CAS, using two or three DB references
+/// The representation of an ElementCache / ElementVault,
+/// using two or three DB references
 pub struct ElementBuf<'env> {
     public_entries: EntryCas<'env>,
     private_entries: Option<EntryCas<'env>>,
@@ -177,7 +178,7 @@ impl<'env> ElementBuf<'env> {
         }
     }
 
-    /// Puts a signed header and optional entry onto the CAS.
+    /// Puts a signed header and optional entry into the Element store.
     /// N.B. this code assumes that the header and entry have been validated
     pub fn put(
         &mut self,

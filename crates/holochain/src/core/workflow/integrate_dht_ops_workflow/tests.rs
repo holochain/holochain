@@ -227,7 +227,7 @@ impl Db {
                             .await
                             .unwrap()
                             .expect(&format!(
-                                "Header {:?} not in element CAS for {}",
+                                "Header {:?} not in element vault for {}",
                                 header, here
                             ))
                             .header(),
@@ -245,7 +245,7 @@ impl Db {
                             .await
                             .unwrap()
                             .expect(&format!(
-                                "Entry {:?} not in element CAS for {}",
+                                "Entry {:?} not in element vault for {}",
                                 entry, here
                             ))
                             .into_content(),
