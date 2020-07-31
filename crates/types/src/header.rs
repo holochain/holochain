@@ -41,7 +41,7 @@ pub enum WireNewEntryHeader {
     Update(WireEntryUpdate),
 }
 
-/// The minimum unique data for new entry header
+/// The minimum unique data for EntryCreate headers
 /// that share a common entry
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Ord, PartialOrd)]
 pub struct WireEntryCreate {
