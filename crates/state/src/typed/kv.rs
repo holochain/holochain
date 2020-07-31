@@ -1,8 +1,9 @@
 use crate::{
-    buffer::{BufKey, BufVal},
+    buffer::{kv::SingleIterRaw, BufKey, BufVal},
     error::{DatabaseError, DatabaseResult},
     prelude::*,
 };
+use fallible_iterator::FallibleIterator;
 use rkv::SingleStore;
 
 /// Wrapper around an rkv SingleStore which provides strongly typed values
@@ -62,5 +63,36 @@ where
     /// Delete value from DB
     pub fn delete(&self, writer: &mut Writer, k: &K) -> DatabaseResult<()> {
         Ok(self.db.delete(writer, k)?)
+    }
+
+    /// Iterate over the underlying persisted data
+    pub fn iter<'env, R: Readable>(
+        &self,
+        reader: &'env R,
+    ) -> DatabaseResult<SingleIterRaw<'env, V>> {
+        Ok(SingleIterRaw::new(
+            self.db.iter_start(reader)?,
+            self.db.iter_end(reader)?,
+        ))
+    }
+
+    /// Iterate from a key onwards
+    pub fn iter_from<'env, R: Readable>(
+        &self,
+        reader: &'env R,
+        k: K,
+    ) -> DatabaseResult<SingleIterRaw<'env, V>> {
+        Ok(SingleIterRaw::new(
+            self.db.iter_from(reader, k)?,
+            self.db.iter_end(reader)?,
+        ))
+    }
+
+    /// Iterate over the underlying persisted data in reverse
+    pub fn iter_reverse<'env, R: Readable>(
+        &self,
+        reader: &'env R,
+    ) -> DatabaseResult<fallible_iterator::Rev<SingleIterRaw<'env, V>>> {
+        Ok(SingleIterRaw::new(self.db.iter_start(reader)?, self.db.iter_end(reader)?).rev())
     }
 }

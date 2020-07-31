@@ -69,6 +69,12 @@ impl InstalledCell {
     pub fn into_nick(self) -> CellNick {
         self.1
     }
+
+    /// Get the inner data as a tuple
+    pub fn into_inner(self) -> (CellId, CellNick) {
+        (self.0, self.1)
+    }
+
     /// Get the CellId
     pub fn as_id(&self) -> &CellId {
         &self.0
