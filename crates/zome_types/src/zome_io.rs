@@ -102,8 +102,8 @@ wasm_io_types!(
     pub struct GetLinksInput((holo_hash::EntryHash, Option<crate::link::LinkTag>));
     pub struct GetLinksOutput(crate::link::Links);
     // get an entry from the cascade
-    pub struct GetEntryInput((holo_hash::EntryHash, crate::entry::GetOptions));
-    pub struct GetEntryOutput(Option<crate::entry::Entry>);
+    pub struct GetEntryInput((holo_hash::AnyDhtHash, crate::entry::GetOptions));
+    pub struct GetEntryOutput(Option<crate::element::Element>);
     // @TODO
     pub struct EntryTypePropertiesInput(());
     pub struct EntryTypePropertiesOutput(());

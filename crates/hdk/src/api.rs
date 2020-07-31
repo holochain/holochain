@@ -110,7 +110,7 @@ macro_rules! get_entry {
     ( $hash:expr, $options:expr ) => {{
         $crate::api_call!(
             __get_entry,
-            GetEntryInput::new(($hash, $options)),
+            GetEntryInput::new(($hash.into(), $options)),
             GetEntryOutput
         )
     }};

@@ -840,7 +840,7 @@ async fn get_entry<'env>(
         let call_context = Arc::new(call_context);
         host_fn::get_entry::get_entry(ribosome.clone(), call_context.clone(), input).unwrap()
     };
-    output.into_inner().try_into().unwrap()
+    output.into_inner().and_then(|el| el.into())
 }
 
 async fn link_entries<'env>(

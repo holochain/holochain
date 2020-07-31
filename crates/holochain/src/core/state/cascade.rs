@@ -188,6 +188,7 @@ where
         options: GetOptions,
     ) -> CascadeResult<()> {
         let results = self.network.get(hash.clone().into(), options).await?;
+        debug!("fetching element");
 
         for response in results {
             match response {
@@ -318,6 +319,7 @@ where
         }
     }
 
+    #[instrument(skip(self, options))]
     /// Returns the oldest live [Element] for this [EntryHash] by getting the
     /// latest available metadata from authorities combined with this agents authored data.
     pub async fn dht_get_entry(
@@ -325,6 +327,7 @@ where
         entry_hash: EntryHash,
         options: GetOptions,
     ) -> CascadeResult<Option<Element>> {
+        debug!("in get entry");
         // Update the cache from the network
         self.fetch_element_via_entry(entry_hash.clone(), options.clone())
             .await?;
@@ -375,6 +378,7 @@ where
         }
     }
 
+    #[instrument(skip(self, options))]
     /// Returns the [Element] for this [HeaderHash] if it is live
     /// by getting the latest available metadata from authorities
     /// combined with this agents authored data.
@@ -384,6 +388,7 @@ where
         header_hash: HeaderHash,
         options: GetOptions,
     ) -> CascadeResult<Option<Element>> {
+        debug!("in get header");
         // Meta Cache
         if let Some(_) = self
             .meta_cache
