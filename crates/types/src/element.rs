@@ -52,7 +52,7 @@ impl<'a> ElementGroup<'a> {
     pub fn len(&self) -> usize {
         self.headers.len()
     }
-    /// The entries visibility
+    /// The entry's visibility
     pub fn visibility(&self) -> ElementGroupResult<&EntryVisibility> {
         self.headers
             .first()
