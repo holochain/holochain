@@ -2,9 +2,7 @@
 
 /// utility for lazy init-ing things
 /// note how new is not async so we can do it in an actor handler
-pub struct AsyncLazy<O: 'static + Clone + Send + Sync>(
-    tokio::sync::watch::Receiver<Option<O>>,
-);
+pub struct AsyncLazy<O: 'static + Clone + Send + Sync>(tokio::sync::watch::Receiver<Option<O>>);
 
 impl<O: 'static + Clone + Send + Sync> AsyncLazy<O> {
     /// sync create a new lazy-init value
@@ -51,9 +49,7 @@ mod tests {
         });
         assert_eq!(
             vec![Arc::new(42), Arc::new(42)],
-            futures::future::join_all(vec![
-                s.get(), s.get(),
-            ]).await
+            futures::future::join_all(vec![s.get(), s.get(),]).await
         );
         assert_eq!(42, *s.get().await);
         assert_eq!(42, *s.get().await);
