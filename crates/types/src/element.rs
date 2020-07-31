@@ -96,18 +96,6 @@ impl<'a> ElementGroup<'a> {
 
         Ok(Self { headers, entry })
     }
-
-    // pub fn try_from_element(e: &'a Element) -> Result<ElementGroup<'a>, ElementGroupError> {
-    //     let ssh = e.signed_header();
-    //     let entry = e
-    //         .entry()
-    //         .as_option()
-    //         .ok_or(ElementGroupError::MissingEntry)?;
-    //     Ok(Self {
-    //         headers: vec![Cow::Borrowed(ssh)],
-    //         entry: Cow::Borrowed(entry),
-    //     })
-    // }
 }
 
 /// Responses from a dht get.
