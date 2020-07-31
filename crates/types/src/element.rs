@@ -26,7 +26,7 @@ pub mod error;
 pub struct WireElement {
     /// The signed header for this element
     signed_header: SignedHeader,
-    /// If there is an entry associated with this header it will be her
+    /// If there is an entry associated with this header it will be here
     maybe_entry: Option<Entry>,
     /// If this element is deleted then we require a single delete
     /// in the cache as proof of the tombstone
