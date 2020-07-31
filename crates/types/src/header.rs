@@ -54,7 +54,7 @@ pub struct WireEntryCreate {
     pub signature: Signature,
 }
 
-/// The minimum unique data for new entry header
+/// The minimum unique data for EntryUpdate headers
 /// that share a common entry
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Ord, PartialOrd)]
 pub struct WireEntryUpdate {
