@@ -20,7 +20,7 @@ use holochain_state::{
     prelude::{Reader, Writer},
 };
 use holochain_types::{
-    element::{ChainElement, SignedHeader, SignedHeaderHashed},
+    element::{Element, ElementGroup, SignedHeader, SignedHeaderHashed},
     entry::EntryHashed,
 };
 use holochain_zome_types::entry_def::EntryVisibility;
@@ -101,8 +101,21 @@ impl<'env> ElementBuf<'env> {
         }
     }
 
-    pub async fn contains(&self, entry_hash: &EntryHash) -> DatabaseResult<bool> {
-        self.get_entry(entry_hash).await.map(|e| e.is_some())
+    pub fn contains_entry(&self, entry_hash: &EntryHash) -> DatabaseResult<bool> {
+        Ok(if self.public_entries.contains(entry_hash)? {
+            true
+        } else {
+            // Potentially avoid this let Some if the above branch is hit first
+            if let Some(private) = &self.private_entries {
+                private.contains(entry_hash)?
+            } else {
+                false
+            }
+        })
+    }
+
+    pub fn contains_header(&self, header_hash: &HeaderHash) -> DatabaseResult<bool> {
+        self.headers.contains(header_hash)
     }
 
     pub async fn get_header(
@@ -155,10 +168,10 @@ impl<'env> ElementBuf<'env> {
     pub async fn get_element(
         &self,
         header_address: &HeaderHash,
-    ) -> SourceChainResult<Option<ChainElement>> {
+    ) -> SourceChainResult<Option<Element>> {
         if let Some(signed_header) = self.get_header(header_address).await? {
             let maybe_entry = self.get_entry_from_header(signed_header.header()).await?;
-            Ok(Some(ChainElement::new(signed_header, maybe_entry)))
+            Ok(Some(Element::new(signed_header, maybe_entry)))
         } else {
             Ok(None)
         }
@@ -192,6 +205,24 @@ impl<'env> ElementBuf<'env> {
         }
 
         self.headers.put(signed_header.into());
+        Ok(())
+    }
+
+    pub fn put_element_group(&mut self, element_group: ElementGroup) -> DatabaseResult<()> {
+        for shh in element_group.owned_signed_headers() {
+            self.headers.put(shh.into());
+        }
+        let entry = element_group.entry_hashed();
+        match element_group.visibility()? {
+            EntryVisibility::Public => self.public_entries.put(entry),
+            EntryVisibility::Private => {
+                if let Some(db) = self.private_entries.as_mut() {
+                    db.put(entry);
+                } else {
+                    error!("Attempted ElementBuf::put on a private entry with a disabled private DB: {}", entry.as_hash());
+                }
+            }
+        }
         Ok(())
     }
 

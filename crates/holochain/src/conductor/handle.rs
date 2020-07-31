@@ -249,6 +249,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         self.conductor.read().await.dna_store().get_entry_def(key)
     }
 
+    #[instrument(skip(self))]
     async fn dispatch_holochain_p2p_event(
         &self,
         cell_id: &CellId,

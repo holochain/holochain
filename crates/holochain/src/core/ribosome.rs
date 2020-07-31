@@ -320,8 +320,8 @@ pub enum ZomeCallInvocationResponse {
 #[derive(Clone, Constructor)]
 pub struct ZomeCallHostAccess {
     pub workspace: UnsafeCallZomeWorkspace,
-    keystore: KeystoreSender,
-    network: HolochainP2pCell,
+    pub keystore: KeystoreSender,
+    pub network: HolochainP2pCell,
 }
 
 impl From<ZomeCallHostAccess> for HostAccess {
@@ -434,7 +434,9 @@ pub mod wasm_test {
 
     #[macro_export]
     macro_rules! call_test_ribosome {
-        ( $host_access:ident, $test_wasm:expr, $fn_name:literal, $input:expr ) => {
+        ( $host_access:expr, $test_wasm:expr, $fn_name:literal, $input:expr ) => {{
+            let mut host_access = $host_access.clone();
+            let input = $input.clone();
             tokio::task::spawn(async move {
                 // ensure type of test wasm
                 use crate::core::ribosome::RibosomeT;
@@ -447,6 +449,13 @@ pub mod wasm_test {
                     .next()
                     .unwrap();
 
+                // Required because otherwise the network will return routing errors
+                let (_network, _r, cell_network) = crate::test_utils::test_network(
+                    Some(ribosome.dna_file().dna_hash().clone()),
+                    None,
+                )
+                .await;
+                host_access.network = cell_network;
                 let timeout = $crate::start_hard_timeout!();
 
                 let invocation = $crate::core::ribosome::ZomeCallInvocationFixturator::new(
@@ -456,13 +465,13 @@ pub mod wasm_test {
                             .unwrap(),
                         $test_wasm.into(),
                         $fn_name.into(),
-                        holochain_zome_types::HostInput::new($input.try_into().unwrap()),
+                        holochain_zome_types::HostInput::new(input.try_into().unwrap()),
                     ),
                 )
                 .next()
                 .unwrap();
                 let zome_invocation_response =
-                    match ribosome.call_zome_function($host_access, invocation.clone()) {
+                    match ribosome.call_zome_function(host_access, invocation.clone()) {
                         Ok(v) => v,
                         Err(e) => {
                             dbg!("call_zome_function error", &invocation, &e);
@@ -486,8 +495,8 @@ pub mod wasm_test {
                 output
             })
             .await
-            .unwrap();
-        };
+            .unwrap()
+        }};
     }
 
     #[test]

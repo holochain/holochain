@@ -1,4 +1,3 @@
-use super::dht_basis;
 use crate::{
     core::state::element_buf::ElementBuf,
     fixt::{
@@ -13,8 +12,8 @@ use holo_hash::{fixt::HeaderHashFixturator, *};
 use holochain_keystore::Signature;
 use holochain_state::{env::ReadManager, test_utils::test_cell_env};
 use holochain_types::{
-    dht_op::{ops_from_element, DhtOp},
-    element::{ChainElement, SignedHeaderHashed},
+    dht_op::{produce_ops_from_element, DhtOp},
+    element::{Element, SignedHeaderHashed},
     fixt::{HeaderBuilderCommonFixturator, IntendedForFixturator, SignatureFixturator},
     header::NewEntryHeader,
     observability, Entry, EntryHashed, HeaderHashed,
@@ -27,7 +26,7 @@ use holochain_zome_types::header::{
 use pretty_assertions::assert_eq;
 use tracing::*;
 
-struct ChainElementTest {
+struct ElementTest {
     entry_type: EntryType,
     entry_hash: EntryHash,
     commons: Box<dyn Iterator<Item = HeaderBuilderCommon>>,
@@ -44,7 +43,7 @@ struct ChainElementTest {
     init_zomes_complete: InitZomesComplete,
 }
 
-impl ChainElementTest {
+impl ElementTest {
     fn new() -> Self {
         let entry_type = fixt!(EntryType);
         let entry_hash = fixt!(EntryHash);
@@ -78,7 +77,7 @@ impl ChainElementTest {
         }
     }
 
-    fn create_element(&mut self) -> (EntryCreate, ChainElement) {
+    fn create_element(&mut self) -> (EntryCreate, Element) {
         let entry_create = builder::EntryCreate {
             entry_type: self.entry_type.clone(),
             entry_hash: self.entry_hash.clone(),
@@ -88,7 +87,7 @@ impl ChainElementTest {
         (entry_create, element)
     }
 
-    fn update_element(&mut self) -> (EntryUpdate, ChainElement) {
+    fn update_element(&mut self) -> (EntryUpdate, Element) {
         let entry_update = builder::EntryUpdate {
             intended_for: self.intended_for.clone(),
             entry_type: self.entry_type.clone(),
@@ -100,7 +99,7 @@ impl ChainElementTest {
         (entry_update, element)
     }
 
-    fn entry_create(mut self) -> (ChainElement, Vec<DhtOp>) {
+    fn entry_create(mut self) -> (Element, Vec<DhtOp>) {
         let (entry_create, element) = self.create_element();
         let header: Header = entry_create.clone().into();
 
@@ -120,7 +119,7 @@ impl ChainElementTest {
         (element, ops)
     }
 
-    fn entry_update(mut self) -> (ChainElement, Vec<DhtOp>) {
+    fn entry_update(mut self) -> (Element, Vec<DhtOp>) {
         let (entry_update, element) = self.update_element();
         let header: Header = entry_update.clone().into();
 
@@ -145,9 +144,10 @@ impl ChainElementTest {
         (element, ops)
     }
 
-    fn entry_delete(mut self) -> (ChainElement, Vec<DhtOp>) {
+    fn entry_delete(mut self) -> (Element, Vec<DhtOp>) {
         let entry_delete = builder::ElementDelete {
-            removes_address: self.header_hash.clone().into(),
+            removes_address: self.header_hash.clone(),
+            removes_entry_address: self.entry_hash.clone(),
         }
         .build(self.commons.next().unwrap());
         let element = self.to_element(entry_delete.clone().into(), None);
@@ -162,7 +162,7 @@ impl ChainElementTest {
         (element, ops)
     }
 
-    fn link_add(mut self) -> (ChainElement, Vec<DhtOp>) {
+    fn link_add(mut self) -> (Element, Vec<DhtOp>) {
         let element = self.to_element(self.link_add.clone().into(), None);
         let header: Header = self.link_add.clone().into();
 
@@ -174,7 +174,7 @@ impl ChainElementTest {
         (element, ops)
     }
 
-    fn link_remove(mut self) -> (ChainElement, Vec<DhtOp>) {
+    fn link_remove(mut self) -> (Element, Vec<DhtOp>) {
         let element = self.to_element(self.link_remove.clone().into(), None);
         let header: Header = self.link_remove.clone().into();
 
@@ -186,7 +186,7 @@ impl ChainElementTest {
         (element, ops)
     }
 
-    fn others(mut self) -> Vec<(ChainElement, Vec<DhtOp>)> {
+    fn others(mut self) -> Vec<(Element, Vec<DhtOp>)> {
         let mut elements = Vec::new();
         elements.push(self.to_element(self.dna.clone().into(), None));
         elements.push(self.to_element(self.chain_open.clone().into(), None));
@@ -206,41 +206,41 @@ impl ChainElementTest {
         chain_elements
     }
 
-    fn to_element(&mut self, header: Header, entry: Option<Entry>) -> ChainElement {
+    fn to_element(&mut self, header: Header, entry: Option<Entry>) -> Element {
         let h = HeaderHashed::with_pre_hashed(header.clone(), self.header_hash.clone());
         let h = SignedHeaderHashed::with_presigned(h, self.sig.clone());
-        ChainElement::new(h, entry.clone())
+        Element::new(h, entry.clone())
     }
 }
 
 #[tokio::test(threaded_scheduler)]
 async fn test_all_ops() {
     observability::test_run().ok();
-    let builder = ChainElementTest::new();
+    let builder = ElementTest::new();
     let (element, expected) = builder.entry_create();
-    let result = ops_from_element(&element).unwrap();
+    let result = produce_ops_from_element(&element).await.unwrap();
     assert_eq!(result, expected);
-    let builder = ChainElementTest::new();
+    let builder = ElementTest::new();
     let (element, expected) = builder.entry_update();
-    let result = ops_from_element(&element).unwrap();
+    let result = produce_ops_from_element(&element).await.unwrap();
     assert_eq!(result, expected);
-    let builder = ChainElementTest::new();
+    let builder = ElementTest::new();
     let (element, expected) = builder.entry_delete();
-    let result = ops_from_element(&element).unwrap();
+    let result = produce_ops_from_element(&element).await.unwrap();
     assert_eq!(result, expected);
-    let builder = ChainElementTest::new();
+    let builder = ElementTest::new();
     let (element, expected) = builder.link_add();
-    let result = ops_from_element(&element).unwrap();
+    let result = produce_ops_from_element(&element).await.unwrap();
     assert_eq!(result, expected);
-    let builder = ChainElementTest::new();
+    let builder = ElementTest::new();
     let (element, expected) = builder.link_remove();
-    let result = ops_from_element(&element).unwrap();
+    let result = produce_ops_from_element(&element).await.unwrap();
     assert_eq!(result, expected);
-    let builder = ChainElementTest::new();
+    let builder = ElementTest::new();
     let elements = builder.others();
     for (element, expected) in elements {
         debug!(?element);
-        let result = ops_from_element(&element).unwrap();
+        let result = produce_ops_from_element(&element).await.unwrap();
         assert_eq!(result, expected);
     }
 }
@@ -258,7 +258,7 @@ async fn test_dht_basis() {
         let expected_entry_hash: AnyDhtHash = original_header.entry_hash.clone().into();
 
         let original_header_hash =
-            HeaderHashed::from_content(Header::EntryCreate(original_header)).await;
+            HeaderHashed::from_content(Header::EntryCreate(original_header.clone())).await;
         let signed_header =
             SignedHeaderHashed::with_presigned(original_header_hash.clone(), fixt!(Signature));
         let original_header_hash = original_header_hash.into_inner().1;
@@ -274,14 +274,14 @@ async fn test_dht_basis() {
 
         // Create the update header with the same hash
         let mut entry_update = fixt!(EntryUpdate);
-        entry_update.intended_for = IntendedFor::Entry;
+        entry_update.intended_for = IntendedFor::Entry(original_header.entry_hash.clone());
         entry_update.replaces_address = original_header_hash;
 
         // Create the op
         let op = DhtOp::RegisterReplacedBy(fixt!(Signature), entry_update, Some(new_entry.into()));
 
         // Get the basis
-        let result = dht_basis(&op, &cas).await.unwrap();
+        let result = op.dht_basis().await;
 
         // Check the hash matches
         assert_eq!(expected_entry_hash, result);

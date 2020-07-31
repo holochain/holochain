@@ -5,7 +5,7 @@
 
 use crate::db::DbName;
 use failure::Fail;
-use holochain_types::prelude::SerializedBytesError;
+use holochain_types::{element::error::ElementGroupError, prelude::SerializedBytesError};
 use std::path::PathBuf;
 use thiserror::Error;
 
@@ -70,6 +70,9 @@ pub enum DatabaseError {
 
     #[error(transparent)]
     KeystoreError(#[from] holochain_keystore::KeystoreError),
+
+    #[error(transparent)]
+    ElementGroupError(#[from] ElementGroupError),
 
     #[error("Empty keys cannot be used with lmdb")]
     EmptyKey,

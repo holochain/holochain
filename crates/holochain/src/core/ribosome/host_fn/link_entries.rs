@@ -1,4 +1,5 @@
 use crate::core::ribosome::error::{RibosomeError, RibosomeResult};
+use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_cache;
 use crate::core::{
     ribosome::{CallContext, RibosomeT},
     workflow::CallZomeWorkspace,
@@ -40,7 +41,19 @@ pub fn link_entries<'a>(
             async move {
                 let source_chain = &mut workspace.source_chain;
                 // push the header into the source chain
-                source_chain.put(header_builder, None).await
+                let header_hash = source_chain.put(header_builder, None).await?;
+                let element = source_chain
+                    .get_element(&header_hash)
+                    .await?
+                    .expect("Element we just put in SourceChain must be gettable");
+                integrate_to_cache(
+                    &element,
+                    workspace.source_chain.elements(),
+                    &mut workspace.cache_meta,
+                )
+                .await
+                .map_err(Box::new)?;
+                Ok(header_hash)
             }
             .boxed()
         };

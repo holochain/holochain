@@ -121,6 +121,9 @@ macro_rules! get_entry {
 
 #[macro_export]
 macro_rules! link_entries {
+    ( $base:expr, $target:expr ) => {
+        link_entries!($base, $target, vec![])
+    };
     ( $base:expr, $target:expr, $tag:expr ) => {{
         $crate::api_call!(
             __link_entries,
@@ -131,12 +134,26 @@ macro_rules! link_entries {
 }
 
 #[macro_export]
+macro_rules! remove_link {
+    ( $add_link_header:expr ) => {{
+        $crate::api_call!(
+            __remove_link,
+            RemoveLinkInput::new($add_link_header),
+            RemoveLinkOutput
+        )
+    }};
+}
+
+#[macro_export]
 macro_rules! get_links {
-    ( $base:expr, $tag:expr ) => {
+    ( $base:expr ) => {
+        get_links!($base, None)
+    };
+    ( $base:expr, $tag:expr ) => {{
         $crate::api_call!(
             __get_links,
             GetLinksInput::new(($base, $tag.into())),
             GetLinksOutput
         )
-    };
+    }};
 }

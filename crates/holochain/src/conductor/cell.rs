@@ -1,7 +1,7 @@
 //! A Cell is an "instance" of Holochain DNA.
 //!
 //! It combines an AgentPubKey with a Dna to create a SourceChain, upon which
-//! ChainElements can be added. A constructed Cell is guaranteed to have a valid
+//! Elements can be added. A constructed Cell is guaranteed to have a valid
 //! SourceChain which has already undergone Genesis.
 
 use super::manager::ManagedTaskAdd;
@@ -16,7 +16,12 @@ use crate::{
     conductor::{api::CellConductorApi, cell::error::CellResult},
     core::ribosome::{guest_callback::init::InitResult, wasm_ribosome::WasmRibosome},
     core::{
-        state::source_chain::SourceChainBuf,
+        state::{
+            dht_op_integration::IntegratedDhtOpsBuf,
+            element_buf::ElementBuf,
+            metadata::{LinkMetaKey, MetadataBuf, MetadataBufT},
+            source_chain::SourceChainBuf,
+        },
         workflow::{
             call_zome_workflow, error::WorkflowError, genesis_workflow::genesis_workflow,
             initialize_zomes_workflow, CallZomeWorkflowArgs, CallZomeWorkspace,
@@ -25,19 +30,31 @@ use crate::{
         },
     },
 };
-use error::CellError;
+use error::{AuthorityDataError, CellError};
+use fallible_iterator::FallibleIterator;
 use futures::future::FutureExt;
+use hash_type::AnyDht;
 use holo_hash::*;
 use holochain_keystore::KeystoreSender;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_state::env::{EnvironmentKind, EnvironmentWrite, ReadManager};
+use holochain_state::{
+    db::GetDb,
+    env::{EnvironmentKind, EnvironmentWrite, ReadManager},
+};
 use holochain_types::{
-    autonomic::AutonomicProcess, cell::CellId, element::WireElement, metadata::MetadataSet,
+    autonomic::AutonomicProcess,
+    cell::CellId,
+    element::{GetElementResponse, RawGetEntryResponse, WireElement},
+    link::{GetLinksResponse, WireLinkMetaKey},
+    metadata::MetadataSet,
+    Timestamp,
 };
 use holochain_zome_types::capability::CapSecret;
 use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::HostInput;
+use holochain_zome_types::{header::conversions::WrongHeaderError, Header, HostInput};
 use std::{
+    collections::BTreeSet,
+    convert::TryInto,
     hash::{Hash, Hasher},
     path::Path,
 };
@@ -284,13 +301,13 @@ impl Cell {
             GetLinks {
                 span,
                 respond,
-                dht_hash,
+                link_key,
                 options,
                 ..
             } => {
                 let _g = span.enter();
                 let res = self
-                    .handle_get_links(dht_hash, options)
+                    .handle_get_links(link_key, options)
                     .await
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
@@ -308,18 +325,30 @@ impl Cell {
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
-            ListDhtOpHashes { span, respond, .. } => {
+            FetchOpHashesForConstraints {
+                span,
+                respond,
+                dht_arc,
+                since,
+                until,
+                ..
+            } => {
                 let _g = span.enter();
                 let res = self
-                    .handle_list_dht_op_hashes()
+                    .handle_fetch_op_hashes_for_constraints(dht_arc, since, until)
                     .await
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
-            FetchDhtOps { span, respond, .. } => {
+            FetchOpHashData {
+                span,
+                respond,
+                op_hashes,
+                ..
+            } => {
                 let _g = span.enter();
                 let res = self
-                    .handle_fetch_dht_ops()
+                    .handle_fetch_op_hash_data(op_hashes)
                     .await
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
@@ -336,29 +365,15 @@ impl Cell {
         Ok(())
     }
 
+    #[instrument(skip(self, _request_validation_receipt, _dht_hash, ops))]
     /// we are receiving a "publish" event from the network
     async fn handle_publish(
         &self,
-        from_agent: AgentPubKey,
+        _from_agent: AgentPubKey,
         _request_validation_receipt: bool,
         _dht_hash: holo_hash::AnyDhtHash,
         ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     ) -> CellResult<()> {
-        if from_agent == *self.id().agent_pubkey() {
-            // Don't handle messages we published to ourselves, because that
-            // would trigger another publish, and cause an infinite loop.
-            //
-            // TODO: Perhaps we *do* want to publish to ourselves, as a way of
-            // discovering that we are the authority for something we just
-            // committed. However, at the moment there is nothing different
-            // we can do, because we already integrate everything that we've
-            // authored. If that is ever no longer the case, then we can revisit
-            // this question of how to handle things we've already published.
-            debug!("Ignoring ops that we've published to ourselves");
-            trace!("{:?}", ops);
-            return Ok(());
-        }
-
         /////////////////////////////////////////////////////////////
         // FIXME - We are temporarily just integrating everything...
         //         Really this should go to validation first!
@@ -405,13 +420,163 @@ impl Cell {
         unimplemented!()
     }
 
+    #[instrument(skip(self, _options))]
     /// a remote node is asking us for entry data
     async fn handle_get(
         &self,
-        _dht_hash: holo_hash::AnyDhtHash,
+        dht_hash: holo_hash::AnyDhtHash,
         _options: holochain_p2p::event::GetOptions,
-    ) -> CellResult<WireElement> {
-        unimplemented!()
+    ) -> CellResult<GetElementResponse> {
+        // TODO: Later we will need more get types but for now
+        // we can just have these defaults depending on whether or not
+        // the hash is an entry or header.
+        // In the future we should use GetOptions to choose which get to run.
+        match *dht_hash.hash_type() {
+            AnyDht::Entry(et) => self.handle_get_entry(dht_hash.retype(et)).await,
+            AnyDht::Header => {
+                self.handle_get_element(dht_hash.retype(hash_type::Header))
+                    .await
+            }
+        }
+    }
+
+    async fn handle_get_entry(&self, hash: EntryHash) -> CellResult<GetElementResponse> {
+        // Get the vaults
+        let env_ref = self.state_env.guard().await;
+        let dbs = self.state_env.dbs().await;
+        let reader = env_ref.reader()?;
+        let element_vault = ElementBuf::vault(&reader, &dbs, false)?;
+        let meta_vault = MetadataBuf::vault(&reader, &dbs)?;
+
+        // The data we want to collect
+        let mut entry_data = None;
+        let mut deletes = Vec::new();
+        let mut live_headers = BTreeSet::new();
+
+        let mut delete_headers = Vec::new();
+        // Get the live header hashes and collect any deletes
+        let results = meta_vault
+            .get_headers(hash)?
+            // Filtering on any live headers only
+            .filter_map(|header_hash| {
+                let header_hash = header_hash.header_hash;
+                match meta_vault
+                    .get_deletes_on_header(header_hash.clone())?
+                    .next()?
+                {
+                    // Header is dead so don't return but collect the deleted header
+                    Some(delete) => {
+                        delete_headers.push(delete.header_hash);
+                        Ok(None)
+                    }
+                    // Header is alive so return
+                    None => Ok(Some(header_hash)),
+                }
+            })
+            // TODO: PERF: Remove this collect by fixing thread safety await issue
+            .collect::<Vec<_>>()?;
+
+        // Collect the actual headers from the element vault
+        for live_header in results {
+            let header = match element_vault.get_header(&live_header).await? {
+                // Found the header
+                Some(header) => {
+                    // Does the header contain entry data?
+                    match header.header().entry_data() {
+                        // Contains the entry data
+                        Some((eh, et)) => {
+                            // We only need the entry data once so if it's None collect it
+                            if let None = &entry_data {
+                                // Can we get the actual entry
+                                match element_vault.get_entry(&eh).await? {
+                                    // Found so everything is ok
+                                    Some(e) => {
+                                        entry_data = Some((e.into_content(), et.clone()));
+                                    }
+                                    // Missing the entry
+                                    None => {
+                                        return Err(AuthorityDataError::missing_data_entry(
+                                            live_header,
+                                        ));
+                                    }
+                                }
+                            }
+                        }
+                        // No entry data so don't return this header
+                        None => {
+                            return Err(AuthorityDataError::WrongHeaderError(WrongHeaderError(
+                                format!("Header should have entry data: {:?}", live_header),
+                            ))
+                            .into());
+                        }
+                    }
+                    header
+                }
+                // Missing the header
+                None => {
+                    return Err(AuthorityDataError::missing_data(live_header));
+                }
+            };
+            // Collect the actual live header
+            live_headers.insert(header.try_into()?);
+        }
+
+        for delete in delete_headers {
+            match element_vault.get_header(&delete).await? {
+                Some(delete) => deletes.push(delete.try_into().map_err(AuthorityDataError::from)?),
+                None => {
+                    return Err(AuthorityDataError::missing_data(delete));
+                }
+            }
+        }
+
+        // Construct the return type
+        let r = match entry_data {
+            Some((entry, entry_type)) => {
+                let r = RawGetEntryResponse {
+                    live_headers,
+                    deletes,
+                    entry,
+                    entry_type,
+                };
+                Some(Box::new(r))
+            }
+            _ => None,
+        };
+        Ok(GetElementResponse::GetEntryFull(r))
+    }
+
+    async fn handle_get_element(&self, hash: HeaderHash) -> CellResult<GetElementResponse> {
+        // Get the vaults
+        let env_ref = self.state_env.guard().await;
+        let dbs = self.state_env.dbs().await;
+        let reader = env_ref.reader()?;
+        let element_vault = ElementBuf::vault(&reader, &dbs, false)?;
+        let meta_vault = MetadataBuf::vault(&reader, &dbs)?;
+
+        // Look for a delete on the header and collect it
+        let deleted = meta_vault.get_deletes_on_header(hash.clone())?.next()?;
+        let deleted = match deleted {
+            Some(delete_header) => {
+                let delete = delete_header.header_hash;
+                match element_vault.get_header(&delete).await? {
+                    Some(delete) => Some(delete.try_into().map_err(AuthorityDataError::from)?),
+                    None => {
+                        return Err(AuthorityDataError::missing_data(delete));
+                    }
+                }
+            }
+            None => None,
+        };
+
+        // Get the actual header and return it with proof of deleted if there is any
+        let r = element_vault
+            .get_element(&hash)
+            .await?
+            .map(|e| WireElement::from_element(e, deleted))
+            .map(Box::new);
+
+        Ok(GetElementResponse::GetHeader(r))
     }
 
     /// a remote node is asking us for metadata
@@ -424,13 +589,82 @@ impl Cell {
     }
 
     /// a remote node is asking us for links
+    // TODO: Right now we are returning all the full headers
+    // We could probably send some smaller types instead of the full headers
+    // if we are careful.
     async fn handle_get_links(
         &self,
-        _dht_hash: holo_hash::AnyDhtHash,
+        link_key: WireLinkMetaKey,
         _options: holochain_p2p::event::GetLinksOptions,
-    ) -> CellResult<SerializedBytes> {
-        tracing::warn!("handle get links is unimplemented");
-        Err(CellError::Todo)
+    ) -> CellResult<GetLinksResponse> {
+        // Get the vaults
+        let env_ref = self.state_env.guard().await;
+        let dbs = self.state_env.dbs().await;
+        let reader = env_ref.reader()?;
+        let element_vault = ElementBuf::vault(&reader, &dbs, false)?;
+        let meta_vault = MetadataBuf::vault(&reader, &dbs)?;
+
+        // Construct the key we need to get the links
+        let key = LinkMetaKey::from(&link_key);
+
+        let mut lr: Vec<HeaderHash> = Vec::new();
+
+        // Gather the link adds and link removes as hashes
+        // TODO: Maybe can only send back removes without adds,
+        // because if we know of a remove, it doesn't matter what the
+        // add was
+        let la = meta_vault
+            .get_links(&key)?
+            .map(|link| {
+                // Add any link removes on this link add
+                lr.extend(
+                    meta_vault
+                        .get_link_removes_on_link_add(link.link_add_hash.clone())?
+                        .map(|l| Ok(l.header_hash))
+                        .iterator()
+                        .filter_map(Result::ok),
+                );
+                Ok(link.link_add_hash)
+            })
+            .collect::<Vec<_>>()?;
+
+        // TODO: PERF: Collects are needed due to async calls that can't happen in closures.
+        // Could use join_all.
+        // But deferring because this is likely to change anyway.
+        let mut link_removes = Vec::with_capacity(lr.len());
+
+        // Get the actual link remove headers
+        for link_remove in lr {
+            if let Some(l) = element_vault.get_header(&link_remove).await?.and_then(|d| {
+                let (h, s) = d.into_inner().0.into();
+                match h {
+                    Header::LinkRemove(lr) => Some((lr, s)),
+                    _ => None,
+                }
+            }) {
+                link_removes.push(l);
+            }
+        }
+
+        // Get the actual link add headers
+        let mut link_adds = Vec::with_capacity(la.len());
+        for link_add in la {
+            if let Some(l) = element_vault.get_header(&link_add).await?.and_then(|d| {
+                let (h, s) = d.into_inner().0.into();
+                match h {
+                    Header::LinkAdd(la) => Some((la, s)),
+                    _ => None,
+                }
+            }) {
+                link_adds.push(l);
+            }
+        }
+
+        // Return the links
+        Ok(GetLinksResponse {
+            link_adds,
+            link_removes,
+        })
     }
 
     /// a remote agent is sending us a validation receipt.
@@ -439,13 +673,51 @@ impl Cell {
     }
 
     /// the network module is requesting a list of dht op hashes
-    async fn handle_list_dht_op_hashes(&self) -> CellResult<()> {
-        unimplemented!()
+    async fn handle_fetch_op_hashes_for_constraints(
+        &self,
+        dht_arc: holochain_p2p::dht_arc::DhtArc,
+        since: Timestamp,
+        until: Timestamp,
+    ) -> CellResult<Vec<DhtOpHash>> {
+        let env_ref = self.state_env.guard().await;
+        let reader = env_ref.reader()?;
+        let integrated_dht_ops = IntegratedDhtOpsBuf::new(&reader, &env_ref)?;
+        let result: Vec<DhtOpHash> = integrated_dht_ops
+            .query(Some(since), Some(until), Some(dht_arc))?
+            .map(|(k, _)| Ok(k))
+            .collect()?;
+        Ok(result)
     }
 
     /// the network module is requesting the content for dht ops
-    async fn handle_fetch_dht_ops(&self) -> CellResult<()> {
-        unimplemented!()
+    async fn handle_fetch_op_hash_data(
+        &self,
+        op_hashes: Vec<holo_hash::DhtOpHash>,
+    ) -> CellResult<
+        Vec<(
+            holo_hash::AnyDhtHash,
+            holo_hash::DhtOpHash,
+            holochain_types::dht_op::DhtOp,
+        )>,
+    > {
+        let env_ref = self.state_env.guard().await;
+        let reader = env_ref.reader()?;
+        let integrated_dht_ops = IntegratedDhtOpsBuf::new(&reader, &env_ref)?;
+        let cas = ElementBuf::vault(&reader, &env_ref, false)?;
+        let mut out = vec![];
+        for op_hash in op_hashes {
+            let val = integrated_dht_ops.get(&op_hash)?;
+            if let Some(val) = val {
+                let full_op =
+                    crate::core::workflow::produce_dht_ops_workflow::dht_op_light::light_to_op(
+                        val.op, &cas,
+                    )
+                    .await?;
+                let basis = full_op.dht_basis().await;
+                out.push((basis, op_hash, full_op));
+            }
+        }
+        Ok(out)
     }
 
     /// the network module would like this cell/agent to sign some data

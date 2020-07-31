@@ -95,9 +95,13 @@ mod tests {
 
     async fn test_delete(
         removes_address: HeaderHash,
+        removes_entry_address: EntryHash,
         fx: &mut TestFixtures,
     ) -> (header::ElementDelete, HeaderHashed) {
-        let builder = builder::ElementDelete { removes_address };
+        let builder = builder::ElementDelete {
+            removes_address,
+            removes_entry_address,
+        };
         let delete = builder.build(fx.common());
         let header = HeaderHashed::from_content(delete.clone().into()).await;
         (delete, header)
@@ -120,7 +124,7 @@ mod tests {
                 &mut fx,
             )
             .await;
-            buf.register_update(update.clone(), None).await?;
+            buf.register_update(update.clone()).await?;
             let original = update.replaces_address;
             let canonical = buf.get_canonical_header_hash(original.clone())?;
 
@@ -160,9 +164,9 @@ mod tests {
                 &mut fx,
             )
             .await;
-            let _ = buf.register_update(update1.clone(), None).await?;
-            let _ = buf.register_update(update2, None).await?;
-            buf.register_update(update3.clone(), None).await?;
+            let _ = buf.register_update(update1.clone()).await?;
+            let _ = buf.register_update(update2).await?;
+            buf.register_update(update3.clone()).await?;
 
             let original = update1.replaces_address;
             let canonical = buf.get_canonical_header_hash(original.clone())?;
@@ -189,11 +193,14 @@ mod tests {
                 .into_inner()
                 .1;
 
-            let (update, _) =
-                test_update(header_hash, fx.entry_hash(), IntendedFor::Entry, &mut fx).await;
-            let _ = buf
-                .register_update(update.clone(), Some(original_entry.clone()))
-                .await?;
+            let (update, _) = test_update(
+                header_hash,
+                fx.entry_hash(),
+                IntendedFor::Entry(original_entry.clone()),
+                &mut fx,
+            )
+            .await;
+            let _ = buf.register_update(update.clone()).await?;
 
             let canonical = buf.get_canonical_entry_hash(original_entry)?;
 
@@ -219,31 +226,30 @@ mod tests {
                 .1
                 .into_inner()
                 .1;
-            let (update1, _) =
-                test_update(header_hash, fx.entry_hash(), IntendedFor::Entry, &mut fx).await;
+            let (update1, _) = test_update(
+                header_hash,
+                fx.entry_hash(),
+                IntendedFor::Entry(original_entry.clone()),
+                &mut fx,
+            )
+            .await;
             let (update2, _) = test_update(
                 update1.replaces_address.clone(),
                 fx.entry_hash(),
-                IntendedFor::Entry,
+                IntendedFor::Entry(original_entry.clone()),
                 &mut fx,
             )
             .await;
             let (update3, _) = test_update(
                 update2.replaces_address.clone(),
                 fx.entry_hash(),
-                IntendedFor::Entry,
+                IntendedFor::Entry(original_entry.clone()),
                 &mut fx,
             )
             .await;
-            let _ = buf
-                .register_update(update1.clone(), Some(original_entry.clone()))
-                .await?;
-            let _ = buf
-                .register_update(update2.clone(), Some(original_entry.clone()))
-                .await?;
-            let _ = buf
-                .register_update(update3.clone(), Some(original_entry.clone()))
-                .await?;
+            let _ = buf.register_update(update1.clone()).await?;
+            let _ = buf.register_update(update2.clone()).await?;
+            let _ = buf.register_update(update3.clone()).await?;
 
             let canonical = buf.get_canonical_entry_hash(original_entry)?;
 
@@ -278,13 +284,16 @@ mod tests {
                 .1
                 .into_inner()
                 .1;
-            let (update_entry, _) =
-                test_update(header_hash, fx.entry_hash(), IntendedFor::Entry, &mut fx).await;
+            let (update_entry, _) = test_update(
+                header_hash,
+                fx.entry_hash(),
+                IntendedFor::Entry(original_entry.clone()),
+                &mut fx,
+            )
+            .await;
 
-            let _ = buf.register_update(update_header.clone(), None).await?;
-            let _ = buf
-                .register_update(update_entry.clone(), Some(original_entry.clone()))
-                .await?;
+            let _ = buf.register_update(update_header.clone()).await?;
+            let _ = buf.register_update(update_entry.clone()).await?;
             let expected_entry_hash = update_entry.entry_hash;
 
             let original_header_hash = update_header.replaces_address;
@@ -362,7 +371,7 @@ mod tests {
             let (e, hash) = test_update(
                 original_header_hash.clone(),
                 fx.entry_hash(),
-                IntendedFor::Entry,
+                IntendedFor::Entry(original_entry_hash.clone()),
                 &mut fx,
             )
             .await;
@@ -375,10 +384,7 @@ mod tests {
             let reader = env.reader().unwrap();
             let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
             for update in entry_updates {
-                meta_buf
-                    .register_update(update, Some(original_entry_hash.clone()))
-                    .await
-                    .unwrap();
+                meta_buf.register_update(update).await.unwrap();
             }
             let mut headers = meta_buf
                 .get_updates(original_entry_hash.clone().into())
@@ -433,7 +439,7 @@ mod tests {
             let reader = env.reader().unwrap();
             let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
             for update in entry_updates {
-                meta_buf.register_update(update, None).await.unwrap();
+                meta_buf.register_update(update).await.unwrap();
             }
             let mut headers = meta_buf
                 .get_updates(original_header_hash.clone().into())
@@ -468,7 +474,7 @@ mod tests {
         let mut expected: Vec<TimedHeaderHash> = Vec::new();
         let mut entry_deletes = Vec::new();
         for _ in 0..10 {
-            let (e, hash) = test_delete(header_hash.clone(), &mut fx).await;
+            let (e, hash) = test_delete(header_hash.clone(), entry_hash.clone(), &mut fx).await;
             expected.push(hash.into());
             entry_deletes.push(e)
         }
@@ -478,10 +484,7 @@ mod tests {
             let reader = env.reader().unwrap();
             let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
             for delete in entry_deletes {
-                meta_buf
-                    .register_delete(delete, entry_hash.clone())
-                    .await
-                    .unwrap();
+                meta_buf.register_delete(delete).await.unwrap();
             }
             let mut headers = meta_buf
                 .get_deletes_on_header(header_hash.clone().into())
@@ -511,17 +514,14 @@ mod tests {
         entry_deletes: &[ElementDelete],
         update_entries: &[NewEntryHeader],
         delete_updates: &[ElementDelete],
-        entry_hash: &EntryHash,
+        _entry_hash: &EntryHash,
         meta_buf: &mut MetadataBuf<'_>,
     ) {
         for e in new_entries.iter().chain(update_entries.iter()) {
             meta_buf.register_header(e.clone()).await.unwrap();
         }
         for delete in entry_deletes.iter().chain(delete_updates.iter()) {
-            meta_buf
-                .register_delete(delete.clone(), entry_hash.clone())
-                .await
-                .unwrap();
+            meta_buf.register_delete(delete.clone()).await.unwrap();
         }
     }
 
@@ -536,12 +536,17 @@ mod tests {
         for _ in 0..10 {
             let (e, h) = test_create(entry_hash.clone(), fx).await;
             entry_creates.push(NewEntryHeader::Create(e));
-            let (e, _) = test_delete(h.clone().into_hash(), fx).await;
+            let (e, _) = test_delete(h.clone().into_hash(), entry_hash.clone(), fx).await;
             entry_deletes.push(e);
-            let (e, h) =
-                test_update(h.into_hash(), entry_hash.clone(), IntendedFor::Entry, fx).await;
+            let (e, h) = test_update(
+                h.into_hash(),
+                entry_hash.clone(),
+                IntendedFor::Entry(fx.entry_hash()),
+                fx,
+            )
+            .await;
             entry_updates.push(NewEntryHeader::Update(e));
-            let (e, _) = test_delete(h.into_hash(), fx).await;
+            let (e, _) = test_delete(h.into_hash(), entry_hash.clone(), fx).await;
             delete_updates.push(e);
         }
     }

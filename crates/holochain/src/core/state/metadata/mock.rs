@@ -3,7 +3,10 @@ use super::*;
 mock! {
     pub MetadataBuf
     {
-        fn get_links<'a>(&self, key: &'a LinkMetaKey<'a>) -> DatabaseResult<Vec<LinkMetaVal>>;
+        fn get_links<'a>(
+            &self,
+            key: &'a LinkMetaKey<'a>,
+        ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError>>>;
         fn add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()>;
         fn remove_link(&mut self, link_remove: LinkRemove) -> DatabaseResult<()>;
         fn sync_add_create(&self, create: header::EntryCreate) -> DatabaseResult<()>;
@@ -12,12 +15,8 @@ mock! {
             &mut self,
             header: Header,
         ) -> DatabaseResult<()>;
-        fn sync_register_update(&mut self, update: header::EntryUpdate, entry: Option<EntryHash>) -> DatabaseResult<()>;
-        fn sync_register_delete(
-            &mut self,
-            delete: header::ElementDelete,
-            entry_hash: EntryHash,
-        ) -> DatabaseResult<()>;
+        fn sync_register_update(&mut self, update: header::EntryUpdate) -> DatabaseResult<()>;
+        fn sync_register_delete(&mut self, delete: header::ElementDelete) -> DatabaseResult<()>;
         fn register_raw_on_entry(&mut self, entry_hash: EntryHash, value: SysMetaVal) -> DatabaseResult<()>;
         fn register_raw_on_header(&mut self, header_hash: HeaderHash, value: SysMetaVal);
         fn get_dht_status(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus>;
@@ -52,7 +51,11 @@ mock! {
 
 #[async_trait::async_trait]
 impl MetadataBufT for MockMetadataBuf {
-    fn get_links<'a>(&self, key: &'a LinkMetaKey) -> DatabaseResult<Vec<LinkMetaVal>> {
+    fn get_links<'a>(
+        &self,
+        key: &'a LinkMetaKey,
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError> + '_>>
+    {
         self.get_links(key)
     }
 
@@ -132,20 +135,12 @@ impl MetadataBufT for MockMetadataBuf {
         self.sync_register_activity(header)
     }
 
-    async fn register_update(
-        &mut self,
-        update: header::EntryUpdate,
-        entry: Option<EntryHash>,
-    ) -> DatabaseResult<()> {
-        self.sync_register_update(update, entry)
+    async fn register_update(&mut self, update: header::EntryUpdate) -> DatabaseResult<()> {
+        self.sync_register_update(update)
     }
 
-    async fn register_delete(
-        &mut self,
-        delete: header::ElementDelete,
-        entry_hash: EntryHash,
-    ) -> DatabaseResult<()> {
-        self.sync_register_delete(delete, entry_hash)
+    async fn register_delete(&mut self, delete: header::ElementDelete) -> DatabaseResult<()> {
+        self.sync_register_delete(delete)
     }
 
     fn register_raw_on_entry(

@@ -1,8 +1,8 @@
 //! Various types for the databases involved in the DhtOp integration workflow
 
-use crate::core::workflow::produce_dht_ops_workflow::dht_op_light::DhtOpLight;
 use fallible_iterator::FallibleIterator;
 use holo_hash::*;
+use holochain_p2p::dht_arc::DhtArc;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::{
     buffer::KvBuf,
@@ -11,13 +11,41 @@ use holochain_state::{
     prelude::{BufferedStore, GetDb, Reader},
 };
 use holochain_types::{
-    dht_arc::DhtArc, dht_op::DhtOp, timestamp::TS_SIZE, validate::ValidationStatus, Timestamp,
-    TimestampKey,
+    dht_op::{DhtOp, DhtOpLight},
+    timestamp::TS_SIZE,
+    validate::ValidationStatus,
+    Timestamp, TimestampKey,
 };
 
 /// Database type for AuthoredDhtOps
 /// Buffer for accessing [DhtOp]s that you authored and finding the amount of validation receipts
-pub type AuthoredDhtOpsStore<'env> = KvBuf<'env, DhtOpHash, u32, Reader<'env>>;
+pub type AuthoredDhtOpsStore<'env> =
+    KvBuf<'env, AuthoredDhtOpsKey, AuthoredDhtOpsValue, Reader<'env>>;
+
+/// The key type for the AuthoredDhtOps db: a DhtOpHash
+pub type AuthoredDhtOpsKey = DhtOpHash;
+
+/// A type for storing in databases that only need the hashes.
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub struct AuthoredDhtOpsValue {
+    /// Signatures and hashes of the op
+    pub op: DhtOpLight,
+    /// Validation receipts received
+    pub receipt_count: u32,
+    /// Time last published, None if never published
+    pub last_publish_time: Option<Timestamp>,
+}
+
+impl AuthoredDhtOpsValue {
+    /// Create a new value from a DhtOpLight with no receipts and no timestamp
+    pub fn from_light(op: DhtOpLight) -> Self {
+        Self {
+            op,
+            receipt_count: 0,
+            last_publish_time: None,
+        }
+    }
+}
 
 /// Database type for IntegrationQueue
 /// Queue of ops ready to be integrated
@@ -107,8 +135,6 @@ impl From<IntegrationQueueKey> for (TimestampKey, DhtOpHash) {
 pub struct IntegratedDhtOpsValue {
     /// The op's validation status
     pub validation_status: ValidationStatus,
-    /// Where to send this op
-    pub basis: AnyDhtHash,
     /// Signatures and hashes of the op
     pub op: DhtOpLight,
     /// Time when the op was integrated
@@ -120,7 +146,7 @@ pub struct IntegratedDhtOpsValue {
 pub struct IntegrationQueueValue {
     /// The op's validation status
     pub validation_status: ValidationStatus,
-    /// Signatures and hashes of the op
+    /// The op
     pub op: DhtOp,
 }
 
@@ -132,6 +158,12 @@ impl<'env> IntegratedDhtOpsBuf<'env> {
             store: IntegratedDhtOpsStore::new(&reader, db)?,
         })
     }
+
+    /// simple get by dht_op_hash
+    pub fn get(&'_ self, op_hash: &DhtOpHash) -> DatabaseResult<Option<IntegratedDhtOpsValue>> {
+        self.store.get(op_hash)
+    }
+
     /// Get ops that match optional queries:
     /// - from a time (Inclusive)
     /// - to a time (Exclusive)
@@ -142,24 +174,30 @@ impl<'env> IntegratedDhtOpsBuf<'env> {
         to: Option<Timestamp>,
         dht_arc: Option<DhtArc>,
     ) -> DatabaseResult<
-        Box<dyn FallibleIterator<Item = IntegratedDhtOpsValue, Error = DatabaseError> + 'env>,
+        Box<
+            dyn FallibleIterator<Item = (DhtOpHash, IntegratedDhtOpsValue), Error = DatabaseError>
+                + 'env,
+        >,
     > {
         Ok(Box::new(
             self.store
                 .iter()?
-                .filter_map(move |(_, v)| match from {
-                    Some(time) if v.when_integrated >= time => Ok(Some(v)),
-                    None => Ok(Some(v)),
+                .map(move |(k, v)| Ok((DhtOpHash::with_pre_hashed(k.to_vec()), v)))
+                .filter_map(move |(k, v)| match from {
+                    Some(time) if v.when_integrated >= time => Ok(Some((k, v))),
+                    None => Ok(Some((k, v))),
                     _ => Ok(None),
                 })
-                .filter_map(move |v| match to {
-                    Some(time) if v.when_integrated < time => Ok(Some(v)),
-                    None => Ok(Some(v)),
+                .filter_map(move |(k, v)| match to {
+                    Some(time) if v.when_integrated < time => Ok(Some((k, v))),
+                    None => Ok(Some((k, v))),
                     _ => Ok(None),
                 })
-                .filter_map(move |v| match dht_arc {
-                    Some(dht_arc) if dht_arc.contains(v.basis.get_loc()) => Ok(Some(v)),
-                    None => Ok(Some(v)),
+                .filter_map(move |(k, v)| match dht_arc {
+                    Some(dht_arc) if dht_arc.contains(v.op.dht_basis().get_loc()) => {
+                        Ok(Some((k, v)))
+                    }
+                    None => Ok(Some((k, v))),
                     _ => Ok(None),
                 }),
         ))
@@ -200,8 +238,7 @@ mod tests {
             .into_iter()
             .map(|when_integrated| IntegratedDhtOpsValue {
                 validation_status: ValidationStatus::Valid,
-                basis: basis.next().unwrap(),
-                op: DhtOpLight::RegisterAgentActivity(fixt!(HeaderHash)),
+                op: DhtOpLight::RegisterAgentActivity(fixt!(HeaderHash), basis.next().unwrap()),
                 when_integrated: when_integrated.into(),
             });
 
@@ -213,7 +250,7 @@ mod tests {
             for mut value in values {
                 buf.put(dht_hash.next().unwrap(), value.clone()).unwrap();
                 expected.push(value.clone());
-                value.basis = same_basis.clone();
+                value.op = DhtOpLight::RegisterAgentActivity(fixt!(HeaderHash), same_basis.clone());
                 buf.put(dht_hash.next().unwrap(), value.clone()).unwrap();
                 expected.push(value.clone());
             }
@@ -230,6 +267,7 @@ mod tests {
             let mut r = buf
                 .query(None, None, None)
                 .unwrap()
+                .map(|(_, v)| Ok(v))
                 .collect::<Vec<_>>()
                 .unwrap();
             r.sort_by_key(|v| v.when_integrated.clone());
@@ -238,6 +276,7 @@ mod tests {
             let mut r = buf
                 .query(Some(times_exp[1].clone().into()), None, None)
                 .unwrap()
+                .map(|(_, v)| Ok(v))
                 .collect::<Vec<_>>()
                 .unwrap();
             r.sort_by_key(|v| v.when_integrated.clone());
@@ -252,6 +291,7 @@ mod tests {
             let mut r = buf
                 .query(Some(ages_ago.into()), Some(future.into()), None)
                 .unwrap()
+                .map(|(_, v)| Ok(v))
                 .collect::<Vec<_>>()
                 .unwrap();
             r.sort_by_key(|v| v.when_integrated.clone());
@@ -271,6 +311,7 @@ mod tests {
                     Some(DhtArc::new(same_basis.get_loc(), 1)),
                 )
                 .unwrap()
+                .map(|(_, v)| Ok(v))
                 .collect::<Vec<_>>()
                 .unwrap();
             r.sort_by_key(|v| v.when_integrated.clone());
@@ -281,6 +322,7 @@ mod tests {
             let mut r = buf
                 .query(None, None, Some(DhtArc::new(same_basis.get_loc(), 1)))
                 .unwrap()
+                .map(|(_, v)| Ok(v))
                 .collect::<Vec<_>>()
                 .unwrap();
             r.sort_by_key(|v| v.when_integrated.clone());

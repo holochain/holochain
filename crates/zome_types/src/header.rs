@@ -1,7 +1,7 @@
 use crate::{entry_def::EntryVisibility, link::LinkTag, timestamp::Timestamp};
 pub use builder::{HeaderBuilder, HeaderBuilderCommon};
 use holo_hash::{
-    impl_hashable_content, AgentPubKey, DnaHash, EntryHash, HashableContent, HeaderHash,
+    impl_hashable_content, AgentPubKey, DnaHash, EntryHash, HashableContent, HeaderHash, HoloHashed,
 };
 use holochain_serialized_bytes::prelude::*;
 
@@ -39,6 +39,8 @@ pub enum Header {
     EntryUpdate(EntryUpdate),
     ElementDelete(ElementDelete),
 }
+
+pub type HeaderHashed = HoloHashed<Header>;
 
 /// a utility wrapper to write intos for our data types
 macro_rules! write_into_header {
@@ -160,10 +162,12 @@ pub struct ZomeId(u8);
 pub struct EntryDefId(u8);
 
 /// Specifies whether an [EntryUpdate] refers to an [Entry] or a [Header]
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+#[derive(
+    Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash, Ord, PartialOrd,
+)]
 pub enum IntendedFor {
     Header,
-    Entry,
+    Entry(EntryHash),
 }
 
 /// The Dna Header is always the first header in a source chain
@@ -219,6 +223,10 @@ pub struct LinkRemove {
     pub timestamp: Timestamp,
     pub header_seq: u32,
     pub prev_header: HeaderHash,
+
+    /// this is redundant with the `LinkAdd` header but needs to be included to facilitate DHT ops
+    /// this is NOT exposed to wasm developers and is validated by the subconscious to ensure that
+    /// it always matches the `base_address` of the `LinkAdd`
     pub base_address: EntryHash,
     /// The address of the `LinkAdd` being reversed
     pub link_add_address: HeaderHash,
@@ -250,7 +258,7 @@ pub struct ChainClose {
 
 /// A header which "speaks" Entry content into being. The same content can be
 /// referenced by multiple such headers.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 pub struct EntryCreate {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
@@ -269,7 +277,7 @@ pub struct EntryCreate {
 /// intended target, the result of which is is that both Headers and Entries can
 /// have a tree of such metadata update references. Entries get "updated" to
 /// other entries, and Headers get "updated" to other headers.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 pub struct EntryUpdate {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
@@ -298,12 +306,13 @@ pub struct ElementDelete {
 
     /// Address of the Element being deleted
     pub removes_address: HeaderHash,
+    pub removes_entry_address: EntryHash,
 }
 
 /// Allows Headers which reference Entries to know what type of Entry it is
 /// referencing. Useful for examining Headers without needing to fetch the
 /// corresponding Entries.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 pub enum EntryType {
     /// An AgentPubKey
     AgentPubKey,
@@ -327,7 +336,7 @@ impl EntryType {
 }
 
 /// Information about a class of Entries provided by the DNA
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 pub struct AppEntryType {
     /// u8 identifier of what entry type this is
     /// this needs to match the position of the entry type returned by entry defs

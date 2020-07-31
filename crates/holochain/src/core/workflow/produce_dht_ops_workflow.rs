@@ -1,7 +1,9 @@
 use super::{error::WorkflowResult, CallZomeWorkspace};
 use crate::core::queue_consumer::{OneshotWriter, TriggerSender, WorkComplete};
 use crate::core::state::{
-    dht_op_integration::{AuthoredDhtOpsStore, IntegrationQueueStore, IntegrationQueueValue},
+    dht_op_integration::{
+        AuthoredDhtOpsStore, AuthoredDhtOpsValue, IntegrationQueueStore, IntegrationQueueValue,
+    },
     workspace::{Workspace, WorkspaceResult},
 };
 use holochain_state::{
@@ -49,6 +51,11 @@ async fn produce_dht_ops_workflow_inner(
         for op in ops {
             let (op, hash) = DhtOpHashed::from_content(op).await.into_inner();
             debug!(?hash);
+            let value = AuthoredDhtOpsValue {
+                op: op.to_light().await,
+                receipt_count: 0,
+                last_publish_time: None,
+            };
             workspace.integration_queue.put(
                 (TimestampKey::now(), hash.clone()).into(),
                 IntegrationQueueValue {
@@ -56,7 +63,7 @@ async fn produce_dht_ops_workflow_inner(
                     op,
                 },
             )?;
-            workspace.authored_dht_ops.put(hash, 0)?;
+            workspace.authored_dht_ops.put(hash, value)?;
         }
         // Mark the dht op as complete
         call_zome_workspace.source_chain.complete_dht_op(index)?;
@@ -105,7 +112,7 @@ mod tests {
         test_utils::test_cell_env,
     };
     use holochain_types::{
-        dht_op::{ops_from_element, DhtOp, DhtOpHashed},
+        dht_op::{produce_ops_from_element, DhtOp, DhtOpHashed},
         observability, Entry, EntryHashed,
     };
     use holochain_zome_types::{
@@ -150,7 +157,7 @@ mod tests {
                 .await
                 .unwrap()
                 .unwrap();
-            ops_from_element(&element).unwrap()
+            produce_ops_from_element(&element).await.unwrap()
         }
     }
 
@@ -178,13 +185,14 @@ mod tests {
             let mut all_ops = Vec::new();
             // Collect the ops from genesis
             for h in headers {
-                let ops = ops_from_element(
+                let ops = produce_ops_from_element(
                     &source_chain
                         .get_element(h.as_hash())
                         .await
                         .unwrap()
                         .unwrap(),
                 )
+                .await
                 .unwrap();
                 all_ops.push(ops);
             }
@@ -259,7 +267,11 @@ mod tests {
                 .iter()
                 .unwrap()
                 .map(|(k, v)| {
-                    assert_eq!(v, 0);
+                    assert_matches!(v, AuthoredDhtOpsValue {
+                        receipt_count: 0,
+                        last_publish_time: None,
+                        ..
+                    });
                     Ok(DhtOpHash::with_pre_hashed(k.to_vec()))
                 })
                 .collect::<Vec<_>>()

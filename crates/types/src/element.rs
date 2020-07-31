@@ -1,262 +1,255 @@
-//! Defines a ChainElement, the basic unit of Holochain data.
+//! Defines a Element, the basic unit of Holochain data.
 
-use crate::{prelude::*, HeaderHashed};
-use derive_more::{From, Into};
+use crate::{
+    header::{WireElementDelete, WireNewEntryHeader},
+    prelude::*,
+    EntryHashed, HeaderHashed,
+};
+use error::{ElementGroupError, ElementGroupResult};
 use futures::future::FutureExt;
-use holo_hash::HeaderHash;
-use holo_hash::{hash_type, HashableContentBytes};
-use holochain_keystore::{KeystoreError, Signature};
+use holochain_keystore::KeystoreError;
 use holochain_serialized_bytes::prelude::*;
+pub use holochain_zome_types::element::*;
 use holochain_zome_types::entry::Entry;
-use holochain_zome_types::entry_def::EntryVisibility;
-use holochain_zome_types::header::Header;
+use holochain_zome_types::{
+    entry_def::EntryVisibility,
+    header::{EntryType, Header},
+};
 use must_future::MustBoxFuture;
+use std::{borrow::Cow, collections::BTreeSet};
 
-/// a chain element which is a triple containing the signature of the header along with the
-/// entry if the header type has one.
-#[derive(Clone, Debug, PartialEq)]
-pub struct ChainElement {
-    /// The signed header for this element
-    signed_header: SignedHeaderHashed,
-    /// If there is an entry associated with this header it will be here
-    maybe_entry: Option<Entry>,
-}
+#[allow(missing_docs)]
+pub mod error;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
-/// ChainElement without the hashes for sending across the network
+/// Element without the hashes for sending across the network
 pub struct WireElement {
     /// The signed header for this element
     signed_header: SignedHeader,
     /// If there is an entry associated with this header it will be here
     maybe_entry: Option<Entry>,
+    /// If this element is deleted then we require a single delete
+    /// in the cache as proof of the tombstone
+    deleted: Option<WireElementDelete>,
 }
 
-impl ChainElement {
-    /// Raw element constructor.  Used only when we know that the values are valid.
-    pub fn new(signed_header: SignedHeaderHashed, maybe_entry: Option<Entry>) -> Self {
-        Self {
-            signed_header,
-            maybe_entry,
+/// A group of elements with a common entry
+#[derive(Debug, Clone)]
+pub struct ElementGroup<'a> {
+    headers: Vec<Cow<'a, SignedHeaderHashed>>,
+    entry: Cow<'a, EntryHashed>,
+}
+
+impl<'a> ElementGroup<'a> {
+    /// Get the headers and header hashes
+    pub fn headers_and_hashes(&self) -> impl Iterator<Item = (&HeaderHash, &Header)> {
+        self.headers
+            .iter()
+            .map(|shh| shh.header_address())
+            .zip(self.headers.iter().map(|shh| shh.header()))
+    }
+    /// Amount of headers
+    pub fn len(&self) -> usize {
+        self.headers.len()
+    }
+    /// The entry's visibility
+    pub fn visibility(&self) -> ElementGroupResult<&EntryVisibility> {
+        self.headers
+            .first()
+            .ok_or(ElementGroupError::Empty)?
+            .header()
+            .entry_data()
+            .map(|(_, et)| et.visibility())
+            .ok_or(ElementGroupError::MissingEntryData)
+    }
+    /// The entry hash
+    pub fn entry_hash(&self) -> &EntryHash {
+        self.entry.as_hash()
+    }
+    /// The entry with hash
+    pub fn entry_hashed(&self) -> EntryHashed {
+        self.entry.clone().into_owned()
+    }
+    /// Get owned iterator of signed headers
+    pub fn owned_signed_headers(&self) -> impl Iterator<Item = SignedHeaderHashed> + 'a {
+        self.headers.clone().into_iter().map(|shh| shh.into_owned())
+    }
+
+    /// Create an element group from wire headers and an entry
+    pub async fn from_wire_elements<I: IntoIterator<Item = WireNewEntryHeader>>(
+        headers_iter: I,
+        entry_type: EntryType,
+        entry: Entry,
+    ) -> ElementGroupResult<ElementGroup<'a>> {
+        let iter = headers_iter.into_iter();
+        let mut headers = Vec::with_capacity(iter.size_hint().0);
+        let entry = EntryHashed::from_content(entry).await;
+        let entry_hash = entry.as_hash().clone();
+        let entry = Cow::Owned(entry);
+        for header in iter {
+            headers.push(Cow::Owned(
+                header
+                    .into_header(entry_type.clone(), entry_hash.clone())
+                    .await,
+            ))
         }
+
+        Ok(Self { headers, entry })
+    }
+}
+
+/// Responses from a dht get.
+/// These vary is size depending on the level of metadata required
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+pub enum GetElementResponse {
+    /// Can be combined with any other metadata monotonically
+    GetEntryFull(Option<Box<RawGetEntryResponse>>),
+    /// Placeholder for more optimized get
+    GetEntryPartial,
+    /// Placeholder for more optimized get
+    GetEntryCollapsed,
+    /// Get a single element
+    /// Can be combined with other metadata monotonically
+    GetHeader(Option<Box<WireElement>>),
+}
+
+/// This type gives full metadata that can be combined
+/// monotonically with other metadata and the actual data
+// in the most compact way that also avoids multiple calls.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+pub struct RawGetEntryResponse {
+    /// The live headers from this authority.
+    /// These can be collapsed to NewEntryHeaderLight
+    /// Which omits the EntryHash and EntryType,
+    /// saving 32 bytes each
+    pub live_headers: BTreeSet<WireNewEntryHeader>,
+    /// just the hashes of headers to delete
+    // TODO: Perf could just send the HeaderHash of the
+    // header being deleted but we would need to only ever store
+    // if there was a header delete in our MetadataBuf and
+    // not the delete header hash as we do now.
+    pub deletes: Vec<WireElementDelete>,
+    /// The entry shared across all headers
+    pub entry: Entry,
+    /// The entry_type shared across all headers
+    pub entry_type: EntryType,
+}
+
+impl RawGetEntryResponse {
+    /// Creates the response from a set of chain elements
+    /// that share the same entry with any deletes.
+    /// Note: It's the callers responsibility to check that
+    /// elements all have the same entry. This is not checked
+    /// due to the performance cost.
+    /// ### Panics
+    /// If the elements are not a header of EntryCreate or EntryDelete
+    /// or there is no entry or the entry hash is different
+    pub fn from_elements<E>(elements: E, deletes: Vec<WireElementDelete>) -> Option<Self>
+    where
+        E: IntoIterator<Item = Element>,
+    {
+        let mut elements = elements.into_iter();
+        elements.next().map(|element| {
+            let mut live_headers = BTreeSet::new();
+            let (new_entry_header, entry_type, entry) = Self::from_element(element);
+            live_headers.insert(new_entry_header);
+            let r = Self {
+                live_headers,
+                deletes,
+                entry,
+                entry_type,
+            };
+            elements.fold(r, |mut response, element| {
+                let (new_entry_header, entry_type, entry) = Self::from_element(element);
+                debug_assert_eq!(response.entry, entry);
+                debug_assert_eq!(response.entry_type, entry_type);
+                response.live_headers.insert(new_entry_header);
+                response
+            })
+        })
     }
 
-    /// Break this element into its components
-    pub fn into_inner(self) -> (SignedHeaderHashed, Option<Entry>) {
-        (self.signed_header, self.maybe_entry)
+    fn from_element(element: Element) -> (WireNewEntryHeader, EntryType, Entry) {
+        let (shh, entry) = element.into_inner();
+        let entry = entry.expect("Get entry responses cannot be created without entries");
+        let (header, signature) = shh.into_header_and_signature();
+        let (new_entry_header, entry_type) = match header.into_content() {
+            Header::EntryCreate(ec) => {
+                let et = ec.entry_type.clone();
+                (WireNewEntryHeader::Create((ec, signature).into()), et)
+            }
+            Header::EntryUpdate(eu) => {
+                let et = eu.entry_type.clone();
+                (WireNewEntryHeader::Update((eu, signature).into()), et)
+            }
+            h @ _ => panic!(
+                "Get entry responses cannot be created from headers
+                    other then EntryCreate or EntryUpdate.
+                    Tried to with: {:?}",
+                h
+            ),
+        };
+        (new_entry_header, entry_type, entry)
     }
+}
 
+/// Extension trait to keep zome types minimal
+#[async_trait::async_trait]
+pub trait ElementExt {
+    /// Validate the signature matches the data
+    async fn validate(&self) -> Result<(), KeystoreError>;
+}
+
+#[async_trait::async_trait]
+impl ElementExt for Element {
     /// Validates a chain element
-    pub async fn validate(&self) -> Result<(), KeystoreError> {
-        self.signed_header.validate().await?;
+    async fn validate(&self) -> Result<(), KeystoreError> {
+        self.signed_header().validate().await?;
 
         //TODO: make sure that any cases around entry existence are valid:
         //      SourceChainError::InvalidStructure(HeaderAndEntryMismatch(address)),
         Ok(())
     }
-
-    /// Access the signature portion of this triple.
-    pub fn signature(&self) -> &Signature {
-        self.signed_header.signature()
-    }
-
-    /// Access the header address
-    pub fn header_address(&self) -> &HeaderHash {
-        self.signed_header.header_address()
-    }
-
-    /// Access the Header portion of this triple.
-    pub fn header(&self) -> &Header {
-        self.signed_header.header()
-    }
-
-    /// Access the HeaderHashed portion.
-    pub fn header_hashed(&self) -> &HeaderHashed {
-        self.signed_header.header_hashed()
-    }
-
-    /// Access the Entry portion of this triple as a ChainElementEntry,
-    /// which includes the context around the presence or absence of the entry.
-    pub fn entry(&self) -> ChainElementEntry {
-        let maybe_visibilty = self
-            .header()
-            .entry_data()
-            .map(|(_, entry_type)| entry_type.visibility());
-        match (self.maybe_entry.as_ref(), maybe_visibilty) {
-            (Some(entry), Some(_)) => ChainElementEntry::Present(entry),
-            (None, Some(EntryVisibility::Private)) => ChainElementEntry::Hidden,
-            (None, None) => ChainElementEntry::NotApplicable,
-            (Some(_), None) => {
-                unreachable!("Entry is present for a Header type which has no entry reference")
-            }
-            (None, Some(EntryVisibility::Public)) => unreachable!("Entry data missing for element"),
-        }
-    }
 }
 
-/// Represents the different ways the entry_address reference within a Header
-/// can be intepreted
-#[derive(Clone, Debug, PartialEq, Eq, derive_more::From)]
-pub enum ChainElementEntry<'a> {
-    /// The Header has an entry_address reference, and the Entry is accessible.
-    Present(&'a Entry),
-    /// The Header has an entry_address reference, but we are in a public
-    /// context and the entry is private.
-    Hidden,
-    /// The Header does not contain an entry_address reference.
-    NotApplicable,
-}
-
-impl<'a> ChainElementEntry<'a> {
-    /// Provides entry data if it exists.
-    ///
-    /// Collapses the enum down to the two possibilities of
-    /// extant or nonextant Entry data
-    pub fn as_option(&'a self) -> Option<&'a Entry> {
-        if let ChainElementEntry::Present(entry) = self {
-            Some(entry)
-        } else {
-            None
-        }
-    }
-}
-
-/// A combination of a Header and its signature.
-///
-/// Has implementations From and Into its tuple form.
-#[derive(Clone, Debug, From, Into, PartialEq, Serialize, Deserialize, SerializedBytes)]
-pub struct SignedHeader(Header, Signature);
-
-impl SignedHeader {
-    /// Accessor for the Header
-    pub fn header(&self) -> &Header {
-        &self.0
-    }
-
-    /// Accessor for the Signature
-    pub fn signature(&self) -> &Signature {
-        &self.1
-    }
-}
-
-impl HashableContent for SignedHeader {
-    type HashType = hash_type::Header;
-
-    fn hash_type(&self) -> Self::HashType {
-        hash_type::Header
-    }
-
-    fn hashable_content(&self) -> HashableContentBytes {
-        HashableContentBytes::Content(
-            (&self.0)
-                .try_into()
-                .expect("Could not serialize HashableContent"),
-        )
-    }
-}
-
-// HACK: In this representation, we have to clone the Header and store it twice,
-// once in the HeaderHashed, and once in the SignedHeader. The reason is that
-// the API currently requires references to both types, and it was easier to
-// do a simple clone than to refactor the entire struct and API to remove the
-// need for one of those references. We probably SHOULD do that refactor at
-// some point.
-// FIXME: refactor so that HeaderHashed is not stored, and then remove the
-// header_hashed method which returns a reference to HeaderHashed.
-// BTW, I tried to think about the possibility of the following, but none were easy:
-// - Having a lazily instantiable SignedHeader, so we only have to clone if needed
-// - Having HeaderHashed take AsRefs for its arguments, so you can have a
-//    HeaderHashed of references instead of values
-// FIXME: OR, even better yet, do away with this struct and just use
-// HoloHashed<SignedHeader> instead, if possible and expedient
-/// The header and the signature that signed it
-#[derive(Clone, Debug, PartialEq)]
-pub struct SignedHeaderHashed {
-    header: HeaderHashed,
-    signed_header: SignedHeader,
+/// Extension trait to keep zome types minimal
+#[async_trait::async_trait]
+pub trait SignedHeaderHashedExt {
+    /// Create a hash from data
+    fn from_content(signed_header: SignedHeader) -> MustBoxFuture<'static, SignedHeaderHashed>;
+    /// Sign some content
+    async fn new(
+        keystore: &KeystoreSender,
+        header: HeaderHashed,
+    ) -> Result<SignedHeaderHashed, KeystoreError>;
+    /// Validate the data
+    async fn validate(&self) -> Result<(), KeystoreError>;
 }
 
 #[allow(missing_docs)]
-impl SignedHeaderHashed {
-    /// Unwrap the complete contents of this "Hashed" wrapper.
-    pub fn into_inner(self) -> (SignedHeader, HeaderHash) {
-        let (header, hash) = self.header.into_inner();
-        ((header, self.signed_header.1).into(), hash)
-    }
-
-    /// Access the main item stored in this wrapper type.
-    pub fn as_content(&self) -> &SignedHeader {
-        &self.signed_header
-    }
-
-    /// Access the already-calculated hash stored in this wrapper type.
-    pub fn as_hash(&self) -> &HeaderHash {
-        self.header.as_hash()
-    }
-
-    pub fn from_content(signed_header: SignedHeader) -> MustBoxFuture<'static, Self>
+#[async_trait::async_trait]
+impl SignedHeaderHashedExt for SignedHeaderHashed {
+    fn from_content(signed_header: SignedHeader) -> MustBoxFuture<'static, Self>
     where
         Self: Sized,
     {
         async move {
             let (header, signature) = signed_header.into();
-            Self {
-                header: HeaderHashed::from_content(header.clone()).await,
-                signed_header: SignedHeader(header, signature),
-            }
+            Self::with_presigned(HeaderHashed::from_content(header).await, signature)
         }
         .boxed()
         .into()
     }
-}
-
-impl SignedHeaderHashed {
     /// SignedHeader constructor
-    pub async fn new(
-        keystore: &KeystoreSender,
-        header: HeaderHashed,
-    ) -> Result<Self, KeystoreError> {
+    async fn new(keystore: &KeystoreSender, header: HeaderHashed) -> Result<Self, KeystoreError> {
         let signature = header.author().sign(keystore, &*header).await?;
         Ok(Self::with_presigned(header, signature))
     }
 
-    /// Constructor for an already signed header
-    pub fn with_presigned(header: HeaderHashed, signature: Signature) -> Self {
-        let signed_header = SignedHeader(header.as_content().clone(), signature);
-        Self {
-            header,
-            signed_header,
-        }
-    }
-
-    /// Break apart into a HeaderHashed and a Signature
-    pub fn into_header_and_signature(self) -> (HeaderHashed, Signature) {
-        (self.header, self.signed_header.1)
-    }
-
-    /// Access the Header Hash.
-    pub fn header_address(&self) -> &HeaderHash {
-        self.header.as_hash()
-    }
-
-    /// Access the Header portion.
-    pub fn header(&self) -> &Header {
-        &self.header
-    }
-
-    /// Access the HeaderHashed portion.
-    pub fn header_hashed(&self) -> &HeaderHashed {
-        &self.header
-    }
-
-    /// Access the signature portion.
-    pub fn signature(&self) -> &Signature {
-        self.signed_header.signature()
-    }
-
     /// Validates a signed header
-    pub async fn validate(&self) -> Result<(), KeystoreError> {
+    async fn validate(&self) -> Result<(), KeystoreError> {
         if !self
-            .header
+            .header()
             .author()
             .verify_signature(self.signature(), self.header())
             .await?
@@ -270,37 +263,35 @@ impl SignedHeaderHashed {
     }
 }
 
-impl From<HoloHashed<SignedHeader>> for SignedHeaderHashed {
-    fn from(hashed: HoloHashed<SignedHeader>) -> SignedHeaderHashed {
-        let (signed_header, hash) = hashed.into_inner();
-        SignedHeaderHashed {
-            header: HeaderHashed::with_pre_hashed(signed_header.header().clone(), hash),
-            signed_header,
-        }
-    }
-}
-
-impl From<SignedHeaderHashed> for HoloHashed<SignedHeader> {
-    fn from(shh: SignedHeaderHashed) -> HoloHashed<SignedHeader> {
-        let hash = shh.header.into_hash();
-        HoloHashed::with_pre_hashed(shh.signed_header, hash)
-    }
-}
-
 impl WireElement {
-    /// Convert into a [ChainElement] when receiving from the network
-    pub async fn into_element(self) -> Result<ChainElement, SerializedBytesError> {
-        Ok(ChainElement::new(
+    /// Convert into a [Element] when receiving from the network
+    pub async fn into_element_and_delete(self) -> (Element, Option<Element>) {
+        let header = Element::new(
             SignedHeaderHashed::from_content(self.signed_header).await,
             self.maybe_entry,
-        ))
+        );
+        let deleted = match self.deleted {
+            Some(deleted) => Some(deleted.into_element().await),
+            None => None,
+        };
+        (header, deleted)
     }
-    /// Convert from a [ChainElement] when sending to the network
-    pub fn from_element(e: ChainElement) -> Self {
+    /// Convert from a [Element] when sending to the network
+    pub fn from_element(e: Element, deleted: Option<WireElementDelete>) -> Self {
+        let (signed_header, maybe_entry) = e.into_inner();
         Self {
-            signed_header: e.signed_header.signed_header,
-            maybe_entry: e.maybe_entry,
+            signed_header: signed_header.into_inner().0,
+            maybe_entry: maybe_entry,
+            deleted,
         }
+    }
+
+    /// Get the entry hash if there is one
+    pub fn entry_hash(&self) -> Option<&EntryHash> {
+        self.signed_header
+            .header()
+            .entry_data()
+            .map(|(hash, _)| hash)
     }
 }
 

@@ -1,8 +1,9 @@
 #![deny(missing_docs)]
 //! Errors occurring during a [Ribosome] call
 
-use crate::core::state::source_chain::SourceChainError;
+use crate::core::state::{cascade::error::CascadeError, source_chain::SourceChainError};
 use crate::core::workflow::call_zome_workflow::unsafe_call_zome_workspace::error::UnsafeCallZomeWorkspaceError;
+use holo_hash::HeaderHash;
 use holochain_crypto::CryptoError;
 use holochain_serialized_bytes::prelude::SerializedBytesError;
 use holochain_types::dna::error::DnaError;
@@ -39,6 +40,13 @@ pub enum RibosomeError {
     #[error("An error with entry defs: {0}")]
     EntryDefs(ZomeName, String),
 
+    /// a mandatory dependency for an element doesn't exist
+    /// for example a remove link ribosome call needs to find the add link in order to infer the
+    /// correct base and this dependent relationship exists before even subconscious validation
+    /// kicks in
+    #[error("A mandatory element is missing, header hash: {0}")]
+    ElementDeps(HeaderHash),
+
     /// ident
     #[error(transparent)]
     CryptoError(#[from] CryptoError),
@@ -46,6 +54,10 @@ pub enum RibosomeError {
     /// ident
     #[error(transparent)]
     DatabaseError(#[from] holochain_state::error::DatabaseError),
+
+    /// ident
+    #[error(transparent)]
+    CascadeError(#[from] CascadeError),
 
     /// ident
     #[error(transparent)]

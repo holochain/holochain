@@ -1,6 +1,6 @@
 use crate::core::ribosome::error::RibosomeResult;
-use crate::core::ribosome::wasm_ribosome::WasmRibosome;
 use crate::core::ribosome::CallContext;
+use crate::core::ribosome::RibosomeT;
 use crate::core::state::source_chain::SourceChainResult;
 use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
 use futures::FutureExt;
@@ -13,7 +13,7 @@ use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
 pub fn agent_info<'a>(
-    _ribosome: Arc<WasmRibosome>,
+    _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     _input: AgentInfoInput,
 ) -> RibosomeResult<AgentInfoOutput> {

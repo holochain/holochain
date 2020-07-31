@@ -8,8 +8,9 @@ use holochain_p2p::{
 };
 use holochain_serialized_bytes::UnsafeBytes;
 use holochain_types::{
-    element::SignedHeaderHashed, test_utils::fake_header_hash, Entry, EntryHashed, HeaderHashed,
-    Timestamp,
+    element::{SignedHeaderHashed, SignedHeaderHashedExt},
+    test_utils::fake_header_hash,
+    Entry, EntryHashed, HeaderHashed, Timestamp,
 };
 use holochain_zome_types::entry_def::EntryVisibility;
 use holochain_zome_types::header::{EntryCreate, EntryType, Header};
@@ -50,11 +51,14 @@ pub async fn fake_unique_element(
 }
 
 /// Convenience constructor for cell networks
-pub async fn test_network() -> (HolochainP2pRef, HolochainP2pEventReceiver, HolochainP2pCell) {
+pub async fn test_network(
+    dna_hash: Option<DnaHash>,
+    agent_key: Option<AgentPubKey>,
+) -> (HolochainP2pRef, HolochainP2pEventReceiver, HolochainP2pCell) {
     let (network, recv) = spawn_holochain_p2p().await.unwrap();
-    let dna = fixt!(DnaHash);
+    let dna = dna_hash.unwrap_or_else(|| fixt!(DnaHash));
     let mut key_fixt = AgentPubKeyFixturator::new(Predictable);
-    let agent_key = key_fixt.next().unwrap();
+    let agent_key = agent_key.unwrap_or_else(|| key_fixt.next().unwrap());
     let cell_network = network.to_cell(dna.clone(), agent_key.clone());
     network.join(dna.clone(), agent_key).await.unwrap();
     // TODO: Network seems to require a minimum of two agents to function

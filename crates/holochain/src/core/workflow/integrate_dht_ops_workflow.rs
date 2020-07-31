@@ -15,7 +15,8 @@ use crate::core::{
 };
 use error::WorkflowResult;
 use fallible_iterator::FallibleIterator;
-use holo_hash::HasHash;
+use holo_hash::HeaderHash;
+use holochain_keystore::Signature;
 use holochain_state::{
     buffer::BufferedStore,
     buffer::KvBuf,
@@ -23,13 +24,14 @@ use holochain_state::{
     prelude::{GetDb, Reader, Writer},
 };
 use holochain_types::{
-    dht_op::{DhtOp, DhtOpHashed},
-    element::SignedHeaderHashed,
+    dht_op::{produce_op_lights_from_elements, DhtOp, DhtOpHashed, DhtOpLight},
+    element::{Element, SignedHeaderHashed, SignedHeaderHashedExt},
     validate::ValidationStatus,
-    EntryHashed, HeaderHashed, Timestamp, TimestampKey,
+    Entry, EntryHashed, Timestamp, TimestampKey,
 };
-use holochain_zome_types::header::IntendedFor;
-use produce_dht_ops_workflow::dht_op_light::{dht_op_to_light_basis, error::DhtOpConvertError};
+use holochain_zome_types::{element::SignedHeader, header::IntendedFor, Header};
+use produce_dht_ops_workflow::dht_op_light::error::{DhtOpConvertError, DhtOpConvertResult};
+use std::convert::TryInto;
 use tracing::*;
 
 mod tests;
@@ -89,7 +91,9 @@ pub async fn integrate_dht_ops_workflow(
             // only integrate this op if it hasn't been integrated already!
             // TODO: test for this [ B-01894 ]
             if workspace.integrated_dht_ops.get(&op_hash)?.is_none() {
-                match integrate_single_dht_op(&mut workspace, value).await? {
+                match integrate_single_dht_op(value, &mut workspace.elements, &mut workspace.meta)
+                    .await?
+                {
                     Outcome::Integrated(integrated) => {
                         workspace.integrated_dht_ops.put(op_hash, integrated)?;
                         num_integrated += 1;
@@ -141,151 +145,252 @@ pub async fn integrate_dht_ops_workflow(
     Ok(result)
 }
 
-#[instrument(skip(workspace, value))]
+/// Integrate a single DhtOp to the specified stores.
+///
+/// The two stores are intended to be either the pair of Vaults,
+/// or the pair of Caches, but never a mixture of the two.
+///
+/// We can skip integrating element data when integrating data as an Author
+/// rather than as an Authority, hence the last parameter.
+#[instrument(skip(value, element_store, meta_store))]
 async fn integrate_single_dht_op(
-    workspace: &mut IntegrateDhtOpsWorkspace<'_>,
     value: IntegrationQueueValue,
-) -> WorkflowResult<Outcome> {
-    debug!("Starting integrate dht ops workflow");
+    element_store: &mut ElementBuf<'_>,
+    meta_store: &mut MetadataBuf<'_>,
+) -> DhtOpConvertResult<Outcome> {
+    match integrate_single_element(value, element_store).await? {
+        Outcome::Integrated(v) => {
+            integrate_single_metadata(v.op.clone(), element_store, meta_store).await?;
+            debug!("integrating");
+            Ok(Outcome::Integrated(v))
+        }
+        v @ Outcome::Deferred(_) => Ok(v),
+    }
+}
+
+async fn integrate_single_element(
+    value: IntegrationQueueValue,
+    element_store: &mut ElementBuf<'_>,
+) -> DhtOpConvertResult<Outcome> {
     {
         // Process each op
         let IntegrationQueueValue {
             op,
             validation_status,
         } = value;
+        let light_op = op.to_light().await;
 
-        // TODO: PERF: We don't really need this clone because dht_to_op_light_basis could
-        // return the full op as it's not consumed when making hashes
-        match op.clone() {
-            DhtOp::StoreElement(signature, header, maybe_entry) => {
-                let header = HeaderHashed::from_content(header).await;
-                let signed_header = SignedHeaderHashed::with_presigned(header, signature);
-                let entry_hashed = match maybe_entry {
-                    Some(entry) => Some(EntryHashed::from_content(*entry).await),
-                    None => None,
-                };
-                // Store the entry
-                workspace.elements.put(signed_header, entry_hashed)?;
-            }
-            DhtOp::StoreEntry(signature, new_entry_header, entry) => {
-                // Reference to headers
-                workspace
-                    .meta
-                    .register_header(new_entry_header.clone())
-                    .await?;
+        async fn put_data(
+            signature: Signature,
+            header: Header,
+            maybe_entry: Option<Entry>,
+            element_store: &mut ElementBuf<'_>,
+        ) -> DhtOpConvertResult<()> {
+            let signed_header =
+                SignedHeaderHashed::from_content(SignedHeader(header, signature)).await;
+            let maybe_entry_hashed = match maybe_entry {
+                Some(entry) => Some(EntryHashed::from_content(entry).await),
+                None => None,
+            };
+            element_store.put(signed_header, maybe_entry_hashed)?;
+            Ok(())
+        }
 
-                let header = HeaderHashed::from_content(new_entry_header.into()).await;
-                let signed_header = SignedHeaderHashed::with_presigned(header, signature);
-                let entry = EntryHashed::from_content(*entry).await;
-                // Store Header and Entry
-                workspace.elements.put(signed_header, Some(entry))?;
-            }
-            DhtOp::RegisterAgentActivity(signature, header) => {
-                // Store header
-                let header_hashed = HeaderHashed::from_content(header.clone()).await;
-                let signed_header = SignedHeaderHashed::with_presigned(header_hashed, signature);
-                workspace.elements.put(signed_header, None)?;
-
-                // register agent activity on this agents pub key
-                workspace.meta.register_activity(header).await?;
-            }
-            DhtOp::RegisterReplacedBy(_, entry_update, _) => {
-                let old_entry_hash = match entry_update.intended_for {
-                    IntendedFor::Header => None,
-                    IntendedFor::Entry => {
-                        match workspace
-                            .elements
-                            .get_header(&entry_update.replaces_address)
-                            .await?
-                            // Handle missing old entry header. Same reason as below
-                            .and_then(|e| e.header().entry_data().map(|(hash, _)| hash.clone()))
-                        {
-                            Some(e) => Some(e),
-                            // Handle missing old Entry (Probably StoreEntry hasn't arrived been processed)
-                            // This is put the op back in the integration queue to try again later
-                            None => return Outcome::deferred(op, validation_status),
-                        }
-                    }
-                };
-                workspace
-                    .meta
-                    .register_update(entry_update, old_entry_hash)
-                    .await?;
-            }
-            DhtOp::RegisterDeletedEntryHeader(_, entry_delete)
-            | DhtOp::RegisterDeletedBy(_, entry_delete) => {
-                let entry_hash = match workspace
-                    .elements
-                    .get_header(&entry_delete.removes_address)
-                    .await?
-                    // Handle missing entry header. Same reason as below
-                    .and_then(|e| e.header().entry_data().map(|(hash, _)| hash.clone()))
-                {
-                    Some(e) => e,
-                    // TODO: VALIDATION: This could also be an invalid delete on a header without a delete
-                    // Handle missing Entry (Probably StoreEntry hasn't arrived been processed)
-                    // This is put the op back in the integration queue to try again later
-                    None => return Outcome::deferred(op, validation_status),
-                };
-                workspace
-                    .meta
-                    .register_delete(entry_delete, entry_hash)
-                    .await?
-            }
-            DhtOp::RegisterAddLink(signature, link_add) => {
-                workspace.meta.add_link(link_add.clone()).await?;
-                // Store add Header
-                let header = HeaderHashed::from_content(link_add.into()).await;
-                debug!(link_add = ?header.as_hash());
-                let signed_header = SignedHeaderHashed::with_presigned(header, signature);
-                workspace.elements.put(signed_header, None)?;
-            }
-            DhtOp::RegisterRemoveLink(signature, link_remove) => {
-                // Check whether they have the base address in the elements.
-                // If not then this should put the op back on the queue with a
-                // warning that it's unimplemented and later add this to the cache meta.
-                // TODO: Base might be in elements due to this agent being an authority for a
-                // header on the Base
-                if let None = workspace
-                    .elements
-                    .get_entry(&link_remove.base_address)
-                    .await?
-                {
-                    warn!(
-                        "Storing link data when not an author or authority requires the
-                         cache metadata store.
-                         The cache metadata store is currently unimplemented"
-                    );
-                    return Outcome::deferred(op, validation_status);
-                }
-
-                // Store link delete Header
-                let header = HeaderHashed::from_content(link_remove.clone().into()).await;
-                let signed_header = SignedHeaderHashed::with_presigned(header, signature);
-                workspace.elements.put(signed_header, None)?;
-
-                // Remove the link
-                workspace.meta.remove_link(link_remove).await?;
+        async fn header_with_entry_is_stored(
+            hash: &HeaderHash,
+            element_store: &ElementBuf<'_>,
+        ) -> DhtOpConvertResult<bool> {
+            match element_store.get_header(hash).await?.map(|e| {
+                e.header()
+                    .entry_data()
+                    .map(|(h, _)| h.clone())
+                    .ok_or_else(|| {
+                        // This is not a NewEntryHeader: cannot continue
+                        DhtOpConvertError::MissingEntryDataForHeader(hash.clone())
+                    })
+            }) {
+                Some(r) => Ok(element_store.contains_entry(&r?)?),
+                None => Ok(false),
             }
         }
 
-        // TODO: PERF: Avoid this clone by returning the op on error
-        let (op, basis) = match dht_op_to_light_basis(op.clone(), &workspace.elements).await {
-            Ok(l) => l,
-            Err(DhtOpConvertError::MissingHeaderEntry(_)) => {
-                return Outcome::deferred(op, validation_status)
+        let entry_is_stored = |hash| element_store.contains_entry(hash);
+
+        let header_is_stored = |hash| element_store.contains_header(hash);
+
+        match op {
+            DhtOp::StoreElement(signature, header, maybe_entry) => {
+                put_data(signature, header, maybe_entry.map(|e| *e), element_store).await?;
             }
-            Err(e) => return Err(e.into()),
-        };
+            DhtOp::StoreEntry(signature, new_entry_header, entry) => {
+                put_data(
+                    signature,
+                    new_entry_header.into(),
+                    Some(*entry),
+                    element_store,
+                )
+                .await?;
+            }
+            DhtOp::RegisterAgentActivity(signature, header) => {
+                put_data(signature, header, None, element_store).await?;
+            }
+            DhtOp::RegisterReplacedBy(signature, entry_update, maybe_entry) => {
+                match entry_update.intended_for {
+                    IntendedFor::Header => {
+                        // Check if we have the header that we are updating in the vault
+                        // or defer the op.
+                        if !header_is_stored(&entry_update.replaces_address)? {
+                            let op =
+                                DhtOp::RegisterReplacedBy(signature, entry_update, maybe_entry);
+                            return Outcome::deferred(op, validation_status);
+                        }
+                    }
+                    IntendedFor::Entry(_) => {
+                        // Check if we have the header with entry that we are updating in the vault
+                        // or defer the op.
+                        if !header_with_entry_is_stored(
+                            &entry_update.replaces_address,
+                            element_store,
+                        )
+                        .await?
+                        {
+                            let op =
+                                DhtOp::RegisterReplacedBy(signature, entry_update, maybe_entry);
+                            return Outcome::deferred(op, validation_status);
+                        }
+                    }
+                }
+                put_data(
+                    signature,
+                    entry_update.into(),
+                    maybe_entry.map(|e| *e),
+                    element_store,
+                )
+                .await?;
+            }
+            DhtOp::RegisterDeletedEntryHeader(signature, element_delete) => {
+                // Check if we have the header with the entry that we are removing in the vault
+                // or defer the op.
+                if !header_with_entry_is_stored(&element_delete.removes_address, element_store)
+                    .await?
+                {
+                    // Can't combine the two delete match arms without cloning the op
+                    let op = DhtOp::RegisterDeletedEntryHeader(signature, element_delete);
+                    return Outcome::deferred(op, validation_status);
+                }
+                put_data(signature, element_delete.into(), None, element_store).await?;
+            }
+            DhtOp::RegisterDeletedBy(signature, element_delete) => {
+                // Check if we have the header with the entry that we are removing in the vault
+                // or defer the op.
+                if !header_with_entry_is_stored(&element_delete.removes_address, element_store)
+                    .await?
+                {
+                    let op = DhtOp::RegisterDeletedBy(signature, element_delete);
+                    return Outcome::deferred(op, validation_status);
+                }
+                put_data(signature, element_delete.into(), None, element_store).await?;
+            }
+            DhtOp::RegisterAddLink(signature, link_add) => {
+                // Check whether we have the base address in the Vault.
+                // If not then this should put the op back on the queue.
+                if !entry_is_stored(&link_add.base_address)? {
+                    let op = DhtOp::RegisterAddLink(signature, link_add);
+                    return Outcome::deferred(op, validation_status);
+                }
+
+                put_data(signature, link_add.into(), None, element_store).await?;
+            }
+            DhtOp::RegisterRemoveLink(signature, link_remove) => {
+                // Check whether we have the base address and link add address
+                // are in the Vault.
+                // If not then this should put the op back on the queue.
+                if !entry_is_stored(&link_remove.base_address)?
+                    || !header_is_stored(&link_remove.link_add_address)?
+                {
+                    let op = DhtOp::RegisterRemoveLink(signature, link_remove);
+                    return Outcome::deferred(op, validation_status);
+                }
+
+                put_data(signature, link_remove.into(), None, element_store).await?;
+            }
+        }
+
         let value = IntegratedDhtOpsValue {
             validation_status,
-            basis,
-            op,
+            op: light_op,
             when_integrated: Timestamp::now(),
         };
-        debug!("integrating");
         Ok(Outcome::Integrated(value))
     }
+}
+
+pub async fn integrate_single_metadata<C: MetadataBufT>(
+    op: DhtOpLight,
+    element_store: &ElementBuf<'_>,
+    meta_store: &mut C,
+) -> DhtOpConvertResult<()> {
+    async fn get_header(
+        hash: HeaderHash,
+        element_store: &ElementBuf<'_>,
+    ) -> DhtOpConvertResult<Header> {
+        Ok(element_store
+            .get_header(&hash)
+            .await?
+            .ok_or(DhtOpConvertError::MissingData)?
+            .into_header_and_signature()
+            .0
+            .into_content())
+    }
+
+    match op {
+        DhtOpLight::StoreElement(_, _, _) => (),
+        DhtOpLight::StoreEntry(hash, _, _) => {
+            let new_entry_header = get_header(hash, element_store).await?.try_into()?;
+            // Reference to headers
+            meta_store.register_header(new_entry_header).await?;
+        }
+        DhtOpLight::RegisterAgentActivity(hash, _) => {
+            let header = get_header(hash, element_store).await?;
+            // register agent activity on this agents pub key
+            meta_store.register_activity(header).await?;
+        }
+        DhtOpLight::RegisterReplacedBy(hash, _, _) => {
+            let header = get_header(hash, element_store).await?.try_into()?;
+            meta_store.register_update(header).await?;
+        }
+        DhtOpLight::RegisterDeletedEntryHeader(hash, _)
+        | DhtOpLight::RegisterDeletedBy(hash, _) => {
+            let header = get_header(hash, element_store).await?.try_into()?;
+            meta_store.register_delete(header).await?
+        }
+        DhtOpLight::RegisterAddLink(hash, _) => {
+            let header = get_header(hash, element_store).await?.try_into()?;
+            meta_store.add_link(header).await?;
+        }
+        DhtOpLight::RegisterRemoveLink(hash, _) => {
+            let header = get_header(hash, element_store).await?.try_into()?;
+            meta_store.remove_link(header).await?;
+        }
+    }
+    Ok(())
+}
+
+/// After writing an Element to our chain, we want to integrate the meta ops
+/// inline, so that they are immediately available in the meta cache.
+/// NB: We skip integrating the element data, since it is already available in
+/// our vault.
+pub async fn integrate_to_cache<C: MetadataBufT>(
+    element: &Element,
+    element_store: &ElementBuf<'_>,
+    meta_store: &mut C,
+) -> DhtOpConvertResult<()> {
+    // Produce the light directly
+    for op in produce_op_lights_from_elements(vec![element]).await? {
+        // we don't integrate element data, because it is already in our vault.
+        integrate_single_metadata(op, element_store, meta_store).await?
+    }
+    Ok(())
 }
 
 /// The outcome of integrating a single DhtOp: either it was, or it wasn't
@@ -295,7 +400,7 @@ enum Outcome {
 }
 
 impl Outcome {
-    fn deferred(op: DhtOp, validation_status: ValidationStatus) -> WorkflowResult<Self> {
+    fn deferred(op: DhtOp, validation_status: ValidationStatus) -> DhtOpConvertResult<Self> {
         Ok(Outcome::Deferred(IntegrationQueueValue {
             op,
             validation_status,

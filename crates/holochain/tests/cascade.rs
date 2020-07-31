@@ -90,10 +90,10 @@ async fn get_links() -> SourceChainResult<()> {
         .put_raw(jessy_header, Some(jessy_entry.as_content().clone()))
         .await?;
 
-    let (_n, _r, cell_network) = test_network().await;
+    let (_n, _r, cell_network) = test_network(None, None).await;
 
     // Pass in stores as references
-    let cascade = Cascade::new(
+    let mut cascade = Cascade::new(
         &source_chain.elements(),
         &meta_vault,
         &mut element_cache,
@@ -104,7 +104,10 @@ async fn get_links() -> SourceChainResult<()> {
     let zome_id = ZomeIdFixturator::new(Unpredictable).next().unwrap();
     let key = LinkMetaKey::BaseZomeTag(&base, zome_id, &tag);
 
-    let links = cascade.dht_get_links(&key).await?;
+    let links = cascade
+        .dht_get_links(&key, Default::default())
+        .await
+        .unwrap();
     let link = links.into_iter().next();
     assert_eq!(link, None);
     Ok(())
