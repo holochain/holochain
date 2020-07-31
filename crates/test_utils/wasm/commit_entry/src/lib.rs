@@ -93,7 +93,7 @@ fn _get_entry() -> Result<GetEntryOutput, WasmError> {
         EntryHashInput::new((&Post("foo".into())).try_into()?)
     )?;
     let output: GetEntryOutput =
-        host_call!(__get_entry, GetEntryInput::new((hash.into(), GetOptions)))?;
+        host_call!(__get_entry, GetEntryInput::new((hash, GetOptions)))?;
     Ok(output)
 }
 
