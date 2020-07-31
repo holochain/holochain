@@ -10,6 +10,7 @@ pub mod dependencies {
     pub use ::url2;
 }
 
+pub mod async_lazy;
 pub mod dht_arc;
 pub mod async_lazy;
 

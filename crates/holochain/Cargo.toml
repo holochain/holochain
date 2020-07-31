@@ -85,7 +85,7 @@ name = "holochain"
 path = "src/bin/holochain/main.rs"
 
 [features]
-default = []
+default = ["slow_tests"]
 
 # wasm ribosome tests take > 60 seconds - let's only run them in CI
 slow_tests = []

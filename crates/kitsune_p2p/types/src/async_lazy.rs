@@ -2,9 +2,7 @@
 
 /// utility for lazy init-ing things
 /// note how new is not async so we can do it in an actor handler
-pub struct AsyncLazy<O: 'static + Clone + Send + Sync>(
-    tokio::sync::watch::Receiver<Option<O>>,
-);
+pub struct AsyncLazy<O: 'static + Clone + Send + Sync>(tokio::sync::watch::Receiver<Option<O>>);
 
 impl<O: 'static + Clone + Send + Sync> AsyncLazy<O> {
     /// sync create a new lazy-init value
@@ -24,13 +22,15 @@ impl<O: 'static + Clone + Send + Sync> AsyncLazy<O> {
 
     /// async get the value of this lazy type
     /// will return once the initialization future completes
-    pub async fn get(&self) -> O {
+    pub fn get(&self) -> impl std::future::Future<Output = O> + 'static {
         let mut r = self.0.clone();
-        loop {
-            match r.recv().await {
-                Some(Some(v)) => return v,
-                None => panic!("sender task dropped"),
-                _ => (),
+        async move {
+            loop {
+                match r.recv().await {
+                    Some(Some(v)) => return v,
+                    None => panic!("sender task dropped"),
+                    _ => (),
+                }
             }
         }
     }
@@ -49,9 +49,7 @@ mod tests {
         });
         assert_eq!(
             vec![Arc::new(42), Arc::new(42)],
-            futures::future::join_all(vec![
-                s.get(), s.get(),
-            ]).await
+            futures::future::join_all(vec![s.get(), s.get(),]).await
         );
         assert_eq!(42, *s.get().await);
         assert_eq!(42, *s.get().await);
