@@ -610,7 +610,9 @@ impl Cell {
         let mut lr: Vec<HeaderHash> = Vec::new();
 
         // Gather the link adds and link removes as hashes
-        // TODO: Maybe don't need to send back add links with removes
+        // TODO: Maybe can only send back removes without adds,
+        // because if we know of a remove, it doesn't matter what the
+        // add was
         let la = meta_vault
             .get_links(&key)?
             .map(|link| {
