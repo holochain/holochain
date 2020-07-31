@@ -1,5 +1,5 @@
 use super::{EntryType, Timestamp};
-use crate::header::{self, HeaderInner, IntendedFor, ZomeId};
+use crate::header::{self, HeaderInner, ZomeId};
 use crate::link::LinkTag;
 use header::Dna;
 use holo_hash::{AgentPubKey, DnaHash, EntryHash, HeaderHash};
@@ -132,8 +132,8 @@ builder_variant!(EntryCreate {
 });
 
 builder_variant!(EntryUpdate {
-    intended_for: IntendedFor,
-    replaces_address: HeaderHash,
+    basis_entry_hash: EntryHash,
+    revises_address: HeaderHash,
 
     entry_type: EntryType,
     entry_hash: EntryHash,

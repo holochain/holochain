@@ -87,7 +87,7 @@ guest_functions!(
     ],
     [__keystore, keystore, KeystoreInput, KeystoreOutput],
     [__get_links, get_links, GetLinksInput, GetLinksOutput],
-    [__get_entry, get_entry, GetEntryInput, GetEntryOutput],
+    [__get_entry, get_entry, GetInput, GetOutput],
     [
         __entry_hash,
         entry_hash,

@@ -139,7 +139,7 @@ pub mod wasm_test {
     use holochain_zome_types::entry_def::EntryDefId;
     use holochain_zome_types::CommitEntryInput;
     use holochain_zome_types::CommitEntryOutput;
-    use holochain_zome_types::GetEntryOutput;
+    use holochain_zome_types::GetOutput;
     use std::sync::Arc;
 
     #[tokio::test(threaded_scheduler)]
@@ -287,11 +287,13 @@ pub mod wasm_test {
 
         assert_eq!(&chain_head, output.inner_ref());
 
-        let round: GetEntryOutput =
+        let round: GetOutput =
             crate::call_test_ribosome!(host_access, TestWasm::CommitEntry, "get_entry", ());
 
-        let sb = match round.into_inner() {
-            Some(holochain_zome_types::entry::Entry::App(serialized_bytes)) => serialized_bytes,
+        let round_entry = round.into_inner().unwrap().entry().as_option().unwrap().clone();
+
+        let sb = match round_entry {
+            holochain_zome_types::entry::Entry::App(serialized_bytes) => serialized_bytes,
             other => panic!(format!("unexpected output: {:?}", other)),
         };
         // this should be the content "foo" of the committed post

@@ -70,11 +70,14 @@ pub fn anchor(anchor_type: String, anchor_text: String) -> Result<holo_hash::Ent
 }
 
 pub fn get_anchor(anchor_address: holo_hash::EntryHash) -> Result<Option<Anchor>, WasmError> {
-    Ok(match get_entry!(anchor_address)? {
-        Some(Entry::App(sb)) => {
-            let path = Path::try_from(sb)?;
-            Some(Anchor::try_from(&path)?)
-        }
+    Ok(match get!(anchor_address)? {
+        Some(element) => match element.entry() {
+            holochain_zome_types::element::ElementEntry::Present(Entry::App(sb)) => {
+                let path = Path::try_from(sb.to_owned())?;
+                Some(Anchor::try_from(&path)?)
+            }
+            _ => None,
+        },
         _ => None,
     })
 }

@@ -161,15 +161,6 @@ pub struct ZomeId(u8);
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
 pub struct EntryDefId(u8);
 
-/// Specifies whether an [EntryUpdate] refers to an [Entry] or a [Header]
-#[derive(
-    Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash, Ord, PartialOrd,
-)]
-pub enum IntendedFor {
-    Header,
-    Entry,
-}
-
 /// The Dna Header is always the first header in a source chain
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub struct Dna {
@@ -272,11 +263,12 @@ pub struct EntryCreate {
 /// A header which specifies that some new Entry content is intended to be an
 /// update to some old Entry.
 ///
-/// The update may refer to either a previous Header, or a previous Entry, via
-/// the `intended_for` field. The update is registered as metadata on the
+/// The update may refers to a previous Entry. The update is registered as metadata on the
 /// intended target, the result of which is is that both Headers and Entries can
 /// have a tree of such metadata update references. Entries get "updated" to
 /// other entries, and Headers get "updated" to other headers.
+///
+/// @see HeaderUpdate
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 pub struct EntryUpdate {
     pub author: AgentPubKey,
@@ -284,8 +276,21 @@ pub struct EntryUpdate {
     pub header_seq: u32,
     pub prev_header: HeaderHash,
 
-    pub intended_for: IntendedFor,
-    pub replaces_address: HeaderHash,
+    pub revises_address: HeaderHash,
+    pub basis_entry_hash: EntryHash,
+
+    pub entry_type: EntryType,
+    pub entry_hash: EntryHash,
+}
+
+// @todo after leapfrog
+pub struct HeaderUpdate {
+    pub author: AgentPubKey,
+    pub timestamp: Timestamp,
+    pub header_seq: u32,
+    pub prev_header: HeaderHash,
+
+    pub revises_address: HeaderHash,
 
     pub entry_type: EntryType,
     pub entry_hash: EntryHash,

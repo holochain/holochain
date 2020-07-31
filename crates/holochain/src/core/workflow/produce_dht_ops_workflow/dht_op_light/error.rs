@@ -12,7 +12,7 @@ pub enum DhtOpConvertError {
     #[error(transparent)]
     SerializedBytesError(#[from] SerializedBytesError),
     #[error(
-        "The replaced header could not be found to find the entry hash for a RegisterReplacedBy that is IntendedFor an entry Entry"
+        "The replaced header could not be found to find the entry hash for a RegisterReplacedBy"
     )]
     MissingHeaderEntry(HeaderHash),
     #[error("Data for a DhtOp was missing from the source chain")]

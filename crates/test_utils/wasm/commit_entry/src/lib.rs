@@ -35,6 +35,6 @@ fn _commit_entry(_: ()) -> Result<HeaderHash, WasmError> {
     Ok(commit_entry!(post())?)
 }
 
-fn _get_entry(_: ()) -> Result<GetEntryOutput, WasmError> {
-    Ok(GetEntryOutput::new(get_entry!(entry_hash!(post())?)?))
+fn _get_entry(_: ()) -> Result<GetOutput, WasmError> {
+    Ok(GetOutput::new(get!(entry_hash!(post())?)?))
 }

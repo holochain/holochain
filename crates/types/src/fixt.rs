@@ -25,7 +25,6 @@ use holochain_zome_types::header::EntryType;
 use holochain_zome_types::header::EntryUpdate;
 use holochain_zome_types::header::Header;
 use holochain_zome_types::header::InitZomesComplete;
-use holochain_zome_types::header::IntendedFor;
 use holochain_zome_types::header::LinkAdd;
 use holochain_zome_types::header::LinkRemove;
 use holochain_zome_types::header::ZomeId;
@@ -127,11 +126,6 @@ fixturator!(
 );
 
 newtype_fixturator!(Signature<Bytes>);
-
-fixturator!(
-    IntendedFor;
-    unit variants [ Entry Header ] empty Entry;
-);
 
 fixturator!(
     MigrateAgent;
@@ -495,7 +489,7 @@ fixturator!(
 
 fixturator!(
     EntryUpdate;
-    constructor fn from_builder(HeaderBuilderCommon, IntendedFor, HeaderHash, EntryType, EntryHash);
+    constructor fn from_builder(HeaderBuilderCommon, EntryHash, HeaderHash, EntryType, EntryHash);
 );
 
 fixturator!(

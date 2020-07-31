@@ -4,6 +4,7 @@ use test_wasm_common::TestBool;
 use test_wasm_common::TestString;
 
 holochain_externs!();
+host_externs!(__get);
 
 entry_defs!(vec![Path::entry_def()]);
 

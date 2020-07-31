@@ -7,7 +7,7 @@ use holochain_types::{
     header::{HeaderHashed, NewEntryHeader},
 };
 use holochain_zome_types::entry_def::EntryVisibility;
-use holochain_zome_types::header::{self, Header, IntendedFor};
+use holochain_zome_types::header::{self, Header};
 use serde::{Deserialize, Serialize};
 
 pub mod error;
@@ -237,12 +237,11 @@ pub async fn dht_basis(op: &DhtOp, cas: &ChainCasBuf<'_>) -> DhtOpConvertResult<
         }
         DhtOp::StoreEntry(_, header, _) => header.entry().clone().into(),
         DhtOp::RegisterAgentActivity(_, header) => header.author().clone().into(),
-        DhtOp::RegisterReplacedBy(_, header, _) => match &header.intended_for {
-            IntendedFor::Header => header.replaces_address.clone().into(),
-            IntendedFor::Entry => get_entry_hash_for_header(&header.replaces_address, &cas)
+        DhtOp::RegisterReplacedBy(_, header, _) => {
+            get_entry_hash_for_header(&header.revises_address, &cas)
                 .await?
-                .into(),
-        },
+                .into()
+        }
         DhtOp::RegisterDeletedBy(_, header) => header.removes_address.clone().into(),
         DhtOp::RegisterDeletedEntryHeader(_, header) => {
             get_entry_hash_for_header(&header.removes_address, &cas)

@@ -4,6 +4,7 @@ use crate::{HasHash, HashableContent, HoloHashOf};
 /// hashes need not be calculated multiple times.
 /// Provides an easy constructor which consumes the content.
 // TODO: consider making lazy with OnceCell
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct HoloHashed<C: HashableContent> {
     pub(crate) content: C,
     pub(crate) hash: HoloHashOf<C>,

@@ -31,7 +31,7 @@ use crate::core::ribosome::host_fn::decrypt::decrypt;
 use crate::core::ribosome::host_fn::emit_signal::emit_signal;
 use crate::core::ribosome::host_fn::encrypt::encrypt;
 use crate::core::ribosome::host_fn::entry_hash::entry_hash;
-use crate::core::ribosome::host_fn::get_entry::get_entry;
+use crate::core::ribosome::host_fn::get::get;
 use crate::core::ribosome::host_fn::get_links::get_links;
 use crate::core::ribosome::host_fn::keystore::keystore;
 use crate::core::ribosome::host_fn::link_entries::link_entries;
@@ -228,11 +228,11 @@ impl WasmRibosome {
             ..
         } = host_fn_access
         {
-            ns.insert("__get_entry", func!(invoke_host_function!(get_entry)));
+            ns.insert("__get", func!(invoke_host_function!(get)));
             ns.insert("__get_links", func!(invoke_host_function!(get_links)));
             ns.insert("__query", func!(invoke_host_function!(query)));
         } else {
-            ns.insert("__get_entry", func!(invoke_host_function!(unreachable)));
+            ns.insert("__get", func!(invoke_host_function!(unreachable)));
             ns.insert("__get_links", func!(invoke_host_function!(unreachable)));
             ns.insert("__query", func!(invoke_host_function!(unreachable)));
         }

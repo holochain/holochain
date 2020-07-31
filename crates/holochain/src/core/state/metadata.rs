@@ -179,11 +179,7 @@ pub trait MetadataBufT {
     async fn register_activity(&mut self, header: Header) -> DatabaseResult<()>;
 
     /// Registers a [Header::EntryUpdate] on the referenced [Header] or [Entry]
-    async fn register_update(
-        &mut self,
-        update: header::EntryUpdate,
-        entry: Option<EntryHash>,
-    ) -> DatabaseResult<()>;
+    async fn register_update(&mut self, update: header::EntryUpdate) -> DatabaseResult<()>;
 
     /// Registers a [Header::ElementDelete] on the Header of an Entry
     async fn register_delete(
@@ -482,31 +478,11 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
     }
 
     #[allow(clippy::needless_lifetimes)]
-    async fn register_update(
-        &mut self,
-        update: header::EntryUpdate,
-        entry: Option<EntryHash>,
-    ) -> DatabaseResult<()> {
-        match (&update.intended_for, entry) {
-            (header::IntendedFor::Header, None) => {
-                let basis: AnyDhtHash = update.replaces_address.clone().into();
-                self.register_header_on_basis(basis, update).await?;
-                // TODO: Can an update intended for a header also change an
-                // entries dht status?
-            }
-            (header::IntendedFor::Header, Some(_)) => {
-                panic!("Can't update to entry when EntryUpdate points to header")
-            }
-            (header::IntendedFor::Entry, None) => {
-                panic!("Can't update to entry with no entry hash")
-            }
-            (header::IntendedFor::Entry, Some(entry_hash)) => {
-                self.register_header_on_basis(AnyDhtHash::from(entry_hash.clone()), update)
-                    .await?;
-                self.update_entry_dht_status(entry_hash)?;
-                return Ok(());
-            }
-        }
+    async fn register_update(&mut self, update: header::EntryUpdate) -> DatabaseResult<()> {
+        let basis_entry_hash = update.basis_entry_hash.clone();
+        self.register_header_on_basis(AnyDhtHash::from(basis_entry_hash.clone()), update)
+            .await?;
+        self.update_entry_dht_status(basis_entry_hash)?;
         Ok(())
     }
 

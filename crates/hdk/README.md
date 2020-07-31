@@ -105,7 +105,7 @@ inside core, but some illustrative examples include:
 - `sign`: use the agent's keypair to sign some data
 - `commit_entry`: save some data to the local source chain and broadcast it to
   the DHT to be redundantly validated and stored
-- `get_entry`: retrieve some data from local or the network given its hash
+- `get`: retrieve an element from local or the network given its header or entry hash
 - `link_entries`: create graph style relationships (links) between entries
 - `get_links`: retrive links between entries using the DHT as a graph database
 - `send`: send data directly to a known peer on the network

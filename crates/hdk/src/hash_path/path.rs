@@ -262,7 +262,7 @@ impl Path {
 
     /// does an entry exist at the hash we expect?
     pub fn exists(&self) -> Result<bool, WasmError> {
-        Ok(get_entry!(self.hash()?)?.is_some())
+        Ok(get!(self.hash()?)?.is_some())
     }
 
     /// recursively touch this and every parent that doesn't exist yet

@@ -37,7 +37,7 @@ use holochain_zome_types::{
     header::{builder, ElementDelete, EntryUpdate, LinkAdd, LinkRemove},
     link::{LinkTag, Links},
     zome::ZomeName,
-    CommitEntryInput, GetEntryInput, GetLinksInput, Header, LinkEntriesInput,
+    CommitEntryInput, GetInput, GetLinksInput, Header, LinkEntriesInput,
 };
 use produce_dht_ops_workflow::{produce_dht_ops_workflow, ProduceDhtOpsWorkspace};
 use std::{collections::BTreeMap, convert::TryInto, sync::Arc};
@@ -104,14 +104,12 @@ impl TestData {
         // Entry update for header
         let mut entry_update_header = fixt!(EntryUpdate);
         entry_update_header.entry_hash = new_entry_hash.clone();
-        entry_update_header.intended_for = IntendedFor::Header;
-        entry_update_header.replaces_address = original_header_hash.clone();
+        entry_update_header.revises_address = original_header_hash.clone();
 
         // Entry update for entry
         let mut entry_update_entry = fixt!(EntryUpdate);
         entry_update_entry.entry_hash = new_entry_hash.clone();
-        entry_update_entry.intended_for = IntendedFor::Entry;
-        entry_update_entry.replaces_address = original_header_hash.clone();
+        entry_update_entry.revises_address = original_header_hash.clone();
 
         // Entry delete
         let mut entry_delete = fixt!(ElementDelete);
@@ -169,6 +167,7 @@ enum Db {
     MetaEmpty,
     MetaHeader(Entry, Header),
     MetaActivity(Header),
+    #[allow(dead_code)]
     MetaUpdate(AnyDhtHash, Header),
     MetaDelete(EntryHash, HeaderHash, Header),
     MetaLink(LinkAdd, EntryHash),
@@ -550,42 +549,42 @@ fn register_agent_activity(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     (pre_state, expect, "register agent activity")
 }
 
-fn register_replaced_by_for_header(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-    let op = DhtOp::RegisterReplacedBy(
-        a.signature.clone(),
-        a.entry_update_header.clone(),
-        Some(a.new_entry.clone().into()),
-    );
-    let pre_state = vec![Db::IntQueue(op.clone())];
-    let expect = vec![
-        Db::Integrated(op.clone()),
-        Db::MetaUpdate(
-            a.original_header_hash.clone().into(),
-            a.entry_update_header.clone().into(),
-        ),
-    ];
-    (pre_state, expect, "register replaced by for header")
-}
+// fn register_replaced_by_for_header(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+//     let op = DhtOp::RegisterReplacedBy(
+//         a.signature.clone(),
+//         a.entry_update_header.clone(),
+//         Some(a.new_entry.clone().into()),
+//     );
+//     let pre_state = vec![Db::IntQueue(op.clone())];
+//     let expect = vec![
+//         Db::Integrated(op.clone()),
+//         Db::MetaUpdate(
+//             a.original_header_hash.clone().into(),
+//             a.entry_update_header.clone().into(),
+//         ),
+//     ];
+//     (pre_state, expect, "register replaced by for header")
+// }
 
-fn register_replaced_by_for_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-    let op = DhtOp::RegisterReplacedBy(
-        a.signature.clone(),
-        a.entry_update_entry.clone(),
-        Some(a.new_entry.clone().into()),
-    );
-    let pre_state = vec![
-        Db::IntQueue(op.clone()),
-        Db::CasHeader(a.original_header.clone().into(), Some(a.signature.clone())),
-    ];
-    let expect = vec![
-        Db::Integrated(op.clone()),
-        Db::MetaUpdate(
-            a.original_entry_hash.clone().into(),
-            a.entry_update_entry.clone().into(),
-        ),
-    ];
-    (pre_state, expect, "register replaced by for entry")
-}
+// fn register_replaced_by_for_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+//     let op = DhtOp::RegisterReplacedBy(
+//         a.signature.clone(),
+//         a.entry_update_entry.clone(),
+//         Some(a.new_entry.clone().into()),
+//     );
+//     let pre_state = vec![
+//         Db::IntQueue(op.clone()),
+//         Db::CasHeader(a.original_header.clone().into(), Some(a.signature.clone())),
+//     ];
+//     let expect = vec![
+//         Db::Integrated(op.clone()),
+//         Db::MetaUpdate(
+//             a.original_entry_hash.clone().into(),
+//             a.entry_update_entry.clone().into(),
+//         ),
+//     ];
+//     (pre_state, expect, "register replaced by for entry")
+// }
 
 // Register replaced by without store entry
 fn register_replaced_by_missing_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
@@ -709,8 +708,8 @@ async fn test_ops_state() {
         store_element,
         store_entry,
         register_agent_activity,
-        register_replaced_by_for_header,
-        register_replaced_by_for_entry,
+        // register_replaced_by_for_header,
+        // register_replaced_by_for_entry,
         register_replaced_by_missing_entry,
         register_deleted_by,
         register_deleted_by_missing_entry,
@@ -831,11 +830,11 @@ async fn commit_entry<'env>(
     (entry_hash, output.into_inner().try_into().unwrap())
 }
 
-async fn get_entry<'env>(
+async fn get<'env>(
     env_ref: &'env EnvironmentWriteRef<'env>,
     dbs: &impl GetDb,
-    entry_hash: EntryHash,
-) -> Option<Entry> {
+    entry_hash: AnyDhtHash,
+) -> Option<Element> {
     let reader = env_ref.reader().unwrap();
     let mut workspace = CallZomeWorkspace::new(&reader, dbs).unwrap();
 
@@ -845,7 +844,7 @@ async fn get_entry<'env>(
 
     let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
 
-    let input = GetEntryInput::new((entry_hash.clone().into(), GetOptions));
+    let input = GetInput::new((entry_hash.clone().into(), GetOptions));
 
     let output = {
         let (_g, raw_workspace) = UnsafeCallZomeWorkspace::from_mut(&mut workspace);
@@ -854,7 +853,7 @@ async fn get_entry<'env>(
         call_context.host_access = host_access.into();
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
-        host_fn::get_entry::get_entry(ribosome.clone(), call_context.clone(), input).unwrap()
+        host_fn::get::get(ribosome.clone(), call_context.clone(), input).unwrap()
     };
     output.into_inner().try_into().unwrap()
 }
@@ -1141,28 +1140,24 @@ async fn test_wasm_api_without_integration_delete() {
 
     // Call integrate
     call_workflow(&env_ref, &dbs, env.clone()).await;
-    assert_eq!(get_entry(&env_ref, &dbs, base_address.clone()).await, None);
+    assert_eq!(get(&env_ref, &dbs, base_address.clone().into()).await, None);
     let base_address = commit_entry(pre_state, &env_ref, &dbs, zome_name.clone())
         .await
         .0;
     assert_eq!(
-        get_entry(&env_ref, &dbs, base_address.clone()).await,
-        Some(original_entry)
+        get(&env_ref, &dbs, base_address.clone().into())
+            .await
+            .unwrap()
+            .entry()
+            .as_option()
+            .unwrap(),
+        &original_entry
     );
 }
 
 #[tokio::test(threaded_scheduler)]
 #[ignore]
-async fn test_integrate_single_register_replaced_by_for_header() {
-    // For RegisterReplacedBy with intended_for Header
-    // metadata has EntryUpdate on HeaderHash but not EntryHash
-    todo!()
-}
-
-#[tokio::test(threaded_scheduler)]
-#[ignore]
 async fn test_integrate_single_register_replaced_by_for_entry() {
-    // For RegisterReplacedBy with intended_for Entry
     // metadata has EntryUpdate on EntryHash but not HeaderHash
     todo!()
 }

@@ -21,7 +21,7 @@ mod tests {
         HeaderHashed,
     };
     use holochain_zome_types::header::{self, builder, EntryType, HeaderBuilder};
-    use holochain_zome_types::header::{ElementDelete, HeaderBuilderCommon, IntendedFor};
+    use holochain_zome_types::header::{ElementDelete, HeaderBuilderCommon};
 
     struct TestFixtures {
         header_hashes: Box<dyn Iterator<Item = HeaderHash>>,
@@ -64,14 +64,14 @@ mod tests {
     }
 
     async fn test_update(
-        replaces_address: HeaderHash,
+        basis_entry_hash: EntryHash,
+        revises_address: HeaderHash,
         entry_hash: EntryHash,
-        intended_for: IntendedFor,
         fx: &mut TestFixtures,
     ) -> (header::EntryUpdate, HeaderHashed) {
         let builder = builder::EntryUpdate {
-            intended_for,
-            replaces_address,
+            basis_entry_hash,
+            revises_address,
             entry_hash,
             entry_type: fx.entry_type(),
         };
@@ -103,200 +103,167 @@ mod tests {
         (delete, header)
     }
 
-    #[tokio::test(threaded_scheduler)]
-    #[ignore]
-    /// Test that a header can be redirected a single hop
-    async fn test_redirect_header_one_hop() -> anyhow::Result<()> {
-        let arc = test_cell_env();
-        let env = arc.guard().await;
-        let mut fx = TestFixtures::new();
-        {
-            let reader = env.reader()?;
-            let mut buf = MetadataBuf::vault(&reader, &env)?;
-            let (update, expected) = test_update(
-                fx.header_hash().into(),
-                fx.entry_hash(),
-                IntendedFor::Header,
-                &mut fx,
-            )
-            .await;
-            buf.register_update(update.clone(), None).await?;
-            let original = update.replaces_address;
-            let canonical = buf.get_canonical_header_hash(original.clone())?;
+    // #[tokio::test(threaded_scheduler)]
+    // #[ignore]
+    // /// Test that a header can be redirected a single hop
+    // async fn test_redirect_header_one_hop() -> anyhow::Result<()> {
+    //     let arc = test_cell_env();
+    //     let env = arc.guard().await;
+    //     let mut fx = TestFixtures::new();
+    //     {
+    //         let reader = env.reader()?;
+    //         let mut buf = MetadataBuf::vault(&reader, &env)?;
+    //         let (update, expected) =
+    //             test_update(fx.header_hash().into(), fx.entry_hash(), &mut fx).await;
+    //         buf.register_update(update.clone(), None).await?;
+    //         let original = update.revises_address;
+    //         let canonical = buf.get_canonical_header_hash(original.clone())?;
+    //
+    //         assert_eq!(&canonical, expected.as_hash());
+    //     }
+    //     Ok(())
+    // }
 
-            assert_eq!(&canonical, expected.as_hash());
-        }
-        Ok(())
-    }
+    // #[tokio::test(threaded_scheduler)]
+    // #[ignore]
+    // /// Test that a header can be redirected three hops
+    // async fn test_redirect_header_three_hops() -> anyhow::Result<()> {
+    //     let arc = test_cell_env();
+    //     let env = arc.guard().await;
+    //     let mut fx = TestFixtures::new();
+    //     {
+    //         let reader = env.reader()?;
+    //         let mut buf = MetadataBuf::vault(&reader, &env)?;
+    //         let (update1, header1) =
+    //             test_update(fx.header_hash().into(), fx.entry_hash(), &mut fx).await;
+    //         let (update2, header2) =
+    //             test_update(header1.into_hash().into(), fx.entry_hash(), &mut fx).await;
+    //         let (update3, expected) =
+    //             test_update(header2.into_hash().into(), fx.entry_hash(), &mut fx).await;
+    //         let _ = buf.register_update(update1.clone(), None).await?;
+    //         let _ = buf.register_update(update2, None).await?;
+    //         buf.register_update(update3.clone(), None).await?;
+    //
+    //         let original = update1.revises_address;
+    //         let canonical = buf.get_canonical_header_hash(original.clone())?;
+    //
+    //         assert_eq!(&canonical, expected.as_hash());
+    //     }
+    //     Ok(())
+    // }
 
-    #[tokio::test(threaded_scheduler)]
-    #[ignore]
-    /// Test that a header can be redirected three hops
-    async fn test_redirect_header_three_hops() -> anyhow::Result<()> {
-        let arc = test_cell_env();
-        let env = arc.guard().await;
-        let mut fx = TestFixtures::new();
-        {
-            let reader = env.reader()?;
-            let mut buf = MetadataBuf::vault(&reader, &env)?;
-            let (update1, header1) = test_update(
-                fx.header_hash().into(),
-                fx.entry_hash(),
-                IntendedFor::Header,
-                &mut fx,
-            )
-            .await;
-            let (update2, header2) = test_update(
-                header1.into_hash().into(),
-                fx.entry_hash(),
-                IntendedFor::Header,
-                &mut fx,
-            )
-            .await;
-            let (update3, expected) = test_update(
-                header2.into_hash().into(),
-                fx.entry_hash(),
-                IntendedFor::Header,
-                &mut fx,
-            )
-            .await;
-            let _ = buf.register_update(update1.clone(), None).await?;
-            let _ = buf.register_update(update2, None).await?;
-            buf.register_update(update3.clone(), None).await?;
+    // #[tokio::test(threaded_scheduler)]
+    // #[ignore]
+    // /// Test that an entry can be redirected a single hop
+    // async fn test_redirect_entry_one_hop() -> anyhow::Result<()> {
+    //     let arc = test_cell_env();
+    //     let env = arc.guard().await;
+    //     let mut fx = TestFixtures::new();
+    //     {
+    //         let reader = env.reader()?;
+    //         let mut buf = MetadataBuf::vault(&reader, &env)?;
+    //         let original_entry = fx.entry_hash();
+    //         let header_hash = test_create(original_entry.clone(), &mut fx)
+    //             .await
+    //             .1
+    //             .into_inner()
+    //             .1;
+    //
+    //         let (update, _) = test_update(header_hash, fx.entry_hash(), &mut fx).await;
+    //         let _ = buf
+    //             .register_update(update.clone(), Some(original_entry.clone()))
+    //             .await?;
+    //
+    //         let canonical = buf.get_canonical_entry_hash(original_entry)?;
+    //
+    //         let expected = update.entry_hash;
+    //         assert_eq!(canonical, expected);
+    //     }
+    //     Ok(())
+    // }
 
-            let original = update1.replaces_address;
-            let canonical = buf.get_canonical_header_hash(original.clone())?;
+    // #[tokio::test(threaded_scheduler)]
+    // #[ignore]
+    // /// Test that an entry can be redirected three hops
+    // async fn test_redirect_entry_three_hops() -> anyhow::Result<()> {
+    //     let arc = test_cell_env();
+    //     let env = arc.guard().await;
+    //     let mut fx = TestFixtures::new();
+    //     {
+    //         let reader = env.reader()?;
+    //         let mut buf = MetadataBuf::vault(&reader, &env)?;
+    //         let original_entry = fx.entry_hash();
+    //         let header_hash = test_create(original_entry.clone(), &mut fx)
+    //             .await
+    //             .1
+    //             .into_inner()
+    //             .1;
+    //         let (update1, _) = test_update(header_hash, fx.entry_hash(), &mut fx).await;
+    //         let (update2, _) =
+    //             test_update(update1.revises_address.clone(), fx.entry_hash(), &mut fx).await;
+    //         let (update3, _) =
+    //             test_update(update2.revises_address.clone(), fx.entry_hash(), &mut fx).await;
+    //         let _ = buf
+    //             .register_update(update1.clone(), Some(original_entry.clone()))
+    //             .await?;
+    //         let _ = buf
+    //             .register_update(update2.clone(), Some(original_entry.clone()))
+    //             .await?;
+    //         let _ = buf
+    //             .register_update(update3.clone(), Some(original_entry.clone()))
+    //             .await?;
+    //
+    //         let canonical = buf.get_canonical_entry_hash(original_entry)?;
+    //
+    //         let expected = update3.entry_hash;
+    //         assert_eq!(canonical, expected);
+    //     }
+    //     Ok(())
+    // }
 
-            assert_eq!(&canonical, expected.as_hash());
-        }
-        Ok(())
-    }
-
-    #[tokio::test(threaded_scheduler)]
-    #[ignore]
-    /// Test that an entry can be redirected a single hop
-    async fn test_redirect_entry_one_hop() -> anyhow::Result<()> {
-        let arc = test_cell_env();
-        let env = arc.guard().await;
-        let mut fx = TestFixtures::new();
-        {
-            let reader = env.reader()?;
-            let mut buf = MetadataBuf::vault(&reader, &env)?;
-            let original_entry = fx.entry_hash();
-            let header_hash = test_create(original_entry.clone(), &mut fx)
-                .await
-                .1
-                .into_inner()
-                .1;
-
-            let (update, _) =
-                test_update(header_hash, fx.entry_hash(), IntendedFor::Entry, &mut fx).await;
-            let _ = buf
-                .register_update(update.clone(), Some(original_entry.clone()))
-                .await?;
-
-            let canonical = buf.get_canonical_entry_hash(original_entry)?;
-
-            let expected = update.entry_hash;
-            assert_eq!(canonical, expected);
-        }
-        Ok(())
-    }
-
-    #[tokio::test(threaded_scheduler)]
-    #[ignore]
-    /// Test that an entry can be redirected three hops
-    async fn test_redirect_entry_three_hops() -> anyhow::Result<()> {
-        let arc = test_cell_env();
-        let env = arc.guard().await;
-        let mut fx = TestFixtures::new();
-        {
-            let reader = env.reader()?;
-            let mut buf = MetadataBuf::vault(&reader, &env)?;
-            let original_entry = fx.entry_hash();
-            let header_hash = test_create(original_entry.clone(), &mut fx)
-                .await
-                .1
-                .into_inner()
-                .1;
-            let (update1, _) =
-                test_update(header_hash, fx.entry_hash(), IntendedFor::Entry, &mut fx).await;
-            let (update2, _) = test_update(
-                update1.replaces_address.clone(),
-                fx.entry_hash(),
-                IntendedFor::Entry,
-                &mut fx,
-            )
-            .await;
-            let (update3, _) = test_update(
-                update2.replaces_address.clone(),
-                fx.entry_hash(),
-                IntendedFor::Entry,
-                &mut fx,
-            )
-            .await;
-            let _ = buf
-                .register_update(update1.clone(), Some(original_entry.clone()))
-                .await?;
-            let _ = buf
-                .register_update(update2.clone(), Some(original_entry.clone()))
-                .await?;
-            let _ = buf
-                .register_update(update3.clone(), Some(original_entry.clone()))
-                .await?;
-
-            let canonical = buf.get_canonical_entry_hash(original_entry)?;
-
-            let expected = update3.entry_hash;
-            assert_eq!(canonical, expected);
-        }
-        Ok(())
-    }
-
-    #[tokio::test(threaded_scheduler)]
-    #[ignore]
-    /// Test that a header can be redirected a single hop
-    async fn test_redirect_header_and_entry() -> anyhow::Result<()> {
-        let arc = test_cell_env();
-        let env = arc.guard().await;
-        let mut fx = TestFixtures::new();
-        {
-            let reader = env.reader()?;
-            let mut buf = MetadataBuf::vault(&reader, &env)?;
-            let original_entry = fx.entry_hash();
-            let header_hash = test_create(original_entry.clone(), &mut fx)
-                .await
-                .1
-                .into_inner()
-                .1;
-            let (update_header, expected_header) =
-                test_update(header_hash, fx.entry_hash(), IntendedFor::Header, &mut fx).await;
-
-            let original_entry_1 = fx.entry_hash();
-            let header_hash = test_create(original_entry_1.clone(), &mut fx)
-                .await
-                .1
-                .into_inner()
-                .1;
-            let (update_entry, _) =
-                test_update(header_hash, fx.entry_hash(), IntendedFor::Entry, &mut fx).await;
-
-            let _ = buf.register_update(update_header.clone(), None).await?;
-            let _ = buf
-                .register_update(update_entry.clone(), Some(original_entry.clone()))
-                .await?;
-            let expected_entry_hash = update_entry.entry_hash;
-
-            let original_header_hash = update_header.replaces_address;
-            let canonical_header_hash =
-                buf.get_canonical_header_hash(original_header_hash.clone())?;
-            let canonical_entry_hash = buf.get_canonical_entry_hash(original_entry_1)?;
-
-            assert_eq!(&canonical_header_hash, expected_header.as_hash());
-            assert_eq!(canonical_entry_hash, expected_entry_hash);
-        }
-        Ok(())
-    }
+    // #[tokio::test(threaded_scheduler)]
+    // #[ignore]
+    // /// Test that a header can be redirected a single hop
+    // async fn test_redirect_header_and_entry() -> anyhow::Result<()> {
+    //     let arc = test_cell_env();
+    //     let env = arc.guard().await;
+    //     let mut fx = TestFixtures::new();
+    //     {
+    //         let reader = env.reader()?;
+    //         let mut buf = MetadataBuf::vault(&reader, &env)?;
+    //         let original_entry = fx.entry_hash();
+    //         let header_hash = test_create(original_entry.clone(), &mut fx)
+    //             .await
+    //             .1
+    //             .into_inner()
+    //             .1;
+    //         let (update_header, expected_header) =
+    //             test_update(header_hash, fx.entry_hash(), &mut fx).await;
+    //
+    //         let original_entry_1 = fx.entry_hash();
+    //         let header_hash = test_create(original_entry_1.clone(), &mut fx)
+    //             .await
+    //             .1
+    //             .into_inner()
+    //             .1;
+    //         let (update_entry, _) = test_update(header_hash, fx.entry_hash(), &mut fx).await;
+    //
+    //         let _ = buf.register_update(update_header.clone(), None).await?;
+    //         let _ = buf
+    //             .register_update(update_entry.clone(), Some(original_entry.clone()))
+    //             .await?;
+    //         let expected_entry_hash = update_entry.entry_hash;
+    //
+    //         let original_header_hash = update_header.revises_address;
+    //         let canonical_header_hash =
+    //             buf.get_canonical_header_hash(original_header_hash.clone())?;
+    //         let canonical_entry_hash = buf.get_canonical_entry_hash(original_entry_1)?;
+    //
+    //         assert_eq!(&canonical_header_hash, expected_header.as_hash());
+    //         assert_eq!(canonical_entry_hash, expected_entry_hash);
+    //     }
+    //     Ok(())
+    // }
 
     #[tokio::test(threaded_scheduler)]
     async fn add_entry_get_headers() {
@@ -360,9 +327,9 @@ mod tests {
         let mut entry_updates = Vec::new();
         for _ in 0..10 {
             let (e, hash) = test_update(
+                original_entry_hash.clone(),
                 original_header_hash.clone(),
                 fx.entry_hash(),
-                IntendedFor::Entry,
                 &mut fx,
             )
             .await;
@@ -375,10 +342,7 @@ mod tests {
             let reader = env.reader().unwrap();
             let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
             for update in entry_updates {
-                meta_buf
-                    .register_update(update, Some(original_entry_hash.clone()))
-                    .await
-                    .unwrap();
+                meta_buf.register_update(update).await.unwrap();
             }
             let mut headers = meta_buf
                 .get_updates(original_entry_hash.clone().into())
@@ -403,60 +367,60 @@ mod tests {
         }
     }
 
-    #[tokio::test(threaded_scheduler)]
-    async fn add_entry_get_updates_header() {
-        let arc = test_cell_env();
-        let env = arc.guard().await;
-        let mut fx = TestFixtures::new();
-        let original_entry_hash = fx.entry_hash();
-        let original_header_hash = test_create(original_entry_hash.clone(), &mut fx)
-            .await
-            .1
-            .into_inner()
-            .1;
-        let mut expected: Vec<TimedHeaderHash> = Vec::new();
-        let mut entry_updates = Vec::new();
-        for _ in 0..10 {
-            let (e, hash) = test_update(
-                original_header_hash.clone(),
-                fx.entry_hash(),
-                IntendedFor::Header,
-                &mut fx,
-            )
-            .await;
-            expected.push(hash.into());
-            entry_updates.push(e)
-        }
-
-        expected.sort_by_key(|h| h.header_hash.clone());
-        {
-            let reader = env.reader().unwrap();
-            let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
-            for update in entry_updates {
-                meta_buf.register_update(update, None).await.unwrap();
-            }
-            let mut headers = meta_buf
-                .get_updates(original_header_hash.clone().into())
-                .unwrap()
-                .collect::<Vec<_>>()
-                .unwrap();
-            headers.sort_by_key(|h| h.header_hash.clone());
-            assert_eq!(headers, expected);
-            env.with_commit(|writer| meta_buf.flush_to_txn(writer))
-                .unwrap();
-        }
-        {
-            let reader = env.reader().unwrap();
-            let meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
-            let mut headers = meta_buf
-                .get_updates(original_header_hash.into())
-                .unwrap()
-                .collect::<Vec<_>>()
-                .unwrap();
-            headers.sort_by_key(|h| h.header_hash.clone());
-            assert_eq!(headers, expected);
-        }
-    }
+    // #[tokio::test(threaded_scheduler)]
+    // async fn add_entry_get_updates_header() {
+    //     let arc = test_cell_env();
+    //     let env = arc.guard().await;
+    //     let mut fx = TestFixtures::new();
+    //     let original_entry_hash = fx.entry_hash();
+    //     let original_header_hash = test_create(original_entry_hash.clone(), &mut fx)
+    //         .await
+    //         .1
+    //         .into_inner()
+    //         .1;
+    //     let mut expected: Vec<TimedHeaderHash> = Vec::new();
+    //     let mut entry_updates = Vec::new();
+    //     for _ in 0..10 {
+    //         let (e, hash) = test_update(
+    //             original_entry_hash.clone(),
+    //             original_header_hash.clone(),
+    //             fx.entry_hash(),
+    //             &mut fx,
+    //         )
+    //         .await;
+    //         expected.push(hash.into());
+    //         entry_updates.push(e)
+    //     }
+    //
+    //     expected.sort_by_key(|h| h.header_hash.clone());
+    //     {
+    //         let reader = env.reader().unwrap();
+    //         let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
+    //         for update in entry_updates {
+    //             meta_buf.register_update(update).await.unwrap();
+    //         }
+    //         let mut headers = meta_buf
+    //             .get_updates(original_header_hash.clone().into())
+    //             .unwrap()
+    //             .collect::<Vec<_>>()
+    //             .unwrap();
+    //         headers.sort_by_key(|h| h.header_hash.clone());
+    //         assert_eq!(headers, expected);
+    //         env.with_commit(|writer| meta_buf.flush_to_txn(writer))
+    //             .unwrap();
+    //     }
+    //     {
+    //         let reader = env.reader().unwrap();
+    //         let meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
+    //         let mut headers = meta_buf
+    //             .get_updates(original_header_hash.into())
+    //             .unwrap()
+    //             .collect::<Vec<_>>()
+    //             .unwrap();
+    //         headers.sort_by_key(|h| h.header_hash.clone());
+    //         assert_eq!(headers, expected);
+    //     }
+    // }
 
     #[tokio::test(threaded_scheduler)]
     async fn add_entry_get_deletes() {
@@ -539,7 +503,7 @@ mod tests {
             let (e, _) = test_delete(h.clone().into_hash(), fx).await;
             entry_deletes.push(e);
             let (e, h) =
-                test_update(h.into_hash(), entry_hash.clone(), IntendedFor::Entry, fx).await;
+                test_update(entry_hash.clone(), h.into_hash(), entry_hash.clone(), fx).await;
             entry_updates.push(NewEntryHeader::Update(e));
             let (e, _) = test_delete(h.into_hash(), fx).await;
             delete_updates.push(e);

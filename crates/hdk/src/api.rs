@@ -123,6 +123,7 @@ macro_rules! entry_defs {
 macro_rules! api_call {
     ( $f:ident, $input:expr, $outputt:ty ) => {{
         holochain_wasmer_guest::holochain_externs!();
+        holochain_wasmer_guest::host_externs!(__get);
 
         let result: Result<$outputt, $crate::prelude::SerializedBytesError> =
             $crate::prelude::host_call!($f, $input);
@@ -208,16 +209,12 @@ macro_rules! entry_hash {
 }
 
 #[macro_export]
-macro_rules! get_entry {
+macro_rules! get {
     ( $hash:expr, $options:expr ) => {{
-        $crate::api_call!(
-            __get_entry,
-            GetEntryInput::new(($hash, $options)),
-            GetEntryOutput
-        )
+        $crate::api_call!(__get, GetInput::new(($hash.into(), $options)), GetOutput)
     }};
     ( $input:expr ) => {
-        get_entry!($input, $crate::prelude::GetOptions)
+        get!($input, $crate::prelude::GetOptions)
     };
 }
 
