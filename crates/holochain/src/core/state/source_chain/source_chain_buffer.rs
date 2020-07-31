@@ -91,7 +91,8 @@ impl<'env> SourceChainBuf<'env> {
                     .get_element(&header)
                     .await?
                     .expect("BUG: element in sequence but not cas"),
-            )?;
+            )
+            .await?;
             ops.push((i, op));
         }
         Ok(ops)
