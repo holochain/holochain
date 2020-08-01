@@ -4,6 +4,7 @@
 mod kv;
 use derive_more::Display;
 
+use crate::buffer::BufVal;
 pub use kv::*;
 
 /// Use this as the key type for LMDB databases which should only have one key.
@@ -25,3 +26,10 @@ impl From<()> for UnitDbKey {
 }
 
 static ARBITRARY_BYTE_SLICE: &[u8] = &[0];
+
+/// A zero-size value type. Useful when inspecting databases without caring
+/// about their actual values.
+#[derive(
+    Display, Hash, PartialEq, Eq, Clone, serde::Serialize, serde::Deserialize, std::fmt::Debug,
+)]
+pub struct UnitDbVal;

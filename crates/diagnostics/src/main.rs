@@ -1,5 +1,7 @@
-use holochain::conductor::ConductorStateDb;
+use holochain::conductor::{state::ConductorState, ConductorStateDb};
 // use holochain::core::state::source_chain::SourceChain;
+use cell::dump_cell_state;
+use conductor::dump_conductor_state;
 use holochain_keystore::test_keystore::spawn_test_keystore;
 use holochain_state::{
     db::{GetDb, CONDUCTOR_STATE},
@@ -9,8 +11,9 @@ use holochain_state::{
 use std::path::PathBuf;
 use structopt::StructOpt;
 
+mod cell;
+mod conductor;
 mod display;
-use crate::display::human_size;
 
 #[derive(Debug, StructOpt)]
 struct Opt {
@@ -19,25 +22,31 @@ struct Opt {
 
 async fn run() -> anyhow::Result<()> {
     let opt = Opt::from_args();
+
+    // throwaway keystore that we'll never use.
     let keystore = spawn_test_keystore(Vec::new()).await.unwrap();
 
-    let conductor_env =
-        EnvironmentWrite::new(opt.lmdb_path.as_ref(), EnvironmentKind::Conductor, keystore)?;
+    // set up the various environments
+    let conductor_env = EnvironmentWrite::new(
+        opt.lmdb_path.as_ref(),
+        EnvironmentKind::Conductor,
+        keystore.clone(),
+    )?;
 
-    get_conductor_state(conductor_env).await?;
+    let conductor_state = dump_conductor_state(conductor_env).await?;
 
-    Ok(())
-}
+    for (_app_id, cells) in conductor_state.active_apps {
+        for cell in cells {
+            let (cell_id, cell_nick) = cell.into_inner();
+            let cell_env = EnvironmentWrite::new(
+                opt.lmdb_path.as_ref(),
+                EnvironmentKind::Cell(cell_id.clone()),
+                keystore.clone(),
+            )?;
+            dump_cell_state(cell_env, cell_id, &cell_nick).await?;
+        }
+    }
 
-async fn get_conductor_state(env: EnvironmentWrite) -> anyhow::Result<()> {
-    let g = env.guard().await;
-    let r = g.reader()?;
-    let db = ConductorStateDb::new(env.get_db(&CONDUCTOR_STATE)?)?;
-    let bytes = db.get_bytes(&r, &().into())?.unwrap();
-    let state = db.get(&r, &().into())?.unwrap();
-    println!("+++++++ CONDUCTOR STATE +++++++");
-    println!("Size: {}", human_size(bytes.len()));
-    println!("Data: {:#?}", state);
     Ok(())
 }
 

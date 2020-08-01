@@ -471,10 +471,12 @@ name = "diagnostics"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "fallible-iterator",
  "holochain",
  "holochain_keystore",
  "holochain_state",
  "holochain_types",
+ "rkv",
  "structopt",
  "tokio",
 ]
