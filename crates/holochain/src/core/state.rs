@@ -30,7 +30,7 @@
 //!         KvvBuf          KvBuf          IntKvBuf
 //!
 //! source: https://textik.com/#d7907793784e17e9
-//! ``` 
+//! ```
 
 #[allow(missing_docs)]
 pub mod cascade;
