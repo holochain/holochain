@@ -1,4 +1,4 @@
-use crate::core::state::chain_cas::ChainCasBuf;
+use crate::core::state::element_buf::ElementBuf;
 use error::{DhtOpConvertError, DhtOpConvertResult};
 use holo_hash::{EntryHash, HeaderHash};
 use holochain_keystore::Signature;
@@ -17,9 +17,9 @@ use tracing::*;
 mod tests;
 
 /// Convert a DhtOpLight into a DhtOp (render all the hashes to values)
-/// This only checks the cas so can only be used with ops that you are an authority
-// or author of.
-pub async fn light_to_op(op: DhtOpLight, cas: &ChainCasBuf<'_>) -> DhtOpConvertResult<DhtOp> {
+/// This only checks the ElementVault so can only be used with ops that you are
+/// an authority or author of.
+pub async fn light_to_op(op: DhtOpLight, cas: &ElementBuf<'_>) -> DhtOpConvertResult<DhtOp> {
     let op_name = format!("{:?}", op);
     match op {
         DhtOpLight::StoreElement(h, _, _) => {
@@ -146,7 +146,7 @@ pub async fn light_to_op(op: DhtOpLight, cas: &ChainCasBuf<'_>) -> DhtOpConvertR
 async fn get_element_delete(
     header_hash: HeaderHash,
     op_name: String,
-    cas: &ChainCasBuf<'_>,
+    cas: &ElementBuf<'_>,
 ) -> DhtOpConvertResult<(header::ElementDelete, Signature)> {
     let (header, sig) = cas
         .get_element(&header_hash)
@@ -167,7 +167,7 @@ async fn get_element_delete(
 #[instrument(skip(cas))]
 async fn get_entry_hash_for_header(
     header_hash: &HeaderHash,
-    cas: &ChainCasBuf<'_>,
+    cas: &ElementBuf<'_>,
 ) -> DhtOpConvertResult<EntryHash> {
     debug!(%header_hash);
     let entry = cas

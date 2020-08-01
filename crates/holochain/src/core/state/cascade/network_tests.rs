@@ -532,7 +532,7 @@ async fn fake_authority<'env>(
     element: Element,
 ) {
     let reader = env_ref.reader().unwrap();
-    let mut element_vault = ChainCasBuf::vault(&reader, dbs, false).unwrap();
+    let mut element_vault = ElementBuf::vault(&reader, dbs, false).unwrap();
     let mut meta_vault = MetadataBuf::vault(&reader, dbs).unwrap();
 
     // Write to the meta vault to fake being an authority

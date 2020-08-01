@@ -1,7 +1,7 @@
 use ::fixt::prelude::*;
 use holochain::core::state::{
     cascade::Cascade,
-    chain_cas::ChainCasBuf,
+    element_buf::ElementBuf,
     metadata::{LinkMetaKey, MetadataBuf},
     source_chain::{SourceChainBuf, SourceChainResult},
 };
@@ -74,11 +74,11 @@ async fn get_links() -> SourceChainResult<()> {
     let reader = env_ref.reader()?;
 
     let mut source_chain = SourceChainBuf::new(&reader, &dbs)?;
-    let mut cache = ChainCasBuf::cache(&reader, &dbs)?;
+    let mut element_cache = ElementBuf::cache(&reader, &dbs)?;
 
     // create a cache and a cas for store and meta
-    let primary_meta = MetadataBuf::vault(&reader, &dbs)?;
-    let mut cache_meta = MetadataBuf::cache(&reader, &dbs)?;
+    let meta_vault = MetadataBuf::vault(&reader, &dbs)?;
+    let mut meta_cache = MetadataBuf::cache(&reader, &dbs)?;
 
     let (_jimbo_id, jimbo_header, jimbo_entry, _jessy_id, jessy_header, jessy_entry) = fixtures();
 
@@ -94,10 +94,10 @@ async fn get_links() -> SourceChainResult<()> {
 
     // Pass in stores as references
     let mut cascade = Cascade::new(
-        &source_chain.cas(),
-        &primary_meta,
-        &mut cache,
-        &mut cache_meta,
+        &source_chain.elements(),
+        &meta_vault,
+        &mut element_cache,
+        &mut meta_cache,
         cell_network,
     );
     let tag = LinkTag::new(BytesFixturator::new(Unpredictable).next().unwrap());

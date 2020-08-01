@@ -17,8 +17,8 @@ use super::{
 use crate::core::{
     queue_consumer::{OneshotWriter, WorkComplete},
     state::{
-        chain_cas::ChainCasBuf,
         dht_op_integration::AuthoredDhtOpsStore,
+        element_buf::ElementBuf,
         workspace::{Workspace, WorkspaceResult},
     },
 };
@@ -50,8 +50,8 @@ pub const MIN_PUBLISH_INTERVAL: time::Duration = time::Duration::from_secs(5);
 pub struct PublishDhtOpsWorkspace<'env> {
     /// Database of authored DhtOps, with data about prior publishing
     authored_dht_ops: AuthoredDhtOpsStore<'env>,
-    /// Cas for looking up data to construct ops
-    cas: ChainCasBuf<'env>,
+    /// Element store for looking up data to construct ops
+    elements: ElementBuf<'env>,
 }
 
 pub async fn publish_dht_ops_workflow(
@@ -120,7 +120,7 @@ pub async fn publish_dht_ops_workflow_inner(
         let op = value.op.clone();
         workspace.authored().put(op_hash.clone(), value)?;
 
-        let op = match light_to_op(op, workspace.cas()).await {
+        let op = match light_to_op(op, workspace.elements()).await {
             // Ignore StoreEntry ops on private
             Err(DhtOpConvertError::StoreEntryOnPrivate) => continue,
             r => r?,
@@ -142,11 +142,11 @@ impl<'env> Workspace<'env> for PublishDhtOpsWorkspace<'env> {
         let db = dbs.get_db(&*AUTHORED_DHT_OPS)?;
         let authored_dht_ops = KvBuf::new(reader, db)?;
         // Note that this must always be false as we don't want private entries being published
-        let cas = ChainCasBuf::vault(reader, dbs, false)?;
+        let elements = ElementBuf::vault(reader, dbs, false)?;
         let _db = dbs.get_db(&*INTEGRATED_DHT_OPS)?;
         Ok(Self {
             authored_dht_ops,
-            cas,
+            elements,
         })
     }
 
@@ -161,8 +161,8 @@ impl<'env> PublishDhtOpsWorkspace<'env> {
         &mut self.authored_dht_ops
     }
 
-    fn cas(&self) -> &ChainCasBuf<'env> {
-        &self.cas
+    fn elements(&self) -> &ElementBuf<'env> {
+        &self.elements
     }
 }
 
@@ -255,15 +255,15 @@ mod tests {
                     .authored_dht_ops
                     .put(op_hash.clone(), authored_value)
                     .unwrap();
-                // Put data into cas
+                // Put data into element store
                 let signed_header = SignedHeaderHashed::with_presigned(header_hash, sig);
-                workspace.cas.put(signed_header, None).unwrap();
+                workspace.elements.put(signed_header, None).unwrap();
             }
             // Manually commit because this workspace doesn't commit to all dbs
             env_ref
                 .with_commit::<DatabaseError, _, _>(|writer| {
                     workspace.authored_dht_ops.flush_to_txn(writer)?;
-                    workspace.cas.flush_to_txn(writer)?;
+                    workspace.elements.flush_to_txn(writer)?;
                     Ok(())
                 })
                 .unwrap();
@@ -515,28 +515,30 @@ mod tests {
 
             let entry_create_header = Header::EntryCreate(entry_create.clone());
 
-            // Put data in cas
+            // Put data in elements
             {
                 let reader = env_ref.reader().unwrap();
 
-                let mut cas = ChainCasBuf::vault(&reader, &dbs, true).unwrap();
+                let mut elements = ElementBuf::vault(&reader, &dbs, true).unwrap();
 
                 let header_hash = HeaderHashed::from_content(entry_create_header.clone()).await;
 
                 // Update the replaces to the header of the original
                 entry_update.replaces_address = header_hash.as_hash().clone();
 
-                // Put data into cas
+                // Put data into elements
                 let signed_header = SignedHeaderHashed::with_presigned(header_hash, sig.clone());
-                cas.put(signed_header, Some(original_entry_hashed)).unwrap();
+                elements
+                    .put(signed_header, Some(original_entry_hashed))
+                    .unwrap();
 
                 let entry_update_header = Header::EntryUpdate(entry_update.clone());
                 let header_hash = HeaderHashed::from_content(entry_update_header).await;
                 let signed_header = SignedHeaderHashed::with_presigned(header_hash, sig.clone());
-                cas.put(signed_header, Some(new_entry_hashed)).unwrap();
+                elements.put(signed_header, Some(new_entry_hashed)).unwrap();
                 env_ref
                     .with_commit::<DatabaseError, _, _>(|writer| {
-                        cas.flush_to_txn(writer)?;
+                        elements.flush_to_txn(writer)?;
                         Ok(())
                     })
                     .unwrap();
@@ -618,7 +620,7 @@ mod tests {
                 env_ref
                     .with_commit::<DatabaseError, _, _>(|writer| {
                         workspace.authored_dht_ops.flush_to_txn(writer)?;
-                        workspace.cas.flush_to_txn(writer)?;
+                        workspace.elements.flush_to_txn(writer)?;
                         Ok(())
                     })
                     .unwrap();

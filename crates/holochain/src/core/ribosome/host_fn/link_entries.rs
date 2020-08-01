@@ -48,7 +48,7 @@ pub fn link_entries<'a>(
                     .expect("Element we just put in SourceChain must be gettable");
                 integrate_to_cache(
                     &element,
-                    workspace.source_chain.cas(),
+                    workspace.source_chain.elements(),
                     &mut workspace.cache_meta,
                 )
                 .await
