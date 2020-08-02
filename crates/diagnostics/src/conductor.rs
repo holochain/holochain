@@ -8,7 +8,7 @@ pub async fn dump_conductor_state(env: EnvironmentWrite) -> anyhow::Result<Condu
     let db = ConductorStateDb::new(env.get_db(&CONDUCTOR_STATE)?)?;
     let bytes = db.get_bytes(&r, &().into())?.unwrap();
     let state = db.get(&r, &().into())?.unwrap();
-    println!("+++++++ CONDUCTOR STATE +++++++");
+
     println!("Size: {}", human_size(bytes.len()));
     println!("Data: {:#?}", state);
     Ok(state)

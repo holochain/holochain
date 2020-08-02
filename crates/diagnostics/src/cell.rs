@@ -1,50 +1,46 @@
-use crate::display::human_size;
-use fallible_iterator::FallibleIterator;
-use holochain::{conductor::state::ConductorState, core::state::source_chain::SourceChain};
-use holochain_state::{
-    buffer::{BufKey, BufVal},
-    db,
-    env::EnvironmentWrite,
-    prelude::*,
-    typed::{Kv, UnitDbKey, UnitDbVal},
-};
+use crate::display::dump_kv;
+use holochain_state::{db, env::EnvironmentWrite, prelude::*};
 use holochain_types::{app::CellNick, cell::CellId};
 
 pub async fn dump_cell_state(
     env: EnvironmentWrite,
-    cell_id: CellId,
+    _cell_id: CellId,
     cell_nick: &CellNick,
 ) -> anyhow::Result<()> {
     use db::*;
     let g = env.guard().await;
     let r = g.reader()?;
 
-    macro_rules! dumper {
-        ($db: ident) => {
-            let db = Kv::new(env.get_db(&$db)?)?;
-            dump_kv(db, &r, cell_nick)?;
+    macro_rules! kv {
+        ($name: expr, $db: ident) => {
+            let db = env.get_db(&$db)?;
+            dump_kv(&r, $name, db)?;
         };
     }
 
-    dumper!(ELEMENT_VAULT_PUBLIC_ENTRIES);
-    dumper!(ELEMENT_VAULT_PRIVATE_ENTRIES);
-    dumper!(ELEMENT_VAULT_HEADERS);
-    dumper!(META_VAULT_LINKS);
-    dumper!(META_VAULT_STATUS);
-    dumper!(ELEMENT_CACHE_ENTRIES);
-    dumper!(ELEMENT_CACHE_HEADERS);
-    dumper!(CACHE_LINKS_META);
-    dumper!(CACHE_STATUS_META);
-    Ok(())
-}
+    println!("+++++++  cell \"{}\"  +++++++", cell_nick);
 
-fn dump_kv(
-    db: Kv<UnitDbKey, UnitDbVal>,
-    reader: &Reader,
-    cell_nick: &CellNick,
-) -> anyhow::Result<()> {
-    let count = db.iter(reader)?.count()?;
-    println!("count: {}", count);
+    kv!(
+        "element vault - public entries",
+        ELEMENT_VAULT_PUBLIC_ENTRIES
+    );
+    kv!(
+        "element vault - private entries",
+        ELEMENT_VAULT_PRIVATE_ENTRIES
+    );
+    kv!("element vault - headers", ELEMENT_VAULT_HEADERS);
+    kv!("metadata vault - links", META_VAULT_LINKS);
+    kv!("metadata vault - status", META_VAULT_STATUS);
+
+    kv!("element cache - entries", ELEMENT_CACHE_ENTRIES);
+    kv!("element cache - headers", ELEMENT_CACHE_HEADERS);
+    kv!("metadata cache - links", CACHE_LINKS_META);
+    kv!("metadata cache - status", CACHE_STATUS_META);
+
+    kv!("integration queue", INTEGRATION_QUEUE);
+    kv!("integrated dht ops", INTEGRATED_DHT_OPS);
+    kv!("authored dht ops", AUTHORED_DHT_OPS);
+
     Ok(())
 }
 
