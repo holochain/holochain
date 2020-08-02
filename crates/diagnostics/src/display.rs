@@ -17,9 +17,11 @@ pub fn human_size(size: usize) -> String {
     recurse(size as f32, 0)
 }
 
-pub fn dump_kv(reader: &Reader, name: &str, db: rkv::SingleStore) -> DatabaseResult<()> {
-    let items = db
-        .iter_start(reader)?
+fn dump_iter<'i>(
+    name: &str,
+    it: impl Iterator<Item = Result<(&'i [u8], Option<rkv::Value<'i>>), rkv::StoreError>>,
+) -> DatabaseResult<()> {
+    let items = it
         .map(|kv| {
             let (k, v) = kv.unwrap();
             let key = k.len();
@@ -31,6 +33,37 @@ pub fn dump_kv(reader: &Reader, name: &str, db: rkv::SingleStore) -> DatabaseRes
     println!("{}", SizeStats::new(items));
     Ok(())
 }
+
+#[allow(dead_code)]
+fn dump_iter_multi<'i>(
+    name: &str,
+    it: impl Iterator<Item = Result<(&'i [u8], rkv::Value<'i>), rkv::StoreError>>,
+) -> DatabaseResult<()> {
+    let items = it
+        .map(|kv| {
+            // FIXME: we're ignoring the key here because its duplicated across items
+            let (_, v) = kv.unwrap();
+            let val = v.to_bytes().unwrap().len();
+            val
+        })
+        .collect();
+    println!("<DB \"{}\">", name);
+    println!("{}", SizeStats::new(items));
+    Ok(())
+}
+
+pub fn dump_kv(reader: &Reader, name: &str, db: rkv::SingleStore) -> DatabaseResult<()> {
+    dump_iter(name, db.iter_start(reader)?)
+}
+
+pub fn dump_kvi(reader: &Reader, name: &str, db: rkv::IntegerStore<u32>) -> DatabaseResult<()> {
+    dump_iter(name, db.iter_start(reader)?)
+}
+
+// TODO:
+// pub fn dump_kvv(reader: &Reader, name: &str, db: rkv::MultiStore) -> DatabaseResult<()> {
+//     dump_iter_multi(name, db.iter_start(reader)?)
+// }
 
 pub struct SizeStats {
     count: usize,

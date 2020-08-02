@@ -4,7 +4,6 @@
 mod kv;
 use derive_more::Display;
 
-use crate::buffer::BufVal;
 pub use kv::*;
 
 /// Use this as the key type for LMDB databases which should only have one key.

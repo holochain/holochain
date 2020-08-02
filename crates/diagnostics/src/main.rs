@@ -1,5 +1,3 @@
-use holochain::conductor::{state::ConductorState, ConductorStateDb};
-// use holochain::core::state::source_chain::SourceChain;
 use cell::dump_cell_state;
 use conductor::dump_conductor_state;
 use holochain_keystore::test_keystore::spawn_test_keystore;
@@ -32,9 +30,10 @@ async fn run() -> anyhow::Result<()> {
     )?;
 
     println!();
-    println!("+++++++++++++++++++++++++++++++++");
-    println!("++++++++   WASM  STATE   ++++++++");
-    println!("+++++++++++++++++++++++++++++++++");
+    println!("        +++++++++++++++++++++++++++++++++");
+    println!("        ++++++++   WASM  STATE   ++++++++");
+    println!("        +++++++++++++++++++++++++++++++++");
+    println!();
     dump_wasm_state(wasm_env).await?;
 
     // set up the various environments
@@ -45,10 +44,17 @@ async fn run() -> anyhow::Result<()> {
     )?;
 
     println!();
-    println!("+++++++++++++++++++++++++++++++++");
-    println!("+++++++  CONDUCTOR STATE  +++++++");
-    println!("+++++++++++++++++++++++++++++++++");
+    println!("        +++++++++++++++++++++++++++++++++");
+    println!("        +++++++  CONDUCTOR STATE  +++++++");
+    println!("        +++++++++++++++++++++++++++++++++");
+    println!();
     let conductor_state = dump_conductor_state(conductor_env).await?;
+
+    println!();
+    println!("        +++++++++++++++++++++++++++++++++");
+    println!("        ++++++++   CELL  STATE   ++++++++");
+    println!("        +++++++++++++++++++++++++++++++++");
+    println!();
 
     for (_app_id, cells) in conductor_state.active_apps {
         for cell in cells {

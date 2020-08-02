@@ -1,4 +1,4 @@
-use crate::display::dump_kv;
+use crate::display::{dump_kv, dump_kvi};
 use holochain_state::{db, env::EnvironmentWrite, prelude::*};
 use holochain_types::{app::CellNick, cell::CellId};
 
@@ -18,8 +18,21 @@ pub async fn dump_cell_state(
         };
     }
 
-    println!("+++++++  cell \"{}\"  +++++++", cell_nick);
+    macro_rules! kvi {
+        ($name: expr, $db: ident) => {
+            let db = env.get_db(&$db)?;
+            dump_kvi(&r, $name, db)?;
+        };
+    }
 
+    println!();
+    println!(
+        "+++++++++++++++++++++++++  cell \"{}\"  +++++++++++++++++++++++++",
+        cell_nick
+    );
+    println!();
+
+    kvi!("chain sequence", CHAIN_SEQUENCE);
     kv!(
         "element vault - public entries",
         ELEMENT_VAULT_PUBLIC_ENTRIES
