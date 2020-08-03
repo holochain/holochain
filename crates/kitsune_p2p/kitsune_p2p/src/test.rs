@@ -47,13 +47,7 @@ mod tests {
                             .boxed()
                             .into()));
                     }
-                    FetchOpHashesForConstraints { respond, .. } => {
-                        respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
-                    }
-                    FetchOpHashData { respond, .. } => {
-                        respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
-                    }
-                    _ => panic!("unexpected event"),
+                    _ => (),
                 }
             }
         });
@@ -105,13 +99,7 @@ mod tests {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
                         recv_count_clone.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                     }
-                    FetchOpHashesForConstraints { respond, .. } => {
-                        respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
-                    }
-                    FetchOpHashData { respond, .. } => {
-                        respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
-                    }
-                    _ => panic!("unexpected event"),
+                    _ => (),
                 }
             }
         });
@@ -173,13 +161,7 @@ mod tests {
                             .boxed()
                             .into()));
                     }
-                    FetchOpHashesForConstraints { respond, .. } => {
-                        respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
-                    }
-                    FetchOpHashData { respond, .. } => {
-                        respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
-                    }
-                    _ => panic!("unexpected event"),
+                    _ => (),
                 }
             }
         });

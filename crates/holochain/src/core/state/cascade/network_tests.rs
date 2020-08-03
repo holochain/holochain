@@ -420,7 +420,7 @@ async fn run_fixt_network(
                             .boxed()
                             .into()));
                     }
-                    _ => panic!("unexpected event"),
+                    _ => (),
                 }
             }
         }

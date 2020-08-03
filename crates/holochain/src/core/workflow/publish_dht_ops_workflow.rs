@@ -302,10 +302,7 @@ mod tests {
                                 break;
                             }
                         }
-                        FetchOpHashesForConstraints { respond, .. } => {
-                            respond.respond(Ok(async move { Ok(vec![]) }.boxed().into()));
-                        }
-                        _ => panic!("unexpected event: {:?}", evt),
+                        _ => (),
                     }
                 }
             }
@@ -674,10 +671,7 @@ mod tests {
                                     tx_complete.take().unwrap().send(()).unwrap();
                                 }
                             }
-                            FetchOpHashesForConstraints { respond, .. } => {
-                                respond.respond(Ok(async move { Ok(vec![]) }.boxed().into()));
-                            }
-                            _ => panic!("unexpected event: {:?}", evt),
+                            _ => (),
                         }
                     }
                 }
