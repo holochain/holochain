@@ -148,7 +148,14 @@ impl LinkMetaVal {
 pub trait MetadataBufT {
     // Links
     /// Get all the links on this base that match the tag
+    /// that do not have removes on them
     fn get_links<'a>(
+        &self,
+        key: &'a LinkMetaKey,
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError> + '_>>;
+
+    /// Get all the links on this base that match the tag regardless of removes
+    fn get_links_all<'a>(
         &self,
         key: &'a LinkMetaKey,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError> + '_>>;
@@ -418,6 +425,18 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
                         None => Ok(Some(link)),
                     }
                 }),
+        ))
+    }
+
+    fn get_links_all<'a>(
+        &self,
+        key: &'a LinkMetaKey,
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError> + '_>>
+    {
+        Ok(Box::new(
+            self.links_meta
+                .iter_all_key_matches(key.to_key())?
+                .map(|(_, v)| Ok(v)),
         ))
     }
 

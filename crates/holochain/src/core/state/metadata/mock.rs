@@ -7,6 +7,10 @@ mock! {
             &self,
             key: &'a LinkMetaKey<'a>,
         ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError>>>;
+        fn get_links_all<'a>(
+            &self,
+            key: &'a LinkMetaKey<'a>,
+        ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError>>>;
         fn add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()>;
         fn remove_link(&mut self, link_remove: LinkRemove) -> DatabaseResult<()>;
         fn sync_add_create(&self, create: header::EntryCreate) -> DatabaseResult<()>;
@@ -57,6 +61,14 @@ impl MetadataBufT for MockMetadataBuf {
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError> + '_>>
     {
         self.get_links(key)
+    }
+
+    fn get_links_all<'a>(
+        &self,
+        key: &'a LinkMetaKey,
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError> + '_>>
+    {
+        self.get_links_all(key)
     }
 
     fn get_canonical_entry_hash(&self, entry_hash: EntryHash) -> DatabaseResult<EntryHash> {
