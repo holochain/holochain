@@ -118,7 +118,7 @@ pub async fn integrate_dht_ops_workflow(
             // when re-adding items to the queue for later processing. This is
             // challenging for now since we don't have access to that original
             // key. Just a possible note for the future.
-            workspace.integration_queue.put(op_hash.into(), value)?;
+            workspace.integration_queue.put(op_hash, value)?;
         }
         WorkComplete::Incomplete
     };

@@ -46,8 +46,9 @@ impl AuthoredDhtOpsValue {
     }
 }
 
-/// Database type for IntegrationQueue
-/// Queue of ops ready to be integrated
+/// Database type for IntegrationQueue: the queue of ops ready to be integrated.
+/// NB: this is not really a queue because it doesn't envorce FIFO.
+/// We should probably change the name.
 pub type IntegrationQueueStore<'env> =
     KvBuf<'env, IntegrationQueueKey, IntegrationQueueValue, Reader<'env>>;
 
