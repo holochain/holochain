@@ -21,9 +21,7 @@ futures = {version = "0.3", optional = true}
 holochain_serialized_bytes = {version = "0.0.40", optional = true }
 must_future = {version = "0.1.1", optional = true}
 rand = {version = "0.7", optional = true}
-
-# may be able to remove with custom SerializedBytes impl
-rmp-serde = "0.14.3"
+rmp-serde = {version = "0.14.3", optional = true}
 
 [features]
 
@@ -31,6 +29,6 @@ default = ["serialized-bytes"]
 full = ["fixturators", "hashing", "string-encoding"]
 
 fixturators = ["fixt", "serialized-bytes", "rand"]
-serialized-bytes = ["holochain_serialized_bytes"]
+serialized-bytes = ["holochain_serialized_bytes", "rmp-serde"]
 string-encoding = ["base64", "blake2b_simd"]
 hashing = ["blake2b_simd", "futures", "serialized-bytes", "must_future"]
