@@ -744,7 +744,8 @@ where
     }
 }
 
-type ConductorStateDb = Kv<UnitDbKey, ConductorState>;
+/// The database used to store ConductorState. It has only one key-value pair.
+pub type ConductorStateDb = Kv<UnitDbKey, ConductorState>;
 
 mod builder {
 

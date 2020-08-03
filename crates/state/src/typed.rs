@@ -18,4 +18,10 @@ impl AsRef<[u8]> for UnitDbKey {
     }
 }
 
+impl From<()> for UnitDbKey {
+    fn from(_: ()) -> Self {
+        Self
+    }
+}
+
 static ARBITRARY_BYTE_SLICE: &[u8] = &[0];
