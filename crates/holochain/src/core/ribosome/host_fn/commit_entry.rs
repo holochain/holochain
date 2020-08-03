@@ -133,13 +133,15 @@ pub mod wasm_test {
     use fixt::prelude::*;
     use futures::future::BoxFuture;
     use futures::future::FutureExt;
-    use holo_hash::HeaderHash;
+    use holo_hash::{AnyDhtHash, EntryHash, HeaderHash};
+    use holochain_serialized_bytes::prelude::*;
     use holochain_types::fixt::AppEntry;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::entry_def::EntryDefId;
     use holochain_zome_types::CommitEntryInput;
     use holochain_zome_types::CommitEntryOutput;
-    use holochain_zome_types::GetEntryOutput;
+    use holochain_zome_types::Entry;
+    use holochain_zome_types::GetOutput;
     use std::sync::Arc;
 
     #[tokio::test(threaded_scheduler)]
@@ -287,14 +289,81 @@ pub mod wasm_test {
 
         assert_eq!(&chain_head, output.inner_ref());
 
-        let round: GetEntryOutput =
+        let round: GetOutput =
             crate::call_test_ribosome!(host_access, TestWasm::CommitEntry, "get_entry", ());
 
-        let sb = match round.into_inner() {
+        let sb = match round.into_inner().and_then(|el| el.into()) {
             Some(holochain_zome_types::entry::Entry::App(serialized_bytes)) => serialized_bytes,
             other => panic!(format!("unexpected output: {:?}", other)),
         };
         // this should be the content "foo" of the committed post
         assert_eq!(&vec![163, 102, 111, 111], sb.bytes(),)
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    #[ignore]
+    async fn test_serialize_bytes_hash() {
+        holochain_types::observability::test_run().ok();
+        #[derive(Default, SerializedBytes, Serialize, Deserialize)]
+        #[repr(transparent)]
+        #[serde(transparent)]
+        struct Post(String);
+        impl TryFrom<&Post> for Entry {
+            type Error = SerializedBytesError;
+            fn try_from(post: &Post) -> Result<Self, Self::Error> {
+                Ok(Entry::App(post.try_into()?))
+            }
+        }
+
+        // This is normal trip that works as expected
+        let entry: Entry = (&Post("foo".into())).try_into().unwrap();
+        let entry_hash = EntryHash::with_data(&entry).await;
+        assert_eq!(
+            "uhCEkPjYXxw4ztKx3wBsxzm-q3Rfoy1bXWbIQohifqC3_HNle3-SO",
+            &entry_hash.to_string()
+        );
+        let sb: SerializedBytes = entry_hash.try_into().unwrap();
+        let entry_hash: EntryHash = sb.try_into().unwrap();
+        assert_eq!(
+            "uhCEkPjYXxw4ztKx3wBsxzm-q3Rfoy1bXWbIQohifqC3_HNle3-SO",
+            &entry_hash.to_string()
+        );
+
+        // Now I can convert to AnyDhtHash
+        let any_hash: AnyDhtHash = entry_hash.clone().into();
+        assert_eq!(
+            "uhCEkPjYXxw4ztKx3wBsxzm-q3Rfoy1bXWbIQohifqC3_HNle3-SO",
+            &entry_hash.to_string()
+        );
+
+        // The trip works as expected
+        let sb: SerializedBytes = any_hash.try_into().unwrap();
+        tracing::debug!(any_sb = ?sb);
+        let any_hash: AnyDhtHash = sb.try_into().unwrap();
+        assert_eq!(
+            "uhCEkPjYXxw4ztKx3wBsxzm-q3Rfoy1bXWbIQohifqC3_HNle3-SO",
+            &any_hash.to_string()
+        );
+
+        // Converting directly works
+        let any_hash: AnyDhtHash = entry_hash.clone().try_into().unwrap();
+        assert_eq!(
+            "uhCEkPjYXxw4ztKx3wBsxzm-q3Rfoy1bXWbIQohifqC3_HNle3-SO",
+            &any_hash.to_string()
+        );
+
+        // But if I go into SerializedBytes first from EntryHash
+        let sb: SerializedBytes = entry_hash.clone().try_into().unwrap();
+        tracing::debug!(entry_sb = ?sb);
+        // Then back into AnyDhtHash
+        // this changes the hash type to a header type?
+        // "uhCkkPjYXxw4ztKx3wBsxzm-q3Rfoy1bXWbIQohifqC3_HNle3-SO",
+        let any_hash: AnyDhtHash = sb.try_into().unwrap();
+        assert_eq!(
+            "uhCEkPjYXxw4ztKx3wBsxzm-q3Rfoy1bXWbIQohifqC3_HNle3-SO",
+            &any_hash.to_string()
+        );
+        let sb: SerializedBytes = any_hash.clone().try_into().unwrap();
+        tracing::debug!(any_2_sb = ?sb);
     }
 }

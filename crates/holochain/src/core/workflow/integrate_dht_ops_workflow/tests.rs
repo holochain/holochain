@@ -37,7 +37,7 @@ use holochain_zome_types::{
     header::{builder, ElementDelete, EntryUpdate, IntendedFor, LinkAdd, LinkRemove},
     link::{LinkTag, Links},
     zome::ZomeName,
-    CommitEntryInput, GetEntryInput, GetLinksInput, Header, LinkEntriesInput,
+    CommitEntryInput, GetInput, GetLinksInput, Header, LinkEntriesInput,
 };
 use produce_dht_ops_workflow::{produce_dht_ops_workflow, ProduceDhtOpsWorkspace};
 use std::{
@@ -840,7 +840,7 @@ async fn get_entry<'env>(
 
     let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
 
-    let input = GetEntryInput::new((entry_hash.clone().into(), GetOptions));
+    let input = GetInput::new((entry_hash.clone().into(), GetOptions));
 
     let output = {
         let (_g, raw_workspace) = UnsafeCallZomeWorkspace::from_mut(&mut workspace);
@@ -849,9 +849,9 @@ async fn get_entry<'env>(
         call_context.host_access = host_access.into();
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
-        host_fn::get_entry::get_entry(ribosome.clone(), call_context.clone(), input).unwrap()
+        host_fn::get::get(ribosome.clone(), call_context.clone(), input).unwrap()
     };
-    output.into_inner().try_into().unwrap()
+    output.into_inner().and_then(|el| el.into())
 }
 
 async fn link_entries<'env>(
