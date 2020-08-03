@@ -4,6 +4,25 @@ use must_future::MustBoxFuture;
 
 impl<T: HashType> HoloHash<T> {
     /// Hash the given content to produce a HoloHash
+    pub fn from_data<'a, C: 'a + HashableContent<HashType = T>>(
+        content: C,
+    ) -> MustBoxFuture<'a, HoloHash<T>> {
+        async move {
+            match content.hashable_content() {
+                HashableContentBytes::Content(sb) => {
+                    let bytes: Vec<u8> = holochain_serialized_bytes::UnsafeBytes::from(sb).into();
+                    Self::with_pre_hashed_typed(encode::blake2b_256(&bytes), content.hash_type())
+                }
+                HashableContentBytes::Prehashed36(bytes) => {
+                    HoloHash::from_raw_bytes_and_type(bytes, content.hash_type())
+                }
+            }
+        }
+        .boxed()
+        .into()
+    }
+
+    /// Hash a reference to the given content to produce a HoloHash
     pub fn with_data<'a, C: HashableContent<HashType = T>>(
         content: &'a C,
     ) -> MustBoxFuture<'a, HoloHash<T>> {

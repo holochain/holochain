@@ -120,6 +120,7 @@ mod tests {
         header::{builder, EntryType},
     };
     use matches::assert_matches;
+    use std::collections::HashSet;
 
     struct TestData {
         app_entry: Box<dyn Iterator<Item = Entry>>,
@@ -169,7 +170,7 @@ mod tests {
         let env_ref = env.guard().await;
 
         // Setup the database and expected data
-        let expected: Vec<_> = {
+        let expected_hashes: HashSet<_> = {
             let reader = env_ref.reader().unwrap();
             let mut td = TestData::new();
             let mut source_chain = ProduceDhtOpsWorkspace::new(&reader, &dbs)
@@ -213,7 +214,15 @@ mod tests {
                 .with_commit(|writer| source_chain.flush_to_txn(writer))
                 .unwrap();
 
-            all_ops.into_iter().flatten().collect()
+            futures::future::join_all(
+                all_ops
+                    .into_iter()
+                    .flatten()
+                    .map(|o| DhtOpHash::from_data(o)),
+            )
+            .await
+            .into_iter()
+            .collect()
         };
 
         // Run the workflow and commit it
@@ -249,7 +258,6 @@ mod tests {
                 })
                 .collect::<Vec<_>>()
                 .unwrap();
-
             // Check that the integration queue is ordered by time
             times.into_iter().fold(None, |last, time| {
                 if let Some(lt) = last {
@@ -260,7 +268,7 @@ mod tests {
             });
 
             // Get the authored ops
-            let mut authored_results = workspace
+            let authored_results = workspace
                 .authored_dht_ops
                 .iter()
                 .unwrap()
@@ -272,22 +280,19 @@ mod tests {
                     });
                     Ok(DhtOpHash::with_pre_hashed(k.to_vec()))
                 })
-                .collect::<Vec<_>>()
+                .collect::<HashSet<_>>()
                 .unwrap();
 
-            // Check we got all the hashes
-            assert_eq!(results, expected);
-
             // Hash the results
-            let mut results_hashed = Vec::new();
+            let mut results_hashed = HashSet::new();
             for op in results {
                 let (_, hash) = DhtOpHashed::from_content(op).await.into();
-                results_hashed.push(hash);
+                results_hashed.insert(hash);
             }
 
-            // authored are in a different order so need to sort
-            results_hashed.sort();
-            authored_results.sort();
+            // Check we got all the hashes
+            assert_eq!(results_hashed, expected_hashes);
+
             // Check authored are all there
             assert_eq!(results_hashed, authored_results);
             results_hashed.len()
