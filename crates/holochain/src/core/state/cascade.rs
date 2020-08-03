@@ -39,7 +39,7 @@
 //! load_true loads the results into cache
 
 use super::{
-    chain_cas::ChainCasBuf,
+    element_buf::ElementBuf,
     metadata::{LinkMetaKey, MetadataBuf, MetadataBufT, SysMetaVal},
 };
 use crate::core::workflow::integrate_dht_ops_workflow::integrate_single_metadata;
@@ -78,10 +78,10 @@ where
     M: MetadataBufT,
     C: MetadataBufT,
 {
-    element_vault: &'a ChainCasBuf<'env>,
+    element_vault: &'a ElementBuf<'env>,
     meta_vault: &'a M,
 
-    element_cache: &'a mut ChainCasBuf<'env>,
+    element_cache: &'a mut ElementBuf<'env>,
     meta_cache: &'a mut C,
 
     network: HolochainP2pCell,
@@ -111,9 +111,9 @@ where
 {
     /// Constructs a [Cascade], taking references to all necessary databases
     pub fn new(
-        element_vault: &'a ChainCasBuf<'env>,
+        element_vault: &'a ElementBuf<'env>,
         meta_vault: &'a M,
-        element_cache: &'a mut ChainCasBuf<'env>,
+        element_cache: &'a mut ElementBuf<'env>,
         meta_cache: &'a mut C,
         network: HolochainP2pCell,
     ) -> Self {
@@ -186,6 +186,7 @@ where
         options: GetOptions,
     ) -> CascadeResult<()> {
         let results = self.network.get(hash.clone().into(), options).await?;
+        debug!("fetching element");
 
         for response in results {
             match response {
@@ -294,6 +295,7 @@ where
         }
     }
 
+    #[instrument(skip(self, options))]
     /// Returns the oldest live [Element] for this [EntryHash] by getting the
     /// latest available metadata from authorities combined with this agents authored data.
     pub async fn dht_get_entry(
@@ -301,6 +303,7 @@ where
         entry_hash: EntryHash,
         options: GetOptions,
     ) -> CascadeResult<Option<Element>> {
+        debug!("in get entry");
         // Update the cache from the network
         self.fetch_element_via_entry(entry_hash.clone(), options.clone())
             .await?;
@@ -351,6 +354,7 @@ where
         }
     }
 
+    #[instrument(skip(self, options))]
     /// Returns the [Element] for this [HeaderHash] if it is live
     /// by getting the latest available metadata from authorities
     /// combined with this agents authored data.
@@ -360,6 +364,7 @@ where
         header_hash: HeaderHash,
         options: GetOptions,
     ) -> CascadeResult<Option<Element>> {
+        debug!("in get header");
         // Meta Cache
         if let Some(_) = self
             .meta_cache
@@ -444,13 +449,13 @@ pub fn test_dbs_and_mocks<'env>(
     reader: &'env holochain_state::transaction::Reader<'env>,
     dbs: &impl holochain_state::db::GetDb,
 ) -> (
-    ChainCasBuf<'env>,
+    ElementBuf<'env>,
     super::metadata::MockMetadataBuf,
-    ChainCasBuf<'env>,
+    ElementBuf<'env>,
     super::metadata::MockMetadataBuf,
 ) {
-    let cas = ChainCasBuf::vault(&reader, dbs, true).unwrap();
-    let element_cache = ChainCasBuf::cache(&reader, dbs).unwrap();
+    let cas = ElementBuf::vault(&reader, dbs, true).unwrap();
+    let element_cache = ElementBuf::cache(&reader, dbs).unwrap();
     let metadata = super::metadata::MockMetadataBuf::new();
     let metadata_cache = super::metadata::MockMetadataBuf::new();
     (cas, metadata, element_cache, metadata_cache)

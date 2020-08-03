@@ -1,5 +1,5 @@
 use crate::{
-    core::state::chain_cas::ChainCasBuf,
+    core::state::element_buf::ElementBuf,
     fixt::{
         AgentValidationPkgFixturator, ChainCloseFixturator, ChainOpenFixturator, DnaFixturator,
         EntryCreateFixturator, EntryFixturator, EntryHashFixturator, EntryTypeFixturator,
@@ -267,7 +267,7 @@ async fn test_dht_basis() {
 
         // Setup a cascade
         let reader = env_ref.reader().unwrap();
-        let mut cas = ChainCasBuf::vault(&reader, &dbs, true).unwrap();
+        let mut cas = ElementBuf::vault(&reader, &dbs, true).unwrap();
 
         // Put the header into the db
         cas.put(signed_header, Some(entry_hashed)).unwrap();

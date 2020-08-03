@@ -9,7 +9,7 @@ pub mod emit_signal;
 pub mod encrypt;
 pub mod entry_hash;
 pub mod entry_type_properties;
-pub mod get_entry;
+pub mod get;
 pub mod get_links;
 pub mod keystore;
 pub mod link_entries;

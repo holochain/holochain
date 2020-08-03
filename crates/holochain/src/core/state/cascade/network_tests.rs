@@ -513,7 +513,7 @@ async fn get_entry<'env>(
     cascade.dht_get(entry_hash.into(), options).await.unwrap()
 
     // TODO: use the real get entry when element in zome types pr lands
-    // let input = GetEntryInput::new((entry_hash.clone().into(), GetOptions));
+    // let input = GetInput::new((entry_hash.clone().into(), GetOptions));
 
     // let output = {
     //     let (_g, raw_workspace) = UnsafeCallZomeWorkspace::from_mut(&mut workspace);
@@ -532,7 +532,7 @@ async fn fake_authority<'env>(
     element: Element,
 ) {
     let reader = env_ref.reader().unwrap();
-    let mut element_vault = ChainCasBuf::vault(&reader, dbs, false).unwrap();
+    let mut element_vault = ElementBuf::vault(&reader, dbs, false).unwrap();
     let mut meta_vault = MetadataBuf::vault(&reader, dbs).unwrap();
 
     // Write to the meta vault to fake being an authority

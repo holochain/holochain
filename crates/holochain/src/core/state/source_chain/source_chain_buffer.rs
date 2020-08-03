@@ -1,7 +1,7 @@
 use super::ChainInvalidReason;
 use crate::core::state::{
-    chain_cas::{ChainCasBuf, HeaderCas},
     chain_sequence::ChainSequenceBuf,
+    element_buf::{ElementBuf, HeaderCas},
     source_chain::{SourceChainError, SourceChainResult},
 };
 use fallible_iterator::FallibleIterator;
@@ -22,7 +22,7 @@ use holochain_zome_types::{header, Entry, Header};
 use tracing::*;
 
 pub struct SourceChainBuf<'env> {
-    cas: ChainCasBuf<'env>,
+    elements: ElementBuf<'env>,
     sequence: ChainSequenceBuf<'env>,
     keystore: KeystoreSender,
 }
@@ -30,7 +30,7 @@ pub struct SourceChainBuf<'env> {
 impl<'env> SourceChainBuf<'env> {
     pub fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Self> {
         Ok(Self {
-            cas: ChainCasBuf::vault(reader, dbs, true)?,
+            elements: ElementBuf::vault(reader, dbs, true)?,
             sequence: ChainSequenceBuf::new(reader, dbs)?,
             keystore: dbs.keystore(),
         })
@@ -41,7 +41,7 @@ impl<'env> SourceChainBuf<'env> {
     // FIXME This should only be cfg(test) but that doesn't work with integration tests
     pub fn cache(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Self> {
         Ok(Self {
-            cas: ChainCasBuf::cache(reader, dbs)?,
+            elements: ElementBuf::cache(reader, dbs)?,
             sequence: ChainSequenceBuf::new(reader, dbs)?,
             keystore: dbs.keystore(),
         })
@@ -71,11 +71,11 @@ impl<'env> SourceChainBuf<'env> {
 
     pub async fn get_element(&self, k: &HeaderHash) -> SourceChainResult<Option<Element>> {
         debug!("GET {:?}", k);
-        self.cas.get_element(k).await
+        self.elements.get_element(k).await
     }
 
     pub async fn get_header(&self, k: &HeaderHash) -> DatabaseResult<Option<SignedHeaderHashed>> {
-        self.cas.get_header(k).await
+        self.elements.get_header(k).await
     }
 
     pub async fn get_incomplete_dht_ops(&self) -> SourceChainResult<Vec<(u32, Vec<DhtOp>)>> {
@@ -90,7 +90,7 @@ impl<'env> SourceChainBuf<'env> {
                 &self
                     .get_element(&header)
                     .await?
-                    .expect("BUG: element in sequence but not cas"),
+                    .expect("Element in ChainSequence but not Element store"),
             )
             .await?;
             ops.push((i, op));
@@ -102,8 +102,8 @@ impl<'env> SourceChainBuf<'env> {
         self.sequence.complete_dht_op(i)
     }
 
-    pub fn cas<'a>(&'a self) -> &'a ChainCasBuf<'env> {
-        &self.cas
+    pub fn elements<'a>(&'a self) -> &'a ElementBuf<'env> {
+        &self.elements
     }
 
     pub fn sequence(&self) -> &ChainSequenceBuf {
@@ -132,12 +132,12 @@ impl<'env> SourceChainBuf<'env> {
         */
 
         self.sequence.put_header(header_address.clone());
-        self.cas.put(signed_header, maybe_entry)?;
+        self.elements.put(signed_header, maybe_entry)?;
         Ok(header_address)
     }
 
     pub fn headers(&self) -> &HeaderCas<'env> {
-        &self.cas.headers()
+        &self.elements.headers()
     }
 
     // TODO: TK-01747: Make this check more robust maybe?
@@ -257,7 +257,7 @@ impl<'env> BufferedStore<'env> for SourceChainBuf<'env> {
     type Error = SourceChainError;
 
     fn flush_to_txn(self, writer: &'env mut Writer) -> Result<(), Self::Error> {
-        self.cas.flush_to_txn(writer)?;
+        self.elements.flush_to_txn(writer)?;
         self.sequence.flush_to_txn(writer)?;
         Ok(())
     }

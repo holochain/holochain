@@ -22,7 +22,7 @@ crate-type = [ "cdylib", "rlib" ]
 [dependencies]
 holo_hash = { path = "../../../holo_hash" }
 holochain_serialized_bytes = "=0.0.40"
-holochain_wasmer_guest = "=0.0.36"
+holochain_wasmer_guest = "=0.0.37"
 holochain_zome_types = { version = "=0.0.1", path = "../../../zome_types" }
 serde = "=1.0.104"
 
