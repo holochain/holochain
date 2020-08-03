@@ -8,7 +8,7 @@ pub fn human_size(size: usize) -> String {
             recurse(size / 1024., marker_index + 1)
         } else {
             if marker_index > 0 {
-                format!("{:.1} {}B", size, BYTE_SIZE_MARKERS[marker_index])
+                format!("{:.1} {}iB", size, BYTE_SIZE_MARKERS[marker_index])
             } else {
                 format!("{} B", size)
             }
