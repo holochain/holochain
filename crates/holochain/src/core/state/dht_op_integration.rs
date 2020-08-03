@@ -46,11 +46,11 @@ impl AuthoredDhtOpsValue {
     }
 }
 
-/// Database type for IntegrationQueue: the queue of ops ready to be integrated.
+/// Database type for IntegrationLimbo: the queue of ops ready to be integrated.
 /// NB: this is not really a queue because it doesn't envorce FIFO.
 /// We should probably change the name.
-pub type IntegrationQueueStore<'env> =
-    KvBuf<'env, IntegrationQueueKey, IntegrationQueueValue, Reader<'env>>;
+pub type IntegrationLimboStore<'env> =
+    KvBuf<'env, IntegrationLimboKey, IntegrationLimboValue, Reader<'env>>;
 
 /// Database type for IntegratedDhtOps
 /// [DhtOp]s that have already been integrated
@@ -84,8 +84,8 @@ impl<'env> BufferedStore<'env> for IntegratedDhtOpsBuf<'env> {
     }
 }
 
-/// The key type for the IntegrationQueue db is just a DhtOpHash
-pub type IntegrationQueueKey = DhtOpHash;
+/// The key type for the IntegrationLimbo db is just a DhtOpHash
+pub type IntegrationLimboKey = DhtOpHash;
 
 /// A type for storing in databases that only need the hashes.
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
@@ -100,7 +100,7 @@ pub struct IntegratedDhtOpsValue {
 
 /// A type for storing in databases that only need the hashes.
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
-pub struct IntegrationQueueValue {
+pub struct IntegrationLimboValue {
     /// The op's validation status
     pub validation_status: ValidationStatus,
     /// The op

@@ -388,7 +388,7 @@ impl Cell {
 
         // add incoming ops to the integration queue transaction
         for (hash, op) in ops {
-            let iqv = crate::core::state::dht_op_integration::IntegrationQueueValue {
+            let iqv = crate::core::state::dht_op_integration::IntegrationLimboValue {
                 validation_status: holochain_types::validate::ValidationStatus::Valid,
                 op,
             };

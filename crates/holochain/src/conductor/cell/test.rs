@@ -1,7 +1,7 @@
 use crate::{
     conductor::manager::spawn_task_manager,
     core::state::{
-        dht_op_integration::{IntegratedDhtOpsValue, IntegrationQueueValue},
+        dht_op_integration::{IntegratedDhtOpsValue, IntegrationLimboValue},
         workspace::Workspace,
     },
     fixt::{DnaFileFixturator, SignatureFixturator},
@@ -107,7 +107,7 @@ async fn test_cell_handle_publish() {
         Some((_, last)) => {
             matches::assert_matches!(
                 last,
-                IntegrationQueueValue {
+                IntegrationLimboValue {
                     op: DhtOp::StoreElement(
                         _,
                         header::Header::Dna(

@@ -5,8 +5,8 @@ use crate::core::{
     queue_consumer::{OneshotWriter, TriggerSender, WorkComplete},
     state::{
         dht_op_integration::{
-            IntegratedDhtOpsStore, IntegratedDhtOpsValue, IntegrationQueueStore,
-            IntegrationQueueValue,
+            IntegratedDhtOpsStore, IntegratedDhtOpsValue, IntegrationLimboStore,
+            IntegrationLimboValue,
         },
         element_buf::ElementBuf,
         metadata::{MetadataBuf, MetadataBufT},
@@ -56,14 +56,14 @@ pub async fn integrate_dht_ops_workflow(
         ops.into_iter()
             .map(|val| {
                 val.map(|val| async move {
-                    let IntegrationQueueValue {
+                    let IntegrationLimboValue {
                         op,
                         validation_status,
                     } = val;
                     let (op, op_hash) = DhtOpHashed::from_content(op).await.into_inner();
                     (
                         op_hash,
-                        IntegrationQueueValue {
+                        IntegrationLimboValue {
                             op,
                             validation_status,
                         },
@@ -153,7 +153,7 @@ pub async fn integrate_dht_ops_workflow(
 /// rather than as an Authority, hence the last parameter.
 #[instrument(skip(value, element_store, meta_store))]
 async fn integrate_single_dht_op(
-    value: IntegrationQueueValue,
+    value: IntegrationLimboValue,
     element_store: &mut ElementBuf<'_>,
     meta_store: &mut MetadataBuf<'_>,
 ) -> DhtOpConvertResult<Outcome> {
@@ -168,12 +168,12 @@ async fn integrate_single_dht_op(
 }
 
 async fn integrate_single_element(
-    value: IntegrationQueueValue,
+    value: IntegrationLimboValue,
     element_store: &mut ElementBuf<'_>,
 ) -> DhtOpConvertResult<Outcome> {
     {
         // Process each op
-        let IntegrationQueueValue {
+        let IntegrationLimboValue {
             op,
             validation_status,
         } = value;
@@ -395,12 +395,12 @@ pub async fn integrate_to_cache<C: MetadataBufT>(
 /// The outcome of integrating a single DhtOp: either it was, or it wasn't
 enum Outcome {
     Integrated(IntegratedDhtOpsValue),
-    Deferred(IntegrationQueueValue),
+    Deferred(IntegrationLimboValue),
 }
 
 impl Outcome {
     fn deferred(op: DhtOp, validation_status: ValidationStatus) -> DhtOpConvertResult<Self> {
-        Ok(Outcome::Deferred(IntegrationQueueValue {
+        Ok(Outcome::Deferred(IntegrationLimboValue {
             op,
             validation_status,
         }))
@@ -409,7 +409,7 @@ impl Outcome {
 
 pub struct IntegrateDhtOpsWorkspace<'env> {
     // integration queue
-    pub integration_queue: IntegrationQueueStore<'env>,
+    pub integration_queue: IntegrationLimboStore<'env>,
     // integrated ops
     pub integrated_dht_ops: IntegratedDhtOpsStore<'env>,
     // Cas for storing

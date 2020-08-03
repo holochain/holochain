@@ -2,7 +2,7 @@ use super::{error::WorkflowResult, CallZomeWorkspace};
 use crate::core::queue_consumer::{OneshotWriter, TriggerSender, WorkComplete};
 use crate::core::state::{
     dht_op_integration::{
-        AuthoredDhtOpsStore, AuthoredDhtOpsValue, IntegrationQueueStore, IntegrationQueueValue,
+        AuthoredDhtOpsStore, AuthoredDhtOpsValue, IntegrationLimboStore, IntegrationLimboValue,
     },
     workspace::{Workspace, WorkspaceResult},
 };
@@ -58,7 +58,7 @@ async fn produce_dht_ops_workflow_inner(
             };
             workspace.integration_queue.put(
                 hash.clone(),
-                IntegrationQueueValue {
+                IntegrationLimboValue {
                     validation_status: ValidationStatus::Valid,
                     op,
                 },
@@ -75,7 +75,7 @@ async fn produce_dht_ops_workflow_inner(
 pub struct ProduceDhtOpsWorkspace<'env> {
     pub call_zome_workspace: CallZomeWorkspace<'env>,
     pub authored_dht_ops: AuthoredDhtOpsStore<'env>,
-    pub integration_queue: IntegrationQueueStore<'env>,
+    pub integration_queue: IntegrationLimboStore<'env>,
 }
 
 impl<'env> Workspace<'env> for ProduceDhtOpsWorkspace<'env> {

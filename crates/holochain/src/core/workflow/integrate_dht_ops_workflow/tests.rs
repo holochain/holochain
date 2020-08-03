@@ -204,7 +204,7 @@ impl Db {
                     assert_eq!(r, value, "{}", here);
                 }
                 Db::IntQueue(op) => {
-                    let value = IntegrationQueueValue {
+                    let value = IntegrationLimboValue {
                         validation_status: ValidationStatus::Valid,
                         op,
                     };
@@ -430,7 +430,7 @@ impl Db {
                 Db::Integrated(_) => {}
                 Db::IntQueue(op) => {
                     let op_hash = DhtOpHashed::from_content(op.clone()).await.into_hash();
-                    let val = IntegrationQueueValue {
+                    let val = IntegrationLimboValue {
                         validation_status: ValidationStatus::Valid,
                         op,
                     };
