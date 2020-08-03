@@ -20,6 +20,7 @@ use holochain_zome_types::header::ChainClose;
 use holochain_zome_types::header::ChainOpen;
 use holochain_zome_types::header::Dna;
 use holochain_zome_types::header::ElementDelete;
+use holochain_zome_types::header::ElementDeleteUpdate;
 use holochain_zome_types::header::EntryCreate;
 use holochain_zome_types::header::EntryType;
 use holochain_zome_types::header::EntryUpdate;
@@ -513,6 +514,11 @@ fixturator!(
 );
 
 fixturator!(
+    ElementDeleteUpdate;
+    constructor fn from_builder(HeaderBuilderCommon, HeaderHash, EntryHash, EntryHash);
+);
+
+fixturator!(
     Header;
     variants [
         Dna(Dna)
@@ -525,6 +531,7 @@ fixturator!(
         EntryCreate(EntryCreate)
         EntryUpdate(EntryUpdate)
         ElementDelete(ElementDelete)
+        ElementDeleteUpdate(ElementDeleteUpdate)
     ];
 );
 

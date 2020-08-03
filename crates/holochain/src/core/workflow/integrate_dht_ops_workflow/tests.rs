@@ -34,7 +34,7 @@ use holochain_types::{
 use holochain_zome_types::{
     entry::GetOptions,
     entry_def::EntryDefs,
-    header::{builder, ElementDelete, EntryUpdate, IntendedFor, LinkAdd, LinkRemove},
+    header::{builder, ElementDelete, EntryUpdate, IntendedFor, LinkAdd, LinkRemove, DeleteUpdate},
     link::{LinkTag, Links},
     zome::ZomeName,
     CommitEntryInput, GetEntryInput, GetLinksInput, Header, LinkEntriesInput,
@@ -1126,6 +1126,7 @@ async fn test_wasm_api_without_integration_delete() {
         let delete = builder::ElementDelete {
             removes_address: entry_header.header_hash,
             removes_entry_address: base_address.clone(),
+            removes_update: DeleteUpdate::NotAnUpdate,
         };
         workspace.source_chain.put(delete, None).await.unwrap();
         env_ref

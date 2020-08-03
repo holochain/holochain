@@ -22,6 +22,7 @@ mod tests {
     };
     use holochain_zome_types::header::{self, builder, EntryType, HeaderBuilder};
     use holochain_zome_types::header::{ElementDelete, HeaderBuilderCommon, IntendedFor};
+    use header::DeleteUpdate;
 
     struct TestFixtures {
         header_hashes: Box<dyn Iterator<Item = HeaderHash>>,
@@ -96,11 +97,13 @@ mod tests {
     async fn test_delete(
         removes_address: HeaderHash,
         removes_entry_address: EntryHash,
+        removes_update: DeleteUpdate,
         fx: &mut TestFixtures,
     ) -> (header::ElementDelete, HeaderHashed) {
         let builder = builder::ElementDelete {
             removes_address,
             removes_entry_address,
+            removes_update,
         };
         let delete = builder.build(fx.common());
         let header = HeaderHashed::from_content(delete.clone().into()).await;
@@ -474,7 +477,7 @@ mod tests {
         let mut expected: Vec<TimedHeaderHash> = Vec::new();
         let mut entry_deletes = Vec::new();
         for _ in 0..10 {
-            let (e, hash) = test_delete(header_hash.clone(), entry_hash.clone(), &mut fx).await;
+            let (e, hash) = test_delete(header_hash.clone(), entry_hash.clone(), DeleteUpdate::NotAnUpdate, &mut fx).await;
             expected.push(hash.into());
             entry_deletes.push(e)
         }
@@ -536,7 +539,7 @@ mod tests {
         for _ in 0..10 {
             let (e, h) = test_create(entry_hash.clone(), fx).await;
             entry_creates.push(NewEntryHeader::Create(e));
-            let (e, _) = test_delete(h.clone().into_hash(), entry_hash.clone(), fx).await;
+            let (e, _) = test_delete(h.clone().into_hash(), entry_hash.clone(), DeleteUpdate::NotAnUpdate, fx).await;
             entry_deletes.push(e);
             let (e, h) = test_update(
                 h.into_hash(),
@@ -546,7 +549,7 @@ mod tests {
             )
             .await;
             entry_updates.push(NewEntryHeader::Update(e));
-            let (e, _) = test_delete(h.into_hash(), entry_hash.clone(), fx).await;
+            let (e, _) = test_delete(h.into_hash(), entry_hash.clone(), DeleteUpdate::NotAnUpdate, fx).await;
             delete_updates.push(e);
         }
     }

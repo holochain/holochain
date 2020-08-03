@@ -1,7 +1,7 @@
 use super::{EntryType, Timestamp};
 use crate::header::{self, HeaderInner, IntendedFor, ZomeId};
 use crate::link::LinkTag;
-use header::Dna;
+use header::{Dna};
 use holo_hash::{AgentPubKey, DnaHash, EntryHash, HeaderHash};
 use holochain_serialized_bytes::SerializedBytes;
 
@@ -142,6 +142,12 @@ builder_variant!(EntryUpdate {
 builder_variant!(ElementDelete {
     removes_address: HeaderHash,
     removes_entry_address: EntryHash,
+});
+
+builder_variant!(ElementDeleteUpdate {
+    removes_address: HeaderHash,
+    removes_entry_address: EntryHash,
+    original_entry_address: EntryHash,
 });
 
 builder_variant!(AgentValidationPkg {

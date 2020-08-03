@@ -21,7 +21,7 @@ use holochain_types::{
 use holochain_zome_types::header::{
     builder::{self, HeaderBuilder},
     AgentValidationPkg, ChainClose, ChainOpen, Dna, EntryCreate, EntryType, EntryUpdate, Header,
-    HeaderBuilderCommon, InitZomesComplete, IntendedFor, LinkAdd, LinkRemove,
+    HeaderBuilderCommon, InitZomesComplete, IntendedFor, LinkAdd, LinkRemove, DeleteUpdate,
 };
 use pretty_assertions::assert_eq;
 use tracing::*;
@@ -148,6 +148,7 @@ impl ElementTest {
         let entry_delete = builder::ElementDelete {
             removes_address: self.header_hash.clone(),
             removes_entry_address: self.entry_hash.clone(),
+            removes_update: DeleteUpdate::NotAnUpdate,
         }
         .build(self.commons.next().unwrap());
         let element = self.to_element(entry_delete.clone().into(), None);

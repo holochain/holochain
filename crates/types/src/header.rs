@@ -34,6 +34,33 @@ pub enum NewEntryHeader {
     Update(EntryUpdate),
 }
 
+/// A header that deletes either an EntryCreate or EntryUpdate
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+pub enum DeleteHeader {
+    /// Deletes an EntryCreate
+    Create(ElementDelete),
+    /// Deletes an EntryUpdate
+    Update(ElementDeleteUpdate),
+}
+
+impl DeleteHeader {
+   pub fn removes_address(&self) -> &HeaderHash {
+       match self {
+           DeleteHeader::Create(ed) => &ed.removes_address,
+           DeleteHeader::Update(edu) => &edu.removes_address,
+       }
+   }
+}
+
+impl DeleteHeader {
+   pub fn removes_entry_address(&self) -> &EntryHash {
+       match self {
+           DeleteHeader::Create(ed) => &ed.removes_entry_address,
+           DeleteHeader::Update(edu) => &edu.removes_entry_address,
+       }
+   }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Ord, PartialOrd)]
 /// A header of one of the two types that create a new entry.
 pub enum WireNewEntryHeader {
@@ -98,6 +125,15 @@ impl From<NewEntryHeader> for Header {
         match h {
             NewEntryHeader::Create(h) => Header::EntryCreate(h),
             NewEntryHeader::Update(h) => Header::EntryUpdate(h),
+        }
+    }
+}
+
+impl From<DeleteHeader> for Header {
+    fn from(dh: DeleteHeader) -> Self {
+        match dh {
+            DeleteHeader::Create(ed) => Header::ElementDelete(ed),
+            DeleteHeader::Update(edu) => Header::ElementDeleteUpdate(edu),
         }
     }
 }
@@ -212,6 +248,29 @@ impl TryFrom<Header> for NewEntryHeader {
             Header::EntryUpdate(h) => Ok(NewEntryHeader::Update(h)),
             _ => Err(WrongHeaderError(format!("{:?}", value))),
         }
+    }
+}
+
+impl TryFrom<Header> for DeleteHeader {
+    type Error = WrongHeaderError;
+    fn try_from(value: Header) -> Result<Self, Self::Error> {
+        match value {
+            Header::ElementDelete(h) => Ok(DeleteHeader::Create(h)),
+            Header::ElementDeleteUpdate(h) => Ok(DeleteHeader::Update(h)),
+            _ => Err(WrongHeaderError(format!("{:?}", value))),
+        }
+    }
+}
+
+impl From<ElementDelete> for DeleteHeader {
+    fn from(ed: ElementDelete) -> Self {
+        DeleteHeader::Create(ed)
+    }
+}
+
+impl From<ElementDeleteUpdate> for DeleteHeader {
+    fn from(ed: ElementDeleteUpdate) -> Self {
+        DeleteHeader::Update(ed)
     }
 }
 

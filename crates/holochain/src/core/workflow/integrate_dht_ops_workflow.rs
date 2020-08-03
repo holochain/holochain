@@ -291,6 +291,10 @@ async fn integrate_single_element(
                 }
                 put_data(signature, element_delete.into(), None, element_store).await?;
             }
+            DhtOp::RegisterDeletedUpdate(signature, element_delete) => {
+                // TODO: Defer?
+                put_data(signature, element_delete.into(), None, element_store).await?;
+            }
             DhtOp::RegisterAddLink(signature, link_add) => {
                 // Check whether we have the base address in the Vault.
                 // If not then this should put the op back on the queue.
@@ -363,6 +367,10 @@ pub async fn integrate_single_metadata<C: MetadataBufT>(
         | DhtOpLight::RegisterDeletedBy(hash, _) => {
             let header = get_header(hash, element_store).await?.try_into()?;
             meta_store.register_delete(header).await?
+        }
+        DhtOpLight::RegisterDeletedUpdate(hash, _) => {
+            let header = get_header(hash, element_store).await?.try_into()?;
+            meta_store.register_delete_update(header).await?
         }
         DhtOpLight::RegisterAddLink(hash, _) => {
             let header = get_header(hash, element_store).await?.try_into()?;

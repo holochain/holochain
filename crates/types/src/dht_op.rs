@@ -5,7 +5,7 @@
 //! [DhtOp]: enum.DhtOp.html
 
 use crate::element::{Element, ElementGroup};
-use crate::{header::NewEntryHeader, prelude::*};
+use crate::{header::{DeleteHeader, NewEntryHeader}, prelude::*};
 use error::{DhtOpError, DhtOpResult};
 use header::IntendedFor;
 use holo_hash::{hash_type, HashableContentBytes};
@@ -68,11 +68,16 @@ pub enum DhtOp {
     RegisterReplacedBy(Signature, header::EntryUpdate, Option<Box<Entry>>),
 
     /// Op for registering a Header deletion with the Header authority
-    RegisterDeletedBy(Signature, header::ElementDelete),
+    RegisterDeletedBy(Signature, DeleteHeader),
 
     /// Op for registering a Header deletion with the Entry authority, so that
     /// the Entry can be marked Dead if all of its Headers have been deleted
-    RegisterDeletedEntryHeader(Signature, header::ElementDelete),
+    RegisterDeletedEntryHeader(Signature, DeleteHeader),
+
+    /// Op for registering a EntryUpdate deletion with the authority for the
+    /// update metadata. This allows the update relationship to be removed when
+    /// an update is removed.
+    RegisterDeletedUpdate(Signature, header::ElementDeleteUpdate),
 
     /// Op for adding a link
     RegisterAddLink(Signature, header::LinkAdd),
@@ -95,6 +100,7 @@ pub enum DhtOpLight {
     RegisterReplacedBy(HeaderHash, EntryHash, DhtBasis),
     RegisterDeletedBy(HeaderHash, DhtBasis),
     RegisterDeletedEntryHeader(HeaderHash, DhtBasis),
+    RegisterDeletedUpdate(HeaderHash, DhtBasis),
     RegisterAddLink(HeaderHash, DhtBasis),
     RegisterRemoveLink(HeaderHash, DhtBasis),
 }
@@ -110,6 +116,7 @@ impl DhtOp {
             Self::RegisterDeletedEntryHeader(_, header) => {
                 UniqueForm::RegisterDeletedEntryHeader(header)
             }
+            Self::RegisterDeletedUpdate(_, header) => UniqueForm::RegisterDeletedUpdate(header),
             Self::RegisterAddLink(_, header) => UniqueForm::RegisterAddLink(header),
             Self::RegisterRemoveLink(_, header) => UniqueForm::RegisterRemoveLink(header),
         }
@@ -156,6 +163,10 @@ impl DhtOp {
                 let h = HeaderHash::with_data(&Header::from(h.clone())).await;
                 DhtOpLight::RegisterDeletedEntryHeader(h, basis)
             }
+            DhtOp::RegisterDeletedUpdate(_, h) => {
+                let h = HeaderHash::with_data(&Header::from(h.clone())).await;
+                DhtOpLight::RegisterDeletedUpdate(h, basis)
+            }
             DhtOp::RegisterAddLink(_, h) => {
                 let h = HeaderHash::with_data(&Header::from(h.clone())).await;
                 DhtOpLight::RegisterAddLink(h, basis)
@@ -178,6 +189,7 @@ impl DhtOpLight {
             | DhtOpLight::RegisterReplacedBy(_, _, b)
             | DhtOpLight::RegisterDeletedBy(_, b)
             | DhtOpLight::RegisterDeletedEntryHeader(_, b)
+            | DhtOpLight::RegisterDeletedUpdate(_, b)
             | DhtOpLight::RegisterAddLink(_, b)
             | DhtOpLight::RegisterRemoveLink(_, b) => b,
         }
@@ -193,8 +205,9 @@ enum UniqueForm<'a> {
     StoreEntry(&'a NewEntryHeader),
     RegisterAgentActivity(&'a Header),
     RegisterReplacedBy(&'a header::EntryUpdate),
-    RegisterDeletedBy(&'a header::ElementDelete),
-    RegisterDeletedEntryHeader(&'a header::ElementDelete),
+    RegisterDeletedBy(&'a DeleteHeader),
+    RegisterDeletedEntryHeader(&'a DeleteHeader),
+    RegisterDeletedUpdate(&'a header::ElementDeleteUpdate),
     RegisterAddLink(&'a header::LinkAdd),
     RegisterRemoveLink(&'a header::LinkRemove),
 }
@@ -209,10 +222,11 @@ impl<'a> UniqueForm<'a> {
                 IntendedFor::Header => header.replaces_address.clone().into(),
                 IntendedFor::Entry(basis) => basis.clone().into(),
             },
-            UniqueForm::RegisterDeletedBy(header) => header.removes_address.clone().into(),
+            UniqueForm::RegisterDeletedBy(header) => header.removes_address().clone().into(),
             UniqueForm::RegisterDeletedEntryHeader(header) => {
-                header.removes_entry_address.clone().into()
+                header.removes_entry_address().clone().into()
             }
+            UniqueForm::RegisterDeletedUpdate(header) => header.original_entry_address.clone().into(),
             UniqueForm::RegisterAddLink(header) => header.base_address.clone().into(),
             UniqueForm::RegisterRemoveLink(header) => header.base_address.clone().into(),
         }
@@ -256,6 +270,10 @@ pub async fn produce_ops_from_element(element: &Element) -> DhtOpResult<Vec<DhtO
                 DhtOp::RegisterDeletedEntryHeader(signature, element_delete)
             }
             DhtOpLight::RegisterDeletedBy(_, _) => {
+                let element_delete = header.try_into()?;
+                DhtOp::RegisterDeletedBy(signature, element_delete)
+            }
+            DhtOpLight::RegisterDeletedUpdate(_, _) => {
                 let element_delete = header.try_into()?;
                 DhtOp::RegisterDeletedBy(signature, element_delete)
             }
@@ -373,11 +391,11 @@ async fn produce_op_lights_from_iter(
                 // or EntryUpdate
                 ops.push(DhtOpLight::RegisterDeletedBy(
                     header_hash.clone(),
-                    UniqueForm::RegisterDeletedBy(entry_delete).basis().await,
+                    UniqueForm::RegisterDeletedBy(entry_delete.into()).basis().await,
                 ));
                 ops.push(DhtOpLight::RegisterDeletedEntryHeader(
                     header_hash,
-                    UniqueForm::RegisterDeletedEntryHeader(entry_delete)
+                    UniqueForm::RegisterDeletedEntryHeader(entry_delete.into())
                         .basis()
                         .await,
                 ));

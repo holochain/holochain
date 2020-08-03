@@ -38,6 +38,7 @@ pub enum Header {
     EntryCreate(EntryCreate),
     EntryUpdate(EntryUpdate),
     ElementDelete(ElementDelete),
+    ElementDeleteUpdate(ElementDeleteUpdate),
 }
 
 pub type HeaderHashed = HoloHashed<Header>;
@@ -78,6 +79,7 @@ write_into_header! {
     EntryCreate,
     EntryUpdate,
     ElementDelete,
+    ElementDeleteUpdate,
 }
 
 /// a utility macro just to not have to type in the match statement everywhere.
@@ -94,6 +96,7 @@ macro_rules! match_header {
             Header::EntryCreate($i) => { $($t)* }
             Header::EntryUpdate($i) => { $($t)* }
             Header::ElementDelete($i) => { $($t)* }
+            Header::ElementDeleteUpdate($i) => { $($t)* }
         }
     };
 }
@@ -142,6 +145,7 @@ impl Header {
             Self::LinkAdd(LinkAdd { prev_header, .. }) => prev_header,
             Self::LinkRemove(LinkRemove { prev_header, .. }) => prev_header,
             Self::ElementDelete(ElementDelete { prev_header, .. }) => prev_header,
+            Self::ElementDeleteUpdate(ElementDeleteUpdate { prev_header, .. }) => prev_header,
             Self::ChainClose(ChainClose { prev_header, .. }) => prev_header,
             Self::ChainOpen(ChainOpen { prev_header, .. }) => prev_header,
             Self::EntryCreate(EntryCreate { prev_header, .. }) => prev_header,
@@ -307,6 +311,22 @@ pub struct ElementDelete {
     /// Address of the Element being deleted
     pub removes_address: HeaderHash,
     pub removes_entry_address: EntryHash,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+pub struct ElementDeleteUpdate {
+    pub author: AgentPubKey,
+    pub timestamp: Timestamp,
+    pub header_seq: u32,
+    pub prev_header: HeaderHash,
+
+    /// Address of the Element being deleted
+    pub removes_address: HeaderHash,
+    pub removes_entry_address: EntryHash,
+    /// The address of the entry that the update replaces.
+    /// The authority of this entry needs to remove the 
+    /// update metadata relationship.
+    pub original_entry_address: EntryHash,
 }
 
 /// Allows Headers which reference Entries to know what type of Entry it is

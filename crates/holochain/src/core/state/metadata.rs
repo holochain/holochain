@@ -184,6 +184,9 @@ pub trait MetadataBufT {
     /// Registers a [Header::ElementDelete] on the Header of an Entry
     async fn register_delete(&mut self, delete: header::ElementDelete) -> DatabaseResult<()>;
 
+    /// Registers a [Header::ElementDelete] on an [EntryUpdate]
+    async fn register_delete_update(&mut self, delete: header::ElementDelete) -> DatabaseResult<()>;
+
     /// Returns all the [HeaderHash]es of headers that created this [Entry]
     fn get_headers(
         &self,
@@ -497,6 +500,14 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
             .await?;
         self.update_entry_dht_status(entry_hash)
     }
+
+    // #[allow(clippy::needless_lifetimes)]
+    // async fn register_delete_update(&mut self, delete: header::ElementDelete) -> DatabaseResult<()> {
+    //     match delete.removes_update {
+    //         header::DeleteUpdate::Header(_) => self.system_meta.put()
+    //         header::DeleteUpdate::Entry(_) => {}
+    //     }
+    // }
 
     #[allow(clippy::needless_lifetimes)]
     async fn register_activity(&mut self, header: Header) -> DatabaseResult<()> {
