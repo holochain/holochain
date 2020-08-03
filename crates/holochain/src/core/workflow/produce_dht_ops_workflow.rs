@@ -11,7 +11,7 @@ use holochain_state::{
     db::{AUTHORED_DHT_OPS, INTEGRATION_QUEUE},
     prelude::{BufferedStore, GetDb, Reader, Writer},
 };
-use holochain_types::{dht_op::DhtOpHashed, validate::ValidationStatus, TimestampKey};
+use holochain_types::{dht_op::DhtOpHashed, validate::ValidationStatus};
 use tracing::*;
 
 pub mod dht_op_light;
@@ -57,7 +57,7 @@ async fn produce_dht_ops_workflow_inner(
                 last_publish_time: None,
             };
             workspace.integration_queue.put(
-                (TimestampKey::now(), hash.clone()).into(),
+                hash.clone(),
                 IntegrationQueueValue {
                     validation_status: ValidationStatus::Valid,
                     op,
@@ -101,7 +101,7 @@ impl<'env> Workspace<'env> for ProduceDhtOpsWorkspace<'env> {
 mod tests {
     use super::super::genesis_workflow::tests::fake_genesis;
     use super::*;
-    use crate::core::state::{dht_op_integration::IntegrationQueueKey, source_chain::SourceChain};
+    use crate::core::state::source_chain::SourceChain;
 
     use ::fixt::prelude::*;
     use fallible_iterator::FallibleIterator;
@@ -241,10 +241,8 @@ mod tests {
                 .map(|(k, v)| {
                     let s = debug_span!("times");
                     let _g = s.enter();
-                    let t: (TimestampKey, DhtOpHash) = IntegrationQueueKey::from(k).into();
-                    debug!(time = ?t.0);
-                    debug!(hash = ?t.1);
-                    times.push(t.0);
+                    debug!(hash = ?k);
+                    times.push(k);
                     // Check the status is Valid
                     assert_matches!(v.validation_status, ValidationStatus::Valid);
                     Ok(v.op)
