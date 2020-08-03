@@ -137,5 +137,4 @@ mod tests {
     fn test_fails_with_bad_size() {
         DnaHash::from_raw_bytes(vec![0xdb; 35]);
     }
-
 }

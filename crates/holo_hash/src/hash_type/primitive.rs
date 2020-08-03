@@ -1,5 +1,13 @@
 use super::*;
 
+const AGENT_PREFIX: &[u8] = &[0x84, 0x20, 0x24]; // uhCAk
+const CONTENT_PREFIX: &[u8] = &[0x84, 0x21, 0x24]; // uhCEk
+const DHTOP_PREFIX: &[u8] = &[0x84, 0x24, 0x24]; // uhCQk
+const DNA_PREFIX: &[u8] = &[0x84, 0x2d, 0x24]; // uhC0k
+const NET_ID_PREFIX: &[u8] = &[0x84, 0x22, 0x24]; // uhCIk
+const HEADER_PREFIX: &[u8] = &[0x84, 0x29, 0x24]; // uhCkk
+const WASM_PREFIX: &[u8] = &[0x84, 0x2a, 0x24]; // uhCok
+
 /// A PrimitiveHashType is one with a multihash prefix.
 /// In contrast, a non-primitive hash type could be one of several primitive
 /// types, e.g. an `AnyDhtHash` can represent one of three primitive types.
