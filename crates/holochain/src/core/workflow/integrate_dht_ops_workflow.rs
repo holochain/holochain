@@ -4,11 +4,11 @@ use super::*;
 use crate::core::{
     queue_consumer::{OneshotWriter, TriggerSender, WorkComplete},
     state::{
-        chain_cas::ChainCasBuf,
         dht_op_integration::{
             IntegratedDhtOpsStore, IntegratedDhtOpsValue, IntegrationQueueStore,
             IntegrationQueueValue,
         },
+        element_buf::ElementBuf,
         metadata::{MetadataBuf, MetadataBufT},
         workspace::{Workspace, WorkspaceResult},
     },
@@ -24,7 +24,7 @@ use holochain_state::{
     prelude::{GetDb, Reader, Writer},
 };
 use holochain_types::{
-    dht_op::{produce_ops_from_element, DhtOp, DhtOpHashed, DhtOpLight},
+    dht_op::{produce_op_lights_from_elements, DhtOp, DhtOpHashed, DhtOpLight},
     element::{Element, SignedHeaderHashed, SignedHeaderHashedExt},
     validate::ValidationStatus,
     Entry, EntryHashed, Timestamp, TimestampKey,
@@ -91,13 +91,8 @@ pub async fn integrate_dht_ops_workflow(
             // only integrate this op if it hasn't been integrated already!
             // TODO: test for this [ B-01894 ]
             if workspace.integrated_dht_ops.get(&op_hash)?.is_none() {
-                match integrate_single_dht_op(
-                    value,
-                    &mut workspace.cas,
-                    &mut workspace.meta,
-                    IntegrationContext::Authority,
-                )
-                .await?
+                match integrate_single_dht_op(value, &mut workspace.elements, &mut workspace.meta)
+                    .await?
                 {
                     Outcome::Integrated(integrated) => {
                         workspace.integrated_dht_ops.put(op_hash, integrated)?;
@@ -160,11 +155,10 @@ pub async fn integrate_dht_ops_workflow(
 #[instrument(skip(value, element_store, meta_store))]
 async fn integrate_single_dht_op(
     value: IntegrationQueueValue,
-    element_store: &mut ChainCasBuf<'_>,
+    element_store: &mut ElementBuf<'_>,
     meta_store: &mut MetadataBuf<'_>,
-    context: IntegrationContext,
 ) -> DhtOpConvertResult<Outcome> {
-    match integrate_single_element(value, element_store, context).await? {
+    match integrate_single_element(value, element_store).await? {
         Outcome::Integrated(v) => {
             integrate_single_metadata(v.op.clone(), element_store, meta_store).await?;
             debug!("integrating");
@@ -176,8 +170,7 @@ async fn integrate_single_dht_op(
 
 async fn integrate_single_element(
     value: IntegrationQueueValue,
-    element_store: &mut ChainCasBuf<'_>,
-    context: IntegrationContext,
+    element_store: &mut ElementBuf<'_>,
 ) -> DhtOpConvertResult<Outcome> {
     {
         // Process each op
@@ -191,7 +184,7 @@ async fn integrate_single_element(
             signature: Signature,
             header: Header,
             maybe_entry: Option<Entry>,
-            element_store: &mut ChainCasBuf<'_>,
+            element_store: &mut ElementBuf<'_>,
         ) -> DhtOpConvertResult<()> {
             let signed_header =
                 SignedHeaderHashed::from_content(SignedHeader(header, signature)).await;
@@ -205,13 +198,8 @@ async fn integrate_single_element(
 
         async fn header_with_entry_is_stored(
             hash: &HeaderHash,
-            element_store: &ChainCasBuf<'_>,
-            context: IntegrationContext,
+            element_store: &ElementBuf<'_>,
         ) -> DhtOpConvertResult<bool> {
-            // If we are the author we don't defer on missing dependencies
-            if let IntegrationContext::Author = context {
-                return Ok(true);
-            }
             match element_store.get_header(hash).await?.map(|e| {
                 e.header()
                     .entry_data()
@@ -226,21 +214,9 @@ async fn integrate_single_element(
             }
         }
 
-        let entry_is_stored = |hash| {
-            // If we are the author we don't defer on missing dependencies
-            if let IntegrationContext::Author = context {
-                return Ok(true);
-            }
-            element_store.contains_entry(hash)
-        };
+        let entry_is_stored = |hash| element_store.contains_entry(hash);
 
-        let header_is_stored = |hash| {
-            // If we are the author we don't defer on missing dependencies
-            if let IntegrationContext::Author = context {
-                return Ok(true);
-            }
-            element_store.contains_header(hash)
-        };
+        let header_is_stored = |hash| element_store.contains_header(hash);
 
         match op {
             DhtOp::StoreElement(signature, header, maybe_entry) => {
@@ -275,7 +251,6 @@ async fn integrate_single_element(
                         if !header_with_entry_is_stored(
                             &entry_update.replaces_address,
                             element_store,
-                            context,
                         )
                         .await?
                         {
@@ -296,12 +271,8 @@ async fn integrate_single_element(
             DhtOp::RegisterDeletedEntryHeader(signature, element_delete) => {
                 // Check if we have the header with the entry that we are removing in the vault
                 // or defer the op.
-                if !header_with_entry_is_stored(
-                    &element_delete.removes_address,
-                    element_store,
-                    context,
-                )
-                .await?
+                if !header_with_entry_is_stored(&element_delete.removes_address, element_store)
+                    .await?
                 {
                     // Can't combine the two delete match arms without cloning the op
                     let op = DhtOp::RegisterDeletedEntryHeader(signature, element_delete);
@@ -312,12 +283,8 @@ async fn integrate_single_element(
             DhtOp::RegisterDeletedBy(signature, element_delete) => {
                 // Check if we have the header with the entry that we are removing in the vault
                 // or defer the op.
-                if !header_with_entry_is_stored(
-                    &element_delete.removes_address,
-                    element_store,
-                    context,
-                )
-                .await?
+                if !header_with_entry_is_stored(&element_delete.removes_address, element_store)
+                    .await?
                 {
                     let op = DhtOp::RegisterDeletedBy(signature, element_delete);
                     return Outcome::deferred(op, validation_status);
@@ -358,14 +325,14 @@ async fn integrate_single_element(
     }
 }
 
-pub async fn integrate_single_metadata(
+pub async fn integrate_single_metadata<C: MetadataBufT>(
     op: DhtOpLight,
-    element_store: &ChainCasBuf<'_>,
-    meta_store: &mut MetadataBuf<'_>,
+    element_store: &ElementBuf<'_>,
+    meta_store: &mut C,
 ) -> DhtOpConvertResult<()> {
     async fn get_header(
         hash: HeaderHash,
-        element_store: &ChainCasBuf<'_>,
+        element_store: &ElementBuf<'_>,
     ) -> DhtOpConvertResult<Header> {
         Ok(element_store
             .get_header(&hash)
@@ -409,29 +376,19 @@ pub async fn integrate_single_metadata(
     Ok(())
 }
 
-#[derive(PartialEq, std::fmt::Debug)]
-/// Specifies my role when integrating
-enum IntegrationContext {
-    /// I am integrating DhtOps which I authored
-    #[allow(dead_code)]
-    Author,
-    /// I am integrating DhtOps which were published to me as an authority
-    Authority,
-}
-
 /// After writing an Element to our chain, we want to integrate the meta ops
 /// inline, so that they are immediately available in the meta cache.
 /// NB: We skip integrating the element data, since it is already available in
 /// our vault.
-pub async fn integrate_to_cache(
+pub async fn integrate_to_cache<C: MetadataBufT>(
     element: &Element,
-    element_store: &ChainCasBuf<'_>,
-    meta_store: &mut MetadataBuf<'_>,
+    element_store: &ElementBuf<'_>,
+    meta_store: &mut C,
 ) -> DhtOpConvertResult<()> {
-    // TODO: Just produce the light directly
-    for op in produce_ops_from_element(element)? {
+    // Produce the light directly
+    for op in produce_op_lights_from_elements(vec![element]).await? {
         // we don't integrate element data, because it is already in our vault.
-        integrate_single_metadata(op.to_light().await, element_store, meta_store).await?
+        integrate_single_metadata(op, element_store, meta_store).await?
     }
     Ok(())
 }
@@ -457,7 +414,7 @@ pub struct IntegrateDhtOpsWorkspace<'env> {
     // integrated ops
     pub integrated_dht_ops: IntegratedDhtOpsStore<'env>,
     // Cas for storing
-    pub cas: ChainCasBuf<'env>,
+    pub elements: ElementBuf<'env>,
     // metadata store
     pub meta: MetadataBuf<'env>,
 }
@@ -471,19 +428,19 @@ impl<'env> Workspace<'env> for IntegrateDhtOpsWorkspace<'env> {
         let db = dbs.get_db(&*INTEGRATION_QUEUE)?;
         let integration_queue = KvBuf::new(reader, db)?;
 
-        let cas = ChainCasBuf::vault(reader, dbs, true)?;
+        let elements = ElementBuf::vault(reader, dbs, true)?;
         let meta = MetadataBuf::vault(reader, dbs)?;
 
         Ok(Self {
             integration_queue,
             integrated_dht_ops,
-            cas,
+            elements,
             meta,
         })
     }
     fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
-        // flush cas
-        self.cas.flush_to_txn(writer)?;
+        // flush elements
+        self.elements.flush_to_txn(writer)?;
         // flush metadata store
         self.meta.flush_to_txn(writer)?;
         // flush integrated

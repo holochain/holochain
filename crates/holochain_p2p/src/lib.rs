@@ -12,8 +12,11 @@ pub use types::actor::{HolochainP2pRef, HolochainP2pSender};
 pub use types::*;
 
 mod spawn;
-use holochain_types::element::WireElement;
-use holochain_types::metadata::MetadataSet;
+use holochain_types::element::GetElementResponse;
+use holochain_types::{
+    link::{GetLinksResponse, WireLinkMetaKey},
+    metadata::MetadataSet,
+};
 pub use spawn::*;
 pub use test::HolochainP2pCellFixturator;
 
@@ -98,7 +101,7 @@ impl HolochainP2pCell {
         &mut self,
         dht_hash: holo_hash::AnyDhtHash,
         options: actor::GetOptions,
-    ) -> actor::HolochainP2pResult<Vec<WireElement>> {
+    ) -> actor::HolochainP2pResult<Vec<GetElementResponse>> {
         self.sender
             .get(
                 (*self.dna_hash).clone(),
@@ -128,14 +131,14 @@ impl HolochainP2pCell {
     /// Get links from the DHT.
     pub async fn get_links(
         &mut self,
-        dht_hash: holo_hash::AnyDhtHash,
+        link_key: WireLinkMetaKey,
         options: actor::GetLinksOptions,
-    ) -> actor::HolochainP2pResult<Vec<SerializedBytes>> {
+    ) -> actor::HolochainP2pResult<Vec<GetLinksResponse>> {
         self.sender
             .get_links(
                 (*self.dna_hash).clone(),
                 (*self.from_agent).clone(),
-                dht_hash,
+                link_key,
                 options,
             )
             .await

@@ -23,7 +23,7 @@ pub enum CompatConfigError {
     BrokenReference(String),
 
     #[error(transparent)]
-    ConductorError(#[from] ConductorError),
+    ConductorError(#[from] Box<ConductorError>),
 
     #[error(transparent)]
     DnaError(#[from] DnaError),
@@ -46,7 +46,8 @@ pub async fn load_conductor_from_legacy_config(
         .config(config)
         .with_keystore(keystore.clone())
         .build()
-        .await?;
+        .await
+        .map_err(Box::new)?;
 
     fn dna_key(path: &Path, uuid: &Option<String>) -> String {
         format!("{:?} ; {:?}", path, uuid)
@@ -65,7 +66,7 @@ pub async fn load_conductor_from_legacy_config(
             dna_key(&path, &dna_config.uuid),
             dna_file.dna_hash().clone(),
         );
-        conductor.install_dna(dna_file).await?;
+        conductor.install_dna(dna_file).await.map_err(Box::new)?;
     }
     let mut app_install_payload = Vec::new();
 
@@ -102,13 +103,17 @@ pub async fn load_conductor_from_legacy_config(
     conductor
         .clone()
         .install_app(app_id.clone(), app_install_payload)
-        .await?;
-    conductor.activate_app(app_id.clone()).await?;
-    let errors = conductor.clone().setup_cells().await?;
+        .await
+        .map_err(Box::new)?;
+    conductor
+        .activate_app(app_id.clone())
+        .await
+        .map_err(Box::new)?;
+    let errors = conductor.clone().setup_cells().await.map_err(Box::new)?;
 
     // If there are any errors return the first one
     if let Some(error) = errors.into_iter().next() {
-        return Err(ConductorError::from(error).into());
+        return Err(Box::new(ConductorError::from(error)).into());
     }
 
     for i in app_interfaces {
@@ -116,7 +121,11 @@ pub async fn load_conductor_from_legacy_config(
             driver: InterfaceDriver::Websocket { port },
             cells: _,
         } = i;
-        conductor.clone().add_app_interface(port).await?;
+        conductor
+            .clone()
+            .add_app_interface(port)
+            .await
+            .map_err(Box::new)?;
     }
 
     Ok(conductor)

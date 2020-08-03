@@ -1,6 +1,6 @@
 use super::Cascade;
 use crate::core::state::{
-    chain_cas::ChainCasBuf,
+    element_buf::ElementBuf,
     metadata::{LinkMetaKey, MockMetadataBuf},
     source_chain::{SourceChainBuf, SourceChainResult},
 };
@@ -29,7 +29,7 @@ use mockall::*;
 #[allow(dead_code)]
 struct Chains<'env> {
     source_chain: SourceChainBuf<'env>,
-    cache: ChainCasBuf<'env>,
+    cache: ElementBuf<'env>,
     jimbo_id: AgentPubKey,
     jimbo_header: Header,
     jimbo_entry: EntryHashed,
@@ -75,7 +75,7 @@ fn setup_env<'env>(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResu
     });
 
     let source_chain = SourceChainBuf::new(reader, dbs)?;
-    let cache = ChainCasBuf::cache(reader, dbs)?;
+    let cache = ElementBuf::cache(reader, dbs)?;
     let mock_meta_vault = MockMetadataBuf::new();
     let mock_meta_cache = MockMetadataBuf::new();
     Ok(Chains {
@@ -122,17 +122,16 @@ async fn live_local_return() -> SourceChainResult<()> {
     let (_n, _r, cell_network) = test_network().await;
 
     // call dht_get with above address
-    let cascade = Cascade::new(
-        &source_chain.cas(),
+    let mut cascade = Cascade::new(
+        &source_chain.elements(),
         &mock_meta_vault,
         &mut cache,
         &mut mock_meta_cache,
         cell_network,
     );
-
-    let entry = cascade.dht_get(address).await?;
+    let entry = cascade.dht_get(address.clone().into()).await.unwrap();
     // check it returns
-    assert_eq!(entry.unwrap(), jimbo_entry);
+    assert_eq!(entry.unwrap().into_inner().1.unwrap(), *jimbo_entry);
     // check it doesn't hit the cache
     // this is implied by the mock not expecting calls
     Ok(())
@@ -169,14 +168,14 @@ async fn dead_local_none() -> SourceChainResult<()> {
 
     let (_n, _r, cell_network) = test_network().await;
     // call dht_get with above address
-    let cascade = Cascade::new(
-        &source_chain.cas(),
+    let mut cascade = Cascade::new(
+        &source_chain.elements(),
         &mock_meta_vault,
         &mut cache,
         &mut mock_meta_cache,
         cell_network,
     );
-    let entry = cascade.dht_get(address).await?;
+    let entry = cascade.dht_get(address.clone().into()).await.unwrap();
     // check it returns none
     assert_eq!(entry, None);
     // check it doesn't hit the cache
@@ -215,14 +214,14 @@ async fn notfound_goto_cache_live() -> SourceChainResult<()> {
 
     let (_n, _r, cell_network) = test_network().await;
     // call dht_get with above address
-    let cascade = Cascade::new(
-        &source_chain.cas(),
+    let mut cascade = Cascade::new(
+        &source_chain.elements(),
         &mock_meta_vault,
         &mut cache,
         &mut mock_meta_cache,
         cell_network,
     );
-    let _entry = cascade.dht_get(&address).await?;
+    let _entry = cascade.dht_get(address.clone().into()).await.unwrap();
     // check it returns
 
     // FIXME!
@@ -253,14 +252,14 @@ async fn notfound_cache() -> DatabaseResult<()> {
 
     let (_n, _r, cell_network) = test_network().await;
     // call dht_get with above address
-    let cascade = Cascade::new(
-        &source_chain.cas(),
+    let mut cascade = Cascade::new(
+        &source_chain.elements(),
         &mock_meta_vault,
         &mut cache,
         &mut mock_meta_cache,
         cell_network,
     );
-    let entry = cascade.dht_get(&address).await?;
+    let entry = cascade.dht_get(address.clone().into()).await.unwrap();
     // check it returns
     assert_eq!(entry, None);
     // check it doesn't hit the primary
@@ -308,6 +307,7 @@ async fn links_local_return() -> SourceChainResult<()> {
     let key = LinkMetaKey::BaseZomeTag(&base, zome_id, &tag);
 
     // Return a link between entries
+    let link_return = vec![link.clone()];
     mock_meta_vault
         .expect_get_links()
         .withf({
@@ -319,14 +319,17 @@ async fn links_local_return() -> SourceChainResult<()> {
             }
         })
         .returning({
-            let link = link.clone();
-            move |_| Ok(vec![link.clone()])
+            move |_| {
+                Ok(Box::new(fallible_iterator::convert(
+                    link_return.clone().into_iter().map(Ok),
+                )))
+            }
         });
 
     let (_n, _r, cell_network) = test_network().await;
     // call dht_get_links with above base
     let cascade = Cascade::new(
-        &source_chain.cas(),
+        &source_chain.elements(),
         &mock_meta_vault,
         &mut cache,
         &mut mock_meta_cache,
@@ -334,7 +337,7 @@ async fn links_local_return() -> SourceChainResult<()> {
     );
     let links = cascade.dht_get_links(&key).await?;
     // check it returns
-    assert_eq!(links, vec![link]);
+    assert_eq!(links, vec![link.into_link()]);
     // check it doesn't hit the cache
     // this is implied by the mock not expecting calls
     Ok(())
@@ -378,6 +381,7 @@ async fn links_cache_return() -> SourceChainResult<()> {
 
     let key = LinkMetaKey::BaseZomeTag(&base, zome_id, &tag);
 
+    let link_return = vec![];
     // Return empty links
     mock_meta_vault
         .expect_get_links()
@@ -389,7 +393,15 @@ async fn links_cache_return() -> SourceChainResult<()> {
                 k == &key
             }
         })
-        .returning(move |_| Ok(Vec::new()));
+        .returning({
+            move |_| {
+                Ok(Box::new(fallible_iterator::convert(
+                    link_return.clone().into_iter().map(Ok),
+                )))
+            }
+        });
+
+    let link_return = vec![link.clone()];
     // Return a link between entries
     mock_meta_cache
         .expect_get_links()
@@ -402,14 +414,17 @@ async fn links_cache_return() -> SourceChainResult<()> {
             }
         })
         .returning({
-            let link = link.clone();
-            move |_| Ok(vec![link.clone()])
+            move |_| {
+                Ok(Box::new(fallible_iterator::convert(
+                    link_return.clone().into_iter().map(Ok),
+                )))
+            }
         });
 
     let (_n, _r, cell_network) = test_network().await;
     // call dht_get_links with above base
     let cascade = Cascade::new(
-        &source_chain.cas(),
+        &source_chain.elements(),
         &mock_meta_vault,
         &mut cache,
         &mut mock_meta_cache,
@@ -417,7 +432,7 @@ async fn links_cache_return() -> SourceChainResult<()> {
     );
     let links = cascade.dht_get_links(&key).await?;
     // check it returns
-    assert_eq!(links, vec![link.clone()]);
+    assert_eq!(links, vec![link.into_link()]);
     Ok(())
 }
 
@@ -454,6 +469,8 @@ async fn links_notauth_cache() -> DatabaseResult<()> {
 
     let key = LinkMetaKey::BaseZomeTag(&base, zome_id, &tag);
 
+    let link_return = vec![link.clone()];
+
     // Return empty links
     mock_meta_cache
         .expect_get_links()
@@ -466,15 +483,18 @@ async fn links_notauth_cache() -> DatabaseResult<()> {
             }
         })
         .returning({
-            let link = link.clone();
-            move |_| Ok(vec![link.clone()])
+            move |_| {
+                Ok(Box::new(fallible_iterator::convert(
+                    link_return.clone().into_iter().map(Ok),
+                )))
+            }
         });
 
     let (_n, _r, cell_network) = test_network().await;
 
     // call dht_get_links with above base
     let cascade = Cascade::new(
-        &source_chain.cas(),
+        &source_chain.elements(),
         &mock_meta_vault,
         &mut cache,
         &mut mock_meta_cache,
@@ -482,7 +502,7 @@ async fn links_notauth_cache() -> DatabaseResult<()> {
     );
     let links = cascade.dht_get_links(&key).await?;
     // check it returns
-    assert_eq!(links, vec![link]);
+    assert_eq!(links, vec![link.into_link()]);
     // check it doesn't hit the primary
     // this is implied by the mock not expecting calls
     Ok(())
