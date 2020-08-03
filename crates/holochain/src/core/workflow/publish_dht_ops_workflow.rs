@@ -299,16 +299,13 @@ mod tests {
                             if recv_count == total_expected {
                                 // notify the test that all items have been received
                                 tx_complete.take().unwrap().send(()).unwrap();
-                                // Small delay to check for extra
-                                if let Ok(Some(_)) =
-                                    tokio::time::timeout(Duration::from_secs(1), recv.next()).await
-                                {
-                                    panic!("Publish got extra messages {:?}");
-                                }
                                 break;
                             }
                         }
-                        _ => panic!("unexpected event"),
+                        FetchOpHashesForConstraints { respond, .. } => {
+                            respond.respond(Ok(async move { Ok(vec![]) }.boxed().into()));
+                        }
+                        _ => panic!("unexpected event: {:?}", evt),
                     }
                 }
             }
@@ -677,7 +674,10 @@ mod tests {
                                     tx_complete.take().unwrap().send(()).unwrap();
                                 }
                             }
-                            _ => panic!("unexpected event"),
+                            FetchOpHashesForConstraints { respond, .. } => {
+                                respond.respond(Ok(async move { Ok(vec![]) }.boxed().into()));
+                            }
+                            _ => panic!("unexpected event: {:?}", evt),
                         }
                     }
                 }
