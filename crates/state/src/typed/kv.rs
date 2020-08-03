@@ -31,7 +31,7 @@ where
         })
     }
 
-    /// Fetch data from DB, deserialize into V type
+    /// Fetch data from DB as raw byte slice
     pub fn get_bytes<'env, R: Readable>(
         &self,
         reader: &'env R,

@@ -56,12 +56,3 @@ pub async fn dump_cell_state(
 
     Ok(())
 }
-
-// fn dump_source_chain(db: SourceChain, cell_nick: &CellNick) -> anyhow::Result<()> {
-//     let header_count = db.
-//     println!("+++++++ SourceChain for \"{}\" +++++++", cell_nick);
-//     println!("Size: {}", human_size(bytes.len()));
-//     println!("Data: {:#?}", state);
-
-//     Ok(())
-// }

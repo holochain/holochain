@@ -12,12 +12,3 @@ pub async fn dump_wasm_state(env: EnvironmentWrite) -> anyhow::Result<()> {
 
     Ok(())
 }
-
-/*
-pub static ref WASM: DbKey<SingleStore> = DbKey::new(DbName::Wasm);
-/// The key to access the DnaDef database
-pub static ref DNA_DEF: DbKey<SingleStore> = DbKey::new(DbName::DnaDef);
-/// The key to access the EntryDef database
-pub static ref ENTRY_DEF: DbKey<SingleStore> = DbKey::new(DbName::EntryDef);
-/// The key to access the AuthoredDhtOps database
-*/
