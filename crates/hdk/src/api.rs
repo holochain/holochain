@@ -108,11 +108,7 @@ macro_rules! entry_hash {
 #[macro_export]
 macro_rules! get_entry {
     ( $hash:expr, $options:expr ) => {{
-        $crate::api_call!(
-            __get_entry,
-            GetEntryInput::new(($hash, $options)),
-            GetEntryOutput
-        )
+        $crate::api_call!(__get, GetInput::new(($hash.into(), $options)), GetOutput)
     }};
     ( $input:expr ) => {
         get_entry!($input, $crate::prelude::GetOptions)

@@ -12,17 +12,17 @@ pub async fn spawn_kitsune_p2p() -> KitsuneP2pResult<(
     let (evt_send, evt_recv) = futures::channel::mpsc::channel(10);
     let builder = ghost_actor::actor_builder::GhostActorBuilder::new();
 
-    let internal_sender = builder
-        .channel_factory()
-        .create_channel::<Internal>()
-        .await?;
+    let channel_factory = builder.channel_factory().clone();
 
-    let sender = builder
-        .channel_factory()
-        .create_channel::<KitsuneP2p>()
-        .await?;
+    let internal_sender = channel_factory.create_channel::<Internal>().await?;
 
-    tokio::task::spawn(builder.spawn(KitsuneP2pActor::new(internal_sender, evt_send)?));
+    let sender = channel_factory.create_channel::<KitsuneP2p>().await?;
+
+    tokio::task::spawn(builder.spawn(KitsuneP2pActor::new(
+        channel_factory,
+        internal_sender,
+        evt_send,
+    )?));
 
     Ok((sender, evt_recv))
 }
