@@ -18,6 +18,9 @@ use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitResult;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
+use crate::core::ribosome::guest_callback::validate_link_add::ValidateLinkAddHostAccess;
+use crate::core::ribosome::guest_callback::validate_link_add::ValidateLinkAddInvocation;
+use crate::core::ribosome::guest_callback::validate_link_add::ValidateLinkAddResult;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 use crate::core::ribosome::guest_callback::CallIterator;
@@ -66,6 +69,7 @@ use holochain_zome_types::migrate_agent::MigrateAgentCallbackResult;
 use holochain_zome_types::post_commit::PostCommitCallbackResult;
 use holochain_zome_types::validate::ValidateCallbackResult;
 use holochain_zome_types::validate::ValidationPackageCallbackResult;
+use holochain_zome_types::validate_link_add::ValidateLinkAddCallbackResult;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::CallbackResult;
 use holochain_zome_types::GuestOutput;
@@ -400,6 +404,14 @@ impl RibosomeT for WasmRibosome {
         invocation: ValidateInvocation,
     ) -> RibosomeResult<ValidateResult> {
         do_callback!(self, access, invocation, ValidateCallbackResult)
+    }
+
+    fn run_validate_link_add(
+        &self,
+        access: ValidateLinkAddHostAccess,
+        invocation: ValidateLinkAddInvocation,
+    ) -> RibosomeResult<ValidateLinkAddResult> {
+        do_callback!(self, access, invocation, ValidateLinkAddCallbackResult)
     }
 
     fn run_init(
