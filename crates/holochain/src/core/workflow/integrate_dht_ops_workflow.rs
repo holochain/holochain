@@ -15,12 +15,13 @@ use crate::core::{
 };
 use error::WorkflowResult;
 use fallible_iterator::FallibleIterator;
-use holo_hash::HeaderHash;
+use holo_hash::{DhtOpHash, HeaderHash};
 use holochain_keystore::Signature;
 use holochain_state::{
     buffer::BufferedStore,
     buffer::KvBuf,
     db::{INTEGRATED_DHT_OPS, INTEGRATION_QUEUE},
+    error::DatabaseResult,
     prelude::{GetDb, Reader, Writer},
 };
 use holochain_types::{
@@ -446,5 +447,12 @@ impl<'env> Workspace<'env> for IntegrateDhtOpsWorkspace<'env> {
         // flush integration queue
         self.integration_queue.flush_to_txn(writer)?;
         Ok(())
+    }
+}
+
+impl<'env> IntegrateDhtOpsWorkspace<'env> {
+    pub fn op_exists(&self, hash: &DhtOpHash) -> DatabaseResult<bool> {
+        Ok(self.integrated_dht_ops.get(&hash)?.is_some()
+            || self.integration_queue.get(&hash)?.is_some())
     }
 }
