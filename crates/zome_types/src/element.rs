@@ -10,7 +10,7 @@ use holochain_serialized_bytes::prelude::*;
 
 /// a chain element which is a triple containing the signature of the header along with the
 /// entry if the header type has one.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub struct Element {
     /// The signed header for this element
     signed_header: SignedHeaderHashed,
@@ -138,7 +138,7 @@ impl HashableContent for SignedHeader {
 }
 
 /// The header and the signature that signed it
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SignedHeaderHashed {
     header: HeaderHashed,
     signature: Signature,
@@ -214,5 +214,11 @@ impl From<SignedHeaderHashed> for HoloHashed<SignedHeader> {
     fn from(shh: SignedHeaderHashed) -> HoloHashed<SignedHeader> {
         let (signed_header, hash) = shh.into_inner();
         HoloHashed::with_pre_hashed(signed_header, hash)
+    }
+}
+
+impl From<Element> for Option<Entry> {
+    fn from(e: Element) -> Self {
+        e.maybe_entry
     }
 }

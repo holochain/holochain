@@ -4,11 +4,11 @@ use super::*;
 use crate::core::{
     queue_consumer::{OneshotWriter, TriggerSender, WorkComplete},
     state::{
-        chain_cas::ChainCasBuf,
         dht_op_integration::{
             IntegratedDhtOpsStore, IntegratedDhtOpsValue, IntegrationQueueStore,
             IntegrationQueueValue,
         },
+        element_buf::ElementBuf,
         metadata::{MetadataBuf, MetadataBufT},
         workspace::{Workspace, WorkspaceResult},
     },
@@ -91,7 +91,7 @@ pub async fn integrate_dht_ops_workflow(
             // only integrate this op if it hasn't been integrated already!
             // TODO: test for this [ B-01894 ]
             if workspace.integrated_dht_ops.get(&op_hash)?.is_none() {
-                match integrate_single_dht_op(value, &mut workspace.cas, &mut workspace.meta)
+                match integrate_single_dht_op(value, &mut workspace.elements, &mut workspace.meta)
                     .await?
                 {
                     Outcome::Integrated(integrated) => {
@@ -155,7 +155,7 @@ pub async fn integrate_dht_ops_workflow(
 #[instrument(skip(value, element_store, meta_store))]
 async fn integrate_single_dht_op(
     value: IntegrationQueueValue,
-    element_store: &mut ChainCasBuf<'_>,
+    element_store: &mut ElementBuf<'_>,
     meta_store: &mut MetadataBuf<'_>,
 ) -> DhtOpConvertResult<Outcome> {
     match integrate_single_element(value, element_store).await? {
@@ -170,7 +170,7 @@ async fn integrate_single_dht_op(
 
 async fn integrate_single_element(
     value: IntegrationQueueValue,
-    element_store: &mut ChainCasBuf<'_>,
+    element_store: &mut ElementBuf<'_>,
 ) -> DhtOpConvertResult<Outcome> {
     {
         // Process each op
@@ -184,7 +184,7 @@ async fn integrate_single_element(
             signature: Signature,
             header: Header,
             maybe_entry: Option<Entry>,
-            element_store: &mut ChainCasBuf<'_>,
+            element_store: &mut ElementBuf<'_>,
         ) -> DhtOpConvertResult<()> {
             let signed_header =
                 SignedHeaderHashed::from_content(SignedHeader(header, signature)).await;
@@ -198,7 +198,7 @@ async fn integrate_single_element(
 
         async fn header_with_entry_is_stored(
             hash: &HeaderHash,
-            element_store: &ChainCasBuf<'_>,
+            element_store: &ElementBuf<'_>,
         ) -> DhtOpConvertResult<bool> {
             match element_store.get_header(hash).await?.map(|e| {
                 e.header()
@@ -327,12 +327,12 @@ async fn integrate_single_element(
 
 pub async fn integrate_single_metadata<C: MetadataBufT>(
     op: DhtOpLight,
-    element_store: &ChainCasBuf<'_>,
+    element_store: &ElementBuf<'_>,
     meta_store: &mut C,
 ) -> DhtOpConvertResult<()> {
     async fn get_header(
         hash: HeaderHash,
-        element_store: &ChainCasBuf<'_>,
+        element_store: &ElementBuf<'_>,
     ) -> DhtOpConvertResult<Header> {
         Ok(element_store
             .get_header(&hash)
@@ -382,7 +382,7 @@ pub async fn integrate_single_metadata<C: MetadataBufT>(
 /// our vault.
 pub async fn integrate_to_cache<C: MetadataBufT>(
     element: &Element,
-    element_store: &ChainCasBuf<'_>,
+    element_store: &ElementBuf<'_>,
     meta_store: &mut C,
 ) -> DhtOpConvertResult<()> {
     // Produce the light directly
@@ -414,7 +414,7 @@ pub struct IntegrateDhtOpsWorkspace<'env> {
     // integrated ops
     pub integrated_dht_ops: IntegratedDhtOpsStore<'env>,
     // Cas for storing
-    pub cas: ChainCasBuf<'env>,
+    pub elements: ElementBuf<'env>,
     // metadata store
     pub meta: MetadataBuf<'env>,
 }
@@ -428,19 +428,19 @@ impl<'env> Workspace<'env> for IntegrateDhtOpsWorkspace<'env> {
         let db = dbs.get_db(&*INTEGRATION_QUEUE)?;
         let integration_queue = KvBuf::new(reader, db)?;
 
-        let cas = ChainCasBuf::vault(reader, dbs, true)?;
+        let elements = ElementBuf::vault(reader, dbs, true)?;
         let meta = MetadataBuf::vault(reader, dbs)?;
 
         Ok(Self {
             integration_queue,
             integrated_dht_ops,
-            cas,
+            elements,
             meta,
         })
     }
     fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
-        // flush cas
-        self.cas.flush_to_txn(writer)?;
+        // flush elements
+        self.elements.flush_to_txn(writer)?;
         // flush metadata store
         self.meta.flush_to_txn(writer)?;
         // flush integrated

@@ -90,7 +90,7 @@ pub fn anchor(anchor_type: String, anchor_text: String) -> Result<holo_hash::Ent
 }
 
 pub fn get_anchor(anchor_address: holo_hash::EntryHash) -> Result<Option<Anchor>, WasmError> {
-    Ok(match get_entry!(anchor_address)? {
+    Ok(match get_entry!(anchor_address)?.and_then(|el| el.into()) {
         Some(Entry::App(sb)) => {
             let path = Path::try_from(sb)?;
             Some(Anchor::try_from(&path)?)
