@@ -1,3 +1,12 @@
+//! Holochain Diagnostics
+//!
+//! This is a simple program that spits out some info about LMDB databases.
+//! It is written as a separate binary so that builds can be fast for quick
+//! feedback loops when debugging. In the future, this could be reorganized
+//! as a library of helper functions alongside a binary that calls into the lib,
+//! so that the binary can be freely modifiable while still accumulating a
+//! useful set of tools for querying LMDB state.
+
 use cell::dump_cell_state;
 use conductor::dump_conductor_state;
 use holochain_keystore::test_keystore::spawn_test_keystore;
