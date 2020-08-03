@@ -48,7 +48,10 @@ pub(crate) async fn spawn_space(
 
     // initialize gossip module
     let gossip_recv = gossip::spawn_gossip_module();
-    builder.channel_factory().attach_receiver(gossip_recv).await?;
+    builder
+        .channel_factory()
+        .attach_receiver(gossip_recv)
+        .await?;
 
     let internal_sender = builder
         .channel_factory()

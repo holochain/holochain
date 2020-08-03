@@ -1,8 +1,8 @@
 //! This is a temporary quick-hack gossip module for use with the
 //! in-memory / full-sync / non-sharded networking module
 
+use crate::{types::actor::KitsuneP2pResult, *};
 use std::sync::Arc;
-use crate::{*, types::actor::KitsuneP2pResult};
 
 ghost_actor::ghost_chan! {
     /// "Event" requests emitted by the gossip module
