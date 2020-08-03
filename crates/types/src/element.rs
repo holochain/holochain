@@ -26,7 +26,7 @@ pub mod error;
 pub struct WireElement {
     /// The signed header for this element
     signed_header: SignedHeader,
-    /// If there is an entry associated with this header it will be her
+    /// If there is an entry associated with this header it will be here
     maybe_entry: Option<Entry>,
     /// If this element is deleted then we require a single delete
     /// in the cache as proof of the tombstone
@@ -52,7 +52,7 @@ impl<'a> ElementGroup<'a> {
     pub fn len(&self) -> usize {
         self.headers.len()
     }
-    /// The entries visibility
+    /// The entry's visibility
     pub fn visibility(&self) -> ElementGroupResult<&EntryVisibility> {
         self.headers
             .first()
@@ -96,18 +96,6 @@ impl<'a> ElementGroup<'a> {
 
         Ok(Self { headers, entry })
     }
-
-    // pub fn try_from_element(e: &'a Element) -> Result<ElementGroup<'a>, ElementGroupError> {
-    //     let ssh = e.signed_header();
-    //     let entry = e
-    //         .entry()
-    //         .as_option()
-    //         .ok_or(ElementGroupError::MissingEntry)?;
-    //     Ok(Self {
-    //         headers: vec![Cow::Borrowed(ssh)],
-    //         entry: Cow::Borrowed(entry),
-    //     })
-    // }
 }
 
 /// Responses from a dht get.

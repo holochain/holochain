@@ -41,7 +41,7 @@ use holochain_types::{
     metadata::TimedHeaderHash,
     observability,
     test_utils::{fake_agent_pubkey_1, fake_agent_pubkey_2},
-    Entry, HeaderHashed, Timestamp,
+    Entry, EntryHashed, HeaderHashed, Timestamp,
 };
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::{entry_def, header::*, zome::ZomeName, CommitEntryInput};
@@ -532,7 +532,7 @@ async fn fake_authority<'env>(
     element: Element,
 ) {
     let reader = env_ref.reader().unwrap();
-    let mut element_vault = ChainCasBuf::vault(&reader, dbs, false).unwrap();
+    let mut element_vault = ElementBuf::vault(&reader, dbs, false).unwrap();
     let mut meta_vault = MetadataBuf::vault(&reader, dbs).unwrap();
 
     // Write to the meta vault to fake being an authority

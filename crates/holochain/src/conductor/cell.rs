@@ -17,8 +17,8 @@ use crate::{
     core::ribosome::{guest_callback::init::InitResult, wasm_ribosome::WasmRibosome},
     core::{
         state::{
-            chain_cas::ChainCasBuf,
             dht_op_integration::IntegratedDhtOpsBuf,
+            element_buf::ElementBuf,
             metadata::{LinkMetaKey, MetadataBuf, MetadataBufT},
             source_chain::SourceChainBuf,
         },
@@ -445,7 +445,7 @@ impl Cell {
         let env_ref = self.state_env.guard().await;
         let dbs = self.state_env.dbs().await;
         let reader = env_ref.reader()?;
-        let element_vault = ChainCasBuf::vault(&reader, &dbs, false)?;
+        let element_vault = ElementBuf::vault(&reader, &dbs, false)?;
         let meta_vault = MetadataBuf::vault(&reader, &dbs)?;
 
         // The data we want to collect
@@ -551,7 +551,7 @@ impl Cell {
         let env_ref = self.state_env.guard().await;
         let dbs = self.state_env.dbs().await;
         let reader = env_ref.reader()?;
-        let element_vault = ChainCasBuf::vault(&reader, &dbs, false)?;
+        let element_vault = ElementBuf::vault(&reader, &dbs, false)?;
         let meta_vault = MetadataBuf::vault(&reader, &dbs)?;
 
         // Look for a delete on the header and collect it
@@ -601,7 +601,7 @@ impl Cell {
         let env_ref = self.state_env.guard().await;
         let dbs = self.state_env.dbs().await;
         let reader = env_ref.reader()?;
-        let element_vault = ChainCasBuf::vault(&reader, &dbs, false)?;
+        let element_vault = ElementBuf::vault(&reader, &dbs, false)?;
         let meta_vault = MetadataBuf::vault(&reader, &dbs)?;
 
         // Construct the key we need to get the links
@@ -610,7 +610,9 @@ impl Cell {
         let mut lr: Vec<HeaderHash> = Vec::new();
 
         // Gather the link adds and link removes as hashes
-        // TODO: Maybe don't need to send back add links with removes
+        // TODO: Maybe can only send back removes without adds,
+        // because if we know of a remove, it doesn't matter what the
+        // add was
         let la = meta_vault
             .get_links(&key)?
             .map(|link| {
@@ -701,7 +703,7 @@ impl Cell {
         let env_ref = self.state_env.guard().await;
         let reader = env_ref.reader()?;
         let integrated_dht_ops = IntegratedDhtOpsBuf::new(&reader, &env_ref)?;
-        let cas = ChainCasBuf::vault(&reader, &env_ref, false)?;
+        let cas = ElementBuf::vault(&reader, &env_ref, false)?;
         let mut out = vec![];
         for op_hash in op_hashes {
             let val = integrated_dht_ops.get(&op_hash)?;

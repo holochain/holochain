@@ -39,7 +39,7 @@
 //! load_true loads the results into cache
 
 use super::{
-    chain_cas::ChainCasBuf,
+    element_buf::ElementBuf,
     metadata::{LinkMetaKey, MetadataBuf, MetadataBufT, SysMetaVal},
 };
 use crate::core::workflow::integrate_dht_ops_workflow::integrate_single_metadata;
@@ -53,7 +53,6 @@ use holochain_p2p::{
     actor::{GetLinksOptions, GetMetaOptions, GetOptions},
     HolochainP2pCell,
 };
-use holochain_state::error::DatabaseResult;
 use holochain_types::{
     dht_op::{produce_op_lights_from_element_group, produce_op_lights_from_elements},
     element::{
@@ -63,7 +62,6 @@ use holochain_types::{
     entry::option_entry_hashed,
     link::{GetLinksResponse, WireLinkMetaKey},
     metadata::{EntryDhtStatus, MetadataSet},
-    EntryHashed,
 };
 use holochain_zome_types::{element::SignedHeader, link::Link};
 use tracing::*;
@@ -80,10 +78,10 @@ where
     M: MetadataBufT,
     C: MetadataBufT,
 {
-    element_vault: &'a ChainCasBuf<'env>,
+    element_vault: &'a ElementBuf<'env>,
     meta_vault: &'a M,
 
-    element_cache: &'a mut ChainCasBuf<'env>,
+    element_cache: &'a mut ElementBuf<'env>,
     meta_cache: &'a mut C,
 
     network: HolochainP2pCell,
@@ -113,9 +111,9 @@ where
 {
     /// Constructs a [Cascade], taking references to all necessary databases
     pub fn new(
-        element_vault: &'a ChainCasBuf<'env>,
+        element_vault: &'a ElementBuf<'env>,
         meta_vault: &'a M,
-        element_cache: &'a mut ChainCasBuf<'env>,
+        element_cache: &'a mut ElementBuf<'env>,
         meta_cache: &'a mut C,
         network: HolochainP2pCell,
     ) -> Self {
@@ -290,28 +288,6 @@ where
         Ok(())
     }
 
-    /// Get a header without checking its metadata
-    pub async fn dht_get_header_raw(
-        &self,
-        header_address: &HeaderHash,
-    ) -> DatabaseResult<Option<SignedHeaderHashed>> {
-        match self.element_vault.get_header(header_address).await? {
-            None => self.element_cache.get_header(header_address).await,
-            r => Ok(r),
-        }
-    }
-
-    /// Get an entry without checking its metadata
-    pub async fn dht_get_entry_raw(
-        &self,
-        entry_hash: &EntryHash,
-    ) -> DatabaseResult<Option<EntryHashed>> {
-        match self.element_vault.get_entry(entry_hash).await? {
-            None => self.element_cache.get_entry(entry_hash).await,
-            r => Ok(r),
-        }
-    }
-
     async fn get_element_local_raw(&self, hash: &HeaderHash) -> CascadeResult<Option<Element>> {
         match self.element_vault.get_element(hash).await? {
             None => Ok(self.element_cache.get_element(hash).await?),
@@ -409,18 +385,18 @@ where
         // Network
         self.fetch_element_via_header(header_hash.clone(), options)
             .await?;
+
         // Check if header is alive after fetch
-        let delete_on_header = self
+        let is_live = self
             .meta_cache
             .get_deletes_on_header(header_hash.clone())?
             .next()?
             .is_none();
 
-        if delete_on_header {
-            Ok(None)
-        } else {
-            // See if the header was found?
+        if is_live {
             self.get_element_local_raw(&header_hash).await
+        } else {
+            Ok(None)
         }
     }
 
@@ -473,13 +449,13 @@ pub fn test_dbs_and_mocks<'env>(
     reader: &'env holochain_state::transaction::Reader<'env>,
     dbs: &impl holochain_state::db::GetDb,
 ) -> (
-    ChainCasBuf<'env>,
+    ElementBuf<'env>,
     super::metadata::MockMetadataBuf,
-    ChainCasBuf<'env>,
+    ElementBuf<'env>,
     super::metadata::MockMetadataBuf,
 ) {
-    let cas = ChainCasBuf::vault(&reader, dbs, true).unwrap();
-    let element_cache = ChainCasBuf::cache(&reader, dbs).unwrap();
+    let cas = ElementBuf::vault(&reader, dbs, true).unwrap();
+    let element_cache = ElementBuf::cache(&reader, dbs).unwrap();
     let metadata = super::metadata::MockMetadataBuf::new();
     let metadata_cache = super::metadata::MockMetadataBuf::new();
     (cas, metadata, element_cache, metadata_cache)
