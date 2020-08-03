@@ -301,7 +301,6 @@ pub mod wasm_test {
     }
 
     #[tokio::test(threaded_scheduler)]
-    #[ignore]
     async fn test_serialize_bytes_hash() {
         holochain_types::observability::test_run().ok();
         #[derive(Default, SerializedBytes, Serialize, Deserialize)]
@@ -351,19 +350,5 @@ pub mod wasm_test {
             "uhCEkPjYXxw4ztKx3wBsxzm-q3Rfoy1bXWbIQohifqC3_HNle3-SO",
             &any_hash.to_string()
         );
-
-        // But if I go into SerializedBytes first from EntryHash
-        let sb: SerializedBytes = entry_hash.clone().try_into().unwrap();
-        tracing::debug!(entry_sb = ?sb);
-        // Then back into AnyDhtHash
-        // this changes the hash type to a header type?
-        // "uhCkkPjYXxw4ztKx3wBsxzm-q3Rfoy1bXWbIQohifqC3_HNle3-SO",
-        let any_hash: AnyDhtHash = sb.try_into().unwrap();
-        assert_eq!(
-            "uhCEkPjYXxw4ztKx3wBsxzm-q3Rfoy1bXWbIQohifqC3_HNle3-SO",
-            &any_hash.to_string()
-        );
-        let sb: SerializedBytes = any_hash.clone().try_into().unwrap();
-        tracing::debug!(any_2_sb = ?sb);
     }
 }
