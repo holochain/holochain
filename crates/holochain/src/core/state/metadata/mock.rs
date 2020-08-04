@@ -3,7 +3,11 @@ use super::*;
 mock! {
     pub MetadataBuf
     {
-        fn get_links<'a>(
+        fn get_live_links<'a>(
+            &self,
+            key: &'a LinkMetaKey<'a>,
+        ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError>>>;
+        fn get_links_all<'a>(
             &self,
             key: &'a LinkMetaKey<'a>,
         ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError>>>;
@@ -51,12 +55,20 @@ mock! {
 
 #[async_trait::async_trait]
 impl MetadataBufT for MockMetadataBuf {
-    fn get_links<'a>(
+    fn get_live_links<'a>(
         &self,
         key: &'a LinkMetaKey,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError> + '_>>
     {
-        self.get_links(key)
+        self.get_live_links(key)
+    }
+
+    fn get_links_all<'a>(
+        &self,
+        key: &'a LinkMetaKey,
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError> + '_>>
+    {
+        self.get_links_all(key)
     }
 
     fn get_canonical_entry_hash(&self, entry_hash: EntryHash) -> DatabaseResult<EntryHash> {

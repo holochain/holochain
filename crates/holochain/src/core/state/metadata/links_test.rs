@@ -90,7 +90,7 @@ impl TestData {
         let key = LinkMetaKey::BaseZomeTag(&self.base_hash, self.zome_id, &self.tag);
         assert!(
             meta_buf
-                .get_links(&key)
+                .get_live_links(&key)
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap()
@@ -103,7 +103,7 @@ impl TestData {
         let key = LinkMetaKey::BaseZomeTag(&self.base_hash, self.zome_id, &self.tag);
         assert!(
             meta_buf
-                .get_links(&key)
+                .get_live_links(&key)
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap()
@@ -117,7 +117,7 @@ impl TestData {
         let key = LinkMetaKey::BaseZomeTag(&self.base_hash, self.zome_id, &self.tag);
         assert_eq!(
             &meta_buf
-                .get_links(&key)
+                .get_live_links(&key)
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap()[..],
@@ -131,7 +131,7 @@ impl TestData {
         let key = LinkMetaKey::BaseZomeTag(&self.base_hash, self.zome_id, &self.tag);
         assert!(
             !meta_buf
-                .get_links(&key)
+                .get_live_links(&key)
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap()
@@ -146,7 +146,7 @@ impl TestData {
         let key = LinkMetaKey::Base(&self.base_hash);
         assert!(
             meta_buf
-                .get_links(&key)
+                .get_live_links(&key)
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap()
@@ -161,7 +161,7 @@ impl TestData {
         let key = LinkMetaKey::Base(&self.base_hash);
         assert_eq!(
             &meta_buf
-                .get_links(&key)
+                .get_live_links(&key)
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap()[..],
@@ -175,7 +175,7 @@ impl TestData {
         let key = LinkMetaKey::BaseZome(&self.base_hash, self.zome_id);
         assert!(
             meta_buf
-                .get_links(&key)
+                .get_live_links(&key)
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap()
@@ -190,7 +190,7 @@ impl TestData {
         let key = LinkMetaKey::BaseZome(&self.base_hash, self.zome_id);
         assert_eq!(
             &meta_buf
-                .get_links(&key)
+                .get_live_links(&key)
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap()[..],
@@ -208,7 +208,7 @@ impl TestData {
         let key = LinkMetaKey::BaseZomeTag(&self.base_hash, self.zome_id, &half_tag);
         assert_eq!(
             &meta_buf
-                .get_links(&key)
+                .get_live_links(&key)
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap()[..],
@@ -226,7 +226,7 @@ impl TestData {
         let key = LinkMetaKey::BaseZomeTag(&self.base_hash, self.zome_id, &half_tag);
         assert!(
             meta_buf
-                .get_links(&key)
+                .get_live_links(&key)
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap()
@@ -263,7 +263,7 @@ impl TestData {
         let key = LinkMetaKey::Base(&base_hash);
         assert_eq!(
             &meta_buf
-                .get_links(&key)
+                .get_live_links(&key)
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap()[..],
@@ -290,7 +290,7 @@ impl TestData {
         let key = LinkMetaKey::BaseZome(&base_hash, zome_id);
         assert_eq!(
             &meta_buf
-                .get_links(&key)
+                .get_live_links(&key)
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap()[..],
@@ -319,7 +319,7 @@ impl TestData {
         let key = LinkMetaKey::BaseZomeTag(&base_hash, zome_id, &tag);
         assert_eq!(
             &meta_buf
-                .get_links(&key)
+                .get_live_links(&key)
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap()[..],
@@ -351,7 +351,7 @@ impl TestData {
         let key = LinkMetaKey::BaseZomeTag(&base_hash, zome_id, &half_tag);
         assert_eq!(
             &meta_buf
-                .get_links(&key)
+                .get_live_links(&key)
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap()[..],
