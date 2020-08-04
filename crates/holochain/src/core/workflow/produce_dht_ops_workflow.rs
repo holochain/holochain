@@ -2,16 +2,16 @@ use super::{error::WorkflowResult, CallZomeWorkspace};
 use crate::core::queue_consumer::{OneshotWriter, TriggerSender, WorkComplete};
 use crate::core::state::{
     dht_op_integration::{
-        AuthoredDhtOpsStore, AuthoredDhtOpsValue, IntegrationQueueStore, IntegrationQueueValue,
+        AuthoredDhtOpsStore, AuthoredDhtOpsValue, IntegrationLimboStore, IntegrationLimboValue,
     },
     workspace::{Workspace, WorkspaceResult},
 };
 use holochain_state::{
     buffer::KvBuf,
-    db::{AUTHORED_DHT_OPS, INTEGRATION_QUEUE},
+    db::{AUTHORED_DHT_OPS, INTEGRATION_LIMBO},
     prelude::{BufferedStore, GetDb, Reader, Writer},
 };
-use holochain_types::{dht_op::DhtOpHashed, validate::ValidationStatus, TimestampKey};
+use holochain_types::{dht_op::DhtOpHashed, validate::ValidationStatus};
 use tracing::*;
 
 pub mod dht_op_light;
@@ -56,9 +56,9 @@ async fn produce_dht_ops_workflow_inner(
                 receipt_count: 0,
                 last_publish_time: None,
             };
-            workspace.integration_queue.put(
-                (TimestampKey::now(), hash.clone()).into(),
-                IntegrationQueueValue {
+            workspace.integration_limbo.put(
+                hash.clone(),
+                IntegrationLimboValue {
                     validation_status: ValidationStatus::Valid,
                     op,
                 },
@@ -75,24 +75,24 @@ async fn produce_dht_ops_workflow_inner(
 pub struct ProduceDhtOpsWorkspace<'env> {
     pub call_zome_workspace: CallZomeWorkspace<'env>,
     pub authored_dht_ops: AuthoredDhtOpsStore<'env>,
-    pub integration_queue: IntegrationQueueStore<'env>,
+    pub integration_limbo: IntegrationLimboStore<'env>,
 }
 
 impl<'env> Workspace<'env> for ProduceDhtOpsWorkspace<'env> {
     fn new(reader: &'env Reader<'env>, db: &impl GetDb) -> WorkspaceResult<Self> {
         let authored_dht_ops = db.get_db(&*AUTHORED_DHT_OPS)?;
-        let integration_queue = db.get_db(&*INTEGRATION_QUEUE)?;
+        let integration_limbo = db.get_db(&*INTEGRATION_LIMBO)?;
         Ok(Self {
             call_zome_workspace: CallZomeWorkspace::new(reader, db)?,
             authored_dht_ops: KvBuf::new(reader, authored_dht_ops)?,
-            integration_queue: KvBuf::new(reader, integration_queue)?,
+            integration_limbo: KvBuf::new(reader, integration_limbo)?,
         })
     }
 
     fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
         self.call_zome_workspace.flush_to_txn(writer)?;
         self.authored_dht_ops.flush_to_txn(writer)?;
-        self.integration_queue.flush_to_txn(writer)?;
+        self.integration_limbo.flush_to_txn(writer)?;
         Ok(())
     }
 }
@@ -101,7 +101,7 @@ impl<'env> Workspace<'env> for ProduceDhtOpsWorkspace<'env> {
 mod tests {
     use super::super::genesis_workflow::tests::fake_genesis;
     use super::*;
-    use crate::core::state::{dht_op_integration::IntegrationQueueKey, source_chain::SourceChain};
+    use crate::core::state::source_chain::SourceChain;
 
     use ::fixt::prelude::*;
     use fallible_iterator::FallibleIterator;
@@ -120,6 +120,7 @@ mod tests {
         header::{builder, EntryType},
     };
     use matches::assert_matches;
+    use std::collections::HashSet;
 
     struct TestData {
         app_entry: Box<dyn Iterator<Item = Entry>>,
@@ -169,7 +170,7 @@ mod tests {
         let env_ref = env.guard().await;
 
         // Setup the database and expected data
-        let expected: Vec<_> = {
+        let expected_hashes: HashSet<_> = {
             let reader = env_ref.reader().unwrap();
             let mut td = TestData::new();
             let mut source_chain = ProduceDhtOpsWorkspace::new(&reader, &dbs)
@@ -213,7 +214,15 @@ mod tests {
                 .with_commit(|writer| source_chain.flush_to_txn(writer))
                 .unwrap();
 
-            all_ops.into_iter().flatten().collect()
+            futures::future::join_all(
+                all_ops
+                    .into_iter()
+                    .flatten()
+                    .map(|o| DhtOpHash::from_data(o)),
+            )
+            .await
+            .into_iter()
+            .collect()
         };
 
         // Run the workflow and commit it
@@ -235,23 +244,20 @@ mod tests {
             let workspace = ProduceDhtOpsWorkspace::new(&reader, &dbs).unwrap();
             let mut times = Vec::new();
             let results = workspace
-                .integration_queue
+                .integration_limbo
                 .iter()
                 .unwrap()
                 .map(|(k, v)| {
                     let s = debug_span!("times");
                     let _g = s.enter();
-                    let t: (TimestampKey, DhtOpHash) = IntegrationQueueKey::from(k).into();
-                    debug!(time = ?t.0);
-                    debug!(hash = ?t.1);
-                    times.push(t.0);
+                    debug!(hash = ?k);
+                    times.push(k);
                     // Check the status is Valid
                     assert_matches!(v.validation_status, ValidationStatus::Valid);
                     Ok(v.op)
                 })
                 .collect::<Vec<_>>()
                 .unwrap();
-
             // Check that the integration queue is ordered by time
             times.into_iter().fold(None, |last, time| {
                 if let Some(lt) = last {
@@ -262,7 +268,7 @@ mod tests {
             });
 
             // Get the authored ops
-            let mut authored_results = workspace
+            let authored_results = workspace
                 .authored_dht_ops
                 .iter()
                 .unwrap()
@@ -274,22 +280,19 @@ mod tests {
                     });
                     Ok(DhtOpHash::with_pre_hashed(k.to_vec()))
                 })
-                .collect::<Vec<_>>()
+                .collect::<HashSet<_>>()
                 .unwrap();
 
-            // Check we got all the hashes
-            assert_eq!(results, expected);
-
             // Hash the results
-            let mut results_hashed = Vec::new();
+            let mut results_hashed = HashSet::new();
             for op in results {
                 let (_, hash) = DhtOpHashed::from_content(op).await.into();
-                results_hashed.push(hash);
+                results_hashed.insert(hash);
             }
 
-            // authored are in a different order so need to sort
-            results_hashed.sort();
-            authored_results.sort();
+            // Check we got all the hashes
+            assert_eq!(results_hashed, expected_hashes);
+
             // Check authored are all there
             assert_eq!(results_hashed, authored_results);
             results_hashed.len()
@@ -313,7 +316,7 @@ mod tests {
         {
             let reader = env_ref.reader().unwrap();
             let workspace = ProduceDhtOpsWorkspace::new(&reader, &dbs).unwrap();
-            let count = workspace.integration_queue.iter().unwrap().count().unwrap();
+            let count = workspace.integration_limbo.iter().unwrap().count().unwrap();
             let authored_count = workspace.authored_dht_ops.iter().unwrap().count().unwrap();
 
             assert_eq!(last_count, count);
