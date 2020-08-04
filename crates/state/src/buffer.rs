@@ -5,10 +5,10 @@
 //! - [KvvBuffer]: a MultiStore with a scratch space
 //! - [CasBuffer]: a [KvBuffer] which enforces that keys must be the "address" of the values (content)
 
-mod cas;
-mod kv;
-mod kv_int;
-mod kvv;
+pub(super) mod cas;
+pub(super) mod kv;
+pub(super) mod kv_int;
+pub(super) mod kvv;
 
 use crate::prelude::Writer;
 pub use cas::CasBuf;

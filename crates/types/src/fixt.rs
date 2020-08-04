@@ -25,7 +25,6 @@ use holochain_zome_types::header::EntryType;
 use holochain_zome_types::header::EntryUpdate;
 use holochain_zome_types::header::Header;
 use holochain_zome_types::header::InitZomesComplete;
-use holochain_zome_types::header::IntendedFor;
 use holochain_zome_types::header::LinkAdd;
 use holochain_zome_types::header::LinkRemove;
 use holochain_zome_types::header::ZomeId;
@@ -127,20 +126,6 @@ fixturator!(
 );
 
 newtype_fixturator!(Signature<Bytes>);
-
-fixturator!(
-    IntendedFor;
-    enum [ Entry Header ];
-    curve Empty IntendedFor::Header;
-    curve Unpredictable match IntendedForVariant::random() {
-        IntendedForVariant::Header => IntendedFor::Header,
-        IntendedForVariant::Entry => IntendedFor::Entry(fixt!(EntryHash)),
-    };
-    curve Predictable match IntendedForVariant::nth(self.0.index) {
-        IntendedForVariant::Header => IntendedFor::Header,
-        IntendedForVariant::Entry => IntendedFor::Entry(EntryHashFixturator::new_indexed(Predictable, self.0.index).next().unwrap()),
-    };
-);
 
 fixturator!(
     MigrateAgent;
@@ -504,7 +489,7 @@ fixturator!(
 
 fixturator!(
     EntryUpdate;
-    constructor fn from_builder(HeaderBuilderCommon, IntendedFor, HeaderHash, EntryType, EntryHash);
+    constructor fn from_builder(HeaderBuilderCommon, EntryHash, HeaderHash, EntryType, EntryHash);
 );
 
 fixturator!(
