@@ -454,7 +454,7 @@ where
         self.fetch_element_via_header(header_hash.clone(), options)
             .await?;
 
-        // Get the element regardless of metadata
+        // Get the element and the metadata
         self.create_element_details(header_hash).await
     }
 
