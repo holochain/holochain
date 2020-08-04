@@ -35,7 +35,7 @@ use fallible_iterator::FallibleIterator;
 use futures::future::FutureExt;
 use hash_type::AnyDht;
 use holo_hash::*;
-use holochain_keystore::KeystoreSender;
+use holochain_keystore::{KeystoreSender, Signature};
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::{
     db::GetDb,
@@ -46,14 +46,17 @@ use holochain_types::{
     cell::CellId,
     element::{GetElementResponse, RawGetEntryResponse, WireElement},
     link::{GetLinksResponse, WireLinkMetaKey},
-    metadata::MetadataSet,
+    metadata::{MetadataSet, TimedHeaderHash},
     Timestamp,
 };
 use holochain_zome_types::capability::CapSecret;
 use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::{header::conversions::WrongHeaderError, Header, HostInput};
+use holochain_zome_types::{
+    header::{conversions::WrongHeaderError, LinkAdd, LinkRemove},
+    HostInput,
+};
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeMap, BTreeSet},
     convert::TryInto,
     hash::{Hash, Hasher},
     path::Path,
@@ -583,6 +586,7 @@ impl Cell {
         unimplemented!()
     }
 
+    #[instrument(skip(self, _options))]
     /// a remote node is asking us for links
     // TODO: Right now we are returning all the full headers
     // We could probably send some smaller types instead of the full headers
@@ -598,67 +602,55 @@ impl Cell {
         let reader = env_ref.reader()?;
         let element_vault = ElementBuf::vault(&reader, &dbs, false)?;
         let meta_vault = MetadataBuf::vault(&reader, &dbs)?;
+        debug!(id = ?self.id());
 
-        // Construct the key we need to get the links
-        let key = LinkMetaKey::from(&link_key);
-
-        let mut lr: Vec<HeaderHash> = Vec::new();
-
-        // Gather the link adds and link removes as hashes
-        // TODO: Maybe can only send back removes without adds,
-        // because if we know of a remove, it doesn't matter what the
-        // add was
-        let la = meta_vault
-            .get_links(&key)?
-            .map(|link| {
-                // Add any link removes on this link add
-                lr.extend(
-                    meta_vault
-                        .get_link_removes_on_link_add(link.link_add_hash.clone())?
-                        .map(|l| Ok(l.header_hash))
-                        .iterator()
-                        .filter_map(Result::ok),
-                );
-                Ok(link.link_add_hash)
+        let links = meta_vault
+            .get_links_all(&LinkMetaKey::from(&link_key))?
+            .map(|link_add| {
+                // Collect the link removes on this link add
+                let link_removes = meta_vault
+                    .get_link_removes_on_link_add(link_add.link_add_hash.clone())?
+                    .collect::<BTreeSet<_>>()?;
+                // Create timed header hash
+                let link_add = TimedHeaderHash {
+                    timestamp: link_add.timestamp,
+                    header_hash: link_add.link_add_hash,
+                };
+                // Return all link removes with this link add
+                Ok((link_add, link_removes))
             })
-            .collect::<Vec<_>>()?;
+            .collect::<BTreeMap<_, _>>()?;
 
-        // TODO: PERF: Collects are needed due to async calls that can't happen in closures.
-        // Could use join_all.
-        // But deferring because this is likely to change anyway.
-        let mut link_removes = Vec::with_capacity(lr.len());
-
-        // Get the actual link remove headers
-        for link_remove in lr {
-            if let Some(l) = element_vault.get_header(&link_remove).await?.and_then(|d| {
-                let (h, s) = d.into_inner().0.into();
-                match h {
-                    Header::LinkRemove(lr) => Some((lr, s)),
-                    _ => None,
+        // Get the headers from the element stores
+        let mut result_adds: Vec<(LinkAdd, Signature)> = Vec::with_capacity(links.len());
+        let mut result_removes: Vec<(LinkRemove, Signature)> = Vec::with_capacity(links.len());
+        for (link_add, link_removes) in links {
+            if let Some(link_add) = element_vault.get_header(&link_add.header_hash).await? {
+                for link_remove in link_removes {
+                    if let Some(link_remove) =
+                        element_vault.get_header(&link_remove.header_hash).await?
+                    {
+                        let (h, s) = link_remove.into_header_and_signature();
+                        let h = h
+                            .into_content()
+                            .try_into()
+                            .map_err(AuthorityDataError::from)?;
+                        result_removes.push((h, s));
+                    }
                 }
-            }) {
-                link_removes.push(l);
-            }
-        }
-
-        // Get the actual link add headers
-        let mut link_adds = Vec::with_capacity(la.len());
-        for link_add in la {
-            if let Some(l) = element_vault.get_header(&link_add).await?.and_then(|d| {
-                let (h, s) = d.into_inner().0.into();
-                match h {
-                    Header::LinkAdd(la) => Some((la, s)),
-                    _ => None,
-                }
-            }) {
-                link_adds.push(l);
+                let (h, s) = link_add.into_header_and_signature();
+                let h = h
+                    .into_content()
+                    .try_into()
+                    .map_err(AuthorityDataError::from)?;
+                result_adds.push((h, s));
             }
         }
 
         // Return the links
         Ok(GetLinksResponse {
-            link_adds,
-            link_removes,
+            link_adds: result_adds,
+            link_removes: result_removes,
         })
     }
 
