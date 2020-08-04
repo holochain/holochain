@@ -438,7 +438,6 @@ impl<'env> Workspace<'env> for IntegrateDhtOpsWorkspace<'env> {
 
 impl<'env> IntegrateDhtOpsWorkspace<'env> {
     pub fn op_exists(&self, hash: &DhtOpHash) -> DatabaseResult<bool> {
-        Ok(self.integrated_dht_ops.get(&hash)?.is_some()
-            || self.integration_limbo.get(&hash)?.is_some())
+        Ok(self.integrated_dht_ops.contains(&hash)? || self.integration_limbo.contains(&hash)?)
     }
 }
