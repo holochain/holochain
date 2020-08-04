@@ -83,6 +83,11 @@ where
         Ok(())
     }
 
+    /// Check if a value is stored at this key, without deserializing
+    pub fn contains(&self, k: &K) -> DatabaseResult<bool> {
+        Ok(self.scratch.get(k.as_ref()).is_some() || self.db.get(self.reader, k)?.is_some())
+    }
+
     /// Fetch data from DB, deserialize into V type
     fn get_persisted(&self, k: &K) -> DatabaseResult<Option<V>> {
         Self::empty_key(&k)?;
