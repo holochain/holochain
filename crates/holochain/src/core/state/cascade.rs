@@ -450,7 +450,7 @@ where
         // Return any links from the meta cache that don't have removes.
         Ok(self
             .meta_cache
-            .get_links(key)?
+            .get_live_links(key)?
             .map(|l| Ok(l.into_link()))
             .collect()?)
     }

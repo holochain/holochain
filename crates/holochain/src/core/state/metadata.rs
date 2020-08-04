@@ -149,7 +149,7 @@ pub trait MetadataBufT {
     // Links
     /// Get all the links on this base that match the tag
     /// that do not have removes on them
-    fn get_links<'a>(
+    fn get_live_links<'a>(
         &self,
         key: &'a LinkMetaKey,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError> + '_>>;
@@ -407,7 +407,7 @@ impl<'env> MetadataBuf<'env> {
 
 #[async_trait::async_trait]
 impl<'env> MetadataBufT for MetadataBuf<'env> {
-    fn get_links<'a>(
+    fn get_live_links<'a>(
         &self,
         key: &'a LinkMetaKey,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError> + '_>>

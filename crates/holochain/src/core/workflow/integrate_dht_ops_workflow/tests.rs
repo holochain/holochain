@@ -364,7 +364,7 @@ impl Db {
                     for link_meta_key in link_meta_keys {
                         let res = workspace
                             .meta
-                            .get_links(&link_meta_key)
+                            .get_live_links(&link_meta_key)
                             .unwrap()
                             .collect::<Vec<_>>()
                             .unwrap();
@@ -403,7 +403,7 @@ impl Db {
                     for link_meta_key in link_meta_keys {
                         let res = workspace
                             .meta
-                            .get_links(&link_meta_key)
+                            .get_live_links(&link_meta_key)
                             .unwrap()
                             .collect::<Vec<_>>()
                             .unwrap();
@@ -1428,7 +1428,11 @@ mod slow_tests {
             let meta = MetadataBuf::vault(&reader, &dbs).unwrap();
             let mut meta_cache = MetadataBuf::cache(&reader, &dbs).unwrap();
             let key = LinkMetaKey::Base(&base_entry_hash);
-            let links = meta.get_links(&key).unwrap().collect::<Vec<_>>().unwrap();
+            let links = meta
+                .get_live_links(&key)
+                .unwrap()
+                .collect::<Vec<_>>()
+                .unwrap();
             let link = links[0].clone();
             assert_eq!(link.target, target_entry_hash);
 
