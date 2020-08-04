@@ -348,7 +348,7 @@ impl Space {
                         // if we haven't sent them a call
                         // and they aren't the requestor - send a call
                         // if we meet our request quota break out.
-                        if agent != from_agent && !sent_to.contains(&agent) {
+                        if !sent_to.contains(&agent) {
                             sent_to.insert(agent.clone());
                             let mut i_s = internal_sender.clone();
                             let space = space.clone();
