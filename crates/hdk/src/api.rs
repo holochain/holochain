@@ -19,12 +19,103 @@ macro_rules! map_extern {
 }
 
 #[macro_export]
+macro_rules! entry_def {
+    ( $t:ident $def:expr ) => {
+        impl $t {
+            pub fn entry_def() -> $crate::prelude::EntryDef {
+                $def
+            }
+
+            pub fn entry_def_id() -> $crate::prelude::EntryDefId {
+                Self::entry_def().id
+            }
+
+            pub fn entry_visibility() -> $crate::prelude::EntryVisibility {
+                Self::entry_def().visibility
+            }
+
+            pub fn crdt_type() -> $crate::prelude::CrdtType {
+                Self::entry_def().crdt_type
+            }
+
+            pub fn required_validations() -> $crate::prelude::RequiredValidations {
+                Self::entry_def().required_validations
+            }
+        }
+
+        impl From<$t> for $crate::prelude::EntryDef {
+            fn from(_: $t) -> Self {
+                $t::entry_def()
+            }
+        }
+
+        impl From<&$t> for $crate::prelude::EntryDef {
+            fn from(_: &$t) -> Self {
+                $t::entry_def()
+            }
+        }
+
+        impl From<$t> for $crate::prelude::EntryDefId {
+            fn from(_: $t) -> Self {
+                $t::entry_def_id()
+            }
+        }
+
+        impl From<&$t> for $crate::prelude::EntryDefId {
+            fn from(_: &$t) -> Self {
+                $t::entry_def_id()
+            }
+        }
+
+        impl From<$t> for $crate::prelude::EntryVisibility {
+            fn from(_: $t) -> Self {
+                $t::entry_visibility()
+            }
+        }
+
+        impl From<&$t> for $crate::prelude::EntryVisibility {
+            fn from(_: &$t) -> Self {
+                $t::entry_visibility()
+            }
+        }
+
+        impl From<$t> for $crate::prelude::CrdtType {
+            fn from(_: $t) -> Self {
+                $t::crdt_type()
+            }
+        }
+
+        impl From<&$t> for $crate::prelude::CrdtType {
+            fn from(_: &$t) -> Self {
+                $t::crdt_type()
+            }
+        }
+
+        impl From<$t> for $crate::prelude::RequiredValidations {
+            fn from(_: $t) -> Self {
+                $t::required_validations()
+            }
+        }
+
+        impl From<&$t> for $crate::prelude::RequiredValidations {
+            fn from(_: &$t) -> Self {
+                $t::required_validations()
+            }
+        }
+    };
+}
+
+#[macro_export]
 macro_rules! entry_defs {
+    ( def $t:ident $def:expr; $($munch:tt)* ) => {
+        $crate::prelude::entry_def!($t $def);
+        $crate::prelude::entry_defs!($($munch)* vec![$t::entry_def()]);
+    };
     ( $defs_vec:expr ) => {
         fn __entry_defs(_: ()) -> Result<EntryDefsCallbackResult, WasmError> {
             Ok(EntryDefsCallbackResult::Defs($defs_vec.into()))
         }
-        map_extern!(entry_defs, __entry_defs);
+        $crate::prelude::map_extern!(entry_defs, __entry_defs);
     };
 }
 
@@ -106,12 +197,12 @@ macro_rules! entry_hash {
 }
 
 #[macro_export]
-macro_rules! get_entry {
+macro_rules! get {
     ( $hash:expr, $options:expr ) => {{
         $crate::api_call!(__get, GetInput::new(($hash.into(), $options)), GetOutput)
     }};
     ( $input:expr ) => {
-        get_entry!($input, $crate::prelude::GetOptions)
+        get!($input, $crate::prelude::GetOptions)
     };
 }
 
