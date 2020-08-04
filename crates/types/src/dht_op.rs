@@ -7,7 +7,6 @@
 use crate::element::{Element, ElementGroup};
 use crate::{header::NewEntryHeader, prelude::*};
 use error::{DhtOpError, DhtOpResult};
-use header::IntendedFor;
 use holo_hash::{hash_type, HashableContentBytes};
 use holochain_zome_types::{header, Entry, Header};
 use serde::{Deserialize, Serialize};
@@ -205,10 +204,7 @@ impl<'a> UniqueForm<'a> {
             UniqueForm::StoreElement(header) => HeaderHash::with_data(*header).await.into(),
             UniqueForm::StoreEntry(header) => header.entry().clone().into(),
             UniqueForm::RegisterAgentActivity(header) => header.author().clone().into(),
-            UniqueForm::RegisterReplacedBy(header) => match &header.intended_for {
-                IntendedFor::Header => header.replaces_address.clone().into(),
-                IntendedFor::Entry(basis) => basis.clone().into(),
-            },
+            UniqueForm::RegisterReplacedBy(header) => header.original_entry_address.clone().into(),
             UniqueForm::RegisterDeletedBy(header) => header.removes_address.clone().into(),
             UniqueForm::RegisterDeletedEntryHeader(header) => {
                 header.removes_entry_address.clone().into()
