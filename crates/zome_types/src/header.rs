@@ -161,15 +161,6 @@ pub struct ZomeId(u8);
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
 pub struct EntryDefId(u8);
 
-/// Specifies whether an [EntryUpdate] refers to an [Entry] or a [Header]
-#[derive(
-    Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash, Ord, PartialOrd,
-)]
-pub enum IntendedFor {
-    Header,
-    Entry(EntryHash),
-}
-
 /// The Dna Header is always the first header in a source chain
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub struct Dna {
@@ -272,11 +263,15 @@ pub struct EntryCreate {
 /// A header which specifies that some new Entry content is intended to be an
 /// update to some old Entry.
 ///
-/// The update may refer to either a previous Header, or a previous Entry, via
-/// the `intended_for` field. The update is registered as metadata on the
-/// intended target, the result of which is is that both Headers and Entries can
-/// have a tree of such metadata update references. Entries get "updated" to
-/// other entries, and Headers get "updated" to other headers.
+/// This header semantically updates an entry to a new entry.
+/// It has the following effects:
+/// - Create a new Entry
+/// - This is the header of that new entry
+/// - Create a metadata relationship between the original entry and this new header
+///
+/// The original header is required to prevent update loops:
+/// If you update A to B and B back to A, and then you don't know which one came first,
+/// or how to break the loop.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 pub struct EntryUpdate {
     pub author: AgentPubKey,
@@ -284,8 +279,23 @@ pub struct EntryUpdate {
     pub header_seq: u32,
     pub prev_header: HeaderHash,
 
-    pub intended_for: IntendedFor,
-    pub replaces_address: HeaderHash,
+    pub original_header_address: HeaderHash,
+    pub original_entry_address: EntryHash,
+
+    pub entry_type: EntryType,
+    pub entry_hash: EntryHash,
+}
+
+/// Placeholder for future when we want to have updates on headers
+/// Not currently in use.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
+pub struct HeaderUpdate {
+    pub author: AgentPubKey,
+    pub timestamp: Timestamp,
+    pub header_seq: u32,
+    pub prev_header: HeaderHash,
+
+    pub original_header_address: HeaderHash,
 
     pub entry_type: EntryType,
     pub entry_hash: EntryHash,

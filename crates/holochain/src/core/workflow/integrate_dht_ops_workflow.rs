@@ -30,7 +30,7 @@ use holochain_types::{
     validate::ValidationStatus,
     Entry, EntryHashed, Timestamp,
 };
-use holochain_zome_types::{element::SignedHeader, header::IntendedFor, Header};
+use holochain_zome_types::{element::SignedHeader, Header};
 use produce_dht_ops_workflow::dht_op_light::error::{DhtOpConvertError, DhtOpConvertResult};
 use std::convert::TryInto;
 use tracing::*;
@@ -234,30 +234,16 @@ async fn integrate_single_element(
                 put_data(signature, header, None, element_store).await?;
             }
             DhtOp::RegisterReplacedBy(signature, entry_update, maybe_entry) => {
-                match entry_update.intended_for {
-                    IntendedFor::Header => {
-                        // Check if we have the header that we are updating in the vault
-                        // or defer the op.
-                        if !header_is_stored(&entry_update.replaces_address)? {
-                            let op =
-                                DhtOp::RegisterReplacedBy(signature, entry_update, maybe_entry);
-                            return Outcome::deferred(op, validation_status);
-                        }
-                    }
-                    IntendedFor::Entry(_) => {
-                        // Check if we have the header with entry that we are updating in the vault
-                        // or defer the op.
-                        if !header_with_entry_is_stored(
-                            &entry_update.replaces_address,
-                            element_store,
-                        )
-                        .await?
-                        {
-                            let op =
-                                DhtOp::RegisterReplacedBy(signature, entry_update, maybe_entry);
-                            return Outcome::deferred(op, validation_status);
-                        }
-                    }
+                // Check if we have the header with entry that we are updating in the vault
+                // or defer the op.
+                if !header_with_entry_is_stored(
+                    &entry_update.original_header_address,
+                    element_store,
+                )
+                .await?
+                {
+                    let op = DhtOp::RegisterReplacedBy(signature, entry_update, maybe_entry);
+                    return Outcome::deferred(op, validation_status);
                 }
                 put_data(
                     signature,

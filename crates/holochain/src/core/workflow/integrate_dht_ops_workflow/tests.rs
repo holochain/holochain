@@ -34,7 +34,7 @@ use holochain_types::{
 use holochain_zome_types::{
     entry::GetOptions,
     entry_def::EntryDefs,
-    header::{builder, ElementDelete, EntryUpdate, IntendedFor, LinkAdd, LinkRemove},
+    header::{builder, ElementDelete, EntryUpdate, LinkAdd, LinkRemove},
     link::{LinkTag, Links},
     zome::ZomeName,
     CommitEntryInput, GetInput, GetLinksInput, Header, LinkEntriesInput,
@@ -108,14 +108,13 @@ impl TestData {
         // Entry update for header
         let mut entry_update_header = fixt!(EntryUpdate);
         entry_update_header.entry_hash = new_entry_hash.clone();
-        entry_update_header.intended_for = IntendedFor::Header;
-        entry_update_header.replaces_address = original_header_hash.clone();
+        entry_update_header.original_header_address = original_header_hash.clone();
 
         // Entry update for entry
         let mut entry_update_entry = fixt!(EntryUpdate);
         entry_update_entry.entry_hash = new_entry_hash.clone();
-        entry_update_entry.intended_for = IntendedFor::Entry(original_entry_hash.clone());
-        entry_update_entry.replaces_address = original_header_hash.clone();
+        entry_update_entry.original_entry_address = original_entry_hash.clone();
+        entry_update_entry.original_header_address = original_header_hash.clone();
 
         // Entry delete
         let mut entry_delete = fixt!(ElementDelete);
@@ -559,6 +558,7 @@ fn register_agent_activity(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     (pre_state, expect, "register agent activity")
 }
 
+#[allow(dead_code)]
 fn register_replaced_by_for_header(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let op = DhtOp::RegisterReplacedBy(
         a.signature.clone(),
@@ -704,7 +704,6 @@ async fn test_ops_state() {
         store_element,
         store_entry,
         register_agent_activity,
-        register_replaced_by_for_header,
         register_replaced_by_for_entry,
         register_deleted_by,
         register_deleted_header_by,
