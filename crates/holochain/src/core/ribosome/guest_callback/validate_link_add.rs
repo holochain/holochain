@@ -8,6 +8,7 @@ use holochain_types::dna::zome::HostFnAccess;
 use holochain_zome_types::entry::Entry;
 use holochain_zome_types::header::LinkAdd;
 use holochain_zome_types::validate_link_add::ValidateLinkAddCallbackResult;
+use holochain_zome_types::validate_link_add::ValidateLinkAddData;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::HostInput;
 use std::sync::Arc;
@@ -28,6 +29,16 @@ impl ValidateLinkAddInvocation {
             link_add: Arc::new(link_add),
             base: Arc::new(base),
             target: Arc::new(target),
+        }
+    }
+}
+
+impl From<ValidateLinkAddInvocation> for ValidateLinkAddData {
+    fn from(validate_link_add_invocation: ValidateLinkAddInvocation) -> Self {
+        Self {
+            link_add: (*validate_link_add_invocation.link_add).clone(),
+            base: (*validate_link_add_invocation.base).clone(),
+            target: (*validate_link_add_invocation.target).clone(),
         }
     }
 }
@@ -63,7 +74,11 @@ impl Invocation for ValidateLinkAddInvocation {
         .into()
     }
     fn host_input(self) -> Result<HostInput, SerializedBytesError> {
-        Ok(HostInput::new((&*self.link_add).try_into()?))
+        Ok(
+            HostInput::new(
+                ValidateLinkAddData::from(self).try_into()?
+            )
+        )
     }
 }
 
@@ -308,20 +323,20 @@ mod slow_tests {
     //
     #[tokio::test(threaded_scheduler)]
     async fn test_validate_link_add_implemented_invalid() {
-        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateInvalid]))
+        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateLinkAddInvalid]))
             .next()
             .unwrap();
-        let mut validate_invocation = ValidateLinkAddInvocationFixturator::new(fixt::Empty)
+        let mut validate_link_add_invocation = ValidateLinkAddInvocationFixturator::new(fixt::Empty)
             .next()
             .unwrap();
-        validate_invocation.zome_name = TestWasm::ValidateInvalid.into();
+        validate_link_add_invocation.zome_name = TestWasm::ValidateLinkAddInvalid.into();
 
         let result = ribosome
-            .run_validate_link_add(ValidateLinkAddHostAccess, validate_invocation)
+            .run_validate_link_add(ValidateLinkAddHostAccess, validate_link_add_invocation)
             .unwrap();
         assert_eq!(
             result,
-            ValidateLinkAddResult::Invalid("esoteric edge case".into()),
+            ValidateLinkAddResult::Invalid("esoteric edge case (link version)".into()),
         );
     }
     //

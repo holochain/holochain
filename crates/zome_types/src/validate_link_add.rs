@@ -1,6 +1,15 @@
 use crate::zome_io::GuestOutput;
 use crate::CallbackResult;
+use crate::header::LinkAdd;
+use crate::entry::Entry;
 use holochain_serialized_bytes::prelude::*;
+
+#[derive(Serialize, Deserialize, SerializedBytes)]
+pub struct ValidateLinkAddData {
+    pub link_add: LinkAdd,
+    pub base: Entry,
+    pub target: Entry,
+}
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub enum ValidateLinkAddCallbackResult {
