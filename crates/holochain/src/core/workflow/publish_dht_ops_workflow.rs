@@ -195,7 +195,7 @@ mod tests {
         observability, EntryHashed, HeaderHashed,
     };
     use holochain_zome_types::entry_def::EntryVisibility;
-    use holochain_zome_types::header::{EntryType, Header, IntendedFor};
+    use holochain_zome_types::header::{EntryType, Header};
     use std::{
         collections::HashMap,
         sync::{
@@ -501,7 +501,7 @@ mod tests {
             entry_update.entry_type = entry_type_fixt.next().unwrap();
 
             // Point update at entry
-            entry_update.intended_for = IntendedFor::Header;
+            entry_update.original_entry_address = original_entry_hashed.as_hash().clone();
 
             // Update the entry hashes
             entry_create.entry_hash = original_entry_hashed.as_hash().clone();
@@ -518,7 +518,7 @@ mod tests {
                 let header_hash = HeaderHashed::from_content(entry_create_header.clone()).await;
 
                 // Update the replaces to the header of the original
-                entry_update.replaces_address = header_hash.as_hash().clone();
+                entry_update.original_header_address = header_hash.as_hash().clone();
 
                 // Put data into elements
                 let signed_header = SignedHeaderHashed::with_presigned(header_hash, sig.clone());
@@ -630,7 +630,8 @@ mod tests {
             let (network, mut recv) = spawn_holochain_p2p().await.unwrap();
             let cell_network = network.to_cell(dna.clone(), agents[0].clone());
             let (tx_complete, rx_complete) = tokio::sync::oneshot::channel();
-            let total_expected = num_agents;
+            // We are expecting two ops per agent
+            let total_expected = num_agents * 2;
             let mut recv_count: u32 = 0;
 
             // Receive events and increment count

@@ -34,7 +34,7 @@ use holochain_types::{
 use holochain_zome_types::{
     entry::GetOptions,
     entry_def::EntryDefs,
-    header::{builder, ElementDelete, EntryUpdate, IntendedFor, LinkAdd, LinkRemove},
+    header::{builder, ElementDelete, EntryUpdate, LinkAdd, LinkRemove},
     link::{LinkTag, Links},
     zome::ZomeName,
     CommitEntryInput, GetInput, GetLinksInput, Header, LinkEntriesInput,
@@ -108,14 +108,13 @@ impl TestData {
         // Entry update for header
         let mut entry_update_header = fixt!(EntryUpdate);
         entry_update_header.entry_hash = new_entry_hash.clone();
-        entry_update_header.intended_for = IntendedFor::Header;
-        entry_update_header.replaces_address = original_header_hash.clone();
+        entry_update_header.original_header_address = original_header_hash.clone();
 
         // Entry update for entry
         let mut entry_update_entry = fixt!(EntryUpdate);
         entry_update_entry.entry_hash = new_entry_hash.clone();
-        entry_update_entry.intended_for = IntendedFor::Entry(original_entry_hash.clone());
-        entry_update_entry.replaces_address = original_header_hash.clone();
+        entry_update_entry.original_entry_address = original_entry_hash.clone();
+        entry_update_entry.original_header_address = original_header_hash.clone();
 
         // Entry delete
         let mut entry_delete = fixt!(ElementDelete);
@@ -204,12 +203,12 @@ impl Db {
                     assert_eq!(r, value, "{}", here);
                 }
                 Db::IntQueue(op) => {
-                    let value = IntegrationQueueValue {
+                    let value = IntegrationLimboValue {
                         validation_status: ValidationStatus::Valid,
                         op,
                     };
                     let res = workspace
-                        .integration_queue
+                        .integration_limbo
                         .iter()
                         .unwrap()
                         .filter_map(|(_, v)| if v == value { Ok(Some(v)) } else { Ok(None) })
@@ -329,7 +328,7 @@ impl Db {
                 }
                 Db::IntQueueEmpty => {
                     assert_eq!(
-                        workspace.integration_queue.iter().unwrap().count().unwrap(),
+                        workspace.integration_limbo.iter().unwrap().count().unwrap(),
                         0,
                         "{}",
                         here
@@ -430,13 +429,13 @@ impl Db {
                 Db::Integrated(_) => {}
                 Db::IntQueue(op) => {
                     let op_hash = DhtOpHashed::from_content(op.clone()).await.into_hash();
-                    let val = IntegrationQueueValue {
+                    let val = IntegrationLimboValue {
                         validation_status: ValidationStatus::Valid,
                         op,
                     };
                     workspace
-                        .integration_queue
-                        .put((TimestampKey::now(), op_hash).try_into().unwrap(), val)
+                        .integration_limbo
+                        .put(op_hash.try_into().unwrap(), val)
                         .unwrap();
                 }
                 Db::CasHeader(header, signature) => {
@@ -498,7 +497,7 @@ fn clear_dbs<'env>(env_ref: &'env EnvironmentWriteRef<'env>, dbs: &'env impl Get
     let mut workspace = IntegrateDhtOpsWorkspace::new(&reader, dbs).unwrap();
     env_ref
         .with_commit::<DatabaseError, _, _>(|writer| {
-            workspace.integration_queue.clear_all(writer)?;
+            workspace.integration_limbo.clear_all(writer)?;
             workspace.integrated_dht_ops.clear_all(writer)?;
             workspace.elements.clear_all(writer)?;
             workspace.meta.clear_all(writer)?;
@@ -559,6 +558,7 @@ fn register_agent_activity(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     (pre_state, expect, "register agent activity")
 }
 
+#[allow(dead_code)]
 fn register_replaced_by_for_header(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let op = DhtOp::RegisterReplacedBy(
         a.signature.clone(),
@@ -704,7 +704,6 @@ async fn test_ops_state() {
         store_element,
         store_entry,
         register_agent_activity,
-        register_replaced_by_for_header,
         register_replaced_by_for_entry,
         register_deleted_by,
         register_deleted_header_by,

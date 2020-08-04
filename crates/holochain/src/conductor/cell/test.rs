@@ -1,13 +1,12 @@
 use crate::{
     conductor::manager::spawn_task_manager,
     core::state::{
-        dht_op_integration::{IntegratedDhtOpsValue, IntegrationQueueValue},
+        dht_op_integration::{IntegratedDhtOpsValue, IntegrationLimboValue},
         workspace::Workspace,
     },
     fixt::{DnaFileFixturator, SignatureFixturator},
 };
 use ::fixt::prelude::*;
-use fallible_iterator::FallibleIterator;
 use holo_hash::HasHash;
 use holochain_p2p::actor::HolochainP2pRefToCell;
 use holochain_state::{
@@ -96,40 +95,32 @@ async fn test_cell_handle_publish() {
         )
         .expect("Could not create Workspace");
 
-    let res = workspace
-        .integration_queue
-        .iter()
-        .unwrap()
-        .collect::<Vec<_>>()
-        .unwrap();
-
-    match res.last() {
-        Some((_, last)) => {
+    // Depending on timing, the value may have been fully integrated, or not,
+    // so we check both the limbo and the integrated table
+    match (
+        workspace.integration_limbo.get(&op_hash).unwrap(),
+        workspace.integrated_dht_ops.get(&op_hash).unwrap(),
+    ) {
+        (Some(val), None) => {
             matches::assert_matches!(
-                last,
-                IntegrationQueueValue {
+                val,
+                IntegrationLimboValue {
                     op: DhtOp::StoreElement(
                         _,
                         header::Header::Dna(
                             header::Dna {
-                                hash,
                                 ..
                             }
                         ),
                         _,
                     ),
                     ..
-                } if hash == &dna
+                }
             );
         }
-        // Op may have already been integrated so check
-        // the integrated ops table.
-        // No easy way to prevent this race so best to just check
-        // both cases.
-        None => {
-            let res = workspace.integrated_dht_ops.get(&op_hash).unwrap().unwrap();
+        (None, Some(val)) => {
             matches::assert_matches!(
-                res,
+                val,
                 IntegratedDhtOpsValue {
                     op: DhtOpLight::StoreElement(
                         hash,
@@ -140,7 +131,10 @@ async fn test_cell_handle_publish() {
                 } if hash == header_hash
             );
         }
+        (Some(_), Some(_)) => panic!("The same value is both in limbo and integrated?"),
+        (None, None) => panic!("The value is missing from the integration pipeline"),
     }
+
     stop_tx.send(()).unwrap();
     shutdown.await.unwrap();
 }

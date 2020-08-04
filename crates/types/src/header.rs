@@ -64,8 +64,8 @@ pub struct WireEntryUpdate {
     pub author: AgentPubKey,
     pub header_seq: u32,
     pub prev_header: HeaderHash,
-    pub intended_for: IntendedFor,
-    pub replaces_address: HeaderHash,
+    pub original_entry_address: EntryHash,
+    pub original_header_address: HeaderHash,
     pub signature: Signature,
 }
 
@@ -121,8 +121,8 @@ impl From<(EntryUpdate, Signature)> for WireEntryUpdate {
             author: eu.author,
             header_seq: eu.header_seq,
             prev_header: eu.prev_header,
-            intended_for: eu.intended_for,
-            replaces_address: eu.replaces_address,
+            original_entry_address: eu.original_entry_address,
+            original_header_address: eu.original_header_address,
             signature,
         }
     }
@@ -180,8 +180,8 @@ impl WireNewEntryHeader {
                     timestamp: eu.timestamp,
                     header_seq: eu.header_seq,
                     prev_header: eu.prev_header,
-                    intended_for: eu.intended_for,
-                    replaces_address: eu.replaces_address,
+                    original_entry_address: eu.original_entry_address,
+                    original_header_address: eu.original_header_address,
                     entry_type,
                     entry_hash,
                 };

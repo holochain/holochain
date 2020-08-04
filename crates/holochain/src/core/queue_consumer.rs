@@ -17,10 +17,10 @@
 //! | CallZome       | *n/a*            | ChainSequence    | ProduceDhtOps  |
 //! | ProduceDhtOps  | ChainSequence    | Auth'd + IntQ †  | DhtOpIntegr.   |
 //! |                 **integration, common to both paths**                 |
-//! | DhtOpIntegr.   | IntegrationQueue | IntegratedDhtOps | Publish        |
+//! | DhtOpIntegr.   | IntegrationLimbo | IntegratedDhtOps | Publish        |
 //! | Publish        | AuthoredDhtOps   | *n/a*            | *n/a*          |
 //!
-//! († Auth'd + IntQ is short for: AuthoredDhtOps + IntegrationQueue)
+//! († Auth'd + IntQ is short for: AuthoredDhtOps + IntegrationLimbo)
 //!
 //! Implicitly, every workflow also writes to its own source queue, i.e. to
 //! remove the item it has just processed.
