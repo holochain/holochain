@@ -336,74 +336,50 @@ mod slow_tests {
             ValidateLinkAddResult::Invalid("esoteric edge case (link version)".into()),
         );
     }
-    //
-    // #[tokio::test(threaded_scheduler)]
-    // async fn test_validate_implemented_multi() {
-    //     let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateInvalid]))
-    //         .next()
-    //         .unwrap();
-    //     let mut validate_invocation = ValidateLinkAddInvocationFixturator::new(fixt::Empty)
-    //         .next()
-    //         .unwrap();
-    //     let entry = Entry::Agent(
-    //         AgentPubKeyFixturator::new(fixt::Unpredictable)
-    //             .next()
-    //             .unwrap()
-    //             .into(),
-    //     );
-    //
-    //     validate_invocation.zome_name = TestWasm::ValidateInvalid.into();
-    //     validate_invocation.link_add = Arc::new(link_add);
-    //
-    //     let result = ribosome
-    //         .run_validate_link_add(ValidateLinkAddHostAccess, validate_invocation)
-    //         .unwrap();
-    //     assert_eq!(result, ValidateLinkAddResult::Invalid("esoteric edge case".into()));
-    // }
-    //
-    // #[tokio::test(threaded_scheduler)]
-    // async fn pass_validate_test<'a>() {
-    //     // test workspace boilerplate
-    //     let env = holochain_state::test_utils::test_cell_env();
-    //     let dbs = env.dbs().await;
-    //     let env_ref = env.guard().await;
-    //     let reader = holochain_state::env::ReadManager::reader(&env_ref).unwrap();
-    //     let mut workspace = <crate::core::workflow::call_zome_workflow::CallZomeWorkspace as crate::core::state::workspace::Workspace>::new(&reader, &dbs).unwrap();
-    //
-    //     // commits fail validation if we don't do genesis
-    //     crate::core::workflow::fake_genesis(&mut workspace.source_chain)
-    //         .await
-    //         .unwrap();
-    //
-    //     let (_g, raw_workspace) =
-    //         crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
-    //             &mut workspace,
-    //         );
-    //     let mut host_access = fixt!(ZomeCallHostAccess);
-    //     host_access.workspace = raw_workspace.clone();
-    //
-    //     let output: CommitEntryOutput =
-    //         crate::call_test_ribosome!(host_access, TestWasm::Validate, "always_validates", ());
-    //
-    //     // the chain head should be the committed entry header
-    //     let call =
-    //         |workspace: &'a mut CallZomeWorkspace| -> BoxFuture<'a, SourceChainResult<HeaderHash>> {
-    //             async move {
-    //                 let source_chain = &mut workspace.source_chain;
-    //                 Ok(source_chain.chain_head()?.to_owned())
-    //             }
-    //             .boxed()
-    //         };
-    //     let chain_head =
-    //         tokio_safe_block_on::tokio_safe_block_forever_on(tokio::task::spawn(async move {
-    //             unsafe { raw_workspace.apply_mut(call).await }
-    //         }))
-    //         .unwrap()
-    //         .unwrap()
-    //         .unwrap();
-    //
-    //     assert_eq!(chain_head, output.into_inner(),);
-    // }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn pass_validate_test<'a>() {
+        // test workspace boilerplate
+        let env = holochain_state::test_utils::test_cell_env();
+        let dbs = env.dbs().await;
+        let env_ref = env.guard().await;
+        let reader = holochain_state::env::ReadManager::reader(&env_ref).unwrap();
+        let mut workspace = <crate::core::workflow::call_zome_workflow::CallZomeWorkspace as crate::core::state::workspace::Workspace>::new(&reader, &dbs).unwrap();
+
+        // commits fail validation if we don't do genesis
+        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+            .await
+            .unwrap();
+
+        let (_g, raw_workspace) =
+            crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
+                &mut workspace,
+            );
+        let mut host_access = fixt!(ZomeCallHostAccess);
+        host_access.workspace = raw_workspace.clone();
+
+        let output: CommitEntryOutput =
+            crate::call_test_ribosome!(host_access, TestWasm::Validate, "always_validates", ());
+
+        // the chain head should be the committed entry header
+        let call =
+            |workspace: &'a mut CallZomeWorkspace| -> BoxFuture<'a, SourceChainResult<HeaderHash>> {
+                async move {
+                    let source_chain = &mut workspace.source_chain;
+                    Ok(source_chain.chain_head()?.to_owned())
+                }
+                .boxed()
+            };
+        let chain_head =
+            tokio_safe_block_on::tokio_safe_block_forever_on(tokio::task::spawn(async move {
+                unsafe { raw_workspace.apply_mut(call).await }
+            }))
+            .unwrap()
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(chain_head, output.into_inner(),);
+    }
     //
     // #[tokio::test(threaded_scheduler)]
     // async fn fail_validate_test<'a>() {
