@@ -26,6 +26,7 @@ pub enum TestWasm {
     ValidateInvalid,
     ValidateLinkAddInvalid,
     ValidateValid,
+    ValidateLinkAddValid,
     ValidationPackageFail,
     ValidationPackageSuccess,
     WhoAmI,
@@ -53,6 +54,7 @@ impl From<TestWasm> for ZomeName {
             TestWasm::ValidateInvalid => "validate_invalid",
             TestWasm::ValidateLinkAddInvalid => "validate_link_add_invalid",
             TestWasm::ValidateValid => "validate_valid",
+            TestWasm::ValidateLinkAddValid => "validate_link_add_valid",
             TestWasm::ValidationPackageFail => "validation_package_fail",
             TestWasm::ValidationPackageSuccess => "validation_package_success",
             TestWasm::WhoAmI => "whoami",
@@ -156,6 +158,11 @@ impl From<TestWasm> for DnaWasm {
             TestWasm::ValidateValid => include_bytes!(concat!(
                 env!("OUT_DIR"),
                 "/wasm32-unknown-unknown/release/test_wasm_validate_valid.wasm"
+            ))
+            .to_vec(),
+            TestWasm::ValidateLinkAddValid => include_bytes!(concat!(
+                env!("OUT_DIR"),
+                "/wasm32-unknown-unknown/release/test_wasm_validate_link_add_valid.wasm"
             ))
             .to_vec(),
             TestWasm::ValidationPackageFail => include_bytes!(concat!(

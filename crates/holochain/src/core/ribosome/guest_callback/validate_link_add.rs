@@ -74,11 +74,7 @@ impl Invocation for ValidateLinkAddInvocation {
         .into()
     }
     fn host_input(self) -> Result<HostInput, SerializedBytesError> {
-        Ok(
-            HostInput::new(
-                ValidateLinkAddData::from(self).try_into()?
-            )
-        )
+        Ok(HostInput::new(ValidateLinkAddData::from(self).try_into()?))
     }
 }
 
@@ -305,30 +301,31 @@ mod slow_tests {
         assert_eq!(result, ValidateLinkAddResult::Valid,);
     }
 
-    // #[tokio::test(threaded_scheduler)]
-    // async fn test_validate_implemented_valid() {
-    //     let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateValid]))
-    //         .next()
-    //         .unwrap();
-    //     let mut validate_invocation = ValidateLinkAddInvocationFixturator::new(fixt::Empty)
-    //         .next()
-    //         .unwrap();
-    //     validate_invocation.zome_name = TestWasm::ValidateValid.into();
-    //
-    //     let result = ribosome
-    //         .run_validate_link_add(ValidateLinkAddHostAccess, validate_invocation)
-    //         .unwrap();
-    //     assert_eq!(result, ValidateLinkAddResult::Valid,);
-    // }
-    //
+    #[tokio::test(threaded_scheduler)]
+    async fn test_validate_implemented_valid() {
+        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateLinkAddValid]))
+            .next()
+            .unwrap();
+        let mut validate_invocation = ValidateLinkAddInvocationFixturator::new(fixt::Empty)
+            .next()
+            .unwrap();
+        validate_invocation.zome_name = TestWasm::ValidateLinkAddValid.into();
+
+        let result = ribosome
+            .run_validate_link_add(ValidateLinkAddHostAccess, validate_invocation)
+            .unwrap();
+        assert_eq!(result, ValidateLinkAddResult::Valid,);
+    }
+
     #[tokio::test(threaded_scheduler)]
     async fn test_validate_link_add_implemented_invalid() {
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateLinkAddInvalid]))
             .next()
             .unwrap();
-        let mut validate_link_add_invocation = ValidateLinkAddInvocationFixturator::new(fixt::Empty)
-            .next()
-            .unwrap();
+        let mut validate_link_add_invocation =
+            ValidateLinkAddInvocationFixturator::new(fixt::Empty)
+                .next()
+                .unwrap();
         validate_link_add_invocation.zome_name = TestWasm::ValidateLinkAddInvalid.into();
 
         let result = ribosome

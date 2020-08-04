@@ -19,6 +19,7 @@ use crate::core::{
     sys_validate_element,
 };
 use fallible_iterator::FallibleIterator;
+use holo_hash::AnyDhtHash;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
 use holochain_state::prelude::*;
@@ -141,36 +142,32 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT>(
                     ValidateLinkAddHostAccess,
                     ValidateLinkAddInvocation {
                         zome_name: zome_name.clone(),
-                        base: Arc::new(
+                        base: Arc::new({
+                            let base_address: AnyDhtHash = link_add.base_address.clone().into();
+                            #[allow(clippy::eval_order_dependence)]
                             cascade
-                                .dht_get(link_add.base_address.clone().into(), GetOptions.into())
+                                .dht_get(base_address.clone(), GetOptions.into())
                                 .await
                                 .map_err(|e| RibosomeError::from(e))?
-                                .ok_or(RibosomeError::ElementDeps(
-                                    link_add.base_address.clone().into(),
-                                ))?
+                                .ok_or_else(|| RibosomeError::ElementDeps(base_address.clone()))?
                                 .entry()
                                 .as_option()
-                                .ok_or(RibosomeError::ElementDeps(
-                                    link_add.base_address.clone().into(),
-                                ))?
-                                .to_owned(),
-                        ),
-                        target: Arc::new(
+                                .ok_or_else(|| RibosomeError::ElementDeps(base_address.clone()))?
+                                .to_owned()
+                        }),
+                        target: Arc::new({
+                            let target_address: AnyDhtHash = link_add.target_address.clone().into();
+                            #[allow(clippy::eval_order_dependence)]
                             cascade
-                                .dht_get(link_add.target_address.clone().into(), GetOptions.into())
+                                .dht_get(target_address.clone(), GetOptions.into())
                                 .await
                                 .map_err(|e| RibosomeError::from(e))?
-                                .ok_or(RibosomeError::ElementDeps(
-                                    link_add.target_address.clone().into(),
-                                ))?
+                                .ok_or_else(|| RibosomeError::ElementDeps(target_address.clone()))?
                                 .entry()
                                 .as_option()
-                                .ok_or(RibosomeError::ElementDeps(
-                                    link_add.target_address.clone().into(),
-                                ))?
-                                .to_owned(),
-                        ),
+                                .ok_or_else(|| RibosomeError::ElementDeps(target_address.clone()))?
+                                .to_owned()
+                        }),
                         link_add: Arc::new(link_add.to_owned()),
                     },
                 )?;

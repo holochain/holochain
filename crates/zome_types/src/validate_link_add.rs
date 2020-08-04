@@ -1,7 +1,7 @@
+use crate::entry::Entry;
+use crate::header::LinkAdd;
 use crate::zome_io::GuestOutput;
 use crate::CallbackResult;
-use crate::header::LinkAdd;
-use crate::entry::Entry;
 use holochain_serialized_bytes::prelude::*;
 
 #[derive(Serialize, Deserialize, SerializedBytes)]

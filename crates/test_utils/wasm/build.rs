@@ -39,6 +39,7 @@ fn main() {
         "validate_invalid",
         "validate_link_add_invalid",
         "validate_valid",
+        "validate_link_add_valid",
         "validation_package_fail",
         "validation_package_success",
         "whoami",
