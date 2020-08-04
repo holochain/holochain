@@ -42,7 +42,10 @@ use super::{
     element_buf::ElementBuf,
     metadata::{LinkMetaKey, MetadataBuf, MetadataBufT, SysMetaVal},
 };
-use crate::core::workflow::integrate_dht_ops_workflow::integrate_single_metadata;
+use crate::core::workflow::{
+    integrate_dht_ops_workflow::integrate_single_metadata,
+    produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError,
+};
 use error::CascadeResult;
 use fallible_iterator::FallibleIterator;
 use holo_hash::{
@@ -62,8 +65,14 @@ use holochain_types::{
     entry::option_entry_hashed,
     link::{GetLinksResponse, WireLinkMetaKey},
     metadata::{EntryDhtStatus, MetadataSet},
+    Entry, EntryHashed,
 };
-use holochain_zome_types::{element::SignedHeader, link::Link};
+use holochain_zome_types::{
+    element::SignedHeader,
+    link::Link,
+    metadata::{Details, ElementDetails, EntryDetails},
+};
+use std::convert::TryInto;
 use tracing::*;
 
 #[cfg(test)]
@@ -295,6 +304,86 @@ where
         }
     }
 
+    async fn get_entry_local_raw(&self, hash: &EntryHash) -> CascadeResult<Option<EntryHashed>> {
+        match self.element_vault.get_entry(hash).await? {
+            None => Ok(self.element_cache.get_entry(hash).await?),
+            r => Ok(r),
+        }
+    }
+
+    async fn create_entry_details(&self, hash: EntryHash) -> CascadeResult<Option<EntryDetails>> {
+        match self.get_entry_local_raw(&hash).await? {
+            Some(entry) => {
+                let entry_dht_status = self.meta_cache.get_dht_status(&hash)?;
+                let new_entry_headers: Vec<_> =
+                    self.meta_cache.get_headers(hash.clone())?.collect()?;
+                let mut headers = Vec::with_capacity(new_entry_headers.len());
+                for h in new_entry_headers {
+                    if let Some(h) = self.get_element_local_raw(&h.header_hash).await? {
+                        headers.push(
+                            h.into_inner()
+                                .0
+                                .into_header_and_signature()
+                                .0
+                                .into_content(),
+                        );
+                    }
+                }
+                let deletes = self
+                    .meta_cache
+                    .get_deletes_on_entry(hash.clone())?
+                    .map(|h| Ok(h.header_hash))
+                    .collect()?;
+                let updates = self
+                    .meta_cache
+                    .get_updates(hash.into())?
+                    .map(|h| Ok(h.header_hash))
+                    .collect()?;
+                Ok(Some(EntryDetails {
+                    entry: entry.into_content(),
+                    headers,
+                    deletes,
+                    updates,
+                    entry_dht_status,
+                }))
+            }
+            None => Ok(None),
+        }
+    }
+
+    async fn create_element_details(
+        &self,
+        hash: HeaderHash,
+    ) -> CascadeResult<Option<ElementDetails>> {
+        match self.get_element_local_raw(&hash).await? {
+            Some(element) => {
+                let hash = element.header_address().clone();
+                let deletes = self
+                    .meta_cache
+                    .get_deletes_on_header(hash)?
+                    .map(|h| Ok(h.header_hash))
+                    .collect()?;
+                Ok(Some(ElementDetails { element, deletes }))
+            }
+            None => Ok(None),
+        }
+    }
+
+    #[instrument(skip(self, options))]
+    pub async fn get_entry_details(
+        &mut self,
+        entry_hash: EntryHash,
+        options: GetOptions,
+    ) -> CascadeResult<Option<EntryDetails>> {
+        debug!("in get entry details");
+        // Update the cache from the network
+        self.fetch_element_via_entry(entry_hash.clone(), options.clone())
+            .await?;
+
+        // Get the entry and metadata
+        self.create_entry_details(entry_hash).await
+    }
+
     #[instrument(skip(self, options))]
     /// Returns the oldest live [Element] for this [EntryHash] by getting the
     /// latest available metadata from authorities combined with this agents authored data.
@@ -352,6 +441,21 @@ where
             }
             Search::NotInCascade => Ok(None),
         }
+    }
+
+    #[instrument(skip(self, options))]
+    pub async fn get_header_details(
+        &mut self,
+        header_hash: HeaderHash,
+        options: GetOptions,
+    ) -> CascadeResult<Option<ElementDetails>> {
+        debug!("in get header details");
+        // Network
+        self.fetch_element_via_header(header_hash.clone(), options)
+            .await?;
+
+        // Get the element regardless of metadata
+        self.create_element_details(header_hash).await
     }
 
     #[instrument(skip(self, options))]
@@ -418,6 +522,30 @@ where
             AnyDht::Header => {
                 let hash = hash.retype(hash_type::Header);
                 self.dht_get_header(hash, options).await
+            }
+        }
+    }
+
+    #[instrument(skip(self))]
+    pub async fn get_details(
+        &mut self,
+        hash: AnyDhtHash,
+        options: GetOptions,
+    ) -> CascadeResult<Option<Details>> {
+        match *hash.hash_type() {
+            AnyDht::Entry(e) => {
+                let hash = hash.retype(e);
+                Ok(self
+                    .get_entry_details(hash, options)
+                    .await?
+                    .map(Details::Entry))
+            }
+            AnyDht::Header => {
+                let hash = hash.retype(hash_type::Header);
+                Ok(self
+                    .get_header_details(hash, options)
+                    .await?
+                    .map(Details::Element))
             }
         }
     }
