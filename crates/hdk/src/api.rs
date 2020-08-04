@@ -107,9 +107,12 @@ macro_rules! entry_def {
 
 #[macro_export]
 macro_rules! entry_defs {
-    ( def $t:ident $def:expr; $($munch:tt)* ) => {
+    // @todo make this work for more than one def
+    ( def $t:ident $def:expr; ) => {
         $crate::prelude::entry_def!($t $def);
-        $crate::prelude::entry_defs!($($munch)* vec![$t::entry_def()]);
+        $crate::prelude::entry_defs!(vec![
+            $t::entry_def()
+        ]);
     };
     ( $defs_vec:expr ) => {
         fn __entry_defs(_: ()) -> Result<EntryDefsCallbackResult, WasmError> {

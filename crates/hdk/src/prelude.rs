@@ -27,6 +27,7 @@ pub use holochain_wasmer_guest::holochain_externs;
 pub use holochain_wasmer_guest::host_call;
 pub use holochain_wasmer_guest::ret;
 pub use holochain_wasmer_guest::try_result;
+pub use holochain_wasmer_guest::GuestPtr;
 pub use holochain_wasmer_guest::WasmError;
 pub use holochain_wasmer_guest::*;
 pub use holochain_zome_types::agent_info::AgentInfo;

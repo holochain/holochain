@@ -255,7 +255,6 @@ impl TryFrom<&LinkTag> for Path {
 }
 
 impl Path {
-
     /// what is the hash for the current Path
     pub fn hash(&self) -> Result<holo_hash::EntryHash, WasmError> {
         Ok(entry_hash!(self)?)
