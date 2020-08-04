@@ -494,16 +494,11 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
 
     #[allow(clippy::needless_lifetimes)]
     async fn register_update(&mut self, update: header::EntryUpdate) -> DatabaseResult<()> {
-        match &update.intended_for {
-            header::IntendedFor::Header => {
-                let basis: AnyDhtHash = update.replaces_address.clone().into();
-                self.register_header_on_basis(basis, update).await
-            }
-            header::IntendedFor::Entry(basis) => {
-                self.register_header_on_basis(AnyDhtHash::from(basis.clone()), update)
-                    .await
-            }
-        }
+        self.register_header_on_basis(
+            AnyDhtHash::from(update.original_entry_address.clone()),
+            update,
+        )
+        .await
     }
 
     #[allow(clippy::needless_lifetimes)]
