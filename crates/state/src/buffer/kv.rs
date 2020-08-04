@@ -54,6 +54,18 @@ where
         })
     }
 
+    /// See if a value exists, avoiding deserialization
+    pub fn contains(&self, k: &K) -> DatabaseResult<bool> {
+        Self::empty_key(&k)?;
+        use Op::*;
+        let exists = match self.scratch.get(k.as_ref()) {
+            Some(Put(_)) => true,
+            Some(Delete) => false,
+            None => self.db.get(self.reader, k)?.is_some(),
+        };
+        Ok(exists)
+    }
+
     /// Get a value, taking the scratch space into account,
     /// or from persistence if needed
     pub fn get(&self, k: &K) -> DatabaseResult<Option<V>> {
@@ -81,11 +93,6 @@ where
         let k = k.as_ref().to_vec();
         self.scratch.insert(k, Op::Delete);
         Ok(())
-    }
-
-    /// Check if a value is stored at this key, without deserializing
-    pub fn contains(&self, k: &K) -> DatabaseResult<bool> {
-        Ok(self.scratch.get(k.as_ref()).is_some() || self.db.get(self.reader, k)?.is_some())
     }
 
     /// Fetch data from DB, deserialize into V type
@@ -799,6 +806,7 @@ pub mod tests {
             buf.put("a", V(1)).unwrap();
             buf.put("b", V(2)).unwrap();
             buf.put("c", V(3)).unwrap();
+            assert!(buf.contains(&"b")?);
 
             env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
         })?;
@@ -806,6 +814,7 @@ pub mod tests {
             let mut buf: KvBuf<_, V> = KvBuf::new(&reader, db).unwrap();
 
             buf.delete("b").unwrap();
+            assert!(!buf.contains(&"b")?);
 
             env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
         })?;
@@ -815,6 +824,7 @@ pub mod tests {
             let forward = buf.iter_raw().unwrap().collect::<Vec<_>>().unwrap();
             debug!(?forward);
             assert_eq!(forward, vec![(&b"a"[..], V(1)), (&b"c"[..], V(3))],);
+            assert!(!buf.contains(&"b")?);
             Ok(())
         })
     }
@@ -899,6 +909,7 @@ pub mod tests {
 
             let n = buf.get(&"b")?;
             assert_eq!(n, Some(V(2)));
+            assert!(buf.contains(&"b")?);
             Ok(())
         })
     }
@@ -919,6 +930,7 @@ pub mod tests {
             buf.delete("b").unwrap();
             let n = buf.get(&"b")?;
             assert_eq!(n, None);
+            assert!(!buf.contains(&"b")?);
             Ok(())
         })
     }
