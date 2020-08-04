@@ -24,9 +24,9 @@ use crate::{
         },
         workflow::{
             call_zome_workflow, error::WorkflowError, genesis_workflow::genesis_workflow,
-            initialize_zomes_workflow, CallZomeWorkflowArgs, CallZomeWorkspace,
-            GenesisWorkflowArgs, GenesisWorkspace, InitializeZomesWorkflowArgs,
-            InitializeZomesWorkspace, ZomeCallInvocationResult,
+            initialize_zomes_workflow, integrate_dht_ops_workflow::IntegrateDhtOpsWorkspace,
+            CallZomeWorkflowArgs, CallZomeWorkspace, GenesisWorkflowArgs, GenesisWorkspace,
+            InitializeZomesWorkflowArgs, InitializeZomesWorkspace, ZomeCallInvocationResult,
         },
     },
 };
@@ -387,22 +387,17 @@ impl Cell {
         let env_ref = self.state_env.guard().await;
         let reader = env_ref.reader().expect("Could not create LMDB reader");
         let mut workspace =
-            crate::core::workflow::produce_dht_ops_workflow::ProduceDhtOpsWorkspace::new(
-                &reader, &env_ref,
-            )
-            .expect("Could not create Workspace");
+            IntegrateDhtOpsWorkspace::new(&reader, &env_ref).expect("Could not create Workspace");
 
         // add incoming ops to the integration queue transaction
         for (hash, op) in ops {
-            let iqv = crate::core::state::dht_op_integration::IntegrationQueueValue {
+            let iqv = crate::core::state::dht_op_integration::IntegrationLimboValue {
                 validation_status: holochain_types::validate::ValidationStatus::Valid,
                 op,
             };
-            // NB: it is possible we may put the same op into the integration
-            // queue twice, but this shouldn't be a problem.
-            workspace
-                .integration_queue
-                .put((holochain_types::TimestampKey::now(), hash).into(), iqv)?;
+            if !workspace.op_exists(&hash)? {
+                workspace.integration_limbo.put(hash, iqv)?;
+            }
         }
 
         // commit our transaction

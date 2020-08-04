@@ -203,12 +203,12 @@ impl Db {
                     assert_eq!(r, value, "{}", here);
                 }
                 Db::IntQueue(op) => {
-                    let value = IntegrationQueueValue {
+                    let value = IntegrationLimboValue {
                         validation_status: ValidationStatus::Valid,
                         op,
                     };
                     let res = workspace
-                        .integration_queue
+                        .integration_limbo
                         .iter()
                         .unwrap()
                         .filter_map(|(_, v)| if v == value { Ok(Some(v)) } else { Ok(None) })
@@ -328,7 +328,7 @@ impl Db {
                 }
                 Db::IntQueueEmpty => {
                     assert_eq!(
-                        workspace.integration_queue.iter().unwrap().count().unwrap(),
+                        workspace.integration_limbo.iter().unwrap().count().unwrap(),
                         0,
                         "{}",
                         here
@@ -429,13 +429,13 @@ impl Db {
                 Db::Integrated(_) => {}
                 Db::IntQueue(op) => {
                     let op_hash = DhtOpHashed::from_content(op.clone()).await.into_hash();
-                    let val = IntegrationQueueValue {
+                    let val = IntegrationLimboValue {
                         validation_status: ValidationStatus::Valid,
                         op,
                     };
                     workspace
-                        .integration_queue
-                        .put((TimestampKey::now(), op_hash).try_into().unwrap(), val)
+                        .integration_limbo
+                        .put(op_hash.try_into().unwrap(), val)
                         .unwrap();
                 }
                 Db::CasHeader(header, signature) => {
@@ -497,7 +497,7 @@ fn clear_dbs<'env>(env_ref: &'env EnvironmentWriteRef<'env>, dbs: &'env impl Get
     let mut workspace = IntegrateDhtOpsWorkspace::new(&reader, dbs).unwrap();
     env_ref
         .with_commit::<DatabaseError, _, _>(|writer| {
-            workspace.integration_queue.clear_all(writer)?;
+            workspace.integration_limbo.clear_all(writer)?;
             workspace.integrated_dht_ops.clear_all(writer)?;
             workspace.elements.clear_all(writer)?;
             workspace.meta.clear_all(writer)?;
