@@ -70,7 +70,7 @@ impl GossipData {
     pub fn new(evt_send: futures::channel::mpsc::Sender<GossipEvent>) -> Self {
         Self {
             evt_send,
-            pending_gossip_list: Vec::with_capacity(0),
+            pending_gossip_list: Vec::new(),
         }
     }
 
