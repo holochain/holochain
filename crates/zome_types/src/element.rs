@@ -1,7 +1,10 @@
 //! Defines a Element, the basic unit of Holochain data.
 
 use crate::{
-    entry_def::EntryVisibility, header::HeaderHashed, signature::Signature, Entry, Header,
+    entry_def::EntryVisibility,
+    header::{conversions::WrongHeaderError, HeaderHashed, LinkAdd, LinkRemove},
+    signature::Signature,
+    Entry, Header,
 };
 use holo_hash::{
     hash_type, HasHash, HashableContent, HashableContentBytes, HeaderHash, HoloHashed,
@@ -220,5 +223,31 @@ impl From<SignedHeaderHashed> for HoloHashed<SignedHeader> {
 impl From<Element> for Option<Entry> {
     fn from(e: Element) -> Self {
         e.maybe_entry
+    }
+}
+
+impl TryFrom<Element> for LinkAdd {
+    type Error = WrongHeaderError;
+    fn try_from(value: Element) -> Result<Self, Self::Error> {
+        value
+            .into_inner()
+            .0
+            .into_header_and_signature()
+            .0
+            .into_content()
+            .try_into()
+    }
+}
+
+impl TryFrom<Element> for LinkRemove {
+    type Error = WrongHeaderError;
+    fn try_from(value: Element) -> Result<Self, Self::Error> {
+        value
+            .into_inner()
+            .0
+            .into_header_and_signature()
+            .0
+            .into_content()
+            .try_into()
     }
 }

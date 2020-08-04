@@ -113,6 +113,7 @@ impl Default for GetMetaOptions {
     }
 }
 
+#[derive(Debug, Clone)]
 /// Get links from the DHT.
 /// Fields tagged with `[Network]` are network-level controls.
 /// Fields tagged with `[Remote]` are controls that will be forwarded to the
