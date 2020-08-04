@@ -8,7 +8,7 @@ use crate::core::state::{
 };
 use holochain_state::{
     buffer::KvBuf,
-    db::{AUTHORED_DHT_OPS, INTEGRATION_QUEUE},
+    db::{AUTHORED_DHT_OPS, INTEGRATION_LIMBO},
     prelude::{BufferedStore, GetDb, Reader, Writer},
 };
 use holochain_types::{dht_op::DhtOpHashed, validate::ValidationStatus};
@@ -56,7 +56,7 @@ async fn produce_dht_ops_workflow_inner(
                 receipt_count: 0,
                 last_publish_time: None,
             };
-            workspace.integration_queue.put(
+            workspace.integration_limbo.put(
                 hash.clone(),
                 IntegrationLimboValue {
                     validation_status: ValidationStatus::Valid,
@@ -75,24 +75,24 @@ async fn produce_dht_ops_workflow_inner(
 pub struct ProduceDhtOpsWorkspace<'env> {
     pub call_zome_workspace: CallZomeWorkspace<'env>,
     pub authored_dht_ops: AuthoredDhtOpsStore<'env>,
-    pub integration_queue: IntegrationLimboStore<'env>,
+    pub integration_limbo: IntegrationLimboStore<'env>,
 }
 
 impl<'env> Workspace<'env> for ProduceDhtOpsWorkspace<'env> {
     fn new(reader: &'env Reader<'env>, db: &impl GetDb) -> WorkspaceResult<Self> {
         let authored_dht_ops = db.get_db(&*AUTHORED_DHT_OPS)?;
-        let integration_queue = db.get_db(&*INTEGRATION_QUEUE)?;
+        let integration_limbo = db.get_db(&*INTEGRATION_LIMBO)?;
         Ok(Self {
             call_zome_workspace: CallZomeWorkspace::new(reader, db)?,
             authored_dht_ops: KvBuf::new(reader, authored_dht_ops)?,
-            integration_queue: KvBuf::new(reader, integration_queue)?,
+            integration_limbo: KvBuf::new(reader, integration_limbo)?,
         })
     }
 
     fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
         self.call_zome_workspace.flush_to_txn(writer)?;
         self.authored_dht_ops.flush_to_txn(writer)?;
-        self.integration_queue.flush_to_txn(writer)?;
+        self.integration_limbo.flush_to_txn(writer)?;
         Ok(())
     }
 }
@@ -244,7 +244,7 @@ mod tests {
             let workspace = ProduceDhtOpsWorkspace::new(&reader, &dbs).unwrap();
             let mut times = Vec::new();
             let results = workspace
-                .integration_queue
+                .integration_limbo
                 .iter()
                 .unwrap()
                 .map(|(k, v)| {
@@ -316,7 +316,7 @@ mod tests {
         {
             let reader = env_ref.reader().unwrap();
             let workspace = ProduceDhtOpsWorkspace::new(&reader, &dbs).unwrap();
-            let count = workspace.integration_queue.iter().unwrap().count().unwrap();
+            let count = workspace.integration_limbo.iter().unwrap().count().unwrap();
             let authored_count = workspace.authored_dht_ops.iter().unwrap().count().unwrap();
 
             assert_eq!(last_count, count);

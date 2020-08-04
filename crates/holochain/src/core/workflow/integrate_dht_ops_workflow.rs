@@ -20,7 +20,7 @@ use holochain_keystore::Signature;
 use holochain_state::{
     buffer::BufferedStore,
     buffer::KvBuf,
-    db::{INTEGRATED_DHT_OPS, INTEGRATION_QUEUE},
+    db::{INTEGRATED_DHT_OPS, INTEGRATION_LIMBO},
     error::DatabaseResult,
     prelude::{GetDb, Reader, Writer},
 };
@@ -46,7 +46,7 @@ pub async fn integrate_dht_ops_workflow(
     // TODO: PERF: we collect() only because this iterator cannot cross awaits,
     // but is there a way to do this without collect()?
     let ops: Vec<_> = workspace
-        .integration_queue
+        .integration_limbo
         .drain_iter()?
         .iterator()
         .collect();
@@ -118,7 +118,7 @@ pub async fn integrate_dht_ops_workflow(
             // when re-adding items to the queue for later processing. This is
             // challenging for now since we don't have access to that original
             // key. Just a possible note for the future.
-            workspace.integration_queue.put(op_hash, value)?;
+            workspace.integration_limbo.put(op_hash, value)?;
         }
         WorkComplete::Incomplete
     };
@@ -409,7 +409,7 @@ impl Outcome {
 
 pub struct IntegrateDhtOpsWorkspace<'env> {
     // integration queue
-    pub integration_queue: IntegrationLimboStore<'env>,
+    pub integration_limbo: IntegrationLimboStore<'env>,
     // integrated ops
     pub integrated_dht_ops: IntegratedDhtOpsStore<'env>,
     // Cas for storing
@@ -424,14 +424,14 @@ impl<'env> Workspace<'env> for IntegrateDhtOpsWorkspace<'env> {
         let db = dbs.get_db(&*INTEGRATED_DHT_OPS)?;
         let integrated_dht_ops = KvBuf::new(reader, db)?;
 
-        let db = dbs.get_db(&*INTEGRATION_QUEUE)?;
-        let integration_queue = KvBuf::new(reader, db)?;
+        let db = dbs.get_db(&*INTEGRATION_LIMBO)?;
+        let integration_limbo = KvBuf::new(reader, db)?;
 
         let elements = ElementBuf::vault(reader, dbs, true)?;
         let meta = MetadataBuf::vault(reader, dbs)?;
 
         Ok(Self {
-            integration_queue,
+            integration_limbo,
             integrated_dht_ops,
             elements,
             meta,
@@ -445,7 +445,7 @@ impl<'env> Workspace<'env> for IntegrateDhtOpsWorkspace<'env> {
         // flush integrated
         self.integrated_dht_ops.flush_to_txn(writer)?;
         // flush integration queue
-        self.integration_queue.flush_to_txn(writer)?;
+        self.integration_limbo.flush_to_txn(writer)?;
         Ok(())
     }
 }
@@ -453,6 +453,6 @@ impl<'env> Workspace<'env> for IntegrateDhtOpsWorkspace<'env> {
 impl<'env> IntegrateDhtOpsWorkspace<'env> {
     pub fn op_exists(&self, hash: &DhtOpHash) -> DatabaseResult<bool> {
         Ok(self.integrated_dht_ops.get(&hash)?.is_some()
-            || self.integration_queue.get(&hash)?.is_some())
+            || self.integration_limbo.get(&hash)?.is_some())
     }
 }

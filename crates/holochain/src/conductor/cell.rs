@@ -392,8 +392,8 @@ impl Cell {
                 validation_status: holochain_types::validate::ValidationStatus::Valid,
                 op,
             };
-            if workspace.op_exists(&hash)? {
-                workspace.integration_queue.put(hash, iqv)?;
+            if !workspace.op_exists(&hash)? {
+                workspace.integration_limbo.put(hash, iqv)?;
             }
         }
 

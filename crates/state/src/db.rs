@@ -151,7 +151,7 @@ lazy_static! {
     /// The key to access the IntegratedDhtOps database
     pub static ref INTEGRATED_DHT_OPS: DbKey<SingleStore> = DbKey::new(DbName::IntegratedDhtOps);
     /// The key to access the IntegrationLimbo database
-    pub static ref INTEGRATION_QUEUE: DbKey<SingleStore> = DbKey::new(DbName::IntegrationLimbo);
+    pub static ref INTEGRATION_LIMBO: DbKey<SingleStore> = DbKey::new(DbName::IntegrationLimbo);
     /// The key to access the ValidationReceipts database
     pub static ref VALIDATION_RECEIPTS: DbKey<MultiStore> = DbKey::new(DbName::ValidationReceipts);
 }
@@ -209,7 +209,7 @@ fn register_databases(env: &Rkv, kind: &EnvironmentKind, um: &mut DbMap) -> Data
             register_db(env, um, &*CACHE_STATUS_META)?;
             register_db(env, um, &*AUTHORED_DHT_OPS)?;
             register_db(env, um, &*INTEGRATED_DHT_OPS)?;
-            register_db(env, um, &*INTEGRATION_QUEUE)?;
+            register_db(env, um, &*INTEGRATION_LIMBO)?;
             register_db(env, um, &*VALIDATION_RECEIPTS)?;
         }
         EnvironmentKind::Conductor => {

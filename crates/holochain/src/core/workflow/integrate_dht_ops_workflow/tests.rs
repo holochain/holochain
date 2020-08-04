@@ -209,7 +209,7 @@ impl Db {
                         op,
                     };
                     let res = workspace
-                        .integration_queue
+                        .integration_limbo
                         .iter()
                         .unwrap()
                         .filter_map(|(_, v)| if v == value { Ok(Some(v)) } else { Ok(None) })
@@ -329,7 +329,7 @@ impl Db {
                 }
                 Db::IntQueueEmpty => {
                     assert_eq!(
-                        workspace.integration_queue.iter().unwrap().count().unwrap(),
+                        workspace.integration_limbo.iter().unwrap().count().unwrap(),
                         0,
                         "{}",
                         here
@@ -435,7 +435,7 @@ impl Db {
                         op,
                     };
                     workspace
-                        .integration_queue
+                        .integration_limbo
                         .put(op_hash.try_into().unwrap(), val)
                         .unwrap();
                 }
@@ -498,7 +498,7 @@ fn clear_dbs<'env>(env_ref: &'env EnvironmentWriteRef<'env>, dbs: &'env impl Get
     let mut workspace = IntegrateDhtOpsWorkspace::new(&reader, dbs).unwrap();
     env_ref
         .with_commit::<DatabaseError, _, _>(|writer| {
-            workspace.integration_queue.clear_all(writer)?;
+            workspace.integration_limbo.clear_all(writer)?;
             workspace.integrated_dht_ops.clear_all(writer)?;
             workspace.elements.clear_all(writer)?;
             workspace.meta.clear_all(writer)?;
