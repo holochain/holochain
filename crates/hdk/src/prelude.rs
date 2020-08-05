@@ -6,6 +6,7 @@ pub use crate::entry_def;
 pub use crate::entry_defs;
 pub use crate::entry_hash;
 pub use crate::get;
+pub use crate::get_link_details;
 pub use crate::get_links;
 pub use crate::hash_path::anchor::anchor;
 pub use crate::hash_path::anchor::get_anchor;

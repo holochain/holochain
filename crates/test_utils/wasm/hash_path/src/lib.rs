@@ -31,3 +31,7 @@ fn _parent(path_string: TestString) -> Result<Option<Path>, WasmError> {
 fn _children(path_string: TestString) -> Result<holochain_zome_types::link::Links, WasmError> {
     Path::from(path_string.0).children()
 }
+
+fn _children_details(path_string: TestString) -> Result<holochain_zome_types::link::LinkDetails, WasmError> {
+    Path::from(path_string.0).children_details()
+}
