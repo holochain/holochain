@@ -48,7 +48,6 @@ use crate::core::workflow::{
 };
 use error::CascadeResult;
 use fallible_iterator::FallibleIterator;
-use futures::{Future, StreamExt, TryStreamExt};
 use holo_hash::{
     hash_type::{self, AnyDht},
     AnyDhtHash, EntryHash, HeaderHash,
@@ -57,7 +56,6 @@ use holochain_p2p::{
     actor::{GetLinksOptions, GetMetaOptions, GetOptions},
     HolochainP2pCell,
 };
-use holochain_state::error::DatabaseResult;
 use holochain_types::{
     dht_op::{produce_op_lights_from_element_group, produce_op_lights_from_elements},
     element::{
@@ -349,14 +347,24 @@ where
         }
     }
 
-    async fn render_header(
+    async fn render_headers<T, F>(
         &self,
-        result: DatabaseResult<TimedHeaderHash>,
-    ) -> CascadeResult<Option<Header>> {
-        match self.get_header_local_raw(&result?.header_hash).await? {
-            Some(h) => Ok(Some(HeaderHashed::into_content(h))),
-            None => Ok(None),
+        headers: Vec<TimedHeaderHash>,
+        f: F,
+    ) -> CascadeResult<Vec<T>>
+    where
+        F: Fn(Header) -> DhtOpConvertResult<T>,
+    {
+        let mut result = Vec::with_capacity(headers.len());
+        for h in headers {
+            let hash = h.header_hash;
+            let h = self.get_header_local_raw(&hash).await?;
+            match h {
+                Some(h) => result.push(f(HeaderHashed::into_content(h))?),
+                None => continue,
+            }
         }
+        Ok(result)
     }
 
     async fn create_entry_details(&self, hash: EntryHash) -> CascadeResult<Option<EntryDetails>> {
@@ -366,21 +374,22 @@ where
                 let headers = self
                     .meta_cache
                     .get_headers(hash.clone())?
-                    .iterator()
-                    .map(|h| self.render_header(h));
-                let headers = try_collect_db(headers, |h| Ok(h)).await?;
+                    .collect::<Vec<_>>()?;
+                let headers = self.render_headers(headers, |h| Ok(h)).await?;
                 let deletes = self
                     .meta_cache
                     .get_deletes_on_entry(hash.clone())?
-                    .iterator()
-                    .map(|h| self.render_header(h));
-                let deletes = try_collect_db(deletes, |h| Ok(ElementDelete::try_from(h)?)).await?;
+                    .collect::<Vec<_>>()?;
+                let deletes = self
+                    .render_headers(deletes, |h| Ok(ElementDelete::try_from(h)?))
+                    .await?;
                 let updates = self
                     .meta_cache
                     .get_updates(hash.into())?
-                    .iterator()
-                    .map(|h| self.render_header(h));
-                let updates = try_collect_db(updates, |h| Ok(EntryUpdate::try_from(h)?)).await?;
+                    .collect::<Vec<_>>()?;
+                let updates = self
+                    .render_headers(updates, |h| Ok(EntryUpdate::try_from(h)?))
+                    .await?;
                 Ok(Some(EntryDetails {
                     entry: entry.into_content(),
                     headers,
@@ -403,9 +412,10 @@ where
                 let deletes = self
                     .meta_cache
                     .get_deletes_on_header(hash)?
-                    .iterator()
-                    .map(|h| self.render_header(h));
-                let deletes = try_collect_db(deletes, |h| Ok(ElementDelete::try_from(h)?)).await?;
+                    .collect::<Vec<_>>()?;
+                let deletes = self
+                    .render_headers(deletes, |h| Ok(ElementDelete::try_from(h)?))
+                    .await?;
                 Ok(Some(ElementDetails { element, deletes }))
             }
             None => Ok(None),
@@ -573,8 +583,9 @@ where
     pub async fn get_details(
         &mut self,
         hash: AnyDhtHash,
-        options: GetOptions,
+        mut options: GetOptions,
     ) -> CascadeResult<Option<Details>> {
+        options.all_live_headers_with_metadata = true;
         match *hash.hash_type() {
             AnyDht::Entry(e) => {
                 let hash = hash.retype(e);
@@ -662,24 +673,6 @@ where
         }
         Ok(result)
     }
-}
-
-async fn try_collect_db<T, Fut, I, F>(iter: I, con: F) -> CascadeResult<Vec<T>>
-where
-    I: Iterator<Item = Fut>,
-    Fut: Future<Output = CascadeResult<Option<Header>>>,
-    F: Fn(Header) -> DhtOpConvertResult<T>,
-{
-    Ok(futures::stream::iter(iter)
-        .buffer_unordered(100)
-        .try_filter_map(|r| async {
-            match r {
-                Some(r) => Ok(Some(con(r)?)),
-                None => Ok(None),
-            }
-        })
-        .try_collect()
-        .await?)
 }
 
 #[cfg(test)]

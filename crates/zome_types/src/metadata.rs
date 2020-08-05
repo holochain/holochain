@@ -6,6 +6,8 @@ use crate::{
 };
 use holochain_serialized_bytes::prelude::*;
 
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, SerializedBytes)]
+#[serde(tag = "type", content = "content")]
 /// Return type for get_details calls.
 /// HeaderHash returns an Element.
 /// EntryHash returns an Entry.
@@ -16,6 +18,7 @@ pub enum Details {
     Entry(EntryDetails),
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, SerializedBytes)]
 /// A specific Element with any deletes
 /// This is all the metadata available for an element.
 pub struct ElementDetails {
@@ -26,6 +29,7 @@ pub struct ElementDetails {
     pub deletes: Vec<ElementDelete>,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, SerializedBytes)]
 /// An Entry with all it's metadata.
 pub struct EntryDetails {
     /// The data

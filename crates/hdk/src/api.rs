@@ -2,18 +2,24 @@
 macro_rules! map_extern {
     ( $name:tt, $f:ident ) => {
         #[no_mangle]
-        pub extern "C" fn $name(ptr: GuestPtr) -> GuestPtr {
-            let input: HostInput = host_args!(ptr);
-            let result = $f(try_result!(
+        pub extern "C" fn $name(ptr: $crate::prelude::GuestPtr) -> $crate::prelude::GuestPtr {
+            let input: $crate::prelude::HostInput = $crate::host_args!(ptr);
+            let x = input.clone();
+            $crate::debug!(x).ok();
+            let x = x.into_inner().try_into();
+            $crate::debug!(x).ok();
+            let x = x.unwrap();
+            $f(x).ok();
+            let result = $f($crate::try_result!(
                 input.into_inner().try_into(),
                 "failed to deserialize args"
             ));
-            let result_value = try_result!(result, "inner function failed");
-            let result_sb = try_result!(
-                SerializedBytes::try_from(result_value),
+            let result_value = $crate::try_result!(result, "inner function failed");
+            let result_sb = $crate::try_result!(
+                $crate::prelude::SerializedBytes::try_from(result_value),
                 "inner function result serialization error"
             );
-            ret!(GuestOutput::new(result_sb));
+            ret!($crate::prelude::GuestOutput::new(result_sb));
         }
     };
 }
@@ -21,8 +27,8 @@ macro_rules! map_extern {
 #[macro_export]
 macro_rules! entry_defs {
     ( $defs_vec:expr ) => {
-        fn __entry_defs(_: ()) -> Result<EntryDefsCallbackResult, WasmError> {
-            Ok(EntryDefsCallbackResult::Defs($defs_vec.into()))
+        fn __entry_defs(_: ()) -> Result<$crate::prelude::EntryDefsCallbackResult, $crate::prelude::WasmError> {
+            Ok($crate::prelude::EntryDefsCallbackResult::Defs($defs_vec.into()))
         }
         map_extern!(entry_defs, __entry_defs);
     };
@@ -31,7 +37,7 @@ macro_rules! entry_defs {
 #[macro_export]
 macro_rules! api_call {
     ( $f:ident, $input:expr, $outputt:ty ) => {{
-        holochain_wasmer_guest::holochain_externs!();
+        $crate::holochain_wasmer_guest::holochain_externs!();
 
         let result: Result<$outputt, $crate::prelude::SerializedBytesError> =
             $crate::prelude::host_call!($f, $input);
@@ -42,14 +48,14 @@ macro_rules! api_call {
 #[macro_export]
 macro_rules! zome_info {
     () => {{
-        $crate::api_call!(__zome_info, ZomeInfoInput::new(()), ZomeInfoOutput)
+        $crate::api_call!(__zome_info, $crate::prelude::ZomeInfoInput::new(()), $crate::prelude::ZomeInfoOutput)
     }};
 }
 
 #[macro_export]
 macro_rules! agent_info {
     () => {{
-        $crate::api_call!(__agent_info, AgentInfoInput::new(()), AgentInfoOutput)
+        $crate::api_call!(__agent_info, $crate::prelude::AgentInfoInput::new(()), $crate::prelude::AgentInfoOutput)
     }};
 }
 
@@ -58,8 +64,8 @@ macro_rules! call_remote {
     ( $agent:expr, $zome:expr, $fn_name:expr, $cap:expr, $request:expr ) => {{
         $crate::api_call!(
             __call_remote,
-            CallRemoteInput::new(CallRemote::new($agent, $zome, $fn_name, $cap, $request)),
-            CallRemoteOutput
+            $crate::prelude::CallRemoteInput::new(CallRemote::new($agent, $zome, $fn_name, $cap, $request)),
+            $crate::prelude::CallRemoteOutput
         )
     }};
 }
@@ -69,8 +75,8 @@ macro_rules! debug {
     ( $msg:expr ) => {{
         $crate::api_call!(
             __debug,
-            DebugInput::new(debug_msg!(format!("{:?}", $msg))),
-            DebugOutput
+            $crate::prelude::DebugInput::new(debug_msg!(format!("{:?}", $msg))),
+            $crate::prelude::DebugOutput
         )
     }};
 }
@@ -78,12 +84,12 @@ macro_rules! debug {
 #[macro_export]
 macro_rules! commit_entry {
     ( $input:expr ) => {{
-        let try_sb = SerializedBytes::try_from($input);
+        let try_sb = $crate::prelude::SerializedBytes::try_from($input);
         match try_sb {
             Ok(sb) => $crate::api_call!(
                 __commit_entry,
-                CommitEntryInput::new(($input.into(), Entry::App(sb))),
-                CommitEntryOutput
+                $crate::prelude::CommitEntryInput::new(($input.into(), Entry::App(sb))),
+                $crate::prelude::CommitEntryOutput
             ),
             Err(e) => Err(e),
         }
@@ -93,12 +99,12 @@ macro_rules! commit_entry {
 #[macro_export]
 macro_rules! entry_hash {
     ( $input:expr ) => {{
-        let try_sb = SerializedBytes::try_from($input);
+        let try_sb = $crate::prelude::SerializedBytes::try_from($input);
         match try_sb {
             Ok(sb) => $crate::api_call!(
                 __entry_hash,
-                EntryHashInput::new(Entry::App(sb)),
-                EntryHashOutput
+                $crate::prelude::EntryHashInput::new(Entry::App(sb)),
+                $crate::prelude::EntryHashOutput
             ),
             Err(e) => Err(e),
         }
@@ -111,14 +117,14 @@ macro_rules! get_entry {
         $crate::api_call!(__get, GetInput::new(($hash.into(), $options)), GetOutput)
     }};
     ( $input:expr ) => {
-        get_entry!($input, $crate::prelude::GetOptions)
+        $crate::get_entry!($input, $crate::prelude::GetOptions)
     };
 }
 
 #[macro_export]
 macro_rules! link_entries {
     ( $base:expr, $target:expr ) => {
-        link_entries!($base, $target, vec![])
+        $crate::link_entries!($base, $target, vec![])
     };
     ( $base:expr, $target:expr, $tag:expr ) => {{
         $crate::api_call!(
@@ -134,8 +140,8 @@ macro_rules! remove_link {
     ( $add_link_header:expr ) => {{
         $crate::api_call!(
             __remove_link,
-            RemoveLinkInput::new($add_link_header),
-            RemoveLinkOutput
+            $crate::prelude::RemoveLinkInput::new($add_link_header),
+            $crate::prelude::RemoveLinkOutput
         )
     }};
 }
@@ -143,13 +149,13 @@ macro_rules! remove_link {
 #[macro_export]
 macro_rules! get_links {
     ( $base:expr ) => {
-        get_links!($base, None)
+        $crate::get_links!($base, None)
     };
     ( $base:expr, $tag:expr ) => {{
         $crate::api_call!(
             __get_links,
-            GetLinksInput::new(($base, $tag.into())),
-            GetLinksOutput
+            $crate::prelude::GetLinksInput::new(($base, $tag.into())),
+            $crate::prelude::GetLinksOutput
         )
     }};
 }

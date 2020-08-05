@@ -59,7 +59,7 @@ impl Default for GetOptions {
         Self {
             remote_agent_count: None,
             timeout_ms: None,
-            as_race: true,
+            as_race: false,
             race_timeout_ms: None,
             follow_redirects: true,
             all_live_headers_with_metadata: false,

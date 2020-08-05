@@ -1,5 +1,5 @@
 use crate::{
-    conductor::{dna_store::MockDnaStore, interface::websocket::test::setup_app},
+    conductor::{dna_store::MockDnaStore, interface::websocket::test::setup_app, ConductorHandle},
     core::{
         ribosome::{host_fn, wasm_ribosome::WasmRibosome, CallContext, ZomeCallHostAccess},
         state::{
@@ -31,7 +31,7 @@ use holochain_p2p::{
 use holochain_serialized_bytes::prelude::*;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::{
-    env::{EnvironmentWriteRef, ReadManager},
+    env::{EnvironmentWrite, EnvironmentWriteRef, ReadManager},
     prelude::{BufferedStore, GetDb, WriteManager},
     test_utils::test_cell_env,
 };
@@ -53,8 +53,10 @@ use holochain_zome_types::{
     entry_def,
     header::*,
     link::{Link, LinkTag},
+    metadata::{Details, EntryDhtStatus},
     zome::ZomeName,
-    CommitEntryInput, GetLinksInput, LinkEntriesInput, RemoveLinkInput,
+    CommitEntryInput, GetDetailsInput, GetInput, GetLinksInput, LinkEntriesInput, RemoveEntryInput,
+    RemoveLinkInput, UpdateEntryInput,
 };
 use maplit::btreeset;
 use std::collections::BTreeMap;
@@ -184,7 +186,6 @@ async fn get_from_another_agent() {
     )
     .await
     .unwrap();
-    let zome_name: ZomeName = TestWasm::CommitEntry.into();
 
     let alice_agent_id = fake_agent_pubkey_1();
     let alice_cell_id = CellId::new(dna_file.dna_hash().to_owned(), alice_agent_id.clone());
@@ -224,24 +225,12 @@ async fn get_from_another_agent() {
     // Bob store element
     let entry = Post("Bananas are good for you".into());
     let entry_hash = EntryHash::with_data(&Entry::try_from(entry.clone()).unwrap()).await;
-    {
-        let bob_env = handle.get_cell_env(&bob_cell_id).await.unwrap();
-        let keystore = bob_env.keystore().clone();
-        let network = handle.holochain_p2p().to_cell(
-            bob_cell_id.dna_hash().clone(),
-            bob_cell_id.agent_pubkey().clone(),
-        );
-
-        let ribosome = WasmRibosome::new(dna_file.clone());
-        let call_data = CallData {
-            ribosome,
-            zome_name: zome_name.clone(),
-            network,
-            keystore,
-        };
+    let header_hash = {
+        let (bob_env, call_data) =
+            make_call_data(bob_cell_id.clone(), handle.clone(), dna_file.clone()).await;
         let env_ref = bob_env.guard().await;
         let dbs = bob_env.dbs().await;
-        commit_entry(
+        let header_hash = commit_entry(
             &env_ref,
             &dbs,
             call_data.clone(),
@@ -251,56 +240,28 @@ async fn get_from_another_agent() {
         .await;
 
         // Bob is not an authority yet
-
-        // Check bob can get the entry
-        let element = get(
+        // Make Bob an "authority"
+        fake_authority(
             &env_ref,
             &dbs,
-            call_data,
-            entry_hash.clone().into(),
-            options.clone(),
+            header_hash.clone().into(),
+            call_data.clone(),
         )
-        .await
-        .unwrap();
-
-        let (signed_header, ret_entry) = element.clone().into_inner();
-
-        // TODO: Check signed header is the same header
-
-        // Check Bob is the author
-        assert_eq!(*signed_header.header().author(), bob_agent_id);
-
-        // Check entry is the same
-        let ret_entry: Post = ret_entry.unwrap().try_into().unwrap();
-        assert_eq!(entry, ret_entry);
-
-        // Make Bob an "authority"
-        fake_authority(&env_ref, &dbs, element).await;
-    }
+        .await;
+        header_hash
+    };
 
     // Alice get element from bob
     let element = {
-        let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
-        let keystore = alice_env.keystore().clone();
-        let network = handle.holochain_p2p().to_cell(
-            alice_cell_id.dna_hash().clone(),
-            alice_cell_id.agent_pubkey().clone(),
-        );
-
-        let ribosome = WasmRibosome::new(dna_file);
-        let call_data = CallData {
-            ribosome,
-            zome_name,
-            network,
-            keystore,
-        };
+        let (alice_env, call_data) =
+            make_call_data(alice_cell_id.clone(), handle.clone(), dna_file.clone()).await;
         let env_ref = alice_env.guard().await;
         let dbs = alice_env.dbs().await;
         get(
             &env_ref,
             &dbs,
             call_data,
-            entry_hash.into(),
+            entry_hash.clone().into(),
             options.clone(),
         )
         .await
@@ -316,6 +277,105 @@ async fn get_from_another_agent() {
     // Check entry is the same
     let ret_entry: Post = ret_entry.unwrap().try_into().unwrap();
     assert_eq!(entry, ret_entry);
+
+    let new_entry = Post("Bananas are bendy".into());
+    let (remove_hash, update_hash) = {
+        let (bob_env, call_data) =
+            make_call_data(bob_cell_id.clone(), handle.clone(), dna_file.clone()).await;
+        let env_ref = bob_env.guard().await;
+        let dbs = bob_env.dbs().await;
+        let remove_hash =
+            remove_entry(&env_ref, &dbs, call_data.clone(), header_hash.clone()).await;
+
+        fake_authority(
+            &env_ref,
+            &dbs,
+            remove_hash.clone().into(),
+            call_data.clone(),
+        )
+        .await;
+        let update_hash = update_entry(
+            &env_ref,
+            &dbs,
+            call_data.clone(),
+            new_entry.clone().try_into().unwrap(),
+            "post".into(),
+            header_hash.clone(),
+        )
+        .await;
+        fake_authority(
+            &env_ref,
+            &dbs,
+            update_hash.clone().into(),
+            call_data.clone(),
+        )
+        .await;
+        (remove_hash, update_hash)
+    };
+
+    // Alice get element from bob
+    let (entry_details, header_details) = {
+        let (alice_env, call_data) =
+            make_call_data(alice_cell_id.clone(), handle.clone(), dna_file.clone()).await;
+        let env_ref = alice_env.guard().await;
+        let dbs = alice_env.dbs().await;
+        let entry_details = get_details(
+            &env_ref,
+            &dbs,
+            call_data.clone(),
+            entry_hash.into(),
+            options.clone(),
+        )
+        .await
+        .unwrap();
+        let header_details = get_details(
+            &env_ref,
+            &dbs,
+            call_data.clone(),
+            header_hash.clone().into(),
+            options.clone(),
+        )
+        .await
+        .unwrap();
+        (entry_details, header_details)
+    };
+
+    let entry_details = unwrap_to!(entry_details => Details::Entry).clone();
+    let header_details = unwrap_to!(header_details => Details::Element).clone();
+
+    assert_eq!(Post::try_from(entry_details.entry).unwrap(), entry);
+    assert_eq!(entry_details.headers.len(), 1);
+    assert_eq!(entry_details.deletes.len(), 1);
+    assert_eq!(entry_details.updates.len(), 1);
+    assert_eq!(entry_details.entry_dht_status, EntryDhtStatus::Dead);
+    assert_eq!(
+        HeaderHash::with_data(entry_details.headers.get(0).unwrap()).await,
+        header_hash
+    );
+    assert_eq!(
+        HeaderHash::with_data(&Header::ElementDelete(
+            entry_details.deletes.get(0).unwrap().clone()
+        ))
+        .await,
+        remove_hash
+    );
+    assert_eq!(
+        HeaderHash::with_data(&Header::EntryUpdate(
+            entry_details.updates.get(0).unwrap().clone()
+        ))
+        .await,
+        update_hash
+    );
+
+    assert_eq!(header_details.deletes.len(), 1);
+    assert_eq!(*header_details.element.header_address(), header_hash);
+    assert_eq!(
+        HeaderHash::with_data(&Header::ElementDelete(
+            header_details.deletes.get(0).unwrap().clone()
+        ))
+        .await,
+        remove_hash
+    );
 
     let shutdown = handle.take_shutdown_handle().await.unwrap();
     handle.shutdown().await;
@@ -336,7 +396,6 @@ async fn get_links_from_another_agent() {
     )
     .await
     .unwrap();
-    let zome_name: ZomeName = TestWasm::CommitEntry.into();
 
     let alice_agent_id = fake_agent_pubkey_1();
     let alice_cell_id = CellId::new(dna_file.dna_hash().to_owned(), alice_agent_id.clone());
@@ -366,15 +425,6 @@ async fn get_links_from_another_agent() {
 
     let link_options = GetLinksOptions { timeout_ms: None };
 
-    let get_options = GetOptions {
-        remote_agent_count: None,
-        timeout_ms: None,
-        as_race: false,
-        race_timeout_ms: None,
-        follow_redirects: false,
-        all_live_headers_with_metadata: false,
-    };
-
     // Bob store links
     let base = Post("Bananas are good for you".into());
     let target = Post("Potassium is radioactive".into());
@@ -382,23 +432,11 @@ async fn get_links_from_another_agent() {
     let target_entry_hash = EntryHash::with_data(&Entry::try_from(target.clone()).unwrap()).await;
     let link_tag = fixt!(LinkTag);
     let link_add_hash = {
-        let bob_env = handle.get_cell_env(&bob_cell_id).await.unwrap();
-        let keystore = bob_env.keystore().clone();
-        let network = handle.holochain_p2p().to_cell(
-            bob_cell_id.dna_hash().clone(),
-            bob_cell_id.agent_pubkey().clone(),
-        );
-
-        let ribosome = WasmRibosome::new(dna_file.clone());
-        let call_data = CallData {
-            ribosome,
-            zome_name: zome_name.clone(),
-            network,
-            keystore,
-        };
+        let (bob_env, call_data) =
+            make_call_data(bob_cell_id.clone(), handle.clone(), dna_file.clone()).await;
         let env_ref = bob_env.guard().await;
         let dbs = bob_env.dbs().await;
-        commit_entry(
+        let base_header_hash = commit_entry(
             &env_ref,
             &dbs,
             call_data.clone(),
@@ -407,7 +445,7 @@ async fn get_links_from_another_agent() {
         )
         .await;
 
-        commit_entry(
+        let target_header_hash = commit_entry(
             &env_ref,
             &dbs,
             call_data.clone(),
@@ -416,35 +454,20 @@ async fn get_links_from_another_agent() {
         )
         .await;
 
-        // Bob is not an authority yet
-
-        // Check bob can get the entry
-        let element = get(
+        fake_authority(
             &env_ref,
             &dbs,
+            target_header_hash.clone().into(),
             call_data.clone(),
-            target_entry_hash.clone().into(),
-            get_options.clone(),
         )
-        .await
-        .unwrap();
-
-        // Make Bob an "authority"
-        fake_authority(&env_ref, &dbs, element).await;
-
-        // Check bob can get the entry
-        let element = get(
+        .await;
+        fake_authority(
             &env_ref,
             &dbs,
+            base_header_hash.clone().into(),
             call_data.clone(),
-            base_entry_hash.clone().into(),
-            get_options.clone(),
         )
-        .await
-        .unwrap();
-
-        // Make Bob an "authority"
-        fake_authority(&env_ref, &dbs, element).await;
+        .await;
 
         // Link the entries
         let link_add_hash = link_entries(
@@ -457,38 +480,21 @@ async fn get_links_from_another_agent() {
         )
         .await;
 
-        let element = get(
+        fake_authority(
             &env_ref,
             &dbs,
-            call_data.clone(),
             link_add_hash.clone().into(),
-            get_options.clone(),
+            call_data.clone(),
         )
-        .await
-        .unwrap();
-
-        // Make Bob an "authority"
-        fake_authority(&env_ref, &dbs, element).await;
+        .await;
 
         link_add_hash
     };
 
     // Alice get links from bob
     let links = {
-        let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
-        let keystore = alice_env.keystore().clone();
-        let network = handle.holochain_p2p().to_cell(
-            alice_cell_id.dna_hash().clone(),
-            alice_cell_id.agent_pubkey().clone(),
-        );
-
-        let ribosome = WasmRibosome::new(dna_file.clone());
-        let call_data = CallData {
-            ribosome,
-            zome_name: zome_name.clone(),
-            network,
-            keystore,
-        };
+        let (alice_env, call_data) =
+            make_call_data(alice_cell_id.clone(), handle.clone(), dna_file.clone()).await;
         let env_ref = alice_env.guard().await;
         let dbs = alice_env.dbs().await;
 
@@ -514,20 +520,8 @@ async fn get_links_from_another_agent() {
 
     // Remove the link
     {
-        let bob_env = handle.get_cell_env(&bob_cell_id).await.unwrap();
-        let keystore = bob_env.keystore().clone();
-        let network = handle.holochain_p2p().to_cell(
-            bob_cell_id.dna_hash().clone(),
-            bob_cell_id.agent_pubkey().clone(),
-        );
-
-        let ribosome = WasmRibosome::new(dna_file.clone());
-        let call_data = CallData {
-            ribosome,
-            zome_name: zome_name.clone(),
-            network,
-            keystore,
-        };
+        let (bob_env, call_data) =
+            make_call_data(bob_cell_id.clone(), handle.clone(), dna_file.clone()).await;
         let env_ref = bob_env.guard().await;
         let dbs = bob_env.dbs().await;
 
@@ -535,35 +529,18 @@ async fn get_links_from_another_agent() {
         let link_remove_hash =
             remove_link(&env_ref, &dbs, call_data.clone(), link_add_hash.clone()).await;
 
-        let element = get(
+        fake_authority(
             &env_ref,
             &dbs,
-            call_data.clone(),
             link_remove_hash.clone().into(),
-            get_options.clone(),
+            call_data.clone(),
         )
-        .await
-        .unwrap();
-
-        // Make Bob an "authority"
-        fake_authority(&env_ref, &dbs, element).await;
+        .await;
     }
 
     let links = {
-        let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
-        let keystore = alice_env.keystore().clone();
-        let network = handle.holochain_p2p().to_cell(
-            alice_cell_id.dna_hash().clone(),
-            alice_cell_id.agent_pubkey().clone(),
-        );
-
-        let ribosome = WasmRibosome::new(dna_file);
-        let call_data = CallData {
-            ribosome,
-            zome_name,
-            network,
-            keystore,
-        };
+        let (alice_env, call_data) =
+            make_call_data(alice_cell_id.clone(), handle.clone(), dna_file.clone()).await;
         let env_ref = alice_env.guard().await;
         let dbs = alice_env.dbs().await;
 
@@ -792,31 +769,147 @@ async fn commit_entry<'env>(
     output.into_inner()
 }
 
+async fn remove_entry<'env>(
+    env_ref: &'env EnvironmentWriteRef<'env>,
+    dbs: &impl GetDb,
+    call_data: CallData,
+    hash: HeaderHash,
+) -> HeaderHash {
+    let CallData {
+        network,
+        keystore,
+        ribosome,
+        zome_name,
+    } = call_data;
+    let reader = env_ref.reader().unwrap();
+    let mut workspace = CallZomeWorkspace::new(&reader, dbs).unwrap();
+
+    let input = RemoveEntryInput::new(hash);
+
+    let output = {
+        let (_g, raw_workspace) = UnsafeCallZomeWorkspace::from_mut(&mut workspace);
+        let host_access = ZomeCallHostAccess::new(raw_workspace, keystore, network);
+        let call_context = CallContext::new(zome_name, host_access.into());
+        let ribosome = Arc::new(ribosome);
+        let call_context = Arc::new(call_context);
+        let r = host_fn::remove_entry::remove_entry(ribosome.clone(), call_context.clone(), input);
+        let r = r.map_err(|e| {
+            debug!(%e);
+            e
+        });
+        r.unwrap()
+    };
+
+    // Write
+    env_ref
+        .with_commit(|writer| workspace.flush_to_txn(writer))
+        .unwrap();
+
+    output.into_inner()
+}
+
+async fn update_entry<'env>(
+    env_ref: &'env EnvironmentWriteRef<'env>,
+    dbs: &impl GetDb,
+    call_data: CallData,
+    entry: Entry,
+    entry_def_id: entry_def::EntryDefId,
+    original_header_hash: HeaderHash,
+) -> HeaderHash {
+    let CallData {
+        network,
+        keystore,
+        ribosome,
+        zome_name,
+    } = call_data;
+    let reader = env_ref.reader().unwrap();
+    let mut workspace = CallZomeWorkspace::new(&reader, dbs).unwrap();
+
+    let input = UpdateEntryInput::new((entry_def_id.clone(), entry.clone(), original_header_hash));
+
+    let output = {
+        let (_g, raw_workspace) = UnsafeCallZomeWorkspace::from_mut(&mut workspace);
+        let host_access = ZomeCallHostAccess::new(raw_workspace, keystore, network);
+        let call_context = CallContext::new(zome_name, host_access.into());
+        let ribosome = Arc::new(ribosome);
+        let call_context = Arc::new(call_context);
+        host_fn::update_entry::update_entry(ribosome.clone(), call_context.clone(), input).unwrap()
+    };
+
+    // Write
+    env_ref
+        .with_commit(|writer| workspace.flush_to_txn(writer))
+        .unwrap();
+
+    output.into_inner()
+}
+
 async fn get<'env>(
     env_ref: &'env EnvironmentWriteRef<'env>,
     dbs: &impl GetDb,
     call_data: CallData,
     entry_hash: AnyDhtHash,
-    options: GetOptions,
+    _options: GetOptions,
 ) -> Option<Element> {
+    let CallData {
+        network,
+        keystore,
+        ribosome,
+        zome_name,
+    } = call_data;
     let reader = env_ref.reader().unwrap();
     let mut workspace = CallZomeWorkspace::new(&reader, dbs).unwrap();
 
-    let mut cascade = workspace.cascade(call_data.network);
-    cascade.dht_get(entry_hash, options).await.unwrap()
+    // let mut cascade = workspace.cascade(call_data.network);
+    // cascade.dht_get(entry_hash, options).await.unwrap()
 
     // TODO: use the real get entry when element in zome types pr lands
-    // let input = GetInput::new((entry_hash.clone().into(), GetOptions));
+    let input = GetInput::new((
+        entry_hash.clone().into(),
+        holochain_zome_types::entry::GetOptions,
+    ));
 
-    // let output = {
-    //     let (_g, raw_workspace) = UnsafeCallZomeWorkspace::from_mut(&mut workspace);
-    //     let host_access = ZomeCallHostAccess::new(raw_workspace, keystore, network);
-    //     let call_context = CallContext::new(zome_name, host_access);
-    //     let ribosome = Arc::new(ribosome);
-    //     let call_context = Arc::new(call_context);
-    //     host_fn::get::get(ribosome.clone(), call_context.clone(), input).unwrap()
-    // };
-    // output.into_inner().try_into().unwrap()
+    let output = {
+        let (_g, raw_workspace) = UnsafeCallZomeWorkspace::from_mut(&mut workspace);
+        let host_access = ZomeCallHostAccess::new(raw_workspace, keystore, network);
+        let call_context = CallContext::new(zome_name, host_access.into());
+        let ribosome = Arc::new(ribosome);
+        let call_context = Arc::new(call_context);
+        host_fn::get::get(ribosome.clone(), call_context.clone(), input).unwrap()
+    };
+    output.into_inner()
+}
+
+async fn get_details<'env>(
+    env_ref: &'env EnvironmentWriteRef<'env>,
+    dbs: &impl GetDb,
+    call_data: CallData,
+    entry_hash: AnyDhtHash,
+    _options: GetOptions,
+) -> Option<Details> {
+    let CallData {
+        network,
+        keystore,
+        ribosome,
+        zome_name,
+    } = call_data;
+    let reader = env_ref.reader().unwrap();
+    let mut workspace = CallZomeWorkspace::new(&reader, dbs).unwrap();
+
+    let input = GetDetailsInput::new((
+        entry_hash.clone().into(),
+        holochain_zome_types::entry::GetOptions,
+    ));
+
+    let output = {
+        let (_g, raw_workspace) = UnsafeCallZomeWorkspace::from_mut(&mut workspace);
+        let host_access = ZomeCallHostAccess::new(raw_workspace, keystore, network);
+        let call_context = CallContext::new(zome_name, host_access.into());
+        let ribosome = Arc::new(ribosome);
+        let call_context = Arc::new(call_context);
+        host_fn::get_details::get_details(ribosome.clone(), call_context.clone(), input).unwrap()
+    };
+    output.into_inner()
 }
 
 async fn link_entries<'env>(
@@ -944,8 +1037,20 @@ async fn get_link_details<'env>(
 async fn fake_authority<'env>(
     env_ref: &'env EnvironmentWriteRef<'env>,
     dbs: &impl GetDb,
-    element: Element,
+    hash: AnyDhtHash,
+    call_data: CallData,
 ) {
+    // Check bob can get the entry
+    let element = get(
+        env_ref,
+        dbs,
+        call_data,
+        hash.clone().into(),
+        GetOptions::default(),
+    )
+    .await
+    .unwrap();
+
     let reader = env_ref.reader().unwrap();
     let mut element_vault = ElementBuf::vault(&reader, dbs, false).unwrap();
     let mut meta_vault = MetadataBuf::vault(&reader, dbs).unwrap();
@@ -966,4 +1071,26 @@ async fn fake_authority<'env>(
             meta_vault.flush_to_txn(writer)
         })
         .unwrap();
+}
+
+async fn make_call_data(
+    cell_id: CellId,
+    handle: ConductorHandle,
+    dna_file: DnaFile,
+) -> (EnvironmentWrite, CallData) {
+    let env = handle.get_cell_env(&cell_id).await.unwrap();
+    let keystore = env.keystore().clone();
+    let network = handle
+        .holochain_p2p()
+        .to_cell(cell_id.dna_hash().clone(), cell_id.agent_pubkey().clone());
+
+    let zome_name = dna_file.dna().zomes.get(0).unwrap().0.clone();
+    let ribosome = WasmRibosome::new(dna_file);
+    let call_data = CallData {
+        ribosome,
+        zome_name,
+        network,
+        keystore,
+    };
+    (env, call_data)
 }

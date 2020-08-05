@@ -8,6 +8,7 @@ use crate::core::ribosome::{ZomeCallInvocation, ZomeCallInvocationResponse};
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::app::{AppId, InstalledApp};
 use holochain_zome_types::GuestOutput;
+use tracing::*;
 
 /// The interface that a Conductor exposes to the outside world.
 #[async_trait::async_trait]
@@ -47,6 +48,7 @@ impl RealAppInterfaceApi {
 
 #[async_trait::async_trait]
 impl AppInterfaceApi for RealAppInterfaceApi {
+    #[instrument(skip(self, request))]
     /// Routes the [AppRequest] to the [AppResponse]
     async fn handle_app_request_inner(
         &self,
@@ -57,6 +59,11 @@ impl AppInterfaceApi for RealAppInterfaceApi {
                 self.conductor_handle.get_app_info(&app_id).await?,
             )),
             AppRequest::ZomeCallInvocation(request) => {
+                debug!(?request);
+                debug!(pay_load = ?request.clone().payload.into_inner().bytes());
+                use ::fixt::prelude::*;
+                use holo_hash::fixt::*;
+                debug!(fixt = ?SerializedBytes::try_from(fixt!(EntryHash)));
                 match self.conductor_handle.call_zome(*request).await? {
                     Ok(ZomeCallInvocationResponse::ZomeApiFn(output)) => {
                         Ok(AppResponse::ZomeCallInvocation(Box::new(output)))

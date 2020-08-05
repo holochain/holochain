@@ -315,10 +315,12 @@ pub async fn integrate_single_metadata<C: MetadataBufT>(
     element_store: &ElementBuf<'_>,
     meta_store: &mut C,
 ) -> DhtOpConvertResult<()> {
+    debug!(?op);
     async fn get_header(
         hash: HeaderHash,
         element_store: &ElementBuf<'_>,
     ) -> DhtOpConvertResult<Header> {
+        debug!(?hash);
         Ok(element_store
             .get_header(&hash)
             .await?
@@ -358,6 +360,7 @@ pub async fn integrate_single_metadata<C: MetadataBufT>(
             meta_store.remove_link(header).await?;
         }
     }
+    debug!("made it");
     Ok(())
 }
 
