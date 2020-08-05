@@ -46,7 +46,7 @@ pub fn get_links<'a>(
                     None => LinkMetaKey::BaseZome(&base_address, zome_id),
                 };
 
-                // Get te links from the dht
+                // Get the links from the dht
                 cascade
                     .dht_get_links(&key, GetLinksOptions::default())
                     .await
