@@ -208,11 +208,11 @@ mod tests {
         let hash_type_json = r#"{"1":[132,33,36]}"#;
         assert_eq!(format!("{:?}", hash_type_sb), hash_type_json.to_string());
 
-        let hash_type_1: hash_type::Entry = serde_json::from_str(hash_type_json).unwrap();
-        assert_eq!(hash_type_1, hash_type::Entry::Content);
+        let hash_type_from_sb: hash_type::Entry = hash_type_sb.try_into().unwrap();
+        assert_eq!(hash_type_from_sb, hash_type::Entry::Content);
 
-        let hash_type_2: hash_type::Entry = hash_type_sb.try_into().unwrap();
-        assert_eq!(hash_type_2, hash_type::Entry::Content);
+        let hash_type_from_json: hash_type::Entry = serde_json::from_str(hash_type_json).unwrap();
+        assert_eq!(hash_type_from_json, hash_type::Entry::Content);
     }
 
     #[test]
