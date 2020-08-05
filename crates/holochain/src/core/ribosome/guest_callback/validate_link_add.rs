@@ -120,40 +120,31 @@ mod test {
     use super::ValidateLinkAddResult;
     use crate::core::ribosome::Invocation;
     use crate::core::ribosome::ZomesToInvoke;
-    use crate::fixt::ValidateHostAccessFixturator;
-    use crate::fixt::ValidateInvocationFixturator;
-    use crate::fixt::ZomeCallCapGrantFixturator;
+    use crate::fixt::ValidateLinkAddHostAccessFixturator;
+    use crate::fixt::ValidateLinkAddInvocationFixturator;
     use ::fixt::prelude::*;
-    use holo_hash::fixt::AgentPubKeyFixturator;
     use holochain_serialized_bytes::prelude::*;
-    use holochain_types::{dna::zome::HostFnAccess, fixt::CapClaimFixturator};
-    use holochain_zome_types::entry::Entry;
+    use holochain_types::dna::zome::HostFnAccess;
     use holochain_zome_types::validate_link_add::ValidateLinkAddCallbackResult;
+    use holochain_zome_types::validate_link_add::ValidateLinkAddData;
     use holochain_zome_types::HostInput;
     use rand::seq::SliceRandom;
-    use std::sync::Arc;
 
     #[tokio::test(threaded_scheduler)]
-    async fn validate_callback_result_fold() {
+    async fn validate_link_add_callback_result_fold() {
         let mut rng = thread_rng();
 
         let result_valid = || ValidateLinkAddResult::Valid;
-        // let result_ud = || ValidateLinkAddResult::UnresolvedDependencies(vec![]);
         let result_invalid = || ValidateLinkAddResult::Invalid("".into());
 
         let cb_valid = || ValidateLinkAddCallbackResult::Valid;
-        // let cb_ud = || ValidateCallbackResult::UnresolvedDependencies(vec![]);
         let cb_invalid = || ValidateLinkAddCallbackResult::Invalid("".into());
 
         for (mut results, expected) in vec![
             (vec![], result_valid()),
             (vec![cb_valid()], result_valid()),
             (vec![cb_invalid()], result_invalid()),
-            // (vec![cb_ud()], result_ud()),
             (vec![cb_invalid(), cb_valid()], result_invalid()),
-            // (vec![cb_invalid(), cb_ud()], result_invalid()),
-            // (vec![cb_valid(), cb_ud()], result_ud()),
-            // (vec![cb_valid(), cb_ud(), cb_invalid()], result_invalid()),
         ] {
             // order of the results should not change the final result
             results.shuffle(&mut rng);
@@ -173,91 +164,58 @@ mod test {
     }
 
     #[tokio::test(threaded_scheduler)]
-    async fn validate_invocation_allow_side_effects() {
-        let validate_host_access = ValidateHostAccessFixturator::new(fixt::Unpredictable)
-            .next()
-            .unwrap();
+    async fn validate_link_add_invocation_allow_side_effects() {
+        let validate_link_add_host_access =
+            ValidateLinkAddHostAccessFixturator::new(fixt::Unpredictable)
+                .next()
+                .unwrap();
         assert_eq!(
-            HostFnAccess::from(&validate_host_access),
+            HostFnAccess::from(&validate_link_add_host_access),
             HostFnAccess::none(),
         );
     }
 
     #[tokio::test(threaded_scheduler)]
-    async fn validate_invocation_zomes() {
-        let validate_invocation = ValidateInvocationFixturator::new(fixt::Unpredictable)
-            .next()
-            .unwrap();
-        let zome_name = validate_invocation.zome_name.clone();
-        assert_eq!(ZomesToInvoke::One(zome_name), validate_invocation.zomes(),);
+    async fn validate_link_add_invocation_zomes() {
+        let validate_link_add_invocation =
+            ValidateLinkAddInvocationFixturator::new(fixt::Unpredictable)
+                .next()
+                .unwrap();
+        let zome_name = validate_link_add_invocation.zome_name.clone();
+        assert_eq!(
+            ZomesToInvoke::One(zome_name),
+            validate_link_add_invocation.zomes(),
+        );
     }
 
     #[tokio::test(threaded_scheduler)]
-    async fn validate_invocation_fn_components() {
-        let mut validate_invocation = ValidateInvocationFixturator::new(fixt::Unpredictable)
-            .next()
-            .unwrap();
-
-        let agent_entry = Entry::Agent(
-            AgentPubKeyFixturator::new(fixt::Unpredictable)
+    async fn validate_link_add_invocation_fn_components() {
+        let validate_link_add_invocation =
+            ValidateLinkAddInvocationFixturator::new(fixt::Unpredictable)
                 .next()
-                .unwrap()
-                .into(),
-        );
-        validate_invocation.entry = Arc::new(agent_entry);
-        let mut expected = vec!["validate", "validate_agent"];
-        for fn_component in validate_invocation.fn_components() {
-            assert_eq!(fn_component, expected.pop().unwrap(),);
-        }
+                .unwrap();
 
-        let agent_entry = Entry::App(
-            SerializedBytesFixturator::new(fixt::Unpredictable)
-                .next()
-                .unwrap()
-                .into(),
-        );
-        validate_invocation.entry = Arc::new(agent_entry);
-        let mut expected = vec!["validate", "validate_entry"];
-        for fn_component in validate_invocation.fn_components() {
-            assert_eq!(fn_component, expected.pop().unwrap(),);
-        }
-
-        let agent_entry = Entry::CapClaim(
-            CapClaimFixturator::new(fixt::Unpredictable)
-                .next()
-                .unwrap()
-                .into(),
-        );
-        validate_invocation.entry = Arc::new(agent_entry);
-        let mut expected = vec!["validate", "validate_cap_claim"];
-        for fn_component in validate_invocation.fn_components() {
-            assert_eq!(fn_component, expected.pop().unwrap(),);
-        }
-
-        let agent_entry = Entry::CapGrant(
-            ZomeCallCapGrantFixturator::new(fixt::Unpredictable)
-                .next()
-                .unwrap()
-                .into(),
-        );
-        validate_invocation.entry = Arc::new(agent_entry);
-        let mut expected = vec!["validate", "validate_cap_grant"];
-        for fn_component in validate_invocation.fn_components() {
+        let mut expected = vec!["validate_link", "validate_link_add"];
+        for fn_component in validate_link_add_invocation.fn_components() {
             assert_eq!(fn_component, expected.pop().unwrap(),);
         }
     }
 
     #[tokio::test(threaded_scheduler)]
-    async fn validate_invocation_host_input() {
-        let validate_invocation = ValidateInvocationFixturator::new(fixt::Unpredictable)
-            .next()
-            .unwrap();
+    async fn validate_link_add_invocation_host_input() {
+        let validate_link_add_invocation =
+            ValidateLinkAddInvocationFixturator::new(fixt::Unpredictable)
+                .next()
+                .unwrap();
 
-        let host_input = validate_invocation.clone().host_input().unwrap();
+        let host_input = validate_link_add_invocation.clone().host_input().unwrap();
 
         assert_eq!(
             host_input,
-            HostInput::new(SerializedBytes::try_from(&*validate_invocation.entry).unwrap()),
+            HostInput::new(
+                SerializedBytes::try_from(&ValidateLinkAddData::from(validate_link_add_invocation))
+                    .unwrap()
+            ),
         );
     }
 }
@@ -269,21 +227,17 @@ mod slow_tests {
     use super::ValidateLinkAddHostAccess;
     use super::ValidateLinkAddResult;
     use crate::core::ribosome::RibosomeT;
-    // use crate::core::state::source_chain::SourceChainResult;
-    // use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
+    use crate::core::state::source_chain::SourceChainResult;
+    use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
     use crate::fixt::curve::Zomes;
     use crate::fixt::ValidateLinkAddInvocationFixturator;
     use crate::fixt::WasmRibosomeFixturator;
-    // use crate::fixt::ZomeCallHostAccessFixturator;
-    // use fixt::prelude::*;
-    // use futures::future::BoxFuture;
-    // use futures::future::FutureExt;
-    // use holo_hash::fixt::AgentPubKeyFixturator;
-    // use holo_hash::HeaderHash;
+    use crate::fixt::ZomeCallHostAccessFixturator;
+    use fixt::prelude::*;
+    use futures::future::BoxFuture;
+    use futures::future::FutureExt;
+    use holo_hash::HeaderHash;
     use holochain_wasm_test_utils::TestWasm;
-    // use holochain_zome_types::CommitEntryOutput;
-    // use holochain_zome_types::Entry;
-    // use std::sync::Arc;
 
     #[tokio::test(threaded_scheduler)]
     async fn test_validate_link_add_unimplemented() {
@@ -338,7 +292,7 @@ mod slow_tests {
     }
 
     #[tokio::test(threaded_scheduler)]
-    async fn pass_validate_test<'a>() {
+    async fn pass_validate_link_add_test<'a>() {
         // test workspace boilerplate
         let env = holochain_state::test_utils::test_cell_env();
         let dbs = env.dbs().await;
@@ -358,8 +312,8 @@ mod slow_tests {
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = raw_workspace.clone();
 
-        let output: CommitEntryOutput =
-            crate::call_test_ribosome!(host_access, TestWasm::Validate, "always_validates", ());
+        let output: HeaderHash =
+            crate::call_test_ribosome!(host_access, TestWasm::ValidateLink, "add_valid_link", ());
 
         // the chain head should be the committed entry header
         let call =
@@ -378,51 +332,51 @@ mod slow_tests {
             .unwrap()
             .unwrap();
 
-        assert_eq!(chain_head, output.into_inner(),);
+        assert_eq!(chain_head, output,);
     }
-    //
-    // #[tokio::test(threaded_scheduler)]
-    // async fn fail_validate_test<'a>() {
-    //     // test workspace boilerplate
-    //     let env = holochain_state::test_utils::test_cell_env();
-    //     let dbs = env.dbs().await;
-    //     let env_ref = env.guard().await;
-    //     let reader = holochain_state::env::ReadManager::reader(&env_ref).unwrap();
-    //     let mut workspace = <crate::core::workflow::call_zome_workflow::CallZomeWorkspace as crate::core::state::workspace::Workspace>::new(&reader, &dbs).unwrap();
-    //
-    //     // commits fail validation if we don't do genesis
-    //     crate::core::workflow::fake_genesis(&mut workspace.source_chain)
-    //         .await
-    //         .unwrap();
-    //
-    //     let (_g, raw_workspace) =
-    //         crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
-    //             &mut workspace,
-    //         );
-    //
-    //     let mut host_access = fixt!(ZomeCallHostAccess);
-    //     host_access.workspace = raw_workspace.clone();
-    //
-    //     let output: CommitEntryOutput =
-    //         crate::call_test_ribosome!(host_access, TestWasm::Validate, "never_validates", ());
-    //
-    //     // the chain head should be the committed entry header
-    //     let call =
-    //         |workspace: &'a mut CallZomeWorkspace| -> BoxFuture<'a, SourceChainResult<HeaderHash>> {
-    //             async move {
-    //                 let source_chain = &mut workspace.source_chain;
-    //                 Ok(source_chain.chain_head()?.to_owned())
-    //             }
-    //             .boxed()
-    //         };
-    //     let chain_head =
-    //         tokio_safe_block_on::tokio_safe_block_forever_on(tokio::task::spawn(async move {
-    //             unsafe { raw_workspace.apply_mut(call).await }
-    //         }))
-    //         .unwrap()
-    //         .unwrap()
-    //         .unwrap();
-    //
-    //     assert_eq!(chain_head, output.into_inner(),);
-    // }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn fail_validate_link_add_test<'a>() {
+        // test workspace boilerplate
+        let env = holochain_state::test_utils::test_cell_env();
+        let dbs = env.dbs().await;
+        let env_ref = env.guard().await;
+        let reader = holochain_state::env::ReadManager::reader(&env_ref).unwrap();
+        let mut workspace = <crate::core::workflow::call_zome_workflow::CallZomeWorkspace as crate::core::state::workspace::Workspace>::new(&reader, &dbs).unwrap();
+
+        // commits fail validation if we don't do genesis
+        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+            .await
+            .unwrap();
+
+        let (_g, raw_workspace) =
+            crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
+                &mut workspace,
+            );
+
+        let mut host_access = fixt!(ZomeCallHostAccess);
+        host_access.workspace = raw_workspace.clone();
+
+        let output: HeaderHash =
+            crate::call_test_ribosome!(host_access, TestWasm::ValidateLink, "add_invalid_link", ());
+
+        // the chain head should be the committed entry header
+        let call =
+            |workspace: &'a mut CallZomeWorkspace| -> BoxFuture<'a, SourceChainResult<HeaderHash>> {
+                async move {
+                    let source_chain = &mut workspace.source_chain;
+                    Ok(source_chain.chain_head()?.to_owned())
+                }
+                .boxed()
+            };
+        let chain_head =
+            tokio_safe_block_on::tokio_safe_block_forever_on(tokio::task::spawn(async move {
+                unsafe { raw_workspace.apply_mut(call).await }
+            }))
+            .unwrap()
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(chain_head, output,);
+    }
 }

@@ -1,5 +1,5 @@
 [package]
-name = "test_wasm_validate"
+name = "test_wasm_validate_link"
 version = "0.0.1"
 authors = [ "thedavidmeister", "thedavidmeister@gmail.com" ]
 edition = "2018"
@@ -16,7 +16,7 @@ opt-level = "z"
 [workspace]
 
 [lib]
-name = "test_wasm_validate"
+name = "test_wasm_validate_link"
 crate-type = [ "cdylib", "rlib" ]
 
 [dependencies]
@@ -24,3 +24,4 @@ holochain_serialized_bytes = "=0.0.40"
 holochain_wasmer_guest = "=0.0.37"
 holochain_zome_types = { version = "=0.0.1", path = "../../../zome_types" }
 serde = "=1.0.104"
+hdk3 = { path = "../../../hdk" }

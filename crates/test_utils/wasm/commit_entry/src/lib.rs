@@ -3,7 +3,7 @@ use hdk3::prelude::*;
 holochain_wasmer_guest::holochain_externs!();
 
 const POST_ID: &str = "post";
-#[derive(Default, SerializedBytes, Serialize, Deserialize)]
+#[derive(Default, SerializedBytes, serde::Serialize, serde::Deserialize)]
 #[repr(transparent)]
 #[serde(transparent)]
 struct Post(String);

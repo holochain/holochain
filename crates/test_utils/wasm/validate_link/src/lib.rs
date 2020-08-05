@@ -1,107 +1,51 @@
-use holochain_wasmer_guest::*;
-use holochain_zome_types::*;
-use holochain_zome_types::validate::ValidateCallbackResult;
-use holochain_zome_types::entry_def::EntryDefId;
-use holochain_zome_types::entry_def::EntryDefsCallbackResult;
-use holochain_zome_types::entry_def::EntryDefs;
-use holochain_zome_types::entry_def::EntryDef;
-use holochain_zome_types::crdt::CrdtType;
-use holochain_zome_types::entry_def::RequiredValidations;
-use holochain_zome_types::entry_def::EntryVisibility;
+use hdk3::prelude::*;
 
 holochain_wasmer_guest::holochain_externs!();
 
-/// an example inner value that can be serialized into the contents of Entry::App()
-#[derive(Deserialize, Serialize, SerializedBytes)]
-enum ThisWasmEntry {
-    AlwaysValidates,
-    NeverValidates,
+const MAYBE_LINKABLE_ID: &str = "maybe_linkable";
+#[derive(serde::Serialize, serde::Deserialize, SerializedBytes, Clone, Copy)]
+enum MaybeLinkable {
+    AlwaysLinkable,
+    NeverLinkable,
 }
 
-impl From<&ThisWasmEntry> for EntryDefId {
-    fn from(entry: &ThisWasmEntry) -> Self {
-        match entry {
-            ThisWasmEntry::AlwaysValidates => "always_validates",
-            ThisWasmEntry::NeverValidates => "never_validates",
-        }.into()
-    }
-}
+entry_def!(MaybeLinkable EntryDef {
+    id: MAYBE_LINKABLE_ID.into(),
+    ..Default::default()
+});
 
-impl From<&ThisWasmEntry> for CrdtType {
-    fn from(_: &ThisWasmEntry) -> Self {
-        Self
-    }
-}
+entry_defs!(vec![MaybeLinkable::entry_def()]);
 
-impl From<&ThisWasmEntry> for RequiredValidations {
-    fn from(_: &ThisWasmEntry) -> Self {
-        5.into()
-    }
-}
+map_extern!(validate_link, _validate_link);
+map_extern!(add_valid_link, _add_valid_link);
+map_extern!(add_invalid_link, _add_invalid_link);
 
-impl From<&ThisWasmEntry> for EntryVisibility {
-    fn from(_: &ThisWasmEntry) -> Self {
-        Self::Public
-    }
-}
+fn _validate_link(validate_link_add_data: ValidateLinkAddData) -> Result<ValidateLinkAddCallbackResult, WasmError> {
+    let base: MaybeLinkable = validate_link_add_data.base.try_into()?;
+    let target: MaybeLinkable = validate_link_add_data.target.try_into()?;
 
-impl From<&ThisWasmEntry> for EntryDef {
-    fn from(entry: &ThisWasmEntry) -> Self {
-        Self {
-            id: entry.into(),
-            crdt_type: entry.into(),
-            required_validations: entry.into(),
-            visibility: entry.into(),
+    Ok(match base {
+        MaybeLinkable::AlwaysLinkable => match target {
+            MaybeLinkable::AlwaysLinkable => ValidateLinkAddCallbackResult::Valid,
+            _ => ValidateLinkAddCallbackResult::Invalid("target never validates".to_string()),
         }
-    }
+        _ => ValidateLinkAddCallbackResult::Invalid("base never validates".to_string()),
+    })
 }
 
-#[no_mangle]
-pub extern "C" fn entry_defs(_: GuestPtr) -> GuestPtr {
-    let defs: EntryDefs = vec![
-        (&ThisWasmEntry::AlwaysValidates).into(),
-        (&ThisWasmEntry::NeverValidates).into(),
-    ].into();
+fn _add_valid_link(_: ()) -> Result<HeaderHash, WasmError> {
+    let always_linkable_entry_hash = entry_hash!(MaybeLinkable::AlwaysLinkable)?;
+    commit_entry!(MaybeLinkable::AlwaysLinkable)?;
 
-    ret!(GuestOutput::new(try_result!(EntryDefsCallbackResult::Defs(
-        defs,
-    ).try_into(), "failed to serialize entry defs return value")));
+    Ok(link_entries!(always_linkable_entry_hash.clone(), always_linkable_entry_hash)?)
 }
 
-#[no_mangle]
-pub extern "C" fn validate(host_allocation_ptr: GuestPtr) -> GuestPtr {
-    // load host args
-    let input: HostInput = host_args!(host_allocation_ptr);
+fn _add_invalid_link(_: ()) -> Result<HeaderHash, WasmError> {
+    let always_linkable_entry_hash = entry_hash!(MaybeLinkable::AlwaysLinkable)?;
+    let never_linkable_entry_hash = entry_hash!(MaybeLinkable::NeverLinkable)?;
 
-    // extract the entry to validate
-    let result: ValidateCallbackResult = match Entry::try_from(input.into_inner()) {
-        // we do want to validate our app entries
-        Ok(Entry::App(serialized_bytes)) => match ThisWasmEntry::try_from(serialized_bytes) {
-            // the AlwaysValidates variant passes
-            Ok(ThisWasmEntry::AlwaysValidates) => ValidateCallbackResult::Valid,
-            // the NeverValidates variants fails
-            Ok(ThisWasmEntry::NeverValidates) => ValidateCallbackResult::Invalid("NeverValidates never validates".to_string()),
-            _ => ValidateCallbackResult::Invalid("Couldn't get ThisWasmEntry from the app entry".to_string()),
-        },
-        // other entry types we don't care about
-        Ok(_) => ValidateCallbackResult::Valid,
-        _ => ValidateCallbackResult::Invalid("Couldn't get App serialized bytes from host input".to_string()),
-    };
+    commit_entry!(MaybeLinkable::AlwaysLinkable)?;
+    commit_entry!(MaybeLinkable::NeverLinkable)?;
 
-    ret!(GuestOutput::new(try_result!(result.try_into(), "failed to serialize return value".to_string())));
-}
-
-/// we can write normal rust code with Results outside our externs
-fn _commit_validate(to_commit: ThisWasmEntry) -> Result<GuestOutput, String> {
-    let commit_output: CommitEntryOutput = host_call!(__commit_entry, CommitEntryInput::new(((&to_commit).into(), Entry::App(to_commit.try_into()?))))?;
-    Ok(GuestOutput::new(commit_output.try_into()?))
-}
-
-#[no_mangle]
-pub extern "C" fn always_validates(_: GuestPtr) -> GuestPtr {
-    ret!(try_result!(_commit_validate(ThisWasmEntry::AlwaysValidates), "error processing commit"))
-}
-#[no_mangle]
-pub extern "C" fn never_validates(_: GuestPtr) -> GuestPtr {
-    ret!(try_result!(_commit_validate(ThisWasmEntry::NeverValidates), "error processing commit"))
+    Ok(link_entries!(always_linkable_entry_hash, never_linkable_entry_hash)?)
 }

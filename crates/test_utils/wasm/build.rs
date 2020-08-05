@@ -36,6 +36,7 @@ fn main() {
         "post_commit_fail",
         "post_commit_success",
         "validate",
+        "validate_link",
         "validate_invalid",
         "validate_link_add_invalid",
         "validate_valid",

@@ -3,9 +3,11 @@ use hdk3::prelude::*;
 holochain_wasmer_guest::holochain_externs!();
 
 const POST_ID: &str = "post";
+#[derive(serde::Serialize, serde::Deserialize, SerializedBytes)]
 struct Post;
 
 const COMMENT_ID: &str = "comment";
+#[derive(serde::Serialize, serde::Deserialize, SerializedBytes)]
 struct Comment;
 
 entry_def!(Post EntryDef {

@@ -22,9 +22,7 @@ pub const NAME: [u8; 8] = [0x68, 0x64, 0x6b, 0x2e, 0x70, 0x61, 0x74, 0x68];
 
 /// each path component is arbitrary bytes to be hashed together in a predictable way when the path
 /// is hashed to create something that can be linked and discovered by all DHT participants
-#[derive(
-    Clone, PartialEq, Debug, Default, serde::Deserialize, serde::Serialize, SerializedBytes,
-)]
+#[derive(Clone, PartialEq, Debug, Default, serde::Deserialize, serde::Serialize)]
 #[repr(transparent)]
 pub struct Component(#[serde(with = "serde_bytes")] Vec<u8>);
 
