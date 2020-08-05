@@ -3,6 +3,7 @@
 use std::sync::Arc;
 
 /// Gather a list of op-hashes from our implementor that meet criteria.
+#[derive(Debug)]
 pub struct FetchOpHashesForConstraintsEvt {
     /// The "space" context.
     pub space: Arc<super::KitsuneSpace>,
@@ -17,6 +18,7 @@ pub struct FetchOpHashesForConstraintsEvt {
 }
 
 /// Gather all op-hash data for a list of op-hashes from our implementor.
+#[derive(Debug)]
 pub struct FetchOpHashDataEvt {
     /// The "space" context.
     pub space: Arc<super::KitsuneSpace>,
@@ -27,6 +29,7 @@ pub struct FetchOpHashDataEvt {
 }
 
 /// Request that our implementor sign some data on behalf of an agent.
+#[derive(Debug)]
 pub struct SignNetworkDataEvt {
     /// The "space" context.
     pub space: Arc<super::KitsuneSpace>,

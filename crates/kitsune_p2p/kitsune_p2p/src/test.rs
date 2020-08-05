@@ -47,7 +47,7 @@ mod tests {
                             .boxed()
                             .into()));
                     }
-                    _ => panic!("unexpected event"),
+                    _ => (),
                 }
             }
         });
@@ -99,7 +99,7 @@ mod tests {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
                         recv_count_clone.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                     }
-                    _ => panic!("unexpected event"),
+                    _ => (),
                 }
             }
         });
@@ -161,7 +161,7 @@ mod tests {
                             .boxed()
                             .into()));
                     }
-                    _ => panic!("unexpected event"),
+                    _ => (),
                 }
             }
         });
@@ -257,5 +257,91 @@ mod tests {
 
         p2p.ghost_actor_shutdown().await.unwrap();
         r_task.await.unwrap();
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn test_gossip_workflow() {
+        let space1: Arc<KitsuneSpace> =
+            Arc::new(b"ssssssssssssssssssssssssssssssssssss".to_vec().into());
+        let a1: Arc<KitsuneAgent> =
+            Arc::new(b"111111111111111111111111111111111111".to_vec().into());
+        let a2: Arc<KitsuneAgent> =
+            Arc::new(b"222222222222222222222222222222222222".to_vec().into());
+
+        let oh1: Arc<KitsuneOpHash> =
+            Arc::new(b"oooooooooooooooooooooooooooooooooooo".to_vec().into());
+        let oh2: Arc<KitsuneOpHash> =
+            Arc::new(b"hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh".to_vec().into());
+
+        let (p2p, mut evt) = spawn_kitsune_p2p().await.unwrap();
+
+        let result = Arc::new(std::sync::RwLock::new((false, false)));
+
+        //let space1_clone = space1.clone();
+        let a1_clone = a1.clone();
+        //let a2_clone = a2.clone();
+        let result_clone = result.clone();
+        let r_task = tokio::task::spawn(async move {
+            use tokio::stream::StreamExt;
+            while let Some(evt) = evt.next().await {
+                use KitsuneP2pEvent::*;
+                match evt {
+                    FetchOpHashesForConstraints { respond, input, .. } => {
+                        //println!("FETCH HASHES REQ: {:#?}", input);
+                        let oh = if input.agent == a1_clone {
+                            oh1.clone()
+                        } else {
+                            oh2.clone()
+                        };
+                        respond.r(Ok(async move { Ok(vec![oh]) }.boxed().into()));
+                    }
+                    FetchOpHashData { respond, input, .. } => {
+                        //println!("FETCH HASH DATA REQ: {:#?}", input);
+                        let mut out = Vec::new();
+                        for op_hash in input.op_hashes {
+                            out.push((op_hash, vec![]));
+                        }
+                        respond.r(Ok(async move { Ok(out) }.boxed().into()));
+                    }
+                    Gossip {
+                        respond,
+                        //agent,
+                        op_hash,
+                        ..
+                    } => {
+                        //println!("GOT GOSSIP: {:?} {:?}", agent, op_hash);
+                        if op_hash == oh1 {
+                            result_clone.write().unwrap().0 = true;
+                        } else {
+                            result_clone.write().unwrap().1 = true;
+                        }
+                        respond.r(Ok(async move { Ok(()) }.boxed().into()));
+                    }
+                    _ => (),
+                }
+            }
+        });
+
+        p2p.join(space1.clone(), a1.clone()).await.unwrap();
+        p2p.join(space1.clone(), a2.clone()).await.unwrap();
+
+        let is_ok = move || {
+            let lock = result.read().unwrap();
+            lock.0 && lock.1
+        };
+
+        for _ in 0..10 {
+            if is_ok() {
+                break;
+            }
+            tokio::time::delay_for(std::time::Duration::from_millis(10)).await;
+        }
+
+        p2p.ghost_actor_shutdown().await.unwrap();
+        r_task.await.unwrap();
+
+        if !is_ok() {
+            panic!("failed to gossip both dht op hashes");
+        }
     }
 }
