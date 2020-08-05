@@ -28,3 +28,4 @@ serde = "=1.0.104"
 test_wasm_common = { version = "=0.0.1", path = "../../wasm_common" }
 
 [patch.crates-io]
+holochain_serialized_bytes = { version = "=0.0.40", git = "https://github.com/holochain/holochain-serialization.git", branch = "most-stringent-rmp-config" }

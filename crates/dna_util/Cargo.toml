@@ -24,3 +24,7 @@ tokio = { version = "0.2", features = [ "full" ] }
 
 [dev-dependencies]
 tempdir = "0.3.7"
+
+
+[patch.crates-io]
+holochain_serialized_bytes = { version = "=0.0.40", git = "https://github.com/holochain/holochain-serialization.git", branch = "most-stringent-rmp-config" }
