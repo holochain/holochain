@@ -20,7 +20,5 @@ tokio = { version = "0.2", features = [ "full" ] }
 
 [patch.crates-io]
 holochain_serialized_bytes = { version = "=0.0.40", git = "https://github.com/holochain/holochain-serialization.git", branch = "most-stringent-rmp-config" }
-holochain_wasmer_guest = { version = "=0.0.37", git = "https://github.com/holochain/holochain-wasmer.git", branch = "extra-error-info" }
-
 rkv = { git = "https://github.com/holochain/rkv.git", branch = "master" }
 lmdb-rkv = { git = "https://github.com/holochain/lmdb-rs.git" }
