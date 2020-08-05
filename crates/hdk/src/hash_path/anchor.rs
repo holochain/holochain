@@ -12,6 +12,8 @@ pub struct Anchor {
     pub anchor_text: Option<String>,
 }
 
+entry_def!(Anchor Path::entry_def());
+
 impl From<&Anchor> for Path {
     fn from(anchor: &Anchor) -> Self {
         Self::from(&format!(
@@ -55,28 +57,6 @@ impl TryFrom<&Path> for Anchor {
     }
 }
 
-impl Anchor {
-    pub fn entry_def_id() -> EntryDefId {
-        Path::entry_def_id()
-    }
-
-    pub fn crdt_type() -> CrdtType {
-        Path::crdt_type()
-    }
-
-    pub fn required_validations() -> RequiredValidations {
-        Path::required_validations()
-    }
-
-    pub fn entry_visibility() -> EntryVisibility {
-        Path::entry_visibility()
-    }
-
-    pub fn entry_def() -> EntryDef {
-        Path::entry_def()
-    }
-}
-
 /// simple string interface to simple string based paths
 /// a.k.a "the anchor pattern" that predates paths by a few years
 pub fn anchor(anchor_type: String, anchor_text: String) -> Result<holo_hash::EntryHash, WasmError> {
@@ -90,7 +70,7 @@ pub fn anchor(anchor_type: String, anchor_text: String) -> Result<holo_hash::Ent
 }
 
 pub fn get_anchor(anchor_address: holo_hash::EntryHash) -> Result<Option<Anchor>, WasmError> {
-    Ok(match get_entry!(anchor_address)?.and_then(|el| el.into()) {
+    Ok(match get!(anchor_address)?.and_then(|el| el.into()) {
         Some(Entry::App(sb)) => {
             let path = Path::try_from(sb)?;
             Some(Anchor::try_from(&path)?)
