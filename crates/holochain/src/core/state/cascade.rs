@@ -77,6 +77,13 @@ use holochain_zome_types::{
     Header,
 };
 use std::convert::TryFrom;
+use holochain_zome_types::{
+    header::{LinkAdd, LinkRemove},
+};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    convert::TryInto,
+};
 use tracing::*;
 
 #[cfg(test)]
@@ -282,11 +289,13 @@ where
         Ok(all_metadata)
     }
 
+    #[instrument(skip(self, options))]
     async fn fetch_links(
         &mut self,
         link_key: WireLinkMetaKey,
         options: GetLinksOptions,
     ) -> CascadeResult<()> {
+        debug!("in get links");
         let results = self.network.get_links(link_key, options).await?;
         for links in results {
             let GetLinksResponse {
@@ -295,6 +304,7 @@ where
             } = links;
 
             for (link_add, signature) in link_adds {
+                debug!(?link_add);
                 let element = Element::new(
                     SignedHeaderHashed::from_content(SignedHeader(link_add.into(), signature))
                         .await,
@@ -303,6 +313,7 @@ where
                 self.update_stores(element).await?;
             }
             for (link_remove, signature) in link_removes {
+                debug!(?link_remove);
                 let element = Element::new(
                     SignedHeaderHashed::from_content(SignedHeader(link_remove.into(), signature))
                         .await,
@@ -588,6 +599,7 @@ where
         }
     }
 
+    #[instrument(skip(self, key, options))]
     /// Gets an links from the cas or cache depending on it's metadata
     // The default behavior is to skip deleted or replaced entries.
     // TODO: Implement customization of this behavior with an options/builder struct
@@ -603,9 +615,58 @@ where
         // Return any links from the meta cache that don't have removes.
         Ok(self
             .meta_cache
-            .get_links(key)?
+            .get_live_links(key)?
             .map(|l| Ok(l.into_link()))
             .collect()?)
+    }
+
+    #[instrument(skip(self, key, options))]
+    /// Return all LinkAdd headers
+    /// and LinkRemove headers ordered by time.
+    pub async fn get_link_details<'link>(
+        &mut self,
+        key: &'link LinkMetaKey<'link>,
+        options: GetLinksOptions,
+    ) -> CascadeResult<Vec<(LinkAdd, Vec<LinkRemove>)>> {
+        // Update the cache from the network
+        self.fetch_links(key.into(), options).await?;
+
+        // Get the links and collect the LinkAdd / LinkRemove hashes by time.
+        let links = self
+            .meta_cache
+            .get_links_all(key)?
+            .map(|link_add| {
+                // Collect the link removes on this link add
+                let link_removes = self
+                    .meta_cache
+                    .get_link_removes_on_link_add(link_add.link_add_hash.clone())?
+                    .collect::<BTreeSet<_>>()?;
+                // Create timed header hash
+                let link_add = TimedHeaderHash {
+                    timestamp: link_add.timestamp,
+                    header_hash: link_add.link_add_hash,
+                };
+                // Return all link removes with this link add
+                Ok((link_add, link_removes))
+            })
+            .collect::<BTreeMap<_, _>>()?;
+
+        // Get the headers from the element stores
+        let mut result: Vec<(LinkAdd, _)> = Vec::with_capacity(links.len());
+        for (link_add, link_removes) in links {
+            if let Some(link_add) = self.get_element_local_raw(&link_add.header_hash).await? {
+                let mut r: Vec<LinkRemove> = Vec::with_capacity(link_removes.len());
+                for link_remove in link_removes {
+                    if let Some(link_remove) =
+                        self.get_element_local_raw(&link_remove.header_hash).await?
+                    {
+                        r.push(link_remove.try_into()?);
+                    }
+                }
+                result.push((link_add.try_into()?, r));
+            }
+        }
+        Ok(result)
     }
 }
 
