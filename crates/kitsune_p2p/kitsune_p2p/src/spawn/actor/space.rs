@@ -46,6 +46,13 @@ pub(crate) async fn spawn_space(
 
     let builder = ghost_actor::actor_builder::GhostActorBuilder::new();
 
+    // initialize gossip module
+    let gossip_recv = gossip::spawn_gossip_module();
+    builder
+        .channel_factory()
+        .attach_receiver(gossip_recv)
+        .await?;
+
     let internal_sender = builder
         .channel_factory()
         .create_channel::<SpaceInternal>()
@@ -59,6 +66,84 @@ pub(crate) async fn spawn_space(
     tokio::task::spawn(builder.spawn(Space::new(space, internal_sender, evt_send)));
 
     Ok((sender, evt_recv))
+}
+
+impl ghost_actor::GhostHandler<gossip::GossipEvent> for Space {}
+
+impl gossip::GossipEventHandler for Space {
+    fn handle_list_neighbor_agents(
+        &mut self,
+    ) -> gossip::GossipEventHandlerResult<Vec<Arc<KitsuneAgent>>> {
+        // while full-sync this is just a clone of list_by_basis
+        let res = self.agents.keys().cloned().collect();
+        Ok(async move { Ok(res) }.boxed().into())
+    }
+
+    fn handle_req_op_hashes(
+        &mut self,
+        _from_agent: Arc<KitsuneAgent>,
+        to_agent: Arc<KitsuneAgent>,
+        dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
+        since_utc_epoch_s: i64,
+        until_utc_epoch_s: i64,
+    ) -> gossip::GossipEventHandlerResult<Vec<Arc<KitsuneOpHash>>> {
+        // while full-sync just redirecting to self...
+        // but eventually some of these will be outgoing remote requests
+        let fut = self
+            .evt_sender
+            .fetch_op_hashes_for_constraints(FetchOpHashesForConstraintsEvt {
+                space: self.space.clone(),
+                agent: to_agent,
+                dht_arc,
+                since_utc_epoch_s,
+                until_utc_epoch_s,
+            });
+        Ok(async move { fut.await }.boxed().into())
+    }
+
+    fn handle_req_op_data(
+        &mut self,
+        _from_agent: Arc<KitsuneAgent>,
+        to_agent: Arc<KitsuneAgent>,
+        op_hashes: Vec<Arc<KitsuneOpHash>>,
+    ) -> gossip::GossipEventHandlerResult<Vec<(Arc<KitsuneOpHash>, Vec<u8>)>> {
+        // while full-sync just redirecting to self...
+        // but eventually some of these will be outgoing remote requests
+        let fut = self.evt_sender.fetch_op_hash_data(FetchOpHashDataEvt {
+            space: self.space.clone(),
+            agent: to_agent,
+            op_hashes,
+        });
+        Ok(async move { fut.await }.boxed().into())
+    }
+
+    fn handle_gossip_ops(
+        &mut self,
+        _from_agent: Arc<KitsuneAgent>,
+        to_agent: Arc<KitsuneAgent>,
+        ops: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
+    ) -> gossip::GossipEventHandlerResult<()> {
+        let all = ops
+            .into_iter()
+            .map(|(op_hash, op_data)| {
+                self.evt_sender
+                    .gossip(self.space.clone(), to_agent.clone(), op_hash, op_data)
+            })
+            .collect::<Vec<_>>();
+        Ok(async move {
+            use futures::stream::StreamExt;
+            futures::stream::iter(all)
+                .for_each_concurrent(10, |res| async move {
+                    if let Err(e) = res.await {
+                        ghost_actor::dependencies::tracing::error!(?e);
+                    }
+                })
+                .await;
+            Ok(())
+        }
+        .boxed()
+        .into())
+    }
 }
 
 impl ghost_actor::GhostHandler<SpaceInternal> for Space {}
