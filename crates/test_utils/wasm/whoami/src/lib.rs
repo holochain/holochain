@@ -1,7 +1,5 @@
 use hdk3::prelude::*;
 
-holochain_wasmer_guest::host_externs!(__call_remote);
-
 // returns the current agent info
 fn _whoami(_: ()) -> Result<AgentInfo, WasmError> {
     Ok(agent_info!()?)
