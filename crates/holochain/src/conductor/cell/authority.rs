@@ -4,10 +4,12 @@ use crate::core::state::{
     metadata::{MetadataBuf, MetadataBufT},
 };
 use fallible_iterator::FallibleIterator;
+use futures::future::try_join_all;
 use holo_hash::EntryHash;
 use holochain_state::{env::EnvironmentWrite, prelude::ReadManager};
 use holochain_types::{
     element::{GetElementResponse, RawGetEntryResponse},
+    header::WireEntryUpdateRelationship,
     metadata::TimedHeaderHash,
 };
 use holochain_zome_types::{element::SignedHeaderHashed, header::conversions::WrongHeaderError};
@@ -78,10 +80,15 @@ pub async fn handle_get_entry(
                 let header = render_header(hash).await?;
                 live_headers.insert(header.try_into()?);
             }
-            updates = meta_vault
-                .get_headers(hash.clone())?
-                .map(|u| Ok(u.header_hash))
-                .collect()?;
+            let updates_returns = meta_vault.get_headers(hash.clone())?.collect::<Vec<_>>()?;
+            let updates_returns = updates_returns.into_iter().map(|update| async {
+                let update: WireEntryUpdateRelationship = render_header(update)
+                    .await?
+                    .try_into()
+                    .map_err(AuthorityDataError::from)?;
+                CellResult::Ok(update)
+            });
+            updates = try_join_all(updates_returns).await?;
 
         // We only want the headers if they are live and all deletes
         } else {

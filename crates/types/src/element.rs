@@ -1,7 +1,7 @@
 //! Defines a Element, the basic unit of Holochain data.
 
 use crate::{
-    header::{WireElementDelete, WireNewEntryHeader},
+    header::{WireElementDelete, WireEntryUpdateRelationship, WireNewEntryHeader},
     prelude::*,
     EntryHashed, HeaderHashed,
 };
@@ -132,7 +132,7 @@ pub struct RawGetEntryResponse {
     /// Any updates on this entry.
     /// Note you will need to ask for "all_live_headers_with_metadata"
     /// to get this back
-    pub updates: Vec<HeaderHash>,
+    pub updates: Vec<WireEntryUpdateRelationship>,
     /// The entry shared across all headers
     pub entry: Entry,
     /// The entry_type shared across all headers
@@ -151,7 +151,7 @@ impl RawGetEntryResponse {
     pub fn from_elements<E>(
         elements: E,
         deletes: Vec<WireElementDelete>,
-        updates: Vec<HeaderHash>,
+        updates: Vec<WireEntryUpdateRelationship>,
     ) -> Option<Self>
     where
         E: IntoIterator<Item = Element>,

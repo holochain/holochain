@@ -4,7 +4,7 @@ use crate::{
         ribosome::{host_fn, wasm_ribosome::WasmRibosome, CallContext, ZomeCallHostAccess},
         state::{
             element_buf::ElementBuf,
-            metadata::{MetadataBuf, MetadataBufT, LinkMetaKey},
+            metadata::{LinkMetaKey, MetadataBuf, MetadataBufT},
             workspace::Workspace,
         },
         workflow::{
@@ -25,7 +25,7 @@ use holo_hash::{
 };
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::{
-    actor::{GetMetaOptions, GetOptions, HolochainP2pRefToCell, GetLinksOptions},
+    actor::{GetLinksOptions, GetMetaOptions, GetOptions, HolochainP2pRefToCell},
     HolochainP2pCell, HolochainP2pRef,
 };
 use holochain_serialized_bytes::prelude::*;
@@ -49,9 +49,12 @@ use holochain_types::{
 };
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::{
-    element::SignedHeaderHashed, entry_def, header::*, zome::ZomeName, CommitEntryInput,
-    link::{Link, LinkTag}, GetLinksInput,
-    LinkEntriesInput, RemoveLinkInput,
+    element::SignedHeaderHashed,
+    entry_def,
+    header::*,
+    link::{Link, LinkTag},
+    zome::ZomeName,
+    CommitEntryInput, GetLinksInput, LinkEntriesInput, RemoveLinkInput,
 };
 use maplit::btreeset;
 use std::collections::BTreeMap;

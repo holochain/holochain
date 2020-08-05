@@ -69,6 +69,7 @@ use holochain_types::{
     metadata::{EntryDhtStatus, MetadataSet, TimedHeaderHash},
     EntryHashed, HeaderHashed,
 };
+use holochain_zome_types::header::{LinkAdd, LinkRemove};
 use holochain_zome_types::{
     element::SignedHeader,
     header::{ElementDelete, EntryUpdate},
@@ -77,9 +78,6 @@ use holochain_zome_types::{
     Header,
 };
 use std::convert::TryFrom;
-use holochain_zome_types::{
-    header::{LinkAdd, LinkRemove},
-};
 use std::{
     collections::{BTreeMap, BTreeSet},
     convert::TryInto,
@@ -223,19 +221,15 @@ where
                     } = *raw;
                     let elements =
                         ElementGroup::from_wire_elements(live_headers, entry_type, entry).await?;
+                    let entry_hash = elements.entry_hash().clone();
                     self.update_stores_with_element_group(elements).await?;
                     for delete in deletes {
                         let element = delete.into_element().await;
                         self.update_stores(element).await?;
                     }
-                    // TODO: For now we are pre-fetching all updates.
-                    // We probably want a way to separate the ops generated
-                    // from an EntryUpdate when creating a new entry vs
-                    // when we just want to update the relationships in the
-                    // metadata
                     for update in updates {
-                        self.fetch_element_via_header(update, options.clone())
-                            .await?;
+                        let element = update.into_element(entry_hash.clone()).await;
+                        self.update_stores(element).await?;
                     }
                 }
                 // Authority didn't have any headers for this entry
