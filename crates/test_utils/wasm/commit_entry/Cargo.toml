@@ -20,6 +20,7 @@ name = "test_wasm_commit_entry"
 crate-type = [ "cdylib", "rlib" ]
 
 [dependencies]
+hdk3 = { path = "../../../hdk" }
 holochain_serialized_bytes = "=0.0.40"
 holochain_wasmer_guest = "=0.0.37"
 holochain_zome_types = { version = "=0.0.1", path = "../../../zome_types" }
@@ -27,8 +28,6 @@ holo_hash = { version = "=0.0.1", path = "../../../holo_hash" }
 serde = "=1.0.104"
 test_wasm_common = { version = "=0.0.1", path = "../../wasm_common" }
 
-
 [patch.crates-io]
 holochain_serialized_bytes = { version = "=0.0.40", git = "https://github.com/holochain/holochain-serialization.git", branch = "most-stringent-rmp-config" }
 holochain_wasmer_guest = { version = "=0.0.37", git = "https://github.com/holochain/holochain-wasmer.git", branch = "extra-error-info" }
-
