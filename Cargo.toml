@@ -35,7 +35,6 @@ incremental = false
 codegen-units = 16
 
 [patch.crates-io]
-holochain_serialized_bytes = { version = "=0.0.40", git = "https://github.com/holochain/holochain-serialization.git", branch = "most-stringent-rmp-config" }
 
 rkv = { git = "https://github.com/holochain/rkv.git", branch = "master" }
 #rkv = { path = "../../rust/rkv" }

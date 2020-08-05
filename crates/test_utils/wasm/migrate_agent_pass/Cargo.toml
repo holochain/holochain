@@ -26,4 +26,4 @@ holochain_zome_types = { version = "=0.0.1", path = "../../../zome_types" }
 serde = "=1.0.104"
 
 [patch.crates-io]
-holochain_serialized_bytes = { version = "=0.0.40", git = "https://github.com/holochain/holochain-serialization.git", branch = "most-stringent-rmp-config" }
+

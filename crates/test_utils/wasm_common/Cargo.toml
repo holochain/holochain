@@ -16,4 +16,4 @@ serde_bytes = "0.11"
 hdk3 = { path = "../../hdk" }
 
 [patch.crates-io]
-holochain_serialized_bytes = { version = "=0.0.40", git = "https://github.com/holochain/holochain-serialization.git", branch = "most-stringent-rmp-config" }
+
