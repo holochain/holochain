@@ -149,6 +149,23 @@ impl TryFrom<SignedHeaderHashed> for WireElementDelete {
     }
 }
 
+impl TryFrom<SignedHeaderHashed> for WireEntryUpdate {
+    type Error = WrongHeaderError;
+    fn try_from(shh: SignedHeaderHashed) -> Result<Self, Self::Error> {
+        let (h, signature) = shh.into_header_and_signature();
+        let d: EntryUpdate = h.into_content().try_into()?;
+        Ok(Self {
+            signature,
+            timestamp: d.timestamp,
+            author: d.author,
+            header_seq: d.header_seq,
+            prev_header: d.prev_header,
+            original_entry_address: d.original_entry_address,
+            original_header_address: d.original_header_address,
+        })
+    }
+}
+
 impl WireNewEntryHeader {
     pub async fn into_element(self, entry_type: EntryType, entry: Entry) -> Element {
         let entry_hash = EntryHash::with_data(&entry).await;

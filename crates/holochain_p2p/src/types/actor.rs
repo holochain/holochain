@@ -47,6 +47,11 @@ pub struct GetOptions {
     /// Whether the remote-end should follow redirects or just return the
     /// requested entry.
     pub follow_redirects: bool,
+
+    /// [Remote]
+    /// Return all live headers even if there is deletes.
+    /// Useful for metadata calls.
+    pub all_live_headers_with_metadata: bool,
 }
 
 impl Default for GetOptions {
@@ -57,6 +62,7 @@ impl Default for GetOptions {
             as_race: true,
             race_timeout_ms: None,
             follow_redirects: true,
+            all_live_headers_with_metadata: false,
         }
     }
 }

@@ -44,10 +44,11 @@ use super::{
 };
 use crate::core::workflow::{
     integrate_dht_ops_workflow::integrate_single_metadata,
-    produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError,
+    produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertResult,
 };
 use error::CascadeResult;
 use fallible_iterator::FallibleIterator;
+use futures::{Future, StreamExt, TryStreamExt};
 use holo_hash::{
     hash_type::{self, AnyDht},
     AnyDhtHash, EntryHash, HeaderHash,
@@ -56,6 +57,7 @@ use holochain_p2p::{
     actor::{GetLinksOptions, GetMetaOptions, GetOptions},
     HolochainP2pCell,
 };
+use holochain_state::error::DatabaseResult;
 use holochain_types::{
     dht_op::{produce_op_lights_from_element_group, produce_op_lights_from_elements},
     element::{
@@ -64,15 +66,17 @@ use holochain_types::{
     },
     entry::option_entry_hashed,
     link::{GetLinksResponse, WireLinkMetaKey},
-    metadata::{EntryDhtStatus, MetadataSet},
-    Entry, EntryHashed,
+    metadata::{EntryDhtStatus, MetadataSet, TimedHeaderHash},
+    EntryHashed, HeaderHashed,
 };
 use holochain_zome_types::{
     element::SignedHeader,
+    header::{ElementDelete, EntryUpdate},
     link::Link,
     metadata::{Details, ElementDetails, EntryDetails},
+    Header,
 };
-use std::convert::TryInto;
+use std::convert::TryFrom;
 use tracing::*;
 
 #[cfg(test)]
@@ -194,7 +198,10 @@ where
         hash: EntryHash,
         options: GetOptions,
     ) -> CascadeResult<()> {
-        let results = self.network.get(hash.clone().into(), options).await?;
+        let results = self
+            .network
+            .get(hash.clone().into(), options.clone())
+            .await?;
         debug!("fetching element");
 
         for response in results {
@@ -205,6 +212,7 @@ where
                         deletes,
                         entry,
                         entry_type,
+                        updates,
                     } = *raw;
                     let elements =
                         ElementGroup::from_wire_elements(live_headers, entry_type, entry).await?;
@@ -212,6 +220,15 @@ where
                     for delete in deletes {
                         let element = delete.into_element().await;
                         self.update_stores(element).await?;
+                    }
+                    // TODO: For now we are pre-fetching all updates.
+                    // We probably want a way to separate the ops generated
+                    // from an EntryUpdate when creating a new entry vs
+                    // when we just want to update the relationships in the
+                    // metadata
+                    for update in updates {
+                        self.fetch_element_via_header(update, options.clone())
+                            .await?;
                     }
                 }
                 // Authority didn't have any headers for this entry
@@ -311,34 +328,54 @@ where
         }
     }
 
+    async fn get_header_local_raw(&self, hash: &HeaderHash) -> CascadeResult<Option<HeaderHashed>> {
+        match self
+            .element_vault
+            .get_header(hash)
+            .await?
+            .map(|h| h.into_header_and_signature().0)
+        {
+            None => Ok(self
+                .element_cache
+                .get_header(hash)
+                .await?
+                .map(|h| h.into_header_and_signature().0)),
+            r => Ok(r),
+        }
+    }
+
+    async fn render_header(
+        &self,
+        result: DatabaseResult<TimedHeaderHash>,
+    ) -> CascadeResult<Option<Header>> {
+        match self.get_header_local_raw(&result?.header_hash).await? {
+            Some(h) => Ok(Some(HeaderHashed::into_content(h))),
+            None => Ok(None),
+        }
+    }
+
     async fn create_entry_details(&self, hash: EntryHash) -> CascadeResult<Option<EntryDetails>> {
         match self.get_entry_local_raw(&hash).await? {
             Some(entry) => {
                 let entry_dht_status = self.meta_cache.get_dht_status(&hash)?;
-                let new_entry_headers: Vec<_> =
-                    self.meta_cache.get_headers(hash.clone())?.collect()?;
-                let mut headers = Vec::with_capacity(new_entry_headers.len());
-                for h in new_entry_headers {
-                    if let Some(h) = self.get_element_local_raw(&h.header_hash).await? {
-                        headers.push(
-                            h.into_inner()
-                                .0
-                                .into_header_and_signature()
-                                .0
-                                .into_content(),
-                        );
-                    }
-                }
+                let headers = self
+                    .meta_cache
+                    .get_headers(hash.clone())?
+                    .iterator()
+                    .map(|h| self.render_header(h));
+                let headers = try_collect_db(headers, |h| Ok(h)).await?;
                 let deletes = self
                     .meta_cache
                     .get_deletes_on_entry(hash.clone())?
-                    .map(|h| Ok(h.header_hash))
-                    .collect()?;
+                    .iterator()
+                    .map(|h| self.render_header(h));
+                let deletes = try_collect_db(deletes, |h| Ok(ElementDelete::try_from(h)?)).await?;
                 let updates = self
                     .meta_cache
                     .get_updates(hash.into())?
-                    .map(|h| Ok(h.header_hash))
-                    .collect()?;
+                    .iterator()
+                    .map(|h| self.render_header(h));
+                let updates = try_collect_db(updates, |h| Ok(EntryUpdate::try_from(h)?)).await?;
                 Ok(Some(EntryDetails {
                     entry: entry.into_content(),
                     headers,
@@ -361,8 +398,9 @@ where
                 let deletes = self
                     .meta_cache
                     .get_deletes_on_header(hash)?
-                    .map(|h| Ok(h.header_hash))
-                    .collect()?;
+                    .iterator()
+                    .map(|h| self.render_header(h));
+                let deletes = try_collect_db(deletes, |h| Ok(ElementDelete::try_from(h)?)).await?;
                 Ok(Some(ElementDetails { element, deletes }))
             }
             None => Ok(None),
@@ -569,6 +607,24 @@ where
             .map(|l| Ok(l.into_link()))
             .collect()?)
     }
+}
+
+async fn try_collect_db<T, Fut, I, F>(iter: I, con: F) -> CascadeResult<Vec<T>>
+where
+    I: Iterator<Item = Fut>,
+    Fut: Future<Output = CascadeResult<Option<Header>>>,
+    F: Fn(Header) -> DhtOpConvertResult<T>,
+{
+    Ok(futures::stream::iter(iter)
+        .buffer_unordered(100)
+        .try_filter_map(|r| async {
+            match r {
+                Some(r) => Ok(Some(con(r)?)),
+                None => Ok(None),
+            }
+        })
+        .try_collect()
+        .await?)
 }
 
 #[cfg(test)]

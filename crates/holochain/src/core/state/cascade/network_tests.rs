@@ -1,9 +1,12 @@
-use super::*;
 use crate::{
     conductor::{dna_store::MockDnaStore, interface::websocket::test::setup_app},
     core::{
         ribosome::{host_fn, wasm_ribosome::WasmRibosome, CallContext, ZomeCallHostAccess},
-        state::workspace::Workspace,
+        state::{
+            element_buf::ElementBuf,
+            metadata::{MetadataBuf, MetadataBufT},
+            workspace::Workspace,
+        },
         workflow::{
             integrate_dht_ops_workflow::integrate_to_cache,
             unsafe_call_zome_workspace::UnsafeCallZomeWorkspace, CallZomeWorkspace,
@@ -18,11 +21,11 @@ use ghost_actor::GhostControlSender;
 use hdk3::prelude::EntryVisibility;
 use holo_hash::{
     hash_type::{self, AnyDht},
-    HasHash,
+    AnyDhtHash, EntryHash, HasHash, HeaderHash,
 };
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::{
-    actor::{GetMetaOptions, HolochainP2pRefToCell},
+    actor::{GetMetaOptions, GetOptions, HolochainP2pRefToCell},
     HolochainP2pCell, HolochainP2pRef,
 };
 use holochain_serialized_bytes::prelude::*;
@@ -37,14 +40,17 @@ use holochain_types::{
     cell::CellId,
     dna::{DnaDef, DnaFile},
     element::{Element, GetElementResponse, WireElement},
+    entry::option_entry_hashed,
     fixt::*,
-    metadata::TimedHeaderHash,
+    metadata::{MetadataSet, TimedHeaderHash},
     observability,
     test_utils::{fake_agent_pubkey_1, fake_agent_pubkey_2},
     Entry, EntryHashed, HeaderHashed, Timestamp,
 };
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::{entry_def, header::*, zome::ZomeName, CommitEntryInput};
+use holochain_zome_types::{
+    element::SignedHeaderHashed, entry_def, header::*, zome::ZomeName, CommitEntryInput,
+};
 use maplit::btreeset;
 use std::collections::BTreeMap;
 use std::{
@@ -52,6 +58,7 @@ use std::{
     sync::Arc,
 };
 use tokio::{sync::oneshot, task::JoinHandle};
+use tracing::*;
 use unwrap_to::unwrap_to;
 
 #[tokio::test(threaded_scheduler)]
@@ -206,6 +213,7 @@ async fn get_from_another_agent() {
         as_race: false,
         race_timeout_ms: None,
         follow_redirects: false,
+        all_live_headers_with_metadata: false,
     };
 
     // Bob store element

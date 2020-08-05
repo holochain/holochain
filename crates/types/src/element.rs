@@ -129,6 +129,10 @@ pub struct RawGetEntryResponse {
     // if there was a header delete in our MetadataBuf and
     // not the delete header hash as we do now.
     pub deletes: Vec<WireElementDelete>,
+    /// Any updates on this entry.
+    /// Note you will need to ask for "all_live_headers_with_metadata"
+    /// to get this back
+    pub updates: Vec<HeaderHash>,
     /// The entry shared across all headers
     pub entry: Entry,
     /// The entry_type shared across all headers
@@ -144,7 +148,11 @@ impl RawGetEntryResponse {
     /// ### Panics
     /// If the elements are not a header of EntryCreate or EntryDelete
     /// or there is no entry or the entry hash is different
-    pub fn from_elements<E>(elements: E, deletes: Vec<WireElementDelete>) -> Option<Self>
+    pub fn from_elements<E>(
+        elements: E,
+        deletes: Vec<WireElementDelete>,
+        updates: Vec<HeaderHash>,
+    ) -> Option<Self>
     where
         E: IntoIterator<Item = Element>,
     {
@@ -156,6 +164,7 @@ impl RawGetEntryResponse {
             let r = Self {
                 live_headers,
                 deletes,
+                updates,
                 entry,
                 entry_type,
             };

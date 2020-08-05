@@ -1,6 +1,9 @@
 //! Metadata types for use in wasm
-use crate::{element::Element, Entry, Header};
-use holo_hash::HeaderHash;
+use crate::{
+    element::Element,
+    header::{ElementDelete, EntryUpdate},
+    Entry, Header,
+};
 use holochain_serialized_bytes::prelude::*;
 
 /// Return type for get_details calls.
@@ -17,9 +20,10 @@ pub enum Details {
 /// This is all the metadata available for an element.
 pub struct ElementDetails {
     /// The specific element.
+    /// Either an EntryCreate or an EntryUpdate.
     pub element: Element,
-    /// Any deletes on this element.
-    pub deletes: Vec<HeaderHash>,
+    /// Any ElementDelete on this element.
+    pub deletes: Vec<ElementDelete>,
 }
 
 /// An Entry with all it's metadata.
@@ -30,9 +34,12 @@ pub struct EntryDetails {
     /// These can only be EntryCreate or EntryUpdate headers
     pub headers: Vec<Header>,
     /// Delete relationships
-    pub deletes: Vec<HeaderHash>,
-    /// Update relationships
-    pub updates: Vec<HeaderHash>,
+    pub deletes: Vec<ElementDelete>,
+    /// Update relationships.
+    /// ## Warning
+    /// This is just the relationship and you will need call get
+    /// if you want to get the new Entry.
+    pub updates: Vec<EntryUpdate>,
     /// The status of this entry currently
     /// according to your view of the metadata
     pub entry_dht_status: EntryDhtStatus,
