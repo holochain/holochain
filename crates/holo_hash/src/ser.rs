@@ -205,7 +205,7 @@ mod tests {
             hash_type::Entry::Content,
         );
         let hash_type_sb: SerializedBytes = entry_hash.hash_type().try_into().unwrap();
-        let hash_type_json = r#"{"1":[132,33,36]}"#;
+        let hash_type_json = r#"{"Content":[132,33,36]}"#;
         assert_eq!(format!("{:?}", hash_type_sb), hash_type_json.to_string());
 
         let hash_type_from_sb: hash_type::Entry = hash_type_sb.try_into().unwrap();
