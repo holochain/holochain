@@ -23,6 +23,9 @@ must_future = {version = "0.1.1", optional = true}
 rand = {version = "0.7", optional = true}
 rmp-serde = {version = "0.14.3", optional = true}
 
+[dev-dependencies]
+serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
+
 [features]
 
 default = ["serialized-bytes"]
