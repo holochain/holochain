@@ -12,7 +12,7 @@ macro_rules! try_from_serialized_bytes {
             type Error = ::std::io::Error;
 
             fn try_from(t: $s) -> ::std::io::Result<::holochain_serialized_bytes::SerializedBytes> {
-                ::holochain_serialized_bytes::to_vec_named(&t)
+                ::holochain_serialized_bytes::encode(&t)
                     .map_err(|e| ::std::io::Error::new(::std::io::ErrorKind::Other, e))
                     .map(|bytes| {
                         ::holochain_serialized_bytes::SerializedBytes::from(
@@ -26,7 +26,7 @@ macro_rules! try_from_serialized_bytes {
             type Error = ::std::io::Error;
 
             fn try_from(t: ::holochain_serialized_bytes::SerializedBytes) -> ::std::io::Result<$s> {
-                ::holochain_serialized_bytes::from_read_ref(t.bytes())
+                ::holochain_serialized_bytes::decode(t.bytes())
                     .map_err(|e| ::std::io::Error::new(::std::io::ErrorKind::Other, e))
             }
         }
