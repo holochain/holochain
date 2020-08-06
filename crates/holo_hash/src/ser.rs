@@ -31,6 +31,8 @@ impl<T: HashType> std::convert::TryFrom<SerializedBytes> for HoloHash<T> {
 #[cfg(test)]
 mod tests {
     use crate::*;
+    use holochain_serialized_bytes::prelude::*;
+    use std::convert::TryInto;
 
     #[test]
     #[cfg(feature = "serialized-bytes")]
@@ -170,24 +172,47 @@ mod tests {
     }
 
     #[test]
-    fn test_struct_roundtrip() {
-        #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-        struct Data {
-            a: AgentPubKey,
+    fn test_struct_to_struct_roundtrip() {
+        #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
+        struct TestData {
+            e: EntryHash,
             h: HeaderHash,
         }
 
-        let orig = Data {
-            a: AgentPubKey::from_raw_bytes(vec![0xdb; 36]),
+        let orig = TestData {
+            e: EntryHash::from_raw_bytes_and_type(vec![0xdb; 36], hash_type::Entry::Content),
             h: HeaderHash::from_raw_bytes(vec![0xdb; 36]),
         };
 
-        let buf = rmp_serde::to_vec_named(&orig).unwrap();
-        let res: Data = rmp_serde::from_read_ref(&buf).unwrap();
+        let sb: SerializedBytes = (&orig).try_into().unwrap();
+        let res: TestData = sb.try_into().unwrap();
 
         assert_eq!(orig, res);
-        assert_eq!(*orig.a.hash_type(), hash_type::Agent::new());
+        assert_eq!(*orig.e.hash_type(), hash_type::Entry::Content);
         assert_eq!(*orig.h.hash_type(), hash_type::Header::new());
+    }
+
+    #[test]
+    fn test_json_to_rust() {
+        #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
+        struct Data {
+            entry_hash: EntryHash,
+            content: String,
+        }
+
+        let entry_hash = EntryHash::from_raw_bytes_and_type(
+            b"000000000000000000000000000000000000".to_vec(),
+            hash_type::Entry::Content,
+        );
+        let hash_type_sb: SerializedBytes = entry_hash.hash_type().try_into().unwrap();
+        let hash_type_json = r#"{"Content":[132,33,36]}"#;
+        assert_eq!(format!("{:?}", hash_type_sb), hash_type_json.to_string());
+
+        let hash_type_from_sb: hash_type::Entry = hash_type_sb.try_into().unwrap();
+        assert_eq!(hash_type_from_sb, hash_type::Entry::Content);
+
+        let hash_type_from_json: hash_type::Entry = serde_json::from_str(hash_type_json).unwrap();
+        assert_eq!(hash_type_from_json, hash_type::Entry::Content);
     }
 
     #[test]

@@ -39,7 +39,7 @@ async fn hash_regression() {
     let sb = SerializedBytes::try_from(x.clone()).unwrap();
     println!("{:?}", sb.bytes());
     println!("{:?}", sb);
-    
+
     CreateMessageInput::try_from(sb).unwrap();
     let sb = SerializedBytes::try_from(x.clone()).unwrap();
     let sb_double = SerializedBytes::try_from(sb).unwrap();

@@ -78,7 +78,13 @@ wasm_io_types!(
     pub struct ScheduleInput(core::time::Duration);
     pub struct ScheduleOutput(());
     // Same as CommitEntryInput but also takes the HeaderHash of the entry you are replacing
-    pub struct UpdateEntryInput((crate::entry_def::EntryDefId, crate::entry::Entry, holo_hash::HeaderHash));
+    pub struct UpdateEntryInput(
+        (
+            crate::entry_def::EntryDefId,
+            crate::entry::Entry,
+            holo_hash::HeaderHash,
+        ),
+    );
     // the header hash of the newly committed entry
     pub struct UpdateEntryOutput(holo_hash::HeaderHash);
     // @TODO
@@ -102,6 +108,8 @@ wasm_io_types!(
     // get links from the cascade
     pub struct GetLinksInput((holo_hash::EntryHash, Option<crate::link::LinkTag>));
     pub struct GetLinksOutput(crate::link::Links);
+    pub struct GetLinkDetailsInput((holo_hash::EntryHash, Option<crate::link::LinkTag>));
+    pub struct GetLinkDetailsOutput(crate::link::LinkDetails);
     // get an entry from the cascade
     pub struct GetInput((holo_hash::AnyDhtHash, crate::entry::GetOptions));
     pub struct GetOutput(Option<crate::element::Element>);

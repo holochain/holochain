@@ -14,9 +14,6 @@ name = "test_wasm_anchor"
 crate-type = [ "cdylib", "rlib" ]
 
 [dependencies]
-holochain_serialized_bytes = "=0.0.40"
-holochain_wasmer_guest = "=0.0.37"
-holochain_zome_types = { version = "=0.0.1", path = "../../../zome_types" }
 hdk3 = { path = "../../../hdk" }
 
 serde = "=1.0.104"

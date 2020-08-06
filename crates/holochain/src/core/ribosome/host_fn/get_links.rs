@@ -74,7 +74,7 @@ pub mod slow_tests {
     use test_wasm_common::*;
 
     #[tokio::test(threaded_scheduler)]
-    async fn ribosome_entry_hash_path_ls() {
+    async fn ribosome_entry_hash_path_children() {
         let env = holochain_state::test_utils::test_cell_env();
         let dbs = env.dbs().await;
         let env_ref = env.guard().await;

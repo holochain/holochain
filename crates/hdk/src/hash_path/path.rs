@@ -140,6 +140,13 @@ impl TryFrom<&Component> for String {
 #[repr(transparent)]
 pub struct Path(Vec<Component>);
 
+entry_def!(Path EntryDef {
+    id: core::str::from_utf8(&NAME).unwrap().into(),
+    crdt_type: CrdtType,
+    required_validations: RequiredValidations::default(),
+    visibility: EntryVisibility::Public,
+});
+
 /// wrap components vector
 impl From<Vec<Component>> for Path {
     fn from(components: Vec<Component>) -> Self {
@@ -223,12 +230,6 @@ impl From<String> for Path {
     }
 }
 
-impl From<&Path> for EntryDefId {
-    fn from(_: &Path) -> Self {
-        Path::entry_def_id()
-    }
-}
-
 impl TryFrom<&Path> for LinkTag {
     type Error = SerializedBytesError;
     fn try_from(path: &Path) -> Result<Self, Self::Error> {
@@ -254,31 +255,6 @@ impl TryFrom<&LinkTag> for Path {
 }
 
 impl Path {
-    pub fn entry_def_id() -> EntryDefId {
-        core::str::from_utf8(&NAME).unwrap().into()
-    }
-
-    pub fn crdt_type() -> CrdtType {
-        CrdtType
-    }
-
-    pub fn required_validations() -> RequiredValidations {
-        RequiredValidations::default()
-    }
-
-    pub fn entry_visibility() -> EntryVisibility {
-        EntryVisibility::Public
-    }
-
-    pub fn entry_def() -> EntryDef {
-        EntryDef {
-            id: Self::entry_def_id(),
-            crdt_type: Self::crdt_type(),
-            required_validations: Self::required_validations(),
-            visibility: Self::entry_visibility(),
-        }
-    }
-
     /// what is the hash for the current Path
     pub fn hash(&self) -> Result<holo_hash::EntryHash, WasmError> {
         Ok(entry_hash!(self)?)
@@ -286,7 +262,7 @@ impl Path {
 
     /// does an entry exist at the hash we expect?
     pub fn exists(&self) -> Result<bool, WasmError> {
-        Ok(get_entry!(self.hash()?)?.is_some())
+        Ok(get!(self.hash()?)?.is_some())
     }
 
     /// recursively touch this and every parent that doesn't exist yet
@@ -323,6 +299,14 @@ impl Path {
         unwrapped.sort();
         unwrapped.dedup();
         Ok(holochain_zome_types::link::Links::from(unwrapped))
+    }
+
+    pub fn children_details(&self) -> Result<holochain_zome_types::link::LinkDetails, WasmError> {
+        Self::ensure(&self)?;
+        Ok(get_link_details!(
+            self.hash()?,
+            holochain_zome_types::link::LinkTag::new(NAME)
+        )?)
     }
 }
 

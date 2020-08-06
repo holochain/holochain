@@ -8,6 +8,7 @@ use std::{
     sync::Arc,
 };
 
+mod gossip;
 mod space;
 use space::*;
 

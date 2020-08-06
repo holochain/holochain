@@ -82,7 +82,7 @@ mod tests {
                                 .into(),
                         ));
                     }
-                    _ => panic!("unexpected event"),
+                    _ => (),
                 }
             }
         });
@@ -128,7 +128,7 @@ mod tests {
                         assert_eq!(b"receipt-test".to_vec(), receipt);
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
                     }
-                    _ => panic!("unexpected event"),
+                    _ => (),
                 }
             }
         });
@@ -167,7 +167,7 @@ mod tests {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
                         recv_count_clone.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                     }
-                    _ => panic!("unexpected event"),
+                    _ => (),
                 }
             }
         });
@@ -232,7 +232,7 @@ mod tests {
                         };
                         respond.r(Ok(async move { Ok(resp) }.boxed().into()));
                     }
-                    _ => panic!("unexpected event"),
+                    _ => (),
                 }
             }
         });
@@ -282,7 +282,7 @@ mod tests {
                     GetLinks { respond, .. } => {
                         respond.r(Ok(async move { Ok(test_1_clone) }.boxed().into()));
                     }
-                    _ => panic!("unexpected event in test_get_links_workflow"),
+                    _ => (),
                 }
             }
         });

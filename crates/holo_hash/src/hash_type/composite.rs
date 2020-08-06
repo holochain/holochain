@@ -1,9 +1,13 @@
 use super::*;
 
+#[cfg(all(test, feature = "serialized-bytes"))]
+use holochain_serialized_bytes::prelude::*;
+
 /// The Entry (composite) HashType
 #[derive(
     Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, serde::Deserialize, serde::Serialize,
 )]
+#[cfg_attr(all(test, feature = "serialized-bytes"), derive(SerializedBytes))]
 #[serde(from = "EntrySerial", into = "EntrySerial")]
 pub enum Entry {
     /// The hash of an Entry of EntryType::Agent
@@ -28,6 +32,7 @@ impl HashType for Entry {
 #[derive(
     Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, serde::Deserialize, serde::Serialize,
 )]
+#[cfg_attr(all(test, feature = "serialized-bytes"), derive(SerializedBytes))]
 #[serde(from = "AnyDhtSerial", into = "AnyDhtSerial")]
 pub enum AnyDht {
     /// The hash of an Entry

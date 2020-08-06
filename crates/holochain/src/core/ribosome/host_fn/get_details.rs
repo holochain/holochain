@@ -3,7 +3,7 @@ use crate::core::ribosome::{CallContext, RibosomeT};
 use crate::core::state::cascade::error::CascadeResult;
 use crate::core::workflow::CallZomeWorkspace;
 use futures::future::FutureExt;
-use holochain_zome_types::{GetDetailsOutput, GetDetailsInput, metadata::Details};
+use holochain_zome_types::{metadata::Details, GetDetailsInput, GetDetailsOutput};
 use must_future::MustBoxFuture;
 use std::sync::Arc;
 
