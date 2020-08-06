@@ -1,6 +1,6 @@
 use hdk3::prelude::*;
 
-holochain_wasmer_guest::holochain_externs!();
+holochain_externs!();
 
 const POST_ID: &str = "post";
 #[derive(serde::Serialize, serde::Deserialize, SerializedBytes)]

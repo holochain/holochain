@@ -1,8 +1,6 @@
-use holochain_wasmer_guest::*;
-use holochain_zome_types::*;
 use hdk3::prelude::*;
 
-holochain_wasmer_guest::holochain_externs!();
+holochain_externs!();
 
 map_extern!(validate_link, _validate_link);
 
