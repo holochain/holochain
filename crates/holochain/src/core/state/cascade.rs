@@ -1,4 +1,6 @@
 //! # Cascade
+//! ALL OUTDATED
+// TODO: Update or remove these docs
 //! This module is still a work in progress.
 //! Here is some pseudocode we are using to build it.
 //! ## Dimensions
