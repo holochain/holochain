@@ -571,10 +571,6 @@ name = "test_wasm_commit_entry"
 version = "0.0.1"
 dependencies = [
  "hdk3",
- "holo_hash",
- "holochain_serialized_bytes",
- "holochain_wasmer_guest",
- "holochain_zome_types",
  "serde",
  "test_wasm_common",
 ]

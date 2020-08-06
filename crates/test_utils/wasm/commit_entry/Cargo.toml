@@ -20,13 +20,8 @@ name = "test_wasm_commit_entry"
 crate-type = [ "cdylib", "rlib" ]
 
 [dependencies]
-hdk3 = { path = "../../../hdk" }
-holochain_serialized_bytes = "=0.0.41"
-holochain_wasmer_guest = "=0.0.40"
-holochain_zome_types = { version = "=0.0.1", path = "../../../zome_types" }
-holo_hash = { version = "=0.0.1", path = "../../../holo_hash" }
 serde = "=1.0.104"
 test_wasm_common = { version = "=0.0.1", path = "../../wasm_common" }
+hdk3 = { path = "../../../hdk" }
 
 [patch.crates-io]
-

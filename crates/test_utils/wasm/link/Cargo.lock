@@ -591,9 +591,6 @@ name = "test_wasm_link"
 version = "0.0.1"
 dependencies = [
  "hdk3",
- "holochain_serialized_bytes",
- "holochain_wasmer_guest",
- "holochain_zome_types",
  "serde",
  "test_wasm_common",
 ]
