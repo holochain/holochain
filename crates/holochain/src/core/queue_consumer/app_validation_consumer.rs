@@ -51,6 +51,9 @@ pub fn spawn_app_validation_consumer(
             tokio::pin!(next_job);
             tokio::pin!(kill);
 
+            // drop the reader so we don't lock it until the next job!
+            drop(reader);
+
             if let Either::Left((Err(_), _)) | Either::Right((_, _)) =
                 futures::future::select(next_job, kill).await
             {
