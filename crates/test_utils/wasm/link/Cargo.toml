@@ -18,3 +18,7 @@ hdk3 = { path = "../../../hdk" }
 
 serde = "1.0.104"
 test_wasm_common = { version = "=0.0.1", path = "../../wasm_common" }
+
+
+[patch.crates-io]
+
