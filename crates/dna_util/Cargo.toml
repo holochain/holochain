@@ -24,7 +24,3 @@ tokio = { version = "0.2", features = [ "full" ] }
 
 [dev-dependencies]
 tempdir = "0.3.7"
-
-
-[patch.crates-io]
-
