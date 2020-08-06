@@ -20,8 +20,11 @@ name = "test_wasm_entry_defs"
 crate-type = [ "cdylib", "rlib" ]
 
 [dependencies]
-holochain_serialized_bytes = "=0.0.40"
-holochain_wasmer_guest = "=0.0.37"
+hdk3 = { path = "../../../hdk" }
+holochain_serialized_bytes = "=0.0.41"
+holochain_wasmer_guest = "=0.0.40"
 holochain_zome_types = { version = "=0.0.1", path = "../../../zome_types" }
 serde = "=1.0.104"
-hdk3 = { path = "../../../hdk" }
+
+[patch.crates-io]
+

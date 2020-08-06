@@ -389,7 +389,7 @@ async fn produce_op_lights_from_iter(
 impl<'a> TryFrom<&UniqueForm<'a>> for SerializedBytes {
     type Error = SerializedBytesError;
     fn try_from(u: &UniqueForm<'a>) -> Result<Self, Self::Error> {
-        match holochain_serialized_bytes::to_vec_named(u) {
+        match holochain_serialized_bytes::encode(u) {
             Ok(v) => Ok(SerializedBytes::from(
                 holochain_serialized_bytes::UnsafeBytes::from(v),
             )),
