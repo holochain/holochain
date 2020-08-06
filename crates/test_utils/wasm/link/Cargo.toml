@@ -14,10 +14,14 @@ name = "test_wasm_link"
 crate-type = [ "cdylib", "rlib" ]
 
 [dependencies]
-holochain_serialized_bytes = "=0.0.40"
-holochain_wasmer_guest = "=0.0.37"
+holochain_serialized_bytes = "=0.0.41"
+holochain_wasmer_guest = "=0.0.39"
 holochain_zome_types = { version = "=0.0.1", path = "../../../zome_types" }
 hdk3 = { path = "../../../hdk" }
 
 serde = "=1.0.104"
 test_wasm_common = { version = "=0.0.1", path = "../../wasm_common" }
+
+
+[patch.crates-io]
+

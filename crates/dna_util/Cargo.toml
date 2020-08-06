@@ -12,7 +12,7 @@ edition = "2018"
 
 [dependencies]
 holo_hash = { version = "0.0.1", path = "../holo_hash" }
-holochain_serialized_bytes = "=0.0.40"
+holochain_serialized_bytes = "=0.0.41"
 holochain_types = { version = "0.0.1", path = "../types" }
 holochain_zome_types = { path = "../zome_types" }
 serde = { version = "1.0.104", features = [ "derive" ] }
@@ -24,3 +24,7 @@ tokio = { version = "0.2", features = [ "full" ] }
 
 [dev-dependencies]
 tempdir = "0.3.7"
+
+
+[patch.crates-io]
+

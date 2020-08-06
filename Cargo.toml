@@ -35,10 +35,6 @@ incremental = false
 codegen-units = 16
 
 [patch.crates-io]
-# holochain_serialized_bytes = { version = "=0.0.40", git = "https://github.com/holochain/holochain-serialization.git", branch = "unpinned" }
-# holochain_wasmer_common = { version = "=0.0.33", git = "https://github.com/holochain/holochain-wasmer.git", branch = "unpinned" }
-# holochain_wasmer_guest = { version = "=0.0.33", git = "https://github.com/holochain/holochain-wasmer.git", branch = "unpinned" }
-# holochain_wasmer_host = { version = "=0.0.33", git = "https://github.com/holochain/holochain-wasmer.git", branch = "unpinned" }
 
 rkv = { git = "https://github.com/holochain/rkv.git", branch = "master" }
 #rkv = { path = "../../rust/rkv" }

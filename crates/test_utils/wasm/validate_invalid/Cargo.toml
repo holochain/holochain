@@ -20,7 +20,11 @@ name = "test_wasm_validate_invalid"
 crate-type = [ "cdylib", "rlib" ]
 
 [dependencies]
-holochain_serialized_bytes = "=0.0.40"
-holochain_wasmer_guest = "=0.0.37"
+holochain_serialized_bytes = "=0.0.41"
+holochain_wasmer_guest = "=0.0.39"
 holochain_zome_types = { version = "=0.0.1", path = "../../../zome_types" }
 serde = "=1.0.104"
+
+
+[patch.crates-io]
+
