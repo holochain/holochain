@@ -70,11 +70,11 @@ pub mod slow_tests {
     use crate::core::state::workspace::Workspace;
     use crate::fixt::ZomeCallHostAccessFixturator;
     use fixt::prelude::*;
+    use holo_hash::HasHash;
     use holochain_state::env::ReadManager;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::header::LinkAdd;
     use test_wasm_common::*;
-    use holo_hash::HasHash;
 
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_entry_hash_path_children_details() {
@@ -180,10 +180,7 @@ pub mod slow_tests {
             if removes.len() > 0 {
                 remove_happened = true;
 
-                assert_eq!(
-                    &removes[0].link_add_address,
-                    &to_remove_hash,
-                );
+                assert_eq!(&removes[0].link_add_address, &to_remove_hash,);
             }
         }
         assert!(remove_happened);
