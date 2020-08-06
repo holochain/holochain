@@ -1,3 +1,5 @@
+use crate::header::LinkAdd;
+use crate::header::LinkRemove;
 use holochain_serialized_bytes::prelude::*;
 
 /// Opaque tag for the link applied at the app layer, used to differentiate
@@ -76,6 +78,27 @@ impl From<Links> for Vec<Link> {
 
 impl Links {
     pub fn into_inner(self) -> Vec<Link> {
+        self.into()
+    }
+}
+
+#[derive(Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+pub struct LinkDetails(Vec<(LinkAdd, Vec<LinkRemove>)>);
+
+impl From<Vec<(LinkAdd, Vec<LinkRemove>)>> for LinkDetails {
+    fn from(v: Vec<(LinkAdd, Vec<LinkRemove>)>) -> Self {
+        Self(v)
+    }
+}
+
+impl From<LinkDetails> for Vec<(LinkAdd, Vec<LinkRemove>)> {
+    fn from(link_details: LinkDetails) -> Self {
+        link_details.0
+    }
+}
+
+impl LinkDetails {
+    pub fn into_inner(self) -> Vec<(LinkAdd, Vec<LinkRemove>)> {
         self.into()
     }
 }
