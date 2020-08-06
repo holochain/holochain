@@ -264,3 +264,17 @@ macro_rules! get_links {
         )
     }};
 }
+
+#[macro_export]
+macro_rules! get_link_details {
+    ( $base:expr ) => {
+        $crate::get_link_details!($base, None)
+    };
+    ( $base:expr, $tag:expr ) => {{
+        $crate::api_call!(
+            __get_link_details,
+            GetLinkDetailsInput::new(($base, $tag.into())),
+            GetLinkDetailsOutput
+        )
+    }};
+}
