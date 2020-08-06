@@ -268,7 +268,7 @@ macro_rules! get_links {
 #[macro_export]
 macro_rules! get_link_details {
     ( $base:expr ) => {
-        get_link_details!($base, None)
+        $crate::get_link_details!($base, None)
     };
     ( $base:expr, $tag:expr ) => {{
         $crate::api_call!(
