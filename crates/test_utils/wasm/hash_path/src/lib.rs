@@ -37,6 +37,6 @@ fn _children(path_string: TestString) -> Result<Links, WasmError> {
     Path::from(path_string.0).children()
 }
 
-fn _children_details(path_string: TestString) -> Result<holochain_zome_types::link::LinkDetails, WasmError> {
+fn _children_details(path_string: TestString) -> Result<LinkDetails, WasmError> {
     Path::from(path_string.0).children_details()
 }

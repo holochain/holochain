@@ -42,6 +42,7 @@ pub use holochain_zome_types::entry_def::EntryDefs;
 pub use holochain_zome_types::entry_def::EntryDefsCallbackResult;
 pub use holochain_zome_types::entry_def::EntryVisibility;
 pub use holochain_zome_types::entry_def::RequiredValidations;
+pub use holochain_zome_types::link::LinkDetails;
 pub use holochain_zome_types::link::Links;
 pub use holochain_zome_types::zome_info::ZomeInfo;
 pub use holochain_zome_types::*;
