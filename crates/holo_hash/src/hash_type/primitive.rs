@@ -85,6 +85,19 @@ macro_rules! primitive_hash_type {
                     _ => panic!("unknown hash prefix during hash deserialization {:?}", v),
                 }
             }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::SeqAccess<'de>,
+            {
+                let mut vec = Vec::with_capacity(seq.size_hint().unwrap_or(0));
+
+                while let Some(b) = seq.next_element()? {
+                    vec.push(b);
+                }
+
+                self.visit_bytes(&vec)
+            }
         }
     };
 }

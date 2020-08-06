@@ -22,3 +22,7 @@ tokio_safe_block_on = "0.1.2"
 [build-dependencies]
 toml = "0.5"
 walkdir = "2.3.1"
+
+
+[patch.crates-io]
+

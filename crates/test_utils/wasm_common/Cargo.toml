@@ -10,7 +10,10 @@ crate-type = [ "cdylib", "rlib" ]
 path = "src/common.rs"
 
 [dependencies]
-holochain_serialized_bytes = "=0.0.40"
+holochain_serialized_bytes = "=0.0.41"
 serde = "=1.0.104"
 serde_bytes = "0.11"
 hdk3 = { path = "../../hdk" }
+
+[patch.crates-io]
+
