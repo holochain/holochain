@@ -11,6 +11,7 @@ pub mod entry_hash;
 pub mod entry_type_properties;
 pub mod get;
 pub mod get_links;
+pub mod get_link_details;
 pub mod keystore;
 pub mod link_entries;
 pub mod property;
