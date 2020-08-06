@@ -1,4 +1,3 @@
-use hdk3::hash_path::path::Path;
 use hdk3::prelude::*;
 use test_wasm_common::TestBool;
 use test_wasm_common::TestString;
@@ -34,7 +33,7 @@ fn _parent(path_string: TestString) -> Result<Option<Path>, WasmError> {
     Ok(Path::from(path_string.0).parent())
 }
 
-fn _children(path_string: TestString) -> Result<holochain_zome_types::link::Links, WasmError> {
+fn _children(path_string: TestString) -> Result<Links, WasmError> {
     Path::from(path_string.0).children()
 }
 

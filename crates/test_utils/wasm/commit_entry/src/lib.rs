@@ -1,6 +1,6 @@
 use hdk3::prelude::*;
 
-holochain_wasmer_guest::holochain_externs!();
+holochain_externs!();
 
 const POST_ID: &str = "post";
 #[derive(Default, SerializedBytes, Serialize, Deserialize)]
@@ -19,7 +19,7 @@ fn post() -> Post {
     Post("foo".into())
 }
 
-fn _commit_entry(_: ()) -> Result<holo_hash::HeaderHash, WasmError> {
+fn _commit_entry(_: ()) -> Result<HeaderHash, WasmError> {
     Ok(commit_entry!(post())?)
 }
 
