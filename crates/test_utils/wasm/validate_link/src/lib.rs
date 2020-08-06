@@ -1,6 +1,6 @@
 use hdk3::prelude::*;
 
-holochain_wasmer_guest::holochain_externs!();
+holochain_externs!();
 
 const MAYBE_LINKABLE_ID: &str = "maybe_linkable";
 #[derive(serde::Serialize, serde::Deserialize, SerializedBytes, Clone, Copy)]

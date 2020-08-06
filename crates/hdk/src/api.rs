@@ -3,7 +3,7 @@ macro_rules! map_extern {
     ( $name:tt, $f:ident ) => {
         #[no_mangle]
         pub extern "C" fn $name(ptr: GuestPtr) -> GuestPtr {
-            let input: HostInput = host_args!(ptr);
+            let input: HostInput = crate::host_args!(ptr);
             let result = $f(try_result!(
                 input.into_inner().try_into(),
                 "failed to deserialize args"
