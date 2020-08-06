@@ -11,6 +11,7 @@ map_extern!(hash, _hash);
 map_extern!(exists, _exists);
 map_extern!(ensure, _ensure);
 map_extern!(children, _children);
+map_extern!(children_details, _children_details);
 
 fn _hash(path_string: TestString) -> Result<EntryHash, WasmError> {
     Path::from(path_string.0).hash()
