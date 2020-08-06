@@ -72,7 +72,9 @@ pub mod slow_tests {
     use fixt::prelude::*;
     use holochain_state::env::ReadManager;
     use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::header::LinkAdd;
     use test_wasm_common::*;
+    use holo_hash::HasHash;
 
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_entry_hash_path_children_details() {
@@ -146,10 +148,44 @@ pub mod slow_tests {
             "children_details",
             TestString::from("foo".to_string())
         );
-        println!("{:?}", children_details_output);
-        // let links = children_output.into_inner();
-        // assert_eq!(2, links.len());
-        // assert_eq!(links[0].target, foo_baz,);
-        // assert_eq!(links[1].target, foo_bar,);
+
+        let link_details = children_details_output.into_inner();
+
+        let to_remove: LinkAdd = (link_details[0]).0.clone();
+
+        let to_remove_hash = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+            holochain_types::header::HeaderHashed::from_content(to_remove.into()).await
+        })
+        .into_hash();
+
+        let _remove_hash: holo_hash::HeaderHash = crate::call_test_ribosome!(
+            host_access,
+            TestWasm::HashPath,
+            "remove_link",
+            to_remove_hash
+        );
+
+        let children_details_output_2: holochain_zome_types::link::LinkDetails = crate::call_test_ribosome!(
+            host_access,
+            TestWasm::HashPath,
+            "children_details",
+            TestString::from("foo".to_string())
+        );
+
+        let children_details_output_2_vec = children_details_output_2.into_inner();
+        assert_eq!(2, children_details_output_2_vec.len());
+
+        let mut remove_happened = false;
+        for (_, removes) in children_details_output_2_vec {
+            if removes.len() > 0 {
+                remove_happened = true;
+
+                assert_eq!(
+                    &removes[0].link_add_address,
+                    &to_remove_hash,
+                );
+            }
+        }
+        assert!(remove_happened);
     }
 }
