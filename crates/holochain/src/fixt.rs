@@ -11,6 +11,8 @@ use crate::core::ribosome::guest_callback::post_commit::PostCommitHostAccess;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateHostAccess;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
+use crate::core::ribosome::guest_callback::validate_link_add::ValidateLinkAddHostAccess;
+use crate::core::ribosome::guest_callback::validate_link_add::ValidateLinkAddInvocation;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageHostAccess;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
 use crate::core::ribosome::wasm_ribosome::WasmRibosome;
@@ -322,6 +324,16 @@ fixturator!(
 fixturator!(
     ValidateInvocation;
     constructor fn new(ZomeName, Entry);
+);
+
+fixturator!(
+    ValidateLinkAddInvocation;
+    constructor fn new(ZomeName, LinkAdd, Entry, Entry);
+);
+
+fixturator!(
+    ValidateLinkAddHostAccess;
+    constructor fn new();
 );
 
 fixturator!(

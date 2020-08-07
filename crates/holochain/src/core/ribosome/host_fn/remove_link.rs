@@ -58,7 +58,7 @@ pub fn remove_link<'a>(
                 Header::LinkAdd(link_add_header) => Ok(link_add_header.base_address.clone()),
                 // the add link header hash provided was found but didn't point to an AddLink
                 // header (it is something else) so we cannot proceed
-                _ => Err(RibosomeError::ElementDeps(link_add_address.clone())),
+                _ => Err(RibosomeError::ElementDeps(link_add_address.clone().into())),
             }
         }
         // the add link header hash could not be found
@@ -66,7 +66,7 @@ pub fn remove_link<'a>(
         // that isn't also discoverable in either the cache or DHT, but it _is_ possible so we have
         // to fail in that case (e.g. the local cache could have GC'd at the same moment the
         // network connection dropped out)
-        None => Err(RibosomeError::ElementDeps(link_add_address.clone())),
+        None => Err(RibosomeError::ElementDeps(link_add_address.clone().into())),
     }?;
 
     // add a LinkRemove to the source chain
