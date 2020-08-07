@@ -1,0 +1,27 @@
+[package]
+name = "test_wasm_validate_link_add_invalid"
+version = "0.0.1"
+authors = [ "thedavidmeister", "thedavidmeister@gmail.com" ]
+edition = "2018"
+
+[profile.dev]
+opt-level = "z"
+
+[profile.release]
+opt-level = "z"
+
+# Ensure that this is not inside of any other workspace.
+# This crate should be an implementation detail of test_utils_wasm and
+# therefore shouldn't be mentioned in the top-level Cargo.toml
+[workspace]
+
+[lib]
+name = "test_wasm_validate_link_add_invalid"
+crate-type = [ "cdylib", "rlib" ]
+
+[dependencies]
+holochain_serialized_bytes = "=0.0.40"
+holochain_wasmer_guest = "=0.0.37"
+holochain_zome_types = { version = "=0.0.1", path = "../../../zome_types" }
+serde = "=1.0.104"
+hdk3 = { path = "../../../hdk" }

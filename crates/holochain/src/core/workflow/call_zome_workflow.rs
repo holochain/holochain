@@ -1,6 +1,10 @@
 use super::error::{WorkflowError, WorkflowResult};
+use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 use crate::core::ribosome::guest_callback::validate::{ValidateHostAccess, ValidateResult};
+use crate::core::ribosome::guest_callback::validate_link_add::ValidateLinkAddHostAccess;
+use crate::core::ribosome::guest_callback::validate_link_add::ValidateLinkAddInvocation;
+use crate::core::ribosome::guest_callback::validate_link_add::ValidateLinkAddResult;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::ribosome::ZomeCallInvocationResponse;
 use crate::core::ribosome::{error::RibosomeResult, RibosomeT, ZomeCallHostAccess};
@@ -15,10 +19,13 @@ use crate::core::{
     sys_validate_element,
 };
 use fallible_iterator::FallibleIterator;
+use holo_hash::AnyDhtHash;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
 use holochain_state::prelude::*;
 use holochain_types::element::Element;
+use holochain_zome_types::entry::GetOptions;
+use holochain_zome_types::header::Header;
 use std::sync::Arc;
 use unsafe_call_zome_workspace::UnsafeCallZomeWorkspace;
 
@@ -78,7 +85,7 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT>(
     // Create the unsafe sourcechain for use with wasm closure
     let result = {
         let (_g, raw_workspace) = UnsafeCallZomeWorkspace::from_mut(workspace);
-        let host_access = ZomeCallHostAccess::new(raw_workspace, keystore, network);
+        let host_access = ZomeCallHostAccess::new(raw_workspace, keystore, network.clone());
         ribosome.call_zome_function(host_access, invocation)
     };
     tracing::trace!(line = line!());
@@ -126,7 +133,54 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT>(
         }
     }
 
+    let mut cascade = workspace.cascade(network);
     for chain_element in to_app_validate {
+        match chain_element.header() {
+            // @todo have app validate in its own workflow
+            Header::LinkAdd(link_add) => {
+                let validate: ValidateLinkAddResult = ribosome.run_validate_link_add(
+                    ValidateLinkAddHostAccess,
+                    ValidateLinkAddInvocation {
+                        zome_name: zome_name.clone(),
+                        base: Arc::new({
+                            let base_address: AnyDhtHash = link_add.base_address.clone().into();
+                            #[allow(clippy::eval_order_dependence)]
+                            cascade
+                                .dht_get(base_address.clone(), GetOptions.into())
+                                .await
+                                .map_err(|e| RibosomeError::from(e))?
+                                .ok_or_else(|| RibosomeError::ElementDeps(base_address.clone()))?
+                                .entry()
+                                .as_option()
+                                .ok_or_else(|| RibosomeError::ElementDeps(base_address.clone()))?
+                                .to_owned()
+                        }),
+                        target: Arc::new({
+                            let target_address: AnyDhtHash = link_add.target_address.clone().into();
+                            #[allow(clippy::eval_order_dependence)]
+                            cascade
+                                .dht_get(target_address.clone(), GetOptions.into())
+                                .await
+                                .map_err(|e| RibosomeError::from(e))?
+                                .ok_or_else(|| RibosomeError::ElementDeps(target_address.clone()))?
+                                .entry()
+                                .as_option()
+                                .ok_or_else(|| RibosomeError::ElementDeps(target_address.clone()))?
+                                .to_owned()
+                        }),
+                        link_add: Arc::new(link_add.to_owned()),
+                    },
+                )?;
+                match validate {
+                    ValidateLinkAddResult::Valid => {}
+                    ValidateLinkAddResult::Invalid(reason) => {
+                        Err(SourceChainError::InvalidLinkAdd(reason))?
+                    }
+                }
+            }
+            _ => {}
+        }
+
         match chain_element.entry() {
             holochain_types::element::ElementEntry::Present(entry) => {
                 let validate: ValidateResult = ribosome.run_validate(
