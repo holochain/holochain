@@ -19,6 +19,8 @@ fn main() {
         }
     }
 
+    let mut all_status = vec![];
+
     for &m in [
         "anchor",
         "bench",
@@ -35,6 +37,7 @@ fn main() {
         "migrate_agent_pass",
         "post_commit_fail",
         "post_commit_success",
+        "ser_regression",
         "validate",
         "validate_invalid",
         "validate_valid",
@@ -44,6 +47,13 @@ fn main() {
     ]
     .iter()
     {
+        // Rerun if the src dirs change
+        for item in walkdir::WalkDir::new(Path::new(m).join("src"))
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
+            println!("cargo:rerun-if-changed={}", item.path().display());
+        }
         let cargo_toml = Path::new(m).join("Cargo.toml");
 
         // Note: If you're trying to use `cargo udeps` and get an error, try
@@ -53,7 +63,7 @@ fn main() {
         let cargo_command = std::env::var_os("CARGO");
         let cargo_command = cargo_command.as_deref().unwrap_or_else(|| "cargo".as_ref());
 
-        let status = std::process::Command::new(cargo_command)
+        let child = std::process::Command::new(cargo_command)
             .arg("build")
             .arg("--manifest-path")
             .arg(cargo_toml)
@@ -61,9 +71,15 @@ fn main() {
             .arg("--target")
             .arg("wasm32-unknown-unknown")
             .env("CARGO_TARGET_DIR", &out_dir)
-            .status()
+            // Run cargo in parallel so we don't have to wait for each to compile
+            // before starting the next
+            .spawn()
             .unwrap();
 
+        all_status.push(child);
+    }
+    for mut child in all_status {
+        let status = child.wait().unwrap();
         assert!(status.success());
     }
 }
