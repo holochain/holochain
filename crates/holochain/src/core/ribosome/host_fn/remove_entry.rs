@@ -109,10 +109,10 @@ pub(crate) fn get_original_address<'a>(
         Some(original_element_signed_header_hash) => {
             match original_element_signed_header_hash.header().entry_data() {
                 Some((entry_hash, _)) => Ok(entry_hash.clone()),
-                _ => Err(RibosomeError::ElementDeps(address)),
+                _ => Err(RibosomeError::ElementDeps(address.into())),
             }
         }
-        None => Err(RibosomeError::ElementDeps(address)),
+        None => Err(RibosomeError::ElementDeps(address.into())),
     }?;
     Ok(entry_address)
 }
