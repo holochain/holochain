@@ -298,6 +298,14 @@ impl Path {
         unwrapped.dedup();
         Ok(holochain_zome_types::link::Links::from(unwrapped))
     }
+
+    pub fn children_details(&self) -> Result<holochain_zome_types::link::LinkDetails, WasmError> {
+        Self::ensure(&self)?;
+        Ok(get_link_details!(
+            self.hash()?,
+            holochain_zome_types::link::LinkTag::new(NAME)
+        )?)
+    }
 }
 
 #[test]
