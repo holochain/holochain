@@ -38,6 +38,8 @@ pub mod timestamp;
 #[allow(missing_docs)]
 pub mod validate;
 #[allow(missing_docs)]
+pub mod validate_link_add;
+#[allow(missing_docs)]
 pub mod zome;
 #[allow(missing_docs)]
 pub mod zome_info;

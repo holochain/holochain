@@ -3,7 +3,7 @@
 
 use crate::core::state::{cascade::error::CascadeError, source_chain::SourceChainError};
 use crate::core::workflow::call_zome_workflow::unsafe_call_zome_workspace::error::UnsafeCallZomeWorkspaceError;
-use holo_hash::HeaderHash;
+use holo_hash::AnyDhtHash;
 use holochain_crypto::CryptoError;
 use holochain_serialized_bytes::prelude::SerializedBytesError;
 use holochain_types::dna::error::DnaError;
@@ -44,8 +44,8 @@ pub enum RibosomeError {
     /// for example a remove link ribosome call needs to find the add link in order to infer the
     /// correct base and this dependent relationship exists before even subconscious validation
     /// kicks in
-    #[error("A mandatory element is missing, header hash: {0}")]
-    ElementDeps(HeaderHash),
+    #[error("A mandatory element is missing, dht hash: {0}")]
+    ElementDeps(AnyDhtHash),
 
     /// ident
     #[error(transparent)]

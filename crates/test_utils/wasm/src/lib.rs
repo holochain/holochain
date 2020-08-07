@@ -23,8 +23,11 @@ pub enum TestWasm {
     PostCommitFail,
     PostCommitSuccess,
     Validate,
+    ValidateLink,
     ValidateInvalid,
+    ValidateLinkAddInvalid,
     ValidateValid,
+    ValidateLinkAddValid,
     ValidationPackageFail,
     ValidationPackageSuccess,
     WhoAmI,
@@ -49,8 +52,11 @@ impl From<TestWasm> for ZomeName {
             TestWasm::PostCommitFail => "post_commit_fail",
             TestWasm::PostCommitSuccess => "post_commit_success",
             TestWasm::Validate => "validate",
+            TestWasm::ValidateLink => "validate_link",
             TestWasm::ValidateInvalid => "validate_invalid",
+            TestWasm::ValidateLinkAddInvalid => "validate_link_add_invalid",
             TestWasm::ValidateValid => "validate_valid",
+            TestWasm::ValidateLinkAddValid => "validate_link_add_valid",
             TestWasm::ValidationPackageFail => "validation_package_fail",
             TestWasm::ValidationPackageSuccess => "validation_package_success",
             TestWasm::WhoAmI => "whoami",
@@ -141,14 +147,29 @@ impl From<TestWasm> for DnaWasm {
                 "/wasm32-unknown-unknown/release/test_wasm_validate.wasm"
             ))
             .to_vec(),
+            TestWasm::ValidateLink => include_bytes!(concat!(
+                env!("OUT_DIR"),
+                "/wasm32-unknown-unknown/release/test_wasm_validate_link.wasm"
+            ))
+            .to_vec(),
             TestWasm::ValidateInvalid => include_bytes!(concat!(
                 env!("OUT_DIR"),
                 "/wasm32-unknown-unknown/release/test_wasm_validate_invalid.wasm"
             ))
             .to_vec(),
+            TestWasm::ValidateLinkAddInvalid => include_bytes!(concat!(
+                env!("OUT_DIR"),
+                "/wasm32-unknown-unknown/release/test_wasm_validate_link_add_invalid.wasm"
+            ))
+            .to_vec(),
             TestWasm::ValidateValid => include_bytes!(concat!(
                 env!("OUT_DIR"),
                 "/wasm32-unknown-unknown/release/test_wasm_validate_valid.wasm"
+            ))
+            .to_vec(),
+            TestWasm::ValidateLinkAddValid => include_bytes!(concat!(
+                env!("OUT_DIR"),
+                "/wasm32-unknown-unknown/release/test_wasm_validate_link_add_valid.wasm"
             ))
             .to_vec(),
             TestWasm::ValidationPackageFail => include_bytes!(concat!(

@@ -1,5 +1,6 @@
 use crate::core::workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
-use holo_hash::{EntryHash, HeaderHash};
+use holo_hash::EntryHash;
+use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::error::DatabaseError;
 use holochain_types::dht_op::error::DhtOpError;
@@ -43,6 +44,9 @@ pub enum SourceChainError {
 
     #[error("InvalidCommit error: {0}")]
     InvalidCommit(String),
+
+    #[error("InvalidLinkAdd error: {0}")]
+    InvalidLinkAdd(String),
 
     #[error("KeystoreError: {0}")]
     KeystoreError(#[from] holochain_keystore::KeystoreError),
