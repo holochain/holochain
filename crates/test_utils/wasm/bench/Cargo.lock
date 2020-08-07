@@ -92,6 +92,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "hdk3"
+version = "0.0.1"
+dependencies = [
+ "holo_hash",
+ "holochain_wasmer_guest",
+ "holochain_zome_types",
+ "serde",
+ "serde_bytes",
+]
+
+[[package]]
 name = "holo_hash"
 version = "0.0.1"
 dependencies = [
@@ -560,9 +571,7 @@ dependencies = [
 name = "test_wasm_bench"
 version = "0.0.1"
 dependencies = [
- "holochain_serialized_bytes",
- "holochain_wasmer_guest",
- "holochain_zome_types",
+ "hdk3",
  "serde",
 ]
 
