@@ -16,7 +16,6 @@ pub struct Channel {
     name: String,
 }
 
-
 #[derive(Constructor, Serialize, Deserialize, SerializedBytes)]
 pub struct ChannelMessage {
     message: String,
@@ -57,13 +56,10 @@ fn _create_channel(name: ChannelName) -> Result<EntryHash, WasmError> {
     commit_entry!(&channel)?;
     debug!(format!("sb in channel {:?}", sb))?;
     link_entries!(entry_hash!(&path)?, channel_hash.clone())?;
-    debug!(format!("end of channel"))?;
     Ok(channel_hash)
 }
 
-
 fn _create_message(input: CreateMessageInput) -> Result<EntryHash, WasmError> {
-    debug!(format!("start of msg"))?;
     debug!(format!("{:?}", input))?;
     let CreateMessageInput {
         channel_hash,
@@ -73,7 +69,6 @@ fn _create_message(input: CreateMessageInput) -> Result<EntryHash, WasmError> {
     let message_hash = entry_hash!(&message)?;
     commit_entry!(&message)?;
     link_entries!(channel_hash, message_hash.clone())?;
-    debug!(format!("end of msg"))?;
     Ok(message_hash)
 }
 
