@@ -4,7 +4,7 @@ fn main() {
     let out_dir = std::env::var_os("OUT_DIR").unwrap();
 
     println!("cargo:rerun-if-changed=Cargo.toml");
-    println!("cargo:rerun-if-changed=*");
+    //println!("cargo:rerun-if-changed=*");
     println!("cargo:rerun-if-changed=../../../Cargo.lock");
     // We want to rebuild if anything upstream of the wasms has changed.
     // Since we use local paths, changes to those crates will not affect the
@@ -18,6 +18,8 @@ fn main() {
             println!("cargo:rerun-if-changed={}", item.path().display());
         }
     }
+
+    let mut all_status = vec![];
 
     for &m in [
         "anchor",
@@ -53,7 +55,7 @@ fn main() {
         let cargo_command = std::env::var_os("CARGO");
         let cargo_command = cargo_command.as_deref().unwrap_or_else(|| "cargo".as_ref());
 
-        let status = std::process::Command::new(cargo_command)
+        let child = std::process::Command::new(cargo_command)
             .arg("build")
             .arg("--manifest-path")
             .arg(cargo_toml)
@@ -61,9 +63,13 @@ fn main() {
             .arg("--target")
             .arg("wasm32-unknown-unknown")
             .env("CARGO_TARGET_DIR", &out_dir)
-            .status()
+            .spawn()
             .unwrap();
 
+        all_status.push(child);
+    }
+    for mut child in all_status {
+        let status = child.wait().unwrap();
         assert!(status.success());
     }
 }

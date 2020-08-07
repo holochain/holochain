@@ -14,7 +14,9 @@ use holochain_types::{
 };
 use holochain_zome_types::{element::SignedHeaderHashed, header::conversions::WrongHeaderError};
 use std::{collections::BTreeSet, convert::TryInto};
+use tracing::*;
 
+#[instrument(skip(state_env))]
 pub async fn handle_get_entry(
     state_env: EnvironmentWrite,
     hash: EntryHash,
@@ -80,7 +82,9 @@ pub async fn handle_get_entry(
                 let header = render_header(hash).await?;
                 live_headers.insert(header.try_into()?);
             }
-            let updates_returns = meta_vault.get_headers(hash.clone())?.collect::<Vec<_>>()?;
+            let updates_returns = meta_vault
+                .get_updates(hash.clone().into())?
+                .collect::<Vec<_>>()?;
             let updates_returns = updates_returns.into_iter().map(|update| async {
                 let update: WireEntryUpdateRelationship = render_header(update)
                     .await?
@@ -152,5 +156,6 @@ pub async fn handle_get_entry(
         }
         _ => None,
     };
+    debug!(handle_get_details_return = ?r);
     Ok(GetElementResponse::GetEntryFull(r))
 }

@@ -1,6 +1,7 @@
 use crate::core::{
     workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError, SourceChainError,
 };
+use holo_hash::AnyDhtHash;
 use holochain_p2p::HolochainP2pError;
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_state::error::DatabaseError;
@@ -21,6 +22,9 @@ pub enum CascadeError {
 
     #[error(transparent)]
     DhtOpError(#[from] DhtOpError),
+
+    #[error("Got an invalid response from an authority for the request hash: {0:?}")]
+    InvalidResponse(AnyDhtHash),
 
     #[error(transparent)]
     SourceChainError(#[from] SourceChainError),

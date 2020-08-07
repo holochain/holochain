@@ -1,7 +1,10 @@
 use crate::core::ribosome::error::{RibosomeError, RibosomeResult};
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use crate::core::state::{cascade::error::CascadeResult, source_chain::SourceChainResult};
+use crate::core::state::{
+    cascade::error::{CascadeError, CascadeResult},
+    source_chain::SourceChainResult,
+};
 use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
 use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_cache;
 use futures::future::BoxFuture;
@@ -74,16 +77,23 @@ pub(crate) fn get_original_address<'a>(
         async move {
             let mut cascade = workspace.cascade(network);
             // TODO: Think about what options to use here
-            Ok(cascade
-                .dht_get(address.into(), GetOptions::default())
+            cascade
+                .get_details(address.clone().into(), GetOptions::default())
                 .await?
-                .map(|el| el.into_inner().0))
+                .map(|el| {
+                    match el {
+                        holochain_zome_types::metadata::Details::Element(e) => Ok(e.element.into_inner().0),
+                        // Should not be trying to get original headers via EntryHash
+                        holochain_zome_types::metadata::Details::Entry(_) => Err(CascadeError::InvalidResponse(address.into())),
+                    }
+                })
+                .transpose()
         }
         .boxed()
     }
     };
     // handle timeouts at the network layer
-    let async_call_context = call_context.clone();
+    let async_call_context = call_context;
     let maybe_original_element: Option<SignedHeaderHashed> =
         tokio_safe_block_on::tokio_safe_block_forever_on(async move {
             unsafe {
@@ -99,10 +109,10 @@ pub(crate) fn get_original_address<'a>(
         Some(original_element_signed_header_hash) => {
             match original_element_signed_header_hash.header().entry_data() {
                 Some((entry_hash, _)) => Ok(entry_hash.clone()),
-                _ => Err(RibosomeError::ElementDeps(address.clone())),
+                _ => Err(RibosomeError::ElementDeps(address)),
             }
         }
-        None => Err(RibosomeError::ElementDeps(address.clone())),
+        None => Err(RibosomeError::ElementDeps(address)),
     }?;
     Ok(entry_address)
 }

@@ -154,6 +154,7 @@ where
         Ok(())
     }
 
+    #[instrument(skip(self, elements))]
     async fn update_stores_with_element_group(
         &mut self,
         elements: ElementGroup<'_>,

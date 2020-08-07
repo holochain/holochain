@@ -319,6 +319,7 @@ async fn get_from_another_agent() {
             make_call_data(alice_cell_id.clone(), handle.clone(), dna_file.clone()).await;
         let env_ref = alice_env.guard().await;
         let dbs = alice_env.dbs().await;
+        debug!(the_entry_hash = ?entry_hash);
         let entry_details = get_details(
             &env_ref,
             &dbs,

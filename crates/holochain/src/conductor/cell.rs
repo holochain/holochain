@@ -242,7 +242,7 @@ impl Cell {
                 request,
                 ..
             } => {
-                let _g = span.enter();
+                let _g = Span::enter(&span);
                 let res = self
                     .handle_call_remote(to_agent, zome_name, fn_name, cap, request)
                     .await
@@ -258,7 +258,7 @@ impl Cell {
                 ops,
                 ..
             } => {
-                let _g = span.enter();
+                let _g = Span::enter(&span);
                 let res = self
                     .handle_publish(from_agent, request_validation_receipt, dht_hash, ops)
                     .await
@@ -266,7 +266,7 @@ impl Cell {
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
             GetValidationPackage { span, respond, .. } => {
-                let _g = span.enter();
+                let _g = Span::enter(&span);
                 let res = self
                     .handle_get_validation_package()
                     .await
@@ -280,7 +280,7 @@ impl Cell {
                 options,
                 ..
             } => {
-                let _g = span.enter();
+                let _g = Span::enter(&span);
                 let res = self
                     .handle_get(dht_hash, options)
                     .await
@@ -294,7 +294,7 @@ impl Cell {
                 options,
                 ..
             } => {
-                let _g = span.enter();
+                let _g = Span::enter(&span);
                 let res = self
                     .handle_get_meta(dht_hash, options)
                     .await
@@ -308,7 +308,7 @@ impl Cell {
                 options,
                 ..
             } => {
-                let _g = span.enter();
+                let _g = Span::enter(&span);
                 let res = self
                     .handle_get_links(link_key, options)
                     .await
@@ -321,7 +321,7 @@ impl Cell {
                 receipt,
                 ..
             } => {
-                let _g = span.enter();
+                let _g = Span::enter(&span);
                 let res = self
                     .handle_validation_receipt(receipt)
                     .await
@@ -336,7 +336,7 @@ impl Cell {
                 until,
                 ..
             } => {
-                let _g = span.enter();
+                let _g = Span::enter(&span);
                 let res = self
                     .handle_fetch_op_hashes_for_constraints(dht_arc, since, until)
                     .await
@@ -349,7 +349,7 @@ impl Cell {
                 op_hashes,
                 ..
             } => {
-                let _g = span.enter();
+                let _g = Span::enter(&span);
                 let res = self
                     .handle_fetch_op_hash_data(op_hashes)
                     .await
@@ -357,7 +357,7 @@ impl Cell {
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
             SignNetworkData { span, respond, .. } => {
-                let _g = span.enter();
+                let _g = Span::enter(&span);
                 let res = self
                     .handle_sign_network_data()
                     .await
@@ -429,15 +429,20 @@ impl Cell {
         // we can just have these defaults depending on whether or not
         // the hash is an entry or header.
         // In the future we should use GetOptions to choose which get to run.
-        match *dht_hash.hash_type() {
+        let r = match *dht_hash.hash_type() {
             AnyDht::Entry(et) => self.handle_get_entry(dht_hash.retype(et), options).await,
             AnyDht::Header => {
                 self.handle_get_element(dht_hash.retype(hash_type::Header))
                     .await
             }
+        };
+        if let Err(e) = &r {
+            error!(msg = "Error handling a get", ?e, agent = ?self.id.agent_pubkey());
         }
+        r
     }
 
+    #[instrument(skip(self, options))]
     async fn handle_get_entry(
         &self,
         hash: EntryHash,
