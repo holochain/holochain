@@ -12,8 +12,10 @@ use futures::future::Either;
 use holochain_state::env::EnvironmentWrite;
 use holochain_state::env::ReadManager;
 use tokio::task::JoinHandle;
+use tracing::*;
 
 /// Spawn the QueueConsumer for Produce_dht_ops workflow
+#[instrument(skip(env, stop, trigger_integration))]
 pub fn spawn_produce_dht_ops_consumer(
     env: EnvironmentWrite,
     mut stop: sync::broadcast::Receiver<()>,
