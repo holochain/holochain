@@ -49,5 +49,5 @@ tracing-serde = "=0.1.1"
 tracing-subscriber = "=0.2.3"
 
 [dev-dependencies]
-rmp-serde = "0.14.3"
+# rmp-serde = "0.14.3"
 tokio = { version = "0.2", features = [ "full" ] }
