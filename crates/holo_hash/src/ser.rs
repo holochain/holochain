@@ -4,7 +4,7 @@ use holochain_serialized_bytes::{SerializedBytes, SerializedBytesError, UnsafeBy
 impl<T: HashType> std::convert::TryFrom<&HoloHash<T>> for SerializedBytes {
     type Error = SerializedBytesError;
     fn try_from(t: &HoloHash<T>) -> std::result::Result<SerializedBytes, SerializedBytesError> {
-        match rmp_serde::to_vec_named(t) {
+        match holochain_serialized_bytes::encode(t) {
             Ok(v) => Ok(SerializedBytes::from(UnsafeBytes::from(v))),
             Err(e) => Err(SerializedBytesError::ToBytes(e.to_string())),
         }
@@ -21,7 +21,7 @@ impl<T: HashType> std::convert::TryFrom<HoloHash<T>> for SerializedBytes {
 impl<T: HashType> std::convert::TryFrom<SerializedBytes> for HoloHash<T> {
     type Error = SerializedBytesError;
     fn try_from(sb: SerializedBytes) -> std::result::Result<HoloHash<T>, SerializedBytesError> {
-        match rmp_serde::from_read_ref(sb.bytes()) {
+        match holochain_serialized_bytes::decode(sb.bytes()) {
             Ok(v) => Ok(v),
             Err(e) => Err(SerializedBytesError::FromBytes(e.to_string())),
         }
@@ -51,8 +51,8 @@ mod tests {
     #[test]
     fn test_rmp_roundtrip() {
         let h_orig = AgentPubKey::from_raw_bytes(vec![0xdb; 36]);
-        let buf = rmp_serde::to_vec_named(&h_orig).unwrap();
-        let h: AgentPubKey = rmp_serde::from_read_ref(&buf).unwrap();
+        let buf = holochain_serialized_bytes::encode(&h_orig).unwrap();
+        let h: AgentPubKey = holochain_serialized_bytes::decode(&buf).unwrap();
 
         assert_eq!(h_orig, h);
         assert_eq!(*h.hash_type(), hash_type::Agent::new());
@@ -63,24 +63,24 @@ mod tests {
         {
             let h_orig =
                 EntryHash::from_raw_bytes_and_type(vec![0xdb; 36], hash_type::Entry::Content);
-            let buf = rmp_serde::to_vec_named(&h_orig).unwrap();
-            let h: EntryHash = rmp_serde::from_read_ref(&buf).unwrap();
+            let buf = holochain_serialized_bytes::encode(&h_orig).unwrap();
+            let h: EntryHash = holochain_serialized_bytes::decode(&buf).unwrap();
             assert_eq!(h_orig, h);
             assert_eq!(*h.hash_type(), hash_type::Entry::Content);
         }
         {
             let h_orig =
                 EntryHash::from_raw_bytes_and_type(vec![0xdb; 36], hash_type::Entry::Agent);
-            let buf = rmp_serde::to_vec_named(&h_orig).unwrap();
-            let h: EntryHash = rmp_serde::from_read_ref(&buf).unwrap();
+            let buf = holochain_serialized_bytes::encode(&h_orig).unwrap();
+            let h: EntryHash = holochain_serialized_bytes::decode(&buf).unwrap();
             assert_eq!(h_orig, h);
             assert_eq!(*h.hash_type(), hash_type::Entry::Agent);
         }
         {
             let h_orig =
                 AnyDhtHash::from_raw_bytes_and_type(vec![0xdb; 36], hash_type::AnyDht::Header);
-            let buf = rmp_serde::to_vec_named(&h_orig).unwrap();
-            let h: AnyDhtHash = rmp_serde::from_read_ref(&buf).unwrap();
+            let buf = holochain_serialized_bytes::encode(&h_orig).unwrap();
+            let h: AnyDhtHash = holochain_serialized_bytes::decode(&buf).unwrap();
             assert_eq!(h_orig, h);
             assert_eq!(*h.hash_type(), hash_type::AnyDht::Header);
         }
@@ -89,8 +89,8 @@ mod tests {
                 vec![0xdb; 36],
                 hash_type::AnyDht::Entry(hash_type::Entry::Content),
             );
-            let buf = rmp_serde::to_vec_named(&h_orig).unwrap();
-            let h: AnyDhtHash = rmp_serde::from_read_ref(&buf).unwrap();
+            let buf = holochain_serialized_bytes::encode(&h_orig).unwrap();
+            let h: AnyDhtHash = holochain_serialized_bytes::decode(&buf).unwrap();
             assert_eq!(h_orig, h);
             assert_eq!(
                 *h.hash_type(),
@@ -102,8 +102,8 @@ mod tests {
                 vec![0xdb; 36],
                 hash_type::AnyDht::Entry(hash_type::Entry::Agent),
             );
-            let buf = rmp_serde::to_vec_named(&h_orig).unwrap();
-            let h: AnyDhtHash = rmp_serde::from_read_ref(&buf).unwrap();
+            let buf = holochain_serialized_bytes::encode(&h_orig).unwrap();
+            let h: AnyDhtHash = holochain_serialized_bytes::decode(&buf).unwrap();
             assert_eq!(h_orig, h);
             assert_eq!(
                 *h.hash_type(),
@@ -118,8 +118,8 @@ mod tests {
         {
             let h_orig =
                 EntryHash::from_raw_bytes_and_type(vec![0xdb; 36], hash_type::Entry::Content);
-            let buf = rmp_serde::to_vec_named(&h_orig).unwrap();
-            let _: AnyDhtHash = rmp_serde::from_read_ref(&buf).unwrap();
+            let buf = holochain_serialized_bytes::encode(&h_orig).unwrap();
+            let _: AnyDhtHash = holochain_serialized_bytes::decode(&buf).unwrap();
         }
     }
 
@@ -129,8 +129,8 @@ mod tests {
         {
             let h_orig =
                 EntryHash::from_raw_bytes_and_type(vec![0xdb; 36], hash_type::Entry::Agent);
-            let buf = rmp_serde::to_vec_named(&h_orig).unwrap();
-            let _: AnyDhtHash = rmp_serde::from_read_ref(&buf).unwrap();
+            let buf = holochain_serialized_bytes::encode(&h_orig).unwrap();
+            let _: AnyDhtHash = holochain_serialized_bytes::decode(&buf).unwrap();
         }
     }
 
@@ -142,8 +142,8 @@ mod tests {
                 vec![0xdb; 36],
                 hash_type::AnyDht::Entry(hash_type::Entry::Content),
             );
-            let buf = rmp_serde::to_vec_named(&h_orig).unwrap();
-            let _: EntryHash = rmp_serde::from_read_ref(&buf).unwrap();
+            let buf = holochain_serialized_bytes::encode(&h_orig).unwrap();
+            let _: EntryHash = holochain_serialized_bytes::decode(&buf).unwrap();
         }
     }
 
@@ -155,8 +155,8 @@ mod tests {
                 vec![0xdb; 36],
                 hash_type::AnyDht::Entry(hash_type::Entry::Agent),
             );
-            let buf = rmp_serde::to_vec_named(&h_orig).unwrap();
-            let _: EntryHash = rmp_serde::from_read_ref(&buf).unwrap();
+            let buf = holochain_serialized_bytes::encode(&h_orig).unwrap();
+            let _: EntryHash = holochain_serialized_bytes::decode(&buf).unwrap();
         }
     }
 
@@ -166,8 +166,8 @@ mod tests {
         {
             let h_orig =
                 AnyDhtHash::from_raw_bytes_and_type(vec![0xdb; 36], hash_type::AnyDht::Header);
-            let buf = rmp_serde::to_vec_named(&h_orig).unwrap();
-            let _: EntryHash = rmp_serde::from_read_ref(&buf).unwrap();
+            let buf = holochain_serialized_bytes::encode(&h_orig).unwrap();
+            let _: EntryHash = holochain_serialized_bytes::decode(&buf).unwrap();
         }
     }
 
@@ -236,11 +236,11 @@ mod tests {
             }
 
             fn get(&self) -> K {
-                rmp_serde::from_read_ref(&self.bytes).unwrap()
+                holochain_serialized_bytes::decode(&self.bytes).unwrap()
             }
 
             fn put(&mut self, k: &K) {
-                self.bytes = rmp_serde::to_vec_named(k).unwrap();
+                self.bytes = holochain_serialized_bytes::encode(k).unwrap();
             }
         }
 

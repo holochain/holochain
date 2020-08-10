@@ -172,7 +172,7 @@ where
         let iter = self.db.get(self.reader, k)?;
         Ok(iter.filter_map(|v| match v {
             Ok((_, Some(rkv::Value::Blob(buf)))) => Some(
-                rmp_serde::from_read_ref(buf)
+                holochain_serialized_bytes::decode(buf)
                     .map(|n| {
                         trace!(?n);
                         n
@@ -243,7 +243,7 @@ where
             for (v, op) in deltas {
                 match op {
                     Insert => {
-                        let buf = rmp_serde::to_vec_named(&v)?;
+                        let buf = holochain_serialized_bytes::encode(&v)?;
                         let encoded = rkv::Value::Blob(&buf);
                         if self.no_dup_data {
                             self.db
@@ -274,7 +274,7 @@ where
                     // everything
                     Delete if delete_all => {}
                     Delete => {
-                        let buf = rmp_serde::to_vec_named(&v)?;
+                        let buf = holochain_serialized_bytes::encode(&v)?;
                         let encoded = rkv::Value::Blob(&buf);
                         self.db.delete(writer, k.clone(), &encoded).or_else(|err| {
                             // Ignore the case where the key is not found

@@ -47,14 +47,14 @@ where
     /// Fetch data from DB, deserialize into V type
     pub fn get<R: Readable>(&self, reader: &R, k: &K) -> DatabaseResult<Option<V>> {
         match self.get_bytes(reader, k)? {
-            Some(bytes) => Ok(Some(rmp_serde::from_read_ref(bytes)?)),
+            Some(bytes) => Ok(Some(holochain_serialized_bytes::decode(bytes)?)),
             None => Ok(None),
         }
     }
 
     /// Put V into DB as serialized data
     pub fn put(&self, writer: &mut Writer, k: &K, v: &V) -> DatabaseResult<()> {
-        let buf = rmp_serde::to_vec_named(v)?;
+        let buf = holochain_serialized_bytes::encode(v)?;
         let encoded = rkv::Value::Blob(&buf);
         self.db.put(writer, k, &encoded)?;
         Ok(())

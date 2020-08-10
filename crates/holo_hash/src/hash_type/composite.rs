@@ -54,8 +54,6 @@ impl HashType for AnyDht {
 }
 
 #[derive(serde::Deserialize, serde::Serialize)]
-#[cfg_attr(all(test, feature = "serialized-bytes"), derive(SerializedBytes))]
-#[serde(tag = "type", content = "data")]
 enum EntrySerial {
     /// The hash of an Entry of EntryType::Agent
     Agent(Agent),
@@ -82,8 +80,6 @@ impl From<EntrySerial> for Entry {
 }
 
 #[derive(serde::Deserialize, serde::Serialize)]
-#[cfg_attr(all(test, feature = "serialized-bytes"), derive(SerializedBytes))]
-#[serde(tag = "type", content = "data")]
 enum AnyDhtSerial {
     /// The hash of an Entry of EntryType::Agent
     Header(Header),
