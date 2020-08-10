@@ -53,7 +53,7 @@ use holochain_types::fixt::CapSecretFixturator;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::GuestOutput;
-use holochain_zome_types::{capability::CapSecret, HostInput};
+use holochain_zome_types::{capability::CapSecret, header::ZomeId, HostInput};
 use mockall::automock;
 use std::iter::Iterator;
 
@@ -350,6 +350,8 @@ pub trait RibosomeT: Sized {
     fn dna_file(&self) -> &DnaFile;
 
     fn zomes_to_invoke(&self, zomes_to_invoke: ZomesToInvoke) -> Vec<ZomeName>;
+
+    fn zome_name_to_id(&self, zome_name: &ZomeName) -> RibosomeResult<ZomeId>;
 
     fn maybe_call<I: Invocation + 'static>(
         &self,

@@ -34,7 +34,7 @@ use holochain_types::{
 use holochain_zome_types::{
     entry::GetOptions,
     entry_def::EntryDefs,
-    header::{builder, ElementDelete, EntryUpdate, LinkAdd, LinkRemove},
+    header::{builder, ElementDelete, EntryUpdate, LinkAdd, LinkRemove, ZomeId},
     link::{LinkTag, Links},
     zome::ZomeName,
     CommitEntryInput, GetInput, GetLinksInput, Header, LinkEntriesInput,
@@ -777,6 +777,9 @@ async fn commit_entry<'env>(
     // This is a lot faster then compiling a zome
     let mut ribosome = MockRibosomeT::new();
     ribosome.expect_dna_file().return_const(dna_file);
+    ribosome
+        .expect_zome_name_to_id()
+        .returning(|_| Ok(ZomeId::from(1)));
 
     ribosome
         .expect_run_entry_defs()
@@ -876,6 +879,9 @@ async fn link_entries<'env>(
     // This is a lot faster then compiling a zome
     let mut ribosome = MockRibosomeT::new();
     ribosome.expect_dna_file().return_const(dna_file);
+    ribosome
+        .expect_zome_name_to_id()
+        .returning(|_| Ok(ZomeId::from(1)));
 
     let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
     call_context.zome_name = zome_name.clone();
@@ -928,6 +934,9 @@ async fn get_links<'env>(
     // This is a lot faster then compiling a zome
     let mut ribosome = MockRibosomeT::new();
     ribosome.expect_dna_file().return_const(dna_file);
+    ribosome
+        .expect_zome_name_to_id()
+        .returning(|_| Ok(ZomeId::from(1)));
 
     let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
     call_context.zome_name = zome_name.clone();

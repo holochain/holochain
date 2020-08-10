@@ -73,9 +73,11 @@ pub struct WireEntryUpdate {
 /// original entry authority to someone asking for
 /// metadata on that original entry.
 /// ## How updates work
-/// EntryUpdates both create new entry and create
-/// a metadata relationship with the original entry.
-/// This wire data is for the relationship and not the
+/// `EntryUpdate` headers create both a new entry and
+/// a metadata relationship on the original entry.
+/// This wire data represents the metadata relationship
+/// which is stored on the original entry, i.e. this represents
+/// the "forward" reference from the original entry to the new entry.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub struct WireEntryUpdateRelationship {
     /// Timestamp is first so that deriving Ord results in

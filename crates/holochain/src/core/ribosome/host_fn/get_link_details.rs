@@ -1,4 +1,4 @@
-use crate::core::ribosome::error::{RibosomeError, RibosomeResult};
+use crate::core::ribosome::error::RibosomeResult;
 use crate::core::{
     ribosome::{CallContext, RibosomeT},
     state::{cascade::error::CascadeResult, metadata::LinkMetaKey},
@@ -21,16 +21,7 @@ pub fn get_link_details<'a>(
     let (base_address, tag) = input.into_inner();
 
     // Get zome id
-    let zome_id: holochain_zome_types::header::ZomeId = match ribosome
-        .dna_file()
-        .dna
-        .zomes
-        .iter()
-        .position(|(name, _)| name == &call_context.zome_name)
-    {
-        Some(index) => holochain_zome_types::header::ZomeId::from(index as u8),
-        None => Err(RibosomeError::ZomeNotExists(call_context.zome_name.clone()))?,
-    };
+    let zome_id = ribosome.zome_name_to_id(&call_context.zome_name)?;
 
     // Get the network from the context
     let network = call_context.host_access.network().clone();
