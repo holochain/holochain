@@ -469,7 +469,6 @@ pub mod wasm_test {
                 )
                 .await;
                 host_access.network = cell_network;
-                let timeout = $crate::start_hard_timeout!();
 
                 let invocation = $crate::core::ribosome::ZomeCallInvocationFixturator::new(
                     $crate::core::ribosome::NamedInvocation(
@@ -491,11 +490,6 @@ pub mod wasm_test {
                             panic!();
                         }
                     };
-
-                // instance building off a warm module should be the slowest part of a wasm test
-                // so if each instance (including inner callbacks) takes ~1ms this gives us
-                // headroom on 4 call(back)s
-                $crate::end_hard_timeout!(timeout, crate::perf::MULTI_WASM_CALL);
 
                 let output = match zome_invocation_response {
                     crate::core::ribosome::ZomeCallInvocationResponse::ZomeApiFn(guest_output) => {

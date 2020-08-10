@@ -379,7 +379,6 @@ impl RibosomeT for WasmRibosome {
         host_access: ZomeCallHostAccess,
         invocation: ZomeCallInvocation,
     ) -> RibosomeResult<ZomeCallInvocationResponse> {
-        let timeout = crate::start_hard_timeout!();
         // make a copy of these for the error handling below
         let zome_name = invocation.zome_name.clone();
         let fn_name = invocation.fn_name.clone();
@@ -391,11 +390,6 @@ impl RibosomeT for WasmRibosome {
             Some(result) => result.1,
             None => return Err(RibosomeError::ZomeFnNotExists(zome_name, fn_name)),
         };
-
-        // instance building is slow 1s+ on a cold cache but should be ~0.8-1 millis on a cache hit
-        // tests should be warming the instance cache before calling zome functions
-        // there could be nested callbacks in this call so we give it 5ms
-        crate::end_hard_timeout!(timeout, crate::perf::MULTI_WASM_CALL);
 
         Ok(ZomeCallInvocationResponse::ZomeApiFn(guest_output))
     }

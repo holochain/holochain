@@ -64,7 +64,7 @@ pub fn wasm_call_n(c: &mut Criterion) {
         // 1 byte
         // 1,     // 1 kb
         1_000, // 1 mb
-        // 1_000_000,
+              // 1_000_000,
     ] {
         group.throughput(Throughput::Bytes(n as _));
 
