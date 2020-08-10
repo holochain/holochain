@@ -66,13 +66,16 @@ use tracing_serde::AsSerde;
 use tracing_subscriber::{
     field::Visit,
     filter::EnvFilter,
-    fmt::{time::ChronoUtc, FmtContext, FormatFields},
+    fmt::{format::FmtSpan, time::ChronoUtc, FmtContext, FormatFields},
+    prelude::__tracing_subscriber_SubscriberExt,
     registry::LookupSpan,
-    FmtSubscriber,
+    FmtSubscriber, Registry,
 };
 
+use chrono::SecondsFormat;
 use serde_json::json;
-use std::{str::FromStr, sync::Once};
+use std::{path::PathBuf, str::FromStr, sync::Once};
+use tracing_flame::FlameLayer;
 
 #[derive(Debug, Clone)]
 /// Sets the kind of structed logging output you want
@@ -81,6 +84,8 @@ pub enum Output {
     Json,
     /// Regular logging (default)
     Log,
+    /// Regular logging plus timed spans
+    LogTimed,
     /// More compact version of above
     Compact,
     /// No logging to console
@@ -98,11 +103,16 @@ impl FromStr for Output {
         match day {
             "Json" => Ok(Output::Json),
             "Log" => Ok(Output::Log),
+            "LogTimed" => Ok(Output::LogTimed),
             "Compact" => Ok(Output::Compact),
             "None" => Ok(Output::None),
             _ => Err("Could not parse log output type".into()),
         }
     }
+}
+
+struct Flame {
+    guard: Option<Box<dyn Drop>>,
 }
 
 struct EventFieldVisitor {
@@ -179,6 +189,89 @@ pub fn test_run() -> Result<(), errors::TracingError> {
     init_fmt(Output::Log)
 }
 
+/// Same as test_run but with timed spans
+pub fn test_run_timed() -> Result<(), errors::TracingError> {
+    if let (None, None) = (
+        std::env::var_os("RUST_LOG"),
+        std::env::var_os("CUSTOM_FILTER"),
+    ) {
+        return Ok(());
+    }
+    init_fmt(Output::LogTimed)
+}
+
+/// Generate a tracing flamegraph for a test
+/// The `RUST_LOG` filter needs to be set to the
+/// spans you are interested in.
+/// The file will be outputted at the `CARGO_MANIFEST_DIR` as
+/// `tracing_flame_{date}.svg`.
+/// You probably want to build you test as release with:
+/// `cargo test --release`.
+/// To avoid building the whole test suite twice it is recommended to use
+/// an integration test like:
+/// `cargo test --test my_integration_test --release`.
+pub fn flame_run() -> Result<Option<impl Drop>, errors::TracingError> {
+    if let None = std::env::var_os("RUST_LOG") {
+        return Ok(None);
+    }
+    let filter = EnvFilter::from_default_env();
+    let path = Flame::generate_path().ok_or(errors::TracingError::TracingFlame)?;
+    let (flame_layer, guard) = FlameLayer::with_file(path.join("flames.folded"))?;
+
+    let subscriber = Registry::default().with(filter).with(flame_layer);
+
+    tracing::subscriber::set_global_default(subscriber)?;
+
+    Ok(Some(Flame {
+        guard: Some(Box::new(guard)),
+    }))
+}
+
+impl Flame {
+    fn generate_path() -> Option<PathBuf> {
+        let path = std::env::var_os("CARGO_MANIFEST_DIR").or_else(|| {
+            println!("failed to get cargo manifest dir for flames");
+            None
+        })?;
+        Some(PathBuf::from(path))
+    }
+
+    /// Save the flamegraph
+    /// We don't want this to fail our tests but we want to know if it doesn't work
+    fn flamegraph(&self) -> Option<()> {
+        let now = chrono::Local::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+        let path = Flame::generate_path()?;
+        let inf = std::fs::File::open(path.join("flames.folded"))
+            .ok()
+            .or_else(|| {
+                eprintln!("failed to create flames dir");
+                None
+            })?;
+        let reader = std::io::BufReader::new(inf);
+
+        let out = std::fs::File::create(path.join(format!("tracing_flame_{}.svg", now)))
+            .ok()
+            .or_else(|| {
+                eprintln!("failed to create flames inferno");
+                None
+            })?;
+        let writer = std::io::BufWriter::new(out);
+
+        let mut opts = inferno::flamegraph::Options::default();
+        inferno::flamegraph::from_reader(&mut opts, reader, writer).unwrap();
+        Some(())
+    }
+}
+
+impl Drop for Flame {
+    fn drop(&mut self) {
+        if let Some(g) = self.guard.take() {
+            drop(g);
+        }
+        self.flamegraph();
+    }
+}
+
 /// This checks RUST_LOG for a filter but doesn't complain if there is none or it doesn't parse.
 /// It then checks for CUSTOM_FILTER which if set will output an error if it doesn't parse.
 pub fn init_fmt(output: Output) -> Result<(), errors::TracingError> {
@@ -211,6 +304,10 @@ pub fn init_fmt(output: Output) -> Result<(), errors::TracingError> {
             finish(subscriber.finish())
         }
         Output::Log => finish(subscriber.with_env_filter(filter).finish()),
+        Output::LogTimed => {
+            let subscriber = subscriber.with_span_events(FmtSpan::CLOSE);
+            finish(subscriber.with_env_filter(filter).finish())
+        }
         Output::Compact => {
             let subscriber = subscriber.compact();
             finish(subscriber.with_env_filter(filter).finish())
@@ -241,5 +338,9 @@ pub mod errors {
     pub enum TracingError {
         #[error(transparent)]
         SetGlobal(#[from] tracing::subscriber::SetGlobalDefaultError),
+        #[error("Failed to setup tracing flame")]
+        TracingFlame,
+        #[error(transparent)]
+        TracingFlameError(#[from] tracing_flame::Error),
     }
 }
