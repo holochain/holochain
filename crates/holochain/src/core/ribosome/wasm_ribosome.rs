@@ -73,7 +73,7 @@ use holochain_zome_types::validate::ValidationPackageCallbackResult;
 use holochain_zome_types::validate_link_add::ValidateLinkAddCallbackResult;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::CallbackResult;
-use holochain_zome_types::GuestOutput;
+use holochain_zome_types::{header::ZomeId, GuestOutput};
 use std::sync::Arc;
 
 /// Path to the wasm cache path
@@ -326,6 +326,20 @@ impl RibosomeT for WasmRibosome {
                 .collect(),
             ZomesToInvoke::One(zome) => vec![zome],
         }
+    }
+
+    fn zome_name_to_id(&self, zome_name: &ZomeName) -> RibosomeResult<ZomeId> {
+        let header_zome_id: holochain_zome_types::header::ZomeId = match self
+            .dna_file()
+            .dna
+            .zomes
+            .iter()
+            .position(|(name, _)| name == zome_name)
+        {
+            Some(index) => holochain_zome_types::header::ZomeId::from(index as u8),
+            None => Err(RibosomeError::ZomeNotExists(zome_name.clone()))?,
+        };
+        Ok(header_zome_id)
     }
 
     /// call a function in a zome for an invocation if it exists

@@ -11,6 +11,7 @@ use crate::core::workflow::{
 use futures::future::BoxFuture;
 use futures::future::FutureExt;
 use holo_hash::{HasHash, HeaderHash};
+use holochain_zome_types::entry_def::{EntryDefId, EntryVisibility};
 use holochain_zome_types::header::builder;
 use holochain_zome_types::header::AppEntryType;
 use holochain_zome_types::header::EntryType;
@@ -36,45 +37,11 @@ pub fn commit_entry<'a>(
     .into_hash();
 
     // extract the zome position
-    let header_zome_id: holochain_zome_types::header::ZomeId = match ribosome
-        .dna_file()
-        .dna
-        .zomes
-        .iter()
-        .position(|(name, _)| name == &call_context.zome_name)
-    {
-        Some(index) => holochain_zome_types::header::ZomeId::from(index as u8),
-        None => Err(RibosomeError::ZomeNotExists(call_context.zome_name.clone()))?,
-    };
+    let header_zome_id = ribosome.zome_name_to_id(&call_context.zome_name)?;
 
     // extract the entry defs for a zome
-    let (header_entry_def_id, entry_visibility) = match match ribosome
-        .run_entry_defs((&call_context.host_access).into(), EntryDefsInvocation)?
-    {
-        // the ribosome returned some defs
-        EntryDefsResult::Defs(defs) => {
-            let maybe_entry_defs = defs.get(&call_context.zome_name);
-            match maybe_entry_defs {
-                // convert the entry def id string into a numeric position in the defs
-                Some(entry_defs) => match entry_defs.entry_def_id_position(entry_def_id.clone()) {
-                    // build an app entry type from the entry def at the found position
-                    Some(index) => Some((
-                        holochain_zome_types::header::EntryDefId::from(index as u8),
-                        entry_defs[index].visibility,
-                    )),
-                    None => None,
-                },
-                None => None,
-            }
-        }
-        _ => None,
-    } {
-        Some(app_entry_type) => app_entry_type,
-        None => Err(RibosomeError::EntryDefs(
-            call_context.zome_name.clone(),
-            format!("entry def not found for {:?}", entry_def_id),
-        ))?,
-    };
+    let (header_entry_def_id, entry_visibility) =
+        extract_entry_def(ribosome, call_context.clone(), entry_def_id)?;
 
     let app_entry_type = AppEntryType::new(header_entry_def_id, header_zome_id, entry_visibility);
 
@@ -115,6 +82,41 @@ pub fn commit_entry<'a>(
     // if the validation fails this commit will be rolled back by virtue of the lmdb transaction
     // being atomic
     Ok(CommitEntryOutput::new(header_address))
+}
+
+pub fn extract_entry_def(
+    ribosome: Arc<impl RibosomeT>,
+    call_context: Arc<CallContext>,
+    entry_def_id: EntryDefId,
+) -> RibosomeResult<(holochain_zome_types::header::EntryDefId, EntryVisibility)> {
+    let app_entry_type = match ribosome
+        .run_entry_defs((&call_context.host_access).into(), EntryDefsInvocation)?
+    {
+        // the ribosome returned some defs
+        EntryDefsResult::Defs(defs) => {
+            let maybe_entry_defs = defs.get(&call_context.zome_name);
+            match maybe_entry_defs {
+                // convert the entry def id string into a numeric position in the defs
+                Some(entry_defs) => match entry_defs.entry_def_id_position(entry_def_id.clone()) {
+                    // build an app entry type from the entry def at the found position
+                    Some(index) => Some((
+                        holochain_zome_types::header::EntryDefId::from(index as u8),
+                        entry_defs[index].visibility,
+                    )),
+                    None => None,
+                },
+                None => None,
+            }
+        }
+        _ => None,
+    };
+    match app_entry_type {
+        Some(app_entry_type) => Ok(app_entry_type),
+        None => Err(RibosomeError::EntryDefs(
+            call_context.zome_name.clone(),
+            format!("entry def not found for {:?}", entry_def_id),
+        )),
+    }
 }
 
 #[cfg(test)]

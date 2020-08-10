@@ -44,17 +44,15 @@ use holochain_state::{
 use holochain_types::{
     autonomic::AutonomicProcess,
     cell::CellId,
-    element::{GetElementResponse, RawGetEntryResponse, WireElement},
+    element::{GetElementResponse, WireElement},
     link::{GetLinksResponse, WireLinkMetaKey},
     metadata::{MetadataSet, TimedHeaderHash},
     Timestamp,
 };
 use holochain_zome_types::capability::CapSecret;
+use holochain_zome_types::header::{LinkAdd, LinkRemove};
 use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::{
-    header::{conversions::WrongHeaderError, LinkAdd, LinkRemove},
-    HostInput,
-};
+use holochain_zome_types::HostInput;
 use std::{
     collections::{BTreeMap, BTreeSet},
     convert::TryInto,
@@ -63,6 +61,8 @@ use std::{
 };
 use tokio::sync;
 use tracing::*;
+
+mod authority;
 
 #[allow(missing_docs)]
 pub mod error;
@@ -242,7 +242,7 @@ impl Cell {
                 request,
                 ..
             } => {
-                let _g = span.enter();
+                let _g = Span::enter(&span);
                 let res = self
                     .handle_call_remote(to_agent, zome_name, fn_name, cap, request)
                     .await
@@ -258,7 +258,7 @@ impl Cell {
                 ops,
                 ..
             } => {
-                let _g = span.enter();
+                let _g = Span::enter(&span);
                 let res = self
                     .handle_publish(from_agent, request_validation_receipt, dht_hash, ops)
                     .await
@@ -266,7 +266,7 @@ impl Cell {
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
             GetValidationPackage { span, respond, .. } => {
-                let _g = span.enter();
+                let _g = Span::enter(&span);
                 let res = self
                     .handle_get_validation_package()
                     .await
@@ -280,7 +280,7 @@ impl Cell {
                 options,
                 ..
             } => {
-                let _g = span.enter();
+                let _g = Span::enter(&span);
                 let res = self
                     .handle_get(dht_hash, options)
                     .await
@@ -294,7 +294,7 @@ impl Cell {
                 options,
                 ..
             } => {
-                let _g = span.enter();
+                let _g = Span::enter(&span);
                 let res = self
                     .handle_get_meta(dht_hash, options)
                     .await
@@ -308,7 +308,7 @@ impl Cell {
                 options,
                 ..
             } => {
-                let _g = span.enter();
+                let _g = Span::enter(&span);
                 let res = self
                     .handle_get_links(link_key, options)
                     .await
@@ -321,7 +321,7 @@ impl Cell {
                 receipt,
                 ..
             } => {
-                let _g = span.enter();
+                let _g = Span::enter(&span);
                 let res = self
                     .handle_validation_receipt(receipt)
                     .await
@@ -336,7 +336,7 @@ impl Cell {
                 until,
                 ..
             } => {
-                let _g = span.enter();
+                let _g = Span::enter(&span);
                 let res = self
                     .handle_fetch_op_hashes_for_constraints(dht_arc, since, until)
                     .await
@@ -349,7 +349,7 @@ impl Cell {
                 op_hashes,
                 ..
             } => {
-                let _g = span.enter();
+                let _g = Span::enter(&span);
                 let res = self
                     .handle_fetch_op_hash_data(op_hashes)
                     .await
@@ -357,7 +357,7 @@ impl Cell {
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
             SignNetworkData { span, respond, .. } => {
-                let _g = span.enter();
+                let _g = Span::enter(&span);
                 let res = self
                     .handle_sign_network_data()
                     .await
@@ -418,130 +418,38 @@ impl Cell {
         unimplemented!()
     }
 
-    #[instrument(skip(self, _options))]
+    #[instrument(skip(self, options))]
     /// a remote node is asking us for entry data
     async fn handle_get(
         &self,
         dht_hash: holo_hash::AnyDhtHash,
-        _options: holochain_p2p::event::GetOptions,
+        options: holochain_p2p::event::GetOptions,
     ) -> CellResult<GetElementResponse> {
         // TODO: Later we will need more get types but for now
         // we can just have these defaults depending on whether or not
         // the hash is an entry or header.
         // In the future we should use GetOptions to choose which get to run.
-        match *dht_hash.hash_type() {
-            AnyDht::Entry(et) => self.handle_get_entry(dht_hash.retype(et)).await,
+        let r = match *dht_hash.hash_type() {
+            AnyDht::Entry(et) => self.handle_get_entry(dht_hash.retype(et), options).await,
             AnyDht::Header => {
                 self.handle_get_element(dht_hash.retype(hash_type::Header))
                     .await
             }
+        };
+        if let Err(e) = &r {
+            error!(msg = "Error handling a get", ?e, agent = ?self.id.agent_pubkey());
         }
+        r
     }
 
-    async fn handle_get_entry(&self, hash: EntryHash) -> CellResult<GetElementResponse> {
-        // Get the vaults
-        let env_ref = self.state_env.guard().await;
-        let dbs = self.state_env.dbs().await;
-        let reader = env_ref.reader()?;
-        let element_vault = ElementBuf::vault(&reader, &dbs, false)?;
-        let meta_vault = MetadataBuf::vault(&reader, &dbs)?;
-
-        // The data we want to collect
-        let mut entry_data = None;
-        let mut deletes = Vec::new();
-        let mut live_headers = BTreeSet::new();
-
-        let mut delete_headers = Vec::new();
-        // Get the live header hashes and collect any deletes
-        let results = meta_vault
-            .get_headers(hash)?
-            // Filtering on any live headers only
-            .filter_map(|header_hash| {
-                let header_hash = header_hash.header_hash;
-                match meta_vault
-                    .get_deletes_on_header(header_hash.clone())?
-                    .next()?
-                {
-                    // Header is dead so don't return but collect the deleted header
-                    Some(delete) => {
-                        delete_headers.push(delete.header_hash);
-                        Ok(None)
-                    }
-                    // Header is alive so return
-                    None => Ok(Some(header_hash)),
-                }
-            })
-            // TODO: PERF: Remove this collect by fixing thread safety await issue
-            .collect::<Vec<_>>()?;
-
-        // Collect the actual headers from the element vault
-        for live_header in results {
-            let header = match element_vault.get_header(&live_header).await? {
-                // Found the header
-                Some(header) => {
-                    // Does the header contain entry data?
-                    match header.header().entry_data() {
-                        // Contains the entry data
-                        Some((eh, et)) => {
-                            // We only need the entry data once so if it's None collect it
-                            if let None = &entry_data {
-                                // Can we get the actual entry
-                                match element_vault.get_entry(&eh).await? {
-                                    // Found so everything is ok
-                                    Some(e) => {
-                                        entry_data = Some((e.into_content(), et.clone()));
-                                    }
-                                    // Missing the entry
-                                    None => {
-                                        return Err(AuthorityDataError::missing_data_entry(
-                                            live_header,
-                                        ));
-                                    }
-                                }
-                            }
-                        }
-                        // No entry data so don't return this header
-                        None => {
-                            return Err(AuthorityDataError::WrongHeaderError(WrongHeaderError(
-                                format!("Header should have entry data: {:?}", live_header),
-                            ))
-                            .into());
-                        }
-                    }
-                    header
-                }
-                // Missing the header
-                None => {
-                    return Err(AuthorityDataError::missing_data(live_header));
-                }
-            };
-            // Collect the actual live header
-            live_headers.insert(header.try_into()?);
-        }
-
-        for delete in delete_headers {
-            match element_vault.get_header(&delete).await? {
-                Some(delete) => deletes.push(delete.try_into().map_err(AuthorityDataError::from)?),
-                None => {
-                    return Err(AuthorityDataError::missing_data(delete));
-                }
-            }
-        }
-
-        // Construct the return type
-        let r = match entry_data {
-            Some((entry, entry_type)) => {
-                let r = RawGetEntryResponse {
-                    live_headers,
-                    deletes,
-                    entry,
-                    entry_type,
-                };
-                Some(Box::new(r))
-            }
-            _ => None,
-        };
-        Ok(GetElementResponse::GetEntryFull(r))
+    #[instrument(skip(self, options))]
+    async fn handle_get_entry(
+        &self,
+        hash: EntryHash,
+        options: holochain_p2p::event::GetOptions,
+    ) -> CellResult<GetElementResponse> {
+        let state_env = self.state_env.clone();
+        authority::handle_get_entry(state_env, hash, options).await
     }
 
     async fn handle_get_element(&self, hash: HeaderHash) -> CellResult<GetElementResponse> {

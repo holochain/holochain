@@ -7,6 +7,7 @@ use holochain_zome_types::DebugOutput;
 use std::sync::Arc;
 use tracing::*;
 
+#[instrument(skip(_ribosome, _call_context, input))]
 pub fn debug(
     _ribosome: Arc<impl RibosomeT>,
     _call_context: Arc<CallContext>,

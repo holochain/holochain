@@ -69,6 +69,32 @@ pub struct WireEntryUpdate {
     pub signature: Signature,
 }
 
+/// This type is used when sending updates from the
+/// original entry authority to someone asking for
+/// metadata on that original entry.
+/// ## How updates work
+/// `EntryUpdate` headers create both a new entry and
+/// a metadata relationship on the original entry.
+/// This wire data represents the metadata relationship
+/// which is stored on the original entry, i.e. this represents
+/// the "forward" reference from the original entry to the new entry.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+pub struct WireEntryUpdateRelationship {
+    /// Timestamp is first so that deriving Ord results in
+    /// order by time
+    pub timestamp: holochain_zome_types::timestamp::Timestamp,
+    pub author: AgentPubKey,
+    pub header_seq: u32,
+    pub prev_header: HeaderHash,
+    /// Address of the original entry header
+    pub original_header_address: HeaderHash,
+    /// The entry that this update created
+    pub new_entry_address: EntryHash,
+    /// The entry type of the entry that this header created
+    pub new_entry_type: EntryType,
+    pub signature: Signature,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
 pub struct WireElementDelete {
     pub delete: ElementDelete,
@@ -138,6 +164,28 @@ impl WireElementDelete {
     }
 }
 
+impl WireEntryUpdateRelationship {
+    /// Recreate the EntryUpdate Element without an Entry.
+    /// Useful for creating dht ops
+    pub async fn into_element(self, original_entry_address: EntryHash) -> Element {
+        let eu = EntryUpdate {
+            author: self.author,
+            timestamp: self.timestamp,
+            header_seq: self.header_seq,
+            prev_header: self.prev_header,
+            original_header_address: self.original_header_address,
+            original_entry_address,
+            entry_type: self.new_entry_type,
+            entry_hash: self.new_entry_address,
+        };
+        Element::new(
+            SignedHeaderHashed::from_content(SignedHeader(Header::EntryUpdate(eu), self.signature))
+                .await,
+            None,
+        )
+    }
+}
+
 impl TryFrom<SignedHeaderHashed> for WireElementDelete {
     type Error = WrongHeaderError;
     fn try_from(shh: SignedHeaderHashed) -> Result<Self, Self::Error> {
@@ -145,6 +193,41 @@ impl TryFrom<SignedHeaderHashed> for WireElementDelete {
         Ok(Self {
             delete: h.into_content().try_into()?,
             signature,
+        })
+    }
+}
+
+impl TryFrom<SignedHeaderHashed> for WireEntryUpdate {
+    type Error = WrongHeaderError;
+    fn try_from(shh: SignedHeaderHashed) -> Result<Self, Self::Error> {
+        let (h, signature) = shh.into_header_and_signature();
+        let d: EntryUpdate = h.into_content().try_into()?;
+        Ok(Self {
+            signature,
+            timestamp: d.timestamp,
+            author: d.author,
+            header_seq: d.header_seq,
+            prev_header: d.prev_header,
+            original_entry_address: d.original_entry_address,
+            original_header_address: d.original_header_address,
+        })
+    }
+}
+
+impl TryFrom<SignedHeaderHashed> for WireEntryUpdateRelationship {
+    type Error = WrongHeaderError;
+    fn try_from(shh: SignedHeaderHashed) -> Result<Self, Self::Error> {
+        let (h, signature) = shh.into_header_and_signature();
+        let d: EntryUpdate = h.into_content().try_into()?;
+        Ok(Self {
+            signature,
+            timestamp: d.timestamp,
+            author: d.author,
+            header_seq: d.header_seq,
+            prev_header: d.prev_header,
+            original_header_address: d.original_header_address,
+            new_entry_address: d.entry_hash,
+            new_entry_type: d.entry_type,
         })
     }
 }
