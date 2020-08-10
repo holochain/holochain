@@ -88,7 +88,7 @@ where
     /// Fetch data from DB, deserialize into V type
     fn get_persisted(&self, k: K) -> DatabaseResult<Option<V>> {
         match self.db.get(self.reader, k)? {
-            Some(rkv::Value::Blob(buf)) => Ok(Some(rmp_serde::from_read_ref(buf)?)),
+            Some(rkv::Value::Blob(buf)) => Ok(Some(holochain_serialized_bytes::decode(buf)?)),
             None => Ok(None),
             Some(_) => Err(DatabaseError::InvalidValue),
         }
@@ -137,7 +137,7 @@ where
         for (k, op) in self.scratch.iter() {
             match op {
                 Put(v) => {
-                    let buf = rmp_serde::to_vec_named(v)?;
+                    let buf = holochain_serialized_bytes::encode(v)?;
                     let encoded = rkv::Value::Blob(&buf);
                     self.db.put(writer, *k, &encoded)?;
                 }
@@ -176,7 +176,7 @@ where
         match self.0.next() {
             Some(Ok((k, Some(rkv::Value::Blob(buf))))) => Some((
                 K::from_bytes(k).expect("Failed to deserialize key"),
-                rmp_serde::from_read_ref(buf).expect("Failed to deserialize value"),
+                holochain_serialized_bytes::decode(buf).expect("Failed to deserialize value"),
             )),
             None => None,
             x => {
