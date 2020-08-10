@@ -18,10 +18,10 @@ base64 = {version = "0.12.0", optional = true}
 blake2b_simd = {version = "0.5.10", optional = true}
 fixt = { version = "0.0.1", path = "../fixt", optional = true }
 futures = {version = "0.3", optional = true}
-holochain_serialized_bytes = {version = "0.0.41", optional = true }
+holochain_serialized_bytes = {version = "=0.0.41", optional = true }
 must_future = {version = "0.1.1", optional = true}
 rand = {version = "0.7", optional = true}
-rmp-serde = {version = "0.14.3", optional = true}
+# rmp-serde = {version = "0.14.3", optional = true}
 
 [dev-dependencies]
 serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
@@ -32,6 +32,6 @@ default = ["serialized-bytes"]
 full = ["fixturators", "hashing", "string-encoding"]
 
 fixturators = ["fixt", "serialized-bytes", "rand"]
-serialized-bytes = ["holochain_serialized_bytes", "rmp-serde"]
+serialized-bytes = ["holochain_serialized_bytes"]
 string-encoding = ["base64", "blake2b_simd"]
 hashing = ["blake2b_simd", "futures", "serialized-bytes", "must_future"]

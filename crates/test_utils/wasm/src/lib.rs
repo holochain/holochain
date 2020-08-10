@@ -22,6 +22,7 @@ pub enum TestWasm {
     MigrateAgentPass,
     PostCommitFail,
     PostCommitSuccess,
+    SerRegression,
     Validate,
     ValidateLink,
     ValidateInvalid,
@@ -51,6 +52,7 @@ impl From<TestWasm> for ZomeName {
             TestWasm::MigrateAgentPass => "migrate_agent_pass",
             TestWasm::PostCommitFail => "post_commit_fail",
             TestWasm::PostCommitSuccess => "post_commit_success",
+            TestWasm::SerRegression => "ser_regression",
             TestWasm::Validate => "validate",
             TestWasm::ValidateLink => "validate_link",
             TestWasm::ValidateInvalid => "validate_invalid",
@@ -140,6 +142,11 @@ impl From<TestWasm> for DnaWasm {
             TestWasm::PostCommitSuccess => include_bytes!(concat!(
                 env!("OUT_DIR"),
                 "/wasm32-unknown-unknown/release/test_wasm_post_commit_success.wasm"
+            ))
+            .to_vec(),
+            TestWasm::SerRegression => include_bytes!(concat!(
+                env!("OUT_DIR"),
+                "/wasm32-unknown-unknown/release/test_wasm_ser_regression.wasm"
             ))
             .to_vec(),
             TestWasm::Validate => include_bytes!(concat!(

@@ -314,8 +314,8 @@ mod tests {
                 .unwrap(),
         )
         .into();
-        let bytes = rmp_serde::to_vec_named(&orig).unwrap();
-        let res: Header = rmp_serde::from_read_ref(&bytes).unwrap();
+        let bytes = holochain_serialized_bytes::encode(&orig).unwrap();
+        let res: Header = holochain_serialized_bytes::decode(&bytes).unwrap();
         assert_eq!(orig, res);
     }
 
@@ -333,9 +333,9 @@ mod tests {
             fake_entry_content_hash(1).into(),
         )
         .into();
-        let bytes = rmp_serde::to_vec_named(&orig).unwrap();
+        let bytes = holochain_serialized_bytes::encode(&orig).unwrap();
         println!("{:?}", bytes);
-        let res: Header = rmp_serde::from_read_ref(&bytes).unwrap();
+        let res: Header = holochain_serialized_bytes::decode(&bytes).unwrap();
         assert_eq!(orig, res);
     }
 
