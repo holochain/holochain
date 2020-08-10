@@ -6,6 +6,7 @@
 //!     std::error::Error, into error types that do
 
 use crate::error::DatabaseError;
+use chrono::{offset::Local, DateTime};
 use derive_more::From;
 use rkv::{Database, RoCursor, StoreError, Value};
 use shrinkwraprs::Shrinkwrap;
@@ -16,9 +17,35 @@ use shrinkwraprs::Shrinkwrap;
 pub trait Readable: rkv::Readable {}
 impl<T: rkv::Readable> Readable for T {}
 
+struct ReaderSpanInfo {
+    _span: tracing::Span,
+    // Using a chrono timestamp here because we need duration operations
+    start_time: DateTime<Local>,
+}
+
+impl ReaderSpanInfo {
+    pub fn new() -> Self {
+        Self {
+            _span: tracing::span!(tracing::Level::DEBUG, "new reader"),
+            start_time: Local::now(),
+        }
+    }
+}
+
+impl Drop for ReaderSpanInfo {
+    fn drop(&mut self) {
+        let ms = Local::now()
+            .signed_duration_since(self.start_time)
+            .num_milliseconds();
+        if ms >= 10 {
+            tracing::warn!("long-lived reader: {} ms", ms)
+        }
+    }
+}
+
 /// Wrapper around `rkv::Reader`, so it can be marked as threadsafe
-#[derive(From, Shrinkwrap)]
-pub struct Reader<'env>(rkv::Reader<'env>);
+#[derive(Shrinkwrap)]
+pub struct Reader<'env>(#[shrinkwrap(main_field)] rkv::Reader<'env>, ReaderSpanInfo);
 
 /// If MDB_NOTLS env flag is set, then read-only transactions are threadsafe
 /// and we can mark them as such
@@ -37,6 +64,12 @@ impl<'env> rkv::Readable for Reader<'env> {
 
     fn open_ro_cursor(&self, db: Database) -> Result<RoCursor, StoreError> {
         self.0.open_ro_cursor(db)
+    }
+}
+
+impl<'env> From<rkv::Reader<'env>> for Reader<'env> {
+    fn from(r: rkv::Reader<'env>) -> Self {
+        Self(r, ReaderSpanInfo::new())
     }
 }
 
