@@ -21,8 +21,6 @@ pub fn wasm_call_n(c: &mut Criterion) {
     ] {
         group.throughput(Throughput::Bytes(n as _));
 
-        println!("{}", n);
-
         group.bench_function(BenchmarkId::from_parameter(n), |b| {
             // bytes
             let bytes = test_wasm_common::TestBytes::from(vec![0; n]);
