@@ -18,21 +18,17 @@ impl<T: rkv::Readable> Readable for T {}
 
 /// Wrapper around `rkv::Reader`, so it can be marked as threadsafe
 #[derive(From, Shrinkwrap)]
-pub struct ThreadsafeRkvReader<'env>(rkv::Reader<'env>);
+pub struct Reader<'env>(rkv::Reader<'env>);
 
 /// If MDB_NOTLS env flag is set, then read-only transactions are threadsafe
 /// and we can mark them as such
 #[cfg(feature = "lmdb_no_tls")]
-unsafe impl<'env> Send for ThreadsafeRkvReader<'env> {}
+unsafe impl<'env> Send for Reader<'env> {}
 
 /// If MDB_NOTLS env flag is set, then read-only transactions are threadsafe
 /// and we can mark them as such
 #[cfg(feature = "lmdb_no_tls")]
-unsafe impl<'env> Sync for ThreadsafeRkvReader<'env> {}
-
-/// Wrapper around [ThreadsafeRkvReader]
-#[derive(From, Shrinkwrap)]
-pub struct Reader<'env>(ThreadsafeRkvReader<'env>);
+unsafe impl<'env> Sync for Reader<'env> {}
 
 impl<'env> rkv::Readable for Reader<'env> {
     fn get<K: AsRef<[u8]>>(&self, db: Database, k: &K) -> Result<Option<Value>, StoreError> {
