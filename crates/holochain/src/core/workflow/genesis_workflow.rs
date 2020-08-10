@@ -49,8 +49,8 @@ pub async fn genesis_workflow<'env, Api: CellConductorApiT>(
     Ok(())
 }
 
-async fn genesis_workflow_inner<'env, Api: CellConductorApiT>(
-    workspace: &mut GenesisWorkspace<'env>,
+async fn genesis_workflow_inner<Api: CellConductorApiT>(
+    workspace: &mut GenesisWorkspace<'_>,
     args: GenesisWorkflowArgs,
     api: Api,
 ) -> WorkflowResult<()> {
