@@ -346,7 +346,7 @@ impl From<&ZomeCallHostAccess> for HostFnAccess {
 /// Interface for a Ribosome. Currently used only for mocking, as our only
 /// real concrete type is [WasmRibosome]
 #[automock]
-pub trait RibosomeT: Sized {
+pub trait RibosomeT: Sized + std::fmt::Debug {
     fn dna_file(&self) -> &DnaFile;
 
     fn zomes_to_invoke(&self, zomes_to_invoke: ZomesToInvoke) -> Vec<ZomeName>;
@@ -434,6 +434,12 @@ pub trait RibosomeT: Sized {
         access: ZomeCallHostAccess,
         invocation: ZomeCallInvocation,
     ) -> RibosomeResult<ZomeCallInvocationResponse>;
+}
+
+impl std::fmt::Debug for MockRibosomeT {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("MockRibosomeT()"))
+    }
 }
 
 #[cfg(test)]

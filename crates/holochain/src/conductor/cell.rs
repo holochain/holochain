@@ -191,14 +191,9 @@ impl Cell {
         let workspace = GenesisWorkspace::new(&reader, &env)
             .map_err(ConductorApiError::from)
             .map_err(Box::new)?;
-        let args = GenesisWorkflowArgs::new(
-            conductor_api,
-            dna_file,
-            id.agent_pubkey().clone(),
-            membrane_proof,
-        );
+        let args = GenesisWorkflowArgs::new(dna_file, id.agent_pubkey().clone(), membrane_proof);
 
-        genesis_workflow(workspace, state_env.clone().into(), args)
+        genesis_workflow(workspace, state_env.clone().into(), conductor_api, args)
             .await
             .map_err(Box::new)
             .map_err(ConductorApiError::from)
@@ -657,6 +652,7 @@ impl Cell {
     }
 
     /// Function called by the Conductor
+    #[instrument(skip(self))]
     pub async fn call_zome(
         &self,
         invocation: ZomeCallInvocation,

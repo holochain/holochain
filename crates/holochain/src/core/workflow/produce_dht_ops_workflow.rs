@@ -16,7 +16,7 @@ use tracing::*;
 
 pub mod dht_op_light;
 
-// TODO: #[instrument]
+#[instrument(skip(workspace, writer, trigger_integration))]
 pub async fn produce_dht_ops_workflow(
     mut workspace: ProduceDhtOpsWorkspace<'_>,
     writer: OneshotWriter,
