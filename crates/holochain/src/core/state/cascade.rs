@@ -1,4 +1,6 @@
 //! # Cascade
+//! ALL OUTDATED
+// TODO: Update or remove these docs
 //! This module is still a work in progress.
 //! Here is some pseudocode we are using to build it.
 //! ## Dimensions
@@ -42,7 +44,10 @@ use super::{
     element_buf::ElementBuf,
     metadata::{LinkMetaKey, MetadataBuf, MetadataBufT, SysMetaVal},
 };
-use crate::core::workflow::integrate_dht_ops_workflow::integrate_single_metadata;
+use crate::core::workflow::{
+    integrate_dht_ops_workflow::integrate_single_metadata,
+    produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertResult,
+};
 use error::CascadeResult;
 use fallible_iterator::FallibleIterator;
 use holo_hash::{
@@ -62,12 +67,17 @@ use holochain_types::{
     entry::option_entry_hashed,
     link::{GetLinksResponse, WireLinkMetaKey},
     metadata::{EntryDhtStatus, MetadataSet, TimedHeaderHash},
+    EntryHashed, HeaderHashed,
 };
+use holochain_zome_types::header::{LinkAdd, LinkRemove};
 use holochain_zome_types::{
     element::SignedHeader,
-    header::{LinkAdd, LinkRemove},
+    header::{ElementDelete, EntryUpdate},
     link::Link,
+    metadata::{Details, ElementDetails, EntryDetails},
+    Header,
 };
+use std::convert::TryFrom;
 use std::{
     collections::{BTreeMap, BTreeSet},
     convert::TryInto,
@@ -144,6 +154,7 @@ where
         Ok(())
     }
 
+    #[instrument(skip(self, elements))]
     async fn update_stores_with_element_group(
         &mut self,
         elements: ElementGroup<'_>,
@@ -193,7 +204,10 @@ where
         hash: EntryHash,
         options: GetOptions,
     ) -> CascadeResult<()> {
-        let results = self.network.get(hash.clone().into(), options).await?;
+        let results = self
+            .network
+            .get(hash.clone().into(), options.clone())
+            .await?;
         debug!("fetching element");
 
         for response in results {
@@ -204,12 +218,18 @@ where
                         deletes,
                         entry,
                         entry_type,
+                        updates,
                     } = *raw;
                     let elements =
                         ElementGroup::from_wire_elements(live_headers, entry_type, entry).await?;
+                    let entry_hash = elements.entry_hash().clone();
                     self.update_stores_with_element_group(elements).await?;
                     for delete in deletes {
                         let element = delete.into_element().await;
+                        self.update_stores(element).await?;
+                    }
+                    for update in updates {
+                        let element = update.into_element(entry_hash.clone()).await;
                         self.update_stores(element).await?;
                     }
                 }
@@ -307,6 +327,119 @@ where
         }
     }
 
+    async fn get_entry_local_raw(&self, hash: &EntryHash) -> CascadeResult<Option<EntryHashed>> {
+        match self.element_vault.get_entry(hash).await? {
+            None => Ok(self.element_cache.get_entry(hash).await?),
+            r => Ok(r),
+        }
+    }
+
+    async fn get_header_local_raw(&self, hash: &HeaderHash) -> CascadeResult<Option<HeaderHashed>> {
+        match self
+            .element_vault
+            .get_header(hash)
+            .await?
+            .map(|h| h.into_header_and_signature().0)
+        {
+            None => Ok(self
+                .element_cache
+                .get_header(hash)
+                .await?
+                .map(|h| h.into_header_and_signature().0)),
+            r => Ok(r),
+        }
+    }
+
+    async fn render_headers<T, F>(
+        &self,
+        headers: Vec<TimedHeaderHash>,
+        f: F,
+    ) -> CascadeResult<Vec<T>>
+    where
+        F: Fn(Header) -> DhtOpConvertResult<T>,
+    {
+        let mut result = Vec::with_capacity(headers.len());
+        for h in headers {
+            let hash = h.header_hash;
+            let h = self.get_header_local_raw(&hash).await?;
+            match h {
+                Some(h) => result.push(f(HeaderHashed::into_content(h))?),
+                None => continue,
+            }
+        }
+        Ok(result)
+    }
+
+    async fn create_entry_details(&self, hash: EntryHash) -> CascadeResult<Option<EntryDetails>> {
+        match self.get_entry_local_raw(&hash).await? {
+            Some(entry) => {
+                let entry_dht_status = self.meta_cache.get_dht_status(&hash)?;
+                let headers = self
+                    .meta_cache
+                    .get_headers(hash.clone())?
+                    .collect::<Vec<_>>()?;
+                let headers = self.render_headers(headers, |h| Ok(h)).await?;
+                let deletes = self
+                    .meta_cache
+                    .get_deletes_on_entry(hash.clone())?
+                    .collect::<Vec<_>>()?;
+                let deletes = self
+                    .render_headers(deletes, |h| Ok(ElementDelete::try_from(h)?))
+                    .await?;
+                let updates = self
+                    .meta_cache
+                    .get_updates(hash.into())?
+                    .collect::<Vec<_>>()?;
+                let updates = self
+                    .render_headers(updates, |h| Ok(EntryUpdate::try_from(h)?))
+                    .await?;
+                Ok(Some(EntryDetails {
+                    entry: entry.into_content(),
+                    headers,
+                    deletes,
+                    updates,
+                    entry_dht_status,
+                }))
+            }
+            None => Ok(None),
+        }
+    }
+
+    async fn create_element_details(
+        &self,
+        hash: HeaderHash,
+    ) -> CascadeResult<Option<ElementDetails>> {
+        match self.get_element_local_raw(&hash).await? {
+            Some(element) => {
+                let hash = element.header_address().clone();
+                let deletes = self
+                    .meta_cache
+                    .get_deletes_on_header(hash)?
+                    .collect::<Vec<_>>()?;
+                let deletes = self
+                    .render_headers(deletes, |h| Ok(ElementDelete::try_from(h)?))
+                    .await?;
+                Ok(Some(ElementDetails { element, deletes }))
+            }
+            None => Ok(None),
+        }
+    }
+
+    #[instrument(skip(self, options))]
+    pub async fn get_entry_details(
+        &mut self,
+        entry_hash: EntryHash,
+        options: GetOptions,
+    ) -> CascadeResult<Option<EntryDetails>> {
+        debug!("in get entry details");
+        // Update the cache from the network
+        self.fetch_element_via_entry(entry_hash.clone(), options.clone())
+            .await?;
+
+        // Get the entry and metadata
+        self.create_entry_details(entry_hash).await
+    }
+
     #[instrument(skip(self, options))]
     /// Returns the oldest live [Element] for this [EntryHash] by getting the
     /// latest available metadata from authorities combined with this agents authored data.
@@ -364,6 +497,21 @@ where
             }
             Search::NotInCascade => Ok(None),
         }
+    }
+
+    #[instrument(skip(self, options))]
+    pub async fn get_header_details(
+        &mut self,
+        header_hash: HeaderHash,
+        options: GetOptions,
+    ) -> CascadeResult<Option<ElementDetails>> {
+        debug!("in get header details");
+        // Network
+        self.fetch_element_via_header(header_hash.clone(), options)
+            .await?;
+
+        // Get the element and the metadata
+        self.create_element_details(header_hash).await
     }
 
     #[instrument(skip(self, options))]
@@ -430,6 +578,31 @@ where
             AnyDht::Header => {
                 let hash = hash.retype(hash_type::Header);
                 self.dht_get_header(hash, options).await
+            }
+        }
+    }
+
+    #[instrument(skip(self))]
+    pub async fn get_details(
+        &mut self,
+        hash: AnyDhtHash,
+        mut options: GetOptions,
+    ) -> CascadeResult<Option<Details>> {
+        options.all_live_headers_with_metadata = true;
+        match *hash.hash_type() {
+            AnyDht::Entry(e) => {
+                let hash = hash.retype(e);
+                Ok(self
+                    .get_entry_details(hash, options)
+                    .await?
+                    .map(Details::Entry))
+            }
+            AnyDht::Header => {
+                let hash = hash.retype(hash_type::Header);
+                Ok(self
+                    .get_header_details(hash, options)
+                    .await?
+                    .map(Details::Element))
             }
         }
     }

@@ -10,6 +10,7 @@ pub mod encrypt;
 pub mod entry_hash;
 pub mod entry_type_properties;
 pub mod get;
+pub mod get_details;
 pub mod get_link_details;
 pub mod get_links;
 pub mod keystore;

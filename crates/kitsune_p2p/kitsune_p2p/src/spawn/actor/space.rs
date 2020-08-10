@@ -440,12 +440,24 @@ impl Space {
                             let mut res_send = res_send.clone();
                             // make the call - the responses will be
                             // sent back to our channel
+
+                            // Leaving commented out code because it's useful for
+                            // checking if gets work
+                            // let fr = from_agent.clone();
+
                             tokio::task::spawn(async move {
+                                // Leaving commented out code because it's useful for
+                                // if agent == fr{
+                                //     tokio::time::delay_for(std::time::Duration::from_secs(2)).await;
+                                // }
                                 if let Ok(response) =
                                     i_s.immediate_request(space, agent.clone(), payload).await
                                 {
                                     let _ = res_send
-                                        .send(actor::RpcMultiResponse { agent, response })
+                                        .send(actor::RpcMultiResponse {
+                                            agent: agent,
+                                            response,
+                                        })
                                         .await;
                                 }
                             });

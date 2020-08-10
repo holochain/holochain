@@ -169,7 +169,6 @@ where
     DS: DnaStore + 'static,
 {
     pub(super) fn cell_by_id(&self, cell_id: &CellId) -> ConductorResult<&Cell> {
-        debug!(cells_map = ?self.cells.keys().collect::<Vec<_>>());
         let item = self
             .cells
             .get(cell_id)

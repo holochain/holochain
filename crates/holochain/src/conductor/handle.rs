@@ -257,6 +257,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     ) -> ConductorResult<()> {
         let lock = self.conductor.read().await;
         let cell: &Cell = lock.cell_by_id(cell_id)?;
+        trace!(agent = ?cell_id.agent_pubkey(), event = ?event);
         cell.handle_holochain_p2p_event(event).await?;
         Ok(())
     }

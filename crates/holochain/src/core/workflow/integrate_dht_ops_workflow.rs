@@ -358,6 +358,7 @@ pub async fn integrate_single_metadata<C: MetadataBufT>(
             meta_store.remove_link(header).await?;
         }
     }
+    debug!("made it");
     Ok(())
 }
 
