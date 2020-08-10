@@ -37,6 +37,7 @@ fn main() {
         "migrate_agent_pass",
         "post_commit_fail",
         "post_commit_success",
+        "ser_regression",
         "validate",
         "validate_link",
         "validate_invalid",
@@ -49,6 +50,13 @@ fn main() {
     ]
     .iter()
     {
+        // Rerun if the src dirs change
+        for item in walkdir::WalkDir::new(Path::new(m).join("src"))
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
+            println!("cargo:rerun-if-changed={}", item.path().display());
+        }
         let cargo_toml = Path::new(m).join("Cargo.toml");
 
         // Note: If you're trying to use `cargo udeps` and get an error, try
@@ -66,6 +74,8 @@ fn main() {
             .arg("--target")
             .arg("wasm32-unknown-unknown")
             .env("CARGO_TARGET_DIR", &out_dir)
+            // Run cargo in parallel so we don't have to wait for each to compile
+            // before starting the next
             .spawn()
             .unwrap();
 
