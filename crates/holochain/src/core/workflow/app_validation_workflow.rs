@@ -8,6 +8,7 @@ use crate::core::{
 use holochain_state::prelude::{GetDb, Reader, Writer};
 use tracing::*;
 
+#[instrument(skip(workspace, writer, trigger_integration))]
 pub async fn app_validation_workflow(
     workspace: AppValidationWorkspace<'_>,
     writer: OneshotWriter,

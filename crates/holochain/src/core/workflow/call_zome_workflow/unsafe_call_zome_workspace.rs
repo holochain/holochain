@@ -8,7 +8,6 @@ use std::{
         Arc,
     },
 };
-use tracing::*;
 
 // TODO write tests to verify the invariant.
 /// This is needed to use the database where

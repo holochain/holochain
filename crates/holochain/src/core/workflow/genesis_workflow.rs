@@ -20,23 +20,24 @@ use derive_more::Constructor;
 use holochain_state::prelude::*;
 use holochain_types::dna::DnaFile;
 use holochain_types::prelude::*;
+use tracing::*;
 
 /// The struct which implements the genesis Workflow
 #[derive(Constructor, Debug)]
-pub struct GenesisWorkflowArgs<Api: CellConductorApiT> {
-    api: Api,
+pub struct GenesisWorkflowArgs {
     dna_file: DnaFile,
     agent_pubkey: AgentPubKey,
     membrane_proof: Option<SerializedBytes>,
 }
 
-// TODO: #[instrument]
+#[instrument(skip(workspace, writer, api))]
 pub async fn genesis_workflow<'env, Api: CellConductorApiT>(
     mut workspace: GenesisWorkspace<'env>,
     writer: OneshotWriter,
-    args: GenesisWorkflowArgs<Api>,
+    api: Api,
+    args: GenesisWorkflowArgs,
 ) -> WorkflowResult<()> {
-    genesis_workflow_inner(&mut workspace, args).await?;
+    genesis_workflow_inner(&mut workspace, args, api).await?;
 
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
@@ -50,10 +51,10 @@ pub async fn genesis_workflow<'env, Api: CellConductorApiT>(
 
 async fn genesis_workflow_inner<'env, Api: CellConductorApiT>(
     workspace: &mut GenesisWorkspace<'env>,
-    args: GenesisWorkflowArgs<Api>,
+    args: GenesisWorkflowArgs,
+    api: Api,
 ) -> WorkflowResult<()> {
     let GenesisWorkflowArgs {
-        api,
         dna_file,
         agent_pubkey,
         membrane_proof,
@@ -143,12 +144,11 @@ pub mod tests {
             api.expect_sync_dpki_request()
                 .returning(|_, _| Ok("mocked dpki request response".to_string()));
             let args = GenesisWorkflowArgs {
-                api,
                 dna_file: dna.clone(),
                 agent_pubkey: agent_pubkey.clone(),
                 membrane_proof: None,
             };
-            let _: () = genesis_workflow(workspace, arc.clone().into(), args).await?;
+            let _: () = genesis_workflow(workspace, arc.clone().into(), api, args).await?;
         }
 
         {
