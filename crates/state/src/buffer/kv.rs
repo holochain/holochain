@@ -99,7 +99,7 @@ where
     fn get_persisted(&self, k: &K) -> DatabaseResult<Option<V>> {
         Self::empty_key(&k)?;
         match self.db.get(self.reader, k)? {
-            Some(rkv::Value::Blob(buf)) => Ok(Some(rmp_serde::from_read_ref(buf)?)),
+            Some(rkv::Value::Blob(buf)) => Ok(Some(holochain_serialized_bytes::decode(buf)?)),
             None => Ok(None),
             Some(_) => Err(DatabaseError::InvalidValue),
         }
@@ -235,7 +235,7 @@ where
                     //     .with_struct_map()
                     //     .with_string_variants();
                     // v.serialize(&mut se)?;
-                    let buf = rmp_serde::to_vec_named(v)?;
+                    let buf = holochain_serialized_bytes::encode(v)?;
                     let encoded = rkv::Value::Blob(&buf);
                     self.db.put(writer, k, &encoded)?;
                 }
@@ -566,7 +566,7 @@ where
         match item {
             Some(Ok((k, Some(rkv::Value::Blob(buf))))) => Ok(Some((
                 k,
-                rmp_serde::from_read_ref(buf).expect(
+                holochain_serialized_bytes::decode(buf).expect(
                     "Failed to deserialize data from database. Database might be corrupted",
                 ),
             ))),
