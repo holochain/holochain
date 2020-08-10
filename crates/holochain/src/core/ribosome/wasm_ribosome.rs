@@ -126,8 +126,6 @@ impl WasmRibosome {
     }
 
     fn imports(&self, call_context: CallContext) -> ImportObject {
-        let instance_timeout = crate::start_hard_timeout!();
-
         let host_fn_access = (&call_context.host_access()).into();
 
         // it is important that WasmRibosome and ZomeCallInvocation are cheap to clone here
@@ -285,7 +283,6 @@ impl WasmRibosome {
         }
         imports.register("env", ns);
 
-        crate::end_hard_timeout!(instance_timeout, crate::perf::WASM_INSTANCE);
         imports
     }
 }
@@ -341,9 +338,7 @@ impl RibosomeT for WasmRibosome {
             zome_name: zome_name.clone(),
             host_access,
         };
-        let module_timeout = crate::start_hard_timeout!();
         let module = self.module(call_context.clone())?;
-        crate::end_hard_timeout!(module_timeout, crate::perf::WASM_MODULE_CACHE_HIT);
 
         if module.info().exports.contains_key(&to_call) {
             // there is a callback to_call and it is implemented in the wasm
@@ -351,7 +346,6 @@ impl RibosomeT for WasmRibosome {
             // because it builds guards against memory leaks and handles imports correctly
             let mut instance = self.instance(call_context)?;
 
-            let call_timeout = crate::start_hard_timeout!();
             let result: GuestOutput = holochain_wasmer_host::guest::call(
                 &mut instance,
                 &to_call,
@@ -360,7 +354,6 @@ impl RibosomeT for WasmRibosome {
                 // @todo - is this a problem for large payloads like entries?
                 invocation.to_owned().host_input()?,
             )?;
-            crate::end_hard_timeout!(call_timeout, crate::perf::MULTI_WASM_CALL);
 
             Ok(Some(result))
         } else {
