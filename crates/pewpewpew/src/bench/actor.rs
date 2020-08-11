@@ -1,4 +1,4 @@
-pub(crate) struct Actor;
+pub struct Actor;
 
 impl actix::Actor for Actor {
     type Context = actix::SyncContext<Self>;

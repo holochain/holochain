@@ -91,12 +91,20 @@ with holonix.pkgs;
 
     ++ ([(
      holonix.pkgs.writeShellScriptBin "pewpewpew" ''
+     # compile and build pewpewpew
      ( cd crates/pewpewpew && cargo run )
      '')])
 
     ++ ([(
      holonix.pkgs.writeShellScriptBin "pewpewpew-ngrok" ''
+     # serve up a local pewpewpew instance that github can point to for testing
      ngrok http http://127.0.0.1:$PEWPEWPEW_PORT
+    '')])
+
+    ++ ([(
+     holonix.pkgs.writeShellScriptBin "pewpewpew-gen-secret" ''
+     # generate a new github secret
+     cat /dev/urandom | head -c 64 | base64
     '')])
   ;
  });

@@ -1,12 +1,13 @@
 /// holds the address to a shared actor that manages all the benchmarking
 /// we need to restrict the app to a single actor to ensure that we don't run more than one bench
 /// at a time
-pub(crate) struct AppState {
-    pub(crate) actor: actix::Addr<super::actor::Actor>,
+pub struct AppState {
+    pub actor: actix::Addr<super::actor::Actor>,
 }
 
 /// bench a specific commit
-pub(crate) async fn commit(data: actix_web::web::Data<AppState>, req: actix_web::HttpRequest) -> impl actix_web::Responder {
+#[allow(dead_code)]
+pub async fn commit(data: actix_web::web::Data<AppState>, req: actix_web::HttpRequest) -> impl actix_web::Responder {
     use actix_web::Responder;
 
     match req.match_info().get("commit") {

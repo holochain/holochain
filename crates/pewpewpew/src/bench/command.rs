@@ -1,4 +1,4 @@
-pub(crate) struct Commit(String);
+pub struct Commit(String);
 
 impl AsRef<std::ffi::OsStr> for Commit {
     fn as_ref(&self) -> &std::ffi::OsStr {
@@ -16,7 +16,7 @@ impl From<String> for Commit {
 /// using a nix command guarantees that we are inside nix
 /// requiring a nix shell allows us to make a _lot_ of assumptions
 /// about how this command will behave like dependencies and environment vars
-pub(crate) fn commit(commit: Commit) {
+pub fn commit(commit: Commit) {
     match std::env::var("GITHUB_TOKEN") {
         Ok(token) => {
             match std::process::Command::new("hc-bench-github")

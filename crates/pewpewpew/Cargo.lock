@@ -1119,6 +1119,7 @@ dependencies = [
  "actix-rt",
  "actix-web",
  "once_cell",
+ "serde",
 ]
 
 [[package]]

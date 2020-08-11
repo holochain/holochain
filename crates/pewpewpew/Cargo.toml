@@ -13,5 +13,6 @@ actix-web = "2"
 actix-rt = "1"
 actix = "0.9"
 once_cell = "1"
+serde = "1"
 
 [workspace]
