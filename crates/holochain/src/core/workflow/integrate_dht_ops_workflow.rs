@@ -37,6 +37,7 @@ use tracing::*;
 
 mod tests;
 
+#[instrument(skip(workspace, writer, trigger_publish))]
 pub async fn integrate_dht_ops_workflow(
     mut workspace: IntegrateDhtOpsWorkspace<'_>,
     writer: OneshotWriter,
