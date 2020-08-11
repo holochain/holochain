@@ -27,18 +27,23 @@ with holonix.pkgs;
   shellHook = holonix.pkgs.lib.concatStrings [
    holonix.shell.shellHook
    ''
+    source .env
     export HC_TARGET_PREFIX=$NIX_ENV_PREFIX
     export CARGO_TARGET_DIR="$HC_TARGET_PREFIX/target"
     export CARGO_CACHE_RUSTC_INFO=1
 
     export HC_WASM_CACHE_PATH="$HC_TARGET_PREFIX/.wasm_cache"
     mkdir -p $HC_WASM_CACHE_PATH
+
+    export PEWPEWPEW_PORT=4343
    ''
   ];
 
   buildInputs = [
    holonix.pkgs.gnuplot
    holonix.pkgs.flamegraph
+   holonix.pkgs.wget
+   holonix.pkgs.ngrok
   ]
    ++ holonix.shell.buildInputs
 
@@ -67,10 +72,32 @@ with holonix.pkgs;
     cargo bench --bench bench
     '')])
 
+   ++ ([(
+    holonix.pkgs.writeShellScriptBin "hc-bench-github" ''
+    set -x
+
+    commit=''${1}
+    token=''${2}
+    dir="$TMP/$commit"
+    tarball="$dir/tarball.tar.gz"
+    github_url="https://github.com/Holo-Host/holochain/archive/$commit.tar.gz"
+
+    mkdir -p $dir
+    curl -L --cacert $SSL_CERT_FILE -H "Authorization: token $token" $github_url > $tarball
+    tar -zxvf $tarball -C $dir
+    cd $dir/holochain-*
+    hc-bench
+    '')])
+
     ++ ([(
      holonix.pkgs.writeShellScriptBin "pewpewpew" ''
      ( cd crates/pewpewpew && cargo run )
      '')])
+
+    ++ ([(
+     holonix.pkgs.writeShellScriptBin "pewpewpew-ngrok" ''
+     ngrok http http://127.0.0.1:$PEWPEWPEW_PORT
+    '')])
   ;
  });
 }

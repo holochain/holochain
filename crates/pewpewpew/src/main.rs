@@ -1,18 +1,20 @@
-use actix_web::{web, App, HttpRequest, HttpServer, Responder};
-
-async fn greet(req: HttpRequest) -> impl Responder {
-    let name = req.match_info().get("name").unwrap_or("World");
-    format!("Hello {}!", &name)
-}
+pub(crate) mod bench;
+pub(crate) mod favicon;
 
 #[actix_rt::main]
 async fn main() -> std::io::Result<()> {
-    HttpServer::new(|| {
-        App::new()
-            .route("/", web::get().to(greet))
-            .route("/{name}", web::get().to(greet))
+    let port = std::env::var("PEWPEWPEW_PORT").unwrap();
+
+    let bench_actor = actix::SyncArbiter::start(1, move || bench::actor::Actor);
+
+    actix_web::HttpServer::new(move || {
+        actix_web::App::new()
+            .data(bench::web::AppState { actor: bench_actor.clone() })
+            // short circuit favicon requests
+            .route("/favicon.ico", actix_web::web::get().to(favicon::web::favicon))
+            .route("/{commit}", actix_web::web::get().to(bench::web::commit))
     })
-    .bind("127.0.0.1:8000")?
+    .bind(format!("127.0.0.1:{}", port))?
     .run()
     .await
 }

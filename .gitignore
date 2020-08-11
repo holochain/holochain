@@ -9,3 +9,5 @@ perf.data
 perf.data.old
 flames.folded
 *.svg
+
+.env
