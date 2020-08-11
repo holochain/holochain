@@ -40,8 +40,22 @@ async fn speed_test_timed() {
     speed_test().await;
 }
 
+#[tokio::test(threaded_scheduler)]
+#[ignore]
+async fn speed_test_timed_json() {
+    let _g = observability::test_run_timed_json().unwrap();
+    speed_test().await;
+}
+
+#[tokio::test(threaded_scheduler)]
+#[ignore]
+async fn speed_test_normal() {
+    observability::test_run().unwrap();
+    speed_test().await;
+}
+
 async fn speed_test() {
-    const NUM: usize = 2;
+    const NUM: usize = 4;
 
     // ////////////
     // START DNA

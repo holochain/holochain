@@ -1,5 +1,6 @@
 use super::*;
 use std::collections::HashSet;
+use tracing_futures::Instrument;
 
 /// if the user specifies None or zero (0) for remote_agent_count
 const DEFAULT_NOTIFY_REMOTE_AGENT_COUNT: u8 = 5;
@@ -250,6 +251,9 @@ impl KitsuneP2pHandler for Space {
                 // attempt to send the request right now
                 let err = match internal_sender
                     .immediate_request(space.clone(), agent.clone(), payload.clone())
+                    .instrument(ghost_actor::dependencies::tracing::debug_span!(
+                        "handle_rpc_single_loop"
+                    ))
                     .await
                 {
                     Ok(res) => return Ok(res),
@@ -445,22 +449,29 @@ impl Space {
                             // checking if gets work
                             // let fr = from_agent.clone();
 
-                            tokio::task::spawn(async move {
-                                // Leaving commented out code because it's useful for
-                                // if agent == fr{
-                                //     tokio::time::delay_for(std::time::Duration::from_secs(2)).await;
-                                // }
-                                if let Ok(response) =
-                                    i_s.immediate_request(space, agent.clone(), payload).await
-                                {
-                                    let _ = res_send
-                                        .send(actor::RpcMultiResponse {
-                                            agent: agent,
-                                            response,
-                                        })
-                                        .await;
+                            tokio::task::spawn(
+                                async move {
+                                    // Leaving commented out code because it's useful for
+                                    // if agent == fr{
+                                    //     tokio::time::delay_for(std::time::Duration::from_secs(2)).await;
+                                    // }
+                                    if let Ok(response) =
+                                        i_s.immediate_request(space, agent.clone(), payload).await
+                                    {
+                                        let _ = res_send
+                                            .send(actor::RpcMultiResponse {
+                                                agent: agent,
+                                                response,
+                                            })
+                                            .await;
+                                    }
                                 }
-                            });
+                                .instrument(
+                                    ghost_actor::dependencies::tracing::debug_span!(
+                                        "handle_rpc_multi_inner_loop"
+                                    ),
+                                ),
+                            );
                         }
                         if sent_to.len() >= remote_agent_count as usize {
                             break;
@@ -602,15 +613,22 @@ impl Space {
                             let space = space.clone();
                             let payload = payload.clone();
                             let send_success_count = send_success_count.clone();
-                            tokio::task::spawn(async move {
-                                if let Ok(_) = internal_sender
-                                    .immediate_request(space, agent, payload)
-                                    .await
-                                {
-                                    send_success_count
-                                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            tokio::task::spawn(
+                                async move {
+                                    if let Ok(_) = internal_sender
+                                        .immediate_request(space, agent, payload)
+                                        .await
+                                    {
+                                        send_success_count
+                                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                                    }
                                 }
-                            });
+                                .instrument(
+                                    ghost_actor::dependencies::tracing::debug_span!(
+                                        "handle_rpc_multi_inner_loop"
+                                    ),
+                                ),
+                            );
                         }
                     }
                 }

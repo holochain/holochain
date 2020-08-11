@@ -54,6 +54,7 @@ pub struct PublishDhtOpsWorkspace<'env> {
     elements: ElementBuf<'env>,
 }
 
+#[tracing::instrument(skip(workspace, writer, network))]
 pub async fn publish_dht_ops_workflow(
     mut workspace: PublishDhtOpsWorkspace<'_>,
     writer: OneshotWriter,

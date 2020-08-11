@@ -1095,14 +1095,13 @@ dependencies = [
 [[package]]
 name = "ghost_actor"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "03fa610da5e5289ec282e7094e7a6def7a7cc164b44bf52d500400b0e1a3f42f"
 dependencies = [
  "futures",
  "must_future",
  "paste",
  "thiserror",
  "tracing",
+ "tracing-futures",
 ]
 
 [[package]]
@@ -1674,6 +1673,7 @@ dependencies = [
  "shrinkwraprs",
  "thiserror",
  "tokio",
+ "tracing-futures",
 ]
 
 [[package]]

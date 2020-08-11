@@ -516,6 +516,7 @@ impl Cell {
         Ok(GetElementResponse::GetHeader(r))
     }
 
+    #[instrument(skip(self, _dht_hash, _options))]
     /// a remote node is asking us for metadata
     async fn handle_get_meta(
         &self,
@@ -598,6 +599,7 @@ impl Cell {
         unimplemented!()
     }
 
+    #[instrument(skip(self, dht_arc, since, until))]
     /// the network module is requesting a list of dht op hashes
     async fn handle_fetch_op_hashes_for_constraints(
         &self,
@@ -615,6 +617,7 @@ impl Cell {
         Ok(result)
     }
 
+    #[instrument(skip(self, op_hashes))]
     /// the network module is requesting the content for dht ops
     async fn handle_fetch_op_hash_data(
         &self,
@@ -660,6 +663,7 @@ impl Cell {
         }
     }
 
+    #[instrument(skip(self, provenance, fn_name, cap, payload))]
     /// a remote agent is attempting a "call_remote" on this cell.
     async fn handle_call_remote(
         &self,
@@ -687,6 +691,7 @@ impl Cell {
         }
     }
 
+    #[instrument(skip(self, invocation))]
     /// Function called by the Conductor
     pub async fn call_zome(
         &self,

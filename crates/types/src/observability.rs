@@ -82,6 +82,8 @@ use tracing_flame::FlameLayer;
 pub enum Output {
     /// Outputs everything as json
     Json,
+    /// Json with timed spans
+    JsonTimed,
     /// Regular logging (default)
     Log,
     /// Regular logging plus timed spans
@@ -200,6 +202,17 @@ pub fn test_run_timed() -> Result<(), errors::TracingError> {
     init_fmt(Output::LogTimed)
 }
 
+/// Same as test_run_timed but saves as json
+pub fn test_run_timed_json() -> Result<(), errors::TracingError> {
+    if let (None, None) = (
+        std::env::var_os("RUST_LOG"),
+        std::env::var_os("CUSTOM_FILTER"),
+    ) {
+        return Ok(());
+    }
+    init_fmt(Output::JsonTimed)
+}
+
 /// Generate a tracing flamegraph for a test
 /// The `RUST_LOG` filter needs to be set to the
 /// spans you are interested in.
@@ -297,6 +310,15 @@ pub fn init_fmt(output: Output) -> Result<(), errors::TracingError> {
     match output {
         Output::Json => {
             let subscriber = subscriber
+                .with_env_filter(filter)
+                .with_timer(ChronoUtc::rfc3339())
+                .json()
+                .event_format(fm);
+            finish(subscriber.finish())
+        }
+        Output::JsonTimed => {
+            let subscriber = subscriber
+                .with_span_events(FmtSpan::CLOSE)
                 .with_env_filter(filter)
                 .with_timer(ChronoUtc::rfc3339())
                 .json()
