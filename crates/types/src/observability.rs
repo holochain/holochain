@@ -74,12 +74,15 @@ use tracing_subscriber::{
 
 use chrono::SecondsFormat;
 use serde_json::json;
+use std::fmt::Write;
 use std::{path::PathBuf, str::FromStr, sync::Once};
 use tracing_flame::FlameLayer;
 
 #[derive(Debug, Clone)]
 /// Sets the kind of structed logging output you want
 pub enum Output {
+    /// More compact version of above
+    Compact,
     /// Outputs everything as json
     Json,
     /// Json with timed spans
@@ -88,8 +91,10 @@ pub enum Output {
     Log,
     /// Regular logging plus timed spans
     LogTimed,
-    /// More compact version of above
-    Compact,
+    /// Creates a flamegraph from timed spans
+    FlameTimed,
+    /// Creates a flamegraph from timed spans using idle time
+    IceTimed,
     /// No logging to console
     None,
 }
@@ -104,11 +109,71 @@ impl FromStr for Output {
     fn from_str(day: &str) -> Result<Self, Self::Err> {
         match day {
             "Json" => Ok(Output::Json),
+            "JsonTimed" => Ok(Output::JsonTimed),
+            "IceTimed" => Ok(Output::IceTimed),
             "Log" => Ok(Output::Log),
             "LogTimed" => Ok(Output::LogTimed),
+            "FlameTimed" => Ok(Output::FlameTimed),
             "Compact" => Ok(Output::Compact),
             "None" => Ok(Output::None),
             _ => Err("Could not parse log output type".into()),
+        }
+    }
+}
+
+struct EventFieldFlameVisitor {
+    samples: usize,
+}
+
+impl EventFieldFlameVisitor {
+    fn new() -> Self {
+        EventFieldFlameVisitor { samples: 0 }
+    }
+}
+
+impl Visit for EventFieldFlameVisitor {
+    fn record_debug(&mut self, field: &Field, value: &dyn std::fmt::Debug) {
+        if field.name() == "time.busy" {
+            parse_time(&mut self.samples, value);
+        }
+    }
+}
+
+struct EventFieldIceVisitor {
+    samples: usize,
+}
+
+impl EventFieldIceVisitor {
+    fn new() -> Self {
+        EventFieldIceVisitor { samples: 0 }
+    }
+}
+
+impl Visit for EventFieldIceVisitor {
+    fn record_debug(&mut self, field: &Field, value: &dyn std::fmt::Debug) {
+        if field.name() == "time.idle" {
+            parse_time(&mut self.samples, value);
+        }
+    }
+}
+
+fn parse_time(samples: &mut usize, value: &dyn std::fmt::Debug) {
+    let v = format!("{:?}", value);
+    if v.ends_with("ns") {
+        if let Some(v) = v.trim_end_matches("ns").parse::<f64>().ok() {
+            *samples = v as usize;
+        }
+    } else if v.ends_with("µs") {
+        if let Some(v) = v.trim_end_matches("µs").parse::<f64>().ok() {
+            *samples = (v * 1000.0) as usize;
+        }
+    } else if v.ends_with("ms") {
+        if let Some(v) = v.trim_end_matches("ms").parse::<f64>().ok() {
+            *samples = (v * 1000000.0) as usize;
+        }
+    } else if v.ends_with("s") {
+        if let Some(v) = v.trim_end_matches("s").parse::<f64>().ok() {
+            *samples = (v * 1000000000.0) as usize;
         }
     }
 }
@@ -178,6 +243,84 @@ where
     writeln!(writer, "{}", json)
 }
 
+// Formating the events for json
+fn format_event_flame<S, N>(
+    ctx: &FmtContext<'_, S, N>,
+    writer: &mut dyn std::fmt::Write,
+    event: &Event<'_>,
+) -> std::fmt::Result
+where
+    S: Subscriber + for<'a> LookupSpan<'a>,
+    N: for<'writer> FormatFields<'writer> + 'static,
+{
+    let mut values = EventFieldFlameVisitor::new();
+    event.record(&mut values);
+    if values.samples > 0 {
+        let mut parents = Vec::new();
+        ctx.visit_spans::<(), _>(|span| {
+            let mut stack = String::new();
+            let meta = span.metadata();
+            let name = meta.name();
+            let file = meta.file();
+            let line = meta.line();
+            stack += "; ";
+            write!(&mut stack, "{}", name).ok();
+            if let Some(file) = file {
+                write!(&mut stack, ":{}", file).ok();
+            }
+            if let Some(line) = line {
+                write!(&mut stack, ":{}", line).ok();
+            }
+            parents.push(stack);
+            Ok(())
+        })
+        .ok();
+        let flat_parents: String = parents.iter().map(|n| n.chars()).rev().flatten().collect();
+        writeln!(writer, "all{} {}", flat_parents, values.samples)
+    } else {
+        write!(writer, "")
+    }
+}
+
+// Formating the events for json
+fn format_event_ice<S, N>(
+    ctx: &FmtContext<'_, S, N>,
+    writer: &mut dyn std::fmt::Write,
+    event: &Event<'_>,
+) -> std::fmt::Result
+where
+    S: Subscriber + for<'a> LookupSpan<'a>,
+    N: for<'writer> FormatFields<'writer> + 'static,
+{
+    let mut values = EventFieldIceVisitor::new();
+    event.record(&mut values);
+    if values.samples > 0 {
+        let mut parents = Vec::new();
+        ctx.visit_spans::<(), _>(|span| {
+            let mut stack = String::new();
+            let meta = span.metadata();
+            let name = meta.name();
+            let file = meta.file();
+            let line = meta.line();
+            stack += "; ";
+            write!(&mut stack, "{}", name).ok();
+            if let Some(file) = file {
+                write!(&mut stack, ":{}", file).ok();
+            }
+            if let Some(line) = line {
+                write!(&mut stack, ":{}", line).ok();
+            }
+            parents.push(stack);
+            Ok(())
+        })
+        .ok();
+        let flat_parents: String = parents.iter().map(|n| n.chars()).rev().flatten().collect();
+        writeln!(writer, "all{} {}", flat_parents, values.samples)
+    } else {
+        write!(writer, "")
+    }
+}
+
 /// Run logging in a unit test
 /// RUST_LOG or CUSTOM_FILTER must be set or
 /// this is a no-op
@@ -211,6 +354,28 @@ pub fn test_run_timed_json() -> Result<(), errors::TracingError> {
         return Ok(());
     }
     init_fmt(Output::JsonTimed)
+}
+
+/// Same as test_run_timed but saves as json
+pub fn test_run_timed_flame() -> Result<(), errors::TracingError> {
+    if let (None, None) = (
+        std::env::var_os("RUST_LOG"),
+        std::env::var_os("CUSTOM_FILTER"),
+    ) {
+        return Ok(());
+    }
+    init_fmt(Output::FlameTimed)
+}
+
+/// Same as test_run_timed but saves as json
+pub fn test_run_timed_ice() -> Result<(), errors::TracingError> {
+    if let (None, None) = (
+        std::env::var_os("RUST_LOG"),
+        std::env::var_os("CUSTOM_FILTER"),
+    ) {
+        return Ok(());
+    }
+    init_fmt(Output::IceTimed)
 }
 
 /// Generate a tracing flamegraph for a test
@@ -302,6 +467,16 @@ pub fn init_fmt(output: Output) -> Result<(), errors::TracingError> {
         &mut dyn std::fmt::Write,
         &Event<'_>,
     ) -> std::fmt::Result = format_event;
+    let fm_flame: fn(
+        ctx: &FmtContext<'_, _, _>,
+        &mut dyn std::fmt::Write,
+        &Event<'_>,
+    ) -> std::fmt::Result = format_event_flame;
+    let fm_ice: fn(
+        ctx: &FmtContext<'_, _, _>,
+        &mut dyn std::fmt::Write,
+        &Event<'_>,
+    ) -> std::fmt::Result = format_event_ice;
 
     let subscriber = FmtSubscriber::builder()
         .with_target(true)
@@ -329,6 +504,22 @@ pub fn init_fmt(output: Output) -> Result<(), errors::TracingError> {
         Output::LogTimed => {
             let subscriber = subscriber.with_span_events(FmtSpan::CLOSE);
             finish(subscriber.with_env_filter(filter).finish())
+        }
+        Output::FlameTimed => {
+            let subscriber = subscriber
+                .with_span_events(FmtSpan::CLOSE)
+                .with_env_filter(filter)
+                .with_timer(ChronoUtc::rfc3339())
+                .event_format(fm_flame);
+            finish(subscriber.finish())
+        }
+        Output::IceTimed => {
+            let subscriber = subscriber
+                .with_span_events(FmtSpan::CLOSE)
+                .with_env_filter(filter)
+                .with_timer(ChronoUtc::rfc3339())
+                .event_format(fm_ice);
+            finish(subscriber.finish())
         }
         Output::Compact => {
             let subscriber = subscriber.compact();

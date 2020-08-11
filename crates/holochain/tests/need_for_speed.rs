@@ -49,6 +49,20 @@ async fn speed_test_timed_json() {
 
 #[tokio::test(threaded_scheduler)]
 #[ignore]
+async fn speed_test_timed_flame() {
+    let _g = observability::test_run_timed_flame().unwrap();
+    speed_test().await;
+}
+
+#[tokio::test(threaded_scheduler)]
+#[ignore]
+async fn speed_test_timed_ice() {
+    let _g = observability::test_run_timed_ice().unwrap();
+    speed_test().await;
+}
+
+#[tokio::test(threaded_scheduler)]
+#[ignore]
 async fn speed_test_normal() {
     observability::test_run().unwrap();
     speed_test().await;

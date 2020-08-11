@@ -7,5 +7,5 @@ target/
 flamegraph.svg
 perf.data
 perf.data.old
-flames.folded
+*.folded
 *.svg
