@@ -66,6 +66,11 @@ with holonix.pkgs;
     holonix.pkgs.writeShellScriptBin "hc-bench" ''
     cargo bench --bench bench
     '')])
+
+    ++ ([(
+     holonix.pkgs.writeShellScriptBin "pewpewpew" ''
+     ( cd crates/pewpewpew && cargo run )
+     '')])
   ;
  });
 }
