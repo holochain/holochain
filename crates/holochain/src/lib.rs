@@ -8,8 +8,6 @@ pub mod core;
 #[allow(missing_docs)]
 pub mod fixt;
 #[allow(missing_docs)]
-pub mod perf;
-#[allow(missing_docs)]
 pub mod test_utils;
 
 use holochain_wasmer_host;
