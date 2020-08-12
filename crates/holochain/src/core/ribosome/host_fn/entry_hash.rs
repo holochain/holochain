@@ -70,14 +70,14 @@ pub mod wasm_test {
         let mut workspace = crate::core::workflow::CallZomeWorkspace::new(&reader, &dbs).unwrap();
 
         let (_g, raw_workspace) =
-            crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
+            crate::core::workflow::unsafe_call_zome_workspace::CallZomeWorkspaceFactory::from_mut(
                 &mut workspace,
             );
 
         let entry = EntryFixturator::new(fixt::Predictable).next().unwrap();
         let input = EntryHashInput::new(entry);
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = raw_workspace;
+        host_access.workspace = env.clone().into();
         let output: EntryHashOutput =
             crate::call_test_ribosome!(host_access, TestWasm::Imports, "entry_hash", input);
         assert_eq!(output.into_inner().get_raw().to_vec().len(), 36,);
@@ -93,12 +93,12 @@ pub mod wasm_test {
         let mut workspace = crate::core::workflow::CallZomeWorkspace::new(&reader, &dbs).unwrap();
 
         let (_g, raw_workspace) =
-            crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
+            crate::core::workflow::unsafe_call_zome_workspace::CallZomeWorkspaceFactory::from_mut(
                 &mut workspace,
             );
 
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = raw_workspace;
+        host_access.workspace = env.clone().into();
         let input = TestString::from("foo.bar".to_string());
         let output: EntryHash =
             crate::call_test_ribosome!(host_access, TestWasm::HashPath, "hash", input);

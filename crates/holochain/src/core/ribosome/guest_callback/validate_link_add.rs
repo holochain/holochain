@@ -306,11 +306,11 @@ mod slow_tests {
             .unwrap();
 
         let (_g, raw_workspace) =
-            crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
+            crate::core::workflow::unsafe_call_zome_workspace::CallZomeWorkspaceFactory::from_mut(
                 &mut workspace,
             );
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = raw_workspace.clone();
+        host_access.workspace = env.clone().into().clone();
 
         let output: HeaderHash =
             crate::call_test_ribosome!(host_access, TestWasm::ValidateLink, "add_valid_link", ());
@@ -350,12 +350,12 @@ mod slow_tests {
             .unwrap();
 
         let (_g, raw_workspace) =
-            crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
+            crate::core::workflow::unsafe_call_zome_workspace::CallZomeWorkspaceFactory::from_mut(
                 &mut workspace,
             );
 
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = raw_workspace.clone();
+        host_access.workspace = env.clone().into().clone();
 
         let output: HeaderHash =
             crate::call_test_ribosome!(host_access, TestWasm::ValidateLink, "add_invalid_link", ());

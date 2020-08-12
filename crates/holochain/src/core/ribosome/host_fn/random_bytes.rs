@@ -74,13 +74,13 @@ pub mod wasm_test {
         let mut workspace = crate::core::workflow::CallZomeWorkspace::new(&reader, &dbs).unwrap();
 
         let (_g, raw_workspace) =
-            crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
+            crate::core::workflow::unsafe_call_zome_workspace::CallZomeWorkspaceFactory::from_mut(
                 &mut workspace,
             );
 
         const LEN: usize = 5;
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = raw_workspace;
+        host_access.workspace = env.clone().into();
         let output: RandomBytesOutput = crate::call_test_ribosome!(
             host_access,
             TestWasm::Imports,

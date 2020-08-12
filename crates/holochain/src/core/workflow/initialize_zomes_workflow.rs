@@ -1,5 +1,5 @@
 use super::{
-    error::WorkflowResult, unsafe_call_zome_workspace::UnsafeCallZomeWorkspace, CallZomeWorkspace,
+    error::WorkflowResult, unsafe_call_zome_workspace::CallZomeWorkspaceFactory, CallZomeWorkspace,
 };
 use crate::core::{
     queue_consumer::OneshotWriter,
@@ -54,7 +54,7 @@ async fn initialize_zomes_workflow_inner<'env, Ribosome: RibosomeT>(
     // Call the init callback
     let result = {
         // TODO: We need a better solution then re-using the CallZomeWorkspace (i.e. ghost actor)
-        let (_g, raw_workspace) = UnsafeCallZomeWorkspace::from_mut(&mut workspace.0);
+        let (_g, raw_workspace) = CallZomeWorkspaceFactory::from_mut(&mut workspace.0);
         let host_access = InitHostAccess::new(raw_workspace, keystore, network);
         let invocation = InitInvocation { dna_def };
         ribosome.run_init(host_access, invocation)?

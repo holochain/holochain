@@ -2,7 +2,7 @@ use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostAccess;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
-use crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace;
+use crate::core::workflow::unsafe_call_zome_workspace::CallZomeWorkspaceFactory;
 use derive_more::Constructor;
 use holo_hash::EntryContentHash;
 use holochain_keystore::KeystoreSender;
@@ -27,7 +27,7 @@ impl InitInvocation {
 
 #[derive(Clone, Constructor)]
 pub struct InitHostAccess {
-    pub workspace: UnsafeCallZomeWorkspace,
+    pub workspace: CallZomeWorkspaceFactory,
     pub keystore: KeystoreSender,
     pub network: HolochainP2pCell,
 }

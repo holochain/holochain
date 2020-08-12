@@ -83,11 +83,11 @@ pub mod slow_tests {
 
         // ensure foo.bar twice to ensure idempotency
         let (_g, raw_workspace) =
-            crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
+            crate::core::workflow::unsafe_call_zome_workspace::CallZomeWorkspaceFactory::from_mut(
                 &mut workspace,
             );
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = raw_workspace;
+        host_access.workspace = env.clone().into();
 
         let _: () = crate::call_test_ribosome!(
             host_access,

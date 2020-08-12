@@ -369,11 +369,11 @@ mod slow_tests {
             .unwrap();
 
         let (_g, raw_workspace) =
-            crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
+            crate::core::workflow::unsafe_call_zome_workspace::CallZomeWorkspaceFactory::from_mut(
                 &mut workspace,
             );
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = raw_workspace.clone();
+        host_access.workspace = env.clone().into().clone();
 
         let output: CommitEntryOutput =
             crate::call_test_ribosome!(host_access, TestWasm::Validate, "always_validates", ());
@@ -413,12 +413,12 @@ mod slow_tests {
             .unwrap();
 
         let (_g, raw_workspace) =
-            crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
+            crate::core::workflow::unsafe_call_zome_workspace::CallZomeWorkspaceFactory::from_mut(
                 &mut workspace,
             );
 
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = raw_workspace.clone();
+        host_access.workspace = env.clone().into().clone();
 
         let output: CommitEntryOutput =
             crate::call_test_ribosome!(host_access, TestWasm::Validate, "never_validates", ());

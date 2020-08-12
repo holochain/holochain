@@ -157,7 +157,7 @@ pub mod wasm_test {
         let mut workspace = <crate::core::workflow::call_zome_workflow::CallZomeWorkspace as crate::core::state::workspace::Workspace>::new(&reader, &dbs).unwrap();
 
         let (_g, raw_workspace) =
-            crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
+            crate::core::workflow::unsafe_call_zome_workspace::CallZomeWorkspaceFactory::from_mut(
                 &mut workspace,
             );
 
@@ -170,7 +170,7 @@ pub mod wasm_test {
             .unwrap();
         call_context.zome_name = TestWasm::CommitEntry.into();
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = raw_workspace;
+        host_access.workspace = env.clone().into();
         call_context.host_access = host_access.into();
         let app_entry = EntryFixturator::new(AppEntry).next().unwrap();
         let entry_def_id = EntryDefId::from("post");
@@ -205,7 +205,7 @@ pub mod wasm_test {
             .unwrap();
 
         let (_g, raw_workspace) =
-            crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
+            crate::core::workflow::unsafe_call_zome_workspace::CallZomeWorkspaceFactory::from_mut(
                 &mut workspace,
             );
 
@@ -218,7 +218,7 @@ pub mod wasm_test {
             .unwrap();
         call_context.zome_name = TestWasm::CommitEntry.into();
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = raw_workspace.clone();
+        host_access.workspace = env.clone().into().clone();
         call_context.host_access = host_access.into();
         let app_entry = EntryFixturator::new(AppEntry).next().unwrap();
         let entry_def_id = EntryDefId::from("post");
@@ -261,11 +261,11 @@ pub mod wasm_test {
             .await
             .unwrap();
         let (_g, raw_workspace) =
-            crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
+            crate::core::workflow::unsafe_call_zome_workspace::CallZomeWorkspaceFactory::from_mut(
                 &mut workspace,
             );
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = raw_workspace.clone();
+        host_access.workspace = env.clone().into().clone();
 
         // get the result of a commit entry
         let output: CommitEntryOutput =

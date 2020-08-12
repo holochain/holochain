@@ -28,7 +28,7 @@ use holochain_zome_types::entry::GetOptions;
 use holochain_zome_types::header::Header;
 use std::sync::Arc;
 use tracing::*;
-use unsafe_call_zome_workspace::UnsafeCallZomeWorkspace;
+use unsafe_call_zome_workspace::CallZomeWorkspaceFactory;
 
 pub mod unsafe_call_zome_workspace;
 
@@ -86,7 +86,7 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT>(
     tracing::trace!(line = line!());
     // Create the unsafe sourcechain for use with wasm closure
     let result = {
-        let (_g, raw_workspace) = UnsafeCallZomeWorkspace::from_mut(workspace);
+        let (_g, raw_workspace) = CallZomeWorkspaceFactory::from_mut(workspace);
         let host_access = ZomeCallHostAccess::new(raw_workspace, keystore, network.clone());
         ribosome.call_zome_function(host_access, invocation)
     };

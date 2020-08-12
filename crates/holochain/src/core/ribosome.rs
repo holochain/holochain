@@ -29,7 +29,7 @@ use crate::core::ribosome::guest_callback::validate_link_add::ValidateLinkAddRes
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 use crate::core::ribosome::guest_callback::CallIterator;
-use crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace;
+use crate::core::workflow::unsafe_call_zome_workspace::CallZomeWorkspaceFactory;
 use crate::fixt::HostInputFixturator;
 use crate::fixt::ZomeNameFixturator;
 use ::fixt::prelude::*;
@@ -112,7 +112,7 @@ impl From<&HostAccess> for HostFnAccess {
 
 impl HostAccess {
     /// Get the workspace, panics if none was provided
-    pub fn workspace(&self) -> &UnsafeCallZomeWorkspace {
+    pub fn workspace(&self) -> &CallZomeWorkspaceFactory {
         match self {
             Self::ZomeCall(ZomeCallHostAccess{workspace, .. }) |
             Self::Init(InitHostAccess{workspace, .. }) |
@@ -326,7 +326,7 @@ pub enum ZomeCallInvocationResponse {
 
 #[derive(Clone, Constructor)]
 pub struct ZomeCallHostAccess {
-    pub workspace: UnsafeCallZomeWorkspace,
+    pub workspace: CallZomeWorkspaceFactory,
     pub keystore: KeystoreSender,
     pub network: HolochainP2pCell,
 }

@@ -2,7 +2,7 @@ use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostAccess;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
-use crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace;
+use crate::core::workflow::unsafe_call_zome_workspace::CallZomeWorkspaceFactory;
 use derive_more::Constructor;
 use holo_hash::EntryContentHash;
 use holochain_serialized_bytes::prelude::*;
@@ -30,7 +30,7 @@ impl ValidationPackageInvocation {
 
 #[derive(Clone, Constructor)]
 pub struct ValidationPackageHostAccess {
-    pub workspace: UnsafeCallZomeWorkspace,
+    pub workspace: CallZomeWorkspaceFactory,
 }
 
 impl From<ValidationPackageHostAccess> for HostAccess {
