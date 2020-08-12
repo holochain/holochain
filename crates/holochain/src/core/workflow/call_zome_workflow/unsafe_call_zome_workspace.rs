@@ -1,5 +1,6 @@
 #![allow(clippy::mutex_atomic)]
 use super::*;
+use crate::core::state::workspace::WorkspaceError;
 use futures::Future;
 use holochain_state::env::{EnvironmentRead, EnvironmentWrite};
 
@@ -20,12 +21,12 @@ impl From<EnvironmentWrite> for CallZomeWorkspaceFactory {
 
 impl CallZomeWorkspaceFactory {
     // TODO: make WorkspaceFactory trait to genericize this across all workspaces.
-    pub fn workspace<'r>(
-        reader: &'r Reader<'r>,
-        dbs: &impl GetDb,
-    ) -> WorkspaceResult<CallZomeWorkspace<'r>> {
-        CallZomeWorkspace::new(reader, dbs)
-    }
+    // pub fn workspace<'r>(
+    //     reader: &'r Reader<'r>,
+    //     dbs: &impl GetDb,
+    // ) -> WorkspaceResult<CallZomeWorkspace<'r>> {
+    //     CallZomeWorkspace::new(reader, dbs)
+    // }
 
     /// Useful when we need this type where we don't want to use it.
     /// It will always return None.
@@ -33,7 +34,7 @@ impl CallZomeWorkspaceFactory {
         todo!()
     }
 
-    pub async unsafe fn apply_ref<
+    pub async fn apply_ref<
         'a,
         R,
         Fut: Future<Output = R> + 'a,
@@ -41,11 +42,11 @@ impl CallZomeWorkspaceFactory {
     >(
         &self,
         f: F,
-    ) -> Result<R, error::CallZomeWorkspaceFactoryError> {
+    ) -> Result<R, WorkspaceError> {
         todo!()
     }
 
-    pub async unsafe fn apply_mut<
+    pub async fn apply_mut<
         'a,
         R,
         Fut: Future<Output = R> + 'a,
@@ -53,18 +54,7 @@ impl CallZomeWorkspaceFactory {
     >(
         &self,
         f: F,
-    ) -> Result<R, error::CallZomeWorkspaceFactoryError> {
+    ) -> Result<R, WorkspaceError> {
         todo!()
-    }
-}
-
-pub mod error {
-    use thiserror::Error;
-    #[derive(Error, Debug)]
-    pub enum CallZomeWorkspaceFactoryError {
-        #[error(
-            "The guard for this workspace has been dropped and this workspace is no loanger valid"
-        )]
-        GuardDropped,
     }
 }
