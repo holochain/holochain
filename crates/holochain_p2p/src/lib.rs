@@ -17,6 +17,7 @@ use holochain_types::{
     link::{GetLinksResponse, WireLinkMetaKey},
     metadata::MetadataSet,
 };
+use ghost_actor::dependencies::{tracing, tracing_futures::Instrument};
 pub use spawn::*;
 pub use test::HolochainP2pCellFixturator;
 
@@ -109,6 +110,7 @@ impl HolochainP2pCell {
                 dht_hash,
                 options,
             )
+            .instrument(tracing::debug_span!("a"))
             .await
     }
 

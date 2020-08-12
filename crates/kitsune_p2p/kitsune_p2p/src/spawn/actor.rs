@@ -11,6 +11,7 @@ use std::{
 mod gossip;
 mod space;
 use space::*;
+use ghost_actor::dependencies::tracing;
 
 ghost_actor::ghost_chan! {
     pub(crate) chan Internal<crate::KitsuneP2pError> {
@@ -178,6 +179,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         )
     }
 
+    #[tracing::instrument(skip(self, input))]
     fn handle_rpc_multi(
         &mut self,
         input: actor::RpcMulti,

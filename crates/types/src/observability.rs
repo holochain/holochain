@@ -60,7 +60,7 @@
 //! tad log.csv
 //! ```
 
-use tracing::{Event, Subscriber};
+use tracing::{Event, Subscriber, Metadata};
 use tracing_core::field::Field;
 use tracing_serde::AsSerde;
 use tracing_subscriber::{
@@ -178,6 +178,10 @@ fn parse_time(samples: &mut usize, value: &dyn std::fmt::Debug) {
     }
 }
 
+struct FlameTimed {
+    path: PathBuf,
+}
+
 struct Flame {
     guard: Option<Box<dyn Drop>>,
 }
@@ -255,28 +259,11 @@ where
 {
     let mut values = EventFieldFlameVisitor::new();
     event.record(&mut values);
+    let mut stack = String::new();
     if values.samples > 0 {
-        let mut parents = Vec::new();
-        ctx.visit_spans::<(), _>(|span| {
-            let mut stack = String::new();
-            let meta = span.metadata();
-            let name = meta.name();
-            let file = meta.file();
-            let line = meta.line();
-            stack += "; ";
-            write!(&mut stack, "{}", name).ok();
-            if let Some(file) = file {
-                write!(&mut stack, ":{}", file).ok();
-            }
-            if let Some(line) = line {
-                write!(&mut stack, ":{}", line).ok();
-            }
-            parents.push(stack);
-            Ok(())
-        })
-        .ok();
-        let flat_parents: String = parents.iter().map(|n| n.chars()).rev().flatten().collect();
-        writeln!(writer, "all{} {}", flat_parents, values.samples)
+        visit_parents(&mut stack, ctx);
+        let event_data = event_data(event.metadata());
+        writeln!(writer, "all; {} {} {}", stack, event_data, values.samples)
     } else {
         write!(writer, "")
     }
@@ -294,31 +281,51 @@ where
 {
     let mut values = EventFieldIceVisitor::new();
     event.record(&mut values);
+    let mut stack = String::new();
     if values.samples > 0 {
-        let mut parents = Vec::new();
-        ctx.visit_spans::<(), _>(|span| {
-            let mut stack = String::new();
-            let meta = span.metadata();
-            let name = meta.name();
-            let file = meta.file();
-            let line = meta.line();
-            stack += "; ";
-            write!(&mut stack, "{}", name).ok();
-            if let Some(file) = file {
-                write!(&mut stack, ":{}", file).ok();
-            }
-            if let Some(line) = line {
-                write!(&mut stack, ":{}", line).ok();
-            }
-            parents.push(stack);
-            Ok(())
-        })
-        .ok();
-        let flat_parents: String = parents.iter().map(|n| n.chars()).rev().flatten().collect();
-        writeln!(writer, "all{} {}", flat_parents, values.samples)
+        visit_parents(&mut stack, ctx);
+        let event_data = event_data(event.metadata());
+        writeln!(writer, "all; {} {} {}", stack, event_data, values.samples)
     } else {
         write!(writer, "")
     }
+}
+
+fn event_data(meta: &Metadata) -> String {
+    let mut event_data = String::new();
+    if let Some(module) = meta.module_path() {
+        write!(event_data, "{}:", module).ok();
+    }
+    if let Some(line) = meta.line() {
+        write!(event_data, "{}", line).ok();
+    }
+    event_data
+}
+
+fn visit_parents<S, N>(stack: &mut String, ctx: &FmtContext<'_, S, N>)
+where
+    S: Subscriber + for<'a> LookupSpan<'a>,
+    N: for<'writer> FormatFields<'writer> + 'static,
+{
+    ctx.visit_spans::<(), _>(|span| {
+        let meta = span.metadata();
+        let name = meta.name();
+        let module= meta.module_path();
+        let line = meta.line();
+        if let Some(module) = module{
+            write!(stack, "{}:", module).ok();
+        }
+        if let Some(line) = line {
+            write!(stack, "{}", line).ok();
+        }
+        // for field in meta.fields() {
+        //     write!(stack, "F:{}:", field.name()).ok();
+        // }
+        write!(stack, "S:{}", name).ok();
+        *stack += "; ";
+        Ok(())
+    })
+    .ok();
 }
 
 /// Run logging in a unit test
@@ -356,26 +363,42 @@ pub fn test_run_timed_json() -> Result<(), errors::TracingError> {
     init_fmt(Output::JsonTimed)
 }
 
-/// Same as test_run_timed but saves as json
-pub fn test_run_timed_flame() -> Result<(), errors::TracingError> {
+/// Generate a flamegraph from timed spans "busy time".
+/// Takes a path where you are piping the output into.
+/// If the path is provided a flamegraph will automatically be generated.
+pub fn test_run_timed_flame(path: Option<&str>) -> Result<Option<impl Drop>, errors::TracingError> {
     if let (None, None) = (
         std::env::var_os("RUST_LOG"),
         std::env::var_os("CUSTOM_FILTER"),
     ) {
-        return Ok(());
+        return Ok(None);
     }
-    init_fmt(Output::FlameTimed)
+    init_fmt(Output::FlameTimed)?;
+    Ok(path.and_then(|p| {
+        toml_path().map(|mut t| {
+            t.push(p);
+            FlameTimed { path: t }
+        })
+    }))
 }
 
-/// Same as test_run_timed but saves as json
-pub fn test_run_timed_ice() -> Result<(), errors::TracingError> {
+/// Generate a flamegraph from timed spans "idle time".
+/// Takes a path where you are piping the output into.
+/// If the path is provided a flamegraph will automatically be generated.
+pub fn test_run_timed_ice(path: Option<&str>) -> Result<Option<impl Drop>, errors::TracingError> {
     if let (None, None) = (
         std::env::var_os("RUST_LOG"),
         std::env::var_os("CUSTOM_FILTER"),
     ) {
-        return Ok(());
+        return Ok(None);
     }
-    init_fmt(Output::IceTimed)
+    init_fmt(Output::IceTimed)?;
+    Ok(path.and_then(|p| {
+        toml_path().map(|mut t| {
+            t.push(p);
+            FlameTimed { path: t }
+        })
+    }))
 }
 
 /// Generate a tracing flamegraph for a test
@@ -393,7 +416,7 @@ pub fn flame_run() -> Result<Option<impl Drop>, errors::TracingError> {
         return Ok(None);
     }
     let filter = EnvFilter::from_default_env();
-    let path = Flame::generate_path().ok_or(errors::TracingError::TracingFlame)?;
+    let path = toml_path().ok_or(errors::TracingError::TracingFlame)?;
     let (flame_layer, guard) = FlameLayer::with_file(path.join("flames.folded"))?;
 
     let subscriber = Registry::default().with(filter).with(flame_layer);
@@ -405,49 +428,53 @@ pub fn flame_run() -> Result<Option<impl Drop>, errors::TracingError> {
     }))
 }
 
-impl Flame {
-    fn generate_path() -> Option<PathBuf> {
-        let path = std::env::var_os("CARGO_MANIFEST_DIR").or_else(|| {
-            println!("failed to get cargo manifest dir for flames");
-            None
-        })?;
-        Some(PathBuf::from(path))
-    }
-
-    /// Save the flamegraph
-    /// We don't want this to fail our tests but we want to know if it doesn't work
-    fn flamegraph(&self) -> Option<()> {
-        let now = chrono::Local::now().to_rfc3339_opts(SecondsFormat::Secs, true);
-        let path = Flame::generate_path()?;
-        let inf = std::fs::File::open(path.join("flames.folded"))
-            .ok()
-            .or_else(|| {
-                eprintln!("failed to create flames dir");
-                None
-            })?;
-        let reader = std::io::BufReader::new(inf);
-
-        let out = std::fs::File::create(path.join(format!("tracing_flame_{}.svg", now)))
-            .ok()
-            .or_else(|| {
-                eprintln!("failed to create flames inferno");
-                None
-            })?;
-        let writer = std::io::BufWriter::new(out);
-
-        let mut opts = inferno::flamegraph::Options::default();
-        inferno::flamegraph::from_reader(&mut opts, reader, writer).unwrap();
-        Some(())
-    }
-}
-
 impl Drop for Flame {
     fn drop(&mut self) {
         if let Some(g) = self.guard.take() {
             drop(g);
         }
-        self.flamegraph();
+        if let Some(toml_path) = toml_path() {
+            save_flamegraph(toml_path);
+        }
     }
+}
+
+impl Drop for FlameTimed {
+    fn drop(&mut self) {
+        save_flamegraph(self.path.clone());
+    }
+}
+
+fn toml_path() -> Option<PathBuf> {
+    let path = std::env::var_os("CARGO_MANIFEST_DIR").or_else(|| {
+        println!("failed to get cargo manifest dir for flames");
+        None
+    })?;
+    Some(PathBuf::from(path))
+}
+
+fn save_flamegraph(path: PathBuf) -> Option<()> {
+    println!("path {:?}", path);
+    let now = chrono::Local::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+    let inf = std::fs::File::open(path.join("flames.folded"))
+        .ok()
+        .or_else(|| {
+            eprintln!("failed to create flames dir");
+            None
+        })?;
+    let reader = std::io::BufReader::new(inf);
+
+    let out = std::fs::File::create(path.join(format!("tracing_flame_{}.svg", now)))
+        .ok()
+        .or_else(|| {
+            eprintln!("failed to create flames inferno");
+            None
+        })?;
+    let writer = std::io::BufWriter::new(out);
+
+    let mut opts = inferno::flamegraph::Options::default();
+    inferno::flamegraph::from_reader(&mut opts, reader, writer).unwrap();
+    Some(())
 }
 
 /// This checks RUST_LOG for a filter but doesn't complain if there is none or it doesn't parse.
@@ -479,8 +506,8 @@ pub fn init_fmt(output: Output) -> Result<(), errors::TracingError> {
     ) -> std::fmt::Result = format_event_ice;
 
     let subscriber = FmtSubscriber::builder()
-        .with_target(true)
-        .with_writer(std::io::stderr);
+        .with_writer(std::io::stderr)
+        .with_target(true);
 
     match output {
         Output::Json => {

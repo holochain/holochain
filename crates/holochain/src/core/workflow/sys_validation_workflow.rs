@@ -9,6 +9,7 @@ use error::WorkflowResult;
 use holochain_state::prelude::{GetDb, Reader, Writer};
 use tracing::*;
 
+#[instrument(skip(workspace, writer, trigger_app_validation))]
 pub async fn sys_validation_workflow(
     workspace: SysValidationWorkspace<'_>,
     writer: OneshotWriter,

@@ -83,6 +83,7 @@ use std::{
     convert::TryInto,
 };
 use tracing::*;
+use tracing_futures::Instrument;
 
 #[cfg(test)]
 mod network_tests;
@@ -207,6 +208,7 @@ where
         let results = self
             .network
             .get(hash.clone().into(), options.clone())
+            .instrument(debug_span!("fetch_element_via_entry::network_get"))
             .await?;
         debug!("fetching element");
 
@@ -221,16 +223,27 @@ where
                         updates,
                     } = *raw;
                     let elements =
-                        ElementGroup::from_wire_elements(live_headers, entry_type, entry).await?;
+                        ElementGroup::from_wire_elements(live_headers, entry_type, entry)
+                            .instrument(debug_span!("a"))
+                            .await?;
                     let entry_hash = elements.entry_hash().clone();
-                    self.update_stores_with_element_group(elements).await?;
+                    self.update_stores_with_element_group(elements)
+                        .instrument(debug_span!("a"))
+                        .await?;
                     for delete in deletes {
-                        let element = delete.into_element().await;
-                        self.update_stores(element).await?;
+                        let element = delete.into_element().instrument(debug_span!("a")).await;
+                        self.update_stores(element)
+                            .instrument(debug_span!("a"))
+                            .await?;
                     }
                     for update in updates {
-                        let element = update.into_element(entry_hash.clone()).await;
-                        self.update_stores(element).await?;
+                        let element = update
+                            .into_element(entry_hash.clone())
+                            .instrument(debug_span!("a"))
+                            .await;
+                        self.update_stores(element)
+                            .instrument(debug_span!("a"))
+                            .await?;
                     }
                 }
                 // Authority didn't have any headers for this entry

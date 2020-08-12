@@ -226,6 +226,7 @@ impl Cell {
         &self.holochain_p2p_cell
     }
 
+    #[instrument(skip(self, evt))]
     /// Entry point for incoming messages from the network that need to be handled
     pub async fn handle_holochain_p2p_event(
         &self,
@@ -234,7 +235,7 @@ impl Cell {
         use holochain_p2p::event::HolochainP2pEvent::*;
         match evt {
             CallRemote {
-                span,
+                span: _span,
                 to_agent,
                 zome_name,
                 fn_name,
@@ -250,11 +251,11 @@ impl Cell {
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
-                .instrument(span)
+                .instrument(debug_span!("call_remote"))
                 .await;
             }
             Publish {
-                span,
+                span: _span,
                 respond,
                 from_agent,
                 request_validation_receipt,
@@ -269,10 +270,14 @@ impl Cell {
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
-                .instrument(span)
+                .instrument(debug_span!("cell_handle_publish"))
                 .await;
             }
-            GetValidationPackage { span, respond, .. } => {
+            GetValidationPackage {
+                span: _span,
+                respond,
+                ..
+            } => {
                 async {
                     let res = self
                         .handle_get_validation_package()
@@ -280,11 +285,11 @@ impl Cell {
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
-                .instrument(span)
+                .instrument(debug_span!("cell_handle_get_validation_package"))
                 .await;
             }
             Get {
-                span,
+                span: _span,
                 respond,
                 dht_hash,
                 options,
@@ -297,11 +302,11 @@ impl Cell {
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
-                .instrument(span)
+                .instrument(debug_span!("cell_handle_get"))
                 .await;
             }
             GetMeta {
-                span,
+                span: _span,
                 respond,
                 dht_hash,
                 options,
@@ -314,11 +319,11 @@ impl Cell {
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
-                .instrument(span)
+                .instrument(debug_span!("cell_handle_get_meta"))
                 .await;
             }
             GetLinks {
-                span,
+                span: _span,
                 respond,
                 link_key,
                 options,
@@ -331,11 +336,11 @@ impl Cell {
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
-                .instrument(span)
+                .instrument(debug_span!("cell_handle_get_links"))
                 .await;
             }
             ValidationReceiptReceived {
-                span,
+                span: _span,
                 respond,
                 receipt,
                 ..
@@ -347,11 +352,11 @@ impl Cell {
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
-                .instrument(span)
+                .instrument(debug_span!("cell_handle_validation_receipt_received"))
                 .await;
             }
             FetchOpHashesForConstraints {
-                span,
+                span: _span,
                 respond,
                 dht_arc,
                 since,
@@ -365,11 +370,11 @@ impl Cell {
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
-                .instrument(span)
+                .instrument(debug_span!("cell_handle_fetch_op_hashes_for_constraints"))
                 .await;
             }
             FetchOpHashData {
-                span,
+                span: _span,
                 respond,
                 op_hashes,
                 ..
@@ -381,10 +386,14 @@ impl Cell {
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
-                .instrument(span)
+                .instrument(debug_span!("cell_handle_fetch_op_hash_data"))
                 .await;
             }
-            SignNetworkData { span, respond, .. } => {
+            SignNetworkData {
+                span: _span,
+                respond,
+                ..
+            } => {
                 async {
                     let res = self
                         .handle_sign_network_data()
@@ -392,7 +401,7 @@ impl Cell {
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
-                .instrument(span)
+                .instrument(debug_span!("cell_handle_sign_network_data"))
                 .await;
             }
         }

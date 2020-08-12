@@ -22,6 +22,7 @@ use holochain_websocket::WebsocketSender;
 use matches::assert_matches;
 use test_utils::*;
 use test_wasm_common::{AnchorInput, TestString};
+use tracing::instrument;
 
 mod test_utils;
 
@@ -50,15 +51,17 @@ async fn speed_test_timed_json() {
 #[tokio::test(threaded_scheduler)]
 #[ignore]
 async fn speed_test_timed_flame() {
-    let _g = observability::test_run_timed_flame().unwrap();
+    let _g = observability::test_run_timed_flame(None).unwrap();
     speed_test().await;
+    tokio::time::delay_for(std::time::Duration::from_millis(100)).await;
 }
 
 #[tokio::test(threaded_scheduler)]
 #[ignore]
 async fn speed_test_timed_ice() {
-    let _g = observability::test_run_timed_ice().unwrap();
+    let _g = observability::test_run_timed_ice(None).unwrap();
     speed_test().await;
+    tokio::time::delay_for(std::time::Duration::from_millis(100)).await;
 }
 
 #[tokio::test(threaded_scheduler)]
@@ -68,8 +71,9 @@ async fn speed_test_normal() {
     speed_test().await;
 }
 
+#[instrument]
 async fn speed_test() {
-    const NUM: usize = 4;
+    const NUM: usize = 1000;
 
     // ////////////
     // START DNA

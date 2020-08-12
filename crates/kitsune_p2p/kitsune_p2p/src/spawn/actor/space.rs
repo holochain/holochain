@@ -1,4 +1,5 @@
 use super::*;
+use ghost_actor::dependencies::tracing::{self, instrument};
 use std::collections::HashSet;
 use tracing_futures::Instrument;
 
@@ -15,7 +16,7 @@ const DEFAULT_RPC_MULTI_REMOTE_AGENT_COUNT: u8 = 2;
 const DEFAULT_RPC_MULTI_TIMEOUT_MS: u64 = 1000;
 
 /// if the user specifies None or zero (0) for race_timeout_ms
-const DEFAULT_RPC_MULTI_RACE_TIMEOUT_MS: u64 = 200;
+const DEFAULT_RPC_MULTI_RACE_TIMEOUT_MS: u64 = 1;
 
 /// Normally network lookups / connections will be async / take some time.
 /// While we are in "short-circuit-only" mode - we just need to allow some
@@ -385,6 +386,7 @@ impl Space {
     /// actual logic for handle_rpc_multi ...
     /// the top-level handler may or may not spawn a task for this
     #[allow(unused_variables, unused_assignments, unused_mut)]
+    #[instrument(skip(self, input))]
     fn handle_rpc_multi_inner(
         &mut self,
         input: actor::RpcMulti,
@@ -407,6 +409,9 @@ impl Space {
             // if these are the same, the effect is that we are not racing
             race_timeout_ms = timeout_ms;
         }
+        tracing::debug!(?as_race);
+        tracing::debug!(?race_timeout_ms);
+        tracing::debug!(?timeout_ms);
 
         // encode the data to send
         let payload = Arc::new(wire::Wire::call(payload).encode());
@@ -414,6 +419,7 @@ impl Space {
         let mut internal_sender = self.internal_sender.clone();
 
         Ok(async move {
+            tracing::debug!("starting first loop");
             let start = std::time::Instant::now();
 
             // TODO - this logic isn't quite right
@@ -494,6 +500,7 @@ impl Space {
                 }
             }
 
+            tracing::debug!("starting second loop");
             // await responses
             let mut out = Vec::new();
             let mut result_fut = None;
@@ -512,7 +519,9 @@ impl Space {
                 // calculate the time to wait based on our barriers
                 let elapsed = start.elapsed().as_millis() as u64;
                 let mut time_remaining = if elapsed >= race_timeout_ms {
-                    if elapsed < timeout_ms {
+                    if as_race {
+                        1
+                    } else if elapsed < timeout_ms {
                         timeout_ms - elapsed
                     } else {
                         1
@@ -554,8 +563,12 @@ impl Space {
                 }
             }
 
+            tracing::debug!("finishing");
             Ok(out)
         }
+        .instrument(ghost_actor::dependencies::tracing::debug_span!(
+            "handle_rpc_multi_inner_task"
+        ))
         .boxed()
         .into())
     }
