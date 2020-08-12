@@ -17,121 +17,9 @@ Old kits:
 3. Requires all holochain interactions to be routed through the HDK
 
 
-## HDK API
+{{readme}}
 
-Welcome to the HDK 3.0.
-This HDK is currently in flux, expect rapid changes.
-Currently there are helper macros to aid in writing happs.
-
-## Examples
-
-### map_extern!
-
-```rust
-use hdk3::prelude::*;
-
-#[derive(Debug, Serialize, Deserialize, SerializedBytes)]
-pub struct MyInput;
-
-#[derive(Debug, Serialize, Deserialize, SerializedBytes)]
-pub struct MyOutput(MyInput);
-
-fn _foo(input: MyInput) -> Result<MyOutput, WasmError> {
-  Ok(MyOutput(input))
-}
-
-map_extern!(foo, _foo);
-```
-
-### entry_def! & entry_defs
-
-```rust
-#[derive(Debug, Clone, Serialize, Deserialize, SerializedBytes)]
-pub struct Foo;
-
-#[derive(Debug, Clone, Serialize, Deserialize, SerializedBytes)]
-pub struct Bar;
-
-const FOO_ID: &str = "foo";
-const BAR_ID: &str = "bar";
-
-// Long version
-entry_def!(Foo EntryDef {
-    id: FOO_ID.into(),
-    crdt_type: CrdtType,
-    required_validations: RequiredValidations::default(),
-    visibility: EntryVisibility::Public,
-});
-
-// Short version
-entry_def!(Bar EntryDef {
-    id: BAR_ID.into(),
-    ..Default::default()
-});
-
-entry_defs!(vec![Foo::entry_def(), Bar::entry_def()]);
-```
-
-### commit_entry!, get!, entry_hash!, link_entries!, get_links!, debug!
-
-```rust
-// Create your entry types
-let foo = Foo;
-let bar = Bar;
-// Commit the entries
-let _foo_header_hash = commit_entry!(foo.clone())?;
-let _bar_header_hash = commit_entry!(bar.clone())?;
-// Get the entry hash of each entry
-let foo_entry_hash = entry_hash!(foo)?;
-let bar_entry_hash = entry_hash!(bar)?;
-// Link from foo (base) to bar (target)
-let _link_add_header_hash = link_entries!(foo_entry_hash.clone(), bar_entry_hash)?;
-// Get the links back
-let links = get_links!(foo_entry_hash)?;
-// Print out the links
-debug!(links)?;
-```
-
-### call_remote!, zome_info!, agent_info!
-
-```rust
-// Get your agent key
-let agent_pubkey = agent_info!()?.agent_pubkey;
-// Get the name of this zome
-let zome_name = zome_info!()?.zome_name;
-// Call your friends foo function
-let result: SerializedBytes = call_remote!(
-    my_friends_agent_pubkey,
-    zome_name,
-    "foo".to_string(),
-    CapSecret::default(),
-    MyInput.try_into()?
-)?;
-// Get their output
-let output: MyOutput = result.try_into()?;
-// Print their output
-debug!(output)?;
-```
-
-### Direct Api Call
-The above macros are convenience macros for calling the api but this
-can also be done directly as follows:
-
-```rust
-// Commit foo
-let foo_header_hash = commit_entry!(foo.clone())?;
-// Call the api directly:
-// Create the Entry from bar.
-let entry = Entry::App(bar.clone().try_into()?);
-// Call the update_entry host_fn directly
-let _bar_header_hash = hdk3::api_call!(
-    __update_entry,
-    UpdateEntryInput::new((bar.clone().into(), entry, foo_header_hash)),
-    UpdateEntryOutput
-)?;
-```
-
-Current version: 0.0.1
+Current version: {{version}}
 
 ## Composable concepts
 
@@ -859,3 +747,4 @@ fn _validate_entry(input: HostInput) -> Result<GuestOutput, String> {
  }.try_into()?))
 }
 ```
+

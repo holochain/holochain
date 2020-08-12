@@ -12,6 +12,7 @@ edition = "2018"
 
 [lib]
 crate-type = [ "cdylib", "rlib" ]
+path = "src/lib.rs"
 
 [dependencies]
 holo_hash = { path = "../holo_hash" }
