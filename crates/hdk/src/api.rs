@@ -128,6 +128,44 @@
 //! # }
 //! ```
 //!
+//! ## Direct Api Call
+//! The above macros are convenience macros for calling the api but this
+//! can also be done directly as follows:
+//!
+//! ```no_run
+//! # fn main() -> Result<(), hdk3::prelude::WasmError> {
+//! # use hdk3::prelude::*;
+//! # #[derive(Debug, Clone, Serialize, Deserialize, SerializedBytes)]
+//! # pub struct Foo;
+//! # #[derive(Debug, Clone, Serialize, Deserialize, SerializedBytes)]
+//! # pub struct Bar;
+//! # const FOO_ID: &str = "foo";
+//! # const BAR_ID: &str = "bar";
+//! # entry_def!(Foo EntryDef {
+//! #     id: FOO_ID.into(),
+//! #     ..Default::default()
+//! # });
+//! # entry_def!(Bar EntryDef {
+//! #     id: BAR_ID.into(),
+//! #     ..Default::default()
+//! # });
+//! # // Create your entry types
+//! # let foo = Foo;
+//! # let bar = Bar;
+//! // Commit foo
+//! let foo_header_hash = commit_entry!(foo.clone())?;
+//! // Call the api directly:
+//! // Create the Entry from bar.
+//! let entry = Entry::App(bar.clone().try_into()?);
+//! // Call the update_entry host_fn directly
+//! let _bar_header_hash = hdk3::api_call!(
+//!     __update_entry,
+//!     UpdateEntryInput::new((bar.clone().into(), entry, foo_header_hash)),
+//!     UpdateEntryOutput
+//! )?;
+//! # Ok(())
+//! # }
+//! ```
 
 #[macro_export]
 macro_rules! map_extern {

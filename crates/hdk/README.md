@@ -113,6 +113,23 @@ let output: MyOutput = result.try_into()?;
 debug!(output)?;
 ```
 
+### Direct Api Call
+The above macros are convenience macros for calling the api but this
+can also be done directly as follows:
+
+```rust
+// Commit foo
+let foo_header_hash = commit_entry!(foo.clone())?;
+// Call the api directly:
+// Create the Entry from bar.
+let entry = Entry::App(bar.clone().try_into()?);
+// Call the update_entry host_fn directly
+let _bar_header_hash = hdk3::api_call!(
+    __update_entry,
+    UpdateEntryInput::new((bar.clone().into(), entry, foo_header_hash)),
+    UpdateEntryOutput
+)?;
+```
 
 Current version: 0.0.1
 
