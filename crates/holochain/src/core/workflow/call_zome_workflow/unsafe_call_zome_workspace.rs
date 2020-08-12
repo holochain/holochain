@@ -2,13 +2,6 @@
 use super::*;
 use futures::Future;
 use holochain_state::env::{EnvironmentRead, EnvironmentWrite};
-use std::{
-    marker::PhantomData,
-    sync::{
-        atomic::{AtomicPtr, Ordering},
-        Arc,
-    },
-};
 
 #[derive(Clone)]
 pub struct CallZomeWorkspaceFactory(EnvironmentRead);
@@ -26,6 +19,14 @@ impl From<EnvironmentWrite> for CallZomeWorkspaceFactory {
 }
 
 impl CallZomeWorkspaceFactory {
+    // TODO: make WorkspaceFactory trait to genericize this across all workspaces.
+    pub fn workspace<'r>(
+        reader: &'r Reader<'r>,
+        dbs: &impl GetDb,
+    ) -> WorkspaceResult<CallZomeWorkspace<'r>> {
+        CallZomeWorkspace::new(reader, dbs)
+    }
+
     /// Useful when we need this type where we don't want to use it.
     /// It will always return None.
     pub fn null() -> Self {

@@ -127,7 +127,9 @@ pub mod wasm_test {
     use crate::core::state::source_chain::ChainInvalidReason;
     use crate::core::state::source_chain::SourceChainError;
     use crate::core::state::source_chain::SourceChainResult;
-    use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
+    use crate::core::workflow::{
+        call_zome_workflow::CallZomeWorkspace, unsafe_call_zome_workspace::CallZomeWorkspaceFactory,
+    };
     use crate::fixt::CallContextFixturator;
     use crate::fixt::EntryFixturator;
     use crate::fixt::WasmRibosomeFixturator;
@@ -156,11 +158,6 @@ pub mod wasm_test {
         let reader = holochain_state::env::ReadManager::reader(&env_ref).unwrap();
         let mut workspace = <crate::core::workflow::call_zome_workflow::CallZomeWorkspace as crate::core::state::workspace::Workspace>::new(&reader, &dbs).unwrap();
 
-        let (_g, raw_workspace) =
-            crate::core::workflow::unsafe_call_zome_workspace::CallZomeWorkspaceFactory::from_mut(
-                &mut workspace,
-            );
-
         let ribosome =
             WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::CommitEntry]))
                 .next()
@@ -170,7 +167,9 @@ pub mod wasm_test {
             .unwrap();
         call_context.zome_name = TestWasm::CommitEntry.into();
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = env.clone().into();
+        let factory: CallZomeWorkspaceFactory = env.clone().into();
+        host_access.workspace = factory.clone();
+
         call_context.host_access = host_access.into();
         let app_entry = EntryFixturator::new(AppEntry).next().unwrap();
         let entry_def_id = EntryDefId::from("post");
@@ -204,11 +203,6 @@ pub mod wasm_test {
             .await
             .unwrap();
 
-        let (_g, raw_workspace) =
-            crate::core::workflow::unsafe_call_zome_workspace::CallZomeWorkspaceFactory::from_mut(
-                &mut workspace,
-            );
-
         let ribosome =
             WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::CommitEntry]))
                 .next()
@@ -218,7 +212,9 @@ pub mod wasm_test {
             .unwrap();
         call_context.zome_name = TestWasm::CommitEntry.into();
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = env.clone().into().clone();
+        let factory: CallZomeWorkspaceFactory = env.clone().into();
+        host_access.workspace = factory.clone();
+
         call_context.host_access = host_access.into();
         let app_entry = EntryFixturator::new(AppEntry).next().unwrap();
         let entry_def_id = EntryDefId::from("post");
@@ -237,7 +233,7 @@ pub mod wasm_test {
             };
         let chain_head =
             tokio_safe_block_on::tokio_safe_block_forever_on(tokio::task::spawn(async move {
-                unsafe { raw_workspace.apply_mut(call).await }
+                unsafe { factory.apply_mut(call).await }
             }))
             .unwrap()
             .unwrap()
@@ -260,12 +256,10 @@ pub mod wasm_test {
         crate::core::workflow::fake_genesis(&mut workspace.source_chain)
             .await
             .unwrap();
-        let (_g, raw_workspace) =
-            crate::core::workflow::unsafe_call_zome_workspace::CallZomeWorkspaceFactory::from_mut(
-                &mut workspace,
-            );
+
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = env.clone().into().clone();
+        let factory: CallZomeWorkspaceFactory = env.clone().into();
+        host_access.workspace = factory.clone();
 
         // get the result of a commit entry
         let output: CommitEntryOutput =
@@ -280,10 +274,9 @@ pub mod wasm_test {
                 }
                 .boxed()
             };
-        let cloned_workspace = raw_workspace.clone();
         let chain_head =
             tokio_safe_block_on::tokio_safe_block_forever_on(tokio::task::spawn(async move {
-                unsafe { cloned_workspace.apply_mut(call).await }
+                unsafe { factory.apply_mut(call).await }
             }))
             .unwrap()
             .unwrap()

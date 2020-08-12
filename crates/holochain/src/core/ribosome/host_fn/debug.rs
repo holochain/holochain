@@ -28,7 +28,9 @@ pub fn debug(
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use super::debug;
-    use crate::core::state::workspace::Workspace;
+    use crate::core::{
+        state::workspace::Workspace, workflow::unsafe_call_zome_workspace::CallZomeWorkspaceFactory,
+    };
     use crate::fixt::CallContextFixturator;
     use crate::fixt::WasmRibosomeFixturator;
     use crate::fixt::ZomeCallHostAccessFixturator;
@@ -64,12 +66,9 @@ pub mod wasm_test {
         let reader = env_ref.reader().unwrap();
         let mut workspace = crate::core::workflow::CallZomeWorkspace::new(&reader, &dbs).unwrap();
 
-        let (_g, raw_workspace) =
-            crate::core::workflow::unsafe_call_zome_workspace::CallZomeWorkspaceFactory::from_mut(
-                &mut workspace,
-            );
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = env.clone().into();
+        let factory: CallZomeWorkspaceFactory = env.clone().into();
+        host_access.workspace = factory.clone();
 
         // this shows that debug is called but our line numbers will be messed up
         // the line numbers will show as coming from this test because we made the input here
@@ -90,12 +89,9 @@ pub mod wasm_test {
         let reader = env_ref.reader().unwrap();
         let mut workspace = crate::core::workflow::CallZomeWorkspace::new(&reader, &dbs).unwrap();
 
-        let (_g, raw_workspace) =
-            crate::core::workflow::unsafe_call_zome_workspace::CallZomeWorkspaceFactory::from_mut(
-                &mut workspace,
-            );
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = env.clone().into();
+        let factory: CallZomeWorkspaceFactory = env.clone().into();
+        host_access.workspace = factory.clone();
 
         // this shows that we can get line numbers out of wasm
         let output: DebugOutput =

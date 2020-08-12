@@ -26,7 +26,9 @@ pub fn zome_info(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod test {
-    use crate::core::state::workspace::Workspace;
+    use crate::core::{
+        state::workspace::Workspace, workflow::unsafe_call_zome_workspace::CallZomeWorkspaceFactory,
+    };
     use crate::fixt::ZomeCallHostAccessFixturator;
     use fixt::prelude::*;
     use holochain_state::env::ReadManager;
@@ -41,13 +43,10 @@ pub mod test {
         let reader = env_ref.reader().unwrap();
         let mut workspace = crate::core::workflow::CallZomeWorkspace::new(&reader, &dbs).unwrap();
 
-        let (_g, raw_workspace) =
-            crate::core::workflow::unsafe_call_zome_workspace::CallZomeWorkspaceFactory::from_mut(
-                &mut workspace,
-            );
-
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = env.clone().into();
+        let factory: CallZomeWorkspaceFactory = env.clone().into();
+        host_access.workspace = factory.clone();
+
         let zome_info: ZomeInfoOutput = crate::call_test_ribosome!(
             host_access,
             TestWasm::Imports,

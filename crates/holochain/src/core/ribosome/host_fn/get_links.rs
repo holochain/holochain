@@ -56,7 +56,9 @@ pub fn get_links<'a>(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod slow_tests {
-    use crate::core::state::workspace::Workspace;
+    use crate::core::{
+        state::workspace::Workspace, workflow::unsafe_call_zome_workspace::CallZomeWorkspaceFactory,
+    };
     use crate::fixt::ZomeCallHostAccessFixturator;
     use fixt::prelude::*;
     use hdk3::prelude::*;
@@ -79,12 +81,10 @@ pub mod slow_tests {
             .unwrap();
 
         // ensure foo.bar twice to ensure idempotency
-        let (_g, raw_workspace) =
-            crate::core::workflow::unsafe_call_zome_workspace::CallZomeWorkspaceFactory::from_mut(
-                &mut workspace,
-            );
+
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = env.clone().into();
+        let factory: CallZomeWorkspaceFactory = env.clone().into();
+        host_access.workspace = factory.clone();
 
         let _: () = crate::call_test_ribosome!(
             host_access,
@@ -157,12 +157,9 @@ pub mod slow_tests {
             .await
             .unwrap();
 
-        let (_g, raw_workspace) =
-            crate::core::workflow::unsafe_call_zome_workspace::CallZomeWorkspaceFactory::from_mut(
-                &mut workspace,
-            );
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = env.clone().into();
+        let factory: CallZomeWorkspaceFactory = env.clone().into();
+        host_access.workspace = factory.clone();
 
         // anchor foo bar
         let anchor_address_one: EntryHash = crate::call_test_ribosome!(

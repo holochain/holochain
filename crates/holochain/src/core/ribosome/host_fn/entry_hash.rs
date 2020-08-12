@@ -27,7 +27,9 @@ pub fn entry_hash(
 pub mod wasm_test {
     use super::*;
     use crate::core::ribosome::host_fn::entry_hash::entry_hash;
-    use crate::core::state::workspace::Workspace;
+    use crate::core::{
+        state::workspace::Workspace, workflow::unsafe_call_zome_workspace::CallZomeWorkspaceFactory,
+    };
     use crate::fixt::CallContextFixturator;
     use crate::fixt::EntryFixturator;
     use crate::fixt::WasmRibosomeFixturator;
@@ -69,15 +71,12 @@ pub mod wasm_test {
         let reader = env_ref.reader().unwrap();
         let mut workspace = crate::core::workflow::CallZomeWorkspace::new(&reader, &dbs).unwrap();
 
-        let (_g, raw_workspace) =
-            crate::core::workflow::unsafe_call_zome_workspace::CallZomeWorkspaceFactory::from_mut(
-                &mut workspace,
-            );
-
         let entry = EntryFixturator::new(fixt::Predictable).next().unwrap();
         let input = EntryHashInput::new(entry);
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = env.clone().into();
+        let factory: CallZomeWorkspaceFactory = env.clone().into();
+        host_access.workspace = factory.clone();
+
         let output: EntryHashOutput =
             crate::call_test_ribosome!(host_access, TestWasm::Imports, "entry_hash", input);
         assert_eq!(output.into_inner().get_raw().to_vec().len(), 36,);
@@ -92,13 +91,10 @@ pub mod wasm_test {
         let reader = env_ref.reader().unwrap();
         let mut workspace = crate::core::workflow::CallZomeWorkspace::new(&reader, &dbs).unwrap();
 
-        let (_g, raw_workspace) =
-            crate::core::workflow::unsafe_call_zome_workspace::CallZomeWorkspaceFactory::from_mut(
-                &mut workspace,
-            );
-
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = env.clone().into();
+        let factory: CallZomeWorkspaceFactory = env.clone().into();
+        host_access.workspace = factory.clone();
+
         let input = TestString::from("foo.bar".to_string());
         let output: EntryHash =
             crate::call_test_ribosome!(host_access, TestWasm::HashPath, "hash", input);

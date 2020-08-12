@@ -65,8 +65,8 @@ pub async fn call_zome_workflow<'env, Ribosome: RibosomeT>(
     Ok(result)
 }
 
-async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT>(
-    workspace: &mut CallZomeWorkspace<'env>,
+async fn call_zome_workflow_inner<Ribosome: RibosomeT>(
+    factory: CallZomeWorkspaceFactory,
     network: HolochainP2pCell,
     keystore: KeystoreSender,
     args: CallZomeWorkflowArgs<Ribosome>,
@@ -79,15 +79,14 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT>(
     let zome_name = invocation.zome_name.clone();
 
     // Get the current head
-    let chain_head_start = workspace.source_chain.chain_head()?.clone();
+    let chain_head_start = factory.source_chain.chain_head()?.clone();
 
     let agent_key = invocation.provenance.clone();
 
     tracing::trace!(line = line!());
     // Create the unsafe sourcechain for use with wasm closure
     let result = {
-        let (_g, raw_workspace) = CallZomeWorkspaceFactory::from_mut(workspace);
-        let host_access = ZomeCallHostAccess::new(raw_workspace, keystore, network.clone());
+        let host_access = ZomeCallHostAccess::new(factory, keystore, network.clone());
         ribosome.call_zome_function(host_access, invocation)
     };
     tracing::trace!(line = line!());

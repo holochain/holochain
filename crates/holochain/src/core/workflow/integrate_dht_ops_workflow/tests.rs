@@ -723,14 +723,11 @@ async fn test_ops_state() {
 }
 
 /// Call the produce dht ops workflow
-async fn produce_dht_ops<'env>(
-    env_ref: &'env EnvironmentWriteRef<'env>,
-    env: EnvironmentWrite,
-    dbs: &impl GetDb,
-) {
+async fn produce_dht_ops<'env>(env: EnvironmentWrite) {
+    let env_ref = env.guard().await;
     let (mut qt, _rx) = TriggerSender::new();
     let reader = env_ref.reader().unwrap();
-    let workspace = ProduceDhtOpsWorkspace::new(&reader, dbs).unwrap();
+    let workspace = ProduceDhtOpsWorkspace::new(&reader, &env_ref).unwrap();
     produce_dht_ops_workflow(workspace, env.into(), &mut qt)
         .await
         .unwrap();
@@ -748,12 +745,12 @@ async fn genesis<'env>(env_ref: &'env EnvironmentWriteRef<'env>, dbs: &impl GetD
 
 async fn commit_entry<'env>(
     pre_state: Vec<Db>,
-    env_ref: &'env EnvironmentWriteRef<'env>,
-    dbs: &impl GetDb,
+    env: EnvironmentWrite,
     zome_name: ZomeName,
 ) -> (EntryHash, HeaderHash) {
+    let env_ref = env.guard().await;
     let reader = env_ref.reader().unwrap();
-    let mut workspace = CallZomeWorkspace::new(&reader, dbs).unwrap();
+    let mut workspace = CallZomeWorkspace::new(&reader, &env_ref).unwrap();
 
     // Create entry def with the correct zome name
     let entry_def_id = fixt!(EntryDefId);
@@ -807,9 +804,10 @@ async fn commit_entry<'env>(
     let input = CommitEntryInput::new((entry_def_id.clone(), entry.clone()));
 
     let output = {
-        let (_g, raw_workspace) = CallZomeWorkspaceFactory::from_mut(&mut workspace);
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = env.clone().into();
+        let factory: CallZomeWorkspaceFactory = env.clone().into();
+        host_access.workspace = factory.clone();
+
         call_context.host_access = host_access.into();
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
@@ -828,13 +826,9 @@ async fn commit_entry<'env>(
     (entry_hash, output.into_inner().try_into().unwrap())
 }
 
-async fn get_entry<'env>(
-    env_ref: &'env EnvironmentWriteRef<'env>,
-    dbs: &impl GetDb,
-    entry_hash: EntryHash,
-) -> Option<Entry> {
+async fn get_entry<'env>(env: EnvironmentWrite, entry_hash: EntryHash) -> Option<Entry> {
+    let env_ref = env.guard().await;
     let reader = env_ref.reader().unwrap();
-    let mut workspace = CallZomeWorkspace::new(&reader, dbs).unwrap();
 
     // Create ribosome mock to return fixtures
     // This is a lot faster then compiling a zome
@@ -845,9 +839,10 @@ async fn get_entry<'env>(
     let input = GetInput::new((entry_hash.clone().into(), GetOptions));
 
     let output = {
-        let (_g, raw_workspace) = CallZomeWorkspaceFactory::from_mut(&mut workspace);
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = env.clone().into();
+        let factory: CallZomeWorkspaceFactory = env.clone().into();
+        host_access.workspace = factory.clone();
+
         call_context.host_access = host_access.into();
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
@@ -857,15 +852,14 @@ async fn get_entry<'env>(
 }
 
 async fn link_entries<'env>(
-    env_ref: &'env EnvironmentWriteRef<'env>,
-    dbs: &impl GetDb,
+    env: EnvironmentWrite,
     base_address: EntryHash,
     target_address: EntryHash,
     zome_name: ZomeName,
     link_tag: LinkTag,
 ) -> HeaderHash {
+    let env_ref = env.guard().await;
     let reader = env_ref.reader().unwrap();
-    let mut workspace = CallZomeWorkspace::new(&reader, dbs).unwrap();
 
     // Create data for calls
     let mut dna_file = DnaFileFixturator::new(Empty).next().unwrap();
@@ -890,10 +884,10 @@ async fn link_entries<'env>(
     let input = LinkEntriesInput::new((base_address.into(), target_address.into(), link_tag));
 
     let output = {
-        let (_g, raw_workspace) = CallZomeWorkspaceFactory::from_mut(&mut workspace);
-
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = env.clone().into();
+        let factory: CallZomeWorkspaceFactory = env.clone().into();
+        host_access.workspace = factory.clone();
+
         call_context.host_access = host_access.into();
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
@@ -901,6 +895,7 @@ async fn link_entries<'env>(
         host_fn::link_entries::link_entries(ribosome.clone(), call_context.clone(), input).unwrap()
     };
 
+    let workspace = CallZomeWorkspace::new(&reader, &env_ref).unwrap();
     // Write the changes
     env_ref
         .with_commit(|writer| workspace.flush_to_txn(writer))
@@ -911,12 +906,12 @@ async fn link_entries<'env>(
 }
 
 async fn get_links<'env>(
-    env_ref: &'env EnvironmentWriteRef<'env>,
-    dbs: &impl GetDb,
+    env: EnvironmentWrite,
     base_address: EntryHash,
     zome_name: ZomeName,
     link_tag: LinkTag,
 ) -> Links {
+    let env_ref = env.guard().await;
     let reader = env_ref.reader().unwrap();
     let mut workspace = CallZomeWorkspace::new(&reader, dbs).unwrap();
 
@@ -945,10 +940,10 @@ async fn get_links<'env>(
     let input = GetLinksInput::new((base_address.into(), Some(link_tag)));
 
     let output = {
-        let (_g, raw_workspace) = CallZomeWorkspaceFactory::from_mut(&mut workspace);
-
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = env.clone().into();
+        let factory: CallZomeWorkspaceFactory = env.clone().into();
+        host_access.workspace = factory.clone();
+
         host_access.network = cell_network;
         call_context.host_access = host_access.into();
         let ribosome = Arc::new(ribosome);
