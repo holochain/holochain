@@ -14,7 +14,7 @@ const DEFAULT_RPC_MULTI_REMOTE_AGENT_COUNT: u8 = 2;
 const DEFAULT_RPC_MULTI_TIMEOUT_MS: u64 = 1000;
 
 /// if the user specifies None or zero (0) for race_timeout_ms
-const DEFAULT_RPC_MULTI_RACE_TIMEOUT_MS: u64 = 200;
+const DEFAULT_RPC_MULTI_RACE_TIMEOUT_MS: u64 = 1;
 
 /// Normally network lookups / connections will be async / take some time.
 /// While we are in "short-circuit-only" mode - we just need to allow some
@@ -501,7 +501,9 @@ impl Space {
                 // calculate the time to wait based on our barriers
                 let elapsed = start.elapsed().as_millis() as u64;
                 let mut time_remaining = if elapsed >= race_timeout_ms {
-                    if elapsed < timeout_ms {
+                    if as_race {
+                        1
+                    } else if elapsed < timeout_ms {
                         timeout_ms - elapsed
                     } else {
                         1
