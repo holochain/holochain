@@ -17,7 +17,25 @@ pub(crate) struct PushEvent {
     pub after: String,
 }
 
-pub(crate) async fn push(data: actix_web::web::Data<crate::bench::web::AppState>, push: actix_web::web::Json<PushEvent>) -> impl actix_web::Responder {
-    data.actor.do_send(crate::bench::actor::Commit::from(push.after.clone()));
-    actix_web::Responder::with_status("", actix_web::http::StatusCode::ACCEPTED)
+pub(crate) async fn push(
+    data: actix_web::web::Data<crate::bench::web::AppState>,
+    request: actix_web::HttpRequest,
+    body: String,
+) -> impl actix_web::Responder {
+    match super::signature::verify(&request, &body) {
+        Ok(_) => {
+            let push_event: Result<PushEvent, ()> = serde_json::from_str(&body).map_err(|_| ());
+            match push_event {
+                Ok(push) => {
+                    data.actor
+                        .do_send(crate::bench::actor::Commit::from(push.after.clone()));
+                    actix_web::Responder::with_status("", actix_web::http::StatusCode::ACCEPTED)
+                }
+                Err(_) => {
+                    actix_web::Responder::with_status("", actix_web::http::StatusCode::BAD_REQUEST)
+                }
+            }
+        }
+        Err(_) => actix_web::Responder::with_status("", actix_web::http::StatusCode::FORBIDDEN),
+    }
 }

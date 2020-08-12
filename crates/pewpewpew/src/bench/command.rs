@@ -22,14 +22,15 @@ pub fn commit(commit: Commit) {
             match std::process::Command::new("hc-bench-github")
                 .arg(commit)
                 .arg(token)
-                .spawn() {
-                    Ok(mut child) => match child.wait() {
-                        Ok(_) => { },
-                        Err(e) => eprintln!("bench error: {}", e),
-                    },
-                    Err(e) => eprintln!("command error: {}", e),
-                }
-        },
+                .spawn()
+            {
+                Ok(mut child) => match child.wait() {
+                    Ok(_) => {}
+                    Err(e) => eprintln!("bench error: {}", e),
+                },
+                Err(e) => eprintln!("command error: {}", e),
+            }
+        }
         Err(e) => eprintln!("token error: {}", e),
     }
 }

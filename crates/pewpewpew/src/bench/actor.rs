@@ -5,11 +5,11 @@ impl actix::Actor for Actor {
 }
 
 #[derive(actix::Message)]
-#[rtype(result="()")]
+#[rtype(result = "()")]
 pub(crate) struct Commit(String);
 
 impl From<Commit> for super::command::Commit {
-    fn from (c: Commit) -> Self {
+    fn from(c: Commit) -> Self {
         Self::from(c.0)
     }
 }
