@@ -42,7 +42,6 @@ with holonix.pkgs;
   buildInputs = [
    holonix.pkgs.gnuplot
    holonix.pkgs.flamegraph
-   holonix.pkgs.wget
    holonix.pkgs.ngrok
    holonix.pkgs.jq
   ]
