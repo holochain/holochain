@@ -18,6 +18,7 @@ kitsune_p2p_types = { version = "0.0.1", path = "../types" }
 shrinkwraprs = "0.3.0"
 thiserror = "1.0.18"
 tokio = { version = "0.2", features = [ "full" ] }
+tracing-futures = "0.2.3"
 
 [dev-dependencies]
 assert_matches = "1.3"

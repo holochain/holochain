@@ -1,5 +1,7 @@
 use super::*;
+use ghost_actor::dependencies::tracing;
 use std::collections::HashSet;
+use tracing_futures::Instrument;
 
 /// if the user specifies None or zero (0) for remote_agent_count
 const DEFAULT_NOTIFY_REMOTE_AGENT_COUNT: u8 = 5;
@@ -178,6 +180,7 @@ impl SpaceInternalHandler for Space {
         match data {
             wire::Wire::Call(payload) => {
                 Ok(async move { evt_sender.call(space, agent, payload).await }
+                    .instrument(tracing::debug_span!("wire_call"))
                     .boxed()
                     .into())
             }
@@ -381,6 +384,7 @@ impl Space {
     /// actual logic for handle_rpc_multi ...
     /// the top-level handler may or may not spawn a task for this
     #[allow(unused_variables, unused_assignments, unused_mut)]
+    #[tracing::instrument(skip(self, input))]
     fn handle_rpc_multi_inner(
         &mut self,
         input: actor::RpcMulti,
@@ -409,7 +413,7 @@ impl Space {
         let i_s = self.internal_sender.clone();
         Ok(async move {
             let mut agent = from_agent.clone();
-            for _ in 0..5 {
+            'search_loop: for _ in 0..5 {
                 if let Ok(agent_list) = i_s
                     .list_online_agents_for_basis_hash(space.clone(), basis.clone())
                     .await
@@ -417,7 +421,7 @@ impl Space {
                     for a in agent_list {
                         if a != from_agent {
                             agent = a;
-                            break;
+                            break 'search_loop;
                         }
                     }
                 }
@@ -427,12 +431,21 @@ impl Space {
 
             let mut out = Vec::new();
 
-            if let Ok(response) = i_s.immediate_request(space, agent.clone(), payload).await {
+            // Timeout on immediate requests after a small interval.
+            // TODO: 20 ms is only appropriate for local calls and not
+            // real networking
+            if let Ok(Ok(response)) = tokio::time::timeout(
+                std::time::Duration::from_millis(20),
+                i_s.immediate_request(space, agent.clone(), payload),
+            )
+            .await
+            {
                 out.push(actor::RpcMultiResponse { agent, response });
             }
 
             Ok(out)
         }
+        .instrument(tracing::debug_span!("multi_inner"))
         .boxed()
         .into())
     }

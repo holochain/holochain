@@ -61,7 +61,5 @@ pub async fn test_network(
     let agent_key = agent_key.unwrap_or_else(|| key_fixt.next().unwrap());
     let cell_network = network.to_cell(dna.clone(), agent_key.clone());
     network.join(dna.clone(), agent_key).await.unwrap();
-    // TODO: Network seems to require a minimum of two agents to function
-    network.join(dna, key_fixt.next().unwrap()).await.unwrap();
     (network, recv, cell_network)
 }
