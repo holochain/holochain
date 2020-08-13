@@ -660,21 +660,21 @@ impl Cell {
         // Check if init has run if not run it
         self.check_or_run_zome_init().await?;
 
-        let arc = self.state_env();
-        let keystore = arc.keystore().clone();
-        let env = arc.guard().await;
-        let reader = env.reader()?;
-        let workspace = CallZomeWorkspace::new(&reader, &env)?;
+        let env = self.state_env();
+        let keystore = env.keystore().clone();
+        let env_ref = env.guard().await;
+        let reader = env_ref.reader()?;
+        let workspace = CallZomeWorkspace::new(&reader, &env_ref)?;
 
         let args = CallZomeWorkflowArgs {
             ribosome: self.get_ribosome().await?,
             invocation,
         };
         Ok(call_zome_workflow(
-            workspace,
+            env.clone().into(),
             self.holochain_p2p_cell.clone(),
             keystore,
-            self.state_env().clone().into(),
+            env.clone().into(),
             args,
             self.queue_triggers.produce_dht_ops.clone(),
         )
@@ -716,7 +716,7 @@ impl Cell {
         // Run the workflow
         let args = InitializeZomesWorkflowArgs { dna_def, ribosome };
         let init_result = initialize_zomes_workflow(
-            workspace,
+            state_env.clone().into(),
             self.holochain_p2p_cell.clone(),
             keystore,
             state_env.clone().into(),

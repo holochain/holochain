@@ -23,10 +23,10 @@ pub fn agent_info<'a>(
                 .boxed()
                 .into()
         };
-    let agent_pubkey: AgentPubKey =
-        tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-            unsafe { call_context.host_access.workspace().apply_ref(call).await }
-        })??;
+    let agent_pubkey: AgentPubKey = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+        unsafe { call_context.host_access.workspace().apply_ref(call).await }
+    })
+    .map_err(Box::new)??;
     Ok(AgentInfoOutput::new(AgentInfo {
         agent_pubkey: agent_pubkey.clone(),
         // @todo these were in redux, what to do here?

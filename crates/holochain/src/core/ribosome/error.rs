@@ -1,7 +1,12 @@
 #![deny(missing_docs)]
 //! Errors occurring during a [Ribosome] call
 
-use crate::core::state::{cascade::error::CascadeError, source_chain::SourceChainError};
+use crate::core::{
+    state::{
+        cascade::error::CascadeError, source_chain::SourceChainError, workspace::WorkspaceError,
+    },
+    workflow::unsafe_call_zome_workspace::error::WorkspaceFactoryError,
+};
 use holo_hash::AnyDhtHash;
 use holochain_crypto::CryptoError;
 use holochain_serialized_bytes::prelude::SerializedBytesError;
@@ -57,6 +62,10 @@ pub enum RibosomeError {
     /// ident
     #[error(transparent)]
     CascadeError(#[from] CascadeError),
+
+    /// ident
+    #[error(transparent)]
+    WorkspaceFactoryError(#[from] Box<WorkspaceFactoryError>),
 
     /// ident
     #[error(transparent)]

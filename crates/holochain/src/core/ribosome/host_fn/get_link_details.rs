@@ -49,8 +49,9 @@ pub fn get_link_details<'a>(
         };
 
     let link_details = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-        unsafe { call_context.host_access.workspace().apply_mut(call).await }
-    })??;
+        call_context.host_access.workspace().apply_mut(call).await
+    })
+    .map_err(Box::new)??;
 
     Ok(GetLinkDetailsOutput::new(link_details))
 }

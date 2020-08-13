@@ -31,7 +31,8 @@ pub fn get_details<'a>(
     let maybe_details: Option<Details> =
         tokio_safe_block_on::tokio_safe_block_forever_on(async move {
             unsafe { call_context.host_access.workspace().apply_mut(call).await }
-        })??;
+        })
+        .map_err(Box::new)??;
     Ok(GetDetailsOutput::new(maybe_details))
 }
 

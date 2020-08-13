@@ -50,8 +50,9 @@ pub fn link_entries<'a>(
         };
     let header_hash =
         tokio_safe_block_on::tokio_safe_block_forever_on(tokio::task::spawn(async move {
-            unsafe { call_context.host_access.workspace().apply_mut(call).await }
-        }))???;
+            call_context.host_access.workspace().apply_mut(call).await
+        }))?
+        .map_err(Box::new)??;
 
     // return the hash of the committed link
     // note that validation is handled by the workflow

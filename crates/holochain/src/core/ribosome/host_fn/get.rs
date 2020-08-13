@@ -31,8 +31,9 @@ pub fn get<'a>(
     // timeouts must be handled by the network
     let maybe_element: Option<Element> =
         tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-            unsafe { call_context.host_access.workspace().apply_mut(call).await }
-        })??;
+            call_context.host_access.workspace().apply_mut(call).await
+        })
+        .map_err(Box::new)??;
     Ok(GetOutput::new(maybe_element))
 }
 

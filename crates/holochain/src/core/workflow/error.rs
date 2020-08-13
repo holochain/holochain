@@ -1,7 +1,10 @@
 // Error types are self-explanatory
 #![allow(missing_docs)]
 
-use super::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
+use super::{
+    produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError,
+    unsafe_call_zome_workspace::error::WorkspaceFactoryError,
+};
 use crate::{
     conductor::{api::error::ConductorApiError, CellError},
     core::{
@@ -55,6 +58,9 @@ pub enum WorkflowError {
 
     #[error(transparent)]
     DhtOpError(#[from] DhtOpError),
+
+    #[error(transparent)]
+    WorkspaceFactoryError(#[from] Box<WorkspaceFactoryError>),
 }
 
 /// Internal type to handle running workflows

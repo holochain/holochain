@@ -43,14 +43,13 @@ pub fn remove_link<'a>(
     let async_call_context = call_context.clone();
     let maybe_add_link: Option<SignedHeaderHashed> =
         tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-            unsafe {
-                async_call_context
-                    .host_access
-                    .workspace()
-                    .apply_mut(add_link_get_call)
-                    .await
-            }
-        })??;
+            async_call_context
+                .host_access
+                .workspace()
+                .apply_mut(add_link_get_call)
+                .await
+        })
+        .map_err(Box::new)??;
 
     let base_address = match maybe_add_link {
         Some(add_link_signed_header_hash) => {
@@ -97,8 +96,9 @@ pub fn remove_link<'a>(
     // handle timeouts at the source chain layer
     let header_address =
         tokio_safe_block_on::tokio_safe_block_forever_on(tokio::task::spawn(async move {
-            unsafe { call_context.host_access.workspace().apply_mut(call).await }
-        }))???;
+            call_context.host_access.workspace().apply_mut(call).await
+        }))?
+        .map_err(Box::new)??;
 
     Ok(RemoveLinkOutput::new(header_address))
 }

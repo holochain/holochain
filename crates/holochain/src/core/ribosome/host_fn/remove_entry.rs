@@ -56,8 +56,9 @@ pub fn remove_entry<'a>(
     // handle timeouts at the source chain layer
     let header_address =
         tokio_safe_block_on::tokio_safe_block_forever_on(tokio::task::spawn(async move {
-            unsafe { call_context.host_access.workspace().apply_mut(call).await }
-        }))???;
+            call_context.host_access.workspace().apply_mut(call).await
+        }))?
+        .map_err(Box::new)??;
 
     Ok(RemoveEntryOutput::new(header_address))
 }
@@ -96,14 +97,13 @@ pub(crate) fn get_original_address<'a>(
     let async_call_context = call_context;
     let maybe_original_element: Option<SignedHeaderHashed> =
         tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-            unsafe {
-                async_call_context
-                    .host_access
-                    .workspace()
-                    .apply_mut(original_element_get_call)
-                    .await
-            }
-        })??;
+            async_call_context
+                .host_access
+                .workspace()
+                .apply_mut(original_element_get_call)
+                .await
+        })
+        .map_err(Box::new)??;
 
     let entry_address = match maybe_original_element {
         Some(original_element_signed_header_hash) => {

@@ -28,7 +28,7 @@ use holochain_zome_types::entry::GetOptions;
 use holochain_zome_types::header::Header;
 use std::sync::Arc;
 use tracing::*;
-use unsafe_call_zome_workspace::CallZomeWorkspaceFactory;
+use unsafe_call_zome_workspace::{error::WorkspaceFactoryResult, CallZomeWorkspaceFactory};
 
 pub mod unsafe_call_zome_workspace;
 
@@ -42,22 +42,26 @@ pub struct CallZomeWorkflowArgs<Ribosome: RibosomeT> {
     pub invocation: ZomeCallInvocation,
 }
 
-#[instrument(skip(workspace, network, keystore, writer, trigger_produce_dht_ops))]
-pub async fn call_zome_workflow<'env, Ribosome: RibosomeT>(
-    mut workspace: CallZomeWorkspace<'env>,
+#[instrument(skip(factory, network, keystore, writer, trigger_produce_dht_ops))]
+pub async fn call_zome_workflow<Ribosome: 'static + RibosomeT>(
+    factory: CallZomeWorkspaceFactory,
     network: HolochainP2pCell,
     keystore: KeystoreSender,
     writer: OneshotWriter,
     args: CallZomeWorkflowArgs<Ribosome>,
     mut trigger_produce_dht_ops: TriggerSender,
 ) -> WorkflowResult<ZomeCallInvocationResult> {
-    let result = call_zome_workflow_inner(&mut workspace, network, keystore, args).await?;
+    let result = call_zome_workflow_inner(factory.clone(), network, keystore, args)
+        .await
+        .map_err(Box::new)?;
 
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // commit the workspace
     writer
-        .with_writer(|writer| workspace.flush_to_txn(writer).expect("TODO"))
+        .with_writer(|txn| {
+            factory.flush_to_txn(txn).expect("TODO");
+        })
         .await?;
 
     trigger_produce_dht_ops.trigger();
@@ -65,12 +69,12 @@ pub async fn call_zome_workflow<'env, Ribosome: RibosomeT>(
     Ok(result)
 }
 
-async fn call_zome_workflow_inner<Ribosome: RibosomeT>(
+async fn call_zome_workflow_inner<Ribosome: 'static + RibosomeT>(
     factory: CallZomeWorkspaceFactory,
     network: HolochainP2pCell,
     keystore: KeystoreSender,
     args: CallZomeWorkflowArgs<Ribosome>,
-) -> WorkflowResult<ZomeCallInvocationResult> {
+) -> WorkspaceFactoryResult<ZomeCallInvocationResult> {
     let CallZomeWorkflowArgs {
         ribosome,
         invocation,
@@ -80,7 +84,9 @@ async fn call_zome_workflow_inner<Ribosome: RibosomeT>(
 
     // Get the current head
     let chain_head_start = factory
-        .apply_ref(|workspace| async { Ok(workspace.source_chain.chain_head()?.clone()) })
+        .apply_ref(|workspace| async move {
+            WorkspaceFactoryResult::Ok(workspace.source_chain.chain_head()?.clone())
+        })
         .await??;
 
     let agent_key = invocation.provenance.clone();
@@ -88,14 +94,14 @@ async fn call_zome_workflow_inner<Ribosome: RibosomeT>(
     tracing::trace!(line = line!());
     // Create the unsafe sourcechain for use with wasm closure
     let result = {
-        let host_access = ZomeCallHostAccess::new(factory, keystore, network.clone());
+        let host_access = ZomeCallHostAccess::new(factory.clone(), keystore, network.clone());
         ribosome.call_zome_function(host_access, invocation)
     };
     tracing::trace!(line = line!());
 
     // FIXME: break this up into smaller transactions
-    factory
-        .apply_ref(|workspace| async {
+    let to_app_validate: Vec<Element> = factory
+        .apply_ref(|workspace| async move {
             // Get the new head
             let chain_head_end = workspace.source_chain.chain_head()?;
 
@@ -142,7 +148,12 @@ async fn call_zome_workflow_inner<Ribosome: RibosomeT>(
                     }
                 }
             }
+            WorkspaceFactoryResult::Ok(to_app_validate)
+        })
+        .await??;
 
+    factory
+        .apply_mut(|workspace| async move {
             let mut cascade = workspace.cascade(network);
             for chain_element in to_app_validate {
                 match chain_element.header() {
@@ -155,7 +166,7 @@ async fn call_zome_workflow_inner<Ribosome: RibosomeT>(
                                 base: Arc::new({
                                     let base_address: AnyDhtHash =
                                         link_add.base_address.clone().into();
-                                    #[allow(clippy::eval_order_dependence)]
+                                    // #[allow(clippy::eval_order_dependence)]
                                     cascade
                                         .dht_get(base_address.clone(), GetOptions.into())
                                         .await
@@ -231,7 +242,7 @@ async fn call_zome_workflow_inner<Ribosome: RibosomeT>(
                     _ => {}
                 }
             }
-            WorkspaceResult::Ok(())
+            WorkspaceFactoryResult::Ok(())
         })
         .await?;
 

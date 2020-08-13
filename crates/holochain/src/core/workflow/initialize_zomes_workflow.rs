@@ -13,7 +13,10 @@ use derive_more::Constructor;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
 use holochain_state::buffer::BufferedStore;
-use holochain_state::prelude::{GetDb, Reader, Writer};
+use holochain_state::{
+    env::{EnvironmentRead, EnvironmentWrite},
+    prelude::{GetDb, Reader, Writer},
+};
 use holochain_types::dna::DnaDef;
 use holochain_zome_types::header::builder;
 use tracing::*;
@@ -24,48 +27,53 @@ pub struct InitializeZomesWorkflowArgs<Ribosome: RibosomeT> {
     pub ribosome: Ribosome,
 }
 
-#[instrument(skip(network, keystore, workspace, writer))]
+#[instrument(skip(network, keystore, env, writer))]
 pub async fn initialize_zomes_workflow<'env, Ribosome: RibosomeT>(
-    mut workspace: InitializeZomesWorkspace<'env>,
+    env: EnvironmentWrite, // TODO, make this a InitializeZomesWorkspaceFactory
     network: HolochainP2pCell,
     keystore: KeystoreSender,
     writer: OneshotWriter,
     args: InitializeZomesWorkflowArgs<Ribosome>,
 ) -> WorkflowResult<InitResult> {
-    let result = initialize_zomes_workflow_inner(&mut workspace, network, keystore, args).await?;
+    let factory = CallZomeWorkspaceFactory::from(env.clone());
+    let result = initialize_zomes_workflow_inner(env.into(), network, keystore, args).await?;
 
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // commit the workspace
     writer
-        .with_writer(|writer| workspace.flush_to_txn(writer).expect("TODO"))
+        .with_writer(|txn| {
+            factory.flush_to_txn(txn).expect("TODO");
+        })
         .await?;
 
     Ok(result)
 }
 
 async fn initialize_zomes_workflow_inner<'env, Ribosome: RibosomeT>(
-    workspace: &mut InitializeZomesWorkspace<'env>,
+    env: EnvironmentRead, // TODO, make this a InitializeZomesWorkspaceFactory
     network: HolochainP2pCell,
     keystore: KeystoreSender,
     args: InitializeZomesWorkflowArgs<Ribosome>,
 ) -> WorkflowResult<InitResult> {
     let InitializeZomesWorkflowArgs { dna_def, ribosome } = args;
+    let factory = CallZomeWorkspaceFactory::from(env.clone());
     // Call the init callback
     let result = {
-        // TODO: We need a better solution then re-using the CallZomeWorkspace (i.e. ghost actor)
-
+        let factory = CallZomeWorkspaceFactory::from(env.clone());
         let host_access = InitHostAccess::new(factory, keystore, network);
         let invocation = InitInvocation { dna_def };
         ribosome.run_init(host_access, invocation)?
     };
 
-    // Insert the init marker
-    workspace
-        .0
-        .source_chain
-        .put(builder::InitZomesComplete {}, None)
-        .await?;
+    factory
+        .apply_mut(|workspace|
+            // Insert the init marker
+            workspace
+                .source_chain
+                .put(builder::InitZomesComplete {}, None))
+        .await
+        .map_err(Box::new)?;
 
     Ok(result)
 }

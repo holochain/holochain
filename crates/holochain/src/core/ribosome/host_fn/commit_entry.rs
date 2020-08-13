@@ -75,7 +75,8 @@ pub fn commit_entry<'a>(
     let header_address =
         tokio_safe_block_on::tokio_safe_block_forever_on(tokio::task::spawn(async move {
             unsafe { call_context.host_access.workspace().apply_mut(call).await }
-        }))???;
+        }))?
+        .map_err(Box::new)??;
 
     // return the hash of the committed entry
     // note that validation is handled by the workflow

@@ -34,6 +34,10 @@ impl CallZomeWorkspaceFactory {
         todo!()
     }
 
+    pub fn flush_to_txn(self, writer: &mut Writer) -> Result<(), error::WorkspaceFactoryError> {
+        todo!()
+    }
+
     pub async fn apply_ref<
         'a,
         R,
@@ -42,7 +46,7 @@ impl CallZomeWorkspaceFactory {
     >(
         &self,
         f: F,
-    ) -> Result<R, WorkspaceError> {
+    ) -> Result<R, error::WorkspaceFactoryError> {
         todo!()
     }
 
@@ -54,7 +58,28 @@ impl CallZomeWorkspaceFactory {
     >(
         &self,
         f: F,
-    ) -> Result<R, WorkspaceError> {
+    ) -> Result<R, error::WorkspaceFactoryError> {
         todo!()
     }
+}
+
+pub mod error {
+    use crate::core::{
+        ribosome::error::RibosomeError, state::workspace::WorkspaceError,
+        workflow::error::WorkflowError, SourceChainError,
+    };
+    use thiserror::Error;
+    #[derive(Error, Debug)]
+    pub enum WorkspaceFactoryError {
+        #[error(transparent)]
+        WorkspaceError(#[from] WorkspaceError),
+        #[error(transparent)]
+        WorkflowError(#[from] WorkflowError),
+        #[error(transparent)]
+        RibosomeError(#[from] RibosomeError),
+        #[error(transparent)]
+        SourceChainError(#[from] SourceChainError),
+    }
+
+    pub type WorkspaceFactoryResult<T> = Result<T, WorkspaceFactoryError>;
 }

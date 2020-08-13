@@ -47,8 +47,9 @@ pub fn get_links<'a>(
         };
 
     let links = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-        unsafe { call_context.host_access.workspace().apply_mut(call).await }
-    })??;
+        call_context.host_access.workspace().apply_mut(call).await
+    })
+    .map_err(Box::new)??;
 
     Ok(GetLinksOutput::new(links.into()))
 }

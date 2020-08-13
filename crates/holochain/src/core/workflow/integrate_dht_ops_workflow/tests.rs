@@ -697,7 +697,6 @@ fn register_remove_link_missing_base(a: TestData) -> (Vec<Db>, Vec<Db>, &'static
 async fn test_ops_state() {
     observability::test_run().ok();
     let env = test_cell_env();
-    let dbs = env.dbs().await;
     let env_ref = env.guard().await;
 
     let tests = [
@@ -713,12 +712,12 @@ async fn test_ops_state() {
     ];
 
     for t in tests.iter() {
-        clear_dbs(&env_ref, &dbs);
+        clear_dbs(&env_ref, &env_ref);
         let td = TestData::new().await;
         let (pre_state, expect, name) = t(td);
-        Db::set(pre_state, &env_ref, &dbs).await;
-        call_workflow(&env_ref, &dbs, env.clone()).await;
-        Db::check(expect, &env_ref, &dbs, format!("{}: {}", name, here!(""))).await;
+        Db::set(pre_state, &env_ref, &env_ref).await;
+        call_workflow(env.clone()).await;
+        Db::check(expect, env.clone(), format!("{}: {}", name, here!(""))).await;
     }
 }
 
@@ -964,9 +963,8 @@ async fn test_metadata_from_wasm_api() {
     // test workspace boilerplate
     observability::test_run().ok();
     let env = holochain_state::test_utils::test_cell_env();
-    let dbs = env.dbs().await;
     let env_ref = env.guard().await;
-    clear_dbs(&env_ref, &dbs);
+    clear_dbs(&env_ref, &env_ref);
 
     // Generate fixture data
     let mut td = TestData::with_app_entry_type().await;
@@ -980,17 +978,16 @@ async fn test_metadata_from_wasm_api() {
     let (pre_state, _expect, _) = register_add_link(td);
 
     // Setup the source chain
-    genesis(&env_ref, &dbs).await;
+    genesis(&env_ref, &env_ref).await;
 
     // Commit the base
-    let base_address = commit_entry(pre_state, &env_ref, &dbs, zome_name.clone())
+    let base_address = commit_entry(pre_state, env.clone(), zome_name.clone())
         .await
         .0;
 
     // Link the base to the target
     let _link_add_address = link_entries(
-        &env_ref,
-        &dbs,
+        env.clone(),
         base_address.clone(),
         target_entry_hash.clone(),
         zome_name.clone(),
@@ -999,13 +996,13 @@ async fn test_metadata_from_wasm_api() {
     .await;
 
     // Trigger the produce workflow
-    produce_dht_ops(&env_ref, env.clone().into(), &dbs).await;
+    produce_dht_ops(&env_ref, env.clone().into(), &env_ref).await;
 
     // Call integrate
-    call_workflow(&env_ref, &dbs, env.clone()).await;
+    call_workflow(env.clone()).await;
 
     // Call get links and get back the targets
-    let links = get_links(&env_ref, &dbs, base_address, zome_name, link_tag).await;
+    let links = get_links(env.clone(), base_address, zome_name, link_tag).await;
     let links = links
         .into_inner()
         .into_iter()
@@ -1020,7 +1017,7 @@ async fn test_metadata_from_wasm_api() {
     // Db::check(
     //     expect,
     //     &env_ref,
-    //     &dbs,
+    //     &env_ref,
     //     format!("{}: {}", "metadata from wasm", here!("")),
     // )
     // .await;
@@ -1033,9 +1030,8 @@ async fn test_wasm_api_without_integration_links() {
     // test workspace boilerplate
     observability::test_run().ok();
     let env = holochain_state::test_utils::test_cell_env();
-    let dbs = env.dbs().await;
     let env_ref = env.guard().await;
-    clear_dbs(&env_ref, &dbs);
+    clear_dbs(&env_ref, &env_ref);
 
     // Generate fixture data
     let mut td = TestData::with_app_entry_type().await;
@@ -1049,17 +1045,16 @@ async fn test_wasm_api_without_integration_links() {
     let (pre_state, _expect, _) = register_add_link(td);
 
     // Setup the source chain
-    genesis(&env_ref, &dbs).await;
+    genesis(&env_ref, &env_ref).await;
 
     // Commit the base
-    let base_address = commit_entry(pre_state, &env_ref, &dbs, zome_name.clone())
+    let base_address = commit_entry(pre_state, env.clone(), zome_name.clone())
         .await
         .0;
 
     // Link the base to the target
     let _link_add_address = link_entries(
-        &env_ref,
-        &dbs,
+        env.clone(),
         base_address.clone(),
         target_entry_hash.clone(),
         zome_name.clone(),
@@ -1068,7 +1063,7 @@ async fn test_wasm_api_without_integration_links() {
     .await;
 
     // Call get links and get back the targets
-    let links = get_links(&env_ref, &dbs, base_address, zome_name, link_tag).await;
+    let links = get_links(env.clone(), base_address, zome_name, link_tag).await;
     let links = links
         .into_inner()
         .into_iter()
@@ -1088,9 +1083,8 @@ async fn test_wasm_api_without_integration_delete() {
     // test workspace boilerplate
     observability::test_run().ok();
     let env = holochain_state::test_utils::test_cell_env();
-    let dbs = env.dbs().await;
     let env_ref = env.guard().await;
-    clear_dbs(&env_ref, &dbs);
+    clear_dbs(&env_ref, &env_ref);
 
     // Generate fixture data
     let mut td = TestData::with_app_entry_type().await;
@@ -1103,22 +1097,22 @@ async fn test_wasm_api_without_integration_delete() {
     let (pre_state, _expect, _) = register_add_link(td.clone());
 
     // Setup the source chain
-    genesis(&env_ref, &dbs).await;
+    genesis(&env_ref, &env_ref).await;
 
     // Commit the base
-    let base_address = commit_entry(pre_state.clone(), &env_ref, &dbs, zome_name.clone())
+    let base_address = commit_entry(pre_state.clone(), env.clone(), zome_name.clone())
         .await
         .0;
 
     // Trigger the produce workflow
-    produce_dht_ops(&env_ref, env.clone().into(), &dbs).await;
+    produce_dht_ops(&env_ref, env.clone().into(), &env_ref).await;
 
     // Call integrate
-    call_workflow(&env_ref, &dbs, env.clone()).await;
+    call_workflow(env.clone()).await;
 
     {
         let reader = env_ref.reader().unwrap();
-        let mut workspace = CallZomeWorkspace::new(&reader, &dbs).unwrap();
+        let mut workspace = CallZomeWorkspace::new(&reader, &env_ref).unwrap();
         let entry_header = workspace
             .meta
             .get_headers(base_address.clone())
@@ -1136,16 +1130,16 @@ async fn test_wasm_api_without_integration_delete() {
             .unwrap();
     }
     // Trigger the produce workflow
-    produce_dht_ops(&env_ref, env.clone().into(), &dbs).await;
+    produce_dht_ops(&env_ref, env.clone().into(), &env_ref).await;
 
     // Call integrate
-    call_workflow(&env_ref, &dbs, env.clone()).await;
-    assert_eq!(get_entry(&env_ref, &dbs, base_address.clone()).await, None);
-    let base_address = commit_entry(pre_state, &env_ref, &dbs, zome_name.clone())
+    call_workflow(env.clone()).await;
+    assert_eq!(get_entry(env.clone(), base_address.clone()).await, None);
+    let base_address = commit_entry(pre_state, env.clone(), zome_name.clone())
         .await
         .0;
     assert_eq!(
-        get_entry(&env_ref, &dbs, base_address.clone()).await,
+        get_entry(env.clone(), base_address.clone()).await,
         Some(original_entry)
     );
 }
@@ -1289,7 +1283,7 @@ mod slow_tests {
             let env_ref = cell_env.guard().await;
 
             let reader = env_ref.reader().unwrap();
-            let mut workspace = CallZomeWorkspace::new(&reader, &dbs).unwrap();
+            let mut workspace = CallZomeWorkspace::new(&reader, &env_ref).unwrap();
 
             let header_builder = builder::EntryCreate {
                 entry_type: EntryType::App(AppEntryType::new(
@@ -1429,8 +1423,8 @@ mod slow_tests {
             debug!(?ops);
             assert!(!ops.is_empty());
 
-            let meta = MetadataBuf::vault(&reader, &dbs).unwrap();
-            let mut meta_cache = MetadataBuf::cache(&reader, &dbs).unwrap();
+            let meta = MetadataBuf::vault(&reader, &env_ref).unwrap();
+            let mut meta_cache = MetadataBuf::cache(&reader, &env_ref).unwrap();
             let key = LinkMetaKey::Base(&base_entry_hash);
             let links = meta
                 .get_live_links(&key)
@@ -1441,7 +1435,7 @@ mod slow_tests {
             assert_eq!(link.target, target_entry_hash);
 
             let (elements, _metadata, mut element_cache, _metadata_cache) =
-                test_dbs_and_mocks(&reader, &dbs);
+                test_dbs_and_mocks(&reader, &env_ref);
             let cell_network = conductor
                 .holochain_p2p()
                 .to_cell(cell_id.dna_hash().clone(), cell_id.agent_pubkey().clone());
