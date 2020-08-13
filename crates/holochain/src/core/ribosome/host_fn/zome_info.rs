@@ -38,11 +38,6 @@ pub mod test {
     #[tokio::test(threaded_scheduler)]
     async fn invoke_import_zome_info_test() {
         let env = holochain_state::test_utils::test_cell_env();
-        let dbs = env.dbs().await;
-        let env_ref = env.guard().await;
-        let reader = env_ref.reader().unwrap();
-        let mut workspace = crate::core::workflow::CallZomeWorkspace::new(&reader, &dbs).unwrap();
-
         let mut host_access = fixt!(ZomeCallHostAccess);
         let factory: CallZomeWorkspaceFactory = env.clone().into();
         host_access.workspace = factory.clone();

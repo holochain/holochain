@@ -58,11 +58,14 @@ pub async fn call_zome_workflow<Ribosome: 'static + RibosomeT>(
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // commit the workspace
-    writer
-        .with_writer(|txn| {
-            factory.flush_to_txn(txn).expect("TODO");
+    factory
+        .apply_mut(|workspace| {
+            writer.with_writer(|txn| {
+                workspace.flush_to_txn(txn).expect("TODO");
+            })
         })
-        .await?;
+        .await
+        .map_err(Box::new)?;
 
     trigger_produce_dht_ops.trigger();
 

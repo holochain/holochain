@@ -2,9 +2,7 @@
 //! Errors occurring during a [Ribosome] call
 
 use crate::core::{
-    state::{
-        cascade::error::CascadeError, source_chain::SourceChainError, workspace::WorkspaceError,
-    },
+    state::{cascade::error::CascadeError, source_chain::SourceChainError},
     workflow::unsafe_call_zome_workspace::error::WorkspaceFactoryError,
 };
 use holo_hash::AnyDhtHash;

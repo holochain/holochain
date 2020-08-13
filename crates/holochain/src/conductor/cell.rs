@@ -662,9 +662,6 @@ impl Cell {
 
         let env = self.state_env();
         let keystore = env.keystore().clone();
-        let env_ref = env.guard().await;
-        let reader = env_ref.reader()?;
-        let workspace = CallZomeWorkspace::new(&reader, &env_ref)?;
 
         let args = CallZomeWorkflowArgs {
             ribosome: self.get_ribosome().await?,

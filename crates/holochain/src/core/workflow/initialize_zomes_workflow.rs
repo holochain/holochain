@@ -43,7 +43,7 @@ pub async fn initialize_zomes_workflow<'env, Ribosome: RibosomeT>(
     // commit the workspace
     writer
         .with_writer(|txn| {
-            factory.flush_to_txn(txn).expect("TODO");
+            factory.flush_to_txn(txn).await.expect("TODO");
         })
         .await?;
 

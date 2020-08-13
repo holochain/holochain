@@ -34,20 +34,30 @@ impl CallZomeWorkspaceFactory {
         todo!()
     }
 
-    pub fn flush_to_txn(self, writer: &mut Writer) -> Result<(), error::WorkspaceFactoryError> {
-        todo!()
+    pub async fn flush_to_txn<'a>(
+        self,
+        writer: &'a mut Writer<'a>,
+    ) -> Result<(), error::WorkspaceFactoryError> {
+        let env_ref = self.0.guard().await;
+        let reader = env_ref.reader().map_err(WorkspaceError::from)?;
+        let workspace = CallZomeWorkspace::new(&reader, &env_ref)?;
+        workspace.flush_to_txn(writer)?;
+        Ok(())
     }
 
     pub async fn apply_ref<
         'a,
-        R,
+        R: 'a,
         Fut: Future<Output = R> + 'a,
-        F: FnOnce(&'a CallZomeWorkspace) -> Fut,
+        F: FnOnce(&CallZomeWorkspace<'a>) -> Fut + 'a,
     >(
-        &self,
+        &'a self,
         f: F,
     ) -> Result<R, error::WorkspaceFactoryError> {
-        todo!()
+        let env_ref = self.0.guard().await;
+        let reader = env_ref.reader().map_err(WorkspaceError::from)?;
+        let workspace = CallZomeWorkspace::new(&reader, &env_ref)?;
+        Ok(f(&workspace).await)
     }
 
     pub async fn apply_mut<
@@ -56,10 +66,28 @@ impl CallZomeWorkspaceFactory {
         Fut: Future<Output = R> + 'a,
         F: FnOnce(&'a mut CallZomeWorkspace) -> Fut,
     >(
-        &self,
+        &'a self,
         f: F,
     ) -> Result<R, error::WorkspaceFactoryError> {
-        todo!()
+        let env_ref = self.0.guard().await;
+        let reader = env_ref.reader().map_err(WorkspaceError::from)?;
+        let mut workspace = CallZomeWorkspace::new(&reader, &env_ref)?;
+        Ok(f(&mut workspace).await)
+    }
+
+    pub async fn apply_owned<
+        'a,
+        R,
+        Fut: Future<Output = R> + 'a,
+        F: FnOnce(CallZomeWorkspace) -> Fut,
+    >(
+        &'a self,
+        f: F,
+    ) -> Result<R, error::WorkspaceFactoryError> {
+        let env_ref = self.0.guard().await;
+        let reader = env_ref.reader().map_err(WorkspaceError::from)?;
+        let mut workspace = CallZomeWorkspace::new(&reader, &env_ref)?;
+        Ok(f(workspace).await)
     }
 }
 
