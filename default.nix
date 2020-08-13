@@ -61,6 +61,11 @@ with holonix.pkgs;
     cargo run --manifest-path "''${HC_TARGET_PREFIX}/crates/dna_util/Cargo.toml" -- "''${@}"
     ''
    )])
+
+   ++ ([(
+    holonix.pkgs.writeShellScriptBin "hc-bench" ''
+    cargo bench --bench bench
+    '')])
   ;
  });
 }

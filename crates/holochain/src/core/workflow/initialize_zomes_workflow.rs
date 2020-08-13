@@ -16,14 +16,15 @@ use holochain_state::buffer::BufferedStore;
 use holochain_state::prelude::{GetDb, Reader, Writer};
 use holochain_types::dna::DnaDef;
 use holochain_zome_types::header::builder;
+use tracing::*;
 
-#[derive(Constructor)]
+#[derive(Constructor, Debug)]
 pub struct InitializeZomesWorkflowArgs<Ribosome: RibosomeT> {
     pub dna_def: DnaDef,
     pub ribosome: Ribosome,
 }
 
-// TODO: #[instrument]
+#[instrument(skip(network, keystore, workspace, writer))]
 pub async fn initialize_zomes_workflow<'env, Ribosome: RibosomeT>(
     mut workspace: InitializeZomesWorkspace<'env>,
     network: HolochainP2pCell,

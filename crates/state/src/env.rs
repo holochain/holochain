@@ -3,7 +3,7 @@
 use crate::{
     db::{get_db, initialize_databases, DbKey, GetDb},
     error::{DatabaseError, DatabaseResult},
-    transaction::{Reader, ThreadsafeRkvReader, Writer},
+    transaction::{Reader, Writer},
 };
 use derive_more::Into;
 use holochain_keystore::KeystoreSender;
@@ -255,7 +255,7 @@ pub trait WriteManager<'e> {
 
 impl<'e> ReadManager<'e> for EnvironmentReadRef<'e> {
     fn reader(&'e self) -> DatabaseResult<Reader<'e>> {
-        let reader = Reader::from(ThreadsafeRkvReader::from(self.rkv.read()?));
+        let reader = Reader::from(self.rkv.read()?);
         Ok(reader)
     }
 

@@ -10,8 +10,10 @@ use futures::future::Either;
 use holochain_state::env::EnvironmentWrite;
 use holochain_state::env::ReadManager;
 use tokio::task::JoinHandle;
+use tracing::*;
 
 /// Spawn the QueueConsumer for Publish workflow
+#[instrument(skip(env, stop, cell_network))]
 pub fn spawn_publish_dht_ops_consumer(
     env: EnvironmentWrite,
     mut stop: sync::broadcast::Receiver<()>,

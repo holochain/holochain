@@ -70,7 +70,7 @@ impl_hashable_content!(DnaDef, Dna);
 pub type Wasms = BTreeMap<holo_hash::WasmHash, wasm::DnaWasm>;
 
 /// Represents a full DNA file including WebAssembly bytecode.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, SerializedBytes)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, SerializedBytes)]
 pub struct DnaFile {
     /// The hashable portion that can be shared with hApp code.
     pub dna: DnaDef,
@@ -180,5 +180,11 @@ impl DnaFile {
         })
         .await
         .expect("blocking thread panic!d - panicing here too")
+    }
+}
+
+impl std::fmt::Debug for DnaFile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("DnaFile(dna_hash = {})", self.dna_hash))
     }
 }

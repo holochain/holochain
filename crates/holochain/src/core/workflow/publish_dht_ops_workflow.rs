@@ -34,6 +34,7 @@ use holochain_state::{
 use holochain_types::{dht_op::DhtOp, Timestamp};
 use std::collections::HashMap;
 use std::time;
+use tracing::*;
 
 /// Default redundancy factor for validation receipts
 // TODO: Pull this from the wasm entry def and only use this if it's missing
@@ -54,7 +55,7 @@ pub struct PublishDhtOpsWorkspace<'env> {
     elements: ElementBuf<'env>,
 }
 
-#[tracing::instrument(skip(workspace, writer, network))]
+#[instrument(skip(workspace, writer, network))]
 pub async fn publish_dht_ops_workflow(
     mut workspace: PublishDhtOpsWorkspace<'_>,
     writer: OneshotWriter,

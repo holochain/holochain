@@ -10,6 +10,7 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0.26"
+chrono = "0.4.6"
 derive_more = "0.99.3"
 either = "1.5.0"
 fallible-iterator = "0.2.0"

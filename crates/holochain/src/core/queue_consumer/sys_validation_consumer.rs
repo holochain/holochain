@@ -12,8 +12,10 @@ use futures::future::Either;
 use holochain_state::env::EnvironmentWrite;
 use holochain_state::env::ReadManager;
 use tokio::task::JoinHandle;
+use tracing::*;
 
 /// Spawn the QueueConsumer for SysValidation workflow
+#[instrument(skip(env, stop, trigger_app_validation))]
 pub fn spawn_sys_validation_consumer(
     env: EnvironmentWrite,
     mut stop: sync::broadcast::Receiver<()>,
