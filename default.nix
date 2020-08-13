@@ -44,6 +44,7 @@ with holonix.pkgs;
    holonix.pkgs.flamegraph
    holonix.pkgs.wget
    holonix.pkgs.ngrok
+   holonix.pkgs.jq
   ]
    ++ holonix.shell.buildInputs
 
@@ -77,6 +78,7 @@ with holonix.pkgs;
     set -x
 
     commit=''${1}
+    compare=develop
     token=''${2}
     dir="$TMP/$commit"
     tarball="$dir/tarball.tar.gz"
@@ -86,7 +88,11 @@ with holonix.pkgs;
     curl -L --cacert $SSL_CERT_FILE -H "Authorization: token $token" $github_url > $tarball
     tar -zxvf $tarball -C $dir
     cd $dir/holochain-*
-    hc-bench
+    CARGO_TARGET_DIR=$BENCH_OUTPUT_DIR cargo bench --bench bench -- --save-baseline $compare
+    CARGO_TARGET_DIR=$BENCH_OUTPUT_DIR cargo bench --bench bench -- --save-baseline $commit
+    # CARGO_TARGET_DIR=$BENCH_OUTPUT_DIR cargo bench --bench bench -- --baseline $compare --load-baseline $commit
+
+    jq -n --arg report "\`\`\`$( CARGO_TARGET_DIR=$BENCH_OUTPUT_DIR cargo bench --bench bench -- --baseline $compare --load-baseline $commit )\`\`\`" '{body: $report}' | curl -L -X POST -H "Accept: application/vnd.github.v3+json" --cacert $SSL_CERT_FILE -H "Authorization: token $token" https://api.github.com/repos/Holo-Host/holochain/commits/$commit/comments -d@-
     '')])
 
     ++ ([(
