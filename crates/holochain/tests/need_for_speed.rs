@@ -73,7 +73,7 @@ async fn speed_test_normal() {
 
 #[instrument]
 async fn speed_test() {
-    const NUM: usize = 1000;
+    const NUM: usize = 2000;
 
     // ////////////
     // START DNA
@@ -197,6 +197,9 @@ async fn speed_test() {
         let response = call(&mut app_interface, invocation).await.unwrap();
         assert_matches!(response, AppResponse::ZomeCallInvocation(_));
     }
+    
+    // Give a little time for gossip to process
+    tokio::time::delay_for(std::time::Duration::from_millis(100)).await;
 
     let invocation = new_invocation(
         alice_cell_id.clone(),
