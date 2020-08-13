@@ -251,7 +251,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(2, res.len());
+        assert_eq!(1, res.len());
 
         for r in res {
             assert!(r == test_1 || r == test_2);

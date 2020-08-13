@@ -185,11 +185,11 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(2, res.len());
+        assert_eq!(1, res.len());
         for r in res {
             let data = String::from_utf8_lossy(&r.response);
             assert_eq!("echo: test-multi-request", &data);
-            assert!(r.agent == a1 || r.agent == a2 || r.agent == a3);
+            assert!(r.agent == a2 || r.agent == a3);
         }
 
         p2p.ghost_actor_shutdown().await.unwrap();
