@@ -1,3 +1,20 @@
+//! # Speed tests
+//! These are designed to diagnose performance issues from a macro level.
+//! They are not intended to detect performance regressions or to be run in CI.
+//! For that a latency test or benchmark should be used.
+//! These tests are useful once you know there is an issue in locating which
+//! part of the codebase it is.
+//! An example of running the flame test to produce a flamegraph is:
+//! ```fish
+//! env RUST_LOG='[{}]=debug' HC_WASM_CACHE_PATH='/path/to/holochain/.wasm_cache' \
+//! cargo test  --release --quiet --test speed_tests \
+//! --  --nocapture --ignored --exact --test speed_test_timed_flame \
+//! 2>| inferno-flamegraph > flamegraph_test_ice_(date +'%d-%m-%y-%X').svg
+//! ```
+//! I plan to make this all automatic as a single command in the future but it's
+//! hard to automate piping from tests stderr.
+//!
+
 use hdk3::prelude::*;
 use holochain::conductor::{
     api::{AdminRequest, AdminResponse, AppRequest, AppResponse, RealAppInterfaceApi},
@@ -197,7 +214,7 @@ async fn speed_test() {
         let response = call(&mut app_interface, invocation).await.unwrap();
         assert_matches!(response, AppResponse::ZomeCallInvocation(_));
     }
-    
+
     // Give a little time for gossip to process
     tokio::time::delay_for(std::time::Duration::from_millis(100)).await;
 

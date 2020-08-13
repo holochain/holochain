@@ -210,7 +210,6 @@ where
             .get(hash.clone().into(), options.clone())
             .instrument(debug_span!("fetch_element_via_entry::network_get"))
             .await?;
-        debug!("fetching element");
 
         for response in results {
             match response {
@@ -223,27 +222,16 @@ where
                         updates,
                     } = *raw;
                     let elements =
-                        ElementGroup::from_wire_elements(live_headers, entry_type, entry)
-                            .instrument(debug_span!("a"))
-                            .await?;
+                        ElementGroup::from_wire_elements(live_headers, entry_type, entry).await?;
                     let entry_hash = elements.entry_hash().clone();
-                    self.update_stores_with_element_group(elements)
-                        .instrument(debug_span!("a"))
-                        .await?;
+                    self.update_stores_with_element_group(elements).await?;
                     for delete in deletes {
-                        let element = delete.into_element().instrument(debug_span!("a")).await;
-                        self.update_stores(element)
-                            .instrument(debug_span!("a"))
-                            .await?;
+                        let element = delete.into_element().await;
+                        self.update_stores(element).await?;
                     }
                     for update in updates {
-                        let element = update
-                            .into_element(entry_hash.clone())
-                            .instrument(debug_span!("a"))
-                            .await;
-                        self.update_stores(element)
-                            .instrument(debug_span!("a"))
-                            .await?;
+                        let element = update.into_element(entry_hash.clone()).await;
+                        self.update_stores(element).await?;
                     }
                 }
                 // Authority didn't have any headers for this entry

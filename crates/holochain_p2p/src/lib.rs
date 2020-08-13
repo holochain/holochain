@@ -12,12 +12,12 @@ pub use types::actor::{HolochainP2pRef, HolochainP2pSender};
 pub use types::*;
 
 mod spawn;
+use ghost_actor::dependencies::{tracing, tracing_futures::Instrument};
 use holochain_types::element::GetElementResponse;
 use holochain_types::{
     link::{GetLinksResponse, WireLinkMetaKey},
     metadata::MetadataSet,
 };
-use ghost_actor::dependencies::{tracing, tracing_futures::Instrument};
 pub use spawn::*;
 pub use test::HolochainP2pCellFixturator;
 
@@ -110,7 +110,7 @@ impl HolochainP2pCell {
                 dht_hash,
                 options,
             )
-            .instrument(tracing::debug_span!("a"))
+            .instrument(tracing::debug_span!("HolochainP2p::get"))
             .await
     }
 

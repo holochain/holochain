@@ -41,4 +41,4 @@ rkv = { git = "https://github.com/holochain/rkv.git", branch = "master" }
 lmdb-rkv = { git = "https://github.com/holochain/lmdb-rs.git" }
 #lmdb-rkv = { path = "../../rust/lmdb-rs" }
 
-ghost_actor = { version = "0.2.0", path = "../ghost_actor/crates/ghost_actor" }
+ghost_actor = { version = "0.3.0-alpha.2", git = "https://github.com/holochain/ghost_actor.git", branch = "disable_spans" }

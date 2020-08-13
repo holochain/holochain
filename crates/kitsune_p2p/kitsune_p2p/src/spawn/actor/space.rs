@@ -1,7 +1,6 @@
 use super::*;
-use ghost_actor::dependencies::tracing;
+use ghost_actor::dependencies::{tracing, tracing_futures::Instrument};
 use std::collections::HashSet;
-use tracing_futures::Instrument;
 
 /// if the user specifies None or zero (0) for remote_agent_count
 const DEFAULT_NOTIFY_REMOTE_AGENT_COUNT: u8 = 5;
@@ -16,7 +15,7 @@ const DEFAULT_RPC_MULTI_REMOTE_AGENT_COUNT: u8 = 2;
 const DEFAULT_RPC_MULTI_TIMEOUT_MS: u64 = 1000;
 
 /// if the user specifies None or zero (0) for race_timeout_ms
-const DEFAULT_RPC_MULTI_RACE_TIMEOUT_MS: u64 = 1;
+const DEFAULT_RPC_MULTI_RACE_TIMEOUT_MS: u64 = 200;
 
 /// Normally network lookups / connections will be async / take some time.
 /// While we are in "short-circuit-only" mode - we just need to allow some
@@ -446,7 +445,6 @@ impl Space {
                 out.push(actor::RpcMultiResponse { agent, response });
             }
 
-            tracing::debug!("finishing");
             Ok(out)
         }
         .instrument(tracing::debug_span!("multi_inner"))

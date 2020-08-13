@@ -1094,7 +1094,8 @@ dependencies = [
 
 [[package]]
 name = "ghost_actor"
-version = "0.2.0"
+version = "0.3.0-alpha.2"
+source = "git+https://github.com/holochain/ghost_actor.git?branch=disable_spans#8d04d6175a30bd1e14b971994e67eaaf26c03edb"
 dependencies = [
  "futures",
  "must_future",
@@ -1307,7 +1308,6 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio_safe_block_on",
- "tracing-futures",
 ]
 
 [[package]]
@@ -1387,11 +1387,11 @@ dependencies = [
  "holochain_keystore",
  "holochain_serialized_bytes",
  "holochain_zome_types",
- "inferno",
  "lazy_static",
  "multihash",
  "must_future",
  "nanoid",
+ "observability",
  "rand 0.7.3",
  "regex",
  "rust-base58",
@@ -1406,10 +1406,6 @@ dependencies = [
  "tokio",
  "tokio_safe_block_on",
  "tracing",
- "tracing-core",
- "tracing-flame",
- "tracing-serde",
- "tracing-subscriber",
 ]
 
 [[package]]
@@ -1675,7 +1671,6 @@ dependencies = [
  "shrinkwraprs",
  "thiserror",
  "tokio",
- "tracing-futures",
 ]
 
 [[package]]
@@ -2152,6 +2147,21 @@ name = "object"
 version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ab52be62400ca80aa00285d25253d7f7c437b7375c4de678f5405d3afe82ca5"
+
+[[package]]
+name = "observability"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "inferno",
+ "serde_json",
+ "thiserror",
+ "tracing",
+ "tracing-core",
+ "tracing-flame",
+ "tracing-serde",
+ "tracing-subscriber",
+]
 
 [[package]]
 name = "once_cell"

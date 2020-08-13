@@ -10,8 +10,8 @@ use std::{
 
 mod gossip;
 mod space;
-use space::*;
 use ghost_actor::dependencies::tracing;
+use space::*;
 
 ghost_actor::ghost_chan! {
     pub(crate) chan Internal<crate::KitsuneP2pError> {
