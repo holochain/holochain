@@ -1307,6 +1307,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio_safe_block_on",
+ "tracing-futures",
 ]
 
 [[package]]

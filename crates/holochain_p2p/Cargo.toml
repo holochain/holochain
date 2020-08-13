@@ -25,3 +25,4 @@ serde_bytes = "0.11"
 thiserror = "1.0.18"
 tokio = { version = "0.2", features = [ "full" ] }
 tokio_safe_block_on = "0.1.2"
+tracing-futures = "0.2.3"

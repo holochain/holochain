@@ -6,7 +6,7 @@ use crate::types::AgentPubKeyExt;
 
 use holochain_types::{element::GetElementResponse, Timestamp};
 use kitsune_p2p::actor::KitsuneP2pSender;
-use ghost_actor::dependencies::{tracing_futures::Instrument, tracing::{instrument, self}};
+use ghost_actor::dependencies::{tracing_futures::Instrument, tracing};
 
 pub(crate) struct HolochainP2pActor {
     evt_sender: futures::channel::mpsc::Sender<HolochainP2pEvent>,
@@ -55,6 +55,7 @@ impl HolochainP2pActor {
     }
 
     /// receiving an incoming get request from a remote node
+    #[tracing::instrument(skip(self, dna_hash, to_agent, dht_hash, options))]
     fn handle_incoming_get(
         &mut self,
         dna_hash: DnaHash,
@@ -69,6 +70,7 @@ impl HolochainP2pActor {
                 .map_err(kitsune_p2p::KitsuneP2pError::from)
                 .map(|res| UnsafeBytes::from(res).into())
         }
+        .instrument(tracing::debug_span!("incoming_get_task"))
         .boxed()
         .into())
     }
@@ -169,6 +171,7 @@ impl HolochainP2pActor {
 impl ghost_actor::GhostHandler<kitsune_p2p::event::KitsuneP2pEvent> for HolochainP2pActor {}
 
 impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
+    #[tracing::instrument(skip(self, space, agent, payload))]
     fn handle_call(
         &mut self,
         space: Arc<kitsune_p2p::KitsuneSpace>,
@@ -452,7 +455,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         Ok(async move { Ok(()) }.boxed().into())
     }
 
-    #[instrument(skip(self, dna_hash, from_agent, dht_hash, options))]
+    #[tracing::instrument(skip(self, dna_hash, from_agent, dht_hash, options))]
     fn handle_get(
         &mut self,
         dna_hash: DnaHash,
