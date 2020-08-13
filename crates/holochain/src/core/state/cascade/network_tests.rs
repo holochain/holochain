@@ -517,7 +517,7 @@ async fn get_links_from_another_agent() {
 
         // Link the entries
         let link_remove_hash =
-            remove_link(&env_ref, &dbs, call_data.clone(), link_add_hash.clone()).await;
+            remove_link(bob_env.clone(), call_data.clone(), link_add_hash.clone()).await;
 
         fake_authority(
             bob_env.clone(),

@@ -133,7 +133,7 @@ pub mod tests {
         let args = InitializeZomesWorkflowArgs { ribosome, dna_def };
         let keystore = fixt!(KeystoreSender);
         let network = fixt!(HolochainP2pCell);
-        initialize_zomes_workflow_inner(&mut workspace, network, keystore, args)
+        initialize_zomes_workflow_inner(env.clone().into(), network, keystore, args)
             .await
             .unwrap();
 

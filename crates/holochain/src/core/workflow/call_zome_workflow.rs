@@ -244,7 +244,7 @@ async fn call_zome_workflow_inner<Ribosome: 'static + RibosomeT>(
             }
             WorkspaceFactoryResult::Ok(())
         })
-        .await?;
+        .await??;
 
     Ok(result)
 }
@@ -317,8 +317,8 @@ pub mod tests {
         a: u32,
     }
 
-    async fn run_call_zome<'env, Ribosome: RibosomeT + Send + Sync + 'env>(
-        workspace: &mut CallZomeWorkspace<'env>,
+    async fn run_call_zome<Ribosome: RibosomeT + Send + Sync + 'static>(
+        factory: CallZomeWorkspaceFactory,
         ribosome: Ribosome,
         invocation: ZomeCallInvocation,
     ) -> WorkflowResult<ZomeCallInvocationResult> {
@@ -328,7 +328,9 @@ pub mod tests {
             invocation,
             ribosome,
         };
-        call_zome_workflow_inner(workspace, network, keystore, args).await
+        Ok(call_zome_workflow_inner(factory, network, keystore, args)
+            .await
+            .map_err(Box::new)?)
     }
 
     // 1.  Check if there is a Capability token secret in the parameters.
@@ -359,7 +361,7 @@ pub mod tests {
         .next()
         .unwrap();
         invocation.cap = todo!("Make secret cap token");
-        let error = run_call_zome(&mut workspace, ribosome, invocation)
+        let error = run_call_zome(env.clone().into(), ribosome, invocation)
             .await
             .unwrap_err();
         assert_matches!(error, WorkflowError::CapabilityMissing);
@@ -443,7 +445,7 @@ pub mod tests {
             .returning(|_entry_hash| Ok(()));
         */
 
-        let _result = run_call_zome(&mut workspace, ribosome, invocation)
+        let _result = run_call_zome(env.clone().into(), ribosome, invocation)
             .await
             .unwrap();
     }
@@ -476,7 +478,7 @@ pub mod tests {
         // TODO: B-01093: Mock the app validation and check it's called
         // TODO: B-01093: How can I pass a app validation into this?
         // These are just static calls
-        let _result = run_call_zome(&mut workspace, ribosome, invocation)
+        let _result = run_call_zome(env.clone().into(), ribosome, invocation)
             .await
             .unwrap();
     }
@@ -506,7 +508,7 @@ pub mod tests {
         )
         .next()
         .unwrap();
-        let _result = run_call_zome(&mut workspace, ribosome, invocation)
+        let _result = run_call_zome(env.clone().into(), ribosome, invocation)
             .await
             .unwrap();
         // TODO: Check the workspace has changes
