@@ -3,31 +3,17 @@ pub(crate) mod error;
 pub(crate) mod favicon;
 pub(crate) mod github;
 
-// use std::convert::TryFrom;
-// use actix_service::Service;
-// use futures::future::FutureExt;
+const PORT_ENV_NAME: &str = "PEWPEWPEW_PORT";
 
 #[actix_rt::main]
 async fn main() -> std::io::Result<()> {
-    let port = std::env::var("PEWPEWPEW_PORT").unwrap();
+    // fatal to not have a port to bind to on boot
+    let port = std::env::var(PORT_ENV_NAME).unwrap();
 
     let bench_actor = actix::SyncArbiter::start(1, move || bench::actor::Actor);
 
     actix_web::HttpServer::new(move || {
         actix_web::App::new()
-            // // .wrap(github::middleware::SayHiMiddleware)
-            // .wrap_fn(|req, srv| {
-            //
-            //     match crate::github::signature::ValidSignature::try_from(&req) {
-            //         Ok(_) => { },
-            //         Err(_) => { },
-            //     }
-            //
-            //     srv.call(req).map(|res| {
-            //         println!("Hi from response");
-            //         res
-            //     })
-            // })
             .data(bench::web::AppState {
                 actor: bench_actor.clone(),
             })
