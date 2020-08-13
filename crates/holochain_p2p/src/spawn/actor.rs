@@ -4,10 +4,9 @@ use futures::future::FutureExt;
 
 use crate::types::AgentPubKeyExt;
 
-use ghost_actor::dependencies::tracing;
+use ghost_actor::dependencies::{tracing, tracing_futures::Instrument};
 use holochain_types::{element::GetElementResponse, Timestamp};
 use kitsune_p2p::actor::KitsuneP2pSender;
-use tracing_futures::Instrument;
 
 pub(crate) struct HolochainP2pActor {
     evt_sender: futures::channel::mpsc::Sender<HolochainP2pEvent>,
@@ -456,6 +455,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         Ok(async move { Ok(()) }.boxed().into())
     }
 
+    #[tracing::instrument(skip(self, dna_hash, from_agent, dht_hash, options))]
     fn handle_get(
         &mut self,
         dna_hash: DnaHash,
@@ -483,6 +483,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
                     race_timeout_ms: options.race_timeout_ms,
                     payload,
                 })
+                .instrument(tracing::debug_span!("rpc_multi"))
                 .await?;
 
             let mut out = Vec::new();

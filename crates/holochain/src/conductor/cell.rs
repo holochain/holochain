@@ -61,6 +61,7 @@ use std::{
 };
 use tokio::sync;
 use tracing::*;
+use tracing_futures::Instrument;
 
 mod authority;
 
@@ -220,6 +221,7 @@ impl Cell {
         &self.holochain_p2p_cell
     }
 
+    #[instrument(skip(self, evt))]
     /// Entry point for incoming messages from the network that need to be handled
     pub async fn handle_holochain_p2p_event(
         &self,
@@ -228,7 +230,7 @@ impl Cell {
         use holochain_p2p::event::HolochainP2pEvent::*;
         match evt {
             CallRemote {
-                span,
+                span: _span,
                 to_agent,
                 zome_name,
                 fn_name,
@@ -237,15 +239,18 @@ impl Cell {
                 request,
                 ..
             } => {
-                let _g = Span::enter(&span);
-                let res = self
-                    .handle_call_remote(to_agent, zome_name, fn_name, cap, request)
-                    .await
-                    .map_err(holochain_p2p::HolochainP2pError::other);
-                respond.respond(Ok(async move { res }.boxed().into()));
+                async {
+                    let res = self
+                        .handle_call_remote(to_agent, zome_name, fn_name, cap, request)
+                        .await
+                        .map_err(holochain_p2p::HolochainP2pError::other);
+                    respond.respond(Ok(async move { res }.boxed().into()));
+                }
+                .instrument(debug_span!("call_remote"))
+                .await;
             }
             Publish {
-                span,
+                span: _span,
                 respond,
                 from_agent,
                 request_validation_receipt,
@@ -253,111 +258,146 @@ impl Cell {
                 ops,
                 ..
             } => {
-                let _g = Span::enter(&span);
-                let res = self
-                    .handle_publish(from_agent, request_validation_receipt, dht_hash, ops)
-                    .await
-                    .map_err(holochain_p2p::HolochainP2pError::other);
-                respond.respond(Ok(async move { res }.boxed().into()));
+                async {
+                    let res = self
+                        .handle_publish(from_agent, request_validation_receipt, dht_hash, ops)
+                        .await
+                        .map_err(holochain_p2p::HolochainP2pError::other);
+                    respond.respond(Ok(async move { res }.boxed().into()));
+                }
+                .instrument(debug_span!("cell_handle_publish"))
+                .await;
             }
-            GetValidationPackage { span, respond, .. } => {
-                let _g = Span::enter(&span);
-                let res = self
-                    .handle_get_validation_package()
-                    .await
-                    .map_err(holochain_p2p::HolochainP2pError::other);
-                respond.respond(Ok(async move { res }.boxed().into()));
+            GetValidationPackage {
+                span: _span,
+                respond,
+                ..
+            } => {
+                async {
+                    let res = self
+                        .handle_get_validation_package()
+                        .await
+                        .map_err(holochain_p2p::HolochainP2pError::other);
+                    respond.respond(Ok(async move { res }.boxed().into()));
+                }
+                .instrument(debug_span!("cell_handle_get_validation_package"))
+                .await;
             }
             Get {
-                span,
+                span: _span,
                 respond,
                 dht_hash,
                 options,
                 ..
             } => {
-                let _g = Span::enter(&span);
-                let res = self
-                    .handle_get(dht_hash, options)
-                    .await
-                    .map_err(holochain_p2p::HolochainP2pError::other);
-                respond.respond(Ok(async move { res }.boxed().into()));
+                async {
+                    let res = self
+                        .handle_get(dht_hash, options)
+                        .await
+                        .map_err(holochain_p2p::HolochainP2pError::other);
+                    respond.respond(Ok(async move { res }.boxed().into()));
+                }
+                .instrument(debug_span!("cell_handle_get"))
+                .await;
             }
             GetMeta {
-                span,
+                span: _span,
                 respond,
                 dht_hash,
                 options,
                 ..
             } => {
-                let _g = Span::enter(&span);
-                let res = self
-                    .handle_get_meta(dht_hash, options)
-                    .await
-                    .map_err(holochain_p2p::HolochainP2pError::other);
-                respond.respond(Ok(async move { res }.boxed().into()));
+                async {
+                    let res = self
+                        .handle_get_meta(dht_hash, options)
+                        .await
+                        .map_err(holochain_p2p::HolochainP2pError::other);
+                    respond.respond(Ok(async move { res }.boxed().into()));
+                }
+                .instrument(debug_span!("cell_handle_get_meta"))
+                .await;
             }
             GetLinks {
-                span,
+                span: _span,
                 respond,
                 link_key,
                 options,
                 ..
             } => {
-                let _g = Span::enter(&span);
-                let res = self
-                    .handle_get_links(link_key, options)
-                    .await
-                    .map_err(holochain_p2p::HolochainP2pError::other);
-                respond.respond(Ok(async move { res }.boxed().into()));
+                async {
+                    let res = self
+                        .handle_get_links(link_key, options)
+                        .await
+                        .map_err(holochain_p2p::HolochainP2pError::other);
+                    respond.respond(Ok(async move { res }.boxed().into()));
+                }
+                .instrument(debug_span!("cell_handle_get_links"))
+                .await;
             }
             ValidationReceiptReceived {
-                span,
+                span: _span,
                 respond,
                 receipt,
                 ..
             } => {
-                let _g = Span::enter(&span);
-                let res = self
-                    .handle_validation_receipt(receipt)
-                    .await
-                    .map_err(holochain_p2p::HolochainP2pError::other);
-                respond.respond(Ok(async move { res }.boxed().into()));
+                async {
+                    let res = self
+                        .handle_validation_receipt(receipt)
+                        .await
+                        .map_err(holochain_p2p::HolochainP2pError::other);
+                    respond.respond(Ok(async move { res }.boxed().into()));
+                }
+                .instrument(debug_span!("cell_handle_validation_receipt_received"))
+                .await;
             }
             FetchOpHashesForConstraints {
-                span,
+                span: _span,
                 respond,
                 dht_arc,
                 since,
                 until,
                 ..
             } => {
-                let _g = Span::enter(&span);
-                let res = self
-                    .handle_fetch_op_hashes_for_constraints(dht_arc, since, until)
-                    .await
-                    .map_err(holochain_p2p::HolochainP2pError::other);
-                respond.respond(Ok(async move { res }.boxed().into()));
+                async {
+                    let res = self
+                        .handle_fetch_op_hashes_for_constraints(dht_arc, since, until)
+                        .await
+                        .map_err(holochain_p2p::HolochainP2pError::other);
+                    respond.respond(Ok(async move { res }.boxed().into()));
+                }
+                .instrument(debug_span!("cell_handle_fetch_op_hashes_for_constraints"))
+                .await;
             }
             FetchOpHashData {
-                span,
+                span: _span,
                 respond,
                 op_hashes,
                 ..
             } => {
-                let _g = Span::enter(&span);
-                let res = self
-                    .handle_fetch_op_hash_data(op_hashes)
-                    .await
-                    .map_err(holochain_p2p::HolochainP2pError::other);
-                respond.respond(Ok(async move { res }.boxed().into()));
+                async {
+                    let res = self
+                        .handle_fetch_op_hash_data(op_hashes)
+                        .await
+                        .map_err(holochain_p2p::HolochainP2pError::other);
+                    respond.respond(Ok(async move { res }.boxed().into()));
+                }
+                .instrument(debug_span!("cell_handle_fetch_op_hash_data"))
+                .await;
             }
-            SignNetworkData { span, respond, .. } => {
-                let _g = Span::enter(&span);
-                let res = self
-                    .handle_sign_network_data()
-                    .await
-                    .map_err(holochain_p2p::HolochainP2pError::other);
-                respond.respond(Ok(async move { res }.boxed().into()));
+            SignNetworkData {
+                span: _span,
+                respond,
+                ..
+            } => {
+                async {
+                    let res = self
+                        .handle_sign_network_data()
+                        .await
+                        .map_err(holochain_p2p::HolochainP2pError::other);
+                    respond.respond(Ok(async move { res }.boxed().into()));
+                }
+                .instrument(debug_span!("cell_handle_sign_network_data"))
+                .await;
             }
         }
         Ok(())
@@ -480,6 +520,7 @@ impl Cell {
         Ok(GetElementResponse::GetHeader(r))
     }
 
+    #[instrument(skip(self, _dht_hash, _options))]
     /// a remote node is asking us for metadata
     async fn handle_get_meta(
         &self,
@@ -562,6 +603,7 @@ impl Cell {
         unimplemented!()
     }
 
+    #[instrument(skip(self, dht_arc, since, until))]
     /// the network module is requesting a list of dht op hashes
     async fn handle_fetch_op_hashes_for_constraints(
         &self,
@@ -579,6 +621,7 @@ impl Cell {
         Ok(result)
     }
 
+    #[instrument(skip(self, op_hashes))]
     /// the network module is requesting the content for dht ops
     async fn handle_fetch_op_hash_data(
         &self,
@@ -624,6 +667,7 @@ impl Cell {
         }
     }
 
+    #[instrument(skip(self, provenance, fn_name, cap, payload))]
     /// a remote agent is attempting a "call_remote" on this cell.
     async fn handle_call_remote(
         &self,
@@ -651,6 +695,7 @@ impl Cell {
         }
     }
 
+    #[instrument(skip(self, invocation))]
     /// Function called by the Conductor
     #[instrument(skip(self))]
     pub async fn call_zome(

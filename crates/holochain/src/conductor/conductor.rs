@@ -947,7 +947,6 @@ mod builder {
     }
 }
 
-#[instrument(skip(p2p_evt, handle))]
 async fn p2p_event_task(
     mut p2p_evt: holochain_p2p::event::HolochainP2pEventReceiver,
     handle: ConductorHandle,

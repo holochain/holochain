@@ -2,7 +2,7 @@
 //! in-memory / full-sync / non-sharded networking module
 
 use crate::{types::actor::KitsuneP2pResult, *};
-use ghost_actor::dependencies::tracing;
+use ghost_actor::dependencies::{tracing, tracing_futures};
 use kitsune_p2p_types::dht_arc::DhtArc;
 use std::{collections::HashSet, iter::FromIterator, sync::Arc};
 
@@ -48,6 +48,7 @@ pub fn spawn_gossip_module() -> GossipEventReceiver {
     evt_recv
 }
 
+#[tracing::instrument(skip(evt_send))]
 /// the gossip module is not an actor because we want to pause while
 /// awaiting requests - not process requests in parallel.
 async fn gossip_loop(

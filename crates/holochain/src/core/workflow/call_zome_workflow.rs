@@ -27,6 +27,7 @@ use holochain_types::element::Element;
 use holochain_zome_types::entry::GetOptions;
 use holochain_zome_types::header::Header;
 use std::sync::Arc;
+use tracing::instrument;
 use tracing::*;
 use unsafe_call_zome_workspace::UnsafeCallZomeWorkspace;
 
@@ -42,7 +43,7 @@ pub struct CallZomeWorkflowArgs<Ribosome: RibosomeT> {
     pub invocation: ZomeCallInvocation,
 }
 
-#[instrument(skip(workspace, network, keystore, writer, trigger_produce_dht_ops))]
+#[instrument(skip(workspace, network, keystore, writer, args, trigger_produce_dht_ops))]
 pub async fn call_zome_workflow<'env, Ribosome: RibosomeT>(
     mut workspace: CallZomeWorkspace<'env>,
     network: HolochainP2pCell,

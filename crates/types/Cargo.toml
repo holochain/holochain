@@ -30,6 +30,7 @@ lazy_static = "1.4.0"
 multihash = "0.8.0"
 must_future = "0.1.1"
 nanoid = "0.3"
+observability = { path = "../observability" }
 rand = "0.7"
 regex = "1.1.2"
 rust-base58 = "0.0.4"
@@ -43,10 +44,7 @@ tempdir = "0.3.7"
 thiserror = "1.0.10"
 tokio = { version = "0.2", features = [ "blocking" ] }
 tokio_safe_block_on = "0.1.2"
-tracing = "=0.1.13"
-tracing-core = "=0.1.10"
-tracing-serde = "=0.1.1"
-tracing-subscriber = "=0.2.3"
+tracing = "=0.1.18"
 
 [dev-dependencies]
 # rmp-serde = "0.14.3"
