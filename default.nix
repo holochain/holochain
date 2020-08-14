@@ -36,6 +36,7 @@ with holonix.pkgs;
     mkdir -p $HC_WASM_CACHE_PATH
 
     export PEWPEWPEW_PORT=4343
+    export NIXPKGS_ALLOW_UNFREE=1
    ''
   ];
 
