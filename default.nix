@@ -76,22 +76,51 @@ with holonix.pkgs;
     holonix.pkgs.writeShellScriptBin "hc-bench-github" ''
     set -x
 
-    commit=''${1}
+    # the first arg is the authentication token for github
+    # @todo this is only required because the repo is currently private
+    token=''${1}
+
+    # set the target dir to somewhere it is less likely to be accidentally deleted
+    CARGO_TARGET_DIR=$BENCH_OUTPUT_DIR
+
+    # run benchmarks from a github archive based on any ref github supports
+    # @param ref: the github ref to benchmark
+    function bench {
+
+     ## vars
+     ref=$1
+     dir="$TMP/$ref"
+     tarball="$dir/tarball.tar.gz"
+
+     ## process
+
+     ### fresh start
+     mkdir -p $dir
+     rm -f $dir/$tarball
+
+     ### fetch code to bench
+     curl -L --cacert $SSL_CERT_FILE -H "Authorization: token $token" "https://github.com/Holo-Host/holochain/archive/$ref.tar.gz" > $tarball
+     tar -zxvf $tarball -C $dir
+
+     ### bench code
+     cd $dir/holochain-$ref
+     cargo bench --bench bench -- --save-baseline $ref
+
+    }
+
+    # load an existing report and push it as a comment to github
+    function add_comment_to_commit {
+     ## convert the report to POST-friendly json and push to github comment API
+     jq -n --arg report "\`\`\`$( cargo bench --bench bench -- --baseline $1 --load-baseline $2 )\`\`\`" '{body: $report}' | curl -L --cacert $SSL_CERT_FILE -H "Authorization: token $token" -X POST -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/Holo-Host/holochain/commits/$2/comments -d=@-
+    }
+
+    commit=''${2}
+    # bench $commit
+
+    # @todo make this flexible based on e.g. the PR base on github
     compare=develop
-    token=''${2}
-    dir="$TMP/$commit"
-    tarball="$dir/tarball.tar.gz"
-    github_url="https://github.com/Holo-Host/holochain/archive/$commit.tar.gz"
-
-    mkdir -p $dir
-    curl -L --cacert $SSL_CERT_FILE -H "Authorization: token $token" $github_url > $tarball
-    tar -zxvf $tarball -C $dir
-    cd $dir/holochain-*
-    CARGO_TARGET_DIR=$BENCH_OUTPUT_DIR cargo bench --bench bench -- --save-baseline $compare
-    CARGO_TARGET_DIR=$BENCH_OUTPUT_DIR cargo bench --bench bench -- --save-baseline $commit
-    # CARGO_TARGET_DIR=$BENCH_OUTPUT_DIR cargo bench --bench bench -- --baseline $compare --load-baseline $commit
-
-    jq -n --arg report "\`\`\`$( CARGO_TARGET_DIR=$BENCH_OUTPUT_DIR cargo bench --bench bench -- --baseline $compare --load-baseline $commit )\`\`\`" '{body: $report}' | curl -L -X POST -H "Accept: application/vnd.github.v3+json" --cacert $SSL_CERT_FILE -H "Authorization: token $token" https://api.github.com/repos/Holo-Host/holochain/commits/$commit/comments -d@-
+    # bench $compare
+    add_comment_to_commit $compare $commit
     '')])
 
     ++ ([(

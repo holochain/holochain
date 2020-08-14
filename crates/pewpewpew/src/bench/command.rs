@@ -20,8 +20,9 @@ pub fn commit(commit: Commit) {
     match std::env::var("GITHUB_TOKEN") {
         Ok(token) => {
             match std::process::Command::new("hc-bench-github")
-                .arg(commit)
+                // token and commit are positional args
                 .arg(token)
+                .arg(commit)
                 .spawn()
             {
                 Ok(mut child) => match child.wait() {
