@@ -13,7 +13,7 @@ edition = "2018"
 [dependencies]
 derive_more = "0.99.7"
 futures = "0.3"
-ghost_actor = "0.2.0"
+ghost_actor = "0.2.1"
 kitsune_p2p_types = { version = "0.0.1", path = "../types" }
 shrinkwraprs = "0.3.0"
 thiserror = "1.0.18"

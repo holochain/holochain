@@ -1,4 +1,5 @@
 use super::*;
+use ghost_actor::dependencies::{tracing, tracing_futures::Instrument};
 use std::collections::HashSet;
 
 /// if the user specifies None or zero (0) for remote_agent_count
@@ -178,6 +179,7 @@ impl SpaceInternalHandler for Space {
         match data {
             wire::Wire::Call(payload) => {
                 Ok(async move { evt_sender.call(space, agent, payload).await }
+                    .instrument(tracing::debug_span!("wire_call"))
                     .boxed()
                     .into())
             }
@@ -250,6 +252,9 @@ impl KitsuneP2pHandler for Space {
                 // attempt to send the request right now
                 let err = match internal_sender
                     .immediate_request(space.clone(), agent.clone(), payload.clone())
+                    .instrument(ghost_actor::dependencies::tracing::debug_span!(
+                        "handle_rpc_single_loop"
+                    ))
                     .await
                 {
                     Ok(res) => return Ok(res),
@@ -381,6 +386,7 @@ impl Space {
     /// actual logic for handle_rpc_multi ...
     /// the top-level handler may or may not spawn a task for this
     #[allow(unused_variables, unused_assignments, unused_mut)]
+    #[tracing::instrument(skip(self, input))]
     fn handle_rpc_multi_inner(
         &mut self,
         input: actor::RpcMulti,
@@ -389,162 +395,59 @@ impl Space {
             space,
             from_agent,
             basis,
-            remote_agent_count,
-            timeout_ms,
-            as_race,
-            race_timeout_ms,
+            //remote_agent_count,
+            //timeout_ms,
+            //as_race,
+            //race_timeout_ms,
             payload,
+            ..
         } = input;
-
-        let remote_agent_count = remote_agent_count.expect("set by handle_rpc_multi");
-        let timeout_ms = timeout_ms.expect("set by handle_rpc_multi");
-        let mut race_timeout_ms = race_timeout_ms.expect("set by handle_rpc_multi");
-        if !as_race {
-            // if these are the same, the effect is that we are not racing
-            race_timeout_ms = timeout_ms;
-        }
 
         // encode the data to send
         let payload = Arc::new(wire::Wire::call(payload).encode());
 
-        let mut internal_sender = self.internal_sender.clone();
+        // TODO - we cannot write proper logic here until we have a
+        //        proper peer discovery mechanism. Instead, let's
+        //        give it 100 ms max to see if there is any agent
+        //        other than us - prefer that, or fall back to
+        //        just reflecting the msg to ourselves.
 
+        let i_s = self.internal_sender.clone();
         Ok(async move {
-            let start = std::time::Instant::now();
-
-            // TODO - this logic isn't quite right
-            //        but we don't want to spend too much time on it
-            //        when we don't have a real peer-discovery pathway
-            //      - right now we're checking for enough agents up to
-            //        the race_timeout - then stopping that and
-            //        checking for responses.
-
-            // send calls to agents
-            let mut sent_to: HashSet<Arc<KitsuneAgent>> = HashSet::new();
-            let (res_send, mut res_recv) = tokio::sync::mpsc::channel(10);
-            loop {
-                let mut i_s = internal_sender.clone();
+            let mut agent = from_agent.clone();
+            'search_loop: for _ in 0..5 {
                 if let Ok(agent_list) = i_s
                     .list_online_agents_for_basis_hash(space.clone(), basis.clone())
                     .await
                 {
-                    for agent in agent_list {
-                        // for each agent returned
-                        // if we haven't sent them a call - send a call
-                        // if we meet our request quota break out.
-                        if !sent_to.contains(&agent) {
-                            sent_to.insert(agent.clone());
-                            let mut i_s = internal_sender.clone();
-                            let space = space.clone();
-                            let payload = payload.clone();
-                            let mut res_send = res_send.clone();
-                            // make the call - the responses will be
-                            // sent back to our channel
-
-                            // Leaving commented out code because it's useful for
-                            // checking if gets work
-                            // let fr = from_agent.clone();
-
-                            tokio::task::spawn(async move {
-                                // Leaving commented out code because it's useful for
-                                // if agent == fr{
-                                //     tokio::time::delay_for(std::time::Duration::from_secs(2)).await;
-                                // }
-                                if let Ok(response) =
-                                    i_s.immediate_request(space, agent.clone(), payload).await
-                                {
-                                    let _ = res_send
-                                        .send(actor::RpcMultiResponse {
-                                            agent: agent,
-                                            response,
-                                        })
-                                        .await;
-                                }
-                            });
-                        }
-                        if sent_to.len() >= remote_agent_count as usize {
-                            break;
+                    for a in agent_list {
+                        if a != from_agent {
+                            agent = a;
+                            break 'search_loop;
                         }
                     }
-
-                    // keep checking until we meet our call quota
-                    // or we get to our race timeout
-                    if sent_to.len() >= remote_agent_count as usize
-                        || start.elapsed().as_millis() as u64 > race_timeout_ms
-                    {
-                        break;
-                    }
-
-                    // we haven't broken, but there are no new peers to send to
-                    // wait for a bit, maybe more will come online
-                    // NOTE - this logic is naive - fix once we have
-                    //        a unified loop with the peer-discovery
-                    tokio::time::delay_for(std::time::Duration::from_millis(10)).await;
                 }
+
+                tokio::time::delay_for(std::time::Duration::from_millis(20)).await;
             }
 
-            // await responses
             let mut out = Vec::new();
-            let mut result_fut = None;
-            loop {
-                // set up our future for waiting on results
-                if result_fut.is_none() {
-                    // if there are results already pending, pull them out
-                    while let Ok(result) = res_recv.try_recv() {
-                        out.push(result);
-                    }
 
-                    use tokio::stream::StreamExt;
-                    result_fut = Some(res_recv.next());
-                }
-
-                // calculate the time to wait based on our barriers
-                let elapsed = start.elapsed().as_millis() as u64;
-                let mut time_remaining = if elapsed >= race_timeout_ms {
-                    if elapsed < timeout_ms {
-                        timeout_ms - elapsed
-                    } else {
-                        1
-                    }
-                } else {
-                    race_timeout_ms - elapsed
-                };
-                if time_remaining < 1 {
-                    time_remaining = 1;
-                }
-
-                // await either
-                //  -  (LEFT) - we need to check one of our timeouts
-                //  - (RIGHT) - we have received a response
-                match futures::future::select(
-                    tokio::time::delay_for(std::time::Duration::from_millis(time_remaining)),
-                    result_fut.take().unwrap(),
-                )
-                .await
-                {
-                    futures::future::Either::Left((_, r_fut)) => {
-                        result_fut = Some(r_fut);
-                    }
-                    futures::future::Either::Right((result, _)) => {
-                        if result.is_none() {
-                            ghost_actor::dependencies::tracing::error!("this should not happen");
-                            break;
-                        }
-                        out.push(result.unwrap());
-                    }
-                }
-
-                // break out if we are beyond time
-                let elapsed = start.elapsed().as_millis() as u64;
-                if elapsed > timeout_ms
-                    || (elapsed > race_timeout_ms && out.len() >= remote_agent_count as usize)
-                {
-                    break;
-                }
+            // Timeout on immediate requests after a small interval.
+            // TODO: 20 ms is only appropriate for local calls and not
+            // real networking
+            if let Ok(Ok(response)) = tokio::time::timeout(
+                std::time::Duration::from_millis(20),
+                i_s.immediate_request(space, agent.clone(), payload),
+            )
+            .await
+            {
+                out.push(actor::RpcMultiResponse { agent, response });
             }
 
             Ok(out)
         }
+        .instrument(tracing::debug_span!("multi_inner"))
         .boxed()
         .into())
     }
@@ -602,15 +505,22 @@ impl Space {
                             let space = space.clone();
                             let payload = payload.clone();
                             let send_success_count = send_success_count.clone();
-                            tokio::task::spawn(async move {
-                                if let Ok(_) = internal_sender
-                                    .immediate_request(space, agent, payload)
-                                    .await
-                                {
-                                    send_success_count
-                                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            tokio::task::spawn(
+                                async move {
+                                    if let Ok(_) = internal_sender
+                                        .immediate_request(space, agent, payload)
+                                        .await
+                                    {
+                                        send_success_count
+                                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                                    }
                                 }
-                            });
+                                .instrument(
+                                    ghost_actor::dependencies::tracing::debug_span!(
+                                        "handle_rpc_multi_inner_loop"
+                                    ),
+                                ),
+                            );
                         }
                     }
                 }

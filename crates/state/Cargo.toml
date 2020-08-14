@@ -36,7 +36,7 @@ tempdir = "0.3.7"
 thiserror = "1.0.10"
 tokio = { version = "0.2.11", features = [ "macros", "rt-threaded", "rt-util", "sync" ] }
 tokio_safe_block_on = "0.1.2"
-tracing = "0.1.13"
+tracing = "0.1.18"
 
 # TODO: can't hook up metrics until a version is pushed for the lazy_static=1.4.0 update
 # holochain_metrics = { version = "0.0.46-alpha1" }

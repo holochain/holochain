@@ -5,7 +5,7 @@ use holochain::conductor::{
     api::{AdminRequest, AdminResponse, AppRequest, AppResponse},
     config::*,
     error::ConductorError,
-    Conductor, ConductorHandle,
+    Conductor,
 };
 use holochain::core::ribosome::NamedInvocation;
 use holochain::core::ribosome::ZomeCallInvocationFixturator;
@@ -29,6 +29,10 @@ use tokio::process::{Child, Command};
 use tokio::stream::StreamExt;
 use tracing::*;
 use url2::prelude::*;
+
+use test_utils::*;
+
+mod test_utils;
 
 pub fn spawn_output(holochain: &mut Child) {
     let stdout = holochain.stdout.take();
@@ -95,28 +99,6 @@ async fn check_timeout<T>(
             panic!("Timed out on request after {}", timeout_millis);
         }
     }
-}
-
-async fn admin_port(conductor: &ConductorHandle) -> u16 {
-    conductor
-        .get_arbitrary_admin_websocket_port()
-        .await
-        .expect("No admin port open on conductor")
-}
-
-async fn websocket_client(
-    conductor: &ConductorHandle,
-) -> Result<(WebsocketSender, WebsocketReceiver)> {
-    let port = admin_port(conductor).await;
-    websocket_client_by_port(port).await
-}
-
-async fn websocket_client_by_port(port: u16) -> Result<(WebsocketSender, WebsocketReceiver)> {
-    Ok(websocket_connect(
-        url2!("ws://127.0.0.1:{}", port),
-        Arc::new(WebsocketConfig::default()),
-    )
-    .await?)
 }
 
 #[tokio::test(threaded_scheduler)]

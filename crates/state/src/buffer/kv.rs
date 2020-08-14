@@ -276,7 +276,6 @@ where
 {
     type Error = DatabaseError;
     type Item = IterItem<'env, V>;
-    #[instrument(skip(self))]
     fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
         let item = self.iter.next()?;
         match &item {
@@ -323,7 +322,6 @@ where
 {
     type Error = DatabaseError;
     type Item = IterItem<'env, V>;
-    #[instrument(skip(self))]
     fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
         self.iter.next()
     }
@@ -353,7 +351,6 @@ where
 {
     type Error = DatabaseError;
     type Item = V;
-    #[instrument(skip(self))]
     fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
         Ok(self.iter.next()?.map(|(k, v)| {
             self.scratch.insert(k.to_vec(), Op::Delete);
@@ -366,7 +363,6 @@ impl<'env, 'a: 'env, V> DoubleEndedFallibleIterator for DrainIter<'env, 'a, V>
 where
     V: BufVal,
 {
-    #[instrument(skip(self))]
     fn next_back(&mut self) -> Result<Option<Self::Item>, Self::Error> {
         Ok(self.iter.next_back()?.map(|(k, v)| {
             self.scratch.insert(k.to_vec(), Op::Delete);
@@ -504,7 +500,6 @@ where
     type Error = IterError;
     type Item = IterItem<'env, V>;
 
-    #[instrument(skip(self))]
     fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
         let current = match self.current.take() {
             Some(c) => Some(c),
@@ -522,7 +517,6 @@ impl<'env, 'a: 'env, V> DoubleEndedFallibleIterator for SingleIter<'env, 'a, V>
 where
     V: BufVal,
 {
-    #[instrument(skip(self))]
     fn next_back(&mut self) -> Result<Option<Self::Item>, Self::Error> {
         let current = match self.current.take() {
             Some(c) => Some(c),

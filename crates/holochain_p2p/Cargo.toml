@@ -13,7 +13,7 @@ edition = "2018"
 [dependencies]
 fixt = { path = "../fixt" }
 futures = "0.3"
-ghost_actor = "0.2.0"
+ghost_actor = "0.2.1"
 holo_hash = { version = "0.0.1", path = "../holo_hash" }
 holochain_keystore = { version = "0.0.1", path = "../keystore" }
 holochain_serialized_bytes = "=0.0.41"

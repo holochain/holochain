@@ -83,6 +83,7 @@ use std::{
     convert::TryInto,
 };
 use tracing::*;
+use tracing_futures::Instrument;
 
 #[cfg(test)]
 mod network_tests;
@@ -207,8 +208,8 @@ where
         let results = self
             .network
             .get(hash.clone().into(), options.clone())
+            .instrument(debug_span!("fetch_element_via_entry::network_get"))
             .await?;
-        debug!("fetching element");
 
         for response in results {
             match response {
