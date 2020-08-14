@@ -89,7 +89,7 @@ async fn process_incoming_message(
                     ))
                     .expect("can set expires_at"),
                 respond: Some(respond),
-                span: tracing::debug_span!("await_response"),
+                _span: tracing::Span::none(),
             };
             tracker.register_response(id, item);
         }
@@ -162,7 +162,7 @@ async fn process_incoming_message(
 struct ResponseItem {
     expires_at: std::time::Instant,
     respond: Option<tokio::sync::oneshot::Sender<Result<SerializedBytes>>>,
-    span: tracing::Span,
+    _span: tracing::Span,
 }
 
 /// internal struct for tracking response callbacks
@@ -186,7 +186,6 @@ impl ResponseTracker {
     /// we received a response, try to match it up to a pending callback
     fn handle_response(&mut self, id: String, data: SerializedBytes) {
         if let Some(mut item) = self.pending_responses.remove(&id) {
-            let _g = item.span.enter();
             if let Some(respond) = item.respond.take() {
                 if let Err(e) = respond.send(Ok(data)) {
                     tracing::warn!(error = ?e);
