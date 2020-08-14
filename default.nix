@@ -111,15 +111,27 @@ with holonix.pkgs;
     # load an existing report and push it as a comment to github
     function add_comment_to_commit {
      ## convert the report to POST-friendly json and push to github comment API
-     jq -n --arg report "\`\`\`$( cargo bench --bench bench -- --baseline $1 --load-baseline $2 )\`\`\`" '{body: $report}' | curl -L --cacert $SSL_CERT_FILE -H "Authorization: token $token" -X POST -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/Holo-Host/holochain/commits/$2/comments -d=@-
+     jq \
+      -n \
+      --arg report \
+      "\`\`\`$( cargo bench --bench bench -- --baseline $1 --load-baseline $2 )\`\`\`" \
+      '{body: $report}' \
+     | curl \
+      -L \
+      --cacert $SSL_CERT_FILE \
+      -H "Authorization: token $token" \
+      -X POST \
+      -H "Accept: application/vnd.github.v3+json" \
+      https://api.github.com/repos/Holo-Host/holochain/commits/$2/comments \
+      -d@-
     }
 
     commit=''${2}
-    # bench $commit
+    bench $commit
 
     # @todo make this flexible based on e.g. the PR base on github
     compare=develop
-    # bench $compare
+    bench $compare
     add_comment_to_commit $compare $commit
     '')])
 
