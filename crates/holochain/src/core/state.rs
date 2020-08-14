@@ -42,6 +42,7 @@ pub mod element_buf;
 pub mod metadata;
 #[allow(missing_docs)]
 pub mod source_chain;
+pub mod validation_db;
 pub mod validation_receipts_db;
 #[allow(missing_docs)]
 pub mod wasm;

@@ -1,9 +1,7 @@
+use super::validation::IncomingDhtOpsWorkspace;
 use crate::{
     conductor::manager::spawn_task_manager,
-    core::state::{
-        dht_op_integration::{IntegratedDhtOpsValue, IntegrationLimboValue},
-        workspace::Workspace,
-    },
+    core::state::workspace::Workspace,
     fixt::{DnaFileFixturator, SignatureFixturator},
 };
 use ::fixt::prelude::*;
@@ -14,7 +12,7 @@ use holochain_state::{
     test_utils::{test_conductor_env, TestEnvironment},
 };
 use holochain_types::{
-    dht_op::{DhtOp, DhtOpHashed, DhtOpLight},
+    dht_op::{DhtOp, DhtOpHashed},
     test_utils::{fake_agent_pubkey_2, fake_cell_id},
     HeaderHashed, Timestamp,
 };
@@ -90,50 +88,9 @@ async fn test_cell_handle_publish() {
     let env_ref = cell.state_env.guard().await;
     let reader = env_ref.reader().expect("Could not create LMDB reader");
     let workspace =
-        crate::core::workflow::integrate_dht_ops_workflow::IntegrateDhtOpsWorkspace::new(
-            &reader, &env_ref,
-        )
-        .expect("Could not create Workspace");
+        IncomingDhtOpsWorkspace::new(&reader, &env_ref).expect("Could not create Workspace");
 
-    // Depending on timing, the value may have been fully integrated, or not,
-    // so we check both the limbo and the integrated table
-    match (
-        workspace.integration_limbo.get(&op_hash).unwrap(),
-        workspace.integrated_dht_ops.get(&op_hash).unwrap(),
-    ) {
-        (Some(val), None) => {
-            matches::assert_matches!(
-                val,
-                IntegrationLimboValue {
-                    op: DhtOp::StoreElement(
-                        _,
-                        header::Header::Dna(
-                            header::Dna {
-                                ..
-                            }
-                        ),
-                        _,
-                    ),
-                    ..
-                }
-            );
-        }
-        (None, Some(val)) => {
-            matches::assert_matches!(
-                val,
-                IntegratedDhtOpsValue {
-                    op: DhtOpLight::StoreElement(
-                        hash,
-                        _,
-                        _
-                    ),
-                    ..
-                } if hash == header_hash
-            );
-        }
-        (Some(_), Some(_)) => panic!("The same value is both in limbo and integrated?"),
-        (None, None) => panic!("The value is missing from the integration pipeline"),
-    }
+    workspace.op_exists(&op_hash).unwrap();
 
     stop_tx.send(()).unwrap();
     shutdown.await.unwrap();

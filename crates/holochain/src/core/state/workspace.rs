@@ -34,7 +34,7 @@ pub trait Workspace<'env>: Send + Sized {
     /// No method is provided to commit the writer as well, because Writers
     /// should be managed such that write failures are properly handled, which
     /// is outside the scope of the workspace.
-    fn flush_to_txn(self, writer: &mut Writer) -> Result<(), WorkspaceError>;
+    fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()>;
 }
 
 #[cfg(test)]
