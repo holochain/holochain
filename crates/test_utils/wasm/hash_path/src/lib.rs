@@ -25,11 +25,6 @@ fn remove_link(remove_link: RemoveLinkInput) -> ExternResult<HeaderHash> {
 }
 
 #[hdk(extern)]
-fn parent(path_string: TestString) -> ExternResult<Option<Path>> {
-    Ok(Path::from(path_string.0).parent())
-}
-
-#[hdk(extern)]
 fn children(path_string: TestString) -> ExternResult<Links> {
     Path::from(path_string.0).children()
 }

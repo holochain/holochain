@@ -47,11 +47,13 @@ impl From<&ThisWasmEntry> for EntryDef {
 }
 
 impl TryFrom<&Entry> for ThisWasmEntry {
-    type Error = ();
+    type Error = SerializedBytesError;
     fn try_from(entry: &Entry) -> Result<Self, Self::Error> {
         match entry {
-            Entry::App(serialized_bytes) => Self::try_from(serialized_bytes),
-            _ => Err(()),
+            Entry::App(serialized_bytes) => Ok(Self::try_from(serialized_bytes.to_owned())?),
+            _ => Err(SerializedBytesError::FromBytes(
+                "failed to deserialize ThisWasmEntry".into(),
+            )),
         }
     }
 }
@@ -63,16 +65,16 @@ entry_defs![
 
 #[hdk(extern)]
 fn validate(entry: Entry) -> ExternResult<ValidateCallbackResult> {
-    match ThisWasmEntry::try_from(serialized_bytes) {
+    Ok(match ThisWasmEntry::try_from(&entry) {
         Ok(ThisWasmEntry::AlwaysValidates) => ValidateCallbackResult::Valid,
         Ok(ThisWasmEntry::NeverValidates) => {
             ValidateCallbackResult::Invalid("NeverValidates never validates".to_string())
         }
         _ => ValidateCallbackResult::Invalid("Not a ThisWasmEntry".to_string()),
-    }
+    })
 }
 
 #[hdk(extern)]
-fn commit_validate(to_commit: ThisWasmEntry) -> ExternResult<CommitEntryOutput> {
-    Ok(commit_entry!(to_commit)?)
+fn commit_validate(to_commit: ThisWasmEntry) -> ExternResult<HeaderHash> {
+    Ok(commit_entry!(&to_commit)?)
 }

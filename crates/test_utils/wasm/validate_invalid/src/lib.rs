@@ -2,7 +2,7 @@ use hdk3::prelude::*;
 
 #[hdk(extern)]
 fn validate_agent(_: ()) -> ExternResult<ValidateCallbackResult> {
-    Ok(ValidateAgentCallbackResult::Valid)
+    Ok(ValidateCallbackResult::Valid)
 }
 
 #[hdk(extern)]
