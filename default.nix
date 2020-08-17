@@ -39,6 +39,7 @@ with holonix.pkgs;
   buildInputs = [
    holonix.pkgs.gnuplot
    holonix.pkgs.flamegraph
+   holonix.pkgs.fd
   ]
    ++ holonix.shell.buildInputs
 
@@ -65,6 +66,11 @@ with holonix.pkgs;
    ++ ([(
     holonix.pkgs.writeShellScriptBin "hc-bench" ''
     cargo bench --bench bench
+    '')])
+
+   ++ ([(
+    holonix.pkgs.writeShellScriptBin "hc-fmt-all" ''
+    fd Cargo.toml crates | xargs -L 1 cargo fmt --manifest-path
     '')])
   ;
  });

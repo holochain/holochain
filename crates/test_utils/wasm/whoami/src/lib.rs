@@ -1,14 +1,16 @@
 use hdk3::prelude::*;
 
 // returns the current agent info
-fn _whoami(_: ()) -> Result<AgentInfo, WasmError> {
+#[hdk(extern)]
+fn whoami(_: ()) -> ExternResult<AgentInfo> {
     Ok(agent_info!()?)
 }
 
 // returns the agent info reported by the given pub key
 // in theory the output is the same as the input
 // it's just that the output comes _from the opinion of the remote agent_
-fn _whoarethey(agent_pubkey: AgentPubKey) -> Result<AgentInfo, WasmError> {
+#[hdk(extern)]
+fn whoarethey(agent_pubkey: AgentPubKey) -> ExternResult<AgentInfo> {
     let result: SerializedBytes = call_remote!(
         agent_pubkey,
         zome_info!()?.zome_name,
@@ -19,6 +21,3 @@ fn _whoarethey(agent_pubkey: AgentPubKey) -> Result<AgentInfo, WasmError> {
 
     Ok(result.try_into()?)
 }
-
-map_extern!(whoami, _whoami);
-map_extern!(whoarethey, _whoarethey);

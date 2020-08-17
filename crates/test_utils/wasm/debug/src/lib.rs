@@ -1,20 +1,6 @@
-use holochain_wasmer_guest::*;
-use holochain_zome_types::*;
+use hdk3::prelude::*;
 
-holochain_wasmer_guest::holochain_externs!();
-
-#[no_mangle]
-pub extern "C" fn debug(_: GuestPtr) -> GuestPtr {
-    let output: DebugOutput = try_result!(
-        host_call!(
-            __debug,
-            DebugInput::new(debug_msg!("debug line numbers {}", "work"))
-        ),
-        "failed to call debug"
-    );
-    let output_sb: SerializedBytes = try_result!(
-        output.try_into(),
-        "failed to serialize output for extern response"
-    );
-    ret!(GuestOutput::new(output_sb));
+#[hdk(extern)]
+fn debug(_: ()) -> ExternResult<()> {
+    debug!("debug line numbers {}", "work")?;
 }

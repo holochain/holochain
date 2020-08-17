@@ -1,15 +1,4 @@
-use holochain_wasmer_guest::*;
-use holochain_zome_types::*;
-use holochain_zome_types::validate::ValidateCallbackResult;
-use holochain_zome_types::entry_def::EntryDefId;
-use holochain_zome_types::entry_def::EntryDefsCallbackResult;
-use holochain_zome_types::entry_def::EntryDefs;
-use holochain_zome_types::entry_def::EntryDef;
-use holochain_zome_types::crdt::CrdtType;
-use holochain_zome_types::entry_def::RequiredValidations;
-use holochain_zome_types::entry_def::EntryVisibility;
-
-holochain_wasmer_guest::holochain_externs!();
+use hdk3::prelude::*;
 
 /// an example inner value that can be serialized into the contents of Entry::App()
 #[derive(Deserialize, Serialize, SerializedBytes)]
@@ -23,7 +12,8 @@ impl From<&ThisWasmEntry> for EntryDefId {
         match entry {
             ThisWasmEntry::AlwaysValidates => "always_validates",
             ThisWasmEntry::NeverValidates => "never_validates",
-        }.into()
+        }
+        .into()
     }
 }
 
@@ -56,52 +46,33 @@ impl From<&ThisWasmEntry> for EntryDef {
     }
 }
 
-#[no_mangle]
-pub extern "C" fn entry_defs(_: GuestPtr) -> GuestPtr {
-    let defs: EntryDefs = vec![
-        (&ThisWasmEntry::AlwaysValidates).into(),
-        (&ThisWasmEntry::NeverValidates).into(),
-    ].into();
-
-    ret!(GuestOutput::new(try_result!(EntryDefsCallbackResult::Defs(
-        defs,
-    ).try_into(), "failed to serialize entry defs return value")));
+impl TryFrom<&Entry> for ThisWasmEntry {
+    type Error = ();
+    fn try_from(entry: &Entry) -> Result<Self, Self::Error> {
+        match entry {
+            Entry::App(serialized_bytes) => Self::try_from(serialized_bytes),
+            _ => Err(()),
+        }
+    }
 }
 
-#[no_mangle]
-pub extern "C" fn validate(host_allocation_ptr: GuestPtr) -> GuestPtr {
-    // load host args
-    let input: HostInput = host_args!(host_allocation_ptr);
+entry_defs![
+    (&ThisWasmEntry::AlwaysValidates).into(),
+    (&ThisWasmEntry::NeverValidates).into()
+];
 
-    // extract the entry to validate
-    let result: ValidateCallbackResult = match Entry::try_from(input.into_inner()) {
-        // we do want to validate our app entries
-        Ok(Entry::App(serialized_bytes)) => match ThisWasmEntry::try_from(serialized_bytes) {
-            // the AlwaysValidates variant passes
-            Ok(ThisWasmEntry::AlwaysValidates) => ValidateCallbackResult::Valid,
-            // the NeverValidates variants fails
-            Ok(ThisWasmEntry::NeverValidates) => ValidateCallbackResult::Invalid("NeverValidates never validates".to_string()),
-            _ => ValidateCallbackResult::Invalid("Couldn't get ThisWasmEntry from the app entry".to_string()),
-        },
-        // other entry types we don't care about
-        Ok(_) => ValidateCallbackResult::Valid,
-        _ => ValidateCallbackResult::Invalid("Couldn't get App serialized bytes from host input".to_string()),
-    };
-
-    ret!(GuestOutput::new(try_result!(result.try_into(), "failed to serialize return value".to_string())));
+#[hdk(extern)]
+fn validate(entry: Entry) -> ExternResult<ValidateCallbackResult> {
+    match ThisWasmEntry::try_from(serialized_bytes) {
+        Ok(ThisWasmEntry::AlwaysValidates) => ValidateCallbackResult::Valid,
+        Ok(ThisWasmEntry::NeverValidates) => {
+            ValidateCallbackResult::Invalid("NeverValidates never validates".to_string())
+        }
+        _ => ValidateCallbackResult::Invalid("Not a ThisWasmEntry".to_string()),
+    }
 }
 
-/// we can write normal rust code with Results outside our externs
-fn _commit_validate(to_commit: ThisWasmEntry) -> Result<GuestOutput, String> {
-    let commit_output: CommitEntryOutput = host_call!(__commit_entry, CommitEntryInput::new(((&to_commit).into(), Entry::App(to_commit.try_into()?))))?;
-    Ok(GuestOutput::new(commit_output.try_into()?))
-}
-
-#[no_mangle]
-pub extern "C" fn always_validates(_: GuestPtr) -> GuestPtr {
-    ret!(try_result!(_commit_validate(ThisWasmEntry::AlwaysValidates), "error processing commit"))
-}
-#[no_mangle]
-pub extern "C" fn never_validates(_: GuestPtr) -> GuestPtr {
-    ret!(try_result!(_commit_validate(ThisWasmEntry::NeverValidates), "error processing commit"))
+#[hdk(extern)]
+fn commit_validate(to_commit: ThisWasmEntry) -> ExternResult<CommitEntryOutput> {
+    Ok(commit_entry!(to_commit)?)
 }

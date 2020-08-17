@@ -1,17 +1,10 @@
-#[macro_use]
-extern crate lazy_static;
+use hdk3::prelude::*;
 
-use holochain_wasmer_guest::*;
-use holochain_zome_types::zome_info::ZomeInfo;
-use holochain_zome_types::*;
-
-// only the host functions we require in order to pull/push data across the host/guest boundary
-memory_externs!();
+holochain_externs!();
 
 macro_rules! guest_functions {
     ( $( [ $host_fn:ident, $guest_fn:ident, $input_type:ty, $output_type:ty ] ),* ) => {
         $(
-            host_externs!($host_fn);
             #[no_mangle]
             pub extern "C" fn $guest_fn(host_allocation_ptr: GuestPtr) -> GuestPtr {
                 let input = {
@@ -58,7 +51,12 @@ guest_functions!(
         RemoveLinkInput,
         RemoveLinkOutput
     ],
-    [__random_bytes, random_bytes, RandomBytesInput, RandomBytesOutput],
+    [
+        __random_bytes,
+        random_bytes,
+        RandomBytesInput,
+        RandomBytesOutput
+    ],
     [__sign, sign, SignInput, SignOutput],
     [__schedule, schedule, ScheduleInput, ScheduleOutput],
     [
@@ -88,12 +86,7 @@ guest_functions!(
     [__keystore, keystore, KeystoreInput, KeystoreOutput],
     [__get_links, get_links, GetLinksInput, GetLinksOutput],
     [__get, get, GetInput, GetOutput],
-    [
-        __entry_hash,
-        entry_hash,
-        EntryHashInput,
-        EntryHashOutput
-    ],
+    [__entry_hash, entry_hash, EntryHashInput, EntryHashOutput],
     [__sys_time, sys_time, SysTimeInput, SysTimeOutput],
     [__debug, debug, DebugInput, DebugOutput],
     [
@@ -103,12 +96,3 @@ guest_functions!(
         UnreachableOutput
     ]
 );
-
-// this is the type of thing you'd expect to see in an HDK to cache the global constants
-// TODO: Does this actually work? I thought wasm lost it's memory between calls? freesig
-lazy_static! {
-    pub(crate) static ref ZOME_INFO: ZomeInfo = {
-        let output: ZomeInfoOutput = host_call!(__zome_info, ZomeInfoInput::new(())).unwrap();
-        output.into_inner()
-    };
-}

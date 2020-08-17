@@ -1,14 +1,8 @@
 [package]
-name = "test_wasm_init_pass"
+name = "test_wasm_agent_info"
 version = "0.0.1"
 authors = [ "thedavidmeister", "thedavidmeister@gmail.com" ]
 edition = "2018"
-
-[profile.dev]
-opt-level = "z"
-
-[profile.release]
-opt-level = "z"
 
 # Ensure that this is not inside of any other workspace.
 # This crate should be an implementation detail of test_utils_wasm and
@@ -16,11 +10,9 @@ opt-level = "z"
 [workspace]
 
 [lib]
-name = "test_wasm_init_pass"
+name = "test_wasm_agent_info"
 crate-type = [ "cdylib", "rlib" ]
 
 [dependencies]
-serde = "=1.0.104"
 hdk3 = { path = "../../../hdk" }
-
-[patch.crates-io]
+serde = "=1.0.104"

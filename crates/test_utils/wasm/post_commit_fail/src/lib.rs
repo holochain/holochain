@@ -1,22 +1,13 @@
-use holo_hash::HeaderHash;
-use holochain_wasmer_guest::*;
-use holochain_zome_types::post_commit::PostCommitCallbackResult;
-use holochain_zome_types::*;
+use hdk3::prelude::*;
 
-holochain_wasmer_guest::holochain_externs!();
-
-#[no_mangle]
-pub extern "C" fn post_commit(_: GuestPtr) -> GuestPtr {
-    ret!(GuestOutput::new(try_result!(
-        PostCommitCallbackResult::Fail(
-            vec![HeaderHash::from_raw_bytes(vec![
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0, 0x99, 0xf6, 0x1f, 0xc2
-            ])]
-            .into(),
-            "empty header fail".into()
-        )
-        .try_into(),
-        "failed to serialize post commit return value"
-    )));
+#[hdk(extern)]
+fn post_commit(_: ()) -> ExternResult<PostCommitCallbackResult> {
+    Ok(PostCommitCallbackResult::Fail(
+        vec![HeaderHash::from_raw_bytes(vec![
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0x99, 0xf6, 0x1f, 0xc2,
+        ])]
+        .into(),
+        "empty header fail".into(),
+    ))
 }

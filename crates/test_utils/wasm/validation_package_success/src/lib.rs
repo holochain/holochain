@@ -1,11 +1,6 @@
-use holochain_wasmer_guest::*;
-use holochain_zome_types::*;
-use holochain_zome_types::validate::ValidationPackageCallbackResult;
-use holochain_zome_types::validate::ValidationPackage;
+use hdk3::prelude::*;
 
-holochain_wasmer_guest::holochain_externs!();
-
-#[no_mangle]
-pub extern "C" fn validation_package(_: GuestPtr) -> GuestPtr {
-    ret!(GuestOutput::new(try_result!(ValidationPackageCallbackResult::Success(ValidationPackage).try_into(), "failed to serialize validation package return value")));
+#[hdk(extern)]
+fn validation_package(_: ()) -> ExternResult<ValidationPackageCallbackResult> {
+    Ok(ValidationPackageCallbackResult::Success(ValidationPackage))
 }

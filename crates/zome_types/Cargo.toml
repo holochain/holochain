@@ -13,7 +13,7 @@ edition = "2018"
 
 [dependencies]
 holo_hash = { path = "../holo_hash" }
-holochain_serialized_bytes = "=0.0.41"
+holochain_serialized_bytes = "=0.0.42"
 # TODO: remove and replace with HoloHash
 multihash = "0.8.0"
 # TODO: remove this once there is some less obtrusive source of randomness

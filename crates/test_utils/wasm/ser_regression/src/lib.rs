@@ -1,8 +1,6 @@
 use derive_more::*;
 use hdk3::prelude::*;
 
-holochain_externs!();
-
 #[derive(Debug, Serialize, Deserialize, SerializedBytes)]
 struct CreateMessageInput {
     channel_hash: EntryHash,
@@ -35,11 +33,11 @@ entry_def!(ChannelMessage EntryDef {
     ..Default::default()
 });
 
-entry_defs!(vec![
+entry_defs![
     Path::entry_def(),
     Channel::entry_def(),
     ChannelMessage::entry_def()
-]);
+];
 
 fn channels_path() -> Path {
     let path = Path::from("channels");
@@ -47,7 +45,8 @@ fn channels_path() -> Path {
     path
 }
 
-fn _create_channel(name: ChannelName) -> Result<EntryHash, WasmError> {
+#[hdk(extern)]
+fn create_channel(name: ChannelName) -> ExternResult<EntryHash> {
     debug!(format!("channel name {:?}", name))?;
     let path = channels_path();
     let channel = Channel::new(name.into());
@@ -59,7 +58,8 @@ fn _create_channel(name: ChannelName) -> Result<EntryHash, WasmError> {
     Ok(channel_hash)
 }
 
-fn _create_message(input: CreateMessageInput) -> Result<EntryHash, WasmError> {
+#[hdk(extern)]
+fn create_message(input: CreateMessageInput) -> ExternResult<EntryHash> {
     debug!(format!("{:?}", input))?;
     let CreateMessageInput {
         channel_hash,
@@ -71,6 +71,3 @@ fn _create_message(input: CreateMessageInput) -> Result<EntryHash, WasmError> {
     link_entries!(channel_hash, message_hash.clone())?;
     Ok(message_hash)
 }
-
-map_extern!(create_channel, _create_channel);
-map_extern!(create_message, _create_message);

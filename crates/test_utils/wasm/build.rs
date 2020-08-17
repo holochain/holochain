@@ -22,6 +22,7 @@ fn main() {
     let mut all_status = vec![];
 
     for &m in [
+        "agent_info",
         "anchor",
         "bench",
         "commit_entry",

@@ -2,41 +2,39 @@ use hdk3::prelude::*;
 use test_wasm_common::TestBool;
 use test_wasm_common::TestString;
 
-holochain_externs!();
+entry_defs![Path::entry_def()];
 
-entry_defs!(vec![Path::entry_def()]);
-
-map_extern!(hash, _hash);
-map_extern!(exists, _exists);
-map_extern!(ensure, _ensure);
-map_extern!(remove_link, _remove_link);
-map_extern!(children, _children);
-map_extern!(children_details, _children_details);
-
-fn _hash(path_string: TestString) -> Result<EntryHash, WasmError> {
+#[hdk(extern)]
+fn hash(path_string: TestString) -> ExternResult<EntryHash> {
     Path::from(path_string.0).hash()
 }
 
-fn _exists(path_string: TestString) -> Result<TestBool, WasmError> {
+#[hdk(extern)]
+fn exists(path_string: TestString) -> ExternResult<TestBool> {
     Ok(Path::from(path_string.0).exists()?.into())
 }
 
-fn _ensure(path_string: TestString) -> Result<(), WasmError> {
+#[hdk(extern)]
+fn ensure(path_string: TestString) -> ExternResult<()> {
     Path::from(path_string.0).ensure()
 }
 
-fn _remove_link(remove_link: RemoveLinkInput) -> Result<HeaderHash, WasmError> {
+#[hdk(extern)]
+fn remove_link(remove_link: RemoveLinkInput) -> ExternResult<HeaderHash> {
     Ok(remove_link!(remove_link.into_inner())?)
 }
 
-fn _parent(path_string: TestString) -> Result<Option<Path>, WasmError> {
+#[hdk(extern)]
+fn parent(path_string: TestString) -> ExternResult<Option<Path>> {
     Ok(Path::from(path_string.0).parent())
 }
 
-fn _children(path_string: TestString) -> Result<Links, WasmError> {
+#[hdk(extern)]
+fn children(path_string: TestString) -> ExternResult<Links> {
     Path::from(path_string.0).children()
 }
 
-fn _children_details(path_string: TestString) -> Result<LinkDetails, WasmError> {
+#[hdk(extern)]
+fn children_details(path_string: TestString) -> ExternResult<LinkDetails> {
     Path::from(path_string.0).children_details()
 }
