@@ -560,11 +560,7 @@ fn register_agent_activity(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
 
 #[allow(dead_code)]
 fn register_replaced_by_for_header(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-    let op = DhtOp::RegisterReplacedBy(
-        a.signature.clone(),
-        a.entry_update_header.clone(),
-        Some(a.new_entry.clone().into()),
-    );
+    let op = DhtOp::RegisterUpdatedBy(a.signature.clone(), a.entry_update_header.clone());
     let pre_state = vec![
         Db::IntQueue(op.clone()),
         Db::CasHeader(a.original_header.clone().into(), Some(a.signature.clone())),
@@ -580,11 +576,7 @@ fn register_replaced_by_for_header(a: TestData) -> (Vec<Db>, Vec<Db>, &'static s
 }
 
 fn register_replaced_by_for_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-    let op = DhtOp::RegisterReplacedBy(
-        a.signature.clone(),
-        a.entry_update_entry.clone(),
-        Some(a.new_entry.clone().into()),
-    );
+    let op = DhtOp::RegisterUpdatedBy(a.signature.clone(), a.entry_update_entry.clone());
     let pre_state = vec![
         Db::IntQueue(op.clone()),
         Db::CasEntry(
@@ -1158,7 +1150,7 @@ async fn test_wasm_api_without_integration_delete() {
 #[tokio::test(threaded_scheduler)]
 #[ignore]
 async fn test_integrate_single_register_replaced_by_for_header() {
-    // For RegisterReplacedBy with intended_for Header
+    // For RegisterUpdatedBy with intended_for Header
     // metadata has EntryUpdate on HeaderHash but not EntryHash
     todo!()
 }
@@ -1166,7 +1158,7 @@ async fn test_integrate_single_register_replaced_by_for_header() {
 #[tokio::test(threaded_scheduler)]
 #[ignore]
 async fn test_integrate_single_register_replaced_by_for_entry() {
-    // For RegisterReplacedBy with intended_for Entry
+    // For RegisterUpdatedBy with intended_for Entry
     // metadata has EntryUpdate on EntryHash but not HeaderHash
     todo!()
 }

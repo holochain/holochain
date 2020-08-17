@@ -234,7 +234,7 @@ async fn integrate_single_element(
             DhtOp::RegisterAgentActivity(signature, header) => {
                 put_data(signature, header, None, element_store).await?;
             }
-            DhtOp::RegisterReplacedBy(signature, entry_update, maybe_entry) => {
+            DhtOp::RegisterUpdatedBy(signature, entry_update) => {
                 // Check if we have the header with entry that we are updating in the vault
                 // or defer the op.
                 if !header_with_entry_is_stored(
@@ -243,16 +243,10 @@ async fn integrate_single_element(
                 )
                 .await?
                 {
-                    let op = DhtOp::RegisterReplacedBy(signature, entry_update, maybe_entry);
+                    let op = DhtOp::RegisterUpdatedBy(signature, entry_update);
                     return Outcome::deferred(op, validation_status);
                 }
-                put_data(
-                    signature,
-                    entry_update.into(),
-                    maybe_entry.map(|e| *e),
-                    element_store,
-                )
-                .await?;
+                put_data(signature, entry_update.into(), None, element_store).await?;
             }
             DhtOp::RegisterDeletedEntryHeader(signature, element_delete) => {
                 // Check if we have the header with the entry that we are removing in the vault
@@ -341,7 +335,7 @@ pub async fn integrate_single_metadata<C: MetadataBufT>(
             // register agent activity on this agents pub key
             meta_store.register_activity(header).await?;
         }
-        DhtOpLight::RegisterReplacedBy(hash, _, _) => {
+        DhtOpLight::RegisterUpdatedBy(hash, _, _) => {
             let header = get_header(hash, element_store).await?.try_into()?;
             meta_store.register_update(header).await?;
         }
