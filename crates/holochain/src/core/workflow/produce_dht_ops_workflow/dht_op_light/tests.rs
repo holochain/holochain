@@ -135,11 +135,7 @@ impl ElementTest {
                 NewEntryHeader::Update(entry_update.clone()),
                 self.entry.clone().into(),
             ),
-            DhtOp::RegisterReplacedBy(
-                self.sig.clone(),
-                entry_update,
-                Some(self.entry.clone().into()),
-            ),
+            DhtOp::RegisterUpdatedBy(self.sig.clone(), entry_update),
         ];
         (element, ops)
     }
@@ -278,7 +274,7 @@ async fn test_dht_basis() {
         entry_update.original_header_address = original_header_hash;
 
         // Create the op
-        let op = DhtOp::RegisterReplacedBy(fixt!(Signature), entry_update, Some(new_entry.into()));
+        let op = DhtOp::RegisterUpdatedBy(fixt!(Signature), entry_update);
 
         // Get the basis
         let result = op.dht_basis().await;

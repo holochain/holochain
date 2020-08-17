@@ -64,7 +64,7 @@ pub enum DhtOp {
     // TODO: This entry is here for validation by the entry update header holder
     // link's don't do this. The entry is validated by store entry. Maybe we either
     // need to remove the Entry here or add it to link.
-    RegisterReplacedBy(Signature, header::EntryUpdate, Option<Box<Entry>>),
+    RegisterUpdatedBy(Signature, header::EntryUpdate),
 
     /// Op for registering a Header deletion with the Header authority
     RegisterDeletedBy(Signature, header::ElementDelete),
@@ -91,7 +91,7 @@ pub enum DhtOpLight {
     StoreElement(HeaderHash, Option<EntryHash>, DhtBasis),
     StoreEntry(HeaderHash, EntryHash, DhtBasis),
     RegisterAgentActivity(HeaderHash, DhtBasis),
-    RegisterReplacedBy(HeaderHash, EntryHash, DhtBasis),
+    RegisterUpdatedBy(HeaderHash, EntryHash, DhtBasis),
     RegisterDeletedBy(HeaderHash, DhtBasis),
     RegisterDeletedEntryHeader(HeaderHash, DhtBasis),
     RegisterAddLink(HeaderHash, DhtBasis),
@@ -104,7 +104,7 @@ impl DhtOp {
             Self::StoreElement(_, header, _) => UniqueForm::StoreElement(header),
             Self::StoreEntry(_, header, _) => UniqueForm::StoreEntry(header),
             Self::RegisterAgentActivity(_, header) => UniqueForm::RegisterAgentActivity(header),
-            Self::RegisterReplacedBy(_, header, _) => UniqueForm::RegisterReplacedBy(header),
+            Self::RegisterUpdatedBy(_, header) => UniqueForm::RegisterUpdatedBy(header),
             Self::RegisterDeletedBy(_, header) => UniqueForm::RegisterDeletedBy(header),
             Self::RegisterDeletedEntryHeader(_, header) => {
                 UniqueForm::RegisterDeletedEntryHeader(header)
@@ -142,10 +142,10 @@ impl DhtOp {
                 let h = HeaderHash::with_data(h).await;
                 DhtOpLight::RegisterAgentActivity(h, basis)
             }
-            DhtOp::RegisterReplacedBy(_, h, _) => {
+            DhtOp::RegisterUpdatedBy(_, h) => {
                 let e = h.entry_hash.clone();
                 let h = HeaderHash::with_data(&Header::from(h.clone())).await;
-                DhtOpLight::RegisterReplacedBy(h, e, basis)
+                DhtOpLight::RegisterUpdatedBy(h, e, basis)
             }
             DhtOp::RegisterDeletedBy(_, h) => {
                 let h = HeaderHash::with_data(&Header::from(h.clone())).await;
@@ -188,7 +188,7 @@ impl DhtOpLight {
             DhtOpLight::StoreElement(_, _, b)
             | DhtOpLight::StoreEntry(_, _, b)
             | DhtOpLight::RegisterAgentActivity(_, b)
-            | DhtOpLight::RegisterReplacedBy(_, _, b)
+            | DhtOpLight::RegisterUpdatedBy(_, _, b)
             | DhtOpLight::RegisterDeletedBy(_, b)
             | DhtOpLight::RegisterDeletedEntryHeader(_, b)
             | DhtOpLight::RegisterAddLink(_, b)
@@ -205,7 +205,7 @@ enum UniqueForm<'a> {
     StoreElement(&'a Header),
     StoreEntry(&'a NewEntryHeader),
     RegisterAgentActivity(&'a Header),
-    RegisterReplacedBy(&'a header::EntryUpdate),
+    RegisterUpdatedBy(&'a header::EntryUpdate),
     RegisterDeletedBy(&'a header::ElementDelete),
     RegisterDeletedEntryHeader(&'a header::ElementDelete),
     RegisterAddLink(&'a header::LinkAdd),
@@ -218,7 +218,7 @@ impl<'a> UniqueForm<'a> {
             UniqueForm::StoreElement(header) => HeaderHash::with_data(*header).await.into(),
             UniqueForm::StoreEntry(header) => header.entry().clone().into(),
             UniqueForm::RegisterAgentActivity(header) => header.author().clone().into(),
-            UniqueForm::RegisterReplacedBy(header) => header.original_entry_address.clone().into(),
+            UniqueForm::RegisterUpdatedBy(header) => header.original_entry_address.clone().into(),
             UniqueForm::RegisterDeletedBy(header) => header.removes_address.clone().into(),
             UniqueForm::RegisterDeletedEntryHeader(header) => {
                 header.removes_entry_address.clone().into()
@@ -256,10 +256,9 @@ pub async fn produce_ops_from_element(element: &Element) -> DhtOpResult<Vec<DhtO
             DhtOpLight::RegisterAgentActivity(_, _) => {
                 DhtOp::RegisterAgentActivity(signature, header)
             }
-            DhtOpLight::RegisterReplacedBy(_, _, _) => {
+            DhtOpLight::RegisterUpdatedBy(_, _, _) => {
                 let entry_update = header.try_into()?;
-                let maybe_entry_box = maybe_entry.clone().map(Box::new);
-                DhtOp::RegisterReplacedBy(signature, entry_update, maybe_entry_box)
+                DhtOp::RegisterUpdatedBy(signature, entry_update)
             }
             DhtOpLight::RegisterDeletedEntryHeader(_, _) => {
                 let element_delete = header.try_into()?;
@@ -372,10 +371,10 @@ async fn produce_op_lights_from_iter(
                         .basis()
                         .await,
                 ));
-                ops.push(DhtOpLight::RegisterReplacedBy(
+                ops.push(DhtOpLight::RegisterUpdatedBy(
                     header_hash,
                     entry_hash,
-                    UniqueForm::RegisterReplacedBy(entry_update).basis().await,
+                    UniqueForm::RegisterUpdatedBy(entry_update).basis().await,
                 ));
             }
             Header::ElementDelete(entry_delete) => {
