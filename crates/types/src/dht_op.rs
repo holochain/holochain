@@ -165,6 +165,20 @@ impl DhtOp {
             }
         }
     }
+
+    /// Get the signature for this op
+    pub fn signature(&self) -> &Signature {
+        match self {
+            DhtOp::StoreElement(s, _, _)
+            | DhtOp::StoreEntry(s, _, _)
+            | DhtOp::RegisterAgentActivity(s, _)
+            | DhtOp::RegisterReplacedBy(s, _, _)
+            | DhtOp::RegisterDeletedBy(s, _)
+            | DhtOp::RegisterDeletedEntryHeader(s, _)
+            | DhtOp::RegisterAddLink(s, _)
+            | DhtOp::RegisterRemoveLink(s, _) => s,
+        }
+    }
 }
 
 impl DhtOpLight {

@@ -70,7 +70,6 @@ async fn test_cell_handle_publish() {
         author: agent.clone(),
         timestamp: Timestamp::now().into(),
         hash: dna.clone(),
-        header_seq: 42,
     });
     let op = DhtOp::StoreElement(sig, header.clone(), None);
     let op_hash = DhtOpHashed::from_content(op.clone()).await.into_hash();

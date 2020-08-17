@@ -222,7 +222,6 @@ impl<'env> SourceChainBuf<'env> {
         let dna_header = Header::Dna(header::Dna {
             author: agent_pubkey.clone(),
             timestamp: Timestamp::now().into(),
-            header_seq: 0,
             hash: dna_hash,
         });
         let dna_header_address = self.put_raw(dna_header, None).await?;
@@ -336,7 +335,6 @@ pub mod tests {
                 let dna_header = Header::Dna(header::Dna {
                     author: agent_pubkey.clone(),
                     timestamp: Timestamp(0, 0).into(),
-                    header_seq: 0,
                     hash: dna.dna_hash().clone(),
                 });
                 let dna_header = HeaderHashed::from_content(dna_header).await;
