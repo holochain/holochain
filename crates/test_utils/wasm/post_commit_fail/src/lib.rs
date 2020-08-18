@@ -1,7 +1,7 @@
 use hdk3::prelude::*;
 
 #[hdk(extern)]
-fn post_commit(_: ()) -> ExternResult<PostCommitCallbackResult> {
+fn post_commit(_: HeaderHashes) -> ExternResult<PostCommitCallbackResult> {
     Ok(PostCommitCallbackResult::Fail(
         vec![HeaderHash::from_raw_bytes(vec![
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,

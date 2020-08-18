@@ -74,7 +74,16 @@ fn validate(entry: Entry) -> ExternResult<ValidateCallbackResult> {
     })
 }
 
-#[hdk(extern)]
-fn commit_validate(to_commit: ThisWasmEntry) -> ExternResult<HeaderHash> {
+fn _commit_validate(to_commit: ThisWasmEntry) -> ExternResult<HeaderHash> {
     Ok(commit_entry!(&to_commit)?)
+}
+
+#[hdk(extern)]
+fn always_validates(_: ()) -> ExternResult<HeaderHash> {
+    _commit_validate(ThisWasmEntry::AlwaysValidates)
+}
+
+#[hdk(extern)]
+fn never_validates(_: ()) -> ExternResult<HeaderHash> {
+    _commit_validate(ThisWasmEntry::NeverValidates)
 }
