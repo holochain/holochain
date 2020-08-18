@@ -1,7 +1,8 @@
-use super::{BufferedStore, KvBuf};
+use super::KvBuf;
 use crate::{
     env::{ReadManager, WriteManager},
     error::{DatabaseError, DatabaseResult},
+    next::BufferedStore,
     test_utils::test_cell_env,
 };
 use rkv::StoreOptions;

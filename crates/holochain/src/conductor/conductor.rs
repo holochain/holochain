@@ -47,7 +47,7 @@ use holochain_state::{
     db,
     env::{EnvironmentWrite, ReadManager},
     exports::SingleStore,
-    next::kv::{KvStore, UnitDbKey},
+    next::{kv::KvStore, UnitDbKey},
     prelude::*,
 };
 use holochain_types::{

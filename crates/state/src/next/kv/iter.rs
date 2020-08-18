@@ -1,8 +1,8 @@
 // FIXME: remove
 #![allow(dead_code)]
 
-use super::{BufVal, KvOp};
 use crate::error::DatabaseError;
+use crate::next::{kv::KvOp, BufVal};
 use fallible_iterator::{DoubleEndedFallibleIterator, FallibleIterator};
 use rkv::StoreError;
 use std::collections::BTreeMap;
