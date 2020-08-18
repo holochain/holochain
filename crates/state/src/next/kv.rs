@@ -44,17 +44,17 @@ pub trait BufferedStore {
 }
 
 /// Trait alias for the combination of constraints needed for keys in [KvBuf] and [KvvBuf]
-pub trait BufKey: Hash + Ord + Eq + AsRef<[u8]> {}
-impl<T> BufKey for T where T: Hash + Ord + Eq + AsRef<[u8]> {}
+pub trait BufKey: Hash + Ord + Eq + AsRef<[u8]> + Send + Sync {}
+impl<T> BufKey for T where T: Hash + Ord + Eq + AsRef<[u8]> + Send + Sync {}
 
 /// Trait alias for the combination of constraints needed for keys in [IntKvBuf](kv_int::IntKvBuf)
-pub trait BufIntKey: Hash + Ord + Eq + rkv::store::integer::PrimitiveInt {}
-impl<T> BufIntKey for T where T: Hash + Ord + Eq + rkv::store::integer::PrimitiveInt {}
+pub trait BufIntKey: Hash + Ord + Eq + rkv::store::integer::PrimitiveInt + Send + Sync {}
+impl<T> BufIntKey for T where T: Hash + Ord + Eq + rkv::store::integer::PrimitiveInt + Send + Sync {}
 
 /// Trait alias for the combination of constraints needed for values in [KvBuf](kv::KvBuf) and [IntKvBuf](kv_int::IntKvBuf)
-pub trait BufVal: Clone + Serialize + DeserializeOwned + std::fmt::Debug {}
-impl<T> BufVal for T where T: Clone + Serialize + DeserializeOwned + std::fmt::Debug {}
+pub trait BufVal: Clone + Serialize + DeserializeOwned + std::fmt::Debug + Send + Sync {}
+impl<T> BufVal for T where T: Clone + Serialize + DeserializeOwned + std::fmt::Debug + Send + Sync {}
 
 /// Trait alias for the combination of constraints needed for values in [KvvBuf]
-pub trait BufMultiVal: Hash + Eq + Clone + Serialize + DeserializeOwned {}
-impl<T> BufMultiVal for T where T: Hash + Eq + Clone + Serialize + DeserializeOwned {}
+pub trait BufMultiVal: Hash + Eq + Clone + Serialize + DeserializeOwned + Send + Sync {}
+impl<T> BufMultiVal for T where T: Hash + Eq + Clone + Serialize + DeserializeOwned + Send + Sync {}

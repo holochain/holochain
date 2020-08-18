@@ -1,6 +1,8 @@
 use super::check_empty_key;
 use super::{BufKey, BufVal, BufferedStore};
+use crate::env::ReadManager;
 use crate::{
+    env::EnvironmentRead,
     error::{DatabaseError, DatabaseResult},
     prelude::{Readable, Reader, Writer},
     typed::Kv,
@@ -34,6 +36,7 @@ where
     K: BufKey,
     V: BufVal,
 {
+    env: EnvironmentRead,
     db: SingleStore,
     scratch: Scratch<K, V>,
 }
@@ -44,8 +47,9 @@ where
     V: BufVal,
 {
     /// Create a new KvBuf from a read-only transaction and a database reference
-    pub fn new(db: SingleStore) -> DatabaseResult<Self> {
+    pub fn new(env: EnvironmentRead, db: SingleStore) -> DatabaseResult<Self> {
         Ok(Self {
+            env,
             db,
             scratch: BTreeMap::new().into(),
         })
@@ -56,7 +60,7 @@ where
     }
 
     /// See if a value exists, avoiding deserialization
-    pub fn contains<R: Readable>(&self, r: &R, k: &K) -> DatabaseResult<bool> {
+    pub fn contains_used<R: Readable>(&self, r: &R, k: &K) -> DatabaseResult<bool> {
         check_empty_key(&k)?;
         use Op::*;
         let exists = match self.scratch.get(k) {
@@ -67,9 +71,17 @@ where
         Ok(exists)
     }
 
+    /// See if a value exists, avoiding deserialization
+    pub async fn contains_fresh(&self, k: &K) -> DatabaseResult<bool> {
+        self.env
+            .guard()
+            .await
+            .with_reader(|reader| self.contains_used(&reader, k))
+    }
+
     /// Get a value, taking the scratch space into account,
     /// or from persistence if needed
-    pub fn get<R: Readable>(&self, r: &R, k: &K) -> DatabaseResult<Option<V>> {
+    pub fn get_used<R: Readable>(&self, r: &R, k: &K) -> DatabaseResult<Option<V>> {
         check_empty_key(k)?;
         use Op::*;
         let val = match self.scratch.get(k) {
@@ -78,6 +90,15 @@ where
             None => self.store().get(r, k)?,
         };
         Ok(val)
+    }
+
+    /// Get a value, taking the scratch space into account,
+    /// or from persistence if needed
+    pub async fn get_fresh<R: Readable>(&self, k: &K) -> DatabaseResult<Option<V>> {
+        self.env
+            .guard()
+            .await
+            .with_reader(|reader| self.get_used(&reader, k))
     }
 
     /// Update the scratch space to record a Put operation for the KV

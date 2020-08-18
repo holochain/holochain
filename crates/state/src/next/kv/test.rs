@@ -38,8 +38,8 @@ async fn kvbuf_scratch_and_persistence() -> DatabaseResult<()> {
     };
 
     env.with_reader::<DatabaseError, _, _>(|reader| {
-        let mut kv1: KvBuf<String, TestVal> = KvBuf::new(db1)?;
-        let mut kv2: KvBuf<String, String> = KvBuf::new(db2)?;
+        let mut kv1: KvBuf<String, TestVal> = KvBuf::new(arc.clone().into(), db1)?;
+        let mut kv2: KvBuf<String, String> = KvBuf::new(arc.clone().into(), db2)?;
 
         env.with_commit(|writer| {
             kv1.put("hi".to_owned(), testval.clone()).unwrap();
@@ -48,6 +48,17 @@ async fn kvbuf_scratch_and_persistence() -> DatabaseResult<()> {
             // Check that the underlying store contains no changes yet
             assert_eq!(kv1.store().get(&reader, &"hi".to_owned())?, None);
             assert_eq!(kv2.store().get(&reader, &"salutations".to_owned())?, None);
+
+            // Check that the values are available due to the scratch space
+            assert_eq!(
+                kv1.get_used(&reader, &"hi".to_owned())?,
+                Some(testval.clone())
+            );
+            assert_eq!(
+                kv2.get_used(&reader, &"salutations".to_owned())?,
+                Some("folks".to_owned())
+            );
+
             kv1.flush_to_txn(writer)
         })?;
 
@@ -57,7 +68,7 @@ async fn kvbuf_scratch_and_persistence() -> DatabaseResult<()> {
         // just for kicks
 
         env.with_commit(|writer| {
-            let kv1a: KvBuf<String, TestVal> = KvBuf::new(db1)?;
+            let kv1a: KvBuf<String, TestVal> = KvBuf::new(arc.clone().into(), db1)?;
             assert_eq!(kv1a.store().get(&reader, &"hi".to_owned())?, None);
             kv2.flush_to_txn(writer)
         })?;
@@ -67,8 +78,8 @@ async fn kvbuf_scratch_and_persistence() -> DatabaseResult<()> {
 
     env.with_reader(|reader| {
         // Now open some fresh Readers to see that our data was persisted
-        let kv1b: KvBuf<String, TestVal> = KvBuf::new(db1)?;
-        let kv2b: KvBuf<String, String> = KvBuf::new(db2)?;
+        let kv1b: KvBuf<String, TestVal> = KvBuf::new(arc.clone().into(), db1)?;
+        let kv2b: KvBuf<String, String> = KvBuf::new(arc.clone().into(), db2)?;
         // Check that the underlying store contains no changes yet
         assert_eq!(kv1b.store().get(&reader, &"hi".to_owned())?, Some(testval));
         assert_eq!(
@@ -142,7 +153,7 @@ fn test_buf(a: &BTreeMap<Vec<u8>, Op<V>>, b: impl Iterator<Item = (&'static str,
 //         .unwrap();
 
 //     env.with_reader(|reader| {
-//         let buf: TestBuf = KvBuf::new( db();
+//         let buf: TestBuf = KvBuf::new(arc.clone().into(),  db();
 
 //         let forward: Vec<_> = buf.iter_raw().unwrap().collect().unwrap();
 //         let reverse: Vec<_> = buf.iter_raw_reverse().unwrap().collect().unwrap();
