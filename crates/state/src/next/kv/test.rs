@@ -5,7 +5,6 @@ use crate::{
     test_utils::test_cell_env,
 };
 use ::fixt::prelude::*;
-use fallible_iterator::FallibleIterator;
 use rkv::StoreOptions;
 use serde_derive::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -28,116 +27,59 @@ impl From<u32> for V {
 fixturator!(V; from u32;);
 
 #[tokio::test(threaded_scheduler)]
-async fn kv_store_sanity_check() -> DatabaseResult<()> {
+async fn kvbuf_scratch_and_persistence() -> DatabaseResult<()> {
     let arc = test_cell_env();
     let env = arc.guard().await;
     let db1 = env.inner().open_single("kv1", StoreOptions::create())?;
     let db2 = env.inner().open_single("kv1", StoreOptions::create())?;
-    let mut scratch1 = Scratch::new();
-    let mut scratch2 = Scratch::new();
 
     let testval = TestVal {
         name: "Joe".to_owned(),
     };
 
     env.with_reader::<DatabaseError, _, _>(|reader| {
-        let mut kv1: KvBuf<String, TestVal> = KvBuf::new(&reader, db1, &mut scratch1)?;
-        let mut kv2: KvBuf<String, String> = KvBuf::new(&reader, db2, &mut scratch2)?;
+        let mut kv1: KvBuf<String, TestVal> = KvBuf::new(db1)?;
+        let mut kv2: KvBuf<String, String> = KvBuf::new(db2)?;
 
         env.with_commit(|writer| {
             kv1.put("hi".to_owned(), testval.clone()).unwrap();
             kv2.put("salutations".to_owned(), "folks".to_owned())
                 .unwrap();
             // Check that the underlying store contains no changes yet
-            assert_eq!(kv1.get_persisted(&"hi".to_owned())?, None);
-            assert_eq!(kv2.get_persisted(&"salutations".to_owned())?, None);
+            assert_eq!(kv1.store().get(&reader, &"hi".to_owned())?, None);
+            assert_eq!(kv2.store().get(&reader, &"salutations".to_owned())?, None);
             kv1.flush_to_txn(writer)
         })?;
 
-        // Ensure that mid-transaction, there has still been no persistence,
-        // just for kicks
-
-        env.with_commit(|writer| {
-            let kv1a: KvBuf<String, TestVal> = KvBuf::new(&reader, db1, &mut scratch1)?;
-            assert_eq!(kv1a.get_persisted(&"hi".to_owned())?, None);
-            kv2.flush_to_txn(writer)
-        })
-    })?;
-
-    env.with_reader(|reader| {
-        // Now open some fresh Readers to see that our data was persisted
-        let kv1b: KvBuf<String, TestVal> = KvBuf::new(&reader, db1, &mut scratch1)?;
-        let kv2b: KvBuf<String, String> = KvBuf::new(&reader, db2, &mut scratch2)?;
-        // Check that the underlying store contains no changes yet
-        assert_eq!(kv1b.get_persisted(&"hi".to_owned())?, Some(testval));
-        assert_eq!(
-            kv2b.get_persisted(&"salutations".to_owned())?,
-            Some("folks".to_owned())
-        );
-        Ok(())
-    })
-}
-
-#[tokio::test(threaded_scheduler)]
-async fn kv_store_sanity_check_2() -> DatabaseResult<()> {
-    let arc = test_cell_env();
-    let env = arc.guard().await;
-    let db1 = env.inner().open_single("kv1", StoreOptions::create())?;
-    let db2 = env.inner().open_single("kv1", StoreOptions::create())?;
-    let mut scratch1 = Scratch::new();
-    let mut scratch2 = Scratch::new();
-
-    let testval = TestVal {
-        name: "Joe".to_owned(),
-    };
-
-    env.with_reader::<DatabaseError, _, _>(|reader| {
-        let mut kv1: KvBuf<String, TestVal> = KvBuf::new(&reader, db1, &mut scratch1)?;
-        let mut kv2: KvBuf<String, String> = KvBuf::new(&reader, db2, &mut scratch2)?;
-
-        env.with_commit(|writer| {
-            kv1.put("hi".to_owned(), testval.clone()).unwrap();
-            kv2.put("salutations".to_owned(), "folks".to_owned())
-                .unwrap();
-            // Check that the underlying store contains no changes yet
-            assert_eq!(kv1.get_persisted(&"hi".to_owned())?, None);
-            assert_eq!(kv2.get_persisted(&"salutations".to_owned())?, None);
-            kv1.flush_to_txn(writer)
-        })?;
-
-        assert_eq!(scratch1.len(), 0);
         assert_eq!(kv2.scratch().len(), 1);
 
         // Ensure that mid-transaction, there has still been no persistence,
         // just for kicks
 
         env.with_commit(|writer| {
-            let kv1a: KvBuf<String, TestVal> = KvBuf::new(&reader, db1, &mut scratch1)?;
-            assert_eq!(kv1a.get_persisted(&"hi".to_owned())?, None);
+            let kv1a: KvBuf<String, TestVal> = KvBuf::new(db1)?;
+            assert_eq!(kv1a.store().get(&reader, &"hi".to_owned())?, None);
             kv2.flush_to_txn(writer)
         })?;
-
-        assert_eq!(scratch1.len(), 0);
-        assert_eq!(scratch2.len(), 0);
 
         Ok(())
     })?;
 
     env.with_reader(|reader| {
         // Now open some fresh Readers to see that our data was persisted
-        let kv1b: KvBuf<String, TestVal> = KvBuf::new(&reader, db1, &mut scratch1)?;
-        let kv2b: KvBuf<String, String> = KvBuf::new(&reader, db2, &mut scratch2)?;
+        let kv1b: KvBuf<String, TestVal> = KvBuf::new(db1)?;
+        let kv2b: KvBuf<String, String> = KvBuf::new(db2)?;
         // Check that the underlying store contains no changes yet
-        assert_eq!(kv1b.get_persisted(&"hi".to_owned())?, Some(testval));
+        assert_eq!(kv1b.store().get(&reader, &"hi".to_owned())?, Some(testval));
         assert_eq!(
-            kv2b.get_persisted(&"salutations".to_owned())?,
+            kv2b.store().get(&reader, &"salutations".to_owned())?,
             Some("folks".to_owned())
         );
         Ok(())
     })
 }
 
-pub(super) type TestBuf<'a> = KvBuf<'a, &'a str, V>;
+pub(super) type TestBuf<'a> = KvBuf<&'a str, V>;
 
 macro_rules! res {
     ($key:expr, $op:ident, $val:expr) => {
@@ -162,7 +104,7 @@ fn test_buf(a: &BTreeMap<Vec<u8>, Op<V>>, b: impl Iterator<Item = (&'static str,
 //     let db = env.inner().open_single("kv", StoreOptions::create())?;
 
 //     env.with_reader::<DatabaseError, _, _>(|reader| {
-//         let mut buf: TestBuf = KvBuf::new(&reader, db)?;
+//         let mut buf: TestBuf = KvBuf::new)?;
 
 //         buf.put("a", V(1)).unwrap();
 //         buf.put("b", V(2)).unwrap();
@@ -175,7 +117,7 @@ fn test_buf(a: &BTreeMap<Vec<u8>, Op<V>>, b: impl Iterator<Item = (&'static str,
 //     })?;
 
 //     env.with_reader(|reader| {
-//         let buf: TestBuf = KvBuf::new(&reader, db)?;
+//         let buf: TestBuf = KvBuf::new)?;
 
 //         let forward: Vec<_> = buf.iter_raw()?.map(|(_, v)| Ok(v)).collect().unwrap();
 //         let reverse: Vec<_> = buf
@@ -200,7 +142,7 @@ fn test_buf(a: &BTreeMap<Vec<u8>, Op<V>>, b: impl Iterator<Item = (&'static str,
 //         .unwrap();
 
 //     env.with_reader(|reader| {
-//         let buf: TestBuf = KvBuf::new(&reader, db).unwrap();
+//         let buf: TestBuf = KvBuf::new( db();
 
 //         let forward: Vec<_> = buf.iter_raw().unwrap().collect().unwrap();
 //         let reverse: Vec<_> = buf.iter_raw_reverse().unwrap().collect().unwrap();

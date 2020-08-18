@@ -695,7 +695,7 @@ where
         Ok(Self {
             env,
             wasm_env,
-            state_db: Kv::new(db)?,
+            state_db: Kv::new(db),
             cells: HashMap::new(),
             shutting_down: false,
             managed_task_add_sender: task_tx,

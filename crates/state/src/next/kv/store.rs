@@ -1,5 +1,5 @@
+use super::{check_empty_key, iter::SingleIterRaw, BufKey, BufVal};
 use crate::{
-    buffer::{kv::SingleIterRaw, BufKey, BufVal},
     error::{DatabaseError, DatabaseResult},
     prelude::*,
 };
@@ -97,14 +97,5 @@ where
         reader: &'env R,
     ) -> DatabaseResult<fallible_iterator::Rev<SingleIterRaw<'env, V>>> {
         Ok(SingleIterRaw::new(self.db.iter_start(reader)?, self.db.iter_end(reader)?).rev())
-    }
-}
-
-// Empty keys break lmdb
-fn check_empty_key<K: AsRef<[u8]>>(k: &K) -> DatabaseResult<()> {
-    if k.as_ref().is_empty() {
-        Err(DatabaseError::EmptyKey)
-    } else {
-        Ok(())
     }
 }
