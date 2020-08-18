@@ -112,9 +112,6 @@ macro_rules! entry_defs {
         crate::entry_def!($t $def);
         crate::entry_defs![$t::entry_def()];
     };
-    // [ $( $defs:expr ),* ] => {
-    //     entry_defs!(vec![ $( $defs )* ]);
-    // };
     [ $( $defs:expr ),* ] => {
         fn __entry_defs(_: ()) -> Result<$crate::prelude::EntryDefsCallbackResult, $crate::prelude::WasmError> {
             Ok($crate::prelude::EntryDefsCallbackResult::from(vec![ $( $defs ),* ]))
