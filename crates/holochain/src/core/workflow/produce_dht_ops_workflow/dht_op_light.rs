@@ -67,13 +67,12 @@ pub async fn light_to_op(op: DhtOpLight, cas: &ElementBuf<'_>) -> DhtOpConvertRe
                 .into_header_and_signature();
             Ok(DhtOp::RegisterAgentActivity(sig, header.into_content()))
         }
-        DhtOpLight::RegisterReplacedBy(h, _, _) => {
-            let (header, entry) = cas
-                .get_element(&h)
+        DhtOpLight::RegisterUpdatedBy(h, _, _) => {
+            let (header, sig) = cas
+                .get_header(&h)
                 .await?
                 .ok_or(DhtOpConvertError::MissingData)?
-                .into_inner();
-            let (header, sig) = header.into_header_and_signature();
+                .into_header_and_signature();
             let header = match header.into_content() {
                 Header::EntryUpdate(u) => u,
                 h => {
@@ -83,16 +82,7 @@ pub async fn light_to_op(op: DhtOpLight, cas: &ElementBuf<'_>) -> DhtOpConvertRe
                     ));
                 }
             };
-            // Entry must be here because it's a RegisterReplacedBy
-            // This is not true for private entries so we should only error
-            // if this is meant to be public
-            let entry = match header.entry_type.visibility() {
-                EntryVisibility::Public => {
-                    Some(entry.ok_or(DhtOpConvertError::MissingData)?.into())
-                }
-                EntryVisibility::Private => entry.map(Box::new),
-            };
-            Ok(DhtOp::RegisterReplacedBy(sig, header, entry))
+            Ok(DhtOp::RegisterUpdatedBy(sig, header))
         }
         DhtOpLight::RegisterDeletedBy(header_hash, _) => {
             let (header, sig) = get_element_delete(header_hash, op_name.clone(), &cas).await?;

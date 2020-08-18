@@ -463,12 +463,12 @@ mod tests {
     /// - Add / Remove links: Currently publish all.
     /// ## Explication
     /// This test is a little big so a quick run down:
-    /// 1. All ops that can contain entries are created with entries (StoreElement, StoreEntry and RegisterReplacedBy)
+    /// 1. All ops that can contain entries are created with entries (StoreElement, StoreEntry and RegisterUpdatedBy)
     /// 2. Then we create identical versions of these ops without the entires (set to None) (expect StoreEntry)
     /// 3. The workflow is run and the ops are sent to the network receiver
     /// 4. We check that the correct number of ops are received (so we know there were no other ops sent)
     /// 5. StoreEntry is __not__ expected so would show up as an extra if it was produced
-    /// 6. Every op that is received (StoreElement and RegisterReplacedBy) is checked to match the expected versions (entries removed)
+    /// 6. Every op that is received (StoreElement and RegisterUpdatedBy) is checked to match the expected versions (entries removed)
     /// 7. Each op also has a count to check for duplicates
     #[test_case(1)]
     #[test_case(10)]
@@ -558,15 +558,10 @@ mod tests {
                 let op_hash = DhtOpHashed::from_content(op.clone()).await.into_hash();
                 let store_entry = (op_hash, light);
 
-                // Create RegisterReplacedBy
-                let op = DhtOp::RegisterReplacedBy(
-                    sig.clone(),
-                    entry_update.clone(),
-                    Some(new_entry.clone().into()),
-                );
+                // Create RegisterUpdatedBy
+                let op = DhtOp::RegisterUpdatedBy(sig.clone(), entry_update.clone());
                 // Op is expected to not contain the Entry even though the above contains the entry
-                let expected_op =
-                    DhtOp::RegisterReplacedBy(sig.clone(), entry_update.clone(), None);
+                let expected_op = DhtOp::RegisterUpdatedBy(sig.clone(), entry_update.clone());
                 let light = op.to_light().await;
                 let op_hash = DhtOpHashed::from_content(op.clone()).await.into_hash();
                 let register_replaced_by = (op_hash, light, expected_op);
