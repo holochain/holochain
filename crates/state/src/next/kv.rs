@@ -58,3 +58,30 @@ impl<T> BufVal for T where T: Clone + Serialize + DeserializeOwned + std::fmt::D
 /// Trait alias for the combination of constraints needed for values in [KvvBuf]
 pub trait BufMultiVal: Hash + Eq + Clone + Serialize + DeserializeOwned + Send + Sync {}
 impl<T> BufMultiVal for T where T: Hash + Eq + Clone + Serialize + DeserializeOwned + Send + Sync {}
+
+/// Use this as the key type for LMDB databases which should only have one key.
+///
+/// This type can only be used as one possible reference
+#[derive(derive_more::Display, PartialOrd, Ord, PartialEq, Eq)]
+pub struct UnitDbKey;
+
+impl AsRef<[u8]> for UnitDbKey {
+    fn as_ref(&self) -> &[u8] {
+        ARBITRARY_BYTE_SLICE
+    }
+}
+
+impl From<Vec<u8>> for UnitDbKey {
+    fn from(bytes: Vec<u8>) -> Self {
+        assert_eq!(bytes.as_slice(), ARBITRARY_BYTE_SLICE);
+        Self
+    }
+}
+
+impl From<()> for UnitDbKey {
+    fn from(_: ()) -> Self {
+        Self
+    }
+}
+
+static ARBITRARY_BYTE_SLICE: &[u8] = &[0];

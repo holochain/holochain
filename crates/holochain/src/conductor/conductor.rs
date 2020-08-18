@@ -47,8 +47,8 @@ use holochain_state::{
     db,
     env::{EnvironmentWrite, ReadManager},
     exports::SingleStore,
+    next::kv::{KvStore, UnitDbKey},
     prelude::*,
-    typed::{Kv, UnitDbKey},
 };
 use holochain_types::{
     app::{AppId, InstalledApp, InstalledCell, MembraneProof},
@@ -695,7 +695,7 @@ where
         Ok(Self {
             env,
             wasm_env,
-            state_db: Kv::new(db),
+            state_db: KvStore::new(db),
             cells: HashMap::new(),
             shutting_down: false,
             managed_task_add_sender: task_tx,
@@ -744,7 +744,7 @@ where
 }
 
 /// The database used to store ConductorState. It has only one key-value pair.
-pub type ConductorStateDb = Kv<UnitDbKey, ConductorState>;
+pub type ConductorStateDb = KvStore<UnitDbKey, ConductorState>;
 
 mod builder {
 
