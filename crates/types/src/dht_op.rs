@@ -172,7 +172,7 @@ impl DhtOp {
             DhtOp::StoreElement(s, _, _)
             | DhtOp::StoreEntry(s, _, _)
             | DhtOp::RegisterAgentActivity(s, _)
-            | DhtOp::RegisterReplacedBy(s, _, _)
+            | DhtOp::RegisterUpdatedBy(s, _)
             | DhtOp::RegisterDeletedBy(s, _)
             | DhtOp::RegisterDeletedEntryHeader(s, _)
             | DhtOp::RegisterAddLink(s, _)

@@ -23,6 +23,49 @@ macro_rules! here {
     };
 }
 
+/// Create metadata mocks easily by passing in
+/// expected functions, return data and with_f checks
+#[macro_export]
+macro_rules! meta_mock {
+    () => {{
+        $crate::core::state::metadata::MockMetadataBuf::new()
+    }};
+    ($fun:ident) => {{
+        let d: Vec<holochain_types::metadata::TimedHeaderHash> = Vec::new();
+        meta_mock!($fun, d)
+    }};
+    ($fun:ident, $data:expr) => {{
+        let mut metadata = $crate::core::state::metadata::MockMetadataBuf::new();
+        metadata.$fun().returning({
+            move |_| {
+                Ok(Box::new(fallible_iterator::convert(
+                    $data
+                        .clone()
+                        .into_iter()
+                        .map(holochain_types::metadata::TimedHeaderHash::from)
+                        .map(Ok),
+                )))
+            }
+        });
+        metadata
+    }};
+    ($fun:ident, $data:expr, $with_fn:expr) => {{
+        let mut metadata = $crate::core::state::metadata::MockMetadataBuf::new();
+        metadata.$fun().withf($with_fn).returning({
+            move |_| {
+                Ok(Box::new(fallible_iterator::convert(
+                    $data
+                        .clone()
+                        .into_iter()
+                        .map(holochain_types::metadata::TimedHeaderHash::from)
+                        .map(Ok),
+                )))
+            }
+        });
+        metadata
+    }};
+}
+
 /// Create a fake SignedHeaderHashed and EntryHashed pair with random content
 pub async fn fake_unique_element(
     keystore: &KeystoreSender,

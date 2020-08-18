@@ -1,9 +1,15 @@
-use super::state::{element_buf::ElementBuf, metadata::MetadataBufT};
+use super::state::{cascade::Cascade, element_buf::ElementBuf, metadata::MetadataBufT};
+use crate::conductor::entry_def_store::EntryDefBuf;
 use error::{PrevHeaderError, SysValidationError, SysValidationResult};
 use fallible_iterator::FallibleIterator;
 use holochain_keystore::{AgentPubKeyExt, Signature};
-use holochain_types::Entry;
-use holochain_zome_types::{header::EntryType, Header};
+use holochain_types::{dna::Zomes, header::NewEntryHeaderRef, Entry, EntryHashed};
+use holochain_zome_types::{
+    element::SignedHeaderHashed,
+    header::{AppEntryType, EntryType, EntryUpdate},
+    link::LinkTag,
+    Header,
+};
 
 pub use crate::core::state::source_chain::{SourceChainError, SourceChainResult};
 pub use holo_hash::*;
@@ -19,6 +25,9 @@ mod tests;
 /// 15mb limit on Entries due to websocket limits.
 /// Consider splitting large entries up.
 pub const MAX_ENTRY_SIZE: usize = 15_000_000;
+
+/// 10kb limit on LinkTags.
+pub const MAX_TAG_SIZE: usize = 10_000;
 
 /// Ensure that a given pre-fetched element is actually valid on this chain.
 ///
@@ -157,11 +166,7 @@ pub async fn check_and_get_prev_header(
     meta_vault: &impl MetadataBufT,
     element_vault: &ElementBuf<'_>,
 ) -> SysValidationResult<Option<Header>> {
-    // Check the prev header is in the metadata
-    meta_vault
-        .get_activity(author)?
-        .find(|activity| Ok(prev_header_hash == &activity.header_hash))?
-        .ok_or(PrevHeaderError::MissingMeta)?;
+    check_prev_header_in_metadata(author, prev_header_hash, meta_vault)?;
 
     // Check we are actually holding the previous header
     let prev_header = element_vault
@@ -176,6 +181,19 @@ pub async fn check_and_get_prev_header(
     // Maybe this should happen if it's not found?
 
     Ok(Some(prev_header))
+}
+
+/// Check the prev header is in the metadata
+pub fn check_prev_header_in_metadata(
+    author: AgentPubKey,
+    prev_header_hash: &HeaderHash,
+    meta_vault: &impl MetadataBufT,
+) -> SysValidationResult<()> {
+    meta_vault
+        .get_activity(author)?
+        .find(|activity| Ok(prev_header_hash == &activity.header_hash))?
+        .ok_or(PrevHeaderError::MissingMeta)?;
+    Ok(())
 }
 
 /// Check that previous header makes sense
@@ -193,6 +211,20 @@ pub fn check_prev_header(header: &Header) -> SysValidationResult<()> {
                 Err(PrevHeaderError::InvalidRoot.into())
             }
         }
+    }
+}
+
+/// Check that Dna headers are only added to empty source chains
+pub async fn check_valid_if_dna(
+    header: &Header,
+    meta_vault: &impl MetadataBufT,
+) -> SysValidationResult<()> {
+    match header {
+        Header::Dna(_) => meta_vault
+            .get_activity(header.author().clone())?
+            .next()?
+            .map_or(Ok(()), |_| Err(PrevHeaderError::InvalidRoot.into())),
+        _ => Ok(()),
     }
 }
 
@@ -246,6 +278,25 @@ pub fn check_entry_type(entry_type: &EntryType, entry: &Entry) -> SysValidationR
     }
 }
 
+/// Check the AppEntryType is valid for the zome.
+/// Check the EntryDefId and ZomeId are in range.
+pub fn check_app_entry_type(
+    entry_type: &AppEntryType,
+    zomes: &Zomes,
+    entry_defs: EntryDefBuf<'_>,
+) -> SysValidationResult<()> {
+    Ok(())
+}
+
+/// Check the app entry type isn't private for store entry
+pub fn check_not_private(
+    entry_type: &AppEntryType,
+    zomes: &Zomes,
+    entry_defs: EntryDefBuf<'_>,
+) -> SysValidationResult<()> {
+    Ok(())
+}
+
 /// Check the headers entry hash matches the hash of the entry
 pub async fn check_entry_hash(hash: &EntryHash, entry: &Entry) -> SysValidationResult<()> {
     if *hash == EntryHash::with_data(entry).await {
@@ -280,4 +331,92 @@ pub fn check_entry_size(entry: &Entry) -> SysValidationResult<()> {
         // Other entry types are small
         _ => Ok(()),
     }
+}
+
+/// Check the link tag size is under the MAX_TAG_SIZE
+// TODO: This could be bad if someone just keeps sending large tags.
+// Getting the size of a large vec over and over might be a DDOS?
+pub fn check_tag_size(tag: &LinkTag) -> SysValidationResult<()> {
+    let size = std::mem::size_of_val(&tag.0[..]);
+    if size < MAX_TAG_SIZE {
+        Ok(())
+    } else {
+        Err(SysValidationError::TagTooLarge(size, MAX_TAG_SIZE))
+    }
+}
+
+/// Check a EntryUpdate's entry schema is the same for
+/// original and new entry.
+/// If EntryType::App Check the EntryDefId, ZomeId and visibility match
+pub fn check_update_reference(
+    eu: &EntryUpdate,
+    new_entry: &NewEntryHeaderRef<'_>,
+) -> SysValidationResult<()> {
+    if eu.entry_type == *new_entry.entry_type() {
+        Ok(())
+    } else {
+        Err(SysValidationError::UpdateTypeMismatch(
+            eu.entry_type.clone(),
+            new_entry.entry_type().clone(),
+        ))
+    }
+}
+
+/// Check we are actually holding an entry
+pub async fn check_holding_entry(
+    hash: &EntryHash,
+    element_vault: &ElementBuf<'_>,
+) -> SysValidationResult<EntryHashed> {
+    element_vault
+        .get_entry(&hash)
+        .await?
+        .ok_or_else(|| SysValidationError::NotHoldingDep(hash.clone().into()))
+}
+
+/// Check we are actually holding an header
+pub async fn check_holding_header(
+    hash: &HeaderHash,
+    element_vault: &ElementBuf<'_>,
+) -> SysValidationResult<SignedHeaderHashed> {
+    element_vault
+        .get_header(&hash)
+        .await?
+        .ok_or_else(|| SysValidationError::NotHoldingDep(hash.clone().into()))
+}
+
+/// Check we are actually holding an element and the entry
+pub async fn check_holding_element(
+    hash: &HeaderHash,
+    element_vault: &ElementBuf<'_>,
+) -> SysValidationResult<Element> {
+    let el = element_vault
+        .get_element(&hash)
+        .await?
+        .ok_or_else(|| SysValidationError::NotHoldingDep(hash.clone().into()))?;
+    el.entry()
+        .as_option()
+        .ok_or_else(|| SysValidationError::NotHoldingDep(hash.clone().into()))?;
+    Ok(el)
+}
+
+/// Check that the entry exists on the dht
+pub async fn check_entry_exists(
+    entry_hash: EntryHash,
+    cascade: &mut Cascade<'_, '_>,
+) -> SysValidationResult<EntryHashed> {
+    cascade
+        .exists_entry(entry_hash.clone(), Default::default())
+        .await?
+        .ok_or_else(|| SysValidationError::DepMissingFromDht(entry_hash.into()))
+}
+
+/// Check that the element exists on the dht
+pub async fn check_element_exists(
+    hash: HeaderHash,
+    cascade: &mut Cascade<'_, '_>,
+) -> SysValidationResult<Element> {
+    cascade
+        .exists(hash.clone().into(), Default::default())
+        .await?
+        .ok_or_else(|| SysValidationError::DepMissingFromDht(hash.into()))
 }

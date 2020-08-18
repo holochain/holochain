@@ -328,6 +328,34 @@ where
         }
     }
 
+    /// Gets the first element we can find for this entry locally
+    async fn get_element_local_raw_via_entry(
+        &self,
+        hash: &EntryHash,
+    ) -> CascadeResult<Option<Element>> {
+        // Get all the headers we know about.
+        let mut headers: BTreeSet<TimedHeaderHash> =
+            self.meta_cache.get_headers(hash.clone())?.collect()?;
+        headers.extend(
+            self.meta_vault
+                .get_headers(hash.clone())?
+                .collect::<Vec<_>>()?,
+        );
+
+        // We might not actually be holding some of these
+        // so we need to search until we find one.
+        // We are most likely holding the newest header
+        // so iterate in reverse
+        for header in headers.into_iter().rev() {
+            // Return the first element we are actually holding
+            if let Some(el) = self.get_element_local_raw(&header.header_hash).await? {
+                return Ok(Some(el));
+            }
+        }
+        // Not holding any
+        Ok(None)
+    }
+
     async fn get_entry_local_raw(&self, hash: &EntryHash) -> CascadeResult<Option<EntryHashed>> {
         match self.element_vault.get_entry(hash).await? {
             None => Ok(self.element_cache.get_entry(hash).await?),
@@ -336,17 +364,18 @@ where
     }
 
     async fn get_header_local_raw(&self, hash: &HeaderHash) -> CascadeResult<Option<HeaderHashed>> {
-        match self
-            .element_vault
-            .get_header(hash)
+        Ok(self
+            .get_header_local_raw_with_sig(hash)
             .await?
-            .map(|h| h.into_header_and_signature().0)
-        {
-            None => Ok(self
-                .element_cache
-                .get_header(hash)
-                .await?
-                .map(|h| h.into_header_and_signature().0)),
+            .map(|h| h.into_header_and_signature().0))
+    }
+
+    async fn get_header_local_raw_with_sig(
+        &self,
+        hash: &HeaderHash,
+    ) -> CascadeResult<Option<SignedHeaderHashed>> {
+        match self.element_vault.get_header(hash).await? {
+            None => Ok(self.element_cache.get_header(hash).await?),
             r => Ok(r),
         }
     }
@@ -561,11 +590,87 @@ where
         }
     }
 
+    /// Get the entry from the dht regardless of metadata.
+    /// This call has the opportunity to hit the local cache
+    /// and avoid a network call.
+    // TODO: This still fetches the full element and metadata.
+    // Need to add a fetch_exists_entry that only gets data.
+    pub async fn exists_entry(
+        &mut self,
+        hash: EntryHash,
+        options: GetOptions,
+    ) -> CascadeResult<Option<EntryHashed>> {
+        match self.get_entry_local_raw(&hash).await? {
+            Some(e) => Ok(Some(e)),
+            None => {
+                self.fetch_element_via_entry(hash.clone(), options).await?;
+                self.get_entry_local_raw(&hash).await
+            }
+        }
+    }
+
+    /// Get only the header from the dht regardless of metadata.
+    /// Useful for avoiding getting the Entry if you don't need it.
+    /// This call has the opportunity to hit the local cache
+    /// and avoid a network call.
+    // TODO: This still fetches the full element and metadata.
+    // Need to add a fetch_exists_header that only gets data.
+    pub async fn exists_header(
+        &mut self,
+        hash: HeaderHash,
+        options: GetOptions,
+    ) -> CascadeResult<Option<SignedHeaderHashed>> {
+        match self.get_header_local_raw_with_sig(&hash).await? {
+            Some(h) => Ok(Some(h)),
+            None => {
+                self.fetch_element_via_header(hash.clone(), options).await?;
+                self.get_header_local_raw_with_sig(&hash).await
+            }
+        }
+    }
+
+    /// Get an element from the dht regardless of metadata.
+    /// Useful for checking if data is held.
+    /// This call has the opportunity to hit the local cache
+    /// and avoid a network call.
+    /// Note we still need to return the element as proof they are really
+    /// holding it unless we create a byte challenge function.
+    // TODO: This still fetches the full element and metadata.
+    // Need to add a fetch_exists that only gets data.
+    pub async fn exists(
+        &mut self,
+        hash: AnyDhtHash,
+        options: GetOptions,
+    ) -> CascadeResult<Option<Element>> {
+        match *hash.hash_type() {
+            AnyDht::Entry(e) => {
+                let hash = hash.retype(e);
+                match self.get_element_local_raw_via_entry(&hash).await? {
+                    Some(e) => Ok(Some(e)),
+                    None => {
+                        self.fetch_element_via_entry(hash.clone(), options).await?;
+                        self.get_element_local_raw_via_entry(&hash).await
+                    }
+                }
+            }
+            AnyDht::Header => {
+                let hash = hash.retype(hash_type::Header);
+                match self.get_element_local_raw(&hash).await? {
+                    Some(e) => Ok(Some(e)),
+                    None => {
+                        self.fetch_element_via_header(hash.clone(), options).await?;
+                        self.get_element_local_raw(&hash).await
+                    }
+                }
+            }
+        }
+    }
+
     #[instrument(skip(self))]
-    // Updates the cache with the latest network authority data
-    // and returns what is in the cache.
-    // This gives you the latest possible picture of the current dht state.
-    // Data from your zome call is also added to the cache.
+    /// Updates the cache with the latest network authority data
+    /// and returns what is in the cache.
+    /// This gives you the latest possible picture of the current dht state.
+    /// Data from your zome call is also added to the cache.
     pub async fn dht_get(
         &mut self,
         hash: AnyDhtHash,

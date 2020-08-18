@@ -1,4 +1,5 @@
 use super::*;
+use crate::{core::state::metadata::MockMetadataBuf, meta_mock};
 use ::fixt::prelude::*;
 use error::SysValidationError;
 use holo_hash::fixt::*;
@@ -152,6 +153,62 @@ async fn check_previous_header() {
 }
 
 #[tokio::test(threaded_scheduler)]
+async fn check_valid_if_dna_test() {
+    // Test data
+    let activity_return = vec![fixt!(HeaderHash)];
+
+    // Empty store not dna
+    let header = fixt!(LinkAdd);
+    let metadata = meta_mock!();
+    assert_matches!(
+        check_valid_if_dna(&header.clone().into(), &metadata).await,
+        Ok(())
+    );
+    let header = fixt!(Dna);
+    let metadata = meta_mock!(expect_get_activity);
+    assert_matches!(
+        check_valid_if_dna(&header.clone().into(), &metadata).await,
+        Ok(())
+    );
+
+    let header = fixt!(Dna);
+    let metadata = meta_mock!(expect_get_activity, activity_return);
+    assert_matches!(
+        check_valid_if_dna(&header.clone().into(), &metadata).await,
+        Err(SysValidationError::PrevHeaderError(
+            PrevHeaderError::InvalidRoot
+        ))
+    );
+}
+
+#[tokio::test(threaded_scheduler)]
+async fn check_prev_header_in_metadata_test() {
+    // Test data
+    let mut header_fixt = HeaderHashFixturator::new(Predictable);
+    let prev_header_hash = header_fixt.next().unwrap();
+    let author = fixt!(AgentPubKey);
+    let activity_return = vec![prev_header_hash.clone()];
+    let metadata = meta_mock!(expect_get_activity, activity_return, {
+        let author = author.clone();
+        move |a| *a == author
+    });
+
+    // Previous header on this hash
+    assert_matches!(
+        check_prev_header_in_metadata(author.clone(), &prev_header_hash, &metadata),
+        Ok(())
+    );
+
+    // No previous header on this hash
+    assert_matches!(
+        check_prev_header_in_metadata(author.clone(), &header_fixt.next().unwrap(), &metadata),
+        Err(SysValidationError::PrevHeaderError(
+            PrevHeaderError::MissingMeta
+        ))
+    );
+}
+
+#[tokio::test(threaded_scheduler)]
 async fn check_previous_timestamp() {
     let mut header = fixt!(LinkAdd);
     let mut prev_header = fixt!(LinkAdd);
@@ -264,5 +321,53 @@ async fn check_entry_size_test() {
     assert_matches!(
         check_entry_size(&huge),
         Err(SysValidationError::EntryTooLarge(_, _))
+    );
+}
+
+#[tokio::test(threaded_scheduler)]
+async fn check_update_reference_test() {
+    let mut ec = fixt!(EntryCreate);
+    let mut eu = fixt!(EntryUpdate);
+    let et_cap = EntryType::CapClaim;
+    let mut aet_fixt = AppEntryTypeFixturator::new(Predictable).map(EntryType::App);
+    let et_app_1 = aet_fixt.next().unwrap();
+    let et_app_2 = aet_fixt.next().unwrap();
+
+    // Same entry type
+    ec.entry_type = et_app_1.clone();
+    eu.entry_type = et_app_1;
+
+    assert_matches!(
+        check_update_reference(&eu, &NewEntryHeaderRef::from(&ec)),
+        Ok(())
+    );
+
+    // Different app entry type
+    ec.entry_type = et_app_2;
+
+    assert_matches!(
+        check_update_reference(&eu, &NewEntryHeaderRef::from(&ec)),
+        Err(SysValidationError::UpdateTypeMismatch(_, _))
+    );
+
+    // Different entry type
+    eu.entry_type = et_cap;
+
+    assert_matches!(
+        check_update_reference(&eu, &NewEntryHeaderRef::from(&ec)),
+        Err(SysValidationError::UpdateTypeMismatch(_, _))
+    );
+}
+
+#[tokio::test(threaded_scheduler)]
+async fn check_link_tag_size_test() {
+    let tiny = LinkTag(vec![0; 1]);
+    let bytes = (0..10_001).map(|_| 0u8).into_iter().collect::<Vec<_>>();
+    let huge = LinkTag(bytes);
+    assert_matches!(check_tag_size(&tiny), Ok(()));
+
+    assert_matches!(
+        check_tag_size(&huge),
+        Err(SysValidationError::TagTooLarge(_, _))
     );
 }

@@ -11,6 +11,7 @@ use crate::{
     prelude::*,
 };
 use conversions::WrongHeaderError;
+use derive_more::From;
 use holo_hash::EntryHash;
 use holochain_zome_types::entry_def::EntryVisibility;
 pub use holochain_zome_types::header::HeaderHashed;
@@ -32,6 +33,14 @@ pub enum NewEntryHeader {
     /// A header which creates a new entry that is semantically related to a
     /// previously created entry or header
     Update(EntryUpdate),
+}
+
+#[allow(missing_docs)]
+#[derive(Debug, From)]
+/// Same as NewEntryHeader but takes headers as reference
+pub enum NewEntryHeaderRef<'a> {
+    Create(&'a EntryCreate),
+    Update(&'a EntryUpdate),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Ord, PartialOrd)]
@@ -186,6 +195,15 @@ impl WireEntryUpdateRelationship {
     }
 }
 
+impl NewEntryHeaderRef<'_> {
+    pub fn entry_type(&self) -> &EntryType {
+        match self {
+            NewEntryHeaderRef::Create(EntryCreate { entry_type, .. })
+            | NewEntryHeaderRef::Update(EntryUpdate { entry_type, .. }) => entry_type,
+        }
+    }
+}
+
 impl TryFrom<SignedHeaderHashed> for WireElementDelete {
     type Error = WrongHeaderError;
     fn try_from(shh: SignedHeaderHashed) -> Result<Self, Self::Error> {
@@ -293,6 +311,17 @@ impl TryFrom<Header> for NewEntryHeader {
         match value {
             Header::EntryCreate(h) => Ok(NewEntryHeader::Create(h)),
             Header::EntryUpdate(h) => Ok(NewEntryHeader::Update(h)),
+            _ => Err(WrongHeaderError(format!("{:?}", value))),
+        }
+    }
+}
+
+impl<'a> TryFrom<&'a Header> for NewEntryHeaderRef<'a> {
+    type Error = WrongHeaderError;
+    fn try_from(value: &'a Header) -> Result<Self, Self::Error> {
+        match value {
+            Header::EntryCreate(h) => Ok(NewEntryHeaderRef::Create(h)),
+            Header::EntryUpdate(h) => Ok(NewEntryHeaderRef::Update(h)),
             _ => Err(WrongHeaderError(format!("{:?}", value))),
         }
     }
