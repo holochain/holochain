@@ -4,14 +4,14 @@ use super::error::WorkflowResult;
 use crate::core::{
     queue_consumer::{OneshotWriter, TriggerSender, WorkComplete},
     state::{
-        dht_op_integration::{IntegratedDhtOpsStore, IntegrationLimboStore},
+        dht_op_integration::IntegrationLimboStore,
         validation_db::ValidationLimboStore,
         workspace::{Workspace, WorkspaceResult},
     },
 };
 use holochain_state::{
     buffer::{BufferedStore, KvBuf},
-    db::{INTEGRATED_DHT_OPS, INTEGRATION_LIMBO},
+    db::INTEGRATION_LIMBO,
     prelude::{GetDb, Reader, Writer},
 };
 use tracing::*;
@@ -39,15 +39,11 @@ pub async fn app_validation_workflow(
 
 pub struct AppValidationWorkspace<'env> {
     pub integration_limbo: IntegrationLimboStore<'env>,
-    pub integrated_dht_ops: IntegratedDhtOpsStore<'env>,
     pub validation_limbo: ValidationLimboStore<'env>,
 }
 
 impl<'env> Workspace<'env> for AppValidationWorkspace<'env> {
     fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self> {
-        let db = dbs.get_db(&*INTEGRATED_DHT_OPS)?;
-        let integrated_dht_ops = KvBuf::new(reader, db)?;
-
         let db = dbs.get_db(&*INTEGRATION_LIMBO)?;
         let integration_limbo = KvBuf::new(reader, db)?;
 
@@ -55,7 +51,6 @@ impl<'env> Workspace<'env> for AppValidationWorkspace<'env> {
 
         Ok(Self {
             integration_limbo,
-            integrated_dht_ops,
             validation_limbo,
         })
     }

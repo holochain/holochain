@@ -1,6 +1,6 @@
 //! The workflow and queue consumer for DhtOp integration
 
-use super::error::CellResult;
+use super::error::WorkflowResult;
 use crate::core::{
     queue_consumer::TriggerSender,
     state::{
@@ -23,11 +23,11 @@ use holochain_types::Timestamp;
 #[cfg(test)]
 mod test;
 
-pub async fn queue_for_validation(
+pub async fn incoming_dht_ops_workflow(
     state_env: &EnvironmentWrite,
     mut sys_validation_trigger: TriggerSender,
     ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
-) -> CellResult<()> {
+) -> WorkflowResult<()> {
     // set up our workspace
     let env_ref = state_env.guard().await;
     let reader = env_ref.reader()?;

@@ -11,7 +11,7 @@ async fn incoming_ops_to_limbo() {
     let hash = DhtOpHash::with_data(&op).await;
     let ops = vec![(hash.clone(), op.clone())];
 
-    queue_for_validation(&env, sys_validation_trigger.clone(), ops)
+    incoming_dht_ops_workflow(&env, sys_validation_trigger.clone(), ops)
         .await
         .unwrap();
     rx.listen().await.unwrap();

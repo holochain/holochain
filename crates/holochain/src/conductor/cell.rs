@@ -24,9 +24,9 @@ use crate::{
         },
         workflow::{
             call_zome_workflow, error::WorkflowError, genesis_workflow::genesis_workflow,
-            initialize_zomes_workflow, CallZomeWorkflowArgs, CallZomeWorkspace,
-            GenesisWorkflowArgs, GenesisWorkspace, InitializeZomesWorkflowArgs,
-            InitializeZomesWorkspace, ZomeCallInvocationResult,
+            incoming_dht_ops_workflow::incoming_dht_ops_workflow, initialize_zomes_workflow,
+            CallZomeWorkflowArgs, CallZomeWorkspace, GenesisWorkflowArgs, GenesisWorkspace,
+            InitializeZomesWorkflowArgs, InitializeZomesWorkspace, ZomeCallInvocationResult,
         },
     },
 };
@@ -62,10 +62,8 @@ use std::{
 use tokio::sync;
 use tracing::*;
 use tracing_futures::Instrument;
-use validation::queue_for_validation;
 
 mod authority;
-mod validation;
 
 #[allow(missing_docs)]
 pub mod error;
@@ -414,12 +412,16 @@ impl Cell {
         _dht_hash: holo_hash::AnyDhtHash,
         ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     ) -> CellResult<()> {
-        queue_for_validation(
+        incoming_dht_ops_workflow(
             &self.state_env,
             self.queue_triggers.sys_validation.clone(),
             ops,
         )
         .await
+        .map_err(Box::new)
+        .map_err(ConductorApiError::from)
+        .map_err(Box::new)?;
+        Ok(())
     }
 
     /// a remote node is attempting to retreive a validation package
