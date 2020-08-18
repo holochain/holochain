@@ -4,26 +4,30 @@ use super::error::WorkflowResult;
 use crate::core::{
     queue_consumer::{OneshotWriter, TriggerSender, WorkComplete},
     state::{
-        dht_op_integration::{IntegratedDhtOpsStore, IntegrationLimboStore},
-        validation_db::ValidationLimboStore,
+        dht_op_integration::{IntegratedDhtOpsStore, IntegrationLimboStore, IntegrationLimboValue},
+        validation_db::{ValidationLimboStatus, ValidationLimboStore, ValidationLimboValue},
         workspace::{Workspace, WorkspaceResult},
     },
 };
+use fallible_iterator::FallibleIterator;
+use holo_hash::DhtOpHash;
 use holochain_state::{
     buffer::{BufferedStore, KvBuf},
     db::{INTEGRATED_DHT_OPS, INTEGRATION_LIMBO},
     prelude::{GetDb, Reader, Writer},
 };
+use holochain_types::validate::ValidationStatus;
 use tracing::*;
 
 #[instrument(skip(workspace, writer, trigger_integration))]
 pub async fn app_validation_workflow(
-    workspace: AppValidationWorkspace<'_>,
+    mut workspace: AppValidationWorkspace<'_>,
     writer: OneshotWriter,
     trigger_integration: &mut TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
     warn!("unimplemented passthrough");
 
+    let complete = app_validation_workflow_inner(&mut workspace).await?;
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // commit the workspace
@@ -34,6 +38,35 @@ pub async fn app_validation_workflow(
     // trigger other workflows
     trigger_integration.trigger();
 
+    Ok(complete)
+}
+async fn app_validation_workflow_inner(
+    workspace: &mut AppValidationWorkspace<'_>,
+) -> WorkflowResult<WorkComplete> {
+    let ops: Vec<ValidationLimboValue> = workspace
+        .validation_limbo
+        .drain_iter()?
+        .filter(|vlv| {
+            match vlv.status {
+                // We only want sys validated or awaiting app dependency ops
+                ValidationLimboStatus::SysValidated | ValidationLimboStatus::AwaitingAppDeps => {
+                    Ok(true)
+                }
+                ValidationLimboStatus::Pending | ValidationLimboStatus::AwaitingSysDeps => {
+                    Ok(false)
+                }
+            }
+        })
+        .collect()?;
+    for vlv in ops {
+        let op = vlv.op;
+        let hash = DhtOpHash::with_data(&op).await;
+        let v = IntegrationLimboValue {
+            validation_status: ValidationStatus::Valid,
+            op,
+        };
+        workspace.integration_limbo.put(hash, v)?;
+    }
     Ok(WorkComplete::Complete)
 }
 

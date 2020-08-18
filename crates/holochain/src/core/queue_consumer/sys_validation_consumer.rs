@@ -15,11 +15,12 @@ use tokio::task::JoinHandle;
 use tracing::*;
 
 /// Spawn the QueueConsumer for SysValidation workflow
-#[instrument(skip(env, stop, trigger_app_validation))]
+#[instrument(skip(env, stop, trigger_app_validation, network))]
 pub fn spawn_sys_validation_consumer(
     env: EnvironmentWrite,
     mut stop: sync::broadcast::Receiver<()>,
     mut trigger_app_validation: TriggerSender,
+    network: HolochainP2pCell,
 ) -> (
     TriggerSender,
     tokio::sync::oneshot::Receiver<()>,
@@ -35,10 +36,14 @@ pub fn spawn_sys_validation_consumer(
             let reader = env_ref.reader().expect("Could not create LMDB reader");
             let workspace =
                 SysValidationWorkspace::new(&reader, &env_ref).expect("Could not create Workspace");
-            if let WorkComplete::Incomplete =
-                sys_validation_workflow(workspace, env.clone().into(), &mut trigger_app_validation)
-                    .await
-                    .expect("Error running Workflow")
+            if let WorkComplete::Incomplete = sys_validation_workflow(
+                workspace,
+                env.clone().into(),
+                &mut trigger_app_validation,
+                network.clone(),
+            )
+            .await
+            .expect("Error running Workflow")
             {
                 trigger_self.trigger()
             };

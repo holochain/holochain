@@ -1,6 +1,5 @@
 use super::state::{cascade::Cascade, element_buf::ElementBuf, metadata::MetadataBufT};
 use crate::conductor::entry_def_store::EntryDefBuf;
-use error::{PrevHeaderError, SysValidationError, SysValidationResult};
 use fallible_iterator::FallibleIterator;
 use holochain_keystore::{AgentPubKeyExt, Signature};
 use holochain_types::{dna::Zomes, header::NewEntryHeaderRef, Entry, EntryHashed};
@@ -12,12 +11,14 @@ use holochain_zome_types::{
 };
 
 pub use crate::core::state::source_chain::{SourceChainError, SourceChainResult};
+pub use error::{PrevHeaderError, SysValidationError, SysValidationResult};
 pub use holo_hash::*;
 pub use holochain_types::{
     element::{Element, ElementExt},
     HeaderHashed, Timestamp,
 };
 
+#[allow(missing_docs)]
 mod error;
 #[cfg(test)]
 mod tests;
@@ -153,34 +154,8 @@ pub async fn verify_header_signature(sig: &Signature, header: &Header) -> SysVal
 /// Verify the author key was valid at the time
 /// of signing with dpki
 /// TODO: This is just a stub until we have dpki.
-pub async fn author_key_is_valid(_author: AgentPubKey) -> SysValidationResult<()> {
+pub async fn author_key_is_valid(_author: &AgentPubKey) -> SysValidationResult<()> {
     Ok(())
-}
-
-/// Check if we are holding the previous header
-/// in the element vault and metadata vault
-/// and return the header
-pub async fn check_and_get_prev_header(
-    author: AgentPubKey,
-    prev_header_hash: &HeaderHash,
-    meta_vault: &impl MetadataBufT,
-    element_vault: &ElementBuf<'_>,
-) -> SysValidationResult<Option<Header>> {
-    check_prev_header_in_metadata(author, prev_header_hash, meta_vault)?;
-
-    // Check we are actually holding the previous header
-    let prev_header = element_vault
-        .get_header(prev_header_hash)
-        .await?
-        .ok_or(PrevHeaderError::MissingVault)?
-        .into_header_and_signature()
-        .0
-        .into_content();
-
-    // TODO: Check the op is integrated or is this redundant?
-    // Maybe this should happen if it's not found?
-
-    Ok(Some(prev_header))
 }
 
 /// Check the prev header is in the metadata
@@ -215,7 +190,7 @@ pub fn check_prev_header(header: &Header) -> SysValidationResult<()> {
 }
 
 /// Check that Dna headers are only added to empty source chains
-pub async fn check_valid_if_dna(
+pub fn check_valid_if_dna(
     header: &Header,
     meta_vault: &impl MetadataBufT,
 ) -> SysValidationResult<()> {
@@ -362,6 +337,20 @@ pub fn check_update_reference(
     }
 }
 
+/// Check if we are holding the previous header
+/// in the element vault and metadata vault
+/// and return the header
+pub async fn check_holding_prev_header(
+    author: AgentPubKey,
+    prev_header_hash: &HeaderHash,
+    meta_vault: &impl MetadataBufT,
+    element_vault: &ElementBuf<'_>,
+) -> SysValidationResult<()> {
+    check_prev_header_in_metadata(author, prev_header_hash, meta_vault)?;
+    check_holding_header(&prev_header_hash, &element_vault).await?;
+    Ok(())
+}
+
 /// Check we are actually holding an entry
 pub async fn check_holding_entry(
     hash: &EntryHash,
@@ -402,7 +391,7 @@ pub async fn check_holding_element(
 /// Check that the entry exists on the dht
 pub async fn check_entry_exists(
     entry_hash: EntryHash,
-    cascade: &mut Cascade<'_, '_>,
+    mut cascade: Cascade<'_, '_>,
 ) -> SysValidationResult<EntryHashed> {
     cascade
         .exists_entry(entry_hash.clone(), Default::default())
@@ -410,10 +399,21 @@ pub async fn check_entry_exists(
         .ok_or_else(|| SysValidationError::DepMissingFromDht(entry_hash.into()))
 }
 
+/// Check that the header exists on the dht
+pub async fn check_header_exists(
+    hash: HeaderHash,
+    mut cascade: Cascade<'_, '_>,
+) -> SysValidationResult<SignedHeaderHashed> {
+    cascade
+        .exists_header(hash.clone(), Default::default())
+        .await?
+        .ok_or_else(|| SysValidationError::DepMissingFromDht(hash.into()))
+}
+
 /// Check that the element exists on the dht
 pub async fn check_element_exists(
     hash: HeaderHash,
-    cascade: &mut Cascade<'_, '_>,
+    mut cascade: Cascade<'_, '_>,
 ) -> SysValidationResult<Element> {
     cascade
         .exists(hash.clone().into(), Default::default())

@@ -161,20 +161,20 @@ async fn check_valid_if_dna_test() {
     let header = fixt!(LinkAdd);
     let metadata = meta_mock!();
     assert_matches!(
-        check_valid_if_dna(&header.clone().into(), &metadata).await,
+        check_valid_if_dna(&header.clone().into(), &metadata),
         Ok(())
     );
     let header = fixt!(Dna);
     let metadata = meta_mock!(expect_get_activity);
     assert_matches!(
-        check_valid_if_dna(&header.clone().into(), &metadata).await,
+        check_valid_if_dna(&header.clone().into(), &metadata),
         Ok(())
     );
 
     let header = fixt!(Dna);
     let metadata = meta_mock!(expect_get_activity, activity_return);
     assert_matches!(
-        check_valid_if_dna(&header.clone().into(), &metadata).await,
+        check_valid_if_dna(&header.clone().into(), &metadata),
         Err(SysValidationError::PrevHeaderError(
             PrevHeaderError::InvalidRoot
         ))

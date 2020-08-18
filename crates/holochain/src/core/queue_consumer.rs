@@ -59,7 +59,7 @@ pub async fn spawn_queue_consumer_tasks(
     stop: sync::broadcast::Sender<()>,
 ) -> InitialQueueTriggers {
     let (tx_publish, rx1, handle) =
-        spawn_publish_dht_ops_consumer(env.clone(), stop.subscribe(), cell_network);
+        spawn_publish_dht_ops_consumer(env.clone(), stop.subscribe(), cell_network.clone());
     task_sender
         .send(ManagedTaskAdd::dont_handle(handle))
         .await
@@ -77,7 +77,7 @@ pub async fn spawn_queue_consumer_tasks(
         .await
         .expect("Failed to manage workflow handle");
     let (tx_sys, rx4, handle) =
-        spawn_sys_validation_consumer(env.clone(), stop.subscribe(), tx_app);
+        spawn_sys_validation_consumer(env.clone(), stop.subscribe(), tx_app, cell_network);
     task_sender
         .send(ManagedTaskAdd::dont_handle(handle))
         .await

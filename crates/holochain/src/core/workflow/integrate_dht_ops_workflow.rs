@@ -409,7 +409,7 @@ impl<'env> Workspace<'env> for IntegrateDhtOpsWorkspace<'env> {
         let db = dbs.get_db(&*INTEGRATION_LIMBO)?;
         let integration_limbo = KvBuf::new(reader, db)?;
 
-        let elements = ElementBuf::vault(reader, dbs, true)?;
+        let elements = ElementBuf::vault(reader, dbs, false)?;
         let meta = MetadataBuf::vault(reader, dbs)?;
 
         Ok(Self {
