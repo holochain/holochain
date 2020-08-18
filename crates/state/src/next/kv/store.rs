@@ -7,7 +7,7 @@ use fallible_iterator::FallibleIterator;
 use rkv::SingleStore;
 
 /// Wrapper around an rkv SingleStore which provides strongly typed values
-pub struct Kv<K, V>
+pub struct KvStore<K, V>
 where
     K: BufKey,
     V: BufVal,
@@ -16,7 +16,7 @@ where
     __phantom: std::marker::PhantomData<(K, V)>,
 }
 
-impl<K, V> Kv<K, V>
+impl<K, V> KvStore<K, V>
 where
     K: BufKey,
     V: BufVal,

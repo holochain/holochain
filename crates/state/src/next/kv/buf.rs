@@ -1,11 +1,10 @@
 use super::check_empty_key;
-use super::{BufKey, BufVal, BufferedStore};
+use super::{BufKey, BufVal, BufferedStore, KvStore};
 use crate::env::ReadManager;
 use crate::{
     env::EnvironmentRead,
     error::{DatabaseError, DatabaseResult},
     prelude::{Readable, Reader, Writer},
-    typed::Kv,
 };
 use rkv::SingleStore;
 use std::collections::BTreeMap;
@@ -55,13 +54,13 @@ where
         })
     }
 
-    pub fn store(&self) -> Kv<K, V> {
-        Kv::new(self.db)
+    pub fn store(&self) -> KvStore<K, V> {
+        KvStore::new(self.db)
     }
 
     /// See if a value exists, avoiding deserialization
     pub fn contains_used<R: Readable>(&self, r: &R, k: &K) -> DatabaseResult<bool> {
-        check_empty_key(&k)?;
+        check_empty_key(k)?;
         use Op::*;
         let exists = match self.scratch.get(k) {
             Some(Put(_)) => true,

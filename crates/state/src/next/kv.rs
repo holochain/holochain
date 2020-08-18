@@ -44,8 +44,8 @@ pub trait BufferedStore {
 }
 
 /// Trait alias for the combination of constraints needed for keys in [KvBuf] and [KvvBuf]
-pub trait BufKey: Hash + Ord + Eq + AsRef<[u8]> + Send + Sync {}
-impl<T> BufKey for T where T: Hash + Ord + Eq + AsRef<[u8]> + Send + Sync {}
+pub trait BufKey: Ord + Eq + AsRef<[u8]> + From<Vec<u8>> + Send + Sync {}
+impl<T> BufKey for T where T: Ord + Eq + AsRef<[u8]> + From<Vec<u8>> + Send + Sync {}
 
 /// Trait alias for the combination of constraints needed for keys in [IntKvBuf](kv_int::IntKvBuf)
 pub trait BufIntKey: Hash + Ord + Eq + rkv::store::integer::PrimitiveInt + Send + Sync {}
