@@ -1,29 +1,11 @@
-use super::{BufferedStore, KvBuf, Op, Scratch};
+use super::{BufferedStore, KvBuf};
 use crate::{
     env::{ReadManager, WriteManager},
     error::{DatabaseError, DatabaseResult},
     test_utils::test_cell_env,
 };
-use ::fixt::prelude::*;
 use rkv::StoreOptions;
 use serde_derive::{Deserialize, Serialize};
-use std::collections::BTreeMap;
-use tracing::*;
-
-// #[derive(Clone, Debug, PartialEq, Eq, derive_more::From)]
-// struct TestKey(Vec<u8>);
-
-// impl TestKey {
-//     pub fn new(s: &str) -> Self {
-//         Self(s.to_owned().as_bytes())
-//     }
-// }
-
-// impl AsRef<[u8]> for TestKey {
-//     fn as_ref(&self) -> &[u8] {
-//         self.0.as_ref()
-//     }
-// }
 
 #[derive(Clone, Debug, PartialOrd, Ord, PartialEq, Eq, Serialize, Deserialize)]
 struct DbString(String);
@@ -104,34 +86,34 @@ async fn kvbuf_scratch_and_persistence() -> DatabaseResult<()> {
     })
 }
 
-pub(super) type TestBuf<'a> = KvBuf<&'a str, V>;
+// pub(super) type TestBuf<'a> = KvBuf<&'a str, V>;
 
-macro_rules! res {
-    ($key:expr, $op:ident, $val:expr) => {
-        ($key, Op::$op(Box::new(V($val))))
-    };
-    ($key:expr, $op:ident) => {
-        ($key, Op::$op)
-    };
-}
+// macro_rules! res {
+//     ($key:expr, $op:ident, $val:expr) => {
+//         ($key, Op::$op(Box::new(V($val))))
+//     };
+//     ($key:expr, $op:ident) => {
+//         ($key, Op::$op)
+//     };
+// }
 
-fn test_buf(a: &BTreeMap<Vec<u8>, Op<V>>, b: impl Iterator<Item = (&'static str, Op<V>)>) {
-    for (k, v) in b {
-        let val = a.get(k.as_bytes()).expect("Missing key");
-        assert_eq!(*val, v);
-    }
-}
+// fn test_buf(a: &BTreeMap<Vec<u8>, Op<V>>, b: impl Iterator<Item = (&'static str, Op<V>)>) {
+//     for (k, v) in b {
+//         let val = a.get(k.as_bytes()).expect("Missing key");
+//         assert_eq!(*val, v);
+//     }
+// }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct V(pub u32);
+// #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+// pub struct V(pub u32);
 
-impl From<u32> for V {
-    fn from(s: u32) -> Self {
-        Self(s)
-    }
-}
+// impl From<u32> for V {
+//     fn from(s: u32) -> Self {
+//         Self(s)
+//     }
+// }
 
-fixturator!(V; from u32;);
+// fixturator!(V; from u32;);
 
 // #[tokio::test(threaded_scheduler)]
 // async fn kv_iterators() -> DatabaseResult<()> {

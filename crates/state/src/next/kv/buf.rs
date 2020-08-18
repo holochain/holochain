@@ -4,7 +4,7 @@ use crate::env::ReadManager;
 use crate::{
     env::EnvironmentRead,
     error::{DatabaseError, DatabaseResult},
-    prelude::{Readable, Reader, Writer},
+    prelude::{Readable, Writer},
 };
 use rkv::SingleStore;
 use std::collections::BTreeMap;

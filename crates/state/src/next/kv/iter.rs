@@ -1,3 +1,6 @@
+// FIXME: remove
+#![allow(dead_code)]
+
 use super::{BufVal, Op};
 use crate::error::DatabaseError;
 use fallible_iterator::{DoubleEndedFallibleIterator, FallibleIterator};
