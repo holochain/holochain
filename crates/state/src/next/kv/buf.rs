@@ -42,7 +42,7 @@ where
         Ok(Self {
             env,
             db,
-            scratch: BTreeMap::new().into(),
+            scratch: BTreeMap::new(),
         })
     }
 
