@@ -1,7 +1,7 @@
 // FIXME: remove
 #![allow(dead_code)]
 
-use super::{BufVal, Op};
+use super::{BufVal, KvOp};
 use crate::error::DatabaseError;
 use fallible_iterator::{DoubleEndedFallibleIterator, FallibleIterator};
 use rkv::StoreError;
@@ -66,7 +66,7 @@ where
     V: BufVal,
 {
     fn new(
-        scratch: &'a BTreeMap<Vec<u8>, Op<V>>,
+        scratch: &'a BTreeMap<Vec<u8>, KvOp<V>>,
         iter: SingleIterRaw<'env, V>,
         key: Vec<u8>,
     ) -> Self {
@@ -91,7 +91,7 @@ pub struct DrainIter<'env, 'a, V>
 where
     V: BufVal,
 {
-    scratch: &'a mut BTreeMap<Vec<u8>, Op<V>>,
+    scratch: &'a mut BTreeMap<Vec<u8>, KvOp<V>>,
     iter: SingleIterRaw<'env, V>,
 }
 
@@ -99,7 +99,7 @@ impl<'env, 'a, V> DrainIter<'env, 'a, V>
 where
     V: BufVal,
 {
-    fn new(scratch: &'a mut BTreeMap<Vec<u8>, Op<V>>, iter: SingleIterRaw<'env, V>) -> Self {
+    fn new(scratch: &'a mut BTreeMap<Vec<u8>, KvOp<V>>, iter: SingleIterRaw<'env, V>) -> Self {
         Self { scratch, iter }
     }
 }
@@ -112,7 +112,7 @@ where
     type Item = V;
     fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
         Ok(self.iter.next()?.map(|(k, v)| {
-            self.scratch.insert(k.to_vec(), Op::Delete);
+            self.scratch.insert(k.to_vec(), KvOp::Delete);
             v
         }))
     }
@@ -124,7 +124,7 @@ where
 {
     fn next_back(&mut self) -> Result<Option<Self::Item>, Self::Error> {
         Ok(self.iter.next_back()?.map(|(k, v)| {
-            self.scratch.insert(k.to_vec(), Op::Delete);
+            self.scratch.insert(k.to_vec(), KvOp::Delete);
             v
         }))
     }
@@ -147,8 +147,8 @@ where
     V: BufVal,
 {
     fn new(
-        scratch: &'a BTreeMap<Vec<u8>, Op<V>>,
-        scratch_iter: impl DoubleEndedIterator<Item = (&'a Vec<u8>, &'a Op<V>)> + 'a,
+        scratch: &'a BTreeMap<Vec<u8>, KvOp<V>>,
+        scratch_iter: impl DoubleEndedIterator<Item = (&'a Vec<u8>, &'a KvOp<V>)> + 'a,
         iter: SingleIterRaw<'env, V>,
     ) -> Self {
         let scratch_iter = scratch_iter
@@ -164,8 +164,8 @@ where
             // Don't include deletes because they are handled
             // in the next db iterator
             .filter_map(|(k, v)| match v {
-                Op::Put(v) => Some((&k[..], *v.clone())),
-                Op::Delete => None,
+                KvOp::Put(v) => Some((&k[..], *v.clone())),
+                KvOp::Delete => None,
             })
             .inspect(|(k, v)| {
                 let span = trace_span!("scratch > filter", key = %String::from_utf8_lossy(k));
@@ -186,8 +186,8 @@ where
             // that instead of this matching item as the scratch
             // is more up to date
             .filter_map(move |(k, v)| match scratch.get(k) {
-                Some(Op::Put(sv)) => Ok(Some((k, *sv.clone()))),
-                Some(Op::Delete) => Ok(None),
+                Some(KvOp::Put(sv)) => Ok(Some((k, *sv.clone()))),
+                Some(KvOp::Delete) => Ok(None),
                 None => Ok(Some((k, v))),
             })
             .inspect(|(k, v)| {

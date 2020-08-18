@@ -9,21 +9,13 @@ use crate::{
 use rkv::SingleStore;
 use std::collections::BTreeMap;
 
-#[derive(shrinkwraprs::Shrinkwrap, derive_more::From)]
-#[shrinkwrap(mutable)]
-pub struct Scratch<K, V>(pub BTreeMap<K, Op<V>>);
-
-impl<K: BufKey, V: BufVal> Scratch<K, V> {
-    pub fn new() -> Self {
-        Self(BTreeMap::new())
-    }
-}
+type Scratch<K, V> = BTreeMap<K, KvOp<V>>;
 
 /// Transactional operations on a KV store
 /// Put: add or replace this KV
 /// Delete: remove the KV
 #[derive(Clone, Debug, PartialEq)]
-pub enum Op<V> {
+pub enum KvOp<V> {
     Put(Box<V>),
     Delete,
 }
@@ -61,7 +53,7 @@ where
     /// See if a value exists, avoiding deserialization
     pub fn contains_used<R: Readable>(&self, r: &R, k: &K) -> DatabaseResult<bool> {
         check_empty_key(k)?;
-        use Op::*;
+        use KvOp::*;
         let exists = match self.scratch.get(k) {
             Some(Put(_)) => true,
             Some(Delete) => false,
@@ -82,7 +74,7 @@ where
     /// or from persistence if needed
     pub fn get_used<R: Readable>(&self, r: &R, k: &K) -> DatabaseResult<Option<V>> {
         check_empty_key(k)?;
-        use Op::*;
+        use KvOp::*;
         let val = match self.scratch.get(k) {
             Some(Put(scratch_val)) => Some(*scratch_val.clone()),
             Some(Delete) => None,
@@ -103,14 +95,14 @@ where
     /// Update the scratch space to record a Put operation for the KV
     pub fn put(&mut self, k: K, v: V) -> DatabaseResult<()> {
         check_empty_key(&k)?;
-        self.scratch.insert(k, Op::Put(Box::new(v)));
+        self.scratch.insert(k, KvOp::Put(Box::new(v)));
         Ok(())
     }
 
     /// Update the scratch space to record a Delete operation for the KV
     pub fn delete(&mut self, k: K) -> DatabaseResult<()> {
         check_empty_key(&k)?;
-        self.scratch.insert(k, Op::Delete);
+        self.scratch.insert(k, KvOp::Delete);
         Ok(())
     }
 
@@ -224,7 +216,7 @@ where
     }
 
     fn flush_to_txn(self, writer: &mut Writer) -> DatabaseResult<()> {
-        use Op::*;
+        use KvOp::*;
 
         if self.is_clean() {
             return Ok(());
