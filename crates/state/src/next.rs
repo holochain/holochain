@@ -6,6 +6,7 @@ use crate::{
 use serde::{de::DeserializeOwned, Serialize};
 use std::hash::Hash;
 
+pub mod cas;
 pub mod kv;
 
 // Empty keys break lmdb

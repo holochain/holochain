@@ -170,6 +170,7 @@ where
 }
 
 #[derive(shrinkwraprs::Shrinkwrap)]
+#[shrinkwrap(mutable, unsafe_ignore_visibility)]
 pub struct KvBufFresh<K, V>
 where
     K: BufKey,
