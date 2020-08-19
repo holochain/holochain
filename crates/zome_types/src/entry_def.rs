@@ -121,6 +121,12 @@ pub enum EntryDefsCallbackResult {
     Err(String),
 }
 
+impl From<Vec<EntryDef>> for EntryDefsCallbackResult {
+    fn from(v: Vec<EntryDef>) -> Self {
+        Self::Defs(v.into())
+    }
+}
+
 impl From<GuestOutput> for EntryDefsCallbackResult {
     fn from(callback_guest_output: GuestOutput) -> Self {
         match callback_guest_output.into_inner().try_into() {

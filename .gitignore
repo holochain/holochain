@@ -11,3 +11,5 @@ perf.data.old
 
 .env
 *.folded
+*.svg
+

@@ -1,4 +1,3 @@
-use hdk3::prelude::link::LinkTag;
 use hdk3::prelude::*;
 
 #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes)]

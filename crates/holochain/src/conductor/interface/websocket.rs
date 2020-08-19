@@ -424,10 +424,6 @@ pub mod test {
     #[tokio::test(threaded_scheduler)]
     async fn websocket_call_zome_function() {
         observability::test_run().ok();
-        #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-        struct Payload {
-            a: u32,
-        }
         let uuid = Uuid::new_v4();
         let dna = fake_dna_zomes(
             &uuid.to_string(),
@@ -439,7 +435,6 @@ pub mod test {
             .next()
             .unwrap();
 
-        let payload = Payload { a: 1 };
         let dna_hash = dna.dna_hash().clone();
         let cell_id = CellId::from((dna_hash.clone(), fake_agent_pubkey_1()));
         let installed_cell = InstalledCell::new(cell_id.clone(), "handle".into());
@@ -466,7 +461,7 @@ pub mod test {
                     cell_id.clone(),
                     TestWasm::Foo.into(),
                     "foo".into(),
-                    HostInput::new(payload.try_into().unwrap()),
+                    HostInput::new(().try_into().unwrap()),
                 ),
             )
             .next()

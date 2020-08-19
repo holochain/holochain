@@ -1,11 +1,6 @@
 use hdk3::prelude::*;
-use hdk3::prelude::link::Links;
 
-entry_defs!(vec![Path::entry_def()]);
-
-map_extern!(link_entries, _link_entries);
-map_extern!(remove_link, _remove_link);
-map_extern!(get_links, _get_links);
+entry_defs![Path::entry_def()];
 
 fn path(s: &str) -> Result<EntryHash, WasmError> {
     let path = Path::from(s);
@@ -21,14 +16,17 @@ fn target() -> Result<EntryHash, WasmError> {
     path("b")
 }
 
-fn _link_entries(_: ()) -> Result<HeaderHash, WasmError> {
+#[hdk(extern)]
+fn link_entries(_: ()) -> ExternResult<HeaderHash> {
     Ok(link_entries!(base()?, target()?)?)
 }
 
-fn _remove_link(input: RemoveLinkInput) -> Result<HeaderHash, WasmError> {
+#[hdk(extern)]
+fn remove_link(input: RemoveLinkInput) -> ExternResult<HeaderHash> {
     Ok(remove_link!(input.into_inner())?)
 }
 
-fn _get_links(_: ()) -> Result<Links, WasmError> {
+#[hdk(extern)]
+fn get_links(_: ()) -> ExternResult<Links> {
     Ok(get_links!(base()?)?)
 }
