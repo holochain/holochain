@@ -9,7 +9,6 @@ use crate::{has_hash::HasHash, HashType, PrimitiveHashType};
 pub struct HoloHash<T> {
     #[serde(with = "serde_bytes")]
     hash: Vec<u8>,
-
     hash_type: T,
 }
 
@@ -17,13 +16,7 @@ impl<T: HashType> HoloHash<T> {
     /// Raw constructor: use a precomputed hash + location byte array in vec
     /// form, along with a type, to construct a hash.
     pub fn from_raw_bytes_and_type(hash: Vec<u8>, hash_type: T) -> Self {
-        if hash.len() != 36 {
-            panic!(
-                "invalid holo_hash byte count, expected: 36, found: {}. {:?}",
-                hash.len(),
-                &hash
-            );
-        }
+        assert_36(&hash);
         Self { hash, hash_type }
     }
 
@@ -70,7 +63,20 @@ impl<P: PrimitiveHashType> HoloHash<P> {
 
 impl<T: HashType> AsRef<[u8]> for HoloHash<T> {
     fn as_ref(&self) -> &[u8] {
-        &self.hash[0..32]
+        &self.hash[..]
+    }
+}
+
+// NB: This is meant to be a strict inverse of the AsRef<[u8]> impl
+// However, there is no From<Vec<u8>> for composite hash types,
+// since the composite information is lost in the AsRef<[u8]>.
+impl<T: PrimitiveHashType> From<Vec<u8>> for HoloHash<T> {
+    fn from(hash: Vec<u8>) -> Self {
+        assert_36(&hash);
+        Self {
+            hash,
+            hash_type: T::new(),
+        }
     }
 }
 
@@ -97,6 +103,16 @@ fn bytes_to_loc(bytes: &[u8]) -> u32 {
         + ((bytes[1] as u32) << 8)
         + ((bytes[2] as u32) << 16)
         + ((bytes[3] as u32) << 24)
+}
+
+fn assert_36(hash: &Vec<u8>) {
+    if hash.len() != 36 {
+        panic!(
+            "invalid holo_hash byte count, expected: 36, found: {}. {:?}",
+            hash.len(),
+            hash
+        );
+    }
 }
 
 #[cfg(test)]

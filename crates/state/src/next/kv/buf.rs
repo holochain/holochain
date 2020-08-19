@@ -84,7 +84,7 @@ where
 
     /// Get a value, taking the scratch space into account,
     /// or from persistence if needed
-    pub async fn get_fresh<R: Readable>(&self, k: &K) -> DatabaseResult<Option<V>> {
+    pub async fn get_fresh(&self, k: &K) -> DatabaseResult<Option<V>> {
         self.env
             .guard()
             .await
