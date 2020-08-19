@@ -50,6 +50,18 @@ impl From<AgentPubKey> for AnyDhtHash {
     }
 }
 
+impl From<AnyDhtHash> for HeaderHash {
+    fn from(hash: AnyDhtHash) -> Self {
+        hash.retype(hash_type::Header)
+    }
+}
+
+impl From<AnyDhtHash> for EntryHash {
+    fn from(hash: AnyDhtHash) -> Self {
+        hash.retype(hash_type::Entry)
+    }
+}
+
 #[cfg(feature = "serialized-bytes")]
 use holochain_serialized_bytes::prelude::*;
 

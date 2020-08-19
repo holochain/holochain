@@ -28,7 +28,7 @@ impl<T: HashType> HoloHash<T> {
     }
 
     /// Change the type of this HoloHash, keeping the same bytes
-    pub fn retype<TT: HashType>(self, hash_type: TT) -> HoloHash<TT> {
+    pub(crate) fn retype<TT: HashType>(self, hash_type: TT) -> HoloHash<TT> {
         HoloHash {
             hash: self.hash,
             hash_type,

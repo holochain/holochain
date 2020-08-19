@@ -252,14 +252,14 @@ where
     #[allow(dead_code)]
     async fn fetch_meta(
         &mut self,
-        hash: AnyDhtHash,
+        basis: AnyDhtHash,
         options: GetMetaOptions,
     ) -> CascadeResult<Vec<MetadataSet>> {
-        let all_metadata = self.network.get_meta(hash.clone(), options).await?;
+        let all_metadata = self.network.get_meta(basis.clone(), options).await?;
 
         // Only put raw meta data in element_cache and combine all results
         for metadata in all_metadata.iter().cloned() {
-            let hash = hash.clone();
+            let basis = basis.clone();
             // Put in meta element_cache
             let values = metadata
                 .headers
@@ -267,17 +267,15 @@ where
                 .map(|h| SysMetaVal::NewEntry(h))
                 .chain(metadata.deletes.into_iter().map(|h| SysMetaVal::Delete(h)))
                 .chain(metadata.updates.into_iter().map(|h| SysMetaVal::Update(h)));
-            match *hash.hash_type() {
-                hash_type::AnyDht::Entry(e) => {
-                    let basis = hash.retype(e);
+            match *basis.hash_type() {
+                hash_type::AnyDht::Entry => {
                     for v in values {
-                        self.meta_cache.register_raw_on_entry(basis.clone(), v)?;
+                        self.meta_cache.register_raw_on_entry(basis.clone().into(), v)?;
                     }
                 }
                 hash_type::AnyDht::Header => {
-                    let basis = hash.retype(hash_type::Header);
                     for v in values {
-                        self.meta_cache.register_raw_on_header(basis.clone(), v);
+                        self.meta_cache.register_raw_on_header(basis.clone().into(), v);
                     }
                 }
             }
@@ -572,14 +570,8 @@ where
         options: GetOptions,
     ) -> CascadeResult<Option<Element>> {
         match *hash.hash_type() {
-            AnyDht::Entry(e) => {
-                let hash = hash.retype(e);
-                self.dht_get_entry(hash, options).await
-            }
-            AnyDht::Header => {
-                let hash = hash.retype(hash_type::Header);
-                self.dht_get_header(hash, options).await
-            }
+            AnyDht::Entry => self.dht_get_entry(hash.into(), options).await,
+            AnyDht::Header => self.dht_get_header(hash.into(), options).await,
         }
     }
 
@@ -591,20 +583,14 @@ where
     ) -> CascadeResult<Option<Details>> {
         options.all_live_headers_with_metadata = true;
         match *hash.hash_type() {
-            AnyDht::Entry(e) => {
-                let hash = hash.retype(e);
-                Ok(self
-                    .get_entry_details(hash, options)
-                    .await?
-                    .map(Details::Entry))
-            }
-            AnyDht::Header => {
-                let hash = hash.retype(hash_type::Header);
-                Ok(self
-                    .get_header_details(hash, options)
-                    .await?
-                    .map(Details::Element))
-            }
+            AnyDht::Entry => Ok(self
+                .get_entry_details(hash.into(), options)
+                .await?
+                .map(Details::Entry)),
+            AnyDht::Header => Ok(self
+                .get_header_details(hash.into(), options)
+                .await?
+                .map(Details::Element)),
         }
     }
 
