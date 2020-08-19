@@ -4,7 +4,7 @@ use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
 use crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace;
 use derive_more::Constructor;
-use holo_hash::EntryContentHash;
+use holo_hash::EntryHash;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
@@ -74,8 +74,8 @@ pub enum InitResult {
     Fail(ZomeName, String),
     /// no init failed but some zome has unresolved dependencies
     /// ZomeName is the first zome that has unresolved dependencies
-    /// Vec<EntryContentHash> is the list of all missing dependency addresses
-    UnresolvedDependencies(ZomeName, Vec<EntryContentHash>),
+    /// Vec<EntryHash> is the list of all missing dependency addresses
+    UnresolvedDependencies(ZomeName, Vec<EntryHash>),
 }
 
 impl From<Vec<(ZomeName, InitCallbackResult)>> for InitResult {

@@ -81,11 +81,11 @@ fn holo_hash_parse() {
         &format!("{:?}", h),
     );
 
-    let h = EntryContentHash::try_from("uhCEkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm")
+    let h = EntryHash::try_from("uhCEkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm")
         .unwrap();
     assert_eq!(3_860_645_936, h.get_loc());
     assert_eq!(
-        "EntryContentHash(uhCEkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm)",
+        "EntryHash(uhCEkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm)",
         &format!("{:?}", h),
     );
 

@@ -66,10 +66,7 @@ impl HashableContent for Entry {
     type HashType = hash_type::Entry;
 
     fn hash_type(&self) -> Self::HashType {
-        match self {
-            Entry::Agent(_) => hash_type::Entry::Agent,
-            _ => hash_type::Entry::Content,
-        }
+        hash_type::Entry
     }
 
     fn hashable_content(&self) -> HashableContentBytes {

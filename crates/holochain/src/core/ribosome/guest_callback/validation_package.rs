@@ -4,7 +4,7 @@ use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
 use crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace;
 use derive_more::Constructor;
-use holo_hash::EntryContentHash;
+use holo_hash::EntryHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::dna::zome::{HostFnAccess, Permission};
 use holochain_zome_types::header::AppEntryType;
@@ -81,7 +81,7 @@ impl TryFrom<ValidationPackageInvocation> for HostInput {
 pub enum ValidationPackageResult {
     Success(ValidationPackage),
     Fail(String),
-    UnresolvedDependencies(Vec<EntryContentHash>),
+    UnresolvedDependencies(Vec<EntryHash>),
     NotImplemented,
 }
 

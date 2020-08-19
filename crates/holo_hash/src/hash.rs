@@ -125,10 +125,7 @@ mod tests {
         assert_type("DnaHash", DnaHash::from_raw_bytes(vec![0xdb; 36]));
         assert_type("NetIdHash", NetIdHash::from_raw_bytes(vec![0xdb; 36]));
         assert_type("AgentPubKey", AgentPubKey::from_raw_bytes(vec![0xdb; 36]));
-        assert_type(
-            "EntryContentHash",
-            EntryContentHash::from_raw_bytes(vec![0xdb; 36]),
-        );
+        assert_type("EntryHash", EntryHash::from_raw_bytes(vec![0xdb; 36]));
         assert_type("DhtOpHash", DhtOpHash::from_raw_bytes(vec![0xdb; 36]));
     }
 

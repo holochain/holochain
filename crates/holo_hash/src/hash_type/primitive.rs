@@ -1,7 +1,8 @@
 use super::*;
+use crate::{hash_type, AgentPubKey, EntryHash};
 
 const AGENT_PREFIX: &[u8] = &[0x84, 0x20, 0x24]; // uhCAk
-const CONTENT_PREFIX: &[u8] = &[0x84, 0x21, 0x24]; // uhCEk
+const ENTRY_PREFIX: &[u8] = &[0x84, 0x21, 0x24]; // uhCEk
 const DHTOP_PREFIX: &[u8] = &[0x84, 0x24, 0x24]; // uhCQk
 const DNA_PREFIX: &[u8] = &[0x84, 0x2d, 0x24]; // uhC0k
 const NET_ID_PREFIX: &[u8] = &[0x84, 0x22, 0x24]; // uhCIk
@@ -103,9 +104,21 @@ macro_rules! primitive_hash_type {
 }
 
 primitive_hash_type!(Agent, AgentPubKey, AgentVisitor, AGENT_PREFIX);
-primitive_hash_type!(Content, EntryContentHash, ContentVisitor, CONTENT_PREFIX);
+primitive_hash_type!(Entry, EntryHash, EntryVisitor, ENTRY_PREFIX);
 primitive_hash_type!(Dna, DnaHash, DnaVisitor, DNA_PREFIX);
 primitive_hash_type!(DhtOp, DhtOpHash, DhtOpVisitor, DHTOP_PREFIX);
 primitive_hash_type!(Header, HeaderHash, HeaderVisitor, HEADER_PREFIX);
 primitive_hash_type!(NetId, NetIdHash, NetIdVisitor, NET_ID_PREFIX);
 primitive_hash_type!(Wasm, WasmHash, WasmVisitor, WASM_PREFIX);
+
+impl From<AgentPubKey> for EntryHash {
+    fn from(hash: AgentPubKey) -> EntryHash {
+        hash.retype(hash_type::Entry)
+    }
+}
+
+impl From<EntryHash> for AgentPubKey {
+    fn from(hash: EntryHash) -> AgentPubKey {
+        hash.retype(hash_type::Agent)
+    }
+}
