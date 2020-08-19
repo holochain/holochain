@@ -202,6 +202,12 @@ impl NewEntryHeaderRef<'_> {
             | NewEntryHeaderRef::Update(EntryUpdate { entry_type, .. }) => entry_type,
         }
     }
+    pub fn entry_hash(&self) -> &EntryHash {
+        match self {
+            NewEntryHeaderRef::Create(EntryCreate { entry_hash, .. })
+            | NewEntryHeaderRef::Update(EntryUpdate { entry_hash, .. }) => entry_hash,
+        }
+    }
 }
 
 impl TryFrom<SignedHeaderHashed> for WireElementDelete {
@@ -323,6 +329,15 @@ impl<'a> TryFrom<&'a Header> for NewEntryHeaderRef<'a> {
             Header::EntryCreate(h) => Ok(NewEntryHeaderRef::Create(h)),
             Header::EntryUpdate(h) => Ok(NewEntryHeaderRef::Update(h)),
             _ => Err(WrongHeaderError(format!("{:?}", value))),
+        }
+    }
+}
+
+impl<'a> From<&'a NewEntryHeader> for NewEntryHeaderRef<'a> {
+    fn from(n: &'a NewEntryHeader) -> Self {
+        match n {
+            NewEntryHeader::Create(ec) => NewEntryHeaderRef::Create(ec),
+            NewEntryHeader::Update(eu) => NewEntryHeaderRef::Update(eu),
         }
     }
 }

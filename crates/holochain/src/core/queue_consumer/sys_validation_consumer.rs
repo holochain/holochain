@@ -15,12 +15,13 @@ use tokio::task::JoinHandle;
 use tracing::*;
 
 /// Spawn the QueueConsumer for SysValidation workflow
-#[instrument(skip(env, stop, trigger_app_validation, network))]
+#[instrument(skip(env, stop, trigger_app_validation, network, conductor_api))]
 pub fn spawn_sys_validation_consumer(
     env: EnvironmentWrite,
     mut stop: sync::broadcast::Receiver<()>,
     mut trigger_app_validation: TriggerSender,
     network: HolochainP2pCell,
+    conductor_api: impl CellConductorApiT + 'static,
 ) -> (
     TriggerSender,
     tokio::sync::oneshot::Receiver<()>,
@@ -41,6 +42,7 @@ pub fn spawn_sys_validation_consumer(
                 env.clone().into(),
                 &mut trigger_app_validation,
                 network.clone(),
+                conductor_api.clone(),
             )
             .await
             .expect("Error running Workflow")

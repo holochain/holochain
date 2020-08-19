@@ -1,19 +1,21 @@
 use super::*;
-use crate::{core::state::metadata::MockMetadataBuf, meta_mock};
+use crate::{conductor::api::MockCellConductorApi, meta_mock};
 use ::fixt::prelude::*;
 use error::SysValidationError;
 use holo_hash::fixt::*;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_serialized_bytes::{SerializedBytes, UnsafeBytes};
 use holochain_types::{
+    dna::{DnaDef, DnaFile},
     element::{SignedHeaderHashed, SignedHeaderHashedExt},
     fixt::*,
     test_utils::{fake_agent_pubkey_1, fake_header_hash},
     Timestamp,
 };
+use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::{header::InitZomesComplete, Header};
 use matches::assert_matches;
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 
 async fn test_gen(ts: Timestamp, seq: u32, prev: HeaderHash) -> Element {
     let keystore = holochain_state::test_utils::test_keystore();
@@ -369,5 +371,86 @@ async fn check_link_tag_size_test() {
     assert_matches!(
         check_tag_size(&huge),
         Err(SysValidationError::TagTooLarge(_, _))
+    );
+}
+
+#[tokio::test(threaded_scheduler)]
+async fn check_app_entry_type_test() {
+    // Setup test data
+    let dna_file = DnaFile::new(
+        DnaDef {
+            name: "app_entry_type_test".to_string(),
+            uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
+            properties: SerializedBytes::try_from(()).unwrap(),
+            zomes: vec![TestWasm::EntryDefs.into()].into(),
+        },
+        vec![TestWasm::EntryDefs.into()],
+    )
+    .await
+    .unwrap();
+    let mut entry_def = fixt!(EntryDef);
+    entry_def.visibility = EntryVisibility::Public;
+
+    // Setup mock conductor
+    let mut conductor_api = MockCellConductorApi::new();
+    conductor_api.expect_cell_id().return_const(fixt!(CellId));
+    // # No dna or entry def
+    conductor_api.expect_sync_get_entry_def().return_const(None);
+    conductor_api.expect_sync_get_this_dna().return_const(None);
+
+    // ## Dna is missing
+    let aet = AppEntryType::new(0.into(), 0.into(), EntryVisibility::Public);
+    assert_matches!(
+        check_app_entry_type(&aet, &conductor_api).await,
+        Err(SysValidationError::DnaMissing(_))
+    );
+
+    // # Dna but no entry def in buffer
+    // ## ZomeId out of range
+    let aet = AppEntryType::new(1.into(), 0.into(), EntryVisibility::Public);
+    conductor_api
+        .expect_sync_get_this_dna()
+        .return_const(Some(dna_file));
+    assert_matches!(
+        check_app_entry_type(&aet, &conductor_api).await,
+        Err(SysValidationError::ZomeId(_))
+    );
+
+    // ## EntryId is out of range
+    let aet = AppEntryType::new(0.into(), 10.into(), EntryVisibility::Public);
+    assert_matches!(
+        check_app_entry_type(&aet, &conductor_api).await,
+        Err(SysValidationError::EntryDefId(_))
+    );
+
+    // ## EntryId is in range for dna
+    let aet = AppEntryType::new(0.into(), 0.into(), EntryVisibility::Public);
+    assert_matches!(check_app_entry_type(&aet, &conductor_api).await, Ok(_));
+    let aet = AppEntryType::new(0.into(), 0.into(), EntryVisibility::Private);
+    assert_matches!(
+        check_app_entry_type(&aet, &conductor_api).await,
+        Err(SysValidationError::EntryVisibility(_))
+    );
+
+    // # Add an entry def to the buffer
+    conductor_api
+        .expect_sync_get_entry_def()
+        .return_const(Some(entry_def));
+
+    // ## Can get the entry from the entry def
+    let aet = AppEntryType::new(0.into(), 0.into(), EntryVisibility::Public);
+    assert_matches!(check_app_entry_type(&aet, &conductor_api).await, Ok(_));
+}
+
+#[tokio::test(threaded_scheduler)]
+async fn check_entry_not_private_test() {
+    let mut ed = fixt!(EntryDef);
+    ed.visibility = EntryVisibility::Public;
+    assert_matches!(check_not_private(&ed), Ok(()));
+
+    ed.visibility = EntryVisibility::Private;
+    assert_matches!(
+        check_not_private(&ed),
+        Err(SysValidationError::PrivateEntry)
     );
 }

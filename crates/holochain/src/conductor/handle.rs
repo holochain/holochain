@@ -107,7 +107,7 @@ pub trait ConductorHandleT: Send + Sync {
     /// Get a [Dna] from the [DnaStore]
     async fn get_dna(&self, hash: &DnaHash) -> Option<DnaFile>;
 
-    /// Get a [EntryDef] from the [DnaStore]
+    /// Get a [EntryDef] from the [EntryDefBuffer]
     async fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef>;
 
     /// Add the [DnaFile]s from the wasm and dna_def databases into memory

@@ -1,17 +1,20 @@
 //! The workflow and queue consumer for sys validation
 
 use super::*;
-use crate::core::{
-    queue_consumer::{OneshotWriter, TriggerSender, WorkComplete},
-    state::{
-        cascade::Cascade,
-        dht_op_integration::{IntegratedDhtOpsStore, IntegrationLimboStore},
-        element_buf::ElementBuf,
-        metadata::MetadataBuf,
-        validation_db::{ValidationLimboStatus, ValidationLimboStore, ValidationLimboValue},
-        workspace::{Workspace, WorkspaceResult},
+use crate::{
+    conductor::api::CellConductorApiT,
+    core::{
+        queue_consumer::{OneshotWriter, TriggerSender, WorkComplete},
+        state::{
+            cascade::Cascade,
+            dht_op_integration::{IntegratedDhtOpsStore, IntegrationLimboStore},
+            element_buf::ElementBuf,
+            metadata::MetadataBuf,
+            validation_db::{ValidationLimboStatus, ValidationLimboStore, ValidationLimboValue},
+            workspace::{Workspace, WorkspaceResult},
+        },
+        sys_validate::*,
     },
-    sys_validate::*,
 };
 use error::WorkflowResult;
 use fallible_iterator::FallibleIterator;
@@ -23,19 +26,23 @@ use holochain_state::{
     db::{INTEGRATED_DHT_OPS, INTEGRATION_LIMBO},
     prelude::{GetDb, Reader, Writer},
 };
-use holochain_types::{dht_op::DhtOp, Timestamp};
-use holochain_zome_types::Header;
+use holochain_types::{dht_op::DhtOp, header::NewEntryHeaderRef, Entry, Timestamp};
+use holochain_zome_types::{
+    header::{ElementDelete, EntryType, EntryUpdate, LinkAdd, LinkRemove},
+    Header,
+};
 use std::convert::TryInto;
 use tracing::*;
 
-#[instrument(skip(workspace, writer, trigger_app_validation, network))]
+#[instrument(skip(workspace, writer, trigger_app_validation, network, conductor_api))]
 pub async fn sys_validation_workflow(
     mut workspace: SysValidationWorkspace<'_>,
     writer: OneshotWriter,
     trigger_app_validation: &mut TriggerSender,
     network: HolochainP2pCell,
+    conductor_api: impl CellConductorApiT,
 ) -> WorkflowResult<WorkComplete> {
-    let complete = sys_validation_workflow_inner(&mut workspace, network).await?;
+    let complete = sys_validation_workflow_inner(&mut workspace, network, conductor_api).await?;
 
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
@@ -53,6 +60,7 @@ pub async fn sys_validation_workflow(
 async fn sys_validation_workflow_inner(
     workspace: &mut SysValidationWorkspace<'_>,
     network: HolochainP2pCell,
+    conductor_api: impl CellConductorApiT,
 ) -> WorkflowResult<WorkComplete> {
     // Drain all the ops
     let mut ops: Vec<ValidationLimboValue> = workspace
@@ -80,7 +88,7 @@ async fn sys_validation_workflow_inner(
             num_tries,
             ..
         } = vlv;
-        let (status, op) = validate_op(op, workspace, network.clone()).await?;
+        let (status, op) = validate_op(op, workspace, network.clone(), &conductor_api).await?;
         match &status {
             ValidationLimboStatus::Pending
             | ValidationLimboStatus::AwaitingSysDeps
@@ -111,8 +119,9 @@ async fn validate_op(
     op: DhtOp,
     workspace: &mut SysValidationWorkspace<'_>,
     network: HolochainP2pCell,
+    conductor_api: &impl CellConductorApiT,
 ) -> WorkflowResult<(ValidationLimboStatus, DhtOp)> {
-    match validate_op_inner(op, workspace, network).await {
+    match validate_op_inner(op, workspace, network, conductor_api).await {
         Ok(op) => Ok((ValidationLimboStatus::SysValidated, op)),
         // TODO: Handle the errors that result in pending or awaiting deps
         Err(_) => todo!(),
@@ -123,28 +132,41 @@ async fn validate_op_inner(
     op: DhtOp,
     workspace: &mut SysValidationWorkspace<'_>,
     network: HolochainP2pCell,
+    conductor_api: &impl CellConductorApiT,
 ) -> SysValidationResult<DhtOp> {
     match op {
         DhtOp::StoreElement(signature, header, maybe_entry) => {
-            all_op_check(&signature, &header).await?;
             store_header(&header, workspace.cascade(network)).await?;
+
+            all_op_check(&signature, &header).await?;
             Ok(DhtOp::StoreElement(signature, header, maybe_entry))
         }
-        DhtOp::StoreEntry(signature, header, maybe_entry) => {
+        DhtOp::StoreEntry(signature, header, entry) => {
+            store_entry(
+                (&header).into(),
+                entry.as_ref(),
+                conductor_api,
+                workspace.cascade(network),
+            )
+            .await?;
+
             let header = header.into();
             all_op_check(&signature, &header).await?;
             Ok(DhtOp::StoreEntry(
                 signature,
                 header.try_into().expect("type hasn't changed"),
-                maybe_entry,
+                entry,
             ))
         }
         DhtOp::RegisterAgentActivity(signature, header) => {
-            all_op_check(&signature, &header).await?;
             register_agent_activity(&header, &workspace).await?;
+
+            all_op_check(&signature, &header).await?;
             Ok(DhtOp::RegisterAgentActivity(signature, header))
         }
         DhtOp::RegisterUpdatedBy(signature, header) => {
+            register_updated_by(&header, &workspace.element_vault).await?;
+
             let header = header.into();
             all_op_check(&signature, &header).await?;
             Ok(DhtOp::RegisterUpdatedBy(
@@ -152,7 +174,10 @@ async fn validate_op_inner(
                 header.try_into().expect("type hasn't changed"),
             ))
         }
-        DhtOp::RegisterDeletedBy(signature, header) => {
+        DhtOp::RegisterDeletedBy(signature, header)
+        | DhtOp::RegisterDeletedEntryHeader(signature, header) => {
+            register_deleted(&header, &workspace.element_vault).await?;
+
             let header = header.into();
             all_op_check(&signature, &header).await?;
             Ok(DhtOp::RegisterDeletedBy(
@@ -160,15 +185,9 @@ async fn validate_op_inner(
                 header.try_into().expect("type hasn't changed"),
             ))
         }
-        DhtOp::RegisterDeletedEntryHeader(signature, header) => {
-            let header = header.into();
-            all_op_check(&signature, &header).await?;
-            Ok(DhtOp::RegisterDeletedEntryHeader(
-                signature,
-                header.try_into().expect("type hasn't changed"),
-            ))
-        }
         DhtOp::RegisterAddLink(signature, header) => {
+            register_add_link(&header, workspace, network).await?;
+
             let header = header.into();
             all_op_check(&signature, &header).await?;
             Ok(DhtOp::RegisterAddLink(
@@ -177,6 +196,8 @@ async fn validate_op_inner(
             ))
         }
         DhtOp::RegisterRemoveLink(signature, header) => {
+            register_remove_link(&header, workspace).await?;
+
             let header = header.into();
             all_op_check(&signature, &header).await?;
             Ok(DhtOp::RegisterRemoveLink(
@@ -228,6 +249,97 @@ async fn store_header(header: &Header, cascade: Cascade<'_, '_>) -> SysValidatio
         check_prev_timestamp(&header, prev_header.header())?;
         check_prev_seq(&header, prev_header.header())?;
     }
+    Ok(())
+}
+
+async fn store_entry(
+    header: NewEntryHeaderRef<'_>,
+    entry: &Entry,
+    conductor_api: &impl CellConductorApiT,
+    cascade: Cascade<'_, '_>,
+) -> SysValidationResult<()> {
+    // Get data ready to validate
+    let entry_type = header.entry_type();
+    let entry_hash = header.entry_hash();
+
+    // Checks
+    check_entry_type(entry_type, entry)?;
+    if let EntryType::App(app_entry_type) = entry_type {
+        let entry_def = check_app_entry_type(app_entry_type, conductor_api).await?;
+        check_not_private(&entry_def)?;
+    }
+    check_entry_hash(entry_hash, entry).await?;
+    check_entry_size(entry)?;
+
+    // Additional checks if this is an EntryUpdate
+    if let NewEntryHeaderRef::Update(entry_update) = header {
+        let original_header =
+            check_header_exists(entry_update.original_header_address.clone(), cascade).await?;
+        update_check(entry_update, original_header.header())?;
+    }
+    Ok(())
+}
+
+async fn register_updated_by(
+    entry_update: &EntryUpdate,
+    element_vault: &ElementBuf<'_>,
+) -> SysValidationResult<()> {
+    // Get data ready to validate
+    let original_header_address = &entry_update.original_header_address;
+
+    // Checks
+    let original_element = check_holding_element(original_header_address, element_vault).await?;
+    update_check(entry_update, original_element.header())?;
+    Ok(())
+}
+
+async fn register_deleted(
+    element_delete: &ElementDelete,
+    element_vault: &ElementBuf<'_>,
+) -> SysValidationResult<()> {
+    // Get data ready to validate
+    let removed_header_address = &element_delete.removes_address;
+
+    // Checks
+    check_holding_header(removed_header_address, element_vault).await?;
+    Ok(())
+}
+
+async fn register_add_link(
+    link_add: &LinkAdd,
+    workspace: &mut SysValidationWorkspace<'_>,
+    network: HolochainP2pCell,
+) -> SysValidationResult<()> {
+    // Get data ready to validate
+    let base_entry_address = &link_add.base_address;
+
+    // Checks
+    check_holding_entry(base_entry_address, &workspace.element_vault).await?;
+    check_entry_exists(base_entry_address.clone(), workspace.cascade(network)).await?;
+    check_tag_size(&link_add.tag)?;
+    Ok(())
+}
+
+async fn register_remove_link(
+    link_remove: &LinkRemove,
+    workspace: &SysValidationWorkspace<'_>,
+) -> SysValidationResult<()> {
+    // Get data ready to validate
+    let link_add_address = &link_remove.link_add_address;
+
+    // Checks
+    let link_add = check_holding_header(link_add_address, &workspace.element_vault).await?;
+    let (link_add, link_add_hash) = link_add.into_header_and_signature().0.into_inner();
+    check_link_in_metadata(link_add, &link_add_hash, &workspace.meta_vault)?;
+    Ok(())
+}
+
+fn update_check(entry_update: &EntryUpdate, original_header: &Header) -> SysValidationResult<()> {
+    check_new_entry_header(original_header)?;
+    let original_header: NewEntryHeaderRef = original_header
+        .try_into()
+        .expect("This can't fail due to the above check_new_entry_header");
+    check_update_reference(entry_update, &original_header)?;
     Ok(())
 }
 

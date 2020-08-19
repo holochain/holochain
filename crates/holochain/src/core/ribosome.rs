@@ -46,10 +46,10 @@ use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::cell::CellId;
-use holochain_types::cell::CellIdFixturator;
 use holochain_types::dna::zome::HostFnAccess;
 use holochain_types::dna::DnaFile;
 use holochain_types::fixt::CapSecretFixturator;
+use holochain_types::fixt::CellIdFixturator;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::GuestOutput;
@@ -480,7 +480,7 @@ pub mod wasm_test {
 
                 let invocation = $crate::core::ribosome::ZomeCallInvocationFixturator::new(
                     $crate::core::ribosome::NamedInvocation(
-                        holochain_types::cell::CellIdFixturator::new(fixt::Unpredictable)
+                        holochain_types::fixt::CellIdFixturator::new(fixt::Unpredictable)
                             .next()
                             .unwrap(),
                         $test_wasm.into(),
@@ -562,7 +562,7 @@ mod slow_tests {
 
         let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(
             crate::core::ribosome::NamedInvocation(
-                holochain_types::cell::CellIdFixturator::new(fixt::Unpredictable)
+                holochain_types::fixt::CellIdFixturator::new(fixt::Unpredictable)
                     .next()
                     .unwrap(),
                 TestWasm::Foo.into(),

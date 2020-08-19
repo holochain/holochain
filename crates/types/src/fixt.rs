@@ -4,6 +4,7 @@
 
 #![allow(missing_docs)]
 
+use crate::cell::CellId;
 use crate::dna::zome::Zome;
 use crate::dna::zome::{HostFnAccess, Permission};
 use crate::dna::DnaDef;
@@ -529,4 +530,9 @@ fixturator!(
 fixturator!(
     HostFnAccess;
     constructor fn new(Permission, Permission, Permission, Permission, Permission, Permission, Permission);
+);
+
+fixturator!(
+    CellId;
+    constructor fn new(DnaHash, AgentPubKey);
 );

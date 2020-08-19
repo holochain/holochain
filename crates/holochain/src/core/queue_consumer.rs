@@ -43,7 +43,7 @@ mod produce_dht_ops_consumer;
 use produce_dht_ops_consumer::*;
 mod publish_dht_ops_consumer;
 use super::state::workspace::WorkspaceError;
-use crate::conductor::manager::ManagedTaskAdd;
+use crate::conductor::{api::CellConductorApiT, manager::ManagedTaskAdd};
 use holochain_p2p::HolochainP2pCell;
 use publish_dht_ops_consumer::*;
 
@@ -55,6 +55,7 @@ use publish_dht_ops_consumer::*;
 pub async fn spawn_queue_consumer_tasks(
     env: &EnvironmentWrite,
     cell_network: HolochainP2pCell,
+    conductor_api: impl CellConductorApiT + 'static,
     mut task_sender: sync::mpsc::Sender<ManagedTaskAdd>,
     stop: sync::broadcast::Sender<()>,
 ) -> InitialQueueTriggers {
@@ -76,8 +77,13 @@ pub async fn spawn_queue_consumer_tasks(
         .send(ManagedTaskAdd::dont_handle(handle))
         .await
         .expect("Failed to manage workflow handle");
-    let (tx_sys, rx4, handle) =
-        spawn_sys_validation_consumer(env.clone(), stop.subscribe(), tx_app, cell_network);
+    let (tx_sys, rx4, handle) = spawn_sys_validation_consumer(
+        env.clone(),
+        stop.subscribe(),
+        tx_app,
+        cell_network,
+        conductor_api,
+    );
     task_sender
         .send(ManagedTaskAdd::dont_handle(handle))
         .await

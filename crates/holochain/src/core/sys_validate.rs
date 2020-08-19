@@ -1,14 +1,23 @@
-use super::state::{cascade::Cascade, element_buf::ElementBuf, metadata::MetadataBufT};
-use crate::conductor::entry_def_store::EntryDefBuf;
+use super::state::{
+    cascade::Cascade,
+    element_buf::ElementBuf,
+    metadata::{LinkMetaKey, MetadataBufT},
+};
+use crate::conductor::{
+    api::CellConductorApiT,
+    entry_def_store::{get_entry_defs, EntryDefBufferKey},
+};
 use fallible_iterator::FallibleIterator;
 use holochain_keystore::{AgentPubKeyExt, Signature};
-use holochain_types::{dna::Zomes, header::NewEntryHeaderRef, Entry, EntryHashed};
+use holochain_types::{header::NewEntryHeaderRef, Entry, EntryHashed};
 use holochain_zome_types::{
     element::SignedHeaderHashed,
-    header::{AppEntryType, EntryType, EntryUpdate},
+    entry_def::{EntryDef, EntryVisibility},
+    header::{AppEntryType, EntryType, EntryUpdate, LinkAdd},
     link::LinkTag,
     Header,
 };
+use std::convert::TryInto;
 
 pub use crate::core::state::source_chain::{SourceChainError, SourceChainResult};
 pub use error::{PrevHeaderError, SysValidationError, SysValidationResult};
@@ -253,23 +262,61 @@ pub fn check_entry_type(entry_type: &EntryType, entry: &Entry) -> SysValidationR
     }
 }
 
+// entry_type: &AppEntryType,
 /// Check the AppEntryType is valid for the zome.
 /// Check the EntryDefId and ZomeId are in range.
-pub fn check_app_entry_type(
+pub async fn check_app_entry_type(
     entry_type: &AppEntryType,
-    zomes: &Zomes,
-    entry_defs: EntryDefBuf<'_>,
-) -> SysValidationResult<()> {
-    Ok(())
+    conductor_api: &impl CellConductorApiT,
+) -> SysValidationResult<EntryDef> {
+    let index = u8::from(entry_type.zome_id()) as usize;
+    // We want to be careful about holding locks open to the conductor api
+    // so calls are made in blocks
+    let dna_file = { conductor_api.get_this_dna().await };
+    let dna_file =
+        dna_file.ok_or_else(|| SysValidationError::DnaMissing(conductor_api.cell_id().clone()))?;
+
+    // Check if the zome is found
+    let zome = dna_file
+        .dna()
+        .zomes
+        .get(index)
+        .ok_or_else(|| SysValidationError::ZomeId(entry_type.clone()))?
+        .1
+        .clone();
+
+    // Try to get the entry def from the entry def store
+    let key = EntryDefBufferKey::new(zome, entry_type.id());
+    let entry_def = { conductor_api.get_entry_def(&key).await };
+
+    // If it's not found run the ribosome and get the entry defs
+    let entry_def = match entry_def {
+        Some(entry_def) => return Ok(entry_def),
+        None => get_entry_defs(dna_file.clone())
+            .await?
+            .get(index)
+            .map(|(_, v)| v.clone()),
+    };
+
+    // Check the visibility and return
+    match entry_def {
+        Some(entry_def) => {
+            if entry_def.visibility == *entry_type.visibility() {
+                Ok(entry_def)
+            } else {
+                Err(SysValidationError::EntryVisibility(entry_type.clone()))
+            }
+        }
+        None => Err(SysValidationError::EntryDefId(entry_type.clone())),
+    }
 }
 
 /// Check the app entry type isn't private for store entry
-pub fn check_not_private(
-    entry_type: &AppEntryType,
-    zomes: &Zomes,
-    entry_defs: EntryDefBuf<'_>,
-) -> SysValidationResult<()> {
-    Ok(())
+pub fn check_not_private(entry_def: &EntryDef) -> SysValidationResult<()> {
+    match entry_def.visibility {
+        EntryVisibility::Public => Ok(()),
+        EntryVisibility::Private => Err(SysValidationError::PrivateEntry),
+    }
 }
 
 /// Check the headers entry hash matches the hash of the entry
@@ -325,14 +372,14 @@ pub fn check_tag_size(tag: &LinkTag) -> SysValidationResult<()> {
 /// If EntryType::App Check the EntryDefId, ZomeId and visibility match
 pub fn check_update_reference(
     eu: &EntryUpdate,
-    new_entry: &NewEntryHeaderRef<'_>,
+    original_entry_header: &NewEntryHeaderRef<'_>,
 ) -> SysValidationResult<()> {
-    if eu.entry_type == *new_entry.entry_type() {
+    if eu.entry_type == *original_entry_header.entry_type() {
         Ok(())
     } else {
         Err(SysValidationError::UpdateTypeMismatch(
             eu.entry_type.clone(),
-            new_entry.entry_type().clone(),
+            original_entry_header.entry_type().clone(),
         ))
     }
 }
@@ -419,4 +466,41 @@ pub async fn check_element_exists(
         .exists(hash.clone().into(), Default::default())
         .await?
         .ok_or_else(|| SysValidationError::DepMissingFromDht(hash.into()))
+}
+
+/// Check we are holding the header in the metadata
+/// as a reference from the entry
+pub async fn check_header_in_metadata(
+    entry_hash: EntryHash,
+    header_hash: &HeaderHash,
+    meta_vault: &impl MetadataBufT,
+) -> SysValidationResult<()> {
+    meta_vault
+        .get_headers(entry_hash)?
+        .find(|h| Ok(h.header_hash == *header_hash))?
+        .ok_or_else(|| SysValidationError::NotHoldingDep(header_hash.clone().into()))?;
+    Ok(())
+}
+
+/// Check we are holding the add link in the metadata
+/// as a reference from the base entry
+pub fn check_link_in_metadata(
+    link_add: Header,
+    link_add_hash: &HeaderHash,
+    meta_vault: &impl MetadataBufT,
+) -> SysValidationResult<()> {
+    // Check the header is a LinkAdd
+    let link_add: LinkAdd = link_add
+        .try_into()
+        .map_err(|_| SysValidationError::NotLinkAdd(link_add_hash.clone()))?;
+
+    // Full key always returns just one link
+    let link_key = LinkMetaKey::from((&link_add, link_add_hash));
+
+    // If the link is there we no the link add is in the metadata
+    meta_vault
+        .get_links_all(&link_key)?
+        .next()?
+        .ok_or_else(|| SysValidationError::NotHoldingDep(link_add_hash.clone().into()))?;
+    Ok(())
 }
