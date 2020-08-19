@@ -389,3 +389,9 @@ impl AppEntryType {
         &self.visibility
     }
 }
+
+impl From<EntryDefId> for u8 {
+    fn from(ei: EntryDefId) -> Self {
+        ei.0
+    }
+}

@@ -90,7 +90,7 @@ async fn speed_test_normal() {
 
 #[instrument]
 async fn speed_test() {
-    const NUM: usize = 2000;
+    const NUM: usize = 500;
 
     // ////////////
     // START DNA

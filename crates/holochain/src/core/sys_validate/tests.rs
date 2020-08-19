@@ -9,6 +9,7 @@ use holochain_types::{
     dna::{DnaDef, DnaFile},
     element::{SignedHeaderHashed, SignedHeaderHashedExt},
     fixt::*,
+    observability,
     test_utils::{fake_agent_pubkey_1, fake_header_hash},
     Timestamp,
 };
@@ -376,6 +377,7 @@ async fn check_link_tag_size_test() {
 
 #[tokio::test(threaded_scheduler)]
 async fn check_app_entry_type_test() {
+    observability::test_run().ok();
     // Setup test data
     let dna_file = DnaFile::new(
         DnaDef {
@@ -407,17 +409,19 @@ async fn check_app_entry_type_test() {
 
     // # Dna but no entry def in buffer
     // ## ZomeId out of range
-    let aet = AppEntryType::new(1.into(), 0.into(), EntryVisibility::Public);
+    conductor_api.checkpoint();
+    conductor_api.expect_sync_get_entry_def().return_const(None);
     conductor_api
         .expect_sync_get_this_dna()
         .return_const(Some(dna_file));
+    let aet = AppEntryType::new(0.into(), 1.into(), EntryVisibility::Public);
     assert_matches!(
         check_app_entry_type(&aet, &conductor_api).await,
         Err(SysValidationError::ZomeId(_))
     );
 
     // ## EntryId is out of range
-    let aet = AppEntryType::new(0.into(), 10.into(), EntryVisibility::Public);
+    let aet = AppEntryType::new(10.into(), 0.into(), EntryVisibility::Public);
     assert_matches!(
         check_app_entry_type(&aet, &conductor_api).await,
         Err(SysValidationError::EntryDefId(_))

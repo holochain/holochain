@@ -269,7 +269,8 @@ pub async fn check_app_entry_type(
     entry_type: &AppEntryType,
     conductor_api: &impl CellConductorApiT,
 ) -> SysValidationResult<EntryDef> {
-    let index = u8::from(entry_type.zome_id()) as usize;
+    let zome_index = u8::from(entry_type.zome_id()) as usize;
+    let entry_def_index = u8::from(entry_type.id()) as usize;
     // We want to be careful about holding locks open to the conductor api
     // so calls are made in blocks
     let dna_file = { conductor_api.get_this_dna().await };
@@ -280,7 +281,7 @@ pub async fn check_app_entry_type(
     let zome = dna_file
         .dna()
         .zomes
-        .get(index)
+        .get(zome_index)
         .ok_or_else(|| SysValidationError::ZomeId(entry_type.clone()))?
         .1
         .clone();
@@ -294,7 +295,7 @@ pub async fn check_app_entry_type(
         Some(entry_def) => return Ok(entry_def),
         None => get_entry_defs(dna_file.clone())
             .await?
-            .get(index)
+            .get(entry_def_index)
             .map(|(_, v)| v.clone()),
     };
 
