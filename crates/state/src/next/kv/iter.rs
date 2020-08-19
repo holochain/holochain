@@ -12,24 +12,24 @@ type IterItem<'env, V> = (&'env [u8], V);
 type IterError = DatabaseError;
 
 /// Returns all the elements on this key
-pub struct SingleKeyIter<'env, 'a, V>
+pub struct SingleIterKeyMatch<'env, 'a, V>
 where
     V: BufVal,
 {
-    iter: SingleFromIter<'env, 'a, V>,
+    iter: SingleIterFrom<'env, 'a, V>,
     key: Vec<u8>,
 }
 
-impl<'env, 'a: 'env, V> SingleKeyIter<'env, 'a, V>
+impl<'env, 'a: 'env, V> SingleIterKeyMatch<'env, 'a, V>
 where
     V: BufVal,
 {
-    pub fn new(iter: SingleFromIter<'env, 'a, V>, key: Vec<u8>) -> Self {
+    pub fn new(iter: SingleIterFrom<'env, 'a, V>, key: Vec<u8>) -> Self {
         Self { iter, key }
     }
 }
 
-impl<'env, 'a: 'env, V> FallibleIterator for SingleKeyIter<'env, 'a, V>
+impl<'env, 'a: 'env, V> FallibleIterator for SingleIterKeyMatch<'env, 'a, V>
 where
     V: BufVal,
 {
@@ -54,14 +54,14 @@ pub fn partial_key_match(partial_key: &[u8], key: &[u8]) -> bool {
 }
 
 /// Iterate from a key
-pub struct SingleFromIter<'env, 'a, V>
+pub struct SingleIterFrom<'env, 'a, V>
 where
     V: BufVal,
 {
     iter: SingleIter<'env, 'a, V>,
 }
 
-impl<'env, 'a: 'env, V> SingleFromIter<'env, 'a, V>
+impl<'env, 'a: 'env, V> SingleIterFrom<'env, 'a, V>
 where
     V: BufVal,
 {
@@ -75,7 +75,7 @@ where
     }
 }
 
-impl<'env, 'a: 'env, V> FallibleIterator for SingleFromIter<'env, 'a, V>
+impl<'env, 'a: 'env, V> FallibleIterator for SingleIterFrom<'env, 'a, V>
 where
     V: BufVal,
 {

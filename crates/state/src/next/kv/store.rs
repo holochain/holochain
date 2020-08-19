@@ -29,6 +29,11 @@ where
         }
     }
 
+    /// Accessor for raw Rkv DB
+    pub fn db(&self) -> SingleStore {
+        self.db
+    }
+
     /// Fetch data from DB as raw byte slice
     pub fn get_bytes<'env, R: Readable>(
         &self,
@@ -97,5 +102,11 @@ where
         reader: &'env R,
     ) -> DatabaseResult<fallible_iterator::Rev<SingleIterRaw<'env, V>>> {
         Ok(SingleIterRaw::new(self.db.iter_start(reader)?, self.db.iter_end(reader)?).rev())
+    }
+
+    // TODO: This should be cfg test but can't because it's in a different crate
+    /// Clear db, useful for tests
+    pub fn delete_all(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
+        Ok(self.db.clear(writer)?)
     }
 }
