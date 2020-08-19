@@ -80,6 +80,12 @@ impl<T: PrimitiveHashType> From<Vec<u8>> for HoloHash<T> {
     }
 }
 
+impl<T: PrimitiveHashType> From<HoloHash<T>> for Vec<u8> {
+    fn from(hh: HoloHash<T>) -> Vec<u8> {
+        hh.hash
+    }
+}
+
 impl<T: HashType> HasHash<T> for HoloHash<T> {
     fn as_hash(&self) -> &HoloHash<T> {
         &self

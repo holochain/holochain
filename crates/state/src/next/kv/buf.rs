@@ -1,3 +1,4 @@
+use super::{DrainIter, SingleFromIter, SingleIter, SingleIterRaw, SingleKeyIter};
 use crate::env::ReadManager;
 use crate::next::{check_empty_key, kv::KvStore, BufKey, BufVal, BufferedStore};
 use crate::{
@@ -5,10 +6,11 @@ use crate::{
     error::{DatabaseError, DatabaseResult},
     prelude::{Readable, Writer},
 };
+use fallible_iterator::FallibleIterator;
 use rkv::SingleStore;
 use std::collections::BTreeMap;
 
-type Scratch<K, V> = BTreeMap<K, KvOp<V>>;
+type Scratch<V> = BTreeMap<Vec<u8>, KvOp<V>>;
 
 /// Transactional operations on a KV store
 /// Put: add or replace this KV
@@ -27,7 +29,8 @@ where
     V: BufVal,
 {
     db: SingleStore,
-    scratch: Scratch<K, V>,
+    scratch: Scratch<V>,
+    __phantom: std::marker::PhantomData<K>,
 }
 
 impl<'env, K, V> KvBufUsed<K, V>
@@ -40,6 +43,7 @@ where
         Ok(Self {
             db,
             scratch: BTreeMap::new(),
+            __phantom: std::marker::PhantomData,
         })
     }
 
@@ -51,7 +55,7 @@ where
     pub fn contains<R: Readable>(&self, r: &R, k: &K) -> DatabaseResult<bool> {
         check_empty_key(k)?;
         use KvOp::*;
-        let exists = match self.scratch.get(k) {
+        let exists = match self.scratch.get(k.as_ref()) {
             Some(Put(_)) => true,
             Some(Delete) => false,
             None => self.store().get(r, k)?.is_some(),
@@ -64,7 +68,7 @@ where
     pub fn get<R: Readable>(&self, r: &R, k: &K) -> DatabaseResult<Option<V>> {
         check_empty_key(k)?;
         use KvOp::*;
-        let val = match self.scratch.get(k) {
+        let val = match self.scratch.get(k.as_ref()) {
             Some(Put(scratch_val)) => Some(*scratch_val.clone()),
             Some(Delete) => None,
             None => self.store().get(r, k)?,
@@ -75,106 +79,120 @@ where
     /// Update the scratch space to record a Put operation for the KV
     pub fn put(&mut self, k: K, v: V) -> DatabaseResult<()> {
         check_empty_key(&k)?;
-        self.scratch.insert(k, KvOp::Put(Box::new(v)));
+        self.scratch.insert(k.into(), KvOp::Put(Box::new(v)));
         Ok(())
     }
 
     /// Update the scratch space to record a Delete operation for the KV
     pub fn delete(&mut self, k: K) -> DatabaseResult<()> {
         check_empty_key(&k)?;
-        self.scratch.insert(k, KvOp::Delete);
+        self.scratch.insert(k.into(), KvOp::Delete);
         Ok(())
     }
 
     #[cfg(test)]
-    pub(crate) fn scratch(&self) -> &Scratch<K, V> {
+    pub(crate) fn scratch(&self) -> &Scratch<V> {
         &self.scratch
     }
 
-    // /// Iterator that checks the scratch space
-    // pub fn iter(&self) -> DatabaseResult<SingleIter<V>> {
-    //     Ok(SingleIter::new(
-    //         &self.scratch,
-    //         self.scratch.iter(),
-    //         self.iter_raw()?,
-    //     ))
-    // }
+    /// Iterator that checks the scratch space
+    pub fn iter<'a, R: Readable>(&'a self, r: &'a R) -> DatabaseResult<SingleIter<'a, '_, V>> {
+        Ok(SingleIter::new(
+            &self.scratch,
+            self.scratch.iter(),
+            self.iter_raw(r)?,
+        ))
+    }
 
-    // /// Iterator that tracks elements so they can be deleted
-    // pub fn drain_iter(&mut self) -> DatabaseResult<DrainIter<V>> {
-    //     Ok(DrainIter::new(
-    //         &mut self.scratch,
-    //         SingleIterRaw::new(
-    //             self.db.iter_start(self.reader)?,
-    //             self.db.iter_end(self.reader)?,
-    //         ),
-    //     ))
-    // }
+    /// Iterator that tracks elements so they can be deleted
+    pub fn drain_iter<'a, R: Readable>(
+        &mut self,
+        r: &'a R,
+    ) -> DatabaseResult<DrainIter<'a, '_, V>> {
+        Ok(DrainIter::new(
+            &mut self.scratch,
+            SingleIterRaw::new(self.db.iter_start(r)?, self.db.iter_end(r)?),
+        ))
+    }
 
-    // /// Iterator that tracks elements so they can be deleted but in reverse
-    // pub fn drain_iter_reverse(&mut self) -> DatabaseResult<fallible_iterator::Rev<DrainIter<V>>> {
-    //     Ok(DrainIter::new(
-    //         &mut self.scratch,
-    //         SingleIterRaw::new(
-    //             self.db.iter_start(self.reader)?,
-    //             self.db.iter_end(self.reader)?,
-    //         ),
-    //     )
-    //     .rev())
-    // }
+    /// Iterator that tracks elements so they can be deleted but in reverse
+    pub fn drain_iter_reverse<'a, R: Readable>(
+        &'a mut self,
+        r: &'a R,
+    ) -> DatabaseResult<fallible_iterator::Rev<DrainIter<'a, '_, V>>> {
+        Ok(DrainIter::new(
+            &mut self.scratch,
+            SingleIterRaw::new(self.db.iter_start(r)?, self.db.iter_end(r)?),
+        )
+        .rev())
+    }
 
-    // /// Iterator that returns all partial matches to this key
-    // pub fn iter_all_key_matches(&self, k: K) -> DatabaseResult<SingleKeyIter<V>> {
-    //     check_empty_key(&k)?;
+    /// Iterator that returns all partial matches to this key
+    pub fn iter_all_key_matches<'a, R: Readable>(
+        &'a self,
+        r: &'a R,
+        k: K,
+    ) -> DatabaseResult<SingleKeyIter<V>> {
+        check_empty_key(&k)?;
 
-    //     let key = k.as_ref().to_vec();
-    //     Ok(SingleKeyIter::new(
-    //         SingleFromIter::new(&self.scratch, self.iter_raw_from(k)?, key.clone()),
-    //         key,
-    //     ))
-    // }
+        let key = k.as_ref().to_vec();
+        Ok(SingleKeyIter::new(
+            SingleFromIter::new(&self.scratch, self.iter_raw_from(r, k)?, key.clone()),
+            key,
+        ))
+    }
 
-    // /// Iterate from a key onwards
-    // pub fn iter_from(&self, k: K) -> DatabaseResult<SingleFromIter<V>> {
-    //     check_empty_key(&k)?;
+    /// Iterate from a key onwards
+    pub fn iter_from<'a, R: Readable>(
+        &'a self,
+        r: &'a R,
+        k: K,
+    ) -> DatabaseResult<SingleFromIter<'a, '_, V>> {
+        check_empty_key(&k)?;
 
-    //     let key = k.as_ref().to_vec();
-    //     Ok(SingleFromIter::new(
-    //         &self.scratch,
-    //         self.iter_raw_from(k)?,
-    //         key,
-    //     ))
-    // }
+        let key = k.as_ref().to_vec();
+        Ok(SingleFromIter::new(
+            &self.scratch,
+            self.iter_raw_from(r, k)?,
+            key,
+        ))
+    }
 
-    // /// Iterate over the data in reverse
-    // pub fn iter_reverse(&self) -> DatabaseResult<fallible_iterator::Rev<SingleIter<V>>> {
-    //     Ok(SingleIter::new(&self.scratch, self.scratch.iter(), self.iter_raw()?).rev())
-    // }
+    /// Iterate over the data in reverse
+    pub fn iter_reverse<'a, R: Readable>(
+        &'a self,
+        r: &'a R,
+    ) -> DatabaseResult<fallible_iterator::Rev<SingleIter<'a, '_, V>>> {
+        Ok(SingleIter::new(&self.scratch, self.scratch.iter(), self.iter_raw(r)?).rev())
+    }
 
-    // /// Iterate over the underlying persisted data, NOT taking the scratch space into consideration
-    // pub fn iter_raw(&self) -> DatabaseResult<SingleIterRaw<V>> {
-    //     Ok(SingleIterRaw::new(
-    //         self.db.iter_start(self.reader)?,
-    //         self.db.iter_end(self.reader)?,
-    //     ))
-    // }
+    /// Iterate over the underlying persisted data, NOT taking the scratch space into consideration
+    pub fn iter_raw<'a, R: Readable>(&self, r: &'a R) -> DatabaseResult<SingleIterRaw<'a, V>> {
+        Ok(SingleIterRaw::new(
+            self.db.iter_start(r)?,
+            self.db.iter_end(r)?,
+        ))
+    }
 
-    // /// Iterate from a key onwards without scratch space
-    // pub fn iter_raw_from(&self, k: K) -> DatabaseResult<SingleIterRaw<V>> {
-    //     Ok(SingleIterRaw::new(
-    //         self.db.iter_from(self.reader, k)?,
-    //         self.db.iter_end(self.reader)?,
-    //     ))
-    // }
+    /// Iterate from a key onwards without scratch space
+    pub fn iter_raw_from<'a, R: Readable>(
+        &self,
+        r: &'a R,
+        k: K,
+    ) -> DatabaseResult<SingleIterRaw<'a, V>> {
+        Ok(SingleIterRaw::new(
+            self.db.iter_from(r, k)?,
+            self.db.iter_end(r)?,
+        ))
+    }
 
-    // /// Iterate over the underlying persisted data in reverse, NOT taking the scratch space into consideration
-    // pub fn iter_raw_reverse(&self) -> DatabaseResult<fallible_iterator::Rev<SingleIterRaw<V>>> {
-    //     Ok(SingleIterRaw::new(
-    //         self.db.iter_start(self.reader)?,
-    //         self.db.iter_end(self.reader)?,
-    //     )
-    //     .rev())
-    // }
+    /// Iterate over the underlying persisted data in reverse, NOT taking the scratch space into consideration
+    pub fn iter_raw_reverse<'a, R: Readable>(
+        &self,
+        r: &'a R,
+    ) -> DatabaseResult<fallible_iterator::Rev<SingleIterRaw<'a, V>>> {
+        Ok(SingleIterRaw::new(self.db.iter_start(r)?, self.db.iter_end(r)?).rev())
+    }
 
     // TODO: This should be cfg test but can't because it's in a different crate
     /// Clear all scratch and db, useful for tests

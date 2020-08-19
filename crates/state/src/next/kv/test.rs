@@ -17,6 +17,12 @@ impl AsRef<[u8]> for DbString {
     }
 }
 
+impl From<DbString> for Vec<u8> {
+    fn from(d: DbString) -> Vec<u8> {
+        d.as_ref().to_vec()
+    }
+}
+
 impl From<Vec<u8>> for DbString {
     fn from(bytes: Vec<u8>) -> Self {
         Self(String::from_utf8(bytes).unwrap())

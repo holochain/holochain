@@ -24,7 +24,7 @@ impl<'env, 'a: 'env, V> SingleKeyIter<'env, 'a, V>
 where
     V: BufVal,
 {
-    fn new(iter: SingleFromIter<'env, 'a, V>, key: Vec<u8>) -> Self {
+    pub fn new(iter: SingleFromIter<'env, 'a, V>, key: Vec<u8>) -> Self {
         Self { iter, key }
     }
 }
@@ -65,7 +65,7 @@ impl<'env, 'a: 'env, V> SingleFromIter<'env, 'a, V>
 where
     V: BufVal,
 {
-    fn new(
+    pub fn new(
         scratch: &'a BTreeMap<Vec<u8>, KvOp<V>>,
         iter: SingleIterRaw<'env, V>,
         key: Vec<u8>,
@@ -99,7 +99,7 @@ impl<'env, 'a, V> DrainIter<'env, 'a, V>
 where
     V: BufVal,
 {
-    fn new(scratch: &'a mut BTreeMap<Vec<u8>, KvOp<V>>, iter: SingleIterRaw<'env, V>) -> Self {
+    pub fn new(scratch: &'a mut BTreeMap<Vec<u8>, KvOp<V>>, iter: SingleIterRaw<'env, V>) -> Self {
         Self { scratch, iter }
     }
 }
@@ -146,7 +146,7 @@ impl<'env, 'a: 'env, V> SingleIter<'env, 'a, V>
 where
     V: BufVal,
 {
-    fn new(
+    pub fn new(
         scratch: &'a BTreeMap<Vec<u8>, KvOp<V>>,
         scratch_iter: impl DoubleEndedIterator<Item = (&'a Vec<u8>, &'a KvOp<V>)> + 'a,
         iter: SingleIterRaw<'env, V>,

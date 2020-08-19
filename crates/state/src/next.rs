@@ -37,8 +37,8 @@ pub trait BufferedStore {
 }
 
 /// Trait alias for the combination of constraints needed for keys in [KvBuf] and [KvvBuf]
-pub trait BufKey: Ord + Eq + AsRef<[u8]> + From<Vec<u8>> + Send + Sync {}
-impl<T> BufKey for T where T: Ord + Eq + AsRef<[u8]> + From<Vec<u8>> + Send + Sync {}
+pub trait BufKey: Ord + Eq + AsRef<[u8]> + From<Vec<u8>> + Into<Vec<u8>> + Send + Sync {}
+impl<T> BufKey for T where T: Ord + Eq + AsRef<[u8]> + From<Vec<u8>> + Into<Vec<u8>> + Send + Sync {}
 
 /// Trait alias for the combination of constraints needed for keys in [IntKvBuf](kv_int::IntKvBuf)
 pub trait BufIntKey: Hash + Ord + Eq + rkv::store::integer::PrimitiveInt + Send + Sync {}
@@ -68,6 +68,12 @@ impl From<Vec<u8>> for UnitDbKey {
     fn from(bytes: Vec<u8>) -> Self {
         assert_eq!(bytes.as_slice(), ARBITRARY_BYTE_SLICE);
         Self
+    }
+}
+
+impl From<UnitDbKey> for Vec<u8> {
+    fn from(_: UnitDbKey) -> Vec<u8> {
+        ARBITRARY_BYTE_SLICE.to_vec()
     }
 }
 
