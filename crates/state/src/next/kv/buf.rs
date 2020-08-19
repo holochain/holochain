@@ -21,25 +21,23 @@ pub enum KvOp<V> {
 
 /// A persisted key-value store with a transient HashMap to store
 /// CRUD-like changes without opening a blocking read-write cursor
-pub struct KvBuf<K, V>
+pub struct KvBufUsed<K, V>
 where
     K: BufKey,
     V: BufVal,
 {
-    env: EnvironmentRead,
     db: SingleStore,
     scratch: Scratch<K, V>,
 }
 
-impl<'env, K, V> KvBuf<K, V>
+impl<'env, K, V> KvBufUsed<K, V>
 where
     K: BufKey,
     V: BufVal,
 {
-    /// Create a new KvBuf from a read-only transaction and a database reference
-    pub fn new(env: EnvironmentRead, db: SingleStore) -> DatabaseResult<Self> {
+    /// Constructor
+    pub fn new(db: SingleStore) -> DatabaseResult<Self> {
         Ok(Self {
-            env,
             db,
             scratch: BTreeMap::new(),
         })
@@ -50,7 +48,7 @@ where
     }
 
     /// See if a value exists, avoiding deserialization
-    pub fn contains_used<R: Readable>(&self, r: &R, k: &K) -> DatabaseResult<bool> {
+    pub fn contains<R: Readable>(&self, r: &R, k: &K) -> DatabaseResult<bool> {
         check_empty_key(k)?;
         use KvOp::*;
         let exists = match self.scratch.get(k) {
@@ -61,17 +59,9 @@ where
         Ok(exists)
     }
 
-    /// See if a value exists, avoiding deserialization
-    pub async fn contains_fresh(&self, k: &K) -> DatabaseResult<bool> {
-        self.env
-            .guard()
-            .await
-            .with_reader(|reader| self.contains_used(&reader, k))
-    }
-
     /// Get a value, taking the scratch space into account,
     /// or from persistence if needed
-    pub fn get_used<R: Readable>(&self, r: &R, k: &K) -> DatabaseResult<Option<V>> {
+    pub fn get<R: Readable>(&self, r: &R, k: &K) -> DatabaseResult<Option<V>> {
         check_empty_key(k)?;
         use KvOp::*;
         let val = match self.scratch.get(k) {
@@ -80,15 +70,6 @@ where
             None => self.store().get(r, k)?,
         };
         Ok(val)
-    }
-
-    /// Get a value, taking the scratch space into account,
-    /// or from persistence if needed
-    pub async fn get_fresh(&self, k: &K) -> DatabaseResult<Option<V>> {
-        self.env
-            .guard()
-            .await
-            .with_reader(|reader| self.get_used(&reader, k))
     }
 
     /// Update the scratch space to record a Put operation for the KV
@@ -203,7 +184,47 @@ where
     }
 }
 
-impl<K, V> BufferedStore for KvBuf<K, V>
+pub struct KvBufFresh<K, V>
+where
+    K: BufKey,
+    V: BufVal,
+{
+    env: EnvironmentRead,
+    inner: KvBufUsed<K, V>,
+}
+
+impl<'env, K, V> KvBufFresh<K, V>
+where
+    K: BufKey,
+    V: BufVal,
+{
+    /// Create a new KvBufUsed from a read-only transaction and a database reference
+    pub fn new(env: EnvironmentRead, db: SingleStore) -> DatabaseResult<Self> {
+        Ok(Self {
+            env,
+            inner: KvBufUsed::new(db)?,
+        })
+    }
+
+    /// See if a value exists, avoiding deserialization
+    pub async fn contains(&self, k: &K) -> DatabaseResult<bool> {
+        self.env
+            .guard()
+            .await
+            .with_reader(|reader| self.inner.contains(&reader, k))
+    }
+
+    /// Get a value, taking the scratch space into account,
+    /// or from persistence if needed
+    pub async fn get(&self, k: &K) -> DatabaseResult<Option<V>> {
+        self.env
+            .guard()
+            .await
+            .with_reader(|reader| self.inner.get(&reader, k))
+    }
+}
+
+impl<K, V> BufferedStore for KvBufUsed<K, V>
 where
     K: BufKey,
     V: BufVal,

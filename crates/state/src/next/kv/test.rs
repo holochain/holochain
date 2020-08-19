@@ -1,4 +1,4 @@
-use super::KvBuf;
+use super::KvBufUsed;
 use crate::{
     env::{ReadManager, WriteManager},
     error::{DatabaseError, DatabaseResult},
@@ -39,8 +39,8 @@ async fn kvbuf_scratch_and_persistence() -> DatabaseResult<()> {
     let testval = DbString::from("Joe");
 
     env.with_reader::<DatabaseError, _, _>(|reader| {
-        let mut kv1: KvBuf<DbString, DbString> = KvBuf::new(arc.clone().into(), db1)?;
-        let mut kv2: KvBuf<DbString, DbString> = KvBuf::new(arc.clone().into(), db2)?;
+        let mut kv1: KvBufUsed<DbString, DbString> = KvBufUsed::new(db1)?;
+        let mut kv2: KvBufUsed<DbString, DbString> = KvBufUsed::new(db2)?;
 
         env.with_commit(|writer| {
             kv1.put("hi".into(), testval.clone()).unwrap();
@@ -50,9 +50,9 @@ async fn kvbuf_scratch_and_persistence() -> DatabaseResult<()> {
             assert_eq!(kv2.store().get(&reader, &"salutations".into())?, None);
 
             // Check that the values are available due to the scratch space
-            assert_eq!(kv1.get_used(&reader, &"hi".into())?, Some(testval.clone()));
+            assert_eq!(kv1.get(&reader, &"hi".into())?, Some(testval.clone()));
             assert_eq!(
-                kv2.get_used(&reader, &"salutations".into())?,
+                kv2.get(&reader, &"salutations".into())?,
                 Some("folks".into())
             );
 
@@ -65,7 +65,7 @@ async fn kvbuf_scratch_and_persistence() -> DatabaseResult<()> {
         // just for kicks
 
         env.with_commit(|writer| {
-            let kv1a: KvBuf<DbString, DbString> = KvBuf::new(arc.clone().into(), db1)?;
+            let kv1a: KvBufUsed<DbString, DbString> = KvBufUsed::new(db1)?;
             assert_eq!(kv1a.store().get(&reader, &"hi".into())?, None);
             kv2.flush_to_txn(writer)
         })?;
@@ -75,8 +75,8 @@ async fn kvbuf_scratch_and_persistence() -> DatabaseResult<()> {
 
     env.with_reader(|reader| {
         // Now open some fresh Readers to see that our data was persisted
-        let kv1b: KvBuf<DbString, DbString> = KvBuf::new(arc.clone().into(), db1)?;
-        let kv2b: KvBuf<DbString, DbString> = KvBuf::new(arc.clone().into(), db2)?;
+        let kv1b: KvBufUsed<DbString, DbString> = KvBufUsed::new(db1)?;
+        let kv2b: KvBufUsed<DbString, DbString> = KvBufUsed::new(db2)?;
         // Check that the underlying store contains no changes yet
         assert_eq!(kv1b.store().get(&reader, &"hi".into())?, Some(testval));
         assert_eq!(
@@ -87,7 +87,7 @@ async fn kvbuf_scratch_and_persistence() -> DatabaseResult<()> {
     })
 }
 
-// pub(super) type TestBuf<'a> = KvBuf<&'a str, V>;
+// pub(super) type TestBuf<'a> = KvBufUsed<&'a str, V>;
 
 // macro_rules! res {
 //     ($key:expr, $op:ident, $val:expr) => {
@@ -123,7 +123,7 @@ async fn kvbuf_scratch_and_persistence() -> DatabaseResult<()> {
 //     let db = env.inner().open_single("kv", StoreOptions::create())?;
 
 //     env.with_reader::<DatabaseError, _, _>(|reader| {
-//         let mut buf: TestBuf = KvBuf::new)?;
+//         let mut buf: TestBuf = KvBufUsed::new)?;
 
 //         buf.put("a", V(1)).unwrap();
 //         buf.put("b", V(2)).unwrap();
@@ -136,7 +136,7 @@ async fn kvbuf_scratch_and_persistence() -> DatabaseResult<()> {
 //     })?;
 
 //     env.with_reader(|reader| {
-//         let buf: TestBuf = KvBuf::new)?;
+//         let buf: TestBuf = KvBufUsed::new)?;
 
 //         let forward: Vec<_> = buf.iter_raw()?.map(|(_, v)| Ok(v)).collect().unwrap();
 //         let reverse: Vec<_> = buf
@@ -161,7 +161,7 @@ async fn kvbuf_scratch_and_persistence() -> DatabaseResult<()> {
 //         .unwrap();
 
 //     env.with_reader(|reader| {
-//         let buf: TestBuf = KvBuf::new(arc.clone().into(),  db();
+//         let buf: TestBuf = KvBufUsed::new( db();
 
 //         let forward: Vec<_> = buf.iter_raw().unwrap().collect().unwrap();
 //         let reverse: Vec<_> = buf.iter_raw_reverse().unwrap().collect().unwrap();
