@@ -3,9 +3,17 @@
 use super::error::WorkflowResult;
 use crate::core::{
     queue_consumer::{OneshotWriter, TriggerSender, WorkComplete},
-    state::workspace::{Workspace, WorkspaceResult},
+    state::{
+        dht_op_integration::IntegrationLimboStore,
+        validation_db::ValidationLimboStore,
+        workspace::{Workspace, WorkspaceResult},
+    },
 };
-use holochain_state::prelude::{GetDb, Reader, Writer};
+use holochain_state::{
+    buffer::{BufferedStore, KvBuf},
+    db::INTEGRATION_LIMBO,
+    prelude::{GetDb, Reader, Writer},
+};
 use tracing::*;
 
 #[instrument(skip(workspace, writer, trigger_integration))]
@@ -14,13 +22,13 @@ pub async fn app_validation_workflow(
     writer: OneshotWriter,
     trigger_integration: &mut TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
-    warn!("unimplemented");
+    warn!("unimplemented passthrough");
 
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // commit the workspace
     writer
-        .with_writer(|writer| workspace.flush_to_txn(writer).expect("TODO"))
+        .with_writer(|writer| Ok(workspace.flush_to_txn(writer)?))
         .await?;
 
     // trigger other workflows
@@ -29,18 +37,27 @@ pub async fn app_validation_workflow(
     Ok(WorkComplete::Complete)
 }
 
-pub struct AppValidationWorkspace<'env>(std::marker::PhantomData<&'env ()>);
-
-impl<'env> AppValidationWorkspace<'env> {}
+pub struct AppValidationWorkspace<'env> {
+    pub integration_limbo: IntegrationLimboStore<'env>,
+    pub validation_limbo: ValidationLimboStore<'env>,
+}
 
 impl<'env> Workspace<'env> for AppValidationWorkspace<'env> {
-    /// Constructor
-    fn new(_reader: &'env Reader<'env>, _dbs: &impl GetDb) -> WorkspaceResult<Self> {
-        Ok(Self(std::marker::PhantomData))
-    }
+    fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self> {
+        let db = dbs.get_db(&*INTEGRATION_LIMBO)?;
+        let integration_limbo = KvBuf::new(reader, db)?;
 
-    fn flush_to_txn(self, _writer: &mut Writer) -> WorkspaceResult<()> {
-        warn!("unimplemented");
+        let validation_limbo = ValidationLimboStore::new(reader, dbs)?;
+
+        Ok(Self {
+            integration_limbo,
+            validation_limbo,
+        })
+    }
+    fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
+        warn!("unimplemented passthrough");
+        self.validation_limbo.0.flush_to_txn(writer)?;
+        self.integration_limbo.flush_to_txn(writer)?;
         Ok(())
     }
 }

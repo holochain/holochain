@@ -24,7 +24,7 @@ use crate::{
         },
         workflow::{
             call_zome_workflow, error::WorkflowError, genesis_workflow::genesis_workflow,
-            initialize_zomes_workflow, integrate_dht_ops_workflow::IntegrateDhtOpsWorkspace,
+            incoming_dht_ops_workflow::incoming_dht_ops_workflow, initialize_zomes_workflow,
             CallZomeWorkflowArgs, CallZomeWorkspace, GenesisWorkflowArgs, GenesisWorkspace,
             InitializeZomesWorkflowArgs, InitializeZomesWorkspace, ZomeCallInvocationResult,
         },
@@ -412,39 +412,15 @@ impl Cell {
         _dht_hash: holo_hash::AnyDhtHash,
         ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     ) -> CellResult<()> {
-        /////////////////////////////////////////////////////////////
-        // FIXME - We are temporarily just integrating everything...
-        //         Really this should go to validation first!
-        //         Everything below this line is throwaway code.
-        /////////////////////////////////////////////////////////////
-
-        // set up our workspace
-        let env_ref = self.state_env.guard().await;
-        let reader = env_ref.reader().expect("Could not create LMDB reader");
-        let mut workspace =
-            IntegrateDhtOpsWorkspace::new(&reader, &env_ref).expect("Could not create Workspace");
-
-        // add incoming ops to the integration queue transaction
-        for (hash, op) in ops {
-            let iqv = crate::core::state::dht_op_integration::IntegrationLimboValue {
-                validation_status: holochain_types::validate::ValidationStatus::Valid,
-                op,
-            };
-            if !workspace.op_exists(&hash)? {
-                workspace.integration_limbo.put(hash, iqv)?;
-            }
-        }
-
-        // commit our transaction
-        let writer: crate::core::queue_consumer::OneshotWriter = self.state_env.clone().into();
-
-        writer
-            .with_writer(|writer| workspace.flush_to_txn(writer).expect("TODO"))
-            .await?;
-
-        // trigger integration of queued ops
-        self.queue_triggers.integrate_dht_ops.clone().trigger();
-
+        incoming_dht_ops_workflow(
+            &self.state_env,
+            self.queue_triggers.sys_validation.clone(),
+            ops,
+        )
+        .await
+        .map_err(Box::new)
+        .map_err(ConductorApiError::from)
+        .map_err(Box::new)?;
         Ok(())
     }
 
@@ -622,7 +598,7 @@ impl Cell {
     }
 
     #[instrument(skip(self, op_hashes))]
-    /// the network module is requesting the content for dht ops
+    /// The network module is requesting the content for dht ops
     async fn handle_fetch_op_hash_data(
         &self,
         op_hashes: Vec<holo_hash::DhtOpHash>,

@@ -18,7 +18,6 @@ pub trait Readable: rkv::Readable {}
 impl<T: rkv::Readable> Readable for T {}
 
 struct ReaderSpanInfo {
-    _span: tracing::Span,
     // Using a chrono timestamp here because we need duration operations
     start_time: DateTime<Local>,
 }
@@ -26,7 +25,6 @@ struct ReaderSpanInfo {
 impl ReaderSpanInfo {
     pub fn new() -> Self {
         Self {
-            _span: tracing::span!(tracing::Level::DEBUG, "new reader"),
             start_time: Local::now(),
         }
     }

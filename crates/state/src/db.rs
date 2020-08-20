@@ -55,8 +55,10 @@ pub enum DbName {
     AuthoredDhtOps,
     /// Integrated [DhtOp]s KV store
     IntegratedDhtOps,
-    /// Integration Queue of [DhtOp]s KV store where key is [Timestamp] + [DhtOpHash]
+    /// Integration Queue of [DhtOp]s KV store where key is [DhtOpHash]
     IntegrationLimbo,
+    /// Place for [DhtOp]s waiting to be validated to hang out. KV store where key is a [DhtOpHash]
+    ValidationLimbo,
     /// KVV store to accumulate validation receipts for a published EntryHash
     ValidationReceipts,
 }
@@ -86,6 +88,7 @@ impl DbName {
             AuthoredDhtOps => Single,
             IntegratedDhtOps => Single,
             IntegrationLimbo => Single,
+            ValidationLimbo => Single,
             ValidationReceipts => Multi,
         }
     }
@@ -152,6 +155,8 @@ lazy_static! {
     pub static ref INTEGRATED_DHT_OPS: DbKey<SingleStore> = DbKey::new(DbName::IntegratedDhtOps);
     /// The key to access the IntegrationLimbo database
     pub static ref INTEGRATION_LIMBO: DbKey<SingleStore> = DbKey::new(DbName::IntegrationLimbo);
+    /// The key to access the IntegrationLimbo database
+    pub static ref VALIDATION_LIMBO: DbKey<SingleStore> = DbKey::new(DbName::ValidationLimbo);
     /// The key to access the ValidationReceipts database
     pub static ref VALIDATION_RECEIPTS: DbKey<MultiStore> = DbKey::new(DbName::ValidationReceipts);
 }
@@ -210,6 +215,7 @@ fn register_databases(env: &Rkv, kind: &EnvironmentKind, um: &mut DbMap) -> Data
             register_db(env, um, &*AUTHORED_DHT_OPS)?;
             register_db(env, um, &*INTEGRATED_DHT_OPS)?;
             register_db(env, um, &*INTEGRATION_LIMBO)?;
+            register_db(env, um, &*VALIDATION_LIMBO)?;
             register_db(env, um, &*VALIDATION_RECEIPTS)?;
         }
         EnvironmentKind::Conductor => {
