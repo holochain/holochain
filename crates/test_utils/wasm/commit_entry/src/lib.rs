@@ -1,7 +1,5 @@
 use hdk3::prelude::*;
 
-holochain_externs!();
-
 const POST_ID: &str = "post";
 #[derive(Default, SerializedBytes, serde::Serialize, serde::Deserialize)]
 #[repr(transparent)]
@@ -19,13 +17,12 @@ fn post() -> Post {
     Post("foo".into())
 }
 
-fn _commit_entry(_: ()) -> Result<HeaderHash, WasmError> {
+#[hdk(extern)]
+fn commit_entry(_: ()) -> ExternResult<HeaderHash> {
     Ok(commit_entry!(post())?)
 }
 
-fn _get_entry(_: ()) -> Result<GetOutput, WasmError> {
+#[hdk(extern)]
+fn get_entry(_: ()) -> ExternResult<GetOutput> {
     Ok(GetOutput::new(get!(entry_hash!(post())?)?))
 }
-
-map_extern!(commit_entry, _commit_entry);
-map_extern!(get_entry, _get_entry);

@@ -124,7 +124,7 @@ let foo_header_hash = commit_entry!(foo.clone())?;
 // Create the Entry from bar.
 let entry = Entry::App(bar.clone().try_into()?);
 // Call the update_entry host_fn directly
-let _bar_header_hash = hdk3::api_call!(
+let _bar_header_hash = hdk3::host_fn!(
     __update_entry,
     UpdateEntryInput::new((bar.clone().into(), entry, foo_header_hash)),
     UpdateEntryOutput
