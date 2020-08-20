@@ -8,8 +8,8 @@ use std::hash::Hash;
 
 pub mod cas;
 pub mod iter;
-pub mod iv;
 pub mod kv;
+pub mod kv_int;
 pub mod kvv;
 
 // Empty keys break lmdb
