@@ -206,18 +206,13 @@ pub async fn call_foo_fn(app_port: u16, original_dna_hash: DnaHash, holochain: &
     // Connect to App Interface
     let (mut app_interface, _) = websocket_client_by_port(app_port).await.unwrap();
 
-    #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-    struct Payload {
-        a: u32,
-    }
-    let payload = Payload { a: 1 };
     let cell_id = CellId::from((original_dna_hash, fake_agent_pubkey_1()));
     let request = Box::new(
         ZomeCallInvocationFixturator::new(NamedInvocation(
             cell_id,
             TestWasm::Foo,
             "foo".into(),
-            HostInput::new(payload.try_into().unwrap()),
+            HostInput::new(().try_into().unwrap()),
         ))
         .next()
         .unwrap(),

@@ -25,6 +25,8 @@ jobs:
         username: $DOCKER_USER
         password: $DOCKER_PASS
     resource_class: xlarge
+    environment:
+     NIXPKGS_ALLOW_UNFREE: 1
     steps:
       - checkout
       - run:

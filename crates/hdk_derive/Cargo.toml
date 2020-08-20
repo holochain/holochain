@@ -1,0 +1,19 @@
+[package]
+name = "hdk3_derive"
+version = "0.0.1"
+description = "derive macros for third iteration of the holochain hdk"
+license = "Apache-2.0"
+homepage = "https://github.com/Holo-host/holochain-2020"
+documentation = "https://github.com/Holo-host/holochain-2020"
+authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
+keywords = [ "holochain", "holo", "hdk" ]
+categories = [ "cryptography" ]
+edition = "2018"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = { version = "1", features = [ "full", "extra-traits" ] }
+quote = "1"
+paste = "1"

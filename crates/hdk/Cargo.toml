@@ -16,10 +16,11 @@ path = "src/lib.rs"
 
 [dependencies]
 holo_hash = { path = "../holo_hash" }
-holochain_wasmer_guest = "=0.0.40"
+holochain_wasmer_guest = "=0.0.41"
 holochain_zome_types = { path = "../zome_types" }
 serde = "1.0.104"
 serde_bytes = "0.11"
+hdk3_derive = { version = "0.0.1", path = "../hdk_derive" }
 
 [dev-dependencies]
 fixt = { path = "../fixt" }
