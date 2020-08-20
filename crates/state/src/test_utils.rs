@@ -106,3 +106,31 @@ pub struct TestEnvironment {
 // /// from the filesystem
 // #[derive(Shrinkwrap)]
 // pub struct TestEnvironment(#[shrinkwrap(main_field)] EnvironmentWrite, TempDir);
+
+/// A String-based newtype suitable for database keys and values
+#[derive(Clone, Debug, PartialOrd, Ord, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct DbString(String);
+
+impl AsRef<[u8]> for DbString {
+    fn as_ref(&self) -> &[u8] {
+        self.0.as_bytes()
+    }
+}
+
+impl From<DbString> for Vec<u8> {
+    fn from(d: DbString) -> Vec<u8> {
+        d.as_ref().to_vec()
+    }
+}
+
+impl From<Vec<u8>> for DbString {
+    fn from(bytes: Vec<u8>) -> Self {
+        Self(String::from_utf8(bytes).unwrap())
+    }
+}
+
+impl From<&str> for DbString {
+    fn from(s: &str) -> Self {
+        Self(s.to_owned())
+    }
+}

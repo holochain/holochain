@@ -4,7 +4,6 @@ use crate::{
     transaction::Writer,
 };
 use serde::{de::DeserializeOwned, Serialize};
-use std::hash::Hash;
 
 pub mod cas;
 pub mod iter;
@@ -81,8 +80,8 @@ pub trait BufVal: Clone + Serialize + DeserializeOwned + std::fmt::Debug + Send 
 impl<T> BufVal for T where T: Clone + Serialize + DeserializeOwned + std::fmt::Debug + Send + Sync {}
 
 /// Trait alias for the combination of constraints needed for values in [KvvStore]
-pub trait BufMultiVal: Hash + Eq + Clone + Serialize + DeserializeOwned + Send + Sync {}
-impl<T> BufMultiVal for T where T: Hash + Eq + Clone + Serialize + DeserializeOwned + Send + Sync {}
+pub trait BufMultiVal: Ord + Eq + Clone + Serialize + DeserializeOwned + Send + Sync {}
+impl<T> BufMultiVal for T where T: Ord + Eq + Clone + Serialize + DeserializeOwned + Send + Sync {}
 
 /// Use this as the key type for LMDB databases which should only have one key.
 ///

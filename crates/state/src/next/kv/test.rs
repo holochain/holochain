@@ -1,40 +1,12 @@
 use super::KvBufUsed;
-use crate::next::kv::generic::KvStoreT;
+use crate::test_utils::DbString;
 use crate::{
     env::{ReadManager, WriteManager},
     error::{DatabaseError, DatabaseResult},
-    next::BufferedStore,
+    next::{kv::generic::KvStoreT, BufferedStore},
     test_utils::test_cell_env,
 };
 use rkv::StoreOptions;
-use serde_derive::{Deserialize, Serialize};
-
-#[derive(Clone, Debug, PartialOrd, Ord, PartialEq, Eq, Serialize, Deserialize)]
-struct DbString(String);
-
-impl AsRef<[u8]> for DbString {
-    fn as_ref(&self) -> &[u8] {
-        self.0.as_bytes()
-    }
-}
-
-impl From<DbString> for Vec<u8> {
-    fn from(d: DbString) -> Vec<u8> {
-        d.as_ref().to_vec()
-    }
-}
-
-impl From<Vec<u8>> for DbString {
-    fn from(bytes: Vec<u8>) -> Self {
-        Self(String::from_utf8(bytes).unwrap())
-    }
-}
-
-impl From<&str> for DbString {
-    fn from(s: &str) -> Self {
-        Self(s.to_owned())
-    }
-}
 
 #[tokio::test(threaded_scheduler)]
 async fn kvbuf_scratch_and_persistence() -> DatabaseResult<()> {
