@@ -115,3 +115,13 @@ impl From<()> for UnitDbKey {
 }
 
 static ARBITRARY_BYTE_SLICE: &[u8] = &[0];
+
+#[macro_export]
+/// Macro to generate a fresh reader from an EnvironmentRead with less boilerplate
+macro_rules! fresh_reader {
+    ($env: expr, $f: expr) => {{
+        let g = $env.guard().await;
+        let r = g.reader()?;
+        $f(r)
+    }};
+}

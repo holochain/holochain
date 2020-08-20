@@ -10,6 +10,7 @@ use crate::next::{
 use crate::{
     env::EnvironmentRead,
     error::{DatabaseError, DatabaseResult},
+    fresh_reader,
     prelude::{Readable, Writer},
 };
 use fallible_iterator::FallibleIterator;
@@ -221,14 +222,6 @@ where
     inner: Used<K, V, Store>,
 }
 
-macro_rules! fresh_reader {
-    ($self_: ident, $f: expr) => {{
-        let g = $self_.env.guard().await;
-        let r = g.reader()?;
-        $f(r)
-    }};
-}
-
 type IterOwned<V> = Vec<(Vec<u8>, V)>;
 
 impl<K, V> Fresh<K, V, KvStore<K, V>>
@@ -266,19 +259,19 @@ where
 {
     /// See if a value exists, avoiding deserialization
     pub async fn contains(&self, k: &K) -> DatabaseResult<bool> {
-        fresh_reader!(self, |reader| self.inner.contains(&reader, k))
+        fresh_reader!(self.env, |reader| self.inner.contains(&reader, k))
     }
 
     /// Get a value, taking the scratch space into account,
     /// or from persistence if needed
     pub async fn get(&self, k: &K) -> DatabaseResult<Option<V>> {
-        fresh_reader!(self, |reader| self.inner.get(&reader, k))
+        fresh_reader!(self.env, |reader| self.inner.get(&reader, k))
     }
 
     // /// Iterator that checks the scratch space
     // TODO: remove, not much point in collecting the entire DB, right?
     // pub async fn iter<'a, R: Readable + Send + Sync>(&'a self) -> DatabaseResult<IterOwned<V>> {
-    //     fresh_reader!(self, |reader| Ok(self
+    //     fresh_reader!(self.env, |reader| Ok(self
     //         .inner
     //         .iter(&reader)?
     //         .map(|(k, v)| { Ok((k.to_vec(), v)) })
@@ -299,7 +292,7 @@ where
         &'a self,
         k: K,
     ) -> DatabaseResult<IterOwned<V>> {
-        fresh_reader!(self, |reader| Ok(self
+        fresh_reader!(self.env, |reader| Ok(self
             .inner
             .iter_all_key_matches(&reader, k)?
             .map(|(k, v)| { Ok((k.to_vec(), v)) })
@@ -312,7 +305,7 @@ where
     //     &'a self,
     //     k: K,
     // ) -> DatabaseResult<SingleIterFrom<'a, '_, V>> {
-    //     fresh_reader!(self, |reader| self.inner.iter_from(&reader, k))
+    //     fresh_reader!(self.env, |reader| self.inner.iter_from(&reader, k))
     // }
 }
 
