@@ -15,14 +15,14 @@ mod tests;
 ///
 /// Replace is a Delete followed by an Insert
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub(super) enum Op {
+pub(super) enum KvvOp {
     Insert,
     Delete,
 }
 
 pub(super) struct ValuesDelta<V> {
     delete_all: bool,
-    deltas: BTreeMap<V, Op>,
+    deltas: BTreeMap<V, KvvOp>,
 }
 
 impl<V: Ord + Eq> ValuesDelta<V> {
@@ -105,7 +105,7 @@ where
 
         let from_scratch_space = deltas
             .iter()
-            .filter(|(_v, op)| **op == Op::Insert)
+            .filter(|(_v, op)| **op == KvvOp::Insert)
             .map(|(v, _op)| Ok(v.clone()));
 
         let iter = if *delete_all {
@@ -134,7 +134,7 @@ where
             .entry(k)
             .or_default()
             .deltas
-            .insert(v, Op::Insert);
+            .insert(v, KvvOp::Insert);
     }
 
     /// Update the scratch space to record a Delete operation for the KV
@@ -143,7 +143,7 @@ where
             .entry(k)
             .or_default()
             .deltas
-            .insert(v, Op::Delete);
+            .insert(v, KvvOp::Delete);
     }
 
     /// Clear the scratch space and record a DeleteAll operation
@@ -218,7 +218,7 @@ where
     }
 
     fn flush_to_txn(self, writer: &mut Writer) -> DatabaseResult<()> {
-        use Op::*;
+        use KvvOp::*;
         if self.is_clean() {
             return Ok(());
         }

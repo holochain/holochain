@@ -1,7 +1,7 @@
 use crate::{
     env::{ReadManager, WriteManager},
     error::{DatabaseError, DatabaseResult},
-    next::{kvv::KvvBufUsed, kvv::Op, kvv::ValuesDelta, BufferedStore},
+    next::{kvv::KvvBufUsed, kvv::KvvOp, kvv::ValuesDelta, BufferedStore},
     test_utils::{test_cell_env, DbString},
     transaction::Readable,
 };
@@ -16,7 +16,7 @@ type Store = KvvBufUsed<DbString, V>;
 
 fn test_buf(
     a: &BTreeMap<DbString, ValuesDelta<V>>,
-    b: impl Iterator<Item = (DbString, Vec<(V, Op)>)>,
+    b: impl Iterator<Item = (DbString, Vec<(V, KvvOp)>)>,
 ) {
     for (k, v) in b {
         let val = a.get(&k).expect("Missing key");
@@ -30,7 +30,7 @@ fn test_persisted<R: Readable>(r: &R, a: &Store, b: impl Iterator<Item = (DbStri
     }
 }
 
-fn test_get(a: &BTreeMap<V, Op>, b: impl Iterator<Item = (V, Op)>) {
+fn test_get(a: &BTreeMap<V, KvvOp>, b: impl Iterator<Item = (V, KvvOp)>) {
     for (k, v) in b {
         let val = a.get(&k).expect("Missing key");
         assert_eq!(*val, v);
@@ -403,7 +403,7 @@ async fn kvv_deleted_persisted() -> DatabaseResult<()> {
 
 #[tokio::test(threaded_scheduler)]
 async fn kvv_deleted_buffer() -> DatabaseResult<()> {
-    use Op::*;
+    use KvvOp::*;
     holochain_types::observability::test_run().ok();
     let arc = test_cell_env();
     let env = arc.guard().await;

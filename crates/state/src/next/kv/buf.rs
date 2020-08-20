@@ -17,6 +17,9 @@ use fallible_iterator::FallibleIterator;
 use rkv::{IntegerStore, SingleStore};
 use std::collections::BTreeMap;
 
+#[cfg(test)]
+mod tests;
+
 pub type KvBufUsed<K, V> = Used<K, V, KvStore<K, V>>;
 pub type KvBufFresh<K, V> = Fresh<K, V, KvStore<K, V>>;
 pub type KvIntBufUsed<V> = Used<IntKey, V, KvIntStore<V>>;
