@@ -1,6 +1,11 @@
-use super::{DrainIter, SingleIter, SingleIterFrom, SingleIterKeyMatch};
 use crate::env::ReadManager;
-use crate::next::{check_empty_key, kv::KvStore, BufKey, BufVal, BufferedStore};
+use crate::next::kv::generic::KvStoreT;
+use crate::next::{
+    check_empty_key,
+    iter::{DrainIter, SingleIter, SingleIterFrom, SingleIterKeyMatch},
+    kv::KvStore,
+    BufKey, BufVal, BufferedStore,
+};
 use crate::{
     env::EnvironmentRead,
     error::{DatabaseError, DatabaseResult},

@@ -1,6 +1,3 @@
-// FIXME: remove
-#![allow(dead_code)]
-
 use crate::error::DatabaseError;
 use crate::next::{kv::KvOp, BufVal};
 use fallible_iterator::{DoubleEndedFallibleIterator, FallibleIterator};

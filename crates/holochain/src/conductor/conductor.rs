@@ -8,7 +8,6 @@
 //! In normal use cases, a single Holochain user runs a single Conductor in a single process.
 //! However, there's no reason we can't have multiple Conductors in a single process, simulating multiple
 //! users in a testing environment.
-
 use super::{
     api::{CellConductorApi, CellConductorApiT, RealAdminInterfaceApi, RealAppInterfaceApi},
     config::{AdminInterfaceConfig, InterfaceDriver},
@@ -47,7 +46,10 @@ use holochain_state::{
     db,
     env::{EnvironmentWrite, ReadManager},
     exports::SingleStore,
-    next::{kv::KvStore, UnitDbKey},
+    next::{
+        kv::{KvStore, KvStoreT},
+        UnitDbKey,
+    },
     prelude::*,
 };
 use holochain_types::{

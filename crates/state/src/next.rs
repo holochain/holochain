@@ -7,7 +7,10 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::hash::Hash;
 
 pub mod cas;
+pub mod iter;
+pub mod iv;
 pub mod kv;
+pub mod kvv;
 
 // Empty keys break lmdb
 pub(super) fn check_empty_key<K: BufKey>(k: &K) -> DatabaseResult<()> {
@@ -42,8 +45,8 @@ pub trait BufKey: Ord + Eq + AsRef<[u8]> + From<Vec<u8>> + Into<Vec<u8>> + Send 
 impl<T> BufKey for T where T: Ord + Eq + AsRef<[u8]> + From<Vec<u8>> + Into<Vec<u8>> + Send + Sync {}
 
 /// Trait alias for the combination of constraints needed for keys in [IntKvBuf](kv_int::IntKvBuf)
-pub trait BufIntKey: Hash + Ord + Eq + rkv::store::integer::PrimitiveInt + Send + Sync {}
-impl<T> BufIntKey for T where T: Hash + Ord + Eq + rkv::store::integer::PrimitiveInt + Send + Sync {}
+pub trait BufIntKey: Ord + Eq + rkv::store::integer::PrimitiveInt + Send + Sync {}
+impl<T> BufIntKey for T where T: Ord + Eq + rkv::store::integer::PrimitiveInt + Send + Sync {}
 
 /// Trait alias for the combination of constraints needed for values in [KvBuf](kv::KvBuf) and [IntKvBuf](kv_int::IntKvBuf)
 pub trait BufVal: Clone + Serialize + DeserializeOwned + std::fmt::Debug + Send + Sync {}

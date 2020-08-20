@@ -1,4 +1,5 @@
 use super::KvBufUsed;
+use crate::next::kv::generic::KvStoreT;
 use crate::{
     env::{ReadManager, WriteManager},
     error::{DatabaseError, DatabaseResult},
