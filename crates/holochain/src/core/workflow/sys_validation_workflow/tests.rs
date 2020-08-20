@@ -1,7 +1,9 @@
-use super::SysValidationWorkspace;
 use crate::{
     conductor::{dna_store::MockDnaStore, ConductorHandle},
-    core::state::{validation_db::ValidationLimboStatus, workspace::Workspace},
+    core::{
+        state::{validation_db::ValidationLimboStatus, workspace::Workspace},
+        workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace,
+    },
     test_utils::{host_fn_api::*, setup_app},
 };
 use ::fixt::prelude::*;
@@ -84,7 +86,7 @@ async fn run_test(
         let env_ref = alice_env.guard().await;
         let dbs = alice_env.dbs().await;
         let reader = env_ref.reader().unwrap();
-        let workspace = SysValidationWorkspace::new(&reader, &dbs).unwrap();
+        let workspace = IncomingDhtOpsWorkspace::new(&reader, &dbs).unwrap();
         // Validation should be empty
         assert_eq!(
             workspace.validation_limbo.iter().unwrap().count().unwrap(),
@@ -121,7 +123,7 @@ async fn run_test(
         let env_ref = alice_env.guard().await;
         let dbs = alice_env.dbs().await;
         let reader = env_ref.reader().unwrap();
-        let workspace = SysValidationWorkspace::new(&reader, &dbs).unwrap();
+        let workspace = IncomingDhtOpsWorkspace::new(&reader, &dbs).unwrap();
         // Validation should still contain bobs link pending because the target was missing
         assert_eq!(
             workspace
@@ -171,7 +173,7 @@ async fn run_test(
         let env_ref = alice_env.guard().await;
         let dbs = alice_env.dbs().await;
         let reader = env_ref.reader().unwrap();
-        let workspace = SysValidationWorkspace::new(&reader, &dbs).unwrap();
+        let workspace = IncomingDhtOpsWorkspace::new(&reader, &dbs).unwrap();
         // Still contains the op from before
         assert_eq!(
             workspace

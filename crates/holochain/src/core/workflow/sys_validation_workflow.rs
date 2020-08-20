@@ -7,9 +7,7 @@ use crate::{
         queue_consumer::{OneshotWriter, TriggerSender, WorkComplete},
         state::{
             cascade::Cascade,
-            dht_op_integration::{
-                IntegratedDhtOpsStore, IntegrationLimboStore, IntegrationLimboValue,
-            },
+            dht_op_integration::{IntegrationLimboStore, IntegrationLimboValue},
             element_buf::ElementBuf,
             metadata::MetadataBuf,
             validation_db::{ValidationLimboStatus, ValidationLimboStore, ValidationLimboValue},
@@ -25,7 +23,7 @@ use holochain_keystore::Signature;
 use holochain_p2p::HolochainP2pCell;
 use holochain_state::{
     buffer::{BufferedStore, KvBuf},
-    db::{INTEGRATED_DHT_OPS, INTEGRATION_LIMBO},
+    db::INTEGRATION_LIMBO,
     prelude::{GetDb, Reader, Writer},
 };
 use holochain_types::{
@@ -437,7 +435,6 @@ fn update_check(entry_update: &EntryUpdate, original_header: &Header) -> SysVali
 
 pub struct SysValidationWorkspace<'env> {
     pub integration_limbo: IntegrationLimboStore<'env>,
-    pub integrated_dht_ops: IntegratedDhtOpsStore<'env>,
     pub validation_limbo: ValidationLimboStore<'env>,
     pub element_vault: ElementBuf<'env>,
     pub meta_vault: MetadataBuf<'env>,
@@ -459,9 +456,6 @@ impl<'env: 'a, 'a> SysValidationWorkspace<'env> {
 
 impl<'env> Workspace<'env> for SysValidationWorkspace<'env> {
     fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self> {
-        let db = dbs.get_db(&*INTEGRATED_DHT_OPS)?;
-        let integrated_dht_ops = KvBuf::new(reader, db)?;
-
         let db = dbs.get_db(&*INTEGRATION_LIMBO)?;
         let integration_limbo = KvBuf::new(reader, db)?;
 
@@ -474,7 +468,6 @@ impl<'env> Workspace<'env> for SysValidationWorkspace<'env> {
 
         Ok(Self {
             integration_limbo,
-            integrated_dht_ops,
             validation_limbo,
             element_vault,
             meta_vault,

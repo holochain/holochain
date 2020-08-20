@@ -1,7 +1,8 @@
-use super::validation::IncomingDhtOpsWorkspace;
 use crate::{
     conductor::manager::spawn_task_manager,
-    core::state::workspace::Workspace,
+    core::{
+        state::workspace::Workspace, workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace,
+    },
     fixt::{DnaFileFixturator, SignatureFixturator},
 };
 use ::fixt::prelude::*;
