@@ -15,7 +15,7 @@ pub trait KvStoreT<K, V> {
     /// Put V into DB as serialized data
     fn put(&self, writer: &mut Writer, k: &K, v: &V) -> DatabaseResult<()>;
 
-    /// Delete value from DB
+    /// Delete value from DB by key
     fn delete(&self, writer: &mut Writer, k: &K) -> DatabaseResult<()>;
 
     /// Iterate over the underlying persisted data

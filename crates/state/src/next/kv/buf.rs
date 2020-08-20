@@ -1,10 +1,11 @@
+use super::KvIntStore;
 use crate::env::ReadManager;
 use crate::next::kv::generic::KvStoreT;
 use crate::next::{
     check_empty_key,
     iter::{DrainIter, SingleIter, SingleIterFrom, SingleIterKeyMatch},
     kv::KvStore,
-    BufKey, BufVal, BufferedStore,
+    BufKey, BufVal, BufferedStore, IntKey,
 };
 use crate::{
     env::EnvironmentRead,
@@ -12,33 +13,59 @@ use crate::{
     prelude::{Readable, Writer},
 };
 use fallible_iterator::FallibleIterator;
-use rkv::SingleStore;
+use rkv::{IntegerStore, SingleStore};
 use std::collections::BTreeMap;
+
+pub type KvBufUsed<K, V> = Used<K, V, KvStore<K, V>>;
+pub type KvBufFresh<K, V> = Fresh<K, V, KvStore<K, V>>;
+pub type KvIntBufUsed<V> = Used<IntKey, V, KvIntStore<V>>;
+pub type KvIntBufFresh<V> = Fresh<IntKey, V, KvIntStore<V>>;
 
 type Scratch<V> = BTreeMap<Vec<u8>, KvOp<V>>;
 
 /// Transactional operations on a KV store
-/// Put: add or replace this KV
-/// Delete: remove the KV
 #[derive(Clone, Debug, PartialEq)]
 pub enum KvOp<V> {
+    /// add or replace the value at a key
     Put(Box<V>),
+    /// remove the value at a key
     Delete,
 }
 
-/// A persisted key-value store with a transient HashMap to store
-/// CRUD-like changes without opening a blocking read-write cursor
-pub struct KvBufUsed<K, V>
+pub struct Used<K, V, Store>
 where
     K: BufKey,
     V: BufVal,
+    Store: KvStoreT<K, V>,
 {
-    store: KvStore<K, V>,
+    store: Store,
     scratch: Scratch<V>,
     __phantom: std::marker::PhantomData<K>,
 }
 
-impl<'env, K, V> KvBufUsed<K, V>
+impl<'env, V> Used<IntKey, V, KvIntStore<V>>
+where
+    V: BufVal,
+{
+    /// Constructor
+    // FIXME: why does this conflict with the other `new` when it's called just "new"?
+    pub fn new_int(db: IntegerStore<IntKey>) -> DatabaseResult<Self> {
+        Ok(Self {
+            store: KvIntStore::new(db),
+            scratch: BTreeMap::new(),
+            __phantom: std::marker::PhantomData,
+        })
+    }
+
+    // TODO: This should be cfg test but can't because it's in a different crate
+    /// Clear all scratch and db, useful for tests
+    pub fn clear_all(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
+        self.scratch.clear();
+        Ok(self.store.delete_all(writer)?)
+    }
+}
+
+impl<'env, K, V> Used<K, V, KvStore<K, V>>
 where
     K: BufKey,
     V: BufVal,
@@ -52,7 +79,21 @@ where
         })
     }
 
-    pub fn store(&self) -> &KvStore<K, V> {
+    // TODO: This should be cfg test but can't because it's in a different crate
+    /// Clear all scratch and db, useful for tests
+    pub fn clear_all(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
+        self.scratch.clear();
+        Ok(self.store.delete_all(writer)?)
+    }
+}
+
+impl<'env, K, V, Store> Used<K, V, Store>
+where
+    K: BufKey,
+    V: BufVal,
+    Store: KvStoreT<K, V>,
+{
+    pub fn store(&self) -> &Store {
         &self.store
     }
 
@@ -165,25 +206,19 @@ where
     ) -> DatabaseResult<fallible_iterator::Rev<DrainIter<'a, '_, V>>> {
         Ok(self.drain_iter(r)?.rev())
     }
-
-    // TODO: This should be cfg test but can't because it's in a different crate
-    /// Clear all scratch and db, useful for tests
-    pub fn clear_all(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
-        self.scratch.clear();
-        Ok(self.store.delete_all(writer)?)
-    }
 }
 
 #[derive(shrinkwraprs::Shrinkwrap)]
 #[shrinkwrap(mutable, unsafe_ignore_visibility)]
-pub struct KvBufFresh<K, V>
+pub struct Fresh<K, V, Store>
 where
     K: BufKey,
     V: BufVal,
+    Store: KvStoreT<K, V>,
 {
     env: EnvironmentRead,
     #[shrinkwrap(main_field)]
-    inner: KvBufUsed<K, V>,
+    inner: Used<K, V, Store>,
 }
 
 macro_rules! fresh_reader {
@@ -196,19 +231,39 @@ macro_rules! fresh_reader {
 
 type IterOwned<V> = Vec<(Vec<u8>, V)>;
 
-impl<'env, K, V> KvBufFresh<K, V>
+impl<K, V> Fresh<K, V, KvStore<K, V>>
 where
     K: BufKey,
     V: BufVal,
 {
-    /// Create a new KvBufUsed from a read-only transaction and a database reference
+    /// Create a new Fresh from a read-only transaction and a database reference
     pub fn new(env: EnvironmentRead, db: SingleStore) -> DatabaseResult<Self> {
         Ok(Self {
             env,
-            inner: KvBufUsed::new(db)?,
+            inner: Used::new(db)?,
         })
     }
+}
 
+impl<V> Fresh<IntKey, V, KvIntStore<V>>
+where
+    V: BufVal,
+{
+    /// Create a new Fresh from a read-only transaction and a database reference
+    pub fn new(env: EnvironmentRead, db: IntegerStore<IntKey>) -> DatabaseResult<Self> {
+        Ok(Self {
+            env,
+            inner: Used::new_int(db)?,
+        })
+    }
+}
+
+impl<K, V, Store> Fresh<K, V, Store>
+where
+    K: BufKey,
+    V: BufVal,
+    Store: KvStoreT<K, V>,
+{
     /// See if a value exists, avoiding deserialization
     pub async fn contains(&self, k: &K) -> DatabaseResult<bool> {
         fresh_reader!(self, |reader| self.inner.contains(&reader, k))
@@ -312,5 +367,3 @@ where
         self.inner.flush_to_txn(writer)
     }
 }
-
-/////////////////////////////////
