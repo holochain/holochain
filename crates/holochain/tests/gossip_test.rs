@@ -1,12 +1,12 @@
 use hdk3::prelude::*;
 use holochain::conductor::{
     api::{AppInterfaceApi, AppRequest, AppResponse, RealAppInterfaceApi},
-    config::{AdminInterfaceConfig, ConductorConfig, InterfaceDriver},
     dna_store::MockDnaStore,
-    ConductorBuilder, ConductorHandle,
 };
-use holochain::core::ribosome::ZomeCallInvocation;
-use holochain_state::test_utils::{test_conductor_env, test_wasm_env, TestEnvironment};
+use holochain::{
+    core::ribosome::ZomeCallInvocation,
+    test_utils::{install_app, setup_app},
+};
 use holochain_types::app::InstalledCell;
 use holochain_types::cell::CellId;
 use holochain_types::dna::DnaDef;
@@ -15,8 +15,6 @@ use holochain_types::test_utils::fake_agent_pubkey_1;
 use holochain_types::{observability, test_utils::fake_agent_pubkey_2};
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::HostInput;
-use std::sync::Arc;
-use tempdir::TempDir;
 
 use matches::assert_matches;
 use test_wasm_common::{AnchorInput, TestString};
@@ -85,7 +83,11 @@ async fn gossip_test() {
         .times(2)
         .return_const(());
 
-    let (_tmpdir, app_api, handle) = setup_app(vec![(alice_installed_cell, None)], dna_store).await;
+    let (_tmpdir, app_api, handle) = setup_app(
+        vec![("alice app", vec![(alice_installed_cell, None)])],
+        dna_store,
+    )
+    .await;
 
     // /////////////
     // END CONDUCTOR
@@ -157,53 +159,4 @@ where
         payload: HostInput::new(payload.try_into()?),
         provenance: cell_id.agent_pubkey().clone(),
     })
-}
-pub async fn install_app(
-    name: &str,
-    cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
-    conductor_handle: ConductorHandle,
-) {
-    conductor_handle
-        .clone()
-        .install_app(name.to_string(), cell_data)
-        .await
-        .unwrap();
-
-    conductor_handle
-        .activate_app(name.to_string())
-        .await
-        .unwrap();
-
-    let errors = conductor_handle.setup_cells().await.unwrap();
-
-    assert!(errors.is_empty());
-}
-
-pub async fn setup_app(
-    cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
-    dna_store: MockDnaStore,
-) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
-    let test_env = test_conductor_env();
-    let TestEnvironment {
-        env: wasm_env,
-        tmpdir: _tmpdir,
-    } = test_wasm_env();
-    let tmpdir = test_env.tmpdir.clone();
-
-    let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
-        .config(ConductorConfig {
-            admin_interfaces: Some(vec![AdminInterfaceConfig {
-                driver: InterfaceDriver::Websocket { port: 0 },
-            }]),
-            ..Default::default()
-        })
-        .test(test_env, wasm_env)
-        .await
-        .unwrap();
-
-    install_app("alice_app", cell_data, conductor_handle.clone()).await;
-
-    let handle = conductor_handle.clone();
-
-    (tmpdir, RealAppInterfaceApi::new(conductor_handle), handle)
 }

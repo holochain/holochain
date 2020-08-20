@@ -71,6 +71,8 @@ use tracing::*;
 #[cfg(test)]
 use super::state::ConductorState;
 #[cfg(test)]
+use crate::core::queue_consumer::InitialQueueTriggers;
+#[cfg(test)]
 use holochain_state::env::EnvironmentWrite;
 use holochain_zome_types::entry_def::EntryDef;
 
@@ -175,6 +177,11 @@ pub trait ConductorHandleT: Send + Sync {
     // HACK: remove when B-01593 lands
     #[cfg(test)]
     async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite>;
+
+    // HACK: remove when B-01593 lands
+    #[cfg(test)]
+    async fn get_cell_triggers(&self, cell_id: &CellId)
+        -> ConductorApiResult<InitialQueueTriggers>;
 
     // HACK: remove when B-01593 lands
     #[cfg(test)]
@@ -401,6 +408,16 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     #[cfg(test)]
+    async fn get_cell_triggers(
+        &self,
+        cell_id: &CellId,
+    ) -> ConductorApiResult<InitialQueueTriggers> {
+        let lock = self.conductor.read().await;
+        let cell = lock.cell_by_id(cell_id)?;
+        Ok(cell.triggers().clone())
+    }
+
+    #[cfg(test)]
     async fn get_state_from_handle(&self) -> ConductorApiResult<ConductorState> {
         let lock = self.conductor.read().await;
         Ok(lock.get_state_from_handle().await?)
@@ -478,6 +495,12 @@ pub mod mock {
 
             #[cfg(test)]
             fn sync_get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite>;
+
+            #[cfg(test)]
+            fn sync_get_cell_triggers(
+                &self,
+                cell_id: &CellId,
+            ) -> ConductorApiResult<InitialQueueTriggers>;
 
             #[cfg(test)]
             fn sync_get_state_from_handle(&self) -> ConductorApiResult<ConductorState>;
@@ -603,6 +626,15 @@ pub mod mock {
         #[cfg(test)]
         async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite> {
             self.sync_get_cell_env(cell_id)
+        }
+
+        // HACK: remove when B-01593 lands
+        #[cfg(test)]
+        async fn get_cell_triggers(
+            &self,
+            cell_id: &CellId,
+        ) -> ConductorApiResult<InitialQueueTriggers> {
+            self.sync_get_cell_triggers(cell_id)
         }
 
         // HACK: remove when B-01593 lands

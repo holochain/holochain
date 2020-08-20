@@ -1,3 +1,9 @@
+use crate::conductor::{
+    api::RealAppInterfaceApi,
+    config::{AdminInterfaceConfig, ConductorConfig, InterfaceDriver},
+    dna_store::MockDnaStore,
+    ConductorBuilder, ConductorHandle,
+};
 use ::fixt::prelude::*;
 use holo_hash::fixt::*;
 use holo_hash::*;
@@ -6,15 +12,21 @@ use holochain_p2p::{
     actor::HolochainP2pRefToCell, event::HolochainP2pEventReceiver, spawn_holochain_p2p,
     HolochainP2pCell, HolochainP2pRef, HolochainP2pSender,
 };
-use holochain_serialized_bytes::UnsafeBytes;
+use holochain_serialized_bytes::{SerializedBytes, UnsafeBytes};
+use holochain_state::test_utils::{test_conductor_env, test_wasm_env, TestEnvironment};
 use holochain_types::{
+    app::InstalledCell,
     element::{SignedHeaderHashed, SignedHeaderHashedExt},
     test_utils::fake_header_hash,
     Entry, EntryHashed, HeaderHashed, Timestamp,
 };
 use holochain_zome_types::entry_def::EntryVisibility;
 use holochain_zome_types::header::{EntryCreate, EntryType, Header};
-use std::convert::TryInto;
+use std::{convert::TryInto, sync::Arc};
+use tempdir::TempDir;
+
+#[cfg(test)]
+pub mod host_fn_api;
 
 #[macro_export]
 macro_rules! here {
@@ -105,4 +117,58 @@ pub async fn test_network(
     let cell_network = network.to_cell(dna.clone(), agent_key.clone());
     network.join(dna.clone(), agent_key).await.unwrap();
     (network, recv, cell_network)
+}
+
+pub async fn install_app(
+    name: &str,
+    cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
+    conductor_handle: ConductorHandle,
+) {
+    conductor_handle
+        .clone()
+        .install_app(name.to_string(), cell_data)
+        .await
+        .unwrap();
+
+    conductor_handle
+        .activate_app(name.to_string())
+        .await
+        .unwrap();
+
+    let errors = conductor_handle.setup_cells().await.unwrap();
+
+    assert!(errors.is_empty());
+}
+
+/// Setup an app for testing
+/// apps_data is a vec of app nicknames with vecs of their cell data
+pub async fn setup_app(
+    apps_data: Vec<(&str, Vec<(InstalledCell, Option<SerializedBytes>)>)>,
+    dna_store: MockDnaStore,
+) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
+    let test_env = test_conductor_env();
+    let TestEnvironment {
+        env: wasm_env,
+        tmpdir: _tmpdir,
+    } = test_wasm_env();
+    let tmpdir = test_env.tmpdir.clone();
+
+    let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
+        .config(ConductorConfig {
+            admin_interfaces: Some(vec![AdminInterfaceConfig {
+                driver: InterfaceDriver::Websocket { port: 0 },
+            }]),
+            ..Default::default()
+        })
+        .test(test_env, wasm_env)
+        .await
+        .unwrap();
+
+    for (app_name, cell_data) in apps_data {
+        install_app(app_name, cell_data, conductor_handle.clone()).await;
+    }
+
+    let handle = conductor_handle.clone();
+
+    (tmpdir, RealAppInterfaceApi::new(conductor_handle), handle)
 }

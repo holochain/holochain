@@ -108,6 +108,7 @@ pub async fn spawn_queue_consumer_tasks(
     }
 }
 
+#[derive(Clone)]
 /// The entry points for kicking off a chain reaction of queue activity
 pub struct InitialQueueTriggers {
     /// Notify the SysValidation workflow to run, i.e. after handling gossip

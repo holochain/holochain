@@ -1238,6 +1238,7 @@ dependencies = [
  "must_future",
  "nanoid",
  "num_cpus",
+ "observability",
  "parking_lot",
  "predicates",
  "pretty_assertions",

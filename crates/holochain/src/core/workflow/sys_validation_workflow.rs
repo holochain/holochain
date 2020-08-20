@@ -42,6 +42,9 @@ use types::{DhtOpOrder, Outcome};
 
 mod types;
 
+#[cfg(test)]
+mod tests;
+
 #[instrument(skip(workspace, writer, trigger_app_validation, network, conductor_api))]
 pub async fn sys_validation_workflow(
     mut workspace: SysValidationWorkspace<'_>,
@@ -70,6 +73,7 @@ async fn sys_validation_workflow_inner(
     network: HolochainP2pCell,
     conductor_api: impl CellConductorApiT,
 ) -> WorkflowResult<WorkComplete> {
+    debug!(msg = "starting sys val", agent = ?conductor_api.cell_id().agent_pubkey());
     // Drain all the ops
     let mut ops: Vec<ValidationLimboValue> = workspace
         .validation_limbo
@@ -93,6 +97,8 @@ async fn sys_validation_workflow_inner(
     // Process each op
     for mut vlv in ops {
         let outcome = validate_op(&vlv.op, workspace, network.clone(), &conductor_api).await?;
+
+        debug!(?outcome, agent = ?conductor_api.cell_id().agent_pubkey());
 
         // TODO: When we introduce abandoning ops make
         // sure they are not written to any outgoing
@@ -131,6 +137,7 @@ async fn sys_validation_workflow_inner(
             }
             Outcome::MissingDhtDep => {
                 vlv.status = ValidationLimboStatus::Pending;
+                debug!(?vlv.num_tries, %vlv.time_added);
                 to_val_limbo(vlv, workspace).await?;
             }
             Outcome::Rejected => {
@@ -142,6 +149,7 @@ async fn sys_validation_workflow_inner(
             }
         }
     }
+    debug!(msg = "finishing sys val", agent = ?conductor_api.cell_id().agent_pubkey());
     Ok(WorkComplete::Complete)
 }
 

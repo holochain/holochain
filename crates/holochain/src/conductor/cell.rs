@@ -672,7 +672,6 @@ impl Cell {
 
     #[instrument(skip(self, invocation))]
     /// Function called by the Conductor
-    #[instrument(skip(self))]
     pub async fn call_zome(
         &self,
         invocation: ZomeCallInvocation,
@@ -778,6 +777,14 @@ impl Cell {
     // TODO: reevaluate once Workflows are fully implemented (after B-01567)
     pub(crate) fn state_env(&self) -> &EnvironmentWrite {
         &self.state_env
+    }
+
+    #[cfg(test)]
+    /// Get the triggers for the cell
+    /// Useful for testing when you want to
+    /// Cause workflows to trigger
+    pub(crate) fn triggers(&self) -> &InitialQueueTriggers {
+        &self.queue_triggers
     }
 }
 
