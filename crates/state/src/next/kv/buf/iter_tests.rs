@@ -1,15 +1,19 @@
-use super::tests::{TestBuf, VFixturator, V};
-use super::{BufferedStore, KvBuf};
+use super::tests::{VFixturator, V};
+use super::{BufferedStore, KvBufUsed};
+use crate::next::kv::generic::KvStoreT;
 use crate::{
     env::{ReadManager, WriteManager},
     error::DatabaseError,
-    test_utils::test_cell_env,
+    prelude::Readable,
+    test_utils::{test_cell_env, DbString},
 };
 use ::fixt::prelude::*;
 use fallible_iterator::{DoubleEndedFallibleIterator, FallibleIterator};
 use rkv::StoreOptions;
 use std::collections::BTreeMap;
 use tracing::*;
+
+pub(super) type Store = KvBufUsed<DbString, V>;
 
 #[tokio::test(threaded_scheduler)]
 async fn kv_iter_from_partial() {
@@ -20,31 +24,29 @@ async fn kv_iter_from_partial() {
         .open_single("kv", StoreOptions::create())
         .unwrap();
 
-    env.with_reader::<DatabaseError, _, _>(|reader| {
-        let mut buf: TestBuf = KvBuf::new(&reader, db).unwrap();
+    {
+        let mut buf: Store = KvBufUsed::new(db).unwrap();
 
-        buf.put("a", V(101)).unwrap();
-        buf.put("b", V(102)).unwrap();
-        buf.put("dogs_likes_7", V(1)).unwrap();
-        buf.put("dogs_likes_79", V(2)).unwrap();
-        buf.put("dogs_likes_3", V(3)).unwrap();
-        buf.put("dogs_likes_88", V(4)).unwrap();
-        buf.put("dogs_likes_f", V(5)).unwrap();
-        buf.put("d", V(103)).unwrap();
-        buf.put("e", V(104)).unwrap();
-        buf.put("aaaaaaaaaaaaaaaaaaaa", V(105)).unwrap();
-        buf.put("eeeeeeeeeeeeeeeeeeee", V(106)).unwrap();
+        buf.put("a".into(), V(101)).unwrap();
+        buf.put("b".into(), V(102)).unwrap();
+        buf.put("dogs_likes_7".into(), V(1)).unwrap();
+        buf.put("dogs_likes_79".into(), V(2)).unwrap();
+        buf.put("dogs_likes_3".into(), V(3)).unwrap();
+        buf.put("dogs_likes_88".into(), V(4)).unwrap();
+        buf.put("dogs_likes_f".into(), V(5)).unwrap();
+        buf.put("d".into(), V(103)).unwrap();
+        buf.put("e".into(), V(104)).unwrap();
+        buf.put("aaaaaaaaaaaaaaaaaaaa".into(), V(105)).unwrap();
+        buf.put("eeeeeeeeeeeeeeeeeeee".into(), V(106)).unwrap();
 
         env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
             .unwrap();
-        Ok(())
-    })
-    .unwrap();
+    }
 
     env.with_reader::<DatabaseError, _, _>(|reader| {
-        let buf: TestBuf = KvBuf::new(&reader, db).unwrap();
+        let buf: Store = KvBufUsed::new(db).unwrap();
 
-        let iter = buf.iter_raw_from("dogs_likes").unwrap();
+        let iter = buf.store().iter_from(&reader, "dogs_likes".into()).unwrap();
         let results = iter.collect::<Vec<_>>().unwrap();
         assert_eq!(
             results,
@@ -65,21 +67,22 @@ async fn kv_iter_from_partial() {
 }
 
 enum TestData {
-    Put((String, V)),
-    Del(String),
+    Put((DbString, V)),
+    Del(DbString),
 }
 
 // Runs the poor prop test
 // This generates an easy to copy and paste
 // Vec of values to use for a test if a bug is found
 // and prints iton failure
-fn do_test(
-    buf: &mut KvBuf<String, V>,
+fn do_test<R: Readable>(
+    reader: &R,
+    buf: &mut Store,
     puts_dels_iter: &mut impl Iterator<Item = TestData>,
-    expected_state: &mut BTreeMap<String, V>,
+    expected_state: &mut BTreeMap<DbString, V>,
     runs: &mut Vec<String>,
     reproduce: &mut Vec<String>,
-    from_key: &String,
+    from_key: &DbString,
 ) {
     let mut rng = rand::thread_rng();
     for _ in 0..rng.gen_range(1, 300) {
@@ -103,12 +106,12 @@ fn do_test(
         }
     }
     // Remove any empty keys
-    expected_state.remove("");
+    expected_state.remove(&"".into());
     // Check single iter
     assert_eq!(
-        buf.iter()
+        buf.iter(reader)
             .unwrap()
-            .map(|(k, v)| Ok((String::from_utf8(k.to_vec()).unwrap(), v)))
+            .map(|(k, v)| Ok((DbString::from(k.to_vec()), v)))
             .inspect(|(k, v)| Ok(trace!(?k, ?v)))
             .collect::<Vec<_>>()
             .unwrap(),
@@ -122,14 +125,14 @@ fn do_test(
     );
     // Check iter from
     assert_eq!(
-        buf.iter_from(from_key.clone())
+        buf.iter_from(reader, from_key.clone())
             .unwrap()
-            .map(|(k, v)| Ok((String::from_utf8(k.to_vec()).unwrap(), v)))
+            .map(|(k, v)| Ok((DbString::from(k.to_vec()), v)))
             .inspect(|(k, v)| Ok(trace!(?k, ?v)))
             .collect::<Vec<_>>()
             .unwrap(),
         expected_state
-            .range::<String, _>(from_key..)
+            .range::<DbString, _>(from_key..)
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect::<Vec<_>>(),
         "{}\n{}];\n from_key: {:?}",
@@ -139,9 +142,9 @@ fn do_test(
     );
     // Check reverse
     assert_eq!(
-        buf.iter_reverse()
+        buf.iter_reverse(reader)
             .unwrap()
-            .map(|(k, v)| Ok((String::from_utf8(k.to_vec()).unwrap(), v)))
+            .map(|(k, v)| Ok((DbString::from(k.to_vec()), v)))
             .inspect(|(k, v)| Ok(trace!(?k, ?v)))
             .collect::<Vec<_>>()
             .unwrap(),
@@ -157,12 +160,13 @@ fn do_test(
 }
 
 // Runs the found bugs tests
-fn re_do_test(
-    buf: &mut KvBuf<String, V>,
+fn re_do_test<R: Readable>(
+    reader: &R,
+    buf: &mut Store,
     puts_dels_iter: &mut impl Iterator<Item = TestData>,
-    expected_state: &mut BTreeMap<String, V>,
+    expected_state: &mut BTreeMap<DbString, V>,
     runs: &mut Vec<String>,
-    from_key: &String,
+    from_key: &DbString,
 ) {
     while let Some(td) = puts_dels_iter.next() {
         match td {
@@ -178,11 +182,11 @@ fn re_do_test(
             }
         }
     }
-    expected_state.remove("");
+    expected_state.remove(&"".into());
     assert_eq!(
-        buf.iter()
+        buf.iter(reader)
             .unwrap()
-            .map(|(k, v)| Ok((String::from_utf8(k.to_vec()).unwrap(), v)))
+            .map(|(k, v)| Ok((DbString::from(k.to_vec()), v)))
             .inspect(|(k, v)| Ok(trace!(?k, ?v)))
             .collect::<Vec<_>>()
             .unwrap(),
@@ -194,23 +198,23 @@ fn re_do_test(
         runs.concat(),
     );
     assert_eq!(
-        buf.iter_from(from_key.clone())
+        buf.iter_from(reader, from_key.clone())
             .unwrap()
-            .map(|(k, v)| Ok((String::from_utf8(k.to_vec()).unwrap(), v)))
+            .map(|(k, v)| Ok((DbString::from(k.to_vec()), v)))
             .inspect(|(k, v)| Ok(trace!(?k, ?v)))
             .collect::<Vec<_>>()
             .unwrap(),
         expected_state
-            .range::<String, _>(from_key..)
+            .range::<DbString, _>(from_key..)
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect::<Vec<_>>(),
         "{}",
         runs.concat(),
     );
     assert_eq!(
-        buf.iter_reverse()
+        buf.iter_reverse(reader)
             .unwrap()
-            .map(|(k, v)| Ok((String::from_utf8(k.to_vec()).unwrap(), v)))
+            .map(|(k, v)| Ok((DbString::from(k.to_vec()), v)))
             .inspect(|(k, v)| Ok(trace!(?k, ?v)))
             .collect::<Vec<_>>()
             .unwrap(),
@@ -242,6 +246,7 @@ async fn kv_single_iter() {
     let td = StringFixturator::new(Unpredictable)
         .zip(VFixturator::new(Unpredictable))
         .filter(|(k, _)| k.len() > 0)
+        .map(|(k, v)| (DbString::from(k), v))
         .take(300)
         .collect::<BTreeMap<_, _>>();
     let td_vec = td.into_iter().collect::<Vec<_>>();
@@ -255,7 +260,7 @@ async fn kv_single_iter() {
     let puts_dels = puts
         .map(|p| {
             if rng.gen() {
-                TestData::Put(p)
+                TestData::Put(p.into())
             } else {
                 TestData::Del(dels.next().unwrap())
             }
@@ -263,16 +268,16 @@ async fn kv_single_iter() {
         .take(1000)
         .collect::<Vec<_>>();
     let mut puts_dels = puts_dels.into_iter();
-    let mut expected_state: BTreeMap<String, V> = BTreeMap::new();
+    let mut expected_state: BTreeMap<DbString, V> = BTreeMap::new();
 
     let span = trace_span!("kv_single_iter");
     let _g = span.enter();
 
-    let mut runs = vec!["Start | ".to_string()];
-    let mut reproduce = vec!["\nReproduce:\n".to_string()];
+    let mut runs = vec!["Start | ".into()];
+    let mut reproduce = vec!["\nReproduce:\n".into()];
 
     env.with_reader::<DatabaseError, _, _>(|reader| {
-        let mut buf: KvBuf<String, V> = KvBuf::new(&reader, db).unwrap();
+        let mut buf: Store = KvBufUsed::new(db).unwrap();
         let span = trace_span!("in_scratch");
         let _g = span.enter();
         runs.push(format!(
@@ -284,6 +289,7 @@ async fn kv_single_iter() {
             span.metadata().map(|f| f.name()).unwrap_or("")
         ));
         do_test(
+            &reader,
             &mut buf,
             &mut puts_dels,
             &mut expected_state,
@@ -298,7 +304,7 @@ async fn kv_single_iter() {
     .unwrap();
 
     env.with_reader::<DatabaseError, _, _>(|reader| {
-        let mut buf: KvBuf<String, V> = KvBuf::new(&reader, db).unwrap();
+        let mut buf: Store = KvBufUsed::new(db).unwrap();
         let span = trace_span!("in_db_first");
         let _g = span.enter();
         runs.push(format!(
@@ -310,6 +316,7 @@ async fn kv_single_iter() {
             span.metadata().map(|f| f.name()).unwrap_or("")
         ));
         do_test(
+            &reader,
             &mut buf,
             &mut puts_dels,
             &mut expected_state,
@@ -323,7 +330,7 @@ async fn kv_single_iter() {
     })
     .unwrap();
     env.with_reader::<DatabaseError, _, _>(|reader| {
-        let mut buf: KvBuf<String, V> = KvBuf::new(&reader, db).unwrap();
+        let mut buf: Store = KvBufUsed::new(db).unwrap();
         let span = trace_span!("in_db_second");
         let _g = span.enter();
         runs.push(format!(
@@ -335,6 +342,7 @@ async fn kv_single_iter() {
             span.metadata().map(|f| f.name()).unwrap_or("")
         ));
         do_test(
+            &reader,
             &mut buf,
             &mut puts_dels,
             &mut expected_state,
@@ -353,37 +361,37 @@ async fn kv_single_iter() {
 async fn kv_single_iter_found_1() {
     holochain_types::observability::test_run().ok();
     let in_scratch = vec![
-        TestData::Del(".".to_string()),
-        TestData::Put(("bar".to_string(), V(0))),
-        TestData::Put(("!".to_string(), V(0))),
-        TestData::Put(("💯".to_string(), V(889149878))),
-        TestData::Put(("bing".to_string(), V(823748021))),
-        TestData::Put(("foo".to_string(), V(3698192405))),
-        TestData::Del("💯".to_string()),
-        TestData::Del("bing".to_string()),
-        TestData::Put(("baz".to_string(), V(3224166057))),
-        TestData::Del("💩".to_string()),
-        TestData::Put(("baz".to_string(), V(3224166057))),
-        TestData::Put((".".to_string(), V(0))),
-        TestData::Del("❤".to_string()),
-        TestData::Put(("💯".to_string(), V(889149878))),
-        TestData::Put((".".to_string(), V(0))),
-        TestData::Del("bing".to_string()),
-        TestData::Put(("!".to_string(), V(0))),
-        TestData::Del("!".to_string()),
-        TestData::Del(".".to_string()),
+        TestData::Del(".".into()),
+        TestData::Put(("bar".into(), V(0))),
+        TestData::Put(("!".into(), V(0))),
+        TestData::Put(("💯".into(), V(889149878))),
+        TestData::Put(("bing".into(), V(823748021))),
+        TestData::Put(("foo".into(), V(3698192405))),
+        TestData::Del("💯".into()),
+        TestData::Del("bing".into()),
+        TestData::Put(("baz".into(), V(3224166057))),
+        TestData::Del("💩".into()),
+        TestData::Put(("baz".into(), V(3224166057))),
+        TestData::Put((".".into(), V(0))),
+        TestData::Del("❤".into()),
+        TestData::Put(("💯".into(), V(889149878))),
+        TestData::Put((".".into(), V(0))),
+        TestData::Del("bing".into()),
+        TestData::Put(("!".into(), V(0))),
+        TestData::Del("!".into()),
+        TestData::Del(".".into()),
     ];
     let in_db_first = vec![
-        TestData::Del("!".to_string()),
-        TestData::Del("foo".to_string()),
-        TestData::Del("foo".to_string()),
-        TestData::Put(("foo".to_string(), V(3698192405))),
-        TestData::Put(("bar".to_string(), V(0))),
-        TestData::Del("!".to_string()),
-        TestData::Del("💩".to_string()),
-        TestData::Put(("bar".to_string(), V(0))),
+        TestData::Del("!".into()),
+        TestData::Del("foo".into()),
+        TestData::Del("foo".into()),
+        TestData::Put(("foo".into(), V(3698192405))),
+        TestData::Put(("bar".into(), V(0))),
+        TestData::Del("!".into()),
+        TestData::Del("💩".into()),
+        TestData::Put(("bar".into(), V(0))),
     ];
-    let from_key = "foo".to_string();
+    let from_key = "foo".into();
     let in_db_second = vec![];
     let span = trace_span!("kv_single_iter_found_1");
     let _g = span.enter();
@@ -401,19 +409,10 @@ async fn kv_single_iter_found_1() {
 #[ignore] // david.b - should_panic tests don't work with abort TODO FIXME
 async fn kv_single_iter_found_2() {
     holochain_types::observability::test_run().ok();
-    let in_scratch = vec![
-        TestData::Del("".to_string()),
-        TestData::Put(("".to_string(), V(0))),
-    ];
-    let in_db_first = vec![
-        TestData::Del("".to_string()),
-        TestData::Put(("".to_string(), V(2))),
-    ];
-    let in_db_second = vec![
-        TestData::Del("".to_string()),
-        TestData::Put(("".to_string(), V(2))),
-    ];
-    let from_key = "foo".to_string();
+    let in_scratch = vec![TestData::Del("".into()), TestData::Put(("".into(), V(0)))];
+    let in_db_first = vec![TestData::Del("".into()), TestData::Put(("".into(), V(2)))];
+    let in_db_second = vec![TestData::Del("".into()), TestData::Put(("".into(), V(2)))];
+    let from_key = "foo".into();
     let span = trace_span!("kv_single_iter_found_2");
     let _g = span.enter();
     kv_single_iter_runner(
@@ -429,23 +428,23 @@ async fn kv_single_iter_found_2() {
 async fn kv_single_iter_found_3() {
     holochain_types::observability::test_run().ok();
     let in_scratch = vec![
-        TestData::Put(("m".to_string(), V(0))),
-        TestData::Put(("n".to_string(), V(0))),
-        TestData::Put(("o".to_string(), V(0))),
-        TestData::Put(("o".to_string(), V(0))),
-        TestData::Put(("p".to_string(), V(0))),
+        TestData::Put(("m".into(), V(0))),
+        TestData::Put(("n".into(), V(0))),
+        TestData::Put(("o".into(), V(0))),
+        TestData::Put(("o".into(), V(0))),
+        TestData::Put(("p".into(), V(0))),
     ];
     let in_db_first = vec![
-        TestData::Put(("o".to_string(), V(2))),
-        TestData::Put(("o".to_string(), V(2))),
-        TestData::Put(("o".to_string(), V(2))),
+        TestData::Put(("o".into(), V(2))),
+        TestData::Put(("o".into(), V(2))),
+        TestData::Put(("o".into(), V(2))),
     ];
     let in_db_second = vec![
-        TestData::Put(("o".to_string(), V(2))),
-        TestData::Del("o".to_string()),
-        TestData::Put(("o".to_string(), V(2))),
+        TestData::Put(("o".into(), V(2))),
+        TestData::Del("o".into()),
+        TestData::Put(("o".into(), V(2))),
     ];
-    let from_key = "o".to_string();
+    let from_key = "o".into();
     let span = trace_span!("kv_single_iter_found_3");
     let _g = span.enter();
     kv_single_iter_runner(
@@ -460,15 +459,15 @@ async fn kv_single_iter_found_3() {
 #[tokio::test(threaded_scheduler)]
 async fn kv_single_iter_found_4() {
     holochain_types::observability::test_run().ok();
-    let in_scratch = vec![TestData::Put((".".to_string(), V(0)))];
+    let in_scratch = vec![TestData::Put((".".into(), V(0)))];
 
     let in_db_first = vec![
-        TestData::Del("💯".to_string()),
-        TestData::Del("foo".to_string()),
-        TestData::Put(("bing".to_string(), V(2017453015))),
-        TestData::Del("❤".to_string()),
+        TestData::Del("💯".into()),
+        TestData::Del("foo".into()),
+        TestData::Put(("bing".into(), V(2017453015))),
+        TestData::Del("❤".into()),
     ];
-    let from_key = "foo".to_string();
+    let from_key = "foo".into();
     let in_db_second = vec![];
     let span = trace_span!("kv_single_iter_found_4");
     let _g = span.enter();
@@ -490,7 +489,7 @@ async fn exhaust_both_ends() {
         .open_single("kv", StoreOptions::create())
         .unwrap();
     let values = (b'a'..=b'z')
-        .map(|a| String::from_utf8_lossy(&[a]).into_owned())
+        .map(|a| DbString::from([a].to_vec()))
         .zip((0..).into_iter().map(V))
         .collect::<Vec<_>>();
     let expected = [
@@ -526,12 +525,12 @@ async fn exhaust_both_ends() {
         .map(|(k, v)| ([k[0]], v.clone()))
         .collect::<Vec<_>>();
     env.with_reader::<DatabaseError, _, _>(|reader| {
-        let mut buf: KvBuf<String, V> = KvBuf::new(&reader, db).unwrap();
+        let mut buf: Store = KvBufUsed::new(db).unwrap();
         for (k, v) in values {
             buf.put(k, v).unwrap();
         }
         {
-            let mut i = buf.iter().unwrap().map(|(k, v)| Ok(([k[0]], v)));
+            let mut i = buf.iter(&reader).unwrap().map(|(k, v)| Ok(([k[0]], v)));
             let mut result = Vec::new();
             loop {
                 match (i.next().unwrap(), i.next_back().unwrap()) {
@@ -552,8 +551,8 @@ async fn exhaust_both_ends() {
     })
     .unwrap();
     env.with_reader::<DatabaseError, _, _>(|reader| {
-        let buf: KvBuf<String, V> = KvBuf::new(&reader, db).unwrap();
-        let mut i = buf.iter().unwrap().map(|(k, v)| Ok(([k[0]], v)));
+        let buf: Store = KvBufUsed::new(db).unwrap();
+        let mut i = buf.iter(&reader).unwrap().map(|(k, v)| Ok(([k[0]], v)));
         let mut result = Vec::new();
         loop {
             match (i.next().unwrap(), i.next_back().unwrap()) {
@@ -576,7 +575,7 @@ async fn kv_single_iter_runner(
     in_scratch: impl Iterator<Item = TestData> + Send,
     in_db_first: impl Iterator<Item = TestData> + Send,
     in_db_second: impl Iterator<Item = TestData> + Send,
-    from_key: String,
+    from_key: DbString,
 ) {
     let arc = test_cell_env();
     let env = arc.guard().await;
@@ -585,11 +584,11 @@ async fn kv_single_iter_runner(
         .open_single("kv", StoreOptions::create())
         .unwrap();
 
-    let mut runs = vec!["Start | ".to_string()];
-    let mut expected_state: BTreeMap<String, V> = BTreeMap::new();
+    let mut runs = vec!["Start | ".into()];
+    let mut expected_state: BTreeMap<DbString, V> = BTreeMap::new();
 
     env.with_reader::<DatabaseError, _, _>(|reader| {
-        let mut buf: KvBuf<String, V> = KvBuf::new(&reader, db).unwrap();
+        let mut buf: Store = KvBufUsed::new(db).unwrap();
         let span = trace_span!("in_scratch");
         let _g = span.enter();
         runs.push(format!(
@@ -597,6 +596,7 @@ async fn kv_single_iter_runner(
             span.metadata().map(|m| m.name()).unwrap_or("in_scratch")
         ));
         re_do_test(
+            &reader,
             &mut buf,
             &mut in_scratch.into_iter(),
             &mut expected_state,
@@ -610,7 +610,7 @@ async fn kv_single_iter_runner(
     .unwrap();
 
     env.with_reader::<DatabaseError, _, _>(|reader| {
-        let mut buf: KvBuf<String, V> = KvBuf::new(&reader, db).unwrap();
+        let mut buf: Store = KvBufUsed::new(db).unwrap();
         let span = trace_span!("in_db_first");
         let _g = span.enter();
         runs.push(format!(
@@ -618,6 +618,7 @@ async fn kv_single_iter_runner(
             span.metadata().map(|m| m.name()).unwrap_or("in_db_first")
         ));
         re_do_test(
+            &reader,
             &mut buf,
             &mut in_db_first.into_iter(),
             &mut expected_state,
@@ -631,7 +632,7 @@ async fn kv_single_iter_runner(
     .unwrap();
 
     env.with_reader::<DatabaseError, _, _>(|reader| {
-        let mut buf: KvBuf<String, V> = KvBuf::new(&reader, db).unwrap();
+        let mut buf: Store = KvBufUsed::new(db).unwrap();
         let span = trace_span!("in_db_second");
         let _g = span.enter();
         runs.push(format!(
@@ -639,6 +640,7 @@ async fn kv_single_iter_runner(
             span.metadata().map(|m| m.name()).unwrap_or("in_db_second")
         ));
         re_do_test(
+            &reader,
             &mut buf,
             &mut in_db_second.into_iter(),
             &mut expected_state,

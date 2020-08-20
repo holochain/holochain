@@ -108,7 +108,18 @@ pub struct TestEnvironment {
 // pub struct TestEnvironment(#[shrinkwrap(main_field)] EnvironmentWrite, TempDir);
 
 /// A String-based newtype suitable for database keys and values
-#[derive(Clone, Debug, PartialOrd, Ord, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone,
+    Debug,
+    PartialOrd,
+    Ord,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    derive_more::Display,
+    derive_more::From,
+)]
 pub struct DbString(String);
 
 impl AsRef<[u8]> for DbString {

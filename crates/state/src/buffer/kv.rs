@@ -8,9 +8,6 @@ use rkv::{SingleStore, StoreError};
 use std::{collections::BTreeMap, marker::PhantomData};
 use tracing::*;
 
-#[cfg(test)]
-mod iter_tests;
-
 /// Transactional operations on a KV store
 /// Put: add or replace this KV
 /// Delete: remove the KV

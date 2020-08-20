@@ -18,6 +18,8 @@ use rkv::{IntegerStore, SingleStore};
 use std::collections::BTreeMap;
 
 #[cfg(test)]
+mod iter_tests;
+#[cfg(test)]
 mod tests;
 
 pub type KvBufUsed<K, V> = Used<K, V, KvStore<K, V>>;
