@@ -85,7 +85,8 @@ impl TestData {
             .into_hash();
 
         // Original entry and header for updates
-        let mut original_header = fixt!(NewEntryHeader);
+        let mut original_header = fixt!(NewEntryHeader, PublicCurve);
+        debug!(?original_header);
 
         match &mut original_header {
             NewEntryHeader::Create(c) => c.entry_hash = original_entry_hash.clone(),
@@ -97,7 +98,7 @@ impl TestData {
             .into_hash();
 
         // Header for the new entry
-        let mut new_entry_header = fixt!(NewEntryHeader);
+        let mut new_entry_header = fixt!(NewEntryHeader, PublicCurve);
 
         // Update to new entry
         match &mut new_entry_header {
@@ -106,12 +107,12 @@ impl TestData {
         }
 
         // Entry update for header
-        let mut entry_update_header = fixt!(EntryUpdate);
+        let mut entry_update_header = fixt!(EntryUpdate, PublicCurve);
         entry_update_header.entry_hash = new_entry_hash.clone();
         entry_update_header.original_header_address = original_header_hash.clone();
 
         // Entry update for entry
-        let mut entry_update_entry = fixt!(EntryUpdate);
+        let mut entry_update_entry = fixt!(EntryUpdate, PublicCurve);
         entry_update_entry.entry_hash = new_entry_hash.clone();
         entry_update_entry.original_entry_address = original_entry_hash.clone();
         entry_update_entry.original_header_address = original_header_hash.clone();
@@ -140,7 +141,7 @@ impl TestData {
             signature: fixt!(Signature),
             original_entry,
             new_entry,
-            any_header: fixt!(Header),
+            any_header: fixt!(Header, PublicCurve),
             entry_update_header,
             entry_update_entry,
             original_header,
@@ -538,6 +539,7 @@ fn store_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
         a.original_header.clone(),
         a.original_entry.clone().into(),
     );
+    debug!(?a.original_header);
     let pre_state = vec![Db::IntQueue(op.clone())];
     let expect = vec![
         Db::Integrated(op.clone()),

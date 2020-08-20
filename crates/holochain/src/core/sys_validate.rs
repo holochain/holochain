@@ -20,7 +20,7 @@ use holochain_zome_types::{
 use std::convert::TryInto;
 
 pub use crate::core::state::source_chain::{SourceChainError, SourceChainResult};
-pub use error::{PrevHeaderError, SysValidationError, SysValidationResult};
+pub use error::{PrevHeaderError, SysValidationError, SysValidationResult, ValidationError};
 pub use holo_hash::*;
 pub use holochain_types::{
     element::{Element, ElementExt},
@@ -153,10 +153,7 @@ pub async fn verify_header_signature(sig: &Signature, header: &Header) -> SysVal
     if header.author().verify_signature(sig, header).await? {
         Ok(())
     } else {
-        Err(SysValidationError::VerifySignature(
-            sig.clone(),
-            header.clone(),
-        ))
+        Err(ValidationError::VerifySignature(sig.clone(), header.clone()).into())
     }
 }
 
@@ -176,7 +173,8 @@ pub fn check_prev_header_in_metadata(
     meta_vault
         .get_activity(author)?
         .find(|activity| Ok(prev_header_hash == &activity.header_hash))?
-        .ok_or(PrevHeaderError::MissingMeta)?;
+        .ok_or_else(|| PrevHeaderError::MissingMeta(prev_header_hash.clone()))
+        .map_err(ValidationError::from)?;
     Ok(())
 }
 
@@ -189,10 +187,13 @@ pub fn check_prev_header(header: &Header) -> SysValidationResult<()> {
         Header::Dna(_) => Ok(()),
         _ => {
             if header.header_seq() > 0 {
-                header.prev_header().ok_or(PrevHeaderError::MissingPrev)?;
+                header
+                    .prev_header()
+                    .ok_or(PrevHeaderError::MissingPrev)
+                    .map_err(ValidationError::from)?;
                 Ok(())
             } else {
-                Err(PrevHeaderError::InvalidRoot.into())
+                Err(PrevHeaderError::InvalidRoot).map_err(|e| ValidationError::from(e).into())
             }
         }
     }
@@ -207,7 +208,9 @@ pub fn check_valid_if_dna(
         Header::Dna(_) => meta_vault
             .get_activity(header.author().clone())?
             .next()?
-            .map_or(Ok(()), |_| Err(PrevHeaderError::InvalidRoot.into())),
+            .map_or(Ok(()), |_| {
+                Err(PrevHeaderError::InvalidRoot).map_err(|e| ValidationError::from(e).into())
+            }),
         _ => Ok(()),
     }
 }
@@ -236,7 +239,7 @@ pub fn check_prev_timestamp(header: &Header, prev_header: &Header) -> SysValidat
     if header.timestamp() > prev_header.timestamp() {
         Ok(())
     } else {
-        Err(PrevHeaderError::Timestamp.into())
+        Err(PrevHeaderError::Timestamp).map_err(|e| ValidationError::from(e).into())
     }
 }
 
@@ -247,7 +250,8 @@ pub fn check_prev_seq(header: &Header, prev_header: &Header) -> SysValidationRes
     if header_seq > 0 && prev_seq == header_seq - 1 {
         Ok(())
     } else {
-        Err(PrevHeaderError::InvalidSeq(header_seq, prev_seq))?
+        Err(PrevHeaderError::InvalidSeq(header_seq, prev_seq))
+            .map_err(|e| ValidationError::from(e).into())
     }
 }
 
@@ -258,7 +262,7 @@ pub fn check_entry_type(entry_type: &EntryType, entry: &Entry) -> SysValidationR
         (EntryType::App(_), Entry::App(_)) => Ok(()),
         (EntryType::CapClaim, Entry::CapClaim(_)) => Ok(()),
         (EntryType::CapGrant, Entry::CapGrant(_)) => Ok(()),
-        _ => Err(SysValidationError::EntryType),
+        _ => Err(ValidationError::EntryType.into()),
     }
 }
 
@@ -275,14 +279,14 @@ pub async fn check_app_entry_type(
     // so calls are made in blocks
     let dna_file = { conductor_api.get_this_dna().await };
     let dna_file =
-        dna_file.ok_or_else(|| SysValidationError::DnaMissing(conductor_api.cell_id().clone()))?;
+        dna_file.ok_or_else(|| ValidationError::DnaMissing(conductor_api.cell_id().clone()))?;
 
     // Check if the zome is found
     let zome = dna_file
         .dna()
         .zomes
         .get(zome_index)
-        .ok_or_else(|| SysValidationError::ZomeId(entry_type.clone()))?
+        .ok_or_else(|| ValidationError::ZomeId(entry_type.clone()))?
         .1
         .clone();
 
@@ -305,10 +309,10 @@ pub async fn check_app_entry_type(
             if entry_def.visibility == *entry_type.visibility() {
                 Ok(entry_def)
             } else {
-                Err(SysValidationError::EntryVisibility(entry_type.clone()))
+                Err(ValidationError::EntryVisibility(entry_type.clone()).into())
             }
         }
-        None => Err(SysValidationError::EntryDefId(entry_type.clone())),
+        None => Err(ValidationError::EntryDefId(entry_type.clone()).into()),
     }
 }
 
@@ -316,7 +320,7 @@ pub async fn check_app_entry_type(
 pub fn check_not_private(entry_def: &EntryDef) -> SysValidationResult<()> {
     match entry_def.visibility {
         EntryVisibility::Public => Ok(()),
-        EntryVisibility::Private => Err(SysValidationError::PrivateEntry),
+        EntryVisibility::Private => Err(ValidationError::PrivateEntry.into()),
     }
 }
 
@@ -325,7 +329,7 @@ pub async fn check_entry_hash(hash: &EntryHash, entry: &Entry) -> SysValidationR
     if *hash == EntryHash::with_data(entry).await {
         Ok(())
     } else {
-        Err(SysValidationError::EntryHash)
+        Err(ValidationError::EntryHash.into())
     }
 }
 
@@ -334,7 +338,7 @@ pub async fn check_entry_hash(hash: &EntryHash, entry: &Entry) -> SysValidationR
 pub fn check_new_entry_header(header: &Header) -> SysValidationResult<()> {
     match header {
         Header::EntryCreate(_) | Header::EntryUpdate(_) => Ok(()),
-        _ => Err(SysValidationError::NotNewEntry(header.clone())),
+        _ => Err(ValidationError::NotNewEntry(header.clone()).into()),
     }
 }
 
@@ -348,7 +352,7 @@ pub fn check_entry_size(entry: &Entry) -> SysValidationResult<()> {
             if size < MAX_ENTRY_SIZE {
                 Ok(())
             } else {
-                Err(SysValidationError::EntryTooLarge(size, MAX_ENTRY_SIZE))
+                Err(ValidationError::EntryTooLarge(size, MAX_ENTRY_SIZE).into())
             }
         }
         // Other entry types are small
@@ -364,7 +368,7 @@ pub fn check_tag_size(tag: &LinkTag) -> SysValidationResult<()> {
     if size < MAX_TAG_SIZE {
         Ok(())
     } else {
-        Err(SysValidationError::TagTooLarge(size, MAX_TAG_SIZE))
+        Err(ValidationError::TagTooLarge(size, MAX_TAG_SIZE).into())
     }
 }
 
@@ -378,10 +382,11 @@ pub fn check_update_reference(
     if eu.entry_type == *original_entry_header.entry_type() {
         Ok(())
     } else {
-        Err(SysValidationError::UpdateTypeMismatch(
+        Err(ValidationError::UpdateTypeMismatch(
             eu.entry_type.clone(),
             original_entry_header.entry_type().clone(),
-        ))
+        )
+        .into())
     }
 }
 
@@ -407,7 +412,7 @@ pub async fn check_holding_entry(
     element_vault
         .get_entry(&hash)
         .await?
-        .ok_or_else(|| SysValidationError::NotHoldingDep(hash.clone().into()))
+        .ok_or_else(|| ValidationError::NotHoldingDep(hash.clone().into()).into())
 }
 
 /// Check we are actually holding an header
@@ -418,7 +423,7 @@ pub async fn check_holding_header(
     element_vault
         .get_header(&hash)
         .await?
-        .ok_or_else(|| SysValidationError::NotHoldingDep(hash.clone().into()))
+        .ok_or_else(|| ValidationError::NotHoldingDep(hash.clone().into()).into())
 }
 
 /// Check we are actually holding an element and the entry
@@ -429,10 +434,10 @@ pub async fn check_holding_element(
     let el = element_vault
         .get_element(&hash)
         .await?
-        .ok_or_else(|| SysValidationError::NotHoldingDep(hash.clone().into()))?;
+        .ok_or_else(|| ValidationError::NotHoldingDep(hash.clone().into()))?;
     el.entry()
         .as_option()
-        .ok_or_else(|| SysValidationError::NotHoldingDep(hash.clone().into()))?;
+        .ok_or_else(|| ValidationError::NotHoldingDep(hash.clone().into()))?;
     Ok(el)
 }
 
@@ -444,7 +449,7 @@ pub async fn check_entry_exists(
     cascade
         .exists_entry(entry_hash.clone(), Default::default())
         .await?
-        .ok_or_else(|| SysValidationError::DepMissingFromDht(entry_hash.into()))
+        .ok_or_else(|| ValidationError::DepMissingFromDht(entry_hash.into()).into())
 }
 
 /// Check that the header exists on the dht
@@ -455,7 +460,7 @@ pub async fn check_header_exists(
     cascade
         .exists_header(hash.clone(), Default::default())
         .await?
-        .ok_or_else(|| SysValidationError::DepMissingFromDht(hash.into()))
+        .ok_or_else(|| ValidationError::DepMissingFromDht(hash.into()).into())
 }
 
 /// Check that the element exists on the dht
@@ -466,12 +471,12 @@ pub async fn check_element_exists(
     cascade
         .exists(hash.clone().into(), Default::default())
         .await?
-        .ok_or_else(|| SysValidationError::DepMissingFromDht(hash.into()))
+        .ok_or_else(|| ValidationError::DepMissingFromDht(hash.into()).into())
 }
 
 /// Check we are holding the header in the metadata
 /// as a reference from the entry
-pub async fn check_header_in_metadata(
+pub fn check_header_in_metadata(
     entry_hash: EntryHash,
     header_hash: &HeaderHash,
     meta_vault: &impl MetadataBufT,
@@ -479,7 +484,7 @@ pub async fn check_header_in_metadata(
     meta_vault
         .get_headers(entry_hash)?
         .find(|h| Ok(h.header_hash == *header_hash))?
-        .ok_or_else(|| SysValidationError::NotHoldingDep(header_hash.clone().into()))?;
+        .ok_or_else(|| ValidationError::NotHoldingDep(header_hash.clone().into()))?;
     Ok(())
 }
 
@@ -493,7 +498,7 @@ pub fn check_link_in_metadata(
     // Check the header is a LinkAdd
     let link_add: LinkAdd = link_add
         .try_into()
-        .map_err(|_| SysValidationError::NotLinkAdd(link_add_hash.clone()))?;
+        .map_err(|_| ValidationError::NotLinkAdd(link_add_hash.clone()))?;
 
     // Full key always returns just one link
     let link_key = LinkMetaKey::from((&link_add, link_add_hash));
@@ -502,6 +507,6 @@ pub fn check_link_in_metadata(
     meta_vault
         .get_links_all(&link_key)?
         .next()?
-        .ok_or_else(|| SysValidationError::NotHoldingDep(link_add_hash.clone().into()))?;
+        .ok_or_else(|| ValidationError::NotHoldingDep(link_add_hash.clone().into()))?;
     Ok(())
 }

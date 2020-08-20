@@ -7,7 +7,9 @@ use crate::{
         queue_consumer::{OneshotWriter, TriggerSender, WorkComplete},
         state::{
             cascade::Cascade,
-            dht_op_integration::{IntegratedDhtOpsStore, IntegrationLimboStore},
+            dht_op_integration::{
+                IntegratedDhtOpsStore, IntegrationLimboStore, IntegrationLimboValue,
+            },
             element_buf::ElementBuf,
             metadata::MetadataBuf,
             validation_db::{ValidationLimboStatus, ValidationLimboStore, ValidationLimboValue},
@@ -26,13 +28,19 @@ use holochain_state::{
     db::{INTEGRATED_DHT_OPS, INTEGRATION_LIMBO},
     prelude::{GetDb, Reader, Writer},
 };
-use holochain_types::{dht_op::DhtOp, header::NewEntryHeaderRef, Entry, Timestamp};
+use holochain_types::{
+    dht_op::DhtOp, header::NewEntryHeaderRef, validate::ValidationStatus, Entry, Timestamp,
+};
 use holochain_zome_types::{
     header::{ElementDelete, EntryType, EntryUpdate, LinkAdd, LinkRemove},
     Header,
 };
 use std::convert::TryInto;
 use tracing::*;
+
+use types::{DhtOpOrder, Outcome};
+
+mod types;
 
 #[instrument(skip(workspace, writer, trigger_app_validation, network, conductor_api))]
 pub async fn sys_validation_workflow(
@@ -69,8 +77,10 @@ async fn sys_validation_workflow_inner(
         .filter(|vlv| {
             match vlv.status {
                 // We only want pending or awaiting sys dependency ops
-                ValidationLimboStatus::Pending | ValidationLimboStatus::AwaitingSysDeps => Ok(true),
-                ValidationLimboStatus::SysValidated | ValidationLimboStatus::AwaitingAppDeps => {
+                ValidationLimboStatus::Pending | ValidationLimboStatus::AwaitingSysDeps(_) => {
+                    Ok(true)
+                }
+                ValidationLimboStatus::SysValidated | ValidationLimboStatus::AwaitingAppDeps(_) => {
                     Ok(false)
                 }
             }
@@ -80,130 +90,195 @@ async fn sys_validation_workflow_inner(
     // Sort the ops
     ops.sort_unstable_by_key(|v| DhtOpOrder::from(&v.op));
 
-    for vlv in ops {
-        let ValidationLimboValue {
-            op,
-            basis,
-            time_added,
-            num_tries,
-            ..
-        } = vlv;
-        let (status, op) = validate_op(op, workspace, network.clone(), &conductor_api).await?;
-        match &status {
-            ValidationLimboStatus::Pending
-            | ValidationLimboStatus::AwaitingSysDeps
-            | ValidationLimboStatus::SysValidated => {
-                // TODO: Some of the ops go straight to integration and
-                // skip app validation so we need to write those to the
-                // integration limbo and not the validation limbo
-                let hash = DhtOpHash::with_data(&op).await;
-                let vlv = ValidationLimboValue {
-                    status,
-                    op,
-                    basis,
-                    time_added,
-                    last_try: Some(Timestamp::now()),
-                    num_tries: num_tries + 1,
-                };
-                workspace.validation_limbo.put(hash, vlv)?;
+    // Process each op
+    for mut vlv in ops {
+        let outcome = validate_op(&vlv.op, workspace, network.clone(), &conductor_api).await?;
+
+        // TODO: When we introduce abandoning ops make
+        // sure they are not written to any outgoing
+        // database
+
+        match outcome {
+            Outcome::Accepted => {
+                vlv.status = ValidationLimboStatus::SysValidated;
+                to_val_limbo(vlv, workspace).await?;
             }
-            ValidationLimboStatus::AwaitingAppDeps => {
-                unreachable!("We should not be returning this status from system validation")
+            Outcome::SkipAppValidation => {
+                let iv = IntegrationLimboValue {
+                    op: vlv.op,
+                    validation_status: ValidationStatus::Valid,
+                };
+                to_int_limbo(iv, workspace).await?;
+            }
+            Outcome::AwaitingOpDep(missing_dep) => {
+                // TODO: Try and get this dependency to add to limbo
+                //
+                // I actually can't see how we can do this because there's no
+                // way to get an DhtOpHash without either having the op or the full
+                // header. We have neither that's why where here.
+                //
+                // We need to be holding the dependency because
+                // we were meant to get a StoreElement or StoreEntry or
+                // RegisterAgentActivity or RegisterAddLink.
+                //
+                // We might be able to make sure the `missing_dep` hash below
+                // is always the correct dht basis hash for the authorities and
+                // then request gossip off that authority.
+                // However we are that authority by definition so maybe we should
+                // just trigger a general gossip fetch at this point?
+                vlv.status = ValidationLimboStatus::AwaitingSysDeps(missing_dep);
+                to_val_limbo(vlv, workspace).await?;
+            }
+            Outcome::MissingDhtDep => {
+                vlv.status = ValidationLimboStatus::Pending;
+                to_val_limbo(vlv, workspace).await?;
+            }
+            Outcome::Rejected => {
+                let iv = IntegrationLimboValue {
+                    op: vlv.op,
+                    validation_status: ValidationStatus::Rejected,
+                };
+                to_int_limbo(iv, workspace).await?;
             }
         }
     }
     Ok(WorkComplete::Complete)
 }
 
+async fn to_val_limbo(
+    mut vlv: ValidationLimboValue,
+    workspace: &mut SysValidationWorkspace<'_>,
+) -> WorkflowResult<()> {
+    let hash = DhtOpHash::with_data(&vlv.op).await;
+    vlv.last_try = Some(Timestamp::now());
+    vlv.num_tries += 1;
+    workspace.validation_limbo.put(hash, vlv)?;
+    Ok(())
+}
+
+async fn to_int_limbo(
+    iv: IntegrationLimboValue,
+    workspace: &mut SysValidationWorkspace<'_>,
+) -> WorkflowResult<()> {
+    let hash = DhtOpHash::with_data(&iv.op).await;
+    workspace.integration_limbo.put(hash, iv)?;
+    Ok(())
+}
+
 async fn validate_op(
-    op: DhtOp,
+    op: &DhtOp,
     workspace: &mut SysValidationWorkspace<'_>,
     network: HolochainP2pCell,
     conductor_api: &impl CellConductorApiT,
-) -> WorkflowResult<(ValidationLimboStatus, DhtOp)> {
+) -> WorkflowResult<Outcome> {
     match validate_op_inner(op, workspace, network, conductor_api).await {
-        Ok(op) => Ok((ValidationLimboStatus::SysValidated, op)),
-        // TODO: Handle the errors that result in pending or awaiting deps
-        Err(_) => todo!(),
+        Ok(_) => match op {
+            DhtOp::RegisterAddLink(_, _) |
+            // TODO: Check strict mode where store element 
+            // is also run through app validation
+            DhtOp::StoreElement(_, _, _) => Ok(Outcome::SkipAppValidation),
+            _ => Ok(Outcome::Accepted)
+        },
+        // Handle the errors that result in pending or awaiting deps
+        Err(SysValidationError::ValidationError(e)) => {
+            warn!(msg = "DhtOp has failed system validation", ?op, error = ?e, error_msg = %e);
+            Ok(handle_failed(e))
+        }
+        Err(e) => Err(e.into()),
+    }
+}
+
+/// For now errors result in an outcome but in the future
+/// we might find it useful to include the reason something
+/// was rejected etc.
+/// This is why the errors contain data but is currently unread.
+fn handle_failed(error: ValidationError) -> Outcome {
+    use Outcome::*;
+    match error {
+        ValidationError::DepMissingFromDht(_) => MissingDhtDep,
+        ValidationError::DnaMissing(cell_id) => {
+            panic!("Cell {:?} is missing the Dna code", cell_id)
+        }
+        ValidationError::EntryDefId(_) => Rejected,
+        ValidationError::EntryHash => Rejected,
+        ValidationError::EntryTooLarge(_, _) => Rejected,
+        ValidationError::EntryType => Rejected,
+        ValidationError::EntryVisibility(_) => Rejected,
+        ValidationError::TagTooLarge(_, _) => Rejected,
+        ValidationError::NotLinkAdd(_) => Rejected,
+        ValidationError::NotNewEntry(_) => Rejected,
+        ValidationError::NotHoldingDep(dep) => AwaitingOpDep(dep),
+        ValidationError::PrevHeaderError(PrevHeaderError::MissingMeta(dep)) => {
+            AwaitingOpDep(dep.into())
+        }
+        ValidationError::PrevHeaderError(_) => Rejected,
+        ValidationError::PrivateEntry => Rejected,
+        ValidationError::UpdateTypeMismatch(_, _) => Rejected,
+        ValidationError::VerifySignature(_, _) => Rejected,
+        ValidationError::ZomeId(_) => Rejected,
     }
 }
 
 async fn validate_op_inner(
-    op: DhtOp,
+    op: &DhtOp,
     workspace: &mut SysValidationWorkspace<'_>,
     network: HolochainP2pCell,
     conductor_api: &impl CellConductorApiT,
-) -> SysValidationResult<DhtOp> {
+) -> SysValidationResult<()> {
     match op {
-        DhtOp::StoreElement(signature, header, maybe_entry) => {
-            store_header(&header, workspace.cascade(network)).await?;
+        DhtOp::StoreElement(signature, header, _) => {
+            store_header(header, workspace.cascade(network)).await?;
 
-            all_op_check(&signature, &header).await?;
-            Ok(DhtOp::StoreElement(signature, header, maybe_entry))
+            all_op_check(signature, header).await?;
+            Ok(())
         }
         DhtOp::StoreEntry(signature, header, entry) => {
             store_entry(
-                (&header).into(),
+                (header).into(),
                 entry.as_ref(),
                 conductor_api,
                 workspace.cascade(network),
             )
             .await?;
 
-            let header = header.into();
-            all_op_check(&signature, &header).await?;
-            Ok(DhtOp::StoreEntry(
-                signature,
-                header.try_into().expect("type hasn't changed"),
-                entry,
-            ))
+            let header = header.clone().into();
+            all_op_check(signature, &header).await?;
+            Ok(())
         }
         DhtOp::RegisterAgentActivity(signature, header) => {
-            register_agent_activity(&header, &workspace).await?;
+            register_agent_activity(header, workspace).await?;
 
-            all_op_check(&signature, &header).await?;
-            Ok(DhtOp::RegisterAgentActivity(signature, header))
+            all_op_check(signature, header).await?;
+            Ok(())
         }
         DhtOp::RegisterUpdatedBy(signature, header) => {
-            register_updated_by(&header, &workspace.element_vault).await?;
+            register_updated_by(header, workspace).await?;
 
-            let header = header.into();
-            all_op_check(&signature, &header).await?;
-            Ok(DhtOp::RegisterUpdatedBy(
-                signature,
-                header.try_into().expect("type hasn't changed"),
-            ))
+            let header = header.clone().into();
+            all_op_check(signature, &header).await?;
+            Ok(())
         }
         DhtOp::RegisterDeletedBy(signature, header)
         | DhtOp::RegisterDeletedEntryHeader(signature, header) => {
-            register_deleted(&header, &workspace.element_vault).await?;
+            register_deleted(header, &workspace.element_vault).await?;
 
-            let header = header.into();
-            all_op_check(&signature, &header).await?;
-            Ok(DhtOp::RegisterDeletedBy(
-                signature,
-                header.try_into().expect("type hasn't changed"),
-            ))
+            let header = header.clone().into();
+            all_op_check(signature, &header).await?;
+            Ok(())
         }
         DhtOp::RegisterAddLink(signature, header) => {
-            register_add_link(&header, workspace, network).await?;
+            register_add_link(header, workspace, network).await?;
 
-            let header = header.into();
-            all_op_check(&signature, &header).await?;
-            Ok(DhtOp::RegisterAddLink(
-                signature,
-                header.try_into().expect("type hasn't changed"),
-            ))
+            let header = header.clone().into();
+            all_op_check(signature, &header).await?;
+            Ok(())
         }
         DhtOp::RegisterRemoveLink(signature, header) => {
-            register_remove_link(&header, workspace).await?;
+            register_remove_link(header, workspace).await?;
 
-            let header = header.into();
-            all_op_check(&signature, &header).await?;
-            Ok(DhtOp::RegisterRemoveLink(
-                signature,
-                header.try_into().expect("type hasn't changed"),
-            ))
+            let header = header.clone().into();
+            all_op_check(signature, &header).await?;
+            Ok(())
         }
     }
 }
@@ -282,13 +357,20 @@ async fn store_entry(
 
 async fn register_updated_by(
     entry_update: &EntryUpdate,
-    element_vault: &ElementBuf<'_>,
+    workspace: &SysValidationWorkspace<'_>,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
     let original_header_address = &entry_update.original_header_address;
+    let original_entry_address = entry_update.original_entry_address.clone();
 
     // Checks
-    let original_element = check_holding_element(original_header_address, element_vault).await?;
+    check_header_in_metadata(
+        original_entry_address,
+        original_header_address,
+        &workspace.meta_vault,
+    )?;
+    let original_element =
+        check_holding_element(original_header_address, &workspace.element_vault).await?;
     update_check(entry_update, original_element.header())?;
     Ok(())
 }
@@ -301,7 +383,8 @@ async fn register_deleted(
     let removed_header_address = &element_delete.removes_address;
 
     // Checks
-    check_holding_header(removed_header_address, element_vault).await?;
+    let removed_header = check_holding_header(removed_header_address, element_vault).await?;
+    check_new_entry_header(removed_header.header())?;
     Ok(())
 }
 
@@ -312,10 +395,11 @@ async fn register_add_link(
 ) -> SysValidationResult<()> {
     // Get data ready to validate
     let base_entry_address = &link_add.base_address;
+    let target_entry_address = &link_add.target_address;
 
     // Checks
     check_holding_entry(base_entry_address, &workspace.element_vault).await?;
-    check_entry_exists(base_entry_address.clone(), workspace.cascade(network)).await?;
+    check_entry_exists(target_entry_address.clone(), workspace.cascade(network)).await?;
     check_tag_size(&link_add.tag)?;
     Ok(())
 }
@@ -341,38 +425,6 @@ fn update_check(entry_update: &EntryUpdate, original_header: &Header) -> SysVali
         .expect("This can't fail due to the above check_new_entry_header");
     check_update_reference(entry_update, &original_header)?;
     Ok(())
-}
-
-/// Type for deriving ordering of DhtOps
-/// Don't change the order of this enum unless
-/// you mean to change the order we process ops
-#[allow(missing_docs)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub enum DhtOpOrder {
-    RegisterAgentActivity,
-    StoreEntry,
-    StoreElement,
-    RegisterUpdatedBy,
-    RegisterDeletedBy,
-    RegisterDeletedEntryHeader,
-    RegisterAddLink,
-    RegisterRemoveLink,
-}
-
-impl From<&DhtOp> for DhtOpOrder {
-    fn from(op: &DhtOp) -> Self {
-        use DhtOpOrder::*;
-        match op {
-            DhtOp::StoreElement(_, _, _) => StoreElement,
-            DhtOp::StoreEntry(_, _, _) => StoreEntry,
-            DhtOp::RegisterAgentActivity(_, _) => RegisterAgentActivity,
-            DhtOp::RegisterUpdatedBy(_, _) => RegisterUpdatedBy,
-            DhtOp::RegisterDeletedBy(_, _) => RegisterDeletedBy,
-            DhtOp::RegisterDeletedEntryHeader(_, _) => RegisterDeletedEntryHeader,
-            DhtOp::RegisterAddLink(_, _) => RegisterAddLink,
-            DhtOp::RegisterRemoveLink(_, _) => RegisterRemoveLink,
-        }
-    }
 }
 
 pub struct SysValidationWorkspace<'env> {

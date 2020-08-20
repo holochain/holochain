@@ -49,10 +49,10 @@ async fn app_validation_workflow_inner(
         .filter(|vlv| {
             match vlv.status {
                 // We only want sys validated or awaiting app dependency ops
-                ValidationLimboStatus::SysValidated | ValidationLimboStatus::AwaitingAppDeps => {
+                ValidationLimboStatus::SysValidated | ValidationLimboStatus::AwaitingAppDeps(_) => {
                     Ok(true)
                 }
-                ValidationLimboStatus::Pending | ValidationLimboStatus::AwaitingSysDeps => {
+                ValidationLimboStatus::Pending | ValidationLimboStatus::AwaitingSysDeps(_) => {
                     Ok(false)
                 }
             }

@@ -25,9 +25,15 @@ pub enum SysValidationError {
     KeystoreError(#[from] KeystoreError),
     #[error(transparent)]
     SourceChainError(#[from] SourceChainError),
-    // Validation error
-    // TODO: move these into a sub error type for
-    // easy matching
+    #[error(transparent)]
+    ValidationError(#[from] ValidationError),
+}
+
+pub type SysValidationResult<T> = Result<T, SysValidationError>;
+
+/// All the errors that can come from validation
+#[derive(Error, Debug)]
+pub enum ValidationError {
     #[error("The dependency {0:?} was not found on the DHT")]
     DepMissingFromDht(AnyDhtHash),
     #[error("Dna is missing for this cell {0:?}. Cannot validate without dna.")]
@@ -62,8 +68,6 @@ pub enum SysValidationError {
     ZomeId(AppEntryType),
 }
 
-pub type SysValidationResult<T> = Result<T, SysValidationError>;
-
 #[derive(Error, Debug)]
 pub enum PrevHeaderError {
     #[error("Root of source chain must be Dna")]
@@ -71,11 +75,9 @@ pub enum PrevHeaderError {
     #[error("Previous header sequence number {1} is not {0} - 1")]
     InvalidSeq(u32, u32),
     #[error("Previous header was missing from the metadata store")]
-    MissingMeta,
+    MissingMeta(HeaderHash),
     #[error("Header is not Dna so needs previous header")]
     MissingPrev,
-    #[error("Previous header was missing from the element store")]
-    MissingVault,
     #[error("The previous header's timestamp is not before the current header's timestamp")]
     Timestamp,
 }
