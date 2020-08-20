@@ -45,8 +45,7 @@ async fn app_validation_workflow_inner(
 ) -> WorkflowResult<WorkComplete> {
     let ops: Vec<ValidationLimboValue> = workspace
         .validation_limbo
-        .drain_iter()?
-        .filter(|vlv| {
+        .drain_iter_filter(|(_, vlv)| {
             match vlv.status {
                 // We only want sys validated or awaiting app dependency ops
                 ValidationLimboStatus::SysValidated | ValidationLimboStatus::AwaitingAppDeps(_) => {
@@ -56,7 +55,7 @@ async fn app_validation_workflow_inner(
                     Ok(false)
                 }
             }
-        })
+        })?
         .collect()?;
     for vlv in ops {
         let op = vlv.op;

@@ -71,12 +71,10 @@ async fn sys_validation_workflow_inner(
     network: HolochainP2pCell,
     conductor_api: impl CellConductorApiT,
 ) -> WorkflowResult<WorkComplete> {
-    debug!(msg = "starting sys val", agent = ?conductor_api.cell_id().agent_pubkey());
     // Drain all the ops
     let mut ops: Vec<ValidationLimboValue> = workspace
         .validation_limbo
-        .drain_iter()?
-        .filter(|vlv| {
+        .drain_iter_filter(|(_, vlv)| {
             match vlv.status {
                 // We only want pending or awaiting sys dependency ops
                 ValidationLimboStatus::Pending | ValidationLimboStatus::AwaitingSysDeps(_) => {
@@ -86,7 +84,7 @@ async fn sys_validation_workflow_inner(
                     Ok(false)
                 }
             }
-        })
+        })?
         .collect()?;
 
     // Sort the ops
@@ -95,8 +93,6 @@ async fn sys_validation_workflow_inner(
     // Process each op
     for mut vlv in ops {
         let outcome = validate_op(&vlv.op, workspace, network.clone(), &conductor_api).await?;
-
-        debug!(?outcome, agent = ?conductor_api.cell_id().agent_pubkey());
 
         // TODO: When we introduce abandoning ops make
         // sure they are not written to any outgoing
@@ -147,7 +143,6 @@ async fn sys_validation_workflow_inner(
             }
         }
     }
-    debug!(msg = "finishing sys val", agent = ?conductor_api.cell_id().agent_pubkey());
     Ok(WorkComplete::Complete)
 }
 

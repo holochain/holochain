@@ -140,10 +140,12 @@ pub async fn install_app(
     assert!(errors.is_empty());
 }
 
+pub type InstalledCellsWithProofs = Vec<(InstalledCell, Option<SerializedBytes>)>;
+
 /// Setup an app for testing
 /// apps_data is a vec of app nicknames with vecs of their cell data
 pub async fn setup_app(
-    apps_data: Vec<(&str, Vec<(InstalledCell, Option<SerializedBytes>)>)>,
+    apps_data: Vec<(&str, InstalledCellsWithProofs)>,
     dna_store: MockDnaStore,
 ) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
     let test_env = test_conductor_env();

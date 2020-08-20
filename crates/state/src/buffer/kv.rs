@@ -125,6 +125,21 @@ where
         ))
     }
 
+    /// Iterator that tracks elements so they can be deleted
+    pub fn drain_iter_filter<F>(&mut self, filter: F) -> DatabaseResult<DrainIter<V>>
+    where
+        F: FnMut(&(&[u8], V)) -> Result<bool, DatabaseError> + 'env,
+    {
+        Ok(DrainIter::new(
+            &mut self.scratch,
+            SingleIterRaw::new(
+                self.db.iter_start(self.reader)?,
+                self.db.iter_end(self.reader)?,
+            )
+            .filter(filter),
+        ))
+    }
+
     /// Iterator that tracks elements so they can be deleted but in reverse
     pub fn drain_iter_reverse(&mut self) -> DatabaseResult<fallible_iterator::Rev<DrainIter<V>>> {
         Ok(DrainIter::new(
@@ -333,15 +348,23 @@ where
     V: BufVal,
 {
     scratch: &'a mut BTreeMap<Vec<u8>, Op<V>>,
-    iter: SingleIterRaw<'env, V>,
+    iter: Box<
+        dyn DoubleEndedFallibleIterator<Item = IterItem<'env, V>, Error = DatabaseError> + 'env,
+    >,
 }
 
 impl<'env, 'a, V> DrainIter<'env, 'a, V>
 where
     V: BufVal,
 {
-    fn new(scratch: &'a mut BTreeMap<Vec<u8>, Op<V>>, iter: SingleIterRaw<'env, V>) -> Self {
-        Self { scratch, iter }
+    fn new(
+        scratch: &'a mut BTreeMap<Vec<u8>, Op<V>>,
+        iter: impl DoubleEndedFallibleIterator<Item = IterItem<'env, V>, Error = DatabaseError> + 'env,
+    ) -> Self {
+        Self {
+            scratch,
+            iter: Box::new(iter),
+        }
     }
 }
 

@@ -37,7 +37,7 @@ mod tests;
 pub const MAX_ENTRY_SIZE: usize = 15_000_000;
 
 /// 10kb limit on LinkTags.
-pub const MAX_TAG_SIZE: usize = 10_000;
+pub const MAX_TAG_SIZE: usize = 400;
 
 /// Ensure that a given pre-fetched element is actually valid on this chain.
 ///

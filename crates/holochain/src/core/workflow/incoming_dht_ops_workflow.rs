@@ -19,10 +19,12 @@ use holochain_state::{
     prelude::{GetDb, ReadManager, Reader, Writer},
 };
 use holochain_types::Timestamp;
+use tracing::*;
 
 #[cfg(test)]
 mod test;
 
+#[instrument(skip(state_env, sys_validation_trigger, ops))]
 pub async fn incoming_dht_ops_workflow(
     state_env: &EnvironmentWrite,
     mut sys_validation_trigger: TriggerSender,
@@ -36,7 +38,7 @@ pub async fn incoming_dht_ops_workflow(
     // add incoming ops to the validation limbo
     for (hash, op) in ops {
         let basis = op.dht_basis().await;
-        let vqv = ValidationLimboValue {
+        let vlv = ValidationLimboValue {
             status: ValidationLimboStatus::Pending,
             op,
             basis,
@@ -45,7 +47,7 @@ pub async fn incoming_dht_ops_workflow(
             num_tries: 0,
         };
         if !workspace.op_exists(&hash)? {
-            workspace.validation_limbo.put(hash, vqv)?;
+            workspace.validation_limbo.put(hash, vlv)?;
         }
     }
 
