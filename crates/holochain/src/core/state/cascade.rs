@@ -270,12 +270,14 @@ where
             match *basis.hash_type() {
                 hash_type::AnyDht::Entry => {
                     for v in values {
-                        self.meta_cache.register_raw_on_entry(basis.clone().into(), v)?;
+                        self.meta_cache
+                            .register_raw_on_entry(basis.clone().into(), v)?;
                     }
                 }
                 hash_type::AnyDht::Header => {
                     for v in values {
-                        self.meta_cache.register_raw_on_header(basis.clone().into(), v);
+                        self.meta_cache
+                            .register_raw_on_header(basis.clone().into(), v);
                     }
                 }
             }
