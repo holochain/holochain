@@ -113,6 +113,7 @@ async fn get_updates_cache() {
 }
 
 #[tokio::test(threaded_scheduler)]
+#[ignore]
 async fn get_meta_updates_meta_cache() {
     observability::test_run().ok();
     // Database setup
