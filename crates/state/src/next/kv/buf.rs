@@ -165,13 +165,12 @@ where
     }
 
     /// Iterator that returns all partial matches to this key
-    pub fn iter_all_key_matches<'a, R: Readable>(
-        &'a self,
-        r: &'a R,
+    pub fn iter_all_key_matches<'r, R: Readable>(
+        &'r self,
+        r: &'r R,
         k: K,
-    ) -> DatabaseResult<SingleIterKeyMatch<V>> {
+    ) -> DatabaseResult<SingleIterKeyMatch<'r, 'r, V>> {
         check_empty_key(&k)?;
-
         let key = k.as_ref().to_vec();
         Ok(SingleIterKeyMatch::new(
             SingleIterFrom::new(&self.scratch, self.store.iter_from(r, k)?, key.clone()),
@@ -293,8 +292,8 @@ where
     }
 
     /// Iterator that returns all partial matches to this key
-    pub async fn iter_all_key_matches<'a, R: Readable + Send + Sync>(
-        &'a self,
+    pub async fn iter_all_key_matches<R: Readable + Send + Sync>(
+        &self,
         k: K,
     ) -> DatabaseResult<IterOwned<V>> {
         fresh_reader!(self.env, |reader| Ok(self

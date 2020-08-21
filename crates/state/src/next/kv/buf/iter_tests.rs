@@ -142,8 +142,9 @@ fn do_test<R: Readable>(
     );
     // Check reverse
     assert_eq!(
-        buf.iter_reverse(reader)
+        buf.iter(reader)
             .unwrap()
+            .rev()
             .map(|(k, v)| Ok((DbString::from(k.to_vec()), v)))
             .inspect(|(k, v)| Ok(trace!(?k, ?v)))
             .collect::<Vec<_>>()
@@ -212,8 +213,9 @@ fn re_do_test<R: Readable>(
         runs.concat(),
     );
     assert_eq!(
-        buf.iter_reverse(reader)
+        buf.iter(reader)
             .unwrap()
+            .rev()
             .map(|(k, v)| Ok((DbString::from(k.to_vec()), v)))
             .inspect(|(k, v)| Ok(trace!(?k, ?v)))
             .collect::<Vec<_>>()
