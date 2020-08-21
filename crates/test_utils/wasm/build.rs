@@ -1,6 +1,8 @@
+use std::process::Stdio;
+
 fn main() {
     let should_build = std::env::var_os("CARGO_FEATURE_BUILD").is_some();
-
+    let wasms_path = format!("{}/{}/", env!("CARGO_MANIFEST_DIR"), "wasm_workspace");
     println!("cargo:rerun-if-changed=Cargo.toml");
     println!("cargo:rerun-if-changed=../../../Cargo.lock");
     // We want to rebuild if anything upstream of the wasms has changed.
@@ -16,19 +18,15 @@ fn main() {
         }
     }
     // If any of the files in the wasms change rebuild
-    for item in walkdir::WalkDir::new(format!(
-        "{}/{}/",
-        env!("CARGO_MANIFEST_DIR"),
-        "wasm_workspace"
-    ))
-    .into_iter()
-    .filter_entry(|e| {
-        e.file_name()
-            .to_str()
-            .map(|e| e != "target")
-            .unwrap_or(false)
-    })
-    .filter_map(|e| e.ok())
+    for item in walkdir::WalkDir::new(wasms_path.clone())
+        .into_iter()
+        .filter_entry(|e| {
+            e.file_name()
+                .to_str()
+                .map(|e| e != "target")
+                .unwrap_or(false)
+        })
+        .filter_map(|e| e.ok())
     {
         println!("cargo:rerun-if-changed={}", item.path().display());
     }
@@ -37,6 +35,8 @@ fn main() {
     let cargo_command = cargo_command.as_deref().unwrap_or_else(|| "cargo".as_ref());
     if should_build {
         let mut cmd = std::process::Command::new(cargo_command);
+        cmd.stdout(Stdio::piped());
+        cmd.stderr(Stdio::piped());
         cmd.arg("build")
             .arg("--manifest-path")
             .arg("wasm_workspace/Cargo.toml")
@@ -44,18 +44,29 @@ fn main() {
             .arg("--workspace")
             .arg("--target")
             .arg("wasm32-unknown-unknown");
-        if let Some(wasm_out) = wasm_out {
-            cmd.env("CARGO_TARGET_DIR", &wasm_out);
+        match wasm_out {
+            Some(wasm_out) => {
+                cmd.env("CARGO_TARGET_DIR", wasm_out);
+            }
+            None => {
+                cmd.env("CARGO_TARGET_DIR", format!("{}/target", wasms_path));
+            }
         }
         let output = cmd.output().unwrap();
+
         assert!(output.status.success());
     } else {
         let mut cmd = std::process::Command::new(cargo_command);
         cmd.arg("check")
             .arg("--manifest-path")
             .arg("wasm_workspace/Cargo.toml");
-        if let Some(wasm_out) = wasm_out {
-            cmd.env("CARGO_TARGET_DIR", &wasm_out);
+        match wasm_out {
+            Some(wasm_out) => {
+                cmd.env("CARGO_TARGET_DIR", wasm_out);
+            }
+            None => {
+                cmd.env("CARGO_TARGET_DIR", format!("{}/target", wasms_path));
+            }
         }
         let output = cmd.output().unwrap();
         assert!(output.status.success());
