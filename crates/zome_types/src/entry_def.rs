@@ -9,6 +9,12 @@ const DEFAULT_REQUIRED_VALIDATIONS: u8 = 5;
 #[repr(transparent)]
 pub struct EntryDefId(String);
 
+impl From<EntryDefId> for String {
+    fn from(entry_def_id: EntryDefId) -> Self {
+        entry_def_id.0
+    }
+}
+
 impl From<String> for EntryDefId {
     fn from(s: String) -> Self {
         Self(s)
@@ -33,12 +39,18 @@ impl Default for EntryVisibility {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct RequiredValidations(u8);
 
 impl From<u8> for RequiredValidations {
     fn from(u: u8) -> Self {
         Self(u)
+    }
+}
+
+impl From<RequiredValidations> for u8 {
+    fn from(required_validations: RequiredValidations) -> Self {
+        required_validations.0
     }
 }
 
