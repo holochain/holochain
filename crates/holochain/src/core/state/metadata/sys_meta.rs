@@ -36,9 +36,7 @@ mod tests {
         pub fn new() -> Self {
             Self {
                 header_hashes: Box::new(HeaderHashFixturator::new(Unpredictable)),
-                entry_hashes: Box::new(
-                    EntryContentHashFixturator::new(Unpredictable).map(Into::into),
-                ),
+                entry_hashes: Box::new(EntryHashFixturator::new(Unpredictable).map(Into::into)),
                 entry_types: Box::new(
                     AppEntryTypeFixturator::new(Unpredictable).map(EntryType::App),
                 ),

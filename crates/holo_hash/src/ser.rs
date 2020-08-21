@@ -62,22 +62,6 @@ mod tests {
     fn test_composite_hashtype_roundtrips() {
         {
             let h_orig =
-                EntryHash::from_raw_bytes_and_type(vec![0xdb; 36], hash_type::Entry::Content);
-            let buf = holochain_serialized_bytes::encode(&h_orig).unwrap();
-            let h: EntryHash = holochain_serialized_bytes::decode(&buf).unwrap();
-            assert_eq!(h_orig, h);
-            assert_eq!(*h.hash_type(), hash_type::Entry::Content);
-        }
-        {
-            let h_orig =
-                EntryHash::from_raw_bytes_and_type(vec![0xdb; 36], hash_type::Entry::Agent);
-            let buf = holochain_serialized_bytes::encode(&h_orig).unwrap();
-            let h: EntryHash = holochain_serialized_bytes::decode(&buf).unwrap();
-            assert_eq!(h_orig, h);
-            assert_eq!(*h.hash_type(), hash_type::Entry::Agent);
-        }
-        {
-            let h_orig =
                 AnyDhtHash::from_raw_bytes_and_type(vec![0xdb; 36], hash_type::AnyDht::Header);
             let buf = holochain_serialized_bytes::encode(&h_orig).unwrap();
             let h: AnyDhtHash = holochain_serialized_bytes::decode(&buf).unwrap();
@@ -85,30 +69,20 @@ mod tests {
             assert_eq!(*h.hash_type(), hash_type::AnyDht::Header);
         }
         {
-            let h_orig = AnyDhtHash::from_raw_bytes_and_type(
-                vec![0xdb; 36],
-                hash_type::AnyDht::Entry(hash_type::Entry::Content),
-            );
+            let h_orig =
+                AnyDhtHash::from_raw_bytes_and_type(vec![0xdb; 36], hash_type::AnyDht::Entry);
             let buf = holochain_serialized_bytes::encode(&h_orig).unwrap();
             let h: AnyDhtHash = holochain_serialized_bytes::decode(&buf).unwrap();
             assert_eq!(h_orig, h);
-            assert_eq!(
-                *h.hash_type(),
-                hash_type::AnyDht::Entry(hash_type::Entry::Content)
-            );
+            assert_eq!(*h.hash_type(), hash_type::AnyDht::Entry);
         }
         {
-            let h_orig = AnyDhtHash::from_raw_bytes_and_type(
-                vec![0xdb; 36],
-                hash_type::AnyDht::Entry(hash_type::Entry::Agent),
-            );
+            let h_orig =
+                AnyDhtHash::from_raw_bytes_and_type(vec![0xdb; 36], hash_type::AnyDht::Entry);
             let buf = holochain_serialized_bytes::encode(&h_orig).unwrap();
             let h: AnyDhtHash = holochain_serialized_bytes::decode(&buf).unwrap();
             assert_eq!(h_orig, h);
-            assert_eq!(
-                *h.hash_type(),
-                hash_type::AnyDht::Entry(hash_type::Entry::Agent)
-            );
+            assert_eq!(*h.hash_type(), hash_type::AnyDht::Entry);
         }
     }
 
@@ -116,8 +90,7 @@ mod tests {
     #[should_panic]
     fn test_composite_hashtype_crossover_error_1() {
         {
-            let h_orig =
-                EntryHash::from_raw_bytes_and_type(vec![0xdb; 36], hash_type::Entry::Content);
+            let h_orig = EntryHash::from_raw_bytes_and_type(vec![0xdb; 36], hash_type::Entry);
             let buf = holochain_serialized_bytes::encode(&h_orig).unwrap();
             let _: AnyDhtHash = holochain_serialized_bytes::decode(&buf).unwrap();
         }
@@ -127,8 +100,7 @@ mod tests {
     #[should_panic]
     fn test_composite_hashtype_crossover_error_2() {
         {
-            let h_orig =
-                EntryHash::from_raw_bytes_and_type(vec![0xdb; 36], hash_type::Entry::Agent);
+            let h_orig = EntryHash::from_raw_bytes_and_type(vec![0xdb; 36], hash_type::Entry);
             let buf = holochain_serialized_bytes::encode(&h_orig).unwrap();
             let _: AnyDhtHash = holochain_serialized_bytes::decode(&buf).unwrap();
         }
@@ -138,10 +110,8 @@ mod tests {
     #[should_panic]
     fn test_composite_hashtype_crossover_error_3() {
         {
-            let h_orig = AnyDhtHash::from_raw_bytes_and_type(
-                vec![0xdb; 36],
-                hash_type::AnyDht::Entry(hash_type::Entry::Content),
-            );
+            let h_orig =
+                AnyDhtHash::from_raw_bytes_and_type(vec![0xdb; 36], hash_type::AnyDht::Entry);
             let buf = holochain_serialized_bytes::encode(&h_orig).unwrap();
             let _: EntryHash = holochain_serialized_bytes::decode(&buf).unwrap();
         }
@@ -151,10 +121,8 @@ mod tests {
     #[should_panic]
     fn test_composite_hashtype_crossover_error_4() {
         {
-            let h_orig = AnyDhtHash::from_raw_bytes_and_type(
-                vec![0xdb; 36],
-                hash_type::AnyDht::Entry(hash_type::Entry::Agent),
-            );
+            let h_orig =
+                AnyDhtHash::from_raw_bytes_and_type(vec![0xdb; 36], hash_type::AnyDht::Entry);
             let buf = holochain_serialized_bytes::encode(&h_orig).unwrap();
             let _: EntryHash = holochain_serialized_bytes::decode(&buf).unwrap();
         }
@@ -180,7 +148,7 @@ mod tests {
         }
 
         let orig = TestData {
-            e: EntryHash::from_raw_bytes_and_type(vec![0xdb; 36], hash_type::Entry::Content),
+            e: EntryHash::from_raw_bytes_and_type(vec![0xdb; 36], hash_type::Entry),
             h: HeaderHash::from_raw_bytes(vec![0xdb; 36]),
         };
 
@@ -188,31 +156,31 @@ mod tests {
         let res: TestData = sb.try_into().unwrap();
 
         assert_eq!(orig, res);
-        assert_eq!(*orig.e.hash_type(), hash_type::Entry::Content);
-        assert_eq!(*orig.h.hash_type(), hash_type::Header::new());
+        assert_eq!(*orig.e.hash_type(), hash_type::Entry);
+        assert_eq!(*orig.h.hash_type(), hash_type::Header);
     }
 
     #[test]
     fn test_json_to_rust() {
         #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
         struct Data {
-            entry_hash: EntryHash,
+            any_hash: AnyDhtHash,
             content: String,
         }
 
-        let entry_hash = EntryHash::from_raw_bytes_and_type(
+        let any_hash = AnyDhtHash::from_raw_bytes_and_type(
             b"000000000000000000000000000000000000".to_vec(),
-            hash_type::Entry::Content,
+            hash_type::AnyDht::Header,
         );
-        let hash_type_sb: SerializedBytes = entry_hash.hash_type().try_into().unwrap();
-        let hash_type_json = r#"{"Content":[132,33,36]}"#;
+        let hash_type_sb: SerializedBytes = any_hash.hash_type().try_into().unwrap();
+        let hash_type_json = r#"{"Header":[132,41,36]}"#;
         assert_eq!(format!("{:?}", hash_type_sb), hash_type_json.to_string());
 
-        let hash_type_from_sb: hash_type::Entry = hash_type_sb.try_into().unwrap();
-        assert_eq!(hash_type_from_sb, hash_type::Entry::Content);
+        let hash_type_from_sb: hash_type::AnyDht = hash_type_sb.try_into().unwrap();
+        assert_eq!(hash_type_from_sb, hash_type::AnyDht::Header);
 
-        let hash_type_from_json: hash_type::Entry = serde_json::from_str(hash_type_json).unwrap();
-        assert_eq!(hash_type_from_json, hash_type::Entry::Content);
+        let hash_type_from_json: hash_type::AnyDht = serde_json::from_str(&hash_type_json).unwrap();
+        assert_eq!(hash_type_from_json, hash_type::AnyDht::Header);
     }
 
     #[test]

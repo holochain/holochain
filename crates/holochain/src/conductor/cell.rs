@@ -441,11 +441,8 @@ impl Cell {
         // the hash is an entry or header.
         // In the future we should use GetOptions to choose which get to run.
         let r = match *dht_hash.hash_type() {
-            AnyDht::Entry(et) => self.handle_get_entry(dht_hash.retype(et), options).await,
-            AnyDht::Header => {
-                self.handle_get_element(dht_hash.retype(hash_type::Header))
-                    .await
-            }
+            AnyDht::Entry => self.handle_get_entry(dht_hash.into(), options).await,
+            AnyDht::Header => self.handle_get_element(dht_hash.into()).await,
         };
         if let Err(e) = &r {
             error!(msg = "Error handling a get", ?e, agent = ?self.id.agent_pubkey());

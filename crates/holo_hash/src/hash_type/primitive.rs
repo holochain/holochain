@@ -1,12 +1,13 @@
 use super::*;
+use crate::{hash_type, AgentPubKey, EntryHash};
 
-const AGENT_PREFIX: &[u8] = &[0x84, 0x20, 0x24]; // uhCAk
-const CONTENT_PREFIX: &[u8] = &[0x84, 0x21, 0x24]; // uhCEk
-const DHTOP_PREFIX: &[u8] = &[0x84, 0x24, 0x24]; // uhCQk
-const DNA_PREFIX: &[u8] = &[0x84, 0x2d, 0x24]; // uhC0k
-const NET_ID_PREFIX: &[u8] = &[0x84, 0x22, 0x24]; // uhCIk
-const HEADER_PREFIX: &[u8] = &[0x84, 0x29, 0x24]; // uhCkk
-const WASM_PREFIX: &[u8] = &[0x84, 0x2a, 0x24]; // uhCok
+const AGENT_PREFIX: &[u8] = &[0x84, 0x20, 0x24]; // uhCAk [132, 32, 36]
+const ENTRY_PREFIX: &[u8] = &[0x84, 0x21, 0x24]; // uhCEk [132, 33, 36]
+const DHTOP_PREFIX: &[u8] = &[0x84, 0x24, 0x24]; // uhCQk [132, 36, 36]
+const DNA_PREFIX: &[u8] = &[0x84, 0x2d, 0x24]; // uhC0k [132, 45, 36]
+const NET_ID_PREFIX: &[u8] = &[0x84, 0x22, 0x24]; // uhCIk [132, 34, 36]
+const HEADER_PREFIX: &[u8] = &[0x84, 0x29, 0x24]; // uhCkk [132, 41, 36]
+const WASM_PREFIX: &[u8] = &[0x84, 0x2a, 0x24]; // uhCok [132, 42, 36]
 
 /// A PrimitiveHashType is one with a multihash prefix.
 /// In contrast, a non-primitive hash type could be one of several primitive
@@ -103,9 +104,21 @@ macro_rules! primitive_hash_type {
 }
 
 primitive_hash_type!(Agent, AgentPubKey, AgentVisitor, AGENT_PREFIX);
-primitive_hash_type!(Content, EntryContentHash, ContentVisitor, CONTENT_PREFIX);
+primitive_hash_type!(Entry, EntryHash, EntryVisitor, ENTRY_PREFIX);
 primitive_hash_type!(Dna, DnaHash, DnaVisitor, DNA_PREFIX);
 primitive_hash_type!(DhtOp, DhtOpHash, DhtOpVisitor, DHTOP_PREFIX);
 primitive_hash_type!(Header, HeaderHash, HeaderVisitor, HEADER_PREFIX);
 primitive_hash_type!(NetId, NetIdHash, NetIdVisitor, NET_ID_PREFIX);
 primitive_hash_type!(Wasm, WasmHash, WasmVisitor, WASM_PREFIX);
+
+impl From<AgentPubKey> for EntryHash {
+    fn from(hash: AgentPubKey) -> EntryHash {
+        hash.retype(hash_type::Entry)
+    }
+}
+
+impl From<EntryHash> for AgentPubKey {
+    fn from(hash: EntryHash) -> AgentPubKey {
+        hash.retype(hash_type::Agent)
+    }
+}

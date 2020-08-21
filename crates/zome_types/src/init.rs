@@ -1,13 +1,13 @@
 use crate::zome_io::GuestOutput;
 use crate::CallbackResult;
-use holo_hash::EntryContentHash;
+use holo_hash::EntryHash;
 use holochain_serialized_bytes::prelude::*;
 
 #[derive(Clone, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub enum InitCallbackResult {
     Pass,
     Fail(String),
-    UnresolvedDependencies(Vec<EntryContentHash>),
+    UnresolvedDependencies(Vec<EntryHash>),
 }
 
 impl From<GuestOutput> for InitCallbackResult {

@@ -2,7 +2,7 @@
 
 use crate::{
     encode::holo_dht_location_bytes, hash_type, AgentPubKey, AnyDhtHash, DhtOpHash, DnaHash,
-    EntryContentHash, EntryHash, HeaderHash, NetIdHash, WasmHash,
+    EntryHash, HeaderHash, NetIdHash, WasmHash,
 };
 use fixt::prelude::*;
 
@@ -17,13 +17,6 @@ pub type HashTypeAnyDht = hash_type::AnyDht;
 // );
 
 fixturator!(
-    HashTypeEntry;
-    curve Empty HashTypeEntry::Content;
-    curve Unpredictable HashTypeEntry::Content;
-    curve Predictable HashTypeEntry::Content;
-);
-
-fixturator!(
     HashTypeAnyDht;
     curve Empty HashTypeAnyDht::Header;
     curve Unpredictable HashTypeAnyDht::Header;
@@ -36,7 +29,7 @@ fixturator!(
 );
 
 fixturator!(
-    EntryContentHash;
+    EntryHash;
     constructor fn from_raw_bytes(ThirtySixBytes);
 );
 
@@ -63,11 +56,6 @@ fixturator!(
 fixturator!(
     WasmHash;
     constructor fn from_raw_bytes(ThirtySixBytes);
-);
-
-fixturator!(
-    EntryHash;
-    constructor fn from_raw_bytes_and_type(ThirtySixBytes, HashTypeEntry);
 );
 
 fixturator!(

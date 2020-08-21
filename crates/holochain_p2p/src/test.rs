@@ -292,7 +292,7 @@ mod tests {
 
         let hash = holo_hash::EntryHash::from_raw_bytes_and_type(
             b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
-            holo_hash::hash_type::Entry::Content,
+            holo_hash::hash_type::Entry,
         );
         let link_key = WireLinkMetaKey::Base(hash);
 
