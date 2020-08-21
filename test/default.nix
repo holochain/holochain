@@ -3,6 +3,7 @@ let
   t-test = pkgs.writeShellScriptBin "hc-test"
   ''
   set -euxo pipefail
+  cargo build --manifest-path=crates/holochain/Cargo.toml --features "build_wasms"
   cargo test warm_wasm_tests
   RUST_BACKTRACE=1 \
   cargo test -- --nocapture

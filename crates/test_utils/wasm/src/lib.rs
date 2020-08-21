@@ -5,6 +5,8 @@ extern crate strum_macros;
 use holochain_types::dna::zome::Zome;
 use holochain_zome_types::zome::ZomeName;
 
+const WASM_WORKSPACE_TARGET: &'static str = "wasm_workspace/target";
+
 #[derive(EnumIter, Clone, Copy)]
 pub enum TestWasm {
     AgentInfo,
@@ -71,138 +73,92 @@ impl From<TestWasm> for ZomeName {
 impl From<TestWasm> for DnaWasm {
     fn from(test_wasm: TestWasm) -> DnaWasm {
         DnaWasm::from(match test_wasm {
-            TestWasm::AgentInfo => include_bytes!(concat!(
-                env!("OUT_DIR"),
-                "/wasm32-unknown-unknown/release/test_wasm_agent_info.wasm"
-            ))
-            .to_vec(),
-            TestWasm::Anchor => include_bytes!(concat!(
-                env!("OUT_DIR"),
-                "/wasm32-unknown-unknown/release/test_wasm_anchor.wasm"
-            ))
-            .to_vec(),
-            TestWasm::Bench => include_bytes!(concat!(
-                env!("OUT_DIR"),
-                "/wasm32-unknown-unknown/release/test_wasm_bench.wasm"
-            ))
-            .to_vec(),
-            TestWasm::CommitEntry => include_bytes!(concat!(
-                env!("OUT_DIR"),
-                "/wasm32-unknown-unknown/release/test_wasm_commit_entry.wasm"
-            ))
-            .to_vec(),
-            TestWasm::Debug => include_bytes!(concat!(
-                env!("OUT_DIR"),
-                "/wasm32-unknown-unknown/release/test_wasm_debug.wasm"
-            ))
-            .to_vec(),
-            TestWasm::EntryDefs => include_bytes!(concat!(
-                env!("OUT_DIR"),
-                "/wasm32-unknown-unknown/release/test_wasm_entry_defs.wasm"
-            ))
-            .to_vec(),
-            TestWasm::Foo => include_bytes!(concat!(
-                env!("OUT_DIR"),
-                "/wasm32-unknown-unknown/release/test_wasm_foo.wasm"
-            ))
-            .to_vec(),
-            TestWasm::HashPath => include_bytes!(concat!(
-                env!("OUT_DIR"),
-                "/wasm32-unknown-unknown/release/test_wasm_hash_path.wasm",
-            ))
-            .to_vec(),
-            TestWasm::Imports => include_bytes!(concat!(
-                env!("OUT_DIR"),
-                "/wasm32-unknown-unknown/release/test_wasm_imports.wasm"
-            ))
-            .to_vec(),
-            TestWasm::InitFail => include_bytes!(concat!(
-                env!("OUT_DIR"),
-                "/wasm32-unknown-unknown/release/test_wasm_init_fail.wasm"
-            ))
-            .to_vec(),
-            TestWasm::InitPass => include_bytes!(concat!(
-                env!("OUT_DIR"),
-                "/wasm32-unknown-unknown/release/test_wasm_init_pass.wasm"
-            ))
-            .to_vec(),
-            TestWasm::Link => include_bytes!(concat!(
-                env!("OUT_DIR"),
-                "/wasm32-unknown-unknown/release/test_wasm_link.wasm"
-            ))
-            .to_vec(),
-            TestWasm::MigrateAgentFail => include_bytes!(concat!(
-                env!("OUT_DIR"),
-                "/wasm32-unknown-unknown/release/test_wasm_migrate_agent_fail.wasm"
-            ))
-            .to_vec(),
-            TestWasm::MigrateAgentPass => include_bytes!(concat!(
-                env!("OUT_DIR"),
-                "/wasm32-unknown-unknown/release/test_wasm_migrate_agent_pass.wasm"
-            ))
-            .to_vec(),
-            TestWasm::PostCommitFail => include_bytes!(concat!(
-                env!("OUT_DIR"),
-                "/wasm32-unknown-unknown/release/test_wasm_post_commit_fail.wasm"
-            ))
-            .to_vec(),
-            TestWasm::PostCommitSuccess => include_bytes!(concat!(
-                env!("OUT_DIR"),
-                "/wasm32-unknown-unknown/release/test_wasm_post_commit_success.wasm"
-            ))
-            .to_vec(),
-            TestWasm::SerRegression => include_bytes!(concat!(
-                env!("OUT_DIR"),
-                "/wasm32-unknown-unknown/release/test_wasm_ser_regression.wasm"
-            ))
-            .to_vec(),
-            TestWasm::Validate => include_bytes!(concat!(
-                env!("OUT_DIR"),
-                "/wasm32-unknown-unknown/release/test_wasm_validate.wasm"
-            ))
-            .to_vec(),
-            TestWasm::ValidateLink => include_bytes!(concat!(
-                env!("OUT_DIR"),
-                "/wasm32-unknown-unknown/release/test_wasm_validate_link.wasm"
-            ))
-            .to_vec(),
-            TestWasm::ValidateInvalid => include_bytes!(concat!(
-                env!("OUT_DIR"),
-                "/wasm32-unknown-unknown/release/test_wasm_validate_invalid.wasm"
-            ))
-            .to_vec(),
-            TestWasm::ValidateLinkAddInvalid => include_bytes!(concat!(
-                env!("OUT_DIR"),
-                "/wasm32-unknown-unknown/release/test_wasm_validate_link_add_invalid.wasm"
-            ))
-            .to_vec(),
-            TestWasm::ValidateValid => include_bytes!(concat!(
-                env!("OUT_DIR"),
-                "/wasm32-unknown-unknown/release/test_wasm_validate_valid.wasm"
-            ))
-            .to_vec(),
-            TestWasm::ValidateLinkAddValid => include_bytes!(concat!(
-                env!("OUT_DIR"),
-                "/wasm32-unknown-unknown/release/test_wasm_validate_link_add_valid.wasm"
-            ))
-            .to_vec(),
-            TestWasm::ValidationPackageFail => include_bytes!(concat!(
-                env!("OUT_DIR"),
-                "/wasm32-unknown-unknown/release/test_wasm_validation_package_fail.wasm"
-            ))
-            .to_vec(),
-            TestWasm::ValidationPackageSuccess => include_bytes!(concat!(
-                env!("OUT_DIR"),
-                "/wasm32-unknown-unknown/release/test_wasm_validation_package_success.wasm"
-            ))
-            .to_vec(),
-            TestWasm::WhoAmI => include_bytes!(concat!(
-                env!("OUT_DIR"),
-                "/wasm32-unknown-unknown/release/test_wasm_whoami.wasm"
-            ))
-            .to_vec(),
+            TestWasm::AgentInfo => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_agent_info.wasm")
+            }
+            TestWasm::Anchor => get_code("wasm32-unknown-unknown/release/test_wasm_anchor.wasm"),
+            TestWasm::Bench => get_code("wasm32-unknown-unknown/release/test_wasm_bench.wasm"),
+            TestWasm::CommitEntry => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_commit_entry.wasm")
+            }
+            TestWasm::Debug => get_code("wasm32-unknown-unknown/release/test_wasm_debug.wasm"),
+            TestWasm::EntryDefs => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_entry_defs.wasm")
+            }
+            TestWasm::Foo => get_code("wasm32-unknown-unknown/release/test_wasm_foo.wasm"),
+            TestWasm::HashPath => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_hash_path.wasm")
+            }
+            TestWasm::Imports => get_code("wasm32-unknown-unknown/release/test_wasm_imports.wasm"),
+            TestWasm::InitFail => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_init_fail.wasm")
+            }
+            TestWasm::InitPass => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_init_pass.wasm")
+            }
+            TestWasm::Link => get_code("wasm32-unknown-unknown/release/test_wasm_link.wasm"),
+            TestWasm::MigrateAgentFail => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_migrate_agent_fail.wasm")
+            }
+            TestWasm::MigrateAgentPass => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_migrate_agent_pass.wasm")
+            }
+            TestWasm::PostCommitFail => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_post_commit_fail.wasm")
+            }
+            TestWasm::PostCommitSuccess => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_post_commit_success.wasm")
+            }
+            TestWasm::SerRegression => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_ser_regression.wasm")
+            }
+            TestWasm::Validate => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_validate.wasm")
+            }
+            TestWasm::ValidateLink => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_validate_link.wasm")
+            }
+            TestWasm::ValidateInvalid => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_validate_invalid.wasm")
+            }
+            TestWasm::ValidateLinkAddInvalid => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_validate_link_add_invalid.wasm")
+            }
+            TestWasm::ValidateValid => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_validate_valid.wasm")
+            }
+            TestWasm::ValidateLinkAddValid => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_validate_link_add_valid.wasm")
+            }
+            TestWasm::ValidationPackageFail => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_validation_package_fail.wasm")
+            }
+            TestWasm::ValidationPackageSuccess => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_validation_package_success.wasm")
+            }
+            TestWasm::WhoAmI => get_code("wasm32-unknown-unknown/release/test_wasm_whoami.wasm"),
         })
     }
+}
+
+fn get_code(path: &'static str) -> Vec<u8> {
+    let path = match option_env!("HC_TEST_WASM_DIR") {
+        Some(dir) => format!("{}/{}", dir, path),
+        None => format!(
+            "{}/{}/{}",
+            env!("CARGO_MANIFEST_DIR"),
+            WASM_WORKSPACE_TARGET,
+            path
+        ),
+    };
+    let warning = format!(
+        "Wasm: {:?} was not found. Maybe you need to build the test wasms\n
+        Run `cargo build --features 'build_wasms' --manifest-path=crates/holochain/Cargo.toml` 
+        or pass the feature flag to `cargo test`
+        ",
+        path
+    );
+    std::fs::read(path).expect(&warning)
 }
 
 impl From<TestWasm> for Zome {
