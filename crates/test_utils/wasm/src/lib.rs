@@ -142,7 +142,7 @@ impl From<TestWasm> for DnaWasm {
 }
 
 fn get_code(path: &'static str) -> Vec<u8> {
-    let path = match option_env!("HC_TEST_WASMS_DIR") {
+    let path = match option_env!("HC_TEST_WASM_DIR") {
         Some(dir) => format!("{}/{}", dir, path),
         None => format!(
             "{}/{}/{}",
