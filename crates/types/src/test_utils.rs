@@ -113,6 +113,17 @@ pub fn fake_agent_pubkey_2() -> AgentPubKey {
         .unwrap()
 }
 
+/// Keeping with convention if Alice is pubkey 1
+/// and bob is pubkey 2 the this helps make test
+/// logging easier to read.
+pub fn which_agent(key: &AgentPubKey) -> String {
+    match key.to_string().as_ref() {
+        "uhCAkw-zrttiYpdfAYX4fR6W8DPUdheZJ-1QsRA4cTImmzTYUcOr4" => "alice".to_string(),
+        "uhCAkomHzekU0-x7p62WmrusdxD2w9wcjdajC88688JGSTEo6cbEK" => "bob".to_string(),
+        a => a.to_string(),
+    }
+}
+
 /// A fixture CapSecret for unit testing.
 pub fn fake_cap_secret() -> CapSecret {
     CapSecret::random()

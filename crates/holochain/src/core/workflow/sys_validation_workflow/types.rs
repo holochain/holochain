@@ -24,8 +24,9 @@ pub(super) enum Outcome {
 #[allow(missing_docs)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum DhtOpOrder {
-    RegisterAgentActivity,
+    RegisterAgentActivity(u32),
     StoreEntry,
+    // Sorted by time
     StoreElement,
     RegisterUpdatedBy,
     RegisterDeletedBy,
@@ -40,7 +41,7 @@ impl From<&DhtOp> for DhtOpOrder {
         match op {
             DhtOp::StoreElement(_, _, _) => StoreElement,
             DhtOp::StoreEntry(_, _, _) => StoreEntry,
-            DhtOp::RegisterAgentActivity(_, _) => RegisterAgentActivity,
+            DhtOp::RegisterAgentActivity(_, h) => RegisterAgentActivity(h.header_seq()),
             DhtOp::RegisterUpdatedBy(_, _) => RegisterUpdatedBy,
             DhtOp::RegisterDeletedBy(_, _) => RegisterDeletedBy,
             DhtOp::RegisterDeletedEntryHeader(_, _) => RegisterDeletedEntryHeader,

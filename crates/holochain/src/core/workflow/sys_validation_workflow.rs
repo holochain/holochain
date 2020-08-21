@@ -27,7 +27,8 @@ use holochain_state::{
     prelude::{GetDb, Reader, Writer},
 };
 use holochain_types::{
-    dht_op::DhtOp, header::NewEntryHeaderRef, validate::ValidationStatus, Entry, Timestamp,
+    dht_op::DhtOp, header::NewEntryHeaderRef, test_utils::which_agent, validate::ValidationStatus,
+    Entry, Timestamp,
 };
 use holochain_zome_types::{
     header::{ElementDelete, EntryType, EntryUpdate, LinkAdd, LinkRemove},
@@ -90,6 +91,11 @@ async fn sys_validation_workflow_inner(
     // Sort the ops
     ops.sort_unstable_by_key(|v| DhtOpOrder::from(&v.op));
 
+    debug!(
+        agent = %which_agent(conductor_api.cell_id().agent_pubkey()),
+        ?ops
+    );
+
     // Process each op
     for mut vlv in ops {
         let outcome = validate_op(&vlv.op, workspace, network.clone(), &conductor_api).await?;
@@ -131,7 +137,6 @@ async fn sys_validation_workflow_inner(
             }
             Outcome::MissingDhtDep => {
                 vlv.status = ValidationLimboStatus::Pending;
-                debug!(?vlv.num_tries, %vlv.time_added);
                 to_val_limbo(vlv, workspace).await?;
             }
             Outcome::Rejected => {
@@ -182,7 +187,13 @@ async fn validate_op(
         },
         // Handle the errors that result in pending or awaiting deps
         Err(SysValidationError::ValidationError(e)) => {
-            warn!(msg = "DhtOp has failed system validation", ?op, error = ?e, error_msg = %e);
+            warn!(
+                agent = %which_agent(conductor_api.cell_id().agent_pubkey()),
+                msg = "DhtOp has failed system validation",
+                ?op,
+                error = ?e,
+                error_msg = %e
+            );
             Ok(handle_failed(e))
         }
         Err(e) => Err(e.into()),
@@ -228,7 +239,7 @@ async fn validate_op_inner(
 ) -> SysValidationResult<()> {
     match op {
         DhtOp::StoreElement(signature, header, _) => {
-            store_header(header, workspace.cascade(network)).await?;
+            store_element(header, workspace.cascade(network)).await?;
 
             all_op_check(signature, header).await?;
             Ok(())
@@ -314,7 +325,7 @@ async fn register_agent_activity(
     Ok(())
 }
 
-async fn store_header(header: &Header, cascade: Cascade<'_, '_>) -> SysValidationResult<()> {
+async fn store_element(header: &Header, cascade: Cascade<'_, '_>) -> SysValidationResult<()> {
     // Get data ready to validate
     let prev_header_hash = header.prev_header();
 
