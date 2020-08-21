@@ -32,7 +32,7 @@ use holochain_serialized_bytes::prelude::*;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::{
     env::{EnvironmentWrite, EnvironmentWriteRef, ReadManager},
-    prelude::{BufferedStore, GetDb, WriteManager, EnvironmentRead},
+    prelude::{BufferedStore, EnvironmentRead, GetDb, WriteManager},
     test_utils::test_cell_env,
 };
 use holochain_types::{
@@ -946,7 +946,7 @@ async fn link_entries<'env>(
 }
 
 async fn remove_link<'env>(
-    env: EnvironmentRead
+    env: EnvironmentRead,
     dbs: &impl GetDb,
     call_data: CallData,
     link_add_hash: HeaderHash,
@@ -979,7 +979,7 @@ async fn remove_link<'env>(
 }
 
 async fn get_links<'env>(
-    env: EnvironmentRead
+    env: EnvironmentRead,
     dbs: &impl GetDb,
     call_data: CallData,
     base: EntryHash,

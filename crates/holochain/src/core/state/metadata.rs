@@ -427,7 +427,8 @@ impl MetadataBufT for MetadataBuf {
     {
         Ok(Box::new(
             self.links_meta
-                .iter_all_key_matches(key.to_key()).await?
+                .iter_all_key_matches(key.to_key())
+                .await?
                 .filter_map(move |(_, link)| {
                     // Check if link has been removed
                     match self
@@ -448,7 +449,8 @@ impl MetadataBufT for MetadataBuf {
     {
         Ok(Box::new(
             self.links_meta
-                .iter_all_key_matches(key.to_key()).await?
+                .iter_all_key_matches(key.to_key())
+                .await?
                 .map(|(_, v)| Ok(v)),
         ))
     }
@@ -613,10 +615,11 @@ impl MetadataBufT for MetadataBuf {
 
     // TODO: For now this is only checking for deletes
     // Once the validation is finished this should check for that as well
-    fn async get_dht_status(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus> {
+    async fn get_dht_status(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus> {
         Ok(self
             .status_meta
-            .get(entry_hash).await?
+            .get(entry_hash)
+            .await?
             .unwrap_or(EntryDhtStatus::Dead))
     }
 

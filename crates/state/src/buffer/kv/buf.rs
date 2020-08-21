@@ -277,6 +277,17 @@ where
         fresh_reader!(self.env, |reader| self.inner.get(&reader, k))
     }
 
+    /// See if a value exists, avoiding deserialization
+    pub fn contains_used<R: Readable>(&self, r: &R, k: &K) -> DatabaseResult<bool> {
+        self.inner.contains(r, k)
+    }
+
+    /// Get a value, taking the scratch space into account,
+    /// or from persistence if needed
+    pub fn get_used<R: Readable>(&self, r: &R, k: &K) -> DatabaseResult<Option<V>> {
+        self.inner.get(r, k)
+    }
+
     // /// Iterator that checks the scratch space
     // TODO: remove, not much point in collecting the entire DB, right?
     // pub async fn iter<'a, R: Readable + Send + Sync>(&'a self) -> DatabaseResult<IterOwned<V>> {
@@ -376,9 +387,17 @@ where
                 Put(v) => {
                     let buf = holochain_serialized_bytes::encode(v)?;
                     let encoded = rkv::Value::Blob(&buf);
-                    self.store.db().put(writer, IntKey::from_key_bytes_fallible(k.to_vec()), &encoded)?;
+                    self.store.db().put(
+                        writer,
+                        IntKey::from_key_bytes_fallible(k.to_vec()),
+                        &encoded,
+                    )?;
                 }
-                Delete => match self.store.db().delete(writer, IntKey::from_key_bytes_fallible(k.to_vec())) {
+                Delete => match self
+                    .store
+                    .db()
+                    .delete(writer, IntKey::from_key_bytes_fallible(k.to_vec()))
+                {
                     Err(rkv::StoreError::LmdbError(rkv::LmdbError::NotFound)) => (),
                     r => r?,
                 },
