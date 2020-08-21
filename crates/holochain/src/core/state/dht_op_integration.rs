@@ -195,7 +195,7 @@ mod tests {
         {
             let mut dht_hash = DhtOpHashFixturator::new(Predictable);
             let reader = env_ref.reader().unwrap();
-            let mut buf = IntegratedDhtOpsBuf::new(&reader, &dbs).unwrap();
+            let mut buf = IntegratedDhtOpsBuf::new(env.clone().into(), &dbs).unwrap();
             for mut value in values {
                 buf.put(dht_hash.next().unwrap(), value.clone()).unwrap();
                 expected.push(value.clone());
@@ -211,7 +211,7 @@ mod tests {
         // Check queries
         {
             let reader = env_ref.reader().unwrap();
-            let buf = IntegratedDhtOpsBuf::new(&reader, &dbs).unwrap();
+            let buf = IntegratedDhtOpsBuf::new(env.clone().into(), &dbs).unwrap();
             // No filter
             let mut r = buf
                 .query(None, None, None)

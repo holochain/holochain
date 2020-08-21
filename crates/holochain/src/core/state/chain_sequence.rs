@@ -118,13 +118,14 @@ impl BufferedStore for ChainSequenceBuf {
         if self.is_clean() {
             return Ok(());
         }
-        let fresh = self.with_reader(writer)?;
-        let (old, new) = (self.persisted_head, fresh.persisted_head);
-        if old != new {
-            Err(SourceChainError::HeadMoved(old, new))
-        } else {
-            Ok(self.db.flush_to_txn(writer)?)
-        }
+        todo!("Reimplement as-at check without the aid of a persistent Reader");
+        // let fresh = self.with_reader(writer)?;
+        // let (old, new) = (self.persisted_head, fresh.persisted_head);
+        // if old != new {
+        //     Err(SourceChainError::HeadMoved(old, new))
+        // } else {
+        //     Ok(self.db.flush_to_txn(writer)?)
+        // }
     }
 }
 
@@ -149,7 +150,7 @@ pub mod tests {
         let env = arc.guard().await;
         let dbs = arc.dbs().await;
         env.with_reader(|reader| {
-            let mut buf = ChainSequenceBuf::new(&reader, &dbs)?;
+            let mut buf = ChainSequenceBuf::new(env.clone().into(), &dbs)?;
             assert_eq!(buf.chain_head(), None);
             buf.put_header(
                 HeaderHash::from_raw_bytes(vec![
@@ -213,7 +214,7 @@ pub mod tests {
         let dbs = arc.dbs().await;
 
         env.with_reader::<SourceChainError, _, _>(|reader| {
-            let mut buf = ChainSequenceBuf::new(&reader, &dbs)?;
+            let mut buf = ChainSequenceBuf::new(env.clone().into(), &dbs)?;
             buf.put_header(
                 HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -250,7 +251,7 @@ pub mod tests {
         })?;
 
         env.with_reader::<SourceChainError, _, _>(|reader| {
-            let buf = ChainSequenceBuf::new(&reader, &dbs)?;
+            let buf = ChainSequenceBuf::new(env.clone().into(), &dbs)?;
             assert_eq!(
                 buf.chain_head(),
                 Some(
@@ -267,7 +268,7 @@ pub mod tests {
         })?;
 
         env.with_reader::<SourceChainError, _, _>(|reader| {
-            let mut buf = ChainSequenceBuf::new(&reader, &dbs)?;
+            let mut buf = ChainSequenceBuf::new(env.clone().into(), &dbs)?;
             buf.put_header(
                 HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -294,7 +295,7 @@ pub mod tests {
         })?;
 
         env.with_reader::<SourceChainError, _, _>(|reader| {
-            let buf = ChainSequenceBuf::new(&reader, &dbs)?;
+            let buf = ChainSequenceBuf::new(env.clone().into(), &dbs)?;
             assert_eq!(
                 buf.chain_head(),
                 Some(
@@ -324,7 +325,7 @@ pub mod tests {
             let env = arc1.guard().await;
             let dbs = arc1.dbs().await;
             let reader = env.reader()?;
-            let mut buf = ChainSequenceBuf::new(&reader, &dbs)?;
+            let mut buf = ChainSequenceBuf::new(env.clone().into(), &dbs)?;
             buf.put_header(
                 HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -360,7 +361,7 @@ pub mod tests {
             let env = arc2.guard().await;
             let dbs = arc2.dbs().await;
             let reader = env.reader()?;
-            let mut buf = ChainSequenceBuf::new(&reader, &dbs)?;
+            let mut buf = ChainSequenceBuf::new(env.clone().into(), &dbs)?;
             buf.put_header(
                 HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,

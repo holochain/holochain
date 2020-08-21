@@ -58,6 +58,7 @@ use holochain_p2p::{
     actor::{GetLinksOptions, GetMetaOptions, GetOptions},
     HolochainP2pCell,
 };
+use holochain_state::prelude::EnvironmentRead;
 use holochain_types::{
     dht_op::{produce_op_lights_from_element_group, produce_op_lights_from_elements},
     element::{
@@ -669,8 +670,8 @@ where
 
 #[cfg(test)]
 /// Helper function for easily setting up cascades during tests
-pub fn test_dbs_and_mocks<'txn>(
-    reader: &'txn holochain_state::transaction::Reader<'txn>,
+pub fn test_dbs_and_mocks(
+    env: EnvironmentRead,
     dbs: &impl holochain_state::db::GetDb,
 ) -> (
     ElementBuf,
@@ -678,8 +679,8 @@ pub fn test_dbs_and_mocks<'txn>(
     ElementBuf,
     super::metadata::MockMetadataBuf,
 ) {
-    let cas = ElementBuf::vault(&reader, dbs, true).unwrap();
-    let element_cache = ElementBuf::cache(&reader, dbs).unwrap();
+    let cas = ElementBuf::vault(env.clone(), dbs, true).unwrap();
+    let element_cache = ElementBuf::cache(env.clone(), dbs).unwrap();
     let metadata = super::metadata::MockMetadataBuf::new();
     let metadata_cache = super::metadata::MockMetadataBuf::new();
     (cas, metadata, element_cache, metadata_cache)

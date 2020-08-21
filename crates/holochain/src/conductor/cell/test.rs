@@ -88,8 +88,8 @@ async fn test_cell_handle_publish() {
 
     let env_ref = cell.state_env.guard().await;
     let reader = env_ref.reader().expect("Could not create LMDB reader");
-    let workspace =
-        IncomingDhtOpsWorkspace::new(&reader, &env_ref).expect("Could not create Workspace");
+    let workspace = IncomingDhtOpsWorkspace::new(cell.state_env.clone().into(), &env_ref)
+        .expect("Could not create Workspace");
 
     workspace.op_exists(&op_hash).unwrap();
 

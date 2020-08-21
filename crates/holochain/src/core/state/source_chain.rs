@@ -10,7 +10,7 @@ use holochain_state::{
     db::GetDb,
     error::DatabaseResult,
     fresh_reader,
-    prelude::{EnvironmentRead, Reader, Writer},
+    prelude::*,
 };
 use holochain_types::{prelude::*, EntryHashed};
 use holochain_zome_types::{
@@ -129,8 +129,8 @@ impl SourceChain {
                     })
                 }))
             })
-            .collect()?
-        });
+            .collect()
+        })?;
 
         let answer = if hashes_n_grants.len() == 0 {
             None
@@ -172,8 +172,8 @@ impl SourceChain {
                 }
             })
             .filter(|(_entry_hash, claim)| Ok(claim.secret() == query))
-            .collect()?
-        });
+            .collect()
+        })?;
 
         let answer = if hashes_n_claims.len() == 0 {
             None

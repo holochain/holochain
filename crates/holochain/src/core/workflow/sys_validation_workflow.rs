@@ -15,7 +15,7 @@ use holo_hash::DhtOpHash;
 use holochain_state::{
     buffer::{BufferedStore, KvBufFresh},
     db::INTEGRATION_LIMBO,
-    prelude::{GetDb, Reader, Writer},
+    prelude::{EnvironmentRead, GetDb, Reader, Writer},
 };
 use holochain_types::validate::ValidationStatus;
 use tracing::*;

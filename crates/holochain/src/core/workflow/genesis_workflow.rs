@@ -139,7 +139,7 @@ pub mod tests {
 
         {
             let reader = env.reader()?;
-            let workspace = GenesisWorkspace::new(&reader, &dbs)?;
+            let workspace = GenesisWorkspace::new(env.clone().into(), &dbs)?;
             let mut api = MockCellConductorApi::new();
             api.expect_sync_dpki_request()
                 .returning(|_, _| Ok("mocked dpki request response".to_string()));
@@ -154,7 +154,7 @@ pub mod tests {
         {
             let reader = env.reader()?;
 
-            let source_chain = SourceChain::new(&reader, &dbs)?;
+            let source_chain = SourceChain::new(env.clone().into(), &dbs)?;
             assert_eq!(source_chain.agent_pubkey().await?, agent_pubkey);
             source_chain.chain_head().expect("chain head should be set");
 

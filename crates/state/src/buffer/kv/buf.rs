@@ -354,6 +354,41 @@ where
     }
 }
 
+impl<V> BufferedStore for KvIntBufUsed<V>
+where
+    V: BufVal,
+{
+    type Error = DatabaseError;
+
+    fn is_clean(&self) -> bool {
+        self.scratch.is_empty()
+    }
+
+    fn flush_to_txn(self, writer: &mut Writer) -> DatabaseResult<()> {
+        use KvOp::*;
+
+        if self.is_clean() {
+            return Ok(());
+        }
+
+        for (k, op) in self.scratch.iter() {
+            match op {
+                Put(v) => {
+                    let buf = holochain_serialized_bytes::encode(v)?;
+                    let encoded = rkv::Value::Blob(&buf);
+                    self.store.db().put(writer, IntKey::from_key_bytes_fallible(k.to_vec()), &encoded)?;
+                }
+                Delete => match self.store.db().delete(writer, IntKey::from_key_bytes_fallible(k.to_vec())) {
+                    Err(rkv::StoreError::LmdbError(rkv::LmdbError::NotFound)) => (),
+                    r => r?,
+                },
+            }
+        }
+
+        Ok(())
+    }
+}
+
 impl<K, V> BufferedStore for KvBufFresh<K, V>
 where
     K: BufKey,
@@ -362,7 +397,22 @@ where
     type Error = DatabaseError;
 
     fn is_clean(&self) -> bool {
-        self.inner.is_clean()
+        self.scratch.is_empty()
+    }
+
+    fn flush_to_txn(self, writer: &mut Writer) -> DatabaseResult<()> {
+        self.inner.flush_to_txn(writer)
+    }
+}
+
+impl<V> BufferedStore for KvIntBufFresh<V>
+where
+    V: BufVal,
+{
+    type Error = DatabaseError;
+
+    fn is_clean(&self) -> bool {
+        self.scratch.is_empty()
     }
 
     fn flush_to_txn(self, writer: &mut Writer) -> DatabaseResult<()> {

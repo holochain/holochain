@@ -110,7 +110,7 @@ pub mod tests {
         let env_ref = env.guard().await;
         let reader = env_ref.reader().unwrap();
         let mut workspace =
-            InitializeZomesWorkspace(CallZomeWorkspace::new(&reader, &dbs).unwrap());
+            InitializeZomesWorkspace(CallZomeWorkspace::new(env.clone().into(), &dbs).unwrap());
         let mut ribosome = MockRibosomeT::new();
 
         // Setup the ribosome mock

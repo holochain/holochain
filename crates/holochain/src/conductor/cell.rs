@@ -133,7 +133,7 @@ impl Cell {
             // check if genesis ran on source chain buf
             let env_ref = state_env.guard().await;
             let reader = env_ref.reader()?;
-            SourceChainBuf::new(&reader, &env_ref)?.has_genesis()
+            SourceChainBuf::new(state_env.clone().into(), &env_ref)?.has_genesis()
         };
 
         if has_genesis {
@@ -189,7 +189,7 @@ impl Cell {
         let conductor_api = CellConductorApi::new(conductor_handle, id.clone());
 
         // run genesis
-        let workspace = GenesisWorkspace::new(&reader, &env)
+        let workspace = GenesisWorkspace::new(arc.clone().into(), &env)
             .map_err(ConductorApiError::from)
             .map_err(Box::new)?;
         let args = GenesisWorkflowArgs::new(dna_file, id.agent_pubkey().clone(), membrane_proof);
@@ -465,8 +465,8 @@ impl Cell {
         let env_ref = self.state_env.guard().await;
         let dbs = self.state_env.dbs().await;
         let reader = env_ref.reader()?;
-        let element_vault = ElementBuf::vault(&reader, &dbs, false)?;
-        let meta_vault = MetadataBuf::vault(&reader, &dbs)?;
+        let element_vault = ElementBuf::vault(self.state_env.clone().into(), &dbs, false)?;
+        let meta_vault = MetadataBuf::vault(self.state_env.clone().into(), &dbs)?;
 
         // Look for a delete on the header and collect it
         let deleted = meta_vault.get_deletes_on_header(hash.clone())?.next()?;
@@ -517,8 +517,8 @@ impl Cell {
         let env_ref = self.state_env.guard().await;
         let dbs = self.state_env.dbs().await;
         let reader = env_ref.reader()?;
-        let element_vault = ElementBuf::vault(&reader, &dbs, false)?;
-        let meta_vault = MetadataBuf::vault(&reader, &dbs)?;
+        let element_vault = ElementBuf::vault(self.state_env.clone().into(), &dbs, false)?;
+        let meta_vault = MetadataBuf::vault(self.state_env.clone().into(), &dbs)?;
         debug!(id = ?self.id());
 
         let links = meta_vault
@@ -586,7 +586,8 @@ impl Cell {
     ) -> CellResult<Vec<DhtOpHash>> {
         let env_ref = self.state_env.guard().await;
         let reader = env_ref.reader()?;
-        let integrated_dht_ops = IntegratedDhtOpsBuf::new(&reader, &env_ref)?;
+        let integrated_dht_ops =
+            IntegratedDhtOpsBuf::new(self.state_env().clone().into(), &env_ref)?;
         let result: Vec<DhtOpHash> = integrated_dht_ops
             .query(Some(since), Some(until), Some(dht_arc))?
             .map(|(k, _)| Ok(k))
@@ -608,8 +609,9 @@ impl Cell {
     > {
         let env_ref = self.state_env.guard().await;
         let reader = env_ref.reader()?;
-        let integrated_dht_ops = IntegratedDhtOpsBuf::new(&reader, &env_ref)?;
-        let cas = ElementBuf::vault(&reader, &env_ref, false)?;
+        let integrated_dht_ops =
+            IntegratedDhtOpsBuf::new(self.state_env().clone().into(), &env_ref)?;
+        let cas = ElementBuf::vault(self.state_env.clone().into(), &env_ref, false)?;
         let mut out = vec![];
         for op_hash in op_hashes {
             let val = integrated_dht_ops.get(&op_hash)?;
@@ -682,7 +684,7 @@ impl Cell {
         let keystore = arc.keystore().clone();
         let env = arc.guard().await;
         let reader = env.reader()?;
-        let workspace = CallZomeWorkspace::new(&reader, &env)?;
+        let workspace = CallZomeWorkspace::new(self.state_env().clone().into(), &env)?;
 
         let args = CallZomeWorkflowArgs {
             ribosome: self.get_ribosome().await?,
@@ -710,7 +712,7 @@ impl Cell {
         let env_ref = state_env.guard().await;
         let reader = env_ref.reader()?;
         // Create the workspace
-        let workspace = CallZomeWorkspace::new(&reader, &env_ref)
+        let workspace = CallZomeWorkspace::new(self.state_env().clone().into(), &env_ref)
             .map_err(WorkflowError::from)
             .map_err(Box::new)?;
         let workspace = InitializeZomesWorkspace(workspace);

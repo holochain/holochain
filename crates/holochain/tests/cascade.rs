@@ -73,12 +73,12 @@ async fn get_links() -> SourceChainResult<()> {
     let env_ref = env.guard().await;
     let reader = env_ref.reader()?;
 
-    let mut source_chain = SourceChainBuf::new(&reader, &dbs)?;
-    let mut element_cache = ElementBuf::cache(&reader, &dbs)?;
+    let mut source_chain = SourceChainBuf::new(env.clone().into(), &dbs)?;
+    let mut element_cache = ElementBuf::cache(env.clone().into(), &dbs)?;
 
     // create a cache and a cas for store and meta
-    let meta_vault = MetadataBuf::vault(&reader, &dbs)?;
-    let mut meta_cache = MetadataBuf::cache(&reader, &dbs)?;
+    let meta_vault = MetadataBuf::vault(env.clone().into(), &dbs)?;
+    let mut meta_cache = MetadataBuf::cache(env.clone().into(), &dbs)?;
 
     let (_jimbo_id, jimbo_header, jimbo_entry, _jessy_id, jessy_header, jessy_entry) = fixtures();
 

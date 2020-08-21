@@ -102,21 +102,21 @@ impl ElementBuf {
         }
     }
 
-    pub fn contains_entry(&self, entry_hash: &EntryHash) -> DatabaseResult<bool> {
-        Ok(if self.public_entries.contains(entry_hash)? {
+    pub async fn contains_entry(&self, entry_hash: &EntryHash) -> DatabaseResult<bool> {
+        Ok(if self.public_entries.contains(entry_hash).await? {
             true
         } else {
             // Potentially avoid this let Some if the above branch is hit first
             if let Some(private) = &self.private_entries {
-                private.contains(entry_hash)?
+                private.contains(entry_hash).await?
             } else {
                 false
             }
         })
     }
 
-    pub fn contains_header(&self, header_hash: &HeaderHash) -> DatabaseResult<bool> {
-        self.headers.contains(header_hash)
+    pub async fn contains_header(&self, header_hash: &HeaderHash) -> DatabaseResult<bool> {
+        self.headers.contains(header_hash).await
     }
 
     pub async fn get_header(

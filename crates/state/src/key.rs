@@ -1,6 +1,6 @@
 //! Traits for defining keys and values of databases
 
-use holo_hash::{HoloHash, PrimitiveHashType};
+use holo_hash::{HashType, HoloHash, PrimitiveHashType};
 use serde::{de::DeserializeOwned, Serialize};
 
 /// Any key type used in a [KvStore] or [KvvStore] must implement this trait
@@ -57,22 +57,31 @@ impl AsRef<[u8]> for IntKey {
     }
 }
 
-// NB: Only primitive HoloHashes can be used as DB keys
-impl<P: PrimitiveHashType + Send + Sync> BufKey for HoloHash<P> {
+impl<T: HashType + Send + Sync> BufKey for HoloHash<T> {
     fn to_key_bytes(self) -> Vec<u8> {
-        let bytes = self.into_inner();
-        // This assertion just helps raise awareness in case we change the
-        // length of a HoloHash [ B-02112 ]
-        assert_eq!(bytes.len(), 36);
-        bytes
+        todo!("implement in terms of SerializedBytes")
     }
 
     fn from_key_bytes_fallible(bytes: Vec<u8>) -> Self {
-        // This assertion could fail if this method is used inappropriately
-        assert_eq!(bytes.len(), 36);
-        Self::from_raw_bytes(bytes)
+        todo!("implement in terms of SerializedBytes")
     }
 }
+
+// impl<P: PrimitiveHashType + Send + Sync> BufKey for HoloHash<P> {
+//     fn to_key_bytes(self) -> Vec<u8> {
+//         let bytes = self.into_inner();
+//         // This assertion just helps raise awareness in case we change the
+//         // length of a HoloHash [ B-02112 ]
+//         assert_eq!(bytes.len(), 36);
+//         bytes
+//     }
+
+//     fn from_key_bytes_fallible(bytes: Vec<u8>) -> Self {
+//         // This assertion could fail if this method is used inappropriately
+//         assert_eq!(bytes.len(), 36);
+//         Self::from_raw_bytes(bytes)
+//     }
+// }
 
 /// Use this as the key type for LMDB databases which should only have one key.
 ///

@@ -386,7 +386,7 @@ pub mod tests {
         {
             let reader = env.reader()?;
 
-            let mut store = SourceChainBuf::new(&reader, &dbs)?;
+            let mut store = SourceChainBuf::new(env.clone().into(), &dbs)?;
             assert!(store.chain_head().is_none());
             store
                 .put_raw(dna_header.as_content().clone(), dna_entry.clone())
@@ -400,7 +400,7 @@ pub mod tests {
         {
             let reader = env.reader()?;
 
-            let store = SourceChainBuf::new(&reader, &dbs)?;
+            let store = SourceChainBuf::new(env.clone().into(), &dbs)?;
             assert!(store.chain_head().is_some());
 
             // get the full element

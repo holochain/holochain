@@ -4,7 +4,9 @@ use derive_more::Constructor;
 use holochain_serialized_bytes::prelude::*;
 
 /// Represents an individual "zome".
-#[derive(Serialize, Deserialize, Hash, Clone, Debug, PartialEq, SerializedBytes)]
+#[derive(
+    Serialize, Deserialize, Hash, Clone, Debug, PartialEq, PartialOrd, Ord, SerializedBytes,
+)]
 pub struct Zome {
     /// The WasmHash representing the WASM byte code for this zome.
     pub wasm_hash: holo_hash::WasmHash,

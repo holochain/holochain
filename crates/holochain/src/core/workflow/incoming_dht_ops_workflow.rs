@@ -31,7 +31,7 @@ pub async fn incoming_dht_ops_workflow(
     // set up our workspace
     let env_ref = state_env.guard().await;
     let reader = env_ref.reader()?;
-    let mut workspace = IncomingDhtOpsWorkspace::new(&reader, &env_ref)?;
+    let mut workspace = IncomingDhtOpsWorkspace::new(state_env.clone().into(), &env_ref)?;
 
     // add incoming ops to the validation limbo
     for (hash, op) in ops {
@@ -92,9 +92,9 @@ impl Workspace for IncomingDhtOpsWorkspace {
 }
 
 impl IncomingDhtOpsWorkspace {
-    pub fn op_exists(&self, hash: &DhtOpHash) -> DatabaseResult<bool> {
-        Ok(self.integrated_dht_ops.contains(&hash)?
-            || self.integration_limbo.contains(&hash)?
-            || self.validation_limbo.contains(&hash)?)
+    pub async fn op_exists(&self, hash: &DhtOpHash) -> DatabaseResult<bool> {
+        Ok(self.integrated_dht_ops.contains(&hash).await?
+            || self.integration_limbo.contains(&hash).await?
+            || self.validation_limbo.contains(&hash).await?)
     }
 }

@@ -25,7 +25,7 @@ pub enum ValidationResult {
 
 /// Validation receipt content - to be signed.
 #[derive(
-    Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize, SerializedBytes,
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize, SerializedBytes,
 )]
 pub struct ValidationReceipt {
     /// the op this validation receipt is for.
@@ -51,7 +51,16 @@ impl ValidationReceipt {
 
 /// A full, signed validation receipt.
 #[derive(
-    Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize, SerializedBytes,
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    SerializedBytes,
 )]
 pub struct SignedValidationReceipt {
     /// the content of the validation receipt.

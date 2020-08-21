@@ -26,8 +26,8 @@ pub async fn handle_get_entry(
     let env_ref = state_env.guard().await;
     let dbs = state_env.dbs().await;
     let reader = env_ref.reader()?;
-    let element_vault = ElementBuf::vault(&reader, &dbs, false)?;
-    let meta_vault = MetadataBuf::vault(&reader, &dbs)?;
+    let element_vault = ElementBuf::vault(state_env.clone().into(), &dbs, false)?;
+    let meta_vault = MetadataBuf::vault(state_env.clone().into(), &dbs)?;
 
     // ## Helper closures to DRY and make more readable
 

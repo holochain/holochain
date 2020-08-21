@@ -525,12 +525,13 @@ where
         let entry_def_db = environ.get_db(&*holochain_state::db::ENTRY_DEF)?;
         let reader = env.reader()?;
 
-        let wasm_buf = Arc::new(WasmBuf::new(&reader, wasm)?);
-        let dna_def_buf = DnaDefBuf::new(&reader, dna_def_db)?;
-        let entry_def_buf = EntryDefBuf::new(&reader, entry_def_db)?;
+        let wasm_buf = Arc::new(WasmBuf::new(environ.clone().into(), wasm)?);
+        let dna_def_buf = DnaDefBuf::new(environ.clone().into(), dna_def_db)?;
+        let entry_def_buf = EntryDefBuf::new(environ.clone().into(), entry_def_db)?;
         // Load out all dna defs
         let wasm_tasks = dna_def_buf
-            .get_all()?
+            .get_all()
+            .await?
             .into_iter()
             .map(|dna_def| {
                 // Load all wasms for each dna_def from the wasm db into memory
@@ -578,14 +579,14 @@ where
 
         let zome_defs = get_entry_defs(dna.clone()).await?;
 
-        let mut entry_def_buf = EntryDefBuf::new(&reader, entry_def_db)?;
+        let mut entry_def_buf = EntryDefBuf::new(environ.clone().into(), entry_def_db)?;
 
         for (key, entry_def) in zome_defs.clone() {
             entry_def_buf.put(key, entry_def)?;
         }
 
-        let mut wasm_buf = WasmBuf::new(&reader, wasm)?;
-        let mut dna_def_buf = DnaDefBuf::new(&reader, dna_def_db)?;
+        let mut wasm_buf = WasmBuf::new(environ.clone().into(), wasm)?;
+        let mut dna_def_buf = DnaDefBuf::new(environ.clone().into(), dna_def_db)?;
         // TODO: PERF: This loop might be slow
         for (wasm_hash, dna_wasm) in dna.code().clone().into_iter() {
             if let None = wasm_buf.get(&wasm_hash).await? {
@@ -613,7 +614,7 @@ where
         let arc = cell.state_env();
         let env = arc.guard().await;
         let reader = env.reader()?;
-        let source_chain = SourceChainBuf::new(&reader, &env)?;
+        let source_chain = SourceChainBuf::new(arc.clone().into(), &env)?;
         Ok(source_chain.dump_as_json().await?)
     }
 

@@ -9,7 +9,7 @@ use crate::core::state::{
 use holochain_state::{
     buffer::KvBufFresh,
     db::{AUTHORED_DHT_OPS, INTEGRATION_LIMBO},
-    prelude::{BufferedStore, GetDb, Reader, Writer},
+    prelude::{BufferedStore, EnvironmentRead, GetDb, Reader, Writer},
 };
 use holochain_types::{dht_op::DhtOpHashed, validate::ValidationStatus};
 use tracing::*;
@@ -173,7 +173,7 @@ mod tests {
         let expected_hashes: HashSet<_> = {
             let reader = env_ref.reader().unwrap();
             let mut td = TestData::new();
-            let mut source_chain = ProduceDhtOpsWorkspace::new(&reader, &dbs)
+            let mut source_chain = ProduceDhtOpsWorkspace::new(env.clone().into(), &dbs)
                 .unwrap()
                 .call_zome_workspace
                 .source_chain;
@@ -228,7 +228,7 @@ mod tests {
         // Run the workflow and commit it
         {
             let reader = env_ref.reader().unwrap();
-            let mut workspace = ProduceDhtOpsWorkspace::new(&reader, &dbs).unwrap();
+            let mut workspace = ProduceDhtOpsWorkspace::new(env.clone().into(), &dbs).unwrap();
             let complete = produce_dht_ops_workflow_inner(&mut workspace)
                 .await
                 .unwrap();
@@ -241,7 +241,7 @@ mod tests {
         // Pull out the results and check them
         let last_count = {
             let reader = env_ref.reader().unwrap();
-            let workspace = ProduceDhtOpsWorkspace::new(&reader, &dbs).unwrap();
+            let workspace = ProduceDhtOpsWorkspace::new(env.clone().into(), &dbs).unwrap();
             let mut times = Vec::new();
             let results = workspace
                 .integration_limbo
@@ -302,7 +302,7 @@ mod tests {
         // because no new ops should hav been added
         {
             let reader = env_ref.reader().unwrap();
-            let mut workspace = ProduceDhtOpsWorkspace::new(&reader, &dbs).unwrap();
+            let mut workspace = ProduceDhtOpsWorkspace::new(env.clone().into(), &dbs).unwrap();
             let complete = produce_dht_ops_workflow_inner(&mut workspace)
                 .await
                 .unwrap();
@@ -315,7 +315,7 @@ mod tests {
         // Check the lengths are unchanged
         {
             let reader = env_ref.reader().unwrap();
-            let workspace = ProduceDhtOpsWorkspace::new(&reader, &dbs).unwrap();
+            let workspace = ProduceDhtOpsWorkspace::new(env.clone().into(), &dbs).unwrap();
             let count = workspace.integration_limbo.iter().unwrap().count().unwrap();
             let authored_count = workspace.authored_dht_ops.iter().unwrap().count().unwrap();
 

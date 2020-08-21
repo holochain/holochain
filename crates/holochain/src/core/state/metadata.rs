@@ -75,7 +75,20 @@ pub enum LinkMetaKey<'a> {
 }
 
 /// The actual type the [LinkMetaKey] turns into
-type LinkMetaKeyBytes = Vec<u8>;
+#[derive(Ord, PartialOrd, Eq, PartialEq)]
+struct LinkMetaKeyBytes(Vec<u8>);
+
+impl AsRef<[u8]> for LinkMetaKeyBytes {
+    fn as_ref(&self) -> &[u8] {
+        self.0.as_slice()
+    }
+}
+
+impl BufKey for LinkMetaKeyBytes {
+    fn from_key_bytes_fallible(bytes: Vec<u8>) -> Self {
+        Self(bytes)
+    }
+}
 
 impl<'a> LinkMetaKey<'a> {
     fn to_key(&self) -> LinkMetaKeyBytes {
@@ -238,7 +251,7 @@ pub trait MetadataBufT {
 }
 
 /// Values of [Header]s stored by the sys meta db
-#[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum SysMetaVal {
     /// A header that results in a new entry
     /// Either a [EntryCreate] or [EntryUpdate]
@@ -414,7 +427,7 @@ impl MetadataBufT for MetadataBuf {
     {
         Ok(Box::new(
             self.links_meta
-                .iter_all_key_matches(key.to_key())?
+                .iter_all_key_matches(key.to_key()).await?
                 .filter_map(move |(_, link)| {
                     // Check if link has been removed
                     match self
@@ -435,7 +448,7 @@ impl MetadataBufT for MetadataBuf {
     {
         Ok(Box::new(
             self.links_meta
-                .iter_all_key_matches(key.to_key())?
+                .iter_all_key_matches(key.to_key()).await?
                 .map(|(_, v)| Ok(v)),
         ))
     }
@@ -600,10 +613,10 @@ impl MetadataBufT for MetadataBuf {
 
     // TODO: For now this is only checking for deletes
     // Once the validation is finished this should check for that as well
-    fn get_dht_status(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus> {
+    fn async get_dht_status(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus> {
         Ok(self
             .status_meta
-            .get(entry_hash)?
+            .get(entry_hash).await?
             .unwrap_or(EntryDhtStatus::Dead))
     }
 

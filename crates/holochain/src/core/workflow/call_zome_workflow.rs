@@ -311,7 +311,7 @@ pub mod tests {
         let dbs = env.dbs().await;
         let env_ref = env.guard().await;
         let reader = env_ref.reader().unwrap();
-        let workspace = CallZomeWorkspace::new(&reader, &dbs).unwrap();
+        let workspace = CallZomeWorkspace::new(env.clone().into(), &dbs).unwrap();
         let ribosome = MockRibosomeT::new();
         // FIXME: CAP: Set this function to private
         let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(
@@ -374,7 +374,7 @@ pub mod tests {
         let dbs = env.dbs().await;
         let env_ref = env.guard().await;
         let reader = env_ref.reader().unwrap();
-        let mut workspace = CallZomeWorkspace::new(&reader, &dbs).unwrap();
+        let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs).unwrap();
 
         // Genesis
         fake_genesis(&mut workspace.source_chain).await.unwrap();
@@ -427,7 +427,7 @@ pub mod tests {
         let dbs = env.dbs().await;
         let env_ref = env.guard().await;
         let reader = env_ref.reader().unwrap();
-        let mut workspace = CallZomeWorkspace::new(&reader, &dbs).unwrap();
+        let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs).unwrap();
         let ribosome = MockRibosomeT::new();
         let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(
             crate::core::ribosome::NamedInvocation(
@@ -459,7 +459,7 @@ pub mod tests {
         let dbs = env.dbs().await;
         let env_ref = env.guard().await;
         let reader = env_ref.reader().unwrap();
-        let mut workspace = CallZomeWorkspace::new(&reader, &dbs).unwrap();
+        let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs).unwrap();
         let ribosome = MockRibosomeT::new();
         // TODO: Make this mock return an output
         let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(

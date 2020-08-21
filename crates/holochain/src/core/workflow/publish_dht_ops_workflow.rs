@@ -249,7 +249,7 @@ mod tests {
         // Create and fill authored ops db in the workspace
         {
             let reader = env_ref.reader().unwrap();
-            let mut workspace = PublishDhtOpsWorkspace::new(&reader, dbs).unwrap();
+            let mut workspace = PublishDhtOpsWorkspace::new(env.clone().into(), dbs).unwrap();
             for (sig, op_hashed, op_light, header_hash) in data {
                 let op_hash = op_hashed.as_hash().clone();
                 let authored_value = AuthoredDhtOpsValue::from_light(op_light);
@@ -322,7 +322,7 @@ mod tests {
     async fn call_workflow(env: EnvironmentWrite, mut cell_network: HolochainP2pCell) {
         let env_ref = env.guard().await;
         let reader = env_ref.reader().unwrap();
-        let workspace = PublishDhtOpsWorkspace::new(&reader, &env_ref).unwrap();
+        let workspace = PublishDhtOpsWorkspace::new(env.clone().into(), &env_ref).unwrap();
         publish_dht_ops_workflow(workspace, env.clone().into(), &mut cell_network)
             .await
             .unwrap();
@@ -364,7 +364,7 @@ mod tests {
             let check = async move {
                 recv_task.await.unwrap();
                 let reader = env_ref.reader().unwrap();
-                let mut workspace = PublishDhtOpsWorkspace::new(&reader, &dbs).unwrap();
+                let mut workspace = PublishDhtOpsWorkspace::new(env.clone().into(), &dbs).unwrap();
                 for i in workspace.authored().iter().unwrap().iterator() {
                     // Check that each item now has a publish time
                     assert!(i.expect("can iterate").1.last_publish_time.is_some())
@@ -408,7 +408,7 @@ mod tests {
             // Update the authored to have > R counts
             {
                 let reader = env_ref.reader().unwrap();
-                let mut workspace = PublishDhtOpsWorkspace::new(&reader, &dbs).unwrap();
+                let mut workspace = PublishDhtOpsWorkspace::new(env.clone().into(), &dbs).unwrap();
 
                 // Update authored to R
                 let values = workspace
@@ -589,7 +589,7 @@ mod tests {
             // Create and fill authored ops db in the workspace
             {
                 let reader = env_ref.reader().unwrap();
-                let mut workspace = PublishDhtOpsWorkspace::new(&reader, &dbs).unwrap();
+                let mut workspace = PublishDhtOpsWorkspace::new(env.clone().into(), &dbs).unwrap();
                 let (op_hash, light, _) = store_element;
                 workspace
                     .authored_dht_ops

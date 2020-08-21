@@ -68,7 +68,7 @@ where
     }
 
     /// Check if a value is stored at this key
-    pub async fn contains_fresh(&self, k: &HoloHashOf<C>) -> DatabaseResult<bool> {
+    pub async fn contains(&self, k: &HoloHashOf<C>) -> DatabaseResult<bool> {
         self.0.contains(k).await
     }
 

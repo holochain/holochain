@@ -209,14 +209,14 @@ async fn integrate_single_element(
                         DhtOpConvertError::MissingEntryDataForHeader(hash.clone())
                     })
             }) {
-                Some(r) => Ok(element_store.contains_entry(&r?)?),
+                Some(r) => Ok(element_store.contains_entry(&r?)?).await,
                 None => Ok(false),
             }
         }
 
-        let entry_is_stored = |hash| element_store.contains_entry(hash);
+        let entry_is_stored = |hash| element_store.contains_entry(hash).await;
 
-        let header_is_stored = |hash| element_store.contains_header(hash);
+        let header_is_stored = |hash| element_store.contains_header(hash).await;
 
         match op {
             DhtOp::StoreElement(signature, header, maybe_entry) => {
@@ -433,7 +433,7 @@ impl Workspace for IntegrateDhtOpsWorkspace {
 }
 
 impl IntegrateDhtOpsWorkspace {
-    pub fn op_exists(&self, hash: &DhtOpHash) -> DatabaseResult<bool> {
-        Ok(self.integrated_dht_ops.contains(&hash)? || self.integration_limbo.contains(&hash)?)
+    pub async fn op_exists(&self, hash: &DhtOpHash) -> DatabaseResult<bool> {
+        Ok(self.integrated_dht_ops.contains(&hash).await? || self.integration_limbo.contains(&hash).await?)
     }
 }

@@ -13,19 +13,20 @@ use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::{
     buffer::KvBufFresh,
     error::{DatabaseError, DatabaseResult},
-    prelude::{BufferedStore, EnvironmentRead, SingleStore},
-    transaction::{Reader, Writer},
+    prelude::*,
+    transaction::Writer,
 };
 use holochain_types::dna::{zome::Zome, DnaFile};
 use holochain_zome_types::entry_def::EntryDef;
 use holochain_zome_types::header::EntryDefId;
-use shrinkwraprs::Shrinkwrap;
 use std::{collections::HashMap, convert::TryInto};
 
 pub mod error;
 
 /// Key for the [EntryDef] buffer
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, SerializedBytes)]
+#[derive(
+    Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd, Serialize, Deserialize, SerializedBytes,
+)]
 pub struct EntryDefBufferKey {
     zome: Zome,
     entry_def_position: EntryDefId,
@@ -40,6 +41,12 @@ struct EntryDefStoreKey(SerializedBytes);
 impl AsRef<[u8]> for EntryDefStoreKey {
     fn as_ref(&self) -> &[u8] {
         self.0.bytes()
+    }
+}
+
+impl BufKey for EntryDefStoreKey {
+    fn from_key_bytes_fallible(bytes: Vec<u8>) -> Self {
+        Self(UnsafeBytes::from(bytes).into())
     }
 }
 
@@ -82,8 +89,8 @@ impl EntryDefBuf {
     }
 
     /// Get an entry def
-    pub fn get(&self, k: EntryDefBufferKey) -> DatabaseResult<Option<EntryDef>> {
-        self.0.get(&k.into())
+    pub async fn get(&self, k: EntryDefBufferKey) -> DatabaseResult<Option<EntryDef>> {
+        self.0.get(&k.into()).await
     }
 
     /// Store an entry def
@@ -99,7 +106,8 @@ impl EntryDefBuf {
     > {
         Ok(Box::new(
             self.0
-                .iter_raw()?
+                .store()
+                .iter()?
                 .map(|(k, v)| Ok((EntryDefStoreKey::from(k).into(), v))),
         ))
     }
@@ -110,7 +118,7 @@ impl BufferedStore for EntryDefBuf {
 
     fn flush_to_txn(self, writer: &mut Writer) -> DatabaseResult<()> {
         let store = self.0;
-        store.0.flush_to_txn(writer)?;
+        store.flush_to_txn(writer)?;
         Ok(())
     }
 }

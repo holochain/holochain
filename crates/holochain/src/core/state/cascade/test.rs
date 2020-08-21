@@ -107,7 +107,7 @@ async fn live_local_return() -> SourceChainResult<()> {
         mut mock_meta_vault,
         mut mock_meta_cache,
         ..
-    } = setup_env(&reader, &dbs)?;
+    } = setup_env(env.clone().into(), &dbs)?;
     source_chain
         .put_raw(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
         .await?;
@@ -154,7 +154,7 @@ async fn dead_local_none() -> SourceChainResult<()> {
         mut mock_meta_vault,
         mut mock_meta_cache,
         ..
-    } = setup_env(&reader, &dbs)?;
+    } = setup_env(env.clone().into(), &dbs)?;
     source_chain
         .put_raw(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
         .await?;
@@ -200,7 +200,7 @@ async fn notfound_goto_cache_live() -> SourceChainResult<()> {
         mock_meta_vault,
         mut mock_meta_cache,
         ..
-    } = setup_env(&reader, &dbs)?;
+    } = setup_env(env.clone().into(), &dbs)?;
     let h = HeaderHashed::from_content(jimbo_header.clone()).await;
     let h = SignedHeaderHashed::with_presigned(h, fixt!(Signature));
     cache.put(h, Some(jimbo_entry.clone()))?;
@@ -247,7 +247,7 @@ async fn notfound_cache() -> DatabaseResult<()> {
         mock_meta_vault,
         mut mock_meta_cache,
         ..
-    } = setup_env(&reader, &dbs)?;
+    } = setup_env(env.clone().into(), &dbs)?;
     let address = jimbo_entry.as_hash();
 
     let (_n, _r, cell_network) = test_network().await;
@@ -287,7 +287,7 @@ async fn links_local_return() -> SourceChainResult<()> {
         jessy_entry,
         mut mock_meta_vault,
         mut mock_meta_cache,
-    } = setup_env(&reader, &dbs)?;
+    } = setup_env(env.clone().into(), &dbs)?;
     source_chain
         .put_raw(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
         .await?;
@@ -362,7 +362,7 @@ async fn links_cache_return() -> SourceChainResult<()> {
         jessy_entry,
         mut mock_meta_vault,
         mut mock_meta_cache,
-    } = setup_env(&reader, &dbs)?;
+    } = setup_env(env.clone().into(), &dbs)?;
     source_chain
         .put_raw(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
         .await?;
@@ -455,7 +455,7 @@ async fn links_notauth_cache() -> DatabaseResult<()> {
         mock_meta_vault,
         mut mock_meta_cache,
         ..
-    } = setup_env(&reader, &dbs)?;
+    } = setup_env(env.clone().into(), &dbs)?;
 
     let base = jimbo_entry.as_hash().clone();
     let target = jessy_entry.as_hash().clone();

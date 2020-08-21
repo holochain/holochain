@@ -78,7 +78,7 @@ pub mod tests {
         let addr2 = "hi".into();
         {
             let reader = env.reader()?;
-            let mut workspace = TestWorkspace::new(&reader, &dbs)?;
+            let mut workspace = TestWorkspace::new(env.clone().into(), &dbs)?;
             assert_eq!(workspace.one.get(&addr1)?, None);
 
             workspace.one.put(addr1.clone(), 1).unwrap();
@@ -91,7 +91,7 @@ pub mod tests {
         // Ensure that the data was persisted
         {
             let reader = env.reader()?;
-            let workspace = TestWorkspace::new(&reader, &dbs)?;
+            let workspace = TestWorkspace::new(env.clone().into(), &dbs)?;
             assert_eq!(workspace.one.get(&addr1)?, Some(1));
         }
         Ok(())
