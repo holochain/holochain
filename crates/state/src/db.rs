@@ -96,11 +96,11 @@ impl DbName {
 
 /// The various "modes" of viewing LMDB databases
 pub enum DbKind {
-    /// Single-value KV with arbitrary keys, associated with [KvBuf]
+    /// Single-value KV with arbitrary keys, associated with [KvBufFresh]
     Single,
-    /// Single-value KV with integer keys, associated with [IntKvBuf]
+    /// Single-value KV with integer keys, associated with [KvIntBufFresh]
     SingleInt,
-    /// Multi-value KV with arbitrary keys, associated with [KvvBuf]
+    /// Multi-value KV with arbitrary keys, associated with [KvvBufUsed]
     Multi,
 }
 
@@ -249,7 +249,7 @@ fn register_db<V: 'static + Send + Sync>(
         DbKind::Multi => {
             let mut opts = StoreOptions::create();
 
-            // This is needed for the optional put flag NO_DUP_DATA on KvvBuf.
+            // This is needed for the optional put flag NO_DUP_DATA on KvvBufUsed.
             // As far as I can tell, if we are not using NO_DUP_DATA, it will
             // only affect the sorting of the values in case there are dups,
             // which should be ok for our usage.

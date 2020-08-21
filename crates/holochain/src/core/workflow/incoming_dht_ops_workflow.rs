@@ -12,11 +12,11 @@ use crate::core::{
 use holo_hash::DhtOpHash;
 use holochain_state::{
     buffer::BufferedStore,
-    buffer::KvBuf,
+    buffer::KvBufFresh,
     db::{INTEGRATED_DHT_OPS, INTEGRATION_LIMBO},
     env::EnvironmentWrite,
     error::DatabaseResult,
-    prelude::{GetDb, ReadManager, Reader, Writer},
+    prelude::{EnvironmentRead, GetDb, ReadManager, Reader, Writer},
 };
 use holochain_types::Timestamp;
 
@@ -63,21 +63,21 @@ pub async fn incoming_dht_ops_workflow(
 }
 
 #[allow(missing_docs)]
-pub struct IncomingDhtOpsWorkspace<'env> {
-    pub integration_limbo: IntegrationLimboStore<'env>,
-    pub integrated_dht_ops: IntegratedDhtOpsStore<'env>,
-    pub validation_limbo: ValidationLimboStore<'env>,
+pub struct IncomingDhtOpsWorkspace {
+    pub integration_limbo: IntegrationLimboStore,
+    pub integrated_dht_ops: IntegratedDhtOpsStore,
+    pub validation_limbo: ValidationLimboStore,
 }
 
-impl<'env> Workspace<'env> for IncomingDhtOpsWorkspace<'env> {
-    fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self> {
+impl Workspace for IncomingDhtOpsWorkspace {
+    fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
         let db = dbs.get_db(&*INTEGRATED_DHT_OPS)?;
-        let integrated_dht_ops = KvBuf::new(reader, db)?;
+        let integrated_dht_ops = KvBufFresh::new(env, db)?;
 
         let db = dbs.get_db(&*INTEGRATION_LIMBO)?;
-        let integration_limbo = KvBuf::new(reader, db)?;
+        let integration_limbo = KvBufFresh::new(env, db)?;
 
-        let validation_limbo = ValidationLimboStore::new(reader, dbs)?;
+        let validation_limbo = ValidationLimboStore::new(env, dbs)?;
 
         Ok(Self {
             integration_limbo,
@@ -91,7 +91,7 @@ impl<'env> Workspace<'env> for IncomingDhtOpsWorkspace<'env> {
     }
 }
 
-impl<'env> IncomingDhtOpsWorkspace<'env> {
+impl IncomingDhtOpsWorkspace {
     pub fn op_exists(&self, hash: &DhtOpHash) -> DatabaseResult<bool> {
         Ok(self.integrated_dht_ops.contains(&hash)?
             || self.integration_limbo.contains(&hash)?

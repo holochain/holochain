@@ -1,4 +1,4 @@
-use super::{BufferedStore, KvBuf, Op, Scratch};
+use super::{BufferedStore, KvBufFresh, Op, Scratch};
 use crate::{
     env::{ReadManager, WriteManager},
     error::{DatabaseError, DatabaseResult},
@@ -24,10 +24,10 @@ impl<'env> WorkspaceRef for OldCallZomeWorkspaceRef<'env> {
 
     fn new(reader: &Reader, scratch: &mut Self::Scratch) -> Self {
         Self {
-            source_chain: SourceChainRef::new(reader, &mut scratch.source_chain),
-            meta: MetadataBufRef::new(reader, &mut scratch.meta),
-            cache_cas: ElementBufRef::new(reader, &mut scratch.cache_cas),
-            cache_meta: MetadataBufRef::new(reader, &mut scratch.cache_meta),
+            source_chain: SourceChainRef::new(env, &mut scratch.source_chain),
+            meta: MetadataBufRef::new(env, &mut scratch.meta),
+            cache_cas: ElementBufRef::new(env, &mut scratch.cache_cas),
+            cache_meta: MetadataBufRef::new(env, &mut scratch.cache_meta),
         }
     }
 }
@@ -74,12 +74,12 @@ impl AsRef for OldCallZomeWorkspaceReader {
 }
 
 impl OldCallZomeWorkspaceRef<'env> {
-    pub fn new(reader: &'env Reader, scratch: &mut OldCallZomeWorkspaceScratch) -> Self {
+    pub fn new(env: EnvironmentRead, scratch: &mut OldCallZomeWorkspaceScratch) -> Self {
         Self {
-            source_chain: SourceChainRef::new(reader, &mut scratch.source_chain),
-            meta: MetadataBufRef::new(reader, &mut scratch.meta),
-            cache_cas: ElementBufRef::new(reader, &mut scratch.cache_cas),
-            cache_meta: MetadataBufRef::new(reader, &mut scratch.cache_meta),
+            source_chain: SourceChainRef::new(env, &mut scratch.source_chain),
+            meta: MetadataBufRef::new(env, &mut scratch.meta),
+            cache_cas: ElementBufRef::new(env, &mut scratch.cache_cas),
+            cache_meta: MetadataBufRef::new(env, &mut scratch.cache_meta),
         }
     }
 }

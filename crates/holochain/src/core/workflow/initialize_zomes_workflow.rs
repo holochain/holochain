@@ -13,7 +13,7 @@ use derive_more::Constructor;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
 use holochain_state::buffer::BufferedStore;
-use holochain_state::prelude::{GetDb, Reader, Writer};
+use holochain_state::prelude::{EnvironmentRead, GetDb, Reader, Writer};
 use holochain_types::dna::DnaDef;
 use holochain_zome_types::header::builder;
 use tracing::*;
@@ -26,7 +26,7 @@ pub struct InitializeZomesWorkflowArgs<Ribosome: RibosomeT> {
 
 #[instrument(skip(network, keystore, workspace, writer))]
 pub async fn initialize_zomes_workflow<'env, Ribosome: RibosomeT>(
-    mut workspace: InitializeZomesWorkspace<'env>,
+    mut workspace: InitializeZomesWorkspace,
     network: HolochainP2pCell,
     keystore: KeystoreSender,
     writer: OneshotWriter,
@@ -45,7 +45,7 @@ pub async fn initialize_zomes_workflow<'env, Ribosome: RibosomeT>(
 }
 
 async fn initialize_zomes_workflow_inner<'env, Ribosome: RibosomeT>(
-    workspace: &mut InitializeZomesWorkspace<'env>,
+    workspace: &mut InitializeZomesWorkspace,
     network: HolochainP2pCell,
     keystore: KeystoreSender,
     args: InitializeZomesWorkflowArgs<Ribosome>,
@@ -70,13 +70,14 @@ async fn initialize_zomes_workflow_inner<'env, Ribosome: RibosomeT>(
     Ok(result)
 }
 
-pub struct InitializeZomesWorkspace<'env>(pub(crate) CallZomeWorkspace<'env>);
+// TODO: why pub? -MD
+pub struct InitializeZomesWorkspace(pub(crate) CallZomeWorkspace);
 
-impl<'env> Workspace<'env> for InitializeZomesWorkspace<'env> {
+impl Workspace for InitializeZomesWorkspace {
     /// Constructor
     #[allow(dead_code)]
-    fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self> {
-        Ok(Self(CallZomeWorkspace::new(reader, dbs)?))
+    fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
+        Ok(Self(CallZomeWorkspace::new(env, dbs)?))
     }
 
     fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {

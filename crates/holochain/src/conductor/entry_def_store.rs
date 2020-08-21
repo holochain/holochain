@@ -11,9 +11,9 @@ use fallible_iterator::FallibleIterator;
 use holochain_serialized_bytes::prelude::*;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::{
-    buffer::KvBuf,
+    buffer::KvBufFresh,
     error::{DatabaseError, DatabaseResult},
-    prelude::{BufferedStore, SingleStore},
+    prelude::{BufferedStore, EnvironmentRead, SingleStore},
     transaction::{Reader, Writer},
 };
 use holochain_types::dna::{zome::Zome, DnaFile};
@@ -32,14 +32,10 @@ pub struct EntryDefBufferKey {
 }
 
 /// This is where entry defs live
-pub struct EntryDefBuf<'env>(EntryDefStore<'env>);
+pub struct EntryDefBuf(KvBufFresh<EntryDefStoreKey, EntryDef>);
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, PartialOrd, Ord)]
 struct EntryDefStoreKey(SerializedBytes);
-
-#[derive(From, Shrinkwrap)]
-#[shrinkwrap(mutable)]
-struct EntryDefStore<'env>(KvBuf<'env, EntryDefStoreKey, EntryDef, Reader<'env>>);
 
 impl AsRef<[u8]> for EntryDefStoreKey {
     fn as_ref(&self) -> &[u8] {
@@ -79,10 +75,10 @@ impl EntryDefBufferKey {
     }
 }
 
-impl<'env> EntryDefBuf<'env> {
+impl EntryDefBuf {
     /// Create a new buffer
-    pub fn new(reader: &'env Reader<'env>, entry_def_store: SingleStore) -> DatabaseResult<Self> {
-        Ok(Self(KvBuf::new(reader, entry_def_store)?.into()))
+    pub fn new(env: EnvironmentRead, entry_def_store: SingleStore) -> DatabaseResult<Self> {
+        Ok(Self(KvBufFresh::new(env, entry_def_store)?.into()))
     }
 
     /// Get an entry def
@@ -109,10 +105,10 @@ impl<'env> EntryDefBuf<'env> {
     }
 }
 
-impl<'env> BufferedStore<'env> for EntryDefBuf<'env> {
+impl BufferedStore for EntryDefBuf {
     type Error = DatabaseError;
 
-    fn flush_to_txn(self, writer: &'env mut Writer) -> DatabaseResult<()> {
+    fn flush_to_txn(self, writer: &mut Writer) -> DatabaseResult<()> {
         let store = self.0;
         store.0.flush_to_txn(writer)?;
         Ok(())

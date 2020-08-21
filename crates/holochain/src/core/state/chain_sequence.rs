@@ -10,10 +10,10 @@
 use crate::core::state::source_chain::{SourceChainError, SourceChainResult};
 use holo_hash::HeaderHash;
 use holochain_state::{
-    buffer::{BufferedStore, IntKvBuf},
+    buffer::{BufferedStore, KvIntBufFresh},
     db::{GetDb, CHAIN_SEQUENCE},
     error::DatabaseResult,
-    prelude::{Readable, Reader, Writer},
+    prelude::{EnvironmentRead, Readable, Reader, Writer},
 };
 use serde::{Deserialize, Serialize};
 use tracing::*;
@@ -26,50 +26,21 @@ pub struct ChainSequenceItem {
     dht_transforms_complete: bool,
 }
 
-type Store<'env, R = Reader<'env>> = IntKvBuf<'env, u32, ChainSequenceItem, R>;
+type Store = KvIntBufFresh<ChainSequenceItem>;
 
 /// A BufferedStore for interacting with the ChainSequence database
-pub struct ChainSequenceBuf<'env, R: Readable = Reader<'env>> {
-    db: Store<'env, R>,
+pub struct ChainSequenceBuf {
+    db: Store,
     next_index: u32,
     tx_seq: u32,
     current_head: Option<HeaderHash>,
     persisted_head: Option<HeaderHash>,
 }
 
-impl<'env, R: Readable> ChainSequenceBuf<'env, R> {
-    /// Create a new instance from a new transaction, using the same database
-    /// as an existing instance. Useful for basing an existing BufStore on
-    /// a different transaction.
-    pub fn with_reader<RR: Readable>(
-        &self,
-        txn: &'env RR,
-    ) -> DatabaseResult<ChainSequenceBuf<'env, RR>> {
-        Self::from_db(self.db.with_reader(txn))
-    }
-
-    fn from_db<RR: Readable>(db: Store<'env, RR>) -> DatabaseResult<ChainSequenceBuf<'env, RR>> {
-        let latest = db.iter_raw_reverse()?.next();
-        debug!("{:?}", latest);
-        let (next_index, tx_seq, current_head) = latest
-            .map(|(key, item)| (key + 1, item.tx_seq + 1, Some(item.header_address)))
-            .unwrap_or((0, 0, None));
-        let persisted_head = current_head.clone();
-
-        Ok(ChainSequenceBuf {
-            db,
-            next_index,
-            tx_seq,
-            current_head,
-            persisted_head,
-        })
-    }
-}
-
-impl<'env> ChainSequenceBuf<'env, Reader<'env>> {
+impl ChainSequenceBuf {
     /// Create a new instance from a read-only transaction and a database reference
-    pub fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Self> {
-        let db: Store<'env> = IntKvBuf::new(reader, dbs.get_db(&*CHAIN_SEQUENCE)?)?;
+    pub fn new(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
+        let db: Store = KvIntBufFresh::new(env, dbs.get_db(&*CHAIN_SEQUENCE)?)?;
         Self::from_db(db)
     }
 
@@ -107,15 +78,16 @@ impl<'env> ChainSequenceBuf<'env, Reader<'env>> {
         self.current_head = Some(header_address);
     }
 
-    pub fn get_items_with_incomplete_dht_ops(
+    pub fn get_items_with_incomplete_dht_ops<'txn, R: Readable>(
         &self,
-    ) -> SourceChainResult<Box<dyn Iterator<Item = (u32, HeaderHash)> + 'env>> {
+        r: &'txn R,
+    ) -> SourceChainResult<Box<dyn Iterator<Item = (u32, HeaderHash)> + 'txn>> {
         if !self.db.is_scratch_fresh() {
             return Err(SourceChainError::ScratchNotFresh);
         }
         // TODO: PERF: Currently this checks every header but we could keep
         // a list of indices for only the headers which have been transformed.
-        Ok(Box::new(self.db.iter_raw()?.filter_map(|(i, c)| {
+        Ok(Box::new(self.db.store().iter(r)?.filter_map(|(i, c)| {
             if !c.dht_transforms_complete {
                 Some((i, c.header_address))
             } else {
@@ -133,7 +105,7 @@ impl<'env> ChainSequenceBuf<'env, Reader<'env>> {
     }
 }
 
-impl<'env, R: Readable> BufferedStore<'env> for ChainSequenceBuf<'env, R> {
+impl BufferedStore for ChainSequenceBuf {
     type Error = SourceChainError;
 
     fn is_clean(&self) -> bool {
@@ -142,7 +114,7 @@ impl<'env, R: Readable> BufferedStore<'env> for ChainSequenceBuf<'env, R> {
 
     /// Commit to the source chain, performing an as-at check and returning a
     /// SourceChainError::HeadMoved error if the as-at check fails
-    fn flush_to_txn(self, writer: &'env mut Writer) -> SourceChainResult<()> {
+    fn flush_to_txn(self, writer: &mut Writer) -> SourceChainResult<()> {
         if self.is_clean() {
             return Ok(());
         }

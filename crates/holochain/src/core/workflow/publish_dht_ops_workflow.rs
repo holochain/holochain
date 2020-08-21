@@ -26,9 +26,9 @@ use fallible_iterator::FallibleIterator;
 use holo_hash::*;
 use holochain_p2p::HolochainP2pCell;
 use holochain_state::{
-    buffer::{BufferedStore, KvBuf},
+    buffer::{BufferedStore, KvBufFresh},
     db::{AUTHORED_DHT_OPS, INTEGRATED_DHT_OPS},
-    prelude::{GetDb, Reader},
+    prelude::{EnvironmentRead, GetDb, Reader},
     transaction::Writer,
 };
 use holochain_types::{dht_op::DhtOp, Timestamp};
@@ -48,16 +48,16 @@ pub const DEFAULT_RECEIPT_BUNDLE_SIZE: u32 = 5;
 pub const MIN_PUBLISH_INTERVAL: time::Duration = time::Duration::from_secs(5);
 
 /// Database buffers required for publishing [DhtOp]s
-pub struct PublishDhtOpsWorkspace<'env> {
+pub struct PublishDhtOpsWorkspace {
     /// Database of authored DhtOps, with data about prior publishing
-    authored_dht_ops: AuthoredDhtOpsStore<'env>,
+    authored_dht_ops: AuthoredDhtOpsStore,
     /// Element store for looking up data to construct ops
-    elements: ElementBuf<'env>,
+    elements: ElementBuf,
 }
 
 #[instrument(skip(workspace, writer, network))]
 pub async fn publish_dht_ops_workflow(
-    mut workspace: PublishDhtOpsWorkspace<'_>,
+    mut workspace: PublishDhtOpsWorkspace,
     writer: OneshotWriter,
     network: &mut HolochainP2pCell,
 ) -> WorkflowResult<WorkComplete> {
@@ -79,7 +79,7 @@ pub async fn publish_dht_ops_workflow(
 
 /// Read the authored for ops with receipt count < R
 pub async fn publish_dht_ops_workflow_inner(
-    workspace: &mut PublishDhtOpsWorkspace<'_>,
+    workspace: &mut PublishDhtOpsWorkspace,
 ) -> WorkflowResult<HashMap<AnyDhtHash, Vec<(DhtOpHash, DhtOp)>>> {
     // TODO: PERF: We need to check all ops every time this runs
     // instead we could have a queue of ops where count < R and a kv for count > R.
@@ -139,12 +139,12 @@ pub async fn publish_dht_ops_workflow_inner(
     Ok(to_publish)
 }
 
-impl<'env> Workspace<'env> for PublishDhtOpsWorkspace<'env> {
-    fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self> {
+impl Workspace for PublishDhtOpsWorkspace {
+    fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
         let db = dbs.get_db(&*AUTHORED_DHT_OPS)?;
-        let authored_dht_ops = KvBuf::new(reader, db)?;
+        let authored_dht_ops = KvBufFresh::new(env.clone(), db)?;
         // Note that this must always be false as we don't want private entries being published
-        let elements = ElementBuf::vault(reader, dbs, false)?;
+        let elements = ElementBuf::vault(env.clone(), dbs, false)?;
         let _db = dbs.get_db(&*INTEGRATED_DHT_OPS)?;
         Ok(Self {
             authored_dht_ops,
@@ -158,12 +158,12 @@ impl<'env> Workspace<'env> for PublishDhtOpsWorkspace<'env> {
     }
 }
 
-impl<'env> PublishDhtOpsWorkspace<'env> {
-    fn authored(&mut self) -> &mut AuthoredDhtOpsStore<'env> {
+impl PublishDhtOpsWorkspace {
+    fn authored(&mut self) -> &mut AuthoredDhtOpsStore {
         &mut self.authored_dht_ops
     }
 
-    fn elements(&self) -> &ElementBuf<'env> {
+    fn elements(&self) -> &ElementBuf {
         &self.elements
     }
 }
@@ -319,7 +319,7 @@ mod tests {
     }
 
     /// Call the workflow
-    async fn call_workflow<'env>(env: EnvironmentWrite, mut cell_network: HolochainP2pCell) {
+    async fn call_workflow(env: EnvironmentWrite, mut cell_network: HolochainP2pCell) {
         let env_ref = env.guard().await;
         let reader = env_ref.reader().unwrap();
         let workspace = PublishDhtOpsWorkspace::new(&reader, &env_ref).unwrap();

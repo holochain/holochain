@@ -7,7 +7,7 @@ use crate::core::state::{
     workspace::{Workspace, WorkspaceResult},
 };
 use holochain_state::{
-    buffer::KvBuf,
+    buffer::KvBufFresh,
     db::{AUTHORED_DHT_OPS, INTEGRATION_LIMBO},
     prelude::{BufferedStore, GetDb, Reader, Writer},
 };
@@ -18,7 +18,7 @@ pub mod dht_op_light;
 
 #[instrument(skip(workspace, writer, trigger_integration))]
 pub async fn produce_dht_ops_workflow(
-    mut workspace: ProduceDhtOpsWorkspace<'_>,
+    mut workspace: ProduceDhtOpsWorkspace,
     writer: OneshotWriter,
     trigger_integration: &mut TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
@@ -38,7 +38,7 @@ pub async fn produce_dht_ops_workflow(
 }
 
 async fn produce_dht_ops_workflow_inner(
-    workspace: &mut ProduceDhtOpsWorkspace<'_>,
+    workspace: &mut ProduceDhtOpsWorkspace,
 ) -> WorkflowResult<WorkComplete> {
     debug!("Starting dht op workflow");
     let call_zome_workspace = &mut workspace.call_zome_workspace;
@@ -72,20 +72,20 @@ async fn produce_dht_ops_workflow_inner(
     Ok(WorkComplete::Complete)
 }
 
-pub struct ProduceDhtOpsWorkspace<'env> {
-    pub call_zome_workspace: CallZomeWorkspace<'env>,
-    pub authored_dht_ops: AuthoredDhtOpsStore<'env>,
-    pub integration_limbo: IntegrationLimboStore<'env>,
+pub struct ProduceDhtOpsWorkspace {
+    pub call_zome_workspace: CallZomeWorkspace,
+    pub authored_dht_ops: AuthoredDhtOpsStore,
+    pub integration_limbo: IntegrationLimboStore,
 }
 
-impl<'env> Workspace<'env> for ProduceDhtOpsWorkspace<'env> {
-    fn new(reader: &'env Reader<'env>, db: &impl GetDb) -> WorkspaceResult<Self> {
+impl Workspace for ProduceDhtOpsWorkspace {
+    fn new(env: EnvironmentRead, db: &impl GetDb) -> WorkspaceResult<Self> {
         let authored_dht_ops = db.get_db(&*AUTHORED_DHT_OPS)?;
         let integration_limbo = db.get_db(&*INTEGRATION_LIMBO)?;
         Ok(Self {
-            call_zome_workspace: CallZomeWorkspace::new(reader, db)?,
-            authored_dht_ops: KvBuf::new(reader, authored_dht_ops)?,
-            integration_limbo: KvBuf::new(reader, integration_limbo)?,
+            call_zome_workspace: CallZomeWorkspace::new(env, db)?,
+            authored_dht_ops: KvBufFresh::new(env, authored_dht_ops)?,
+            integration_limbo: KvBufFresh::new(env, integration_limbo)?,
         })
     }
 
@@ -135,7 +135,7 @@ mod tests {
 
         async fn put_fix_entry(
             &mut self,
-            source_chain: &mut SourceChain<'_>,
+            source_chain: &mut SourceChain,
             visibility: EntryVisibility,
         ) -> Vec<DhtOp> {
             let app_entry = self.app_entry.next().unwrap();

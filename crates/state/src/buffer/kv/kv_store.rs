@@ -93,7 +93,7 @@ where
     K: BufKey,
     V: BufVal,
 {
-    /// Create a new IntKvBuf from a read-only transaction and a database reference
+    /// Create a new KvIntBufFresh from a read-only transaction and a database reference
     pub fn new(db: SingleStore) -> Self {
         Self {
             db,

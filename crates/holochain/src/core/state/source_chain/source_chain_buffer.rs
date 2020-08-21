@@ -9,7 +9,8 @@ use holochain_state::db::GetDb;
 use holochain_state::{
     buffer::BufferedStore,
     error::DatabaseResult,
-    prelude::{Reader, Writer},
+    fresh_reader,
+    prelude::{EnvironmentRead, Reader, Writer},
 };
 use holochain_types::{
     dht_op::{produce_ops_from_element, DhtOp},
@@ -21,29 +22,37 @@ use holochain_types::{
 use holochain_zome_types::{header, Entry, Header};
 use tracing::*;
 
-pub struct SourceChainBuf<'env> {
-    elements: ElementBuf<'env>,
-    sequence: ChainSequenceBuf<'env>,
+pub struct SourceChainBuf {
+    elements: ElementBuf,
+    sequence: ChainSequenceBuf,
     keystore: KeystoreSender,
+
+    env: EnvironmentRead,
 }
 
-impl<'env> SourceChainBuf<'env> {
-    pub fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Self> {
+impl SourceChainBuf {
+    pub fn new(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
         Ok(Self {
-            elements: ElementBuf::vault(reader, dbs, true)?,
-            sequence: ChainSequenceBuf::new(reader, dbs)?,
+            elements: ElementBuf::vault(env.clone(), dbs, true)?,
+            sequence: ChainSequenceBuf::new(env.clone(), dbs)?,
             keystore: dbs.keystore(),
+            env,
         })
+    }
+
+    pub fn env(&self) -> &EnvironmentRead {
+        &self.env
     }
 
     // add a cache test only method that allows this to
     // be used with the cache database for testing
     // FIXME This should only be cfg(test) but that doesn't work with integration tests
-    pub fn cache(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Self> {
+    pub fn cache(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
         Ok(Self {
-            elements: ElementBuf::cache(reader, dbs)?,
-            sequence: ChainSequenceBuf::new(reader, dbs)?,
+            elements: ElementBuf::cache(env.clone(), dbs)?,
+            sequence: ChainSequenceBuf::new(env.clone(), dbs)?,
             keystore: dbs.keystore(),
+            env,
         })
     }
 
@@ -80,11 +89,11 @@ impl<'env> SourceChainBuf<'env> {
 
     pub async fn get_incomplete_dht_ops(&self) -> SourceChainResult<Vec<(u32, Vec<DhtOp>)>> {
         let mut ops = Vec::new();
-        // FIXME: This collect shouldn't need to happen but the iterator to the db is not Send
-        let ops_headers = self
-            .sequence
-            .get_items_with_incomplete_dht_ops()?
-            .collect::<Vec<_>>();
+        let ops_headers = fresh_reader!(self.env(), |r| {
+            self.sequence
+                .get_items_with_incomplete_dht_ops(&r)?
+                .collect::<Vec<_>>()
+        });
         for (i, header) in ops_headers {
             let op = produce_ops_from_element(
                 &self
@@ -102,7 +111,7 @@ impl<'env> SourceChainBuf<'env> {
         self.sequence.complete_dht_op(i)
     }
 
-    pub fn elements<'a>(&'a self) -> &'a ElementBuf<'env> {
+    pub fn elements<'a>(&'a self) -> &'a ElementBuf {
         &self.elements
     }
 
@@ -136,7 +145,7 @@ impl<'env> SourceChainBuf<'env> {
         Ok(header_address)
     }
 
-    pub fn headers(&self) -> &HeaderCas<'env> {
+    pub fn headers(&self) -> &HeaderCas {
         &self.elements.headers()
     }
 
@@ -163,7 +172,7 @@ impl<'env> SourceChainBuf<'env> {
         }
     }
 
-    pub fn iter_back(&'env self) -> SourceChainBackwardIterator<'env> {
+    pub fn iter_back(&self) -> SourceChainBackwardIterator {
         SourceChainBackwardIterator::new(self)
     }
 
@@ -253,10 +262,10 @@ impl<'env> SourceChainBuf<'env> {
     }
 }
 
-impl<'env> BufferedStore<'env> for SourceChainBuf<'env> {
+impl BufferedStore for SourceChainBuf {
     type Error = SourceChainError;
 
-    fn flush_to_txn(self, writer: &'env mut Writer) -> Result<(), Self::Error> {
+    fn flush_to_txn(self, writer: &mut Writer) -> Result<(), Self::Error> {
         self.elements.flush_to_txn(writer)?;
         self.sequence.flush_to_txn(writer)?;
         Ok(())
@@ -265,13 +274,13 @@ impl<'env> BufferedStore<'env> for SourceChainBuf<'env> {
 
 /// FallibleIterator returning SignedHeaderHashed instances from chain
 /// starting with the head, moving back to the origin (Dna) header.
-pub struct SourceChainBackwardIterator<'env> {
-    store: &'env SourceChainBuf<'env>,
+pub struct SourceChainBackwardIterator<'a> {
+    store: &'a SourceChainBuf,
     current: Option<HeaderHash>,
 }
 
-impl<'env> SourceChainBackwardIterator<'env> {
-    pub fn new(store: &'env SourceChainBuf<'env>) -> Self {
+impl<'a> SourceChainBackwardIterator<'a> {
+    pub fn new(store: &'a SourceChainBuf) -> Self {
         Self {
             store,
             current: store.chain_head().cloned(),
@@ -279,7 +288,7 @@ impl<'env> SourceChainBackwardIterator<'env> {
     }
 }
 
-impl<'env> FallibleIterator for SourceChainBackwardIterator<'env> {
+impl<'a> FallibleIterator for SourceChainBackwardIterator<'a> {
     type Item = SignedHeaderHashed;
     type Error = SourceChainError;
 

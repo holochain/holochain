@@ -27,9 +27,9 @@ use holochain_zome_types::{header, Entry, Header};
 use mockall::*;
 
 #[allow(dead_code)]
-struct Chains<'env> {
-    source_chain: SourceChainBuf<'env>,
-    cache: ElementBuf<'env>,
+struct Chains {
+    source_chain: SourceChainBuf,
+    cache: ElementBuf,
     jimbo_id: AgentPubKey,
     jimbo_header: Header,
     jimbo_entry: EntryHashed,
@@ -40,7 +40,7 @@ struct Chains<'env> {
     mock_meta_cache: MockMetadataBuf,
 }
 
-fn setup_env<'env>(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Chains<'env>> {
+fn setup_env(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Chains> {
     let previous_header = fake_header_hash(1);
 
     let jimbo_id = fake_agent_pubkey_1();
@@ -74,7 +74,7 @@ fn setup_env<'env>(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResu
         entry_hash: jessy_entry.as_hash().clone(),
     });
 
-    let source_chain = SourceChainBuf::new(reader, dbs)?;
+    let source_chain = SourceChainBuf::new(env, dbs)?;
     let cache = ElementBuf::cache(reader, dbs)?;
     let mock_meta_vault = MockMetadataBuf::new();
     let mock_meta_cache = MockMetadataBuf::new();

@@ -5,10 +5,10 @@ use holo_hash::*;
 use holochain_p2p::dht_arc::DhtArc;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::{
-    buffer::KvBuf,
+    buffer::KvBufFresh,
     db::INTEGRATED_DHT_OPS,
     error::{DatabaseError, DatabaseResult},
-    prelude::{BufferedStore, GetDb, Reader},
+    prelude::{BufferedStore, EnvironmentRead, GetDb, Reader},
 };
 use holochain_types::{
     dht_op::{DhtOp, DhtOpLight},
@@ -18,8 +18,7 @@ use holochain_types::{
 
 /// Database type for AuthoredDhtOps
 /// Buffer for accessing [DhtOp]s that you authored and finding the amount of validation receipts
-pub type AuthoredDhtOpsStore<'env> =
-    KvBuf<'env, AuthoredDhtOpsKey, AuthoredDhtOpsValue, Reader<'env>>;
+pub type AuthoredDhtOpsStore = KvBufFresh<AuthoredDhtOpsKey, AuthoredDhtOpsValue>;
 
 /// The key type for the AuthoredDhtOps db: a DhtOpHash
 pub type AuthoredDhtOpsKey = DhtOpHash;
@@ -47,36 +46,35 @@ impl AuthoredDhtOpsValue {
 }
 
 /// Database type for IntegrationLimbo: the queue of ops ready to be integrated.
-pub type IntegrationLimboStore<'env> =
-    KvBuf<'env, IntegrationLimboKey, IntegrationLimboValue, Reader<'env>>;
+pub type IntegrationLimboStore = KvBufFresh<IntegrationLimboKey, IntegrationLimboValue>;
 
 /// Database type for IntegratedDhtOps
 /// [DhtOp]s that have already been integrated
-pub type IntegratedDhtOpsStore<'env> = KvBuf<'env, DhtOpHash, IntegratedDhtOpsValue, Reader<'env>>;
+pub type IntegratedDhtOpsStore = KvBufFresh<DhtOpHash, IntegratedDhtOpsValue>;
 
 /// Buffer that adds query logic to the IntegratedDhtOpsStore
-pub struct IntegratedDhtOpsBuf<'env> {
-    store: IntegratedDhtOpsStore<'env>,
+pub struct IntegratedDhtOpsBuf {
+    store: IntegratedDhtOpsStore,
 }
 
-impl<'env> std::ops::Deref for IntegratedDhtOpsBuf<'env> {
-    type Target = IntegratedDhtOpsStore<'env>;
+impl std::ops::Deref for IntegratedDhtOpsBuf {
+    type Target = IntegratedDhtOpsStore;
     fn deref(&self) -> &Self::Target {
         &self.store
     }
 }
 
-impl<'env> std::ops::DerefMut for IntegratedDhtOpsBuf<'env> {
+impl std::ops::DerefMut for IntegratedDhtOpsBuf {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.store
     }
 }
 
-impl<'env> BufferedStore<'env> for IntegratedDhtOpsBuf<'env> {
+impl BufferedStore for IntegratedDhtOpsBuf {
     type Error = DatabaseError;
     fn flush_to_txn(
         self,
-        writer: &'env mut holochain_state::prelude::Writer,
+        writer: &mut holochain_state::prelude::Writer,
     ) -> Result<(), Self::Error> {
         self.store.flush_to_txn(writer)
     }
@@ -105,12 +103,12 @@ pub struct IntegrationLimboValue {
     pub op: DhtOp,
 }
 
-impl<'env> IntegratedDhtOpsBuf<'env> {
+impl IntegratedDhtOpsBuf {
     /// Create a new buffer for the IntegratedDhtOpsStore
-    pub fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Self> {
+    pub fn new(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
         let db = dbs.get_db(&*INTEGRATED_DHT_OPS).unwrap();
         Ok(Self {
-            store: IntegratedDhtOpsStore::new(&reader, db)?,
+            store: IntegratedDhtOpsStore::new(env, db)?,
         })
     }
 
@@ -124,15 +122,12 @@ impl<'env> IntegratedDhtOpsBuf<'env> {
     /// - to a time (Exclusive)
     /// - match a dht location
     pub fn query(
-        &'env self,
+        &self,
         from: Option<Timestamp>,
         to: Option<Timestamp>,
         dht_arc: Option<DhtArc>,
     ) -> DatabaseResult<
-        Box<
-            dyn FallibleIterator<Item = (DhtOpHash, IntegratedDhtOpsValue), Error = DatabaseError>
-                + 'env,
-        >,
+        Box<dyn FallibleIterator<Item = (DhtOpHash, IntegratedDhtOpsValue), Error = DatabaseError>>,
     > {
         Ok(Box::new(
             self.store

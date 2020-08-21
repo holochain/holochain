@@ -10,14 +10,14 @@
 use crate::core::state::source_chain::{ChainInvalidReason, SourceChainError, SourceChainResult};
 use holo_hash::{EntryHash, HasHash, HeaderHash};
 use holochain_state::{
-    buffer::{BufferedStore, CasBuf},
+    buffer::CasBuf,
     db::{
         GetDb, ELEMENT_CACHE_ENTRIES, ELEMENT_CACHE_HEADERS, ELEMENT_VAULT_HEADERS,
         ELEMENT_VAULT_PRIVATE_ENTRIES, ELEMENT_VAULT_PUBLIC_ENTRIES,
     },
     error::{DatabaseError, DatabaseResult},
     exports::SingleStore,
-    prelude::{Reader, Writer},
+    prelude::*,
 };
 use holochain_types::{
     element::{Element, ElementGroup, SignedHeader, SignedHeaderHashed},
@@ -28,34 +28,34 @@ use holochain_zome_types::{Entry, Header};
 use tracing::*;
 
 /// A CasBuf with Entries for values
-pub type EntryCas<'env> = CasBuf<'env, Entry>;
+pub type EntryCas = CasBuf<Entry>;
 /// A CasBuf with SignedHeaders for values
-pub type HeaderCas<'env> = CasBuf<'env, SignedHeader>;
+pub type HeaderCas = CasBuf<SignedHeader>;
 
 /// The representation of an ElementCache / ElementVault,
 /// using two or three DB references
-pub struct ElementBuf<'env> {
-    public_entries: EntryCas<'env>,
-    private_entries: Option<EntryCas<'env>>,
-    headers: HeaderCas<'env>,
+pub struct ElementBuf {
+    public_entries: EntryCas,
+    private_entries: Option<EntryCas>,
+    headers: HeaderCas,
 }
 
-impl<'env> ElementBuf<'env> {
+impl ElementBuf {
     fn new(
-        reader: &'env Reader<'env>,
+        env: EnvironmentRead,
         public_entries_store: SingleStore,
         private_entries_store: Option<SingleStore>,
         headers_store: SingleStore,
     ) -> DatabaseResult<Self> {
         let private_entries = if let Some(store) = private_entries_store {
-            Some(CasBuf::new(reader, store)?)
+            Some(CasBuf::new(env.clone(), store)?)
         } else {
             None
         };
         Ok(Self {
-            public_entries: CasBuf::new(reader, public_entries_store)?,
+            public_entries: CasBuf::new(env.clone(), public_entries_store)?,
             private_entries,
-            headers: CasBuf::new(reader, headers_store)?,
+            headers: CasBuf::new(env.clone(), headers_store)?,
         })
     }
 
@@ -63,7 +63,7 @@ impl<'env> ElementBuf<'env> {
     /// The `allow_private` argument allows you to specify whether private
     /// entries should be readable or writeable with this reference.
     pub fn vault(
-        reader: &'env Reader<'env>,
+        env: EnvironmentRead,
         dbs: &impl GetDb,
         allow_private: bool,
     ) -> DatabaseResult<Self> {
@@ -74,15 +74,15 @@ impl<'env> ElementBuf<'env> {
         } else {
             None
         };
-        Self::new(reader, entries, private_entries, headers)
+        Self::new(env, entries, private_entries, headers)
     }
 
     /// Create a ElementBuf using the Cache databases.
     /// There is no cache for private entries, so private entries are disallowed
-    pub fn cache(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Self> {
+    pub fn cache(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
         let entries = dbs.get_db(&*ELEMENT_CACHE_ENTRIES)?;
         let headers = dbs.get_db(&*ELEMENT_CACHE_HEADERS)?;
-        Self::new(reader, entries, None, headers)
+        Self::new(env, entries, None, headers)
     }
 
     /// Get an entry by its address
@@ -235,15 +235,15 @@ impl<'env> ElementBuf<'env> {
         self.public_entries.delete(entry_hash);
     }
 
-    pub fn headers(&self) -> &HeaderCas<'env> {
+    pub fn headers(&self) -> &HeaderCas {
         &self.headers
     }
 
-    pub fn public_entries(&self) -> &EntryCas<'env> {
+    pub fn public_entries(&self) -> &EntryCas {
         &self.public_entries
     }
 
-    pub fn private_entries(&self) -> Option<&EntryCas<'env>> {
+    pub fn private_entries(&self) -> Option<&EntryCas> {
         self.private_entries.as_ref()
     }
 
@@ -258,7 +258,7 @@ impl<'env> ElementBuf<'env> {
     }
 }
 
-impl<'env> BufferedStore<'env> for ElementBuf<'env> {
+impl BufferedStore for ElementBuf {
     type Error = DatabaseError;
 
     fn is_clean(&self) -> bool {
@@ -271,7 +271,7 @@ impl<'env> BufferedStore<'env> for ElementBuf<'env> {
                 .unwrap_or(true)
     }
 
-    fn flush_to_txn(self, writer: &'env mut Writer) -> DatabaseResult<()> {
+    fn flush_to_txn(self, writer: &mut Writer) -> DatabaseResult<()> {
         if self.is_clean() {
             return Ok(());
         }

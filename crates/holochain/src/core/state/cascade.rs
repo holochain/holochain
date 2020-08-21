@@ -92,15 +92,15 @@ mod test;
 
 pub mod error;
 
-pub struct Cascade<'env: 'a, 'a, M = MetadataBuf<'env>, C = MetadataBuf<'env>>
+pub struct Cascade<'a, M = MetadataBuf, C = MetadataBuf>
 where
     M: MetadataBufT,
     C: MetadataBufT,
 {
-    element_vault: &'a ElementBuf<'env>,
+    element_vault: &'a ElementBuf,
     meta_vault: &'a M,
 
-    element_cache: &'a mut ElementBuf<'env>,
+    element_cache: &'a mut ElementBuf,
     meta_cache: &'a mut C,
 
     network: HolochainP2pCell,
@@ -123,16 +123,16 @@ enum Search {
 
 /// Should these functions be sync or async?
 /// Depends on how much computation, and if writes are involved
-impl<'env: 'a, 'a, M, C> Cascade<'env, 'a, M, C>
+impl<'a, M, C> Cascade<'a, M, C>
 where
     C: MetadataBufT,
     M: MetadataBufT,
 {
     /// Constructs a [Cascade], taking references to all necessary databases
     pub fn new(
-        element_vault: &'a ElementBuf<'env>,
+        element_vault: &'a ElementBuf,
         meta_vault: &'a M,
-        element_cache: &'a mut ElementBuf<'env>,
+        element_cache: &'a mut ElementBuf,
         meta_cache: &'a mut C,
         network: HolochainP2pCell,
     ) -> Self {
@@ -669,13 +669,13 @@ where
 
 #[cfg(test)]
 /// Helper function for easily setting up cascades during tests
-pub fn test_dbs_and_mocks<'env>(
-    reader: &'env holochain_state::transaction::Reader<'env>,
+pub fn test_dbs_and_mocks<'txn>(
+    reader: &'txn holochain_state::transaction::Reader<'txn>,
     dbs: &impl holochain_state::db::GetDb,
 ) -> (
-    ElementBuf<'env>,
+    ElementBuf,
     super::metadata::MockMetadataBuf,
-    ElementBuf<'env>,
+    ElementBuf,
     super::metadata::MockMetadataBuf,
 ) {
     let cas = ElementBuf::vault(&reader, dbs, true).unwrap();

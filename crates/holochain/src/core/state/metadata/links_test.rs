@@ -237,10 +237,10 @@ impl TestData {
         );
     }
 
-    async fn add_link(&self, meta_buf: &mut MetadataBuf<'_>) {
+    async fn add_link(&self, meta_buf: &mut MetadataBuf) {
         meta_buf.add_link(self.link_add.clone()).await.unwrap();
     }
-    async fn remove_link(&self, meta_buf: &mut MetadataBuf<'_>) {
+    async fn remove_link(&self, meta_buf: &mut MetadataBuf) {
         meta_buf
             .remove_link(self.link_remove.clone())
             .await

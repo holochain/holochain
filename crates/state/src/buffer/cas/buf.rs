@@ -34,6 +34,10 @@ where
         Ok(Self(KvBufFresh::new(env, db)?))
     }
 
+    pub fn env(&self) -> &EnvironmentRead {
+        &self.0.env()
+    }
+
     /// Get a value from the underlying [KvBufFresh]
     pub fn get<'a>(
         &'a self,

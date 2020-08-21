@@ -6,7 +6,7 @@
 use super::source_chain::SourceChainError;
 use holochain_state::{
     error::DatabaseError,
-    prelude::{GetDb, Reader, Writer},
+    prelude::{EnvironmentRead, GetDb, Writer},
 };
 use thiserror::Error;
 
@@ -24,9 +24,9 @@ pub enum WorkspaceError {
 pub type WorkspaceResult<T> = Result<T, WorkspaceError>;
 
 /// Defines a Workspace
-pub trait Workspace<'env>: Send + Sized {
+pub trait Workspace: Send + Sized {
     /// Generic constructor
-    fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self>;
+    fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self>;
 
     /// Flush accumulated changes to the writer without committing.
     /// This consumes the Workspace.
@@ -43,23 +43,23 @@ pub mod tests {
     use super::Workspace;
     use crate::core::state::workspace::WorkspaceResult;
     use holochain_state::{
-        buffer::{BufferedStore, KvBuf},
+        buffer::{BufferedStore, KvBufFresh},
         db::{GetDb, ELEMENT_VAULT_HEADERS, ELEMENT_VAULT_PUBLIC_ENTRIES},
         prelude::*,
-        test_utils::test_cell_env,
+        test_utils::{test_cell_env, DbString},
     };
     use holochain_types::{prelude::*, test_utils::fake_header_hash};
 
-    pub struct TestWorkspace<'env> {
-        one: KvBuf<'env, HeaderHash, u32, Reader<'env>>,
-        two: KvBuf<'env, String, bool, Reader<'env>>,
+    pub struct TestWorkspace {
+        one: KvBufFresh<HeaderHash, u32>,
+        two: KvBufFresh<DbString, bool>,
     }
 
-    impl<'env> Workspace<'env> for TestWorkspace<'env> {
-        fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self> {
+    impl Workspace for TestWorkspace {
+        fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
             Ok(Self {
-                one: KvBuf::new(reader, dbs.get_db(&*ELEMENT_VAULT_PUBLIC_ENTRIES)?)?,
-                two: KvBuf::new(reader, dbs.get_db(&*ELEMENT_VAULT_HEADERS)?)?,
+                one: KvBufFresh::new(env, dbs.get_db(&*ELEMENT_VAULT_PUBLIC_ENTRIES)?)?,
+                two: KvBufFresh::new(env, dbs.get_db(&*ELEMENT_VAULT_HEADERS)?)?,
             })
         }
         fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
@@ -75,7 +75,7 @@ pub mod tests {
         let env = arc.guard().await;
         let dbs = arc.dbs().await;
         let addr1 = fake_header_hash(1);
-        let addr2 = "hi".to_string();
+        let addr2 = "hi".into();
         {
             let reader = env.reader()?;
             let mut workspace = TestWorkspace::new(&reader, &dbs)?;

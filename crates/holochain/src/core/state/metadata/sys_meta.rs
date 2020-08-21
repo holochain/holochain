@@ -513,7 +513,7 @@ mod tests {
         update_entries: &[NewEntryHeader],
         delete_updates: &[ElementDelete],
         _entry_hash: &EntryHash,
-        meta_buf: &mut MetadataBuf<'_>,
+        meta_buf: &mut MetadataBuf,
     ) {
         for e in new_entries.iter().chain(update_entries.iter()) {
             meta_buf.register_header(e.clone()).await.unwrap();

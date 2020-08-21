@@ -9,7 +9,7 @@ use holo_hash::HasHash;
 use holo_hash::{AgentPubKey, AnyDhtHash, EntryHash, HeaderHash};
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::{
-    buffer::{KvBuf, KvvBuf},
+    buffer::{KvBufFresh, KvvBufUsed},
     db::{
         CACHE_LINKS_META, CACHE_STATUS_META, CACHE_SYSTEM_META, META_VAULT_LINKS,
         META_VAULT_STATUS, META_VAULT_SYS,
@@ -330,39 +330,39 @@ impl From<header::ElementDelete> for EntryHeader {
 }
 
 /// Updates and answers queries for the links and system meta databases
-pub struct MetadataBuf<'env> {
-    system_meta: KvvBuf<'env, SysMetaKey, SysMetaVal, Reader<'env>>,
-    links_meta: KvBuf<'env, LinkMetaKeyBytes, LinkMetaVal, Reader<'env>>,
-    status_meta: KvBuf<'env, EntryHash, EntryDhtStatus, Reader<'env>>,
+pub struct MetadataBuf {
+    system_meta: KvvBufUsed<SysMetaKey, SysMetaVal>,
+    links_meta: KvBufFresh<LinkMetaKeyBytes, LinkMetaVal>,
+    status_meta: KvBufFresh<EntryHash, EntryDhtStatus>,
 }
 
-impl<'env> MetadataBuf<'env> {
+impl MetadataBuf {
     pub(crate) fn new(
-        reader: &'env Reader<'env>,
+        env: EnvironmentRead,
         system_meta: MultiStore,
         links_meta: SingleStore,
         status_meta: SingleStore,
     ) -> DatabaseResult<Self> {
         Ok(Self {
-            system_meta: KvvBuf::new(reader, system_meta)?,
-            links_meta: KvBuf::new(reader, links_meta)?,
-            status_meta: KvBuf::new(reader, status_meta)?,
+            system_meta: KvvBufUsed::new(env, system_meta)?,
+            links_meta: KvBufFresh::new(env, links_meta)?,
+            status_meta: KvBufFresh::new(env, status_meta)?,
         })
     }
     /// Create a [MetadataBuf] with the vault databases
-    pub fn vault(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Self> {
+    pub fn vault(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
         let system_meta = dbs.get_db(&*META_VAULT_SYS)?;
         let links_meta = dbs.get_db(&*META_VAULT_LINKS)?;
         let status_meta = dbs.get_db(&*META_VAULT_STATUS)?;
-        Self::new(reader, system_meta, links_meta, status_meta)
+        Self::new(env, system_meta, links_meta, status_meta)
     }
 
     /// Create a [MetadataBuf] with the cache databases
-    pub fn cache(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Self> {
+    pub fn cache(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
         let system_meta = dbs.get_db(&*CACHE_SYSTEM_META)?;
         let links_meta = dbs.get_db(&*CACHE_LINKS_META)?;
         let status_meta = dbs.get_db(&*CACHE_STATUS_META)?;
-        Self::new(reader, system_meta, links_meta, status_meta)
+        Self::new(env, system_meta, links_meta, status_meta)
     }
 
     async fn register_header_on_basis<K, H>(&mut self, key: K, header: H) -> DatabaseResult<()>
@@ -406,7 +406,7 @@ impl<'env> MetadataBuf<'env> {
 }
 
 #[async_trait::async_trait]
-impl<'env> MetadataBufT for MetadataBuf<'env> {
+impl MetadataBufT for MetadataBuf {
     fn get_live_links<'a>(
         &self,
         key: &'a LinkMetaKey,
@@ -631,10 +631,10 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
     }
 }
 
-impl<'env> BufferedStore<'env> for MetadataBuf<'env> {
+impl BufferedStore for MetadataBuf {
     type Error = DatabaseError;
 
-    fn flush_to_txn(self, writer: &'env mut Writer) -> DatabaseResult<()> {
+    fn flush_to_txn(self, writer: &mut Writer) -> DatabaseResult<()> {
         self.system_meta.flush_to_txn(writer)?;
         self.links_meta.flush_to_txn(writer)?;
         self.status_meta.flush_to_txn(writer)?;

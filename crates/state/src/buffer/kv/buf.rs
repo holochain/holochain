@@ -261,6 +261,10 @@ where
     V: BufVal,
     Store: KvStoreT<K, V>,
 {
+    pub fn env(&self) -> &EnvironmentRead {
+        &self.env
+    }
+
     /// See if a value exists, avoiding deserialization
     pub async fn contains(&self, k: &K) -> DatabaseResult<bool> {
         fresh_reader!(self.env, |reader| self.inner.contains(&reader, k))

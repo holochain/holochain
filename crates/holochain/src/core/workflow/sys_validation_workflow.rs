@@ -13,7 +13,7 @@ use error::WorkflowResult;
 use fallible_iterator::FallibleIterator;
 use holo_hash::DhtOpHash;
 use holochain_state::{
-    buffer::{BufferedStore, KvBuf},
+    buffer::{BufferedStore, KvBufFresh},
     db::INTEGRATION_LIMBO,
     prelude::{GetDb, Reader, Writer},
 };
@@ -22,7 +22,7 @@ use tracing::*;
 
 #[instrument(skip(workspace, writer, trigger_app_validation))]
 pub async fn sys_validation_workflow(
-    mut workspace: SysValidationWorkspace<'_>,
+    mut workspace: SysValidationWorkspace,
     writer: OneshotWriter,
     trigger_app_validation: &mut TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
@@ -43,7 +43,7 @@ pub async fn sys_validation_workflow(
 }
 
 async fn sys_validation_workflow_inner(
-    workspace: &mut SysValidationWorkspace<'_>,
+    workspace: &mut SysValidationWorkspace,
 ) -> WorkflowResult<WorkComplete> {
     let ops: Vec<ValidationLimboValue> = workspace.validation_limbo.drain_iter()?.collect()?;
     for vlv in ops {
@@ -58,17 +58,17 @@ async fn sys_validation_workflow_inner(
     Ok(WorkComplete::Complete)
 }
 
-pub struct SysValidationWorkspace<'env> {
-    pub integration_limbo: IntegrationLimboStore<'env>,
-    pub validation_limbo: ValidationLimboStore<'env>,
+pub struct SysValidationWorkspace {
+    pub integration_limbo: IntegrationLimboStore,
+    pub validation_limbo: ValidationLimboStore,
 }
 
-impl<'env> Workspace<'env> for SysValidationWorkspace<'env> {
-    fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self> {
+impl Workspace for SysValidationWorkspace {
+    fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
         let db = dbs.get_db(&*INTEGRATION_LIMBO)?;
-        let integration_limbo = KvBuf::new(reader, db)?;
+        let integration_limbo = KvBufFresh::new(env, db)?;
 
-        let validation_limbo = ValidationLimboStore::new(reader, dbs)?;
+        let validation_limbo = ValidationLimboStore::new(env, dbs)?;
 
         Ok(Self {
             integration_limbo,

@@ -5,7 +5,7 @@ use holo_hash::{AgentPubKey, DhtOpHash};
 use holochain_keystore::{AgentPubKeyExt, KeystoreSender, Signature};
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::{
-    buffer::{BufferedStore, KvvBuf},
+    buffer::{BufferedStore, KvvBufUsed},
     db::GetDb,
     env::EnvironmentReadRef,
     error::{DatabaseError, DatabaseResult},
@@ -63,19 +63,13 @@ pub struct SignedValidationReceipt {
 
 /// The database/buffer for aggregating validation_receipts sent by remote
 /// nodes in charge of storage thereof.
-pub struct ValidationReceiptsBuf<'env>(
-    KvvBuf<'env, DhtOpHash, SignedValidationReceipt, Reader<'env>>,
-);
+pub struct ValidationReceiptsBuf(KvvBufUsed<DhtOpHash, SignedValidationReceipt>);
 
-impl<'env> ValidationReceiptsBuf<'env> {
+impl ValidationReceiptsBuf {
     /// Constructor given read-only transaction and db ref.
-    pub fn new(
-        env: &'env EnvironmentReadRef<'env>,
-        reader: &'env Reader<'env>,
-    ) -> DatabaseResult<ValidationReceiptsBuf<'env>> {
-        Ok(Self(KvvBuf::new_opts(
-            reader,
-            env.get_db(&*holochain_state::db::VALIDATION_RECEIPTS)?,
+    pub fn new(env_ref: &EnvironmentReadRef) -> DatabaseResult<ValidationReceiptsBuf> {
+        Ok(Self(KvvBufUsed::new_opts(
+            env_ref.get_db(&*holochain_state::db::VALIDATION_RECEIPTS)?,
             true, // set to no_dup_data mode
         )?))
     }
@@ -90,7 +84,9 @@ impl<'env> ValidationReceiptsBuf<'env> {
                 Error = DatabaseError,
             > + '_,
     > {
-        Ok(fallible_iterator::convert(self.0.get(dht_op_hash)?))
+        Ok(fallible_iterator::convert(
+            self.0.get(todo!("pass in a reader"), dht_op_hash)?,
+        ))
     }
 
     /// Get the current valid receipt count for a given hash.
@@ -108,17 +104,17 @@ impl<'env> ValidationReceiptsBuf<'env> {
 
     /// Add this receipt if it isn't already in the database.
     pub fn add_if_unique(&mut self, receipt: SignedValidationReceipt) -> DatabaseResult<()> {
-        // The underlying KvvBuf manages the uniqueness
+        // The underlying KvvBufUsed manages the uniqueness
         self.0.insert(receipt.receipt.dht_op_hash.clone(), receipt);
 
         Ok(())
     }
 }
 
-impl<'env> BufferedStore<'env> for ValidationReceiptsBuf<'env> {
+impl BufferedStore for ValidationReceiptsBuf {
     type Error = DatabaseError;
 
-    fn flush_to_txn(self, writer: &'env mut Writer) -> DatabaseResult<()> {
+    fn flush_to_txn(self, writer: &mut Writer) -> DatabaseResult<()> {
         // we are in no_dup_data mode
         // so even if someone else added a dup in the mean time
         // it will not get written to the DB
@@ -167,9 +163,9 @@ mod tests {
             // capture the readers at the same time
             // so we can test out the resolve-dups-on-write logic
             let reader1 = env_ref.reader()?;
-            let mut vr_buf1 = ValidationReceiptsBuf::new(&env_ref, &reader1)?;
+            let mut vr_buf1 = ValidationReceiptsBuf::new(&env_ref)?;
             let reader2 = env_ref.reader()?;
-            let mut vr_buf2 = ValidationReceiptsBuf::new(&env_ref, &reader2)?;
+            let mut vr_buf2 = ValidationReceiptsBuf::new(&env_ref)?;
 
             vr_buf1.add_if_unique(vr1.clone())?;
             vr_buf1.add_if_unique(vr1.clone())?;
@@ -184,7 +180,7 @@ mod tests {
         }
 
         let reader = env_ref.reader()?;
-        let vr_buf = ValidationReceiptsBuf::new(&env_ref, &reader)?;
+        let vr_buf = ValidationReceiptsBuf::new(&env_ref)?;
 
         assert_eq!(2, vr_buf.count_valid(&test_op_hash)?);
 

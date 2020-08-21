@@ -286,21 +286,21 @@ where
     }
 }
 
-pub struct SingleIterRaw<'env, V> {
-    iter: rkv::store::single::Iter<'env>,
-    rev: rkv::store::single::Iter<'env>,
-    key: Option<&'env [u8]>,
-    key_back: Option<&'env [u8]>,
+pub struct SingleIterRaw<'txn, V> {
+    iter: rkv::store::single::Iter<'txn>,
+    rev: rkv::store::single::Iter<'txn>,
+    key: Option<&'txn [u8]>,
+    key_back: Option<&'txn [u8]>,
     __type: std::marker::PhantomData<V>,
 }
 
-type InnerItem<'env> = (&'env [u8], Option<rkv::Value<'env>>);
+type InnerItem<'a> = (&'a [u8], Option<rkv::Value<'a>>);
 
-impl<'env, V> SingleIterRaw<'env, V>
+impl<'txn, V> SingleIterRaw<'txn, V>
 where
     V: BufVal,
 {
-    pub fn new(iter: rkv::store::single::Iter<'env>, rev: rkv::store::single::Iter<'env>) -> Self {
+    pub fn new(iter: rkv::store::single::Iter<'txn>, rev: rkv::store::single::Iter<'txn>) -> Self {
         Self {
             iter,
             rev,
@@ -311,8 +311,8 @@ where
     }
 
     fn next_inner(
-        item: Option<Result<InnerItem<'env>, StoreError>>,
-    ) -> Result<Option<IterItem<'env, V>>, IterError> {
+        item: Option<Result<InnerItem<'txn>, StoreError>>,
+    ) -> Result<Option<IterItem<'txn, V>>, IterError> {
         match item {
             Some(Ok((k, Some(rkv::Value::Blob(buf))))) => Ok(Some((
                 k,
