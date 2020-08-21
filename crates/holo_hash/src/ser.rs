@@ -173,13 +173,13 @@ mod tests {
             hash_type::AnyDht::Header,
         );
         let hash_type_sb: SerializedBytes = any_hash.hash_type().try_into().unwrap();
-        let hash_type_json = r#"{"Header":[132,33,36]}"#;
+        let hash_type_json = r#"{"Header":[132,41,36]}"#;
         assert_eq!(format!("{:?}", hash_type_sb), hash_type_json.to_string());
 
         let hash_type_from_sb: hash_type::AnyDht = hash_type_sb.try_into().unwrap();
         assert_eq!(hash_type_from_sb, hash_type::AnyDht::Header);
 
-        let hash_type_from_json: hash_type::AnyDht = serde_json::from_str(hash_type_json).unwrap();
+        let hash_type_from_json: hash_type::AnyDht = serde_json::from_str(&hash_type_json).unwrap();
         assert_eq!(hash_type_from_json, hash_type::AnyDht::Header);
     }
 
