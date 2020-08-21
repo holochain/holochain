@@ -27,7 +27,7 @@ pub type NetIdHash = HoloHash<hash_type::NetId>;
 pub type WasmHash = HoloHash<hash_type::Wasm>;
 
 /// The hash of anything referrable in the DHT.
-/// This is a composite of AgentPubKey, EntryHash, and HeaderHash
+/// This is a composite of either an EntryHash or a HeaderHash
 pub type AnyDhtHash = HoloHash<hash_type::AnyDht>;
 
 impl From<HeaderHash> for AnyDhtHash {
