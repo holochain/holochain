@@ -41,7 +41,7 @@ where
     ) -> MustBoxFuture<'a, DatabaseResult<Option<HoloHashed<C>>>> {
         async move {
             Ok(if let Some(content) = self.0.get(hash).await? {
-                Some(Self::deserialize_and_hash(hash.get_bytes(), content).await)
+                Some(Self::deserialize_and_hash(hash.get_full_bytes(), content).await)
             } else {
                 None
             })
@@ -93,7 +93,7 @@ where
         fatal_db_hash_integrity_check!(
             "CasBuf::get",
             hash_bytes,
-            data.as_hash().get_bytes(),
+            data.as_hash().get_full_bytes(),
             data.as_content(),
         );
         data

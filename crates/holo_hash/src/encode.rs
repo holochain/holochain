@@ -29,7 +29,7 @@ impl<P: PrimitiveHashType> TryFrom<String> for HoloHash<P> {
 impl<T: HashType> std::fmt::Display for HoloHash<T> {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
         let prefix = self.hash_type().get_prefix();
-        write!(f, "{}", holo_hash_encode(prefix, self.get_raw()))
+        write!(f, "{}", holo_hash_encode(prefix, self.get_full_bytes()))
     }
 }
 

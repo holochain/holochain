@@ -110,7 +110,12 @@ impl WasmRibosome {
         // TODO: make this actually the hash of the wasm once we can do that
         // watch out for cache misses in the tests that make things slooow if you change this!
         // format!("{}{}", &self.dna.dna_hash(), zome_name).into_bytes()
-        Ok(self.dna_file.dna().get_zome(zome_name)?.wasm_hash.get_raw())
+        Ok(self
+            .dna_file
+            .dna()
+            .get_zome(zome_name)?
+            .wasm_hash
+            .get_full_bytes())
     }
 
     pub fn instance(&self, call_context: CallContext) -> RibosomeResult<Instance> {

@@ -1,5 +1,11 @@
 use crate::{has_hash::HasHash, HashType, PrimitiveHashType};
 
+// pub(crate) const HASH_PREFIX_LEN: usize = 3;
+pub(crate) const HASH_CORE_LEN: usize = 32;
+pub(crate) const HASH_LOC_LEN: usize = 4;
+
+pub(crate) const HASH_SERIALIZED_LEN: usize = HASH_CORE_LEN + HASH_LOC_LEN;
+
 /// A HoloHash contains a vector of 36 bytes representing a 32-byte blake2b hash
 /// plus 4 bytes representing a DHT location. It also contains a zero-sized
 /// type which specifies what it is a hash of.
@@ -16,7 +22,7 @@ impl<T: HashType> HoloHash<T> {
     /// Raw constructor: use a precomputed hash + location byte array in vec
     /// form, along with a type, to construct a hash.
     pub fn from_raw_bytes_and_type(hash: Vec<u8>, hash_type: T) -> Self {
-        assert_36(&hash);
+        assert_length(&hash);
         Self { hash, hash_type }
     }
 
@@ -34,12 +40,13 @@ impl<T: HashType> HoloHash<T> {
     }
 
     /// Get the full byte array including the base 32 bytes and the 4 byte loc
-    pub fn get_raw(&self) -> &[u8] {
+    pub fn get_full_bytes(&self) -> &[u8] {
         &self.hash
     }
 
     /// Fetch just the core 32 bytes (without the 4 location bytes)
-    pub fn get_bytes(&self) -> &[u8] {
+    // TODO: change once prefix is included
+    pub fn get_core_bytes(&self) -> &[u8] {
         &self.hash[..self.hash.len() - 4]
     }
 
@@ -62,8 +69,10 @@ impl<P: PrimitiveHashType> HoloHash<P> {
 }
 
 impl<T: HashType> AsRef<[u8]> for HoloHash<T> {
+    // TODO: revisit this, especially after changing serialization format. [ B-02112 ]
+    // Should this be 32, 36, or 39 bytes?
     fn as_ref(&self) -> &[u8] {
-        &self.hash[..]
+        &self.hash[..36]
     }
 }
 
@@ -72,7 +81,7 @@ impl<T: HashType> AsRef<[u8]> for HoloHash<T> {
 // since the composite information is lost in the AsRef<[u8]>.
 impl<T: PrimitiveHashType> From<Vec<u8>> for HoloHash<T> {
     fn from(hash: Vec<u8>) -> Self {
-        assert_36(&hash);
+        assert_length(&hash);
         Self {
             hash,
             hash_type: T::new(),
@@ -111,10 +120,11 @@ fn bytes_to_loc(bytes: &[u8]) -> u32 {
         + ((bytes[3] as u32) << 24)
 }
 
-fn assert_36(hash: &Vec<u8>) {
-    if hash.len() != 36 {
+fn assert_length(hash: &Vec<u8>) {
+    if hash.len() != HASH_SERIALIZED_LEN {
         panic!(
-            "invalid holo_hash byte count, expected: 36, found: {}. {:?}",
+            "invalid holo_hash byte count, expected: {}, found: {}. {:?}",
+            HASH_SERIALIZED_LEN,
             hash.len(),
             hash
         );
