@@ -1,10 +1,7 @@
-use std::path::Path;
-
 fn main() {
-    let out_dir = std::env::var_os("OUT_DIR").unwrap();
+    let should_build = std::env::var_os("CARGO_FEATURE_BUILD").is_some();
 
     println!("cargo:rerun-if-changed=Cargo.toml");
-    // println!("cargo:rerun-if-changed=*");
     println!("cargo:rerun-if-changed=../../../Cargo.lock");
     // We want to rebuild if anything upstream of the wasms has changed.
     // Since we use local paths, changes to those crates will not affect the
@@ -18,73 +15,50 @@ fn main() {
             println!("cargo:rerun-if-changed={}", item.path().display());
         }
     }
-
-    let mut all_status = vec![];
-
-    for &m in [
-        "agent_info",
-        "anchor",
-        "bench",
-        "commit_entry",
-        "debug",
-        "entry_defs",
-        "foo",
-        "hash_path",
-        "imports",
-        "init_fail",
-        "init_pass",
-        "link",
-        "migrate_agent_fail",
-        "migrate_agent_pass",
-        "post_commit_fail",
-        "post_commit_success",
-        "ser_regression",
-        "validate",
-        "validate_link",
-        "validate_invalid",
-        "validate_link_add_invalid",
-        "validate_valid",
-        "validate_link_add_valid",
-        "validation_package_fail",
-        "validation_package_success",
-        "whoami",
-    ]
-    .iter()
+    // If any of the files in the wasms change rebuild
+    for item in walkdir::WalkDir::new(format!(
+        "{}/{}/",
+        env!("CARGO_MANIFEST_DIR"),
+        "wasm_workspace"
+    ))
+    .into_iter()
+    .filter_entry(|e| {
+        e.file_name()
+            .to_str()
+            .map(|e| e != "target")
+            .unwrap_or(false)
+    })
+    .filter_map(|e| e.ok())
     {
-        // Rerun if the src dirs change
-        for item in walkdir::WalkDir::new(Path::new(m).join("src"))
-            .into_iter()
-            .filter_map(|e| e.ok())
-        {
-            println!("cargo:rerun-if-changed={}", item.path().display());
-        }
-        let cargo_toml = Path::new(m).join("Cargo.toml");
-
-        // Note: If you're trying to use `cargo udeps` and get an error, try
-        // replacing these two lines with:
-        //
-        // let cargo_command = "cargo";
-        let cargo_command = std::env::var_os("CARGO");
-        let cargo_command = cargo_command.as_deref().unwrap_or_else(|| "cargo".as_ref());
-
-        let child = std::process::Command::new(cargo_command)
-            .arg("build")
-            .arg("--manifest-path")
-            .arg(cargo_toml)
-            .arg("--release")
-            .arg("--target")
-            .arg("wasm32-unknown-unknown")
-            .env("CARGO_TARGET_DIR", &out_dir)
-            // Run cargo in parallel so we don't have to wait for each to compile
-            // before starting the next
-            .spawn()
-            .unwrap();
-
-        all_status.push(child);
+        println!("cargo:rerun-if-changed={}", item.path().display());
     }
-    for mut child in all_status {
-        let status = child.wait().unwrap();
-        assert!(status.success());
+    let wasm_out = std::env::var_os("HC_TEST_WASM_DIR");
+    let cargo_command = std::env::var_os("CARGO");
+    let cargo_command = cargo_command.as_deref().unwrap_or_else(|| "cargo".as_ref());
+    if should_build {
+        let mut cmd = std::process::Command::new(cargo_command);
+        cmd.arg("build")
+            .arg("--manifest-path")
+            .arg("wasm_workspace/Cargo.toml")
+            .arg("--release")
+            .arg("--workspace")
+            .arg("--target")
+            .arg("wasm32-unknown-unknown");
+        if let Some(wasm_out) = wasm_out {
+            cmd.env("CARGO_TARGET_DIR", &wasm_out);
+        }
+        let output = cmd.output().unwrap();
+        assert!(output.status.success());
+    } else {
+        let mut cmd = std::process::Command::new(cargo_command);
+        cmd.arg("check")
+            .arg("--manifest-path")
+            .arg("wasm_workspace/Cargo.toml");
+        if let Some(wasm_out) = wasm_out {
+            cmd.env("CARGO_TARGET_DIR", &wasm_out);
+        }
+        let output = cmd.output().unwrap();
+        assert!(output.status.success());
     }
 }
 
