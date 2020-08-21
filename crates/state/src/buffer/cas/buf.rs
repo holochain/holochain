@@ -1,9 +1,9 @@
 use crate::{
-    buffer::{kv::KvBufFresh, BufKey, BufVal, BufferedStore},
+    buffer::{kv::KvBufFresh, BufferedStore},
     env::EnvironmentRead,
     error::{DatabaseError, DatabaseResult},
     fatal_db_hash_integrity_check,
-    prelude::Writer,
+    prelude::*,
     transaction::Readable,
 };
 use fallible_iterator::FallibleIterator;

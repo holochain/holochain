@@ -1,5 +1,5 @@
 use super::KvStoreT;
-use crate::buffer::{check_empty_key, iter::SingleIterRaw, BufKey, BufVal};
+use crate::buffer::{check_empty_key, iter::SingleIterRaw};
 use crate::{
     error::{DatabaseError, DatabaseResult},
     prelude::*,

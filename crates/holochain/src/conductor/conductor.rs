@@ -43,7 +43,7 @@ use holochain_keystore::{
 };
 use holochain_state::{
     buffer::BufferedStore,
-    buffer::{KvStore, KvStoreT, UnitDbKey},
+    buffer::{KvStore, KvStoreT},
     db,
     env::{EnvironmentWrite, ReadManager},
     exports::SingleStore,

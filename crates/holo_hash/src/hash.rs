@@ -76,25 +76,6 @@ impl<T: HashType> AsRef<[u8]> for HoloHash<T> {
     }
 }
 
-// NB: This is meant to be a strict inverse of the AsRef<[u8]> impl
-// However, there is no From<Vec<u8>> for composite hash types,
-// since the composite information is lost in the AsRef<[u8]>.
-impl<T: PrimitiveHashType> From<Vec<u8>> for HoloHash<T> {
-    fn from(hash: Vec<u8>) -> Self {
-        assert_length(&hash);
-        Self {
-            hash,
-            hash_type: T::new(),
-        }
-    }
-}
-
-impl<T: PrimitiveHashType> From<HoloHash<T>> for Vec<u8> {
-    fn from(hh: HoloHash<T>) -> Vec<u8> {
-        hh.hash
-    }
-}
-
 impl<T: HashType> HasHash<T> for HoloHash<T> {
     fn as_hash(&self) -> &HoloHash<T> {
         &self

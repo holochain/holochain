@@ -1,5 +1,5 @@
 use crate::{
-    buffer::{BufKey, BufMultiVal, BufferedStore},
+    buffer::BufferedStore,
     error::{DatabaseError, DatabaseResult},
     prelude::*,
 };

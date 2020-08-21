@@ -5,5 +5,6 @@ pub use crate::{
     db::GetDb,
     env::{EnvironmentRead, ReadManager, WriteManager},
     exports::*,
+    key::*,
     transaction::{Readable, Reader, Writer},
 };

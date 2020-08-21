@@ -1,4 +1,4 @@
-use crate::buffer::{iter::SingleIterRaw, kv::KvStoreT, BufIntKey, BufVal, IntKey};
+use crate::buffer::{iter::SingleIterRaw, kv::KvStoreT};
 use crate::{
     error::{DatabaseError, DatabaseResult},
     prelude::*,

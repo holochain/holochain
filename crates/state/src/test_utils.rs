@@ -1,6 +1,9 @@
 //! Helpers for unit tests
 
-use crate::env::{EnvironmentKind, EnvironmentWrite};
+use crate::{
+    env::{EnvironmentKind, EnvironmentWrite},
+    prelude::BufKey,
+};
 use holochain_types::test_utils::fake_cell_id;
 use shrinkwraprs::Shrinkwrap;
 use std::sync::Arc;
@@ -128,14 +131,8 @@ impl AsRef<[u8]> for DbString {
     }
 }
 
-impl From<DbString> for Vec<u8> {
-    fn from(d: DbString) -> Vec<u8> {
-        d.as_ref().to_vec()
-    }
-}
-
-impl From<Vec<u8>> for DbString {
-    fn from(bytes: Vec<u8>) -> Self {
+impl BufKey for DbString {
+    fn from_key_bytes_fallible(bytes: Vec<u8>) -> Self {
         Self(String::from_utf8(bytes).unwrap())
     }
 }

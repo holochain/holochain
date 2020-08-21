@@ -4,14 +4,14 @@ use crate::buffer::{
     check_empty_key,
     iter::{DrainIter, SingleIter, SingleIterFrom, SingleIterKeyMatch},
     kv::KvStore,
-    BufKey, BufVal, BufferedStore, IntKey,
+    BufferedStore,
 };
 use crate::env::ReadManager;
 use crate::{
     env::EnvironmentRead,
     error::{DatabaseError, DatabaseResult},
     fresh_reader,
-    prelude::{Readable, Writer},
+    prelude::*,
 };
 use fallible_iterator::FallibleIterator;
 use rkv::{IntegerStore, SingleStore};
@@ -131,14 +131,15 @@ where
     /// Update the scratch space to record a Put operation for the KV
     pub fn put(&mut self, k: K, v: V) -> DatabaseResult<()> {
         check_empty_key(&k)?;
-        self.scratch.insert(k.into(), KvOp::Put(Box::new(v)));
+        self.scratch
+            .insert(k.to_key_bytes(), KvOp::Put(Box::new(v)));
         Ok(())
     }
 
     /// Update the scratch space to record a Delete operation for the KV
     pub fn delete(&mut self, k: K) -> DatabaseResult<()> {
         check_empty_key(&k)?;
-        self.scratch.insert(k.into(), KvOp::Delete);
+        self.scratch.insert(k.to_key_bytes(), KvOp::Delete);
         Ok(())
     }
 
