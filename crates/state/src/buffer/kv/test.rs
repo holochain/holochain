@@ -3,7 +3,7 @@ use crate::test_utils::DbString;
 use crate::{
     env::{ReadManager, WriteManager},
     error::{DatabaseError, DatabaseResult},
-    next::{kv::generic::KvStoreT, BufferedStore},
+    buffer::{kv::generic::KvStoreT, BufferedStore},
     test_utils::test_cell_env,
 };
 use rkv::StoreOptions;

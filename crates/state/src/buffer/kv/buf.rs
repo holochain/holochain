@@ -1,12 +1,12 @@
 use super::KvIntStore;
-use crate::env::ReadManager;
-use crate::next::kv::generic::KvStoreT;
-use crate::next::{
+use crate::buffer::kv::generic::KvStoreT;
+use crate::buffer::{
     check_empty_key,
     iter::{DrainIter, SingleIter, SingleIterFrom, SingleIterKeyMatch},
     kv::KvStore,
     BufKey, BufVal, BufferedStore, IntKey,
 };
+use crate::env::ReadManager;
 use crate::{
     env::EnvironmentRead,
     error::{DatabaseError, DatabaseResult},

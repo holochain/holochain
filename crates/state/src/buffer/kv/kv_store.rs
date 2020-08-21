@@ -1,5 +1,6 @@
+use super::KvStoreT;
+use crate::buffer::{check_empty_key, iter::SingleIterRaw, BufKey, BufVal};
 use crate::{
-    buffer::{kv::SingleIterRaw, BufKey, BufVal},
     error::{DatabaseError, DatabaseResult},
     prelude::*,
 };
@@ -7,7 +8,7 @@ use fallible_iterator::FallibleIterator;
 use rkv::SingleStore;
 
 /// Wrapper around an rkv SingleStore which provides strongly typed values
-pub struct Kv<K, V>
+pub struct KvStore<K, V>
 where
     K: BufKey,
     V: BufVal,
@@ -16,21 +17,13 @@ where
     __phantom: std::marker::PhantomData<(K, V)>,
 }
 
-impl<K, V> Kv<K, V>
+impl<K, V> KvStoreT<K, V> for KvStore<K, V>
 where
     K: BufKey,
     V: BufVal,
 {
-    /// Create a new IntKvBuf from a read-only transaction and a database reference
-    pub fn new(db: SingleStore) -> Self {
-        Self {
-            db,
-            __phantom: std::marker::PhantomData,
-        }
-    }
-
     /// Fetch data from DB as raw byte slice
-    pub fn get_bytes<'env, R: Readable>(
+    fn get_bytes<'env, R: Readable>(
         &self,
         reader: &'env R,
         k: &K,
@@ -44,7 +37,7 @@ where
     }
 
     /// Fetch data from DB, deserialize into V type
-    pub fn get<R: Readable>(&self, reader: &R, k: &K) -> DatabaseResult<Option<V>> {
+    fn get<R: Readable>(&self, reader: &R, k: &K) -> DatabaseResult<Option<V>> {
         check_empty_key(k)?;
         match self.get_bytes(reader, k)? {
             Some(bytes) => Ok(Some(holochain_serialized_bytes::decode(bytes)?)),
@@ -53,8 +46,7 @@ where
     }
 
     /// Put V into DB as serialized data
-    pub fn put(&self, writer: &mut Writer, k: &K, v: &V) -> DatabaseResult<()> {
-        check_empty_key(k)?;
+    fn put(&self, writer: &mut Writer, k: &K, v: &V) -> DatabaseResult<()> {
         let buf = holochain_serialized_bytes::encode(v)?;
         let encoded = rkv::Value::Blob(&buf);
         self.db.put(writer, k, &encoded)?;
@@ -62,16 +54,12 @@ where
     }
 
     /// Delete value from DB
-    pub fn delete(&self, writer: &mut Writer, k: &K) -> DatabaseResult<()> {
-        check_empty_key(k)?;
+    fn delete(&self, writer: &mut Writer, k: &K) -> DatabaseResult<()> {
         Ok(self.db.delete(writer, k)?)
     }
 
     /// Iterate over the underlying persisted data
-    pub fn iter<'env, R: Readable>(
-        &self,
-        reader: &'env R,
-    ) -> DatabaseResult<SingleIterRaw<'env, V>> {
+    fn iter<'env, R: Readable>(&self, reader: &'env R) -> DatabaseResult<SingleIterRaw<'env, V>> {
         Ok(SingleIterRaw::new(
             self.db.iter_start(reader)?,
             self.db.iter_end(reader)?,
@@ -79,7 +67,7 @@ where
     }
 
     /// Iterate from a key onwards
-    pub fn iter_from<'env, R: Readable>(
+    fn iter_from<'env, R: Readable>(
         &self,
         reader: &'env R,
         k: K,
@@ -92,7 +80,7 @@ where
     }
 
     /// Iterate over the underlying persisted data in reverse
-    pub fn iter_reverse<'env, R: Readable>(
+    fn iter_reverse<'env, R: Readable>(
         &self,
         reader: &'env R,
     ) -> DatabaseResult<fallible_iterator::Rev<SingleIterRaw<'env, V>>> {
@@ -100,11 +88,27 @@ where
     }
 }
 
-// Empty keys break lmdb
-fn check_empty_key<K: AsRef<[u8]>>(k: &K) -> DatabaseResult<()> {
-    if k.as_ref().is_empty() {
-        Err(DatabaseError::EmptyKey)
-    } else {
-        Ok(())
+impl<K, V> KvStore<K, V>
+where
+    K: BufKey,
+    V: BufVal,
+{
+    /// Create a new IntKvBuf from a read-only transaction and a database reference
+    pub fn new(db: SingleStore) -> Self {
+        Self {
+            db,
+            __phantom: std::marker::PhantomData,
+        }
+    }
+
+    /// Accessor for raw Rkv DB
+    pub fn db(&self) -> SingleStore {
+        self.db
+    }
+
+    // TODO: This should be cfg test but can't because it's in a different crate
+    /// Clear db, useful for tests
+    pub fn delete_all(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
+        Ok(self.db.clear(writer)?)
     }
 }

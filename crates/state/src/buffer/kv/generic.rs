@@ -1,4 +1,4 @@
-use crate::next::iter::SingleIterRaw;
+use crate::buffer::iter::SingleIterRaw;
 use crate::{error::DatabaseResult, prelude::*};
 
 pub trait KvStoreT<K, V> {

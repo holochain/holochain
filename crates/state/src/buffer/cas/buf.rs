@@ -1,8 +1,8 @@
 use crate::{
+    buffer::{kv::KvBufFresh, BufKey, BufVal, BufferedStore},
     env::EnvironmentRead,
     error::{DatabaseError, DatabaseResult},
     fatal_db_hash_integrity_check,
-    next::{kv::KvBufFresh, BufKey, BufVal, BufferedStore},
     prelude::Writer,
     transaction::Readable,
 };

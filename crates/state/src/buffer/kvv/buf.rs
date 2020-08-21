@@ -1,6 +1,6 @@
 use crate::{
+    buffer::{BufKey, BufMultiVal, BufferedStore},
     error::{DatabaseError, DatabaseResult},
-    next::{BufKey, BufMultiVal, BufferedStore},
     prelude::*,
 };
 use either::Either;

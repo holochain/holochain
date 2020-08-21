@@ -1,5 +1,5 @@
+use crate::buffer::{kv::KvOp, BufVal};
 use crate::error::DatabaseError;
-use crate::next::{kv::KvOp, BufVal};
 use fallible_iterator::{DoubleEndedFallibleIterator, FallibleIterator};
 use rkv::StoreError;
 use std::collections::BTreeMap;
