@@ -15,6 +15,12 @@ impl From<EntryDefId> for String {
     }
 }
 
+impl From<&EntryDefId> for String {
+    fn from(entry_def_id: &EntryDefId) -> Self {
+        entry_def_id.0.to_string()
+    }
+}
+
 impl From<String> for EntryDefId {
     fn from(s: String) -> Self {
         Self(s)

@@ -81,16 +81,18 @@ impl quote::ToTokens for CrdtType {
 
 impl quote::ToTokens for EntryDefId {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        let s = String::from(&self.0);
         tokens.append_all(quote::quote! {
-            hdk3::prelude::EntryDefId::from(String::from(#self.0))
+            hdk3::prelude::EntryDefId::from(#s)
         });
     }
 }
 
 impl quote::ToTokens for RequiredValidations {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        let u = <u8>::from(self.0);
         tokens.append_all(quote::quote! {
-            hdk3::prelude::RequiredValidations::From(<u8>::from(#self.0))
+            hdk3::prelude::RequiredValidations::from(#u)
         });
     }
 }
@@ -140,6 +142,7 @@ pub fn hdk_entry(attrs: TokenStream, code: TokenStream) -> TokenStream {
     let entry_def = syn::parse_macro_input!(attrs as EntryDef);
 
     (quote::quote! {
+        #[derive(hdk3::prelude::Serialize, hdk3::prelude::Deserialize, hdk3::prelude::SerializedBytes)]
         #item
         hdk3::prelude::entry_def!(#struct_ident #entry_def);
     })
