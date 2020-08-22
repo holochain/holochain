@@ -62,12 +62,12 @@ where
     K: BufKey + Debug,
     V: BufMultiVal + Debug,
 {
-    /// Create a new KvvBufUsed from a read-only transaction and a database reference
+    /// Create a new KvvBufUsed
     pub fn new(db: MultiStore) -> DatabaseResult<Self> {
         Self::new_opts(db, false)
     }
 
-    /// Create a new KvvBufUsed from a read-only transaction and a database reference
+    /// Create a new KvvBufUsed
     /// also allow switching to no_dup_data mode.
     pub fn new_opts(db: MultiStore, no_dup_data: bool) -> DatabaseResult<Self> {
         Ok(Self {

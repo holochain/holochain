@@ -1,8 +1,8 @@
 use crate::{
-    buffer::{kv::KvBufFresh, BufferedStore},
+    buffer::{kv::KvBufFresh, BufferedStore, KvBufUsed},
     env::EnvironmentRead,
     error::{DatabaseError, DatabaseResult},
-    fatal_db_hash_integrity_check,
+    fatal_db_hash_integrity_check, fresh_reader,
     prelude::*,
     transaction::Readable,
 };
@@ -15,61 +15,53 @@ use must_future::MustBoxFuture;
 /// and values are always AddressableContent.
 ///
 /// There is no "CasStore" (which would wrap a `KvStore`), because so far
-/// there has been no need for one. There is also no "fresh" and "used" version
-/// of CasBuf: all operations are "fresh", except for iteration which is "used"
-pub struct CasBuf<C>(KvBufFresh<HoloHashOf<C>, C>)
+/// there has been no need for one.
+pub struct CasBufUsed<C>(KvBufUsed<HoloHashOf<C>, C>)
 where
     C: HashableContent + BufVal + Send + Sync,
     HoloHashOf<C>: BufKey,
     C::HashType: PrimitiveHashType + Send + Sync;
 
-impl<C> CasBuf<C>
+impl<C> CasBufUsed<C>
 where
     C: HashableContent + BufVal + Send + Sync,
     HoloHashOf<C>: BufKey,
     C::HashType: PrimitiveHashType + Send + Sync,
 {
-    /// Create a new CasBuf from a read-only transaction and a database reference
-    pub fn new(env: EnvironmentRead, db: rkv::SingleStore) -> DatabaseResult<Self> {
-        Ok(Self(KvBufFresh::new(env, db)?))
+    /// Create a new CasBufUsed
+    pub fn new(db: rkv::SingleStore) -> Self {
+        Self(KvBufUsed::new(db))
     }
 
-    pub fn env(&self) -> &EnvironmentRead {
-        &self.0.env()
-    }
-
-    /// Get a value from the underlying [KvBufFresh]
-    pub fn get<'a>(
-        &'a self,
-        hash: &'a HoloHashOf<C>,
-    ) -> MustBoxFuture<'a, DatabaseResult<Option<HoloHashed<C>>>> {
-        async move {
-            Ok(if let Some(content) = self.0.get(hash).await? {
-                Some(Self::deserialize_and_hash(hash.get_full_bytes(), content).await)
-            } else {
-                None
-            })
-        }
-        .boxed()
-        .into()
-    }
-
-    /// Put a value into the underlying [KvBufFresh]
+    /// Put a value into the underlying [KvBufUsed]
     pub fn put(&mut self, h: HoloHashed<C>) {
         let (content, hash) = h.into_inner();
         // These expects seem valid as it means the hashing is broken
         self.0.put(hash, content).expect("Hash should not be empty");
     }
 
-    /// Delete a value from the underlying [KvBufFresh]
+    /// Delete a value from the underlying [KvBufUsed]
     pub fn delete(&mut self, k: HoloHashOf<C>) {
         // These expects seem valid as it means the hashing is broken
         self.0.delete(k).expect("Hash key is empty");
     }
 
+    /// Get a value from the underlying [KvBufUsed]
+    pub async fn get<'r, 'a: 'r, R: Readable + Send + Sync>(
+        &'a self,
+        r: &'r R,
+        hash: &'a HoloHashOf<C>,
+    ) -> DatabaseResult<Option<HoloHashed<C>>> {
+        Ok(if let Some(content) = self.0.get(r, hash)? {
+            Some(Self::deserialize_and_hash(hash.get_full_bytes(), content).await)
+        } else {
+            None
+        })
+    }
+
     /// Check if a value is stored at this key
-    pub async fn contains(&self, k: &HoloHashOf<C>) -> DatabaseResult<bool> {
-        self.0.contains(k).await
+    pub fn contains<'r, R: Readable>(&self, r: &'r R, k: &HoloHashOf<C>) -> DatabaseResult<bool> {
+        self.0.contains(r, k)
     }
 
     /// Iterate over the underlying persisted data taking the scratch space into consideration
@@ -95,7 +87,7 @@ where
     async fn deserialize_and_hash(hash_bytes: &[u8], content: C) -> HoloHashed<C> {
         let data = HoloHashed::from_content(content).await;
         fatal_db_hash_integrity_check!(
-            "CasBuf::get",
+            "CasBufUsed::get",
             hash_bytes,
             data.as_hash().get_full_bytes(),
             data.as_content(),
@@ -110,7 +102,49 @@ where
     }
 }
 
-impl<C> BufferedStore for CasBuf<C>
+pub struct CasBufFresh<C>
+where
+    C: HashableContent + BufVal + Send + Sync,
+    HoloHashOf<C>: BufKey,
+    C::HashType: PrimitiveHashType + Send + Sync,
+{
+    env: EnvironmentRead,
+    inner: CasBufUsed<C>,
+}
+
+impl<C> CasBufFresh<C>
+where
+    C: HashableContent + BufVal + Send + Sync,
+    HoloHashOf<C>: BufKey,
+    C::HashType: PrimitiveHashType + Send + Sync,
+{
+    /// Create a new CasBufFresh
+    pub fn new(env: EnvironmentRead, db: rkv::SingleStore) -> Self {
+        Self {
+            env,
+            inner: CasBufUsed::new(db),
+        }
+    }
+
+    pub fn env(&self) -> &EnvironmentRead {
+        &self.0.env()
+    }
+
+    /// Get a value from the underlying [KvBufFresh]
+    pub async fn get<'a>(
+        &'a self,
+        hash: &'a HoloHashOf<C>,
+    ) -> DatabaseResult<Option<HoloHashed<C>>> {
+        fresh_reader!(self.env, |r| async move { self.inner.get(&r, hash).await }).await
+    }
+
+    /// Check if a value is stored at this key
+    pub async fn contains(&self, k: &HoloHashOf<C>) -> DatabaseResult<bool> {
+        self.0.contains(k).await
+    }
+}
+
+impl<C> BufferedStore for CasBufUsed<C>
 where
     C: HashableContent + BufVal + Send + Sync,
     C::HashType: PrimitiveHashType + Send + Sync,

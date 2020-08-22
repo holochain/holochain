@@ -1,7 +1,7 @@
 use super::entry_def_store::EntryDefBufferKey;
 use fallible_iterator::FallibleIterator;
 use holochain_state::{
-    buffer::CasBuf,
+    buffer::CasBufFresh,
     env::EnvironmentRead,
     error::{DatabaseError, DatabaseResult},
     exports::SingleStore,
@@ -25,7 +25,7 @@ pub struct RealDnaStore {
 }
 
 pub struct DnaDefBuf {
-    dna_defs: CasBuf<DnaDef>,
+    dna_defs: CasBufFresh<DnaDef>,
 }
 
 #[automock]
@@ -85,7 +85,7 @@ impl RealDnaStore {
 impl DnaDefBuf {
     pub fn new(env: EnvironmentRead, dna_def_store: SingleStore) -> DatabaseResult<Self> {
         Ok(Self {
-            dna_defs: CasBuf::new(env, dna_def_store)?,
+            dna_defs: CasBufFresh::new(env, dna_def_store)?,
         })
     }
 

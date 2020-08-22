@@ -55,12 +55,12 @@ where
 {
     /// Constructor
     // FIXME: why does this conflict with the other `new` when it's called just "new"?
-    pub fn new_int(db: IntegerStore<IntKey>) -> DatabaseResult<Self> {
-        Ok(Self {
+    pub fn new_int(db: IntegerStore<IntKey>) -> Self {
+        Self {
             store: KvIntStore::new(db),
             scratch: BTreeMap::new(),
             __phantom: std::marker::PhantomData,
-        })
+        }
     }
 
     // TODO: This should be cfg test but can't because it's in a different crate
@@ -77,12 +77,12 @@ where
     V: BufVal,
 {
     /// Constructor
-    pub fn new(db: SingleStore) -> DatabaseResult<Self> {
-        Ok(Self {
+    pub fn new(db: SingleStore) -> Self {
+        Self {
             store: KvStore::new(db),
             scratch: BTreeMap::new(),
             __phantom: std::marker::PhantomData,
-        })
+        }
     }
 
     // TODO: This should be cfg test but can't because it's in a different crate
@@ -234,12 +234,12 @@ where
     K: BufKey,
     V: BufVal,
 {
-    /// Create a new Fresh from a read-only transaction and a database reference
-    pub fn new(env: EnvironmentRead, db: SingleStore) -> DatabaseResult<Self> {
-        Ok(Self {
+    /// Create a new Fresh
+    pub fn new(env: EnvironmentRead, db: SingleStore) -> Self {
+        Self {
             env,
-            inner: Used::new(db)?,
-        })
+            inner: Used::new(db),
+        }
     }
 }
 
@@ -247,12 +247,12 @@ impl<V> Fresh<IntKey, V, KvIntStore<V>>
 where
     V: BufVal,
 {
-    /// Create a new Fresh from a read-only transaction and a database reference
-    pub fn new(env: EnvironmentRead, db: IntegerStore<IntKey>) -> DatabaseResult<Self> {
-        Ok(Self {
+    /// Create a new Fresh
+    pub fn new(env: EnvironmentRead, db: IntegerStore<IntKey>) -> Self {
+        Self {
             env,
-            inner: Used::new_int(db)?,
-        })
+            inner: Used::new_int(db),
+        }
     }
 }
 

@@ -38,7 +38,7 @@ pub struct ChainSequenceBuf {
 }
 
 impl ChainSequenceBuf {
-    /// Create a new instance from a read-only transaction and a database reference
+    /// Create a new instance
     pub fn new(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
         let db: Store = KvIntBufFresh::new(env, dbs.get_db(&*CHAIN_SEQUENCE)?)?;
         let latest = db.iter_raw_reverse()?.next();

@@ -43,7 +43,7 @@
 //! - [KvBuffer]: a SingleStore with a scratch space
 //! - [KvIntBuffer]: an IntegerStore with a scratch space
 //! - [KvvBuffer]: a MultiStore with a scratch space
-//! - [CasBuffer]: a [KvBuffer] which enforces that keys must be the "address" of the values (content)
+//! - [CasBufFreshfer]: a [KvBuffer] which enforces that keys must be the "address" of the values (content)
 //!
 //! The `holochain` crate composes these building blocks together to build more purpose-specific BufferedStore implementations
 //!

@@ -9,7 +9,7 @@ pub mod iter;
 mod kv;
 mod kvv;
 
-pub use cas::CasBuf;
+pub use cas::CasBufFresh;
 pub use kv::{KvBufFresh, KvBufUsed, KvIntBufFresh, KvIntBufUsed, KvIntStore, KvStore, KvStoreT};
 pub use kvv::KvvBufUsed;
 

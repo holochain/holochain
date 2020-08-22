@@ -1,4 +1,4 @@
-/// A convenient composition of CasBufsepresenting source chain data.
+/// A convenient composition of CasBufFreshsepresenting source chain data.
 ///
 /// Source chain data is split into three databases: one for headers, and two
 /// for public and private entries. Specifying the private_entries DB in a
@@ -10,7 +10,7 @@
 use crate::core::state::source_chain::{ChainInvalidReason, SourceChainError, SourceChainResult};
 use holo_hash::{EntryHash, HasHash, HeaderHash};
 use holochain_state::{
-    buffer::CasBuf,
+    buffer::CasBufFresh,
     db::{
         GetDb, ELEMENT_CACHE_ENTRIES, ELEMENT_CACHE_HEADERS, ELEMENT_VAULT_HEADERS,
         ELEMENT_VAULT_PRIVATE_ENTRIES, ELEMENT_VAULT_PUBLIC_ENTRIES,
@@ -27,10 +27,10 @@ use holochain_zome_types::entry_def::EntryVisibility;
 use holochain_zome_types::{Entry, Header};
 use tracing::*;
 
-/// A CasBuf with Entries for values
-pub type EntryCas = CasBuf<Entry>;
-/// A CasBuf with SignedHeaders for values
-pub type HeaderCas = CasBuf<SignedHeader>;
+/// A CasBufFresh with Entries for values
+pub type EntryCas = CasBufFresh<Entry>;
+/// A CasBufFresh with SignedHeaders for values
+pub type HeaderCas = CasBufFresh<SignedHeader>;
 
 /// The representation of an ElementCache / ElementVault,
 /// using two or three DB references
@@ -48,14 +48,14 @@ impl ElementBuf {
         headers_store: SingleStore,
     ) -> DatabaseResult<Self> {
         let private_entries = if let Some(store) = private_entries_store {
-            Some(CasBuf::new(env.clone().into(), store)?)
+            Some(CasBufFresh::new(env.clone().into(), store)?)
         } else {
             None
         };
         Ok(Self {
-            public_entries: CasBuf::new(env.clone().into(), public_entries_store)?,
+            public_entries: CasBufFresh::new(env.clone().into(), public_entries_store)?,
             private_entries,
-            headers: CasBuf::new(env.clone().into(), headers_store)?,
+            headers: CasBufFresh::new(env.clone().into(), headers_store)?,
         })
     }
 
