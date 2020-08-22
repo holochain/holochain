@@ -14,7 +14,6 @@ use holochain_state::{
     buffer::KvBufFresh,
     error::{DatabaseError, DatabaseResult},
     prelude::*,
-    transaction::Writer,
 };
 use holochain_types::dna::{zome::Zome, DnaFile};
 use holochain_zome_types::entry_def::EntryDef;
@@ -201,7 +200,7 @@ mod tests {
         } = test_wasm_env();
         let _tmpdir = test_env.tmpdir.clone();
         let test_env_2 = TestEnvironment {
-            env: test_env.env.clone(),
+            env: test_env.env.clone().into(),
             tmpdir: test_env.tmpdir.clone(),
         };
         let handle = Conductor::builder()

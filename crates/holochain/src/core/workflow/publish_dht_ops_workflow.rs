@@ -142,9 +142,9 @@ pub async fn publish_dht_ops_workflow_inner(
 impl Workspace for PublishDhtOpsWorkspace {
     fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
         let db = dbs.get_db(&*AUTHORED_DHT_OPS)?;
-        let authored_dht_ops = KvBufFresh::new(env.clone(), db)?;
+        let authored_dht_ops = KvBufFresh::new(env.clone().into(), db)?;
         // Note that this must always be false as we don't want private entries being published
-        let elements = ElementBuf::vault(env.clone(), dbs, false)?;
+        let elements = ElementBuf::vault(env.clone().into(), dbs, false)?;
         let _db = dbs.get_db(&*INTEGRATED_DHT_OPS)?;
         Ok(Self {
             authored_dht_ops,
@@ -351,7 +351,7 @@ mod tests {
             let (network, cell_network, recv_task, rx_complete) =
                 setup(&env_ref, &dbs, num_agents, num_hash, false).await;
 
-            call_workflow(env.env.clone(), cell_network).await;
+            call_workflow(env.env.clone().into(), cell_network).await;
 
             // Wait for expected # of responses, or timeout
             tokio::select! {
@@ -436,7 +436,7 @@ mod tests {
             }
 
             // Call the workflow
-            call_workflow(env.env.clone(), cell_network).await;
+            call_workflow(env.env.clone().into(), cell_network).await;
 
             // If we can wait a while without receiving any publish, we have succeeded
             tokio::time::delay_for(Duration::from_millis(
@@ -680,7 +680,7 @@ mod tests {
                 network.join(dna.clone(), agent).await.unwrap();
             }
 
-            call_workflow(env.env.clone(), cell_network).await;
+            call_workflow(env.env.clone().into(), cell_network).await;
 
             // Wait for expected # of responses, or timeout
             tokio::select! {

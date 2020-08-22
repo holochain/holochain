@@ -375,7 +375,7 @@ where
     async fn create_entry_details(&self, hash: EntryHash) -> CascadeResult<Option<EntryDetails>> {
         match self.get_entry_local_raw(&hash).await? {
             Some(entry) => {
-                let entry_dht_status = self.meta_cache.get_dht_status(&hash)?;
+                let entry_dht_status = self.meta_cache.get_dht_status(&hash).await?;
                 let headers = self
                     .meta_cache
                     .get_headers(hash.clone())?
@@ -613,7 +613,8 @@ where
         // Return any links from the meta cache that don't have removes.
         Ok(self
             .meta_cache
-            .get_live_links(key)?
+            .get_live_links(key)
+            .await?
             .map(|l| Ok(l.into_link()))
             .collect()?)
     }
@@ -632,7 +633,8 @@ where
         // Get the links and collect the LinkAdd / LinkRemove hashes by time.
         let links = self
             .meta_cache
-            .get_links_all(key)?
+            .get_links_all(key)
+            .await?
             .map(|link_add| {
                 // Collect the link removes on this link add
                 let link_removes = self
@@ -679,8 +681,8 @@ pub fn test_dbs_and_mocks(
     ElementBuf,
     super::metadata::MockMetadataBuf,
 ) {
-    let cas = ElementBuf::vault(env.clone(), dbs, true).unwrap();
-    let element_cache = ElementBuf::cache(env.clone(), dbs).unwrap();
+    let cas = ElementBuf::vault(env.clone().into(), dbs, true).unwrap();
+    let element_cache = ElementBuf::cache(env.clone().into(), dbs).unwrap();
     let metadata = super::metadata::MockMetadataBuf::new();
     let metadata_cache = super::metadata::MockMetadataBuf::new();
     (cas, metadata, element_cache, metadata_cache)

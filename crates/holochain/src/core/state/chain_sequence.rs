@@ -57,7 +57,7 @@ impl ChainSequenceBuf {
     /// Get a header at an index
     pub fn get(&self, i: u32) -> DatabaseResult<Option<HeaderHash>> {
         self.db
-            .get(i)
+            .get(&i.into())
             .map(|seq_item| seq_item.map(|si| si.header_address))
     }
 

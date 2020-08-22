@@ -3,13 +3,14 @@
 use crate::{
     env::EnvironmentKind,
     error::{DatabaseError, DatabaseResult},
+    exports::IntegerStore,
 };
 use derive_more::Display;
 use holochain_keystore::KeystoreSender;
 use holochain_types::universal_map::{Key as UmKey, UniversalMap};
 use lazy_static::lazy_static;
 use parking_lot::RwLock;
-use rkv::{IntegerStore, MultiStore, Rkv, SingleStore, StoreOptions};
+use rkv::{MultiStore, Rkv, SingleStore, StoreOptions};
 use std::collections::{hash_map, HashMap};
 use std::path::{Path, PathBuf};
 
@@ -128,7 +129,7 @@ lazy_static! {
     /// The key to access the entry status database of the Vault
     pub static ref META_VAULT_STATUS: DbKey<SingleStore> = DbKey::new(DbName::MetaVaultStatus);
     /// The key to access the ChainSequence database
-    pub static ref CHAIN_SEQUENCE: DbKey<IntegerStore<u32>> = DbKey::new(DbName::ChainSequence);
+    pub static ref CHAIN_SEQUENCE: DbKey<IntegerStore> = DbKey::new(DbName::ChainSequence);
     /// The key to access the ChainEntries database
     pub static ref ELEMENT_CACHE_ENTRIES: DbKey<SingleStore> =
     DbKey::<SingleStore>::new(DbName::ElementCacheEntries);

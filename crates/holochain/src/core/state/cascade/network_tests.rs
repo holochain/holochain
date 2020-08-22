@@ -231,7 +231,7 @@ async fn get_from_another_agent() {
         let env_ref = bob_env.guard().await;
         let dbs = bob_env.dbs().await;
         let header_hash = commit_entry(
-            &env_ref,
+            bob_env.clone(),
             &dbs,
             call_data.clone(),
             entry.clone().try_into().unwrap(),
@@ -242,7 +242,7 @@ async fn get_from_another_agent() {
         // Bob is not an authority yet
         // Make Bob an "authority"
         fake_authority(
-            &env_ref,
+            bob_env.clone(),
             &dbs,
             header_hash.clone().into(),
             call_data.clone(),
@@ -258,7 +258,7 @@ async fn get_from_another_agent() {
         let env_ref = alice_env.guard().await;
         let dbs = alice_env.dbs().await;
         get(
-            &env_ref,
+            alice_env.clone(),
             &dbs,
             call_data,
             entry_hash.clone().into(),
@@ -284,18 +284,23 @@ async fn get_from_another_agent() {
             make_call_data(bob_cell_id.clone(), handle.clone(), dna_file.clone()).await;
         let env_ref = bob_env.guard().await;
         let dbs = bob_env.dbs().await;
-        let remove_hash =
-            remove_entry(&env_ref, &dbs, call_data.clone(), header_hash.clone()).await;
+        let remove_hash = remove_entry(
+            bob_env.clone(),
+            &dbs,
+            call_data.clone(),
+            header_hash.clone(),
+        )
+        .await;
 
         fake_authority(
-            &env_ref,
+            bob_env.clone(),
             &dbs,
             remove_hash.clone().into(),
             call_data.clone(),
         )
         .await;
         let update_hash = update_entry(
-            &env_ref,
+            bob_env.clone(),
             &dbs,
             call_data.clone(),
             new_entry.clone().try_into().unwrap(),
@@ -304,7 +309,7 @@ async fn get_from_another_agent() {
         )
         .await;
         fake_authority(
-            &env_ref,
+            bob_env.clone(),
             &dbs,
             update_hash.clone().into(),
             call_data.clone(),
@@ -321,7 +326,7 @@ async fn get_from_another_agent() {
         let dbs = alice_env.dbs().await;
         debug!(the_entry_hash = ?entry_hash);
         let entry_details = get_details(
-            &env_ref,
+            alice_env.clone(),
             &dbs,
             call_data.clone(),
             entry_hash.into(),
@@ -330,7 +335,7 @@ async fn get_from_another_agent() {
         .await
         .unwrap();
         let header_details = get_details(
-            &env_ref,
+            alice_env.clone(),
             &dbs,
             call_data.clone(),
             header_hash.clone().into(),
@@ -440,7 +445,7 @@ async fn get_links_from_another_agent() {
         let env_ref = bob_env.guard().await;
         let dbs = bob_env.dbs().await;
         let base_header_hash = commit_entry(
-            &env_ref,
+            bob_env.clone(),
             &dbs,
             call_data.clone(),
             base.clone().try_into().unwrap(),
@@ -449,7 +454,7 @@ async fn get_links_from_another_agent() {
         .await;
 
         let target_header_hash = commit_entry(
-            &env_ref,
+            bob_env.clone(),
             &dbs,
             call_data.clone(),
             target.clone().try_into().unwrap(),
@@ -458,14 +463,14 @@ async fn get_links_from_another_agent() {
         .await;
 
         fake_authority(
-            &env_ref,
+            bob_env.clone(),
             &dbs,
             target_header_hash.clone().into(),
             call_data.clone(),
         )
         .await;
         fake_authority(
-            &env_ref,
+            bob_env.clone(),
             &dbs,
             base_header_hash.clone().into(),
             call_data.clone(),
@@ -474,7 +479,7 @@ async fn get_links_from_another_agent() {
 
         // Link the entries
         let link_add_hash = link_entries(
-            &env_ref,
+            bob_env.clone(),
             &dbs,
             call_data.clone(),
             base_entry_hash.clone(),
@@ -484,7 +489,7 @@ async fn get_links_from_another_agent() {
         .await;
 
         fake_authority(
-            &env_ref,
+            bob_env.clone(),
             &dbs,
             link_add_hash.clone().into(),
             call_data.clone(),
@@ -502,7 +507,7 @@ async fn get_links_from_another_agent() {
         let dbs = alice_env.dbs().await;
 
         get_links(
-            &env_ref,
+            alice_env.clone(),
             &dbs,
             call_data.clone(),
             base_entry_hash.clone(),
@@ -529,11 +534,16 @@ async fn get_links_from_another_agent() {
         let dbs = bob_env.dbs().await;
 
         // Link the entries
-        let link_remove_hash =
-            remove_link(&env_ref, &dbs, call_data.clone(), link_add_hash.clone()).await;
+        let link_remove_hash = remove_link(
+            bob_env.clone(),
+            &dbs,
+            call_data.clone(),
+            link_add_hash.clone(),
+        )
+        .await;
 
         fake_authority(
-            &env_ref,
+            bob_env.clone(),
             &dbs,
             link_remove_hash.clone().into(),
             call_data.clone(),
@@ -548,7 +558,7 @@ async fn get_links_from_another_agent() {
         let dbs = alice_env.dbs().await;
 
         get_link_details(
-            &env_ref,
+            alice_env.clone(),
             &dbs,
             call_data.clone(),
             base_entry_hash.clone(),
@@ -737,8 +747,8 @@ async fn generate_fixt_store() -> (
     (store, meta_store)
 }
 
-async fn commit_entry<'env>(
-    env: EnvironmentRead,
+async fn commit_entry(
+    env: EnvironmentWrite,
     dbs: &impl GetDb,
     call_data: CallData,
     entry: Entry,
@@ -764,7 +774,8 @@ async fn commit_entry<'env>(
     };
 
     // Write
-    env_ref
+    env.guard()
+        .await
         .with_commit(|writer| workspace.flush_to_txn(writer))
         .unwrap();
 
@@ -772,7 +783,7 @@ async fn commit_entry<'env>(
 }
 
 async fn remove_entry<'env>(
-    env: EnvironmentRead,
+    env: EnvironmentWrite,
     dbs: &impl GetDb,
     call_data: CallData,
     hash: HeaderHash,
@@ -802,7 +813,8 @@ async fn remove_entry<'env>(
     };
 
     // Write
-    env_ref
+    env.guard()
+        .await
         .with_commit(|writer| workspace.flush_to_txn(writer))
         .unwrap();
 
@@ -810,7 +822,7 @@ async fn remove_entry<'env>(
 }
 
 async fn update_entry<'env>(
-    env: EnvironmentRead,
+    env: EnvironmentWrite,
     dbs: &impl GetDb,
     call_data: CallData,
     entry: Entry,
@@ -837,7 +849,8 @@ async fn update_entry<'env>(
     };
 
     // Write
-    env_ref
+    env.guard()
+        .await
         .with_commit(|writer| workspace.flush_to_txn(writer))
         .unwrap();
 
@@ -845,7 +858,7 @@ async fn update_entry<'env>(
 }
 
 async fn get<'env>(
-    env: EnvironmentRead,
+    env: EnvironmentWrite,
     dbs: &impl GetDb,
     call_data: CallData,
     entry_hash: AnyDhtHash,
@@ -880,7 +893,7 @@ async fn get<'env>(
 }
 
 async fn get_details<'env>(
-    env: EnvironmentRead,
+    env: EnvironmentWrite,
     dbs: &impl GetDb,
     call_data: CallData,
     entry_hash: AnyDhtHash,
@@ -892,7 +905,7 @@ async fn get_details<'env>(
         ribosome,
         zome_name,
     } = call_data;
-    let mut workspace = CallZomeWorkspace::new(env.clone(), dbs).unwrap();
+    let mut workspace = CallZomeWorkspace::new(env.clone().into(), dbs).unwrap();
 
     let input = GetDetailsInput::new((
         entry_hash.clone().into(),
@@ -911,7 +924,7 @@ async fn get_details<'env>(
 }
 
 async fn link_entries<'env>(
-    env: EnvironmentRead,
+    env: EnvironmentWrite,
     dbs: &impl GetDb,
     call_data: CallData,
     base: EntryHash,
@@ -924,7 +937,7 @@ async fn link_entries<'env>(
         ribosome,
         zome_name,
     } = call_data;
-    let mut workspace = CallZomeWorkspace::new(env.clone(), dbs).unwrap();
+    let mut workspace = CallZomeWorkspace::new(env.clone().into(), dbs).unwrap();
 
     let input = LinkEntriesInput::new((base.clone(), target.clone(), link_tag));
 
@@ -938,7 +951,8 @@ async fn link_entries<'env>(
     };
 
     // Write
-    env_ref
+    env.guard()
+        .await
         .with_commit(|writer| workspace.flush_to_txn(writer))
         .unwrap();
 
@@ -946,7 +960,7 @@ async fn link_entries<'env>(
 }
 
 async fn remove_link<'env>(
-    env: EnvironmentRead,
+    env: EnvironmentWrite,
     dbs: &impl GetDb,
     call_data: CallData,
     link_add_hash: HeaderHash,
@@ -971,7 +985,8 @@ async fn remove_link<'env>(
     };
 
     // Write
-    env_ref
+    env.guard()
+        .await
         .with_commit(|writer| workspace.flush_to_txn(writer))
         .unwrap();
 
@@ -979,7 +994,7 @@ async fn remove_link<'env>(
 }
 
 async fn get_links<'env>(
-    env: EnvironmentRead,
+    env: EnvironmentWrite,
     dbs: &impl GetDb,
     call_data: CallData,
     base: EntryHash,
@@ -1006,7 +1021,8 @@ async fn get_links<'env>(
     };
 
     // Write
-    env_ref
+    env.guard()
+        .await
         .with_commit(|writer| workspace.flush_to_txn(writer))
         .unwrap();
 
@@ -1014,7 +1030,7 @@ async fn get_links<'env>(
 }
 
 async fn get_link_details<'env>(
-    env: EnvironmentRead,
+    env: EnvironmentWrite,
     dbs: &impl GetDb,
     call_data: CallData,
     base: EntryHash,
@@ -1029,14 +1045,14 @@ async fn get_link_details<'env>(
 }
 
 async fn fake_authority<'env>(
-    env: EnvironmentRead,
+    env: EnvironmentWrite,
     dbs: &impl GetDb,
     hash: AnyDhtHash,
     call_data: CallData,
 ) {
     // Check bob can get the entry
     let element = get(
-        env_ref,
+        env.clone(),
         dbs,
         call_data,
         hash.clone().into(),
@@ -1045,7 +1061,7 @@ async fn fake_authority<'env>(
     .await
     .unwrap();
 
-    let mut element_vault = ElementBuf::vault(env.clone(), dbs, false).unwrap();
+    let mut element_vault = ElementBuf::vault(env.clone().into(), dbs, false).unwrap();
     let mut meta_vault = MetadataBuf::vault(env.clone().into(), dbs).unwrap();
 
     // Write to the meta vault to fake being an authority
@@ -1058,7 +1074,8 @@ async fn fake_authority<'env>(
         .await
         .unwrap();
 
-    env_ref
+    env.guard()
+        .await
         .with_commit(|writer| {
             element_vault.flush_to_txn(writer)?;
             meta_vault.flush_to_txn(writer)

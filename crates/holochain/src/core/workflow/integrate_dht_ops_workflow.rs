@@ -404,13 +404,13 @@ impl Workspace for IntegrateDhtOpsWorkspace {
     /// Constructor
     fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
         let db = dbs.get_db(&*INTEGRATED_DHT_OPS)?;
-        let integrated_dht_ops = KvBufFresh::new(env.clone(), db)?;
+        let integrated_dht_ops = KvBufFresh::new(env.clone().into(), db)?;
 
         let db = dbs.get_db(&*INTEGRATION_LIMBO)?;
-        let integration_limbo = KvBufFresh::new(env.clone(), db)?;
+        let integration_limbo = KvBufFresh::new(env.clone().into(), db)?;
 
-        let elements = ElementBuf::vault(env.clone(), dbs, true)?;
-        let meta = MetadataBuf::vault(env.clone(), dbs)?;
+        let elements = ElementBuf::vault(env.clone().into(), dbs, true)?;
+        let meta = MetadataBuf::vault(env.clone().into(), dbs)?;
 
         Ok(Self {
             integration_limbo,
@@ -434,6 +434,7 @@ impl Workspace for IntegrateDhtOpsWorkspace {
 
 impl IntegrateDhtOpsWorkspace {
     pub async fn op_exists(&self, hash: &DhtOpHash) -> DatabaseResult<bool> {
-        Ok(self.integrated_dht_ops.contains(&hash).await? || self.integration_limbo.contains(&hash).await?)
+        Ok(self.integrated_dht_ops.contains(&hash).await?
+            || self.integration_limbo.contains(&hash).await?)
     }
 }

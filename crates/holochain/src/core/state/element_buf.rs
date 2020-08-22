@@ -48,14 +48,14 @@ impl ElementBuf {
         headers_store: SingleStore,
     ) -> DatabaseResult<Self> {
         let private_entries = if let Some(store) = private_entries_store {
-            Some(CasBuf::new(env.clone(), store)?)
+            Some(CasBuf::new(env.clone().into(), store)?)
         } else {
             None
         };
         Ok(Self {
-            public_entries: CasBuf::new(env.clone(), public_entries_store)?,
+            public_entries: CasBuf::new(env.clone().into(), public_entries_store)?,
             private_entries,
-            headers: CasBuf::new(env.clone(), headers_store)?,
+            headers: CasBuf::new(env.clone().into(), headers_store)?,
         })
     }
 

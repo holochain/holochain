@@ -277,13 +277,12 @@ where
         fresh_reader!(self.env, |reader| self.inner.get(&reader, k))
     }
 
-    /// See if a value exists, avoiding deserialization
+    /// TODO: clean up fresh/used distinction
     pub fn contains_used<R: Readable>(&self, r: &R, k: &K) -> DatabaseResult<bool> {
         self.inner.contains(r, k)
     }
 
-    /// Get a value, taking the scratch space into account,
-    /// or from persistence if needed
+    /// TODO: clean up fresh/used distinction
     pub fn get_used<R: Readable>(&self, r: &R, k: &K) -> DatabaseResult<Option<V>> {
         self.inner.get(r, k)
     }

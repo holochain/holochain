@@ -50,7 +50,7 @@ pub async fn incoming_dht_ops_workflow(
     }
 
     // commit our transaction
-    let writer: crate::core::queue_consumer::OneshotWriter = state_env.clone().into();
+    let writer: crate::core::queue_consumer::OneshotWriter = state_env.clone();
 
     writer
         .with_writer(|writer| Ok(workspace.flush_to_txn(writer)?))

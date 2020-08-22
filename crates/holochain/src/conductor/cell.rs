@@ -522,7 +522,8 @@ impl Cell {
         debug!(id = ?self.id());
 
         let links = meta_vault
-            .get_links_all(&LinkMetaKey::from(&link_key))?
+            .get_links_all(&LinkMetaKey::from(&link_key))
+            .await?
             .map(|link_add| {
                 // Collect the link removes on this link add
                 let link_removes = meta_vault

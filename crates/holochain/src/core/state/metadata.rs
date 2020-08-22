@@ -162,15 +162,15 @@ pub trait MetadataBufT {
     // Links
     /// Get all the links on this base that match the tag
     /// that do not have removes on them
-    fn get_live_links<'a>(
+    async fn get_live_links<'a>(
         &self,
-        key: &'a LinkMetaKey,
+        key: &'a LinkMetaKey<'a>,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError> + '_>>;
 
     /// Get all the links on this base that match the tag regardless of removes
-    fn get_links_all<'a>(
+    async fn get_links_all<'a>(
         &self,
-        key: &'a LinkMetaKey,
+        key: &'a LinkMetaKey<'a>,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError> + '_>>;
 
     /// Add a link
@@ -235,7 +235,7 @@ pub trait MetadataBufT {
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>;
 
     /// Returns the current [EntryDhtStatus] of an [Entry]
-    fn get_dht_status(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus>;
+    async fn get_dht_status(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus>;
 
     /// Finds the redirect path and returns the final [Entry]
     fn get_canonical_entry_hash(&self, entry_hash: EntryHash) -> DatabaseResult<EntryHash>;
@@ -420,9 +420,9 @@ impl MetadataBuf {
 
 #[async_trait::async_trait]
 impl MetadataBufT for MetadataBuf {
-    fn get_live_links<'a>(
+    async fn get_live_links<'a>(
         &self,
-        key: &'a LinkMetaKey,
+        key: &'a LinkMetaKey<'a>,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError> + '_>>
     {
         Ok(Box::new(
@@ -442,9 +442,9 @@ impl MetadataBufT for MetadataBuf {
         ))
     }
 
-    fn get_links_all<'a>(
+    async fn get_links_all<'a>(
         &self,
-        key: &'a LinkMetaKey,
+        key: &'a LinkMetaKey<'a>,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError> + '_>>
     {
         Ok(Box::new(
