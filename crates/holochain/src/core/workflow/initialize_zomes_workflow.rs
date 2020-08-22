@@ -7,7 +7,7 @@ use crate::core::{
         guest_callback::init::{InitHostAccess, InitInvocation, InitResult},
         RibosomeT,
     },
-    state::workspace::{Workspace, WorkspaceError, WorkspaceResult},
+    state::workspace::{Workspace, WorkspaceResult},
 };
 use derive_more::Constructor;
 use holochain_keystore::KeystoreSender;
@@ -38,7 +38,7 @@ pub async fn initialize_zomes_workflow<'env, Ribosome: RibosomeT>(
 
     // commit the workspace
     writer
-        .with_writer(|writer| workspace.flush_to_txn(writer).expect("TODO"))
+        .with_writer(|writer| Ok(workspace.flush_to_txn(writer)?))
         .await?;
 
     Ok(result)
@@ -79,7 +79,7 @@ impl<'env> Workspace<'env> for InitializeZomesWorkspace<'env> {
         Ok(Self(CallZomeWorkspace::new(reader, dbs)?))
     }
 
-    fn flush_to_txn(self, writer: &mut Writer) -> Result<(), WorkspaceError> {
+    fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
         self.0.source_chain.into_inner().flush_to_txn(writer)?;
         self.0.meta.flush_to_txn(writer)?;
         self.0.cache_cas.flush_to_txn(writer)?;
