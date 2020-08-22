@@ -41,7 +41,20 @@ impl ChainSequenceBuf {
     /// Create a new instance from a read-only transaction and a database reference
     pub fn new(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
         let db: Store = KvIntBufFresh::new(env, dbs.get_db(&*CHAIN_SEQUENCE)?)?;
-        Self::from_db(db)
+        let latest = db.iter_raw_reverse()?.next();
+        debug!("{:?}", latest);
+        let (next_index, tx_seq, current_head) = latest
+            .map(|(key, item)| (key + 1, item.tx_seq + 1, Some(item.header_address)))
+            .unwrap_or((0, 0, None));
+        let persisted_head = current_head.clone();
+
+        Ok(ChainSequenceBuf {
+            db,
+            next_index,
+            tx_seq,
+            current_head,
+            persisted_head,
+        })
     }
 
     /// Get the chain head, AKA top chain header. None if the chain is empty.
