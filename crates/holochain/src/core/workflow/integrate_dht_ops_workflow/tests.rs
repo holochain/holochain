@@ -181,12 +181,8 @@ enum Db {
 impl Db {
     /// Checks that the database is in a state
     #[instrument(skip(expects, env_ref, dbs))]
-    async fn check<'env>(
-        expects: Vec<Self>,
-        env_ref: &'env EnvironmentReadRef<'env>,
-        dbs: &'env impl GetDb,
-        here: String,
-    ) {
+    async fn check(expects: Vec<Self>, env: EnvironmentRead, dbs: &impl GetDb, here: String) {
+        let env_ref = env.guard().await;
         let reader = env_ref.reader().unwrap();
         let workspace = IntegrateDhtOpsWorkspace::new(env.clone().into(), dbs).unwrap();
         for expect in expects {
@@ -364,7 +360,7 @@ impl Db {
                     for link_meta_key in link_meta_keys {
                         let res = workspace
                             .meta
-                            .get_live_links(&link_meta_key)
+                            .get_live_links(&reader, &link_meta_key)
                             .unwrap()
                             .collect::<Vec<_>>()
                             .unwrap();

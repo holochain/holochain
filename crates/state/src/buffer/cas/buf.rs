@@ -2,7 +2,7 @@ use crate::{
     buffer::{kv::KvBufFresh, BufferedStore, KvBufUsed},
     env::EnvironmentRead,
     error::{DatabaseError, DatabaseResult},
-    fatal_db_hash_integrity_check, fresh_reader,
+    fatal_db_hash_integrity_check, fresh_reader, fresh_reader_async,
     prelude::*,
     transaction::Readable,
 };
@@ -102,6 +102,8 @@ where
     }
 }
 
+#[derive(shrinkwraprs::Shrinkwrap)]
+#[shrinkwrap(mutable, unsafe_ignore_visibility)]
 pub struct CasBufFresh<C>
 where
     C: HashableContent + BufVal + Send + Sync,
@@ -109,6 +111,7 @@ where
     C::HashType: PrimitiveHashType + Send + Sync,
 {
     env: EnvironmentRead,
+    #[shrinkwrap(main_field)]
     inner: CasBufUsed<C>,
 }
 
@@ -127,7 +130,7 @@ where
     }
 
     pub fn env(&self) -> &EnvironmentRead {
-        &self.0.env()
+        &self.env
     }
 
     /// Get a value from the underlying [KvBufFresh]
@@ -135,12 +138,12 @@ where
         &'a self,
         hash: &'a HoloHashOf<C>,
     ) -> DatabaseResult<Option<HoloHashed<C>>> {
-        fresh_reader!(self.env, |r| async move { self.inner.get(&r, hash).await }).await
+        fresh_reader_async!(self.env, |r| async move { self.inner.get(&r, hash).await })
     }
 
     /// Check if a value is stored at this key
     pub async fn contains(&self, k: &HoloHashOf<C>) -> DatabaseResult<bool> {
-        self.0.contains(k).await
+        fresh_reader!(self.env, |r| self.inner.contains(&r, k))
     }
 }
 

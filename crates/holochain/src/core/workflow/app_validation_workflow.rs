@@ -12,7 +12,7 @@ use crate::core::{
 use holochain_state::{
     buffer::{BufferedStore, KvBufFresh},
     db::INTEGRATION_LIMBO,
-    prelude::{EnvironmentRead, GetDb, Reader, Writer},
+    prelude::*,
 };
 use tracing::*;
 
@@ -42,10 +42,10 @@ pub struct AppValidationWorkspace {
     pub validation_limbo: ValidationLimboStore,
 }
 
-impl Workspace for AppValidationWorkspace {
-    fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
+impl AppValidationWorkspace {
+    pub fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
         let db = dbs.get_db(&*INTEGRATION_LIMBO)?;
-        let integration_limbo = KvBufFresh::new(env, db)?;
+        let integration_limbo = KvBufFresh::new(env, db);
 
         let validation_limbo = ValidationLimboStore::new(env, dbs)?;
 
@@ -54,6 +54,9 @@ impl Workspace for AppValidationWorkspace {
             validation_limbo,
         })
     }
+}
+
+impl Workspace for AppValidationWorkspace {
     fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
         warn!("unimplemented passthrough");
         self.validation_limbo.0.flush_to_txn(writer)?;

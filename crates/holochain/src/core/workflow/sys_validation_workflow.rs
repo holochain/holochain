@@ -15,7 +15,8 @@ use holo_hash::DhtOpHash;
 use holochain_state::{
     buffer::{BufferedStore, KvBufFresh},
     db::INTEGRATION_LIMBO,
-    prelude::{EnvironmentRead, GetDb, Reader, Writer},
+    fresh_reader,
+    prelude::*,
 };
 use holochain_types::validate::ValidationStatus;
 use tracing::*;
@@ -45,7 +46,12 @@ pub async fn sys_validation_workflow(
 async fn sys_validation_workflow_inner(
     workspace: &mut SysValidationWorkspace,
 ) -> WorkflowResult<WorkComplete> {
-    let ops: Vec<ValidationLimboValue> = workspace.validation_limbo.drain_iter()?.collect()?;
+    // one of many ways to get env
+    let env = workspace.integration_limbo.env().clone();
+    let ops: Vec<ValidationLimboValue> = fresh_reader!(env, |r| workspace
+        .validation_limbo
+        .drain_iter(&r)?
+        .collect())?;
     for vlv in ops {
         let op = vlv.op;
         let hash = DhtOpHash::with_data(&op).await;
@@ -63,10 +69,10 @@ pub struct SysValidationWorkspace {
     pub validation_limbo: ValidationLimboStore,
 }
 
-impl Workspace for SysValidationWorkspace {
-    fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
+impl SysValidationWorkspace {
+    pub fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
         let db = dbs.get_db(&*INTEGRATION_LIMBO)?;
-        let integration_limbo = KvBufFresh::new(env, db)?;
+        let integration_limbo = KvBufFresh::new(env, db);
 
         let validation_limbo = ValidationLimboStore::new(env, dbs)?;
 
@@ -75,6 +81,9 @@ impl Workspace for SysValidationWorkspace {
             validation_limbo,
         })
     }
+}
+
+impl Workspace for SysValidationWorkspace {
     fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
         warn!("unimplemented passthrough");
         self.validation_limbo.0.flush_to_txn(writer)?;

@@ -34,6 +34,7 @@ pub fn spawn_produce_dht_ops_consumer(
             let env_ref = env.guard().await;
             let reader = env_ref.reader().expect("Could not create LMDB reader");
             let workspace = ProduceDhtOpsWorkspace::new(env.clone().into(), &env_ref)
+                .await
                 .expect("Could not create Workspace");
             if let WorkComplete::Incomplete =
                 produce_dht_ops_workflow(workspace, env.clone().into(), &mut trigger_integration)

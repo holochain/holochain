@@ -8,7 +8,7 @@ use holochain_state::{
     buffer::KvBufFresh,
     db::INTEGRATED_DHT_OPS,
     error::{DatabaseError, DatabaseResult},
-    prelude::{BufferedStore, EnvironmentRead, GetDb, Reader},
+    prelude::{BufferedStore, EnvironmentRead, GetDb, Readable, Reader},
 };
 use holochain_types::{
     dht_op::{DhtOp, DhtOpLight},
@@ -108,30 +108,37 @@ impl IntegratedDhtOpsBuf {
     pub fn new(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
         let db = dbs.get_db(&*INTEGRATED_DHT_OPS).unwrap();
         Ok(Self {
-            store: IntegratedDhtOpsStore::new(env, db)?,
+            store: IntegratedDhtOpsStore::new(env, db),
         })
     }
 
     /// simple get by dht_op_hash
-    pub fn get(&'_ self, op_hash: &DhtOpHash) -> DatabaseResult<Option<IntegratedDhtOpsValue>> {
-        self.store.get(op_hash)
+    pub async fn get(
+        &'_ self,
+        op_hash: &DhtOpHash,
+    ) -> DatabaseResult<Option<IntegratedDhtOpsValue>> {
+        self.store.get(op_hash).await
     }
 
     /// Get ops that match optional queries:
     /// - from a time (Inclusive)
     /// - to a time (Exclusive)
     /// - match a dht location
-    pub fn query(
-        &self,
+    pub fn query<'r, R: Readable>(
+        &'r self,
+        r: &'r R,
         from: Option<Timestamp>,
         to: Option<Timestamp>,
         dht_arc: Option<DhtArc>,
     ) -> DatabaseResult<
-        Box<dyn FallibleIterator<Item = (DhtOpHash, IntegratedDhtOpsValue), Error = DatabaseError>>,
+        Box<
+            dyn FallibleIterator<Item = (DhtOpHash, IntegratedDhtOpsValue), Error = DatabaseError>
+                + 'r,
+        >,
     > {
         Ok(Box::new(
             self.store
-                .iter()?
+                .iter(r)?
                 .map(move |(k, v)| Ok((DhtOpHash::with_pre_hashed(k.to_vec()), v)))
                 .filter_map(move |(k, v)| match from {
                     Some(time) if v.when_integrated >= time => Ok(Some((k, v))),

@@ -9,11 +9,13 @@ use holochain_state::{
     db::GetDb,
     env::EnvironmentReadRef,
     error::{DatabaseError, DatabaseResult},
-    prelude::{Reader, Writer},
+    prelude::{Readable, Reader, Writer},
 };
 
 /// The result of a DhtOp Validation.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
 #[serde(tag = "type")]
 pub enum ValidationResult {
     /// Successful validation.
@@ -25,7 +27,16 @@ pub enum ValidationResult {
 
 /// Validation receipt content - to be signed.
 #[derive(
-    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize, SerializedBytes,
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    SerializedBytes,
 )]
 pub struct ValidationReceipt {
     /// the op this validation receipt is for.
@@ -80,12 +91,13 @@ impl ValidationReceiptsBuf {
         Ok(Self(KvvBufUsed::new_opts(
             env_ref.get_db(&*holochain_state::db::VALIDATION_RECEIPTS)?,
             true, // set to no_dup_data mode
-        )?))
+        )))
     }
 
     /// List all the validation receipts for a given hash.
-    pub fn list_receipts(
-        &self,
+    pub fn list_receipts<'r, R: Readable>(
+        &'r self,
+        r: &'r R,
         dht_op_hash: &DhtOpHash,
     ) -> DatabaseResult<
         impl fallible_iterator::FallibleIterator<
@@ -93,16 +105,18 @@ impl ValidationReceiptsBuf {
                 Error = DatabaseError,
             > + '_,
     > {
-        Ok(fallible_iterator::convert(
-            self.0.get(todo!("pass in a reader"), dht_op_hash)?,
-        ))
+        Ok(fallible_iterator::convert(self.0.get(r, dht_op_hash)?))
     }
 
     /// Get the current valid receipt count for a given hash.
-    pub fn count_valid(&self, dht_op_hash: &DhtOpHash) -> DatabaseResult<usize> {
+    pub fn count_valid<'r, R: Readable>(
+        &'r self,
+        r: &'r R,
+        dht_op_hash: &DhtOpHash,
+    ) -> DatabaseResult<usize> {
         let mut count = 0;
 
-        let mut iter = self.list_receipts(dht_op_hash)?;
+        let mut iter = self.list_receipts(r, dht_op_hash)?;
         while let Some(v) = iter.next()? {
             if v.receipt.validation_result == ValidationResult::Valid {
                 count += 1;
@@ -191,9 +205,11 @@ mod tests {
         let reader = env_ref.reader()?;
         let vr_buf = ValidationReceiptsBuf::new(&env_ref)?;
 
-        assert_eq!(2, vr_buf.count_valid(&test_op_hash)?);
+        assert_eq!(2, vr_buf.count_valid(&reader, &test_op_hash)?);
 
-        let mut list = vr_buf.list_receipts(&test_op_hash)?.collect::<Vec<_>>()?;
+        let mut list = vr_buf
+            .list_receipts(&reader, &test_op_hash)?
+            .collect::<Vec<_>>()?;
         list.sort_by(|a, b| {
             a.receipt
                 .validator

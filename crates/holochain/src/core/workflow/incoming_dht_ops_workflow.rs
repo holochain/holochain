@@ -44,13 +44,13 @@ pub async fn incoming_dht_ops_workflow(
             last_try: None,
             num_tries: 0,
         };
-        if !workspace.op_exists(&hash)? {
+        if !workspace.op_exists(&hash).await? {
             workspace.validation_limbo.put(hash, vqv)?;
         }
     }
 
     // commit our transaction
-    let writer: crate::core::queue_consumer::OneshotWriter = state_env.clone();
+    let writer: crate::core::queue_consumer::OneshotWriter = state_env.clone().into();
 
     writer
         .with_writer(|writer| Ok(workspace.flush_to_txn(writer)?))
@@ -70,12 +70,19 @@ pub struct IncomingDhtOpsWorkspace {
 }
 
 impl Workspace for IncomingDhtOpsWorkspace {
-    fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
+    fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
+        self.validation_limbo.0.flush_to_txn(writer)?;
+        Ok(())
+    }
+}
+
+impl IncomingDhtOpsWorkspace {
+    pub fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
         let db = dbs.get_db(&*INTEGRATED_DHT_OPS)?;
-        let integrated_dht_ops = KvBufFresh::new(env, db)?;
+        let integrated_dht_ops = KvBufFresh::new(env, db);
 
         let db = dbs.get_db(&*INTEGRATION_LIMBO)?;
-        let integration_limbo = KvBufFresh::new(env, db)?;
+        let integration_limbo = KvBufFresh::new(env, db);
 
         let validation_limbo = ValidationLimboStore::new(env, dbs)?;
 
@@ -85,13 +92,7 @@ impl Workspace for IncomingDhtOpsWorkspace {
             validation_limbo,
         })
     }
-    fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
-        self.validation_limbo.0.flush_to_txn(writer)?;
-        Ok(())
-    }
-}
 
-impl IncomingDhtOpsWorkspace {
     pub async fn op_exists(&self, hash: &DhtOpHash) -> DatabaseResult<bool> {
         Ok(self.integrated_dht_ops.contains(&hash).await?
             || self.integration_limbo.contains(&hash).await?

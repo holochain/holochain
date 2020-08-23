@@ -57,6 +57,22 @@ impl AsRef<[u8]> for IntKey {
     }
 }
 
+impl From<u32> for IntKey {
+    fn from(u: u32) -> Self {
+        use byteorder::{BigEndian, WriteBytesExt};
+        let mut wtr = vec![];
+        wtr.write_u32::<BigEndian>(u).unwrap();
+        Self::from_key_bytes_fallible(wtr)
+    }
+}
+
+impl From<IntKey> for u32 {
+    fn from(k: IntKey) -> u32 {
+        use byteorder::{BigEndian, ByteOrder};
+        BigEndian::read_u32(&k.0)
+    }
+}
+
 impl<T: HashType + Send + Sync> BufKey for HoloHash<T> {
     fn to_key_bytes(self) -> Vec<u8> {
         todo!("implement in terms of SerializedBytes")

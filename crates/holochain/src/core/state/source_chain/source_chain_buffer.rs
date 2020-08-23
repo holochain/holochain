@@ -7,10 +7,7 @@ use crate::core::state::{
 use fallible_iterator::FallibleIterator;
 use holochain_state::db::GetDb;
 use holochain_state::{
-    buffer::BufferedStore,
-    error::DatabaseResult,
-    fresh_reader,
-    prelude::{EnvironmentRead, Reader, Writer},
+    buffer::BufferedStore, error::DatabaseResult, fresh_reader, fresh_reader_async, prelude::*,
 };
 use holochain_types::{
     dht_op::{produce_ops_from_element, DhtOp},
@@ -31,10 +28,10 @@ pub struct SourceChainBuf {
 }
 
 impl SourceChainBuf {
-    pub fn new(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
+    pub async fn new(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
         Ok(Self {
             elements: ElementBuf::vault(env.clone().into(), dbs, true)?,
-            sequence: ChainSequenceBuf::new(env.clone().into(), dbs)?,
+            sequence: ChainSequenceBuf::new(env.clone().into(), dbs).await?,
             keystore: dbs.keystore(),
             env,
         })
@@ -47,10 +44,10 @@ impl SourceChainBuf {
     // add a cache test only method that allows this to
     // be used with the cache database for testing
     // FIXME This should only be cfg(test) but that doesn't work with integration tests
-    pub fn cache(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
+    pub async fn cache(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
         Ok(Self {
             elements: ElementBuf::cache(env.clone().into(), dbs)?,
-            sequence: ChainSequenceBuf::new(env.clone().into(), dbs)?,
+            sequence: ChainSequenceBuf::new(env.clone().into(), dbs).await?,
             keystore: dbs.keystore(),
             env,
         })
@@ -71,7 +68,7 @@ impl SourceChainBuf {
     }
 
     pub async fn get_at_index(&self, i: u32) -> SourceChainResult<Option<Element>> {
-        if let Some(address) = self.sequence.get(i)? {
+        if let Some(address) = self.sequence.get(i).await? {
             self.get_element(&address).await
         } else {
             Ok(None)
@@ -90,10 +87,12 @@ impl SourceChainBuf {
     pub async fn get_incomplete_dht_ops(&self) -> SourceChainResult<Vec<(u32, Vec<DhtOp>)>> {
         let mut ops = Vec::new();
         let ops_headers = fresh_reader!(self.env(), |r| {
-            self.sequence
-                .get_items_with_incomplete_dht_ops(&r)?
-                .collect::<Vec<_>>()
-        });
+            SourceChainResult::Ok(
+                self.sequence
+                    .get_items_with_incomplete_dht_ops(&r)?
+                    .collect::<Vec<_>>()?,
+            )
+        })?;
         for (i, header) in ops_headers {
             let op = produce_ops_from_element(
                 &self
@@ -107,8 +106,8 @@ impl SourceChainBuf {
         Ok(ops)
     }
 
-    pub fn complete_dht_op(&mut self, i: u32) -> SourceChainResult<()> {
-        self.sequence.complete_dht_op(i)
+    pub async fn complete_dht_op(&mut self, i: u32) -> SourceChainResult<()> {
+        self.sequence.complete_dht_op(i).await
     }
 
     pub fn elements<'a>(&'a self) -> &'a ElementBuf {

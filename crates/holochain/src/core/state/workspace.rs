@@ -25,9 +25,6 @@ pub type WorkspaceResult<T> = Result<T, WorkspaceError>;
 
 /// Defines a Workspace
 pub trait Workspace: Send + Sized {
-    /// Generic constructor
-    fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self>;
-
     /// Flush accumulated changes to the writer without committing.
     /// This consumes the Workspace.
     ///

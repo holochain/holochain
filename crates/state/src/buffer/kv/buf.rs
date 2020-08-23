@@ -143,6 +143,10 @@ where
         Ok(())
     }
 
+    pub fn is_scratch_fresh(&self) -> bool {
+        self.scratch.is_empty()
+    }
+
     #[cfg(test)]
     pub(crate) fn scratch(&self) -> &Scratch<V> {
         &self.scratch
@@ -299,6 +303,7 @@ where
 
     /// Iterator that tracks elements so they can be deleted
     // NB: this cannot return an iterator due to lifetime issues
+    #[deprecated = "this doesn't actually return an iterator"]
     pub async fn drain<R: Readable + Send + Sync>(&mut self) -> DatabaseResult<Vec<V>> {
         let g = self.env.guard().await;
         let r = g.reader()?;
@@ -307,6 +312,7 @@ where
     }
 
     /// Iterator that returns all partial matches to this key
+    #[deprecated = "this doesn't actually return an iterator"]
     pub async fn iter_all_key_matches<R: Readable + Send + Sync>(
         &self,
         k: K,

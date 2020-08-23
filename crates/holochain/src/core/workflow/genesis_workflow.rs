@@ -88,14 +88,16 @@ pub struct GenesisWorkspace {
     source_chain: SourceChainBuf,
 }
 
-impl Workspace for GenesisWorkspace {
+impl GenesisWorkspace {
     /// Constructor
-    #[allow(dead_code)]
-    fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
+    pub async fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
         Ok(Self {
-            source_chain: SourceChainBuf::new(env, dbs)?,
+            source_chain: SourceChainBuf::new(env, dbs).await?,
         })
     }
+}
+
+impl Workspace for GenesisWorkspace {
     fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
         self.source_chain.flush_to_txn(writer)?;
         Ok(())

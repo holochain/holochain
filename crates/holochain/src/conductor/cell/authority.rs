@@ -68,7 +68,9 @@ pub async fn handle_get_entry(
     let gather_headers = || async {
         let mut deletes = Vec::new();
         let mut updates = Vec::new();
-        let headers = meta_vault.get_headers(hash.clone())?.collect::<Vec<_>>()?;
+        let headers = meta_vault
+            .get_headers(&reader, hash.clone())?
+            .collect::<Vec<_>>()?;
         let mut live_headers = BTreeSet::new();
 
         // We want all the live headers and deletes
@@ -76,14 +78,14 @@ pub async fn handle_get_entry(
             for hash in headers {
                 deletes.extend(
                     meta_vault
-                        .get_deletes_on_header(hash.header_hash.clone())?
+                        .get_deletes_on_header(&reader, hash.header_hash.clone())?
                         .iterator(),
                 );
                 let header = render_header(hash).await?;
                 live_headers.insert(header.try_into()?);
             }
             let updates_returns = meta_vault
-                .get_updates(hash.clone().into())?
+                .get_updates(&reader, hash.clone().into())?
                 .collect::<Vec<_>>()?;
             let updates_returns = updates_returns.into_iter().map(|update| async {
                 let update: WireEntryUpdateRelationship = render_header(update)
@@ -99,7 +101,7 @@ pub async fn handle_get_entry(
             for hash in headers {
                 // Check for a delete
                 let is_deleted = meta_vault
-                    .get_deletes_on_header(hash.header_hash.clone())?
+                    .get_deletes_on_header(&reader, hash.header_hash.clone())?
                     .next()?
                     .is_some();
 
@@ -107,7 +109,7 @@ pub async fn handle_get_entry(
                 if is_deleted {
                     deletes.extend(
                         meta_vault
-                            .get_deletes_on_header(hash.header_hash.clone())?
+                            .get_deletes_on_header(&reader, hash.header_hash.clone())?
                             .iterator(),
                     );
 
@@ -131,7 +133,7 @@ pub async fn handle_get_entry(
 
     // ### Gather the entry
     // Get the entry from the first header
-    let first_header = meta_vault.get_headers(hash.clone())?.next()?;
+    let first_header = meta_vault.get_headers(&reader, hash.clone())?.next()?;
     let entry_data = match first_header {
         Some(first_header) => {
             let header = render_header(first_header).await?;

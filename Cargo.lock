@@ -1348,6 +1348,7 @@ name = "holochain_state"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "byteorder",
  "chrono",
  "derive_more",
  "either",

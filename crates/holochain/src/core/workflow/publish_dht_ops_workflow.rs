@@ -28,7 +28,8 @@ use holochain_p2p::HolochainP2pCell;
 use holochain_state::{
     buffer::{BufferedStore, KvBufFresh},
     db::{AUTHORED_DHT_OPS, INTEGRATED_DHT_OPS},
-    prelude::{EnvironmentRead, GetDb, Reader},
+    fresh_reader,
+    prelude::*,
     transaction::Writer,
 };
 use holochain_types::{dht_op::DhtOp, Timestamp};
@@ -90,9 +91,12 @@ pub async fn publish_dht_ops_workflow_inner(
     let interval =
         chrono::Duration::from_std(MIN_PUBLISH_INTERVAL).expect("const interval must be positive");
 
-    let values = workspace
+    // one of many ways to access the env
+    let env = workspace.elements.headers().env().clone();
+
+    let values = fresh_reader!(env, |r| workspace
         .authored()
-        .iter()?
+        .iter(&r)?
         .filter_map(|(k, mut r)| {
             Ok(if r.receipt_count < DEFAULT_RECEIPT_BUNDLE_SIZE {
                 let needs_publish = r
@@ -112,7 +116,7 @@ pub async fn publish_dht_ops_workflow_inner(
                 None
             })
         })
-        .collect::<Vec<_>>()?;
+        .collect::<Vec<_>>())?;
 
     // Ops to publish by basis
     let mut to_publish = HashMap::new();
@@ -140,9 +144,16 @@ pub async fn publish_dht_ops_workflow_inner(
 }
 
 impl Workspace for PublishDhtOpsWorkspace {
-    fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
+    fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
+        self.authored_dht_ops.flush_to_txn(writer)?;
+        Ok(())
+    }
+}
+
+impl PublishDhtOpsWorkspace {
+    pub fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
         let db = dbs.get_db(&*AUTHORED_DHT_OPS)?;
-        let authored_dht_ops = KvBufFresh::new(env.clone().into(), db)?;
+        let authored_dht_ops = KvBufFresh::new(env.clone().into(), db);
         // Note that this must always be false as we don't want private entries being published
         let elements = ElementBuf::vault(env.clone().into(), dbs, false)?;
         let _db = dbs.get_db(&*INTEGRATED_DHT_OPS)?;
@@ -152,13 +163,6 @@ impl Workspace for PublishDhtOpsWorkspace {
         })
     }
 
-    fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
-        self.authored_dht_ops.flush_to_txn(writer)?;
-        Ok(())
-    }
-}
-
-impl PublishDhtOpsWorkspace {
     fn authored(&mut self) -> &mut AuthoredDhtOpsStore {
         &mut self.authored_dht_ops
     }

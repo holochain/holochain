@@ -85,7 +85,7 @@ impl RealDnaStore {
 impl DnaDefBuf {
     pub fn new(env: EnvironmentRead, dna_def_store: SingleStore) -> DatabaseResult<Self> {
         Ok(Self {
-            dna_defs: CasBufFresh::new(env, dna_def_store)?,
+            dna_defs: CasBufFresh::new(env, dna_def_store),
         })
     }
 

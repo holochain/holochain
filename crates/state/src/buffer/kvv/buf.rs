@@ -63,18 +63,18 @@ where
     V: BufMultiVal + Debug,
 {
     /// Create a new KvvBufUsed
-    pub fn new(db: MultiStore) -> DatabaseResult<Self> {
+    pub fn new(db: MultiStore) -> Self {
         Self::new_opts(db, false)
     }
 
     /// Create a new KvvBufUsed
     /// also allow switching to no_dup_data mode.
-    pub fn new_opts(db: MultiStore, no_dup_data: bool) -> DatabaseResult<Self> {
-        Ok(Self {
+    pub fn new_opts(db: MultiStore, no_dup_data: bool) -> Self {
+        Self {
             db,
             scratch: BTreeMap::new(),
             no_dup_data,
-        })
+        }
     }
 
     /// Get a set of values, taking the scratch space into account,

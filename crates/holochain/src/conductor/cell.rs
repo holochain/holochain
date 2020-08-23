@@ -133,7 +133,9 @@ impl Cell {
             // check if genesis ran on source chain buf
             let env_ref = state_env.guard().await;
             let reader = env_ref.reader()?;
-            SourceChainBuf::new(state_env.clone().into(), &env_ref)?.has_genesis()
+            SourceChainBuf::new(state_env.clone().into(), &env_ref)
+                .await?
+                .has_genesis()
         };
 
         if has_genesis {
@@ -190,6 +192,7 @@ impl Cell {
 
         // run genesis
         let workspace = GenesisWorkspace::new(arc.clone().into(), &env)
+            .await
             .map_err(ConductorApiError::from)
             .map_err(Box::new)?;
         let args = GenesisWorkflowArgs::new(dna_file, id.agent_pubkey().clone(), membrane_proof);
@@ -469,7 +472,9 @@ impl Cell {
         let meta_vault = MetadataBuf::vault(self.state_env.clone().into(), &dbs)?;
 
         // Look for a delete on the header and collect it
-        let deleted = meta_vault.get_deletes_on_header(hash.clone())?.next()?;
+        let deleted = meta_vault
+            .get_deletes_on_header(&reader, hash.clone())?
+            .next()?;
         let deleted = match deleted {
             Some(delete_header) => {
                 let delete = delete_header.header_hash;
@@ -522,12 +527,11 @@ impl Cell {
         debug!(id = ?self.id());
 
         let links = meta_vault
-            .get_links_all(&LinkMetaKey::from(&link_key))
-            .await?
+            .get_links_all(&reader, &LinkMetaKey::from(&link_key))?
             .map(|link_add| {
                 // Collect the link removes on this link add
                 let link_removes = meta_vault
-                    .get_link_removes_on_link_add(link_add.link_add_hash.clone())?
+                    .get_link_removes_on_link_add(&reader, link_add.link_add_hash.clone())?
                     .collect::<BTreeSet<_>>()?;
                 // Create timed header hash
                 let link_add = TimedHeaderHash {
@@ -590,7 +594,7 @@ impl Cell {
         let integrated_dht_ops =
             IntegratedDhtOpsBuf::new(self.state_env().clone().into(), &env_ref)?;
         let result: Vec<DhtOpHash> = integrated_dht_ops
-            .query(Some(since), Some(until), Some(dht_arc))?
+            .query(&reader, Some(since), Some(until), Some(dht_arc))?
             .map(|(k, _)| Ok(k))
             .collect()?;
         Ok(result)
@@ -615,7 +619,7 @@ impl Cell {
         let cas = ElementBuf::vault(self.state_env.clone().into(), &env_ref, false)?;
         let mut out = vec![];
         for op_hash in op_hashes {
-            let val = integrated_dht_ops.get(&op_hash)?;
+            let val = integrated_dht_ops.get(&op_hash).await?;
             if let Some(val) = val {
                 let full_op =
                     crate::core::workflow::produce_dht_ops_workflow::dht_op_light::light_to_op(
@@ -714,6 +718,7 @@ impl Cell {
         let reader = env_ref.reader()?;
         // Create the workspace
         let workspace = CallZomeWorkspace::new(self.state_env().clone().into(), &env_ref)
+            .await
             .map_err(WorkflowError::from)
             .map_err(Box::new)?;
         let workspace = InitializeZomesWorkspace(workspace);

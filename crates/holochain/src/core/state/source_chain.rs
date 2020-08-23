@@ -6,11 +6,7 @@
 use fallible_iterator::FallibleIterator;
 use holo_hash::*;
 use holochain_state::{
-    buffer::BufferedStore,
-    db::GetDb,
-    error::DatabaseResult,
-    fresh_reader,
-    prelude::*,
+    buffer::BufferedStore, db::GetDb, error::DatabaseResult, fresh_reader, prelude::*,
 };
 use holochain_types::{prelude::*, EntryHashed};
 use holochain_zome_types::{
@@ -46,8 +42,8 @@ impl SourceChain {
         self.0.chain_head().ok_or(SourceChainError::ChainEmpty)
     }
 
-    pub fn new(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
-        Ok(SourceChainBuf::new(env, dbs)?.into())
+    pub async fn new(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
+        Ok(SourceChainBuf::new(env, dbs).await?.into())
     }
 
     pub fn into_inner(self) -> SourceChainBuf {

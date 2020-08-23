@@ -84,7 +84,7 @@ impl EntryDefBufferKey {
 impl EntryDefBuf {
     /// Create a new buffer
     pub fn new(env: EnvironmentRead, entry_def_store: SingleStore) -> DatabaseResult<Self> {
-        Ok(Self(KvBufFresh::new(env, entry_def_store)?.into()))
+        Ok(Self(KvBufFresh::new(env, entry_def_store).into()))
     }
 
     /// Get an entry def
@@ -98,15 +98,16 @@ impl EntryDefBuf {
     }
 
     /// Get all the entry defs in the database
-    pub fn get_all(
+    pub fn get_all<'r, R: Readable>(
         &self,
+        r: &'r R,
     ) -> DatabaseResult<
-        Box<dyn FallibleIterator<Item = (EntryDefBufferKey, EntryDef), Error = DatabaseError> + '_>,
+        Box<dyn FallibleIterator<Item = (EntryDefBufferKey, EntryDef), Error = DatabaseError> + 'r>,
     > {
         Ok(Box::new(
             self.0
                 .store()
-                .iter()?
+                .iter(r)?
                 .map(|(k, v)| Ok((EntryDefStoreKey::from(k).into(), v))),
         ))
     }

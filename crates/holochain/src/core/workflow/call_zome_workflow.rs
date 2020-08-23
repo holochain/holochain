@@ -226,20 +226,8 @@ pub struct CallZomeWorkspace {
 }
 
 impl<'a> CallZomeWorkspace {
-    pub fn cascade(&'a mut self, network: HolochainP2pCell) -> Cascade<'a> {
-        Cascade::new(
-            &self.source_chain.elements(),
-            &self.meta,
-            &mut self.cache_cas,
-            &mut self.cache_meta,
-            network,
-        )
-    }
-}
-
-impl Workspace for CallZomeWorkspace {
-    fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
-        let source_chain = SourceChain::new(env.clone().into(), dbs)?;
+    pub async fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
+        let source_chain = SourceChain::new(env.clone().into(), dbs).await?;
         let cache_cas = ElementBuf::cache(env.clone().into(), dbs)?;
         let meta = MetadataBuf::vault(env.clone().into(), dbs)?;
         let cache_meta = MetadataBuf::cache(env.clone().into(), dbs)?;
@@ -252,6 +240,19 @@ impl Workspace for CallZomeWorkspace {
         })
     }
 
+    pub fn cascade(&'a mut self, network: HolochainP2pCell) -> Cascade<'a> {
+        Cascade::new(
+            self.source_chain.env().clone(),
+            &self.source_chain.elements(),
+            &self.meta,
+            &mut self.cache_cas,
+            &mut self.cache_meta,
+            network,
+        )
+    }
+}
+
+impl Workspace for CallZomeWorkspace {
     fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
         self.source_chain.into_inner().flush_to_txn(writer)?;
         self.meta.flush_to_txn(writer)?;

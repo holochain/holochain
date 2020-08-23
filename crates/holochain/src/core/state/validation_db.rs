@@ -55,6 +55,6 @@ impl ValidationLimboStore {
     /// Create a new Validation Limbo db
     pub fn new(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
         let db = dbs.get_db(&*VALIDATION_LIMBO)?;
-        Ok(Self(KvBufFresh::new(env, db)?))
+        Ok(Self(KvBufFresh::new(env, db)))
     }
 }

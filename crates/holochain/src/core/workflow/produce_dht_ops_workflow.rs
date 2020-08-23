@@ -66,7 +66,10 @@ async fn produce_dht_ops_workflow_inner(
             workspace.authored_dht_ops.put(hash, value)?;
         }
         // Mark the dht op as complete
-        call_zome_workspace.source_chain.complete_dht_op(index)?;
+        call_zome_workspace
+            .source_chain
+            .complete_dht_op(index)
+            .await?;
     }
 
     Ok(WorkComplete::Complete)
@@ -78,17 +81,19 @@ pub struct ProduceDhtOpsWorkspace {
     pub integration_limbo: IntegrationLimboStore,
 }
 
-impl Workspace for ProduceDhtOpsWorkspace {
-    fn new(env: EnvironmentRead, db: &impl GetDb) -> WorkspaceResult<Self> {
+impl ProduceDhtOpsWorkspace {
+    pub async fn new(env: EnvironmentRead, db: &impl GetDb) -> WorkspaceResult<Self> {
         let authored_dht_ops = db.get_db(&*AUTHORED_DHT_OPS)?;
         let integration_limbo = db.get_db(&*INTEGRATION_LIMBO)?;
         Ok(Self {
-            call_zome_workspace: CallZomeWorkspace::new(env, db)?,
-            authored_dht_ops: KvBufFresh::new(env, authored_dht_ops)?,
-            integration_limbo: KvBufFresh::new(env, integration_limbo)?,
+            call_zome_workspace: CallZomeWorkspace::new(env.clone(), db).await?,
+            authored_dht_ops: KvBufFresh::new(env.clone(), authored_dht_ops),
+            integration_limbo: KvBufFresh::new(env, integration_limbo),
         })
     }
+}
 
+impl Workspace for ProduceDhtOpsWorkspace {
     fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
         self.call_zome_workspace.flush_to_txn(writer)?;
         self.authored_dht_ops.flush_to_txn(writer)?;

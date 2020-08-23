@@ -48,14 +48,14 @@ impl ElementBuf {
         headers_store: SingleStore,
     ) -> DatabaseResult<Self> {
         let private_entries = if let Some(store) = private_entries_store {
-            Some(CasBufFresh::new(env.clone().into(), store)?)
+            Some(CasBufFresh::new(env.clone().into(), store))
         } else {
             None
         };
         Ok(Self {
-            public_entries: CasBufFresh::new(env.clone().into(), public_entries_store)?,
+            public_entries: CasBufFresh::new(env.clone().into(), public_entries_store),
             private_entries,
-            headers: CasBufFresh::new(env.clone().into(), headers_store)?,
+            headers: CasBufFresh::new(env.clone().into(), headers_store),
         })
     }
 
@@ -310,7 +310,7 @@ mod tests {
         // write one public-entry header and one private-entry header
         env.with_commit(|txn| {
             let reader = env.reader()?;
-            let mut store = ElementBuf::vault(&reader, &env, true)?;
+            let mut store = ElementBuf::vault(arc.clone().into(), &env, true)?;
             store.put(header_pub, Some(entry_pub.clone()))?;
             store.put(header_priv, Some(entry_priv.clone()))?;
             store.flush_to_txn(txn)
@@ -319,7 +319,7 @@ mod tests {
         // Can retrieve both entries when private entries are enabled
         {
             let reader = env.reader()?;
-            let store = ElementBuf::vault(&reader, &env, true)?;
+            let store = ElementBuf::vault(arc.clone().into(), &env, true)?;
             assert_eq!(
                 store.get_entry(entry_pub.as_hash()).await,
                 Ok(Some(entry_pub.clone()))
@@ -333,7 +333,7 @@ mod tests {
         // Cannot retrieve private entry when disabled
         {
             let reader = env.reader()?;
-            let store = ElementBuf::vault(&reader, &env, false)?;
+            let store = ElementBuf::vault(arc.clone().into(), &env, false)?;
             assert_eq!(
                 store.get_entry(entry_pub.as_hash()).await,
                 Ok(Some(entry_pub.clone()))
@@ -359,7 +359,7 @@ mod tests {
         // write one public-entry header and one private-entry header (which will be a noop)
         env.with_commit(|txn| {
             let reader = env.reader()?;
-            let mut store = ElementBuf::vault(&reader, &env, false)?;
+            let mut store = ElementBuf::vault(arc.clone().into(), &env, false)?;
             store.put(header_pub, Some(entry_pub.clone()))?;
             store.put(header_priv, Some(entry_priv.clone()))?;
             store.flush_to_txn(txn)
@@ -368,7 +368,7 @@ mod tests {
         // Can retrieve both entries when private entries are enabled
         {
             let reader = env.reader()?;
-            let store = ElementBuf::vault(&reader, &env, true)?;
+            let store = ElementBuf::vault(arc.clone().into(), &env, true)?;
             assert_eq!(
                 store.get_entry(entry_pub.as_hash()).await,
                 Ok(Some(entry_pub.clone()))
@@ -379,7 +379,7 @@ mod tests {
         // Cannot retrieve private entry when disabled
         {
             let reader = env.reader()?;
-            let store = ElementBuf::vault(&reader, &env, false)?;
+            let store = ElementBuf::vault(arc.clone().into(), &env, false)?;
             assert_eq!(
                 store.get_entry(entry_pub.as_hash()).await,
                 Ok(Some(entry_pub))

@@ -8,3 +8,5 @@ pub type SingleStore = rkv::SingleStore;
 pub type IntegerStore = rkv::IntegerStore<IntKey>;
 /// Simple type alias for re-exporting
 pub type MultiStore = rkv::MultiStore;
+
+pub use fallible_iterator::FallibleIterator;

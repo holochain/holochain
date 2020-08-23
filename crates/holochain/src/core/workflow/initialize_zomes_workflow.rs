@@ -73,13 +73,15 @@ async fn initialize_zomes_workflow_inner<'env, Ribosome: RibosomeT>(
 // TODO: why pub? -MD
 pub struct InitializeZomesWorkspace(pub(crate) CallZomeWorkspace);
 
-impl Workspace for InitializeZomesWorkspace {
-    /// Constructor
+impl InitializeZomesWorkspace {
     #[allow(dead_code)]
-    fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
-        Ok(Self(CallZomeWorkspace::new(env, dbs)?))
+    /// Constructor
+    pub async fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
+        Ok(Self(CallZomeWorkspace::new(env, dbs).await?))
     }
+}
 
+impl Workspace for InitializeZomesWorkspace {
     fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
         self.0.source_chain.into_inner().flush_to_txn(writer)?;
         self.0.meta.flush_to_txn(writer)?;

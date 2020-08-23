@@ -47,6 +47,7 @@ use holochain_state::{
     db,
     env::{EnvironmentWrite, ReadManager},
     exports::SingleStore,
+    fresh_reader,
     prelude::*,
 };
 use holochain_types::{
@@ -548,15 +549,15 @@ where
                 async move {
                     let wasms = futures::future::try_join_all(wasms).await?;
                     let dna_file = DnaFile::new(dna_def.into_content(), wasms).await?;
-                    Ok((dna_file.dna_hash().clone(), dna_file))
+                    ConductorResult::Ok((dna_file.dna_hash().clone(), dna_file))
                 }
             })
             // This needs to happen due to the environment not being Send
             .collect::<Vec<_>>();
         // try to join all the tasks and return the list of dna files
-        futures::future::try_join_all(wasm_tasks)
-            .await
-            .and_then(|dnas| Ok((dnas, entry_def_buf.get_all()?.collect::<Vec<_>>()?)))
+        let dnas = futures::future::try_join_all(wasm_tasks).await?;
+        let defs = fresh_reader!(environ, |r| entry_def_buf.get_all(&r)?.collect::<Vec<_>>())?;
+        Ok((dnas, defs))
     }
 
     /// Remove cells from the cell map in the Conductor
@@ -614,7 +615,7 @@ where
         let arc = cell.state_env();
         let env = arc.guard().await;
         let reader = env.reader()?;
-        let source_chain = SourceChainBuf::new(arc.clone().into(), &env)?;
+        let source_chain = SourceChainBuf::new(arc.clone().into(), &env).await?;
         Ok(source_chain.dump_as_json().await?)
     }
 

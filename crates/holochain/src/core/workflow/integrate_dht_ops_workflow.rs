@@ -22,7 +22,8 @@ use holochain_state::{
     buffer::KvBufFresh,
     db::{INTEGRATED_DHT_OPS, INTEGRATION_LIMBO},
     error::DatabaseResult,
-    prelude::{EnvironmentRead, GetDb, Reader, Writer},
+    fresh_reader,
+    prelude::*,
 };
 use holochain_types::{
     dht_op::{produce_op_lights_from_elements, DhtOp, DhtOpHashed, DhtOpLight},
@@ -43,14 +44,19 @@ pub async fn integrate_dht_ops_workflow(
     writer: OneshotWriter,
     trigger_publish: &mut TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
+    // one of many possible ways to access the env
+    let env = workspace.elements.headers().env().clone();
     // Pull ops out of queue
     // TODO: PERF: we collect() only because this iterator cannot cross awaits,
     // but is there a way to do this without collect()?
-    let ops: Vec<_> = workspace
-        .integration_limbo
-        .drain_iter()?
-        .iterator()
-        .collect();
+    let ops: Vec<DatabaseResult<IntegrationLimboValue>> =
+        fresh_reader!(env, |r| DatabaseResult::Ok(
+            workspace
+                .integration_limbo
+                .drain_iter(&r)?
+                .iterator()
+                .collect::<Vec<_>>()
+        ))?;
 
     // Compute hashes for all dht_ops, include in tuples alongside db values
     let mut ops = futures::future::join_all(
@@ -92,7 +98,7 @@ pub async fn integrate_dht_ops_workflow(
         for (op_hash, value) in ops {
             // only integrate this op if it hasn't been integrated already!
             // TODO: test for this [ B-01894 ]
-            if workspace.integrated_dht_ops.get(&op_hash)?.is_none() {
+            if workspace.integrated_dht_ops.get(&op_hash).await?.is_none() {
                 match integrate_single_dht_op(value, &mut workspace.elements, &mut workspace.meta)
                     .await?
                 {
@@ -209,14 +215,14 @@ async fn integrate_single_element(
                         DhtOpConvertError::MissingEntryDataForHeader(hash.clone())
                     })
             }) {
-                Some(r) => Ok(element_store.contains_entry(&r?)?).await,
+                Some(r) => Ok(element_store.contains_entry(&r?).await?),
                 None => Ok(false),
             }
         }
 
-        let entry_is_stored = |hash| element_store.contains_entry(hash).await;
+        let entry_is_stored = |hash| element_store.contains_entry(hash);
 
-        let header_is_stored = |hash| element_store.contains_header(hash).await;
+        let header_is_stored = |hash| element_store.contains_header(hash);
 
         match op {
             DhtOp::StoreElement(signature, header, maybe_entry) => {
@@ -274,7 +280,7 @@ async fn integrate_single_element(
             DhtOp::RegisterAddLink(signature, link_add) => {
                 // Check whether we have the base address in the Vault.
                 // If not then this should put the op back on the queue.
-                if !entry_is_stored(&link_add.base_address)? {
+                if !entry_is_stored(&link_add.base_address).await? {
                     let op = DhtOp::RegisterAddLink(signature, link_add);
                     return Outcome::deferred(op, validation_status);
                 }
@@ -285,8 +291,8 @@ async fn integrate_single_element(
                 // Check whether we have the base address and link add address
                 // are in the Vault.
                 // If not then this should put the op back on the queue.
-                if !entry_is_stored(&link_remove.base_address)?
-                    || !header_is_stored(&link_remove.link_add_address)?
+                if !entry_is_stored(&link_remove.base_address).await?
+                    || !header_is_stored(&link_remove.link_add_address).await?
                 {
                     let op = DhtOp::RegisterRemoveLink(signature, link_remove);
                     return Outcome::deferred(op, validation_status);
@@ -401,24 +407,6 @@ pub struct IntegrateDhtOpsWorkspace {
 }
 
 impl Workspace for IntegrateDhtOpsWorkspace {
-    /// Constructor
-    fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
-        let db = dbs.get_db(&*INTEGRATED_DHT_OPS)?;
-        let integrated_dht_ops = KvBufFresh::new(env.clone().into(), db)?;
-
-        let db = dbs.get_db(&*INTEGRATION_LIMBO)?;
-        let integration_limbo = KvBufFresh::new(env.clone().into(), db)?;
-
-        let elements = ElementBuf::vault(env.clone().into(), dbs, true)?;
-        let meta = MetadataBuf::vault(env.clone().into(), dbs)?;
-
-        Ok(Self {
-            integration_limbo,
-            integrated_dht_ops,
-            elements,
-            meta,
-        })
-    }
     fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
         // flush elements
         self.elements.flush_to_txn(writer)?;
@@ -433,6 +421,25 @@ impl Workspace for IntegrateDhtOpsWorkspace {
 }
 
 impl IntegrateDhtOpsWorkspace {
+    /// Constructor
+    pub fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
+        let db = dbs.get_db(&*INTEGRATED_DHT_OPS)?;
+        let integrated_dht_ops = KvBufFresh::new(env.clone().into(), db);
+
+        let db = dbs.get_db(&*INTEGRATION_LIMBO)?;
+        let integration_limbo = KvBufFresh::new(env.clone().into(), db);
+
+        let elements = ElementBuf::vault(env.clone().into(), dbs, true)?;
+        let meta = MetadataBuf::vault(env.clone().into(), dbs)?;
+
+        Ok(Self {
+            integration_limbo,
+            integrated_dht_ops,
+            elements,
+            meta,
+        })
+    }
+
     pub async fn op_exists(&self, hash: &DhtOpHash) -> DatabaseResult<bool> {
         Ok(self.integrated_dht_ops.contains(&hash).await?
             || self.integration_limbo.contains(&hash).await?)
