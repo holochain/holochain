@@ -116,3 +116,57 @@ pub(crate) fn get_original_address<'a>(
     }?;
     Ok(entry_address)
 }
+
+#[cfg(test)]
+#[cfg(feature = "slow_tests")]
+pub mod wasm_test {
+    use crate::fixt::ZomeCallHostAccessFixturator;
+    use fixt::prelude::*;
+    use hdk3::prelude::*;
+    use holochain_wasm_test_utils::TestWasm;
+
+    #[tokio::test(threaded_scheduler)]
+    async fn ribosome_delete_entry_test<'a>() {
+        holochain_types::observability::test_run().ok();
+
+        let env = holochain_state::test_utils::test_cell_env();
+        let dbs = env.dbs().await;
+        let env_ref = env.guard().await;
+        let reader = holochain_state::env::ReadManager::reader(&env_ref).unwrap();
+        let mut workspace = <crate::core::workflow::call_zome_workflow::CallZomeWorkspace as crate::core::state::workspace::Workspace>::new(&reader, &dbs).unwrap();
+
+        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+            .await
+            .unwrap();
+
+        let (_g, raw_workspace) =
+            crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
+                &mut workspace,
+            );
+
+        let mut host_access = fixt!(ZomeCallHostAccess);
+        host_access.workspace = raw_workspace.clone();
+
+        let thing_a: HeaderHash =
+            crate::call_test_ribosome!(host_access, TestWasm::Crd, "create", ());
+        let get_thing: GetOutput =
+            crate::call_test_ribosome!(host_access, TestWasm::Crd, "read", thing_a);
+        match get_thing.into_inner() {
+            Some(element) => assert!(element.entry().as_option().is_some()),
+
+            None => unreachable!(),
+        }
+
+        let _: HeaderHash =
+            crate::call_test_ribosome!(host_access, TestWasm::Crd, "delete", thing_a);
+
+        let get_thing: GetOutput =
+            crate::call_test_ribosome!(host_access, TestWasm::Crd, "read", thing_a);
+        match get_thing.into_inner() {
+            None => {
+                // this is what we want, deletion => None for a get
+            }
+            _ => unreachable!(),
+        }
+    }
+}

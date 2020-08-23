@@ -1,0 +1,18 @@
+[package]
+name = "test_wasm_crd"
+version = "0.0.1"
+authors = [ "thedavidmeister", "thedavidmeister@gmail.com" ]
+edition = "2018"
+
+# Ensure that this is not inside of any other workspace.
+# This crate should be an implementation detail of test_utils_wasm and
+# therefore shouldn't be mentioned in the top-level Cargo.toml
+
+[lib]
+name = "test_wasm_crd"
+crate-type = [ "cdylib", "rlib" ]
+
+[dependencies]
+serde = "=1.0.104"
+test_wasm_common = { version = "=0.0.1", path = "../../../wasm_common" }
+hdk3 = { path = "../../../../hdk" }
