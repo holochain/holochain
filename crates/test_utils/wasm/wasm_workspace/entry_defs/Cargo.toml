@@ -1,0 +1,23 @@
+[package]
+name = "test_wasm_entry_defs"
+version = "0.0.1"
+authors = [ "thedavidmeister", "thedavidmeister@gmail.com" ]
+edition = "2018"
+
+
+
+# Ensure that this is not inside of any other workspace.
+# This crate should be an implementation detail of test_utils_wasm and
+# therefore shouldn't be mentioned in the top-level Cargo.toml
+
+
+[lib]
+name = "test_wasm_entry_defs"
+crate-type = [ "cdylib", "rlib" ]
+
+[dependencies]
+serde = "1.0.104"
+hdk3 = { path = "../../../../hdk" }
+
+
+

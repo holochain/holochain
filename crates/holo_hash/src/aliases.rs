@@ -8,14 +8,14 @@ use crate::{hash_type, HoloHash};
 /// An Agent public signing key. Not really a hash, more of an "identity hash".
 pub type AgentPubKey = HoloHash<hash_type::Agent>;
 
-/// The hash of an Entry, if that Entry is not an AgentPubKey
-pub type EntryContentHash = HoloHash<hash_type::Content>;
-
 /// The hash of a DnaDef
 pub type DnaHash = HoloHash<hash_type::Dna>;
 
 /// The hash of a DhtOp's "unique form" representation
 pub type DhtOpHash = HoloHash<hash_type::DhtOp>;
+
+/// The hash of an Entry.
+pub type EntryHash = HoloHash<hash_type::Entry>;
 
 /// The hash of a Header
 pub type HeaderHash = HoloHash<hash_type::Header>;
@@ -26,25 +26,9 @@ pub type NetIdHash = HoloHash<hash_type::NetId>;
 /// The hash of some wasm bytecode
 pub type WasmHash = HoloHash<hash_type::Wasm>;
 
-/// The hash of an entry.
-/// This is a composite of AgentPubKey and EntryContentHash.
-pub type EntryHash = HoloHash<hash_type::Entry>;
-
 /// The hash of anything referrable in the DHT.
-/// This is a composite of AgentPubKey, EntryContentHash, and HeaderHash
+/// This is a composite of either an EntryHash or a HeaderHash
 pub type AnyDhtHash = HoloHash<hash_type::AnyDht>;
-
-impl From<AgentPubKey> for EntryHash {
-    fn from(hash: AgentPubKey) -> Self {
-        hash.retype(hash_type::Entry::Agent)
-    }
-}
-
-impl From<EntryContentHash> for EntryHash {
-    fn from(hash: EntryContentHash) -> Self {
-        hash.retype(hash_type::Entry::Content)
-    }
-}
 
 impl From<HeaderHash> for AnyDhtHash {
     fn from(hash: HeaderHash) -> Self {
@@ -54,14 +38,27 @@ impl From<HeaderHash> for AnyDhtHash {
 
 impl From<EntryHash> for AnyDhtHash {
     fn from(hash: EntryHash) -> Self {
-        let hash_type = *hash.hash_type();
-        hash.retype(hash_type::AnyDht::Entry(hash_type))
+        hash.retype(hash_type::AnyDht::Entry)
     }
 }
 
+// Since an AgentPubKey can be treated as an EntryHash, we can also go straight
+// to AnyDhtHash
 impl From<AgentPubKey> for AnyDhtHash {
     fn from(hash: AgentPubKey) -> Self {
-        hash.retype(hash_type::AnyDht::Entry(hash_type::Entry::Agent))
+        hash.retype(hash_type::AnyDht::Entry)
+    }
+}
+
+impl From<AnyDhtHash> for HeaderHash {
+    fn from(hash: AnyDhtHash) -> Self {
+        hash.retype(hash_type::Header)
+    }
+}
+
+impl From<AnyDhtHash> for EntryHash {
+    fn from(hash: AnyDhtHash) -> Self {
+        hash.retype(hash_type::Entry)
     }
 }
 

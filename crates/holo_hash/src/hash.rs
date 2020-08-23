@@ -28,7 +28,7 @@ impl<T: HashType> HoloHash<T> {
     }
 
     /// Change the type of this HoloHash, keeping the same bytes
-    pub fn retype<TT: HashType>(self, hash_type: TT) -> HoloHash<TT> {
+    pub(crate) fn retype<TT: HashType>(self, hash_type: TT) -> HoloHash<TT> {
         HoloHash {
             hash: self.hash,
             hash_type,
@@ -125,10 +125,7 @@ mod tests {
         assert_type("DnaHash", DnaHash::from_raw_bytes(vec![0xdb; 36]));
         assert_type("NetIdHash", NetIdHash::from_raw_bytes(vec![0xdb; 36]));
         assert_type("AgentPubKey", AgentPubKey::from_raw_bytes(vec![0xdb; 36]));
-        assert_type(
-            "EntryContentHash",
-            EntryContentHash::from_raw_bytes(vec![0xdb; 36]),
-        );
+        assert_type("EntryHash", EntryHash::from_raw_bytes(vec![0xdb; 36]));
         assert_type("DhtOpHash", DhtOpHash::from_raw_bytes(vec![0xdb; 36]));
     }
 

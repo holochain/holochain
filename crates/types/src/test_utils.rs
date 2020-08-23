@@ -91,9 +91,9 @@ pub fn fake_dht_op_hash(name: u8) -> DhtOpHash {
     fake_holo_hash(name, hash_type::DhtOp::new())
 }
 
-/// A fixture EntryContentHash for unit testing.
-pub fn fake_entry_content_hash(name: u8) -> EntryContentHash {
-    fake_holo_hash(name, hash_type::Content::new())
+/// A fixture EntryHash for unit testing.
+pub fn fake_entry_hash(name: u8) -> EntryHash {
+    fake_holo_hash(name, hash_type::Entry::new())
 }
 
 /// A fixture AgentPubKey for unit testing.

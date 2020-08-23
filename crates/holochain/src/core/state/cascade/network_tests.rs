@@ -102,6 +102,7 @@ async fn get_updates_cache() {
 }
 
 #[tokio::test(threaded_scheduler)]
+#[ignore]
 async fn get_meta_updates_meta_cache() {
     observability::test_run().ok();
     // Database setup
@@ -148,7 +149,7 @@ async fn get_meta_updates_meta_cache() {
     let result = workspace
         .cache_meta
         .get_headers(match expected.0.hash_type().clone() {
-            hash_type::AnyDht::Entry(e) => expected.0.clone().retype(e),
+            hash_type::AnyDht::Entry => expected.0.clone().into(),
             _ => unreachable!(),
         })
         .unwrap()
@@ -613,7 +614,7 @@ async fn run_fixt_network(
                         dht_hash, respond, ..
                     } => {
                         let dht_hash = match dht_hash.hash_type() {
-                            AnyDht::Header => dht_hash.retype(hash_type::Header),
+                            AnyDht::Header => dht_hash.into(),
                             _ => unreachable!(),
                         };
 

@@ -90,3 +90,4 @@ default = ["slow_tests"]
 
 # wasm ribosome tests take > 60 seconds - let's only run them in CI
 slow_tests = []
+build_wasms = ['holochain_wasm_test_utils/build']

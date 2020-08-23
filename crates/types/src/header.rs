@@ -347,7 +347,7 @@ mod tests {
     use super::*;
     use crate::{
         fixt::HeaderBuilderCommonFixturator,
-        test_utils::{fake_dna_hash, fake_entry_content_hash},
+        test_utils::{fake_dna_hash, fake_entry_hash},
     };
     use ::fixt::prelude::*;
 
@@ -376,7 +376,7 @@ mod tests {
                 0.into(),
                 EntryVisibility::Public,
             )),
-            fake_entry_content_hash(1).into(),
+            fake_entry_hash(1).into(),
         )
         .into();
         let bytes = holochain_serialized_bytes::encode(&orig).unwrap();
@@ -396,7 +396,7 @@ mod tests {
                 0.into(),
                 EntryVisibility::Public,
             )),
-            fake_entry_content_hash(1).into(),
+            fake_entry_hash(1).into(),
         )
         .into();
         let bytes: SerializedBytes = orig.clone().try_into().unwrap();

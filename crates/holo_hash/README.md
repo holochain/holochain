@@ -21,15 +21,15 @@ Each HoloHash has a HashType. There are two flavors of HashType: *primitive*, an
 
 Each primitive HashType has a unique 3-byte prefix associated with it, to easily distiguish between hashes in any environment. These prefixes are multihash compatible. The primitive types are:
 
-| hash type | HoloHash alias   | prefix |
-|-----------|------------------|--------|
-| Agent     | AgentHash        | uhCAk  |
-| Content   | EntryContentHash | uhCEk  |
-| DhtOp     | DhtOpHash        | uhCQk  |
-| Dna       | DnaHash          | uhC0k  |
-| NetId     | NetIdHash        | uhCIk  |
-| Header    | HeaderHash       | uhCkk  |
-| Wasm      | DnaWasmHash      | uhCok  |
+| hash type | HoloHash alias | prefix |
+|-----------|----------------|--------|
+| Agent     | AgentHash      | uhCAk  |
+| Entry     | EntryHash      | uhCEk  |
+| DhtOp     | DhtOpHash      | uhCQk  |
+| Dna       | DnaHash        | uhC0k  |
+| NetId     | NetIdHash      | uhCIk  |
+| Header    | HeaderHash     | uhCkk  |
+| Wasm      | DnaWasmHash    | uhCok  |
 
 The "HoloHash alias" column lists the type aliases provided to refer to each type of HoloHash. For instance, `HeaderHash` is the following type alias:
 
@@ -72,7 +72,7 @@ assert_eq!(3860645936, entry.get_loc());
 let bytes: SerializedBytes = entry.try_into().unwrap();
 
 assert_eq!(
-    "{\"type\":\"EntryContentHash\",\"hash\":[88,43,0,130,130,164,145,252,50,36,8,37,143,125,49,95,241,139,45,95,183,5,123,133,203,141,250,107,100,170,165,193,48,200,28,230]}",
+    "{\"type\":\"EntryHash\",\"hash\":[88,43,0,130,130,164,145,252,50,36,8,37,143,125,49,95,241,139,45,95,183,5,123,133,203,141,250,107,100,170,165,193,48,200,28,230]}",
     &format!("{:?}", bytes),
 );
 ```
@@ -86,10 +86,10 @@ use holo_hash::*;
 
 let entry_content = b"test entry content";
 
-let content_hash = EntryContentHash::with_data(entry_content.to_vec()).await.into();
+let content_hash = EntryHash::with_data(entry_content.to_vec()).await.into();
 
 assert_eq!(
-    "EntryContentHash(uhCEkhPbA5vaw3Fk-ZvPSKuyyjg8eoX98fve75qiUEFgAE3BO7D4d)",
+    "EntryHash(uhCEkhPbA5vaw3Fk-ZvPSKuyyjg8eoX98fve75qiUEFgAE3BO7D4d)",
     &format!("{:?}", content_hash),
 );
 ```

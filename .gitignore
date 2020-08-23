@@ -3,6 +3,7 @@ target/
 *.log
 *~
 .wasm_cache
+.wasm_target
 
 flamegraph.svg
 perf.data
