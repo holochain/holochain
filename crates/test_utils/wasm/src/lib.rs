@@ -30,6 +30,7 @@ pub enum TestWasm {
     PostCommitSuccess,
     RandomBytes,
     SerRegression,
+    SysTime,
     Validate,
     ValidateLink,
     ValidateInvalid,
@@ -39,6 +40,7 @@ pub enum TestWasm {
     ValidationPackageFail,
     ValidationPackageSuccess,
     WhoAmI,
+    ZomeInfo,
 }
 
 impl From<TestWasm> for ZomeName {
@@ -65,6 +67,7 @@ impl From<TestWasm> for ZomeName {
             TestWasm::PostCommitSuccess => "post_commit_success",
             TestWasm::RandomBytes => "random_bytes",
             TestWasm::SerRegression => "ser_regression",
+            TestWasm::SysTime => "sys_time",
             TestWasm::Validate => "validate",
             TestWasm::ValidateLink => "validate_link",
             TestWasm::ValidateInvalid => "validate_invalid",
@@ -74,6 +77,7 @@ impl From<TestWasm> for ZomeName {
             TestWasm::ValidationPackageFail => "validation_package_fail",
             TestWasm::ValidationPackageSuccess => "validation_package_success",
             TestWasm::WhoAmI => "whoami",
+            TestWasm::ZomeInfo => "zome_info",
         })
     }
 }
@@ -128,6 +132,7 @@ impl From<TestWasm> for DnaWasm {
             TestWasm::SerRegression => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_ser_regression.wasm")
             }
+            TestWasm::SysTime => get_code("wasm32-unknown-unknown/release/test_wasm_sys_time.wasm"),
             TestWasm::Validate => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_validate.wasm")
             }
@@ -153,6 +158,9 @@ impl From<TestWasm> for DnaWasm {
                 get_code("wasm32-unknown-unknown/release/test_wasm_validation_package_success.wasm")
             }
             TestWasm::WhoAmI => get_code("wasm32-unknown-unknown/release/test_wasm_whoami.wasm"),
+            TestWasm::ZomeInfo => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_zome_info.wasm")
+            }
         })
     }
 }

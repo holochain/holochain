@@ -22,6 +22,7 @@ pub use crate::map_extern;
 pub use crate::map_extern::ExternResult;
 pub use crate::random_bytes;
 pub use crate::remove_link;
+pub use crate::sys_time;
 pub use crate::update_entry;
 pub use crate::zome_info;
 pub use hdk3_derive::hdk_entry;

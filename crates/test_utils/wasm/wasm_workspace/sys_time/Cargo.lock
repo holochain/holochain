@@ -14,9 +14,9 @@ checksum = "1d49d90015b3c36167a20fe2810c5cd875ad504b39cff3d4eae7977e6b7c1cb2"
 
 [[package]]
 name = "autocfg"
-version = "1.0.1"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"
+checksum = "f8aac770f1885fd7e387acedd76065302551364496e46b3dd00860b2f8359b9d"
 
 [[package]]
 name = "bitflags"
@@ -62,17 +62,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a81dae078cea95a014a339291cec439d2f232ebe854a9d672b796c6afafa9b7"
 
 [[package]]
-name = "derive_more"
-version = "0.99.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "298998b1cf6b5b2c8a7b023dfd45821825ce3ba8a8af55c921a0e734e4653f76"
-dependencies = [
- "proc-macro2 1.0.19",
- "quote 1.0.7",
- "syn 1.0.38",
-]
-
-[[package]]
 name = "digest"
 version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -108,7 +97,7 @@ version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e91b62f79061a0bc2e046024cb7ba44b08419ed238ecbd9adbd787434b9e8c25"
 dependencies = [
- "autocfg 1.0.1",
+ "autocfg 1.0.0",
 ]
 
 [[package]]
@@ -170,9 +159,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_common"
-version = "0.0.42"
+version = "0.0.41"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3aec2a89c8121f45730a72c08716fa2d32c6d967902fd1ede73405177d14cb82"
+checksum = "5a121c1df70f22c86286bf2fdc8c77d54c1a71bb2ea71164dbcbaa4dfb75b261"
 dependencies = [
  "holochain_serialized_bytes",
  "serde",
@@ -181,9 +170,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_guest"
-version = "0.0.42"
+version = "0.0.41"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f548c70ea7ff5383c52cf1af0ce33c219a01b526dbe0ad5a06d22545cb78c3a2"
+checksum = "23b4d11ea832f406341c991dbd6a4153425b483042d5bdf233dc9944258cda79"
 dependencies = [
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
@@ -209,7 +198,7 @@ version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "86b45e59b16c76b11bf9738fd5d38879d3bd28ad292d7b313608becb17ae2df9"
 dependencies = [
- "autocfg 1.0.1",
+ "autocfg 1.0.0",
  "hashbrown",
 ]
 
@@ -220,16 +209,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dc6f3ad7b9d11a0c00842ff8de1b60ee58661048eb8049ed33c73594f359d7e6"
 
 [[package]]
-name = "lazy_static"
-version = "1.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
-
-[[package]]
 name = "libc"
-version = "0.2.76"
+version = "0.2.74"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "755456fae044e6fa1ebbbd1b3e902ae19e73097ed4ed87bb79934a867c007bc3"
+checksum = "a2f02823cf78b754822df5f7f268fb59822e7296276d3e069d8e8cb26a14bd10"
 
 [[package]]
 name = "multihash"
@@ -271,7 +254,7 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b7f3fc75e3697059fb1bc465e3d8cca6cf92f56854f201158b3f9c77d5a3cfa0"
 dependencies = [
- "autocfg 1.0.1",
+ "autocfg 1.0.0",
  "num-integer",
  "num-traits",
 ]
@@ -291,7 +274,7 @@ version = "0.1.43"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8d59457e662d541ba17869cf51cf177c0b5f0cbf476c66bdc90bf1edac4f875b"
 dependencies = [
- "autocfg 1.0.1",
+ "autocfg 1.0.0",
  "num-traits",
 ]
 
@@ -301,7 +284,7 @@ version = "0.1.41"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a6e6b7c748f995c4c29c5f5ae0248536e04a5739927c74ec0fa564805094b9f"
 dependencies = [
- "autocfg 1.0.1",
+ "autocfg 1.0.0",
  "num-integer",
  "num-traits",
 ]
@@ -312,7 +295,7 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a5b4d7360f362cfb50dde8143501e6940b22f644be75a4cc90b2d81968908138"
 dependencies = [
- "autocfg 1.0.1",
+ "autocfg 1.0.0",
  "num-bigint",
  "num-integer",
  "num-traits",
@@ -324,7 +307,7 @@ version = "0.2.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac267bcc07f48ee5f8935ab0d24f316fb722d7a1292e2913f0cc196b29ffd611"
 dependencies = [
- "autocfg 1.0.1",
+ "autocfg 1.0.0",
 ]
 
 [[package]]
@@ -612,274 +595,6 @@ dependencies = [
 
 [[package]]
 name = "test_wasm_agent_info"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
-]
-
-[[package]]
-name = "test_wasm_anchor"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
- "test_wasm_common",
-]
-
-[[package]]
-name = "test_wasm_bench"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
-]
-
-[[package]]
-name = "test_wasm_commit_entry"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
- "test_wasm_common",
-]
-
-[[package]]
-name = "test_wasm_common"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "holochain_serialized_bytes",
- "serde",
- "serde_bytes",
-]
-
-[[package]]
-name = "test_wasm_crd"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
- "test_wasm_common",
-]
-
-[[package]]
-name = "test_wasm_crud"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
- "test_wasm_common",
-]
-
-[[package]]
-name = "test_wasm_debug"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
-]
-
-[[package]]
-name = "test_wasm_entry_defs"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
-]
-
-[[package]]
-name = "test_wasm_entry_hash"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
-]
-
-[[package]]
-name = "test_wasm_foo"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
- "test_wasm_common",
-]
-
-[[package]]
-name = "test_wasm_hash_path"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
- "test_wasm_common",
-]
-
-[[package]]
-name = "test_wasm_imports"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "lazy_static",
- "serde",
-]
-
-[[package]]
-name = "test_wasm_init_fail"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
-]
-
-[[package]]
-name = "test_wasm_init_pass"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
-]
-
-[[package]]
-name = "test_wasm_link"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
- "test_wasm_common",
-]
-
-[[package]]
-name = "test_wasm_migrate_agent_fail"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
-]
-
-[[package]]
-name = "test_wasm_migrate_agent_pass"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
-]
-
-[[package]]
-name = "test_wasm_post_commit_fail"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
-]
-
-[[package]]
-name = "test_wasm_post_commit_success"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
-]
-
-[[package]]
-name = "test_wasm_random_bytes"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
-]
-
-[[package]]
-name = "test_wasm_ser_regression"
-version = "0.0.1"
-dependencies = [
- "derive_more",
- "hdk3",
- "serde",
-]
-
-[[package]]
-name = "test_wasm_sys_time"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
-]
-
-[[package]]
-name = "test_wasm_validate"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
-]
-
-[[package]]
-name = "test_wasm_validate_invalid"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
-]
-
-[[package]]
-name = "test_wasm_validate_link"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
-]
-
-[[package]]
-name = "test_wasm_validate_link_add_invalid"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
-]
-
-[[package]]
-name = "test_wasm_validate_link_add_valid"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
-]
-
-[[package]]
-name = "test_wasm_validate_valid"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
-]
-
-[[package]]
-name = "test_wasm_validation_package_fail"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
-]
-
-[[package]]
-name = "test_wasm_validation_package_success"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
-]
-
-[[package]]
-name = "test_wasm_whoami"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
- "test_wasm_common",
-]
-
-[[package]]
-name = "test_wasm_zome_info"
 version = "0.0.1"
 dependencies = [
  "hdk3",

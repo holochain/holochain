@@ -85,3 +85,5 @@ pub fn update_entry<'a>(
     // being atomic
     Ok(UpdateEntryOutput::new(header_address))
 }
+
+// relying on tests for get_details
