@@ -1,15 +1,17 @@
 [package]
-name = "test_wasm_commit_entry"
+name = "test_wasm_crud"
 version = "0.0.1"
 authors = [ "thedavidmeister", "thedavidmeister@gmail.com" ]
 edition = "2018"
+
 
 # Ensure that this is not inside of any other workspace.
 # This crate should be an implementation detail of test_utils_wasm and
 # therefore shouldn't be mentioned in the top-level Cargo.toml
 
+
 [lib]
-name = "test_wasm_commit_entry"
+name = "test_wasm_crud"
 crate-type = [ "cdylib", "rlib" ]
 
 [dependencies]

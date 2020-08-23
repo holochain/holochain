@@ -12,16 +12,16 @@ use futures::future::FutureExt;
 use holo_hash::{EntryHash, HeaderHash};
 use holochain_p2p::actor::GetOptions;
 use holochain_zome_types::header::builder;
-use holochain_zome_types::RemoveEntryInput;
-use holochain_zome_types::{element::SignedHeaderHashed, RemoveEntryOutput};
+use holochain_zome_types::DeleteEntryInput;
+use holochain_zome_types::{element::SignedHeaderHashed, DeleteEntryOutput};
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
-pub fn remove_entry<'a>(
+pub fn delete_entry<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: RemoveEntryInput,
-) -> RibosomeResult<RemoveEntryOutput> {
+    input: DeleteEntryInput,
+) -> RibosomeResult<DeleteEntryOutput> {
     let removes_address = input.into_inner();
 
     let removes_entry_address =
@@ -40,7 +40,7 @@ pub fn remove_entry<'a>(
                     .get_element(&header_hash)
                     .await?
                     .expect("Element we just put in SourceChain must be gettable");
-                tracing::debug!(in_remove_entry = ?header_hash);
+                tracing::debug!(in_delete_entry = ?header_hash);
                 integrate_to_cache(
                     &element,
                     workspace.source_chain.elements(),
@@ -59,7 +59,7 @@ pub fn remove_entry<'a>(
             unsafe { call_context.host_access.workspace().apply_mut(call).await }
         }))???;
 
-    Ok(RemoveEntryOutput::new(header_address))
+    Ok(DeleteEntryOutput::new(header_address))
 }
 
 #[allow(clippy::extra_unused_lifetimes)]

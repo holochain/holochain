@@ -13,6 +13,7 @@ pub enum TestWasm {
     Anchor,
     Bench,
     CommitEntry,
+    Crud,
     Debug,
     EntryDefs,
     EntryHash,
@@ -45,6 +46,7 @@ impl From<TestWasm> for ZomeName {
             TestWasm::Anchor => "anchor",
             TestWasm::Bench => "bench",
             TestWasm::CommitEntry => "commit_entry",
+            TestWasm::Crud => "crud",
             TestWasm::Debug => "debug",
             TestWasm::EntryDefs => "entry_defs",
             TestWasm::EntryHash => "entry_hash",
@@ -83,6 +85,7 @@ impl From<TestWasm> for DnaWasm {
             TestWasm::CommitEntry => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_commit_entry.wasm")
             }
+            TestWasm::Crud => get_code("wasm32-unknown-unknown/release/test_wasm_crud.wasm"),
             TestWasm::Debug => get_code("wasm32-unknown-unknown/release/test_wasm_debug.wasm"),
             TestWasm::EntryDefs => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_entry_defs.wasm")

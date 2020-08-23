@@ -1,3 +1,4 @@
+use std::io::Write;
 use std::process::Stdio;
 
 fn main() {
@@ -54,7 +55,10 @@ fn main() {
         }
         let output = cmd.output().unwrap();
 
-        assert!(output.status.success());
+        assert!(
+            output.status.success(),
+            std::io::stderr().write_all(&output.stderr)
+        );
     } else {
         let mut cmd = std::process::Command::new(cargo_command);
         cmd.arg("check")
@@ -69,7 +73,10 @@ fn main() {
             }
         }
         let output = cmd.output().unwrap();
-        assert!(output.status.success());
+        assert!(
+            output.status.success(),
+            std::io::stderr().write_all(&output.stderr)
+        );
     }
 }
 

@@ -72,10 +72,10 @@ guest_functions!(
         EmitSignalOutput
     ],
     [
-        __remove_entry,
-        remove_entry,
-        RemoveEntryInput,
-        RemoveEntryOutput
+        __delete_entry,
+        delete_entry,
+        DeleteEntryInput,
+        DeleteEntryOutput
     ],
     [
         __link_entries,

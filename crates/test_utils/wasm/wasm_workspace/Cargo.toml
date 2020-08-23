@@ -4,6 +4,7 @@ members = [
     "anchor",
     "bench",
     "commit_entry",
+    "crud",
     "debug",
     "entry_defs",
     "entry_hash",

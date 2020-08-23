@@ -14,9 +14,9 @@ checksum = "1d49d90015b3c36167a20fe2810c5cd875ad504b39cff3d4eae7977e6b7c1cb2"
 
 [[package]]
 name = "autocfg"
-version = "1.0.1"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"
+checksum = "f8aac770f1885fd7e387acedd76065302551364496e46b3dd00860b2f8359b9d"
 
 [[package]]
 name = "bitflags"
@@ -62,17 +62,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a81dae078cea95a014a339291cec439d2f232ebe854a9d672b796c6afafa9b7"
 
 [[package]]
-name = "derive_more"
-version = "0.99.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "298998b1cf6b5b2c8a7b023dfd45821825ce3ba8a8af55c921a0e734e4653f76"
-dependencies = [
- "proc-macro2 1.0.19",
- "quote 1.0.7",
- "syn 1.0.38",
-]
-
-[[package]]
 name = "digest"
 version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -103,15 +92,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hashbrown"
-version = "0.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e91b62f79061a0bc2e046024cb7ba44b08419ed238ecbd9adbd787434b9e8c25"
-dependencies = [
- "autocfg 1.0.1",
-]
-
-[[package]]
 name = "hdk3"
 version = "0.0.1"
 dependencies = [
@@ -129,7 +109,7 @@ version = "0.0.1"
 dependencies = [
  "holochain_zome_types",
  "paste",
- "proc-macro2 1.0.19",
+ "proc-macro2 1.0.18",
  "quote 1.0.7",
  "syn 1.0.38",
 ]
@@ -170,9 +150,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_common"
-version = "0.0.42"
+version = "0.0.41"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3aec2a89c8121f45730a72c08716fa2d32c6d967902fd1ede73405177d14cb82"
+checksum = "5a121c1df70f22c86286bf2fdc8c77d54c1a71bb2ea71164dbcbaa4dfb75b261"
 dependencies = [
  "holochain_serialized_bytes",
  "serde",
@@ -181,9 +161,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_guest"
-version = "0.0.42"
+version = "0.0.41"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f548c70ea7ff5383c52cf1af0ce33c219a01b526dbe0ad5a06d22545cb78c3a2"
+checksum = "23b4d11ea832f406341c991dbd6a4153425b483042d5bdf233dc9944258cda79"
 dependencies = [
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
@@ -205,12 +185,11 @@ dependencies = [
 
 [[package]]
 name = "indexmap"
-version = "1.5.1"
+version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86b45e59b16c76b11bf9738fd5d38879d3bd28ad292d7b313608becb17ae2df9"
+checksum = "c398b2b113b55809ceb9ee3e753fcbac793f1956663f3c36549c1346015c2afe"
 dependencies = [
- "autocfg 1.0.1",
- "hashbrown",
+ "autocfg 1.0.0",
 ]
 
 [[package]]
@@ -220,16 +199,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dc6f3ad7b9d11a0c00842ff8de1b60ee58661048eb8049ed33c73594f359d7e6"
 
 [[package]]
-name = "lazy_static"
-version = "1.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
-
-[[package]]
 name = "libc"
-version = "0.2.76"
+version = "0.2.72"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "755456fae044e6fa1ebbbd1b3e902ae19e73097ed4ed87bb79934a867c007bc3"
+checksum = "a9f8082297d534141b30c8d39e9b1773713ab50fdbe4ff30f750d063b3bfd701"
 
 [[package]]
 name = "multihash"
@@ -271,7 +244,7 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b7f3fc75e3697059fb1bc465e3d8cca6cf92f56854f201158b3f9c77d5a3cfa0"
 dependencies = [
- "autocfg 1.0.1",
+ "autocfg 1.0.0",
  "num-integer",
  "num-traits",
 ]
@@ -291,7 +264,7 @@ version = "0.1.43"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8d59457e662d541ba17869cf51cf177c0b5f0cbf476c66bdc90bf1edac4f875b"
 dependencies = [
- "autocfg 1.0.1",
+ "autocfg 1.0.0",
  "num-traits",
 ]
 
@@ -301,7 +274,7 @@ version = "0.1.41"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a6e6b7c748f995c4c29c5f5ae0248536e04a5739927c74ec0fa564805094b9f"
 dependencies = [
- "autocfg 1.0.1",
+ "autocfg 1.0.0",
  "num-integer",
  "num-traits",
 ]
@@ -312,7 +285,7 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a5b4d7360f362cfb50dde8143501e6940b22f644be75a4cc90b2d81968908138"
 dependencies = [
- "autocfg 1.0.1",
+ "autocfg 1.0.0",
  "num-bigint",
  "num-integer",
  "num-traits",
@@ -324,7 +297,7 @@ version = "0.2.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac267bcc07f48ee5f8935ab0d24f316fb722d7a1292e2913f0cc196b29ffd611"
 dependencies = [
- "autocfg 1.0.1",
+ "autocfg 1.0.0",
 ]
 
 [[package]]
@@ -344,9 +317,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.19"
+version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "04f5f085b5d71e2188cb8271e5da0161ad52c3f227a661a3c135fdf28e258b12"
+checksum = "beae6331a816b1f65d04c45b078fd8e6c93e8071771f41b8163255bbd8d7c8fa"
 dependencies = [
  "unicode-xid 0.2.1",
 ]
@@ -366,7 +339,7 @@ version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aa563d17ecb180e500da1cfd2b028310ac758de548efdd203e18f283af693f37"
 dependencies = [
- "proc-macro2 1.0.19",
+ "proc-macro2 1.0.18",
 ]
 
 [[package]]
@@ -496,9 +469,9 @@ dependencies = [
 
 [[package]]
 name = "rmp-serde"
-version = "0.14.4"
+version = "0.14.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ce7d70c926fe472aed493b902010bccc17fa9f7284145cb8772fd22fdb052d8"
+checksum = "4c1ee98f14fe8b8e9c5ea13d25da7b2a1796169202c57a09d7288de90d56222b"
 dependencies = [
  "byteorder",
  "rmp",
@@ -553,16 +526,16 @@ version = "1.0.104"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "128f9e303a5a29922045a830221b8f78ec74a5f544944f3d5984f8ec3895ef64"
 dependencies = [
- "proc-macro2 1.0.19",
+ "proc-macro2 1.0.18",
  "quote 1.0.7",
  "syn 1.0.38",
 ]
 
 [[package]]
 name = "serde_json"
-version = "1.0.57"
+version = "1.0.56"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "164eacbdb13512ec2745fb09d51fd5b22b0d65ed294a1dcf7285a360c80a675c"
+checksum = "3433e879a558dde8b5e8feb2a04899cf34fdde1fafb894687e52105fc1162ac3"
 dependencies = [
  "indexmap",
  "itoa",
@@ -605,34 +578,9 @@ version = "1.0.38"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e69abc24912995b3038597a7a593be5053eb0fb44f3cc5beec0deb421790c1f4"
 dependencies = [
- "proc-macro2 1.0.19",
+ "proc-macro2 1.0.18",
  "quote 1.0.7",
  "unicode-xid 0.2.1",
-]
-
-[[package]]
-name = "test_wasm_agent_info"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
-]
-
-[[package]]
-name = "test_wasm_anchor"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
- "test_wasm_common",
-]
-
-[[package]]
-name = "test_wasm_bench"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
 ]
 
 [[package]]
@@ -655,205 +603,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "test_wasm_crud"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
- "test_wasm_common",
-]
-
-[[package]]
-name = "test_wasm_debug"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
-]
-
-[[package]]
-name = "test_wasm_entry_defs"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
-]
-
-[[package]]
-name = "test_wasm_entry_hash"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
-]
-
-[[package]]
-name = "test_wasm_foo"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
- "test_wasm_common",
-]
-
-[[package]]
-name = "test_wasm_hash_path"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
- "test_wasm_common",
-]
-
-[[package]]
-name = "test_wasm_imports"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "lazy_static",
- "serde",
-]
-
-[[package]]
-name = "test_wasm_init_fail"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
-]
-
-[[package]]
-name = "test_wasm_init_pass"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
-]
-
-[[package]]
-name = "test_wasm_link"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
- "test_wasm_common",
-]
-
-[[package]]
-name = "test_wasm_migrate_agent_fail"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
-]
-
-[[package]]
-name = "test_wasm_migrate_agent_pass"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
-]
-
-[[package]]
-name = "test_wasm_post_commit_fail"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
-]
-
-[[package]]
-name = "test_wasm_post_commit_success"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
-]
-
-[[package]]
-name = "test_wasm_ser_regression"
-version = "0.0.1"
-dependencies = [
- "derive_more",
- "hdk3",
- "serde",
-]
-
-[[package]]
-name = "test_wasm_validate"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
-]
-
-[[package]]
-name = "test_wasm_validate_invalid"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
-]
-
-[[package]]
-name = "test_wasm_validate_link"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
-]
-
-[[package]]
-name = "test_wasm_validate_link_add_invalid"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
-]
-
-[[package]]
-name = "test_wasm_validate_link_add_valid"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
-]
-
-[[package]]
-name = "test_wasm_validate_valid"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
-]
-
-[[package]]
-name = "test_wasm_validation_package_fail"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
-]
-
-[[package]]
-name = "test_wasm_validation_package_success"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
-]
-
-[[package]]
-name = "test_wasm_whoami"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
- "test_wasm_common",
-]
-
-[[package]]
 name = "thiserror"
 version = "1.0.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -868,7 +617,7 @@ version = "1.0.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bd80fc12f73063ac132ac92aceea36734f04a1d93c1240c6944e23a3b8841793"
 dependencies = [
- "proc-macro2 1.0.19",
+ "proc-macro2 1.0.18",
  "quote 1.0.7",
  "syn 1.0.38",
 ]
