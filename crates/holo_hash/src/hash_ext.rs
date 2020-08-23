@@ -6,16 +6,7 @@ use crate::{
 impl<T: HashType> HoloHash<T> {
     /// Hash the given content to produce a HoloHash
     pub fn from_data<C: HashableContent<HashType = T>>(content: C) -> HoloHash<T> {
-        match content.hashable_content() {
-            HashableContentBytes::Content(sb) => {
-                assert!(sb.bytes().len() <= crate::MAX_HASHABLE_CONTENT_LEN);
-                let bytes: Vec<u8> = holochain_serialized_bytes::UnsafeBytes::from(sb).into();
-                Self::with_pre_hashed_typed(encode::blake2b_256(&bytes), content.hash_type())
-            }
-            HashableContentBytes::Prehashed36(bytes) => {
-                HoloHash::from_raw_bytes_and_type(bytes, content.hash_type())
-            }
-        }
+        Self::with_data(&content)
     }
 
     /// Hash a reference to the given content to produce a HoloHash
