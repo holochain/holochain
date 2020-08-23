@@ -2,7 +2,7 @@ use hdk3::prelude::*;
 
 #[hdk_entry(id = "countree")]
 /// a tree of counters
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Clone, Copy, PartialEq)]
 pub struct CounTree(u32);
 
 impl std::ops::Add for CounTree {
@@ -19,17 +19,9 @@ impl CounTree {
     }
 
     pub fn ensure(countree: CounTree) -> ExternResult<HeaderHash> {
-        Ok(commit_entry!(countree)?)
-    }
-
-    pub fn get_or_new(header_hash: HeaderHash) -> ExternResult<CounTree> {
-        let maybe: Option<Element> = get!(header_hash)?;
-        match maybe {
-            Some(element) => match element.entry().to_app_option()? {
-                Some(v) => Ok(v),
-                None => Ok(Self::get_or_new(Self::new()?)?),
-            },
-            None => Ok(Self::get_or_new(Self::new()?)?),
+        match get!(entry_hash!(countree)?)? {
+            Some(element) => Ok(element.header_address().to_owned()),
+            None => Ok(commit_entry!(countree)?)
         }
     }
 
@@ -37,8 +29,20 @@ impl CounTree {
         Ok(GetDetailsOutput::new(get_details!(header_hash)?))
     }
 
-    pub fn inc(header_hash: HeaderHash) -> ExternResult<HeaderHash> {
-        Ok(Self::ensure(Self::get_or_new(header_hash)? + CounTree(1))?)
+    /// increments the given header hash by 1 or creates it if not found
+    /// this is silly as being offline resets the counter >.<
+    pub fn incsert(header_hash: HeaderHash) -> ExternResult<HeaderHash> {
+        let current: CounTree = match get!(header_hash.clone())? {
+            Some(element) => {
+                match element.entry().to_app_option()? {
+                    Some(v) => v,
+                    None => return Self::new(),
+                }
+            },
+            None => return Self::new(),
+        };
+
+        Ok(update_entry!(header_hash, current + CounTree(1))?)
     }
 
     pub fn dec(header_hash: HeaderHash) -> ExternResult<HeaderHash> {

@@ -15,7 +15,7 @@ fn details(header_hash: HeaderHash) -> ExternResult<GetDetailsOutput> {
 
 #[hdk_extern]
 fn inc(header_hash: HeaderHash) -> ExternResult<HeaderHash> {
-    countree::CounTree::inc(header_hash)
+    countree::CounTree::incsert(header_hash)
 }
 
 #[hdk_extern]

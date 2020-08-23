@@ -38,6 +38,7 @@ pub use holochain_zome_types::crdt::CrdtType;
 pub use holochain_zome_types::debug_msg;
 pub use holochain_zome_types::element::Element;
 pub use holochain_zome_types::entry::GetOptions;
+pub use holochain_zome_types::metadata::Details;
 pub use holochain_zome_types::entry_def::EntryDef;
 pub use holochain_zome_types::entry_def::EntryDefId;
 pub use holochain_zome_types::entry_def::EntryDefs;
