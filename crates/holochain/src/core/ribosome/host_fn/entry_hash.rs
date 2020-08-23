@@ -79,7 +79,7 @@ pub mod wasm_test {
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = raw_workspace;
         let output: EntryHashOutput =
-            crate::call_test_ribosome!(host_access, TestWasm::Imports, "entry_hash", input);
+            crate::call_test_ribosome!(host_access, TestWasm::EntryHash, "entry_hash", input);
         assert_eq!(output.into_inner().get_raw().to_vec().len(), 36,);
     }
 

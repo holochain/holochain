@@ -6,6 +6,7 @@ members = [
     "commit_entry",
     "debug",
     "entry_defs",
+    "entry_hash",
     "foo",
     "hash_path",
     "imports",

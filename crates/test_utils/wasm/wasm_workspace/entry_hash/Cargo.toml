@@ -1,5 +1,5 @@
 [package]
-name = "test_wasm_agent_info"
+name = "test_wasm_entry_hash"
 version = "0.0.1"
 authors = [ "thedavidmeister", "thedavidmeister@gmail.com" ]
 edition = "2018"
@@ -9,7 +9,7 @@ edition = "2018"
 # therefore shouldn't be mentioned in the top-level Cargo.toml
 
 [lib]
-name = "test_wasm_agent_info"
+name = "test_wasm_entry_hash"
 crate-type = [ "cdylib", "rlib" ]
 
 [dependencies]

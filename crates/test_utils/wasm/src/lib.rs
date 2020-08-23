@@ -15,6 +15,7 @@ pub enum TestWasm {
     CommitEntry,
     Debug,
     EntryDefs,
+    EntryHash,
     Foo,
     HashPath,
     Imports,
@@ -46,6 +47,7 @@ impl From<TestWasm> for ZomeName {
             TestWasm::CommitEntry => "commit_entry",
             TestWasm::Debug => "debug",
             TestWasm::EntryDefs => "entry_defs",
+            TestWasm::EntryHash => "entry_hash",
             TestWasm::Foo => "foo",
             TestWasm::HashPath => "hash_path",
             TestWasm::Imports => "imports",
@@ -84,6 +86,9 @@ impl From<TestWasm> for DnaWasm {
             TestWasm::Debug => get_code("wasm32-unknown-unknown/release/test_wasm_debug.wasm"),
             TestWasm::EntryDefs => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_entry_defs.wasm")
+            }
+            TestWasm::EntryHash => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_entry_hash.wasm")
             }
             TestWasm::Foo => get_code("wasm32-unknown-unknown/release/test_wasm_foo.wasm"),
             TestWasm::HashPath => {
@@ -153,7 +158,7 @@ fn get_code(path: &'static str) -> Vec<u8> {
     };
     let warning = format!(
         "Wasm: {:?} was not found. Maybe you need to build the test wasms\n
-        Run `cargo build --features 'build_wasms' --manifest-path=crates/holochain/Cargo.toml` 
+        Run `cargo build --features 'build_wasms' --manifest-path=crates/holochain/Cargo.toml`
         or pass the feature flag to `cargo test`
         ",
         path
