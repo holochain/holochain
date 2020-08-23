@@ -5,7 +5,7 @@ use crate::{
 
 impl<T: HashType> HoloHash<T> {
     /// Hash the given content to produce a HoloHash
-    pub fn from_data<'a, C: 'a + HashableContent<HashType = T>>(content: C) -> HoloHash<T> {
+    pub fn from_data<C: HashableContent<HashType = T>>(content: C) -> HoloHash<T> {
         match content.hashable_content() {
             HashableContentBytes::Content(sb) => {
                 assert!(sb.bytes().len() <= crate::MAX_HASHABLE_CONTENT_LEN);
@@ -19,7 +19,7 @@ impl<T: HashType> HoloHash<T> {
     }
 
     /// Hash a reference to the given content to produce a HoloHash
-    pub fn with_data<'a, C: HashableContent<HashType = T>>(content: &'a C) -> HoloHash<T> {
+    pub fn with_data<C: HashableContent<HashType = T>>(content: &C) -> HoloHash<T> {
         match content.hashable_content() {
             HashableContentBytes::Content(sb) => {
                 assert!(sb.bytes().len() <= crate::MAX_HASHABLE_CONTENT_LEN);
