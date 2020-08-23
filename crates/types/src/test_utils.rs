@@ -49,7 +49,7 @@ pub fn fake_dna_zomes(uuid: &str, zomes: Vec<(ZomeName, DnaWasm)>) -> DnaFile {
     tokio_safe_block_on::tokio_safe_block_forever_on(async move {
         let mut wasm_code = Vec::new();
         for (zome_name, wasm) in zomes {
-            let wasm = crate::dna::wasm::DnaWasmHashed::from_content(wasm).await;
+            let wasm = crate::dna::wasm::DnaWasmHashed::from_content(wasm);
             let (wasm, wasm_hash) = wasm.into_inner();
             dna.zomes.push((zome_name, Zome { wasm_hash }));
             wasm_code.push(wasm);

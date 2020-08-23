@@ -135,7 +135,7 @@ mod tests {
             prev_header: prev,
         };
 
-        let hashed = HeaderHashed::from_content(header.into()).await;
+        let hashed = HeaderHashed::from_content(header.into());
         let signed = SignedHeaderHashed::new(&keystore, hashed).await.unwrap();
         Element::new(signed, None)
     }

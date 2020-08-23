@@ -131,12 +131,12 @@ impl SourceChainBuf {
         header: Header,
         maybe_entry: Option<Entry>,
     ) -> SourceChainResult<HeaderHash> {
-        let header = HeaderHashed::from_content(header).await;
+        let header = HeaderHashed::from_content(header);
         let header_address = header.as_hash().to_owned();
         let signed_header = SignedHeaderHashed::new(&self.keystore, header).await?;
         let maybe_entry = match maybe_entry {
             None => None,
-            Some(entry) => Some(EntryHashed::from_content(entry).await),
+            Some(entry) => Some(EntryHashed::from_content(entry)),
         };
 
         /*
@@ -354,7 +354,7 @@ pub mod tests {
                     header_seq: 0,
                     hash: dna.dna_hash().clone(),
                 });
-                let dna_header = HeaderHashed::from_content(dna_header).await;
+                let dna_header = HeaderHashed::from_content(dna_header);
 
                 let agent_header = Header::EntryCreate(header::EntryCreate {
                     author: agent_pubkey.clone(),
@@ -364,7 +364,7 @@ pub mod tests {
                     entry_type: header::EntryType::AgentPubKey,
                     entry_hash: agent_pubkey.clone().into(),
                 });
-                let agent_header = HeaderHashed::from_content(agent_header).await;
+                let agent_header = HeaderHashed::from_content(agent_header);
 
                 (dna_header, agent_header)
             },
@@ -501,8 +501,8 @@ pub mod tests {
 
         let (_, hashed, _, _, _) = fixtures();
         let header = hashed.into_content();
-        let hash = HeaderHash::with_data(&header).await;
-        let hashed = HeaderHashed::from_content(header.clone()).await;
+        let hash = HeaderHash::with_data(&header);
+        let hashed = HeaderHashed::from_content(header.clone());
         assert_eq!(hash, *hashed.as_hash());
 
         store.put_raw(header, None).await.unwrap();

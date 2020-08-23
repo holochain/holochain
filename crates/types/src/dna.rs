@@ -48,7 +48,7 @@ pub struct DnaDef {
 impl DnaDef {
     /// Calculate DnaHash for DnaDef
     pub async fn dna_hash(&self) -> DnaHash {
-        DnaHash::with_data(self).await
+        DnaHash::with_data(self)
     }
 
     /// Return a Zome
@@ -100,10 +100,10 @@ impl DnaFile {
     ) -> Result<Self, DnaError> {
         let mut code = BTreeMap::new();
         for wasm in wasm {
-            let wasm_hash = holo_hash::WasmHash::with_data(&wasm).await;
+            let wasm_hash = holo_hash::WasmHash::with_data(&wasm);
             code.insert(wasm_hash, wasm);
         }
-        let dna_hash = holo_hash::DnaHash::with_data(&dna).await;
+        let dna_hash = holo_hash::DnaHash::with_data(&dna);
         Ok(Self {
             dna,
             dna_hash,

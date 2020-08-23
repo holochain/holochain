@@ -54,7 +54,7 @@ async fn sys_validation_workflow_inner(
         .collect())?;
     for vlv in ops {
         let op = vlv.op;
-        let hash = DhtOpHash::with_data(&op).await;
+        let hash = DhtOpHash::with_data(&op);
         let v = IntegrationLimboValue {
             validation_status: ValidationStatus::Valid,
             op,

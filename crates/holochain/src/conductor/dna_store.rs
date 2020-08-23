@@ -94,7 +94,7 @@ impl DnaDefBuf {
     }
 
     pub async fn put(&mut self, dna_def: DnaDef) -> DatabaseResult<()> {
-        self.dna_defs.put(DnaDefHashed::from_content(dna_def).await);
+        self.dna_defs.put(DnaDefHashed::from_content(dna_def));
         Ok(())
     }
 

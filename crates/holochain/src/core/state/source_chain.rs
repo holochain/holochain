@@ -75,9 +75,8 @@ impl SourceChain {
         &mut self,
         grant_entry: CapGrantEntry,
     ) -> SourceChainResult<HeaderHash> {
-        let (entry, entry_hash) = EntryHashed::from_content(Entry::CapGrant(grant_entry))
-            .await
-            .into_inner();
+        let (entry, entry_hash) =
+            EntryHashed::from_content(Entry::CapGrant(grant_entry)).into_inner();
         let header_builder = builder::EntryCreate {
             entry_type: EntryType::CapGrant,
             entry_hash,
@@ -90,9 +89,8 @@ impl SourceChain {
         &mut self,
         claim_entry: CapClaimEntry,
     ) -> SourceChainResult<HeaderHash> {
-        let (entry, entry_hash) = EntryHashed::from_content(Entry::CapClaim(claim_entry))
-            .await
-            .into_inner();
+        let (entry, entry_hash) =
+            EntryHashed::from_content(Entry::CapClaim(claim_entry)).into_inner();
         let header_builder = builder::EntryCreate {
             entry_type: EntryType::CapClaim,
             entry_hash,

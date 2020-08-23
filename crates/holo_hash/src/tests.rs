@@ -29,7 +29,7 @@ async fn check_hashed_type() {
         i: 42,
     };
 
-    let my_type_hashed = TestDhtOpHashed::from_content(my_type).await;
+    let my_type_hashed = TestDhtOpHashed::from_content(my_type);
 
     assert_eq!(
         "uhCQkQFRMcbVVfPJ5AbAv0HJq0geatTakGEEj5rpv_Dp0pjmJob3P",
@@ -132,7 +132,7 @@ fn agent_id_try_parse() {
 #[tokio::test(threaded_scheduler)]
 async fn agent_id_debug() {
     tokio::task::spawn(async move {
-        let agent_id = HeaderHash::with_data(&TestHeader("hi".to_string())).await;
+        let agent_id = HeaderHash::with_data(&TestHeader("hi".to_string()));
         assert_eq!(
             "HeaderHash(uhCkkdwAAuHr_AKFTzF2vjvVzlkWTOxdAhqZ00jcBe9GZQs77BSjQ)",
             &format!("{:?}", agent_id),
@@ -145,7 +145,7 @@ async fn agent_id_debug() {
 #[tokio::test(threaded_scheduler)]
 async fn agent_id_display() {
     tokio::task::spawn(async move {
-        let agent_id = HeaderHash::with_data(&TestHeader("hi".to_string())).await;
+        let agent_id = HeaderHash::with_data(&TestHeader("hi".to_string()));
         assert_eq!(
             "uhCkkdwAAuHr_AKFTzF2vjvVzlkWTOxdAhqZ00jcBe9GZQs77BSjQ",
             &format!("{}", agent_id.to_string()),
@@ -158,7 +158,7 @@ async fn agent_id_display() {
 #[tokio::test(threaded_scheduler)]
 async fn agent_id_loc() {
     tokio::task::spawn(async move {
-        let agent_id = HeaderHash::with_data(&TestHeader("hi".to_string())).await;
+        let agent_id = HeaderHash::with_data(&TestHeader("hi".to_string()));
         assert_eq!(3_492_283_899, agent_id.get_loc());
     })
     .await

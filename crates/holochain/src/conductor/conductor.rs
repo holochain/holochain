@@ -588,7 +588,7 @@ where
         // TODO: PERF: This loop might be slow
         for (wasm_hash, dna_wasm) in dna.code().clone().into_iter() {
             if let None = wasm_buf.get(&wasm_hash).await? {
-                wasm_buf.put(DnaWasmHashed::from_content(dna_wasm).await);
+                wasm_buf.put(DnaWasmHashed::from_content(dna_wasm));
             }
         }
         if let None = dna_def_buf.get(dna.dna_hash()).await? {

@@ -66,7 +66,7 @@ pub async fn integrate_dht_ops_workflow(
                         op,
                         validation_status,
                     } = val;
-                    let (op, op_hash) = DhtOpHashed::from_content(op).await.into_inner();
+                    let (op, op_hash) = DhtOpHashed::from_content(op).into_inner();
                     (
                         op_hash,
                         IntegrationLimboValue {
@@ -184,10 +184,9 @@ async fn integrate_single_element(
             maybe_entry: Option<Entry>,
             element_store: &mut ElementBuf,
         ) -> DhtOpConvertResult<()> {
-            let signed_header =
-                SignedHeaderHashed::from_content(SignedHeader(header, signature)).await;
+            let signed_header = SignedHeaderHashed::from_content(SignedHeader(header, signature));
             let maybe_entry_hashed = match maybe_entry {
-                Some(entry) => Some(EntryHashed::from_content(entry).await),
+                Some(entry) => Some(EntryHashed::from_content(entry)),
                 None => None,
             };
             element_store.put(signed_header, maybe_entry_hashed)?;

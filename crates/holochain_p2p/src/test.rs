@@ -200,7 +200,7 @@ mod tests {
         let test_1 = GetElementResponse::GetHeader(Some(Box::new(WireElement::from_element(
             Element::new(
                 SignedHeaderHashed::with_presigned(
-                    HoloHashed::from_content(fixt!(Header)).await,
+                    HoloHashed::from_content(fixt!(Header)),
                     fixt!(Signature),
                 ),
                 None,
@@ -210,7 +210,7 @@ mod tests {
         let test_2 = GetElementResponse::GetHeader(Some(Box::new(WireElement::from_element(
             Element::new(
                 SignedHeaderHashed::with_presigned(
-                    HoloHashed::from_content(fixt!(Header)).await,
+                    HoloHashed::from_content(fixt!(Header)),
                     fixt!(Signature),
                 ),
                 None,

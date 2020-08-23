@@ -83,7 +83,7 @@ where
     }
 
     async fn deserialize_and_hash(hash_bytes: &[u8], content: C) -> HoloHashed<C> {
-        let data = HoloHashed::from_content(content).await;
+        let data = HoloHashed::from_content(content);
         fatal_db_hash_integrity_check!(
             "CasBufUsed::get",
             hash_bytes,

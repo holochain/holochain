@@ -1,6 +1,9 @@
 use crate::HashType;
 use holochain_serialized_bytes::prelude::*;
 
+/// Soft upper limit for content size, to ensure that hashing is not too expensive
+pub const MAX_HASHABLE_CONTENT_LEN: usize = 16 * 1024 * 1024; // 16 MiB
+
 /// Any implementor of HashableContent may be used in a HoloHashed to pair
 /// data with its HoloHash representation. It also has an associated HashType.
 pub trait HashableContent: Sized + Send + Sync {

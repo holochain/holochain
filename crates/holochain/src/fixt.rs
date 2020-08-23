@@ -108,7 +108,7 @@ fixturator!(
             let wasm = dna_wasm_fixturator.next().unwrap();
             wasms.insert(
                 tokio_safe_block_on::tokio_safe_block_forever_on(
-                    async { WasmHash::with_data(&wasm).await },
+                    async { WasmHash::with_data(&wasm) },
                 )
                 .into(),
                 wasm,
@@ -123,7 +123,7 @@ fixturator!(
             let wasm = dna_wasm_fixturator.next().unwrap();
             wasms.insert(
                 tokio_safe_block_on::tokio_safe_block_forever_on(
-                    async { WasmHash::with_data(&wasm).await },
+                    async { WasmHash::with_data(&wasm) },
                 )
                 .into(),
                 wasm,

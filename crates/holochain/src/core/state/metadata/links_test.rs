@@ -46,9 +46,7 @@ async fn fixtures(env: EnvironmentWrite, n: usize) -> Vec<TestData> {
 
         // Create the expected link result
         let (_, link_add_hash): (_, HeaderHash) =
-            HeaderHashed::from_content(Header::LinkAdd(link_add.clone()))
-                .await
-                .into();
+            HeaderHashed::from_content(Header::LinkAdd(link_add.clone())).into();
 
         let expected_link = LinkMetaVal {
             link_add_hash: link_add_hash.clone(),
@@ -80,9 +78,8 @@ impl TestData {
     /// Create the same test data with a new timestamp
     async fn with_same_keys(mut td: Self) -> Self {
         td.link_add.timestamp = Timestamp::now().into();
-        let link_add_hash = HeaderHashed::from_content(Header::LinkAdd(td.link_add.clone()))
-            .await
-            .into_hash();
+        let link_add_hash =
+            HeaderHashed::from_content(Header::LinkAdd(td.link_add.clone())).into_hash();
         td.link_remove.link_add_address = link_add_hash.clone();
         td.expected_link.timestamp = td.link_add.timestamp.clone().into();
         td.expected_link.link_add_hash = link_add_hash;
@@ -639,9 +636,7 @@ async fn links_on_same_base() {
         d.link_add.base_address = base_hash.clone();
         // Create the new hash
         let (_, link_add_hash): (_, HeaderHash) =
-            HeaderHashed::from_content(Header::LinkAdd(d.link_add.clone()))
-                .await
-                .into();
+            HeaderHashed::from_content(Header::LinkAdd(d.link_add.clone())).into();
         d.expected_link.link_add_hash = link_add_hash.clone();
         d.link_remove.link_add_address = link_add_hash;
     }
@@ -726,9 +721,7 @@ async fn links_on_same_zome_id() {
         d.link_add.zome_id = zome_id;
         // Create the new hash
         let (_, link_add_hash): (_, HeaderHash) =
-            HeaderHashed::from_content(Header::LinkAdd(d.link_add.clone()))
-                .await
-                .into();
+            HeaderHashed::from_content(Header::LinkAdd(d.link_add.clone())).into();
         d.expected_link.link_add_hash = link_add_hash.clone();
         d.expected_link.zome_id = zome_id;
         d.link_remove.link_add_address = link_add_hash;
@@ -833,9 +826,7 @@ async fn links_on_same_tag() {
 
         // Create the new hash
         let (_, link_add_hash): (_, HeaderHash) =
-            HeaderHashed::from_content(Header::LinkAdd(d.link_add.clone()))
-                .await
-                .into();
+            HeaderHashed::from_content(Header::LinkAdd(d.link_add.clone())).into();
         d.expected_link.link_add_hash = link_add_hash.clone();
         d.expected_link.zome_id = zome_id;
         d.expected_link.tag = tag.clone();

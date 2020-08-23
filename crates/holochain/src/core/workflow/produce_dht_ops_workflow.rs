@@ -44,7 +44,7 @@ async fn produce_dht_ops_workflow_inner(
 
     for (index, ops) in all_ops {
         for op in ops {
-            let (op, hash) = DhtOpHashed::from_content(op).await.into_inner();
+            let (op, hash) = DhtOpHashed::from_content(op).into_inner();
             debug!(?hash, ?op);
             let value = AuthoredDhtOpsValue {
                 op: op.to_light().await,
@@ -126,7 +126,7 @@ mod tests {
             visibility: EntryVisibility,
         ) -> Vec<DhtOp> {
             let app_entry = self.app_entry.next().unwrap();
-            let (app_entry, entry_hash) = EntryHashed::from_content(app_entry).await.into();
+            let (app_entry, entry_hash) = EntryHashed::from_content(app_entry).into();
             let app_entry_type = holochain_types::fixt::AppEntryTypeFixturator::new(visibility)
                 .next()
                 .unwrap();
@@ -208,15 +208,11 @@ mod tests {
                 .with_commit(|writer| source_chain.flush_to_txn(writer))
                 .unwrap();
 
-            futures::future::join_all(
-                all_ops
-                    .into_iter()
-                    .flatten()
-                    .map(|o| DhtOpHash::from_data(o)),
-            )
-            .await
-            .into_iter()
-            .collect()
+            all_ops
+                .into_iter()
+                .flatten()
+                .map(|o| DhtOpHash::from_data(o))
+                .collect()
         };
 
         // Run the workflow and commit it

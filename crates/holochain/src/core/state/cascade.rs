@@ -307,8 +307,7 @@ where
             for (link_add, signature) in link_adds {
                 debug!(?link_add);
                 let element = Element::new(
-                    SignedHeaderHashed::from_content(SignedHeader(link_add.into(), signature))
-                        .await,
+                    SignedHeaderHashed::from_content(SignedHeader(link_add.into(), signature)),
                     None,
                 );
                 self.update_stores(element).await?;
@@ -316,8 +315,7 @@ where
             for (link_remove, signature) in link_removes {
                 debug!(?link_remove);
                 let element = Element::new(
-                    SignedHeaderHashed::from_content(SignedHeader(link_remove.into(), signature))
-                        .await,
+                    SignedHeaderHashed::from_content(SignedHeader(link_remove.into(), signature)),
                     None,
                 );
                 self.update_stores(element).await?;

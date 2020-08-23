@@ -227,9 +227,7 @@ mod tests {
             crdt_type: CrdtType,
             required_validations: 5.into(),
         };
-        let dna_wasm = DnaWasmHashed::from_content(TestWasm::EntryDefs.into())
-            .await
-            .into_hash();
+        let dna_wasm = DnaWasmHashed::from_content(TestWasm::EntryDefs.into()).into_hash();
 
         let post_def_key = EntryDefBufferKey {
             zome: Zome::from_hash(dna_wasm.clone()),
