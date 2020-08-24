@@ -675,9 +675,8 @@ impl Cell {
         }
     }
 
-    #[instrument(skip(self, invocation))]
     /// Function called by the Conductor
-    #[instrument(skip(self))]
+    #[instrument(skip(self, invocation))]
     pub async fn call_zome(
         &self,
         invocation: ZomeCallInvocation,
@@ -689,7 +688,7 @@ impl Cell {
         let keystore = arc.keystore().clone();
         let env = arc.guard().await;
         let reader = env.reader()?;
-        let workspace = CallZomeWorkspace::new(self.state_env().clone().into(), &env)?;
+        let workspace = CallZomeWorkspace::new(self.state_env().clone().into(), &env).await?;
 
         let args = CallZomeWorkflowArgs {
             ribosome: self.get_ribosome().await?,

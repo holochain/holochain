@@ -163,3 +163,20 @@ where
         Ok(())
     }
 }
+
+impl<C> BufferedStore for CasBufFresh<C>
+where
+    C: HashableContent + BufVal + Send + Sync,
+    C::HashType: PrimitiveHashType + Send + Sync,
+{
+    type Error = DatabaseError;
+
+    fn is_clean(&self) -> bool {
+        self.inner.is_clean()
+    }
+
+    fn flush_to_txn(self, writer: &mut Writer) -> DatabaseResult<()> {
+        self.inner.flush_to_txn(writer)?;
+        Ok(())
+    }
+}

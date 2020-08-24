@@ -45,7 +45,7 @@ pub struct AppValidationWorkspace {
 impl AppValidationWorkspace {
     pub fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
         let db = dbs.get_db(&*INTEGRATION_LIMBO)?;
-        let integration_limbo = KvBufFresh::new(env, db);
+        let integration_limbo = KvBufFresh::new(env.clone(), db);
 
         let validation_limbo = ValidationLimboStore::new(env, dbs)?;
 
