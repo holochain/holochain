@@ -3,9 +3,7 @@
 use super::*;
 use crate::{
     conductor::manager::ManagedTaskResult,
-    core::{
-        workflow::app_validation_workflow::{app_validation_workflow, AppValidationWorkspace},
-    },
+    core::workflow::app_validation_workflow::{app_validation_workflow, AppValidationWorkspace},
 };
 use futures::future::Either;
 use holochain_state::env::EnvironmentWrite;

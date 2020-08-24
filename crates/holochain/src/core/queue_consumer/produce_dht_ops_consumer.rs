@@ -3,9 +3,7 @@
 use super::*;
 use crate::{
     conductor::manager::ManagedTaskResult,
-    core::{
-        workflow::produce_dht_ops_workflow::{produce_dht_ops_workflow, ProduceDhtOpsWorkspace},
-    },
+    core::workflow::produce_dht_ops_workflow::{produce_dht_ops_workflow, ProduceDhtOpsWorkspace},
 };
 use futures::future::Either;
 use holochain_state::env::EnvironmentWrite;

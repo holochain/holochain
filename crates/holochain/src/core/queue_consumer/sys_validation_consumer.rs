@@ -3,9 +3,7 @@
 use super::*;
 use crate::{
     conductor::manager::ManagedTaskResult,
-    core::{
-        workflow::sys_validation_workflow::{sys_validation_workflow, SysValidationWorkspace},
-    },
+    core::workflow::sys_validation_workflow::{sys_validation_workflow, SysValidationWorkspace},
 };
 use futures::future::Either;
 use holochain_state::env::EnvironmentWrite;
