@@ -1,6 +1,6 @@
 use hdk3::prelude::*;
 
-#[hdk(extern)]
+#[hdk_extern]
 fn init(_: ()) -> ExternResult<InitCallbackResult> {
     Ok(InitCallbackResult::Pass)
 }

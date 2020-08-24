@@ -1,20 +1,15 @@
 use hdk3::prelude::*;
 
-const MAYBE_LINKABLE_ID: &str = "maybe_linkable";
-#[derive(serde::Serialize, serde::Deserialize, SerializedBytes, Clone, Copy)]
+#[hdk_entry(id = "maybe_linkable")]
+#[derive(Clone, Copy)]
 enum MaybeLinkable {
     AlwaysLinkable,
     NeverLinkable,
 }
 
-entry_def!(MaybeLinkable EntryDef {
-    id: MAYBE_LINKABLE_ID.into(),
-    ..Default::default()
-});
-
 entry_defs![MaybeLinkable::entry_def()];
 
-#[hdk(extern)]
+#[hdk_extern]
 fn validate_link(
     validate_link_add_data: ValidateLinkAddData,
 ) -> ExternResult<ValidateLinkAddCallbackResult> {
@@ -30,7 +25,7 @@ fn validate_link(
     })
 }
 
-#[hdk(extern)]
+#[hdk_extern]
 fn add_valid_link(_: ()) -> ExternResult<HeaderHash> {
     let always_linkable_entry_hash = entry_hash!(MaybeLinkable::AlwaysLinkable)?;
     commit_entry!(MaybeLinkable::AlwaysLinkable)?;
@@ -41,7 +36,7 @@ fn add_valid_link(_: ()) -> ExternResult<HeaderHash> {
     )?)
 }
 
-#[hdk(extern)]
+#[hdk_extern]
 fn add_invalid_link(_: ()) -> ExternResult<HeaderHash> {
     let always_linkable_entry_hash = entry_hash!(MaybeLinkable::AlwaysLinkable)?;
     let never_linkable_entry_hash = entry_hash!(MaybeLinkable::NeverLinkable)?;
