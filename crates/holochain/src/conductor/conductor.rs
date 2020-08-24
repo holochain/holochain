@@ -524,7 +524,7 @@ where
         let wasm = environ.get_db(&*holochain_state::db::WASM)?;
         let dna_def_db = environ.get_db(&*holochain_state::db::DNA_DEF)?;
         let entry_def_db = environ.get_db(&*holochain_state::db::ENTRY_DEF)?;
-        let reader = env.reader()?;
+        let _reader = env.reader()?;
 
         let wasm_buf = Arc::new(WasmBuf::new(environ.clone().into(), wasm)?);
         let dna_def_buf = DnaDefBuf::new(environ.clone().into(), dna_def_db)?;
@@ -576,7 +576,7 @@ where
         let wasm = environ.get_db(&*holochain_state::db::WASM)?;
         let dna_def_db = environ.get_db(&*holochain_state::db::DNA_DEF)?;
         let entry_def_db = environ.get_db(&*holochain_state::db::ENTRY_DEF)?;
-        let reader = env.reader()?;
+        let _reader = env.reader()?;
 
         let zome_defs = get_entry_defs(dna.clone()).await?;
 
@@ -614,7 +614,7 @@ where
         let cell = self.cell_by_id(cell_id)?;
         let arc = cell.state_env();
         let env = arc.guard().await;
-        let reader = env.reader()?;
+        let _reader = env.reader()?;
         let source_chain = SourceChainBuf::new(arc.clone().into(), &env).await?;
         Ok(source_chain.dump_as_json().await?)
     }

@@ -9,7 +9,7 @@ use holochain_state::{
     db::GetDb,
     env::EnvironmentReadRef,
     error::{DatabaseError, DatabaseResult},
-    prelude::{Readable, Reader, Writer},
+    prelude::{Readable, Writer},
 };
 
 /// The result of a DhtOp Validation.

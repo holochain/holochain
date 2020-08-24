@@ -1,7 +1,7 @@
 //! The workflow and queue consumer for sys validation
 
 use super::*;
-use crate::core::state::workspace::Workspace;
+
 use crate::{
     conductor::manager::ManagedTaskResult,
     core::workflow::publish_dht_ops_workflow::{publish_dht_ops_workflow, PublishDhtOpsWorkspace},

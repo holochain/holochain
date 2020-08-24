@@ -4,7 +4,6 @@ use super::*;
 use crate::{
     conductor::manager::ManagedTaskResult,
     core::{
-        state::workspace::Workspace,
         workflow::sys_validation_workflow::{sys_validation_workflow, SysValidationWorkspace},
     },
 };

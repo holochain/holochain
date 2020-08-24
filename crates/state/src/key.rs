@@ -78,7 +78,7 @@ impl<T: HashType + Send + Sync> BufKey for HoloHash<T> {
         todo!("implement in terms of SerializedBytes")
     }
 
-    fn from_key_bytes_fallible(bytes: Vec<u8>) -> Self {
+    fn from_key_bytes_fallible(_bytes: Vec<u8>) -> Self {
         todo!("implement in terms of SerializedBytes")
     }
 }

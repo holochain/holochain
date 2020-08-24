@@ -146,7 +146,7 @@ impl BufferedStore for ChainSequenceBuf {
 
     /// Commit to the source chain, performing an as-at check and returning a
     /// SourceChainError::HeadMoved error if the as-at check fails
-    fn flush_to_txn(self, writer: &mut Writer) -> SourceChainResult<()> {
+    fn flush_to_txn(self, _writer: &mut Writer) -> SourceChainResult<()> {
         if self.is_clean() {
             return Ok(());
         }

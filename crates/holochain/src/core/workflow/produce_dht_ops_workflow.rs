@@ -9,7 +9,7 @@ use crate::core::state::{
 use holochain_state::{
     buffer::KvBufFresh,
     db::{AUTHORED_DHT_OPS, INTEGRATION_LIMBO},
-    prelude::{BufferedStore, EnvironmentRead, GetDb, Reader, Writer},
+    prelude::{BufferedStore, EnvironmentRead, GetDb, Writer},
 };
 use holochain_types::{dht_op::DhtOpHashed, validate::ValidationStatus};
 use tracing::*;

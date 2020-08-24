@@ -9,7 +9,7 @@ use holo_hash::HasHash;
 use holo_hash::{AgentPubKey, AnyDhtHash, EntryHash, HeaderHash};
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::{
-    buffer::{KvBufFresh, KvBufUsed, KvvBufUsed},
+    buffer::{KvBufUsed, KvvBufUsed},
     db::{
         CACHE_LINKS_META, CACHE_STATUS_META, CACHE_SYSTEM_META, META_VAULT_LINKS,
         META_VAULT_STATUS, META_VAULT_SYS,

@@ -8,7 +8,7 @@ use holochain_state::{
     buffer::KvBufFresh,
     db::INTEGRATED_DHT_OPS,
     error::{DatabaseError, DatabaseResult},
-    prelude::{BufferedStore, EnvironmentRead, GetDb, Readable, Reader},
+    prelude::{BufferedStore, EnvironmentRead, GetDb, Readable},
 };
 use holochain_types::{
     dht_op::{DhtOp, DhtOpLight},

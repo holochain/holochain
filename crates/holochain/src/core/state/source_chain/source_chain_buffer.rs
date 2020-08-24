@@ -7,7 +7,7 @@ use crate::core::state::{
 use fallible_iterator::FallibleIterator;
 use holochain_state::db::GetDb;
 use holochain_state::{
-    buffer::BufferedStore, error::DatabaseResult, fresh_reader, fresh_reader_async, prelude::*,
+    buffer::BufferedStore, error::DatabaseResult, fresh_reader, prelude::*,
 };
 use holochain_types::{
     dht_op::{produce_ops_from_element, DhtOp},

@@ -1,5 +1,5 @@
 use crate::{
-    buffer::{kv::KvBufFresh, BufferedStore, KvBufUsed},
+    buffer::{BufferedStore, KvBufUsed},
     env::EnvironmentRead,
     error::{DatabaseError, DatabaseResult},
     fatal_db_hash_integrity_check, fresh_reader, fresh_reader_async,
@@ -9,7 +9,7 @@ use crate::{
 use fallible_iterator::FallibleIterator;
 use futures::future::FutureExt;
 use holo_hash::{HasHash, HashableContent, HoloHashOf, HoloHashed, PrimitiveHashType};
-use must_future::MustBoxFuture;
+
 
 /// A wrapper around a KvBufFresh where keys are always Addresses,
 /// and values are always AddressableContent.

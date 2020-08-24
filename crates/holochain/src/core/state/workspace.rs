@@ -6,7 +6,7 @@
 use super::source_chain::SourceChainError;
 use holochain_state::{
     error::DatabaseError,
-    prelude::{EnvironmentRead, GetDb, Writer},
+    prelude::{Writer},
 };
 use thiserror::Error;
 

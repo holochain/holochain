@@ -4,7 +4,6 @@ use super::*;
 use crate::{
     conductor::manager::ManagedTaskResult,
     core::{
-        state::workspace::Workspace,
         workflow::produce_dht_ops_workflow::{produce_dht_ops_workflow, ProduceDhtOpsWorkspace},
     },
 };

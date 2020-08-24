@@ -5,7 +5,7 @@ use crate::core::ribosome::{
     wasm_ribosome::WasmRibosome,
     RibosomeT,
 };
-use derive_more::From;
+
 use error::{EntryDefStoreError, EntryDefStoreResult};
 use fallible_iterator::FallibleIterator;
 use holochain_serialized_bytes::prelude::*;

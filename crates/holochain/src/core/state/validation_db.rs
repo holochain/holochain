@@ -7,7 +7,6 @@ use holochain_state::{
     db::VALIDATION_LIMBO,
     error::DatabaseResult,
     prelude::{EnvironmentRead, GetDb},
-    transaction::Reader,
 };
 use holochain_types::{dht_op::DhtOp, Timestamp};
 use shrinkwraprs::Shrinkwrap;

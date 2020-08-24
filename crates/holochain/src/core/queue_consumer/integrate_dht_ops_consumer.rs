@@ -1,7 +1,7 @@
 //! The workflow and queue consumer for DhtOp integration
 
 use super::*;
-use crate::core::state::workspace::Workspace;
+
 use crate::{
     conductor::manager::ManagedTaskResult,
     core::workflow::integrate_dht_ops_workflow::{
