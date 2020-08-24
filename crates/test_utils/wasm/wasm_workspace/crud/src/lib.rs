@@ -9,8 +9,18 @@ fn new(_: ()) -> ExternResult<HeaderHash> {
 }
 
 #[hdk_extern]
-fn details(header_hash: HeaderHash) -> ExternResult<GetDetailsOutput> {
-    countree::CounTree::details(header_hash)
+fn header_details(header_hash: HeaderHash) -> ExternResult<GetDetailsOutput> {
+    countree::CounTree::header_details(header_hash)
+}
+
+#[hdk_extern]
+fn entry_details(entry_hash: EntryHash) -> ExternResult<GetDetailsOutput> {
+    countree::CounTree::entry_details(entry_hash)
+}
+
+#[hdk_extern]
+fn entry_hash(countree: countree::CounTree) -> ExternResult<EntryHash> {
+    Ok(entry_hash!(countree)?)
 }
 
 #[hdk_extern]

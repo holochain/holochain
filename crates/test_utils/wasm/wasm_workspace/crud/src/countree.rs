@@ -25,8 +25,13 @@ impl CounTree {
         }
     }
 
-    pub fn details(header_hash: HeaderHash) -> ExternResult<GetDetailsOutput> {
+    pub fn header_details(header_hash: HeaderHash) -> ExternResult<GetDetailsOutput> {
         Ok(GetDetailsOutput::new(get_details!(header_hash)?))
+    }
+
+    /// return the GetDetailsOutput for the entry hash from the header
+    pub fn entry_details(entry_hash: EntryHash) -> ExternResult<GetDetailsOutput> {
+        Ok(GetDetailsOutput::new(get_details!(entry_hash)?))
     }
 
     /// increments the given header hash by 1 or creates it if not found
