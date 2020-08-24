@@ -47,7 +47,7 @@ async fn produce_dht_ops_workflow_inner(
             let (op, hash) = DhtOpHashed::from_content(op).await.into_inner();
             debug!(?hash, ?op);
             let value = AuthoredDhtOpsValue {
-                op,
+                op: op.to_light().await,
                 receipt_count: 0,
                 last_publish_time: None,
             };

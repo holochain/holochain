@@ -10,11 +10,15 @@
 //!
 //!
 
-use super::error::WorkflowResult;
+use super::{
+    error::WorkflowResult,
+    produce_dht_ops_workflow::dht_op_light::{error::DhtOpConvertError, light_to_op},
+};
 use crate::core::{
     queue_consumer::{OneshotWriter, WorkComplete},
     state::{
         dht_op_integration::AuthoredDhtOpsStore,
+        element_buf::ElementBuf,
         workspace::{Workspace, WorkspaceResult},
     },
 };
@@ -23,7 +27,7 @@ use holo_hash::*;
 use holochain_p2p::HolochainP2pCell;
 use holochain_state::{
     buffer::{BufferedStore, KvBuf},
-    db::{AUTHORED_DHT_OPS, INTEGRATED_DHT_OPS},
+    db::AUTHORED_DHT_OPS,
     prelude::{GetDb, Reader},
     transaction::Writer,
 };
@@ -47,6 +51,8 @@ pub const MIN_PUBLISH_INTERVAL: time::Duration = time::Duration::from_secs(5);
 pub struct PublishDhtOpsWorkspace<'env> {
     /// Database of authored DhtOps, with data about prior publishing
     authored_dht_ops: AuthoredDhtOpsStore<'env>,
+    /// Element store for looking up data to construct ops
+    elements: ElementBuf<'env>,
 }
 
 #[instrument(skip(workspace, writer, network))]
@@ -116,6 +122,11 @@ pub async fn publish_dht_ops_workflow_inner(
         let op = value.op.clone();
         workspace.authored().put(op_hash.clone(), value)?;
 
+        let op = match light_to_op(op, workspace.elements()).await {
+            // Ignore StoreEntry ops on private
+            Err(DhtOpConvertError::StoreEntryOnPrivate) => continue,
+            r => r?,
+        };
         // For every op publish a request
         // Collect and sort ops by basis
         to_publish
@@ -131,8 +142,12 @@ impl<'env> Workspace<'env> for PublishDhtOpsWorkspace<'env> {
     fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self> {
         let db = dbs.get_db(&*AUTHORED_DHT_OPS)?;
         let authored_dht_ops = KvBuf::new(reader, db)?;
-        let _db = dbs.get_db(&*INTEGRATED_DHT_OPS)?;
-        Ok(Self { authored_dht_ops })
+        // Note that this must always be false as we don't want private entries being published
+        let elements = ElementBuf::vault(reader, dbs, false)?;
+        Ok(Self {
+            authored_dht_ops,
+            elements,
+        })
     }
 
     fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
@@ -144,6 +159,9 @@ impl<'env> Workspace<'env> for PublishDhtOpsWorkspace<'env> {
 impl<'env> PublishDhtOpsWorkspace<'env> {
     fn authored(&mut self) -> &mut AuthoredDhtOpsStore<'env> {
         &mut self.authored_dht_ops
+    }
+    fn elements(&self) -> &ElementBuf<'env> {
+        &self.elements
     }
 }
 
@@ -177,12 +195,15 @@ mod tests {
         test_utils::test_cell_env,
     };
     use holochain_types::{
-        dht_op::{DhtOp, DhtOpHashed},
+        dht_op::{DhtOp, DhtOpHashed, DhtOpLight},
         fixt::{AppEntryTypeFixturator, SignatureFixturator},
-        observability,
+        observability, HeaderHashed,
     };
     use holochain_zome_types::entry_def::EntryVisibility;
-    use holochain_zome_types::header::{builder, EntryType, EntryUpdate};
+    use holochain_zome_types::{
+        element::SignedHeaderHashed,
+        header::{builder, EntryType, EntryUpdate},
+    };
     use matches::assert_matches;
     use std::{
         collections::HashMap,
@@ -225,25 +246,35 @@ mod tests {
             let op = DhtOp::RegisterAddLink(sig.clone(), link_add.clone());
             // Get the hash from the op
             let op_hashed = DhtOpHashed::from_content(op.clone()).await;
-            data.push(op_hashed);
+            // Convert op to DhtOpLight
+            let header_hash = HeaderHashed::from_content(link_add.clone().into()).await;
+            let op_light = DhtOpLight::RegisterAddLink(
+                header_hash.as_hash().clone(),
+                link_add.base_address.into(),
+            );
+            data.push((sig, op_hashed, op_light, header_hash));
         }
 
         // Create and fill authored ops db in the workspace
         {
             let reader = env_ref.reader().unwrap();
             let mut workspace = PublishDhtOpsWorkspace::new(&reader, dbs).unwrap();
-            for op_hashed in data {
+            for (sig, op_hashed, op_light, header_hash) in data {
                 let op_hash = op_hashed.as_hash().clone();
-                let authored_value = AuthoredDhtOpsValue::from_op(op_hashed.as_content().clone());
+                let authored_value = AuthoredDhtOpsValue::from_light(op_light);
                 workspace
                     .authored_dht_ops
                     .put(op_hash.clone(), authored_value)
                     .unwrap();
+                // Put data into element store
+                let signed_header = SignedHeaderHashed::with_presigned(header_hash, sig);
+                workspace.elements.put(signed_header, None).unwrap();
             }
             // Manually commit because this workspace doesn't commit to all dbs
             env_ref
                 .with_commit::<DatabaseError, _, _>(|writer| {
                     workspace.authored_dht_ops.flush_to_txn(writer)?;
+                    workspace.elements.flush_to_txn(writer)?;
                     Ok(())
                 })
                 .unwrap();
