@@ -18,7 +18,7 @@ impl std::fmt::Display for ZomeId {
     }
 }
 
-impl From<u8> for EntryDefId {
+impl From<u8> for EntryDefInt {
     fn from(a: u8) -> Self {
         Self(a)
     }
