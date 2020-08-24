@@ -171,6 +171,7 @@ pub mod tests {
     use holochain_state::{
         env::{ReadManager, WriteManager},
         error::DatabaseResult,
+        prelude::*,
         test_utils::test_cell_env,
     };
     use holochain_types::observability;
@@ -297,7 +298,12 @@ pub mod tests {
                     .into()
                 )
             );
-            let items: Vec<u32> = buf.db.iter_raw()?.map(|(key, _)| key).collect();
+            let items: Vec<u32> = buf
+                .buf
+                .store()
+                .iter(&reader)?
+                .map(|(key, _)| Ok(key))
+                .collect()?;
             assert_eq!(items, vec![0, 1, 2]);
         }
 
@@ -341,7 +347,12 @@ pub mod tests {
                     .into()
                 )
             );
-            let items: Vec<u32> = buf.db.iter_raw()?.map(|(_, i)| i.tx_seq).collect();
+            let items: Vec<u32> = buf
+                .buf
+                .store()
+                .iter(&reader)?
+                .map(|(_, i)| Ok(i.tx_seq))
+                .collect()?;
             assert_eq!(items, vec![0, 0, 0, 1, 1, 1]);
         }
 
@@ -359,7 +370,7 @@ pub mod tests {
             let env = arc1.guard().await;
             let dbs = arc1.dbs().await;
             let reader = env.reader()?;
-            let mut buf = ChainSequenceBuf::new(arc1.clone().into(), &dbs)?.await?;
+            let mut buf = ChainSequenceBuf::new(arc1.clone().into(), &dbs).await?;
             buf.put_header(
                 HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -395,7 +406,7 @@ pub mod tests {
             let env = arc2.guard().await;
             let dbs = arc2.dbs().await;
             let reader = env.reader()?;
-            let mut buf = ChainSequenceBuf::new(arc2.clone().into(), &dbs)?.await?;
+            let mut buf = ChainSequenceBuf::new(arc2.clone().into(), &dbs).await?;
             buf.put_header(
                 HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,

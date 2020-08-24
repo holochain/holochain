@@ -49,13 +49,16 @@ pub mod tests {
         two: KvBufFresh<DbString, bool>,
     }
 
-    impl Workspace for TestWorkspace {
-        fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
+    impl TestWorkspace {
+        pub fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
             Ok(Self {
                 one: KvBufFresh::new(env, dbs.get_db(&*ELEMENT_VAULT_PUBLIC_ENTRIES)?)?,
                 two: KvBufFresh::new(env, dbs.get_db(&*ELEMENT_VAULT_HEADERS)?)?,
             })
         }
+    }
+
+    impl Workspace for TestWorkspace {
         fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
             self.one.flush_to_txn(writer)?;
             self.two.flush_to_txn(writer)?;

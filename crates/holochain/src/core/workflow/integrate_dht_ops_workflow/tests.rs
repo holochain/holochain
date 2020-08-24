@@ -180,7 +180,7 @@ enum Db {
 
 impl Db {
     /// Checks that the database is in a state
-    #[instrument(skip(expects, env_ref, dbs))]
+    #[instrument(skip(expects, env, dbs))]
     async fn check(expects: Vec<Self>, env: EnvironmentRead, dbs: &impl GetDb, here: String) {
         let env_ref = env.guard().await;
         let reader = env_ref.reader().unwrap();
@@ -194,7 +194,12 @@ impl Db {
                         op: op.to_light().await,
                         when_integrated: Timestamp::now().into(),
                     };
-                    let mut r = workspace.integrated_dht_ops.get(&op_hash).unwrap().unwrap();
+                    let mut r = workspace
+                        .integrated_dht_ops
+                        .get(&op_hash)
+                        .await
+                        .unwrap()
+                        .unwrap();
                     r.when_integrated = value.when_integrated;
                     assert_eq!(r, value, "{}", here);
                 }

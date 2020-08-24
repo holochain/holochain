@@ -655,7 +655,9 @@ pub mod test {
         let expected = {
             let env = cell_env.guard().await;
             let reader = env.reader().unwrap();
-            let source_chain = SourceChainBuf::new(cell_env.clone().into(), &env).unwrap();
+            let source_chain = SourceChainBuf::new(cell_env.clone().into(), &env)
+                .await
+                .unwrap();
             source_chain.dump_as_json().await.unwrap()
         };
 

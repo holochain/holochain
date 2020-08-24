@@ -84,7 +84,9 @@ async fn get_updates_cache() {
         .unwrap();
 
     // Create the cascade
-    let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs).unwrap();
+    let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
+        .await
+        .unwrap();
     let (network, shutdown) = run_fixt_network(element_fixt_store, BTreeMap::new()).await;
 
     {
@@ -130,7 +132,9 @@ async fn get_meta_updates_meta_cache() {
         .unwrap();
 
     // Create the cascade
-    let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs).unwrap();
+    let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
+        .await
+        .unwrap();
     let (network, shutdown) = run_fixt_network(BTreeMap::new(), meta_fixt_store).await;
 
     let returned = {
@@ -153,18 +157,23 @@ async fn get_meta_updates_meta_cache() {
     // Check the returned element is correct
     assert_eq!(returned.headers.len(), 1);
     assert_eq!(returned.headers.into_iter().next().unwrap(), expected.1);
+    let result = {
+        let reader = env_ref.reader().unwrap();
 
-    // Check the cache has been updated
-    let result = workspace
-        .cache_meta
-        .get_headers(match expected.0.hash_type().clone() {
-            hash_type::AnyDht::Entry => expected.0.clone().into(),
-            _ => unreachable!(),
-        })
-        .unwrap()
-        .collect::<Vec<_>>()
-        .unwrap();
-
+        // Check the cache has been updated
+        workspace
+            .cache_meta
+            .get_headers(
+                &reader,
+                match expected.0.hash_type().clone() {
+                    hash_type::AnyDht::Entry => expected.0.clone().into(),
+                    _ => unreachable!(),
+                },
+            )
+            .unwrap()
+            .collect::<Vec<_>>()
+            .unwrap()
+    };
     assert_eq!(result[0], expected.1);
     assert_eq!(result.len(), 1);
 
@@ -760,7 +769,9 @@ async fn commit_entry(
         ribosome,
         zome_name,
     } = call_data;
-    let mut workspace = CallZomeWorkspace::new(env.clone().into(), dbs).unwrap();
+    let mut workspace = CallZomeWorkspace::new(env.clone().into(), dbs)
+        .await
+        .unwrap();
 
     let input = CommitEntryInput::new((entry_def_id.clone(), entry.clone()));
 
@@ -794,7 +805,9 @@ async fn remove_entry<'env>(
         ribosome,
         zome_name,
     } = call_data;
-    let mut workspace = CallZomeWorkspace::new(env.clone().into(), dbs).unwrap();
+    let mut workspace = CallZomeWorkspace::new(env.clone().into(), dbs)
+        .await
+        .unwrap();
 
     let input = RemoveEntryInput::new(hash);
 
@@ -835,7 +848,9 @@ async fn update_entry<'env>(
         ribosome,
         zome_name,
     } = call_data;
-    let mut workspace = CallZomeWorkspace::new(env.clone().into(), dbs).unwrap();
+    let mut workspace = CallZomeWorkspace::new(env.clone().into(), dbs)
+        .await
+        .unwrap();
 
     let input = UpdateEntryInput::new((entry_def_id.clone(), entry.clone(), original_header_hash));
 
@@ -870,7 +885,9 @@ async fn get<'env>(
         ribosome,
         zome_name,
     } = call_data;
-    let mut workspace = CallZomeWorkspace::new(env.clone().into(), dbs).unwrap();
+    let mut workspace = CallZomeWorkspace::new(env.clone().into(), dbs)
+        .await
+        .unwrap();
 
     // let mut cascade = workspace.cascade(call_data.network);
     // cascade.dht_get(entry_hash, options).await.unwrap()
@@ -905,7 +922,9 @@ async fn get_details<'env>(
         ribosome,
         zome_name,
     } = call_data;
-    let mut workspace = CallZomeWorkspace::new(env.clone().into(), dbs).unwrap();
+    let mut workspace = CallZomeWorkspace::new(env.clone().into(), dbs)
+        .await
+        .unwrap();
 
     let input = GetDetailsInput::new((
         entry_hash.clone().into(),
@@ -937,7 +956,9 @@ async fn link_entries<'env>(
         ribosome,
         zome_name,
     } = call_data;
-    let mut workspace = CallZomeWorkspace::new(env.clone().into(), dbs).unwrap();
+    let mut workspace = CallZomeWorkspace::new(env.clone().into(), dbs)
+        .await
+        .unwrap();
 
     let input = LinkEntriesInput::new((base.clone(), target.clone(), link_tag));
 
@@ -971,7 +992,9 @@ async fn remove_link<'env>(
         ribosome,
         zome_name,
     } = call_data;
-    let mut workspace = CallZomeWorkspace::new(env.clone().into(), dbs).unwrap();
+    let mut workspace = CallZomeWorkspace::new(env.clone().into(), dbs)
+        .await
+        .unwrap();
 
     let input = RemoveLinkInput::new(link_add_hash);
 
@@ -1007,7 +1030,9 @@ async fn get_links<'env>(
         ribosome,
         zome_name,
     } = call_data;
-    let mut workspace = CallZomeWorkspace::new(env.clone().into(), dbs).unwrap();
+    let mut workspace = CallZomeWorkspace::new(env.clone().into(), dbs)
+        .await
+        .unwrap();
 
     let input = GetLinksInput::new((base.clone(), link_tag));
 
@@ -1037,7 +1062,9 @@ async fn get_link_details<'env>(
     tag: LinkTag,
     options: GetLinksOptions,
 ) -> Vec<(LinkAdd, Vec<LinkRemove>)> {
-    let mut workspace = CallZomeWorkspace::new(env.clone().into(), dbs).unwrap();
+    let mut workspace = CallZomeWorkspace::new(env.clone().into(), dbs)
+        .await
+        .unwrap();
 
     let mut cascade = workspace.cascade(call_data.network);
     let key = LinkMetaKey::BaseZomeTag(&base, 0.into(), &tag);

@@ -73,7 +73,7 @@ async fn get_links() -> SourceChainResult<()> {
     let env_ref = env.guard().await;
     let reader = env_ref.reader()?;
 
-    let mut source_chain = SourceChainBuf::new(env.clone().into(), &dbs)?;
+    let mut source_chain = SourceChainBuf::new(env.clone().into(), &dbs).await?;
     let mut element_cache = ElementBuf::cache(env.clone().into(), &dbs)?;
 
     // create a cache and a cas for store and meta

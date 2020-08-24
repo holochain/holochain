@@ -221,7 +221,7 @@ mod tests {
             let buf = IntegratedDhtOpsBuf::new(env.clone().into(), &dbs).unwrap();
             // No filter
             let mut r = buf
-                .query(None, None, None)
+                .query(&reader, None, None, None)
                 .unwrap()
                 .map(|(_, v)| Ok(v))
                 .collect::<Vec<_>>()
@@ -230,7 +230,7 @@ mod tests {
             assert_eq!(&r[..], &expected[..]);
             // From now
             let mut r = buf
-                .query(Some(times_exp[1].clone().into()), None, None)
+                .query(&reader, Some(times_exp[1].clone().into()), None, None)
                 .unwrap()
                 .map(|(_, v)| Ok(v))
                 .collect::<Vec<_>>()
@@ -245,7 +245,7 @@ mod tests {
             let ages_ago = times_exp[0] - Duration::weeks(5);
             let future = times_exp[1] + Duration::hours(1);
             let mut r = buf
-                .query(Some(ages_ago.into()), Some(future.into()), None)
+                .query(&reader, Some(ages_ago.into()), Some(future.into()), None)
                 .unwrap()
                 .map(|(_, v)| Ok(v))
                 .collect::<Vec<_>>()
@@ -262,6 +262,7 @@ mod tests {
             let future = times_exp[1] + Duration::hours(1);
             let mut r = buf
                 .query(
+                    &reader,
                     Some(ages_ago.into()),
                     Some(future.into()),
                     Some(DhtArc::new(same_basis.get_loc(), 1)),
@@ -276,7 +277,12 @@ mod tests {
             assert_eq!(r.len(), 2);
             // Same basis all
             let mut r = buf
-                .query(None, None, Some(DhtArc::new(same_basis.get_loc(), 1)))
+                .query(
+                    &reader,
+                    None,
+                    None,
+                    Some(DhtArc::new(same_basis.get_loc(), 1)),
+                )
                 .unwrap()
                 .map(|(_, v)| Ok(v))
                 .collect::<Vec<_>>()
