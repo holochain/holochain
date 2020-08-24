@@ -1,6 +1,6 @@
 use hdk3::prelude::*;
 
-#[hdk(extern)]
+#[hdk_extern]
 fn validate(_: Entry) -> ExternResult<ValidateCallbackResult> {
     Ok(ValidateCallbackResult::Valid)
 }

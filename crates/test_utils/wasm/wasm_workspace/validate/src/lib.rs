@@ -63,7 +63,7 @@ entry_defs![
     (&ThisWasmEntry::NeverValidates).into()
 ];
 
-#[hdk(extern)]
+#[hdk_extern]
 fn validate(entry: Entry) -> ExternResult<ValidateCallbackResult> {
     Ok(match ThisWasmEntry::try_from(&entry) {
         Ok(ThisWasmEntry::AlwaysValidates) => ValidateCallbackResult::Valid,
@@ -78,12 +78,12 @@ fn _commit_validate(to_commit: ThisWasmEntry) -> ExternResult<HeaderHash> {
     Ok(commit_entry!(&to_commit)?)
 }
 
-#[hdk(extern)]
+#[hdk_extern]
 fn always_validates(_: ()) -> ExternResult<HeaderHash> {
     _commit_validate(ThisWasmEntry::AlwaysValidates)
 }
 
-#[hdk(extern)]
+#[hdk_extern]
 fn never_validates(_: ()) -> ExternResult<HeaderHash> {
     _commit_validate(ThisWasmEntry::NeverValidates)
 }

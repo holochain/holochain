@@ -107,15 +107,10 @@ macro_rules! entry_def {
 
 #[macro_export]
 macro_rules! entry_defs {
-    // @todo make this work for more than one def
-    ( def $t:ident $def:expr; ) => {
-        crate::entry_def!($t $def);
-        crate::entry_defs![$t::entry_def()];
-    };
-    [ $( $defs:expr ),* ] => {
-        fn __entry_defs(_: ()) -> Result<$crate::prelude::EntryDefsCallbackResult, $crate::prelude::WasmError> {
-            Ok($crate::prelude::EntryDefsCallbackResult::from(vec![ $( $defs ),* ]))
+    [ $( $def:expr ),* ] => {
+        #[hdk_extern]
+        fn entry_defs(_: ()) -> $crate::prelude::ExternResult<$crate::prelude::EntryDefsCallbackResult> {
+            Ok($crate::prelude::EntryDefsCallbackResult::from(vec![ $( $def ),* ]))
         }
-        crate::map_extern!(entry_defs, __entry_defs);
     };
 }
