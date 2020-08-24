@@ -1,6 +1,6 @@
 //! Traits for defining keys and values of databases
 
-use holo_hash::{HashType, HoloHash, PrimitiveHashType};
+use holo_hash::{HashType, HoloHash};
 use serde::{de::DeserializeOwned, Serialize};
 
 /// Any key type used in a [KvStore] or [KvvStore] must implement this trait

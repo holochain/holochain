@@ -43,7 +43,7 @@ impl ChainSequenceBuf {
     pub async fn new(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
         let buf: Store = KvIntBufFresh::new(env.clone(), dbs.get_db(&*CHAIN_SEQUENCE)?);
         let (next_index, tx_seq, current_head) = fresh_reader!(env, |r| {
-            let latest = buf.store().iter_reverse(&r)?.next()?;
+            let latest = buf.store().iter(&r)?.rev().next()?;
             debug!("{:?}", latest);
             DatabaseResult::Ok(
                 latest
@@ -91,7 +91,7 @@ impl ChainSequenceBuf {
     /// Add a header to the chain, setting all other values automatically.
     /// This is intentionally the only way to modify this database.
     #[instrument(skip(self))]
-    pub fn put_header(&mut self, header_address: HeaderHash) {
+    pub fn put_header(&mut self, header_address: HeaderHash) -> DatabaseResult<()> {
         self.buf.put(
             self.next_index.into(),
             ChainSequenceItem {
@@ -99,10 +99,11 @@ impl ChainSequenceBuf {
                 tx_seq: self.tx_seq,
                 dht_transforms_complete: false,
             },
-        );
+        )?;
         trace!(self.next_index);
         self.next_index += 1;
         self.current_head = Some(header_address);
+        Ok(())
     }
 
     pub fn get_items_with_incomplete_dht_ops<'txn, R: Readable>(
@@ -131,7 +132,7 @@ impl ChainSequenceBuf {
     pub async fn complete_dht_op(&mut self, i: u32) -> SourceChainResult<()> {
         if let Some(mut c) = self.buf.get(&i.into()).await? {
             c.dht_transforms_complete = true;
-            self.buf.put(i.into(), c);
+            self.buf.put(i.into(), c)?;
         }
         Ok(())
     }

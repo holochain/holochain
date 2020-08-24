@@ -7,7 +7,6 @@ use crate::{
     transaction::Readable,
 };
 use fallible_iterator::FallibleIterator;
-use futures::future::FutureExt;
 use holo_hash::{HasHash, HashableContent, HoloHashOf, HoloHashed, PrimitiveHashType};
 
 /// A wrapper around a KvBufFresh where keys are always Addresses,

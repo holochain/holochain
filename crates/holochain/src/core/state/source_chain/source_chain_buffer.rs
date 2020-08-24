@@ -137,7 +137,7 @@ impl SourceChainBuf {
         }
         */
 
-        self.sequence.put_header(header_address.clone());
+        self.sequence.put_header(header_address.clone())?;
         self.elements.put(signed_header, maybe_entry)?;
         Ok(header_address)
     }
