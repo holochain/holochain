@@ -28,7 +28,7 @@ pub type AuthoredDhtOpsKey = DhtOpHash;
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct AuthoredDhtOpsValue {
     /// Signatures and hashes of the op
-    pub op: DhtOpLight,
+    pub op: DhtOp,
     /// Validation receipts received
     pub receipt_count: u32,
     /// Time last published, None if never published
@@ -37,7 +37,7 @@ pub struct AuthoredDhtOpsValue {
 
 impl AuthoredDhtOpsValue {
     /// Create a new value from a DhtOpLight with no receipts and no timestamp
-    pub fn from_light(op: DhtOpLight) -> Self {
+    pub fn from_op(op: DhtOp) -> Self {
         Self {
             op,
             receipt_count: 0,

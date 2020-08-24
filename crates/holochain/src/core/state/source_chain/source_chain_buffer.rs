@@ -36,6 +36,14 @@ impl<'env> SourceChainBuf<'env> {
         })
     }
 
+    pub fn public_only(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Self> {
+        Ok(Self {
+            elements: ElementBuf::vault(reader, dbs, false)?,
+            sequence: ChainSequenceBuf::new(reader, dbs)?,
+            keystore: dbs.keystore(),
+        })
+    }
+
     // add a cache test only method that allows this to
     // be used with the cache database for testing
     // FIXME This should only be cfg(test) but that doesn't work with integration tests

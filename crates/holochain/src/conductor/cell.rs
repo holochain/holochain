@@ -670,7 +670,6 @@ impl Cell {
 
     #[instrument(skip(self, invocation))]
     /// Function called by the Conductor
-    #[instrument(skip(self))]
     pub async fn call_zome(
         &self,
         invocation: ZomeCallInvocation,
