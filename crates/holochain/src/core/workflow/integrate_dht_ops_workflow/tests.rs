@@ -487,7 +487,8 @@ async fn call_workflow<'env>(
     let reader = env_ref.reader().unwrap();
     let workspace = IntegrateDhtOpsWorkspace::new(&reader, dbs).unwrap();
     let (mut qt, _rx) = TriggerSender::new();
-    integrate_dht_ops_workflow(workspace, env.into(), &mut qt)
+    let (mut qt_2, _rx_2) = TriggerSender::new();
+    integrate_dht_ops_workflow(workspace, env.into(), &mut qt, &mut qt_2)
         .await
         .unwrap();
 }

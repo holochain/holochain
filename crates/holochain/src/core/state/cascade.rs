@@ -643,8 +643,8 @@ where
         options: GetOptions,
     ) -> CascadeResult<Option<Element>> {
         match *hash.hash_type() {
-            AnyDht::Entry(e) => {
-                let hash = hash.retype(e);
+            AnyDht::Entry => {
+                let hash = hash.into();
                 match self.get_element_local_raw_via_entry(&hash).await? {
                     Some(e) => Ok(Some(e)),
                     None => {
@@ -654,7 +654,7 @@ where
                 }
             }
             AnyDht::Header => {
-                let hash = hash.retype(hash_type::Header);
+                let hash = hash.into();
                 match self.get_element_local_raw(&hash).await? {
                     Some(e) => Ok(Some(e)),
                     None => {

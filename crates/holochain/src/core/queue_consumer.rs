@@ -59,24 +59,33 @@ pub async fn spawn_queue_consumer_tasks(
     mut task_sender: sync::mpsc::Sender<ManagedTaskAdd>,
     stop: sync::broadcast::Sender<()>,
 ) -> InitialQueueTriggers {
+    // Publish
     let (tx_publish, rx1, handle) =
         spawn_publish_dht_ops_consumer(env.clone(), stop.subscribe(), cell_network.clone());
     task_sender
         .send(ManagedTaskAdd::dont_handle(handle))
         .await
         .expect("Failed to manage workflow handle");
+
+    let (create_tx_sys, get_tx_sys) = tokio::sync::oneshot::channel();
+
+    // Integration
     let (tx_integration, rx2, handle) =
-        spawn_integrate_dht_ops_consumer(env.clone(), stop.subscribe(), tx_publish);
+        spawn_integrate_dht_ops_consumer(env.clone(), stop.subscribe(), tx_publish, get_tx_sys);
     task_sender
         .send(ManagedTaskAdd::dont_handle(handle))
         .await
         .expect("Failed to manage workflow handle");
+
+    // App validation
     let (tx_app, rx3, handle) =
         spawn_app_validation_consumer(env.clone(), stop.subscribe(), tx_integration.clone());
     task_sender
         .send(ManagedTaskAdd::dont_handle(handle))
         .await
         .expect("Failed to manage workflow handle");
+
+    // Sys validation
     let (tx_sys, rx4, handle) = spawn_sys_validation_consumer(
         env.clone(),
         stop.subscribe(),
@@ -88,6 +97,11 @@ pub async fn spawn_queue_consumer_tasks(
         .send(ManagedTaskAdd::dont_handle(handle))
         .await
         .expect("Failed to manage workflow handle");
+    if let Err(_) = create_tx_sys.send(tx_sys.clone()) {
+        panic!("Failed to send tx_sys");
+    }
+
+    // Produce
     let (tx_produce, rx5, handle) =
         spawn_produce_dht_ops_consumer(env.clone(), stop.subscribe(), tx_integration.clone());
     task_sender

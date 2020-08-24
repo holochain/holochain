@@ -47,6 +47,7 @@ pub async fn incoming_dht_ops_workflow(
             num_tries: 0,
         };
         if !workspace.op_exists(&hash)? {
+            debug!(?vlv.op);
             workspace.validation_limbo.put(hash, vlv)?;
         }
     }

@@ -37,11 +37,12 @@ use tracing::*;
 
 mod tests;
 
-#[instrument(skip(workspace, writer, trigger_publish))]
+#[instrument(skip(workspace, writer, trigger_publish, trigger_sys))]
 pub async fn integrate_dht_ops_workflow(
     mut workspace: IntegrateDhtOpsWorkspace<'_>,
     writer: OneshotWriter,
     trigger_publish: &mut TriggerSender,
+    trigger_sys: &mut TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
     // Pull ops out of queue
     // TODO: PERF: we collect() only because this iterator cannot cross awaits,
@@ -140,6 +141,7 @@ pub async fn integrate_dht_ops_workflow(
     // TODO: only trigger if we have integrated ops that we have authored
     if total_integrated > 0 {
         trigger_publish.trigger();
+        trigger_sys.trigger();
     }
 
     Ok(result)

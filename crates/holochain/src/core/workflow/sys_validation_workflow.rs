@@ -179,7 +179,7 @@ async fn validate_op(
 ) -> WorkflowResult<Outcome> {
     match validate_op_inner(op, workspace, network, conductor_api).await {
         Ok(_) => match op {
-            DhtOp::RegisterAddLink(_, _) |
+            DhtOp::RegisterAgentActivity(_, _) |
             // TODO: Check strict mode where store element 
             // is also run through app validation
             DhtOp::StoreElement(_, _, _) => Ok(Outcome::SkipAppValidation),

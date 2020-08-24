@@ -116,9 +116,10 @@ async fn run_test(
 
     let (big_entry_header, big_entry_hash, link_add_hash) =
         bob_makes_a_large_link(&bob_cell_id, &handle, &dna_file).await;
+    info!("now");
 
     // Some time for ops to reach alice and run through validation
-    tokio::time::delay_for(Duration::from_millis(2000)).await;
+    tokio::time::delay_for(Duration::from_millis(500)).await;
 
     {
         let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();

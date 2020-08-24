@@ -65,6 +65,7 @@ pub async fn publish_dht_ops_workflow(
 
     // Commit to the network
     for (basis, ops) in to_publish {
+        debug!(?ops);
         network.publish(true, basis, ops, None).await?;
     }
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
