@@ -238,8 +238,19 @@ async fn validate_op_inner(
     conductor_api: &impl CellConductorApiT,
 ) -> SysValidationResult<()> {
     match op {
-        DhtOp::StoreElement(signature, header, _) => {
-            store_element(header, workspace.cascade(network)).await?;
+        DhtOp::StoreElement(signature, header, entry) => {
+            store_element(header, workspace.cascade(network.clone())).await?;
+            if let Some(entry) = entry {
+                store_entry(
+                    (header)
+                        .try_into()
+                        .map_err(|_| ValidationError::NotNewEntry(header.clone()))?,
+                    entry.as_ref(),
+                    conductor_api,
+                    workspace.cascade(network),
+                )
+                .await?;
+            }
 
             all_op_check(signature, header).await?;
             Ok(())
@@ -249,11 +260,12 @@ async fn validate_op_inner(
                 (header).into(),
                 entry.as_ref(),
                 conductor_api,
-                workspace.cascade(network),
+                workspace.cascade(network.clone()),
             )
             .await?;
 
             let header = header.clone().into();
+            store_element(&header, workspace.cascade(network)).await?;
             all_op_check(signature, &header).await?;
             Ok(())
         }
