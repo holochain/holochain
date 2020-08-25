@@ -37,7 +37,7 @@ pub trait ZomeApi {
     // fn sign_one_time();
     // fn sleep();
     // fn verify_signature();
-    // fn remove_entry();
+    // fn delete_entry();
     // // fn update_agent();
     // fn update_entry();
     // fn version();

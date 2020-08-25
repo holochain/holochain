@@ -104,6 +104,19 @@ impl<'a> ElementEntry<'a> {
             None
         }
     }
+
+    /// Provides deserialized app entry if it exists
+    ///
+    /// same as as_option but handles deserialization
+    /// anything other than ElementEntry::Present returns None
+    /// a present entry that fails to deserialize cleanly is an error
+    /// a present entry that deserializes cleanly is returned as the provided type A
+    pub fn to_app_option<A: TryFrom<SerializedBytes>>(&'a self) -> Result<Option<A>, A::Error> {
+        match self.as_option() {
+            Some(Entry::App(sb)) => Ok(Some(A::try_from(sb.to_owned())?)),
+            _ => Ok(None),
+        }
+    }
 }
 
 /// A combination of a Header and its signature.
