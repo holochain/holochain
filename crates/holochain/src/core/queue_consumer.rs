@@ -65,7 +65,7 @@ pub async fn spawn_queue_consumer_tasks(
         .await
         .expect("Failed to manage workflow handle");
     let (tx_integration, rx2, handle) =
-        spawn_integrate_dht_ops_consumer(env.clone(), stop.subscribe(), tx_publish);
+        spawn_integrate_dht_ops_consumer(env.clone(), stop.subscribe());
     task_sender
         .send(ManagedTaskAdd::dont_handle(handle))
         .await
@@ -83,7 +83,7 @@ pub async fn spawn_queue_consumer_tasks(
         .await
         .expect("Failed to manage workflow handle");
     let (tx_produce, rx5, handle) =
-        spawn_produce_dht_ops_consumer(env.clone(), stop.subscribe(), tx_integration.clone());
+        spawn_produce_dht_ops_consumer(env.clone(), stop.subscribe(), tx_publish.clone());
     task_sender
         .send(ManagedTaskAdd::dont_handle(handle))
         .await

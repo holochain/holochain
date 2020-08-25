@@ -7,6 +7,7 @@ use crate::fixt::ZomeCallHostAccessFixturator;
 use crate::here;
 use crate::{
     core::{
+        queue_consumer::TriggerSender,
         ribosome::{guest_callback::entry_defs::EntryDefsResult, host_fn, MockRibosomeT},
         state::{metadata::LinkMetaKey, workspace::WorkspaceError},
         workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace,
@@ -485,8 +486,7 @@ async fn call_workflow<'env>(
 ) {
     let reader = env_ref.reader().unwrap();
     let workspace = IntegrateDhtOpsWorkspace::new(&reader, dbs).unwrap();
-    let (mut qt, _rx) = TriggerSender::new();
-    integrate_dht_ops_workflow(workspace, env.into(), &mut qt)
+    integrate_dht_ops_workflow(workspace, env.into())
         .await
         .unwrap();
 }
