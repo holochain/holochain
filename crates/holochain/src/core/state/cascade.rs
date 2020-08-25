@@ -321,11 +321,13 @@ where
         Ok(())
     }
 
+
     async fn get_element_local_raw(&self, hash: &HeaderHash) -> CascadeResult<Option<Element>> {
-        match self.element_vault.get_element(hash).await? {
-            None => Ok(self.element_cache.get_element(hash).await?),
-            r => Ok(r),
-        }
+        let r = match self.element_vault.get_element(hash).await? {
+            Some(el) => self.meta_vault.get_headers(entry_hash),
+            None => self.element_cache.get_element(hash).await?,
+        };
+        Ok(r)
     }
 
     /// Gets the first element we can find for this entry locally
@@ -645,13 +647,13 @@ where
         match *hash.hash_type() {
             AnyDht::Entry => {
                 let hash = hash.into();
-                match self.get_element_local_raw_via_entry(&hash).await? {
+                let entry = match self.get_element_local_raw_via_entry(&hash).await? {
                     Some(e) => Ok(Some(e)),
                     None => {
                         self.fetch_element_via_entry(hash.clone(), options).await?;
                         self.get_element_local_raw_via_entry(&hash).await
                     }
-                }
+                }?;
             }
             AnyDht::Header => {
                 let hash = hash.into();
