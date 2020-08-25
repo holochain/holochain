@@ -108,7 +108,7 @@ impl Workspace for GenesisWorkspace {
 pub mod tests {
 
     use super::*;
-    use crate::core::state::workspace::Workspace;
+    
     use crate::{
         conductor::api::MockCellConductorApi,
         core::{state::source_chain::SourceChain, SourceChainResult},
@@ -140,7 +140,7 @@ pub mod tests {
         let agent_pubkey = fake_agent_pubkey_1();
 
         {
-            let reader = env.reader()?;
+            let _reader = env.reader()?;
             let workspace = GenesisWorkspace::new(arc.clone().into(), &dbs).await?;
             let mut api = MockCellConductorApi::new();
             api.expect_sync_dpki_request()
@@ -154,7 +154,7 @@ pub mod tests {
         }
 
         {
-            let reader = env.reader()?;
+            let _reader = env.reader()?;
 
             let source_chain = SourceChain::new(arc.clone().into(), &dbs).await?;
             assert_eq!(source_chain.agent_pubkey().await?, agent_pubkey);

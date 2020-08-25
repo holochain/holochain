@@ -376,7 +376,7 @@ pub mod tests {
         let env = test_cell_env();
         let dbs = env.dbs().await;
         let env_ref = env.guard().await;
-        let reader = env_ref.reader().unwrap();
+        let _reader = env_ref.reader().unwrap();
         let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
             .await
             .unwrap();
@@ -431,7 +431,7 @@ pub mod tests {
         let env = test_cell_env();
         let dbs = env.dbs().await;
         let env_ref = env.guard().await;
-        let reader = env_ref.reader().unwrap();
+        let _reader = env_ref.reader().unwrap();
         let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
             .await
             .unwrap();
@@ -465,7 +465,7 @@ pub mod tests {
         let env = test_cell_env();
         let dbs = env.dbs().await;
         let env_ref = env.guard().await;
-        let reader = env_ref.reader().unwrap();
+        let _reader = env_ref.reader().unwrap();
         let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
             .await
             .unwrap();

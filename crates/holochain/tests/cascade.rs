@@ -71,7 +71,7 @@ async fn get_links() -> SourceChainResult<()> {
     let env = test_cell_env();
     let dbs = env.dbs().await;
     let env_ref = env.guard().await;
-    let reader = env_ref.reader()?;
+    let _reader = env_ref.reader()?;
 
     let mut source_chain = SourceChainBuf::new(env.clone().into(), &dbs).await?;
     let mut element_cache = ElementBuf::cache(env.clone().into(), &dbs)?;

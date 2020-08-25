@@ -28,7 +28,7 @@ pub fn debug(
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use super::debug;
-    use crate::core::state::workspace::Workspace;
+    
     use crate::fixt::CallContextFixturator;
     use crate::fixt::WasmRibosomeFixturator;
     use crate::fixt::ZomeCallHostAccessFixturator;
@@ -61,7 +61,7 @@ pub mod wasm_test {
         let env = holochain_state::test_utils::test_cell_env();
         let dbs = env.dbs().await;
         let env_ref = env.guard().await;
-        let reader = env_ref.reader().unwrap();
+        let _reader = env_ref.reader().unwrap();
         let mut workspace = crate::core::workflow::CallZomeWorkspace::new(env.clone().into(), &dbs)
             .await
             .unwrap();
@@ -89,7 +89,7 @@ pub mod wasm_test {
         let env = holochain_state::test_utils::test_cell_env();
         let dbs = env.dbs().await;
         let env_ref = env.guard().await;
-        let reader = env_ref.reader().unwrap();
+        let _reader = env_ref.reader().unwrap();
         let mut workspace = crate::core::workflow::CallZomeWorkspace::new(env.clone().into(), &dbs)
             .await
             .unwrap();

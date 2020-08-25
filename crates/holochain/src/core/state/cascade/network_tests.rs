@@ -74,7 +74,7 @@ async fn get_updates_cache() {
     // Database setup
     let env = test_cell_env();
     let dbs = env.dbs().await;
-    let env_ref = env.guard().await;
+    let _env_ref = env.guard().await;
 
     let (element_fixt_store, _) = generate_fixt_store().await;
     let expected = element_fixt_store
@@ -237,7 +237,7 @@ async fn get_from_another_agent() {
     let header_hash = {
         let (bob_env, call_data) =
             make_call_data(bob_cell_id.clone(), handle.clone(), dna_file.clone()).await;
-        let env_ref = bob_env.guard().await;
+        let _env_ref = bob_env.guard().await;
         let dbs = bob_env.dbs().await;
         let header_hash = commit_entry(
             bob_env.clone(),
@@ -264,7 +264,7 @@ async fn get_from_another_agent() {
     let element = {
         let (alice_env, call_data) =
             make_call_data(alice_cell_id.clone(), handle.clone(), dna_file.clone()).await;
-        let env_ref = alice_env.guard().await;
+        let _env_ref = alice_env.guard().await;
         let dbs = alice_env.dbs().await;
         get(
             alice_env.clone(),
@@ -291,7 +291,7 @@ async fn get_from_another_agent() {
     let (remove_hash, update_hash) = {
         let (bob_env, call_data) =
             make_call_data(bob_cell_id.clone(), handle.clone(), dna_file.clone()).await;
-        let env_ref = bob_env.guard().await;
+        let _env_ref = bob_env.guard().await;
         let dbs = bob_env.dbs().await;
         let remove_hash = remove_entry(
             bob_env.clone(),
@@ -331,7 +331,7 @@ async fn get_from_another_agent() {
     let (entry_details, header_details) = {
         let (alice_env, call_data) =
             make_call_data(alice_cell_id.clone(), handle.clone(), dna_file.clone()).await;
-        let env_ref = alice_env.guard().await;
+        let _env_ref = alice_env.guard().await;
         let dbs = alice_env.dbs().await;
         debug!(the_entry_hash = ?entry_hash);
         let entry_details = get_details(
@@ -451,7 +451,7 @@ async fn get_links_from_another_agent() {
     let link_add_hash = {
         let (bob_env, call_data) =
             make_call_data(bob_cell_id.clone(), handle.clone(), dna_file.clone()).await;
-        let env_ref = bob_env.guard().await;
+        let _env_ref = bob_env.guard().await;
         let dbs = bob_env.dbs().await;
         let base_header_hash = commit_entry(
             bob_env.clone(),
@@ -512,7 +512,7 @@ async fn get_links_from_another_agent() {
     let links = {
         let (alice_env, call_data) =
             make_call_data(alice_cell_id.clone(), handle.clone(), dna_file.clone()).await;
-        let env_ref = alice_env.guard().await;
+        let _env_ref = alice_env.guard().await;
         let dbs = alice_env.dbs().await;
 
         get_links(
@@ -539,7 +539,7 @@ async fn get_links_from_another_agent() {
     {
         let (bob_env, call_data) =
             make_call_data(bob_cell_id.clone(), handle.clone(), dna_file.clone()).await;
-        let env_ref = bob_env.guard().await;
+        let _env_ref = bob_env.guard().await;
         let dbs = bob_env.dbs().await;
 
         // Link the entries
@@ -563,7 +563,7 @@ async fn get_links_from_another_agent() {
     let links = {
         let (alice_env, call_data) =
             make_call_data(alice_cell_id.clone(), handle.clone(), dna_file.clone()).await;
-        let env_ref = alice_env.guard().await;
+        let _env_ref = alice_env.guard().await;
         let dbs = alice_env.dbs().await;
 
         get_link_details(

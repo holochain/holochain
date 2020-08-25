@@ -176,7 +176,7 @@ mod tests {
 
         // Setup the database and expected data
         let expected_hashes: HashSet<_> = {
-            let reader = env_ref.reader().unwrap();
+            let _reader = env_ref.reader().unwrap();
             let mut td = TestData::new();
             let mut source_chain = ProduceDhtOpsWorkspace::new(env.clone().into(), &dbs)
                 .await
@@ -233,7 +233,7 @@ mod tests {
 
         // Run the workflow and commit it
         {
-            let reader = env_ref.reader().unwrap();
+            let _reader = env_ref.reader().unwrap();
             let mut workspace = ProduceDhtOpsWorkspace::new(env.clone().into(), &dbs)
                 .await
                 .unwrap();
@@ -311,7 +311,7 @@ mod tests {
         // Call the workflow again now the queue should be the same length as last time
         // because no new ops should hav been added
         {
-            let reader = env_ref.reader().unwrap();
+            let _reader = env_ref.reader().unwrap();
             let mut workspace = ProduceDhtOpsWorkspace::new(env.clone().into(), &dbs)
                 .await
                 .unwrap();

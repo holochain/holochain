@@ -205,7 +205,7 @@ impl BufferedStore for SourceChain {
 pub mod tests {
 
     use super::*;
-    use holochain_state::prelude::*;
+    
     use holochain_state::test_utils::test_cell_env;
     use holochain_types::test_utils::{fake_agent_pubkey_1, fake_dna_hash};
     use holochain_zome_types::capability::{CapAccess, ZomeCallCapGrant};
@@ -219,7 +219,7 @@ pub mod tests {
         let secret = access.secret().unwrap();
         let grant = ZomeCallCapGrant::new("tag".into(), access.clone(), BTreeMap::new());
         {
-            let reader = env.reader()?;
+            let _reader = env.reader()?;
             let mut store = SourceChainBuf::new(arc.clone().into(), &env).await?;
             store
                 .genesis(fake_dna_hash(1), fake_agent_pubkey_1(), None)
@@ -228,7 +228,7 @@ pub mod tests {
         }
 
         {
-            let reader = env.reader()?;
+            let _reader = env.reader()?;
             let mut chain = SourceChain::new(arc.clone().into(), &env).await?;
             chain.put_cap_grant(grant.clone()).await?;
 
@@ -245,7 +245,7 @@ pub mod tests {
         }
 
         {
-            let reader = env.reader()?;
+            let _reader = env.reader()?;
             let chain = SourceChain::new(arc.clone().into(), &env).await?;
             assert_eq!(
                 chain.get_persisted_cap_grant_by_secret(secret).await?,
@@ -264,7 +264,7 @@ pub mod tests {
         let agent_pubkey = fake_agent_pubkey_1().into();
         let claim = CapClaim::new("tag".into(), agent_pubkey, secret.clone());
         {
-            let reader = env.reader()?;
+            let _reader = env.reader()?;
             let mut store = SourceChainBuf::new(arc.clone().into(), &env).await?;
             store
                 .genesis(fake_dna_hash(1), fake_agent_pubkey_1(), None)
@@ -273,7 +273,7 @@ pub mod tests {
         }
 
         {
-            let reader = env.reader()?;
+            let _reader = env.reader()?;
             let mut chain = SourceChain::new(arc.clone().into(), &env).await?;
             chain.put_cap_claim(claim.clone()).await?;
 
@@ -290,7 +290,7 @@ pub mod tests {
         }
 
         {
-            let reader = env.reader()?;
+            let _reader = env.reader()?;
             let chain = SourceChain::new(arc.clone().into(), &env).await?;
             assert_eq!(
                 chain.get_persisted_cap_claim_by_secret(&secret).await?,

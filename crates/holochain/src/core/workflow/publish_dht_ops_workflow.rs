@@ -189,7 +189,7 @@ mod tests {
     };
     use holochain_state::{
         buffer::BufferedStore,
-        env::{EnvironmentWrite, EnvironmentWriteRef, ReadManager, WriteManager},
+        env::{EnvironmentWrite, ReadManager, WriteManager},
         error::DatabaseError,
         test_utils::test_cell_env,
     };
@@ -252,7 +252,7 @@ mod tests {
 
         // Create and fill authored ops db in the workspace
         {
-            let reader = env_ref.reader().unwrap();
+            let _reader = env_ref.reader().unwrap();
             let mut workspace = PublishDhtOpsWorkspace::new(env.clone().into(), &env_ref).unwrap();
             for (sig, op_hashed, op_light, header_hash) in data {
                 let op_hash = op_hashed.as_hash().clone();
@@ -325,7 +325,7 @@ mod tests {
     /// Call the workflow
     async fn call_workflow(env: EnvironmentWrite, mut cell_network: HolochainP2pCell) {
         let env_ref = env.guard().await;
-        let reader = env_ref.reader().unwrap();
+        let _reader = env_ref.reader().unwrap();
         let workspace = PublishDhtOpsWorkspace::new(env.clone().into(), &env_ref).unwrap();
         publish_dht_ops_workflow(workspace, env.clone().into(), &mut cell_network)
             .await
@@ -517,7 +517,7 @@ mod tests {
 
             // Put data in elements
             {
-                let reader = env_ref.reader().unwrap();
+                let _reader = env_ref.reader().unwrap();
 
                 let mut elements = ElementBuf::vault(env.clone().into(), &dbs, true).unwrap();
 
@@ -592,7 +592,7 @@ mod tests {
 
             // Create and fill authored ops db in the workspace
             {
-                let reader = env_ref.reader().unwrap();
+                let _reader = env_ref.reader().unwrap();
                 let mut workspace = PublishDhtOpsWorkspace::new(env.clone().into(), &dbs).unwrap();
                 let (op_hash, light, _) = store_element;
                 workspace

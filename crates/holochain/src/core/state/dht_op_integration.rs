@@ -201,7 +201,7 @@ mod tests {
         // Put them in the db
         {
             let mut dht_hash = DhtOpHashFixturator::new(Predictable);
-            let reader = env_ref.reader().unwrap();
+            let _reader = env_ref.reader().unwrap();
             let mut buf = IntegratedDhtOpsBuf::new(env.clone().into(), &dbs).unwrap();
             for mut value in values {
                 buf.put(dht_hash.next().unwrap(), value.clone()).unwrap();

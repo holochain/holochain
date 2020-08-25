@@ -309,7 +309,7 @@ mod tests {
 
         // write one public-entry header and one private-entry header
         env.with_commit(|txn| {
-            let reader = env.reader()?;
+            let _reader = env.reader()?;
             let mut store = ElementBuf::vault(arc.clone().into(), &env, true)?;
             store.put(header_pub, Some(entry_pub.clone()))?;
             store.put(header_priv, Some(entry_priv.clone()))?;
@@ -318,7 +318,7 @@ mod tests {
 
         // Can retrieve both entries when private entries are enabled
         {
-            let reader = env.reader()?;
+            let _reader = env.reader()?;
             let store = ElementBuf::vault(arc.clone().into(), &env, true)?;
             assert_eq!(
                 store.get_entry(entry_pub.as_hash()).await,
@@ -332,7 +332,7 @@ mod tests {
 
         // Cannot retrieve private entry when disabled
         {
-            let reader = env.reader()?;
+            let _reader = env.reader()?;
             let store = ElementBuf::vault(arc.clone().into(), &env, false)?;
             assert_eq!(
                 store.get_entry(entry_pub.as_hash()).await,
@@ -358,7 +358,7 @@ mod tests {
 
         // write one public-entry header and one private-entry header (which will be a noop)
         env.with_commit(|txn| {
-            let reader = env.reader()?;
+            let _reader = env.reader()?;
             let mut store = ElementBuf::vault(arc.clone().into(), &env, false)?;
             store.put(header_pub, Some(entry_pub.clone()))?;
             store.put(header_priv, Some(entry_priv.clone()))?;
@@ -367,7 +367,7 @@ mod tests {
 
         // Can retrieve both entries when private entries are enabled
         {
-            let reader = env.reader()?;
+            let _reader = env.reader()?;
             let store = ElementBuf::vault(arc.clone().into(), &env, true)?;
             assert_eq!(
                 store.get_entry(entry_pub.as_hash()).await,
@@ -378,7 +378,7 @@ mod tests {
 
         // Cannot retrieve private entry when disabled
         {
-            let reader = env.reader()?;
+            let _reader = env.reader()?;
             let store = ElementBuf::vault(arc.clone().into(), &env, false)?;
             assert_eq!(
                 store.get_entry(entry_pub.as_hash()).await,
