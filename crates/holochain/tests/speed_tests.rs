@@ -206,6 +206,8 @@ async fn speed_test() {
         app_interface.request(request).await
     }
 
+    let timer = std::time::Instant::now();
+
     for i in 0..NUM {
         let invocation = anchor_invocation("alice", alice_cell_id.clone(), i).unwrap();
         let response = call(&mut app_interface, invocation).await.unwrap();
@@ -215,41 +217,50 @@ async fn speed_test() {
         assert_matches!(response, AppResponse::ZomeCallInvocation(_));
     }
 
-    // Give a little time for gossip to process
-    tokio::time::delay_for(std::time::Duration::from_millis(100)).await;
-
-    let invocation = new_invocation(
-        alice_cell_id.clone(),
-        "list_anchor_addresses",
-        TestString("bobbo".into()),
-    )
-    .unwrap();
-    let response = call(&mut app_interface, invocation).await.unwrap();
-    match response {
-        AppResponse::ZomeCallInvocation(r) => {
-            let response: SerializedBytes = r.into_inner();
-            let hashes: EntryHashes = response.try_into().unwrap();
-            assert_eq!(hashes.0.len(), NUM);
+    let mut alice_done = false;
+    let mut bobbo_done = false;
+    loop {
+        if !bobbo_done {
+            let invocation = new_invocation(
+                alice_cell_id.clone(),
+                "list_anchor_addresses",
+                TestString("bobbo".into()),
+            )
+            .unwrap();
+            let response = call(&mut app_interface, invocation).await.unwrap();
+            match response {
+                AppResponse::ZomeCallInvocation(r) => {
+                    let response: SerializedBytes = r.into_inner();
+                    let hashes: EntryHashes = response.try_into().unwrap();
+                    bobbo_done = hashes.0.len() == NUM;
+                }
+                _ => unreachable!(),
+            }
         }
-        _ => unreachable!(),
-    }
 
-    let invocation = new_invocation(
-        bob_cell_id.clone(),
-        "list_anchor_addresses",
-        TestString("alice".into()),
-    )
-    .unwrap();
-    let response = call(&mut app_interface, invocation).await.unwrap();
-    match response {
-        AppResponse::ZomeCallInvocation(r) => {
-            let response: SerializedBytes = r.into_inner();
-            let hashes: EntryHashes = response.try_into().unwrap();
-            assert_eq!(hashes.0.len(), NUM);
+        if !alice_done {
+            let invocation = new_invocation(
+                bob_cell_id.clone(),
+                "list_anchor_addresses",
+                TestString("alice".into()),
+            )
+            .unwrap();
+            let response = call(&mut app_interface, invocation).await.unwrap();
+            match response {
+                AppResponse::ZomeCallInvocation(r) => {
+                    let response: SerializedBytes = r.into_inner();
+                    let hashes: EntryHashes = response.try_into().unwrap();
+                    alice_done = hashes.0.len() == NUM;
+                }
+                _ => unreachable!(),
+            }
         }
-        _ => unreachable!(),
+        if alice_done && bobbo_done {
+            let el = timer.elapsed();
+            println!("Consistency in {}ms or {}s", el.as_millis(), el.as_secs());
+            break;
+        }
     }
-
     app_interface
         .close(1000, "Shutting down".into())
         .await
