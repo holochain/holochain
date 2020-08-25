@@ -11,28 +11,29 @@ use holochain_serialized_bytes::prelude::*;
 use holochain_state::{
     buffer::{KvBuf, KvvBuf},
     db::{
-        CACHE_LINKS_META, CACHE_STATUS_META, CACHE_SYSTEM_META, META_VAULT_LINKS,
-        META_VAULT_STATUS, META_VAULT_SYS,
+        CACHE_LINKS_META, CACHE_STATUS_META, CACHE_SYSTEM_META, META_VAULT_LINKS, META_VAULT_MISC,
+        META_VAULT_SYS,
     },
     error::{DatabaseError, DatabaseResult},
     prelude::*,
 };
 use holochain_types::metadata::{EntryDhtStatus, TimedHeaderHash};
+use holochain_types::{header::NewEntryHeader, link::WireLinkMetaKey};
 use holochain_types::{HeaderHashed, Timestamp};
 use holochain_zome_types::header::{self, LinkAdd, LinkRemove, ZomeId};
 use holochain_zome_types::{link::LinkTag, Header};
 use std::fmt::Debug;
-
-pub use sys_meta::*;
 use tracing::*;
 
-use holochain_types::{header::NewEntryHeader, link::WireLinkMetaKey};
+pub use keys::*;
+pub use sys_meta::*;
 
 #[cfg(test)]
 pub use mock::MockMetadataBuf;
 #[cfg(test)]
 use mockall::mock;
 
+mod keys;
 #[cfg(test)]
 pub mod links_test;
 mod sys_meta;
@@ -40,107 +41,6 @@ mod sys_meta;
 #[allow(missing_docs)]
 #[cfg(test)]
 mod mock;
-
-/// The value stored in the links meta db
-#[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub struct LinkMetaVal {
-    /// Hash of the [LinkAdd] [Header] that created this link
-    pub link_add_hash: HeaderHash,
-    /// The [Entry] being linked to
-    pub target: EntryHash,
-    /// When the link was added
-    pub timestamp: Timestamp,
-    /// The [ZomePosition] of the zome this link belongs to
-    pub zome_id: ZomeId,
-    /// A tag used to find this link
-    pub tag: LinkTag,
-}
-
-/// Key for the LinkMeta database.
-///
-/// Constructed so that links can be queried by a prefix match
-/// on the key.
-/// Must provide `tag` and `link_add_hash` for inserts,
-/// but both are optional for gets.
-#[derive(Debug, Eq, PartialEq, Clone)]
-pub enum LinkMetaKey<'a> {
-    /// Search for all links on a base
-    Base(&'a EntryHash),
-    /// Search for all links on a base, for a zome
-    BaseZome(&'a EntryHash, ZomeId),
-    /// Search for all links on a base, for a zome and with a tag
-    BaseZomeTag(&'a EntryHash, ZomeId, &'a LinkTag),
-    /// This will match only the link created with a certain [LinkAdd] hash
-    Full(&'a EntryHash, ZomeId, &'a LinkTag, &'a HeaderHash),
-}
-
-/// The actual type the [LinkMetaKey] turns into
-type LinkMetaKeyBytes = Vec<u8>;
-
-impl<'a> LinkMetaKey<'a> {
-    fn to_key(&self) -> LinkMetaKeyBytes {
-        use LinkMetaKey::*;
-        match self {
-            Base(b) => b.as_ref().to_vec(),
-            BaseZome(b, z) => [b.as_ref(), &[u8::from(*z)]].concat(),
-            BaseZomeTag(b, z, t) => [b.as_ref(), &[u8::from(*z)], t.as_ref()].concat(),
-            Full(b, z, t, l) => [b.as_ref(), &[u8::from(*z)], t.as_ref(), l.as_ref()].concat(),
-        }
-    }
-
-    /// Return the base of this key
-    pub fn base(&self) -> &EntryHash {
-        use LinkMetaKey::*;
-        match self {
-            Base(b) | BaseZome(b, _) | BaseZomeTag(b, _, _) | Full(b, _, _, _) => b,
-        }
-    }
-}
-
-impl<'a> From<(&'a LinkAdd, &'a HeaderHash)> for LinkMetaKey<'a> {
-    fn from((link_add, hash): (&'a LinkAdd, &'a HeaderHash)) -> Self {
-        Self::Full(
-            &link_add.base_address,
-            link_add.zome_id,
-            &link_add.tag,
-            hash,
-        )
-    }
-}
-
-impl<'a> From<&'a WireLinkMetaKey> for LinkMetaKey<'a> {
-    fn from(w: &'a WireLinkMetaKey) -> Self {
-        match w {
-            WireLinkMetaKey::Base(b) => Self::Base(b),
-            WireLinkMetaKey::BaseZome(b, z) => Self::BaseZome(b, *z),
-            WireLinkMetaKey::BaseZomeTag(b, z, t) => Self::BaseZomeTag(b, *z, t),
-            WireLinkMetaKey::Full(b, z, t, l) => Self::Full(b, *z, t, l),
-        }
-    }
-}
-
-impl From<&LinkMetaKey<'_>> for WireLinkMetaKey {
-    fn from(k: &LinkMetaKey) -> Self {
-        match k.clone() {
-            LinkMetaKey::Base(b) => Self::Base(b.clone()),
-            LinkMetaKey::BaseZome(b, z) => Self::BaseZome(b.clone(), z),
-            LinkMetaKey::BaseZomeTag(b, z, t) => Self::BaseZomeTag(b.clone(), z, t.clone()),
-            LinkMetaKey::Full(b, z, t, l) => Self::Full(b.clone(), z, t.clone(), l.clone()),
-        }
-    }
-}
-
-impl LinkMetaVal {
-    /// Turn into a zome friendly type
-    pub fn into_link(self) -> holochain_zome_types::link::Link {
-        let timestamp: chrono::DateTime<chrono::Utc> = self.timestamp.into();
-        holochain_zome_types::link::Link {
-            target: self.target,
-            timestamp: timestamp.into(),
-            tag: self.tag,
-        }
-    }
-}
 
 /// Trait for the [MetadataBuf]
 /// Needed for mocking
@@ -181,6 +81,10 @@ pub trait MetadataBufT {
 
     /// Registers a [Header::NewEntryHeader] on the referenced [Entry]
     async fn register_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()>;
+
+    /// Registers a [Header] when a StoreElement is processed.
+    /// Useful for knowing if we can serve a header from our element vault
+    async fn register_element_header(&mut self, header: &Header) -> DatabaseResult<()>;
 
     /// Registers a published [Header] on the authoring agent's public key
     async fn register_activity(&mut self, header: Header) -> DatabaseResult<()>;
@@ -235,105 +139,16 @@ pub trait MetadataBufT {
         &self,
         link_add: HeaderHash,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>;
-}
 
-/// Values of [Header]s stored by the sys meta db
-#[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub enum SysMetaVal {
-    /// A header that results in a new entry
-    /// Either a [EntryCreate] or [EntryUpdate]
-    NewEntry(TimedHeaderHash),
-    /// An [EntryUpdate] [Header]
-    Update(TimedHeaderHash),
-    /// An [Header::ElementDelete]
-    Delete(TimedHeaderHash),
-    /// Activity on an agent's public key
-    Activity(TimedHeaderHash),
-    /// Link remove on link add
-    LinkRemove(TimedHeaderHash),
-}
-
-/// Subset of headers for the sys meta db
-enum EntryHeader {
-    Activity(Header),
-    NewEntry(Header),
-    Update(Header),
-    Delete(Header),
-}
-
-type SysMetaKey = AnyDhtHash;
-
-impl LinkMetaVal {
-    /// Create a new Link for the link meta db
-    pub fn new(
-        link_add_hash: HeaderHash,
-        target: EntryHash,
-        timestamp: Timestamp,
-        zome_id: ZomeId,
-        tag: LinkTag,
-    ) -> Self {
-        Self {
-            link_add_hash,
-            target,
-            timestamp,
-            zome_id,
-            tag,
-        }
-    }
-}
-
-impl From<SysMetaVal> for HeaderHash {
-    fn from(v: SysMetaVal) -> Self {
-        match v {
-            SysMetaVal::NewEntry(h)
-            | SysMetaVal::Update(h)
-            | SysMetaVal::Delete(h)
-            | SysMetaVal::LinkRemove(h)
-            | SysMetaVal::Activity(h) => h.header_hash,
-        }
-    }
-}
-
-impl EntryHeader {
-    async fn into_hash(self) -> Result<TimedHeaderHash, SerializedBytesError> {
-        let header = match self {
-            EntryHeader::NewEntry(h)
-            | EntryHeader::Update(h)
-            | EntryHeader::Delete(h)
-            | EntryHeader::Activity(h) => h,
-        };
-        let (header, header_hash): (Header, HeaderHash) =
-            HeaderHashed::from_content(header).await.into();
-        Ok(TimedHeaderHash {
-            timestamp: header.timestamp().into(),
-            header_hash,
-        })
-    }
-}
-
-impl From<NewEntryHeader> for EntryHeader {
-    fn from(h: NewEntryHeader) -> Self {
-        EntryHeader::NewEntry(h.into())
-    }
-}
-
-impl From<header::EntryUpdate> for EntryHeader {
-    fn from(h: header::EntryUpdate) -> Self {
-        EntryHeader::Update(Header::EntryUpdate(h))
-    }
-}
-
-impl From<header::ElementDelete> for EntryHeader {
-    fn from(h: header::ElementDelete) -> Self {
-        EntryHeader::Delete(Header::ElementDelete(h))
-    }
+    /// Finds if there is a StoreElement under this header
+    fn has_element_header(&self, header: &HeaderHash) -> DatabaseResult<bool>;
 }
 
 /// Updates and answers queries for the links and system meta databases
 pub struct MetadataBuf<'env> {
     system_meta: KvvBuf<'env, SysMetaKey, SysMetaVal, Reader<'env>>,
-    links_meta: KvBuf<'env, LinkMetaKeyBytes, LinkMetaVal, Reader<'env>>,
-    status_meta: KvBuf<'env, EntryHash, EntryDhtStatus, Reader<'env>>,
+    links_meta: KvBuf<'env, BytesKey, LinkMetaVal, Reader<'env>>,
+    misc_meta: KvBuf<'env, BytesKey, MiscMetaValue, Reader<'env>>,
 }
 
 impl<'env> MetadataBuf<'env> {
@@ -341,28 +156,28 @@ impl<'env> MetadataBuf<'env> {
         reader: &'env Reader<'env>,
         system_meta: MultiStore,
         links_meta: SingleStore,
-        status_meta: SingleStore,
+        misc_meta: SingleStore,
     ) -> DatabaseResult<Self> {
         Ok(Self {
             system_meta: KvvBuf::new(reader, system_meta)?,
             links_meta: KvBuf::new(reader, links_meta)?,
-            status_meta: KvBuf::new(reader, status_meta)?,
+            misc_meta: KvBuf::new(reader, misc_meta)?,
         })
     }
     /// Create a [MetadataBuf] with the vault databases
     pub fn vault(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Self> {
         let system_meta = dbs.get_db(&*META_VAULT_SYS)?;
         let links_meta = dbs.get_db(&*META_VAULT_LINKS)?;
-        let status_meta = dbs.get_db(&*META_VAULT_STATUS)?;
-        Self::new(reader, system_meta, links_meta, status_meta)
+        let misc_meta = dbs.get_db(&*META_VAULT_MISC)?;
+        Self::new(reader, system_meta, links_meta, misc_meta)
     }
 
     /// Create a [MetadataBuf] with the cache databases
     pub fn cache(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Self> {
         let system_meta = dbs.get_db(&*CACHE_SYSTEM_META)?;
         let links_meta = dbs.get_db(&*CACHE_LINKS_META)?;
-        let status_meta = dbs.get_db(&*CACHE_STATUS_META)?;
-        Self::new(reader, system_meta, links_meta, status_meta)
+        let misc_meta = dbs.get_db(&*CACHE_STATUS_META)?;
+        Self::new(reader, system_meta, links_meta, misc_meta)
     }
 
     async fn register_header_on_basis<K, H>(&mut self, key: K, header: H) -> DatabaseResult<()>
@@ -395,7 +210,10 @@ impl<'env> MetadataBuf<'env> {
             })?
             // No evidence of life found so entry is marked dead
             .unwrap_or(EntryDhtStatus::Dead);
-        self.status_meta.put(basis, status)
+        self.misc_meta.put(
+            MiscMetaKey::EntryStatus(basis).into(),
+            MiscMetaValue::EntryStatus(status),
+        )
     }
 
     #[cfg(test)]
@@ -414,7 +232,7 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
     {
         Ok(Box::new(
             self.links_meta
-                .iter_all_key_matches(key.to_key())?
+                .iter_all_key_matches(key.into())?
                 .filter_map(move |(_, link)| {
                     // Check if link has been removed
                     match self
@@ -435,7 +253,7 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
     {
         Ok(Box::new(
             self.links_meta
-                .iter_all_key_matches(key.to_key())?
+                .iter_all_key_matches(key.into())?
                 .map(|(_, v)| Ok(v)),
         ))
     }
@@ -451,7 +269,7 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
         let key = LinkMetaKey::from((&link_add, &link_add_hash));
 
         self.links_meta.put(
-            key.to_key(),
+            key.into(),
             LinkMetaVal {
                 link_add_hash,
                 target: link_add.target_address,
@@ -490,6 +308,13 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
             .await?;
         self.update_entry_dht_status(basis)?;
         Ok(())
+    }
+
+    async fn register_element_header(&mut self, header: &Header) -> DatabaseResult<()> {
+        self.misc_meta.put(
+            MiscMetaKey::StoreElement(HeaderHash::with_data(header).await).into(),
+            MiscMetaValue::new_store_element(),
+        )
     }
 
     #[allow(clippy::needless_lifetimes)]
@@ -602,8 +427,9 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
     // Once the validation is finished this should check for that as well
     fn get_dht_status(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus> {
         Ok(self
-            .status_meta
-            .get(entry_hash)?
+            .misc_meta
+            .get(&MiscMetaKey::EntryStatus(entry_hash.clone()).into())?
+            .map(MiscMetaValue::entry_status)
             .unwrap_or(EntryDhtStatus::Dead))
     }
 
@@ -629,6 +455,11 @@ impl<'env> MetadataBufT for MetadataBuf<'env> {
             }),
         ))
     }
+
+    fn has_element_header(&self, hash: &HeaderHash) -> DatabaseResult<bool> {
+        self.misc_meta
+            .contains(&MiscMetaKey::StoreElement(hash.clone()).into())
+    }
 }
 
 impl<'env> BufferedStore<'env> for MetadataBuf<'env> {
@@ -637,7 +468,7 @@ impl<'env> BufferedStore<'env> for MetadataBuf<'env> {
     fn flush_to_txn(self, writer: &'env mut Writer) -> DatabaseResult<()> {
         self.system_meta.flush_to_txn(writer)?;
         self.links_meta.flush_to_txn(writer)?;
-        self.status_meta.flush_to_txn(writer)?;
+        self.misc_meta.flush_to_txn(writer)?;
         Ok(())
     }
 }

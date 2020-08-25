@@ -324,7 +324,10 @@ pub async fn integrate_single_metadata<C: MetadataBufT>(
     }
 
     match op {
-        DhtOpLight::StoreElement(_, _, _) => (),
+        DhtOpLight::StoreElement(hash, _, _) => {
+            let header = get_header(hash, element_store).await?;
+            meta_store.register_element_header(&header).await?;
+        }
         DhtOpLight::StoreEntry(hash, _, _) => {
             let new_entry_header = get_header(hash, element_store).await?.try_into()?;
             // Reference to headers

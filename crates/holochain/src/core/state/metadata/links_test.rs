@@ -258,7 +258,7 @@ impl TestData {
             .iter()
             .map(|d| (d.link_add.clone(), d.expected_link.clone()))
             .collect::<Vec<_>>();
-        expected.sort_by_key(|d| LinkMetaKey::from((&d.0, &d.1.link_add_hash)).to_key());
+        expected.sort_by_key(|d| BytesKey::from(LinkMetaKey::from((&d.0, &d.1.link_add_hash))));
         let expected = expected.into_iter().map(|d| d.1).collect::<Vec<_>>();
         let key = LinkMetaKey::Base(&base_hash);
         assert_eq!(
@@ -285,7 +285,7 @@ impl TestData {
             .iter()
             .map(|d| (d.link_add.clone(), d.expected_link.clone()))
             .collect::<Vec<_>>();
-        expected.sort_by_key(|d| LinkMetaKey::from((&d.0, &d.1.link_add_hash)).to_key());
+        expected.sort_by_key(|d| BytesKey::from(LinkMetaKey::from((&d.0, &d.1.link_add_hash))));
         let expected = expected.into_iter().map(|d| d.1).collect::<Vec<_>>();
         let key = LinkMetaKey::BaseZome(&base_hash, zome_id);
         assert_eq!(
@@ -314,7 +314,7 @@ impl TestData {
             .iter()
             .map(|d| (d.link_add.clone(), d.expected_link.clone()))
             .collect::<Vec<_>>();
-        expected.sort_by_key(|d| LinkMetaKey::from((&d.0, &d.1.link_add_hash)).to_key());
+        expected.sort_by_key(|d| BytesKey::from(LinkMetaKey::from((&d.0, &d.1.link_add_hash))));
         let expected = expected.into_iter().map(|d| d.1).collect::<Vec<_>>();
         let key = LinkMetaKey::BaseZomeTag(&base_hash, zome_id, &tag);
         assert_eq!(
@@ -346,7 +346,7 @@ impl TestData {
             .iter()
             .map(|d| (d.link_add.clone(), d.expected_link.clone()))
             .collect::<Vec<_>>();
-        expected.sort_by_key(|d| LinkMetaKey::from((&d.0, &d.1.link_add_hash)).to_key());
+        expected.sort_by_key(|d| BytesKey::from(LinkMetaKey::from((&d.0, &d.1.link_add_hash))));
         let expected = expected.into_iter().map(|d| d.1).collect::<Vec<_>>();
         let key = LinkMetaKey::BaseZomeTag(&base_hash, zome_id, &half_tag);
         assert_eq!(

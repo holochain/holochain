@@ -15,6 +15,7 @@ mock! {
         fn remove_link(&mut self, link_remove: LinkRemove) -> DatabaseResult<()>;
         fn sync_add_create(&self, create: header::EntryCreate) -> DatabaseResult<()>;
         fn sync_register_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()>;
+        fn sync_register_element_header(&mut self, header: &Header) -> DatabaseResult<()>;
         fn sync_register_activity(
             &mut self,
             header: Header,
@@ -50,6 +51,7 @@ mock! {
             &self,
             link_add: HeaderHash,
         ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError>>>;
+        fn has_element_header(&self, hash: &HeaderHash) -> DatabaseResult<bool>;
     }
 }
 
@@ -142,6 +144,9 @@ impl MetadataBufT for MockMetadataBuf {
     async fn register_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()> {
         self.sync_register_header(new_entry_header)
     }
+    async fn register_element_header(&mut self, header: &Header) -> DatabaseResult<()> {
+        self.sync_register_element_header(header)
+    }
 
     async fn register_activity(&mut self, header: Header) -> DatabaseResult<()> {
         self.sync_register_activity(header)
@@ -165,5 +170,8 @@ impl MetadataBufT for MockMetadataBuf {
 
     fn register_raw_on_header(&mut self, header_hash: HeaderHash, value: SysMetaVal) {
         self.register_raw_on_header(header_hash, value)
+    }
+    fn has_element_header(&self, hash: &HeaderHash) -> DatabaseResult<bool> {
+        self.has_element_header(hash)
     }
 }
