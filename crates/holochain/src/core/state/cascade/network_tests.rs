@@ -274,7 +274,7 @@ async fn get_from_another_agent() {
         let env_ref = bob_env.guard().await;
         let dbs = bob_env.dbs().await;
         let remove_hash =
-            remove_entry(&env_ref, &dbs, call_data.clone(), header_hash.clone()).await;
+            delete_entry(&env_ref, &dbs, call_data.clone(), header_hash.clone()).await;
 
         fake_authority(
             &env_ref,

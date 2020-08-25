@@ -13,8 +13,11 @@ pub enum TestWasm {
     Anchor,
     Bench,
     CommitEntry,
+    Crd,
+    Crud,
     Debug,
     EntryDefs,
+    EntryHash,
     Foo,
     HashPath,
     Imports,
@@ -25,7 +28,9 @@ pub enum TestWasm {
     MigrateAgentPass,
     PostCommitFail,
     PostCommitSuccess,
+    RandomBytes,
     SerRegression,
+    SysTime,
     Validate,
     ValidateLink,
     ValidateInvalid,
@@ -35,6 +40,7 @@ pub enum TestWasm {
     ValidationPackageFail,
     ValidationPackageSuccess,
     WhoAmI,
+    ZomeInfo,
 }
 
 impl From<TestWasm> for ZomeName {
@@ -44,8 +50,11 @@ impl From<TestWasm> for ZomeName {
             TestWasm::Anchor => "anchor",
             TestWasm::Bench => "bench",
             TestWasm::CommitEntry => "commit_entry",
+            TestWasm::Crd => "crd",
+            TestWasm::Crud => "crud",
             TestWasm::Debug => "debug",
             TestWasm::EntryDefs => "entry_defs",
+            TestWasm::EntryHash => "entry_hash",
             TestWasm::Foo => "foo",
             TestWasm::HashPath => "hash_path",
             TestWasm::Imports => "imports",
@@ -56,7 +65,9 @@ impl From<TestWasm> for ZomeName {
             TestWasm::MigrateAgentPass => "migrate_agent_pass",
             TestWasm::PostCommitFail => "post_commit_fail",
             TestWasm::PostCommitSuccess => "post_commit_success",
+            TestWasm::RandomBytes => "random_bytes",
             TestWasm::SerRegression => "ser_regression",
+            TestWasm::SysTime => "sys_time",
             TestWasm::Validate => "validate",
             TestWasm::ValidateLink => "validate_link",
             TestWasm::ValidateInvalid => "validate_invalid",
@@ -66,6 +77,7 @@ impl From<TestWasm> for ZomeName {
             TestWasm::ValidationPackageFail => "validation_package_fail",
             TestWasm::ValidationPackageSuccess => "validation_package_success",
             TestWasm::WhoAmI => "whoami",
+            TestWasm::ZomeInfo => "zome_info",
         })
     }
 }
@@ -81,9 +93,14 @@ impl From<TestWasm> for DnaWasm {
             TestWasm::CommitEntry => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_commit_entry.wasm")
             }
+            TestWasm::Crd => get_code("wasm32-unknown-unknown/release/test_wasm_crd.wasm"),
+            TestWasm::Crud => get_code("wasm32-unknown-unknown/release/test_wasm_crud.wasm"),
             TestWasm::Debug => get_code("wasm32-unknown-unknown/release/test_wasm_debug.wasm"),
             TestWasm::EntryDefs => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_entry_defs.wasm")
+            }
+            TestWasm::EntryHash => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_entry_hash.wasm")
             }
             TestWasm::Foo => get_code("wasm32-unknown-unknown/release/test_wasm_foo.wasm"),
             TestWasm::HashPath => {
@@ -109,9 +126,13 @@ impl From<TestWasm> for DnaWasm {
             TestWasm::PostCommitSuccess => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_post_commit_success.wasm")
             }
+            TestWasm::RandomBytes => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_random_bytes.wasm")
+            }
             TestWasm::SerRegression => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_ser_regression.wasm")
             }
+            TestWasm::SysTime => get_code("wasm32-unknown-unknown/release/test_wasm_sys_time.wasm"),
             TestWasm::Validate => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_validate.wasm")
             }
@@ -137,6 +158,9 @@ impl From<TestWasm> for DnaWasm {
                 get_code("wasm32-unknown-unknown/release/test_wasm_validation_package_success.wasm")
             }
             TestWasm::WhoAmI => get_code("wasm32-unknown-unknown/release/test_wasm_whoami.wasm"),
+            TestWasm::ZomeInfo => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_zome_info.wasm")
+            }
         })
     }
 }
@@ -153,7 +177,7 @@ fn get_code(path: &'static str) -> Vec<u8> {
     };
     let warning = format!(
         "Wasm: {:?} was not found. Maybe you need to build the test wasms\n
-        Run `cargo build --features 'build_wasms' --manifest-path=crates/holochain/Cargo.toml` 
+        Run `cargo build --features 'build_wasms' --manifest-path=crates/holochain/Cargo.toml`
         or pass the feature flag to `cargo test`
         ",
         path

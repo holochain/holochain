@@ -24,7 +24,7 @@ use holochain_zome_types::{
     link::{Link, LinkTag},
     metadata::Details,
     zome::ZomeName,
-    CommitEntryInput, GetDetailsInput, GetInput, GetLinksInput, LinkEntriesInput, RemoveEntryInput,
+    CommitEntryInput, DeleteEntryInput, GetDetailsInput, GetInput, GetLinksInput, LinkEntriesInput,
     RemoveLinkInput, UpdateEntryInput,
 };
 use std::sync::Arc;
@@ -110,7 +110,7 @@ pub async fn commit_entry<'env, E: Into<entry_def::EntryDefId>>(
     output.into_inner()
 }
 
-pub async fn remove_entry<'env>(
+pub async fn delete_entry<'env>(
     env_ref: &'env EnvironmentWriteRef<'env>,
     dbs: &impl GetDb,
     call_data: CallData,
@@ -125,7 +125,7 @@ pub async fn remove_entry<'env>(
     let reader = env_ref.reader().unwrap();
     let mut workspace = CallZomeWorkspace::new(&reader, dbs).unwrap();
 
-    let input = RemoveEntryInput::new(hash);
+    let input = DeleteEntryInput::new(hash);
 
     let output = {
         let (_g, raw_workspace) = UnsafeCallZomeWorkspace::from_mut(&mut workspace);
@@ -133,7 +133,7 @@ pub async fn remove_entry<'env>(
         let call_context = CallContext::new(zome_name, host_access.into());
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
-        let r = host_fn::remove_entry::remove_entry(ribosome.clone(), call_context.clone(), input);
+        let r = host_fn::delete_entry::delete_entry(ribosome.clone(), call_context.clone(), input);
         let r = r.map_err(|e| {
             debug!(%e);
             e
