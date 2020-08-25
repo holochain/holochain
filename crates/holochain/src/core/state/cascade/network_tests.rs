@@ -55,7 +55,7 @@ use holochain_zome_types::{
     link::{Link, LinkTag},
     metadata::{Details, EntryDhtStatus},
     zome::ZomeName,
-    CommitEntryInput, GetDetailsInput, GetInput, GetLinksInput, LinkEntriesInput, RemoveEntryInput,
+    CommitEntryInput, DeleteEntryInput, GetDetailsInput, GetInput, GetLinksInput, LinkEntriesInput,
     RemoveLinkInput, UpdateEntryInput,
 };
 use maplit::btreeset;
@@ -287,7 +287,7 @@ async fn get_from_another_agent() {
         let env_ref = bob_env.guard().await;
         let dbs = bob_env.dbs().await;
         let remove_hash =
-            remove_entry(&env_ref, &dbs, call_data.clone(), header_hash.clone()).await;
+            delete_entry(&env_ref, &dbs, call_data.clone(), header_hash.clone()).await;
 
         fake_authority(
             &env_ref,
@@ -774,7 +774,7 @@ async fn commit_entry<'env>(
     output.into_inner()
 }
 
-async fn remove_entry<'env>(
+async fn delete_entry<'env>(
     env_ref: &'env EnvironmentWriteRef<'env>,
     dbs: &impl GetDb,
     call_data: CallData,
@@ -789,7 +789,7 @@ async fn remove_entry<'env>(
     let reader = env_ref.reader().unwrap();
     let mut workspace = CallZomeWorkspace::new(&reader, dbs).unwrap();
 
-    let input = RemoveEntryInput::new(hash);
+    let input = DeleteEntryInput::new(hash);
 
     let output = {
         let (_g, raw_workspace) = UnsafeCallZomeWorkspace::from_mut(&mut workspace);
@@ -797,7 +797,7 @@ async fn remove_entry<'env>(
         let call_context = CallContext::new(zome_name, host_access.into());
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
-        let r = host_fn::remove_entry::remove_entry(ribosome.clone(), call_context.clone(), input);
+        let r = host_fn::delete_entry::delete_entry(ribosome.clone(), call_context.clone(), input);
         let r = r.map_err(|e| {
             debug!(%e);
             e
