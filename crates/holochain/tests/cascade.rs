@@ -94,6 +94,7 @@ async fn get_links() -> SourceChainResult<()> {
 
     // Pass in stores as references
     let mut cascade = Cascade::new(
+        env.clone().into(),
         &source_chain.elements(),
         &meta_vault,
         &mut element_cache,

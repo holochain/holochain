@@ -52,8 +52,8 @@ pub mod tests {
     impl TestWorkspace {
         pub fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
             Ok(Self {
-                one: KvBufFresh::new(env, dbs.get_db(&*ELEMENT_VAULT_PUBLIC_ENTRIES)?)?,
-                two: KvBufFresh::new(env, dbs.get_db(&*ELEMENT_VAULT_HEADERS)?)?,
+                one: KvBufFresh::new(env.clone(), dbs.get_db(&*ELEMENT_VAULT_PUBLIC_ENTRIES)?),
+                two: KvBufFresh::new(env.clone(), dbs.get_db(&*ELEMENT_VAULT_HEADERS)?),
             })
         }
     }
@@ -72,24 +72,24 @@ pub mod tests {
         let env = arc.guard().await;
         let dbs = arc.dbs().await;
         let addr1 = fake_header_hash(1);
-        let addr2 = "hi".into();
+        let addr2: DbString = "hi".into();
         {
             let reader = env.reader()?;
-            let mut workspace = TestWorkspace::new(env.clone().into(), &dbs)?;
-            assert_eq!(workspace.one.get(&addr1)?, None);
+            let mut workspace = TestWorkspace::new(arc.clone().into(), &dbs)?;
+            assert_eq!(workspace.one.get(&addr1).await?, None);
 
             workspace.one.put(addr1.clone(), 1).unwrap();
             workspace.two.put(addr2.clone(), true).unwrap();
-            assert_eq!(workspace.one.get(&addr1)?, Some(1));
-            assert_eq!(workspace.two.get(&addr2)?, Some(true));
+            assert_eq!(workspace.one.get(&addr1).await?, Some(1));
+            assert_eq!(workspace.two.get(&addr2).await?, Some(true));
             env.with_commit(|mut writer| workspace.flush_to_txn(&mut writer))?;
         }
 
         // Ensure that the data was persisted
         {
             let reader = env.reader()?;
-            let workspace = TestWorkspace::new(env.clone().into(), &dbs)?;
-            assert_eq!(workspace.one.get(&addr1)?, Some(1));
+            let workspace = TestWorkspace::new(arc.clone().into(), &dbs)?;
+            assert_eq!(workspace.one.get(&addr1).await?, Some(1));
         }
         Ok(())
     }

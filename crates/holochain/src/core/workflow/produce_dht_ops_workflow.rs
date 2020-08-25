@@ -179,6 +179,7 @@ mod tests {
             let reader = env_ref.reader().unwrap();
             let mut td = TestData::new();
             let mut source_chain = ProduceDhtOpsWorkspace::new(env.clone().into(), &dbs)
+                .await
                 .unwrap()
                 .call_zome_workspace
                 .source_chain;
@@ -233,7 +234,9 @@ mod tests {
         // Run the workflow and commit it
         {
             let reader = env_ref.reader().unwrap();
-            let mut workspace = ProduceDhtOpsWorkspace::new(env.clone().into(), &dbs).unwrap();
+            let mut workspace = ProduceDhtOpsWorkspace::new(env.clone().into(), &dbs)
+                .await
+                .unwrap();
             let complete = produce_dht_ops_workflow_inner(&mut workspace)
                 .await
                 .unwrap();
@@ -246,11 +249,13 @@ mod tests {
         // Pull out the results and check them
         let last_count = {
             let reader = env_ref.reader().unwrap();
-            let workspace = ProduceDhtOpsWorkspace::new(env.clone().into(), &dbs).unwrap();
+            let workspace = ProduceDhtOpsWorkspace::new(env.clone().into(), &dbs)
+                .await
+                .unwrap();
             let mut times = Vec::new();
             let results = workspace
                 .integration_limbo
-                .iter()
+                .iter(&reader)
                 .unwrap()
                 .map(|(k, v)| {
                     let s = debug_span!("times");
@@ -275,7 +280,7 @@ mod tests {
             // Get the authored ops
             let authored_results = workspace
                 .authored_dht_ops
-                .iter()
+                .iter(&reader)
                 .unwrap()
                 .map(|(k, v)| {
                     assert_matches!(v, AuthoredDhtOpsValue {
@@ -307,7 +312,9 @@ mod tests {
         // because no new ops should hav been added
         {
             let reader = env_ref.reader().unwrap();
-            let mut workspace = ProduceDhtOpsWorkspace::new(env.clone().into(), &dbs).unwrap();
+            let mut workspace = ProduceDhtOpsWorkspace::new(env.clone().into(), &dbs)
+                .await
+                .unwrap();
             let complete = produce_dht_ops_workflow_inner(&mut workspace)
                 .await
                 .unwrap();
@@ -320,9 +327,21 @@ mod tests {
         // Check the lengths are unchanged
         {
             let reader = env_ref.reader().unwrap();
-            let workspace = ProduceDhtOpsWorkspace::new(env.clone().into(), &dbs).unwrap();
-            let count = workspace.integration_limbo.iter().unwrap().count().unwrap();
-            let authored_count = workspace.authored_dht_ops.iter().unwrap().count().unwrap();
+            let workspace = ProduceDhtOpsWorkspace::new(env.clone().into(), &dbs)
+                .await
+                .unwrap();
+            let count = workspace
+                .integration_limbo
+                .iter(&reader)
+                .unwrap()
+                .count()
+                .unwrap();
+            let authored_count = workspace
+                .authored_dht_ops
+                .iter(&reader)
+                .unwrap()
+                .count()
+                .unwrap();
 
             assert_eq!(last_count, count);
             assert_eq!(last_count, authored_count);

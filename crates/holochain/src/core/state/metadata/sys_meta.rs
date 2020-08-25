@@ -12,6 +12,7 @@ mod tests {
     };
     use ::fixt::prelude::*;
     use fallible_iterator::FallibleIterator;
+    use header::EntryCreate;
     use holo_hash::fixt::*;
     use holo_hash::*;
     use holochain_state::{prelude::*, test_utils::test_cell_env};
@@ -312,8 +313,8 @@ mod tests {
         let mut fx = TestFixtures::new();
         let entry_hash = fx.entry_hash();
         let mut expected: Vec<TimedHeaderHash> = Vec::new();
-        let mut entry_creates = Vec::new();
-        for _ in 0..10 {
+        let mut entry_creates: Vec<EntryCreate> = Vec::new();
+        for _ in 0..10 as u32 {
             let (e, hash) = test_create(entry_hash.clone(), &mut fx).await;
             expected.push(hash.into());
             entry_creates.push(e)
@@ -330,7 +331,7 @@ mod tests {
                     .unwrap();
             }
             let mut headers = meta_buf
-                .get_headers(entry_hash.clone())
+                .get_headers(&reader, entry_hash.clone())
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
@@ -343,7 +344,7 @@ mod tests {
             let reader = env.reader().unwrap();
             let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
             let mut headers = meta_buf
-                .get_headers(entry_hash.clone())
+                .get_headers(&reader, entry_hash.clone())
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
@@ -385,7 +386,7 @@ mod tests {
                 meta_buf.register_update(update).await.unwrap();
             }
             let mut headers = meta_buf
-                .get_updates(original_entry_hash.clone().into())
+                .get_updates(&reader, original_entry_hash.clone().into())
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
@@ -398,7 +399,7 @@ mod tests {
             let reader = env.reader().unwrap();
             let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
             let mut headers = meta_buf
-                .get_updates(original_entry_hash.into())
+                .get_updates(&reader, original_entry_hash.into())
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
@@ -440,7 +441,7 @@ mod tests {
                 meta_buf.register_update(update).await.unwrap();
             }
             let mut headers = meta_buf
-                .get_updates(original_entry_hash.clone().into())
+                .get_updates(&reader, original_entry_hash.clone().into())
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
@@ -453,7 +454,7 @@ mod tests {
             let reader = env.reader().unwrap();
             let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
             let mut headers = meta_buf
-                .get_updates(original_entry_hash.into())
+                .get_updates(&reader, original_entry_hash.into())
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
@@ -485,7 +486,7 @@ mod tests {
                 meta_buf.register_delete(delete).await.unwrap();
             }
             let mut headers = meta_buf
-                .get_deletes_on_header(header_hash.clone().into())
+                .get_deletes_on_header(&reader, header_hash.clone().into())
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
@@ -498,7 +499,7 @@ mod tests {
             let reader = env.reader().unwrap();
             let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
             let mut headers = meta_buf
-                .get_deletes_on_header(header_hash.clone().into())
+                .get_deletes_on_header(&reader, header_hash.clone().into())
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
@@ -547,6 +548,7 @@ mod tests {
     async fn test_entry_dht_status() {
         let arc = test_cell_env();
         let env = arc.guard().await;
+        let reader = env.reader().unwrap();
         let mut fx = TestFixtures::new();
         let entry_hash = fx.entry_hash();
         let mut entry_creates = Vec::new();
@@ -575,7 +577,9 @@ mod tests {
             &mut meta_buf,
         )
         .await;
-        let status = meta_buf.get_dht_status(&entry_hash.clone().into()).unwrap();
+        let status = meta_buf
+            .get_dht_status(&reader, &entry_hash.clone().into())
+            .unwrap();
         assert_eq!(status, EntryDhtStatus::Live);
         update_dbs(
             &entry_creates[..0],
@@ -586,7 +590,9 @@ mod tests {
             &mut meta_buf,
         )
         .await;
-        let status = meta_buf.get_dht_status(&entry_hash.clone().into()).unwrap();
+        let status = meta_buf
+            .get_dht_status(&reader, &entry_hash.clone().into())
+            .unwrap();
         assert_eq!(status, EntryDhtStatus::Dead);
 
         // Same headers don't reanimate entry
@@ -599,7 +605,9 @@ mod tests {
             &mut meta_buf,
         )
         .await;
-        let status = meta_buf.get_dht_status(&entry_hash.clone().into()).unwrap();
+        let status = meta_buf
+            .get_dht_status(&reader, &entry_hash.clone().into())
+            .unwrap();
         assert_eq!(status, EntryDhtStatus::Dead);
 
         // Check create bring entry back to life
@@ -623,7 +631,9 @@ mod tests {
             &mut meta_buf,
         )
         .await;
-        let status = meta_buf.get_dht_status(&entry_hash.clone().into()).unwrap();
+        let status = meta_buf
+            .get_dht_status(&reader, &entry_hash.clone().into())
+            .unwrap();
         assert_eq!(status, EntryDhtStatus::Live);
 
         // New deletes should be dead
@@ -636,7 +646,9 @@ mod tests {
             &mut meta_buf,
         )
         .await;
-        let status = meta_buf.get_dht_status(&entry_hash.clone().into()).unwrap();
+        let status = meta_buf
+            .get_dht_status(&reader, &entry_hash.clone().into())
+            .unwrap();
         assert_eq!(status, EntryDhtStatus::Dead);
 
         // Check update bring entry back to life
@@ -649,7 +661,9 @@ mod tests {
             &mut meta_buf,
         )
         .await;
-        let status = meta_buf.get_dht_status(&entry_hash.clone().into()).unwrap();
+        let status = meta_buf
+            .get_dht_status(&reader, &entry_hash.clone().into())
+            .unwrap();
         assert_eq!(status, EntryDhtStatus::Live);
 
         // Check deleting update kills entry
@@ -662,7 +676,9 @@ mod tests {
             &mut meta_buf,
         )
         .await;
-        let status = meta_buf.get_dht_status(&entry_hash.clone().into()).unwrap();
+        let status = meta_buf
+            .get_dht_status(&reader, &entry_hash.clone().into())
+            .unwrap();
         assert_eq!(status, EntryDhtStatus::Dead);
     }
 
@@ -698,7 +714,9 @@ mod tests {
             &mut meta_buf,
         )
         .await;
-        let status = meta_buf.get_dht_status(&entry_hash.clone().into()).unwrap();
+        let status = meta_buf
+            .get_dht_status(&reader, &entry_hash.clone().into())
+            .unwrap();
         assert_eq!(status, EntryDhtStatus::Live);
         update_dbs(
             &entry_creates[..0],
@@ -709,7 +727,9 @@ mod tests {
             &mut meta_buf,
         )
         .await;
-        let status = meta_buf.get_dht_status(&entry_hash.clone().into()).unwrap();
+        let status = meta_buf
+            .get_dht_status(&reader, &entry_hash.clone().into())
+            .unwrap();
         assert_eq!(status, EntryDhtStatus::Live);
         update_dbs(
             &entry_creates[..0],
@@ -720,7 +740,9 @@ mod tests {
             &mut meta_buf,
         )
         .await;
-        let status = meta_buf.get_dht_status(&entry_hash.clone().into()).unwrap();
+        let status = meta_buf
+            .get_dht_status(&reader, &entry_hash.clone().into())
+            .unwrap();
         assert_eq!(status, EntryDhtStatus::Dead);
     }
 }

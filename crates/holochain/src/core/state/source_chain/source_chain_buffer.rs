@@ -383,7 +383,7 @@ pub mod tests {
         {
             let reader = env.reader()?;
 
-            let mut store = SourceChainBuf::new(env.clone().into(), &dbs)?;
+            let mut store = SourceChainBuf::new(arc.clone().into(), &dbs).await.unwrap();
             assert!(store.chain_head().is_none());
             store
                 .put_raw(dna_header.as_content().clone(), dna_entry.clone())
@@ -397,7 +397,7 @@ pub mod tests {
         {
             let reader = env.reader()?;
 
-            let store = SourceChainBuf::new(env.clone().into(), &dbs)?;
+            let store = SourceChainBuf::new(arc.clone().into(), &dbs).await.unwrap();
             assert!(store.chain_head().is_some());
 
             // get the full element
@@ -456,7 +456,7 @@ pub mod tests {
         {
             let reader = env.reader()?;
 
-            let mut store = SourceChainBuf::new(&reader, &env)?;
+            let mut store = SourceChainBuf::new(arc.clone().into(), &env).await.unwrap();
             store
                 .put_raw(dna_header.as_content().clone(), dna_entry)
                 .await?;
@@ -470,7 +470,7 @@ pub mod tests {
         {
             let reader = env.reader()?;
 
-            let store = SourceChainBuf::new(&reader, &env)?;
+            let store = SourceChainBuf::new(arc.clone().into(), &env).await.unwrap();
             let json = store.dump_as_json().await?;
             let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
 
@@ -494,7 +494,7 @@ pub mod tests {
         let arc = test_cell_env();
         let env = arc.guard().await;
         let reader = env.reader().unwrap();
-        let mut store = SourceChainBuf::new(&reader, &env).unwrap();
+        let mut store = SourceChainBuf::new(arc.clone().into(), &env).await.unwrap();
 
         let (_, hashed, _, _, _) = fixtures();
         let header = hashed.into_content();

@@ -51,8 +51,11 @@ mod tests {
         let dbs = env.dbs().await;
         let env_ref = env.guard().await;
         let reader = env_ref.reader()?;
-        let mut wasm_buf =
-            WasmBuf::new(&reader, dbs.get_db(&*holochain_state::db::WASM).unwrap()).unwrap();
+        let mut wasm_buf = WasmBuf::new(
+            env.clone().into(),
+            dbs.get_db(&*holochain_state::db::WASM).unwrap(),
+        )
+        .unwrap();
 
         // a wasm
         let wasm =

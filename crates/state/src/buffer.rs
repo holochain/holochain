@@ -52,6 +52,17 @@ macro_rules! fresh_reader {
 }
 
 #[macro_export]
+/// Macro to generate a fresh reader from an EnvironmentRead with less boilerplate
+/// Use this in tests, where everything gets unwrapped anyway
+macro_rules! fresh_reader_test {
+    ($env: expr, $f: expr) => {{
+        let g = $env.guard().await;
+        let r = g.reader().unwrap();
+        $f(r)
+    }};
+}
+
+#[macro_export]
 /// Use this variant of `fresh_reader` when the $f closure is async
 macro_rules! fresh_reader_async {
     ($env: expr, $f: expr) => {{

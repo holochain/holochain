@@ -25,7 +25,7 @@ async fn kv_iter_from_partial() {
         .unwrap();
 
     {
-        let mut buf: Store = KvBufUsed::new(db).await.unwrap();
+        let mut buf: Store = KvBufUsed::new(db);
 
         buf.put("a".into(), V(101)).unwrap();
         buf.put("b".into(), V(102)).unwrap();
@@ -44,7 +44,7 @@ async fn kv_iter_from_partial() {
     }
 
     env.with_reader::<DatabaseError, _, _>(|reader| {
-        let buf: Store = KvBufUsed::new(db).await.unwrap();
+        let buf: Store = KvBufUsed::new(db);
 
         let iter = buf.store().iter_from(&reader, "dogs_likes".into()).unwrap();
         let results = iter.collect::<Vec<_>>().unwrap();
@@ -279,7 +279,7 @@ async fn kv_single_iter() {
     let mut reproduce = vec!["\nReproduce:\n".into()];
 
     env.with_reader::<DatabaseError, _, _>(|reader| {
-        let mut buf: Store = KvBufUsed::new(db).await.unwrap();
+        let mut buf: Store = KvBufUsed::new(db);
         let span = trace_span!("in_scratch");
         let _g = span.enter();
         runs.push(format!(
@@ -306,7 +306,7 @@ async fn kv_single_iter() {
     .unwrap();
 
     env.with_reader::<DatabaseError, _, _>(|reader| {
-        let mut buf: Store = KvBufUsed::new(db).await.unwrap();
+        let mut buf: Store = KvBufUsed::new(db);
         let span = trace_span!("in_db_first");
         let _g = span.enter();
         runs.push(format!(
@@ -332,7 +332,7 @@ async fn kv_single_iter() {
     })
     .unwrap();
     env.with_reader::<DatabaseError, _, _>(|reader| {
-        let mut buf: Store = KvBufUsed::new(db).await.unwrap();
+        let mut buf: Store = KvBufUsed::new(db);
         let span = trace_span!("in_db_second");
         let _g = span.enter();
         runs.push(format!(
@@ -527,7 +527,7 @@ async fn exhaust_both_ends() {
         .map(|(k, v)| ([k[0]], v.clone()))
         .collect::<Vec<_>>();
     env.with_reader::<DatabaseError, _, _>(|reader| {
-        let mut buf: Store = KvBufUsed::new(db).await.unwrap();
+        let mut buf: Store = KvBufUsed::new(db);
         for (k, v) in values {
             buf.put(k, v).unwrap();
         }
@@ -553,7 +553,7 @@ async fn exhaust_both_ends() {
     })
     .unwrap();
     env.with_reader::<DatabaseError, _, _>(|reader| {
-        let buf: Store = KvBufUsed::new(db).await.unwrap();
+        let buf: Store = KvBufUsed::new(db);
         let mut i = buf.iter(&reader).unwrap().map(|(k, v)| Ok(([k[0]], v)));
         let mut result = Vec::new();
         loop {
@@ -590,7 +590,7 @@ async fn kv_single_iter_runner(
     let mut expected_state: BTreeMap<DbString, V> = BTreeMap::new();
 
     env.with_reader::<DatabaseError, _, _>(|reader| {
-        let mut buf: Store = KvBufUsed::new(db).await.unwrap();
+        let mut buf: Store = KvBufUsed::new(db);
         let span = trace_span!("in_scratch");
         let _g = span.enter();
         runs.push(format!(
@@ -612,7 +612,7 @@ async fn kv_single_iter_runner(
     .unwrap();
 
     env.with_reader::<DatabaseError, _, _>(|reader| {
-        let mut buf: Store = KvBufUsed::new(db).await.unwrap();
+        let mut buf: Store = KvBufUsed::new(db);
         let span = trace_span!("in_db_first");
         let _g = span.enter();
         runs.push(format!(
@@ -634,7 +634,7 @@ async fn kv_single_iter_runner(
     .unwrap();
 
     env.with_reader::<DatabaseError, _, _>(|reader| {
-        let mut buf: Store = KvBufUsed::new(db).await.unwrap();
+        let mut buf: Store = KvBufUsed::new(db);
         let span = trace_span!("in_db_second");
         let _g = span.enter();
         runs.push(format!(

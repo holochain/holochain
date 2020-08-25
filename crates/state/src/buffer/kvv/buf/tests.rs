@@ -56,7 +56,7 @@ async fn kvvbuf_basics() {
         .unwrap();
 
     env.with_reader::<DatabaseError, _, _>(|reader| {
-        let mut store: Store = Store::new(multi_store).unwrap();
+        let mut store: Store = Store::new(multi_store);
         assert_eq!(
             store
                 .get(&reader, &"key".into())
@@ -96,7 +96,7 @@ async fn kvvbuf_basics() {
         .unwrap();
 
     env.with_reader::<DatabaseError, _, _>(|reader| {
-        let mut store: Store = Store::new(multi_store).unwrap();
+        let mut store: Store = Store::new(multi_store);
         assert_eq!(
             store
                 .get(&reader, &"key".into())
@@ -136,7 +136,7 @@ async fn kvvbuf_basics() {
         .unwrap();
 
     env.with_reader::<DatabaseError, _, _>(|reader| {
-        let store: Store = Store::new(multi_store).unwrap();
+        let store: Store = Store::new(multi_store);
         assert_eq!(
             store
                 .get(&reader, &"key".into())
@@ -161,7 +161,7 @@ async fn delete_all() {
         .unwrap();
 
     env.with_reader::<DatabaseError, _, _>(|reader| {
-        let mut store: Store = Store::new(multi_store).unwrap();
+        let mut store: Store = Store::new(multi_store);
         assert_eq!(
             store
                 .get(&reader, &"key".into())
@@ -198,7 +198,7 @@ async fn delete_all() {
         .unwrap();
 
     env.with_reader::<DatabaseError, _, _>(|reader| {
-        let mut store: Store = Store::new(multi_store).unwrap();
+        let mut store: Store = Store::new(multi_store);
         assert_eq!(
             collect_sorted(store.get(&reader, &"key".into())),
             Ok(vec![V(0), V(1)])
@@ -241,7 +241,7 @@ async fn delete_all() {
         .unwrap();
 
     env.with_reader::<DatabaseError, _, _>(|reader| {
-        let store: Store = Store::new(multi_store).unwrap();
+        let store: Store = Store::new(multi_store);
         assert_eq!(
             store
                 .get(&reader, &"key".into())
@@ -269,7 +269,7 @@ async fn idempotent_inserts() {
         .unwrap();
 
     env.with_reader::<DatabaseError, _, _>(|reader| {
-        let mut store: Store = Store::new(multi_store).unwrap();
+        let mut store: Store = Store::new(multi_store);
         assert_eq!(
             collect_sorted(store.get(&reader, &"key".into())),
             Ok(vec![])
@@ -307,7 +307,7 @@ async fn idempotent_inserts() {
     .unwrap();
 
     env.with_reader::<DatabaseError, _, _>(|reader| {
-        let mut store: Store = Store::new(multi_store).unwrap();
+        let mut store: Store = Store::new(multi_store);
         assert_eq!(
             collect_sorted(store.get(&reader, &"key".into())),
             Ok(vec![V(0), V(1), V(2)])
@@ -331,7 +331,7 @@ async fn kvv_indicate_value_appends() -> DatabaseResult<()> {
     let env = arc.guard().await;
     let db = env.inner().open_multi("kvv", StoreOptions::create())?;
     env.with_reader(|reader| {
-        let mut buf = Store::new(db)?;
+        let mut buf = Store::new(db);
 
         buf.insert("a".into(), V(1));
         assert_eq!(buf.get(&reader, &"a".into())?.next().unwrap()?, V(1));
@@ -351,7 +351,7 @@ async fn kvv_indicate_value_overwritten() -> DatabaseResult<()> {
     let env = arc.guard().await;
     let db = env.inner().open_multi("kvv", StoreOptions::create())?;
     env.with_reader(|reader| {
-        let mut buf = Store::new(db)?;
+        let mut buf = Store::new(db);
 
         buf.insert("a".into(), V(1));
         assert_eq!(buf.get(&reader, &"a".into())?.next().unwrap()?, V(1));
@@ -373,7 +373,7 @@ async fn kvv_deleted_persisted() -> DatabaseResult<()> {
     let db = env.inner().open_multi("kv", StoreOptions::create())?;
 
     {
-        let mut buf = Store::new(db).unwrap();
+        let mut buf = Store::new(db);
 
         buf.insert("a".into(), V(1));
         buf.insert("b".into(), V(2));
@@ -382,14 +382,14 @@ async fn kvv_deleted_persisted() -> DatabaseResult<()> {
         env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
     }
     {
-        let mut buf: KvvBufUsed<_, V> = Store::new(db).unwrap();
+        let mut buf: KvvBufUsed<_, V> = Store::new(db);
 
         buf.delete("b".into(), V(2));
 
         env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
     }
     env.with_reader(|reader| {
-        let buf: KvvBufUsed<DbString, _> = Store::new(db).unwrap();
+        let buf: KvvBufUsed<DbString, _> = Store::new(db);
         test_persisted(
             &reader,
             &buf,
@@ -410,7 +410,7 @@ async fn kvv_deleted_buffer() -> DatabaseResult<()> {
     let db = env.inner().open_multi("kv", StoreOptions::create())?;
 
     {
-        let mut buf = Store::new(db).unwrap();
+        let mut buf = Store::new(db);
 
         buf.insert("a".into(), V(5));
         buf.insert("b".into(), V(4));
@@ -440,7 +440,7 @@ async fn kvv_deleted_buffer() -> DatabaseResult<()> {
         env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
     }
     env.with_reader(|reader| {
-        let buf: KvvBufUsed<DbString, _> = Store::new(db).unwrap();
+        let buf: KvvBufUsed<DbString, _> = Store::new(db);
         test_persisted(
             &reader,
             &buf,
@@ -460,7 +460,7 @@ async fn kvv_get_buffer() -> DatabaseResult<()> {
     let db = env.inner().open_multi("kv", StoreOptions::create())?;
 
     env.with_reader(|reader| {
-        let mut buf = Store::new(db).unwrap();
+        let mut buf = Store::new(db);
 
         buf.insert("a".into(), V(5));
         buf.insert("b".into(), V(4));
@@ -480,7 +480,7 @@ async fn kvv_get_persisted() -> DatabaseResult<()> {
     let db = env.inner().open_multi("kv", StoreOptions::create())?;
 
     {
-        let mut buf = Store::new(db).unwrap();
+        let mut buf = Store::new(db);
 
         buf.insert("a".into(), V(1));
         buf.insert("b".into(), V(2));
@@ -490,7 +490,7 @@ async fn kvv_get_persisted() -> DatabaseResult<()> {
     }
 
     env.with_reader(|reader| {
-        let buf = Store::new(db).unwrap();
+        let buf = Store::new(db);
 
         let mut n = buf.get(&reader, &"b".into())?;
         assert_eq!(n.next(), Some(Ok(V(2))));
@@ -506,7 +506,7 @@ async fn kvv_get_del_buffer() -> DatabaseResult<()> {
     let db = env.inner().open_multi("kv", StoreOptions::create())?;
 
     env.with_reader(|reader| {
-        let mut buf = Store::new(db).unwrap();
+        let mut buf = Store::new(db);
 
         buf.insert("a".into(), V(5));
         buf.insert("b".into(), V(4));
@@ -526,7 +526,7 @@ async fn kvv_get_del_persisted() -> DatabaseResult<()> {
     let db = env.inner().open_multi("kv", StoreOptions::create())?;
 
     {
-        let mut buf = Store::new(db).unwrap();
+        let mut buf = Store::new(db);
 
         buf.insert("a".into(), V(1));
         buf.insert("b".into(), V(2));
@@ -536,7 +536,7 @@ async fn kvv_get_del_persisted() -> DatabaseResult<()> {
     }
 
     env.with_reader(|reader| {
-        let mut buf: Store = Store::new(db).unwrap();
+        let mut buf: Store = Store::new(db);
 
         buf.delete("b".into(), V(2));
         {
@@ -548,7 +548,7 @@ async fn kvv_get_del_persisted() -> DatabaseResult<()> {
     })?;
 
     env.with_reader(|reader| {
-        let buf: KvvBufUsed<_, V> = Store::new(db).unwrap();
+        let buf: KvvBufUsed<_, V> = Store::new(db);
 
         let mut n = buf.get(&reader, &"b".into())?;
         assert_eq!(n.next(), None);

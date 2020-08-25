@@ -217,8 +217,7 @@ mod tests {
 
     /// publish ops setup
     async fn setup<'env>(
-        env_ref: &EnvironmentWriteRef<'env>,
-        dbs: &impl GetDb,
+        env: EnvironmentWrite,
         num_agents: u32,
         num_hash: u32,
         panic_on_publish: bool,
@@ -228,6 +227,7 @@ mod tests {
         JoinHandle<()>,
         tokio::sync::oneshot::Receiver<()>,
     ) {
+        let env_ref = env.guard().await;
         // Create data fixts for op
         let mut sig_fixt = SignatureFixturator::new(Unpredictable);
         let mut link_add_fixt = LinkAddFixturator::new(Unpredictable);
@@ -253,7 +253,7 @@ mod tests {
         // Create and fill authored ops db in the workspace
         {
             let reader = env_ref.reader().unwrap();
-            let mut workspace = PublishDhtOpsWorkspace::new(env.clone().into(), dbs).unwrap();
+            let mut workspace = PublishDhtOpsWorkspace::new(env.clone().into(), &env_ref).unwrap();
             for (sig, op_hashed, op_light, header_hash) in data {
                 let op_hash = op_hashed.as_hash().clone();
                 let authored_value = AuthoredDhtOpsValue::from_light(op_light);
@@ -348,12 +348,10 @@ mod tests {
 
             // Create test env
             let env = test_cell_env();
-            let dbs = env.dbs().await;
-            let env_ref = env.guard().await;
 
             // Setup
             let (network, cell_network, recv_task, rx_complete) =
-                setup(&env_ref, &dbs, num_agents, num_hash, false).await;
+                setup(env.clone(), num_agents, num_hash, false).await;
 
             call_workflow(env.env.clone().into(), cell_network).await;
 
@@ -366,10 +364,12 @@ mod tests {
             };
 
             let check = async move {
+                let env_ref = env.guard().await;
                 recv_task.await.unwrap();
                 let reader = env_ref.reader().unwrap();
-                let mut workspace = PublishDhtOpsWorkspace::new(env.clone().into(), &dbs).unwrap();
-                for i in workspace.authored().iter().unwrap().iterator() {
+                let mut workspace =
+                    PublishDhtOpsWorkspace::new(env.clone().into(), &env_ref).unwrap();
+                for i in workspace.authored().iter(&reader).unwrap().iterator() {
                     // Check that each item now has a publish time
                     assert!(i.expect("can iterate").1.last_publish_time.is_some())
                 }
@@ -407,7 +407,7 @@ mod tests {
 
             // Setup
             let (network, cell_network, recv_task, _) =
-                setup(&env_ref, &dbs, num_agents, num_hash, true).await;
+                setup(env.clone(), num_agents, num_hash, true).await;
 
             // Update the authored to have > R counts
             {
@@ -417,7 +417,7 @@ mod tests {
                 // Update authored to R
                 let values = workspace
                     .authored_dht_ops
-                    .iter()
+                    .iter(&reader)
                     .unwrap()
                     .map(|(k, mut v)| {
                         v.receipt_count = DEFAULT_RECEIPT_BUNDLE_SIZE;
@@ -519,7 +519,7 @@ mod tests {
             {
                 let reader = env_ref.reader().unwrap();
 
-                let mut elements = ElementBuf::vault(&reader, &dbs, true).unwrap();
+                let mut elements = ElementBuf::vault(env.clone().into(), &dbs, true).unwrap();
 
                 let header_hash = HeaderHashed::from_content(entry_create_header.clone()).await;
 

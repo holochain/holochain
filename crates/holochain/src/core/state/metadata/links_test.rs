@@ -5,7 +5,9 @@ use crate::fixt::{
 };
 use crate::here;
 use ::fixt::prelude::*;
-use holochain_state::{buffer::BufferedStore, test_utils::test_cell_env};
+use holochain_state::{
+    buffer::BufferedStore, env::EnvironmentWrite, fresh_reader_test, test_utils::test_cell_env,
+};
 use holochain_types::observability;
 
 #[derive(Clone)]
@@ -16,9 +18,10 @@ struct TestData {
     zome_id: ZomeId,
     tag: LinkTag,
     expected_link: LinkMetaVal,
+    env: EnvironmentWrite,
 }
 
-async fn fixtures(n: usize) -> Vec<TestData> {
+async fn fixtures(env: EnvironmentWrite, n: usize) -> Vec<TestData> {
     let mut tag_fix = BytesFixturator::new(Predictable);
     let mut zome_id = ZomeIdFixturator::new(Predictable);
     let mut data = Vec::new();
@@ -66,13 +69,14 @@ async fn fixtures(n: usize) -> Vec<TestData> {
             zome_id,
             tag,
             expected_link,
+            env: env.clone(),
         };
         data.push(td);
     }
     data
 }
 
-#[allow(dead_code)]
+// #[allow(dead_code)]
 impl TestData {
     /// Create the same test data with a new timestamp
     async fn with_same_keys(mut td: Self) -> Self {
@@ -86,151 +90,149 @@ impl TestData {
         td
     }
 
-    fn empty(&self, test: &'static str, meta_buf: &MetadataBuf) {
+    async fn empty<'a>(&'a self, test: &'static str, meta_buf: &'a MetadataBuf) {
         let key = LinkMetaKey::BaseZomeTag(&self.base_hash, self.zome_id, &self.tag);
-        assert!(
-            meta_buf
-                .get_live_links(&key)
-                .unwrap()
-                .collect::<Vec<_>>()
-                .unwrap()
-                .is_empty(),
-            test
-        );
+        let val = fresh_reader_test!(self.env, |r| meta_buf
+            .get_live_links(&r, &key)
+            .unwrap()
+            .collect::<Vec<_>>()
+            .unwrap()
+            .is_empty());
+        assert!(val, test);
     }
 
-    fn is_on_full_key(&self, test: &'static str, meta_buf: &MetadataBuf) {
+    async fn is_on_full_key<'a>(&'a self, test: &'static str, meta_buf: &'a MetadataBuf) {
         let key = LinkMetaKey::BaseZomeTag(&self.base_hash, self.zome_id, &self.tag);
         assert!(
-            meta_buf
-                .get_live_links(&key)
+            fresh_reader_test!(self.env, |r| meta_buf
+                .get_live_links(&r, &key)
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap()
-                .contains(&self.expected_link),
+                .contains(&self.expected_link)),
             "{}",
             test
         );
     }
 
-    fn only_on_full_key(&self, test: &'static str, meta_buf: &MetadataBuf) {
+    async fn only_on_full_key<'a>(&'a self, test: &'static str, meta_buf: &'a MetadataBuf) {
         let key = LinkMetaKey::BaseZomeTag(&self.base_hash, self.zome_id, &self.tag);
-        assert_eq!(
+        fresh_reader_test!(self.env, |r| assert_eq!(
             &meta_buf
-                .get_live_links(&key)
+                .get_live_links(&r, &key)
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap()[..],
             &[self.expected_link.clone()],
             "{}",
             test
-        );
+        ));
     }
 
-    fn not_on_full_key(&self, test: &'static str, meta_buf: &MetadataBuf) {
+    async fn not_on_full_key<'a>(&'a self, test: &'static str, meta_buf: &'a MetadataBuf) {
         let key = LinkMetaKey::BaseZomeTag(&self.base_hash, self.zome_id, &self.tag);
         assert!(
-            !meta_buf
-                .get_live_links(&key)
+            fresh_reader_test!(self.env, |r| !meta_buf
+                .get_live_links(&r, &key)
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap()
-                .contains(&self.expected_link),
+                .contains(&self.expected_link)),
             "LinkMetaVal: {:?} should not be present {}",
             self.expected_link,
             test
         );
     }
 
-    fn is_on_base(&self, test: &'static str, meta_buf: &MetadataBuf) {
+    async fn is_on_base<'a>(&'a self, test: &'static str, meta_buf: &'a MetadataBuf) {
         let key = LinkMetaKey::Base(&self.base_hash);
         assert!(
-            meta_buf
-                .get_live_links(&key)
+            fresh_reader_test!(self.env, |r| meta_buf
+                .get_live_links(&r, &key)
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap()
-                .contains(&self.expected_link),
+                .contains(&self.expected_link)),
             "Results should contain LinkMetaVal: {:?} in test: {}",
             self.expected_link,
             test
         );
     }
 
-    fn only_on_base(&self, test: &'static str, meta_buf: &MetadataBuf) {
+    async fn only_on_base<'a>(&'a self, test: &'static str, meta_buf: &'a MetadataBuf) {
         let key = LinkMetaKey::Base(&self.base_hash);
-        assert_eq!(
+        fresh_reader_test!(self.env, |r| assert_eq!(
             &meta_buf
-                .get_live_links(&key)
+                .get_live_links(&r, &key)
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap()[..],
             &[self.expected_link.clone()],
             "{}",
             test
-        );
+        ));
     }
 
-    fn is_on_zome_id(&self, test: &'static str, meta_buf: &MetadataBuf) {
+    async fn is_on_zome_id<'a>(&'a self, test: &'static str, meta_buf: &'a MetadataBuf) {
         let key = LinkMetaKey::BaseZome(&self.base_hash, self.zome_id);
         assert!(
-            meta_buf
-                .get_live_links(&key)
+            fresh_reader_test!(self.env, |r| meta_buf
+                .get_live_links(&r, &key)
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap()
-                .contains(&self.expected_link),
+                .contains(&self.expected_link)),
             "Results should contain LinkMetaVal: {:?} in test: {}",
             self.expected_link,
             test
         );
     }
 
-    fn only_on_zome_id(&self, test: &'static str, meta_buf: &MetadataBuf) {
+    async fn only_on_zome_id<'a>(&'a self, test: &'static str, meta_buf: &'a MetadataBuf) {
         let key = LinkMetaKey::BaseZome(&self.base_hash, self.zome_id);
-        assert_eq!(
+        fresh_reader_test!(self.env, |r| assert_eq!(
             &meta_buf
-                .get_live_links(&key)
+                .get_live_links(&r, &key)
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap()[..],
             &[self.expected_link.clone()],
             "{}",
             test
-        );
+        ));
     }
 
-    fn only_on_half_tag(&self, test: &'static str, meta_buf: &MetadataBuf) {
+    async fn only_on_half_tag<'a>(&'a self, test: &'static str, meta_buf: &'a MetadataBuf) {
         let tag_len = self.tag.0.len();
         // Make sure there is at least some tag
         let half_tag = if tag_len > 1 { tag_len / 2 } else { tag_len };
         let half_tag = LinkTag::new(&self.tag.0[..half_tag]);
         let key = LinkMetaKey::BaseZomeTag(&self.base_hash, self.zome_id, &half_tag);
-        assert_eq!(
+        fresh_reader_test!(self.env, |r| assert_eq!(
             &meta_buf
-                .get_live_links(&key)
+                .get_live_links(&r, &key)
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap()[..],
             &[self.expected_link.clone()],
             "{}",
             test
-        );
+        ));
     }
 
-    fn is_on_half_tag(&self, test: &'static str, meta_buf: &MetadataBuf) {
+    async fn is_on_half_tag<'a>(&'a self, test: &'static str, meta_buf: &'a MetadataBuf) {
         let tag_len = self.tag.0.len();
         // Make sure there is at least some tag
         let half_tag = if tag_len > 1 { tag_len / 2 } else { tag_len };
         let half_tag = LinkTag::new(&self.tag.0[..half_tag]);
         let key = LinkMetaKey::BaseZomeTag(&self.base_hash, self.zome_id, &half_tag);
         assert!(
-            meta_buf
-                .get_live_links(&key)
+            fresh_reader_test!(self.env, |r| meta_buf
+                .get_live_links(&r, &key)
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap()
-                .contains(&self.expected_link),
+                .contains(&self.expected_link)),
             "Results should contain LinkMetaVal: {:?} in test: {}",
             self.expected_link,
             test
@@ -248,7 +250,7 @@ impl TestData {
     }
 
     #[instrument(skip(td, meta_buf))]
-    fn only_these_on_base(td: &[Self], test: &'static str, meta_buf: &MetadataBuf) {
+    async fn only_these_on_base<'a>(td: &'a [Self], test: &'static str, meta_buf: &'a MetadataBuf) {
         // Check all base hash are the same
         for d in td {
             assert_eq!(d.base_hash, td[0].base_hash, "{}", test);
@@ -261,19 +263,23 @@ impl TestData {
         expected.sort_by_key(|d| LinkMetaKey::from((&d.0, &d.1.link_add_hash)).to_key());
         let expected = expected.into_iter().map(|d| d.1).collect::<Vec<_>>();
         let key = LinkMetaKey::Base(&base_hash);
-        assert_eq!(
+        fresh_reader_test!(td[0].env, |r| assert_eq!(
             &meta_buf
-                .get_live_links(&key)
+                .get_live_links(&r, &key)
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap()[..],
             &expected[..],
             "{}",
             test
-        );
+        ));
     }
 
-    fn only_these_on_zome_id(td: &[Self], test: &'static str, meta_buf: &MetadataBuf) {
+    async fn only_these_on_zome_id<'a>(
+        td: &'a [Self],
+        test: &'static str,
+        meta_buf: &'a MetadataBuf,
+    ) {
         // Check all base hash, zome_id are the same
         for d in td {
             assert_eq!(d.base_hash, td[0].base_hash, "{}", test);
@@ -288,19 +294,23 @@ impl TestData {
         expected.sort_by_key(|d| LinkMetaKey::from((&d.0, &d.1.link_add_hash)).to_key());
         let expected = expected.into_iter().map(|d| d.1).collect::<Vec<_>>();
         let key = LinkMetaKey::BaseZome(&base_hash, zome_id);
-        assert_eq!(
+        fresh_reader_test!(td[0].env, |r| assert_eq!(
             &meta_buf
-                .get_live_links(&key)
+                .get_live_links(&r, &key)
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap()[..],
             &expected[..],
             "{}",
             test
-        );
+        ));
     }
 
-    fn only_these_on_full_key(td: &[Self], test: &'static str, meta_buf: &MetadataBuf) {
+    async fn only_these_on_full_key<'a>(
+        td: &'a [Self],
+        test: &'static str,
+        meta_buf: &'a MetadataBuf,
+    ) {
         // Check all base hash, zome_id, tag are the same
         for d in td {
             assert_eq!(d.base_hash, td[0].base_hash, "{}", test);
@@ -317,19 +327,23 @@ impl TestData {
         expected.sort_by_key(|d| LinkMetaKey::from((&d.0, &d.1.link_add_hash)).to_key());
         let expected = expected.into_iter().map(|d| d.1).collect::<Vec<_>>();
         let key = LinkMetaKey::BaseZomeTag(&base_hash, zome_id, &tag);
-        assert_eq!(
+        fresh_reader_test!(td[0].env, |r| assert_eq!(
             &meta_buf
-                .get_live_links(&key)
+                .get_live_links(&r, &key)
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap()[..],
             &expected[..],
             "{}",
             test
-        );
+        ));
     }
 
-    fn only_these_on_half_key(td: &[Self], test: &'static str, meta_buf: &MetadataBuf) {
+    async fn only_these_on_half_key<'a>(
+        td: &'a [Self],
+        test: &'static str,
+        meta_buf: &'a MetadataBuf,
+    ) {
         let tag_len = td[0].tag.0.len();
         // Make sure there is at least some tag
         let tag_len = if tag_len > 1 { tag_len / 2 } else { tag_len };
@@ -349,16 +363,16 @@ impl TestData {
         expected.sort_by_key(|d| LinkMetaKey::from((&d.0, &d.1.link_add_hash)).to_key());
         let expected = expected.into_iter().map(|d| d.1).collect::<Vec<_>>();
         let key = LinkMetaKey::BaseZomeTag(&base_hash, zome_id, &half_tag);
-        assert_eq!(
+        fresh_reader_test!(td[0].env, |r| assert_eq!(
             &meta_buf
-                .get_live_links(&key)
+                .get_live_links(&r, &key)
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap()[..],
             &expected[..],
             "{}",
             test
-        );
+        ));
     }
 }
 
@@ -367,11 +381,11 @@ async fn can_add_and_remove_link() {
     let arc = test_cell_env();
     let env = arc.guard().await;
 
-    let mut td = fixtures(1).await.into_iter().next().unwrap();
+    let mut td = fixtures(arc.clone(), 1).await.into_iter().next().unwrap();
 
     // Check it's empty
     env.with_reader(|reader| {
-        let meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
+        let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         td.empty(here!("empty at start"), &meta_buf);
         DatabaseResult::Ok(())
     })
@@ -380,7 +394,7 @@ async fn can_add_and_remove_link() {
     // Add a link
     {
         let reader = env.reader().unwrap();
-        let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
+        let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         // Add
         td.add_link(&mut meta_buf).await;
         // Is in scratch
@@ -407,7 +421,7 @@ async fn can_add_and_remove_link() {
 
     // Check it's in db
     env.with_reader(|reader| {
-        let meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
+        let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         td.only_on_full_key(here!("It's in the db"), &meta_buf);
         DatabaseResult::Ok(())
     })
@@ -416,7 +430,7 @@ async fn can_add_and_remove_link() {
     // Remove the link
     {
         let reader = env.reader().unwrap();
-        let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
+        let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         td.remove_link(&mut meta_buf).await;
         // Is empty
         td.empty(here!("empty after remove"), &meta_buf);
@@ -426,7 +440,7 @@ async fn can_add_and_remove_link() {
 
     // Check it's empty
     env.with_reader(|reader| {
-        let meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
+        let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         // Is empty
         td.empty(here!("empty after remove in db"), &meta_buf);
         DatabaseResult::Ok(())
@@ -436,7 +450,7 @@ async fn can_add_and_remove_link() {
     // Add a link
     {
         let reader = env.reader().unwrap();
-        let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
+        let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         let new_td = TestData::with_same_keys(td.clone()).await;
         td = new_td;
         // Add
@@ -455,7 +469,7 @@ async fn can_add_and_remove_link() {
 
     // Partial matching
     env.with_reader(|reader| {
-        let meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
+        let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         td.only_on_full_key(here!("db"), &meta_buf);
         // No zome, no tag
         td.only_on_base(here!("db"), &meta_buf);
@@ -473,12 +487,12 @@ async fn multiple_links() {
     let arc = test_cell_env();
     let env = arc.guard().await;
 
-    let mut td = fixtures(10).await;
+    let mut td = fixtures(arc.clone().into(), 10).await;
 
     // Add links
     {
         let reader = env.reader().unwrap();
-        let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
+        let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         // Add
         for d in td.iter() {
             d.add_link(&mut meta_buf).await;
@@ -516,7 +530,7 @@ async fn multiple_links() {
 
     {
         let reader = env.reader().unwrap();
-        let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
+        let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         for d in td.iter() {
             d.only_on_full_key(here!("all in db"), &meta_buf);
         }
@@ -532,7 +546,7 @@ async fn multiple_links() {
     }
 
     env.with_reader(|reader| {
-        let meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
+        let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         for d in &td[1..] {
             d.only_on_full_key(here!("all except 0"), &meta_buf);
         }
@@ -547,11 +561,11 @@ async fn duplicate_links() {
     let arc = test_cell_env();
     let env = arc.guard().await;
 
-    let td = fixtures(10).await;
+    let td = fixtures(arc.clone(), 10).await;
     // Add to db then the same to scratch and expect on one result
     {
         let reader = env.reader().unwrap();
-        let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
+        let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         // Add
         for d in td.iter() {
             d.add_link(&mut meta_buf).await;
@@ -585,7 +599,7 @@ async fn duplicate_links() {
     }
     {
         let reader = env.reader().unwrap();
-        let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
+        let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         // Add
         for d in td.iter() {
             d.add_link(&mut meta_buf).await;
@@ -604,7 +618,7 @@ async fn duplicate_links() {
             .unwrap();
     }
     env.with_reader(|reader| {
-        let meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
+        let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         // Is in db
         for d in td.iter() {
             d.only_on_full_key(here!("re add"), &meta_buf);
@@ -626,7 +640,7 @@ async fn links_on_same_base() {
     let arc = test_cell_env();
     let env = arc.guard().await;
 
-    let mut td = fixtures(10).await;
+    let mut td = fixtures(arc.clone(), 10).await;
     let base_hash = td[0].base_hash.clone();
     let base_hash = &base_hash;
     for d in td.iter_mut() {
@@ -642,7 +656,7 @@ async fn links_on_same_base() {
     }
     {
         let reader = env.reader().unwrap();
-        let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
+        let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         // Add
         for d in td.iter() {
             d.add_link(&mut meta_buf).await;
@@ -659,7 +673,7 @@ async fn links_on_same_base() {
             .unwrap();
     }
     env.with_reader(|reader| {
-        let meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
+        let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         // In db
         for d in td.iter() {
             d.only_on_full_key(here!("same base"), &meta_buf);
@@ -676,7 +690,7 @@ async fn links_on_same_base() {
         let span = debug_span!("check_remove");
         let _g = span.enter();
         let reader = env.reader().unwrap();
-        let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
+        let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         td[0].remove_link(&mut meta_buf).await;
         for d in &td[1..] {
             d.only_on_full_key(here!("same base"), &meta_buf);
@@ -690,7 +704,7 @@ async fn links_on_same_base() {
             .unwrap();
     }
     env.with_reader(|reader| {
-        let meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
+        let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         for d in &td[1..] {
             d.only_on_full_key(here!("same base"), &meta_buf);
             d.only_on_zome_id(here!("same base"), &meta_buf);
@@ -709,7 +723,7 @@ async fn links_on_same_zome_id() {
     let arc = test_cell_env();
     let env = arc.guard().await;
 
-    let mut td = fixtures(10).await;
+    let mut td = fixtures(arc.clone(), 10).await;
     let base_hash = td[0].base_hash.clone();
     let zome_id = td[0].zome_id;
     let base_hash = &base_hash;
@@ -731,7 +745,7 @@ async fn links_on_same_zome_id() {
         let span = debug_span!("check_zome_id");
         let _g = span.enter();
         let reader = env.reader().unwrap();
-        let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
+        let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         // Add
         for d in td.iter() {
             d.add_link(&mut meta_buf).await;
@@ -748,7 +762,7 @@ async fn links_on_same_zome_id() {
             .unwrap();
     }
     env.with_reader(|reader| {
-        let meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
+        let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         // In db
         for d in td.iter() {
             d.only_on_full_key(here!("same base"), &meta_buf);
@@ -765,7 +779,7 @@ async fn links_on_same_zome_id() {
         let span = debug_span!("check_remove");
         let _g = span.enter();
         let reader = env.reader().unwrap();
-        let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
+        let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         td[9].remove_link(&mut meta_buf).await;
         for d in &td[..9] {
             d.only_on_full_key(here!("same base"), &meta_buf);
@@ -783,7 +797,7 @@ async fn links_on_same_zome_id() {
             .unwrap();
     }
     env.with_reader(|reader| {
-        let meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
+        let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         for d in &td[..9] {
             d.only_on_full_key(here!("same base"), &meta_buf);
             // Half the tag
@@ -807,7 +821,7 @@ async fn links_on_same_tag() {
     let arc = test_cell_env();
     let env = arc.guard().await;
 
-    let mut td = fixtures(10).await;
+    let mut td = fixtures(arc.clone(), 10).await;
     let base_hash = td[0].base_hash.clone();
     let zome_id = td[0].zome_id;
     let tag = td[0].tag.clone();
@@ -832,7 +846,7 @@ async fn links_on_same_tag() {
     }
     {
         let reader = env.reader().unwrap();
-        let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
+        let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         // Add
         for d in td.iter() {
             d.add_link(&mut meta_buf).await;
@@ -853,7 +867,7 @@ async fn links_on_same_tag() {
             .unwrap();
     }
     env.with_reader(|reader| {
-        let meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
+        let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         // In db
         TestData::only_these_on_base(&td[..], here!("check all return on same base"), &meta_buf);
         TestData::only_these_on_zome_id(&td[..], here!("check all return on same base"), &meta_buf);
@@ -875,7 +889,7 @@ async fn links_on_same_tag() {
         let span = debug_span!("check_remove");
         let _g = span.enter();
         let reader = env.reader().unwrap();
-        let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
+        let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         td[5].remove_link(&mut meta_buf).await;
         td[6].remove_link(&mut meta_buf).await;
         let partial_td = &td[..5].iter().chain(&td[7..]).cloned().collect::<Vec<_>>();
@@ -903,7 +917,7 @@ async fn links_on_same_tag() {
             .unwrap();
     }
     env.with_reader(|reader| {
-        let meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
+        let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         let partial_td = &td[..5].iter().chain(&td[7..]).cloned().collect::<Vec<_>>();
         TestData::only_these_on_base(
             &partial_td[..],

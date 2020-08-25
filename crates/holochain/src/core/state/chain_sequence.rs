@@ -302,7 +302,7 @@ pub mod tests {
                 .buf
                 .store()
                 .iter(&reader)?
-                .map(|(key, _)| Ok(key))
+                .map(|(key, _)| Ok(IntKey::from_key_bytes_fallible(key.to_vec()).into()))
                 .collect()?;
             assert_eq!(items, vec![0, 1, 2]);
         }
