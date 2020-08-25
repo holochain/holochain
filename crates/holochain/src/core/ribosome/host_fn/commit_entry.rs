@@ -88,7 +88,7 @@ pub fn extract_entry_def(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     entry_def_id: EntryDefId,
-) -> RibosomeResult<(holochain_zome_types::header::EntryDefInt, EntryVisibility)> {
+) -> RibosomeResult<(holochain_zome_types::header::EntryDefIndex, EntryVisibility)> {
     let app_entry_type = match ribosome
         .run_entry_defs((&call_context.host_access).into(), EntryDefsInvocation)?
     {
@@ -100,7 +100,7 @@ pub fn extract_entry_def(
                 Some(entry_defs) => match entry_defs.entry_def_id_position(entry_def_id.clone()) {
                     // build an app entry type from the entry def at the found position
                     Some(index) => Some((
-                        holochain_zome_types::header::EntryDefInt::from(index as u8),
+                        holochain_zome_types::header::EntryDefIndex::from(index as u8),
                         entry_defs[index].visibility,
                     )),
                     None => None,

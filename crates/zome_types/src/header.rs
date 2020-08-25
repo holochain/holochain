@@ -159,7 +159,7 @@ impl_hashable_content!(Header, Header);
 pub struct ZomeId(u8);
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
-pub struct EntryDefInt(u8);
+pub struct EntryDefIndex(u8);
 
 /// The Dna Header is always the first header in a source chain
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
@@ -350,7 +350,7 @@ impl EntryType {
 pub struct AppEntryType {
     /// u8 identifier of what entry type this is
     /// this needs to match the position of the entry type returned by entry defs
-    pub(crate) id: EntryDefInt,
+    pub(crate) id: EntryDefIndex,
     /// u8 identifier of what zome this is for
     /// this needs to be shared across the dna
     /// comes from the numeric index position of a zome in dna config
@@ -360,7 +360,7 @@ pub struct AppEntryType {
 }
 
 impl AppEntryType {
-    pub fn new(id: EntryDefInt, zome_id: ZomeId, visibility: EntryVisibility) -> Self {
+    pub fn new(id: EntryDefIndex, zome_id: ZomeId, visibility: EntryVisibility) -> Self {
         Self {
             id,
             zome_id,
@@ -368,7 +368,7 @@ impl AppEntryType {
         }
     }
 
-    pub fn id(&self) -> EntryDefInt {
+    pub fn id(&self) -> EntryDefIndex {
         self.id
     }
     pub fn zome_id(&self) -> ZomeId {

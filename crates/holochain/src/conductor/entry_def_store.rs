@@ -18,7 +18,7 @@ use holochain_state::{
 };
 use holochain_types::dna::{zome::Zome, DnaFile};
 use holochain_zome_types::entry_def::EntryDef;
-use holochain_zome_types::header::EntryDefInt;
+use holochain_zome_types::header::EntryDefIndex;
 use shrinkwraprs::Shrinkwrap;
 use std::{collections::HashMap, convert::TryInto};
 
@@ -28,7 +28,7 @@ pub mod error;
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, SerializedBytes)]
 pub struct EntryDefBufferKey {
     zome: Zome,
-    entry_def_position: EntryDefInt,
+    entry_def_position: EntryDefIndex,
 }
 
 /// This is where entry defs live
@@ -71,7 +71,7 @@ impl From<EntryDefStoreKey> for EntryDefBufferKey {
 
 impl EntryDefBufferKey {
     /// Create a new key
-    pub fn new(zome: Zome, entry_def_position: EntryDefInt) -> Self {
+    pub fn new(zome: Zome, entry_def_position: EntryDefIndex) -> Self {
         Self {
             zome,
             entry_def_position,
