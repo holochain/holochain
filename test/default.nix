@@ -3,8 +3,7 @@ let
   t-test = pkgs.writeShellScriptBin "hc-test"
   ''
   set -euxo pipefail
-  cargo test --no-run --manifest-path=crates/holochain/Cargo.toml --features "build_wasms"
-  cargo test warm_wasm_tests
+  cargo test warm_wasm_tests --manifest-path=crates/holochain/Cargo.toml --features "slow_tests build_wasms"
   RUST_BACKTRACE=1 \
   cargo test -- --nocapture
 
@@ -86,9 +85,8 @@ let
 
   t-speed = pkgs.writeShellScriptBin "hc-speed-test"
   ''
-  cargo test --release --no-run --manifest-path=crates/holochain/Cargo.toml --features "build_wasms"
-  cargo test --release warm_wasm_tests
-  cargo test speed_test_all --release -- --ignored
+  cargo test speed_test_prep --test speed_tests --release --manifest-path=crates/holochain/Cargo.toml --features "build_wasms" -- --ignored
+  cargo test speed_test_all --test speed_tests --release --manifest-path=crates/holochain/Cargo.toml --features "build_wasms" -- --ignored --nocapture
   '';
 
   maybe_linux = if pkgs.stdenv.isLinux then [ t-cover ] else [ ];

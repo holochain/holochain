@@ -538,16 +538,7 @@ mod slow_tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn warm_wasm_tests() {
-        holochain_types::observability::test_run().ok();
-        use strum::IntoEnumIterator;
-
-        // If HC_WASM_CACHE_PATH is set warm the cache
-        if let Some(_path) = std::env::var_os("HC_WASM_CACHE_PATH") {
-            let wasms: Vec<_> = TestWasm::iter().collect();
-            crate::fixt::WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(wasms))
-                .next()
-                .unwrap();
-        }
+        crate::test_utils::warm_wasm_tests();
     }
 
     #[tokio::test(threaded_scheduler)]

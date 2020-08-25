@@ -22,7 +22,7 @@ use holochain::conductor::{
     dna_store::MockDnaStore,
     ConductorBuilder, ConductorHandle,
 };
-use holochain::core::ribosome::ZomeCallInvocation;
+use holochain::{core::ribosome::ZomeCallInvocation, test_utils::warm_wasm_tests};
 use holochain_state::test_utils::{test_conductor_env, test_wasm_env, TestEnvironment};
 use holochain_types::app::InstalledCell;
 use holochain_types::cell::CellId;
@@ -45,6 +45,12 @@ use tracing::instrument;
 mod test_utils;
 
 const DEFAULT_NUM: usize = 2000;
+
+#[tokio::test(threaded_scheduler)]
+#[ignore]
+async fn speed_test_prep() {
+    warm_wasm_tests();
+}
 
 #[tokio::test(threaded_scheduler)]
 #[ignore]
