@@ -69,6 +69,7 @@ use tracing::*;
 use unwrap_to::unwrap_to;
 
 #[tokio::test(threaded_scheduler)]
+#[ignore]
 async fn get_updates_cache() {
     observability::test_run().ok();
     // Database setup
