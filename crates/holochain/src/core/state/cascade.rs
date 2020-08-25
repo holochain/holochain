@@ -52,7 +52,7 @@ use error::CascadeResult;
 use fallible_iterator::FallibleIterator;
 use holo_hash::{
     hash_type::{self, AnyDht},
-    AnyDhtHash, EntryHash, HeaderHash,
+    AnyDhtHash, EntryHash, HasHash, HeaderHash,
 };
 use holochain_p2p::{
     actor::{GetLinksOptions, GetMetaOptions, GetOptions},
@@ -321,13 +321,23 @@ where
         Ok(())
     }
 
-
     async fn get_element_local_raw(&self, hash: &HeaderHash) -> CascadeResult<Option<Element>> {
         let r = match self.element_vault.get_element(hash).await? {
-            Some(el) => self.meta_vault.get_headers(entry_hash),
             None => self.element_cache.get_element(hash).await?,
+            r => r,
         };
-        Ok(r)
+        // Check we have a valid reason to return this element
+        match r {
+            Some(el)
+                if self.valid_element(
+                    el.header_address(),
+                    el.header().entry_data().map(|(h, _)| h),
+                )? =>
+            {
+                Ok(Some(el))
+            }
+            _ => Ok(None),
+        }
     }
 
     /// Gets the first element we can find for this entry locally
@@ -359,9 +369,14 @@ where
     }
 
     async fn get_entry_local_raw(&self, hash: &EntryHash) -> CascadeResult<Option<EntryHashed>> {
-        match self.element_vault.get_entry(hash).await? {
-            None => Ok(self.element_cache.get_entry(hash).await?),
-            r => Ok(r),
+        let r = match self.element_vault.get_entry(hash).await? {
+            None => self.element_cache.get_entry(hash).await?,
+            r => r,
+        };
+        // Check we have a valid reason to return this element
+        match r {
+            Some(e) if self.valid_entry(e.as_hash())? => Ok(Some(e)),
+            _ => Ok(None),
         }
     }
 
@@ -376,9 +391,21 @@ where
         &self,
         hash: &HeaderHash,
     ) -> CascadeResult<Option<SignedHeaderHashed>> {
-        match self.element_vault.get_header(hash).await? {
-            None => Ok(self.element_cache.get_header(hash).await?),
-            r => Ok(r),
+        let r = match self.element_vault.get_header(hash).await? {
+            None => self.element_cache.get_header(hash).await?,
+            r => r,
+        };
+        // Check we have a valid reason to return this element
+        match r {
+            Some(h)
+                if self.valid_element(
+                    h.header_address(),
+                    h.header().entry_data().map(|(h, _)| h),
+                )? =>
+            {
+                Ok(Some(h))
+            }
+            _ => Ok(None),
         }
     }
 
@@ -455,6 +482,53 @@ where
             }
             None => Ok(None),
         }
+    }
+
+    fn valid_header(&self, hash: &HeaderHash) -> CascadeResult<bool> {
+        Ok(self.meta_vault.has_element_header(&hash)?
+            || self.meta_cache.has_element_header(&hash)?)
+    }
+
+    fn valid_entry(&self, hash: &EntryHash) -> CascadeResult<bool> {
+        if self.meta_cache.get_headers(hash.clone())?.next()?.is_some() {
+            // Found a entry header in the cache
+            return Ok(true);
+        }
+        if self.meta_vault.get_headers(hash.clone())?.next()?.is_some() {
+            // Found a entry header in the vault
+            return Ok(true);
+        }
+        Ok(false)
+    }
+
+    /// Check if we have a valid reason to return an element from the cascade
+    fn valid_element(
+        &self,
+        header_hash: &HeaderHash,
+        entry_hash: Option<&EntryHash>,
+    ) -> CascadeResult<bool> {
+        if self.valid_header(&header_hash)? {
+            return Ok(true);
+        }
+        if let Some(eh) = entry_hash {
+            if self
+                .meta_cache
+                .get_headers(eh.clone())?
+                .any(|h| Ok(h.header_hash == *header_hash))?
+            {
+                // Found a entry header in the cache
+                return Ok(true);
+            }
+            if self
+                .meta_vault
+                .get_headers(eh.clone())?
+                .any(|h| Ok(h.header_hash == *header_hash))?
+            {
+                // Found a entry header in the vault
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 
     #[instrument(skip(self, options))]
@@ -647,13 +721,13 @@ where
         match *hash.hash_type() {
             AnyDht::Entry => {
                 let hash = hash.into();
-                let entry = match self.get_element_local_raw_via_entry(&hash).await? {
+                match self.get_element_local_raw_via_entry(&hash).await? {
                     Some(e) => Ok(Some(e)),
                     None => {
                         self.fetch_element_via_entry(hash.clone(), options).await?;
                         self.get_element_local_raw_via_entry(&hash).await
                     }
-                }?;
+                }
             }
             AnyDht::Header => {
                 let hash = hash.into();
