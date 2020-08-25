@@ -31,7 +31,7 @@ pub mod test {
     use fixt::prelude::*;
     use holochain_state::env::ReadManager;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::{ZomeInfoInput, ZomeInfoOutput};
+    use holochain_zome_types::ZomeInfoOutput;
 
     #[tokio::test(threaded_scheduler)]
     async fn invoke_import_zome_info_test() {
@@ -48,12 +48,8 @@ pub mod test {
 
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = raw_workspace;
-        let zome_info: ZomeInfoOutput = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::Imports,
-            "zome_info",
-            ZomeInfoInput::new(())
-        );
+        let zome_info: ZomeInfoOutput =
+            crate::call_test_ribosome!(host_access, TestWasm::ZomeInfo, "zome_info", ());
         assert_eq!(zome_info.inner_ref().dna_name, "test",);
     }
 }

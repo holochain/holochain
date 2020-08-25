@@ -83,7 +83,7 @@ pub mod wasm_test {
         host_access.workspace = raw_workspace;
         let output: RandomBytesOutput = crate::call_test_ribosome!(
             host_access,
-            TestWasm::Imports,
+            TestWasm::RandomBytes,
             "random_bytes",
             RandomBytesInput::new(5 as _)
         );

@@ -25,7 +25,7 @@ pub mod wasm_test {
     use fixt::prelude::*;
     use holochain_state::env::ReadManager;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::{SysTimeInput, SysTimeOutput};
+    use holochain_zome_types::SysTimeOutput;
 
     #[tokio::test(threaded_scheduler)]
     async fn invoke_import_sys_time_test() {
@@ -42,11 +42,7 @@ pub mod wasm_test {
 
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = raw_workspace;
-        let _: SysTimeOutput = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::Imports,
-            "sys_time",
-            SysTimeInput::new(())
-        );
+        let _: SysTimeOutput =
+            crate::call_test_ribosome!(host_access, TestWasm::SysTime, "sys_time", ());
     }
 }

@@ -1,4 +1,4 @@
-use super::{commit_entry::extract_entry_def, remove_entry::get_original_address};
+use super::{commit_entry::extract_entry_def, delete_entry::get_original_address};
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::{
@@ -85,3 +85,5 @@ pub fn update_entry<'a>(
     // being atomic
     Ok(UpdateEntryOutput::new(header_address))
 }
+
+// relying on tests for get_details
