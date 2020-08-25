@@ -28,7 +28,7 @@ pub enum DbName {
     /// Vault database: Kv store of links
     MetaVaultLinks,
     /// Vault database: Kv store of entry dht status
-    MetaVaultStatus,
+    MetaVaultMisc,
     /// int KV store storing the sequence of committed headers,
     /// most notably allowing access to the chain head
     ChainSequence,
@@ -74,7 +74,7 @@ impl DbName {
             ElementVaultHeaders => Single,
             MetaVaultSys => Multi,
             MetaVaultLinks => Single,
-            MetaVaultStatus => Single,
+            MetaVaultMisc => Single,
             ChainSequence => SingleInt,
             ElementCacheEntries => Single,
             ElementCacheHeaders => Single,
@@ -125,8 +125,8 @@ lazy_static! {
     pub static ref META_VAULT_SYS: DbKey<MultiStore> = DbKey::new(DbName::MetaVaultSys);
     /// The key to access the links database of the Vault
     pub static ref META_VAULT_LINKS: DbKey<SingleStore> = DbKey::new(DbName::MetaVaultLinks);
-    /// The key to access the entry status database of the Vault
-    pub static ref META_VAULT_STATUS: DbKey<SingleStore> = DbKey::new(DbName::MetaVaultStatus);
+    /// The key to access the miscellaneous metadata database of the Vault
+    pub static ref META_VAULT_MISC: DbKey<SingleStore> = DbKey::new(DbName::MetaVaultMisc);
     /// The key to access the ChainSequence database
     pub static ref CHAIN_SEQUENCE: DbKey<IntegerStore<u32>> = DbKey::new(DbName::ChainSequence);
     /// The key to access the ChainEntries database
@@ -205,7 +205,7 @@ fn register_databases(env: &Rkv, kind: &EnvironmentKind, um: &mut DbMap) -> Data
             register_db(env, um, &*ELEMENT_VAULT_HEADERS)?;
             register_db(env, um, &*META_VAULT_SYS)?;
             register_db(env, um, &*META_VAULT_LINKS)?;
-            register_db(env, um, &*META_VAULT_STATUS)?;
+            register_db(env, um, &*META_VAULT_MISC)?;
             register_db(env, um, &*CHAIN_SEQUENCE)?;
             register_db(env, um, &*ELEMENT_CACHE_ENTRIES)?;
             register_db(env, um, &*ELEMENT_CACHE_HEADERS)?;

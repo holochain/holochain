@@ -469,6 +469,12 @@ impl Cell {
         let element_vault = ElementBuf::vault(&reader, &dbs, false)?;
         let meta_vault = MetadataBuf::vault(&reader, &dbs)?;
 
+        // Check that we have the authority to serve this request because we have
+        // done the StoreElement validation
+        if !meta_vault.has_element_header(&hash)? {
+            return Ok(GetElementResponse::GetHeader(None));
+        }
+
         // Look for a delete on the header and collect it
         let deleted = meta_vault.get_deletes_on_header(hash.clone())?.next()?;
         let deleted = match deleted {
