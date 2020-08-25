@@ -384,27 +384,23 @@ async fn can_add_and_remove_link() {
     let mut td = fixtures(arc.clone(), 1).await.into_iter().next().unwrap();
 
     // Check it's empty
-    env.with_reader(|_reader| {
-        let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
-        td.empty(here!("empty at start"), &meta_buf);
-        DatabaseResult::Ok(())
-    })
-    .unwrap();
+    let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
+    td.empty(here!("empty at start"), &meta_buf).await;
 
     // Add a link
     {
-        let _reader = env.reader().unwrap();
         let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         // Add
         td.add_link(&mut meta_buf).await;
         // Is in scratch
-        td.only_on_full_key(here!("add link in scratch"), &meta_buf);
+        td.only_on_full_key(here!("add link in scratch"), &meta_buf)
+            .await;
 
         // Remove from scratch
         td.remove_link(&mut meta_buf).await;
 
         // Is empty
-        td.empty(here!("empty after remove"), &meta_buf);
+        td.empty(here!("empty after remove"), &meta_buf).await;
 
         let new_td = TestData::with_same_keys(td.clone()).await;
         td = new_td;
@@ -413,73 +409,62 @@ async fn can_add_and_remove_link() {
         td.add_link(&mut meta_buf).await;
 
         // Is in scratch again
-        td.only_on_full_key(here!("Is still in the scratch"), &meta_buf);
+        td.only_on_full_key(here!("Is still in the scratch"), &meta_buf)
+            .await;
 
         env.with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
     }
 
     // Check it's in db
-    env.with_reader(|_reader| {
-        let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
-        td.only_on_full_key(here!("It's in the db"), &meta_buf);
-        DatabaseResult::Ok(())
-    })
-    .unwrap();
+    let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
+    td.only_on_full_key(here!("It's in the db"), &meta_buf)
+        .await;
 
     // Remove the link
     {
-        let _reader = env.reader().unwrap();
         let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         td.remove_link(&mut meta_buf).await;
         // Is empty
-        td.empty(here!("empty after remove"), &meta_buf);
+        td.empty(here!("empty after remove"), &meta_buf).await;
         env.with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
     }
 
     // Check it's empty
-    env.with_reader(|_reader| {
-        let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
-        // Is empty
-        td.empty(here!("empty after remove in db"), &meta_buf);
-        DatabaseResult::Ok(())
-    })
-    .unwrap();
+    let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
+    // Is empty
+    td.empty(here!("empty after remove in db"), &meta_buf).await;
 
     // Add a link
     {
-        let _reader = env.reader().unwrap();
         let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         let new_td = TestData::with_same_keys(td.clone()).await;
         td = new_td;
         // Add
         td.add_link(&mut meta_buf).await;
         // Is in scratch
-        td.only_on_full_key(here!("add link in scratch"), &meta_buf);
+        td.only_on_full_key(here!("add link in scratch"), &meta_buf)
+            .await;
         // No zome, no tag
-        td.only_on_base(here!("scratch"), &meta_buf);
+        td.only_on_base(here!("scratch"), &meta_buf).await;
         // No tag
-        td.only_on_zome_id(here!("scratch"), &meta_buf);
+        td.only_on_zome_id(here!("scratch"), &meta_buf).await;
         // Half the tag
-        td.only_on_half_tag(here!("scratch"), &meta_buf);
+        td.only_on_half_tag(here!("scratch"), &meta_buf).await;
         env.with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
     }
 
     // Partial matching
-    env.with_reader(|_reader| {
-        let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
-        td.only_on_full_key(here!("db"), &meta_buf);
-        // No zome, no tag
-        td.only_on_base(here!("db"), &meta_buf);
-        // No tag
-        td.only_on_zome_id(here!("db"), &meta_buf);
-        // Half the tag
-        td.only_on_half_tag(here!("db"), &meta_buf);
-        DatabaseResult::Ok(())
-    })
-    .unwrap();
+    let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
+    td.only_on_full_key(here!("db"), &meta_buf).await;
+    // No zome, no tag
+    td.only_on_base(here!("db"), &meta_buf).await;
+    // No tag
+    td.only_on_zome_id(here!("db"), &meta_buf).await;
+    // Half the tag
+    td.only_on_half_tag(here!("db"), &meta_buf).await;
 }
 
 #[tokio::test(threaded_scheduler)]
@@ -491,7 +476,6 @@ async fn multiple_links() {
 
     // Add links
     {
-        let _reader = env.reader().unwrap();
         let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         // Add
         for d in td.iter() {
@@ -499,16 +483,20 @@ async fn multiple_links() {
         }
         // Is in scratch
         for d in td.iter() {
-            d.only_on_full_key(here!("add link in scratch"), &meta_buf);
+            d.only_on_full_key(here!("add link in scratch"), &meta_buf)
+                .await;
         }
 
         // Remove from scratch
         td[5].remove_link(&mut meta_buf).await;
 
-        td[5].not_on_full_key(here!("removed in scratch"), &meta_buf);
+        td[5]
+            .not_on_full_key(here!("removed in scratch"), &meta_buf)
+            .await;
 
         for d in td[0..5].iter().chain(&td[6..]) {
-            d.only_on_full_key(here!("all except 5 scratch"), &meta_buf);
+            d.only_on_full_key(here!("all except 5 scratch"), &meta_buf)
+                .await;
         }
         // Can't add back the same header because removes are tombstones
         // so add one with the same key
@@ -518,10 +506,13 @@ async fn multiple_links() {
         td[5].add_link(&mut meta_buf).await;
 
         // Is in scratch again
-        td[5].only_on_full_key(here!("Is back in the scratch"), &meta_buf);
+        td[5]
+            .only_on_full_key(here!("Is back in the scratch"), &meta_buf)
+            .await;
 
         for d in td.iter() {
-            d.only_on_full_key(here!("add link in scratch"), &meta_buf);
+            d.only_on_full_key(here!("add link in scratch"), &meta_buf)
+                .await;
         }
 
         env.with_commit(|writer| meta_buf.flush_to_txn(writer))
@@ -529,31 +520,31 @@ async fn multiple_links() {
     }
 
     {
-        let _reader = env.reader().unwrap();
         let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         for d in td.iter() {
-            d.only_on_full_key(here!("all in db"), &meta_buf);
+            d.only_on_full_key(here!("all in db"), &meta_buf).await;
         }
         td[0].remove_link(&mut meta_buf).await;
 
         for d in &td[1..] {
-            d.only_on_full_key(here!("all except 0 scratch"), &meta_buf);
+            d.only_on_full_key(here!("all except 0 scratch"), &meta_buf)
+                .await;
         }
 
-        td[0].not_on_full_key(here!("removed in scratch"), &meta_buf);
+        td[0]
+            .not_on_full_key(here!("removed in scratch"), &meta_buf)
+            .await;
         env.with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
     }
 
-    env.with_reader(|_reader| {
-        let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
-        for d in &td[1..] {
-            d.only_on_full_key(here!("all except 0"), &meta_buf);
-        }
-        td[0].not_on_full_key(here!("removed in db"), &meta_buf);
-        DatabaseResult::Ok(())
-    })
-    .unwrap();
+    let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
+    for d in &td[1..] {
+        d.only_on_full_key(here!("all except 0"), &meta_buf).await;
+    }
+    td[0]
+        .not_on_full_key(here!("removed in db"), &meta_buf)
+        .await;
 }
 #[tokio::test(threaded_scheduler)]
 async fn duplicate_links() {
@@ -564,7 +555,6 @@ async fn duplicate_links() {
     let td = fixtures(arc.clone(), 10).await;
     // Add to db then the same to scratch and expect on one result
     {
-        let _reader = env.reader().unwrap();
         let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         // Add
         for d in td.iter() {
@@ -572,13 +562,13 @@ async fn duplicate_links() {
         }
         // Is in scratch
         for d in td.iter() {
-            d.only_on_full_key(here!("re add"), &meta_buf);
+            d.only_on_full_key(here!("re add"), &meta_buf).await;
             // No zome, no tag
-            d.only_on_base(here!("re add"), &meta_buf);
+            d.only_on_base(here!("re add"), &meta_buf).await;
             // No tag
-            d.only_on_zome_id(here!("re add"), &meta_buf);
+            d.only_on_zome_id(here!("re add"), &meta_buf).await;
             // Half the tag
-            d.is_on_half_tag(here!("re add"), &meta_buf);
+            d.is_on_half_tag(here!("re add"), &meta_buf).await;
         }
         // Add Again
         for d in td.iter() {
@@ -586,19 +576,18 @@ async fn duplicate_links() {
         }
         // Is in scratch
         for d in td.iter() {
-            d.only_on_full_key(here!("re add"), &meta_buf);
+            d.only_on_full_key(here!("re add"), &meta_buf).await;
             // No zome, no tag
-            d.only_on_base(here!("re add"), &meta_buf);
+            d.only_on_base(here!("re add"), &meta_buf).await;
             // No tag
-            d.only_on_zome_id(here!("re add"), &meta_buf);
+            d.only_on_zome_id(here!("re add"), &meta_buf).await;
             // Half the tag
-            d.is_on_half_tag(here!("re add"), &meta_buf);
+            d.is_on_half_tag(here!("re add"), &meta_buf).await;
         }
         env.with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
     }
     {
-        let _reader = env.reader().unwrap();
         let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         // Add
         for d in td.iter() {
@@ -606,32 +595,28 @@ async fn duplicate_links() {
         }
         // Is in scratch
         for d in td.iter() {
-            d.only_on_full_key(here!("re add"), &meta_buf);
+            d.only_on_full_key(here!("re add"), &meta_buf).await;
             // No zome, no tag
-            d.only_on_base(here!("re add"), &meta_buf);
+            d.only_on_base(here!("re add"), &meta_buf).await;
             // No tag
-            d.only_on_zome_id(here!("re add"), &meta_buf);
+            d.only_on_zome_id(here!("re add"), &meta_buf).await;
             // Half the tag
-            d.is_on_half_tag(here!("re add"), &meta_buf);
+            d.is_on_half_tag(here!("re add"), &meta_buf).await;
         }
         env.with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
     }
-    env.with_reader(|_reader| {
-        let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
-        // Is in db
-        for d in td.iter() {
-            d.only_on_full_key(here!("re add"), &meta_buf);
-            // No zome, no tag
-            d.only_on_base(here!("re add"), &meta_buf);
-            // No tag
-            d.only_on_zome_id(here!("re add"), &meta_buf);
-            // Half the tag
-            d.is_on_half_tag(here!("re add"), &meta_buf);
-        }
-        DatabaseResult::Ok(())
-    })
-    .unwrap();
+    let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
+    // Is in db
+    for d in td.iter() {
+        d.only_on_full_key(here!("re add"), &meta_buf).await;
+        // No zome, no tag
+        d.only_on_base(here!("re add"), &meta_buf).await;
+        // No tag
+        d.only_on_zome_id(here!("re add"), &meta_buf).await;
+        // Half the tag
+        d.is_on_half_tag(here!("re add"), &meta_buf).await;
+    }
 }
 
 #[tokio::test(threaded_scheduler)]
@@ -655,7 +640,6 @@ async fn links_on_same_base() {
         d.link_remove.link_add_address = link_add_hash;
     }
     {
-        let _reader = env.reader().unwrap();
         let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         // Add
         for d in td.iter() {
@@ -663,58 +647,59 @@ async fn links_on_same_base() {
         }
         // Is in scratch
         for d in td.iter() {
-            d.only_on_full_key(here!("same base"), &meta_buf);
-            d.only_on_zome_id(here!("same base"), &meta_buf);
+            d.only_on_full_key(here!("same base"), &meta_buf).await;
+            d.only_on_zome_id(here!("same base"), &meta_buf).await;
             // Half the tag
-            d.is_on_half_tag(here!("same base"), &meta_buf);
+            d.is_on_half_tag(here!("same base"), &meta_buf).await;
         }
-        TestData::only_these_on_base(&td, here!("check all return on same base"), &meta_buf);
+        TestData::only_these_on_base(&td, here!("check all return on same base"), &meta_buf).await;
         env.with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
     }
-    env.with_reader(|_reader| {
+    {
         let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         // In db
         for d in td.iter() {
-            d.only_on_full_key(here!("same base"), &meta_buf);
-            d.only_on_zome_id(here!("same base"), &meta_buf);
+            d.only_on_full_key(here!("same base"), &meta_buf).await;
+            d.only_on_zome_id(here!("same base"), &meta_buf).await;
             // Half the tag
-            d.is_on_half_tag(here!("same base"), &meta_buf);
+            d.is_on_half_tag(here!("same base"), &meta_buf).await;
         }
-        TestData::only_these_on_base(&td, here!("check all return on same base"), &meta_buf);
-        DatabaseResult::Ok(())
-    })
-    .unwrap();
+        TestData::only_these_on_base(&td, here!("check all return on same base"), &meta_buf).await;
+    }
     // Check removes etc.
     {
         let span = debug_span!("check_remove");
         let _g = span.enter();
-        let _reader = env.reader().unwrap();
         let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         td[0].remove_link(&mut meta_buf).await;
         for d in &td[1..] {
-            d.only_on_full_key(here!("same base"), &meta_buf);
-            d.only_on_zome_id(here!("same base"), &meta_buf);
+            d.only_on_full_key(here!("same base"), &meta_buf).await;
+            d.only_on_zome_id(here!("same base"), &meta_buf).await;
             // Half the tag
-            d.is_on_half_tag(here!("same base"), &meta_buf);
+            d.is_on_half_tag(here!("same base"), &meta_buf).await;
         }
-        TestData::only_these_on_base(&td[1..], here!("check all return on same base"), &meta_buf);
-        td[0].not_on_full_key(here!("removed in scratch"), &meta_buf);
+        TestData::only_these_on_base(&td[1..], here!("check all return on same base"), &meta_buf)
+            .await;
+        td[0]
+            .not_on_full_key(here!("removed in scratch"), &meta_buf)
+            .await;
         env.with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
     }
-    env.with_reader(|_reader| {
+    {
         let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         for d in &td[1..] {
-            d.only_on_full_key(here!("same base"), &meta_buf);
-            d.only_on_zome_id(here!("same base"), &meta_buf);
-            d.is_on_half_tag(here!("same base"), &meta_buf);
+            d.only_on_full_key(here!("same base"), &meta_buf).await;
+            d.only_on_zome_id(here!("same base"), &meta_buf).await;
+            d.is_on_half_tag(here!("same base"), &meta_buf).await;
         }
-        TestData::only_these_on_base(&td[1..], here!("check all return on same base"), &meta_buf);
-        td[0].not_on_full_key(here!("removed in scratch"), &meta_buf);
-        DatabaseResult::Ok(())
-    })
-    .unwrap();
+        TestData::only_these_on_base(&td[1..], here!("check all return on same base"), &meta_buf)
+            .await;
+        td[0]
+            .not_on_full_key(here!("removed in scratch"), &meta_buf)
+            .await;
+    }
 }
 
 #[tokio::test(threaded_scheduler)]
@@ -744,7 +729,6 @@ async fn links_on_same_zome_id() {
     {
         let span = debug_span!("check_zome_id");
         let _g = span.enter();
-        let _reader = env.reader().unwrap();
         let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         // Add
         for d in td.iter() {
@@ -752,67 +736,72 @@ async fn links_on_same_zome_id() {
         }
         // Is in scratch
         for d in td.iter() {
-            d.only_on_full_key(here!("same base"), &meta_buf);
+            d.only_on_full_key(here!("same base"), &meta_buf).await;
             // Half the tag
-            d.is_on_half_tag(here!("same base"), &meta_buf);
+            d.is_on_half_tag(here!("same base"), &meta_buf).await;
         }
-        TestData::only_these_on_base(&td, here!("check all return on same base"), &meta_buf);
-        TestData::only_these_on_zome_id(&td, here!("check all return on same base"), &meta_buf);
+        TestData::only_these_on_base(&td, here!("check all return on same base"), &meta_buf).await;
+        TestData::only_these_on_zome_id(&td, here!("check all return on same base"), &meta_buf)
+            .await;
         env.with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
     }
-    env.with_reader(|_reader| {
+    {
         let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         // In db
         for d in td.iter() {
-            d.only_on_full_key(here!("same base"), &meta_buf);
+            d.only_on_full_key(here!("same base"), &meta_buf).await;
             // Half the tag
-            d.is_on_half_tag(here!("same base"), &meta_buf);
+            d.is_on_half_tag(here!("same base"), &meta_buf).await;
         }
-        TestData::only_these_on_base(&td, here!("check all return on same base"), &meta_buf);
-        TestData::only_these_on_zome_id(&td, here!("check all return on same base"), &meta_buf);
-        DatabaseResult::Ok(())
-    })
-    .unwrap();
+        TestData::only_these_on_base(&td, here!("check all return on same base"), &meta_buf).await;
+        TestData::only_these_on_zome_id(&td, here!("check all return on same base"), &meta_buf)
+            .await;
+    }
     // Check removes etc.
     {
         let span = debug_span!("check_remove");
         let _g = span.enter();
-        let _reader = env.reader().unwrap();
         let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         td[9].remove_link(&mut meta_buf).await;
         for d in &td[..9] {
-            d.only_on_full_key(here!("same base"), &meta_buf);
+            d.only_on_full_key(here!("same base"), &meta_buf).await;
             // Half the tag
-            d.is_on_half_tag(here!("same base"), &meta_buf);
+            d.is_on_half_tag(here!("same base"), &meta_buf).await;
         }
-        TestData::only_these_on_base(&td[..9], here!("check all return on same base"), &meta_buf);
+        TestData::only_these_on_base(&td[..9], here!("check all return on same base"), &meta_buf)
+            .await;
         TestData::only_these_on_zome_id(
             &td[..9],
             here!("check all return on same base"),
             &meta_buf,
-        );
-        td[9].not_on_full_key(here!("removed in scratch"), &meta_buf);
+        )
+        .await;
+        td[9]
+            .not_on_full_key(here!("removed in scratch"), &meta_buf)
+            .await;
         env.with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
     }
-    env.with_reader(|_reader| {
+    {
         let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         for d in &td[..9] {
-            d.only_on_full_key(here!("same base"), &meta_buf);
+            d.only_on_full_key(here!("same base"), &meta_buf).await;
             // Half the tag
-            d.is_on_half_tag(here!("same base"), &meta_buf);
+            d.is_on_half_tag(here!("same base"), &meta_buf).await;
         }
-        TestData::only_these_on_base(&td[..9], here!("check all return on same base"), &meta_buf);
+        TestData::only_these_on_base(&td[..9], here!("check all return on same base"), &meta_buf)
+            .await;
         TestData::only_these_on_zome_id(
             &td[..9],
             here!("check all return on same base"),
             &meta_buf,
-        );
-        td[9].not_on_full_key(here!("removed in scratch"), &meta_buf);
-        DatabaseResult::Ok(())
-    })
-    .unwrap();
+        )
+        .await;
+        td[9]
+            .not_on_full_key(here!("removed in scratch"), &meta_buf)
+            .await;
+    }
 }
 
 #[tokio::test(threaded_scheduler)]
@@ -845,50 +834,54 @@ async fn links_on_same_tag() {
         d.link_remove.link_add_address = link_add_hash;
     }
     {
-        let _reader = env.reader().unwrap();
         let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         // Add
         for d in td.iter() {
             d.add_link(&mut meta_buf).await;
         }
-        TestData::only_these_on_base(&td[..], here!("check all return on same base"), &meta_buf);
-        TestData::only_these_on_zome_id(&td[..], here!("check all return on same base"), &meta_buf);
+        TestData::only_these_on_base(&td[..], here!("check all return on same base"), &meta_buf)
+            .await;
+        TestData::only_these_on_zome_id(&td[..], here!("check all return on same base"), &meta_buf)
+            .await;
         TestData::only_these_on_full_key(
             &td[..],
             here!("check all return on same base"),
             &meta_buf,
-        );
+        )
+        .await;
         TestData::only_these_on_half_key(
             &td[..],
             here!("check all return on same base"),
             &meta_buf,
-        );
+        )
+        .await;
         env.with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
     }
-    env.with_reader(|_reader| {
+    {
         let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         // In db
-        TestData::only_these_on_base(&td[..], here!("check all return on same base"), &meta_buf);
-        TestData::only_these_on_zome_id(&td[..], here!("check all return on same base"), &meta_buf);
+        TestData::only_these_on_base(&td[..], here!("check all return on same base"), &meta_buf)
+            .await;
+        TestData::only_these_on_zome_id(&td[..], here!("check all return on same base"), &meta_buf)
+            .await;
         TestData::only_these_on_full_key(
             &td[..],
             here!("check all return on same base"),
             &meta_buf,
-        );
+        )
+        .await;
         TestData::only_these_on_half_key(
             &td[..],
             here!("check all return on same base"),
             &meta_buf,
-        );
-        DatabaseResult::Ok(())
-    })
-    .unwrap();
+        )
+        .await;
+    }
     // Check removes etc.
     {
         let span = debug_span!("check_remove");
         let _g = span.enter();
-        let _reader = env.reader().unwrap();
         let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         td[5].remove_link(&mut meta_buf).await;
         td[6].remove_link(&mut meta_buf).await;
@@ -897,49 +890,55 @@ async fn links_on_same_tag() {
             &partial_td[..],
             here!("check all return on same base"),
             &meta_buf,
-        );
+        )
+        .await;
         TestData::only_these_on_zome_id(
             &partial_td[..],
             here!("check all return on same base"),
             &meta_buf,
-        );
+        )
+        .await;
         TestData::only_these_on_full_key(
             &partial_td[..],
             here!("check all return on same base"),
             &meta_buf,
-        );
+        )
+        .await;
         TestData::only_these_on_half_key(
             &partial_td[..],
             here!("check all return on same base"),
             &meta_buf,
-        );
+        )
+        .await;
         env.with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
     }
-    env.with_reader(|_reader| {
+    {
         let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         let partial_td = &td[..5].iter().chain(&td[7..]).cloned().collect::<Vec<_>>();
         TestData::only_these_on_base(
             &partial_td[..],
             here!("check all return on same base"),
             &meta_buf,
-        );
+        )
+        .await;
         TestData::only_these_on_zome_id(
             &partial_td[..],
             here!("check all return on same base"),
             &meta_buf,
-        );
+        )
+        .await;
         TestData::only_these_on_full_key(
             &partial_td[..],
             here!("check all return on same base"),
             &meta_buf,
-        );
+        )
+        .await;
         TestData::only_these_on_half_key(
             &partial_td[..],
             here!("check all return on same base"),
             &meta_buf,
-        );
-        DatabaseResult::Ok(())
-    })
-    .unwrap();
+        )
+        .await;
+    }
 }

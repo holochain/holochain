@@ -31,8 +31,8 @@ use holochain_p2p::{
 use holochain_serialized_bytes::prelude::*;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::{
-    env::{EnvironmentWrite, EnvironmentWriteRef, ReadManager},
-    prelude::{BufferedStore, EnvironmentRead, GetDb, WriteManager},
+    env::{EnvironmentWrite, ReadManager},
+    prelude::{BufferedStore, GetDb, WriteManager},
     test_utils::test_cell_env,
 };
 use holochain_types::{

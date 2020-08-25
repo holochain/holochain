@@ -193,7 +193,7 @@ pub mod tests {
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 ])
                 .into(),
-            );
+            )?;
             assert_eq!(
                 buf.chain_head(),
                 Some(
@@ -210,7 +210,7 @@ pub mod tests {
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
                 ])
                 .into(),
-            );
+            )?;
             assert_eq!(
                 buf.chain_head(),
                 Some(
@@ -227,7 +227,7 @@ pub mod tests {
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
                 ])
                 .into(),
-            );
+            )?;
             assert_eq!(
                 buf.chain_head(),
                 Some(
@@ -257,14 +257,14 @@ pub mod tests {
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 ])
                 .into(),
-            );
+            )?;
             buf.put_header(
                 HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
                 ])
                 .into(),
-            );
+            )?;
             assert_eq!(
                 buf.chain_head(),
                 Some(
@@ -281,7 +281,7 @@ pub mod tests {
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
                 ])
                 .into(),
-            );
+            )?;
             env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
         }
 
@@ -316,21 +316,21 @@ pub mod tests {
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 3,
                 ])
                 .into(),
-            );
+            )?;
             buf.put_header(
                 HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 4,
                 ])
                 .into(),
-            );
+            )?;
             buf.put_header(
                 HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 5,
                 ])
                 .into(),
-            );
+            )?;
             env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
         }
 
@@ -377,21 +377,21 @@ pub mod tests {
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 ])
                 .into(),
-            );
+            )?;
             buf.put_header(
                 HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
                 ])
                 .into(),
-            );
+            )?;
             buf.put_header(
                 HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
                 ])
                 .into(),
-            );
+            )?;
 
             // let the other task run and make a commit to the chain head,
             // which will cause this one to error out when it re-enters and tries to commit
@@ -413,21 +413,21 @@ pub mod tests {
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 3,
                 ])
                 .into(),
-            );
+            )?;
             buf.put_header(
                 HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 4,
                 ])
                 .into(),
-            );
+            )?;
             buf.put_header(
                 HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 5,
                 ])
                 .into(),
-            );
+            )?;
 
             env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
             tx2.send(()).unwrap();
