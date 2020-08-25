@@ -108,7 +108,7 @@ impl Workspace for GenesisWorkspace {
 pub mod tests {
 
     use super::*;
-    
+
     use crate::{
         conductor::api::MockCellConductorApi,
         core::{state::source_chain::SourceChain, SourceChainResult},

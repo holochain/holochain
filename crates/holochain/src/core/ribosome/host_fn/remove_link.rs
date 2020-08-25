@@ -107,7 +107,6 @@ pub fn remove_link<'a>(
 #[cfg(feature = "slow_tests")]
 pub mod slow_tests {
 
-    
     use crate::fixt::ZomeCallHostAccessFixturator;
     use fixt::prelude::*;
     use holo_hash::HeaderHash;

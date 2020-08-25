@@ -20,7 +20,7 @@ pub fn sys_time(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    
+
     use crate::fixt::ZomeCallHostAccessFixturator;
     use fixt::prelude::*;
     use holochain_state::env::ReadManager;

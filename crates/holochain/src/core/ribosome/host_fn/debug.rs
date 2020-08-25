@@ -28,7 +28,7 @@ pub fn debug(
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use super::debug;
-    
+
     use crate::fixt::CallContextFixturator;
     use crate::fixt::WasmRibosomeFixturator;
     use crate::fixt::ZomeCallHostAccessFixturator;

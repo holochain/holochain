@@ -205,7 +205,7 @@ impl BufferedStore for SourceChain {
 pub mod tests {
 
     use super::*;
-    
+
     use holochain_state::test_utils::test_cell_env;
     use holochain_types::test_utils::{fake_agent_pubkey_1, fake_dna_hash};
     use holochain_zome_types::capability::{CapAccess, ZomeCallCapGrant};
