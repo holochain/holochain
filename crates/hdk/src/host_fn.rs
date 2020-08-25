@@ -28,6 +28,24 @@ pub mod unreachable;
 pub mod update_entry;
 pub mod zome_info;
 
+/// simple wrapper around the holochain_wasmer_guest host_call! macro
+///
+/// - ensures the holochain_externs!() are setup
+/// - unwraps the output type into the inner result to hide the host/guest crossover
+/// - needs the host_fn to call, input/output types to be provided
+///
+/// every ribosome function can be called and interacted with in a standard way using this fn
+///
+/// ```ignore
+/// let foo_value = host_fn!(__foo_ribosome_fn, FooRibosomeFnInput( ... ), FooRibosomeOutput)?;
+/// ```
+///
+/// note: every host_fn! call returns a Result that represents the possibility that the guest can
+///       fail to deserialize whatever the host is injecting into it.
+///       it is a Result because this is designed to be used if happ devs want to get more low
+///       level and we can't assume whether this is being used in a native rust extern that returns
+///       an int or a function that returns a result, and we should never unwrap such things in
+///       wasm because that is hard to debug.
 #[macro_export]
 macro_rules! host_fn {
     ( $f:ident, $input:expr, $outputt:ty ) => {{

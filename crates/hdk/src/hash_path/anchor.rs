@@ -3,17 +3,21 @@ use crate::hash_path::path::Path;
 use crate::prelude::*;
 use holochain_wasmer_guest::*;
 
-/// "anchor"
+/// "hdk3anchor"
 pub const ROOT: &str = "hdk3anchor";
 
 #[derive(PartialEq, SerializedBytes, serde::Serialize, serde::Deserialize, Debug, Clone)]
+/// historically an anchor could only be 1 or 2 levels deep as "type" and "text"
 pub struct Anchor {
     pub anchor_type: String,
     pub anchor_text: Option<String>,
 }
 
+// provide all the default entry conventions for anchors
 entry_def!(Anchor Path::entry_def());
 
+/// anchors are just a special case of path, so we can move from anchor to path losslessly
+/// we simply format the anchor structure into a string that works with the path string handling
 impl From<&Anchor> for Path {
     fn from(anchor: &Anchor) -> Self {
         Self::from(&format!(
@@ -26,6 +30,9 @@ impl From<&Anchor> for Path {
     }
 }
 
+/// paths are more general than anchors so a path could be represented that is not a valid anchor
+/// the obvious example would be a path of binary data that is not valid utf-8 strings or a path
+/// that is more than 2 levels deep
 impl TryFrom<&Path> for Anchor {
     type Error = SerializedBytesError;
     fn try_from(path: &Path) -> Result<Self, Self::Error> {
@@ -69,6 +76,9 @@ pub fn anchor(anchor_type: String, anchor_text: String) -> Result<holo_hash::Ent
     Ok(path.hash()?)
 }
 
+/// attempt to get an anchor by its hash
+/// this can return None if the hash doesn't point to an anchor
+/// we can't do anything fancy like ensure the anchor if not exists because we only have a hash
 pub fn get_anchor(anchor_address: holo_hash::EntryHash) -> Result<Option<Anchor>, WasmError> {
     Ok(match get!(anchor_address)?.and_then(|el| el.into()) {
         Some(Entry::App(sb)) => {
@@ -79,6 +89,8 @@ pub fn get_anchor(anchor_address: holo_hash::EntryHash) -> Result<Option<Anchor>
     })
 }
 
+/// returns every entry hash in a vector from the root of an anchor
+/// hashes are sorted in the same way that paths sort children
 pub fn list_anchor_type_addresses() -> Result<Vec<holo_hash::EntryHash>, WasmError> {
     let links = Path::from(ROOT)
         .children()?
@@ -89,6 +101,9 @@ pub fn list_anchor_type_addresses() -> Result<Vec<holo_hash::EntryHash>, WasmErr
     Ok(links)
 }
 
+/// returns every entry hash in a vector from the second level of an anchor
+/// uses the string argument to build the path from the root
+/// hashes are sorted in the same way that paths sort children
 pub fn list_anchor_addresses(anchor_type: String) -> Result<Vec<holo_hash::EntryHash>, WasmError> {
     let path: Path = (&Anchor {
         anchor_type: anchor_type,

@@ -1,3 +1,24 @@
+/// hides away the gross bit where we hook up integer pointers to length-prefixed guest memory
+/// to serialization and deserialization, and returning things to the host, and memory allocation
+/// and deallocation.
+///
+/// a lot of that is handled by the holochain_wasmer crates but this handles the boilerplate of
+/// writing an extern function that has an awkward input and output signature:
+///
+/// - requires remembering #[no_mangle]
+/// - requires remembering pub extern "C"
+/// - requires juggling GuestPtr on the input and output with the memory/serialization
+/// - doesn't support Result returns at all, so breaks things as simple as `?`
+///
+/// this can be used directly as `map_extern!(external_facing_fn_name, internal_fn_name)` but it is
+/// more idiomatic to use the `#[hdk_extern]` attribute
+///
+/// ```ignore
+/// #[hdk_extern]
+/// pub fn foo(foo_input: FooInput) -> ExternResult<FooOutput> {
+///  // ... do stuff to respond to incoming calls from the host to "foo"
+/// }
+/// ```
 #[macro_export]
 macro_rules! map_extern {
     ( $name:tt, $f:ident ) => {

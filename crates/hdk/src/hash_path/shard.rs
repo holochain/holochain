@@ -2,15 +2,27 @@ use crate::hash_path::path::Component;
 use crate::hash_path::path::Path;
 use std::str::FromStr;
 
+/// separates the shard width and depth
 pub const SHARDSPLIT: &str = ":";
+/// terminates the end of a shard shorthand
 pub const SHARDEND: &str = "#";
 
+/// the width of a shard is how many bytes/characters to use for each path component in sharding
+/// e.g. abcdef with width 1 shards to a.b.c.d.e.f.abcdef and 2 shards to ab.cd.ef.abcdef
 pub type ShardWidth = u32;
+/// the depth of a shard is the number of path components to stretch out for shards
+/// e.g. abcdef with a depth of 1 and width 1 shards to a.abcdef and depth 2 shards to a.b.abcdef
 pub type ShardDepth = u32;
 
 #[derive(Debug)]
+/// a valid strategy for sharding requires both a width and a depth
+/// at the moment sharding only really works well for data that is reliably longer than width/depth
+/// for example, sharding the username foo with width 4 doesn't make sense
+/// there is no magic padding or extending of the provided data to make up undersized shards
+/// @todo stretch short shards out in a nice balanced way (append some bytes from the hash?)
 pub struct ShardStrategy(ShardWidth, ShardDepth);
 
+/// impl ShardStrategy as an immutable/read-only thingy
 impl ShardStrategy {
     fn width(&self) -> ShardWidth {
         self.0
@@ -31,6 +43,9 @@ pub enum ParseShardStrategyError {
     EmptyString,
 }
 
+/// attempt to parse a "width:depth#" shard out of a string
+/// this function looks way scarier than it is
+/// each level of nesting is just handling a potential parse failure
 impl FromStr for ShardStrategy {
     type Err = ParseShardStrategyError;
 
@@ -77,6 +92,8 @@ impl FromStr for ShardStrategy {
     }
 }
 
+/// builds a path for a shard strategy and some binary bytes
+/// this is the trivial case, we just split the bytes out one by one and make a path from it
 impl From<(&ShardStrategy, &[u8])> for Path {
     fn from((strategy, bytes): (&ShardStrategy, &[u8])) -> Path {
         let full_length = strategy.width() * strategy.depth();
@@ -104,19 +121,24 @@ impl From<(&ShardStrategy, &[u8])> for Path {
         Path::from(sharded)
     }
 }
+/// wrapper around &Vec<u8> to work the same as &[u8]
 impl From<(&ShardStrategy, &Vec<u8>)> for Path {
     fn from((strategy, bytes): (&ShardStrategy, &Vec<u8>)) -> Path {
         let bytes: &[u8] = bytes.as_ref();
         Path::from((strategy, bytes))
     }
 }
+/// wrapper around Vec<u8> to work the same as &[u8]
 impl From<(&ShardStrategy, Vec<u8>)> for Path {
     fn from((strategy, bytes): (&ShardStrategy, Vec<u8>)) -> Path {
         let bytes: &[u8] = bytes.as_ref();
         Path::from((strategy, bytes))
     }
 }
-
+/// create paths from strings
+/// to ensure that this works for all utf8, which can have anywhere from 1-4 bytes for a single
+/// character, we first represent each character as a utf32 so it gets padded out with 0 bytes
+/// this means the width is 4x what it would be for raw bytes with the same strategy
 impl From<(&ShardStrategy, &str)> for Path {
     fn from((strategy, s): (&ShardStrategy, &str)) -> Path {
         // truncate the string to only relevant chars
@@ -136,11 +158,13 @@ impl From<(&ShardStrategy, &str)> for Path {
         ))
     }
 }
+/// &String wrapper mimicing &str for path building
 impl From<(&ShardStrategy, &String)> for Path {
     fn from((strategy, s): (&ShardStrategy, &String)) -> Path {
         Path::from((strategy, s.as_str()))
     }
 }
+// String wrapper mimicing &str for path building
 impl From<(&ShardStrategy, String)> for Path {
     fn from((strategy, s): (&ShardStrategy, String)) -> Path {
         Path::from((strategy, s.as_str()))

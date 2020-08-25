@@ -7,7 +7,7 @@ use std::str::FromStr;
 
 /// allows for "foo.bar.baz" to automatically move to/from ["foo", "bar", "baz"] components
 /// technically it's moving each string component in as bytes
-/// if this is a problem for you simply built the components yourself
+/// if this is a problem for you simply build the components yourself as a Vec<Vec<u8>>
 /// @see `impl From<String> for Path` below
 pub const DELIMITER: &str = ".";
 
