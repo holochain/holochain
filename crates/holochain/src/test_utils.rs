@@ -20,6 +20,7 @@ use holochain_types::{
     test_utils::fake_header_hash,
     Entry, EntryHashed, HeaderHashed, Timestamp,
 };
+use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::entry_def::EntryVisibility;
 use holochain_zome_types::header::{EntryCreate, EntryType, Header};
 use std::{convert::TryInto, sync::Arc};
@@ -173,4 +174,14 @@ pub async fn setup_app(
     let handle = conductor_handle.clone();
 
     (tmpdir, RealAppInterfaceApi::new(conductor_handle), handle)
+}
+
+pub fn warm_wasm_tests() {
+    // If HC_WASM_CACHE_PATH is set warm the cache
+    if let Some(_path) = std::env::var_os("HC_WASM_CACHE_PATH") {
+        let wasms: Vec<_> = TestWasm::iter().collect();
+        crate::fixt::WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(wasms))
+            .next()
+            .unwrap();
+    }
 }

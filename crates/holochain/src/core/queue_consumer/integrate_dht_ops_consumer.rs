@@ -15,11 +15,10 @@ use tokio::task::JoinHandle;
 use tracing::*;
 
 /// Spawn the QueueConsumer for DhtOpIntegration workflow
-#[instrument(skip(env, stop, trigger_publish, trigger_sys))]
+#[instrument(skip(env, stop, trigger_sys))]
 pub fn spawn_integrate_dht_ops_consumer(
     env: EnvironmentWrite,
     mut stop: sync::broadcast::Receiver<()>,
-    mut trigger_publish: TriggerSender,
     trigger_sys: sync::oneshot::Receiver<TriggerSender>,
 ) -> (
     TriggerSender,
@@ -37,14 +36,10 @@ pub fn spawn_integrate_dht_ops_consumer(
             let reader = env_ref.reader().expect("Could not create LMDB reader");
             let workspace = IntegrateDhtOpsWorkspace::new(&reader, &env_ref)
                 .expect("Could not create Workspace");
-            if let WorkComplete::Incomplete = integrate_dht_ops_workflow(
-                workspace,
-                env.clone().into(),
-                &mut trigger_publish,
-                &mut trigger_sys,
-            )
-            .await
-            .expect("Error running Workflow")
+            if let WorkComplete::Incomplete =
+                integrate_dht_ops_workflow(workspace, env.clone().into(), &mut trigger_sys)
+                    .await
+                    .expect("Error running Workflow")
             {
                 trigger_self.trigger()
             };

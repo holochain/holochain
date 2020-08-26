@@ -49,6 +49,10 @@ impl<'env> SourceChain<'env> {
         Ok(SourceChainBuf::new(reader, dbs)?.into())
     }
 
+    pub fn public_only(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Self> {
+        Ok(SourceChainBuf::public_only(reader, dbs)?.into())
+    }
+
     pub fn into_inner(self) -> SourceChainBuf<'env> {
         self.0
     }

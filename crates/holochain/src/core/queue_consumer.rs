@@ -71,7 +71,7 @@ pub async fn spawn_queue_consumer_tasks(
 
     // Integration
     let (tx_integration, rx2, handle) =
-        spawn_integrate_dht_ops_consumer(env.clone(), stop.subscribe(), tx_publish, get_tx_sys);
+        spawn_integrate_dht_ops_consumer(env.clone(), stop.subscribe(), get_tx_sys);
     task_sender
         .send(ManagedTaskAdd::dont_handle(handle))
         .await
@@ -103,7 +103,7 @@ pub async fn spawn_queue_consumer_tasks(
 
     // Produce
     let (tx_produce, rx5, handle) =
-        spawn_produce_dht_ops_consumer(env.clone(), stop.subscribe(), tx_integration.clone());
+        spawn_produce_dht_ops_consumer(env.clone(), stop.subscribe(), tx_publish.clone());
     task_sender
         .send(ManagedTaskAdd::dont_handle(handle))
         .await

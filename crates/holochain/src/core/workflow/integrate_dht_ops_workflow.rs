@@ -37,11 +37,10 @@ use tracing::*;
 
 mod tests;
 
-#[instrument(skip(workspace, writer, trigger_publish, trigger_sys))]
+#[instrument(skip(workspace, writer, trigger_sys))]
 pub async fn integrate_dht_ops_workflow(
     mut workspace: IntegrateDhtOpsWorkspace<'_>,
     writer: OneshotWriter,
-    trigger_publish: &mut TriggerSender,
     trigger_sys: &mut TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
     // Pull ops out of queue
@@ -134,13 +133,7 @@ pub async fn integrate_dht_ops_workflow(
 
     // trigger other workflows
 
-    // Only trigger publish if we have done any work during this workflow,
-    // to prevent endless cascades of publishing. Ideally, we shouldn't trigger
-    // publish unless we have integrated something we've authored, but this is
-    // a step in that direction.
-    // TODO: only trigger if we have integrated ops that we have authored
     if total_integrated > 0 {
-        trigger_publish.trigger();
         trigger_sys.trigger();
     }
 
