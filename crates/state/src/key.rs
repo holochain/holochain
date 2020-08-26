@@ -75,7 +75,8 @@ impl From<IntKey> for u32 {
 
 impl<T: HashType + Send + Sync> BufKey for HoloHash<T> {
     fn from_key_bytes_fallible(bytes: Vec<u8>) -> Self {
-        tracing::warn!("This is NOT correct for AnyDhtHash!");
+        // FIXME: change after [ B-02112 ]
+        tracing::error!("This is NOT correct for AnyDhtHash!");
         Self::from_raw_bytes_and_type(bytes, T::default())
     }
 }

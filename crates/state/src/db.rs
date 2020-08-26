@@ -188,13 +188,14 @@ pub(super) fn get_db<V: 'static + Copy + Send + Sync>(
     path: &Path,
     key: &'static DbKey<V>,
 ) -> DatabaseResult<V> {
+    tracing::debug!("Getting db at path: {:?}", path);
     let dbmap = DB_MAP_MAP.read();
     let um: &DbMap = dbmap
         .get(path)
         .ok_or_else(|| DatabaseError::EnvironmentMissing(path.into()))?;
     let db = *um
         .get(key)
-        .ok_or_else(|| DatabaseError::StoreNotInitialized(key.key().clone()))?;
+        .ok_or_else(|| DatabaseError::StoreNotInitialized(key.key().clone(), path.to_owned()))?;
     Ok(db)
 }
 

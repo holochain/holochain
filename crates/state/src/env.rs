@@ -165,6 +165,7 @@ impl EnvironmentWrite {
             hash_map::Entry::Vacant(e) => e
                 .insert({
                     let rkv = rkv_builder(None, None)(&path)?;
+                    tracing::debug!("Initializing databases for path {:?}", path);
                     initialize_databases(&rkv, &kind)?;
                     EnvironmentWrite(EnvironmentRead {
                         arc: Arc::new(RwLock::new(rkv)),
