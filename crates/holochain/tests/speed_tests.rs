@@ -44,7 +44,7 @@ use tracing::instrument;
 
 mod test_utils;
 
-const DEFAULT_NUM: usize = 2000;
+const DEFAULT_NUM: usize = 1000;
 
 #[tokio::test(threaded_scheduler)]
 #[ignore]
