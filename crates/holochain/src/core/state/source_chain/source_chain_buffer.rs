@@ -35,6 +35,15 @@ impl SourceChainBuf {
         })
     }
 
+    pub async fn public_only(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
+        Ok(Self {
+            elements: ElementBuf::vault(env.clone(), dbs, false)?,
+            sequence: ChainSequenceBuf::new(env.clone(), dbs).await?,
+            keystore: dbs.keystore(),
+            env,
+        })
+    }
+
     pub fn env(&self) -> &EnvironmentRead {
         &self.env
     }

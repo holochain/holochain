@@ -55,7 +55,7 @@ use holochain_zome_types::{
     link::{Link, LinkTag},
     metadata::{Details, EntryDhtStatus},
     zome::ZomeName,
-    CommitEntryInput, GetDetailsInput, GetInput, GetLinksInput, LinkEntriesInput, RemoveEntryInput,
+    CommitEntryInput, DeleteEntryInput, GetDetailsInput, GetInput, GetLinksInput, LinkEntriesInput,
     RemoveLinkInput, UpdateEntryInput,
 };
 use maplit::btreeset;
@@ -293,7 +293,7 @@ async fn get_from_another_agent() {
             make_call_data(bob_cell_id.clone(), handle.clone(), dna_file.clone()).await;
         let _env_ref = bob_env.guard().await;
         let dbs = bob_env.dbs().await;
-        let remove_hash = remove_entry(
+        let remove_hash = delete_entry(
             bob_env.clone(),
             &dbs,
             call_data.clone(),
@@ -793,7 +793,7 @@ async fn commit_entry(
     output.into_inner()
 }
 
-async fn remove_entry<'env>(
+async fn delete_entry<'env>(
     env: EnvironmentWrite,
     dbs: &impl GetDb,
     call_data: CallData,
@@ -809,7 +809,7 @@ async fn remove_entry<'env>(
         .await
         .unwrap();
 
-    let input = RemoveEntryInput::new(hash);
+    let input = DeleteEntryInput::new(hash);
 
     let output = {
         let (_g, raw_workspace) = UnsafeCallZomeWorkspace::from_mut(&mut workspace);
@@ -817,7 +817,7 @@ async fn remove_entry<'env>(
         let call_context = CallContext::new(zome_name, host_access.into());
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
-        let r = host_fn::remove_entry::remove_entry(ribosome.clone(), call_context.clone(), input);
+        let r = host_fn::delete_entry::delete_entry(ribosome.clone(), call_context.clone(), input);
         let r = r.map_err(|e| {
             debug!(%e);
             e

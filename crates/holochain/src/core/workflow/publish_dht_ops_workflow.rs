@@ -27,7 +27,7 @@ use holo_hash::*;
 use holochain_p2p::HolochainP2pCell;
 use holochain_state::{
     buffer::{BufferedStore, KvBufFresh},
-    db::{AUTHORED_DHT_OPS, INTEGRATED_DHT_OPS},
+    db::AUTHORED_DHT_OPS,
     fresh_reader,
     prelude::*,
     transaction::Writer,
@@ -131,7 +131,6 @@ pub async fn publish_dht_ops_workflow_inner(
             Err(DhtOpConvertError::StoreEntryOnPrivate) => continue,
             r => r?,
         };
-
         // For every op publish a request
         // Collect and sort ops by basis
         to_publish
@@ -156,7 +155,6 @@ impl PublishDhtOpsWorkspace {
         let authored_dht_ops = KvBufFresh::new(env.clone(), db);
         // Note that this must always be false as we don't want private entries being published
         let elements = ElementBuf::vault(env, dbs, false)?;
-        let _db = dbs.get_db(&*INTEGRATED_DHT_OPS)?;
         Ok(Self {
             authored_dht_ops,
             elements,
@@ -176,8 +174,16 @@ impl PublishDhtOpsWorkspace {
 mod tests {
     use super::*;
     use crate::{
-        core::state::dht_op_integration::AuthoredDhtOpsValue,
-        fixt::{EntryCreateFixturator, EntryFixturator, EntryUpdateFixturator, LinkAddFixturator},
+        core::{
+            queue_consumer::TriggerSender,
+            state::{dht_op_integration::AuthoredDhtOpsValue, source_chain::SourceChain},
+            workflow::{
+                fake_genesis,
+                produce_dht_ops_workflow::{produce_dht_ops_workflow, ProduceDhtOpsWorkspace},
+            },
+            SourceChainError,
+        },
+        fixt::{EntryFixturator, LinkAddFixturator},
     };
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
@@ -195,15 +201,18 @@ mod tests {
     };
     use holochain_types::{
         dht_op::{DhtOp, DhtOpHashed, DhtOpLight},
-        element::SignedHeaderHashed,
         fixt::{AppEntryTypeFixturator, SignatureFixturator},
-        header::NewEntryHeader,
-        observability, EntryHashed, HeaderHashed,
+        observability, HeaderHashed,
     };
     use holochain_zome_types::entry_def::EntryVisibility;
-    use holochain_zome_types::header::{EntryType, Header};
+    use holochain_zome_types::{
+        element::SignedHeaderHashed,
+        header::{builder, EntryType, EntryUpdate},
+    };
+    use matches::assert_matches;
     use std::{
         collections::HashMap,
+        convert::TryInto,
         sync::{
             atomic::{AtomicU32, Ordering},
             Arc,
@@ -212,6 +221,7 @@ mod tests {
     };
     use test_case::test_case;
     use tokio::task::JoinHandle;
+    use tracing_futures::Instrument;
 
     const RECV_TIMEOUT: Duration = Duration::from_millis(3000);
 
@@ -242,7 +252,7 @@ mod tests {
             // Get the hash from the op
             let op_hashed = DhtOpHashed::from_content(op.clone()).await;
             // Convert op to DhtOpLight
-            let header_hash = HeaderHashed::from_content(Header::LinkAdd(link_add.clone())).await;
+            let header_hash = HeaderHashed::from_content(link_add.clone().into()).await;
             let op_light = DhtOpLight::RegisterAddLink(
                 header_hash.as_hash().clone(),
                 link_add.base_address.into(),
@@ -478,237 +488,288 @@ mod tests {
     #[test_case(10)]
     #[test_case(100)]
     fn test_private_entries(num_agents: u32) {
-        crate::conductor::tokio_runtime().block_on(async {
-            observability::test_run().ok();
+        crate::conductor::tokio_runtime().block_on(
+            async {
+                observability::test_run().ok();
 
-            // Create test env
-            let env = test_cell_env();
-            let dbs = env.dbs().await;
-            let env_ref = env.guard().await;
+                // Create test env
+                let env = test_cell_env();
+                let dbs = env.dbs().await;
+                let env_ref = env.guard().await;
 
-            // Setup data
-            let mut sig_fixt = SignatureFixturator::new(Unpredictable);
-            let sig = sig_fixt.next().unwrap();
-            let original_entry = fixt!(Entry);
-            let new_entry = fixt!(Entry);
-            let original_entry_hashed = EntryHashed::from_content(original_entry.clone()).await;
-            let new_entry_hashed = EntryHashed::from_content(new_entry.clone()).await;
+                // Setup data
+                let original_entry = fixt!(Entry);
+                let new_entry = fixt!(Entry);
+                let original_entry_hash = EntryHash::with_data(&original_entry).await;
+                let new_entry_hash = EntryHash::with_data(&new_entry).await;
 
-            // Create StoreElement
-            // Create the headers
-            let mut entry_create = fixt!(EntryCreate);
-            let mut entry_update = fixt!(EntryUpdate);
+                // Make them private
+                let visibility = EntryVisibility::Private;
+                let mut entry_type_fixt =
+                    AppEntryTypeFixturator::new(visibility.clone()).map(EntryType::App);
+                let ec_entry_type = entry_type_fixt.next().unwrap();
+                let eu_entry_type = entry_type_fixt.next().unwrap();
 
-            // Make them private
-            let visibility = EntryVisibility::Private;
-            let mut entry_type_fixt =
-                AppEntryTypeFixturator::new(visibility.clone()).map(EntryType::App);
-            entry_create.entry_type = entry_type_fixt.next().unwrap();
-            entry_update.entry_type = entry_type_fixt.next().unwrap();
+                // Genesis and produce ops to clear these from the chains
+                {
+                    let mut source_chain =
+                        SourceChain::new(env.clone().into(), &dbs).await.unwrap();
+                    fake_genesis(&mut source_chain).await.unwrap();
+                    env_ref
+                        .with_commit::<SourceChainError, _, _>(|writer| {
+                            source_chain.flush_to_txn(writer)?;
+                            Ok(())
+                        })
+                        .unwrap();
+                }
+                {
+                    let workspace = ProduceDhtOpsWorkspace::new(env.clone().into(), &dbs)
+                        .await
+                        .unwrap();
+                    let (mut qt, _rx) = TriggerSender::new();
+                    let complete =
+                        produce_dht_ops_workflow(workspace, env.env.clone().into(), &mut qt)
+                            .await
+                            .unwrap();
+                    assert_matches!(complete, WorkComplete::Complete);
+                }
+                {
+                    let mut workspace = ProduceDhtOpsWorkspace::new(env.clone().into(), &dbs)
+                        .await
+                        .unwrap();
+                    env_ref
+                        .with_commit::<SourceChainError, _, _>(|writer| {
+                            workspace.authored_dht_ops.clear_all(writer)?;
+                            Ok(())
+                        })
+                        .unwrap();
+                }
 
-            // Point update at entry
-            entry_update.original_entry_address = original_entry_hashed.as_hash().clone();
+                // Put data in elements
+                let (entry_create_header, entry_update_header) = {
+                    let mut source_chain =
+                        SourceChain::new(env.clone().into(), &dbs).await.unwrap();
+                    let original_header_address = source_chain
+                        .put(
+                            builder::EntryCreate {
+                                entry_type: ec_entry_type,
+                                entry_hash: original_entry_hash.clone(),
+                            },
+                            Some(original_entry),
+                        )
+                        .await
+                        .unwrap();
 
-            // Update the entry hashes
-            entry_create.entry_hash = original_entry_hashed.as_hash().clone();
-            entry_update.entry_hash = new_entry_hashed.as_hash().clone();
+                    let entry_create_header = source_chain
+                        .get_header(&original_header_address)
+                        .await
+                        .unwrap()
+                        .unwrap()
+                        .clone();
 
-            let entry_create_header = Header::EntryCreate(entry_create.clone());
+                    let entry_update_hash = source_chain
+                        .put(
+                            builder::EntryUpdate {
+                                entry_type: eu_entry_type,
+                                entry_hash: new_entry_hash,
+                                original_header_address: original_header_address.clone(),
+                                original_entry_address: original_entry_hash,
+                            },
+                            Some(new_entry),
+                        )
+                        .await
+                        .unwrap();
 
-            // Put data in elements
-            {
-                let _reader = env_ref.reader().unwrap();
+                    let entry_update_header = source_chain
+                        .get_header(&entry_update_hash)
+                        .await
+                        .unwrap()
+                        .unwrap()
+                        .clone();
 
-                let mut elements = ElementBuf::vault(env.clone().into(), &dbs, true).unwrap();
+                    env_ref
+                        .with_commit::<SourceChainError, _, _>(|writer| {
+                            source_chain.flush_to_txn(writer)?;
+                            Ok(())
+                        })
+                        .unwrap();
+                    (entry_create_header, entry_update_header)
+                };
 
-                let header_hash = HeaderHashed::from_content(entry_create_header.clone()).await;
+                // Gather the expected op hashes, ops and basis
+                // We are only expecting Store Element and Register Replaced By ops and nothing else
+                let store_element_count = Arc::new(AtomicU32::new(0));
+                let register_replaced_by_count = Arc::new(AtomicU32::new(0));
+                let register_agent_activity_count = Arc::new(AtomicU32::new(0));
 
-                // Update the replaces to the header of the original
-                entry_update.original_header_address = header_hash.as_hash().clone();
+                let expected = {
+                    let mut map = HashMap::new();
+                    // Op is expected to not contain the Entry even though the above contains the entry
+                    let (entry_create_header, sig) =
+                        entry_create_header.into_header_and_signature();
+                    let expected_op = DhtOp::RegisterAgentActivity(
+                        sig.clone(),
+                        entry_create_header.clone().into_content(),
+                    );
+                    let op_hash = DhtOpHashed::from_content(expected_op.clone())
+                        .await
+                        .into_hash();
+                    map.insert(
+                        op_hash,
+                        (expected_op, register_agent_activity_count.clone()),
+                    );
 
-                // Put data into elements
-                let signed_header = SignedHeaderHashed::with_presigned(header_hash, sig.clone());
-                elements
-                    .put(signed_header, Some(original_entry_hashed))
-                    .unwrap();
+                    let expected_op = DhtOp::StoreElement(
+                        sig,
+                        entry_create_header.into_content().try_into().unwrap(),
+                        None,
+                    );
+                    let op_hash = DhtOpHashed::from_content(expected_op.clone())
+                        .await
+                        .into_hash();
 
-                let entry_update_header = Header::EntryUpdate(entry_update.clone());
-                let header_hash = HeaderHashed::from_content(entry_update_header).await;
-                let signed_header = SignedHeaderHashed::with_presigned(header_hash, sig.clone());
-                elements.put(signed_header, Some(new_entry_hashed)).unwrap();
-                env_ref
-                    .with_commit::<DatabaseError, _, _>(|writer| {
-                        elements.flush_to_txn(writer)?;
-                        Ok(())
-                    })
-                    .unwrap();
-            }
-            let (store_element, store_entry, register_replaced_by) = {
-                let op = DhtOp::StoreElement(
-                    sig.clone(),
-                    entry_create_header.clone(),
-                    Some(original_entry.clone().into()),
-                );
-                // Op is expected to not contain the Entry even though the above contains the entry
-                let expected_op = DhtOp::StoreElement(sig.clone(), entry_create_header, None);
-                let light = op.to_light().await;
-                let op_hash = DhtOpHashed::from_content(op.clone()).await.into_hash();
-                let store_element = (op_hash, light, expected_op);
+                    map.insert(op_hash, (expected_op, store_element_count.clone()));
 
-                // Create StoreEntry
-                let header = NewEntryHeader::Create(entry_create.clone());
-                let op = DhtOp::StoreEntry(sig.clone(), header, original_entry.clone().into());
-                let light = op.to_light().await;
-                let op_hash = DhtOpHashed::from_content(op.clone()).await.into_hash();
-                let store_entry = (op_hash, light);
+                    // Create RegisterUpdatedBy
+                    // Op is expected to not contain the Entry
+                    let (entry_update_header, sig) =
+                        entry_update_header.into_header_and_signature();
+                    let entry_update_header: EntryUpdate =
+                        entry_update_header.into_content().try_into().unwrap();
+                    let expected_op =
+                        DhtOp::StoreElement(sig.clone(), entry_update_header.clone().into(), None);
+                    let op_hash = DhtOpHashed::from_content(expected_op.clone())
+                        .await
+                        .into_hash();
 
-                // Create RegisterUpdatedBy
-                let op = DhtOp::RegisterUpdatedBy(sig.clone(), entry_update.clone());
-                // Op is expected to not contain the Entry even though the above contains the entry
-                let expected_op = DhtOp::RegisterUpdatedBy(sig.clone(), entry_update.clone());
-                let light = op.to_light().await;
-                let op_hash = DhtOpHashed::from_content(op.clone()).await.into_hash();
-                let register_replaced_by = (op_hash, light, expected_op);
+                    map.insert(op_hash, (expected_op, store_element_count.clone()));
 
-                (store_element, store_entry, register_replaced_by)
-            };
+                    let expected_op =
+                        DhtOp::RegisterUpdatedBy(sig.clone(), entry_update_header.clone());
+                    let op_hash = DhtOpHashed::from_content(expected_op.clone())
+                        .await
+                        .into_hash();
 
-            // Gather the expected op hashes, ops and basis
-            // We are only expecting Store Element and Register Replaced By ops and nothing else
-            let store_element_count = Arc::new(AtomicU32::new(0));
-            let register_replaced_by_count = Arc::new(AtomicU32::new(0));
-            let expected = {
-                let mut map = HashMap::new();
-                let op_hash = store_element.0.clone();
-                let expected_op = store_element.2.clone();
-                let store_element_count = store_element_count.clone();
-                map.insert(op_hash, (expected_op, store_element_count));
-                let op_hash = register_replaced_by.0.clone();
-                let expected_op = register_replaced_by.2.clone();
-                let register_replaced_by_count = register_replaced_by_count.clone();
-                map.insert(op_hash, (expected_op, register_replaced_by_count));
-                map
-            };
+                    map.insert(op_hash, (expected_op, register_replaced_by_count.clone()));
+                    let expected_op = DhtOp::RegisterAgentActivity(sig, entry_update_header.into());
+                    let op_hash = DhtOpHashed::from_content(expected_op.clone())
+                        .await
+                        .into_hash();
+                    map.insert(
+                        op_hash,
+                        (expected_op, register_agent_activity_count.clone()),
+                    );
 
-            // Create and fill authored ops db in the workspace
-            {
-                let _reader = env_ref.reader().unwrap();
-                let mut workspace = PublishDhtOpsWorkspace::new(env.clone().into(), &dbs).unwrap();
-                let (op_hash, light, _) = store_element;
-                workspace
-                    .authored_dht_ops
-                    .put(op_hash.clone(), AuthoredDhtOpsValue::from_light(light))
-                    .unwrap();
+                    map
+                };
 
-                let (op_hash, light) = store_entry;
-                workspace
-                    .authored_dht_ops
-                    .put(op_hash.clone(), AuthoredDhtOpsValue::from_light(light))
-                    .unwrap();
+                // Create and fill authored ops db in the workspace
+                {
+                    let workspace = ProduceDhtOpsWorkspace::new(env.clone().into(), &dbs)
+                        .await
+                        .unwrap();
+                    let (mut qt, _rx) = TriggerSender::new();
+                    let complete =
+                        produce_dht_ops_workflow(workspace, env.env.clone().into(), &mut qt)
+                            .await
+                            .unwrap();
+                    assert_matches!(complete, WorkComplete::Complete);
+                }
 
-                let (op_hash, light, _) = register_replaced_by;
-                workspace
-                    .authored_dht_ops
-                    .put(op_hash.clone(), AuthoredDhtOpsValue::from_light(light))
-                    .unwrap();
-                // Manually commit because this workspace doesn't commit to all dbs
-                env_ref
-                    .with_commit::<DatabaseError, _, _>(|writer| {
-                        workspace.authored_dht_ops.flush_to_txn(writer)?;
-                        workspace.elements.flush_to_txn(writer)?;
-                        Ok(())
-                    })
-                    .unwrap();
-            }
+                // Create cell data
+                let dna = fixt!(DnaHash);
+                let agents = AgentPubKeyFixturator::new(Unpredictable)
+                    .take(num_agents as usize)
+                    .collect::<Vec<_>>();
 
-            // Create cell data
-            let dna = fixt!(DnaHash);
-            let agents = AgentPubKeyFixturator::new(Unpredictable)
-                .take(num_agents as usize)
-                .collect::<Vec<_>>();
+                // Create the network
+                let (network, mut recv) = spawn_holochain_p2p().await.unwrap();
+                let cell_network = network.to_cell(dna.clone(), agents[0].clone());
+                let (tx_complete, rx_complete) = tokio::sync::oneshot::channel();
+                // We are expecting five ops per agent
+                let total_expected = num_agents * 5;
+                let mut recv_count: u32 = 0;
 
-            // Create the network
-            let (network, mut recv) = spawn_holochain_p2p().await.unwrap();
-            let cell_network = network.to_cell(dna.clone(), agents[0].clone());
-            let (tx_complete, rx_complete) = tokio::sync::oneshot::channel();
-            // We are expecting two ops per agent
-            let total_expected = num_agents * 2;
-            let mut recv_count: u32 = 0;
+                // Receive events and increment count
+                let recv_task = tokio::task::spawn({
+                    async move {
+                        use tokio::stream::StreamExt;
+                        let mut tx_complete = Some(tx_complete);
+                        while let Some(evt) = recv.next().await {
+                            use holochain_p2p::event::HolochainP2pEvent::*;
+                            match evt {
+                                Publish {
+                                    respond,
+                                    dht_hash,
+                                    ops,
+                                    ..
+                                } => {
+                                    tracing::debug!(?dht_hash);
+                                    tracing::debug!(?ops);
 
-            // Receive events and increment count
-            let recv_task = tokio::task::spawn({
-                async move {
-                    use tokio::stream::StreamExt;
-                    let mut tx_complete = Some(tx_complete);
-                    while let Some(evt) = recv.next().await {
-                        use holochain_p2p::event::HolochainP2pEvent::*;
-                        match evt {
-                            Publish {
-                                respond,
-                                span,
-                                dht_hash,
-                                ops,
-                                ..
-                            } => {
-                                let _g = span.enter();
-                                tracing::debug!(?dht_hash);
-                                tracing::debug!(?ops);
-
-                                // Check the ops are correct
-                                for (op_hash, op) in ops {
-                                    match expected.get(&op_hash) {
-                                        Some((expected_op, count)) => {
-                                            assert_eq!(&op, expected_op);
-                                            assert_eq!(dht_hash, expected_op.dht_basis().await);
-                                            count.fetch_add(1, Ordering::SeqCst);
+                                    // Check the ops are correct
+                                    for (op_hash, op) in ops {
+                                        match expected.get(&op_hash) {
+                                            Some((expected_op, count)) => {
+                                                assert_eq!(&op, expected_op);
+                                                assert_eq!(dht_hash, expected_op.dht_basis().await);
+                                                count.fetch_add(1, Ordering::SeqCst);
+                                            }
+                                            None => panic!(
+                                                "This DhtOpHash was not expected: {:?}",
+                                                op_hash
+                                            ),
                                         }
-                                        None => {
-                                            panic!("This DhtOpHash was not expected: {:?}", op_hash)
-                                        }
+                                        recv_count += 1;
+                                    }
+                                    respond.respond(Ok(async move { Ok(()) }.boxed().into()));
+                                    if recv_count == total_expected {
+                                        tx_complete.take().unwrap().send(()).unwrap();
                                     }
                                 }
-                                respond.respond(Ok(async move { Ok(()) }.boxed().into()));
-                                recv_count += 1;
-                                if recv_count == total_expected {
-                                    tx_complete.take().unwrap().send(()).unwrap();
-                                }
+                                _ => (),
                             }
-                            _ => (),
                         }
                     }
-                }
-            });
+                    .instrument(debug_span!("private_entries_inner"))
+                });
 
-            // Join some agents onto the network
-            for agent in agents {
-                network.join(dna.clone(), agent).await.unwrap();
+                // Join some agents onto the network
+                for agent in agents {
+                    network.join(dna.clone(), agent).await.unwrap();
+                }
+
+                call_workflow(env.env.clone().into(), cell_network).await;
+
+                // Wait for expected # of responses, or timeout
+                tokio::select! {
+                    _ = rx_complete => {}
+                    _ = tokio::time::delay_for(RECV_TIMEOUT) => {
+                        panic!("Timed out while waiting for expected responses.")
+                    }
+                };
+
+                // Check there is no ops left that didn't come through
+                assert_eq!(
+                    num_agents * 1,
+                    register_replaced_by_count.load(Ordering::SeqCst)
+                );
+                assert_eq!(num_agents * 2, store_element_count.load(Ordering::SeqCst));
+                assert_eq!(
+                    num_agents * 2,
+                    register_agent_activity_count.load(Ordering::SeqCst)
+                );
+
+                // Shutdown
+                tokio::time::timeout(Duration::from_secs(10), network.ghost_actor_shutdown())
+                    .await
+                    .ok();
+                tokio::time::timeout(Duration::from_secs(10), recv_task)
+                    .await
+                    .ok();
             }
-
-            call_workflow(env.env.clone().into(), cell_network).await;
-
-            // Wait for expected # of responses, or timeout
-            tokio::select! {
-                _ = rx_complete => {}
-                _ = tokio::time::delay_for(RECV_TIMEOUT) => {
-                    panic!("Timed out while waiting for expected responses.")
-                }
-            };
-
-            // Check there is no ops left that didn't come through
-            assert_eq!(
-                num_agents,
-                register_replaced_by_count.load(Ordering::SeqCst)
-            );
-            assert_eq!(num_agents, store_element_count.load(Ordering::SeqCst));
-
-            // Shutdown
-            tokio::time::timeout(Duration::from_secs(10), network.ghost_actor_shutdown())
-                .await
-                .ok();
-            tokio::time::timeout(Duration::from_secs(10), recv_task)
-                .await
-                .ok();
-        });
+            .instrument(debug_span!("private_entries")),
+        );
     }
 
     // TODO: COVERAGE: Test public ops do publish

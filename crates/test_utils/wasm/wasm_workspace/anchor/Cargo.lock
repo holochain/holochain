@@ -107,7 +107,9 @@ dependencies = [
 name = "hdk3_derive"
 version = "0.0.1"
 dependencies = [
+ "holochain_zome_types",
  "paste",
+ "proc-macro2 1.0.19",
  "quote 1.0.5",
  "syn 1.0.38",
 ]

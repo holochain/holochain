@@ -12,11 +12,11 @@ use tokio::task::JoinHandle;
 use tracing::*;
 
 /// Spawn the QueueConsumer for Produce_dht_ops workflow
-#[instrument(skip(env, stop, trigger_integration))]
+#[instrument(skip(env, stop, trigger_publish))]
 pub fn spawn_produce_dht_ops_consumer(
     env: EnvironmentWrite,
     mut stop: sync::broadcast::Receiver<()>,
-    mut trigger_integration: TriggerSender,
+    mut trigger_publish: TriggerSender,
 ) -> (
     TriggerSender,
     tokio::sync::oneshot::Receiver<()>,
@@ -34,7 +34,7 @@ pub fn spawn_produce_dht_ops_consumer(
                 .await
                 .expect("Could not create Workspace");
             if let WorkComplete::Incomplete =
-                produce_dht_ops_workflow(workspace, env.clone().into(), &mut trigger_integration)
+                produce_dht_ops_workflow(workspace, env.clone().into(), &mut trigger_publish)
                     .await
                     .expect("Error running Workflow")
             {

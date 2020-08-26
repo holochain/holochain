@@ -59,3 +59,5 @@ pub fn link_entries<'a>(
     // being atomic
     Ok(LinkEntriesOutput::new(header_hash))
 }
+
+// we rely on the tests for get_links and get_link_details

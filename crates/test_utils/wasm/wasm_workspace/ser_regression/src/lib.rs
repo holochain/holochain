@@ -9,29 +9,17 @@ struct CreateMessageInput {
 #[derive(Debug, From, Into, Serialize, Deserialize, SerializedBytes)]
 pub struct ChannelName(String);
 
-#[derive(Constructor, Serialize, Deserialize, SerializedBytes)]
+#[hdk_entry(id = "channel")]
+#[derive(Constructor)]
 pub struct Channel {
     name: String,
 }
 
-#[derive(Constructor, Serialize, Deserialize, SerializedBytes)]
+#[hdk_entry(id = "channel_message")]
+#[derive(Constructor)]
 pub struct ChannelMessage {
     message: String,
 }
-
-const CHANNEL_ID: &str = "channel";
-
-const CHANNEL_MESSAGE_ID: &str = "channel_message";
-
-entry_def!(Channel EntryDef {
-    id: CHANNEL_ID.into(),
-    ..Default::default()
-});
-
-entry_def!(ChannelMessage EntryDef {
-    id: CHANNEL_MESSAGE_ID.into(),
-    ..Default::default()
-});
 
 entry_defs![
     Path::entry_def(),
@@ -45,7 +33,7 @@ fn channels_path() -> Path {
     path
 }
 
-#[hdk(extern)]
+#[hdk_extern]
 fn create_channel(name: ChannelName) -> ExternResult<EntryHash> {
     debug!(format!("channel name {:?}", name))?;
     let path = channels_path();
@@ -58,7 +46,7 @@ fn create_channel(name: ChannelName) -> ExternResult<EntryHash> {
     Ok(channel_hash)
 }
 
-#[hdk(extern)]
+#[hdk_extern]
 fn create_message(input: CreateMessageInput) -> ExternResult<EntryHash> {
     debug!(format!("{:?}", input))?;
     let CreateMessageInput {

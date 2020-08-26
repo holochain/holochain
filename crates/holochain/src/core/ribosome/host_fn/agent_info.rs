@@ -71,7 +71,7 @@ pub mod test {
 
         let agent_info: AgentInfoOutput = crate::call_test_ribosome!(
             host_access,
-            TestWasm::Imports,
+            TestWasm::AgentInfo,
             "agent_info",
             AgentInfoInput::new(())
         );

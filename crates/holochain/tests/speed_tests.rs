@@ -22,7 +22,7 @@ use holochain::conductor::{
     dna_store::MockDnaStore,
     ConductorBuilder, ConductorHandle,
 };
-use holochain::core::ribosome::ZomeCallInvocation;
+use holochain::{core::ribosome::ZomeCallInvocation, test_utils::warm_wasm_tests};
 use holochain_state::test_utils::{test_conductor_env, test_wasm_env, TestEnvironment};
 use holochain_types::app::InstalledCell;
 use holochain_types::cell::CellId;
@@ -37,39 +37,48 @@ use tempdir::TempDir;
 
 use holochain_websocket::WebsocketSender;
 use matches::assert_matches;
+use test_case::test_case;
 use test_utils::*;
 use test_wasm_common::{AnchorInput, TestString};
 use tracing::instrument;
 
 mod test_utils;
 
+const DEFAULT_NUM: usize = 2000;
+
+#[tokio::test(threaded_scheduler)]
+#[ignore]
+async fn speed_test_prep() {
+    warm_wasm_tests();
+}
+
 #[tokio::test(threaded_scheduler)]
 #[ignore]
 async fn speed_test_flame() {
     let _g = observability::flame_run().unwrap();
     let _g = _g.unwrap();
-    speed_test().await;
+    speed_test(None).await;
 }
 
 #[tokio::test(threaded_scheduler)]
 #[ignore]
 async fn speed_test_timed() {
     let _g = observability::test_run_timed().unwrap();
-    speed_test().await;
+    speed_test(None).await;
 }
 
 #[tokio::test(threaded_scheduler)]
 #[ignore]
 async fn speed_test_timed_json() {
     let _g = observability::test_run_timed_json().unwrap();
-    speed_test().await;
+    speed_test(None).await;
 }
 
 #[tokio::test(threaded_scheduler)]
 #[ignore]
 async fn speed_test_timed_flame() {
     let _g = observability::test_run_timed_flame(None).unwrap();
-    speed_test().await;
+    speed_test(None).await;
     tokio::time::delay_for(std::time::Duration::from_millis(100)).await;
 }
 
@@ -77,7 +86,7 @@ async fn speed_test_timed_flame() {
 #[ignore]
 async fn speed_test_timed_ice() {
     let _g = observability::test_run_timed_ice(None).unwrap();
-    speed_test().await;
+    speed_test(None).await;
     tokio::time::delay_for(std::time::Duration::from_millis(100)).await;
 }
 
@@ -85,12 +94,22 @@ async fn speed_test_timed_ice() {
 #[ignore]
 async fn speed_test_normal() {
     observability::test_run().unwrap();
-    speed_test().await;
+    speed_test(None).await;
+}
+#[test_case(1)]
+#[test_case(10)]
+#[test_case(100)]
+#[test_case(1000)]
+#[test_case(2000)]
+#[ignore]
+fn speed_test_all(n: usize) {
+    observability::test_run().unwrap();
+    holochain::conductor::tokio_runtime().block_on(speed_test(Some(n)));
 }
 
 #[instrument]
-async fn speed_test() {
-    const NUM: usize = 2000;
+async fn speed_test(n: Option<usize>) {
+    let num = n.unwrap_or(DEFAULT_NUM);
 
     // ////////////
     // START DNA
@@ -206,7 +225,9 @@ async fn speed_test() {
         app_interface.request(request).await
     }
 
-    for i in 0..NUM {
+    let timer = std::time::Instant::now();
+
+    for i in 0..num {
         let invocation = anchor_invocation("alice", alice_cell_id.clone(), i).unwrap();
         let response = call(&mut app_interface, invocation).await.unwrap();
         assert_matches!(response, AppResponse::ZomeCallInvocation(_));
@@ -215,41 +236,63 @@ async fn speed_test() {
         assert_matches!(response, AppResponse::ZomeCallInvocation(_));
     }
 
-    // Give a little time for gossip to process
-    tokio::time::delay_for(std::time::Duration::from_millis(100)).await;
-
-    let invocation = new_invocation(
-        alice_cell_id.clone(),
-        "list_anchor_addresses",
-        TestString("bobbo".into()),
-    )
-    .unwrap();
-    let response = call(&mut app_interface, invocation).await.unwrap();
-    match response {
-        AppResponse::ZomeCallInvocation(r) => {
-            let response: SerializedBytes = r.into_inner();
-            let hashes: EntryHashes = response.try_into().unwrap();
-            assert_eq!(hashes.0.len(), NUM);
+    let mut alice_done = false;
+    let mut bobbo_done = false;
+    let mut alice_attempts = 0;
+    let mut bobbo_attempts = 0;
+    loop {
+        if !bobbo_done {
+            bobbo_attempts += 1;
+            let invocation = new_invocation(
+                alice_cell_id.clone(),
+                "list_anchor_addresses",
+                TestString("bobbo".into()),
+            )
+            .unwrap();
+            let response = call(&mut app_interface, invocation).await.unwrap();
+            match response {
+                AppResponse::ZomeCallInvocation(r) => {
+                    let response: SerializedBytes = r.into_inner();
+                    let hashes: EntryHashes = response.try_into().unwrap();
+                    bobbo_done = hashes.0.len() == num;
+                }
+                _ => unreachable!(),
+            }
         }
-        _ => unreachable!(),
-    }
 
-    let invocation = new_invocation(
-        bob_cell_id.clone(),
-        "list_anchor_addresses",
-        TestString("alice".into()),
-    )
-    .unwrap();
-    let response = call(&mut app_interface, invocation).await.unwrap();
-    match response {
-        AppResponse::ZomeCallInvocation(r) => {
-            let response: SerializedBytes = r.into_inner();
-            let hashes: EntryHashes = response.try_into().unwrap();
-            assert_eq!(hashes.0.len(), NUM);
+        if !alice_done {
+            alice_attempts += 1;
+            let invocation = new_invocation(
+                bob_cell_id.clone(),
+                "list_anchor_addresses",
+                TestString("alice".into()),
+            )
+            .unwrap();
+            let response = call(&mut app_interface, invocation).await.unwrap();
+            match response {
+                AppResponse::ZomeCallInvocation(r) => {
+                    let response: SerializedBytes = r.into_inner();
+                    let hashes: EntryHashes = response.try_into().unwrap();
+                    alice_done = hashes.0.len() == num;
+                }
+                _ => unreachable!(),
+            }
         }
-        _ => unreachable!(),
+        if alice_done && bobbo_done {
+            let el = timer.elapsed();
+            println!(
+                "Consistency in for {} calls: {}ms or {}s\n
+                Alice took {} attempts to reach consistency\n
+                Bobbo took {} attempts to reach consistency",
+                num,
+                el.as_millis(),
+                el.as_secs(),
+                alice_attempts,
+                bobbo_attempts,
+            );
+            break;
+        }
     }
-
     app_interface
         .close(1000, "Shutting down".into())
         .await

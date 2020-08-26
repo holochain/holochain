@@ -46,6 +46,10 @@ impl SourceChain {
         Ok(SourceChainBuf::new(env, dbs).await?.into())
     }
 
+    pub async fn public_only(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
+        Ok(SourceChainBuf::public_only(env, dbs).await?.into())
+    }
+
     pub fn into_inner(self) -> SourceChainBuf {
         self.0
     }

@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::core::{
-    queue_consumer::{OneshotWriter, TriggerSender, WorkComplete},
+    queue_consumer::{OneshotWriter, WorkComplete},
     state::{
         dht_op_integration::{
             IntegratedDhtOpsStore, IntegratedDhtOpsValue, IntegrationLimboStore,
@@ -38,11 +38,10 @@ use tracing::*;
 
 mod tests;
 
-#[instrument(skip(workspace, writer, trigger_publish))]
+#[instrument(skip(workspace, writer))]
 pub async fn integrate_dht_ops_workflow(
     mut workspace: IntegrateDhtOpsWorkspace,
     writer: OneshotWriter,
-    trigger_publish: &mut TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
     // one of many possible ways to access the env
     let env = workspace.elements.headers().env().clone();
@@ -139,14 +138,8 @@ pub async fn integrate_dht_ops_workflow(
 
     // trigger other workflows
 
-    // Only trigger publish if we have done any work during this workflow,
-    // to prevent endless cascades of publishing. Ideally, we shouldn't trigger
-    // publish unless we have integrated something we've authored, but this is
-    // a step in that direction.
-    // TODO: only trigger if we have integrated ops that we have authored
-    if total_integrated > 0 {
-        trigger_publish.trigger();
-    }
+    // TODO: Add trigger validation here
+    if total_integrated > 0 {}
 
     Ok(result)
 }

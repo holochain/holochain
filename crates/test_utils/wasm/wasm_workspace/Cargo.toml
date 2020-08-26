@@ -4,8 +4,11 @@ members = [
     "anchor",
     "bench",
     "commit_entry",
+    "crd",
+    "crud",
     "debug",
     "entry_defs",
+    "entry_hash",
     "foo",
     "hash_path",
     "imports",
@@ -16,7 +19,9 @@ members = [
     "migrate_agent_pass",
     "post_commit_fail",
     "post_commit_success",
+    "random_bytes",
     "ser_regression",
+    "sys_time",
     "validate",
     "validate_invalid",
     "validate_link",
@@ -26,6 +31,7 @@ members = [
     "validation_package_fail",
     "validation_package_success",
     "whoami",
+    "zome_info",
 ]
 
 [profile.release]

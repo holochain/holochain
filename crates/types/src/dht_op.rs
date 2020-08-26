@@ -233,10 +233,13 @@ pub async fn produce_ops_from_element(element: &Element) -> DhtOpResult<Vec<DhtO
             }
             DhtOpLight::StoreEntry(_, _, _) => {
                 let new_entry_header = header.clone().try_into()?;
-                let box_entry = maybe_entry
-                    .clone()
-                    .map(Box::new)
-                    .ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.clone()))?;
+                let box_entry = match maybe_entry.clone() {
+                    Some(entry) => Box::new(entry),
+                    None => {
+                        // Entry is private so continue
+                        continue;
+                    }
+                };
                 DhtOp::StoreEntry(signature, new_entry_header, box_entry)
             }
             DhtOpLight::RegisterAgentActivity(_, _) => {

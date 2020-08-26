@@ -127,7 +127,9 @@ dependencies = [
 name = "hdk3_derive"
 version = "0.0.1"
 dependencies = [
+ "holochain_zome_types",
  "paste",
+ "proc-macro2 1.0.19",
  "quote 1.0.7",
  "syn 1.0.38",
 ]
@@ -166,9 +168,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_common"
-version = "0.0.41"
+version = "0.0.42"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5a121c1df70f22c86286bf2fdc8c77d54c1a71bb2ea71164dbcbaa4dfb75b261"
+checksum = "3aec2a89c8121f45730a72c08716fa2d32c6d967902fd1ede73405177d14cb82"
 dependencies = [
  "holochain_serialized_bytes",
  "serde",
@@ -177,9 +179,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_guest"
-version = "0.0.41"
+version = "0.0.42"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23b4d11ea832f406341c991dbd6a4153425b483042d5bdf233dc9944258cda79"
+checksum = "f548c70ea7ff5383c52cf1af0ce33c219a01b526dbe0ad5a06d22545cb78c3a2"
 dependencies = [
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
@@ -651,6 +653,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_wasm_crd"
+version = "0.0.1"
+dependencies = [
+ "hdk3",
+ "serde",
+ "test_wasm_common",
+]
+
+[[package]]
+name = "test_wasm_crud"
+version = "0.0.1"
+dependencies = [
+ "hdk3",
+ "serde",
+ "test_wasm_common",
+]
+
+[[package]]
 name = "test_wasm_debug"
 version = "0.0.1"
 dependencies = [
@@ -660,6 +680,14 @@ dependencies = [
 
 [[package]]
 name = "test_wasm_entry_defs"
+version = "0.0.1"
+dependencies = [
+ "hdk3",
+ "serde",
+]
+
+[[package]]
+name = "test_wasm_entry_hash"
 version = "0.0.1"
 dependencies = [
  "hdk3",
@@ -751,10 +779,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_wasm_random_bytes"
+version = "0.0.1"
+dependencies = [
+ "hdk3",
+ "serde",
+]
+
+[[package]]
 name = "test_wasm_ser_regression"
 version = "0.0.1"
 dependencies = [
  "derive_more",
+ "hdk3",
+ "serde",
+]
+
+[[package]]
+name = "test_wasm_sys_time"
+version = "0.0.1"
+dependencies = [
  "hdk3",
  "serde",
 ]
@@ -830,6 +874,14 @@ dependencies = [
  "hdk3",
  "serde",
  "test_wasm_common",
+]
+
+[[package]]
+name = "test_wasm_zome_info"
+version = "0.0.1"
+dependencies = [
+ "hdk3",
+ "serde",
 ]
 
 [[package]]
