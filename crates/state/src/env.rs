@@ -17,7 +17,6 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
-use tokio::sync::RwLockReadGuard;
 
 const DEFAULT_INITIAL_MAP_SIZE: usize = 100 * 1024 * 1024; // 100MB
 const MAX_DBS: u32 = 32;
@@ -87,7 +86,9 @@ fn rkv_builder(
 /// This environment can only generate read-only transactions, never read-write.
 #[derive(Clone)]
 pub struct EnvironmentRead {
-    // arc: Arc<RwLock<Rkv>>,
+    // FIXME [ B-03180 ]: Use some synchronization strategy so we can get
+    //       mutable access to this
+    // arc: Arc<RwLockSync<Rkv>>,
     arc: Arc<Rkv>,
     kind: EnvironmentKind,
     path: PathBuf,
@@ -226,10 +227,6 @@ pub struct EnvironmentReadRef<'e> {
     path: &'e Path,
     keystore: KeystoreSender,
 }
-
-/// Newtype wrapper for a read-only lock guard on the Environment,
-/// with read-only access to the underlying guard
-pub struct EnvironmentRefReadOnly<'e>(RwLockReadGuard<'e, Rkv>);
 
 /// Implementors are able to create a new read-only LMDB transaction
 pub trait ReadManager<'e> {
