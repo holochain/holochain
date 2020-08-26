@@ -1,6 +1,7 @@
 //! Traits for defining keys and values of databases
 
 use holo_hash::{HashType, HoloHash};
+use holochain_serialized_bytes::prelude::*;
 use serde::{de::DeserializeOwned, Serialize};
 
 /// Any key type used in a [KvStore] or [KvvStore] must implement this trait
@@ -41,7 +42,6 @@ impl rkv::store::integer::PrimitiveInt for IntKey {}
 
 impl BufKey for IntKey {
     fn from_key_bytes_fallible(vec: Vec<u8>) -> Self {
-        use std::convert::TryInto;
         let boxed_slice = vec.into_boxed_slice();
         let boxed_array: Box<[u8; 4]> = match boxed_slice.try_into() {
             Ok(ba) => ba,
@@ -74,12 +74,9 @@ impl From<IntKey> for u32 {
 }
 
 impl<T: HashType + Send + Sync> BufKey for HoloHash<T> {
-    fn to_key_bytes(self) -> Vec<u8> {
-        todo!("implement in terms of SerializedBytes")
-    }
-
-    fn from_key_bytes_fallible(_bytes: Vec<u8>) -> Self {
-        todo!("implement in terms of SerializedBytes")
+    fn from_key_bytes_fallible(bytes: Vec<u8>) -> Self {
+        tracing::warn!("This is NOT correct for AnyDhtHash!");
+        Self::from_raw_bytes_and_type(bytes, T::default())
     }
 }
 

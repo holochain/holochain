@@ -10,13 +10,14 @@
 use crate::core::state::source_chain::{SourceChainError, SourceChainResult};
 use holo_hash::HeaderHash;
 use holochain_state::{
-    buffer::{BufferedStore, KvIntBufFresh},
+    buffer::{BufferedStore, KvIntBufFresh, KvIntStore},
     db::{GetDb, CHAIN_SEQUENCE},
     error::{DatabaseError, DatabaseResult},
     fresh_reader,
     prelude::*,
 };
 use serde::{Deserialize, Serialize};
+use tokio_safe_block_on::tokio_safe_block_forever_on;
 use tracing::*;
 
 /// A Value in the ChainSequence database.
@@ -42,23 +43,8 @@ impl ChainSequenceBuf {
     /// Create a new instance
     pub async fn new(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
         let buf: Store = KvIntBufFresh::new(env.clone(), dbs.get_db(&*CHAIN_SEQUENCE)?);
-        let (next_index, tx_seq, current_head) = fresh_reader!(env, |r| {
-            let latest = buf.store().iter(&r)?.rev().next()?;
-            debug!("{:?}", latest);
-            DatabaseResult::Ok(
-                latest
-                    .map(|(key, item)| {
-                        (
-                            // TODO: this is a bit ridiculous -- reevaluate whether the
-                            //       IntKey is really needed (vs simple u32)
-                            u32::from(IntKey::from_key_bytes_fallible(key.to_vec())) + 1,
-                            item.tx_seq + 1,
-                            Some(item.header_address),
-                        )
-                    })
-                    .unwrap_or((0, 0, None)),
-            )
-        })?;
+        let (next_index, tx_seq, current_head) =
+            fresh_reader!(env, |r| { Self::head_info(buf.store(), &r) })?;
         let persisted_head = current_head.clone();
 
         Ok(ChainSequenceBuf {
@@ -68,6 +54,27 @@ impl ChainSequenceBuf {
             current_head,
             persisted_head,
         })
+    }
+
+    fn head_info<R: Readable>(
+        store: &KvIntStore<ChainSequenceItem>,
+        r: &R,
+    ) -> DatabaseResult<(u32, u32, Option<HeaderHash>)> {
+        let latest = store.iter(r)?.rev().next()?;
+        debug!("{:?}", latest);
+        DatabaseResult::Ok(
+            latest
+                .map(|(key, item)| {
+                    (
+                        // TODO: this is a bit ridiculous -- reevaluate whether the
+                        //       IntKey is really needed (vs simple u32)
+                        u32::from(IntKey::from_key_bytes_fallible(key.to_vec())) + 1,
+                        item.tx_seq + 1,
+                        Some(item.header_address),
+                    )
+                })
+                .unwrap_or((0, 0, None)),
+        )
     }
 
     /// Get the chain head, AKA top chain header. None if the chain is empty.
@@ -147,18 +154,21 @@ impl BufferedStore for ChainSequenceBuf {
 
     /// Commit to the source chain, performing an as-at check and returning a
     /// SourceChainError::HeadMoved error if the as-at check fails
-    fn flush_to_txn(self, _writer: &mut Writer) -> SourceChainResult<()> {
+    fn flush_to_txn(self, writer: &mut Writer) -> SourceChainResult<()> {
         if self.is_clean() {
             return Ok(());
         }
-        todo!("Reimplement as-at check without the aid of a persistent Reader");
-        // let fresh = self.with_reader(writer)?;
-        // let (old, new) = (self.persisted_head, fresh.persisted_head);
-        // if old != new {
-        //     Err(SourceChainError::HeadMoved(old, new))
-        // } else {
-        //     Ok(self.buf.flush_to_txn(writer)?)
-        // }
+        let env = self.buf.env().clone();
+        // FIXME: consider making the whole method async
+        let db =
+            tokio_safe_block_forever_on(async move { env.dbs().await.get_db(&*CHAIN_SEQUENCE) })?;
+        let (_, _, persisted_head) = ChainSequenceBuf::head_info(&KvIntStore::new(db), writer)?;
+        let (old, new) = (self.persisted_head, persisted_head);
+        if old != new {
+            Err(SourceChainError::HeadMoved(old, new))
+        } else {
+            Ok(self.buf.flush_to_txn(writer)?)
+        }
     }
 }
 
