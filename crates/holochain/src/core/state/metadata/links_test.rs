@@ -76,7 +76,6 @@ async fn fixtures(env: EnvironmentWrite, n: usize) -> Vec<TestData> {
     data
 }
 
-// #[allow(dead_code)]
 impl TestData {
     /// Create the same test data with a new timestamp
     async fn with_same_keys(mut td: Self) -> Self {
@@ -101,6 +100,7 @@ impl TestData {
         assert!(val, test);
     }
 
+    #[allow(dead_code)]
     async fn is_on_full_key<'a>(&'a self, test: &'static str, meta_buf: &'a MetadataBuf) {
         let key = LinkMetaKey::BaseZomeTag(&self.base_hash, self.zome_id, &self.tag);
         assert!(
@@ -144,6 +144,7 @@ impl TestData {
         );
     }
 
+    #[allow(dead_code)]
     async fn is_on_base<'a>(&'a self, test: &'static str, meta_buf: &'a MetadataBuf) {
         let key = LinkMetaKey::Base(&self.base_hash);
         assert!(
@@ -173,6 +174,7 @@ impl TestData {
         ));
     }
 
+    #[allow(dead_code)]
     async fn is_on_zome_id<'a>(&'a self, test: &'static str, meta_buf: &'a MetadataBuf) {
         let key = LinkMetaKey::BaseZome(&self.base_hash, self.zome_id);
         assert!(

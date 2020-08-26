@@ -84,7 +84,7 @@ impl EntryDefBufferKey {
 impl EntryDefBuf {
     /// Create a new buffer
     pub fn new(env: EnvironmentRead, entry_def_store: SingleStore) -> DatabaseResult<Self> {
-        Ok(Self(KvBufFresh::new(env, entry_def_store).into()))
+        Ok(Self(KvBufFresh::new(env, entry_def_store)))
     }
 
     /// Get an entry def

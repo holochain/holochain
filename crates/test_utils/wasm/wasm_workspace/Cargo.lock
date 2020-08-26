@@ -144,6 +144,7 @@ dependencies = [
 [[package]]
 name = "holochain_serialized_bytes"
 version = "0.0.42"
+source = "git+https://github.com/holochain/holochain-serialization.git?branch=reading-rainbow#2b93a7ce7fb3a9d1d563cd946ded13d27ba6a387"
 dependencies = [
  "holochain_serialized_bytes_derive",
  "rmp-serde",
@@ -157,6 +158,7 @@ dependencies = [
 [[package]]
 name = "holochain_serialized_bytes_derive"
 version = "0.0.42"
+source = "git+https://github.com/holochain/holochain-serialization.git?branch=reading-rainbow#2b93a7ce7fb3a9d1d563cd946ded13d27ba6a387"
 dependencies = [
  "quote 0.6.13",
  "syn 0.15.44",

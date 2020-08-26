@@ -178,7 +178,7 @@ mod tests {
         let expected_hashes: HashSet<_> = {
             let _reader = env_ref.reader().unwrap();
             let mut td = TestData::new();
-            let mut source_chain = ProduceDhtOpsWorkspace::new(env.clone().into(), &dbs)
+            let mut source_chain = ProduceDhtOpsWorkspace::new(env.env.clone().into(), &dbs)
                 .await
                 .unwrap()
                 .call_zome_workspace
@@ -234,7 +234,7 @@ mod tests {
         // Run the workflow and commit it
         {
             let _reader = env_ref.reader().unwrap();
-            let mut workspace = ProduceDhtOpsWorkspace::new(env.clone().into(), &dbs)
+            let mut workspace = ProduceDhtOpsWorkspace::new(env.env.clone().into(), &dbs)
                 .await
                 .unwrap();
             let complete = produce_dht_ops_workflow_inner(&mut workspace)

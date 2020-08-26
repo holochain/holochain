@@ -262,7 +262,7 @@ where
         let all_metadata = self.network.get_meta(basis.clone(), options).await?;
 
         // Only put raw meta data in element_cache and combine all results
-        for metadata in all_metadata.iter().cloned() {
+        for metadata in <[_]>::iter(&all_metadata[..]).cloned() {
             let basis = basis.clone();
             // Put in meta element_cache
             let values = metadata

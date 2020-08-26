@@ -227,10 +227,10 @@ pub struct CallZomeWorkspace {
 
 impl<'a> CallZomeWorkspace {
     pub async fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
-        let source_chain = SourceChain::new(env.clone().into(), dbs).await?;
-        let cache_cas = ElementBuf::cache(env.clone().into(), dbs)?;
-        let meta = MetadataBuf::vault(env.clone().into(), dbs)?;
-        let cache_meta = MetadataBuf::cache(env.clone().into(), dbs)?;
+        let source_chain = SourceChain::new(env.clone(), dbs).await?;
+        let cache_cas = ElementBuf::cache(env.clone(), dbs)?;
+        let meta = MetadataBuf::vault(env.clone(), dbs)?;
+        let cache_meta = MetadataBuf::cache(env.clone(), dbs)?;
 
         Ok(CallZomeWorkspace {
             source_chain,

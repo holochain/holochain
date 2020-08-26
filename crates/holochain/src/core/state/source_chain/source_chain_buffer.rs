@@ -28,8 +28,8 @@ pub struct SourceChainBuf {
 impl SourceChainBuf {
     pub async fn new(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
         Ok(Self {
-            elements: ElementBuf::vault(env.clone().into(), dbs, true)?,
-            sequence: ChainSequenceBuf::new(env.clone().into(), dbs).await?,
+            elements: ElementBuf::vault(env.clone(), dbs, true)?,
+            sequence: ChainSequenceBuf::new(env.clone(), dbs).await?,
             keystore: dbs.keystore(),
             env,
         })
@@ -44,8 +44,8 @@ impl SourceChainBuf {
     // FIXME This should only be cfg(test) but that doesn't work with integration tests
     pub async fn cache(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
         Ok(Self {
-            elements: ElementBuf::cache(env.clone().into(), dbs)?,
-            sequence: ChainSequenceBuf::new(env.clone().into(), dbs).await?,
+            elements: ElementBuf::cache(env.clone(), dbs)?,
+            sequence: ChainSequenceBuf::new(env.clone(), dbs).await?,
             keystore: dbs.keystore(),
             env,
         })
@@ -108,7 +108,7 @@ impl SourceChainBuf {
         self.sequence.complete_dht_op(i).await
     }
 
-    pub fn elements<'a>(&'a self) -> &'a ElementBuf {
+    pub fn elements(&self) -> &ElementBuf {
         &self.elements
     }
 

@@ -153,9 +153,9 @@ impl Workspace for PublishDhtOpsWorkspace {
 impl PublishDhtOpsWorkspace {
     pub fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
         let db = dbs.get_db(&*AUTHORED_DHT_OPS)?;
-        let authored_dht_ops = KvBufFresh::new(env.clone().into(), db);
+        let authored_dht_ops = KvBufFresh::new(env.clone(), db);
         // Note that this must always be false as we don't want private entries being published
-        let elements = ElementBuf::vault(env.clone().into(), dbs, false)?;
+        let elements = ElementBuf::vault(env, dbs, false)?;
         let _db = dbs.get_db(&*INTEGRATED_DHT_OPS)?;
         Ok(Self {
             authored_dht_ops,

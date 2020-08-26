@@ -59,34 +59,31 @@ pub async fn spawn_queue_consumer_tasks(
     stop: sync::broadcast::Sender<()>,
 ) -> InitialQueueTriggers {
     let (tx_publish, rx1, handle) =
-        spawn_publish_dht_ops_consumer(env.clone().into(), stop.subscribe(), cell_network);
+        spawn_publish_dht_ops_consumer(env.clone(), stop.subscribe(), cell_network);
     task_sender
         .send(ManagedTaskAdd::dont_handle(handle))
         .await
         .expect("Failed to manage workflow handle");
     let (tx_integration, rx2, handle) =
-        spawn_integrate_dht_ops_consumer(env.clone().into(), stop.subscribe(), tx_publish);
+        spawn_integrate_dht_ops_consumer(env.clone(), stop.subscribe(), tx_publish);
     task_sender
         .send(ManagedTaskAdd::dont_handle(handle))
         .await
         .expect("Failed to manage workflow handle");
     let (tx_app, rx3, handle) =
-        spawn_app_validation_consumer(env.clone().into(), stop.subscribe(), tx_integration.clone());
+        spawn_app_validation_consumer(env.clone(), stop.subscribe(), tx_integration.clone());
     task_sender
         .send(ManagedTaskAdd::dont_handle(handle))
         .await
         .expect("Failed to manage workflow handle");
     let (tx_sys, rx4, handle) =
-        spawn_sys_validation_consumer(env.clone().into(), stop.subscribe(), tx_app);
+        spawn_sys_validation_consumer(env.clone(), stop.subscribe(), tx_app);
     task_sender
         .send(ManagedTaskAdd::dont_handle(handle))
         .await
         .expect("Failed to manage workflow handle");
-    let (tx_produce, rx5, handle) = spawn_produce_dht_ops_consumer(
-        env.clone().into(),
-        stop.subscribe(),
-        tx_integration.clone(),
-    );
+    let (tx_produce, rx5, handle) =
+        spawn_produce_dht_ops_consumer(env.clone(), stop.subscribe(), tx_integration.clone());
     task_sender
         .send(ManagedTaskAdd::dont_handle(handle))
         .await

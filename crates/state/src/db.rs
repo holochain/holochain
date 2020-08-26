@@ -4,6 +4,7 @@ use crate::{
     env::EnvironmentKind,
     error::{DatabaseError, DatabaseResult},
     exports::IntegerStore,
+    prelude::IntKey,
 };
 use derive_more::Display;
 use holochain_keystore::KeystoreSender;
@@ -95,6 +96,7 @@ impl DbName {
     }
 }
 
+#[derive(Debug)]
 /// The various "modes" of viewing LMDB databases
 pub enum DbKind {
     /// Single-value KV with arbitrary keys, associated with [KvBufFresh]
@@ -188,7 +190,6 @@ pub(super) fn get_db<V: 'static + Copy + Send + Sync>(
     path: &Path,
     key: &'static DbKey<V>,
 ) -> DatabaseResult<V> {
-    tracing::debug!("Getting db at path: {:?}", path);
     let dbmap = DB_MAP_MAP.read();
     let um: &DbMap = dbmap
         .get(path)
@@ -246,7 +247,7 @@ fn register_db<V: 'static + Send + Sync>(
         ),
         DbKind::SingleInt => um.insert(
             key.with_value_type(),
-            env.open_integer::<&str, u32>(db_str.as_str(), StoreOptions::create())?,
+            env.open_integer::<&str, IntKey>(db_str.as_str(), StoreOptions::create())?,
         ),
         DbKind::Multi => {
             let mut opts = StoreOptions::create();
