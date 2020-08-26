@@ -81,22 +81,6 @@ impl<T: HashType + Send + Sync> BufKey for HoloHash<T> {
     }
 }
 
-// impl<P: PrimitiveHashType + Send + Sync> BufKey for HoloHash<P> {
-//     fn to_key_bytes(self) -> Vec<u8> {
-//         let bytes = self.into_inner();
-//         // This assertion just helps raise awareness in case we change the
-//         // length of a HoloHash [ B-02112 ]
-//         assert_eq!(bytes.len(), 36);
-//         bytes
-//     }
-
-//     fn from_key_bytes_fallible(bytes: Vec<u8>) -> Self {
-//         // This assertion could fail if this method is used inappropriately
-//         assert_eq!(bytes.len(), 36);
-//         Self::from_raw_bytes(bytes)
-//     }
-// }
-
 /// Use this as the key type for LMDB databases which should only have one key.
 ///
 /// This type can only be used as one possible reference

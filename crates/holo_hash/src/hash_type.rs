@@ -21,8 +21,8 @@ pub trait HashType:
     + Ord
     + serde::de::DeserializeOwned
     + serde::Serialize
+    // FIXME: REMOVE!!! This is a hack to get composite keys working with LMDB before [ B-02112 ] is done
     + Default
-// FIXME: REMOVE!!! This is a hack to get composite keys working with LMDB before [ B-02112 ] is done
 {
     /// Get the 3 byte prefix for the underlying primitive hash type
     fn get_prefix(self) -> &'static [u8];

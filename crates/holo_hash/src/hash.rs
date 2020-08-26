@@ -45,7 +45,7 @@ impl<T: HashType> HoloHash<T> {
     }
 
     /// Fetch just the core 32 bytes (without the 4 location bytes)
-    // TODO: change once prefix is included
+    // TODO: change once prefix is included [ B-02112 ]
     pub fn get_core_bytes(&self) -> &[u8] {
         &self.hash[..self.hash.len() - 4]
     }
