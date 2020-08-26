@@ -69,7 +69,7 @@ impl ProduceDhtOpsWorkspace {
     pub async fn new(env: EnvironmentRead, db: &impl GetDb) -> WorkspaceResult<Self> {
         let authored_dht_ops = db.get_db(&*AUTHORED_DHT_OPS)?;
         Ok(Self {
-            source_chain: SourceChain::new(env.clone(), db).await?,
+            source_chain: SourceChain::public_only(env.clone(), db).await?,
             authored_dht_ops: KvBufFresh::new(env.clone(), authored_dht_ops),
         })
     }
@@ -222,7 +222,6 @@ mod tests {
 
         // Run the workflow and commit it
         {
-            let _reader = env_ref.reader().unwrap();
             let mut workspace = ProduceDhtOpsWorkspace::new(env.env.clone().into(), &dbs)
                 .await
                 .unwrap();
@@ -253,10 +252,14 @@ mod tests {
                         last_publish_time: None,
                         ..
                     });
+
                     Ok(DhtOpHash::with_pre_hashed(k.to_vec()))
                 })
                 .collect::<HashSet<_>>()
                 .unwrap();
+            for a in &authored_results {
+                assert!(expected_hashes.contains(a), "{:?}", a);
+            }
 
             // Check we got all the hashes
             assert_eq!(authored_results, expected_hashes);
@@ -267,7 +270,6 @@ mod tests {
         // Call the workflow again now the queue should be the same length as last time
         // because no new ops should hav been added
         {
-            let _reader = env_ref.reader().unwrap();
             let mut workspace = ProduceDhtOpsWorkspace::new(env.clone().into(), &dbs)
                 .await
                 .unwrap();
@@ -285,6 +287,7 @@ mod tests {
             let workspace = ProduceDhtOpsWorkspace::new(env.clone().into(), &dbs)
                 .await
                 .unwrap();
+            let env_ref = env.guard().await;
             let reader = env_ref.reader().unwrap();
             let authored_count = workspace
                 .authored_dht_ops
