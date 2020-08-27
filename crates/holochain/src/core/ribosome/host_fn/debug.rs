@@ -33,7 +33,7 @@ pub mod wasm_test {
     use crate::fixt::WasmRibosomeFixturator;
     use crate::fixt::ZomeCallHostAccessFixturator;
     use fixt::prelude::*;
-    
+
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::debug_msg;
     use holochain_zome_types::DebugInput;
@@ -60,8 +60,7 @@ pub mod wasm_test {
     async fn ribosome_debug_test() {
         let env = holochain_state::test_utils::test_cell_env();
         let dbs = env.dbs().await;
-        let _env_ref = env.guard().await;
-        let mut workspace = crate::core::workflow::CallZomeWorkspace::new(env.clone().into(), &dbs)
+                let mut workspace = crate::core::workflow::CallZomeWorkspace::new(env.clone().into(), &dbs)
             .await
             .unwrap();
 
@@ -87,8 +86,7 @@ pub mod wasm_test {
     async fn wasm_line_numbers_test() {
         let env = holochain_state::test_utils::test_cell_env();
         let dbs = env.dbs().await;
-        let _env_ref = env.guard().await;
-        let mut workspace = crate::core::workflow::CallZomeWorkspace::new(env.clone().into(), &dbs)
+                let mut workspace = crate::core::workflow::CallZomeWorkspace::new(env.clone().into(), &dbs)
             .await
             .unwrap();
 

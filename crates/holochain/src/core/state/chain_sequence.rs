@@ -191,9 +191,8 @@ pub mod tests {
     async fn chain_sequence_scratch_awareness() -> DatabaseResult<()> {
         observability::test_run().ok();
         let arc = test_cell_env();
-        let _env = arc.guard().await;
         let dbs = arc.dbs().await;
-                {
+        {
             let mut buf = ChainSequenceBuf::new(arc.clone().into(), &dbs).await?;
             assert_eq!(buf.chain_head(), None);
             buf.put_header(
@@ -257,7 +256,7 @@ pub mod tests {
         let env = arc.guard().await;
         let dbs = arc.dbs().await;
 
-                {
+        {
             let mut buf = ChainSequenceBuf::new(arc.clone().into(), &dbs).await?;
             buf.put_header(
                 HeaderHash::from_raw_bytes(vec![
@@ -315,7 +314,7 @@ pub mod tests {
             assert_eq!(items, vec![0, 1, 2]);
         }
 
-                {
+        {
             let mut buf = ChainSequenceBuf::new(arc.clone().into(), &dbs).await?;
             buf.put_header(
                 HeaderHash::from_raw_bytes(vec![
@@ -376,7 +375,7 @@ pub mod tests {
         let task1 = tokio::spawn(async move {
             let env = arc1.guard().await;
             let dbs = arc1.dbs().await;
-                        let mut buf = ChainSequenceBuf::new(arc1.clone().into(), &dbs).await?;
+            let mut buf = ChainSequenceBuf::new(arc1.clone().into(), &dbs).await?;
             buf.put_header(
                 HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -411,7 +410,7 @@ pub mod tests {
             rx1.await.unwrap();
             let env = arc2.guard().await;
             let dbs = arc2.dbs().await;
-                        let mut buf = ChainSequenceBuf::new(arc2.clone().into(), &dbs).await?;
+            let mut buf = ChainSequenceBuf::new(arc2.clone().into(), &dbs).await?;
             buf.put_header(
                 HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,

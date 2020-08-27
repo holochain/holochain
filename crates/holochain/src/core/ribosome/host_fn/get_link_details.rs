@@ -62,7 +62,7 @@ pub mod slow_tests {
     use crate::fixt::ZomeCallHostAccessFixturator;
     use fixt::prelude::*;
     use holo_hash::HasHash;
-    
+
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::header::LinkAdd;
     use test_wasm_common::*;
@@ -71,7 +71,6 @@ pub mod slow_tests {
     async fn ribosome_entry_hash_path_children_details() {
         let env = holochain_state::test_utils::test_cell_env();
         let dbs = env.dbs().await;
-        let _env_ref = env.guard().await;
 
         let mut workspace = crate::core::workflow::CallZomeWorkspace::new(env.clone().into(), &dbs)
             .await

@@ -960,8 +960,7 @@ async fn test_metadata_from_wasm_api() {
     observability::test_run().ok();
     let env = holochain_state::test_utils::test_cell_env();
     let _dbs = env.dbs().await;
-    let _env_ref = env.guard().await;
-    clear_dbs(env.clone()).await;
+        clear_dbs(env.clone()).await;
 
     // Generate fixture data
     let mut td = TestData::with_app_entry_type().await;
@@ -1028,8 +1027,7 @@ async fn test_wasm_api_without_integration_links() {
     observability::test_run().ok();
     let env = holochain_state::test_utils::test_cell_env();
     let _dbs = env.dbs().await;
-    let _env_ref = env.guard().await;
-    clear_dbs(env.clone()).await;
+        clear_dbs(env.clone()).await;
 
     // Generate fixture data
     let mut td = TestData::with_app_entry_type().await;

@@ -34,7 +34,7 @@ pub mod wasm_test {
     use crate::fixt::ZomeCallHostAccessFixturator;
     use fixt::prelude::*;
     use holo_hash::EntryHash;
-    
+
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::EntryHashInput;
     use holochain_zome_types::EntryHashOutput;
@@ -65,8 +65,7 @@ pub mod wasm_test {
     async fn ribosome_entry_hash_test() {
         let env = holochain_state::test_utils::test_cell_env();
         let dbs = env.dbs().await;
-        let _env_ref = env.guard().await;
-        let mut workspace = crate::core::workflow::CallZomeWorkspace::new(env.clone().into(), &dbs)
+                let mut workspace = crate::core::workflow::CallZomeWorkspace::new(env.clone().into(), &dbs)
             .await
             .unwrap();
 
@@ -89,8 +88,7 @@ pub mod wasm_test {
     async fn ribosome_hash_path_pwd_test() {
         let env = holochain_state::test_utils::test_cell_env();
         let dbs = env.dbs().await;
-        let _env_ref = env.guard().await;
-        let mut workspace = crate::core::workflow::CallZomeWorkspace::new(env.clone().into(), &dbs)
+                let mut workspace = crate::core::workflow::CallZomeWorkspace::new(env.clone().into(), &dbs)
             .await
             .unwrap();
 

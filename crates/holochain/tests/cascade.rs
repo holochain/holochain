@@ -70,7 +70,6 @@ fn fixtures() -> (
 async fn get_links() -> SourceChainResult<()> {
     let env = test_cell_env();
     let dbs = env.dbs().await;
-    let _env_ref = env.guard().await;
 
     let mut source_chain = SourceChainBuf::new(env.clone().into(), &dbs).await?;
     let mut element_cache = ElementBuf::cache(env.clone().into(), &dbs)?;

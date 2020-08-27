@@ -134,13 +134,12 @@ pub mod tests {
     async fn genesis_initializes_source_chain() -> Result<(), anyhow::Error> {
         observability::test_run()?;
         let arc = test_cell_env();
-        let _env = arc.guard().await;
         let dbs = arc.dbs().await;
         let dna = fake_dna_file("a");
         let agent_pubkey = fake_agent_pubkey_1();
 
         {
-                        let workspace = GenesisWorkspace::new(arc.clone().into(), &dbs).await?;
+            let workspace = GenesisWorkspace::new(arc.clone().into(), &dbs).await?;
             let mut api = MockCellConductorApi::new();
             api.expect_sync_dpki_request()
                 .returning(|_, _| Ok("mocked dpki request response".to_string()));
@@ -153,7 +152,6 @@ pub mod tests {
         }
 
         {
-
             let source_chain = SourceChain::new(arc.clone().into(), &dbs).await?;
             assert_eq!(source_chain.agent_pubkey().await?, agent_pubkey);
             source_chain.chain_head().expect("chain head should be set");

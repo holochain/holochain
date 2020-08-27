@@ -520,7 +520,6 @@ where
         impl IntoIterator<Item = (EntryDefBufferKey, EntryDef)>,
     )> {
         let environ = &self.wasm_env;
-        let _env = environ.guard().await;
         let wasm = environ.get_db(&*holochain_state::db::WASM)?;
         let dna_def_db = environ.get_db(&*holochain_state::db::DNA_DEF)?;
         let entry_def_db = environ.get_db(&*holochain_state::db::ENTRY_DEF)?;
@@ -612,7 +611,7 @@ where
         let cell = self.cell_by_id(cell_id)?;
         let arc = cell.state_env();
         let env = arc.guard().await;
-                let source_chain = SourceChainBuf::new(arc.clone().into(), &env).await?;
+        let source_chain = SourceChainBuf::new(arc.clone().into(), &env).await?;
         Ok(source_chain.dump_as_json().await?)
     }
 

@@ -29,7 +29,7 @@ pub mod test {
 
     use crate::fixt::ZomeCallHostAccessFixturator;
     use fixt::prelude::*;
-    
+
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::ZomeInfoOutput;
 
@@ -37,7 +37,6 @@ pub mod test {
     async fn invoke_import_zome_info_test() {
         let env = holochain_state::test_utils::test_cell_env();
         let dbs = env.dbs().await;
-        let _env_ref = env.guard().await;
         let mut workspace = crate::core::workflow::CallZomeWorkspace::new(env.clone().into(), &dbs)
             .await
             .unwrap();
