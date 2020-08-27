@@ -19,10 +19,12 @@ use holochain_state::{
     prelude::{EnvironmentRead, GetDb, ReadManager, Writer},
 };
 use holochain_types::Timestamp;
+use tracing::instrument;
 
 #[cfg(test)]
 mod test;
 
+#[instrument(skip(state_env, sys_validation_trigger, ops))]
 pub async fn incoming_dht_ops_workflow(
     state_env: &EnvironmentWrite,
     mut sys_validation_trigger: TriggerSender,
