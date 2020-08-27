@@ -6,9 +6,9 @@ use crate::core::state::{
     workspace::{Workspace, WorkspaceResult},
 };
 use holochain_state::{
-    buffer::KvBuf,
+    buffer::KvBufFresh,
     db::AUTHORED_DHT_OPS,
-    prelude::{BufferedStore, GetDb, Reader, Writer},
+    prelude::{BufferedStore, EnvironmentRead, GetDb, Writer},
 };
 use holochain_types::dht_op::DhtOpHashed;
 use tracing::*;
@@ -17,7 +17,7 @@ pub mod dht_op_light;
 
 #[instrument(skip(workspace, writer, trigger_publish))]
 pub async fn produce_dht_ops_workflow(
-    mut workspace: ProduceDhtOpsWorkspace<'_>,
+    mut workspace: ProduceDhtOpsWorkspace,
     writer: OneshotWriter,
     trigger_publish: &mut TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
@@ -37,7 +37,7 @@ pub async fn produce_dht_ops_workflow(
 }
 
 async fn produce_dht_ops_workflow_inner(
-    workspace: &mut ProduceDhtOpsWorkspace<'_>,
+    workspace: &mut ProduceDhtOpsWorkspace,
 ) -> WorkflowResult<WorkComplete> {
     debug!("Starting dht op workflow");
     let all_ops = workspace.source_chain.get_incomplete_dht_ops().await?;
@@ -54,27 +54,28 @@ async fn produce_dht_ops_workflow_inner(
             workspace.authored_dht_ops.put(hash, value)?;
         }
         // Mark the dht op as complete
-        workspace.source_chain.complete_dht_op(index)?;
+        workspace.source_chain.complete_dht_op(index).await?;
     }
 
     Ok(WorkComplete::Complete)
 }
 
-pub struct ProduceDhtOpsWorkspace<'env> {
-    pub source_chain: SourceChain<'env>,
-    pub authored_dht_ops: AuthoredDhtOpsStore<'env>,
+pub struct ProduceDhtOpsWorkspace {
+    pub source_chain: SourceChain,
+    pub authored_dht_ops: AuthoredDhtOpsStore,
 }
 
-impl<'env> Workspace<'env> for ProduceDhtOpsWorkspace<'env> {
-    fn new(reader: &'env Reader<'env>, db: &impl GetDb) -> WorkspaceResult<Self> {
+impl ProduceDhtOpsWorkspace {
+    pub async fn new(env: EnvironmentRead, db: &impl GetDb) -> WorkspaceResult<Self> {
         let authored_dht_ops = db.get_db(&*AUTHORED_DHT_OPS)?;
         Ok(Self {
-            // Note that this must always be be public only as we don't want private entries being published
-            source_chain: SourceChain::public_only(reader, db)?,
-            authored_dht_ops: KvBuf::new(reader, authored_dht_ops)?,
+            source_chain: SourceChain::public_only(env.clone(), db).await?,
+            authored_dht_ops: KvBufFresh::new(env.clone(), authored_dht_ops),
         })
     }
+}
 
+impl Workspace for ProduceDhtOpsWorkspace {
     fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
         self.source_chain.flush_to_txn(writer)?;
         self.authored_dht_ops.flush_to_txn(writer)?;
@@ -120,7 +121,7 @@ mod tests {
 
         async fn put_fix_entry(
             &mut self,
-            source_chain: &mut SourceChain<'_>,
+            source_chain: &mut SourceChain,
             visibility: EntryVisibility,
         ) -> Vec<DhtOp> {
             let app_entry = self.app_entry.next().unwrap();
@@ -150,15 +151,15 @@ mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn elements_produce_ops() {
         observability::test_run().ok();
-        let env = test_cell_env();
+        let test_env = test_cell_env();
+        let env = test_env.env();
         let dbs = env.dbs().await;
         let env_ref = env.guard().await;
 
         // Setup the database and expected data
         let expected_hashes: HashSet<_> = {
-            let reader = env_ref.reader().unwrap();
             let mut td = TestData::new();
-            let mut source_chain = SourceChain::new(&reader, &dbs).unwrap();
+            let mut source_chain = SourceChain::new(env.clone().into(), &dbs).await.unwrap();
 
             // Add genesis so we can use the source chain
             fake_genesis(&mut source_chain).await.unwrap();
@@ -219,8 +220,9 @@ mod tests {
 
         // Run the workflow and commit it
         {
-            let reader = env_ref.reader().unwrap();
-            let mut workspace = ProduceDhtOpsWorkspace::new(&reader, &dbs).unwrap();
+            let mut workspace = ProduceDhtOpsWorkspace::new(env.clone().into(), &dbs)
+                .await
+                .unwrap();
             let complete = produce_dht_ops_workflow_inner(&mut workspace)
                 .await
                 .unwrap();
@@ -233,12 +235,14 @@ mod tests {
         // Pull out the results and check them
         let last_count = {
             let reader = env_ref.reader().unwrap();
-            let workspace = ProduceDhtOpsWorkspace::new(&reader, &dbs).unwrap();
+            let workspace = ProduceDhtOpsWorkspace::new(env.clone().into(), &dbs)
+                .await
+                .unwrap();
 
             // Get the authored ops
             let authored_results = workspace
                 .authored_dht_ops
-                .iter()
+                .iter(&reader)
                 .unwrap()
                 .map(|(k, v)| {
                     assert_matches!(v, AuthoredDhtOpsValue {
@@ -246,10 +250,14 @@ mod tests {
                         last_publish_time: None,
                         ..
                     });
+
                     Ok(DhtOpHash::with_pre_hashed(k.to_vec()))
                 })
                 .collect::<HashSet<_>>()
                 .unwrap();
+            for a in &authored_results {
+                assert!(expected_hashes.contains(a), "{:?}", a);
+            }
 
             // Check we got all the hashes
             assert_eq!(authored_results, expected_hashes);
@@ -260,8 +268,9 @@ mod tests {
         // Call the workflow again now the queue should be the same length as last time
         // because no new ops should hav been added
         {
-            let reader = env_ref.reader().unwrap();
-            let mut workspace = ProduceDhtOpsWorkspace::new(&reader, &dbs).unwrap();
+            let mut workspace = ProduceDhtOpsWorkspace::new(env.clone().into(), &dbs)
+                .await
+                .unwrap();
             let complete = produce_dht_ops_workflow_inner(&mut workspace)
                 .await
                 .unwrap();
@@ -273,9 +282,17 @@ mod tests {
 
         // Check the lengths are unchanged
         {
+            let workspace = ProduceDhtOpsWorkspace::new(env.clone().into(), &dbs)
+                .await
+                .unwrap();
+            let env_ref = env.guard().await;
             let reader = env_ref.reader().unwrap();
-            let workspace = ProduceDhtOpsWorkspace::new(&reader, &dbs).unwrap();
-            let authored_count = workspace.authored_dht_ops.iter().unwrap().count().unwrap();
+            let authored_count = workspace
+                .authored_dht_ops
+                .iter(&reader)
+                .unwrap()
+                .count()
+                .unwrap();
 
             assert_eq!(last_count, authored_count);
         }

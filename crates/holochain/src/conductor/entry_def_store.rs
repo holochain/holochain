@@ -5,45 +5,47 @@ use crate::core::ribosome::{
     wasm_ribosome::WasmRibosome,
     RibosomeT,
 };
-use derive_more::From;
+
 use error::{EntryDefStoreError, EntryDefStoreResult};
 use fallible_iterator::FallibleIterator;
 use holochain_serialized_bytes::prelude::*;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::{
-    buffer::KvBuf,
+    buffer::KvBufFresh,
     error::{DatabaseError, DatabaseResult},
-    prelude::{BufferedStore, SingleStore},
-    transaction::{Reader, Writer},
+    prelude::*,
 };
 use holochain_types::dna::{zome::Zome, DnaFile};
 use holochain_zome_types::entry_def::EntryDef;
 use holochain_zome_types::header::EntryDefIndex;
-use shrinkwraprs::Shrinkwrap;
 use std::{collections::HashMap, convert::TryInto};
 
 pub mod error;
 
 /// Key for the [EntryDef] buffer
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, SerializedBytes)]
+#[derive(
+    Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd, Serialize, Deserialize, SerializedBytes,
+)]
 pub struct EntryDefBufferKey {
     zome: Zome,
     entry_def_position: EntryDefIndex,
 }
 
 /// This is where entry defs live
-pub struct EntryDefBuf<'env>(EntryDefStore<'env>);
+pub struct EntryDefBuf(KvBufFresh<EntryDefStoreKey, EntryDef>);
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, PartialOrd, Ord)]
 struct EntryDefStoreKey(SerializedBytes);
-
-#[derive(From, Shrinkwrap)]
-#[shrinkwrap(mutable)]
-struct EntryDefStore<'env>(KvBuf<'env, EntryDefStoreKey, EntryDef, Reader<'env>>);
 
 impl AsRef<[u8]> for EntryDefStoreKey {
     fn as_ref(&self) -> &[u8] {
         self.0.bytes()
+    }
+}
+
+impl BufKey for EntryDefStoreKey {
+    fn from_key_bytes_fallible(bytes: &[u8]) -> Self {
+        Self(UnsafeBytes::from(bytes.to_vec()).into())
     }
 }
 
@@ -79,15 +81,15 @@ impl EntryDefBufferKey {
     }
 }
 
-impl<'env> EntryDefBuf<'env> {
+impl EntryDefBuf {
     /// Create a new buffer
-    pub fn new(reader: &'env Reader<'env>, entry_def_store: SingleStore) -> DatabaseResult<Self> {
-        Ok(Self(KvBuf::new(reader, entry_def_store)?.into()))
+    pub fn new(env: EnvironmentRead, entry_def_store: SingleStore) -> DatabaseResult<Self> {
+        Ok(Self(KvBufFresh::new(env, entry_def_store)))
     }
 
     /// Get an entry def
-    pub fn get(&self, k: EntryDefBufferKey) -> DatabaseResult<Option<EntryDef>> {
-        self.0.get(&k.into())
+    pub async fn get(&self, k: EntryDefBufferKey) -> DatabaseResult<Option<EntryDef>> {
+        self.0.get(&k.into()).await
     }
 
     /// Store an entry def
@@ -96,25 +98,27 @@ impl<'env> EntryDefBuf<'env> {
     }
 
     /// Get all the entry defs in the database
-    pub fn get_all(
+    pub fn get_all<'r, R: Readable>(
         &self,
+        r: &'r R,
     ) -> DatabaseResult<
-        Box<dyn FallibleIterator<Item = (EntryDefBufferKey, EntryDef), Error = DatabaseError> + '_>,
+        Box<dyn FallibleIterator<Item = (EntryDefBufferKey, EntryDef), Error = DatabaseError> + 'r>,
     > {
         Ok(Box::new(
             self.0
-                .iter_raw()?
+                .store()
+                .iter(r)?
                 .map(|(k, v)| Ok((EntryDefStoreKey::from(k).into(), v))),
         ))
     }
 }
 
-impl<'env> BufferedStore<'env> for EntryDefBuf<'env> {
+impl BufferedStore for EntryDefBuf {
     type Error = DatabaseError;
 
-    fn flush_to_txn(self, writer: &'env mut Writer) -> DatabaseResult<()> {
+    fn flush_to_txn(self, writer: &mut Writer) -> DatabaseResult<()> {
         let store = self.0;
-        store.0.flush_to_txn(writer)?;
+        store.flush_to_txn(writer)?;
         Ok(())
     }
 }
@@ -197,7 +201,7 @@ mod tests {
         } = test_wasm_env();
         let _tmpdir = test_env.tmpdir.clone();
         let test_env_2 = TestEnvironment {
-            env: test_env.env.clone(),
+            env: test_env.env().into(),
             tmpdir: test_env.tmpdir.clone(),
         };
         let handle = Conductor::builder()

@@ -1199,6 +1199,7 @@ dependencies = [
  "serde",
  "serde_bytes",
  "serde_json",
+ "tracing",
 ]
 
 [[package]]
@@ -1326,8 +1327,7 @@ dependencies = [
 [[package]]
 name = "holochain_serialized_bytes"
 version = "0.0.42"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "88e79687b22936b23689fdcf81c6e61825560e1dd536ddc89ec0f8efee14ec24"
+source = "git+https://github.com/holochain/holochain-serialization.git?branch=reading-rainbow#2b93a7ce7fb3a9d1d563cd946ded13d27ba6a387"
 dependencies = [
  "holochain_serialized_bytes_derive",
  "rmp-serde",
@@ -1341,8 +1341,7 @@ dependencies = [
 [[package]]
 name = "holochain_serialized_bytes_derive"
 version = "0.0.42"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "483f009b6de95dbfb84935d0bb1c0880fc48c9281beb0b7f7e84102b6978697d"
+source = "git+https://github.com/holochain/holochain-serialization.git?branch=reading-rainbow#2b93a7ce7fb3a9d1d563cd946ded13d27ba6a387"
 dependencies = [
  "quote 0.6.13",
  "syn 0.15.44",
@@ -1353,6 +1352,7 @@ name = "holochain_state"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "byteorder",
  "chrono",
  "derive_more",
  "either",
@@ -1380,6 +1380,7 @@ dependencies = [
  "tokio",
  "tokio_safe_block_on",
  "tracing",
+ "tracing-futures",
 ]
 
 [[package]]

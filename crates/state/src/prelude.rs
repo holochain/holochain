@@ -1,9 +1,10 @@
 //! Common types, especially traits, which we'd like to import en masse
 
 pub use crate::{
-    buffer::BufferedStore,
+    buffer::{BufferedStore, KvStoreT},
     db::GetDb,
-    env::{ReadManager, WriteManager},
+    env::{EnvironmentRead, ReadManager, WriteManager},
     exports::*,
+    key::*,
     transaction::{Readable, Reader, Writer},
 };

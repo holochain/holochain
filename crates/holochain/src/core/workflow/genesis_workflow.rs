@@ -32,7 +32,7 @@ pub struct GenesisWorkflowArgs {
 
 #[instrument(skip(workspace, writer, api))]
 pub async fn genesis_workflow<'env, Api: CellConductorApiT>(
-    mut workspace: GenesisWorkspace<'env>,
+    mut workspace: GenesisWorkspace,
     writer: OneshotWriter,
     api: Api,
     args: GenesisWorkflowArgs,
@@ -50,7 +50,7 @@ pub async fn genesis_workflow<'env, Api: CellConductorApiT>(
 }
 
 async fn genesis_workflow_inner<Api: CellConductorApiT>(
-    workspace: &mut GenesisWorkspace<'_>,
+    workspace: &mut GenesisWorkspace,
     args: GenesisWorkflowArgs,
     api: Api,
 ) -> WorkflowResult<()> {
@@ -84,18 +84,20 @@ async fn genesis_workflow_inner<Api: CellConductorApiT>(
 }
 
 /// The workspace for Genesis
-pub struct GenesisWorkspace<'env> {
-    source_chain: SourceChainBuf<'env>,
+pub struct GenesisWorkspace {
+    source_chain: SourceChainBuf,
 }
 
-impl<'env> Workspace<'env> for GenesisWorkspace<'env> {
+impl GenesisWorkspace {
     /// Constructor
-    #[allow(dead_code)]
-    fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self> {
+    pub async fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
         Ok(Self {
-            source_chain: SourceChainBuf::<'env>::new(reader, dbs)?,
+            source_chain: SourceChainBuf::new(env, dbs).await?,
         })
     }
+}
+
+impl Workspace for GenesisWorkspace {
     fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
         self.source_chain.flush_to_txn(writer)?;
         Ok(())
@@ -106,7 +108,7 @@ impl<'env> Workspace<'env> for GenesisWorkspace<'env> {
 pub mod tests {
 
     use super::*;
-    use crate::core::state::workspace::Workspace;
+
     use crate::{
         conductor::api::MockCellConductorApi,
         core::{state::source_chain::SourceChain, SourceChainResult},
@@ -120,7 +122,7 @@ pub mod tests {
     use holochain_zome_types::Header;
     use matches::assert_matches;
 
-    pub async fn fake_genesis(source_chain: &mut SourceChain<'_>) -> SourceChainResult<()> {
+    pub async fn fake_genesis(source_chain: &mut SourceChain) -> SourceChainResult<()> {
         let dna = fake_dna_file("cool dna");
         let dna_hash = dna.dna_hash().clone();
         let agent_pubkey = fake_agent_pubkey_1();
@@ -133,14 +135,14 @@ pub mod tests {
         observability::test_run()?;
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let env = arc.guard().await;
+        let test_env = test_cell_env();
+let arc = test_env.env();
         let dbs = arc.dbs().await;
         let dna = fake_dna_file("a");
         let agent_pubkey = fake_agent_pubkey_1();
 
         {
-            let reader = env.reader()?;
-            let workspace = GenesisWorkspace::new(&reader, &dbs)?;
+            let workspace = GenesisWorkspace::new(arc.clone().into(), &dbs).await?;
             let mut api = MockCellConductorApi::new();
             api.expect_sync_dpki_request()
                 .returning(|_, _| Ok("mocked dpki request response".to_string()));
@@ -153,9 +155,7 @@ pub mod tests {
         }
 
         {
-            let reader = env.reader()?;
-
-            let source_chain = SourceChain::new(&reader, &dbs)?;
+            let source_chain = SourceChain::new(arc.clone().into(), &dbs).await?;
             assert_eq!(source_chain.agent_pubkey().await?, agent_pubkey);
             source_chain.chain_head().expect("chain head should be set");
 

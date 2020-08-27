@@ -1,4 +1,7 @@
-use crate::{encode, HashType, HashableContent, HashableContentBytes, HoloHash, PrimitiveHashType};
+use crate::{
+    encode, HashType, HashableContent, HashableContentBytes, HoloHash, PrimitiveHashType,
+    HASH_CORE_LEN, HASH_SERIALIZED_LEN,
+};
 use futures::FutureExt;
 use must_future::MustBoxFuture;
 
@@ -41,15 +44,25 @@ impl<T: HashType> HoloHash<T> {
         .into()
     }
 
-    /// Construct a HoloHash from a prehashed raw 32-byte slice, with given type.
+    /// Construct a HoloHash from a prehashed raw 36-byte slice, with given type.
     /// The location bytes will be calculated.
+    // TODO: revisit when changing serialization format [ B-02112 ]
     pub fn with_pre_hashed_typed(mut hash: Vec<u8>, hash_type: T) -> Self {
         // Assert the data size is relatively small so we are
         // comfortable executing this synchronously / blocking
         // tokio thread.
-        assert_eq!(32, hash.len(), "only 32 byte hashes supported");
 
-        hash.append(&mut encode::holo_dht_location_bytes(&hash));
+        if hash.len() == HASH_CORE_LEN {
+            tracing::warn!("Got core 32 bytes instead of 36, recalcuating loc.");
+            hash.append(&mut encode::holo_dht_location_bytes(&hash));
+        }
+
+        assert_eq!(
+            HASH_SERIALIZED_LEN,
+            hash.len(),
+            "only 36 byte hashes supported"
+        );
+
         HoloHash::from_raw_bytes_and_type(hash, hash_type)
     }
 }
@@ -57,14 +70,24 @@ impl<T: HashType> HoloHash<T> {
 impl<P: PrimitiveHashType> HoloHash<P> {
     /// Construct a HoloHash from a prehashed raw 32-byte slice.
     /// The location bytes will be calculated.
+    // TODO: revisit when changing serialization format [ B-02112 ]
     pub fn with_pre_hashed(mut hash: Vec<u8>) -> Self {
         // Assert the data size is relatively small so we are
         // comfortable executing this synchronously / blocking
         // tokio thread.
         // TODO: DRY, write in terms of with_pre_hashed_typed
-        assert_eq!(32, hash.len(), "only 32 byte hashes supported");
 
-        hash.append(&mut encode::holo_dht_location_bytes(&hash));
+        if hash.len() == HASH_CORE_LEN {
+            tracing::warn!("Got core 32 bytes instead of 36, recalcuating loc.");
+            hash.append(&mut encode::holo_dht_location_bytes(&hash));
+        }
+
+        assert_eq!(
+            HASH_SERIALIZED_LEN,
+            hash.len(),
+            "only 36 byte hashes supported"
+        );
+
         HoloHash::from_raw_bytes(hash)
     }
 }

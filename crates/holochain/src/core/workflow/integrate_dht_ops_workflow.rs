@@ -19,10 +19,11 @@ use holo_hash::{DhtOpHash, HeaderHash};
 use holochain_keystore::Signature;
 use holochain_state::{
     buffer::BufferedStore,
-    buffer::KvBuf,
+    buffer::KvBufFresh,
     db::{INTEGRATED_DHT_OPS, INTEGRATION_LIMBO},
     error::DatabaseResult,
-    prelude::{GetDb, Reader, Writer},
+    fresh_reader,
+    prelude::*,
 };
 use holochain_types::{
     dht_op::{produce_op_lights_from_elements, DhtOp, DhtOpHashed, DhtOpLight},
@@ -39,17 +40,22 @@ mod tests;
 
 #[instrument(skip(workspace, writer))]
 pub async fn integrate_dht_ops_workflow(
-    mut workspace: IntegrateDhtOpsWorkspace<'_>,
+    mut workspace: IntegrateDhtOpsWorkspace,
     writer: OneshotWriter,
 ) -> WorkflowResult<WorkComplete> {
+    // one of many possible ways to access the env
+    let env = workspace.elements.headers().env().clone();
     // Pull ops out of queue
     // TODO: PERF: we collect() only because this iterator cannot cross awaits,
     // but is there a way to do this without collect()?
-    let ops: Vec<_> = workspace
-        .integration_limbo
-        .drain_iter()?
-        .iterator()
-        .collect();
+    let ops: Vec<DatabaseResult<IntegrationLimboValue>> =
+        fresh_reader!(env, |r| DatabaseResult::Ok(
+            workspace
+                .integration_limbo
+                .drain_iter(&r)?
+                .iterator()
+                .collect::<Vec<_>>()
+        ))?;
 
     // Compute hashes for all dht_ops, include in tuples alongside db values
     let mut ops = futures::future::join_all(
@@ -90,8 +96,7 @@ pub async fn integrate_dht_ops_workflow(
         let mut next_ops = Vec::new();
         for (op_hash, value) in ops {
             // only integrate this op if it hasn't been integrated already!
-            // TODO: test for this [ B-01894 ]
-            if workspace.integrated_dht_ops.get(&op_hash)?.is_none() {
+            if workspace.integrated_dht_ops.get(&op_hash).await?.is_none() {
                 match integrate_single_dht_op(value, &mut workspace.elements, &mut workspace.meta)
                     .await?
                 {
@@ -148,8 +153,8 @@ pub async fn integrate_dht_ops_workflow(
 #[instrument(skip(value, element_store, meta_store))]
 async fn integrate_single_dht_op(
     value: IntegrationLimboValue,
-    element_store: &mut ElementBuf<'_>,
-    meta_store: &mut MetadataBuf<'_>,
+    element_store: &mut ElementBuf,
+    meta_store: &mut MetadataBuf,
 ) -> DhtOpConvertResult<Outcome> {
     match integrate_single_element(value, element_store).await? {
         Outcome::Integrated(v) => {
@@ -163,7 +168,7 @@ async fn integrate_single_dht_op(
 
 async fn integrate_single_element(
     value: IntegrationLimboValue,
-    element_store: &mut ElementBuf<'_>,
+    element_store: &mut ElementBuf,
 ) -> DhtOpConvertResult<Outcome> {
     {
         // Process each op
@@ -177,7 +182,7 @@ async fn integrate_single_element(
             signature: Signature,
             header: Header,
             maybe_entry: Option<Entry>,
-            element_store: &mut ElementBuf<'_>,
+            element_store: &mut ElementBuf,
         ) -> DhtOpConvertResult<()> {
             let signed_header =
                 SignedHeaderHashed::from_content(SignedHeader(header, signature)).await;
@@ -191,7 +196,7 @@ async fn integrate_single_element(
 
         async fn header_with_entry_is_stored(
             hash: &HeaderHash,
-            element_store: &ElementBuf<'_>,
+            element_store: &ElementBuf,
         ) -> DhtOpConvertResult<bool> {
             match element_store.get_header(hash).await?.map(|e| {
                 e.header()
@@ -202,7 +207,7 @@ async fn integrate_single_element(
                         DhtOpConvertError::MissingEntryDataForHeader(hash.clone())
                     })
             }) {
-                Some(r) => Ok(element_store.contains_entry(&r?)?),
+                Some(r) => Ok(element_store.contains_entry(&r?).await?),
                 None => Ok(false),
             }
         }
@@ -267,7 +272,7 @@ async fn integrate_single_element(
             DhtOp::RegisterAddLink(signature, link_add) => {
                 // Check whether we have the base address in the Vault.
                 // If not then this should put the op back on the queue.
-                if !entry_is_stored(&link_add.base_address)? {
+                if !entry_is_stored(&link_add.base_address).await? {
                     let op = DhtOp::RegisterAddLink(signature, link_add);
                     return Outcome::deferred(op, validation_status);
                 }
@@ -278,8 +283,8 @@ async fn integrate_single_element(
                 // Check whether we have the base address and link add address
                 // are in the Vault.
                 // If not then this should put the op back on the queue.
-                if !entry_is_stored(&link_remove.base_address)?
-                    || !header_is_stored(&link_remove.link_add_address)?
+                if !entry_is_stored(&link_remove.base_address).await?
+                    || !header_is_stored(&link_remove.link_add_address).await?
                 {
                     let op = DhtOp::RegisterRemoveLink(signature, link_remove);
                     return Outcome::deferred(op, validation_status);
@@ -300,12 +305,12 @@ async fn integrate_single_element(
 
 pub async fn integrate_single_metadata<C: MetadataBufT>(
     op: DhtOpLight,
-    element_store: &ElementBuf<'_>,
+    element_store: &ElementBuf,
     meta_store: &mut C,
 ) -> DhtOpConvertResult<()> {
     async fn get_header(
         hash: HeaderHash,
-        element_store: &ElementBuf<'_>,
+        element_store: &ElementBuf,
     ) -> DhtOpConvertResult<Header> {
         Ok(element_store
             .get_header(&hash)
@@ -356,7 +361,7 @@ pub async fn integrate_single_metadata<C: MetadataBufT>(
 /// our vault.
 pub async fn integrate_to_cache<C: MetadataBufT>(
     element: &Element,
-    element_store: &ElementBuf<'_>,
+    element_store: &ElementBuf,
     meta_store: &mut C,
 ) -> DhtOpConvertResult<()> {
     // Produce the light directly
@@ -382,36 +387,18 @@ impl Outcome {
     }
 }
 
-pub struct IntegrateDhtOpsWorkspace<'env> {
+pub struct IntegrateDhtOpsWorkspace {
     // integration queue
-    pub integration_limbo: IntegrationLimboStore<'env>,
+    pub integration_limbo: IntegrationLimboStore,
     // integrated ops
-    pub integrated_dht_ops: IntegratedDhtOpsStore<'env>,
+    pub integrated_dht_ops: IntegratedDhtOpsStore,
     // Cas for storing
-    pub elements: ElementBuf<'env>,
+    pub elements: ElementBuf,
     // metadata store
-    pub meta: MetadataBuf<'env>,
+    pub meta: MetadataBuf,
 }
 
-impl<'env> Workspace<'env> for IntegrateDhtOpsWorkspace<'env> {
-    /// Constructor
-    fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self> {
-        let db = dbs.get_db(&*INTEGRATED_DHT_OPS)?;
-        let integrated_dht_ops = KvBuf::new(reader, db)?;
-
-        let db = dbs.get_db(&*INTEGRATION_LIMBO)?;
-        let integration_limbo = KvBuf::new(reader, db)?;
-
-        let elements = ElementBuf::vault(reader, dbs, true)?;
-        let meta = MetadataBuf::vault(reader, dbs)?;
-
-        Ok(Self {
-            integration_limbo,
-            integrated_dht_ops,
-            elements,
-            meta,
-        })
-    }
+impl Workspace for IntegrateDhtOpsWorkspace {
     fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
         // flush elements
         self.elements.flush_to_txn(writer)?;
@@ -425,8 +412,28 @@ impl<'env> Workspace<'env> for IntegrateDhtOpsWorkspace<'env> {
     }
 }
 
-impl<'env> IntegrateDhtOpsWorkspace<'env> {
-    pub fn op_exists(&self, hash: &DhtOpHash) -> DatabaseResult<bool> {
-        Ok(self.integrated_dht_ops.contains(&hash)? || self.integration_limbo.contains(&hash)?)
+impl IntegrateDhtOpsWorkspace {
+    /// Constructor
+    pub fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
+        let db = dbs.get_db(&*INTEGRATED_DHT_OPS)?;
+        let integrated_dht_ops = KvBufFresh::new(env.clone(), db);
+
+        let db = dbs.get_db(&*INTEGRATION_LIMBO)?;
+        let integration_limbo = KvBufFresh::new(env.clone(), db);
+
+        let elements = ElementBuf::vault(env.clone(), dbs, true)?;
+        let meta = MetadataBuf::vault(env, dbs)?;
+
+        Ok(Self {
+            integration_limbo,
+            integrated_dht_ops,
+            elements,
+            meta,
+        })
+    }
+
+    pub async fn op_exists(&self, hash: &DhtOpHash) -> DatabaseResult<bool> {
+        Ok(self.integrated_dht_ops.contains(&hash).await?
+            || self.integration_limbo.contains(&hash).await?)
     }
 }

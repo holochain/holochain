@@ -248,10 +248,7 @@ pub mod test {
     use crate::fixt::WasmRibosomeFixturator;
     use futures::future::FutureExt;
     use holochain_serialized_bytes::prelude::*;
-    use holochain_state::{
-        env::ReadManager,
-        test_utils::{test_conductor_env, test_wasm_env, TestEnvironment},
-    };
+    use holochain_state::test_utils::{test_conductor_env, test_wasm_env, TestEnvironment};
     use holochain_types::{
         app::{InstallAppDnaPayload, InstallAppPayload, InstalledCell},
         cell::CellId,
@@ -654,8 +651,9 @@ pub mod test {
         // Get state
         let expected = {
             let env = cell_env.guard().await;
-            let reader = env.reader().unwrap();
-            let source_chain = SourceChainBuf::new(&reader, &env).unwrap();
+            let source_chain = SourceChainBuf::new(cell_env.clone().into(), &env)
+                .await
+                .unwrap();
             source_chain.dump_as_json().await.unwrap()
         };
 

@@ -6,11 +6,7 @@ use crate::core::state::{
 };
 use fallible_iterator::FallibleIterator;
 use holochain_state::db::GetDb;
-use holochain_state::{
-    buffer::BufferedStore,
-    error::DatabaseResult,
-    prelude::{Reader, Writer},
-};
+use holochain_state::{buffer::BufferedStore, error::DatabaseResult, fresh_reader, prelude::*};
 use holochain_types::{
     dht_op::{produce_ops_from_element, DhtOp},
     element::{Element, SignedHeaderHashed, SignedHeaderHashedExt},
@@ -21,37 +17,46 @@ use holochain_types::{
 use holochain_zome_types::{header, Entry, Header};
 use tracing::*;
 
-pub struct SourceChainBuf<'env> {
-    elements: ElementBuf<'env>,
-    sequence: ChainSequenceBuf<'env>,
+pub struct SourceChainBuf {
+    elements: ElementBuf,
+    sequence: ChainSequenceBuf,
     keystore: KeystoreSender,
+
+    env: EnvironmentRead,
 }
 
-impl<'env> SourceChainBuf<'env> {
-    pub fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Self> {
+impl SourceChainBuf {
+    pub async fn new(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
         Ok(Self {
-            elements: ElementBuf::vault(reader, dbs, true)?,
-            sequence: ChainSequenceBuf::new(reader, dbs)?,
+            elements: ElementBuf::vault(env.clone(), dbs, true)?,
+            sequence: ChainSequenceBuf::new(env.clone(), dbs).await?,
             keystore: dbs.keystore(),
+            env,
         })
     }
 
-    pub fn public_only(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Self> {
+    pub async fn public_only(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
         Ok(Self {
-            elements: ElementBuf::vault(reader, dbs, false)?,
-            sequence: ChainSequenceBuf::new(reader, dbs)?,
+            elements: ElementBuf::vault(env.clone(), dbs, false)?,
+            sequence: ChainSequenceBuf::new(env.clone(), dbs).await?,
             keystore: dbs.keystore(),
+            env,
         })
+    }
+
+    pub fn env(&self) -> &EnvironmentRead {
+        &self.env
     }
 
     // add a cache test only method that allows this to
     // be used with the cache database for testing
     // FIXME This should only be cfg(test) but that doesn't work with integration tests
-    pub fn cache(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Self> {
+    pub async fn cache(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
         Ok(Self {
-            elements: ElementBuf::cache(reader, dbs)?,
-            sequence: ChainSequenceBuf::new(reader, dbs)?,
+            elements: ElementBuf::cache(env.clone(), dbs)?,
+            sequence: ChainSequenceBuf::new(env.clone(), dbs).await?,
             keystore: dbs.keystore(),
+            env,
         })
     }
 
@@ -70,7 +75,7 @@ impl<'env> SourceChainBuf<'env> {
     }
 
     pub async fn get_at_index(&self, i: u32) -> SourceChainResult<Option<Element>> {
-        if let Some(address) = self.sequence.get(i)? {
+        if let Some(address) = self.sequence.get(i).await? {
             self.get_element(&address).await
         } else {
             Ok(None)
@@ -88,11 +93,13 @@ impl<'env> SourceChainBuf<'env> {
 
     pub async fn get_incomplete_dht_ops(&self) -> SourceChainResult<Vec<(u32, Vec<DhtOp>)>> {
         let mut ops = Vec::new();
-        // FIXME: This collect shouldn't need to happen but the iterator to the db is not Send
-        let ops_headers = self
-            .sequence
-            .get_items_with_incomplete_dht_ops()?
-            .collect::<Vec<_>>();
+        let ops_headers = fresh_reader!(self.env(), |r| {
+            SourceChainResult::Ok(
+                self.sequence
+                    .get_items_with_incomplete_dht_ops(&r)?
+                    .collect::<Vec<_>>()?,
+            )
+        })?;
         for (i, header) in ops_headers {
             let op = produce_ops_from_element(
                 &self
@@ -106,11 +113,11 @@ impl<'env> SourceChainBuf<'env> {
         Ok(ops)
     }
 
-    pub fn complete_dht_op(&mut self, i: u32) -> SourceChainResult<()> {
-        self.sequence.complete_dht_op(i)
+    pub async fn complete_dht_op(&mut self, i: u32) -> SourceChainResult<()> {
+        self.sequence.complete_dht_op(i).await
     }
 
-    pub fn elements<'a>(&'a self) -> &'a ElementBuf<'env> {
+    pub fn elements(&self) -> &ElementBuf {
         &self.elements
     }
 
@@ -139,12 +146,12 @@ impl<'env> SourceChainBuf<'env> {
         }
         */
 
-        self.sequence.put_header(header_address.clone());
+        self.sequence.put_header(header_address.clone())?;
         self.elements.put(signed_header, maybe_entry)?;
         Ok(header_address)
     }
 
-    pub fn headers(&self) -> &HeaderCas<'env> {
+    pub fn headers(&self) -> &HeaderCas {
         &self.elements.headers()
     }
 
@@ -171,7 +178,7 @@ impl<'env> SourceChainBuf<'env> {
         }
     }
 
-    pub fn iter_back(&'env self) -> SourceChainBackwardIterator<'env> {
+    pub fn iter_back(&self) -> SourceChainBackwardIterator {
         SourceChainBackwardIterator::new(self)
     }
 
@@ -261,10 +268,10 @@ impl<'env> SourceChainBuf<'env> {
     }
 }
 
-impl<'env> BufferedStore<'env> for SourceChainBuf<'env> {
+impl BufferedStore for SourceChainBuf {
     type Error = SourceChainError;
 
-    fn flush_to_txn(self, writer: &'env mut Writer) -> Result<(), Self::Error> {
+    fn flush_to_txn(self, writer: &mut Writer) -> Result<(), Self::Error> {
         self.elements.flush_to_txn(writer)?;
         self.sequence.flush_to_txn(writer)?;
         Ok(())
@@ -273,13 +280,13 @@ impl<'env> BufferedStore<'env> for SourceChainBuf<'env> {
 
 /// FallibleIterator returning SignedHeaderHashed instances from chain
 /// starting with the head, moving back to the origin (Dna) header.
-pub struct SourceChainBackwardIterator<'env> {
-    store: &'env SourceChainBuf<'env>,
+pub struct SourceChainBackwardIterator<'a> {
+    store: &'a SourceChainBuf,
     current: Option<HeaderHash>,
 }
 
-impl<'env> SourceChainBackwardIterator<'env> {
-    pub fn new(store: &'env SourceChainBuf<'env>) -> Self {
+impl<'a> SourceChainBackwardIterator<'a> {
+    pub fn new(store: &'a SourceChainBuf) -> Self {
         Self {
             store,
             current: store.chain_head().cloned(),
@@ -287,7 +294,7 @@ impl<'env> SourceChainBackwardIterator<'env> {
     }
 }
 
-impl<'env> FallibleIterator for SourceChainBackwardIterator<'env> {
+impl<'a> FallibleIterator for SourceChainBackwardIterator<'a> {
     type Item = SignedHeaderHashed;
     type Error = SourceChainError;
 
@@ -376,16 +383,15 @@ pub mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn source_chain_buffer_iter_back() -> SourceChainResult<()> {
-        let arc = test_cell_env();
+        let test_env = test_cell_env();
+let arc = test_env.env();
         let env = arc.guard().await;
         let dbs = arc.dbs().await;
 
         let (_agent_pubkey, dna_header, dna_entry, agent_header, agent_entry) = fixtures();
 
         {
-            let reader = env.reader()?;
-
-            let mut store = SourceChainBuf::new(&reader, &dbs)?;
+            let mut store = SourceChainBuf::new(arc.clone().into(), &dbs).await.unwrap();
             assert!(store.chain_head().is_none());
             store
                 .put_raw(dna_header.as_content().clone(), dna_entry.clone())
@@ -397,9 +403,7 @@ pub mod tests {
         };
 
         {
-            let reader = env.reader()?;
-
-            let store = SourceChainBuf::new(&reader, &dbs)?;
+            let store = SourceChainBuf::new(arc.clone().into(), &dbs).await.unwrap();
             assert!(store.chain_head().is_some());
 
             // get the full element
@@ -450,15 +454,14 @@ pub mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn source_chain_buffer_dump_entries_json() -> SourceChainResult<()> {
-        let arc = test_cell_env();
+        let test_env = test_cell_env();
+let arc = test_env.env();
         let env = arc.guard().await;
 
         let (_agent_pubkey, dna_header, dna_entry, agent_header, agent_entry) = fixtures();
 
         {
-            let reader = env.reader()?;
-
-            let mut store = SourceChainBuf::new(&reader, &env)?;
+            let mut store = SourceChainBuf::new(arc.clone().into(), &env).await.unwrap();
             store
                 .put_raw(dna_header.as_content().clone(), dna_entry)
                 .await?;
@@ -470,9 +473,7 @@ pub mod tests {
         }
 
         {
-            let reader = env.reader()?;
-
-            let store = SourceChainBuf::new(&reader, &env)?;
+            let store = SourceChainBuf::new(arc.clone().into(), &env).await.unwrap();
             let json = store.dump_as_json().await?;
             let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
 
@@ -493,10 +494,10 @@ pub mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_header_cas_roundtrip() {
-        let arc = test_cell_env();
+        let test_env = test_cell_env();
+let arc = test_env.env();
         let env = arc.guard().await;
-        let reader = env.reader().unwrap();
-        let mut store = SourceChainBuf::new(&reader, &env).unwrap();
+        let mut store = SourceChainBuf::new(arc.clone().into(), &env).await.unwrap();
 
         let (_, hashed, _, _, _) = fixtures();
         let header = hashed.into_content();

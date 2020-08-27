@@ -27,14 +27,14 @@ pub fn entry_hash(
 pub mod wasm_test {
     use super::*;
     use crate::core::ribosome::host_fn::entry_hash::entry_hash;
-    use crate::core::state::workspace::Workspace;
+
     use crate::fixt::CallContextFixturator;
     use crate::fixt::EntryFixturator;
     use crate::fixt::WasmRibosomeFixturator;
     use crate::fixt::ZomeCallHostAccessFixturator;
     use fixt::prelude::*;
     use holo_hash::EntryHash;
-    use holochain_state::env::ReadManager;
+
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::EntryHashInput;
     use holochain_zome_types::EntryHashOutput;
@@ -57,17 +57,18 @@ pub mod wasm_test {
         let output: EntryHashOutput =
             entry_hash(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
 
-        assert_eq!(output.into_inner().get_raw().to_vec().len(), 36,);
+        assert_eq!(output.into_inner().get_full_bytes().to_vec().len(), 36,);
     }
 
     #[tokio::test(threaded_scheduler)]
     /// we can get an entry hash out of the fn via. a wasm call
     async fn ribosome_entry_hash_test() {
-        let env = holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_state::test_utils::test_cell_env();
+        let env = test_env.env();
         let dbs = env.dbs().await;
-        let env_ref = env.guard().await;
-        let reader = env_ref.reader().unwrap();
-        let mut workspace = crate::core::workflow::CallZomeWorkspace::new(&reader, &dbs).unwrap();
+        let mut workspace = crate::core::workflow::CallZomeWorkspace::new(env.clone().into(), &dbs)
+            .await
+            .unwrap();
 
         let (_g, raw_workspace) =
             crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
@@ -80,17 +81,18 @@ pub mod wasm_test {
         host_access.workspace = raw_workspace;
         let output: EntryHashOutput =
             crate::call_test_ribosome!(host_access, TestWasm::EntryHash, "entry_hash", input);
-        assert_eq!(output.into_inner().get_raw().to_vec().len(), 36,);
+        assert_eq!(output.into_inner().get_full_bytes().to_vec().len(), 36,);
     }
 
     #[tokio::test(threaded_scheduler)]
     /// the hash path underlying anchors wraps entry_hash
     async fn ribosome_hash_path_pwd_test() {
-        let env = holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_state::test_utils::test_cell_env();
+        let env = test_env.env();
         let dbs = env.dbs().await;
-        let env_ref = env.guard().await;
-        let reader = env_ref.reader().unwrap();
-        let mut workspace = crate::core::workflow::CallZomeWorkspace::new(&reader, &dbs).unwrap();
+        let mut workspace = crate::core::workflow::CallZomeWorkspace::new(env.clone().into(), &dbs)
+            .await
+            .unwrap();
 
         let (_g, raw_workspace) =
             crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
