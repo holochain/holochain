@@ -88,30 +88,30 @@ async fn speed_test_timed_ice() {
 }
 
 #[tokio::test(threaded_scheduler)]
-#[cfg(feature = "slow_tests")]
+#[ignore]
 async fn speed_test_normal() {
     observability::test_run().unwrap();
+    speed_test(None).await;
+}
+
+/// Run this test to execute the speed test, but then keep the LMDB env files
+/// around in temp dirs for inspection by e.g. `mdb_stat`
+#[tokio::test(threaded_scheduler)]
+#[ignore]
+async fn speed_test_persisted() {
+    observability::test_run().unwrap();
     let env = speed_test(None).await;
-    let stat = env.guard().await.rkv().stat().expect("Couldn't get stats");
-    // TODO: real assertions
-    dbg!(stat.page_size());
-    assert!(stat.page_size() >= 0);
-    dbg!(stat.depth());
-    assert!(stat.depth() >= 0);
-    dbg!(stat.branch_pages());
-    assert!(stat.branch_pages() >= 0);
-    dbg!(stat.leaf_pages());
-    assert!(stat.leaf_pages() >= 0);
-    dbg!(stat.overflow_pages());
-    assert!(stat.overflow_pages() >= 0);
-    dbg!(stat.entries());
-    assert!(stat.entries() >= 0);
     let tmpdir = env.tmpdir();
     drop(env);
     let tmpdir = std::sync::Arc::try_unwrap(tmpdir).unwrap();
     let path = tmpdir.into_path();
-    println!("$ mdb_stat -afe {}", path.to_string_lossy());
+    println!("Run the following to see info about the test that just ran,");
+    println!("with the correct cell env dir appended to the path:");
+    println!();
+    println!("    $ mdb_stat -afe {}/", path.to_string_lossy());
+    println!();
 }
+
 #[test_case(1)]
 #[test_case(10)]
 #[test_case(100)]
