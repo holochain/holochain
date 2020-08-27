@@ -106,6 +106,11 @@ async fn speed_test_normal() {
     assert!(stat.overflow_pages() >= 0);
     dbg!(stat.entries());
     assert!(stat.entries() >= 0);
+    let tmpdir = env.tmpdir();
+    drop(env);
+    let tmpdir = std::sync::Arc::try_unwrap(tmpdir).unwrap();
+    let path = tmpdir.into_path();
+    println!("$ mdb_stat -afe {}", path.to_string_lossy());
 }
 #[test_case(1)]
 #[test_case(10)]
