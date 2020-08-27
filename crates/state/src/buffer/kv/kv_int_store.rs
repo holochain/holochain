@@ -1,43 +1,35 @@
+use crate::buffer::{iter::SingleIterRaw, kv::KvStoreT};
 use crate::{
-    buffer::{kv::SingleIterRaw, BufKey, BufVal},
     error::{DatabaseError, DatabaseResult},
     prelude::*,
 };
 use fallible_iterator::FallibleIterator;
-use rkv::SingleStore;
+use rkv::IntegerStore;
 
-/// Wrapper around an rkv SingleStore which provides strongly typed values
-// #[derive(Shrinkwrap)]
-pub struct Kv<K, V>
+pub type KvIntStore<V> = KvIntStoreGeneric<IntKey, V>;
+
+/// Wrapper around an rkv IntegerStore which provides strongly typed values
+pub struct KvIntStoreGeneric<K, V>
 where
-    K: BufKey,
+    K: BufIntKey,
     V: BufVal,
 {
-    // #[shrinkwrap(main_field)]
-    db: SingleStore,
-    _phantom: std::marker::PhantomData<(K, V)>,
+    db: IntegerStore<K>,
+    __phantom: std::marker::PhantomData<(K, V)>,
 }
 
-impl<K, V> Kv<K, V>
+impl<K, V> KvStoreT<K, V> for KvIntStoreGeneric<K, V>
 where
-    K: BufKey,
+    K: BufIntKey,
     V: BufVal,
 {
-    /// Create a new IntKvBuf from a read-only transaction and a database reference
-    pub fn new(db: SingleStore) -> DatabaseResult<Self> {
-        Ok(Self {
-            db,
-            _phantom: std::marker::PhantomData,
-        })
-    }
-
     /// Fetch data from DB as raw byte slice
-    pub fn get_bytes<'env, R: Readable>(
+    fn get_bytes<'env, R: Readable>(
         &self,
         reader: &'env R,
         k: &K,
     ) -> DatabaseResult<Option<&'env [u8]>> {
-        match self.db.get(reader, k)? {
+        match self.db.get(reader, *k)? {
             Some(rkv::Value::Blob(buf)) => Ok(Some(buf)),
             None => Ok(None),
             Some(_) => Err(DatabaseError::InvalidValue),
@@ -45,7 +37,7 @@ where
     }
 
     /// Fetch data from DB, deserialize into V type
-    pub fn get<R: Readable>(&self, reader: &R, k: &K) -> DatabaseResult<Option<V>> {
+    fn get<R: Readable>(&self, reader: &R, k: &K) -> DatabaseResult<Option<V>> {
         match self.get_bytes(reader, k)? {
             Some(bytes) => Ok(Some(holochain_serialized_bytes::decode(bytes)?)),
             None => Ok(None),
@@ -53,23 +45,20 @@ where
     }
 
     /// Put V into DB as serialized data
-    pub fn put(&self, writer: &mut Writer, k: &K, v: &V) -> DatabaseResult<()> {
+    fn put(&self, writer: &mut Writer, k: &K, v: &V) -> DatabaseResult<()> {
         let buf = holochain_serialized_bytes::encode(v)?;
         let encoded = rkv::Value::Blob(&buf);
-        self.db.put(writer, k, &encoded)?;
+        self.db.put(writer, *k, &encoded)?;
         Ok(())
     }
 
     /// Delete value from DB
-    pub fn delete(&self, writer: &mut Writer, k: &K) -> DatabaseResult<()> {
-        Ok(self.db.delete(writer, k)?)
+    fn delete(&self, writer: &mut Writer, k: &K) -> DatabaseResult<()> {
+        Ok(self.db.delete(writer, *k)?)
     }
 
     /// Iterate over the underlying persisted data
-    pub fn iter<'env, R: Readable>(
-        &self,
-        reader: &'env R,
-    ) -> DatabaseResult<SingleIterRaw<'env, V>> {
+    fn iter<'env, R: Readable>(&self, reader: &'env R) -> DatabaseResult<SingleIterRaw<'env, V>> {
         Ok(SingleIterRaw::new(
             self.db.iter_start(reader)?,
             self.db.iter_end(reader)?,
@@ -77,7 +66,7 @@ where
     }
 
     /// Iterate from a key onwards
-    pub fn iter_from<'env, R: Readable>(
+    fn iter_from<'env, R: Readable>(
         &self,
         reader: &'env R,
         k: K,
@@ -89,10 +78,35 @@ where
     }
 
     /// Iterate over the underlying persisted data in reverse
-    pub fn iter_reverse<'env, R: Readable>(
+    fn iter_reverse<'env, R: Readable>(
         &self,
         reader: &'env R,
     ) -> DatabaseResult<fallible_iterator::Rev<SingleIterRaw<'env, V>>> {
         Ok(SingleIterRaw::new(self.db.iter_start(reader)?, self.db.iter_end(reader)?).rev())
+    }
+}
+
+impl<K, V> KvIntStoreGeneric<K, V>
+where
+    K: BufIntKey,
+    V: BufVal,
+{
+    /// Create a new KvIntBufFresh
+    pub fn new(db: IntegerStore<K>) -> Self {
+        Self {
+            db,
+            __phantom: std::marker::PhantomData,
+        }
+    }
+
+    /// Accessor for raw Rkv DB
+    pub fn db(&self) -> IntegerStore<K> {
+        self.db
+    }
+
+    // TODO: This should be cfg test but can't because it's in a different crate
+    /// Clear db, useful for tests
+    pub fn delete_all(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
+        Ok(self.db.clear(writer)?)
     }
 }

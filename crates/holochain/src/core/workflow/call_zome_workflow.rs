@@ -45,7 +45,7 @@ pub struct CallZomeWorkflowArgs<Ribosome: RibosomeT> {
 
 #[instrument(skip(workspace, network, keystore, writer, args, trigger_produce_dht_ops))]
 pub async fn call_zome_workflow<'env, Ribosome: RibosomeT>(
-    mut workspace: CallZomeWorkspace<'env>,
+    mut workspace: CallZomeWorkspace,
     network: HolochainP2pCell,
     keystore: KeystoreSender,
     writer: OneshotWriter,
@@ -67,7 +67,7 @@ pub async fn call_zome_workflow<'env, Ribosome: RibosomeT>(
 }
 
 async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT>(
-    workspace: &mut CallZomeWorkspace<'env>,
+    workspace: &mut CallZomeWorkspace,
     network: HolochainP2pCell,
     keystore: KeystoreSender,
     args: CallZomeWorkflowArgs<Ribosome>,
@@ -218,32 +218,19 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT>(
     Ok(result)
 }
 
-pub struct CallZomeWorkspace<'env> {
-    pub source_chain: SourceChain<'env>,
-    pub meta: MetadataBuf<'env>,
-    pub cache_cas: ElementBuf<'env>,
-    pub cache_meta: MetadataBuf<'env>,
+pub struct CallZomeWorkspace {
+    pub source_chain: SourceChain,
+    pub meta: MetadataBuf,
+    pub cache_cas: ElementBuf,
+    pub cache_meta: MetadataBuf,
 }
 
-impl<'env: 'a, 'a> CallZomeWorkspace<'env> {
-    pub fn cascade(&'a mut self, network: HolochainP2pCell) -> Cascade<'env, 'a> {
-        Cascade::new(
-            &self.source_chain.elements(),
-            &self.meta,
-            &mut self.cache_cas,
-            &mut self.cache_meta,
-            network,
-        )
-    }
-}
-
-impl<'env> Workspace<'env> for CallZomeWorkspace<'env> {
-    fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self> {
-        let source_chain = SourceChain::new(reader, dbs)?;
-
-        let cache_cas = ElementBuf::cache(reader, dbs)?;
-        let meta = MetadataBuf::vault(reader, dbs)?;
-        let cache_meta = MetadataBuf::cache(reader, dbs)?;
+impl<'a> CallZomeWorkspace {
+    pub async fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
+        let source_chain = SourceChain::new(env.clone(), dbs).await?;
+        let cache_cas = ElementBuf::cache(env.clone(), dbs)?;
+        let meta = MetadataBuf::vault(env.clone(), dbs)?;
+        let cache_meta = MetadataBuf::cache(env.clone(), dbs)?;
 
         Ok(CallZomeWorkspace {
             source_chain,
@@ -253,6 +240,19 @@ impl<'env> Workspace<'env> for CallZomeWorkspace<'env> {
         })
     }
 
+    pub fn cascade(&'a mut self, network: HolochainP2pCell) -> Cascade<'a> {
+        Cascade::new(
+            self.source_chain.env().clone(),
+            &self.source_chain.elements(),
+            &self.meta,
+            &mut self.cache_cas,
+            &mut self.cache_meta,
+            network,
+        )
+    }
+}
+
+impl Workspace for CallZomeWorkspace {
     fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
         self.source_chain.into_inner().flush_to_txn(writer)?;
         self.meta.flush_to_txn(writer)?;
@@ -287,7 +287,7 @@ pub mod tests {
     }
 
     async fn run_call_zome<'env, Ribosome: RibosomeT + Send + Sync + 'env>(
-        workspace: &mut CallZomeWorkspace<'env>,
+        workspace: &mut CallZomeWorkspace,
         ribosome: Ribosome,
         invocation: ZomeCallInvocation,
     ) -> WorkflowResult<ZomeCallInvocationResult> {
@@ -312,7 +312,9 @@ pub mod tests {
         let dbs = env.dbs().await;
         let env_ref = env.guard().await;
         let reader = env_ref.reader().unwrap();
-        let workspace = CallZomeWorkspace::new(&reader, &dbs).unwrap();
+        let workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
+            .await
+            .unwrap();
         let ribosome = MockRibosomeT::new();
         // FIXME: CAP: Set this function to private
         let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(
@@ -374,8 +376,10 @@ pub mod tests {
         let env = test_cell_env();
         let dbs = env.dbs().await;
         let env_ref = env.guard().await;
-        let reader = env_ref.reader().unwrap();
-        let mut workspace = CallZomeWorkspace::new(&reader, &dbs).unwrap();
+        let _reader = env_ref.reader().unwrap();
+        let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
+            .await
+            .unwrap();
 
         // Genesis
         fake_genesis(&mut workspace.source_chain).await.unwrap();
@@ -427,8 +431,10 @@ pub mod tests {
         let env = test_cell_env();
         let dbs = env.dbs().await;
         let env_ref = env.guard().await;
-        let reader = env_ref.reader().unwrap();
-        let mut workspace = CallZomeWorkspace::new(&reader, &dbs).unwrap();
+        let _reader = env_ref.reader().unwrap();
+        let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
+            .await
+            .unwrap();
         let ribosome = MockRibosomeT::new();
         let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(
             crate::core::ribosome::NamedInvocation(
@@ -459,8 +465,10 @@ pub mod tests {
         let env = test_cell_env();
         let dbs = env.dbs().await;
         let env_ref = env.guard().await;
-        let reader = env_ref.reader().unwrap();
-        let mut workspace = CallZomeWorkspace::new(&reader, &dbs).unwrap();
+        let _reader = env_ref.reader().unwrap();
+        let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
+            .await
+            .unwrap();
         let ribosome = MockRibosomeT::new();
         // TODO: Make this mock return an output
         let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(

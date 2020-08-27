@@ -164,20 +164,20 @@ async fn check_valid_if_dna_test() {
     let header = fixt!(LinkAdd);
     let metadata = meta_mock!();
     assert_matches!(
-        check_valid_if_dna(&header.clone().into(), &metadata),
+        check_valid_if_dna(&header.clone().into(), &metadata).await,
         Ok(())
     );
     let header = fixt!(Dna);
     let metadata = meta_mock!(expect_get_activity);
     assert_matches!(
-        check_valid_if_dna(&header.clone().into(), &metadata),
+        check_valid_if_dna(&header.clone().into(), &metadata).await,
         Ok(())
     );
 
     let header = fixt!(Dna);
     let metadata = meta_mock!(expect_get_activity, activity_return);
     assert_matches!(
-        check_valid_if_dna(&header.clone().into(), &metadata),
+        check_valid_if_dna(&header.clone().into(), &metadata).await,
         Err(SysValidationError::ValidationError(
             ValidationError::PrevHeaderError(PrevHeaderError::InvalidRoot)
         ))
@@ -198,13 +198,14 @@ async fn check_prev_header_in_metadata_test() {
 
     // Previous header on this hash
     assert_matches!(
-        check_prev_header_in_metadata(author.clone(), &prev_header_hash, &metadata),
+        check_prev_header_in_metadata(author.clone(), &prev_header_hash, &metadata).await,
         Ok(())
     );
 
     // No previous header on this hash
     assert_matches!(
-        check_prev_header_in_metadata(author.clone(), &header_fixt.next().unwrap(), &metadata),
+        check_prev_header_in_metadata(author.clone(), &header_fixt.next().unwrap(), &metadata)
+            .await,
         Err(SysValidationError::ValidationError(ValidationError::PrevHeaderError(_)))
     );
 }

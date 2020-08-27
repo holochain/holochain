@@ -17,7 +17,6 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
-use tokio::sync::{RwLock, RwLockReadGuard};
 
 const DEFAULT_INITIAL_MAP_SIZE: usize = 100 * 1024 * 1024; // 100MB
 const MAX_DBS: u32 = 32;
@@ -87,7 +86,10 @@ fn rkv_builder(
 /// This environment can only generate read-only transactions, never read-write.
 #[derive(Clone)]
 pub struct EnvironmentRead {
-    arc: Arc<RwLock<Rkv>>,
+    // FIXME [ B-03180 ]: Use some synchronization strategy so we can get
+    //       mutable access to this
+    // arc: Arc<RwLockSync<Rkv>>,
+    arc: Arc<Rkv>,
     kind: EnvironmentKind,
     path: PathBuf,
     keystore: KeystoreSender,
@@ -100,7 +102,7 @@ impl EnvironmentRead {
     /// explicitly.
     pub async fn guard(&self) -> EnvironmentReadRef<'_> {
         EnvironmentReadRef {
-            rkv: self.arc.read().await,
+            rkv: self.arc.clone(),
             path: &self.path,
             keystore: self.keystore.clone(),
         }
@@ -165,9 +167,10 @@ impl EnvironmentWrite {
             hash_map::Entry::Vacant(e) => e
                 .insert({
                     let rkv = rkv_builder(None, None)(&path)?;
+                    tracing::debug!("Initializing databases for path {:?}", path);
                     initialize_databases(&rkv, &kind)?;
                     EnvironmentWrite(EnvironmentRead {
-                        arc: Arc::new(RwLock::new(rkv)),
+                        arc: Arc::new(rkv),
                         kind,
                         keystore,
                         path,
@@ -220,14 +223,10 @@ impl EnvironmentKind {
 /// This has the distinction of being unable to create a read-write transaction,
 /// because unlike [EnvironmentWriteRef], this does not implement WriteManager
 pub struct EnvironmentReadRef<'e> {
-    rkv: RwLockReadGuard<'e, Rkv>,
+    rkv: Arc<Rkv>,
     path: &'e Path,
     keystore: KeystoreSender,
 }
-
-/// Newtype wrapper for a read-only lock guard on the Environment,
-/// with read-only access to the underlying guard
-pub struct EnvironmentRefReadOnly<'e>(RwLockReadGuard<'e, Rkv>);
 
 /// Implementors are able to create a new read-only LMDB transaction
 pub trait ReadManager<'e> {
@@ -300,7 +299,7 @@ impl<'e> EnvironmentReadRef<'e> {
 impl<'e> EnvironmentWriteRef<'e> {
     /// Access the underlying Rkv lock guard
     #[cfg(test)]
-    pub(crate) fn inner(&'e self) -> &RwLockReadGuard<'e, Rkv> {
+    pub(crate) fn inner(&'e self) -> &Rkv {
         &self.rkv
     }
 

@@ -26,9 +26,10 @@ use fallible_iterator::FallibleIterator;
 use holo_hash::*;
 use holochain_p2p::HolochainP2pCell;
 use holochain_state::{
-    buffer::{BufferedStore, KvBuf},
+    buffer::{BufferedStore, KvBufFresh},
     db::AUTHORED_DHT_OPS,
-    prelude::{GetDb, Reader},
+    fresh_reader,
+    prelude::*,
     transaction::Writer,
 };
 use holochain_types::{dht_op::DhtOp, Timestamp};
@@ -48,16 +49,16 @@ pub const DEFAULT_RECEIPT_BUNDLE_SIZE: u32 = 5;
 pub const MIN_PUBLISH_INTERVAL: time::Duration = time::Duration::from_secs(5);
 
 /// Database buffers required for publishing [DhtOp]s
-pub struct PublishDhtOpsWorkspace<'env> {
+pub struct PublishDhtOpsWorkspace {
     /// Database of authored DhtOps, with data about prior publishing
-    authored_dht_ops: AuthoredDhtOpsStore<'env>,
+    authored_dht_ops: AuthoredDhtOpsStore,
     /// Element store for looking up data to construct ops
-    elements: ElementBuf<'env>,
+    elements: ElementBuf,
 }
 
 #[instrument(skip(workspace, writer, network))]
 pub async fn publish_dht_ops_workflow(
-    mut workspace: PublishDhtOpsWorkspace<'_>,
+    mut workspace: PublishDhtOpsWorkspace,
     writer: OneshotWriter,
     network: &mut HolochainP2pCell,
 ) -> WorkflowResult<WorkComplete> {
@@ -80,7 +81,7 @@ pub async fn publish_dht_ops_workflow(
 
 /// Read the authored for ops with receipt count < R
 pub async fn publish_dht_ops_workflow_inner(
-    workspace: &mut PublishDhtOpsWorkspace<'_>,
+    workspace: &mut PublishDhtOpsWorkspace,
 ) -> WorkflowResult<HashMap<AnyDhtHash, Vec<(DhtOpHash, DhtOp)>>> {
     // TODO: PERF: We need to check all ops every time this runs
     // instead we could have a queue of ops where count < R and a kv for count > R.
@@ -91,9 +92,12 @@ pub async fn publish_dht_ops_workflow_inner(
     let interval =
         chrono::Duration::from_std(MIN_PUBLISH_INTERVAL).expect("const interval must be positive");
 
-    let values = workspace
+    // one of many ways to access the env
+    let env = workspace.elements.headers().env().clone();
+
+    let values = fresh_reader!(env, |r| workspace
         .authored()
-        .iter()?
+        .iter(&r)?
         .filter_map(|(k, mut r)| {
             Ok(if r.receipt_count < DEFAULT_RECEIPT_BUNDLE_SIZE {
                 let needs_publish = r
@@ -113,7 +117,7 @@ pub async fn publish_dht_ops_workflow_inner(
                 None
             })
         })
-        .collect::<Vec<_>>()?;
+        .collect::<Vec<_>>())?;
 
     // Ops to publish by basis
     let mut to_publish = HashMap::new();
@@ -139,29 +143,30 @@ pub async fn publish_dht_ops_workflow_inner(
     Ok(to_publish)
 }
 
-impl<'env> Workspace<'env> for PublishDhtOpsWorkspace<'env> {
-    fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self> {
-        let db = dbs.get_db(&*AUTHORED_DHT_OPS)?;
-        let authored_dht_ops = KvBuf::new(reader, db)?;
-        // Note that this must always be false as we don't want private entries being published
-        let elements = ElementBuf::vault(reader, dbs, false)?;
-        Ok(Self {
-            authored_dht_ops,
-            elements,
-        })
-    }
-
+impl Workspace for PublishDhtOpsWorkspace {
     fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
         self.authored_dht_ops.flush_to_txn(writer)?;
         Ok(())
     }
 }
 
-impl<'env> PublishDhtOpsWorkspace<'env> {
-    fn authored(&mut self) -> &mut AuthoredDhtOpsStore<'env> {
+impl PublishDhtOpsWorkspace {
+    pub fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
+        let db = dbs.get_db(&*AUTHORED_DHT_OPS)?;
+        let authored_dht_ops = KvBufFresh::new(env.clone(), db);
+        // Note that this must always be false as we don't want private entries being published
+        let elements = ElementBuf::vault(env, dbs, false)?;
+        Ok(Self {
+            authored_dht_ops,
+            elements,
+        })
+    }
+
+    fn authored(&mut self) -> &mut AuthoredDhtOpsStore {
         &mut self.authored_dht_ops
     }
-    fn elements(&self) -> &ElementBuf<'env> {
+
+    fn elements(&self) -> &ElementBuf {
         &self.elements
     }
 }
@@ -191,7 +196,7 @@ mod tests {
     };
     use holochain_state::{
         buffer::BufferedStore,
-        env::{EnvironmentWrite, EnvironmentWriteRef, ReadManager, WriteManager},
+        env::{EnvironmentWrite, ReadManager, WriteManager},
         error::DatabaseError,
         test_utils::test_cell_env,
     };
@@ -223,8 +228,7 @@ mod tests {
 
     /// publish ops setup
     async fn setup<'env>(
-        env_ref: &EnvironmentWriteRef<'env>,
-        dbs: &impl GetDb,
+        env: EnvironmentWrite,
         num_agents: u32,
         num_hash: u32,
         panic_on_publish: bool,
@@ -234,6 +238,7 @@ mod tests {
         JoinHandle<()>,
         tokio::sync::oneshot::Receiver<()>,
     ) {
+        let env_ref = env.guard().await;
         // Create data fixts for op
         let mut sig_fixt = SignatureFixturator::new(Unpredictable);
         let mut link_add_fixt = LinkAddFixturator::new(Unpredictable);
@@ -258,8 +263,8 @@ mod tests {
 
         // Create and fill authored ops db in the workspace
         {
-            let reader = env_ref.reader().unwrap();
-            let mut workspace = PublishDhtOpsWorkspace::new(&reader, dbs).unwrap();
+            let _reader = env_ref.reader().unwrap();
+            let mut workspace = PublishDhtOpsWorkspace::new(env.clone().into(), &env_ref).unwrap();
             for (sig, op_hashed, op_light, header_hash) in data {
                 let op_hash = op_hashed.as_hash().clone();
                 let authored_value = AuthoredDhtOpsValue::from_light(op_light);
@@ -329,10 +334,10 @@ mod tests {
     }
 
     /// Call the workflow
-    async fn call_workflow<'env>(env: EnvironmentWrite, mut cell_network: HolochainP2pCell) {
+    async fn call_workflow(env: EnvironmentWrite, mut cell_network: HolochainP2pCell) {
         let env_ref = env.guard().await;
-        let reader = env_ref.reader().unwrap();
-        let workspace = PublishDhtOpsWorkspace::new(&reader, &env_ref).unwrap();
+        let _reader = env_ref.reader().unwrap();
+        let workspace = PublishDhtOpsWorkspace::new(env.clone().into(), &env_ref).unwrap();
         publish_dht_ops_workflow(workspace, env.clone().into(), &mut cell_network)
             .await
             .unwrap();
@@ -354,14 +359,12 @@ mod tests {
 
             // Create test env
             let env = test_cell_env();
-            let dbs = env.dbs().await;
-            let env_ref = env.guard().await;
 
             // Setup
             let (network, cell_network, recv_task, rx_complete) =
-                setup(&env_ref, &dbs, num_agents, num_hash, false).await;
+                setup(env.clone(), num_agents, num_hash, false).await;
 
-            call_workflow(env.env.clone(), cell_network).await;
+            call_workflow(env.env.clone().into(), cell_network).await;
 
             // Wait for expected # of responses, or timeout
             tokio::select! {
@@ -372,10 +375,12 @@ mod tests {
             };
 
             let check = async move {
+                let env_ref = env.guard().await;
                 recv_task.await.unwrap();
                 let reader = env_ref.reader().unwrap();
-                let mut workspace = PublishDhtOpsWorkspace::new(&reader, &dbs).unwrap();
-                for i in workspace.authored().iter().unwrap().iterator() {
+                let mut workspace =
+                    PublishDhtOpsWorkspace::new(env.clone().into(), &env_ref).unwrap();
+                for i in workspace.authored().iter(&reader).unwrap().iterator() {
                     // Check that each item now has a publish time
                     assert!(i.expect("can iterate").1.last_publish_time.is_some())
                 }
@@ -413,17 +418,17 @@ mod tests {
 
             // Setup
             let (network, cell_network, recv_task, _) =
-                setup(&env_ref, &dbs, num_agents, num_hash, true).await;
+                setup(env.clone(), num_agents, num_hash, true).await;
 
             // Update the authored to have > R counts
             {
                 let reader = env_ref.reader().unwrap();
-                let mut workspace = PublishDhtOpsWorkspace::new(&reader, &dbs).unwrap();
+                let mut workspace = PublishDhtOpsWorkspace::new(env.clone().into(), &dbs).unwrap();
 
                 // Update authored to R
                 let values = workspace
                     .authored_dht_ops
-                    .iter()
+                    .iter(&reader)
                     .unwrap()
                     .map(|(k, mut v)| {
                         v.receipt_count = DEFAULT_RECEIPT_BUNDLE_SIZE;
@@ -446,7 +451,7 @@ mod tests {
             }
 
             // Call the workflow
-            call_workflow(env.env.clone(), cell_network).await;
+            call_workflow(env.env.clone().into(), cell_network).await;
 
             // If we can wait a while without receiving any publish, we have succeeded
             tokio::time::delay_for(Duration::from_millis(
@@ -508,9 +513,8 @@ mod tests {
 
                 // Genesis and produce ops to clear these from the chains
                 {
-                    let reader = env_ref.reader().unwrap();
-
-                    let mut source_chain = SourceChain::new(&reader, &dbs).unwrap();
+                    let mut source_chain =
+                        SourceChain::new(env.clone().into(), &dbs).await.unwrap();
                     fake_genesis(&mut source_chain).await.unwrap();
                     env_ref
                         .with_commit::<SourceChainError, _, _>(|writer| {
@@ -520,8 +524,9 @@ mod tests {
                         .unwrap();
                 }
                 {
-                    let reader = env_ref.reader().unwrap();
-                    let workspace = ProduceDhtOpsWorkspace::new(&reader, &dbs).unwrap();
+                    let workspace = ProduceDhtOpsWorkspace::new(env.clone().into(), &dbs)
+                        .await
+                        .unwrap();
                     let (mut qt, _rx) = TriggerSender::new();
                     let complete =
                         produce_dht_ops_workflow(workspace, env.env.clone().into(), &mut qt)
@@ -530,8 +535,9 @@ mod tests {
                     assert_matches!(complete, WorkComplete::Complete);
                 }
                 {
-                    let reader = env_ref.reader().unwrap();
-                    let mut workspace = ProduceDhtOpsWorkspace::new(&reader, &dbs).unwrap();
+                    let mut workspace = ProduceDhtOpsWorkspace::new(env.clone().into(), &dbs)
+                        .await
+                        .unwrap();
                     env_ref
                         .with_commit::<SourceChainError, _, _>(|writer| {
                             workspace.authored_dht_ops.clear_all(writer)?;
@@ -542,9 +548,8 @@ mod tests {
 
                 // Put data in elements
                 let (entry_create_header, entry_update_header) = {
-                    let reader = env_ref.reader().unwrap();
-
-                    let mut source_chain = SourceChain::new(&reader, &dbs).unwrap();
+                    let mut source_chain =
+                        SourceChain::new(env.clone().into(), &dbs).await.unwrap();
                     let original_header_address = source_chain
                         .put(
                             builder::EntryCreate {
@@ -661,8 +666,9 @@ mod tests {
 
                 // Create and fill authored ops db in the workspace
                 {
-                    let reader = env_ref.reader().unwrap();
-                    let workspace = ProduceDhtOpsWorkspace::new(&reader, &dbs).unwrap();
+                    let workspace = ProduceDhtOpsWorkspace::new(env.clone().into(), &dbs)
+                        .await
+                        .unwrap();
                     let (mut qt, _rx) = TriggerSender::new();
                     let complete =
                         produce_dht_ops_workflow(workspace, env.env.clone().into(), &mut qt)
@@ -734,7 +740,7 @@ mod tests {
                     network.join(dna.clone(), agent).await.unwrap();
                 }
 
-                call_workflow(env.env.clone(), cell_network).await;
+                call_workflow(env.env.clone().into(), cell_network).await;
 
                 // Wait for expected # of responses, or timeout
                 tokio::select! {

@@ -35,7 +35,8 @@ incremental = false
 codegen-units = 16
 
 [patch.crates-io]
-
+# holochain_serialized_bytes = { path = "/home/michael/Holo/holochain-serialization/crates/holochain_serialized_bytes" }
+holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization.git", branch = "reading-rainbow" }
 rkv = { git = "https://github.com/holochain/rkv.git", branch = "master" }
 #rkv = { path = "../../rust/rkv" }
 lmdb-rkv = { git = "https://github.com/holochain/lmdb-rs.git" }

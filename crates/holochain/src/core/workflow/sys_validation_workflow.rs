@@ -22,9 +22,10 @@ use holo_hash::DhtOpHash;
 use holochain_keystore::Signature;
 use holochain_p2p::HolochainP2pCell;
 use holochain_state::{
-    buffer::{BufferedStore, KvBuf},
+    buffer::{BufferedStore, KvBufFresh},
     db::INTEGRATION_LIMBO,
-    prelude::{GetDb, Reader, Writer},
+    fresh_reader,
+    prelude::*,
 };
 use holochain_types::{
     dht_op::DhtOp, header::NewEntryHeaderRef, test_utils::which_agent, validate::ValidationStatus,
@@ -46,7 +47,7 @@ mod tests;
 
 #[instrument(skip(workspace, writer, trigger_app_validation, network, conductor_api))]
 pub async fn sys_validation_workflow(
-    mut workspace: SysValidationWorkspace<'_>,
+    mut workspace: SysValidationWorkspace,
     writer: OneshotWriter,
     trigger_app_validation: &mut TriggerSender,
     network: HolochainP2pCell,
@@ -68,14 +69,15 @@ pub async fn sys_validation_workflow(
 }
 
 async fn sys_validation_workflow_inner(
-    workspace: &mut SysValidationWorkspace<'_>,
+    workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
     conductor_api: impl CellConductorApiT,
 ) -> WorkflowResult<WorkComplete> {
+    let env = workspace.validation_limbo.env().clone();
     // Drain all the ops
-    let mut ops: Vec<ValidationLimboValue> = workspace
+    let mut ops: Vec<ValidationLimboValue> = fresh_reader!(env, |r| workspace
         .validation_limbo
-        .drain_iter_filter(|(_, vlv)| {
+        .drain_iter_filter(&r, |(_, vlv)| {
             match vlv.status {
                 // We only want pending or awaiting sys dependency ops
                 ValidationLimboStatus::Pending | ValidationLimboStatus::AwaitingSysDeps(_) => {
@@ -86,7 +88,7 @@ async fn sys_validation_workflow_inner(
                 }
             }
         })?
-        .collect()?;
+        .collect())?;
 
     // Sort the ops
     ops.sort_unstable_by_key(|v| DhtOpOrder::from(&v.op));
@@ -153,7 +155,7 @@ async fn sys_validation_workflow_inner(
 
 async fn to_val_limbo(
     mut vlv: ValidationLimboValue,
-    workspace: &mut SysValidationWorkspace<'_>,
+    workspace: &mut SysValidationWorkspace,
 ) -> WorkflowResult<()> {
     let hash = DhtOpHash::with_data(&vlv.op).await;
     vlv.last_try = Some(Timestamp::now());
@@ -164,7 +166,7 @@ async fn to_val_limbo(
 
 async fn to_int_limbo(
     iv: IntegrationLimboValue,
-    workspace: &mut SysValidationWorkspace<'_>,
+    workspace: &mut SysValidationWorkspace,
 ) -> WorkflowResult<()> {
     let hash = DhtOpHash::with_data(&iv.op).await;
     workspace.integration_limbo.put(hash, iv)?;
@@ -173,7 +175,7 @@ async fn to_int_limbo(
 
 async fn validate_op(
     op: &DhtOp,
-    workspace: &mut SysValidationWorkspace<'_>,
+    workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
     conductor_api: &impl CellConductorApiT,
 ) -> WorkflowResult<Outcome> {
@@ -233,7 +235,7 @@ fn handle_failed(error: ValidationError) -> Outcome {
 
 async fn validate_op_inner(
     op: &DhtOp,
-    workspace: &mut SysValidationWorkspace<'_>,
+    workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
     conductor_api: &impl CellConductorApiT,
 ) -> SysValidationResult<()> {
@@ -315,7 +317,7 @@ async fn all_op_check(signature: &Signature, header: &Header) -> SysValidationRe
 
 async fn register_agent_activity(
     header: &Header,
-    workspace: &SysValidationWorkspace<'_>,
+    workspace: &SysValidationWorkspace,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
     let author = header.author();
@@ -323,7 +325,7 @@ async fn register_agent_activity(
 
     // Checks
     check_prev_header(&header)?;
-    check_valid_if_dna(&header, &workspace.meta_vault)?;
+    check_valid_if_dna(&header, &workspace.meta_vault).await?;
     if let Some(prev_header_hash) = prev_header_hash {
         check_holding_prev_header(
             author.clone(),
@@ -337,7 +339,7 @@ async fn register_agent_activity(
     Ok(())
 }
 
-async fn store_element(header: &Header, cascade: Cascade<'_, '_>) -> SysValidationResult<()> {
+async fn store_element(header: &Header, cascade: Cascade<'_>) -> SysValidationResult<()> {
     // Get data ready to validate
     let prev_header_hash = header.prev_header();
 
@@ -355,7 +357,7 @@ async fn store_entry(
     header: NewEntryHeaderRef<'_>,
     entry: &Entry,
     conductor_api: &impl CellConductorApiT,
-    cascade: Cascade<'_, '_>,
+    cascade: Cascade<'_>,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
     let entry_type = header.entry_type();
@@ -381,7 +383,7 @@ async fn store_entry(
 
 async fn register_updated_by(
     entry_update: &EntryUpdate,
-    workspace: &SysValidationWorkspace<'_>,
+    workspace: &SysValidationWorkspace,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
     let original_header_address = &entry_update.original_header_address;
@@ -392,7 +394,8 @@ async fn register_updated_by(
         original_entry_address,
         original_header_address,
         &workspace.meta_vault,
-    )?;
+    )
+    .await?;
     let original_element =
         check_holding_element(original_header_address, &workspace.element_vault).await?;
     update_check(entry_update, original_element.header())?;
@@ -401,7 +404,7 @@ async fn register_updated_by(
 
 async fn register_deleted(
     element_delete: &ElementDelete,
-    element_vault: &ElementBuf<'_>,
+    element_vault: &ElementBuf,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
     let removed_header_address = &element_delete.removes_address;
@@ -414,7 +417,7 @@ async fn register_deleted(
 
 async fn register_add_link(
     link_add: &LinkAdd,
-    workspace: &mut SysValidationWorkspace<'_>,
+    workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
@@ -430,7 +433,7 @@ async fn register_add_link(
 
 async fn register_remove_link(
     link_remove: &LinkRemove,
-    workspace: &SysValidationWorkspace<'_>,
+    workspace: &SysValidationWorkspace,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
     let link_add_address = &link_remove.link_add_address;
@@ -438,7 +441,7 @@ async fn register_remove_link(
     // Checks
     let link_add = check_holding_header(link_add_address, &workspace.element_vault).await?;
     let (link_add, link_add_hash) = link_add.into_header_and_signature().0.into_inner();
-    check_link_in_metadata(link_add, &link_add_hash, &workspace.meta_vault)?;
+    check_link_in_metadata(link_add, &link_add_hash, &workspace.meta_vault).await?;
     Ok(())
 }
 
@@ -451,18 +454,19 @@ fn update_check(entry_update: &EntryUpdate, original_header: &Header) -> SysVali
     Ok(())
 }
 
-pub struct SysValidationWorkspace<'env> {
-    pub integration_limbo: IntegrationLimboStore<'env>,
-    pub validation_limbo: ValidationLimboStore<'env>,
-    pub element_vault: ElementBuf<'env>,
-    pub meta_vault: MetadataBuf<'env>,
-    pub element_cache: ElementBuf<'env>,
-    pub meta_cache: MetadataBuf<'env>,
+pub struct SysValidationWorkspace {
+    pub integration_limbo: IntegrationLimboStore,
+    pub validation_limbo: ValidationLimboStore,
+    pub element_vault: ElementBuf,
+    pub meta_vault: MetadataBuf,
+    pub element_cache: ElementBuf,
+    pub meta_cache: MetadataBuf,
 }
 
-impl<'env: 'a, 'a> SysValidationWorkspace<'env> {
-    pub fn cascade(&'a mut self, network: HolochainP2pCell) -> Cascade<'env, 'a> {
+impl<'a> SysValidationWorkspace {
+    pub fn cascade(&'a mut self, network: HolochainP2pCell) -> Cascade<'a> {
         Cascade::new(
+            self.validation_limbo.env().clone(),
             &self.element_vault,
             &self.meta_vault,
             &mut self.element_cache,
@@ -472,17 +476,17 @@ impl<'env: 'a, 'a> SysValidationWorkspace<'env> {
     }
 }
 
-impl<'env> Workspace<'env> for SysValidationWorkspace<'env> {
-    fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self> {
+impl SysValidationWorkspace {
+    pub fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
         let db = dbs.get_db(&*INTEGRATION_LIMBO)?;
-        let integration_limbo = KvBuf::new(reader, db)?;
+        let integration_limbo = KvBufFresh::new(env.clone(), db);
 
-        let validation_limbo = ValidationLimboStore::new(reader, dbs)?;
+        let validation_limbo = ValidationLimboStore::new(env.clone(), dbs)?;
 
-        let element_vault = ElementBuf::vault(reader, dbs, false)?;
-        let meta_vault = MetadataBuf::vault(reader, dbs)?;
-        let element_cache = ElementBuf::cache(reader, dbs)?;
-        let meta_cache = MetadataBuf::cache(reader, dbs)?;
+        let element_vault = ElementBuf::vault(env.clone(), dbs, false)?;
+        let meta_vault = MetadataBuf::vault(env.clone(), dbs)?;
+        let element_cache = ElementBuf::cache(env.clone(), dbs)?;
+        let meta_cache = MetadataBuf::cache(env, dbs)?;
 
         Ok(Self {
             integration_limbo,
@@ -493,6 +497,9 @@ impl<'env> Workspace<'env> for SysValidationWorkspace<'env> {
             meta_cache,
         })
     }
+}
+
+impl Workspace for SysValidationWorkspace {
     fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
         self.validation_limbo.0.flush_to_txn(writer)?;
         self.integration_limbo.flush_to_txn(writer)?;

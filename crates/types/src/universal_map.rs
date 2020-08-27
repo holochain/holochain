@@ -15,7 +15,7 @@ use std::{any::Any, collections::HashMap, hash::Hash, marker::PhantomData};
 pub struct Key<K: Send + Sync, V>(K, PhantomData<V>);
 
 /// The actual UniversalMap struct. See module-level documentation.
-#[derive(Shrinkwrap)]
+#[derive(Shrinkwrap, Debug)]
 pub struct UniversalMap<K: Send + Sync>(HashMap<K, Box<dyn Any + Send + Sync>>);
 
 impl<K: Send + Sync, V> Key<K, V> {

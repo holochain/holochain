@@ -42,9 +42,7 @@ pub struct UnsafeCallZomeWorkspaceGuard<'env> {
 }
 
 impl UnsafeCallZomeWorkspace {
-    pub fn from_mut<'env>(
-        workspace: &'env mut CallZomeWorkspace,
-    ) -> (UnsafeCallZomeWorkspaceGuard<'env>, Self) {
+    pub fn from_mut(workspace: &mut CallZomeWorkspace) -> (UnsafeCallZomeWorkspaceGuard<'_>, Self) {
         let raw_ptr = workspace as *mut CallZomeWorkspace as *mut std::ffi::c_void;
         let guard = Arc::new(tokio::sync::RwLock::new(AtomicPtr::new(raw_ptr)));
         let workspace = Arc::downgrade(&guard);

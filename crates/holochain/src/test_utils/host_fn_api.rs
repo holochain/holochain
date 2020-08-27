@@ -14,7 +14,7 @@ use holochain_p2p::{
 };
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::{
-    env::{EnvironmentWrite, EnvironmentWriteRef, ReadManager},
+    env::{EnvironmentRead, EnvironmentWrite},
     prelude::{GetDb, WriteManager},
 };
 use holochain_types::{cell::CellId, dna::DnaFile, element::Element, Entry};
@@ -76,7 +76,7 @@ impl CallData {
 }
 
 pub async fn commit_entry<'env, E: Into<entry_def::EntryDefId>>(
-    env_ref: &'env EnvironmentWriteRef<'env>,
+    env: &EnvironmentWrite,
     dbs: &impl GetDb,
     call_data: CallData,
     entry: Entry,
@@ -88,8 +88,10 @@ pub async fn commit_entry<'env, E: Into<entry_def::EntryDefId>>(
         ribosome,
         zome_name,
     } = call_data;
-    let reader = env_ref.reader().unwrap();
-    let mut workspace = CallZomeWorkspace::new(&reader, dbs).unwrap();
+
+    let mut workspace = CallZomeWorkspace::new(env.clone().into(), dbs)
+        .await
+        .unwrap();
 
     let input = CommitEntryInput::new((entry_def_id.into(), entry));
 
@@ -103,7 +105,8 @@ pub async fn commit_entry<'env, E: Into<entry_def::EntryDefId>>(
     };
 
     // Write
-    env_ref
+    env.guard()
+        .await
         .with_commit(|writer| workspace.flush_to_txn(writer))
         .unwrap();
 
@@ -111,7 +114,7 @@ pub async fn commit_entry<'env, E: Into<entry_def::EntryDefId>>(
 }
 
 pub async fn delete_entry<'env>(
-    env_ref: &'env EnvironmentWriteRef<'env>,
+    env: &EnvironmentWrite,
     dbs: &impl GetDb,
     call_data: CallData,
     hash: HeaderHash,
@@ -122,8 +125,10 @@ pub async fn delete_entry<'env>(
         ribosome,
         zome_name,
     } = call_data;
-    let reader = env_ref.reader().unwrap();
-    let mut workspace = CallZomeWorkspace::new(&reader, dbs).unwrap();
+
+    let mut workspace = CallZomeWorkspace::new(env.clone().into(), dbs)
+        .await
+        .unwrap();
 
     let input = DeleteEntryInput::new(hash);
 
@@ -142,7 +147,8 @@ pub async fn delete_entry<'env>(
     };
 
     // Write
-    env_ref
+    env.guard()
+        .await
         .with_commit(|writer| workspace.flush_to_txn(writer))
         .unwrap();
 
@@ -150,7 +156,7 @@ pub async fn delete_entry<'env>(
 }
 
 pub async fn update_entry<'env, E: Into<entry_def::EntryDefId>>(
-    env_ref: &'env EnvironmentWriteRef<'env>,
+    env: &EnvironmentWrite,
     dbs: &impl GetDb,
     call_data: CallData,
     entry: Entry,
@@ -163,8 +169,10 @@ pub async fn update_entry<'env, E: Into<entry_def::EntryDefId>>(
         ribosome,
         zome_name,
     } = call_data;
-    let reader = env_ref.reader().unwrap();
-    let mut workspace = CallZomeWorkspace::new(&reader, dbs).unwrap();
+
+    let mut workspace = CallZomeWorkspace::new(env.clone().into(), dbs)
+        .await
+        .unwrap();
 
     let input = UpdateEntryInput::new((entry_def_id.into(), entry, original_header_hash));
 
@@ -178,15 +186,16 @@ pub async fn update_entry<'env, E: Into<entry_def::EntryDefId>>(
     };
 
     // Write
-    env_ref
+    env.guard()
+        .await
         .with_commit(|writer| workspace.flush_to_txn(writer))
         .unwrap();
 
     output.into_inner()
 }
 
-pub async fn get<'env>(
-    env_ref: &'env EnvironmentWriteRef<'env>,
+pub async fn get(
+    env: &EnvironmentRead,
     dbs: &impl GetDb,
     call_data: CallData,
     entry_hash: AnyDhtHash,
@@ -198,8 +207,9 @@ pub async fn get<'env>(
         ribosome,
         zome_name,
     } = call_data;
-    let reader = env_ref.reader().unwrap();
-    let mut workspace = CallZomeWorkspace::new(&reader, dbs).unwrap();
+    let mut workspace = CallZomeWorkspace::new(env.clone().into(), dbs)
+        .await
+        .unwrap();
 
     let input = GetInput::new((
         entry_hash.clone().into(),
@@ -218,7 +228,7 @@ pub async fn get<'env>(
 }
 
 pub async fn get_details<'env>(
-    env_ref: &'env EnvironmentWriteRef<'env>,
+    env: &EnvironmentWrite,
     dbs: &impl GetDb,
     call_data: CallData,
     entry_hash: AnyDhtHash,
@@ -230,8 +240,10 @@ pub async fn get_details<'env>(
         ribosome,
         zome_name,
     } = call_data;
-    let reader = env_ref.reader().unwrap();
-    let mut workspace = CallZomeWorkspace::new(&reader, dbs).unwrap();
+
+    let mut workspace = CallZomeWorkspace::new(env.clone().into(), dbs)
+        .await
+        .unwrap();
 
     let input = GetDetailsInput::new((
         entry_hash.clone().into(),
@@ -250,7 +262,7 @@ pub async fn get_details<'env>(
 }
 
 pub async fn link_entries<'env>(
-    env_ref: &'env EnvironmentWriteRef<'env>,
+    env: &EnvironmentWrite,
     dbs: &impl GetDb,
     call_data: CallData,
     base: EntryHash,
@@ -263,8 +275,10 @@ pub async fn link_entries<'env>(
         ribosome,
         zome_name,
     } = call_data;
-    let reader = env_ref.reader().unwrap();
-    let mut workspace = CallZomeWorkspace::new(&reader, dbs).unwrap();
+
+    let mut workspace = CallZomeWorkspace::new(env.clone().into(), dbs)
+        .await
+        .unwrap();
 
     let input = LinkEntriesInput::new((base.clone(), target.clone(), link_tag));
 
@@ -278,7 +292,8 @@ pub async fn link_entries<'env>(
     };
 
     // Write
-    env_ref
+    env.guard()
+        .await
         .with_commit(|writer| workspace.flush_to_txn(writer))
         .unwrap();
 
@@ -286,7 +301,7 @@ pub async fn link_entries<'env>(
 }
 
 pub async fn remove_link<'env>(
-    env_ref: &'env EnvironmentWriteRef<'env>,
+    env: &EnvironmentWrite,
     dbs: &impl GetDb,
     call_data: CallData,
     link_add_hash: HeaderHash,
@@ -297,8 +312,10 @@ pub async fn remove_link<'env>(
         ribosome,
         zome_name,
     } = call_data;
-    let reader = env_ref.reader().unwrap();
-    let mut workspace = CallZomeWorkspace::new(&reader, dbs).unwrap();
+
+    let mut workspace = CallZomeWorkspace::new(env.clone().into(), dbs)
+        .await
+        .unwrap();
 
     let input = RemoveLinkInput::new(link_add_hash);
 
@@ -312,7 +329,8 @@ pub async fn remove_link<'env>(
     };
 
     // Write
-    env_ref
+    env.guard()
+        .await
         .with_commit(|writer| workspace.flush_to_txn(writer))
         .unwrap();
 
@@ -320,7 +338,7 @@ pub async fn remove_link<'env>(
 }
 
 pub async fn get_links<'env>(
-    env_ref: &'env EnvironmentWriteRef<'env>,
+    env: &EnvironmentWrite,
     dbs: &impl GetDb,
     call_data: CallData,
     base: EntryHash,
@@ -333,8 +351,10 @@ pub async fn get_links<'env>(
         ribosome,
         zome_name,
     } = call_data;
-    let reader = env_ref.reader().unwrap();
-    let mut workspace = CallZomeWorkspace::new(&reader, dbs).unwrap();
+
+    let mut workspace = CallZomeWorkspace::new(env.clone().into(), dbs)
+        .await
+        .unwrap();
 
     let input = GetLinksInput::new((base.clone(), link_tag));
 
@@ -348,7 +368,8 @@ pub async fn get_links<'env>(
     };
 
     // Write
-    env_ref
+    env.guard()
+        .await
         .with_commit(|writer| workspace.flush_to_txn(writer))
         .unwrap();
 
@@ -356,15 +377,16 @@ pub async fn get_links<'env>(
 }
 
 pub async fn get_link_details<'env>(
-    env_ref: &'env EnvironmentWriteRef<'env>,
+    env: &EnvironmentWrite,
     dbs: &impl GetDb,
     call_data: CallData,
     base: EntryHash,
     tag: LinkTag,
     options: GetLinksOptions,
 ) -> Vec<(LinkAdd, Vec<LinkRemove>)> {
-    let reader = env_ref.reader().unwrap();
-    let mut workspace = CallZomeWorkspace::new(&reader, dbs).unwrap();
+    let mut workspace = CallZomeWorkspace::new(env.clone().into(), dbs)
+        .await
+        .unwrap();
 
     let mut cascade = workspace.cascade(call_data.network);
     let key = LinkMetaKey::BaseZomeTag(&base, 0.into(), &tag);

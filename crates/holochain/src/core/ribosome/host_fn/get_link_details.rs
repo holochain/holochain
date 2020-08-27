@@ -58,7 +58,7 @@ pub fn get_link_details<'a>(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod slow_tests {
-    use crate::core::state::workspace::Workspace;
+
     use crate::fixt::ZomeCallHostAccessFixturator;
     use fixt::prelude::*;
     use holo_hash::HasHash;
@@ -73,8 +73,10 @@ pub mod slow_tests {
         let dbs = env.dbs().await;
         let env_ref = env.guard().await;
 
-        let reader = env_ref.reader().unwrap();
-        let mut workspace = crate::core::workflow::CallZomeWorkspace::new(&reader, &dbs).unwrap();
+        let _reader = env_ref.reader().unwrap();
+        let mut workspace = crate::core::workflow::CallZomeWorkspace::new(env.clone().into(), &dbs)
+            .await
+            .unwrap();
 
         // commits fail validation if we don't do genesis
         crate::core::workflow::fake_genesis(&mut workspace.source_chain)

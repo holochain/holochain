@@ -50,6 +50,13 @@ macro_rules! primitive_hash_type {
             }
         }
 
+        // FIXME: REMOVE [ B-02112 ]
+        impl Default for $name {
+            fn default() -> Self {
+                Self
+            }
+        }
+
         impl serde::Serialize for $name {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
             where

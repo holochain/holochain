@@ -19,7 +19,7 @@ mod tests;
 /// Convert a DhtOpLight into a DhtOp (render all the hashes to values)
 /// This only checks the ElementVault so can only be used with ops that you are
 /// an authority or author of.
-pub async fn light_to_op(op: DhtOpLight, cas: &ElementBuf<'_>) -> DhtOpConvertResult<DhtOp> {
+pub async fn light_to_op(op: DhtOpLight, cas: &ElementBuf) -> DhtOpConvertResult<DhtOp> {
     let op_name = format!("{:?}", op);
     match op {
         DhtOpLight::StoreElement(h, _, _) => {
@@ -136,7 +136,7 @@ pub async fn light_to_op(op: DhtOpLight, cas: &ElementBuf<'_>) -> DhtOpConvertRe
 async fn get_element_delete(
     header_hash: HeaderHash,
     op_name: String,
-    cas: &ElementBuf<'_>,
+    cas: &ElementBuf,
 ) -> DhtOpConvertResult<(header::ElementDelete, Signature)> {
     let (header, sig) = cas
         .get_element(&header_hash)
@@ -157,7 +157,7 @@ async fn get_element_delete(
 #[instrument(skip(cas))]
 async fn get_entry_hash_for_header(
     header_hash: &HeaderHash,
-    cas: &ElementBuf<'_>,
+    cas: &ElementBuf,
 ) -> DhtOpConvertResult<EntryHash> {
     debug!(%header_hash);
     let entry = cas

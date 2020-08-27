@@ -9,6 +9,7 @@ use crate::conductor::{
 };
 use fallible_iterator::FallibleIterator;
 use holochain_keystore::{AgentPubKeyExt, Signature};
+use holochain_state::fresh_reader;
 use holochain_types::{header::NewEntryHeaderRef, Entry, EntryHashed};
 use holochain_zome_types::{
     element::SignedHeaderHashed,
@@ -165,17 +166,19 @@ pub async fn author_key_is_valid(_author: &AgentPubKey) -> SysValidationResult<(
 }
 
 /// Check the prev header is in the metadata
-pub fn check_prev_header_in_metadata(
+pub async fn check_prev_header_in_metadata(
     author: AgentPubKey,
     prev_header_hash: &HeaderHash,
     meta_vault: &impl MetadataBufT,
 ) -> SysValidationResult<()> {
-    meta_vault
-        .get_activity(author)?
-        .find(|activity| Ok(prev_header_hash == &activity.header_hash))?
-        .ok_or_else(|| PrevHeaderError::MissingMeta(prev_header_hash.clone()))
-        .map_err(ValidationError::from)?;
-    Ok(())
+    fresh_reader!(meta_vault.env(), |r| {
+        meta_vault
+            .get_activity(&r, author)?
+            .find(|activity| Ok(prev_header_hash == &activity.header_hash))?
+            .ok_or_else(|| PrevHeaderError::MissingMeta(prev_header_hash.clone()))
+            .map_err(ValidationError::from)?;
+        Ok(())
+    })
 }
 
 /// Check that previous header makes sense
@@ -200,19 +203,21 @@ pub fn check_prev_header(header: &Header) -> SysValidationResult<()> {
 }
 
 /// Check that Dna headers are only added to empty source chains
-pub fn check_valid_if_dna(
+pub async fn check_valid_if_dna(
     header: &Header,
     meta_vault: &impl MetadataBufT,
 ) -> SysValidationResult<()> {
-    match header {
-        Header::Dna(_) => meta_vault
-            .get_activity(header.author().clone())?
-            .next()?
-            .map_or(Ok(()), |_| {
-                Err(PrevHeaderError::InvalidRoot).map_err(|e| ValidationError::from(e).into())
-            }),
-        _ => Ok(()),
-    }
+    fresh_reader!(meta_vault.env(), |r| {
+        match header {
+            Header::Dna(_) => meta_vault
+                .get_activity(&r, header.author().clone())?
+                .next()?
+                .map_or(Ok(()), |_| {
+                    Err(PrevHeaderError::InvalidRoot).map_err(|e| ValidationError::from(e).into())
+                }),
+            _ => Ok(()),
+        }
+    })
 }
 
 /// Check if there are other headers at this
@@ -220,7 +225,7 @@ pub fn check_valid_if_dna(
 pub async fn check_chain_rollback(
     _header: &Header,
     _meta_vault: &impl MetadataBufT,
-    _element_vault: &ElementBuf<'_>,
+    _element_vault: &ElementBuf,
 ) -> SysValidationResult<()> {
     // Will need to pull out all headers to check this.
     // TODO: Do we need some way of storing headers by
@@ -397,9 +402,9 @@ pub async fn check_holding_prev_header(
     author: AgentPubKey,
     prev_header_hash: &HeaderHash,
     meta_vault: &impl MetadataBufT,
-    element_vault: &ElementBuf<'_>,
+    element_vault: &ElementBuf,
 ) -> SysValidationResult<()> {
-    check_prev_header_in_metadata(author, prev_header_hash, meta_vault)?;
+    check_prev_header_in_metadata(author, prev_header_hash, meta_vault).await?;
     check_holding_header(&prev_header_hash, &element_vault).await?;
     Ok(())
 }
@@ -407,7 +412,7 @@ pub async fn check_holding_prev_header(
 /// Check we are actually holding an entry
 pub async fn check_holding_entry(
     hash: &EntryHash,
-    element_vault: &ElementBuf<'_>,
+    element_vault: &ElementBuf,
 ) -> SysValidationResult<EntryHashed> {
     element_vault
         .get_entry(&hash)
@@ -418,7 +423,7 @@ pub async fn check_holding_entry(
 /// Check we are actually holding an header
 pub async fn check_holding_header(
     hash: &HeaderHash,
-    element_vault: &ElementBuf<'_>,
+    element_vault: &ElementBuf,
 ) -> SysValidationResult<SignedHeaderHashed> {
     element_vault
         .get_header(&hash)
@@ -429,7 +434,7 @@ pub async fn check_holding_header(
 /// Check we are actually holding an element and the entry
 pub async fn check_holding_element(
     hash: &HeaderHash,
-    element_vault: &ElementBuf<'_>,
+    element_vault: &ElementBuf,
 ) -> SysValidationResult<Element> {
     let el = element_vault
         .get_element(&hash)
@@ -444,7 +449,7 @@ pub async fn check_holding_element(
 /// Check that the entry exists on the dht
 pub async fn check_entry_exists(
     entry_hash: EntryHash,
-    mut cascade: Cascade<'_, '_>,
+    mut cascade: Cascade<'_>,
 ) -> SysValidationResult<EntryHashed> {
     cascade
         .exists_entry(entry_hash.clone(), Default::default())
@@ -455,7 +460,7 @@ pub async fn check_entry_exists(
 /// Check that the header exists on the dht
 pub async fn check_header_exists(
     hash: HeaderHash,
-    mut cascade: Cascade<'_, '_>,
+    mut cascade: Cascade<'_>,
 ) -> SysValidationResult<SignedHeaderHashed> {
     cascade
         .exists_header(hash.clone(), Default::default())
@@ -466,7 +471,7 @@ pub async fn check_header_exists(
 /// Check that the element exists on the dht
 pub async fn check_element_exists(
     hash: HeaderHash,
-    mut cascade: Cascade<'_, '_>,
+    mut cascade: Cascade<'_>,
 ) -> SysValidationResult<Element> {
     cascade
         .exists(hash.clone().into(), Default::default())
@@ -476,21 +481,23 @@ pub async fn check_element_exists(
 
 /// Check we are holding the header in the metadata
 /// as a reference from the entry
-pub fn check_header_in_metadata(
+pub async fn check_header_in_metadata(
     entry_hash: EntryHash,
     header_hash: &HeaderHash,
     meta_vault: &impl MetadataBufT,
 ) -> SysValidationResult<()> {
-    meta_vault
-        .get_headers(entry_hash)?
-        .find(|h| Ok(h.header_hash == *header_hash))?
-        .ok_or_else(|| ValidationError::NotHoldingDep(header_hash.clone().into()))?;
-    Ok(())
+    fresh_reader!(meta_vault.env(), |r| {
+        meta_vault
+            .get_headers(&r, entry_hash)?
+            .find(|h| Ok(h.header_hash == *header_hash))?
+            .ok_or_else(|| ValidationError::NotHoldingDep(header_hash.clone().into()))?;
+        Ok(())
+    })
 }
 
 /// Check we are holding the add link in the metadata
 /// as a reference from the base entry
-pub fn check_link_in_metadata(
+pub async fn check_link_in_metadata(
     link_add: Header,
     link_add_hash: &HeaderHash,
     meta_vault: &impl MetadataBufT,
@@ -503,10 +510,16 @@ pub fn check_link_in_metadata(
     // Full key always returns just one link
     let link_key = LinkMetaKey::from((&link_add, link_add_hash));
 
+    fresh_reader!(meta_vault.env(), |r| {
+        meta_vault
+            .get_links_all(&r, &link_key)?
+            .next()?
+            .ok_or_else(|| {
+                SysValidationError::from(ValidationError::NotHoldingDep(
+                    link_add_hash.clone().into(),
+                ))
+            })
+    })?;
     // If the link is there we no the link add is in the metadata
-    meta_vault
-        .get_links_all(&link_key)?
-        .next()?
-        .ok_or_else(|| ValidationError::NotHoldingDep(link_add_hash.clone().into()))?;
     Ok(())
 }

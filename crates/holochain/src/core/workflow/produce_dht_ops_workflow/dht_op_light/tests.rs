@@ -244,7 +244,6 @@ async fn test_all_ops() {
 #[tokio::test(threaded_scheduler)]
 async fn test_dht_basis() {
     let env = test_cell_env();
-    let dbs = env.dbs().await;
     let env_ref = env.guard().await;
 
     {
@@ -262,8 +261,8 @@ async fn test_dht_basis() {
         let entry_hashed = EntryHashed::with_pre_hashed(new_entry.clone(), fixt!(EntryHash));
 
         // Setup a cascade
-        let reader = env_ref.reader().unwrap();
-        let mut cas = ElementBuf::vault(&reader, &dbs, true).unwrap();
+        let _reader = env_ref.reader().unwrap();
+        let mut cas = ElementBuf::vault(env.clone().into(), &env_ref, true).unwrap();
 
         // Put the header into the db
         cas.put(signed_header, Some(entry_hashed)).unwrap();

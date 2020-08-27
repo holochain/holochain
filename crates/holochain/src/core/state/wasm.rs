@@ -1,18 +1,19 @@
 use holo_hash::WasmHash;
-use holochain_state::buffer::{BufferedStore, CasBuf};
 use holochain_state::error::{DatabaseError, DatabaseResult};
 use holochain_state::exports::SingleStore;
-use holochain_state::transaction::{Reader, Writer};
+use holochain_state::{
+    buffer::CasBufFresh,
+    prelude::{BufferedStore, EnvironmentRead},
+    transaction::Writer,
+};
 use holochain_types::dna::wasm::{DnaWasm, DnaWasmHashed};
 
-pub type WasmCas<'env> = CasBuf<'env, DnaWasm>;
-
 /// This is where wasm lives
-pub struct WasmBuf<'env>(WasmCas<'env>);
+pub struct WasmBuf(CasBufFresh<DnaWasm>);
 
-impl<'env> WasmBuf<'env> {
-    pub fn new(reader: &'env Reader<'env>, wasm_store: SingleStore) -> DatabaseResult<Self> {
-        Ok(Self(CasBuf::new(reader, wasm_store)?))
+impl WasmBuf {
+    pub fn new(env: EnvironmentRead, wasm_store: SingleStore) -> DatabaseResult<Self> {
+        Ok(Self(CasBufFresh::new(env, wasm_store)))
     }
 
     pub async fn get(&self, wasm_hash: &WasmHash) -> DatabaseResult<Option<DnaWasmHashed>> {
@@ -24,10 +25,10 @@ impl<'env> WasmBuf<'env> {
     }
 }
 
-impl<'env> BufferedStore<'env> for WasmBuf<'env> {
+impl BufferedStore for WasmBuf {
     type Error = DatabaseError;
 
-    fn flush_to_txn(self, writer: &'env mut Writer) -> DatabaseResult<()> {
+    fn flush_to_txn(self, writer: &mut Writer) -> DatabaseResult<()> {
         self.0.flush_to_txn(writer)?;
         Ok(())
     }
@@ -49,9 +50,12 @@ mod tests {
         let env = holochain_state::test_utils::test_wasm_env();
         let dbs = env.dbs().await;
         let env_ref = env.guard().await;
-        let reader = env_ref.reader()?;
-        let mut wasm_buf =
-            WasmBuf::new(&reader, dbs.get_db(&*holochain_state::db::WASM).unwrap()).unwrap();
+        let _reader = env_ref.reader()?;
+        let mut wasm_buf = WasmBuf::new(
+            env.clone().into(),
+            dbs.get_db(&*holochain_state::db::WASM).unwrap(),
+        )
+        .unwrap();
 
         // a wasm
         let wasm =

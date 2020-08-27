@@ -58,6 +58,7 @@ use holochain_p2p::{
     actor::{GetLinksOptions, GetMetaOptions, GetOptions},
     HolochainP2pCell,
 };
+use holochain_state::{fresh_reader, fresh_reader_async, prelude::*};
 use holochain_types::{
     dht_op::{produce_op_lights_from_element_group, produce_op_lights_from_elements},
     element::{
@@ -92,17 +93,18 @@ mod test;
 
 pub mod error;
 
-pub struct Cascade<'env: 'a, 'a, M = MetadataBuf<'env>, C = MetadataBuf<'env>>
+pub struct Cascade<'a, M = MetadataBuf, C = MetadataBuf>
 where
     M: MetadataBufT,
     C: MetadataBufT,
 {
-    element_vault: &'a ElementBuf<'env>,
+    element_vault: &'a ElementBuf,
     meta_vault: &'a M,
 
-    element_cache: &'a mut ElementBuf<'env>,
+    element_cache: &'a mut ElementBuf,
     meta_cache: &'a mut C,
 
+    env: EnvironmentRead,
     network: HolochainP2pCell,
 }
 
@@ -123,20 +125,22 @@ enum Search {
 
 /// Should these functions be sync or async?
 /// Depends on how much computation, and if writes are involved
-impl<'env: 'a, 'a, M, C> Cascade<'env, 'a, M, C>
+impl<'a, M, C> Cascade<'a, M, C>
 where
     C: MetadataBufT,
     M: MetadataBufT,
 {
     /// Constructs a [Cascade], taking references to all necessary databases
     pub fn new(
-        element_vault: &'a ElementBuf<'env>,
+        env: EnvironmentRead,
+        element_vault: &'a ElementBuf,
         meta_vault: &'a M,
-        element_cache: &'a mut ElementBuf<'env>,
+        element_cache: &'a mut ElementBuf,
         meta_cache: &'a mut C,
         network: HolochainP2pCell,
     ) -> Self {
         Cascade {
+            env,
             element_vault,
             meta_vault,
             element_cache,
@@ -258,7 +262,7 @@ where
         let all_metadata = self.network.get_meta(basis.clone(), options).await?;
 
         // Only put raw meta data in element_cache and combine all results
-        for metadata in all_metadata.iter().cloned() {
+        for metadata in <[_]>::iter(&all_metadata[..]).cloned() {
             let basis = basis.clone();
             // Put in meta element_cache
             let values = metadata
@@ -271,7 +275,8 @@ where
                 hash_type::AnyDht::Entry => {
                     for v in values {
                         self.meta_cache
-                            .register_raw_on_entry(basis.clone().into(), v)?;
+                            .register_raw_on_entry(basis.clone().into(), v)
+                            .await?;
                     }
                 }
                 hash_type::AnyDht::Header => {
@@ -329,10 +334,12 @@ where
         // Check we have a valid reason to return this element
         match r {
             Some(el)
-                if self.valid_element(
-                    el.header_address(),
-                    el.header().entry_data().map(|(h, _)| h),
-                )? =>
+                if self
+                    .valid_element(
+                        el.header_address(),
+                        el.header().entry_data().map(|(h, _)| h),
+                    )
+                    .await? =>
             {
                 Ok(Some(el))
             }
@@ -347,12 +354,14 @@ where
     ) -> CascadeResult<Option<Element>> {
         // Get all the headers we know about.
         let mut headers: BTreeSet<TimedHeaderHash> =
-            self.meta_cache.get_headers(hash.clone())?.collect()?;
-        headers.extend(
-            self.meta_vault
-                .get_headers(hash.clone())?
-                .collect::<Vec<_>>()?,
-        );
+            fresh_reader!(self.meta_cache.env(), |r| self
+                .meta_cache
+                .get_headers(&r, hash.clone())?
+                .collect())?;
+        headers.extend(fresh_reader!(self.meta_cache.env(), |r| self
+            .meta_vault
+            .get_headers(&r, hash.clone())?
+            .collect::<Vec<_>>())?);
 
         // We might not actually be holding some of these
         // so we need to search until we find one.
@@ -375,7 +384,7 @@ where
         };
         // Check we have a valid reason to return this element
         match r {
-            Some(e) if self.valid_entry(e.as_hash())? => Ok(Some(e)),
+            Some(e) if self.valid_entry(e.as_hash()).await? => Ok(Some(e)),
             _ => Ok(None),
         }
     }
@@ -398,10 +407,9 @@ where
         // Check we have a valid reason to return this element
         match r {
             Some(h)
-                if self.valid_element(
-                    h.header_address(),
-                    h.header().entry_data().map(|(h, _)| h),
-                )? =>
+                if self
+                    .valid_element(h.header_address(), h.header().entry_data().map(|(h, _)| h))
+                    .await? =>
             {
                 Ok(Some(h))
             }
@@ -431,23 +439,23 @@ where
 
     async fn create_entry_details(&self, hash: EntryHash) -> CascadeResult<Option<EntryDetails>> {
         match self.get_entry_local_raw(&hash).await? {
-            Some(entry) => {
-                let entry_dht_status = self.meta_cache.get_dht_status(&hash)?;
+            Some(entry) => fresh_reader_async!(self.env, |r| async move {
+                let entry_dht_status = self.meta_cache.get_dht_status(&r, &hash)?;
                 let headers = self
                     .meta_cache
-                    .get_headers(hash.clone())?
+                    .get_headers(&r, hash.clone())?
                     .collect::<Vec<_>>()?;
                 let headers = self.render_headers(headers, |h| Ok(h)).await?;
                 let deletes = self
                     .meta_cache
-                    .get_deletes_on_entry(hash.clone())?
+                    .get_deletes_on_entry(&r, hash.clone())?
                     .collect::<Vec<_>>()?;
                 let deletes = self
                     .render_headers(deletes, |h| Ok(ElementDelete::try_from(h)?))
                     .await?;
                 let updates = self
                     .meta_cache
-                    .get_updates(hash.into())?
+                    .get_updates(&r, hash.into())?
                     .collect::<Vec<_>>()?;
                 let updates = self
                     .render_headers(updates, |h| Ok(EntryUpdate::try_from(h)?))
@@ -459,7 +467,7 @@ where
                     updates,
                     entry_dht_status,
                 }))
-            }
+            }),
             None => Ok(None),
         }
     }
@@ -471,10 +479,10 @@ where
         match self.get_element_local_raw(&hash).await? {
             Some(element) => {
                 let hash = element.header_address().clone();
-                let deletes = self
+                let deletes = fresh_reader!(self.env, |r| self
                     .meta_cache
-                    .get_deletes_on_header(hash)?
-                    .collect::<Vec<_>>()?;
+                    .get_deletes_on_header(&r, hash)?
+                    .collect::<Vec<_>>())?;
                 let deletes = self
                     .render_headers(deletes, |h| Ok(ElementDelete::try_from(h)?))
                     .await?;
@@ -484,51 +492,65 @@ where
         }
     }
 
-    fn valid_header(&self, hash: &HeaderHash) -> CascadeResult<bool> {
-        Ok(self.meta_vault.has_element_header(&hash)?
-            || self.meta_cache.has_element_header(&hash)?)
+    async fn valid_header(&self, hash: &HeaderHash) -> CascadeResult<bool> {
+        Ok(self.meta_vault.has_element_header(&hash).await?
+            || self.meta_cache.has_element_header(&hash).await?)
     }
 
-    fn valid_entry(&self, hash: &EntryHash) -> CascadeResult<bool> {
-        if self.meta_cache.get_headers(hash.clone())?.next()?.is_some() {
-            // Found a entry header in the cache
-            return Ok(true);
-        }
-        if self.meta_vault.get_headers(hash.clone())?.next()?.is_some() {
-            // Found a entry header in the vault
-            return Ok(true);
-        }
-        Ok(false)
-    }
-
-    /// Check if we have a valid reason to return an element from the cascade
-    fn valid_element(
-        &self,
-        header_hash: &HeaderHash,
-        entry_hash: Option<&EntryHash>,
-    ) -> CascadeResult<bool> {
-        if self.valid_header(&header_hash)? {
-            return Ok(true);
-        }
-        if let Some(eh) = entry_hash {
+    async fn valid_entry(&self, hash: &EntryHash) -> CascadeResult<bool> {
+        fresh_reader!(self.meta_vault.env(), |r| {
             if self
                 .meta_cache
-                .get_headers(eh.clone())?
-                .any(|h| Ok(h.header_hash == *header_hash))?
+                .get_headers(&r, hash.clone())?
+                .next()?
+                .is_some()
             {
                 // Found a entry header in the cache
                 return Ok(true);
             }
             if self
                 .meta_vault
-                .get_headers(eh.clone())?
-                .any(|h| Ok(h.header_hash == *header_hash))?
+                .get_headers(&r, hash.clone())?
+                .next()?
+                .is_some()
             {
                 // Found a entry header in the vault
                 return Ok(true);
             }
+            Ok(false)
+        })
+    }
+
+    /// Check if we have a valid reason to return an element from the cascade
+    async fn valid_element(
+        &self,
+        header_hash: &HeaderHash,
+        entry_hash: Option<&EntryHash>,
+    ) -> CascadeResult<bool> {
+        if self.valid_header(&header_hash).await? {
+            return Ok(true);
         }
-        Ok(false)
+        fresh_reader!(self.meta_vault.env(), |r| {
+            if let Some(eh) = entry_hash {
+                if self
+                    .meta_cache
+                    .get_headers(&r, eh.clone())?
+                    .any(|h| Ok(h.header_hash == *header_hash))?
+                {
+                    // Found a entry header in the cache
+                    return Ok(true);
+                }
+                if self
+                    .meta_vault
+                    .get_headers(&r, eh.clone())?
+                    .any(|h| Ok(h.header_hash == *header_hash))?
+                {
+                    // Found a entry header in the vault
+                    return Ok(true);
+                }
+            }
+            Ok(false)
+        })
     }
 
     #[instrument(skip(self, options))]
@@ -555,54 +577,56 @@ where
         options: GetOptions,
     ) -> CascadeResult<Option<Element>> {
         debug!("in get entry");
-        // Update the cache from the network
-        self.fetch_element_via_entry(entry_hash.clone(), options.clone())
-            .await?;
+        fresh_reader_async!(self.env.clone(), |r| async move {
+            // Update the cache from the network
+            self.fetch_element_via_entry(entry_hash.clone(), options.clone())
+                .await?;
 
-        // Meta Cache
-        let oldest_live_element = match self.meta_cache.get_dht_status(&entry_hash)? {
-            EntryDhtStatus::Live => {
-                let oldest_live_header = self
-                    .meta_cache
-                    .get_headers(entry_hash)?
-                    .filter_map(|header| {
-                        if let None = self
-                            .meta_cache
-                            .get_deletes_on_header(header.header_hash.clone())?
-                            .next()?
-                        {
-                            Ok(Some(header))
-                        } else {
-                            Ok(None)
-                        }
-                    })
-                    .min()?
-                    .expect("Status is live but no headers?");
+            // Meta Cache
+            let oldest_live_element = match self.meta_cache.get_dht_status(&r, &entry_hash)? {
+                EntryDhtStatus::Live => {
+                    let oldest_live_header = self
+                        .meta_cache
+                        .get_headers(&r, entry_hash)?
+                        .filter_map(|header| {
+                            if let None = self
+                                .meta_cache
+                                .get_deletes_on_header(&r, header.header_hash.clone())?
+                                .next()?
+                            {
+                                Ok(Some(header))
+                            } else {
+                                Ok(None)
+                            }
+                        })
+                        .min()?
+                        .expect("Status is live but no headers?");
 
-                // We have an oldest live header now get the element
-                self.get_element_local_raw(&oldest_live_header.header_hash)
-                    .await?
-                    .map(Search::Found)
-                    // It's not local so check the network
-                    .unwrap_or(Search::Continue(oldest_live_header.header_hash))
+                    // We have an oldest live header now get the element
+                    self.get_element_local_raw(&oldest_live_header.header_hash)
+                        .await?
+                        .map(Search::Found)
+                        // It's not local so check the network
+                        .unwrap_or(Search::Continue(oldest_live_header.header_hash))
+                }
+                EntryDhtStatus::Dead
+                | EntryDhtStatus::Pending
+                | EntryDhtStatus::Rejected
+                | EntryDhtStatus::Abandoned
+                | EntryDhtStatus::Conflict
+                | EntryDhtStatus::Withdrawn
+                | EntryDhtStatus::Purged => Search::NotInCascade,
+            };
+
+            // Network
+            match oldest_live_element {
+                Search::Found(element) => Ok(Some(element)),
+                Search::Continue(oldest_live_header) => {
+                    self.dht_get_header(oldest_live_header, options).await
+                }
+                Search::NotInCascade => Ok(None),
             }
-            EntryDhtStatus::Dead
-            | EntryDhtStatus::Pending
-            | EntryDhtStatus::Rejected
-            | EntryDhtStatus::Abandoned
-            | EntryDhtStatus::Conflict
-            | EntryDhtStatus::Withdrawn
-            | EntryDhtStatus::Purged => Search::NotInCascade,
-        };
-
-        // Network
-        match oldest_live_element {
-            Search::Found(element) => Ok(Some(element)),
-            Search::Continue(oldest_live_header) => {
-                self.dht_get_header(oldest_live_header, options).await
-            }
-            Search::NotInCascade => Ok(None),
-        }
+        })
     }
 
     #[instrument(skip(self, options))]
@@ -631,39 +655,41 @@ where
         options: GetOptions,
     ) -> CascadeResult<Option<Element>> {
         debug!("in get header");
-        // Meta Cache
-        if let Some(_) = self
-            .meta_cache
-            .get_deletes_on_header(header_hash.clone())?
-            .next()?
-        {
-            // Final tombstone found
-            return Ok(None);
-        // Meta Vault
-        } else if let Some(_) = self
-            .meta_vault
-            .get_deletes_on_header(header_hash.clone())?
-            .next()?
-        {
-            // Final tombstone found
-            return Ok(None);
-        }
-        // Network
-        self.fetch_element_via_header(header_hash.clone(), options)
-            .await?;
+        fresh_reader_async!(self.env, |r| async move {
+            // Meta Cache
+            if let Some(_) = self
+                .meta_cache
+                .get_deletes_on_header(&r, header_hash.clone())?
+                .next()?
+            {
+                // Final tombstone found
+                return Ok(None);
+            // Meta Vault
+            } else if let Some(_) = self
+                .meta_vault
+                .get_deletes_on_header(&r, header_hash.clone())?
+                .next()?
+            {
+                // Final tombstone found
+                return Ok(None);
+            }
+            // Network
+            self.fetch_element_via_header(header_hash.clone(), options)
+                .await?;
 
-        // Check if header is alive after fetch
-        let is_live = self
-            .meta_cache
-            .get_deletes_on_header(header_hash.clone())?
-            .next()?
-            .is_none();
+            // Check if header is alive after fetch
+            let is_live = self
+                .meta_cache
+                .get_deletes_on_header(&r, header_hash.clone())?
+                .next()?
+                .is_none();
 
-        if is_live {
-            self.get_element_local_raw(&header_hash).await
-        } else {
-            Ok(None)
-        }
+            if is_live {
+                self.get_element_local_raw(&header_hash).await
+            } else {
+                Ok(None)
+            }
+        })
     }
 
     /// Get the entry from the dht regardless of metadata.
@@ -789,13 +815,15 @@ where
         // Update the cache from the network
         self.fetch_links(key.into(), options).await?;
 
-        // Meta Cache
-        // Return any links from the meta cache that don't have removes.
-        Ok(self
-            .meta_cache
-            .get_live_links(key)?
-            .map(|l| Ok(l.into_link()))
-            .collect()?)
+        fresh_reader!(self.env, |r| {
+            // Meta Cache
+            // Return any links from the meta cache that don't have removes.
+            Ok(self
+                .meta_cache
+                .get_live_links(&r, key)?
+                .map(|l| Ok(l.into_link()))
+                .collect()?)
+        })
     }
 
     #[instrument(skip(self, key, options))]
@@ -810,25 +838,25 @@ where
         self.fetch_links(key.into(), options).await?;
 
         // Get the links and collect the LinkAdd / LinkRemove hashes by time.
-        let links = self
-            .meta_cache
-            .get_links_all(key)?
-            .map(|link_add| {
-                // Collect the link removes on this link add
-                let link_removes = self
-                    .meta_cache
-                    .get_link_removes_on_link_add(link_add.link_add_hash.clone())?
-                    .collect::<BTreeSet<_>>()?;
-                // Create timed header hash
-                let link_add = TimedHeaderHash {
-                    timestamp: link_add.timestamp,
-                    header_hash: link_add.link_add_hash,
-                };
-                // Return all link removes with this link add
-                Ok((link_add, link_removes))
-            })
-            .collect::<BTreeMap<_, _>>()?;
-
+        let links = fresh_reader!(self.env, |r| {
+            self.meta_cache
+                .get_links_all(&r, key)?
+                .map(|link_add| {
+                    // Collect the link removes on this link add
+                    let link_removes = self
+                        .meta_cache
+                        .get_link_removes_on_link_add(&r, link_add.link_add_hash.clone())?
+                        .collect::<BTreeSet<_>>()?;
+                    // Create timed header hash
+                    let link_add = TimedHeaderHash {
+                        timestamp: link_add.timestamp,
+                        header_hash: link_add.link_add_hash,
+                    };
+                    // Return all link removes with this link add
+                    Ok((link_add, link_removes))
+                })
+                .collect::<BTreeMap<_, _>>()
+        })?;
         // Get the headers from the element stores
         let mut result: Vec<(LinkAdd, _)> = Vec::with_capacity(links.len());
         for (link_add, link_removes) in links {
@@ -850,17 +878,17 @@ where
 
 #[cfg(test)]
 /// Helper function for easily setting up cascades during tests
-pub fn test_dbs_and_mocks<'env>(
-    reader: &'env holochain_state::transaction::Reader<'env>,
+pub fn test_dbs_and_mocks(
+    env: EnvironmentRead,
     dbs: &impl holochain_state::db::GetDb,
 ) -> (
-    ElementBuf<'env>,
+    ElementBuf,
     super::metadata::MockMetadataBuf,
-    ElementBuf<'env>,
+    ElementBuf,
     super::metadata::MockMetadataBuf,
 ) {
-    let cas = ElementBuf::vault(&reader, dbs, true).unwrap();
-    let element_cache = ElementBuf::cache(&reader, dbs).unwrap();
+    let cas = ElementBuf::vault(env.clone().into(), dbs, true).unwrap();
+    let element_cache = ElementBuf::cache(env.clone().into(), dbs).unwrap();
     let metadata = super::metadata::MockMetadataBuf::new();
     let metadata_cache = super::metadata::MockMetadataBuf::new();
     (cas, metadata, element_cache, metadata_cache)
