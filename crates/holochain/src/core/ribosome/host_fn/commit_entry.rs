@@ -152,7 +152,7 @@ pub mod wasm_test {
         // test workspace boilerplate
         let env = holochain_state::test_utils::test_cell_env();
         let dbs = env.dbs().await;
-        let env_ref = env.guard().await;
+        let _env_ref = env.guard().await;
         let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
             .await
             .unwrap();
@@ -196,7 +196,7 @@ pub mod wasm_test {
         // test workspace boilerplate
         let env = holochain_state::test_utils::test_cell_env();
         let dbs = env.dbs().await;
-        let env_ref = env.guard().await;
+        let _env_ref = env.guard().await;
         let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
             .await
             .unwrap();
@@ -254,7 +254,7 @@ pub mod wasm_test {
         // test workspace boilerplate
         let env = holochain_state::test_utils::test_cell_env();
         let dbs = env.dbs().await;
-        let env_ref = env.guard().await;
+        let _env_ref = env.guard().await;
         let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
             .await
             .unwrap();

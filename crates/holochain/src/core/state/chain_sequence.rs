@@ -191,7 +191,7 @@ pub mod tests {
     async fn chain_sequence_scratch_awareness() -> DatabaseResult<()> {
         observability::test_run().ok();
         let arc = test_cell_env();
-        let env = arc.guard().await;
+        let _env = arc.guard().await;
         let dbs = arc.dbs().await;
                 {
             let mut buf = ChainSequenceBuf::new(arc.clone().into(), &dbs).await?;

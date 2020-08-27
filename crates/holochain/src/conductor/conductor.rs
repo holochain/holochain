@@ -520,7 +520,7 @@ where
         impl IntoIterator<Item = (EntryDefBufferKey, EntryDef)>,
     )> {
         let environ = &self.wasm_env;
-        let env = environ.guard().await;
+        let _env = environ.guard().await;
         let wasm = environ.get_db(&*holochain_state::db::WASM)?;
         let dna_def_db = environ.get_db(&*holochain_state::db::DNA_DEF)?;
         let entry_def_db = environ.get_db(&*holochain_state::db::ENTRY_DEF)?;

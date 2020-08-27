@@ -96,7 +96,6 @@ pub async fn integrate_dht_ops_workflow(
         let mut next_ops = Vec::new();
         for (op_hash, value) in ops {
             // only integrate this op if it hasn't been integrated already!
-            // TODO: test for this [ B-01894 ]
             if workspace.integrated_dht_ops.get(&op_hash).await?.is_none() {
                 match integrate_single_dht_op(value, &mut workspace.elements, &mut workspace.meta)
                     .await?

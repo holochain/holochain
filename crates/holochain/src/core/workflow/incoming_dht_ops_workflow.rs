@@ -16,7 +16,7 @@ use holochain_state::{
     db::{INTEGRATED_DHT_OPS, INTEGRATION_LIMBO},
     env::EnvironmentWrite,
     error::DatabaseResult,
-    prelude::{EnvironmentRead, GetDb, ReadManager, Writer},
+    prelude::{EnvironmentRead, GetDb, Writer},
 };
 use holochain_types::Timestamp;
 use tracing::instrument;

@@ -7,7 +7,6 @@ use ::fixt::prelude::*;
 use holo_hash::HasHash;
 use holochain_p2p::actor::HolochainP2pRefToCell;
 use holochain_state::{
-    env::ReadManager,
     test_utils::{test_conductor_env, TestEnvironment},
 };
 use holochain_types::{

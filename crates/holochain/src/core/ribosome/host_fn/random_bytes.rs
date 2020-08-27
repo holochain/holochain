@@ -37,7 +37,7 @@ pub mod wasm_test {
     use crate::fixt::WasmRibosomeFixturator;
     use crate::fixt::ZomeCallHostAccessFixturator;
     use fixt::prelude::*;
-    use holochain_state::env::ReadManager;
+    
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::RandomBytesInput;
     use holochain_zome_types::RandomBytesOutput;
@@ -69,7 +69,7 @@ pub mod wasm_test {
     async fn ribosome_random_bytes_test() {
         let env = holochain_state::test_utils::test_cell_env();
         let dbs = env.dbs().await;
-        let env_ref = env.guard().await;
+        let _env_ref = env.guard().await;
         let mut workspace = crate::core::workflow::CallZomeWorkspace::new(env.clone().into(), &dbs)
             .await
             .unwrap();

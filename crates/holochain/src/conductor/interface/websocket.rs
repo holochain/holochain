@@ -249,7 +249,6 @@ pub mod test {
     use futures::future::FutureExt;
     use holochain_serialized_bytes::prelude::*;
     use holochain_state::{
-        env::ReadManager,
         test_utils::{test_conductor_env, test_wasm_env, TestEnvironment},
     };
     use holochain_types::{

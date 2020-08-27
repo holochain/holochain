@@ -41,7 +41,7 @@ pub mod test {
 
     use crate::fixt::ZomeCallHostAccessFixturator;
     use fixt::prelude::*;
-    use holochain_state::env::ReadManager;
+    
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::AgentInfoInput;
@@ -51,7 +51,7 @@ pub mod test {
     async fn invoke_import_agent_info_test() {
         let env = holochain_state::test_utils::test_cell_env();
         let dbs = env.dbs().await;
-        let env_ref = env.guard().await;
+        let _env_ref = env.guard().await;
         let mut workspace = crate::core::workflow::CallZomeWorkspace::new(env.clone().into(), &dbs)
             .await
             .unwrap();

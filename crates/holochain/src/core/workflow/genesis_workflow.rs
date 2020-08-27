@@ -134,7 +134,7 @@ pub mod tests {
     async fn genesis_initializes_source_chain() -> Result<(), anyhow::Error> {
         observability::test_run()?;
         let arc = test_cell_env();
-        let env = arc.guard().await;
+        let _env = arc.guard().await;
         let dbs = arc.dbs().await;
         let dna = fake_dna_file("a");
         let agent_pubkey = fake_agent_pubkey_1();
