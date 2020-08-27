@@ -68,7 +68,7 @@ impl ChainSequenceBuf {
                     (
                         // TODO: this is a bit ridiculous -- reevaluate whether the
                         //       IntKey is really needed (vs simple u32)
-                        u32::from(IntKey::from_key_bytes_fallible(key.to_vec())) + 1,
+                        u32::from(IntKey::from_key_bytes_fallible(key)) + 1,
                         item.tx_seq + 1,
                         Some(item.header_address),
                     )
@@ -126,10 +126,7 @@ impl ChainSequenceBuf {
         // a list of indices for only the headers which have been transformed.
         Ok(Box::new(self.buf.store().iter(r)?.filter_map(|(i, c)| {
             Ok(if !c.dht_transforms_complete {
-                Some((
-                    IntKey::from_key_bytes_fallible(i.to_vec()).into(),
-                    c.header_address,
-                ))
+                Some((IntKey::from_key_bytes_fallible(i).into(), c.header_address))
             } else {
                 None
             })
@@ -309,7 +306,7 @@ pub mod tests {
                 .buf
                 .store()
                 .iter(&reader)?
-                .map(|(key, _)| Ok(IntKey::from_key_bytes_fallible(key.to_vec()).into()))
+                .map(|(key, _)| Ok(IntKey::from_key_bytes_fallible(key).into()))
                 .collect()?;
             assert_eq!(items, vec![0, 1, 2]);
         }

@@ -86,8 +86,8 @@ impl AsRef<[u8]> for LinkMetaKeyBytes {
 }
 
 impl BufKey for LinkMetaKeyBytes {
-    fn from_key_bytes_fallible(bytes: Vec<u8>) -> Self {
-        Self(bytes)
+    fn from_key_bytes_fallible(bytes: &[u8]) -> Self {
+        Self(bytes.to_vec())
     }
 }
 

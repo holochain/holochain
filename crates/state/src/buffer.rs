@@ -70,7 +70,6 @@ macro_rules! fresh_reader_async {
         let g = env.guard().await;
         let r = g.reader()?;
         let val = $f(r).await;
-        drop(g);
         val
     }};
 }

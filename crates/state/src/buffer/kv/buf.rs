@@ -392,16 +392,14 @@ where
                 Put(v) => {
                     let buf = holochain_serialized_bytes::encode(v)?;
                     let encoded = rkv::Value::Blob(&buf);
-                    self.store.db().put(
-                        writer,
-                        IntKey::from_key_bytes_fallible(k.to_vec()),
-                        &encoded,
-                    )?;
+                    self.store
+                        .db()
+                        .put(writer, IntKey::from_key_bytes_fallible(k), &encoded)?;
                 }
                 Delete => match self
                     .store
                     .db()
-                    .delete(writer, IntKey::from_key_bytes_fallible(k.to_vec()))
+                    .delete(writer, IntKey::from_key_bytes_fallible(k))
                 {
                     Err(rkv::StoreError::LmdbError(rkv::LmdbError::NotFound)) => (),
                     r => r?,
