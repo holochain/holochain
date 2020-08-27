@@ -143,6 +143,16 @@ impl GetDb for EnvironmentWrite {
     }
 }
 
+impl GetDb for EnvironmentRead {
+    fn get_db<V: 'static + Copy + Send + Sync>(&self, key: &'static DbKey<V>) -> DatabaseResult<V> {
+        get_db(&self.path, key)
+    }
+
+    fn keystore(&self) -> KeystoreSender {
+        self.keystore.clone()
+    }
+}
+
 /// The canonical representation of a (singleton) LMDB environment.
 /// The wrapper contains methods for managing transactions
 /// and database connections,

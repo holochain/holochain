@@ -17,7 +17,6 @@ use holochain_state::{
     prelude::*,
 };
 use serde::{Deserialize, Serialize};
-use tokio_safe_block_on::tokio_safe_block_forever_on;
 use tracing::*;
 
 /// A Value in the ChainSequence database.
@@ -156,9 +155,7 @@ impl BufferedStore for ChainSequenceBuf {
             return Ok(());
         }
         let env = self.buf.env().clone();
-        // FIXME: Remove block_on after considering sync locking for environment [ B-03180 ]
-        let db =
-            tokio_safe_block_forever_on(async move { env.dbs().await.get_db(&*CHAIN_SEQUENCE) })?;
+        let db = env.get_db(&*CHAIN_SEQUENCE)?;
         let (_, _, persisted_head) = ChainSequenceBuf::head_info(&KvIntStore::new(db), writer)?;
         let (old, new) = (self.persisted_head, persisted_head);
         if old != new {
