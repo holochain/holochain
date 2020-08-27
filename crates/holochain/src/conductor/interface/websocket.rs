@@ -248,9 +248,7 @@ pub mod test {
     use crate::fixt::WasmRibosomeFixturator;
     use futures::future::FutureExt;
     use holochain_serialized_bytes::prelude::*;
-    use holochain_state::{
-        test_utils::{test_conductor_env, test_wasm_env, TestEnvironment},
-    };
+    use holochain_state::test_utils::{test_conductor_env, test_wasm_env, TestEnvironment};
     use holochain_types::{
         app::{InstallAppDnaPayload, InstallAppPayload, InstalledCell},
         cell::CellId,

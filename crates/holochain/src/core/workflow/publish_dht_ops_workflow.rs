@@ -262,7 +262,7 @@ mod tests {
 
         // Create and fill authored ops db in the workspace
         {
-                        let mut workspace = PublishDhtOpsWorkspace::new(env.clone().into(), &env_ref).unwrap();
+            let mut workspace = PublishDhtOpsWorkspace::new(env.clone().into(), &env_ref).unwrap();
             for (sig, op_hashed, op_light, header_hash) in data {
                 let op_hash = op_hashed.as_hash().clone();
                 let authored_value = AuthoredDhtOpsValue::from_light(op_light);
@@ -334,7 +334,7 @@ mod tests {
     /// Call the workflow
     async fn call_workflow(env: EnvironmentWrite, mut cell_network: HolochainP2pCell) {
         let env_ref = env.guard().await;
-                let workspace = PublishDhtOpsWorkspace::new(env.clone().into(), &env_ref).unwrap();
+        let workspace = PublishDhtOpsWorkspace::new(env.clone().into(), &env_ref).unwrap();
         publish_dht_ops_workflow(workspace, env.clone().into(), &mut cell_network)
             .await
             .unwrap();

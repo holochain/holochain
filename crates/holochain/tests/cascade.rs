@@ -6,7 +6,7 @@ use holochain::core::state::{
     source_chain::{SourceChainBuf, SourceChainResult},
 };
 use holochain::{fixt::ZomeIdFixturator, test_utils::test_network};
-use holochain_state::{test_utils::test_cell_env};
+use holochain_state::test_utils::test_cell_env;
 use holochain_types::{
     entry::EntryHashed,
     prelude::*,

@@ -74,7 +74,7 @@ pub mod tests {
         let addr1 = fake_header_hash(1);
         let addr2: DbString = "hi".into();
         {
-                        let mut workspace = TestWorkspace::new(arc.clone().into(), &dbs)?;
+            let mut workspace = TestWorkspace::new(arc.clone().into(), &dbs)?;
             assert_eq!(workspace.one.get(&addr1).await?, None);
 
             workspace.one.put(addr1.clone(), 1).unwrap();
@@ -86,7 +86,7 @@ pub mod tests {
 
         // Ensure that the data was persisted
         {
-                        let workspace = TestWorkspace::new(arc.clone().into(), &dbs)?;
+            let workspace = TestWorkspace::new(arc.clone().into(), &dbs)?;
             assert_eq!(workspace.one.get(&addr1).await?, Some(1));
         }
         Ok(())

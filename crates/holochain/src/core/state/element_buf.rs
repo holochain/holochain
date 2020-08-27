@@ -309,7 +309,7 @@ mod tests {
 
         // write one public-entry header and one private-entry header
         env.with_commit(|txn| {
-                        let mut store = ElementBuf::vault(arc.clone().into(), &env, true)?;
+            let mut store = ElementBuf::vault(arc.clone().into(), &env, true)?;
             store.put(header_pub, Some(entry_pub.clone()))?;
             store.put(header_priv, Some(entry_priv.clone()))?;
             store.flush_to_txn(txn)
@@ -317,7 +317,7 @@ mod tests {
 
         // Can retrieve both entries when private entries are enabled
         {
-                        let store = ElementBuf::vault(arc.clone().into(), &env, true)?;
+            let store = ElementBuf::vault(arc.clone().into(), &env, true)?;
             assert_eq!(
                 store.get_entry(entry_pub.as_hash()).await,
                 Ok(Some(entry_pub.clone()))
@@ -330,7 +330,7 @@ mod tests {
 
         // Cannot retrieve private entry when disabled
         {
-                        let store = ElementBuf::vault(arc.clone().into(), &env, false)?;
+            let store = ElementBuf::vault(arc.clone().into(), &env, false)?;
             assert_eq!(
                 store.get_entry(entry_pub.as_hash()).await,
                 Ok(Some(entry_pub.clone()))
@@ -355,7 +355,7 @@ mod tests {
 
         // write one public-entry header and one private-entry header (which will be a noop)
         env.with_commit(|txn| {
-                        let mut store = ElementBuf::vault(arc.clone().into(), &env, false)?;
+            let mut store = ElementBuf::vault(arc.clone().into(), &env, false)?;
             store.put(header_pub, Some(entry_pub.clone()))?;
             store.put(header_priv, Some(entry_priv.clone()))?;
             store.flush_to_txn(txn)
@@ -363,7 +363,7 @@ mod tests {
 
         // Can retrieve both entries when private entries are enabled
         {
-                        let store = ElementBuf::vault(arc.clone().into(), &env, true)?;
+            let store = ElementBuf::vault(arc.clone().into(), &env, true)?;
             assert_eq!(
                 store.get_entry(entry_pub.as_hash()).await,
                 Ok(Some(entry_pub.clone()))
@@ -373,7 +373,7 @@ mod tests {
 
         // Cannot retrieve private entry when disabled
         {
-                        let store = ElementBuf::vault(arc.clone().into(), &env, false)?;
+            let store = ElementBuf::vault(arc.clone().into(), &env, false)?;
             assert_eq!(
                 store.get_entry(entry_pub.as_hash()).await,
                 Ok(Some(entry_pub))

@@ -156,7 +156,7 @@ impl BufferedStore for ChainSequenceBuf {
             return Ok(());
         }
         let env = self.buf.env().clone();
-        // FIXME: consider making the whole method async
+        // FIXME: Remove block_on after considering sync locking for environment [ B-03180 ]
         let db =
             tokio_safe_block_forever_on(async move { env.dbs().await.get_db(&*CHAIN_SEQUENCE) })?;
         let (_, _, persisted_head) = ChainSequenceBuf::head_info(&KvIntStore::new(db), writer)?;

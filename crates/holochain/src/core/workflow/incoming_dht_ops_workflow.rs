@@ -32,7 +32,7 @@ pub async fn incoming_dht_ops_workflow(
 ) -> WorkflowResult<()> {
     // set up our workspace
     let env_ref = state_env.guard().await;
-        let mut workspace = IncomingDhtOpsWorkspace::new(state_env.clone().into(), &env_ref)?;
+    let mut workspace = IncomingDhtOpsWorkspace::new(state_env.clone().into(), &env_ref)?;
 
     // add incoming ops to the validation limbo
     for (hash, op) in ops {

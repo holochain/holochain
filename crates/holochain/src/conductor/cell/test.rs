@@ -6,9 +6,7 @@ use crate::{
 use ::fixt::prelude::*;
 use holo_hash::HasHash;
 use holochain_p2p::actor::HolochainP2pRefToCell;
-use holochain_state::{
-    test_utils::{test_conductor_env, TestEnvironment},
-};
+use holochain_state::test_utils::{test_conductor_env, TestEnvironment};
 use holochain_types::{
     dht_op::{DhtOp, DhtOpHashed},
     test_utils::{fake_agent_pubkey_2, fake_cell_id},

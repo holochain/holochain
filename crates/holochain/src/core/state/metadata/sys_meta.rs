@@ -114,7 +114,7 @@ mod tests {
         let env = arc.guard().await;
         let mut fx = TestFixtures::new();
         {
-                        let mut buf = MetadataBuf::vault(arc.clone().into(), &env)?;
+            let mut buf = MetadataBuf::vault(arc.clone().into(), &env)?;
             let (update, expected) = test_update(
                 fx.header_hash().into(),
                 fx.entry_hash(),
@@ -139,7 +139,7 @@ mod tests {
         let env = arc.guard().await;
         let mut fx = TestFixtures::new();
         {
-                        let mut buf = MetadataBuf::vault(arc.clone().into(), &env)?;
+            let mut buf = MetadataBuf::vault(arc.clone().into(), &env)?;
             let (update1, header1) = test_update(
                 fx.header_hash().into(),
                 fx.entry_hash(),
@@ -181,7 +181,7 @@ mod tests {
         let env = arc.guard().await;
         let mut fx = TestFixtures::new();
         {
-                        let mut buf = MetadataBuf::vault(arc.clone().into(), &env)?;
+            let mut buf = MetadataBuf::vault(arc.clone().into(), &env)?;
             let original_entry = fx.entry_hash();
             let header_hash = test_create(original_entry.clone(), &mut fx)
                 .await
@@ -214,7 +214,7 @@ mod tests {
         let env = arc.guard().await;
         let mut fx = TestFixtures::new();
         {
-                        let mut buf = MetadataBuf::vault(arc.clone().into(), &env)?;
+            let mut buf = MetadataBuf::vault(arc.clone().into(), &env)?;
             let original_entry = fx.entry_hash();
             let header_hash = test_create(original_entry.clone(), &mut fx)
                 .await
@@ -262,7 +262,7 @@ mod tests {
         let env = arc.guard().await;
         let mut fx = TestFixtures::new();
         {
-                        let mut buf = MetadataBuf::vault(arc.clone().into(), &env)?;
+            let mut buf = MetadataBuf::vault(arc.clone().into(), &env)?;
             let original_entry = fx.entry_hash();
             let header_hash = test_create(original_entry.clone(), &mut fx)
                 .await
@@ -543,7 +543,7 @@ mod tests {
     async fn test_entry_dht_status() {
         let arc = test_cell_env();
         let env = arc.guard().await;
-                let mut fx = TestFixtures::new();
+        let mut fx = TestFixtures::new();
         let entry_hash = fx.entry_hash();
         let mut entry_creates = Vec::new();
         let mut entry_deletes = Vec::new();
