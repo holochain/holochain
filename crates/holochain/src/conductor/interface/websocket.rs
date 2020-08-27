@@ -654,7 +654,6 @@ pub mod test {
         // Get state
         let expected = {
             let env = cell_env.guard().await;
-            let _reader = env.reader().unwrap();
             let source_chain = SourceChainBuf::new(cell_env.clone().into(), &env)
                 .await
                 .unwrap();

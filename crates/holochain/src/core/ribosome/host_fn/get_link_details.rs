@@ -73,7 +73,6 @@ pub mod slow_tests {
         let dbs = env.dbs().await;
         let env_ref = env.guard().await;
 
-        let _reader = env_ref.reader().unwrap();
         let mut workspace = crate::core::workflow::CallZomeWorkspace::new(env.clone().into(), &dbs)
             .await
             .unwrap();

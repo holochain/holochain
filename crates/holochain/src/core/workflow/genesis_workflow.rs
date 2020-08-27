@@ -140,8 +140,7 @@ pub mod tests {
         let agent_pubkey = fake_agent_pubkey_1();
 
         {
-            let _reader = env.reader()?;
-            let workspace = GenesisWorkspace::new(arc.clone().into(), &dbs).await?;
+                        let workspace = GenesisWorkspace::new(arc.clone().into(), &dbs).await?;
             let mut api = MockCellConductorApi::new();
             api.expect_sync_dpki_request()
                 .returning(|_, _| Ok("mocked dpki request response".to_string()));
@@ -154,7 +153,6 @@ pub mod tests {
         }
 
         {
-            let _reader = env.reader()?;
 
             let source_chain = SourceChain::new(arc.clone().into(), &dbs).await?;
             assert_eq!(source_chain.agent_pubkey().await?, agent_pubkey);

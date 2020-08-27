@@ -390,7 +390,6 @@ pub mod tests {
         let (_agent_pubkey, dna_header, dna_entry, agent_header, agent_entry) = fixtures();
 
         {
-            let _reader = env.reader()?;
 
             let mut store = SourceChainBuf::new(arc.clone().into(), &dbs).await.unwrap();
             assert!(store.chain_head().is_none());
@@ -404,7 +403,6 @@ pub mod tests {
         };
 
         {
-            let _reader = env.reader()?;
 
             let store = SourceChainBuf::new(arc.clone().into(), &dbs).await.unwrap();
             assert!(store.chain_head().is_some());
@@ -463,7 +461,6 @@ pub mod tests {
         let (_agent_pubkey, dna_header, dna_entry, agent_header, agent_entry) = fixtures();
 
         {
-            let _reader = env.reader()?;
 
             let mut store = SourceChainBuf::new(arc.clone().into(), &env).await.unwrap();
             store
@@ -477,7 +474,6 @@ pub mod tests {
         }
 
         {
-            let _reader = env.reader()?;
 
             let store = SourceChainBuf::new(arc.clone().into(), &env).await.unwrap();
             let json = store.dump_as_json().await?;
@@ -502,8 +498,7 @@ pub mod tests {
     async fn test_header_cas_roundtrip() {
         let arc = test_cell_env();
         let env = arc.guard().await;
-        let _reader = env.reader().unwrap();
-        let mut store = SourceChainBuf::new(arc.clone().into(), &env).await.unwrap();
+                let mut store = SourceChainBuf::new(arc.clone().into(), &env).await.unwrap();
 
         let (_, hashed, _, _, _) = fixtures();
         let header = hashed.into_content();
