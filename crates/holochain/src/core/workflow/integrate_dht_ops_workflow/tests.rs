@@ -688,7 +688,8 @@ fn register_remove_link_missing_base(a: TestData) -> (Vec<Db>, Vec<Db>, &'static
 #[tokio::test(threaded_scheduler)]
 async fn test_ops_state() {
     observability::test_run().ok();
-    let env = test_cell_env();
+    let test_env = test_cell_env();
+    let env = test_env.env();
     let dbs = env.dbs().await;
     let env_ref = env.guard().await;
 
@@ -960,7 +961,8 @@ async fn get_links<'env>(
 async fn test_metadata_from_wasm_api() {
     // test workspace boilerplate
     observability::test_run().ok();
-    let env = holochain_state::test_utils::test_cell_env();
+    let test_env = holochain_state::test_utils::test_cell_env();
+    let env = test_env.env();
     let dbs = env.dbs().await;
     let env_ref = env.guard().await;
     clear_dbs(&env_ref, &dbs);
@@ -1084,7 +1086,8 @@ async fn test_wasm_api_without_integration_links() {
 async fn test_wasm_api_without_integration_delete() {
     // test workspace boilerplate
     observability::test_run().ok();
-    let env = holochain_state::test_utils::test_cell_env();
+    let test_env = holochain_state::test_utils::test_cell_env();
+    let env = test_env.env();
     let dbs = env.dbs().await;
     let env_ref = env.guard().await;
     clear_dbs(&env_ref, &dbs);

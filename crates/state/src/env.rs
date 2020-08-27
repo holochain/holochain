@@ -225,6 +225,13 @@ pub struct EnvironmentReadRef<'e> {
     keystore: KeystoreSender,
 }
 
+impl<'e> EnvironmentReadRef<'e> {
+    /// Access the wrapped Rkv
+    pub fn rkv(&self) -> &Rkv {
+        &self.rkv
+    }
+}
+
 /// Newtype wrapper for a read-only lock guard on the Environment,
 /// with read-only access to the underlying guard
 pub struct EnvironmentRefReadOnly<'e>(RwLockReadGuard<'e, Rkv>);

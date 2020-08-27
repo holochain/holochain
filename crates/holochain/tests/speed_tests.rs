@@ -31,11 +31,8 @@ use holochain_types::dna::DnaFile;
 use holochain_types::test_utils::fake_agent_pubkey_1;
 use holochain_types::{observability, test_utils::fake_agent_pubkey_2};
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::HostInput;
-use std::sync::Arc;
-use tempdir::TempDir;
-
 use holochain_websocket::WebsocketSender;
+use holochain_zome_types::HostInput;
 use matches::assert_matches;
 use test_case::test_case;
 use test_utils::*;
@@ -91,10 +88,24 @@ async fn speed_test_timed_ice() {
 }
 
 #[tokio::test(threaded_scheduler)]
-#[ignore]
+#[cfg(feature = "slow_tests")]
 async fn speed_test_normal() {
     observability::test_run().unwrap();
-    speed_test(None).await;
+    let env = speed_test(None).await;
+    let stat = env.guard().await.rkv().stat().expect("Couldn't get stats");
+    // TODO: real assertions
+    dbg!(stat.page_size());
+    assert!(stat.page_size() >= 0);
+    dbg!(stat.depth());
+    assert!(stat.depth() >= 0);
+    dbg!(stat.branch_pages());
+    assert!(stat.branch_pages() >= 0);
+    dbg!(stat.leaf_pages());
+    assert!(stat.leaf_pages() >= 0);
+    dbg!(stat.overflow_pages());
+    assert!(stat.overflow_pages() >= 0);
+    dbg!(stat.entries());
+    assert!(stat.entries() >= 0);
 }
 #[test_case(1)]
 #[test_case(10)]
@@ -108,7 +119,7 @@ fn speed_test_all(n: usize) {
 }
 
 #[instrument]
-async fn speed_test(n: Option<usize>) {
+async fn speed_test(n: Option<usize>) -> TestEnvironment {
     let num = n.unwrap_or(DEFAULT_NUM);
 
     // ////////////
@@ -171,7 +182,7 @@ async fn speed_test(n: Option<usize>) {
         .times(2)
         .return_const(());
 
-    let (_tmpdir, _app_api, handle) = setup_app(
+    let (test_env, _app_api, handle) = setup_app(
         vec![(alice_installed_cell, None), (bob_installed_cell, None)],
         dna_store,
     )
@@ -300,18 +311,18 @@ async fn speed_test(n: Option<usize>) {
     let shutdown = handle.take_shutdown_handle().await.unwrap();
     handle.shutdown().await;
     shutdown.await.unwrap();
+    test_env
 }
 
 pub async fn setup_app(
     cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
     dna_store: MockDnaStore,
-) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
+) -> (TestEnvironment, RealAppInterfaceApi, ConductorHandle) {
     let test_env = test_conductor_env();
     let TestEnvironment {
         env: wasm_env,
         tmpdir: _tmpdir,
     } = test_wasm_env();
-    let tmpdir = test_env.tmpdir.clone();
 
     let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
         .config(ConductorConfig {
@@ -320,7 +331,7 @@ pub async fn setup_app(
             }]),
             ..Default::default()
         })
-        .test(test_env, wasm_env)
+        .test(test_env.clone(), wasm_env)
         .await
         .unwrap();
 
@@ -341,5 +352,5 @@ pub async fn setup_app(
 
     let handle = conductor_handle.clone();
 
-    (tmpdir, RealAppInterfaceApi::new(conductor_handle), handle)
+    (test_env, RealAppInterfaceApi::new(conductor_handle), handle)
 }
