@@ -74,13 +74,14 @@ pub async fn handle_get_entry(
         // We want all the live headers and deletes
         if options.all_live_headers_with_metadata {
             for hash in headers {
-                fresh_reader!(meta_vault.env(), |r| CellResult::Ok(
+                fresh_reader!(meta_vault.env(), |r| {
                     deletes.extend(
                         meta_vault
                             .get_deletes_on_header(&r, hash.header_hash.clone())?
-                            .iterator()
-                    )
-                ))?;
+                            .iterator(),
+                    );
+                    CellResult::Ok(())
+                })?;
                 let header = render_header(hash).await?;
                 live_headers.insert(header.try_into()?);
             }
@@ -109,13 +110,14 @@ pub async fn handle_get_entry(
 
                 // If there is a delete then gather all deletes
                 if is_deleted {
-                    fresh_reader!(meta_vault.env(), |r| CellResult::Ok(
+                    fresh_reader!(meta_vault.env(), |r| {
                         deletes.extend(
                             meta_vault
                                 .get_deletes_on_header(&r, hash.header_hash.clone())?
                                 .iterator(),
-                        )
-                    ))?;
+                        );
+                        CellResult::Ok(())
+                    })?;
 
                 // Otherwise gather the header
                 } else {

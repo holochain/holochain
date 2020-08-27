@@ -93,11 +93,6 @@ async fn sys_validation_workflow_inner(
     // Sort the ops
     ops.sort_unstable_by_key(|v| DhtOpOrder::from(&v.op));
 
-    debug!(
-        agent = %which_agent(conductor_api.cell_id().agent_pubkey()),
-        ?ops
-    );
-
     // Process each op
     for mut vlv in ops {
         let outcome = validate_op(&vlv.op, workspace, network.clone(), &conductor_api).await?;

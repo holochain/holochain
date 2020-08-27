@@ -80,7 +80,7 @@ async fn run_test(
     bob_links_in_a_legit_way(&bob_cell_id, &handle, &dna_file).await;
 
     // Some time for ops to reach alice and run through validation
-    tokio::time::delay_for(Duration::from_millis(500)).await;
+    tokio::time::delay_for(Duration::from_millis(1000)).await;
 
     {
         let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
@@ -124,10 +124,10 @@ async fn run_test(
 
     let (big_entry_header, big_entry_hash, link_add_hash) =
         bob_makes_a_large_link(&bob_cell_id, &handle, &dna_file).await;
-    info!("now");
 
     // Some time for ops to reach alice and run through validation
-    tokio::time::delay_for(Duration::from_millis(500)).await;
+    // This takes a little longer due to the large entry and links
+    tokio::time::delay_for(Duration::from_millis(1500)).await;
 
     {
         let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
@@ -171,6 +171,9 @@ async fn run_test(
                         {
                             assert_eq!(i.validation_status, ValidationStatus::Rejected)
                         }
+                        DhtOpLight::StoreElement(hh, _, _) if hh == &big_entry_header => {
+                            assert_eq!(i.validation_status, ValidationStatus::Rejected)
+                        }
                         DhtOpLight::RegisterAddLink(hh, _) if hh == &link_add_hash => {
                             assert_eq!(i.validation_status, ValidationStatus::Rejected)
                         }
@@ -187,7 +190,7 @@ async fn run_test(
     dodgy_bob(&bob_cell_id, &handle, &dna_file).await;
 
     // Some time for ops to reach alice and run through validation
-    tokio::time::delay_for(Duration::from_millis(500)).await;
+    tokio::time::delay_for(Duration::from_millis(1000)).await;
 
     {
         let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
@@ -287,7 +290,7 @@ async fn bob_makes_a_large_link(
     handle: &ConductorHandle,
     dna_file: &DnaFile,
 ) -> (HeaderHash, EntryHash, HeaderHash) {
-    let bytes = (0..16_000_000).map(|_| 0u8).into_iter().collect::<Vec<_>>();
+    let bytes = (0..16_000_001).map(|_| 0u8).into_iter().collect::<Vec<_>>();
     let big_base = Entry::App(SerializedBytes::from(UnsafeBytes::from(bytes)));
     let big_base_entry_hash =
         EntryHash::with_data(&Entry::try_from(big_base.clone()).unwrap()).await;

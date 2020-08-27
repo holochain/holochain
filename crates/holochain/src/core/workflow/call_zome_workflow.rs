@@ -375,8 +375,7 @@ pub mod tests {
         observability::test_run().ok();
         let env = test_cell_env();
         let dbs = env.dbs().await;
-        let env_ref = env.guard().await;
-        let _reader = env_ref.reader().unwrap();
+
         let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
             .await
             .unwrap();
@@ -430,8 +429,7 @@ pub mod tests {
     async fn calls_app_validation() {
         let env = test_cell_env();
         let dbs = env.dbs().await;
-        let env_ref = env.guard().await;
-        let _reader = env_ref.reader().unwrap();
+
         let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
             .await
             .unwrap();
@@ -464,8 +462,7 @@ pub mod tests {
     async fn creates_outputs() {
         let env = test_cell_env();
         let dbs = env.dbs().await;
-        let env_ref = env.guard().await;
-        let _reader = env_ref.reader().unwrap();
+
         let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
             .await
             .unwrap();

@@ -33,9 +33,9 @@ mod error;
 #[cfg(test)]
 mod tests;
 
-/// 15mb limit on Entries due to websocket limits.
+/// 16mb limit on Entries due to websocket limits.
 /// Consider splitting large entries up.
-pub const MAX_ENTRY_SIZE: usize = 15_000_000;
+pub const MAX_ENTRY_SIZE: usize = 16_000_000;
 
 /// 10kb limit on LinkTags.
 pub const MAX_TAG_SIZE: usize = 400;

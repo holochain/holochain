@@ -169,7 +169,8 @@ where
         Ok(DrainIter::new(&mut self.scratch, self.store.iter(r)?))
     }
 
-    /// Iterator that tracks elements so they can be deleted
+    /// Iterator that tracks elements so they can be deleted.
+    /// This allows filtering before the deletes are added
     pub fn drain_iter_filter<'a, F, R>(
         &mut self,
         r: &'a R,

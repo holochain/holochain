@@ -428,7 +428,7 @@ impl Db {
     #[instrument(skip(pre_state, env))]
     async fn set<'env>(pre_state: Vec<Self>, env: EnvironmentWrite) {
         let env_ref = env.guard().await;
-        let _reader = env_ref.reader().unwrap();
+
         let mut workspace = IntegrateDhtOpsWorkspace::new(env.clone().into(), &env_ref).unwrap();
         for state in pre_state {
             match state {
@@ -496,7 +496,7 @@ async fn call_workflow(env: EnvironmentWrite) {
 // Need to clear the data from the previous test
 async fn clear_dbs(env: EnvironmentWrite) {
     let env_ref = env.guard().await;
-    let _reader = env_ref.reader().unwrap();
+
     let mut workspace = IntegrateDhtOpsWorkspace::new(env.clone().into(), &env_ref).unwrap();
     env_ref
         .with_commit::<DatabaseError, _, _>(|writer| {
@@ -720,7 +720,7 @@ async fn test_ops_state() {
 async fn produce_dht_ops<'env>(env: EnvironmentWrite) {
     let env_ref = env.guard().await;
     let (mut qt, _rx) = TriggerSender::new();
-    let _reader = env_ref.reader().unwrap();
+
     let workspace = ProduceDhtOpsWorkspace::new(env.clone().into(), &env_ref)
         .await
         .unwrap();
@@ -732,7 +732,7 @@ async fn produce_dht_ops<'env>(env: EnvironmentWrite) {
 /// Run genesis on the source chain
 async fn genesis<'env>(env: EnvironmentWrite) {
     let env_ref = env.guard().await;
-    let _reader = env_ref.reader().unwrap();
+
     let mut workspace = CallZomeWorkspace::new(env.clone().into(), &env_ref)
         .await
         .unwrap();
@@ -748,7 +748,7 @@ async fn commit_entry<'env>(
     zome_name: ZomeName,
 ) -> (EntryHash, HeaderHash) {
     let env_ref = env.guard().await;
-    let _reader = env_ref.reader().unwrap();
+
     let mut workspace = CallZomeWorkspace::new(env.clone().into(), &env_ref)
         .await
         .unwrap();
@@ -828,7 +828,7 @@ async fn commit_entry<'env>(
 
 async fn get_entry(env: EnvironmentWrite, entry_hash: EntryHash) -> Option<Entry> {
     let env_ref = env.guard().await;
-    let _reader = env_ref.reader().unwrap();
+
     let mut workspace = CallZomeWorkspace::new(env.clone().into(), &env_ref)
         .await
         .unwrap();
@@ -861,7 +861,7 @@ async fn link_entries(
     link_tag: LinkTag,
 ) -> HeaderHash {
     let env_ref = env.guard().await;
-    let _reader = env_ref.reader().unwrap();
+
     let mut workspace = CallZomeWorkspace::new(env.clone().into(), &env_ref)
         .await
         .unwrap();
@@ -916,7 +916,7 @@ async fn get_links(
     link_tag: LinkTag,
 ) -> Links {
     let env_ref = env.guard().await;
-    let _reader = env_ref.reader().unwrap();
+
     let mut workspace = CallZomeWorkspace::new(env.clone().into(), &env_ref)
         .await
         .unwrap();
@@ -1294,7 +1294,6 @@ mod slow_tests {
             let dbs = cell_env.dbs().await;
             let env_ref = cell_env.guard().await;
 
-            let _reader = env_ref.reader().unwrap();
             let mut workspace = CallZomeWorkspace::new(cell_env.clone().into(), &dbs)
                 .await
                 .unwrap();

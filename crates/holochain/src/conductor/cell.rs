@@ -132,7 +132,7 @@ impl Cell {
         let has_genesis = {
             // check if genesis ran on source chain buf
             let env_ref = state_env.guard().await;
-            let _reader = env_ref.reader()?;
+
             SourceChainBuf::new(state_env.clone().into(), &env_ref)
                 .await?
                 .has_genesis()
@@ -181,7 +181,6 @@ impl Cell {
         // get a reader
         let arc = state_env.clone();
         let env = arc.guard().await;
-        let _reader = env.reader()?;
 
         // get the dna
         let dna_file = conductor_handle
@@ -620,7 +619,7 @@ impl Cell {
         )>,
     > {
         let env_ref = self.state_env.guard().await;
-        let _reader = env_ref.reader()?;
+
         let integrated_dht_ops =
             IntegratedDhtOpsBuf::new(self.state_env().clone().into(), &env_ref)?;
         let cas = ElementBuf::vault(self.state_env.clone().into(), &env_ref, false)?;
@@ -694,7 +693,7 @@ impl Cell {
         let arc = self.state_env();
         let keystore = arc.keystore().clone();
         let env = arc.guard().await;
-        let _reader = env.reader()?;
+
         let workspace = CallZomeWorkspace::new(self.state_env().clone().into(), &env).await?;
 
         let args = CallZomeWorkflowArgs {
@@ -721,7 +720,7 @@ impl Cell {
         let id = self.id.clone();
         let conductor_api = self.conductor_api.clone();
         let env_ref = state_env.guard().await;
-        let _reader = env_ref.reader()?;
+
         // Create the workspace
         let workspace = CallZomeWorkspace::new(self.state_env().clone().into(), &env_ref)
             .await

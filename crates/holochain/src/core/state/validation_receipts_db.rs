@@ -185,9 +185,9 @@ mod tests {
         {
             // capture the readers at the same time
             // so we can test out the resolve-dups-on-write logic
-            let _reader1 = env_ref.reader()?;
+
             let mut vr_buf1 = ValidationReceiptsBuf::new(&env_ref)?;
-            let _reader2 = env_ref.reader()?;
+
             let mut vr_buf2 = ValidationReceiptsBuf::new(&env_ref)?;
 
             vr_buf1.add_if_unique(vr1.clone())?;

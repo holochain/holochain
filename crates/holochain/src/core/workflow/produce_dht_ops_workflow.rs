@@ -157,7 +157,6 @@ mod tests {
 
         // Setup the database and expected data
         let expected_hashes: HashSet<_> = {
-            let _reader = env_ref.reader().unwrap();
             let mut td = TestData::new();
             let mut source_chain = SourceChain::new(env.env.clone().into(), &dbs)
                 .await

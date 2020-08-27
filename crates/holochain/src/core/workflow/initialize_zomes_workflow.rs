@@ -101,7 +101,7 @@ pub mod tests {
     use fixt::prelude::*;
     use fixt::Unpredictable;
     use holochain_p2p::HolochainP2pCellFixturator;
-    use holochain_state::{env::ReadManager, test_utils::test_cell_env};
+    use holochain_state::test_utils::test_cell_env;
     use holochain_zome_types::Header;
     use matches::assert_matches;
 
@@ -109,8 +109,7 @@ pub mod tests {
     async fn adds_init_marker() {
         let env = test_cell_env();
         let dbs = env.dbs().await;
-        let env_ref = env.guard().await;
-        let _reader = env_ref.reader().unwrap();
+
         let mut workspace = InitializeZomesWorkspace(
             CallZomeWorkspace::new(env.clone().into(), &dbs)
                 .await

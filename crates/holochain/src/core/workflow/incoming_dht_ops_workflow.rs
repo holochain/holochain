@@ -16,7 +16,7 @@ use holochain_state::{
     db::{INTEGRATED_DHT_OPS, INTEGRATION_LIMBO},
     env::EnvironmentWrite,
     error::DatabaseResult,
-    prelude::{EnvironmentRead, GetDb, ReadManager, Writer},
+    prelude::{EnvironmentRead, GetDb, Writer},
 };
 use holochain_types::Timestamp;
 use tracing::instrument;
@@ -32,7 +32,7 @@ pub async fn incoming_dht_ops_workflow(
 ) -> WorkflowResult<()> {
     // set up our workspace
     let env_ref = state_env.guard().await;
-    let _reader = env_ref.reader()?;
+
     let mut workspace = IncomingDhtOpsWorkspace::new(state_env.clone().into(), &env_ref)?;
 
     // add incoming ops to the validation limbo

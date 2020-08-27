@@ -66,7 +66,6 @@ pub async fn publish_dht_ops_workflow(
 
     // Commit to the network
     for (basis, ops) in to_publish {
-        debug!(?ops);
         network.publish(true, basis, ops, None).await?;
     }
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
@@ -263,7 +262,6 @@ mod tests {
 
         // Create and fill authored ops db in the workspace
         {
-            let _reader = env_ref.reader().unwrap();
             let mut workspace = PublishDhtOpsWorkspace::new(env.clone().into(), &env_ref).unwrap();
             for (sig, op_hashed, op_light, header_hash) in data {
                 let op_hash = op_hashed.as_hash().clone();
@@ -336,7 +334,7 @@ mod tests {
     /// Call the workflow
     async fn call_workflow(env: EnvironmentWrite, mut cell_network: HolochainP2pCell) {
         let env_ref = env.guard().await;
-        let _reader = env_ref.reader().unwrap();
+
         let workspace = PublishDhtOpsWorkspace::new(env.clone().into(), &env_ref).unwrap();
         publish_dht_ops_workflow(workspace, env.clone().into(), &mut cell_network)
             .await
