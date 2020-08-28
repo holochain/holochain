@@ -14,7 +14,6 @@ use shrinkwraprs::Shrinkwrap;
 #[derive(Shrinkwrap)]
 #[shrinkwrap(mutable)]
 /// The database for putting ops into to await validation
-// TODO: why is the buf pub?
 pub struct ValidationLimboStore(pub KvBufFresh<ValidationLimboKey, ValidationLimboValue>);
 
 /// Key to the validation limbo

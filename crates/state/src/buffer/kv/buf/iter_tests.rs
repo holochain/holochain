@@ -111,7 +111,7 @@ fn do_test<R: Readable>(
     assert_eq!(
         buf.iter(reader)
             .unwrap()
-            .map(|(k, v)| Ok((DbString::from_key_bytes_fallible(k), v)))
+            .map(|(k, v)| Ok((DbString::from_key_bytes_or_friendly_panic(k), v)))
             .inspect(|(k, v)| Ok(trace!(?k, ?v)))
             .collect::<Vec<_>>()
             .unwrap(),
@@ -127,7 +127,7 @@ fn do_test<R: Readable>(
     assert_eq!(
         buf.iter_from(reader, from_key.clone())
             .unwrap()
-            .map(|(k, v)| Ok((DbString::from_key_bytes_fallible(k), v)))
+            .map(|(k, v)| Ok((DbString::from_key_bytes_or_friendly_panic(k), v)))
             .inspect(|(k, v)| Ok(trace!(?k, ?v)))
             .collect::<Vec<_>>()
             .unwrap(),
@@ -145,7 +145,7 @@ fn do_test<R: Readable>(
         buf.iter(reader)
             .unwrap()
             .rev()
-            .map(|(k, v)| Ok((DbString::from_key_bytes_fallible(k), v)))
+            .map(|(k, v)| Ok((DbString::from_key_bytes_or_friendly_panic(k), v)))
             .inspect(|(k, v)| Ok(trace!(?k, ?v)))
             .collect::<Vec<_>>()
             .unwrap(),
@@ -187,7 +187,7 @@ fn re_do_test<R: Readable>(
     assert_eq!(
         buf.iter(reader)
             .unwrap()
-            .map(|(k, v)| Ok((DbString::from_key_bytes_fallible(k), v)))
+            .map(|(k, v)| Ok((DbString::from_key_bytes_or_friendly_panic(k), v)))
             .inspect(|(k, v)| Ok(trace!(?k, ?v)))
             .collect::<Vec<_>>()
             .unwrap(),
@@ -201,7 +201,7 @@ fn re_do_test<R: Readable>(
     assert_eq!(
         buf.iter_from(reader, from_key.clone())
             .unwrap()
-            .map(|(k, v)| Ok((DbString::from_key_bytes_fallible(k), v)))
+            .map(|(k, v)| Ok((DbString::from_key_bytes_or_friendly_panic(k), v)))
             .inspect(|(k, v)| Ok(trace!(?k, ?v)))
             .collect::<Vec<_>>()
             .unwrap(),
@@ -216,7 +216,7 @@ fn re_do_test<R: Readable>(
         buf.iter(reader)
             .unwrap()
             .rev()
-            .map(|(k, v)| Ok((DbString::from_key_bytes_fallible(k), v)))
+            .map(|(k, v)| Ok((DbString::from_key_bytes_or_friendly_panic(k), v)))
             .inspect(|(k, v)| Ok(trace!(?k, ?v)))
             .collect::<Vec<_>>()
             .unwrap(),
@@ -491,7 +491,7 @@ async fn exhaust_both_ends() {
         .open_single("kv", StoreOptions::create())
         .unwrap();
     let values = (b'a'..=b'z')
-        .map(|a| DbString::from_key_bytes_fallible(&[a]))
+        .map(|a| DbString::from_key_bytes_or_friendly_panic(&[a]))
         .zip((0..).into_iter().map(V))
         .collect::<Vec<_>>();
     let expected = [

@@ -16,7 +16,10 @@ pub trait BufKey: Sized + Ord + Eq + AsRef<[u8]> + Send + Sync {
 
     /// The inverse of to_key_bytes. **This can panic!**.
     /// Only call this on bytes which were created by `to_key_bytes`.
-    fn from_key_bytes_fallible(bytes: &[u8]) -> Self;
+    /// The method is named as such to remind implementors that any potential
+    /// panic should be a friendly message that suggests that the database may
+    /// have been corrupted
+    fn from_key_bytes_or_friendly_panic(bytes: &[u8]) -> Self;
 }
 
 /// Trait alias for the combination of constraints needed for keys in [KvIntStore](kv_int::KvIntStore)
@@ -41,7 +44,7 @@ pub struct IntKey([u8; 4]);
 impl rkv::store::integer::PrimitiveInt for IntKey {}
 
 impl BufKey for IntKey {
-    fn from_key_bytes_fallible(vec: &[u8]) -> Self {
+    fn from_key_bytes_or_friendly_panic(vec: &[u8]) -> Self {
         let boxed_slice = vec.to_vec().into_boxed_slice();
         let boxed_array: Box<[u8; 4]> = match boxed_slice.try_into() {
             Ok(ba) => ba,
@@ -62,7 +65,7 @@ impl From<u32> for IntKey {
         use byteorder::{BigEndian, WriteBytesExt};
         let mut wtr = vec![];
         wtr.write_u32::<BigEndian>(u).unwrap();
-        Self::from_key_bytes_fallible(&wtr)
+        Self::from_key_bytes_or_friendly_panic(&wtr)
     }
 }
 
@@ -74,7 +77,7 @@ impl From<IntKey> for u32 {
 }
 
 impl<T: HashType + Send + Sync> BufKey for HoloHash<T> {
-    fn from_key_bytes_fallible(bytes: &[u8]) -> Self {
+    fn from_key_bytes_or_friendly_panic(bytes: &[u8]) -> Self {
         // FIXME: change after [ B-02112 ]
         tracing::error!("This is NOT correct for AnyDhtHash!");
         Self::from_raw_bytes_and_type(bytes.to_vec(), T::default())
@@ -98,7 +101,7 @@ impl BufKey for UnitDbKey {
         ARBITRARY_BYTE_SLICE.to_vec()
     }
 
-    fn from_key_bytes_fallible(bytes: &[u8]) -> Self {
+    fn from_key_bytes_or_friendly_panic(bytes: &[u8]) -> Self {
         assert_eq!(bytes, ARBITRARY_BYTE_SLICE);
         Self
     }
