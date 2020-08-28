@@ -26,7 +26,6 @@ pub fn commit_entry<'a>(
     call_context: Arc<CallContext>,
     input: CommitEntryInput,
 ) -> RibosomeResult<CommitEntryOutput> {
-    dbg!(&input);
     // destructure the args out into an app type def id and entry
     let (entry_def_id, entry) = input.into_inner();
 
@@ -53,10 +52,6 @@ pub fn commit_entry<'a>(
         EntryDefId::CapClaim => EntryType::CapClaim,
     };
 
-    dbg!(&entry_type);
-    dbg!(&entry);
-    dbg!(&entry_hash);
-
     // build a header for the entry being committed
     let header_builder = builder::EntryCreate {
         entry_type,
@@ -65,11 +60,9 @@ pub fn commit_entry<'a>(
     let call =
         |workspace: &'a mut CallZomeWorkspace| -> BoxFuture<'a, SourceChainResult<HeaderHash>> {
             async move {
-                dbg!(&"foo");
                 let source_chain = &mut workspace.source_chain;
                 // push the header and the entry into the source chain
                 let header_hash = source_chain.put(header_builder, Some(entry)).await?;
-                dbg!(&header_hash);
                 // fetch the element we just added so we can integrate its DhtOps
                 let element = source_chain
                     .get_element(&header_hash)
@@ -90,8 +83,6 @@ pub fn commit_entry<'a>(
         tokio_safe_block_on::tokio_safe_block_forever_on(tokio::task::spawn(async move {
             unsafe { call_context.host_access.workspace().apply_mut(call).await }
         }))???;
-
-    dbg!(&header_address);
 
     // return the hash of the committed entry
     // note that validation is handled by the workflow

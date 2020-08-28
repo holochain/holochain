@@ -78,7 +78,6 @@ pub mod wasm_test {
         );
         let entry: GetOutput =
             crate::call_test_ribosome!(host_access, TestWasm::Capability, "get_entry", header);
-        dbg!(&entry);
 
         let entry_secret: CapSecret = match entry.into_inner() {
             Some(element) => {
