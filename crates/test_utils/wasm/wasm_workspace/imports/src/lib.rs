@@ -33,7 +33,9 @@ guest_functions!(
     [__zome_info, zome_info, ZomeInfoInput, ZomeInfoOutput],
     [__agent_info, agent_info, AgentInfoInput, AgentInfoOutput],
     [__call, call, CallInput, CallOutput],
-    [__capability, capability, CapabilityInput, CapabilityOutput],
+    [__capability_claims, capability_claims, CapabilityClaimsInput, CapabilityClaimsOutput],
+    [__capability_grants, capability_grants, CapabilityGrantsInput, CapabilityGrantsOutput],
+    [__capability_info, capability_info, CapabilityInfoInput, CapabilityInfoOutput],
     [
         __commit_entry,
         commit_entry,

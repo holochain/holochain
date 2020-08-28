@@ -37,6 +37,8 @@ pub mod wasm_test {
     use crate::conductor::interface::websocket::test::setup_app;
     use crate::core::ribosome::ZomeCallInvocation;
     use crate::core::ribosome::ZomeCallInvocationResponse;
+    use crate::fixt::*;
+    use fixt::prelude::*;
     use hdk3::prelude::*;
     use holochain_types::app::InstalledCell;
     use holochain_types::cell::CellId;
@@ -127,7 +129,7 @@ pub mod wasm_test {
             .call_zome(ZomeCallInvocation {
                 cell_id: alice_cell_id,
                 zome_name: TestWasm::WhoAmI.into(),
-                cap: CapSecret::default(),
+                cap: CapSecretFixturator::new(Empty).next().unwrap(),
                 fn_name: "whoarethey".to_string(),
                 payload: HostInput::new(bob_agent_id.clone().try_into().unwrap()),
                 provenance: alice_agent_id,
@@ -143,7 +145,6 @@ pub mod wasm_test {
                 assert_eq!(
                     agent_info,
                     AgentInfo {
-                        agent_pubkey: bob_agent_id.clone(),
                         agent_initial_pubkey: bob_agent_id.clone(),
                         agent_latest_pubkey: bob_agent_id,
                     },
