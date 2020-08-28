@@ -103,12 +103,12 @@ impl ElementBuf {
     }
 
     pub async fn contains_entry(&self, entry_hash: &EntryHash) -> DatabaseResult<bool> {
-        Ok(if self.public_entries.contains(entry_hash).await? {
+        Ok(if self.public_entries.contains(entry_hash)? {
             true
         } else {
             // Potentially avoid this let Some if the above branch is hit first
             if let Some(private) = &self.private_entries {
-                private.contains(entry_hash).await?
+                private.contains(entry_hash)?
             } else {
                 false
             }
@@ -116,7 +116,7 @@ impl ElementBuf {
     }
 
     pub async fn contains_header(&self, header_hash: &HeaderHash) -> DatabaseResult<bool> {
-        self.headers.contains(header_hash).await
+        self.headers.contains(header_hash)
     }
 
     pub async fn get_header(
@@ -299,7 +299,7 @@ mod tests {
     async fn can_write_private_entry_when_enabled() -> anyhow::Result<()> {
         let keystore = spawn_test_keystore(Vec::new()).await?;
         let arc = test_cell_env();
-        let env = arc.guard().await;
+        let env = arc.guard();
 
         let agent_key = AgentPubKey::new_from_pure_entropy(&keystore).await?;
         let (header_pub, entry_pub) =
@@ -345,7 +345,7 @@ mod tests {
     async fn cannot_write_private_entry_when_disabled() -> anyhow::Result<()> {
         let keystore = spawn_test_keystore(Vec::new()).await?;
         let arc = test_cell_env();
-        let env = arc.guard().await;
+        let env = arc.guard();
 
         let agent_key = AgentPubKey::new_from_pure_entropy(&keystore).await?;
         let (header_pub, entry_pub) =

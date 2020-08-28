@@ -67,10 +67,9 @@ pub mod wasm_test {
     /// we can get some random data out of the fn via. a wasm call
     async fn ribosome_random_bytes_test() {
         let env = holochain_state::test_utils::test_cell_env();
-        let dbs = env.dbs().await;
-        let mut workspace = crate::core::workflow::CallZomeWorkspace::new(env.clone().into(), &dbs)
-            .await
-            .unwrap();
+        let dbs = env.dbs();
+        let mut workspace =
+            crate::core::workflow::CallZomeWorkspace::new(env.clone().into(), &dbs).unwrap();
 
         let (_g, raw_workspace) =
             crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(

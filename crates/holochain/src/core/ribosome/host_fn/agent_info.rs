@@ -49,10 +49,9 @@ pub mod test {
     #[tokio::test(threaded_scheduler)]
     async fn invoke_import_agent_info_test() {
         let env = holochain_state::test_utils::test_cell_env();
-        let dbs = env.dbs().await;
-        let mut workspace = crate::core::workflow::CallZomeWorkspace::new(env.clone().into(), &dbs)
-            .await
-            .unwrap();
+        let dbs = env.dbs();
+        let mut workspace =
+            crate::core::workflow::CallZomeWorkspace::new(env.clone().into(), &dbs).unwrap();
 
         crate::core::workflow::fake_genesis(&mut workspace.source_chain)
             .await

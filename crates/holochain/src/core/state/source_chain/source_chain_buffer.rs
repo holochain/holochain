@@ -26,19 +26,19 @@ pub struct SourceChainBuf {
 }
 
 impl SourceChainBuf {
-    pub async fn new(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
+    pub fn new(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
         Ok(Self {
             elements: ElementBuf::vault(env.clone(), dbs, true)?,
-            sequence: ChainSequenceBuf::new(env.clone(), dbs).await?,
+            sequence: ChainSequenceBuf::new(env.clone(), dbs)?,
             keystore: dbs.keystore(),
             env,
         })
     }
 
-    pub async fn public_only(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
+    pub fn public_only(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
         Ok(Self {
             elements: ElementBuf::vault(env.clone(), dbs, false)?,
-            sequence: ChainSequenceBuf::new(env.clone(), dbs).await?,
+            sequence: ChainSequenceBuf::new(env.clone(), dbs)?,
             keystore: dbs.keystore(),
             env,
         })
@@ -51,10 +51,10 @@ impl SourceChainBuf {
     // add a cache test only method that allows this to
     // be used with the cache database for testing
     // FIXME This should only be cfg(test) but that doesn't work with integration tests
-    pub async fn cache(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
+    pub fn cache(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
         Ok(Self {
             elements: ElementBuf::cache(env.clone(), dbs)?,
-            sequence: ChainSequenceBuf::new(env.clone(), dbs).await?,
+            sequence: ChainSequenceBuf::new(env.clone(), dbs)?,
             keystore: dbs.keystore(),
             env,
         })
@@ -75,7 +75,7 @@ impl SourceChainBuf {
     }
 
     pub async fn get_at_index(&self, i: u32) -> SourceChainResult<Option<Element>> {
-        if let Some(address) = self.sequence.get(i).await? {
+        if let Some(address) = self.sequence.get(i)? {
             self.get_element(&address).await
         } else {
             Ok(None)
@@ -113,8 +113,8 @@ impl SourceChainBuf {
         Ok(ops)
     }
 
-    pub async fn complete_dht_op(&mut self, i: u32) -> SourceChainResult<()> {
-        self.sequence.complete_dht_op(i).await
+    pub fn complete_dht_op(&mut self, i: u32) -> SourceChainResult<()> {
+        self.sequence.complete_dht_op(i)
     }
 
     pub fn elements(&self) -> &ElementBuf {
@@ -382,13 +382,13 @@ pub mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn source_chain_buffer_iter_back() -> SourceChainResult<()> {
         let arc = test_cell_env();
-        let env = arc.guard().await;
-        let dbs = arc.dbs().await;
+        let env = arc.guard();
+        let dbs = arc.dbs();
 
         let (_agent_pubkey, dna_header, dna_entry, agent_header, agent_entry) = fixtures();
 
         {
-            let mut store = SourceChainBuf::new(arc.clone().into(), &dbs).await.unwrap();
+            let mut store = SourceChainBuf::new(arc.clone().into(), &dbs).unwrap();
             assert!(store.chain_head().is_none());
             store
                 .put_raw(dna_header.as_content().clone(), dna_entry.clone())
@@ -400,7 +400,7 @@ pub mod tests {
         };
 
         {
-            let store = SourceChainBuf::new(arc.clone().into(), &dbs).await.unwrap();
+            let store = SourceChainBuf::new(arc.clone().into(), &dbs).unwrap();
             assert!(store.chain_head().is_some());
 
             // get the full element
@@ -452,12 +452,12 @@ pub mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn source_chain_buffer_dump_entries_json() -> SourceChainResult<()> {
         let arc = test_cell_env();
-        let env = arc.guard().await;
+        let env = arc.guard();
 
         let (_agent_pubkey, dna_header, dna_entry, agent_header, agent_entry) = fixtures();
 
         {
-            let mut store = SourceChainBuf::new(arc.clone().into(), &env).await.unwrap();
+            let mut store = SourceChainBuf::new(arc.clone().into(), &env).unwrap();
             store
                 .put_raw(dna_header.as_content().clone(), dna_entry)
                 .await?;
@@ -469,7 +469,7 @@ pub mod tests {
         }
 
         {
-            let store = SourceChainBuf::new(arc.clone().into(), &env).await.unwrap();
+            let store = SourceChainBuf::new(arc.clone().into(), &env).unwrap();
             let json = store.dump_as_json().await?;
             let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
 
@@ -491,8 +491,8 @@ pub mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn test_header_cas_roundtrip() {
         let arc = test_cell_env();
-        let env = arc.guard().await;
-        let mut store = SourceChainBuf::new(arc.clone().into(), &env).await.unwrap();
+        let env = arc.guard();
+        let mut store = SourceChainBuf::new(arc.clone().into(), &env).unwrap();
 
         let (_, hashed, _, _, _) = fixtures();
         let header = hashed.into_content();

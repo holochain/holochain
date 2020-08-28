@@ -3,11 +3,11 @@ use super::*;
 mock! {
     pub MetadataBuf
     {
-        fn sync_get_live_links<'a>(
+        fn get_live_links<'a>(
             &self,
             key: &'a LinkMetaKey<'a>,
         ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError>>>;
-        fn sync_get_links_all<'a>(
+        fn get_links_all<'a>(
             &self,
             key: &'a LinkMetaKey<'a>,
         ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError>>>;
@@ -24,7 +24,7 @@ mock! {
         fn sync_register_delete(&mut self, delete: header::ElementDelete) -> DatabaseResult<()>;
         fn register_raw_on_entry(&mut self, entry_hash: EntryHash, value: SysMetaVal) -> DatabaseResult<()>;
         fn register_raw_on_header(&mut self, header_hash: HeaderHash, value: SysMetaVal);
-        fn sync_get_dht_status(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus>;
+        fn get_dht_status(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus>;
         fn get_canonical_entry_hash(&self, entry_hash: EntryHash) -> DatabaseResult<EntryHash>;
         fn get_canonical_header_hash(&self, header_hash: HeaderHash) -> DatabaseResult<HeaderHash>;
         fn get_headers(
@@ -64,7 +64,7 @@ impl MetadataBufT for MockMetadataBuf {
         key: &'k LinkMetaKey<'k>,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError> + 'r>>
     {
-        self.sync_get_live_links(key)
+        MockMetadataBuf::get_live_links(&self, key)
     }
 
     fn get_links_all<'r, 'k, R: Readable>(
@@ -73,7 +73,7 @@ impl MetadataBufT for MockMetadataBuf {
         key: &'k LinkMetaKey<'k>,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError> + 'r>>
     {
-        self.sync_get_links_all(key)
+        MockMetadataBuf::get_links_all(&self, key)
     }
 
     fn get_canonical_entry_hash(&self, entry_hash: EntryHash) -> DatabaseResult<EntryHash> {
@@ -85,7 +85,7 @@ impl MetadataBufT for MockMetadataBuf {
         _r: &'r R,
         entry_hash: &EntryHash,
     ) -> DatabaseResult<EntryDhtStatus> {
-        self.sync_get_dht_status(entry_hash)
+        MockMetadataBuf::get_dht_status(&self, entry_hash)
     }
 
     fn get_canonical_header_hash(&self, header_hash: HeaderHash) -> DatabaseResult<HeaderHash> {
@@ -173,7 +173,7 @@ impl MetadataBufT for MockMetadataBuf {
         self.sync_register_delete(delete)
     }
 
-    async fn register_raw_on_entry(
+    fn register_raw_on_entry(
         &mut self,
         entry_hash: EntryHash,
         value: SysMetaVal,

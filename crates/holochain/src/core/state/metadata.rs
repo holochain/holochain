@@ -69,7 +69,7 @@ pub trait MetadataBufT {
     /// Register a HeaderHash directly on an entry hash.
     /// Also updates the entry dht status.
     /// Useful when you only have hashes and not full types
-    async fn register_raw_on_entry(
+    fn register_raw_on_entry(
         &mut self,
         entry_hash: EntryHash,
         value: SysMetaVal,
@@ -214,7 +214,7 @@ impl MetadataBuf {
     }
 
     #[instrument(skip(self))]
-    async fn update_entry_dht_status(&mut self, basis: EntryHash) -> DatabaseResult<()> {
+    fn update_entry_dht_status(&mut self, basis: EntryHash) -> DatabaseResult<()> {
         let status = fresh_reader!(self.env, |r| self.get_headers(&r, basis.clone())?.find_map(
             |header| {
                 if let None = self.get_deletes_on_header(&r, header.header_hash)?.next()? {
@@ -309,13 +309,13 @@ impl MetadataBufT for MetadataBuf {
         Ok(())
     }
 
-    async fn register_raw_on_entry(
+    fn register_raw_on_entry(
         &mut self,
         entry_hash: EntryHash,
         value: SysMetaVal,
     ) -> DatabaseResult<()> {
         self.system_meta.insert(entry_hash.clone().into(), value);
-        self.update_entry_dht_status(entry_hash).await
+        self.update_entry_dht_status(entry_hash)
     }
 
     fn register_raw_on_header(&mut self, header_hash: HeaderHash, value: SysMetaVal) {
@@ -326,7 +326,7 @@ impl MetadataBufT for MetadataBuf {
         let basis = new_entry_header.entry().clone();
         self.register_header_on_basis(basis.clone(), new_entry_header)
             .await?;
-        self.update_entry_dht_status(basis).await?;
+        self.update_entry_dht_status(basis)?;
         Ok(())
     }
 
@@ -354,7 +354,7 @@ impl MetadataBufT for MetadataBuf {
             .await?;
         self.register_header_on_basis(entry_hash.clone(), delete)
             .await?;
-        self.update_entry_dht_status(entry_hash).await
+        self.update_entry_dht_status(entry_hash)
     }
 
     #[allow(clippy::needless_lifetimes)]

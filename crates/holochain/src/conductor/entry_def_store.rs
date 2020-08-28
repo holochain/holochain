@@ -44,7 +44,7 @@ impl AsRef<[u8]> for EntryDefStoreKey {
 }
 
 impl BufKey for EntryDefStoreKey {
-    fn from_key_bytes_fallible(bytes: &[u8]) -> Self {
+    fn from_key_bytes_or_friendly_panic(bytes: &[u8]) -> Self {
         Self(UnsafeBytes::from(bytes.to_vec()).into())
     }
 }
@@ -88,8 +88,8 @@ impl EntryDefBuf {
     }
 
     /// Get an entry def
-    pub async fn get(&self, k: EntryDefBufferKey) -> DatabaseResult<Option<EntryDef>> {
-        self.0.get(&k.into()).await
+    pub fn get(&self, k: EntryDefBufferKey) -> DatabaseResult<Option<EntryDef>> {
+        self.0.get(&k.into())
     }
 
     /// Store an entry def
@@ -124,7 +124,7 @@ impl BufferedStore for EntryDefBuf {
 }
 
 /// Get all the [EntryDef] for this dna
-pub(crate) async fn get_entry_defs(
+pub(crate) fn get_entry_defs(
     dna: DnaFile,
 ) -> EntryDefStoreResult<Vec<(EntryDefBufferKey, EntryDef)>> {
     let invocation = EntryDefsInvocation::new();

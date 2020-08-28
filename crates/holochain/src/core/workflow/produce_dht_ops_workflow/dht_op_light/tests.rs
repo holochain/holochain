@@ -244,7 +244,7 @@ async fn test_all_ops() {
 #[tokio::test(threaded_scheduler)]
 async fn test_dht_basis() {
     let env = test_cell_env();
-    let env_ref = env.guard().await;
+    let env_ref = env.guard();
 
     {
         // Create a header that points to an entry

@@ -62,7 +62,7 @@ async fn get_updates_cache() {
     observability::test_run().ok();
     // Database setup
     let env = test_cell_env();
-    let dbs = env.dbs().await;
+    let dbs = env.dbs();
 
     let (element_fixt_store, _) = generate_fixt_store().await;
     let expected = element_fixt_store
@@ -72,9 +72,7 @@ async fn get_updates_cache() {
         .unwrap();
 
     // Create the cascade
-    let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
-        .await
-        .unwrap();
+    let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs).unwrap();
     let (network, shutdown) = run_fixt_network(element_fixt_store, BTreeMap::new()).await;
 
     {
@@ -107,8 +105,8 @@ async fn get_meta_updates_meta_cache() {
     observability::test_run().ok();
     // Database setup
     let env = test_cell_env();
-    let dbs = env.dbs().await;
-    let env_ref = env.guard().await;
+    let dbs = env.dbs();
+    let env_ref = env.guard();
 
     // Setup other metadata store with fixtures attached
     // to known entry hash
@@ -120,9 +118,7 @@ async fn get_meta_updates_meta_cache() {
         .unwrap();
 
     // Create the cascade
-    let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
-        .await
-        .unwrap();
+    let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs).unwrap();
     let (network, shutdown) = run_fixt_network(BTreeMap::new(), meta_fixt_store).await;
 
     let returned = {
@@ -225,7 +221,7 @@ async fn get_from_another_agent() {
     let entry_hash = EntryHash::with_data(&Entry::try_from(entry.clone()).unwrap()).await;
     let header_hash = {
         let (bob_env, call_data) = CallData::create(&bob_cell_id, &handle, &dna_file).await;
-        let dbs = bob_env.dbs().await;
+        let dbs = bob_env.dbs();
         let header_hash = commit_entry(
             &bob_env,
             &dbs,
@@ -250,7 +246,7 @@ async fn get_from_another_agent() {
     // Alice get element from bob
     let element = {
         let (alice_env, call_data) = CallData::create(&alice_cell_id, &handle, &dna_file).await;
-        let dbs = alice_env.dbs().await;
+        let dbs = alice_env.dbs();
         get(
             &alice_env,
             &dbs,
@@ -275,7 +271,7 @@ async fn get_from_another_agent() {
     let new_entry = Post("Bananas are bendy".into());
     let (remove_hash, update_hash) = {
         let (bob_env, call_data) = CallData::create(&bob_cell_id, &handle, &dna_file).await;
-        let dbs = bob_env.dbs().await;
+        let dbs = bob_env.dbs();
         let remove_hash =
             delete_entry(&bob_env, &dbs, call_data.clone(), header_hash.clone()).await;
 
@@ -308,7 +304,7 @@ async fn get_from_another_agent() {
     // Alice get element from bob
     let (entry_details, header_details) = {
         let (alice_env, call_data) = CallData::create(&alice_cell_id, &handle, &dna_file).await;
-        let dbs = alice_env.dbs().await;
+        let dbs = alice_env.dbs();
         debug!(the_entry_hash = ?entry_hash);
         let entry_details = get_details(
             &alice_env,
@@ -427,7 +423,7 @@ async fn get_links_from_another_agent() {
     let link_tag = fixt!(LinkTag);
     let link_add_hash = {
         let (bob_env, call_data) = CallData::create(&bob_cell_id, &handle, &dna_file).await;
-        let dbs = bob_env.dbs().await;
+        let dbs = bob_env.dbs();
         let base_header_hash = commit_entry(
             &bob_env,
             &dbs,
@@ -486,7 +482,7 @@ async fn get_links_from_another_agent() {
     // Alice get links from bob
     let links = {
         let (alice_env, call_data) = CallData::create(&alice_cell_id, &handle, &dna_file).await;
-        let dbs = alice_env.dbs().await;
+        let dbs = alice_env.dbs();
 
         get_links(
             &alice_env,
@@ -511,7 +507,8 @@ async fn get_links_from_another_agent() {
     // Remove the link
     {
         let (bob_env, call_data) = CallData::create(&bob_cell_id, &handle, &dna_file).await;
-        let dbs = bob_env.dbs().await;
+        let dbs = bob_env.dbs();
+
         // Link the entries
         let link_remove_hash =
             remove_link(&bob_env, &dbs, call_data.clone(), link_add_hash.clone()).await;
@@ -527,7 +524,7 @@ async fn get_links_from_another_agent() {
 
     let links = {
         let (alice_env, call_data) = CallData::create(&alice_cell_id, &handle, &dna_file).await;
-        let dbs = alice_env.dbs().await;
+        let dbs = alice_env.dbs();
 
         get_link_details(
             &alice_env,
@@ -722,7 +719,6 @@ async fn fake_authority<'env>(
         .unwrap();
 
     env.guard()
-        .await
         .with_commit(|writer| {
             element_vault.flush_to_txn(writer)?;
             meta_vault.flush_to_txn(writer)

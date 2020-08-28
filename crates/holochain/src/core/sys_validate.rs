@@ -61,8 +61,7 @@ pub async fn sys_validate_element(
     sys_validate_header(
         element.header_hashed(),
         prev_element.map(|e| e.header_hashed()),
-    )
-    .await?;
+    )?;
 
     // The header was authored by the agent that owns this chain.
     if element.header().author() != author {
@@ -93,7 +92,7 @@ pub async fn sys_validate_element(
 ///   ordering is correct, and the previous header is strictly the previous
 ///   header by sequence.
 /// - @TODO - The agent was valid in DPKI at time of signing.
-pub async fn sys_validate_header(
+pub fn sys_validate_header(
     header: &HeaderHashed,
     prev_header: Option<&HeaderHashed>,
 ) -> SourceChainResult<()> {

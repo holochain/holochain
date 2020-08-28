@@ -18,7 +18,7 @@ pub(super) type Store = KvBufUsed<DbString, V>;
 #[tokio::test(threaded_scheduler)]
 async fn kv_iter_from_partial() {
     let arc = test_cell_env();
-    let env = arc.guard().await;
+    let env = arc.guard();
     let db = env
         .inner()
         .open_single("kv", StoreOptions::create())
@@ -111,7 +111,7 @@ fn do_test<R: Readable>(
     assert_eq!(
         buf.iter(reader)
             .unwrap()
-            .map(|(k, v)| Ok((DbString::from_key_bytes_fallible(k), v)))
+            .map(|(k, v)| Ok((DbString::from_key_bytes_or_friendly_panic(k), v)))
             .inspect(|(k, v)| Ok(trace!(?k, ?v)))
             .collect::<Vec<_>>()
             .unwrap(),
@@ -127,7 +127,7 @@ fn do_test<R: Readable>(
     assert_eq!(
         buf.iter_from(reader, from_key.clone())
             .unwrap()
-            .map(|(k, v)| Ok((DbString::from_key_bytes_fallible(k), v)))
+            .map(|(k, v)| Ok((DbString::from_key_bytes_or_friendly_panic(k), v)))
             .inspect(|(k, v)| Ok(trace!(?k, ?v)))
             .collect::<Vec<_>>()
             .unwrap(),
@@ -145,7 +145,7 @@ fn do_test<R: Readable>(
         buf.iter(reader)
             .unwrap()
             .rev()
-            .map(|(k, v)| Ok((DbString::from_key_bytes_fallible(k), v)))
+            .map(|(k, v)| Ok((DbString::from_key_bytes_or_friendly_panic(k), v)))
             .inspect(|(k, v)| Ok(trace!(?k, ?v)))
             .collect::<Vec<_>>()
             .unwrap(),
@@ -187,7 +187,7 @@ fn re_do_test<R: Readable>(
     assert_eq!(
         buf.iter(reader)
             .unwrap()
-            .map(|(k, v)| Ok((DbString::from_key_bytes_fallible(k), v)))
+            .map(|(k, v)| Ok((DbString::from_key_bytes_or_friendly_panic(k), v)))
             .inspect(|(k, v)| Ok(trace!(?k, ?v)))
             .collect::<Vec<_>>()
             .unwrap(),
@@ -201,7 +201,7 @@ fn re_do_test<R: Readable>(
     assert_eq!(
         buf.iter_from(reader, from_key.clone())
             .unwrap()
-            .map(|(k, v)| Ok((DbString::from_key_bytes_fallible(k), v)))
+            .map(|(k, v)| Ok((DbString::from_key_bytes_or_friendly_panic(k), v)))
             .inspect(|(k, v)| Ok(trace!(?k, ?v)))
             .collect::<Vec<_>>()
             .unwrap(),
@@ -216,7 +216,7 @@ fn re_do_test<R: Readable>(
         buf.iter(reader)
             .unwrap()
             .rev()
-            .map(|(k, v)| Ok((DbString::from_key_bytes_fallible(k), v)))
+            .map(|(k, v)| Ok((DbString::from_key_bytes_or_friendly_panic(k), v)))
             .inspect(|(k, v)| Ok(trace!(?k, ?v)))
             .collect::<Vec<_>>()
             .unwrap(),
@@ -240,7 +240,7 @@ async fn kv_single_iter() {
     holochain_types::observability::test_run().ok();
     let mut rng = rand::thread_rng();
     let arc = test_cell_env();
-    let env = arc.guard().await;
+    let env = arc.guard();
     let db = env
         .inner()
         .open_single("kv", StoreOptions::create())
@@ -485,13 +485,13 @@ async fn kv_single_iter_found_4() {
 #[tokio::test(threaded_scheduler)]
 async fn exhaust_both_ends() {
     let arc = test_cell_env();
-    let env = arc.guard().await;
+    let env = arc.guard();
     let db = env
         .inner()
         .open_single("kv", StoreOptions::create())
         .unwrap();
     let values = (b'a'..=b'z')
-        .map(|a| DbString::from_key_bytes_fallible(&[a]))
+        .map(|a| DbString::from_key_bytes_or_friendly_panic(&[a]))
         .zip((0..).into_iter().map(V))
         .collect::<Vec<_>>();
     let expected = [
@@ -580,7 +580,7 @@ async fn kv_single_iter_runner(
     from_key: DbString,
 ) {
     let arc = test_cell_env();
-    let env = arc.guard().await;
+    let env = arc.guard();
     let db = env
         .inner()
         .open_single("kv", StoreOptions::create())

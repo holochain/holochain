@@ -29,7 +29,7 @@ pub fn spawn_sys_validation_consumer(
     let mut trigger_self = tx.clone();
     let handle = tokio::spawn(async move {
         loop {
-            let env_ref = env.guard().await;
+            let env_ref = env.guard();
             let workspace = SysValidationWorkspace::new(env.clone().into(), &env_ref)
                 .expect("Could not create Workspace");
             if let WorkComplete::Incomplete = sys_validation_workflow(

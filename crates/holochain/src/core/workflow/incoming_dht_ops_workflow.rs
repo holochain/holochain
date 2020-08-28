@@ -31,7 +31,7 @@ pub async fn incoming_dht_ops_workflow(
     ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
 ) -> WorkflowResult<()> {
     // set up our workspace
-    let env_ref = state_env.guard().await;
+    let env_ref = state_env.guard();
     let mut workspace = IncomingDhtOpsWorkspace::new(state_env.clone().into(), &env_ref)?;
 
     // add incoming ops to the validation limbo
@@ -45,7 +45,7 @@ pub async fn incoming_dht_ops_workflow(
             last_try: None,
             num_tries: 0,
         };
-        if !workspace.op_exists(&hash).await? {
+        if !workspace.op_exists(&hash)? {
             workspace.validation_limbo.put(hash, vlv)?;
         }
     }
@@ -53,9 +53,7 @@ pub async fn incoming_dht_ops_workflow(
     // commit our transaction
     let writer: crate::core::queue_consumer::OneshotWriter = state_env.clone().into();
 
-    writer
-        .with_writer(|writer| Ok(workspace.flush_to_txn(writer)?))
-        .await?;
+    writer.with_writer(|writer| Ok(workspace.flush_to_txn(writer)?))?;
 
     // trigger validation of queued ops
     sys_validation_trigger.trigger();
@@ -94,9 +92,9 @@ impl IncomingDhtOpsWorkspace {
         })
     }
 
-    pub async fn op_exists(&self, hash: &DhtOpHash) -> DatabaseResult<bool> {
-        Ok(self.integrated_dht_ops.contains(&hash).await?
-            || self.integration_limbo.contains(&hash).await?
-            || self.validation_limbo.contains(&hash).await?)
+    pub fn op_exists(&self, hash: &DhtOpHash) -> DatabaseResult<bool> {
+        Ok(self.integrated_dht_ops.contains(&hash)?
+            || self.integration_limbo.contains(&hash)?
+            || self.validation_limbo.contains(&hash)?)
     }
 }

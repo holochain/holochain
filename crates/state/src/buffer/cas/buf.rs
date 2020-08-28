@@ -140,7 +140,7 @@ where
     }
 
     /// Check if a value is stored at this key
-    pub async fn contains(&self, k: &HoloHashOf<C>) -> DatabaseResult<bool> {
+    pub fn contains(&self, k: &HoloHashOf<C>) -> DatabaseResult<bool> {
         fresh_reader!(self.env, |r| self.inner.contains(&r, k))
     }
 }

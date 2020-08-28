@@ -130,10 +130,8 @@ pub mod wasm_test {
         holochain_types::observability::test_run().ok();
 
         let env = holochain_state::test_utils::test_cell_env();
-        let dbs = env.dbs().await;
-        let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
-            .await
-            .unwrap();
+        let dbs = env.dbs();
+        let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs).unwrap();
 
         crate::core::workflow::fake_genesis(&mut workspace.source_chain)
             .await

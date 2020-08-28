@@ -111,7 +111,7 @@ mod tests {
     /// Test that a header can be redirected a single hop
     async fn test_redirect_header_one_hop() -> anyhow::Result<()> {
         let arc = test_cell_env();
-        let env = arc.guard().await;
+        let env = arc.guard();
         let mut fx = TestFixtures::new();
         {
             let mut buf = MetadataBuf::vault(arc.clone().into(), &env)?;
@@ -136,7 +136,7 @@ mod tests {
     /// Test that a header can be redirected three hops
     async fn test_redirect_header_three_hops() -> anyhow::Result<()> {
         let arc = test_cell_env();
-        let env = arc.guard().await;
+        let env = arc.guard();
         let mut fx = TestFixtures::new();
         {
             let mut buf = MetadataBuf::vault(arc.clone().into(), &env)?;
@@ -178,7 +178,7 @@ mod tests {
     /// Test that an entry can be redirected a single hop
     async fn test_redirect_entry_one_hop() -> anyhow::Result<()> {
         let arc = test_cell_env();
-        let env = arc.guard().await;
+        let env = arc.guard();
         let mut fx = TestFixtures::new();
         {
             let mut buf = MetadataBuf::vault(arc.clone().into(), &env)?;
@@ -211,7 +211,7 @@ mod tests {
     /// Test that an entry can be redirected three hops
     async fn test_redirect_entry_three_hops() -> anyhow::Result<()> {
         let arc = test_cell_env();
-        let env = arc.guard().await;
+        let env = arc.guard();
         let mut fx = TestFixtures::new();
         {
             let mut buf = MetadataBuf::vault(arc.clone().into(), &env)?;
@@ -259,7 +259,7 @@ mod tests {
     /// Test that a header can be redirected a single hop
     async fn test_redirect_header_and_entry() -> anyhow::Result<()> {
         let arc = test_cell_env();
-        let env = arc.guard().await;
+        let env = arc.guard();
         let mut fx = TestFixtures::new();
         {
             let mut buf = MetadataBuf::vault(arc.clone().into(), &env)?;
@@ -304,7 +304,7 @@ mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn add_entry_get_headers() {
         let arc = test_cell_env();
-        let env = arc.guard().await;
+        let env = arc.guard();
         let mut fx = TestFixtures::new();
         let entry_hash = fx.entry_hash();
         let mut expected: Vec<TimedHeaderHash> = Vec::new();
@@ -351,7 +351,7 @@ mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn add_entry_get_updates() {
         let arc = test_cell_env();
-        let env = arc.guard().await;
+        let env = arc.guard();
         let mut fx = TestFixtures::new();
         let original_entry_hash = fx.entry_hash();
         let original_header_hash = test_create(original_entry_hash.clone(), &mut fx)
@@ -406,7 +406,7 @@ mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn add_entry_get_updates_header() {
         let arc = test_cell_env();
-        let env = arc.guard().await;
+        let env = arc.guard();
         let mut fx = TestFixtures::new();
         let original_entry_hash = fx.entry_hash();
         let original_header_hash = test_create(original_entry_hash.clone(), &mut fx)
@@ -461,7 +461,7 @@ mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn add_entry_get_deletes() {
         let arc = test_cell_env();
-        let env = arc.guard().await;
+        let env = arc.guard();
         let mut fx = TestFixtures::new();
         let header_hash = fx.header_hash();
         let entry_hash = fx.entry_hash();
@@ -542,7 +542,7 @@ mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn test_entry_dht_status() {
         let arc = test_cell_env();
-        let env = arc.guard().await;
+        let env = arc.guard();
         let mut fx = TestFixtures::new();
         let entry_hash = fx.entry_hash();
         let mut entry_creates = Vec::new();
@@ -679,7 +679,7 @@ mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn test_entry_dht_status_one_less() {
         let arc = test_cell_env();
-        let env = arc.guard().await;
+        let env = arc.guard();
         let mut fx = TestFixtures::new();
         let entry_hash = fx.entry_hash();
         let mut entry_creates = Vec::new();

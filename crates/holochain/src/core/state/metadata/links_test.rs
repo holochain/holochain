@@ -252,7 +252,7 @@ impl TestData {
     }
 
     #[instrument(skip(td, meta_buf))]
-    async fn only_these_on_base<'a>(td: &'a [Self], test: &'static str, meta_buf: &'a MetadataBuf) {
+    fn only_these_on_base<'a>(td: &'a [Self], test: &'static str, meta_buf: &'a MetadataBuf) {
         // Check all base hash are the same
         for d in td {
             assert_eq!(d.base_hash, td[0].base_hash, "{}", test);
@@ -277,11 +277,7 @@ impl TestData {
         ));
     }
 
-    async fn only_these_on_zome_id<'a>(
-        td: &'a [Self],
-        test: &'static str,
-        meta_buf: &'a MetadataBuf,
-    ) {
+    fn only_these_on_zome_id<'a>(td: &'a [Self], test: &'static str, meta_buf: &'a MetadataBuf) {
         // Check all base hash, zome_id are the same
         for d in td {
             assert_eq!(d.base_hash, td[0].base_hash, "{}", test);
@@ -308,11 +304,7 @@ impl TestData {
         ));
     }
 
-    async fn only_these_on_full_key<'a>(
-        td: &'a [Self],
-        test: &'static str,
-        meta_buf: &'a MetadataBuf,
-    ) {
+    fn only_these_on_full_key<'a>(td: &'a [Self], test: &'static str, meta_buf: &'a MetadataBuf) {
         // Check all base hash, zome_id, tag are the same
         for d in td {
             assert_eq!(d.base_hash, td[0].base_hash, "{}", test);
@@ -341,11 +333,7 @@ impl TestData {
         ));
     }
 
-    async fn only_these_on_half_key<'a>(
-        td: &'a [Self],
-        test: &'static str,
-        meta_buf: &'a MetadataBuf,
-    ) {
+    fn only_these_on_half_key<'a>(td: &'a [Self], test: &'static str, meta_buf: &'a MetadataBuf) {
         let tag_len = td[0].tag.0.len();
         // Make sure there is at least some tag
         let tag_len = if tag_len > 1 { tag_len / 2 } else { tag_len };
@@ -381,7 +369,7 @@ impl TestData {
 #[tokio::test(threaded_scheduler)]
 async fn can_add_and_remove_link() {
     let arc = test_cell_env();
-    let env = arc.guard().await;
+    let env = arc.guard();
 
     let mut td = fixtures(arc.clone(), 1).await.into_iter().next().unwrap();
 
@@ -472,7 +460,7 @@ async fn can_add_and_remove_link() {
 #[tokio::test(threaded_scheduler)]
 async fn multiple_links() {
     let arc = test_cell_env();
-    let env = arc.guard().await;
+    let env = arc.guard();
 
     let mut td = fixtures(arc.clone().into(), 10).await;
 
@@ -552,7 +540,7 @@ async fn multiple_links() {
 async fn duplicate_links() {
     observability::test_run().ok();
     let arc = test_cell_env();
-    let env = arc.guard().await;
+    let env = arc.guard();
 
     let td = fixtures(arc.clone(), 10).await;
     // Add to db then the same to scratch and expect on one result
@@ -625,7 +613,7 @@ async fn duplicate_links() {
 async fn links_on_same_base() {
     observability::test_run().ok();
     let arc = test_cell_env();
-    let env = arc.guard().await;
+    let env = arc.guard();
 
     let mut td = fixtures(arc.clone(), 10).await;
     let base_hash = td[0].base_hash.clone();
@@ -654,7 +642,7 @@ async fn links_on_same_base() {
             // Half the tag
             d.is_on_half_tag(here!("same base"), &meta_buf).await;
         }
-        TestData::only_these_on_base(&td, here!("check all return on same base"), &meta_buf).await;
+        TestData::only_these_on_base(&td, here!("check all return on same base"), &meta_buf);
         env.with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
     }
@@ -667,7 +655,7 @@ async fn links_on_same_base() {
             // Half the tag
             d.is_on_half_tag(here!("same base"), &meta_buf).await;
         }
-        TestData::only_these_on_base(&td, here!("check all return on same base"), &meta_buf).await;
+        TestData::only_these_on_base(&td, here!("check all return on same base"), &meta_buf);
     }
     // Check removes etc.
     {
@@ -681,8 +669,7 @@ async fn links_on_same_base() {
             // Half the tag
             d.is_on_half_tag(here!("same base"), &meta_buf).await;
         }
-        TestData::only_these_on_base(&td[1..], here!("check all return on same base"), &meta_buf)
-            .await;
+        TestData::only_these_on_base(&td[1..], here!("check all return on same base"), &meta_buf);
         td[0]
             .not_on_full_key(here!("removed in scratch"), &meta_buf)
             .await;
@@ -696,8 +683,7 @@ async fn links_on_same_base() {
             d.only_on_zome_id(here!("same base"), &meta_buf).await;
             d.is_on_half_tag(here!("same base"), &meta_buf).await;
         }
-        TestData::only_these_on_base(&td[1..], here!("check all return on same base"), &meta_buf)
-            .await;
+        TestData::only_these_on_base(&td[1..], here!("check all return on same base"), &meta_buf);
         td[0]
             .not_on_full_key(here!("removed in scratch"), &meta_buf)
             .await;
@@ -708,7 +694,7 @@ async fn links_on_same_base() {
 async fn links_on_same_zome_id() {
     observability::test_run().ok();
     let arc = test_cell_env();
-    let env = arc.guard().await;
+    let env = arc.guard();
 
     let mut td = fixtures(arc.clone(), 10).await;
     let base_hash = td[0].base_hash.clone();
@@ -742,9 +728,8 @@ async fn links_on_same_zome_id() {
             // Half the tag
             d.is_on_half_tag(here!("same base"), &meta_buf).await;
         }
-        TestData::only_these_on_base(&td, here!("check all return on same base"), &meta_buf).await;
-        TestData::only_these_on_zome_id(&td, here!("check all return on same base"), &meta_buf)
-            .await;
+        TestData::only_these_on_base(&td, here!("check all return on same base"), &meta_buf);
+        TestData::only_these_on_zome_id(&td, here!("check all return on same base"), &meta_buf);
         env.with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
     }
@@ -756,9 +741,8 @@ async fn links_on_same_zome_id() {
             // Half the tag
             d.is_on_half_tag(here!("same base"), &meta_buf).await;
         }
-        TestData::only_these_on_base(&td, here!("check all return on same base"), &meta_buf).await;
-        TestData::only_these_on_zome_id(&td, here!("check all return on same base"), &meta_buf)
-            .await;
+        TestData::only_these_on_base(&td, here!("check all return on same base"), &meta_buf);
+        TestData::only_these_on_zome_id(&td, here!("check all return on same base"), &meta_buf);
     }
     // Check removes etc.
     {
@@ -771,14 +755,12 @@ async fn links_on_same_zome_id() {
             // Half the tag
             d.is_on_half_tag(here!("same base"), &meta_buf).await;
         }
-        TestData::only_these_on_base(&td[..9], here!("check all return on same base"), &meta_buf)
-            .await;
+        TestData::only_these_on_base(&td[..9], here!("check all return on same base"), &meta_buf);
         TestData::only_these_on_zome_id(
             &td[..9],
             here!("check all return on same base"),
             &meta_buf,
-        )
-        .await;
+        );
         td[9]
             .not_on_full_key(here!("removed in scratch"), &meta_buf)
             .await;
@@ -792,14 +774,12 @@ async fn links_on_same_zome_id() {
             // Half the tag
             d.is_on_half_tag(here!("same base"), &meta_buf).await;
         }
-        TestData::only_these_on_base(&td[..9], here!("check all return on same base"), &meta_buf)
-            .await;
+        TestData::only_these_on_base(&td[..9], here!("check all return on same base"), &meta_buf);
         TestData::only_these_on_zome_id(
             &td[..9],
             here!("check all return on same base"),
             &meta_buf,
-        )
-        .await;
+        );
         td[9]
             .not_on_full_key(here!("removed in scratch"), &meta_buf)
             .await;
@@ -810,7 +790,7 @@ async fn links_on_same_zome_id() {
 async fn links_on_same_tag() {
     observability::test_run().ok();
     let arc = test_cell_env();
-    let env = arc.guard().await;
+    let env = arc.guard();
 
     let mut td = fixtures(arc.clone(), 10).await;
     let base_hash = td[0].base_hash.clone();
@@ -841,44 +821,36 @@ async fn links_on_same_tag() {
         for d in td.iter() {
             d.add_link(&mut meta_buf).await;
         }
-        TestData::only_these_on_base(&td[..], here!("check all return on same base"), &meta_buf)
-            .await;
-        TestData::only_these_on_zome_id(&td[..], here!("check all return on same base"), &meta_buf)
-            .await;
+        TestData::only_these_on_base(&td[..], here!("check all return on same base"), &meta_buf);
+        TestData::only_these_on_zome_id(&td[..], here!("check all return on same base"), &meta_buf);
         TestData::only_these_on_full_key(
             &td[..],
             here!("check all return on same base"),
             &meta_buf,
-        )
-        .await;
+        );
         TestData::only_these_on_half_key(
             &td[..],
             here!("check all return on same base"),
             &meta_buf,
-        )
-        .await;
+        );
         env.with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
     }
     {
         let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         // In db
-        TestData::only_these_on_base(&td[..], here!("check all return on same base"), &meta_buf)
-            .await;
-        TestData::only_these_on_zome_id(&td[..], here!("check all return on same base"), &meta_buf)
-            .await;
+        TestData::only_these_on_base(&td[..], here!("check all return on same base"), &meta_buf);
+        TestData::only_these_on_zome_id(&td[..], here!("check all return on same base"), &meta_buf);
         TestData::only_these_on_full_key(
             &td[..],
             here!("check all return on same base"),
             &meta_buf,
-        )
-        .await;
+        );
         TestData::only_these_on_half_key(
             &td[..],
             here!("check all return on same base"),
             &meta_buf,
-        )
-        .await;
+        );
     }
     // Check removes etc.
     {
@@ -892,26 +864,22 @@ async fn links_on_same_tag() {
             &partial_td[..],
             here!("check all return on same base"),
             &meta_buf,
-        )
-        .await;
+        );
         TestData::only_these_on_zome_id(
             &partial_td[..],
             here!("check all return on same base"),
             &meta_buf,
-        )
-        .await;
+        );
         TestData::only_these_on_full_key(
             &partial_td[..],
             here!("check all return on same base"),
             &meta_buf,
-        )
-        .await;
+        );
         TestData::only_these_on_half_key(
             &partial_td[..],
             here!("check all return on same base"),
             &meta_buf,
-        )
-        .await;
+        );
         env.with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
     }
@@ -922,25 +890,21 @@ async fn links_on_same_tag() {
             &partial_td[..],
             here!("check all return on same base"),
             &meta_buf,
-        )
-        .await;
+        );
         TestData::only_these_on_zome_id(
             &partial_td[..],
             here!("check all return on same base"),
             &meta_buf,
-        )
-        .await;
+        );
         TestData::only_these_on_full_key(
             &partial_td[..],
             here!("check all return on same base"),
             &meta_buf,
-        )
-        .await;
+        );
         TestData::only_these_on_half_key(
             &partial_td[..],
             here!("check all return on same base"),
             &meta_buf,
-        )
-        .await;
+        );
     }
 }

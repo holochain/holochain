@@ -37,9 +37,7 @@ pub async fn initialize_zomes_workflow<'env, Ribosome: RibosomeT>(
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // commit the workspace
-    writer
-        .with_writer(|writer| Ok(workspace.flush_to_txn(writer)?))
-        .await?;
+    writer.with_writer(|writer| Ok(workspace.flush_to_txn(writer)?))?;
 
     Ok(result)
 }
@@ -70,14 +68,13 @@ async fn initialize_zomes_workflow_inner<'env, Ribosome: RibosomeT>(
     Ok(result)
 }
 
-// TODO: why pub? -MD
 pub struct InitializeZomesWorkspace(pub(crate) CallZomeWorkspace);
 
 impl InitializeZomesWorkspace {
     #[allow(dead_code)]
     /// Constructor
-    pub async fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
-        Ok(Self(CallZomeWorkspace::new(env, dbs).await?))
+    pub fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
+        Ok(Self(CallZomeWorkspace::new(env, dbs)?))
     }
 }
 
@@ -108,12 +105,9 @@ pub mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn adds_init_marker() {
         let env = test_cell_env();
-        let dbs = env.dbs().await;
-        let mut workspace = InitializeZomesWorkspace(
-            CallZomeWorkspace::new(env.clone().into(), &dbs)
-                .await
-                .unwrap(),
-        );
+        let dbs = env.dbs();
+        let mut workspace =
+            InitializeZomesWorkspace(CallZomeWorkspace::new(env.clone().into(), &dbs).unwrap());
         let mut ribosome = MockRibosomeT::new();
 
         // Setup the ribosome mock

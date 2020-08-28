@@ -97,7 +97,7 @@ pub async fn integrate_dht_ops_workflow(
         let mut next_ops = Vec::new();
         for (op_hash, value) in ops {
             // only integrate this op if it hasn't been integrated already!
-            if workspace.integrated_dht_ops.get(&op_hash).await?.is_none() {
+            if workspace.integrated_dht_ops.get(&op_hash)?.is_none() {
                 match integrate_single_dht_op(value, &mut workspace.elements, &mut workspace.meta)
                     .await?
                 {
@@ -132,9 +132,7 @@ pub async fn integrate_dht_ops_workflow(
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // commit the workspace
-    writer
-        .with_writer(|writer| Ok(workspace.flush_to_txn(writer)?))
-        .await?;
+    writer.with_writer(|writer| Ok(workspace.flush_to_txn(writer)?))?;
 
     // trigger other workflows
 
@@ -437,8 +435,7 @@ impl IntegrateDhtOpsWorkspace {
         })
     }
 
-    pub async fn op_exists(&self, hash: &DhtOpHash) -> DatabaseResult<bool> {
-        Ok(self.integrated_dht_ops.contains(&hash).await?
-            || self.integration_limbo.contains(&hash).await?)
+    pub fn op_exists(&self, hash: &DhtOpHash) -> DatabaseResult<bool> {
+        Ok(self.integrated_dht_ops.contains(&hash)? || self.integration_limbo.contains(&hash)?)
     }
 }

@@ -45,7 +45,7 @@ pub trait BufferedStore {
 /// Macro to generate a fresh reader from an EnvironmentRead with less boilerplate
 macro_rules! fresh_reader {
     ($env: expr, $f: expr) => {{
-        let g = $env.guard().await;
+        let g = $env.guard();
         let r = $crate::env::ReadManager::reader(&g)?;
         $f(r)
     }};
@@ -56,8 +56,8 @@ macro_rules! fresh_reader {
 /// Use this in tests, where everything gets unwrapped anyway
 macro_rules! fresh_reader_test {
     ($env: expr, $f: expr) => {{
-        let g = $env.guard().await;
-        let r = g.reader().unwrap();
+        let g = $env.guard();
+        let r = $crate::env::ReadManager::reader(&g).unwrap();
         $f(r)
     }};
 }
@@ -67,8 +67,8 @@ macro_rules! fresh_reader_test {
 macro_rules! fresh_reader_async {
     ($env: expr, $f: expr) => {{
         let env = $env.clone();
-        let g = env.guard().await;
-        let r = g.reader()?;
+        let g = env.guard();
+        let r = $crate::env::ReadManager::reader(&g)?;
         let val = $f(r).await;
         val
     }};

@@ -295,10 +295,8 @@ mod slow_tests {
     async fn pass_validate_link_add_test<'a>() {
         // test workspace boilerplate
         let env = holochain_state::test_utils::test_cell_env();
-        let dbs = env.dbs().await;
-        let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
-            .await
-            .unwrap();
+        let dbs = env.dbs();
+        let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs).unwrap();
 
         // commits fail validation if we don't do genesis
         crate::core::workflow::fake_genesis(&mut workspace.source_chain)
@@ -339,10 +337,8 @@ mod slow_tests {
     async fn fail_validate_link_add_test<'a>() {
         // test workspace boilerplate
         let env = holochain_state::test_utils::test_cell_env();
-        let dbs = env.dbs().await;
-        let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
-            .await
-            .unwrap();
+        let dbs = env.dbs();
+        let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs).unwrap();
 
         // commits fail validation if we don't do genesis
         crate::core::workflow::fake_genesis(&mut workspace.source_chain)
