@@ -46,12 +46,6 @@ wasm_io_types!(
     // get the capability for the current zome call
     pub struct CapabilityInfoInput(());
     pub struct CapabilityInfoOutput(());
-    // commit a capability claim
-    pub struct CommitCapabilityClaimInput(());
-    pub struct CommitCapabilityClaimOutput(());
-    // commit a capability grant
-    pub struct CommitCapabilityGrantInput(());
-    pub struct CommitCapabilityGrantOutput(());
     // the SerializedBytes will be stuffed into an Entry::App(SB) host side
     pub struct CommitEntryInput((crate::entry_def::EntryDefId, crate::entry::Entry));
     // the header hash of the newly committed entry
