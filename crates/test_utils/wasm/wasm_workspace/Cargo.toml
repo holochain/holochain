@@ -3,6 +3,7 @@ members = [
     "agent_info",
     "anchor",
     "bench",
+    "capability",
     "commit_entry",
     "crd",
     "crud",

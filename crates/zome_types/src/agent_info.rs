@@ -5,7 +5,6 @@ use holochain_serialized_bytes::prelude::*;
 #[allow(missing_docs)]
 #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq)]
 pub struct AgentInfo {
-    pub agent_pubkey: AgentPubKey,
     pub agent_initial_pubkey: AgentPubKey,
     pub agent_latest_pubkey: AgentPubKey,
 }
