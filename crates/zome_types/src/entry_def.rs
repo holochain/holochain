@@ -5,31 +5,22 @@ use holochain_serialized_bytes::prelude::*;
 
 const DEFAULT_REQUIRED_VALIDATIONS: u8 = 5;
 
-#[derive(Default, Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-#[repr(transparent)]
-pub struct EntryDefId(String);
-
-impl From<EntryDefId> for String {
-    fn from(entry_def_id: EntryDefId) -> Self {
-        entry_def_id.0
-    }
-}
-
-impl From<&EntryDefId> for String {
-    fn from(entry_def_id: &EntryDefId) -> Self {
-        entry_def_id.0.to_string()
-    }
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum EntryDefId {
+    App(String),
+    CapClaim,
+    CapGrant,
 }
 
 impl From<String> for EntryDefId {
     fn from(s: String) -> Self {
-        Self(s)
+        Self::App(s)
     }
 }
 
 impl From<&str> for EntryDefId {
     fn from(s: &str) -> Self {
-        Self(s.to_string())
+        Self::App(s.to_string())
     }
 }
 
@@ -73,7 +64,7 @@ impl EntryVisibility {
     }
 }
 
-#[derive(Default, Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct EntryDef {
     /// Zome-unique identifier for this entry type
     pub id: EntryDefId,

@@ -26,6 +26,7 @@ pub fn commit_entry<'a>(
     call_context: Arc<CallContext>,
     input: CommitEntryInput,
 ) -> RibosomeResult<CommitEntryOutput> {
+    dbg!(&input);
     // destructure the args out into an app type def id and entry
     let (entry_def_id, entry) = input.into_inner();
 
@@ -40,22 +41,33 @@ pub fn commit_entry<'a>(
     let header_zome_id = ribosome.zome_name_to_id(&call_context.zome_name)?;
 
     // extract the entry defs for a zome
-    let (header_entry_def_id, entry_visibility) =
-        extract_entry_def(ribosome, call_context.clone(), entry_def_id)?;
+    let entry_type = match entry_def_id {
+        EntryDefId::App(entry_def_id) => {
+            let (header_entry_def_id, entry_visibility) = extract_entry_def(ribosome, call_context.clone(), entry_def_id.into())?;
+            let app_entry_type = AppEntryType::new(header_entry_def_id, header_zome_id, entry_visibility);
+            EntryType::App(app_entry_type)
+        },
+        EntryDefId::CapGrant => EntryType::CapGrant,
+        EntryDefId::CapClaim => EntryType::CapClaim,
+    };
 
-    let app_entry_type = AppEntryType::new(header_entry_def_id, header_zome_id, entry_visibility);
+    dbg!(&entry_type);
+    dbg!(&entry);
+    dbg!(&entry_hash);
 
     // build a header for the entry being committed
     let header_builder = builder::EntryCreate {
-        entry_type: EntryType::App(app_entry_type),
-        entry_hash: entry_hash,
+        entry_type,
+        entry_hash,
     };
     let call =
         |workspace: &'a mut CallZomeWorkspace| -> BoxFuture<'a, SourceChainResult<HeaderHash>> {
             async move {
+                dbg!(&"foo");
                 let source_chain = &mut workspace.source_chain;
                 // push the header and the entry into the source chain
                 let header_hash = source_chain.put(header_builder, Some(entry)).await?;
+                dbg!(&header_hash);
                 // fetch the element we just added so we can integrate its DhtOps
                 let element = source_chain
                     .get_element(&header_hash)
@@ -76,6 +88,8 @@ pub fn commit_entry<'a>(
         tokio_safe_block_on::tokio_safe_block_forever_on(tokio::task::spawn(async move {
             unsafe { call_context.host_access.workspace().apply_mut(call).await }
         }))???;
+
+    dbg!(&header_address);
 
     // return the hash of the committed entry
     // note that validation is handled by the workflow
@@ -173,7 +187,7 @@ pub mod wasm_test {
         host_access.workspace = raw_workspace;
         call_context.host_access = host_access.into();
         let app_entry = EntryFixturator::new(AppEntry).next().unwrap();
-        let entry_def_id = EntryDefId::from("post");
+        let entry_def_id = EntryDefId::App("post".into());
         let input = CommitEntryInput::new((entry_def_id, app_entry.clone()));
 
         let output = commit_entry(Arc::new(ribosome), Arc::new(call_context), input);
@@ -221,7 +235,7 @@ pub mod wasm_test {
         host_access.workspace = raw_workspace.clone();
         call_context.host_access = host_access.into();
         let app_entry = EntryFixturator::new(AppEntry).next().unwrap();
-        let entry_def_id = EntryDefId::from("post");
+        let entry_def_id = EntryDefId::App("post".into());
         let input = CommitEntryInput::new((entry_def_id, app_entry.clone()));
 
         let output = commit_entry(Arc::new(ribosome), Arc::new(call_context), input).unwrap();

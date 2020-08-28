@@ -63,13 +63,16 @@ impl<'env> SourceChain<'env> {
         header_builder: B,
         maybe_entry: Option<Entry>,
     ) -> SourceChainResult<HeaderHash> {
+        dbg!(&maybe_entry);
         let common = HeaderBuilderCommon {
             author: self.agent_pubkey().await?,
             timestamp: Timestamp::now().into(),
             header_seq: self.len() as u32,
             prev_header: self.chain_head()?.to_owned(),
         };
+        dbg!(&common);
         let header = header_builder.build(common).into();
+        dbg!(&header, &maybe_entry);
         self.put_raw(header, maybe_entry).await
     }
 

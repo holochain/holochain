@@ -34,6 +34,9 @@ pub mod wasm_test {
         let reader = holochain_state::env::ReadManager::reader(&env_ref).unwrap();
         let mut workspace = <crate::core::workflow::call_zome_workflow::CallZomeWorkspace as crate::core::state::workspace::Workspace>::new(&reader, &dbs).unwrap();
 
+        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+            .await
+            .unwrap();
         let (_g, raw_workspace) =
             crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
                 &mut workspace,
@@ -43,5 +46,33 @@ pub mod wasm_test {
 
         let _output: CapSecret =
             crate::call_test_ribosome!(host_access, TestWasm::Capability, "cap_secret", ());
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn ribosome_transferable_cap_grant<'a>() {
+        holochain_types::observability::test_run().ok();
+        // test workspace boilerplate
+        let env = holochain_state::test_utils::test_cell_env();
+        let dbs = env.dbs().await;
+        let env_ref = env.guard().await;
+        let reader = holochain_state::env::ReadManager::reader(&env_ref).unwrap();
+        let mut workspace = <crate::core::workflow::call_zome_workflow::CallZomeWorkspace as crate::core::state::workspace::Workspace>::new(&reader, &dbs).unwrap();
+
+        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+            .await
+            .unwrap();
+        let (_g, raw_workspace) =
+            crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
+                &mut workspace,
+            );
+        let mut host_access = fixt!(ZomeCallHostAccess);
+        host_access.workspace = raw_workspace.clone();
+
+        let _output: HeaderHash = crate::call_test_ribosome!(
+            host_access,
+            TestWasm::Capability,
+            "transferable_cap_grant",
+            ()
+        );
     }
 }

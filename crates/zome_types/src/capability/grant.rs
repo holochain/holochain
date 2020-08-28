@@ -23,19 +23,19 @@ pub enum CapGrant {
 /// @todo the ability to forcibly curry payloads into functions that are called with a claim
 pub struct CurryPayloads(pub BTreeMap<GrantedFunction, SerializedBytes>);
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Default, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 /// The payload for the ZomeCall capability grant.
 /// This data is committed to the source chain as a private entry.
 pub struct ZomeCallCapGrant {
     /// A string by which to later query for saved grants.
     /// This does not need to be unique within a source chain.
-    tag: String,
+    pub tag: String,
     /// Specifies who may claim this capability, and by what means
-    access: CapAccess,
+    pub access: CapAccess,
     /// Set of functions to which this capability grants ZomeCall access
-    functions: GrantedFunctions,
+    pub functions: GrantedFunctions,
     /// the payloads to curry to the functions
-    curry_payloads: CurryPayloads,
+    pub curry_payloads: CurryPayloads,
 }
 
 impl ZomeCallCapGrant {
@@ -106,6 +106,12 @@ pub enum CapAccess {
     },
 }
 
+impl Default for CapAccess {
+    fn default() -> Self {
+        Self::Unrestricted
+    }
+}
+
 impl From<()> for CapAccess {
     fn from(_: ()) -> Self {
         Self::Unrestricted
@@ -125,11 +131,6 @@ impl From<(CapSecret, HashSet<AgentPubKey>)> for CapAccess {
 }
 
 impl CapAccess {
-    /// Create a new CapAccess::Unrestricted
-    pub fn unrestricted() -> Self {
-        CapAccess::Unrestricted
-    }
-
     /// Check if access is granted given the inputs
     pub fn is_authorized(&self, agent_key: &AgentPubKey, maybe_secret: Option<&CapSecret>) -> bool {
         match self {
