@@ -308,7 +308,8 @@ pub mod tests {
     #[allow(unused_variables, unreachable_code)]
     #[tokio::test]
     async fn private_zome_call() {
-        let env = test_cell_env();
+        let test_env = test_cell_env();
+        let env = test_env.env();
         let dbs = env.dbs().await;
         let env_ref = env.guard().await;
         let reader = env_ref.reader().unwrap();
@@ -373,7 +374,8 @@ pub mod tests {
     #[tokio::test]
     async fn calls_system_validation<'a>() {
         observability::test_run().ok();
-        let env = test_cell_env();
+        let test_env = test_cell_env();
+        let env = test_env.env();
         let dbs = env.dbs().await;
         let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
             .await
@@ -426,7 +428,8 @@ pub mod tests {
     #[ignore]
     #[tokio::test]
     async fn calls_app_validation() {
-        let env = test_cell_env();
+        let test_env = test_cell_env();
+        let env = test_env.env();
         let dbs = env.dbs().await;
         let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
             .await
@@ -458,7 +461,8 @@ pub mod tests {
     #[ignore]
     #[tokio::test]
     async fn creates_outputs() {
-        let env = test_cell_env();
+        let test_env = test_cell_env();
+        let env = test_env.env();
         let dbs = env.dbs().await;
         let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
             .await

@@ -28,7 +28,8 @@ pub mod wasm_test {
     async fn ribosome_capability_secret_test<'a>() {
         holochain_types::observability::test_run().ok();
         // test workspace boilerplate
-        let env = holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_state::test_utils::test_cell_env();
+        let env = test_env.env();
         let dbs = env.dbs().await;
         let mut workspace = crate::core::workflow::call_zome_workflow::CallZomeWorkspace::new(
             env.clone().into(),

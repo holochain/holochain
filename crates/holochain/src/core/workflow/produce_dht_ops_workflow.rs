@@ -151,16 +151,15 @@ mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn elements_produce_ops() {
         observability::test_run().ok();
-        let env = test_cell_env();
+        let test_env = test_cell_env();
+        let env = test_env.env();
         let dbs = env.dbs().await;
         let env_ref = env.guard().await;
 
         // Setup the database and expected data
         let expected_hashes: HashSet<_> = {
             let mut td = TestData::new();
-            let mut source_chain = SourceChain::new(env.env.clone().into(), &dbs)
-                .await
-                .unwrap();
+            let mut source_chain = SourceChain::new(env.clone().into(), &dbs).await.unwrap();
 
             // Add genesis so we can use the source chain
             fake_genesis(&mut source_chain).await.unwrap();
@@ -221,7 +220,7 @@ mod tests {
 
         // Run the workflow and commit it
         {
-            let mut workspace = ProduceDhtOpsWorkspace::new(env.env.clone().into(), &dbs)
+            let mut workspace = ProduceDhtOpsWorkspace::new(env.clone().into(), &dbs)
                 .await
                 .unwrap();
             let complete = produce_dht_ops_workflow_inner(&mut workspace)

@@ -355,13 +355,14 @@ mod tests {
             observability::test_run().ok();
 
             // Create test env
-            let env = test_cell_env();
+            let test_env = test_cell_env();
+            let env = test_env.env();
 
             // Setup
             let (network, cell_network, recv_task, rx_complete) =
                 setup(env.clone(), num_agents, num_hash, false).await;
 
-            call_workflow(env.env.clone().into(), cell_network).await;
+            call_workflow(env.clone().into(), cell_network).await;
 
             // Wait for expected # of responses, or timeout
             tokio::select! {
@@ -409,7 +410,8 @@ mod tests {
             observability::test_run().ok();
 
             // Create test env
-            let env = test_cell_env();
+            let test_env = test_cell_env();
+            let env = test_env.env();
             let dbs = env.dbs().await;
             let env_ref = env.guard().await;
 
@@ -448,7 +450,7 @@ mod tests {
             }
 
             // Call the workflow
-            call_workflow(env.env.clone().into(), cell_network).await;
+            call_workflow(env.clone().into(), cell_network).await;
 
             // If we can wait a while without receiving any publish, we have succeeded
             tokio::time::delay_for(Duration::from_millis(
@@ -491,7 +493,8 @@ mod tests {
                 observability::test_run().ok();
 
                 // Create test env
-                let env = test_cell_env();
+                let test_env = test_cell_env();
+                let env = test_env.env();
                 let dbs = env.dbs().await;
                 let env_ref = env.guard().await;
 
@@ -525,10 +528,9 @@ mod tests {
                         .await
                         .unwrap();
                     let (mut qt, _rx) = TriggerSender::new();
-                    let complete =
-                        produce_dht_ops_workflow(workspace, env.env.clone().into(), &mut qt)
-                            .await
-                            .unwrap();
+                    let complete = produce_dht_ops_workflow(workspace, env.clone().into(), &mut qt)
+                        .await
+                        .unwrap();
                     assert_matches!(complete, WorkComplete::Complete);
                 }
                 {
@@ -667,10 +669,9 @@ mod tests {
                         .await
                         .unwrap();
                     let (mut qt, _rx) = TriggerSender::new();
-                    let complete =
-                        produce_dht_ops_workflow(workspace, env.env.clone().into(), &mut qt)
-                            .await
-                            .unwrap();
+                    let complete = produce_dht_ops_workflow(workspace, env.clone().into(), &mut qt)
+                        .await
+                        .unwrap();
                     assert_matches!(complete, WorkComplete::Complete);
                 }
 
@@ -737,7 +738,7 @@ mod tests {
                     network.join(dna.clone(), agent).await.unwrap();
                 }
 
-                call_workflow(env.env.clone().into(), cell_network).await;
+                call_workflow(env.clone().into(), cell_network).await;
 
                 // Wait for expected # of responses, or timeout
                 tokio::select! {

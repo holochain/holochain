@@ -17,7 +17,8 @@ pub(super) type Store = KvBufUsed<DbString, V>;
 
 #[tokio::test(threaded_scheduler)]
 async fn kv_iter_from_partial() {
-    let arc = test_cell_env();
+    let test_env = test_cell_env();
+    let arc = test_env.env();
     let env = arc.guard().await;
     let db = env
         .inner()
@@ -239,7 +240,8 @@ fn re_do_test<R: Readable>(
 async fn kv_single_iter() {
     holochain_types::observability::test_run().ok();
     let mut rng = rand::thread_rng();
-    let arc = test_cell_env();
+    let test_env = test_cell_env();
+    let arc = test_env.env();
     let env = arc.guard().await;
     let db = env
         .inner()
@@ -484,7 +486,8 @@ async fn kv_single_iter_found_4() {
 
 #[tokio::test(threaded_scheduler)]
 async fn exhaust_both_ends() {
-    let arc = test_cell_env();
+    let test_env = test_cell_env();
+    let arc = test_env.env();
     let env = arc.guard().await;
     let db = env
         .inner()
@@ -579,7 +582,8 @@ async fn kv_single_iter_runner(
     in_db_second: impl Iterator<Item = TestData> + Send,
     from_key: DbString,
 ) {
-    let arc = test_cell_env();
+    let test_env = test_cell_env();
+    let arc = test_env.env();
     let env = arc.guard().await;
     let db = env
         .inner()

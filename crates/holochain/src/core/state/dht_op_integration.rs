@@ -176,7 +176,8 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_query() {
-        let env = test_cell_env();
+        let test_env = test_cell_env();
+        let env = test_env.env();
         let dbs = env.dbs().await;
         let env_ref = env.guard().await;
 
