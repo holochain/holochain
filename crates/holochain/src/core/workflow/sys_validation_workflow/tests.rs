@@ -84,7 +84,7 @@ async fn run_test(
 
     {
         let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
-        let dbs = alice_env.dbs().await;
+        let dbs = alice_env.dbs();
 
         let workspace = IncomingDhtOpsWorkspace::new(alice_env.clone().into(), &dbs).unwrap();
         // Validation should be empty
@@ -131,7 +131,7 @@ async fn run_test(
 
     {
         let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
-        let dbs = alice_env.dbs().await;
+        let dbs = alice_env.dbs();
 
         let workspace = IncomingDhtOpsWorkspace::new(alice_env.clone().into(), &dbs).unwrap();
         // Validation should be empty
@@ -194,8 +194,8 @@ async fn run_test(
 
     {
         let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
-        let env_ref = alice_env.guard().await;
-        let dbs = alice_env.dbs().await;
+        let env_ref = alice_env.guard();
+        let dbs = alice_env.dbs();
 
         let workspace = IncomingDhtOpsWorkspace::new(alice_env.clone().into(), &dbs).unwrap();
         // Validation should still contain bobs link pending because the target was missing
@@ -246,7 +246,7 @@ async fn bob_links_in_a_legit_way(
     let target_entry_hash = EntryHash::with_data(&Entry::try_from(target.clone()).unwrap()).await;
     let link_tag = fixt!(LinkTag);
     let (bob_env, call_data) = CallData::create(bob_cell_id, handle, dna_file).await;
-    let dbs = bob_env.dbs().await;
+    let dbs = bob_env.dbs();
     // 3
     commit_entry(
         &bob_env,
@@ -304,7 +304,7 @@ async fn bob_makes_a_large_link(
     let link_tag = LinkTag(bytes);
 
     let (bob_env, call_data) = CallData::create(bob_cell_id, handle, dna_file).await;
-    let dbs = bob_env.dbs().await;
+    let dbs = bob_env.dbs();
 
     // 6
     commit_entry(
@@ -362,7 +362,7 @@ async fn dodgy_bob(bob_cell_id: &CellId, handle: &ConductorHandle, dna_file: &Dn
     let target_entry_hash = EntryHash::with_data(&Entry::try_from(target.clone()).unwrap()).await;
     let link_tag = fixt!(LinkTag);
     let (bob_env, call_data) = CallData::create(bob_cell_id, handle, dna_file).await;
-    let dbs = bob_env.dbs().await;
+    let dbs = bob_env.dbs();
 
     // 11
     commit_entry(

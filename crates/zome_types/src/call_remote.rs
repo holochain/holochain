@@ -42,7 +42,7 @@ impl CallRemote {
     }
 
     pub fn cap(&self) -> CapSecret {
-        self.cap.clone()
+        self.cap
     }
 
     pub fn request(&self) -> SerializedBytes {

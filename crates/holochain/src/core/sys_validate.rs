@@ -301,8 +301,7 @@ pub async fn check_app_entry_type(
     // If it's not found run the ribosome and get the entry defs
     let entry_def = match entry_def {
         Some(entry_def) => return Ok(entry_def),
-        None => get_entry_defs(dna_file.clone())
-            .await?
+        None => get_entry_defs(dna_file.clone())?
             .get(entry_def_index)
             .map(|(_, v)| v.clone()),
     };

@@ -120,7 +120,7 @@ impl LinkMetaVal {
 }
 
 impl BufKey for BytesKey {
-    fn from_key_bytes_fallible(bytes: &[u8]) -> Self {
+    fn from_key_bytes_or_friendly_panic(bytes: &[u8]) -> Self {
         bytes.into()
     }
 }
