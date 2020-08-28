@@ -107,11 +107,10 @@ pub fn remove_link<'a>(
 #[cfg(feature = "slow_tests")]
 pub mod slow_tests {
 
-    use crate::core::state::workspace::Workspace;
     use crate::fixt::ZomeCallHostAccessFixturator;
     use fixt::prelude::*;
     use holo_hash::HeaderHash;
-    use holochain_state::env::ReadManager;
+
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::link::Links;
     use holochain_zome_types::RemoveLinkInput;
@@ -120,10 +119,10 @@ pub mod slow_tests {
     async fn ribosome_remove_link_add_remove() {
         let env = holochain_state::test_utils::test_cell_env();
         let dbs = env.dbs().await;
-        let env_ref = env.guard().await;
 
-        let reader = env_ref.reader().unwrap();
-        let mut workspace = crate::core::workflow::CallZomeWorkspace::new(&reader, &dbs).unwrap();
+        let mut workspace = crate::core::workflow::CallZomeWorkspace::new(env.clone().into(), &dbs)
+            .await
+            .unwrap();
 
         // commits fail validation if we don't do genesis
         crate::core::workflow::fake_genesis(&mut workspace.source_chain)

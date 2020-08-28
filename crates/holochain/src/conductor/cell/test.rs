@@ -1,17 +1,12 @@
 use crate::{
     conductor::manager::spawn_task_manager,
-    core::{
-        state::workspace::Workspace, workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace,
-    },
+    core::workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace,
     fixt::{DnaFileFixturator, SignatureFixturator},
 };
 use ::fixt::prelude::*;
 use holo_hash::HasHash;
 use holochain_p2p::actor::HolochainP2pRefToCell;
-use holochain_state::{
-    env::ReadManager,
-    test_utils::{test_conductor_env, TestEnvironment},
-};
+use holochain_state::test_utils::{test_conductor_env, TestEnvironment};
 use holochain_types::{
     dht_op::{DhtOp, DhtOpHashed},
     test_utils::{fake_agent_pubkey_2, fake_cell_id},
@@ -87,11 +82,10 @@ async fn test_cell_handle_publish() {
     .unwrap();
 
     let env_ref = cell.state_env.guard().await;
-    let reader = env_ref.reader().expect("Could not create LMDB reader");
-    let workspace =
-        IncomingDhtOpsWorkspace::new(&reader, &env_ref).expect("Could not create Workspace");
+    let workspace = IncomingDhtOpsWorkspace::new(cell.state_env.clone().into(), &env_ref)
+        .expect("Could not create Workspace");
 
-    workspace.op_exists(&op_hash).unwrap();
+    workspace.op_exists(&op_hash).await.unwrap();
 
     stop_tx.send(()).unwrap();
     shutdown.await.unwrap();

@@ -55,18 +55,20 @@ mock! {
 
 #[async_trait::async_trait]
 impl MetadataBufT for MockMetadataBuf {
-    fn get_live_links<'a>(
-        &self,
-        key: &'a LinkMetaKey,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError> + '_>>
+    fn get_live_links<'r, 'k, R: Readable>(
+        &'r self,
+        _r: &'r R,
+        key: &'k LinkMetaKey<'k>,
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError> + 'r>>
     {
         self.get_live_links(key)
     }
 
-    fn get_links_all<'a>(
-        &self,
-        key: &'a LinkMetaKey,
-    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError> + '_>>
+    fn get_links_all<'r, 'k, R: Readable>(
+        &'r self,
+        _r: &'r R,
+        key: &'k LinkMetaKey<'k>,
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError> + 'r>>
     {
         self.get_links_all(key)
     }
@@ -75,7 +77,11 @@ impl MetadataBufT for MockMetadataBuf {
         self.get_canonical_entry_hash(entry_hash)
     }
 
-    fn get_dht_status(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus> {
+    fn get_dht_status<'r, R: Readable>(
+        &'r self,
+        _r: &'r R,
+        entry_hash: &EntryHash,
+    ) -> DatabaseResult<EntryDhtStatus> {
         self.get_dht_status(entry_hash)
     }
 
@@ -83,48 +89,54 @@ impl MetadataBufT for MockMetadataBuf {
         self.get_canonical_header_hash(header_hash)
     }
 
-    fn get_headers(
-        &self,
+    fn get_headers<'r, R: Readable>(
+        &'r self,
+        _reader: &'r R,
         entry_hash: EntryHash,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
         self.get_headers(entry_hash)
     }
 
-    fn get_activity(
-        &self,
+    fn get_activity<'r, R: Readable>(
+        &'r self,
+        _reader: &'r R,
         agent_pubkey: AgentPubKey,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
         self.get_activity(agent_pubkey)
     }
 
-    fn get_updates(
-        &self,
+    fn get_updates<'r, R: Readable>(
+        &'r self,
+        _reader: &'r R,
         hash: AnyDhtHash,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
         self.get_updates(hash)
     }
 
-    fn get_deletes_on_header(
-        &self,
+    fn get_deletes_on_header<'r, R: Readable>(
+        &'r self,
+        _reader: &'r R,
         new_entry_header: HeaderHash,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
         self.get_deletes_on_header(new_entry_header)
     }
 
-    fn get_deletes_on_entry(
-        &self,
+    fn get_deletes_on_entry<'r, R: Readable>(
+        &'r self,
+        _reader: &'r R,
         entry_hash: EntryHash,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
         self.get_deletes_on_entry(entry_hash)
     }
 
-    fn get_link_removes_on_link_add(
-        &self,
+    fn get_link_removes_on_link_add<'r, R: Readable>(
+        &'r self,
+        _reader: &'r R,
         link_add: HeaderHash,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
@@ -155,7 +167,7 @@ impl MetadataBufT for MockMetadataBuf {
         self.sync_register_delete(delete)
     }
 
-    fn register_raw_on_entry(
+    async fn register_raw_on_entry(
         &mut self,
         entry_hash: EntryHash,
         value: SysMetaVal,

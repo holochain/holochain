@@ -14,8 +14,8 @@ pub enum DatabaseError {
     #[error("A store which was expected not to be empty turned out to be empty: {0}")]
     EmptyStore(DbName),
 
-    #[error("An LMDB store was not created/initialized: {0}")]
-    StoreNotInitialized(DbName),
+    #[error("An LMDB store was not created/initialized: {0}, path: {1}")]
+    StoreNotInitialized(DbName, PathBuf),
 
     #[error("An LMDB environment's database map was initialized more than once: {0}")]
     EnvironmentDoubleInitialized(PathBuf),

@@ -3,10 +3,7 @@
 use super::*;
 use crate::{
     conductor::manager::ManagedTaskResult,
-    core::{
-        state::workspace::Workspace,
-        workflow::sys_validation_workflow::{sys_validation_workflow, SysValidationWorkspace},
-    },
+    core::workflow::sys_validation_workflow::{sys_validation_workflow, SysValidationWorkspace},
 };
 use futures::future::Either;
 use holochain_state::env::EnvironmentWrite;
@@ -33,8 +30,8 @@ pub fn spawn_sys_validation_consumer(
         loop {
             let env_ref = env.guard().await;
             let reader = env_ref.reader().expect("Could not create LMDB reader");
-            let workspace =
-                SysValidationWorkspace::new(&reader, &env_ref).expect("Could not create Workspace");
+            let workspace = SysValidationWorkspace::new(env.clone().into(), &env_ref)
+                .expect("Could not create Workspace");
             if let WorkComplete::Incomplete =
                 sys_validation_workflow(workspace, env.clone().into(), &mut trigger_app_validation)
                     .await

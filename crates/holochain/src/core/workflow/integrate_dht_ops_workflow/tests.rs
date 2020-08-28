@@ -19,7 +19,7 @@ use ::fixt::prelude::*;
 use holo_hash::*;
 use holochain_keystore::Signature;
 use holochain_state::{
-    env::{EnvironmentReadRef, EnvironmentWrite, EnvironmentWriteRef, ReadManager, WriteManager},
+    env::{EnvironmentWrite, ReadManager, WriteManager},
     error::DatabaseError,
     test_utils::test_cell_env,
 };
@@ -181,15 +181,11 @@ enum Db {
 
 impl Db {
     /// Checks that the database is in a state
-    #[instrument(skip(expects, env_ref, dbs))]
-    async fn check<'env>(
-        expects: Vec<Self>,
-        env_ref: &'env EnvironmentReadRef<'env>,
-        dbs: &'env impl GetDb,
-        here: String,
-    ) {
+    #[instrument(skip(expects, env))]
+    async fn check(expects: Vec<Self>, env: EnvironmentWrite, here: String) {
+        let env_ref = env.guard().await;
         let reader = env_ref.reader().unwrap();
-        let workspace = IntegrateDhtOpsWorkspace::new(&reader, dbs).unwrap();
+        let workspace = IntegrateDhtOpsWorkspace::new(env.clone().into(), &env_ref).unwrap();
         for expect in expects {
             match expect {
                 Db::Integrated(op) => {
@@ -199,7 +195,12 @@ impl Db {
                         op: op.to_light().await,
                         when_integrated: Timestamp::now().into(),
                     };
-                    let mut r = workspace.integrated_dht_ops.get(&op_hash).unwrap().unwrap();
+                    let mut r = workspace
+                        .integrated_dht_ops
+                        .get(&op_hash)
+                        .await
+                        .unwrap()
+                        .unwrap();
                     r.when_integrated = value.when_integrated;
                     assert_eq!(r, value, "{}", here);
                 }
@@ -210,7 +211,7 @@ impl Db {
                     };
                     let res = workspace
                         .integration_limbo
-                        .iter()
+                        .iter(&reader)
                         .unwrap()
                         .filter_map(|(_, v)| if v == value { Ok(Some(v)) } else { Ok(None) })
                         .collect::<Vec<_>>()
@@ -260,7 +261,7 @@ impl Db {
                     let entry_hash = EntryHashed::from_content(entry.clone()).await.into_hash();
                     let res = workspace
                         .meta
-                        .get_headers(entry_hash)
+                        .get_headers(&reader, entry_hash)
                         .unwrap()
                         .collect::<Vec<_>>()
                         .unwrap();
@@ -272,7 +273,7 @@ impl Db {
                     let header_hash = TimedHeaderHash::from(header_hash);
                     let res = workspace
                         .meta
-                        .get_activity(header.author().clone())
+                        .get_activity(&reader, header.author().clone())
                         .unwrap()
                         .collect::<Vec<_>>()
                         .unwrap();
@@ -284,7 +285,7 @@ impl Db {
                     let header_hash = TimedHeaderHash::from(header_hash);
                     let res = workspace
                         .meta
-                        .get_updates(base)
+                        .get_updates(&reader, base)
                         .unwrap()
                         .collect::<Vec<_>>()
                         .unwrap();
@@ -297,6 +298,7 @@ impl Db {
                     let res = workspace
                         .meta
                         .get_deletes_on_entry(
+                            &reader,
                             ElementDelete::try_from(header)
                                 .unwrap()
                                 .removes_entry_address,
@@ -306,7 +308,7 @@ impl Db {
                         .unwrap();
                     let res2 = workspace
                         .meta
-                        .get_deletes_on_header(deleted_header_hash)
+                        .get_deletes_on_header(&reader, deleted_header_hash)
                         .unwrap()
                         .collect::<Vec<_>>()
                         .unwrap();
@@ -318,7 +320,7 @@ impl Db {
                     assert_eq!(
                         workspace
                             .integrated_dht_ops
-                            .iter()
+                            .iter(&reader)
                             .unwrap()
                             .count()
                             .unwrap(),
@@ -329,7 +331,12 @@ impl Db {
                 }
                 Db::IntQueueEmpty => {
                     assert_eq!(
-                        workspace.integration_limbo.iter().unwrap().count().unwrap(),
+                        workspace
+                            .integration_limbo
+                            .iter(&reader)
+                            .unwrap()
+                            .count()
+                            .unwrap(),
                         0,
                         "{}",
                         here
@@ -365,7 +372,7 @@ impl Db {
                     for link_meta_key in link_meta_keys {
                         let res = workspace
                             .meta
-                            .get_live_links(&link_meta_key)
+                            .get_live_links(&reader, &link_meta_key)
                             .unwrap()
                             .collect::<Vec<_>>()
                             .unwrap();
@@ -404,7 +411,7 @@ impl Db {
                     for link_meta_key in link_meta_keys {
                         let res = workspace
                             .meta
-                            .get_live_links(&link_meta_key)
+                            .get_live_links(&reader, &link_meta_key)
                             .unwrap()
                             .collect::<Vec<_>>()
                             .unwrap();
@@ -417,14 +424,10 @@ impl Db {
     }
 
     // Sets the database to a certain state
-    #[instrument(skip(pre_state, env_ref, dbs))]
-    async fn set<'env>(
-        pre_state: Vec<Self>,
-        env_ref: &'env EnvironmentWriteRef<'env>,
-        dbs: &impl GetDb,
-    ) {
-        let reader = env_ref.reader().unwrap();
-        let mut workspace = IntegrateDhtOpsWorkspace::new(&reader, dbs).unwrap();
+    #[instrument(skip(pre_state, env))]
+    async fn set<'env>(pre_state: Vec<Self>, env: EnvironmentWrite) {
+        let env_ref = env.guard().await;
+        let mut workspace = IntegrateDhtOpsWorkspace::new(env.clone().into(), &env_ref).unwrap();
         for state in pre_state {
             match state {
                 Db::Integrated(_) => {}
@@ -479,22 +482,18 @@ impl Db {
     }
 }
 
-async fn call_workflow<'env>(
-    env_ref: &'env EnvironmentReadRef<'env>,
-    dbs: &'env impl GetDb,
-    env: EnvironmentWrite,
-) {
-    let reader = env_ref.reader().unwrap();
-    let workspace = IntegrateDhtOpsWorkspace::new(&reader, dbs).unwrap();
-    integrate_dht_ops_workflow(workspace, env.into())
+async fn call_workflow<'env>(env: EnvironmentWrite) {
+    let env_ref = env.guard().await;
+    let workspace = IntegrateDhtOpsWorkspace::new(env.clone().into(), &env_ref).unwrap();
+    integrate_dht_ops_workflow(workspace, env.clone().into())
         .await
         .unwrap();
 }
 
 // Need to clear the data from the previous test
-fn clear_dbs<'env>(env_ref: &'env EnvironmentWriteRef<'env>, dbs: &'env impl GetDb) {
-    let reader = env_ref.reader().unwrap();
-    let mut workspace = IntegrateDhtOpsWorkspace::new(&reader, dbs).unwrap();
+async fn clear_dbs(env: EnvironmentWrite) {
+    let env_ref = env.guard().await;
+    let mut workspace = IntegrateDhtOpsWorkspace::new(env.clone().into(), &env_ref).unwrap();
     env_ref
         .with_commit::<DatabaseError, _, _>(|writer| {
             workspace.integration_limbo.clear_all(writer)?;
@@ -689,8 +688,6 @@ fn register_remove_link_missing_base(a: TestData) -> (Vec<Db>, Vec<Db>, &'static
 async fn test_ops_state() {
     observability::test_run().ok();
     let env = test_cell_env();
-    let dbs = env.dbs().await;
-    let env_ref = env.guard().await;
 
     let tests = [
         store_element,
@@ -705,33 +702,33 @@ async fn test_ops_state() {
     ];
 
     for t in tests.iter() {
-        clear_dbs(&env_ref, &dbs);
+        clear_dbs(env.clone()).await;
         let td = TestData::new().await;
         let (pre_state, expect, name) = t(td);
-        Db::set(pre_state, &env_ref, &dbs).await;
-        call_workflow(&env_ref, &dbs, env.clone()).await;
-        Db::check(expect, &env_ref, &dbs, format!("{}: {}", name, here!(""))).await;
+        Db::set(pre_state, env.clone()).await;
+        call_workflow(env.clone()).await;
+        Db::check(expect, env.clone(), format!("{}: {}", name, here!(""))).await;
     }
 }
 
 /// Call the produce dht ops workflow
-async fn produce_dht_ops<'env>(
-    env_ref: &'env EnvironmentWriteRef<'env>,
-    env: EnvironmentWrite,
-    dbs: &impl GetDb,
-) {
+async fn produce_dht_ops<'env>(env: EnvironmentWrite) {
+    let env_ref = env.guard().await;
     let (mut qt, _rx) = TriggerSender::new();
-    let reader = env_ref.reader().unwrap();
-    let workspace = ProduceDhtOpsWorkspace::new(&reader, dbs).unwrap();
-    produce_dht_ops_workflow(workspace, env.into(), &mut qt)
+    let workspace = ProduceDhtOpsWorkspace::new(env.clone().into(), &env_ref)
+        .await
+        .unwrap();
+    produce_dht_ops_workflow(workspace, env.clone().into(), &mut qt)
         .await
         .unwrap();
 }
 
 /// Run genesis on the source chain
-async fn genesis<'env>(env_ref: &'env EnvironmentWriteRef<'env>, dbs: &impl GetDb) {
-    let reader = env_ref.reader().unwrap();
-    let mut workspace = CallZomeWorkspace::new(&reader, dbs).unwrap();
+async fn genesis<'env>(env: EnvironmentWrite) {
+    let env_ref = env.guard().await;
+    let mut workspace = CallZomeWorkspace::new(env.clone().into(), &env_ref)
+        .await
+        .unwrap();
     fake_genesis(&mut workspace.source_chain).await.unwrap();
     env_ref
         .with_commit(|writer| workspace.flush_to_txn(writer))
@@ -740,12 +737,13 @@ async fn genesis<'env>(env_ref: &'env EnvironmentWriteRef<'env>, dbs: &impl GetD
 
 async fn commit_entry<'env>(
     pre_state: Vec<Db>,
-    env_ref: &'env EnvironmentWriteRef<'env>,
-    dbs: &impl GetDb,
+    env: EnvironmentWrite,
     zome_name: ZomeName,
 ) -> (EntryHash, HeaderHash) {
-    let reader = env_ref.reader().unwrap();
-    let mut workspace = CallZomeWorkspace::new(&reader, dbs).unwrap();
+    let env_ref = env.guard().await;
+    let mut workspace = CallZomeWorkspace::new(env.clone().into(), &env_ref)
+        .await
+        .unwrap();
 
     // Create entry def with the correct zome name
     let entry_def_id = fixt!(EntryDefId);
@@ -820,13 +818,11 @@ async fn commit_entry<'env>(
     (entry_hash, output.into_inner().try_into().unwrap())
 }
 
-async fn get_entry<'env>(
-    env_ref: &'env EnvironmentWriteRef<'env>,
-    dbs: &impl GetDb,
-    entry_hash: EntryHash,
-) -> Option<Entry> {
-    let reader = env_ref.reader().unwrap();
-    let mut workspace = CallZomeWorkspace::new(&reader, dbs).unwrap();
+async fn get_entry(env: EnvironmentWrite, entry_hash: EntryHash) -> Option<Entry> {
+    let env_ref = env.guard().await;
+    let mut workspace = CallZomeWorkspace::new(env.clone().into(), &env_ref)
+        .await
+        .unwrap();
 
     // Create ribosome mock to return fixtures
     // This is a lot faster then compiling a zome
@@ -848,16 +844,17 @@ async fn get_entry<'env>(
     output.into_inner().and_then(|el| el.into())
 }
 
-async fn link_entries<'env>(
-    env_ref: &'env EnvironmentWriteRef<'env>,
-    dbs: &impl GetDb,
+async fn link_entries(
+    env: EnvironmentWrite,
     base_address: EntryHash,
     target_address: EntryHash,
     zome_name: ZomeName,
     link_tag: LinkTag,
 ) -> HeaderHash {
-    let reader = env_ref.reader().unwrap();
-    let mut workspace = CallZomeWorkspace::new(&reader, dbs).unwrap();
+    let env_ref = env.guard().await;
+    let mut workspace = CallZomeWorkspace::new(env.clone().into(), &env_ref)
+        .await
+        .unwrap();
 
     // Create data for calls
     let mut dna_file = DnaFileFixturator::new(Empty).next().unwrap();
@@ -902,15 +899,16 @@ async fn link_entries<'env>(
     output.into_inner()
 }
 
-async fn get_links<'env>(
-    env_ref: &'env EnvironmentWriteRef<'env>,
-    dbs: &impl GetDb,
+async fn get_links(
+    env: EnvironmentWrite,
     base_address: EntryHash,
     zome_name: ZomeName,
     link_tag: LinkTag,
 ) -> Links {
-    let reader = env_ref.reader().unwrap();
-    let mut workspace = CallZomeWorkspace::new(&reader, dbs).unwrap();
+    let env_ref = env.guard().await;
+    let mut workspace = CallZomeWorkspace::new(env.clone().into(), &env_ref)
+        .await
+        .unwrap();
 
     // Create data for calls
     let mut dna_file = DnaFileFixturator::new(Empty).next().unwrap();
@@ -961,9 +959,8 @@ async fn test_metadata_from_wasm_api() {
     // test workspace boilerplate
     observability::test_run().ok();
     let env = holochain_state::test_utils::test_cell_env();
-    let dbs = env.dbs().await;
-    let env_ref = env.guard().await;
-    clear_dbs(&env_ref, &dbs);
+    let _dbs = env.dbs().await;
+    clear_dbs(env.clone()).await;
 
     // Generate fixture data
     let mut td = TestData::with_app_entry_type().await;
@@ -977,17 +974,16 @@ async fn test_metadata_from_wasm_api() {
     let (pre_state, _expect, _) = register_add_link(td);
 
     // Setup the source chain
-    genesis(&env_ref, &dbs).await;
+    genesis(env.clone()).await;
 
     // Commit the base
-    let base_address = commit_entry(pre_state, &env_ref, &dbs, zome_name.clone())
+    let base_address = commit_entry(pre_state, env.clone(), zome_name.clone())
         .await
         .0;
 
     // Link the base to the target
     let _link_add_address = link_entries(
-        &env_ref,
-        &dbs,
+        env.clone(),
         base_address.clone(),
         target_entry_hash.clone(),
         zome_name.clone(),
@@ -996,13 +992,13 @@ async fn test_metadata_from_wasm_api() {
     .await;
 
     // Trigger the produce workflow
-    produce_dht_ops(&env_ref, env.clone().into(), &dbs).await;
+    produce_dht_ops(env.clone()).await;
 
     // Call integrate
-    call_workflow(&env_ref, &dbs, env.clone()).await;
+    call_workflow(env.clone()).await;
 
     // Call get links and get back the targets
-    let links = get_links(&env_ref, &dbs, base_address, zome_name, link_tag).await;
+    let links = get_links(env.clone(), base_address, zome_name, link_tag).await;
     let links = links
         .into_inner()
         .into_iter()
@@ -1030,9 +1026,8 @@ async fn test_wasm_api_without_integration_links() {
     // test workspace boilerplate
     observability::test_run().ok();
     let env = holochain_state::test_utils::test_cell_env();
-    let dbs = env.dbs().await;
-    let env_ref = env.guard().await;
-    clear_dbs(&env_ref, &dbs);
+    let _dbs = env.dbs().await;
+    clear_dbs(env.clone()).await;
 
     // Generate fixture data
     let mut td = TestData::with_app_entry_type().await;
@@ -1046,17 +1041,16 @@ async fn test_wasm_api_without_integration_links() {
     let (pre_state, _expect, _) = register_add_link(td);
 
     // Setup the source chain
-    genesis(&env_ref, &dbs).await;
+    genesis(env.clone()).await;
 
     // Commit the base
-    let base_address = commit_entry(pre_state, &env_ref, &dbs, zome_name.clone())
+    let base_address = commit_entry(pre_state, env.clone(), zome_name.clone())
         .await
         .0;
 
     // Link the base to the target
     let _link_add_address = link_entries(
-        &env_ref,
-        &dbs,
+        env.clone(),
         base_address.clone(),
         target_entry_hash.clone(),
         zome_name.clone(),
@@ -1065,7 +1059,7 @@ async fn test_wasm_api_without_integration_links() {
     .await;
 
     // Call get links and get back the targets
-    let links = get_links(&env_ref, &dbs, base_address, zome_name, link_tag).await;
+    let links = get_links(env.clone(), base_address, zome_name, link_tag).await;
     let links = links
         .into_inner()
         .into_iter()
@@ -1087,7 +1081,7 @@ async fn test_wasm_api_without_integration_delete() {
     let env = holochain_state::test_utils::test_cell_env();
     let dbs = env.dbs().await;
     let env_ref = env.guard().await;
-    clear_dbs(&env_ref, &dbs);
+    clear_dbs(env.clone()).await;
 
     // Generate fixture data
     let mut td = TestData::with_app_entry_type().await;
@@ -1100,25 +1094,27 @@ async fn test_wasm_api_without_integration_delete() {
     let (pre_state, _expect, _) = register_add_link(td.clone());
 
     // Setup the source chain
-    genesis(&env_ref, &dbs).await;
+    genesis(env.clone()).await;
 
     // Commit the base
-    let base_address = commit_entry(pre_state.clone(), &env_ref, &dbs, zome_name.clone())
+    let base_address = commit_entry(pre_state.clone(), env.clone(), zome_name.clone())
         .await
         .0;
 
     // Trigger the produce workflow
-    produce_dht_ops(&env_ref, env.clone().into(), &dbs).await;
+    produce_dht_ops(env.clone()).await;
 
     // Call integrate
-    call_workflow(&env_ref, &dbs, env.clone()).await;
+    call_workflow(env.clone()).await;
 
     {
         let reader = env_ref.reader().unwrap();
-        let mut workspace = CallZomeWorkspace::new(&reader, &dbs).unwrap();
+        let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
+            .await
+            .unwrap();
         let entry_header = workspace
             .meta
-            .get_headers(base_address.clone())
+            .get_headers(&reader, base_address.clone())
             .unwrap()
             .next()
             .unwrap()
@@ -1133,16 +1129,16 @@ async fn test_wasm_api_without_integration_delete() {
             .unwrap();
     }
     // Trigger the produce workflow
-    produce_dht_ops(&env_ref, env.clone().into(), &dbs).await;
+    produce_dht_ops(env.clone()).await;
 
     // Call integrate
-    call_workflow(&env_ref, &dbs, env.clone()).await;
-    assert_eq!(get_entry(&env_ref, &dbs, base_address.clone()).await, None);
-    let base_address = commit_entry(pre_state, &env_ref, &dbs, zome_name.clone())
+    call_workflow(env.clone()).await;
+    assert_eq!(get_entry(env.clone(), base_address.clone()).await, None);
+    let base_address = commit_entry(pre_state, env.clone(), zome_name.clone())
         .await
         .0;
     assert_eq!(
-        get_entry(&env_ref, &dbs, base_address.clone()).await,
+        get_entry(env.clone(), base_address.clone()).await,
         Some(original_entry)
     );
 }
@@ -1285,8 +1281,9 @@ mod slow_tests {
             let dbs = cell_env.dbs().await;
             let env_ref = cell_env.guard().await;
 
-            let reader = env_ref.reader().unwrap();
-            let mut workspace = CallZomeWorkspace::new(&reader, &dbs).unwrap();
+            let mut workspace = CallZomeWorkspace::new(cell_env.clone().into(), &dbs)
+                .await
+                .unwrap();
 
             let header_builder = builder::EntryCreate {
                 entry_type: EntryType::App(AppEntryType::new(
@@ -1421,16 +1418,16 @@ mod slow_tests {
 
             let reader = env_ref.reader().unwrap();
             let db = dbs.get_db(&*INTEGRATED_DHT_OPS).unwrap();
-            let ops_db = IntegratedDhtOpsStore::new(&reader, db).unwrap();
-            let ops = ops_db.iter().unwrap().collect::<Vec<_>>().unwrap();
+            let ops_db = IntegratedDhtOpsStore::new(cell_env.clone().into(), db);
+            let ops = ops_db.iter(&reader).unwrap().collect::<Vec<_>>().unwrap();
             debug!(?ops);
             assert!(!ops.is_empty());
 
-            let meta = MetadataBuf::vault(&reader, &dbs).unwrap();
-            let mut meta_cache = MetadataBuf::cache(&reader, &dbs).unwrap();
+            let meta = MetadataBuf::vault(cell_env.clone().into(), &dbs).unwrap();
+            let mut meta_cache = MetadataBuf::cache(cell_env.clone().into(), &dbs).unwrap();
             let key = LinkMetaKey::Base(&base_entry_hash);
             let links = meta
-                .get_live_links(&key)
+                .get_live_links(&reader, &key)
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
@@ -1438,11 +1435,12 @@ mod slow_tests {
             assert_eq!(link.target, target_entry_hash);
 
             let (elements, _metadata, mut element_cache, _metadata_cache) =
-                test_dbs_and_mocks(&reader, &dbs);
+                test_dbs_and_mocks(cell_env.clone().into(), &dbs);
             let cell_network = conductor
                 .holochain_p2p()
                 .to_cell(cell_id.dna_hash().clone(), cell_id.agent_pubkey().clone());
             let mut cascade = Cascade::new(
+                cell_env.clone().into(),
                 &elements,
                 &meta,
                 &mut element_cache,

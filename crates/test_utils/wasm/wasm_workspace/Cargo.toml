@@ -37,3 +37,7 @@ members = [
 
 [profile.release]
 opt-level = "z"
+
+
+[patch.crates-io]
+

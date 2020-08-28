@@ -27,9 +27,9 @@ use holochain_zome_types::{header, Entry, Header};
 use mockall::*;
 
 #[allow(dead_code)]
-struct Chains<'env> {
-    source_chain: SourceChainBuf<'env>,
-    cache: ElementBuf<'env>,
+struct Chains {
+    source_chain: SourceChainBuf,
+    cache: ElementBuf,
     jimbo_id: AgentPubKey,
     jimbo_header: Header,
     jimbo_entry: EntryHashed,
@@ -40,7 +40,7 @@ struct Chains<'env> {
     mock_meta_cache: MockMetadataBuf,
 }
 
-fn setup_env<'env>(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Chains<'env>> {
+fn setup_env(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Chains> {
     let previous_header = fake_header_hash(1);
 
     let jimbo_id = fake_agent_pubkey_1();
@@ -74,7 +74,7 @@ fn setup_env<'env>(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResu
         entry_hash: jessy_entry.as_hash().clone(),
     });
 
-    let source_chain = SourceChainBuf::new(reader, dbs)?;
+    let source_chain = SourceChainBuf::new(env, dbs)?;
     let cache = ElementBuf::cache(reader, dbs)?;
     let mock_meta_vault = MockMetadataBuf::new();
     let mock_meta_cache = MockMetadataBuf::new();
@@ -107,7 +107,7 @@ async fn live_local_return() -> SourceChainResult<()> {
         mut mock_meta_vault,
         mut mock_meta_cache,
         ..
-    } = setup_env(&reader, &dbs)?;
+    } = setup_env(env.clone().into(), &dbs)?;
     source_chain
         .put_raw(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
         .await?;
@@ -154,7 +154,7 @@ async fn dead_local_none() -> SourceChainResult<()> {
         mut mock_meta_vault,
         mut mock_meta_cache,
         ..
-    } = setup_env(&reader, &dbs)?;
+    } = setup_env(env.clone().into(), &dbs)?;
     source_chain
         .put_raw(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
         .await?;
@@ -200,7 +200,7 @@ async fn notfound_goto_cache_live() -> SourceChainResult<()> {
         mock_meta_vault,
         mut mock_meta_cache,
         ..
-    } = setup_env(&reader, &dbs)?;
+    } = setup_env(env.clone().into(), &dbs)?;
     let h = HeaderHashed::from_content(jimbo_header.clone()).await;
     let h = SignedHeaderHashed::with_presigned(h, fixt!(Signature));
     cache.put(h, Some(jimbo_entry.clone()))?;
@@ -247,7 +247,7 @@ async fn notfound_cache() -> DatabaseResult<()> {
         mock_meta_vault,
         mut mock_meta_cache,
         ..
-    } = setup_env(&reader, &dbs)?;
+    } = setup_env(env.clone().into(), &dbs)?;
     let address = jimbo_entry.as_hash();
 
     let (_n, _r, cell_network) = test_network().await;
@@ -287,7 +287,7 @@ async fn links_local_return() -> SourceChainResult<()> {
         jessy_entry,
         mut mock_meta_vault,
         mut mock_meta_cache,
-    } = setup_env(&reader, &dbs)?;
+    } = setup_env(env.clone().into(), &dbs)?;
     source_chain
         .put_raw(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
         .await?;
@@ -362,7 +362,7 @@ async fn links_cache_return() -> SourceChainResult<()> {
         jessy_entry,
         mut mock_meta_vault,
         mut mock_meta_cache,
-    } = setup_env(&reader, &dbs)?;
+    } = setup_env(env.clone().into(), &dbs)?;
     source_chain
         .put_raw(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
         .await?;
@@ -455,7 +455,7 @@ async fn links_notauth_cache() -> DatabaseResult<()> {
         mock_meta_vault,
         mut mock_meta_cache,
         ..
-    } = setup_env(&reader, &dbs)?;
+    } = setup_env(env.clone().into(), &dbs)?;
 
     let base = jimbo_entry.as_hash().clone();
     let target = jessy_entry.as_hash().clone();

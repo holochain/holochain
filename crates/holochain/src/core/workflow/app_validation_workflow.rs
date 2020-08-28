@@ -10,15 +10,15 @@ use crate::core::{
     },
 };
 use holochain_state::{
-    buffer::{BufferedStore, KvBuf},
+    buffer::{BufferedStore, KvBufFresh},
     db::INTEGRATION_LIMBO,
-    prelude::{GetDb, Reader, Writer},
+    prelude::*,
 };
 use tracing::*;
 
 #[instrument(skip(workspace, writer, trigger_integration))]
 pub async fn app_validation_workflow(
-    workspace: AppValidationWorkspace<'_>,
+    workspace: AppValidationWorkspace,
     writer: OneshotWriter,
     trigger_integration: &mut TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
@@ -37,23 +37,26 @@ pub async fn app_validation_workflow(
     Ok(WorkComplete::Complete)
 }
 
-pub struct AppValidationWorkspace<'env> {
-    pub integration_limbo: IntegrationLimboStore<'env>,
-    pub validation_limbo: ValidationLimboStore<'env>,
+pub struct AppValidationWorkspace {
+    pub integration_limbo: IntegrationLimboStore,
+    pub validation_limbo: ValidationLimboStore,
 }
 
-impl<'env> Workspace<'env> for AppValidationWorkspace<'env> {
-    fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self> {
+impl AppValidationWorkspace {
+    pub fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
         let db = dbs.get_db(&*INTEGRATION_LIMBO)?;
-        let integration_limbo = KvBuf::new(reader, db)?;
+        let integration_limbo = KvBufFresh::new(env.clone(), db);
 
-        let validation_limbo = ValidationLimboStore::new(reader, dbs)?;
+        let validation_limbo = ValidationLimboStore::new(env, dbs)?;
 
         Ok(Self {
             integration_limbo,
             validation_limbo,
         })
     }
+}
+
+impl Workspace for AppValidationWorkspace {
     fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
         warn!("unimplemented passthrough");
         self.validation_limbo.0.flush_to_txn(writer)?;
