@@ -1,6 +1,5 @@
 use crate::{has_hash::HasHash, HashType, PrimitiveHashType};
 
-// pub(crate) const HASH_PREFIX_LEN: usize = 3;
 pub(crate) const HASH_CORE_LEN: usize = 32;
 pub(crate) const HASH_LOC_LEN: usize = 4;
 
