@@ -175,7 +175,7 @@ mod tests {
         holochain_types::observability::test_run().ok();
 
         let test_env = holochain_state::test_utils::test_cell_env();
-let env = test_env.env();
+        let env = test_env.env();
         let env_ref = env.guard().await;
         let keystore = holochain_state::test_utils::test_keystore();
 

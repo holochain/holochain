@@ -118,7 +118,7 @@ pub mod slow_tests {
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_remove_link_add_remove() {
         let test_env = holochain_state::test_utils::test_cell_env();
-let env = test_env.env();
+        let env = test_env.env();
         let dbs = env.dbs().await;
 
         let mut workspace = crate::core::workflow::CallZomeWorkspace::new(env.clone().into(), &dbs)

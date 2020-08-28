@@ -358,7 +358,7 @@ mod slow_tests {
     async fn pass_validate_test<'a>() {
         // test workspace boilerplate
         let test_env = holochain_state::test_utils::test_cell_env();
-let env = test_env.env();
+        let env = test_env.env();
         let dbs = env.dbs().await;
         let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
             .await
@@ -403,7 +403,7 @@ let env = test_env.env();
     async fn fail_validate_test<'a>() {
         // test workspace boilerplate
         let test_env = holochain_state::test_utils::test_cell_env();
-let env = test_env.env();
+        let env = test_env.env();
         let dbs = env.dbs().await;
         let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
             .await

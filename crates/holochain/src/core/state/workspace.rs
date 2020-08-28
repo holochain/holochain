@@ -69,7 +69,7 @@ pub mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn workspace_sanity_check() -> anyhow::Result<()> {
         let test_env = test_cell_env();
-let arc = test_env.env();
+        let arc = test_env.env();
         let env = arc.guard().await;
         let dbs = arc.dbs().await;
         let addr1 = fake_header_hash(1);

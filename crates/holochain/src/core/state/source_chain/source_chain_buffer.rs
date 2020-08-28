@@ -384,7 +384,7 @@ pub mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn source_chain_buffer_iter_back() -> SourceChainResult<()> {
         let test_env = test_cell_env();
-let arc = test_env.env();
+        let arc = test_env.env();
         let env = arc.guard().await;
         let dbs = arc.dbs().await;
 
@@ -455,7 +455,7 @@ let arc = test_env.env();
     #[tokio::test(threaded_scheduler)]
     async fn source_chain_buffer_dump_entries_json() -> SourceChainResult<()> {
         let test_env = test_cell_env();
-let arc = test_env.env();
+        let arc = test_env.env();
         let env = arc.guard().await;
 
         let (_agent_pubkey, dna_header, dna_entry, agent_header, agent_entry) = fixtures();
@@ -495,7 +495,7 @@ let arc = test_env.env();
     #[tokio::test(threaded_scheduler)]
     async fn test_header_cas_roundtrip() {
         let test_env = test_cell_env();
-let arc = test_env.env();
+        let arc = test_env.env();
         let env = arc.guard().await;
         let mut store = SourceChainBuf::new(arc.clone().into(), &env).await.unwrap();
 
