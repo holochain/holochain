@@ -37,9 +37,21 @@ wasm_io_types!(
     // call is entirely arbitrary so we need to send and receive SerializedBytes
     pub struct CallInput(SerializedBytes);
     pub struct CallOutput(SerializedBytes);
-    // @TODO
-    pub struct CapabilityInput(());
-    pub struct CapabilityOutput(());
+    // list all the local capability claims
+    pub struct CapabilityClaimsInput(());
+    pub struct CapabilityClaimsOutput(());
+    // list all the local capability grants
+    pub struct CapabilityGrantsInput(());
+    pub struct CapabilityGrantsOutput(());
+    // get the capability for the current zome call
+    pub struct CapabilityInfoInput(());
+    pub struct CapabilityInfoOutput(());
+    // commit a capability claim
+    pub struct CommitCapabilityClaimInput(());
+    pub struct CommitCapabilityClaimOutput(());
+    // commit a capability grant
+    pub struct CommitCapabilityGrantInput(());
+    pub struct CommitCapabilityGrantOutput(());
     // the SerializedBytes will be stuffed into an Entry::App(SB) host side
     pub struct CommitEntryInput((crate::entry_def::EntryDefId, crate::entry::Entry));
     // the header hash of the newly committed entry

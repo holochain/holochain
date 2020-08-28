@@ -22,3 +22,4 @@ nanoid = "0.3"
 rust-base58 = "0.0.4"
 serde = { version = "1.0.104", features = [ "derive" ] }
 serde_bytes = "0.11"
+subtle = "2"

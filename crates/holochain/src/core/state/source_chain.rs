@@ -208,19 +208,22 @@ impl<'env> BufferedStore<'env> for SourceChain<'env> {
 pub mod tests {
 
     use super::*;
+    use crate::fixt::*;
+    use ::fixt::prelude::*;
     use holochain_state::prelude::*;
     use holochain_state::test_utils::test_cell_env;
     use holochain_types::test_utils::{fake_agent_pubkey_1, fake_dna_hash};
     use holochain_zome_types::capability::{CapAccess, ZomeCallCapGrant};
-    use std::collections::BTreeMap;
+    use std::collections::HashSet;
 
     #[tokio::test(threaded_scheduler)]
     async fn test_get_cap_grant() -> SourceChainResult<()> {
         let arc = test_cell_env();
         let env = arc.guard().await;
-        let access = CapAccess::transferable();
+        let access = CapAccess::from(CapSecretFixturator::new(Unpredictable).next().unwrap());
         let secret = access.secret().unwrap();
-        let grant = ZomeCallCapGrant::new("tag".into(), access.clone(), BTreeMap::new());
+        let curry = CurryPayloadsFixturator::new(Empty).next().unwrap();
+        let grant = ZomeCallCapGrant::new("tag".into(), access.clone(), HashSet::new(), curry);
         {
             let reader = env.reader()?;
             let mut store = SourceChainBuf::new(&reader, &env)?;
@@ -263,7 +266,7 @@ pub mod tests {
     async fn test_get_cap_claim() -> SourceChainResult<()> {
         let arc = test_cell_env();
         let env = arc.guard().await;
-        let secret = CapSecret::random();
+        let secret = CapSecretFixturator::new(Unpredictable).next().unwrap();
         let agent_pubkey = fake_agent_pubkey_1().into();
         let claim = CapClaim::new("tag".into(), agent_pubkey, secret.clone());
         {

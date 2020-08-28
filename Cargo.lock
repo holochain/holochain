@@ -611,7 +611,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4434400df11d95d556bac068ddfedd482915eb18fe8bea89bc80b6e4b1c179e5"
 dependencies = [
  "generic-array 0.12.3",
- "subtle",
+ "subtle 1.0.0",
 ]
 
 [[package]]
@@ -1439,9 +1439,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_common"
-version = "0.0.42"
+version = "0.0.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3aec2a89c8121f45730a72c08716fa2d32c6d967902fd1ede73405177d14cb82"
+checksum = "007c1abfaccab383e3aeb2fa12fabfa918c0a5d86401d4179339dc2591468271"
 dependencies = [
  "holochain_serialized_bytes",
  "serde",
@@ -1450,9 +1450,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_guest"
-version = "0.0.42"
+version = "0.0.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f548c70ea7ff5383c52cf1af0ce33c219a01b526dbe0ad5a06d22545cb78c3a2"
+checksum = "5ea68e5eab1f6d053321f44b4d86b7335e8c66dadfdd8fac0173f639b3288dde"
 dependencies = [
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
@@ -1461,9 +1461,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_host"
-version = "0.0.42"
+version = "0.0.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea002422d19d82673e1a03b35e34e61dd2a7ea8a247a04557e0f95bc0f375f87"
+checksum = "d5de8a925e9d64f8b45734db19f0d4a29640b6f6e749980b134171c6459b7abc"
 dependencies = [
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
@@ -1504,6 +1504,7 @@ dependencies = [
  "rust-base58",
  "serde",
  "serde_bytes",
+ "subtle 2.2.3",
 ]
 
 [[package]]
@@ -3385,6 +3386,12 @@ name = "subtle"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2d67a5a62ba6e01cb2192ff309324cb4875d0c451d55fe2319433abe7a05a8ee"
+
+[[package]]
+name = "subtle"
+version = "2.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "502d53007c02d7605a05df1c1a73ee436952781653da5d0bf57ad608f66932c1"
 
 [[package]]
 name = "syn"
