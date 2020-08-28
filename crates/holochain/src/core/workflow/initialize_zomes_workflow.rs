@@ -68,7 +68,6 @@ async fn initialize_zomes_workflow_inner<'env, Ribosome: RibosomeT>(
     Ok(result)
 }
 
-// TODO: why pub? -MD
 pub struct InitializeZomesWorkspace(pub(crate) CallZomeWorkspace);
 
 impl InitializeZomesWorkspace {
