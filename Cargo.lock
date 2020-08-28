@@ -1500,7 +1500,6 @@ dependencies = [
  "holo_hash",
  "holochain_serialized_bytes",
  "multihash",
- "nanoid",
  "rust-base58",
  "serde",
  "serde_bytes",
