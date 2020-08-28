@@ -118,6 +118,14 @@ primitive_hash_type!(Header, HeaderHash, HeaderVisitor, HEADER_PREFIX);
 primitive_hash_type!(NetId, NetIdHash, NetIdVisitor, NET_ID_PREFIX);
 primitive_hash_type!(Wasm, WasmHash, WasmVisitor, WASM_PREFIX);
 
+impl HashTypeSync for DhtOp {}
+impl HashTypeSync for Entry {}
+impl HashTypeSync for Header {}
+
+impl HashTypeAsync for Dna {}
+impl HashTypeAsync for NetId {}
+impl HashTypeAsync for Wasm {}
+
 impl From<AgentPubKey> for EntryHash {
     fn from(hash: AgentPubKey) -> EntryHash {
         hash.retype(hash_type::Entry)
