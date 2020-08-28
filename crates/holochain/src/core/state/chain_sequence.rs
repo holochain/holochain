@@ -59,7 +59,7 @@ impl ChainSequenceBuf {
         store: &KvIntStore<ChainSequenceItem>,
         r: &R,
     ) -> DatabaseResult<(u32, u32, Option<HeaderHash>)> {
-        let latest = store.iter(r)?.rev().next()?;
+        let latest = store.iter(r)?.next_back()?;
         debug!("{:?}", latest);
         DatabaseResult::Ok(
             latest
