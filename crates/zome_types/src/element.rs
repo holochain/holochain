@@ -117,6 +117,17 @@ impl<'a> ElementEntry<'a> {
             _ => Ok(None),
         }
     }
+
+    /// Provides CapGrantEntry if it exists
+    ///
+    /// same as as_option but handles cap grants
+    /// anything other than ElementEntry::Present for a Entry::CapGrant returns None
+    pub fn to_grant_option(&self) -> Option<crate::entry::CapGrantEntry> {
+        match self.as_option() {
+            Some(Entry::CapGrant(cap_grant_entry)) => Some(cap_grant_entry.to_owned()),
+            _ => None,
+        }
+    }
 }
 
 /// A combination of a Header and its signature.

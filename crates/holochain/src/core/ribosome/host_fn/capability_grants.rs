@@ -68,11 +68,28 @@ pub mod wasm_test {
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = raw_workspace.clone();
 
-        let _output: HeaderHash = crate::call_test_ribosome!(
+        let secret: CapSecret =
+            crate::call_test_ribosome!(host_access, TestWasm::Capability, "cap_secret", ());
+        let header: HeaderHash = crate::call_test_ribosome!(
             host_access,
             TestWasm::Capability,
             "transferable_cap_grant",
-            ()
+            secret
         );
+        let entry: GetOutput =
+            crate::call_test_ribosome!(host_access, TestWasm::Capability, "get_entry", header);
+        dbg!(&entry);
+
+        let entry_secret: CapSecret = match entry.into_inner() {
+            Some(element) => {
+                let cap_grant_entry: CapGrantEntry = element.entry().to_grant_option().unwrap();
+                match cap_grant_entry.access {
+                    CapAccess::Transferable { secret, .. } => secret,
+                    _ => unreachable!(),
+                }
+            }
+            _ => unreachable!(),
+        };
+        assert_eq!(entry_secret, secret,);
     }
 }
