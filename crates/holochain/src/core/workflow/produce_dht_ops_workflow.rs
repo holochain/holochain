@@ -208,15 +208,10 @@ mod tests {
                 .with_commit(|writer| source_chain.flush_to_txn(writer))
                 .unwrap();
 
-            futures::future::join_all(
-                all_ops
-                    .into_iter()
-                    .flatten()
-                    .map(|o| DhtOpHash::from_data(o)),
-            )
-            .await
-            .into_iter()
-            .collect()
+            futures::future::join_all(all_ops.iter().flatten().map(|o| DhtOpHash::with_data(o)))
+                .await
+                .into_iter()
+                .collect()
         };
 
         // Run the workflow and commit it
