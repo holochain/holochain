@@ -63,7 +63,6 @@ async fn get_updates_cache() {
     // Database setup
     let env = test_cell_env();
     let dbs = env.dbs().await;
-    let _env_ref = env.guard().await;
 
     let (element_fixt_store, _) = generate_fixt_store().await;
     let expected = element_fixt_store

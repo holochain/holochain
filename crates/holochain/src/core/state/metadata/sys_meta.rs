@@ -543,7 +543,6 @@ mod tests {
     async fn test_entry_dht_status() {
         let arc = test_cell_env();
         let env = arc.guard().await;
-
         let mut fx = TestFixtures::new();
         let entry_hash = fx.entry_hash();
         let mut entry_creates = Vec::new();

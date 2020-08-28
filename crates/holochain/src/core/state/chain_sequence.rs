@@ -17,7 +17,6 @@ use holochain_state::{
     prelude::*,
 };
 use serde::{Deserialize, Serialize};
-use tokio_safe_block_on::tokio_safe_block_forever_on;
 use tracing::*;
 
 /// A Value in the ChainSequence database.
@@ -68,7 +67,7 @@ impl ChainSequenceBuf {
                     (
                         // TODO: this is a bit ridiculous -- reevaluate whether the
                         //       IntKey is really needed (vs simple u32)
-                        u32::from(IntKey::from_key_bytes_fallible(key.to_vec())) + 1,
+                        u32::from(IntKey::from_key_bytes_fallible(key)) + 1,
                         item.tx_seq + 1,
                         Some(item.header_address),
                     )
@@ -126,10 +125,7 @@ impl ChainSequenceBuf {
         // a list of indices for only the headers which have been transformed.
         Ok(Box::new(self.buf.store().iter(r)?.filter_map(|(i, c)| {
             Ok(if !c.dht_transforms_complete {
-                Some((
-                    IntKey::from_key_bytes_fallible(i.to_vec()).into(),
-                    c.header_address,
-                ))
+                Some((IntKey::from_key_bytes_fallible(i).into(), c.header_address))
             } else {
                 None
             })
@@ -159,9 +155,7 @@ impl BufferedStore for ChainSequenceBuf {
             return Ok(());
         }
         let env = self.buf.env().clone();
-        // FIXME: consider making the whole method async
-        let db =
-            tokio_safe_block_forever_on(async move { env.dbs().await.get_db(&*CHAIN_SEQUENCE) })?;
+        let db = env.get_db(&*CHAIN_SEQUENCE)?;
         let (_, _, persisted_head) = ChainSequenceBuf::head_info(&KvIntStore::new(db), writer)?;
         let (old, new) = (self.persisted_head, persisted_head);
         if old != new {
@@ -192,7 +186,6 @@ pub mod tests {
         observability::test_run().ok();
         let arc = test_cell_env();
         let dbs = arc.dbs().await;
-
         {
             let mut buf = ChainSequenceBuf::new(arc.clone().into(), &dbs).await?;
             assert_eq!(buf.chain_head(), None);
@@ -310,7 +303,7 @@ pub mod tests {
                 .buf
                 .store()
                 .iter(&reader)?
-                .map(|(key, _)| Ok(IntKey::from_key_bytes_fallible(key.to_vec()).into()))
+                .map(|(key, _)| Ok(IntKey::from_key_bytes_fallible(key).into()))
                 .collect()?;
             assert_eq!(items, vec![0, 1, 2]);
         }
@@ -376,7 +369,6 @@ pub mod tests {
         let task1 = tokio::spawn(async move {
             let env = arc1.guard().await;
             let dbs = arc1.dbs().await;
-
             let mut buf = ChainSequenceBuf::new(arc1.clone().into(), &dbs).await?;
             buf.put_header(
                 HeaderHash::from_raw_bytes(vec![
@@ -412,7 +404,6 @@ pub mod tests {
             rx1.await.unwrap();
             let env = arc2.guard().await;
             let dbs = arc2.dbs().await;
-
             let mut buf = ChainSequenceBuf::new(arc2.clone().into(), &dbs).await?;
             buf.put_header(
                 HeaderHash::from_raw_bytes(vec![

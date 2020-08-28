@@ -492,7 +492,6 @@ pub mod tests {
     async fn test_header_cas_roundtrip() {
         let arc = test_cell_env();
         let env = arc.guard().await;
-
         let mut store = SourceChainBuf::new(arc.clone().into(), &env).await.unwrap();
 
         let (_, hashed, _, _, _) = fixtures();

@@ -36,7 +36,6 @@ pub mod test {
     async fn invoke_import_zome_info_test() {
         let env = holochain_state::test_utils::test_cell_env();
         let dbs = env.dbs().await;
-
         let mut workspace = crate::core::workflow::CallZomeWorkspace::new(env.clone().into(), &dbs)
             .await
             .unwrap();

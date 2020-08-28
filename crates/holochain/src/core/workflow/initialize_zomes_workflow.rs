@@ -109,7 +109,6 @@ pub mod tests {
     async fn adds_init_marker() {
         let env = test_cell_env();
         let dbs = env.dbs().await;
-
         let mut workspace = InitializeZomesWorkspace(
             CallZomeWorkspace::new(env.clone().into(), &dbs)
                 .await

@@ -44,8 +44,8 @@ impl AsRef<[u8]> for EntryDefStoreKey {
 }
 
 impl BufKey for EntryDefStoreKey {
-    fn from_key_bytes_fallible(bytes: Vec<u8>) -> Self {
-        Self(UnsafeBytes::from(bytes).into())
+    fn from_key_bytes_fallible(bytes: &[u8]) -> Self {
+        Self(UnsafeBytes::from(bytes.to_vec()).into())
     }
 }
 

@@ -611,7 +611,6 @@ where
         let cell = self.cell_by_id(cell_id)?;
         let arc = cell.state_env();
         let env = arc.guard().await;
-
         let source_chain = SourceChainBuf::new(arc.clone().into(), &env).await?;
         Ok(source_chain.dump_as_json().await?)
     }

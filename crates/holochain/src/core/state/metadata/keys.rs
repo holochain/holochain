@@ -120,8 +120,8 @@ impl LinkMetaVal {
 }
 
 impl BufKey for BytesKey {
-    fn from_key_bytes_fallible(bytes: Vec<u8>) -> Self {
-        Self(bytes)
+    fn from_key_bytes_fallible(bytes: &[u8]) -> Self {
+        bytes.into()
     }
 }
 
@@ -267,5 +267,11 @@ impl From<BytesKey> for MiscMetaKey {
         SerializedBytes::from(UnsafeBytes::from(<Vec<u8>>::from(k)))
             .try_into()
             .expect("Database MiscMetaKey failed to serialize")
+    }
+}
+
+impl From<&[u8]> for BytesKey {
+    fn from(b: &[u8]) -> Self {
+        Self(b.to_owned())
     }
 }

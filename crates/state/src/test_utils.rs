@@ -132,8 +132,8 @@ impl AsRef<[u8]> for DbString {
 }
 
 impl BufKey for DbString {
-    fn from_key_bytes_fallible(bytes: Vec<u8>) -> Self {
-        Self(String::from_utf8(bytes).unwrap())
+    fn from_key_bytes_fallible(bytes: &[u8]) -> Self {
+        Self(String::from_utf8(bytes.to_vec()).unwrap())
     }
 }
 

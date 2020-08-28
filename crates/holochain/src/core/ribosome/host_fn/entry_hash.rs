@@ -64,7 +64,6 @@ pub mod wasm_test {
     async fn ribosome_entry_hash_test() {
         let env = holochain_state::test_utils::test_cell_env();
         let dbs = env.dbs().await;
-
         let mut workspace = crate::core::workflow::CallZomeWorkspace::new(env.clone().into(), &dbs)
             .await
             .unwrap();
@@ -88,7 +87,6 @@ pub mod wasm_test {
     async fn ribosome_hash_path_pwd_test() {
         let env = holochain_state::test_utils::test_cell_env();
         let dbs = env.dbs().await;
-
         let mut workspace = crate::core::workflow::CallZomeWorkspace::new(env.clone().into(), &dbs)
             .await
             .unwrap();
