@@ -1,3 +1,4 @@
+use fixt::prelude::*;
 use hdk3::prelude::*;
 use holochain::conductor::{
     api::{AppInterfaceApi, AppRequest, AppResponse, RealAppInterfaceApi},
@@ -6,6 +7,7 @@ use holochain::conductor::{
     ConductorBuilder, ConductorHandle,
 };
 use holochain::core::ribosome::ZomeCallInvocation;
+use holochain::fixt::*;
 use holochain_state::test_utils::{test_conductor_env, test_wasm_env, TestEnvironment};
 use holochain_types::app::InstalledCell;
 use holochain_types::cell::CellId;
@@ -15,10 +17,9 @@ use holochain_types::test_utils::fake_agent_pubkey_1;
 use holochain_types::{observability, test_utils::fake_agent_pubkey_2};
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::HostInput;
+use matches::assert_matches;
 use std::sync::Arc;
 use tempdir::TempDir;
-
-use matches::assert_matches;
 use test_wasm_common::{AnchorInput, TestString};
 
 #[tokio::test(threaded_scheduler)]
@@ -152,7 +153,7 @@ where
     Ok(ZomeCallInvocation {
         cell_id: cell_id.clone(),
         zome_name: TestWasm::Anchor.into(),
-        cap: CapSecret::default(),
+        cap: CapSecretFixturator::new(Unpredictable).next().unwrap(),
         fn_name: func.to_string(),
         payload: HostInput::new(payload.try_into()?),
         provenance: cell_id.agent_pubkey().clone(),

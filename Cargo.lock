@@ -611,7 +611,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4434400df11d95d556bac068ddfedd482915eb18fe8bea89bc80b6e4b1c179e5"
 dependencies = [
  "generic-array 0.12.3",
- "subtle",
+ "subtle 1.0.0",
 ]
 
 [[package]]
@@ -748,7 +748,7 @@ name = "dna_util"
 version = "0.0.1"
 dependencies = [
  "holo_hash",
- "holochain_serialized_bytes 0.0.43",
+ "holochain_serialized_bytes",
  "holochain_types",
  "holochain_zome_types",
  "serde",
@@ -876,7 +876,7 @@ dependencies = [
 name = "fixt"
 version = "0.0.1"
 dependencies = [
- "holochain_serialized_bytes 0.0.43",
+ "holochain_serialized_bytes",
  "paste 0.1.12",
  "rand 0.7.3",
  "serde",
@@ -1193,7 +1193,7 @@ dependencies = [
  "blake2b_simd",
  "fixt",
  "futures",
- "holochain_serialized_bytes 0.0.43",
+ "holochain_serialized_bytes",
  "must_future",
  "rand 0.7.3",
  "serde",
@@ -1226,7 +1226,7 @@ dependencies = [
  "holochain_keystore",
  "holochain_legacy",
  "holochain_p2p",
- "holochain_serialized_bytes 0.0.43",
+ "holochain_serialized_bytes",
  "holochain_state",
  "holochain_types",
  "holochain_wasm_test_utils",
@@ -1288,7 +1288,7 @@ dependencies = [
  "ghost_actor",
  "holo_hash",
  "holochain_crypto",
- "holochain_serialized_bytes 0.0.43",
+ "holochain_serialized_bytes",
  "holochain_zome_types",
  "serde",
  "serde_bytes",
@@ -1313,7 +1313,7 @@ dependencies = [
  "ghost_actor",
  "holo_hash",
  "holochain_keystore",
- "holochain_serialized_bytes 0.0.43",
+ "holochain_serialized_bytes",
  "holochain_types",
  "holochain_zome_types",
  "kitsune_p2p",
@@ -1326,42 +1326,17 @@ dependencies = [
 
 [[package]]
 name = "holochain_serialized_bytes"
-version = "0.0.42"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "88e79687b22936b23689fdcf81c6e61825560e1dd536ddc89ec0f8efee14ec24"
-dependencies = [
- "holochain_serialized_bytes_derive 0.0.42",
- "rmp-serde",
- "serde",
- "serde-transcode",
- "serde_bytes",
- "serde_json",
- "thiserror",
-]
-
-[[package]]
-name = "holochain_serialized_bytes"
 version = "0.0.43"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d61a43f9efb00384b2e35c8690774423be81f4675c3849d757ad45e74bf853f1"
 dependencies = [
- "holochain_serialized_bytes_derive 0.0.43",
+ "holochain_serialized_bytes_derive",
  "rmp-serde",
  "serde",
  "serde-transcode",
  "serde_bytes",
  "serde_json",
  "thiserror",
-]
-
-[[package]]
-name = "holochain_serialized_bytes_derive"
-version = "0.0.42"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "483f009b6de95dbfb84935d0bb1c0880fc48c9281beb0b7f7e84102b6978697d"
-dependencies = [
- "quote 0.6.13",
- "syn 0.15.44",
 ]
 
 [[package]]
@@ -1390,7 +1365,7 @@ dependencies = [
  "holo_hash",
  "holochain_crypto",
  "holochain_keystore",
- "holochain_serialized_bytes 0.0.43",
+ "holochain_serialized_bytes",
  "holochain_types",
  "lazy_static",
  "must_future",
@@ -1426,7 +1401,7 @@ dependencies = [
  "holo_hash",
  "holochain_crypto",
  "holochain_keystore",
- "holochain_serialized_bytes 0.0.43",
+ "holochain_serialized_bytes",
  "holochain_zome_types",
  "lazy_static",
  "multihash",
@@ -1467,33 +1442,33 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_common"
-version = "0.0.42"
+version = "0.0.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3aec2a89c8121f45730a72c08716fa2d32c6d967902fd1ede73405177d14cb82"
+checksum = "0367dabf82b157d98dc6080edc94034bce8d6cc6fc276bfbee06005d58380397"
 dependencies = [
- "holochain_serialized_bytes 0.0.42",
+ "holochain_serialized_bytes",
  "serde",
  "thiserror",
 ]
 
 [[package]]
 name = "holochain_wasmer_guest"
-version = "0.0.42"
+version = "0.0.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f548c70ea7ff5383c52cf1af0ce33c219a01b526dbe0ad5a06d22545cb78c3a2"
+checksum = "c1cb68124704cee9c6755775216352bb4287e6fdc0c5223e62284dc11447dcd4"
 dependencies = [
- "holochain_serialized_bytes 0.0.42",
+ "holochain_serialized_bytes",
  "holochain_wasmer_common",
  "serde",
 ]
 
 [[package]]
 name = "holochain_wasmer_host"
-version = "0.0.42"
+version = "0.0.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea002422d19d82673e1a03b35e34e61dd2a7ea8a247a04557e0f95bc0f375f87"
+checksum = "d51d0e18d2d470a5104fc5a3fd41714445f40d931112f690b0696eaab12f6a64"
 dependencies = [
- "holochain_serialized_bytes 0.0.42",
+ "holochain_serialized_bytes",
  "holochain_wasmer_common",
  "lazy_static",
  "serde",
@@ -1506,7 +1481,7 @@ name = "holochain_websocket"
 version = "0.0.1"
 dependencies = [
  "futures",
- "holochain_serialized_bytes 0.0.43",
+ "holochain_serialized_bytes",
  "holochain_types",
  "linefeed",
  "nanoid",
@@ -1526,12 +1501,12 @@ name = "holochain_zome_types"
 version = "0.0.1"
 dependencies = [
  "holo_hash",
- "holochain_serialized_bytes 0.0.43",
+ "holochain_serialized_bytes",
  "multihash",
- "nanoid",
  "rust-base58",
  "serde",
  "serde_bytes",
+ "subtle 2.2.3",
 ]
 
 [[package]]
@@ -3415,6 +3390,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2d67a5a62ba6e01cb2192ff309324cb4875d0c451d55fe2319433abe7a05a8ee"
 
 [[package]]
+name = "subtle"
+version = "2.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "502d53007c02d7605a05df1c1a73ee436952781653da5d0bf57ad608f66932c1"
+
+[[package]]
 name = "syn"
 version = "0.15.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3535,7 +3516,7 @@ name = "test_wasm_common"
 version = "0.0.1"
 dependencies = [
  "hdk3",
- "holochain_serialized_bytes 0.0.43",
+ "holochain_serialized_bytes",
  "serde",
  "serde_bytes",
 ]
