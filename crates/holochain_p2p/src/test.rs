@@ -97,7 +97,7 @@ mod tests {
                 a2,
                 "".into(),
                 "".to_string(),
-                "".to_string().into(),
+                [0; holochain_zome_types::capability::CAP_SECRET_BYTES].into(),
                 UnsafeBytes::from(b"yippo".to_vec()).into(),
             )
             .await

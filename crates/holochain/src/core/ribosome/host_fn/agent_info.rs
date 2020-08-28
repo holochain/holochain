@@ -28,8 +28,6 @@ pub fn agent_info<'a>(
             unsafe { call_context.host_access.workspace().apply_ref(call).await }
         })??;
     Ok(AgentInfoOutput::new(AgentInfo {
-        agent_pubkey: agent_pubkey.clone(),
-        // @todo these were in redux, what to do here?
         agent_initial_pubkey: agent_pubkey.clone(),
         agent_latest_pubkey: agent_pubkey,
     }))
@@ -73,7 +71,6 @@ pub mod test {
             "agent_info",
             AgentInfoInput::new(())
         );
-        assert_eq!(agent_info.inner_ref().agent_pubkey, fake_agent_pubkey_1(),);
         assert_eq!(
             agent_info.inner_ref().agent_initial_pubkey,
             fake_agent_pubkey_1(),

@@ -9,6 +9,7 @@ use crate::{
 
 use holo_hash::{hash_type, PrimitiveHashType};
 use holochain_zome_types::capability::CapSecret;
+use holochain_zome_types::capability::CAP_SECRET_BYTES;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::HostInput;
 use std::path::PathBuf;
@@ -115,7 +116,7 @@ pub fn fake_agent_pubkey_2() -> AgentPubKey {
 
 /// A fixture CapSecret for unit testing.
 pub fn fake_cap_secret() -> CapSecret {
-    CapSecret::random()
+    [0; CAP_SECRET_BYTES].into()
 }
 
 /// A fixture ZomeCallInvocationPayload for unit testing.

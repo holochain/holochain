@@ -1,3 +1,4 @@
+pub mod capability;
 pub mod guest_callback;
 pub mod hash_path;
 pub mod host_fn;

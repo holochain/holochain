@@ -8,6 +8,7 @@ use holochain::conductor::{
 };
 use holochain::core::ribosome::ZomeCallInvocation;
 use holochain::core::ribosome::ZomeCallInvocationResponse;
+use holochain::fixt::*;
 use holochain_state::test_utils::{test_conductor_env, test_wasm_env, TestEnvironment};
 use holochain_types::app::InstalledCell;
 use holochain_types::cell::CellId;
@@ -123,7 +124,7 @@ async fn ser_regression_test() {
     let invocation = ZomeCallInvocation {
         cell_id: alice_cell_id.clone(),
         zome_name: TestWasm::SerRegression.into(),
-        cap: CapSecret::default(),
+        cap: CapSecretFixturator::new(Unpredictable).next().unwrap(),
         fn_name: "create_channel".to_string(),
         payload: HostInput::new(channel.try_into().unwrap()),
         provenance: alice_agent_id.clone(),
@@ -159,7 +160,7 @@ async fn ser_regression_test() {
     let invocation = ZomeCallInvocation {
         cell_id: alice_cell_id.clone(),
         zome_name: TestWasm::SerRegression.into(),
-        cap: CapSecret::default(),
+        cap: CapSecretFixturator::new(Unpredictable).next().unwrap(),
         fn_name: "create_message".to_string(),
         payload: HostInput::new(message.try_into().unwrap()),
         provenance: alice_agent_id.clone(),
