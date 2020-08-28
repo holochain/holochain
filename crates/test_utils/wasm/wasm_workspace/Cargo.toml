@@ -39,5 +39,4 @@ opt-level = "z"
 
 
 [patch.crates-io]
-# holochain_serialized_bytes = { path = "/home/michael/Holo/holochain-serialization/crates/holochain_serialized_bytes" }
-holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization.git", branch = "reading-rainbow" }
+
