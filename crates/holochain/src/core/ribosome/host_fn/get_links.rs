@@ -56,11 +56,11 @@ pub fn get_links<'a>(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod slow_tests {
-    use crate::core::state::workspace::Workspace;
+
     use crate::fixt::ZomeCallHostAccessFixturator;
     use fixt::prelude::*;
     use hdk3::prelude::*;
-    use holochain_state::env::ReadManager;
+
     use holochain_wasm_test_utils::TestWasm;
     use test_wasm_common::*;
 
@@ -68,10 +68,10 @@ pub mod slow_tests {
     async fn ribosome_entry_hash_path_children() {
         let env = holochain_state::test_utils::test_cell_env();
         let dbs = env.dbs().await;
-        let env_ref = env.guard().await;
 
-        let reader = env_ref.reader().unwrap();
-        let mut workspace = crate::core::workflow::CallZomeWorkspace::new(&reader, &dbs).unwrap();
+        let mut workspace = crate::core::workflow::CallZomeWorkspace::new(env.clone().into(), &dbs)
+            .await
+            .unwrap();
 
         // commits fail validation if we don't do genesis
         crate::core::workflow::fake_genesis(&mut workspace.source_chain)
@@ -147,10 +147,10 @@ pub mod slow_tests {
     async fn hash_path_anchor_get_anchor() {
         let env = holochain_state::test_utils::test_cell_env();
         let dbs = env.dbs().await;
-        let env_ref = env.guard().await;
 
-        let reader = env_ref.reader().unwrap();
-        let mut workspace = crate::core::workflow::CallZomeWorkspace::new(&reader, &dbs).unwrap();
+        let mut workspace = crate::core::workflow::CallZomeWorkspace::new(env.clone().into(), &dbs)
+            .await
+            .unwrap();
 
         // commits fail validation if we don't do genesis
         crate::core::workflow::fake_genesis(&mut workspace.source_chain)
@@ -173,7 +173,7 @@ pub mod slow_tests {
         );
 
         assert_eq!(
-            anchor_address_one.get_raw().to_vec(),
+            anchor_address_one.get_full_bytes().to_vec(),
             vec![
                 138, 240, 209, 89, 206, 160, 42, 131, 107, 63, 111, 243, 67, 8, 24, 48, 151, 62,
                 108, 99, 102, 109, 57, 253, 219, 26, 255, 164, 83, 134, 245, 254, 186, 50, 192,
@@ -190,7 +190,7 @@ pub mod slow_tests {
         );
 
         assert_eq!(
-            anchor_address_two.get_raw().to_vec(),
+            anchor_address_two.get_full_bytes().to_vec(),
             vec![
                 175, 176, 111, 101, 56, 12, 198, 140, 48, 157, 209, 87, 118, 124, 157, 94, 234,
                 232, 82, 136, 228, 219, 237, 221, 195, 225, 98, 177, 76, 26, 126, 6, 26, 90, 146,
@@ -223,7 +223,9 @@ pub mod slow_tests {
         // should be 1 anchor type, "foo"
         assert_eq!(list_anchor_type_addresses_output.0.len(), 1,);
         assert_eq!(
-            (list_anchor_type_addresses_output.0)[0].get_raw().to_vec(),
+            (list_anchor_type_addresses_output.0)[0]
+                .get_full_bytes()
+                .to_vec(),
             vec![
                 14, 28, 21, 33, 162, 54, 200, 39, 170, 131, 53, 252, 229, 108, 231, 41, 38, 79, 4,
                 232, 36, 95, 237, 120, 101, 249, 248, 91, 140, 51, 61, 124, 199, 152, 168, 188
@@ -242,12 +244,16 @@ pub mod slow_tests {
         // should be 2 anchors under "foo" sorted by hash
         assert_eq!(list_anchor_addresses_output.0.len(), 2,);
         assert_eq!(
-            (list_anchor_addresses_output.0)[0].get_raw().to_vec(),
-            anchor_address_one.get_raw().to_vec(),
+            (list_anchor_addresses_output.0)[0]
+                .get_full_bytes()
+                .to_vec(),
+            anchor_address_one.get_full_bytes().to_vec(),
         );
         assert_eq!(
-            (list_anchor_addresses_output.0)[1].get_raw().to_vec(),
-            anchor_address_two.get_raw().to_vec(),
+            (list_anchor_addresses_output.0)[1]
+                .get_full_bytes()
+                .to_vec(),
+            anchor_address_two.get_full_bytes().to_vec(),
         );
 
         let list_anchor_tags_output: AnchorTags = crate::call_test_ribosome!(

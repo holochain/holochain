@@ -3,13 +3,15 @@
 use crate::{
     env::EnvironmentKind,
     error::{DatabaseError, DatabaseResult},
+    exports::IntegerStore,
+    prelude::IntKey,
 };
 use derive_more::Display;
 use holochain_keystore::KeystoreSender;
 use holochain_types::universal_map::{Key as UmKey, UniversalMap};
 use lazy_static::lazy_static;
 use parking_lot::RwLock;
-use rkv::{IntegerStore, MultiStore, Rkv, SingleStore, StoreOptions};
+use rkv::{MultiStore, Rkv, SingleStore, StoreOptions};
 use std::collections::{hash_map, HashMap};
 use std::path::{Path, PathBuf};
 
@@ -94,13 +96,14 @@ impl DbName {
     }
 }
 
+#[derive(Debug)]
 /// The various "modes" of viewing LMDB databases
 pub enum DbKind {
-    /// Single-value KV with arbitrary keys, associated with [KvBuf]
+    /// Single-value KV with arbitrary keys, associated with [KvBufFresh]
     Single,
-    /// Single-value KV with integer keys, associated with [IntKvBuf]
+    /// Single-value KV with integer keys, associated with [KvIntBufFresh]
     SingleInt,
-    /// Multi-value KV with arbitrary keys, associated with [KvvBuf]
+    /// Multi-value KV with arbitrary keys, associated with [KvvBufUsed]
     Multi,
 }
 
@@ -128,7 +131,7 @@ lazy_static! {
     /// The key to access the entry status database of the Vault
     pub static ref META_VAULT_STATUS: DbKey<SingleStore> = DbKey::new(DbName::MetaVaultStatus);
     /// The key to access the ChainSequence database
-    pub static ref CHAIN_SEQUENCE: DbKey<IntegerStore<u32>> = DbKey::new(DbName::ChainSequence);
+    pub static ref CHAIN_SEQUENCE: DbKey<IntegerStore> = DbKey::new(DbName::ChainSequence);
     /// The key to access the ChainEntries database
     pub static ref ELEMENT_CACHE_ENTRIES: DbKey<SingleStore> =
     DbKey::<SingleStore>::new(DbName::ElementCacheEntries);
@@ -193,7 +196,7 @@ pub(super) fn get_db<V: 'static + Copy + Send + Sync>(
         .ok_or_else(|| DatabaseError::EnvironmentMissing(path.into()))?;
     let db = *um
         .get(key)
-        .ok_or_else(|| DatabaseError::StoreNotInitialized(key.key().clone()))?;
+        .ok_or_else(|| DatabaseError::StoreNotInitialized(key.key().clone(), path.to_owned()))?;
     Ok(db)
 }
 
@@ -244,12 +247,12 @@ fn register_db<V: 'static + Send + Sync>(
         ),
         DbKind::SingleInt => um.insert(
             key.with_value_type(),
-            env.open_integer::<&str, u32>(db_str.as_str(), StoreOptions::create())?,
+            env.open_integer::<&str, IntKey>(db_str.as_str(), StoreOptions::create())?,
         ),
         DbKind::Multi => {
             let mut opts = StoreOptions::create();
 
-            // This is needed for the optional put flag NO_DUP_DATA on KvvBuf.
+            // This is needed for the optional put flag NO_DUP_DATA on KvvBufUsed.
             // As far as I can tell, if we are not using NO_DUP_DATA, it will
             // only affect the sorting of the values in case there are dups,
             // which should be ok for our usage.

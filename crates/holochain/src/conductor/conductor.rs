@@ -8,7 +8,6 @@
 //! In normal use cases, a single Holochain user runs a single Conductor in a single process.
 //! However, there's no reason we can't have multiple Conductors in a single process, simulating multiple
 //! users in a testing environment.
-
 use super::{
     api::{CellConductorApi, CellConductorApiT, RealAdminInterfaceApi, RealAppInterfaceApi},
     config::{AdminInterfaceConfig, InterfaceDriver},
@@ -44,11 +43,12 @@ use holochain_keystore::{
 };
 use holochain_state::{
     buffer::BufferedStore,
+    buffer::{KvStore, KvStoreT},
     db,
     env::{EnvironmentWrite, ReadManager},
     exports::SingleStore,
+    fresh_reader,
     prelude::*,
-    typed::{Kv, UnitDbKey},
 };
 use holochain_types::{
     app::{AppId, InstalledApp, InstalledCell, MembraneProof},
@@ -520,18 +520,17 @@ where
         impl IntoIterator<Item = (EntryDefBufferKey, EntryDef)>,
     )> {
         let environ = &self.wasm_env;
-        let env = environ.guard().await;
         let wasm = environ.get_db(&*holochain_state::db::WASM)?;
         let dna_def_db = environ.get_db(&*holochain_state::db::DNA_DEF)?;
         let entry_def_db = environ.get_db(&*holochain_state::db::ENTRY_DEF)?;
-        let reader = env.reader()?;
 
-        let wasm_buf = Arc::new(WasmBuf::new(&reader, wasm)?);
-        let dna_def_buf = DnaDefBuf::new(&reader, dna_def_db)?;
-        let entry_def_buf = EntryDefBuf::new(&reader, entry_def_db)?;
+        let wasm_buf = Arc::new(WasmBuf::new(environ.clone().into(), wasm)?);
+        let dna_def_buf = DnaDefBuf::new(environ.clone().into(), dna_def_db)?;
+        let entry_def_buf = EntryDefBuf::new(environ.clone().into(), entry_def_db)?;
         // Load out all dna defs
         let wasm_tasks = dna_def_buf
-            .get_all()?
+            .get_all()
+            .await?
             .into_iter()
             .map(|dna_def| {
                 // Load all wasms for each dna_def from the wasm db into memory
@@ -548,15 +547,15 @@ where
                 async move {
                     let wasms = futures::future::try_join_all(wasms).await?;
                     let dna_file = DnaFile::new(dna_def.into_content(), wasms).await?;
-                    Ok((dna_file.dna_hash().clone(), dna_file))
+                    ConductorResult::Ok((dna_file.dna_hash().clone(), dna_file))
                 }
             })
             // This needs to happen due to the environment not being Send
             .collect::<Vec<_>>();
         // try to join all the tasks and return the list of dna files
-        futures::future::try_join_all(wasm_tasks)
-            .await
-            .and_then(|dnas| Ok((dnas, entry_def_buf.get_all()?.collect::<Vec<_>>()?)))
+        let dnas = futures::future::try_join_all(wasm_tasks).await?;
+        let defs = fresh_reader!(environ, |r| entry_def_buf.get_all(&r)?.collect::<Vec<_>>())?;
+        Ok((dnas, defs))
     }
 
     /// Remove cells from the cell map in the Conductor
@@ -575,18 +574,17 @@ where
         let wasm = environ.get_db(&*holochain_state::db::WASM)?;
         let dna_def_db = environ.get_db(&*holochain_state::db::DNA_DEF)?;
         let entry_def_db = environ.get_db(&*holochain_state::db::ENTRY_DEF)?;
-        let reader = env.reader()?;
 
         let zome_defs = get_entry_defs(dna.clone()).await?;
 
-        let mut entry_def_buf = EntryDefBuf::new(&reader, entry_def_db)?;
+        let mut entry_def_buf = EntryDefBuf::new(environ.clone().into(), entry_def_db)?;
 
         for (key, entry_def) in zome_defs.clone() {
             entry_def_buf.put(key, entry_def)?;
         }
 
-        let mut wasm_buf = WasmBuf::new(&reader, wasm)?;
-        let mut dna_def_buf = DnaDefBuf::new(&reader, dna_def_db)?;
+        let mut wasm_buf = WasmBuf::new(environ.clone().into(), wasm)?;
+        let mut dna_def_buf = DnaDefBuf::new(environ.clone().into(), dna_def_db)?;
         // TODO: PERF: This loop might be slow
         for (wasm_hash, dna_wasm) in dna.code().clone().into_iter() {
             if let None = wasm_buf.get(&wasm_hash).await? {
@@ -613,8 +611,7 @@ where
         let cell = self.cell_by_id(cell_id)?;
         let arc = cell.state_env();
         let env = arc.guard().await;
-        let reader = env.reader()?;
-        let source_chain = SourceChainBuf::new(&reader, &env)?;
+        let source_chain = SourceChainBuf::new(arc.clone().into(), &env).await?;
         Ok(source_chain.dump_as_json().await?)
     }
 
@@ -695,7 +692,7 @@ where
         Ok(Self {
             env,
             wasm_env,
-            state_db: Kv::new(db)?,
+            state_db: KvStore::new(db),
             cells: HashMap::new(),
             shutting_down: false,
             managed_task_add_sender: task_tx,
@@ -744,7 +741,7 @@ where
 }
 
 /// The database used to store ConductorState. It has only one key-value pair.
-pub type ConductorStateDb = Kv<UnitDbKey, ConductorState>;
+pub type ConductorStateDb = KvStore<UnitDbKey, ConductorState>;
 
 mod builder {
 

@@ -70,7 +70,8 @@ impl AgentPubKeyExt for holo_hash::AgentPubKey {
             holochain_crypto::DynCryptoBytes,
             holochain_crypto::DynCryptoBytes,
         )> = (|| {
-            let pub_key = holochain_crypto::crypto_insecure_buffer_from_bytes(self.get_bytes())?;
+            let pub_key =
+                holochain_crypto::crypto_insecure_buffer_from_bytes(self.get_core_bytes())?;
             let signature = holochain_crypto::crypto_insecure_buffer_from_bytes(&signature.0)?;
             let data: SerializedBytes = data.try_into()?;
             let data = holochain_crypto::crypto_insecure_buffer_from_bytes(data.bytes())?;
@@ -96,7 +97,8 @@ impl AgentPubKeyExt for holo_hash::AgentPubKey {
             holochain_crypto::DynCryptoBytes,
             holochain_crypto::DynCryptoBytes,
         )> = (|| {
-            let pub_key = holochain_crypto::crypto_insecure_buffer_from_bytes(self.get_bytes())?;
+            let pub_key =
+                holochain_crypto::crypto_insecure_buffer_from_bytes(self.get_core_bytes())?;
             let signature = holochain_crypto::crypto_insecure_buffer_from_bytes(&signature.0)?;
             let data = holochain_crypto::crypto_insecure_buffer_from_bytes(data)?;
             Ok((signature, data, pub_key))

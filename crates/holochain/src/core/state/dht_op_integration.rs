@@ -5,10 +5,10 @@ use holo_hash::*;
 use holochain_p2p::dht_arc::DhtArc;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::{
-    buffer::KvBuf,
+    buffer::KvBufFresh,
     db::INTEGRATED_DHT_OPS,
     error::{DatabaseError, DatabaseResult},
-    prelude::{BufferedStore, GetDb, Reader},
+    prelude::{BufferedStore, EnvironmentRead, GetDb, Readable},
 };
 use holochain_types::{
     dht_op::{DhtOp, DhtOpLight},
@@ -18,8 +18,7 @@ use holochain_types::{
 
 /// Database type for AuthoredDhtOps
 /// Buffer for accessing [DhtOp]s that you authored and finding the amount of validation receipts
-pub type AuthoredDhtOpsStore<'env> =
-    KvBuf<'env, AuthoredDhtOpsKey, AuthoredDhtOpsValue, Reader<'env>>;
+pub type AuthoredDhtOpsStore = KvBufFresh<AuthoredDhtOpsKey, AuthoredDhtOpsValue>;
 
 /// The key type for the AuthoredDhtOps db: a DhtOpHash
 pub type AuthoredDhtOpsKey = DhtOpHash;
@@ -47,36 +46,35 @@ impl AuthoredDhtOpsValue {
 }
 
 /// Database type for IntegrationLimbo: the queue of ops ready to be integrated.
-pub type IntegrationLimboStore<'env> =
-    KvBuf<'env, IntegrationLimboKey, IntegrationLimboValue, Reader<'env>>;
+pub type IntegrationLimboStore = KvBufFresh<IntegrationLimboKey, IntegrationLimboValue>;
 
 /// Database type for IntegratedDhtOps
 /// [DhtOp]s that have already been integrated
-pub type IntegratedDhtOpsStore<'env> = KvBuf<'env, DhtOpHash, IntegratedDhtOpsValue, Reader<'env>>;
+pub type IntegratedDhtOpsStore = KvBufFresh<DhtOpHash, IntegratedDhtOpsValue>;
 
 /// Buffer that adds query logic to the IntegratedDhtOpsStore
-pub struct IntegratedDhtOpsBuf<'env> {
-    store: IntegratedDhtOpsStore<'env>,
+pub struct IntegratedDhtOpsBuf {
+    store: IntegratedDhtOpsStore,
 }
 
-impl<'env> std::ops::Deref for IntegratedDhtOpsBuf<'env> {
-    type Target = IntegratedDhtOpsStore<'env>;
+impl std::ops::Deref for IntegratedDhtOpsBuf {
+    type Target = IntegratedDhtOpsStore;
     fn deref(&self) -> &Self::Target {
         &self.store
     }
 }
 
-impl<'env> std::ops::DerefMut for IntegratedDhtOpsBuf<'env> {
+impl std::ops::DerefMut for IntegratedDhtOpsBuf {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.store
     }
 }
 
-impl<'env> BufferedStore<'env> for IntegratedDhtOpsBuf<'env> {
+impl BufferedStore for IntegratedDhtOpsBuf {
     type Error = DatabaseError;
     fn flush_to_txn(
         self,
-        writer: &'env mut holochain_state::prelude::Writer,
+        writer: &mut holochain_state::prelude::Writer,
     ) -> Result<(), Self::Error> {
         self.store.flush_to_txn(writer)
     }
@@ -105,38 +103,42 @@ pub struct IntegrationLimboValue {
     pub op: DhtOp,
 }
 
-impl<'env> IntegratedDhtOpsBuf<'env> {
+impl IntegratedDhtOpsBuf {
     /// Create a new buffer for the IntegratedDhtOpsStore
-    pub fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Self> {
+    pub fn new(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
         let db = dbs.get_db(&*INTEGRATED_DHT_OPS).unwrap();
         Ok(Self {
-            store: IntegratedDhtOpsStore::new(&reader, db)?,
+            store: IntegratedDhtOpsStore::new(env, db),
         })
     }
 
     /// simple get by dht_op_hash
-    pub fn get(&'_ self, op_hash: &DhtOpHash) -> DatabaseResult<Option<IntegratedDhtOpsValue>> {
-        self.store.get(op_hash)
+    pub async fn get(
+        &'_ self,
+        op_hash: &DhtOpHash,
+    ) -> DatabaseResult<Option<IntegratedDhtOpsValue>> {
+        self.store.get(op_hash).await
     }
 
     /// Get ops that match optional queries:
     /// - from a time (Inclusive)
     /// - to a time (Exclusive)
     /// - match a dht location
-    pub fn query(
-        &'env self,
+    pub fn query<'r, R: Readable>(
+        &'r self,
+        r: &'r R,
         from: Option<Timestamp>,
         to: Option<Timestamp>,
         dht_arc: Option<DhtArc>,
     ) -> DatabaseResult<
         Box<
             dyn FallibleIterator<Item = (DhtOpHash, IntegratedDhtOpsValue), Error = DatabaseError>
-                + 'env,
+                + 'r,
         >,
     > {
         Ok(Box::new(
             self.store
-                .iter()?
+                .iter(r)?
                 .map(move |(k, v)| Ok((DhtOpHash::with_pre_hashed(k.to_vec()), v)))
                 .filter_map(move |(k, v)| match from {
                     Some(time) if v.when_integrated >= time => Ok(Some((k, v))),
@@ -199,8 +201,7 @@ mod tests {
         // Put them in the db
         {
             let mut dht_hash = DhtOpHashFixturator::new(Predictable);
-            let reader = env_ref.reader().unwrap();
-            let mut buf = IntegratedDhtOpsBuf::new(&reader, &dbs).unwrap();
+            let mut buf = IntegratedDhtOpsBuf::new(env.clone().into(), &dbs).unwrap();
             for mut value in values {
                 buf.put(dht_hash.next().unwrap(), value.clone()).unwrap();
                 expected.push(value.clone());
@@ -216,10 +217,10 @@ mod tests {
         // Check queries
         {
             let reader = env_ref.reader().unwrap();
-            let buf = IntegratedDhtOpsBuf::new(&reader, &dbs).unwrap();
+            let buf = IntegratedDhtOpsBuf::new(env.clone().into(), &dbs).unwrap();
             // No filter
             let mut r = buf
-                .query(None, None, None)
+                .query(&reader, None, None, None)
                 .unwrap()
                 .map(|(_, v)| Ok(v))
                 .collect::<Vec<_>>()
@@ -228,7 +229,7 @@ mod tests {
             assert_eq!(&r[..], &expected[..]);
             // From now
             let mut r = buf
-                .query(Some(times_exp[1].clone().into()), None, None)
+                .query(&reader, Some(times_exp[1].clone().into()), None, None)
                 .unwrap()
                 .map(|(_, v)| Ok(v))
                 .collect::<Vec<_>>()
@@ -243,7 +244,7 @@ mod tests {
             let ages_ago = times_exp[0] - Duration::weeks(5);
             let future = times_exp[1] + Duration::hours(1);
             let mut r = buf
-                .query(Some(ages_ago.into()), Some(future.into()), None)
+                .query(&reader, Some(ages_ago.into()), Some(future.into()), None)
                 .unwrap()
                 .map(|(_, v)| Ok(v))
                 .collect::<Vec<_>>()
@@ -260,6 +261,7 @@ mod tests {
             let future = times_exp[1] + Duration::hours(1);
             let mut r = buf
                 .query(
+                    &reader,
                     Some(ages_ago.into()),
                     Some(future.into()),
                     Some(DhtArc::new(same_basis.get_loc(), 1)),
@@ -274,7 +276,12 @@ mod tests {
             assert_eq!(r.len(), 2);
             // Same basis all
             let mut r = buf
-                .query(None, None, Some(DhtArc::new(same_basis.get_loc(), 1)))
+                .query(
+                    &reader,
+                    None,
+                    None,
+                    Some(DhtArc::new(same_basis.get_loc(), 1)),
+                )
                 .unwrap()
                 .map(|(_, v)| Ok(v))
                 .collect::<Vec<_>>()

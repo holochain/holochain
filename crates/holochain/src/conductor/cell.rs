@@ -11,7 +11,7 @@ use crate::conductor::handle::ConductorHandle;
 use crate::core::queue_consumer::{spawn_queue_consumer_tasks, InitialQueueTriggers};
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::ribosome::ZomeCallInvocationResponse;
-use crate::core::state::workspace::Workspace;
+
 use crate::{
     conductor::{api::CellConductorApi, cell::error::CellResult},
     core::ribosome::{guest_callback::init::InitResult, wasm_ribosome::WasmRibosome},
@@ -132,8 +132,9 @@ impl Cell {
         let has_genesis = {
             // check if genesis ran on source chain buf
             let env_ref = state_env.guard().await;
-            let reader = env_ref.reader()?;
-            SourceChainBuf::new(&reader, &env_ref)?.has_genesis()
+            SourceChainBuf::new(state_env.clone().into(), &env_ref)
+                .await?
+                .has_genesis()
         };
 
         if has_genesis {
@@ -178,7 +179,6 @@ impl Cell {
         // get a reader
         let arc = state_env.clone();
         let env = arc.guard().await;
-        let reader = env.reader()?;
 
         // get the dna
         let dna_file = conductor_handle
@@ -189,7 +189,8 @@ impl Cell {
         let conductor_api = CellConductorApi::new(conductor_handle, id.clone());
 
         // run genesis
-        let workspace = GenesisWorkspace::new(&reader, &env)
+        let workspace = GenesisWorkspace::new(arc.clone().into(), &env)
+            .await
             .map_err(ConductorApiError::from)
             .map_err(Box::new)?;
         let args = GenesisWorkflowArgs::new(dna_file, id.agent_pubkey().clone(), membrane_proof);
@@ -465,11 +466,13 @@ impl Cell {
         let env_ref = self.state_env.guard().await;
         let dbs = self.state_env.dbs().await;
         let reader = env_ref.reader()?;
-        let element_vault = ElementBuf::vault(&reader, &dbs, false)?;
-        let meta_vault = MetadataBuf::vault(&reader, &dbs)?;
+        let element_vault = ElementBuf::vault(self.state_env.clone().into(), &dbs, false)?;
+        let meta_vault = MetadataBuf::vault(self.state_env.clone().into(), &dbs)?;
 
         // Look for a delete on the header and collect it
-        let deleted = meta_vault.get_deletes_on_header(hash.clone())?.next()?;
+        let deleted = meta_vault
+            .get_deletes_on_header(&reader, hash.clone())?
+            .next()?;
         let deleted = match deleted {
             Some(delete_header) => {
                 let delete = delete_header.header_hash;
@@ -517,16 +520,16 @@ impl Cell {
         let env_ref = self.state_env.guard().await;
         let dbs = self.state_env.dbs().await;
         let reader = env_ref.reader()?;
-        let element_vault = ElementBuf::vault(&reader, &dbs, false)?;
-        let meta_vault = MetadataBuf::vault(&reader, &dbs)?;
+        let element_vault = ElementBuf::vault(self.state_env.clone().into(), &dbs, false)?;
+        let meta_vault = MetadataBuf::vault(self.state_env.clone().into(), &dbs)?;
         debug!(id = ?self.id());
 
         let links = meta_vault
-            .get_links_all(&LinkMetaKey::from(&link_key))?
+            .get_links_all(&reader, &LinkMetaKey::from(&link_key))?
             .map(|link_add| {
                 // Collect the link removes on this link add
                 let link_removes = meta_vault
-                    .get_link_removes_on_link_add(link_add.link_add_hash.clone())?
+                    .get_link_removes_on_link_add(&reader, link_add.link_add_hash.clone())?
                     .collect::<BTreeSet<_>>()?;
                 // Create timed header hash
                 let link_add = TimedHeaderHash {
@@ -586,9 +589,10 @@ impl Cell {
     ) -> CellResult<Vec<DhtOpHash>> {
         let env_ref = self.state_env.guard().await;
         let reader = env_ref.reader()?;
-        let integrated_dht_ops = IntegratedDhtOpsBuf::new(&reader, &env_ref)?;
+        let integrated_dht_ops =
+            IntegratedDhtOpsBuf::new(self.state_env().clone().into(), &env_ref)?;
         let result: Vec<DhtOpHash> = integrated_dht_ops
-            .query(Some(since), Some(until), Some(dht_arc))?
+            .query(&reader, Some(since), Some(until), Some(dht_arc))?
             .map(|(k, _)| Ok(k))
             .collect()?;
         Ok(result)
@@ -607,12 +611,12 @@ impl Cell {
         )>,
     > {
         let env_ref = self.state_env.guard().await;
-        let reader = env_ref.reader()?;
-        let integrated_dht_ops = IntegratedDhtOpsBuf::new(&reader, &env_ref)?;
-        let cas = ElementBuf::vault(&reader, &env_ref, false)?;
+        let integrated_dht_ops =
+            IntegratedDhtOpsBuf::new(self.state_env().clone().into(), &env_ref)?;
+        let cas = ElementBuf::vault(self.state_env.clone().into(), &env_ref, false)?;
         let mut out = vec![];
         for op_hash in op_hashes {
-            let val = integrated_dht_ops.get(&op_hash)?;
+            let val = integrated_dht_ops.get(&op_hash).await?;
             if let Some(val) = val {
                 let full_op =
                     crate::core::workflow::produce_dht_ops_workflow::dht_op_light::light_to_op(
@@ -668,8 +672,8 @@ impl Cell {
         }
     }
 
-    #[instrument(skip(self, invocation))]
     /// Function called by the Conductor
+    #[instrument(skip(self, invocation))]
     pub async fn call_zome(
         &self,
         invocation: ZomeCallInvocation,
@@ -680,8 +684,7 @@ impl Cell {
         let arc = self.state_env();
         let keystore = arc.keystore().clone();
         let env = arc.guard().await;
-        let reader = env.reader()?;
-        let workspace = CallZomeWorkspace::new(&reader, &env)?;
+        let workspace = CallZomeWorkspace::new(self.state_env().clone().into(), &env).await?;
 
         let args = CallZomeWorkflowArgs {
             ribosome: self.get_ribosome().await?,
@@ -707,9 +710,9 @@ impl Cell {
         let id = self.id.clone();
         let conductor_api = self.conductor_api.clone();
         let env_ref = state_env.guard().await;
-        let reader = env_ref.reader()?;
         // Create the workspace
-        let workspace = CallZomeWorkspace::new(&reader, &env_ref)
+        let workspace = CallZomeWorkspace::new(self.state_env().clone().into(), &env_ref)
+            .await
             .map_err(WorkflowError::from)
             .map_err(Box::new)?;
         let workspace = InitializeZomesWorkspace(workspace);
