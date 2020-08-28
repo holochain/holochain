@@ -40,7 +40,7 @@ pub struct ChainSequenceBuf {
 
 impl ChainSequenceBuf {
     /// Create a new instance
-    pub async fn new(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
+    pub fn new(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
         let buf: Store = KvIntBufFresh::new(env.clone(), dbs.get_db(&*CHAIN_SEQUENCE)?);
         let (next_index, tx_seq, current_head) =
             fresh_reader!(env, |r| { Self::head_info(buf.store(), &r) })?;
@@ -87,10 +87,9 @@ impl ChainSequenceBuf {
     }
 
     /// Get a header at an index
-    pub async fn get(&self, i: u32) -> DatabaseResult<Option<HeaderHash>> {
+    pub fn get(&self, i: u32) -> DatabaseResult<Option<HeaderHash>> {
         self.buf
             .get(&i.into())
-            .await
             .map(|seq_item| seq_item.map(|si| si.header_address))
     }
 
@@ -132,8 +131,8 @@ impl ChainSequenceBuf {
         })))
     }
 
-    pub async fn complete_dht_op(&mut self, i: u32) -> SourceChainResult<()> {
-        if let Some(mut c) = self.buf.get(&i.into()).await? {
+    pub fn complete_dht_op(&mut self, i: u32) -> SourceChainResult<()> {
+        if let Some(mut c) = self.buf.get(&i.into())? {
             c.dht_transforms_complete = true;
             self.buf.put(i.into(), c)?;
         }
@@ -185,9 +184,9 @@ pub mod tests {
     async fn chain_sequence_scratch_awareness() -> DatabaseResult<()> {
         observability::test_run().ok();
         let arc = test_cell_env();
-        let dbs = arc.dbs().await;
+        let dbs = arc.dbs();
         {
-            let mut buf = ChainSequenceBuf::new(arc.clone().into(), &dbs).await?;
+            let mut buf = ChainSequenceBuf::new(arc.clone().into(), &dbs)?;
             assert_eq!(buf.chain_head(), None);
             buf.put_header(
                 HeaderHash::from_raw_bytes(vec![
@@ -247,11 +246,11 @@ pub mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn chain_sequence_functionality() -> SourceChainResult<()> {
         let arc = test_cell_env();
-        let env = arc.guard().await;
-        let dbs = arc.dbs().await;
+        let env = arc.guard();
+        let dbs = arc.dbs();
 
         {
-            let mut buf = ChainSequenceBuf::new(arc.clone().into(), &dbs).await?;
+            let mut buf = ChainSequenceBuf::new(arc.clone().into(), &dbs)?;
             buf.put_header(
                 HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -288,7 +287,7 @@ pub mod tests {
 
         let reader = env.reader()?;
         {
-            let buf = ChainSequenceBuf::new(arc.clone().into(), &dbs).await?;
+            let buf = ChainSequenceBuf::new(arc.clone().into(), &dbs)?;
             assert_eq!(
                 buf.chain_head(),
                 Some(
@@ -309,7 +308,7 @@ pub mod tests {
         }
 
         {
-            let mut buf = ChainSequenceBuf::new(arc.clone().into(), &dbs).await?;
+            let mut buf = ChainSequenceBuf::new(arc.clone().into(), &dbs)?;
             buf.put_header(
                 HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -336,7 +335,7 @@ pub mod tests {
 
         let reader = env.reader()?;
         {
-            let buf = ChainSequenceBuf::new(arc.clone().into(), &dbs).await?;
+            let buf = ChainSequenceBuf::new(arc.clone().into(), &dbs)?;
             assert_eq!(
                 buf.chain_head(),
                 Some(
@@ -367,9 +366,9 @@ pub mod tests {
         let (tx2, rx2) = tokio::sync::oneshot::channel();
 
         let task1 = tokio::spawn(async move {
-            let env = arc1.guard().await;
-            let dbs = arc1.dbs().await;
-            let mut buf = ChainSequenceBuf::new(arc1.clone().into(), &dbs).await?;
+            let env = arc1.guard();
+            let dbs = arc1.dbs();
+            let mut buf = ChainSequenceBuf::new(arc1.clone().into(), &dbs)?;
             buf.put_header(
                 HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -402,9 +401,9 @@ pub mod tests {
 
         let task2 = tokio::spawn(async move {
             rx1.await.unwrap();
-            let env = arc2.guard().await;
-            let dbs = arc2.dbs().await;
-            let mut buf = ChainSequenceBuf::new(arc2.clone().into(), &dbs).await?;
+            let env = arc2.guard();
+            let dbs = arc2.dbs();
+            let mut buf = ChainSequenceBuf::new(arc2.clone().into(), &dbs)?;
             buf.put_header(
                 HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,

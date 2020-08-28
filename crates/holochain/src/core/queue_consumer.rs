@@ -173,11 +173,11 @@ pub struct OneshotWriter(EnvironmentWrite);
 
 impl OneshotWriter {
     /// Create the writer and pass it into a closure.
-    pub async fn with_writer<F>(self, f: F) -> Result<(), WorkspaceError>
+    pub fn with_writer<F>(self, f: F) -> Result<(), WorkspaceError>
     where
         F: FnOnce(&mut Writer) -> Result<(), WorkspaceError> + Send,
     {
-        let env_ref = self.0.guard().await;
+        let env_ref = self.0.guard();
         env_ref.with_commit::<WorkspaceError, (), _>(|w| {
             f(w)?;
             Ok(())

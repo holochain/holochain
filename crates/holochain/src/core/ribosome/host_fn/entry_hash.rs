@@ -64,10 +64,9 @@ pub mod wasm_test {
     /// we can get an entry hash out of the fn via. a wasm call
     async fn ribosome_entry_hash_test() {
         let env = holochain_state::test_utils::test_cell_env();
-        let dbs = env.dbs().await;
-        let mut workspace = crate::core::workflow::CallZomeWorkspace::new(env.clone().into(), &dbs)
-            .await
-            .unwrap();
+        let dbs = env.dbs();
+        let mut workspace =
+            crate::core::workflow::CallZomeWorkspace::new(env.clone().into(), &dbs).unwrap();
 
         let (_g, raw_workspace) =
             crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
@@ -87,10 +86,9 @@ pub mod wasm_test {
     /// the hash path underlying anchors wraps entry_hash
     async fn ribosome_hash_path_pwd_test() {
         let env = holochain_state::test_utils::test_cell_env();
-        let dbs = env.dbs().await;
-        let mut workspace = crate::core::workflow::CallZomeWorkspace::new(env.clone().into(), &dbs)
-            .await
-            .unwrap();
+        let dbs = env.dbs();
+        let mut workspace =
+            crate::core::workflow::CallZomeWorkspace::new(env.clone().into(), &dbs).unwrap();
 
         let (_g, raw_workspace) =
             crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(

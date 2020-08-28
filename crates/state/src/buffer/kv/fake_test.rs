@@ -89,6 +89,6 @@ impl OldCallZomeWorkspaceRef<'env> {
 #[tokio::test(threaded_scheduler)]
 async fn test_commit() -> DatabaseResult<()> {
     let arc = test_cell_env();
-    let env = arc.guard().await;
+    let env = arc.guard();
     let db1 = env.inner().open_single("kv1", StoreOptions::create())?;
 }

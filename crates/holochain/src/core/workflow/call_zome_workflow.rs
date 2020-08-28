@@ -57,9 +57,7 @@ pub async fn call_zome_workflow<'env, Ribosome: RibosomeT>(
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // commit the workspace
-    writer
-        .with_writer(|writer| Ok(workspace.flush_to_txn(writer)?))
-        .await?;
+    writer.with_writer(|writer| Ok(workspace.flush_to_txn(writer)?))?;
 
     trigger_produce_dht_ops.trigger();
 
@@ -226,11 +224,11 @@ pub struct CallZomeWorkspace {
 }
 
 impl<'a> CallZomeWorkspace {
-    pub async fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
-        let source_chain = SourceChain::new(env.clone(), dbs).await?;
+    pub fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
+        let source_chain = SourceChain::new(env.clone(), dbs)?;
         let cache_cas = ElementBuf::cache(env.clone(), dbs)?;
         let meta = MetadataBuf::vault(env.clone(), dbs)?;
-        let cache_meta = MetadataBuf::cache(env.clone(), dbs)?;
+        let cache_meta = MetadataBuf::cache(env, dbs)?;
 
         Ok(CallZomeWorkspace {
             source_chain,
@@ -309,12 +307,10 @@ pub mod tests {
     #[tokio::test]
     async fn private_zome_call() {
         let env = test_cell_env();
-        let dbs = env.dbs().await;
-        let env_ref = env.guard().await;
+        let dbs = env.dbs();
+        let env_ref = env.guard();
         let reader = env_ref.reader().unwrap();
-        let workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
-            .await
-            .unwrap();
+        let workspace = CallZomeWorkspace::new(env.clone().into(), &dbs).unwrap();
         let ribosome = MockRibosomeT::new();
         // FIXME: CAP: Set this function to private
         let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(
@@ -374,10 +370,8 @@ pub mod tests {
     async fn calls_system_validation<'a>() {
         observability::test_run().ok();
         let env = test_cell_env();
-        let dbs = env.dbs().await;
-        let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
-            .await
-            .unwrap();
+        let dbs = env.dbs();
+        let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs).unwrap();
 
         // Genesis
         fake_genesis(&mut workspace.source_chain).await.unwrap();
@@ -427,10 +421,8 @@ pub mod tests {
     #[tokio::test]
     async fn calls_app_validation() {
         let env = test_cell_env();
-        let dbs = env.dbs().await;
-        let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
-            .await
-            .unwrap();
+        let dbs = env.dbs();
+        let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs).unwrap();
         let ribosome = MockRibosomeT::new();
         let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(
             crate::core::ribosome::NamedInvocation(
@@ -459,10 +451,8 @@ pub mod tests {
     #[tokio::test]
     async fn creates_outputs() {
         let env = test_cell_env();
-        let dbs = env.dbs().await;
-        let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
-            .await
-            .unwrap();
+        let dbs = env.dbs();
+        let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs).unwrap();
         let ribosome = MockRibosomeT::new();
         // TODO: Make this mock return an output
         let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(

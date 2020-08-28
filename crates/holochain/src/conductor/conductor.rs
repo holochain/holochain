@@ -529,8 +529,7 @@ where
         let entry_def_buf = EntryDefBuf::new(environ.clone().into(), entry_def_db)?;
         // Load out all dna defs
         let wasm_tasks = dna_def_buf
-            .get_all()
-            .await?
+            .get_all()?
             .into_iter()
             .map(|dna_def| {
                 // Load all wasms for each dna_def from the wasm db into memory
@@ -570,12 +569,12 @@ where
         dna: DnaFile,
     ) -> ConductorResult<Vec<(EntryDefBufferKey, EntryDef)>> {
         let environ = &self.wasm_env;
-        let env = environ.guard().await;
+        let env = environ.guard();
         let wasm = environ.get_db(&*holochain_state::db::WASM)?;
         let dna_def_db = environ.get_db(&*holochain_state::db::DNA_DEF)?;
         let entry_def_db = environ.get_db(&*holochain_state::db::ENTRY_DEF)?;
 
-        let zome_defs = get_entry_defs(dna.clone()).await?;
+        let zome_defs = get_entry_defs(dna.clone())?;
 
         let mut entry_def_buf = EntryDefBuf::new(environ.clone().into(), entry_def_db)?;
 
@@ -610,8 +609,8 @@ where
     pub(super) async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
         let cell = self.cell_by_id(cell_id)?;
         let arc = cell.state_env();
-        let env = arc.guard().await;
-        let source_chain = SourceChainBuf::new(arc.clone().into(), &env).await?;
+        let env = arc.guard();
+        let source_chain = SourceChainBuf::new(arc.clone().into(), &env)?;
         Ok(source_chain.dump_as_json().await?)
     }
 
@@ -707,7 +706,7 @@ where
     }
 
     pub(super) async fn get_state(&self) -> ConductorResult<ConductorState> {
-        let guard = self.env.guard().await;
+        let guard = self.env.guard();
         let reader = guard.reader()?;
         Ok(self.state_db.get(&reader, &UnitDbKey)?.unwrap_or_default())
     }
@@ -717,7 +716,7 @@ where
         F: FnOnce(ConductorState) -> ConductorResult<ConductorState>,
     {
         self.check_running()?;
-        let guard = self.env.guard().await;
+        let guard = self.env.guard();
         let new_state = guard.with_commit(|txn| {
             let state: ConductorState = self.state_db.get(txn, &UnitDbKey)?.unwrap_or_default();
             let new_state = f(state)?;

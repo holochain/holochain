@@ -61,7 +61,7 @@ impl MetadataBufT for MockMetadataBuf {
         key: &'k LinkMetaKey<'k>,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError> + 'r>>
     {
-        self.get_live_links(key)
+        MockMetadataBuf::get_live_links(&self, key)
     }
 
     fn get_links_all<'r, 'k, R: Readable>(
@@ -70,7 +70,7 @@ impl MetadataBufT for MockMetadataBuf {
         key: &'k LinkMetaKey<'k>,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError> + 'r>>
     {
-        self.get_links_all(key)
+        MockMetadataBuf::get_links_all(&self, key)
     }
 
     fn get_canonical_entry_hash(&self, entry_hash: EntryHash) -> DatabaseResult<EntryHash> {
@@ -82,7 +82,7 @@ impl MetadataBufT for MockMetadataBuf {
         _r: &'r R,
         entry_hash: &EntryHash,
     ) -> DatabaseResult<EntryDhtStatus> {
-        self.get_dht_status(entry_hash)
+        MockMetadataBuf::get_dht_status(&self, entry_hash)
     }
 
     fn get_canonical_header_hash(&self, header_hash: HeaderHash) -> DatabaseResult<HeaderHash> {
@@ -167,7 +167,7 @@ impl MetadataBufT for MockMetadataBuf {
         self.sync_register_delete(delete)
     }
 
-    async fn register_raw_on_entry(
+    fn register_raw_on_entry(
         &mut self,
         entry_hash: EntryHash,
         value: SysMetaVal,

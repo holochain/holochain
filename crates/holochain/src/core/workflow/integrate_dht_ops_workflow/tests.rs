@@ -183,7 +183,7 @@ impl Db {
     /// Checks that the database is in a state
     #[instrument(skip(expects, env))]
     async fn check(expects: Vec<Self>, env: EnvironmentWrite, here: String) {
-        let env_ref = env.guard().await;
+        let env_ref = env.guard();
         let reader = env_ref.reader().unwrap();
         let workspace = IntegrateDhtOpsWorkspace::new(env.clone().into(), &env_ref).unwrap();
         for expect in expects {
@@ -195,12 +195,7 @@ impl Db {
                         op: op.to_light().await,
                         when_integrated: Timestamp::now().into(),
                     };
-                    let mut r = workspace
-                        .integrated_dht_ops
-                        .get(&op_hash)
-                        .await
-                        .unwrap()
-                        .unwrap();
+                    let mut r = workspace.integrated_dht_ops.get(&op_hash).unwrap().unwrap();
                     r.when_integrated = value.when_integrated;
                     assert_eq!(r, value, "{}", here);
                 }
@@ -426,7 +421,7 @@ impl Db {
     // Sets the database to a certain state
     #[instrument(skip(pre_state, env))]
     async fn set<'env>(pre_state: Vec<Self>, env: EnvironmentWrite) {
-        let env_ref = env.guard().await;
+        let env_ref = env.guard();
         let mut workspace = IntegrateDhtOpsWorkspace::new(env.clone().into(), &env_ref).unwrap();
         for state in pre_state {
             match state {
@@ -483,7 +478,7 @@ impl Db {
 }
 
 async fn call_workflow<'env>(env: EnvironmentWrite) {
-    let env_ref = env.guard().await;
+    let env_ref = env.guard();
     let workspace = IntegrateDhtOpsWorkspace::new(env.clone().into(), &env_ref).unwrap();
     integrate_dht_ops_workflow(workspace, env.clone().into())
         .await
@@ -491,8 +486,8 @@ async fn call_workflow<'env>(env: EnvironmentWrite) {
 }
 
 // Need to clear the data from the previous test
-async fn clear_dbs(env: EnvironmentWrite) {
-    let env_ref = env.guard().await;
+fn clear_dbs(env: EnvironmentWrite) {
+    let env_ref = env.guard();
     let mut workspace = IntegrateDhtOpsWorkspace::new(env.clone().into(), &env_ref).unwrap();
     env_ref
         .with_commit::<DatabaseError, _, _>(|writer| {
@@ -702,7 +697,7 @@ async fn test_ops_state() {
     ];
 
     for t in tests.iter() {
-        clear_dbs(env.clone()).await;
+        clear_dbs(env.clone());
         let td = TestData::new().await;
         let (pre_state, expect, name) = t(td);
         Db::set(pre_state, env.clone()).await;
@@ -713,11 +708,9 @@ async fn test_ops_state() {
 
 /// Call the produce dht ops workflow
 async fn produce_dht_ops<'env>(env: EnvironmentWrite) {
-    let env_ref = env.guard().await;
+    let env_ref = env.guard();
     let (mut qt, _rx) = TriggerSender::new();
-    let workspace = ProduceDhtOpsWorkspace::new(env.clone().into(), &env_ref)
-        .await
-        .unwrap();
+    let workspace = ProduceDhtOpsWorkspace::new(env.clone().into(), &env_ref).unwrap();
     produce_dht_ops_workflow(workspace, env.clone().into(), &mut qt)
         .await
         .unwrap();
@@ -725,10 +718,8 @@ async fn produce_dht_ops<'env>(env: EnvironmentWrite) {
 
 /// Run genesis on the source chain
 async fn genesis<'env>(env: EnvironmentWrite) {
-    let env_ref = env.guard().await;
-    let mut workspace = CallZomeWorkspace::new(env.clone().into(), &env_ref)
-        .await
-        .unwrap();
+    let env_ref = env.guard();
+    let mut workspace = CallZomeWorkspace::new(env.clone().into(), &env_ref).unwrap();
     fake_genesis(&mut workspace.source_chain).await.unwrap();
     env_ref
         .with_commit(|writer| workspace.flush_to_txn(writer))
@@ -740,10 +731,8 @@ async fn commit_entry<'env>(
     env: EnvironmentWrite,
     zome_name: ZomeName,
 ) -> (EntryHash, HeaderHash) {
-    let env_ref = env.guard().await;
-    let mut workspace = CallZomeWorkspace::new(env.clone().into(), &env_ref)
-        .await
-        .unwrap();
+    let env_ref = env.guard();
+    let mut workspace = CallZomeWorkspace::new(env.clone().into(), &env_ref).unwrap();
 
     // Create entry def with the correct zome name
     let entry_def_id = fixt!(EntryDefId);
@@ -819,10 +808,8 @@ async fn commit_entry<'env>(
 }
 
 async fn get_entry(env: EnvironmentWrite, entry_hash: EntryHash) -> Option<Entry> {
-    let env_ref = env.guard().await;
-    let mut workspace = CallZomeWorkspace::new(env.clone().into(), &env_ref)
-        .await
-        .unwrap();
+    let env_ref = env.guard();
+    let mut workspace = CallZomeWorkspace::new(env.clone().into(), &env_ref).unwrap();
 
     // Create ribosome mock to return fixtures
     // This is a lot faster then compiling a zome
@@ -851,10 +838,8 @@ async fn link_entries(
     zome_name: ZomeName,
     link_tag: LinkTag,
 ) -> HeaderHash {
-    let env_ref = env.guard().await;
-    let mut workspace = CallZomeWorkspace::new(env.clone().into(), &env_ref)
-        .await
-        .unwrap();
+    let env_ref = env.guard();
+    let mut workspace = CallZomeWorkspace::new(env.clone().into(), &env_ref).unwrap();
 
     // Create data for calls
     let mut dna_file = DnaFileFixturator::new(Empty).next().unwrap();
@@ -905,10 +890,8 @@ async fn get_links(
     zome_name: ZomeName,
     link_tag: LinkTag,
 ) -> Links {
-    let env_ref = env.guard().await;
-    let mut workspace = CallZomeWorkspace::new(env.clone().into(), &env_ref)
-        .await
-        .unwrap();
+    let env_ref = env.guard();
+    let mut workspace = CallZomeWorkspace::new(env.clone().into(), &env_ref).unwrap();
 
     // Create data for calls
     let mut dna_file = DnaFileFixturator::new(Empty).next().unwrap();
@@ -959,8 +942,8 @@ async fn test_metadata_from_wasm_api() {
     // test workspace boilerplate
     observability::test_run().ok();
     let env = holochain_state::test_utils::test_cell_env();
-    let _dbs = env.dbs().await;
-    clear_dbs(env.clone()).await;
+    let _dbs = env.dbs();
+    clear_dbs(env.clone());
 
     // Generate fixture data
     let mut td = TestData::with_app_entry_type().await;
@@ -1026,8 +1009,8 @@ async fn test_wasm_api_without_integration_links() {
     // test workspace boilerplate
     observability::test_run().ok();
     let env = holochain_state::test_utils::test_cell_env();
-    let _dbs = env.dbs().await;
-    clear_dbs(env.clone()).await;
+    let _dbs = env.dbs();
+    clear_dbs(env.clone());
 
     // Generate fixture data
     let mut td = TestData::with_app_entry_type().await;
@@ -1079,9 +1062,9 @@ async fn test_wasm_api_without_integration_delete() {
     // test workspace boilerplate
     observability::test_run().ok();
     let env = holochain_state::test_utils::test_cell_env();
-    let dbs = env.dbs().await;
-    let env_ref = env.guard().await;
-    clear_dbs(env.clone()).await;
+    let dbs = env.dbs();
+    let env_ref = env.guard();
+    clear_dbs(env.clone());
 
     // Generate fixture data
     let mut td = TestData::with_app_entry_type().await;
@@ -1109,9 +1092,7 @@ async fn test_wasm_api_without_integration_delete() {
 
     {
         let reader = env_ref.reader().unwrap();
-        let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
-            .await
-            .unwrap();
+        let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs).unwrap();
         let entry_header = workspace
             .meta
             .get_headers(&reader, base_address.clone())
@@ -1278,12 +1259,10 @@ mod slow_tests {
         // Put commit entry into source chain
         {
             let cell_env = conductor.get_cell_env(&cell_id).await.unwrap();
-            let dbs = cell_env.dbs().await;
-            let env_ref = cell_env.guard().await;
+            let dbs = cell_env.dbs();
+            let env_ref = cell_env.guard();
 
-            let mut workspace = CallZomeWorkspace::new(cell_env.clone().into(), &dbs)
-                .await
-                .unwrap();
+            let mut workspace = CallZomeWorkspace::new(cell_env.clone().into(), &dbs).unwrap();
 
             let header_builder = builder::EntryCreate {
                 entry_type: EntryType::App(AppEntryType::new(
@@ -1413,8 +1392,8 @@ mod slow_tests {
         // Check the ops
         {
             let cell_env = conductor.get_cell_env(&cell_id).await.unwrap();
-            let dbs = cell_env.dbs().await;
-            let env_ref = cell_env.guard().await;
+            let dbs = cell_env.dbs();
+            let env_ref = cell_env.guard();
 
             let reader = env_ref.reader().unwrap();
             let db = dbs.get_db(&*INTEGRATED_DHT_OPS).unwrap();

@@ -23,8 +23,8 @@ pub async fn handle_get_entry(
     options: holochain_p2p::event::GetOptions,
 ) -> CellResult<GetElementResponse> {
     // Get the vaults
-    let env_ref = state_env.guard().await;
-    let dbs = state_env.dbs().await;
+    let env_ref = state_env.guard();
+    let dbs = state_env.dbs();
     let reader = env_ref.reader()?;
     let element_vault = ElementBuf::vault(state_env.clone().into(), &dbs, false)?;
     let meta_vault = MetadataBuf::vault(state_env.clone().into(), &dbs)?;

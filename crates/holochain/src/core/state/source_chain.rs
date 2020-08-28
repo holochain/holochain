@@ -42,12 +42,12 @@ impl SourceChain {
         self.0.chain_head().ok_or(SourceChainError::ChainEmpty)
     }
 
-    pub async fn new(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
-        Ok(SourceChainBuf::new(env, dbs).await?.into())
+    pub fn new(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
+        Ok(SourceChainBuf::new(env, dbs)?.into())
     }
 
-    pub async fn public_only(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
-        Ok(SourceChainBuf::public_only(env, dbs).await?.into())
+    pub fn public_only(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
+        Ok(SourceChainBuf::public_only(env, dbs)?.into())
     }
 
     pub fn into_inner(self) -> SourceChainBuf {
@@ -105,7 +105,7 @@ impl SourceChain {
     /// NB: [B-01676] the entry must be persisted for this to work. Once we have a
     /// proper capability index DB, OR a proper iterator that respects the
     /// scratch space, that will no longer be the case.
-    pub async fn get_persisted_cap_grant_by_secret(
+    pub fn get_persisted_cap_grant_by_secret(
         &self,
         query: &CapSecret,
     ) -> SourceChainResult<Option<CapGrant>> {
@@ -151,7 +151,7 @@ impl SourceChain {
     /// NB: [B-01676] the entry must be persisted for this to work. Once we have a
     /// proper capability index DB, OR a proper iterator that respects the
     /// scratch space, that will no longer be the case.
-    pub async fn get_persisted_cap_claim_by_secret(
+    pub fn get_persisted_cap_claim_by_secret(
         &self,
         query: &CapSecret,
     ) -> SourceChainResult<Option<CapClaim>> {
@@ -218,12 +218,12 @@ pub mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn test_get_cap_grant() -> SourceChainResult<()> {
         let arc = test_cell_env();
-        let env = arc.guard().await;
+        let env = arc.guard();
         let access = CapAccess::transferable();
         let secret = access.secret().unwrap();
         let grant = ZomeCallCapGrant::new("tag".into(), access.clone(), BTreeMap::new());
         {
-            let mut store = SourceChainBuf::new(arc.clone().into(), &env).await?;
+            let mut store = SourceChainBuf::new(arc.clone().into(), &env)?;
             store
                 .genesis(fake_dna_hash(1), fake_agent_pubkey_1(), None)
                 .await?;
@@ -231,7 +231,7 @@ pub mod tests {
         }
 
         {
-            let mut chain = SourceChain::new(arc.clone().into(), &env).await?;
+            let mut chain = SourceChain::new(arc.clone().into(), &env)?;
             chain.put_cap_grant(grant.clone()).await?;
 
             // ideally the following would work, but it won't because currently
@@ -247,9 +247,9 @@ pub mod tests {
         }
 
         {
-            let chain = SourceChain::new(arc.clone().into(), &env).await?;
+            let chain = SourceChain::new(arc.clone().into(), &env)?;
             assert_eq!(
-                chain.get_persisted_cap_grant_by_secret(secret).await?,
+                chain.get_persisted_cap_grant_by_secret(secret)?,
                 Some(grant.into())
             );
         }
@@ -260,12 +260,12 @@ pub mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn test_get_cap_claim() -> SourceChainResult<()> {
         let arc = test_cell_env();
-        let env = arc.guard().await;
+        let env = arc.guard();
         let secret = CapSecret::random();
         let agent_pubkey = fake_agent_pubkey_1().into();
         let claim = CapClaim::new("tag".into(), agent_pubkey, secret.clone());
         {
-            let mut store = SourceChainBuf::new(arc.clone().into(), &env).await?;
+            let mut store = SourceChainBuf::new(arc.clone().into(), &env)?;
             store
                 .genesis(fake_dna_hash(1), fake_agent_pubkey_1(), None)
                 .await?;
@@ -273,7 +273,7 @@ pub mod tests {
         }
 
         {
-            let mut chain = SourceChain::new(arc.clone().into(), &env).await?;
+            let mut chain = SourceChain::new(arc.clone().into(), &env)?;
             chain.put_cap_claim(claim.clone()).await?;
 
             // ideally the following would work, but it won't because currently
@@ -289,9 +289,9 @@ pub mod tests {
         }
 
         {
-            let chain = SourceChain::new(arc.clone().into(), &env).await?;
+            let chain = SourceChain::new(arc.clone().into(), &env)?;
             assert_eq!(
-                chain.get_persisted_cap_claim_by_secret(&secret).await?,
+                chain.get_persisted_cap_claim_by_secret(&secret)?,
                 Some(claim)
             );
         }

@@ -71,9 +71,7 @@ pub async fn publish_dht_ops_workflow(
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // commit the workspace
-    writer
-        .with_writer(|writer| Ok(workspace.flush_to_txn(writer)?))
-        .await?;
+    writer.with_writer(|writer| Ok(workspace.flush_to_txn(writer)?))?;
 
     Ok(WorkComplete::Complete)
 }
@@ -237,7 +235,7 @@ mod tests {
         JoinHandle<()>,
         tokio::sync::oneshot::Receiver<()>,
     ) {
-        let env_ref = env.guard().await;
+        let env_ref = env.guard();
         // Create data fixts for op
         let mut sig_fixt = SignatureFixturator::new(Unpredictable);
         let mut link_add_fixt = LinkAddFixturator::new(Unpredictable);
@@ -333,7 +331,7 @@ mod tests {
 
     /// Call the workflow
     async fn call_workflow(env: EnvironmentWrite, mut cell_network: HolochainP2pCell) {
-        let env_ref = env.guard().await;
+        let env_ref = env.guard();
         let workspace = PublishDhtOpsWorkspace::new(env.clone().into(), &env_ref).unwrap();
         publish_dht_ops_workflow(workspace, env.clone().into(), &mut cell_network)
             .await
@@ -372,7 +370,7 @@ mod tests {
             };
 
             let check = async move {
-                let env_ref = env.guard().await;
+                let env_ref = env.guard();
                 recv_task.await.unwrap();
                 let reader = env_ref.reader().unwrap();
                 let mut workspace =
@@ -410,8 +408,8 @@ mod tests {
 
             // Create test env
             let env = test_cell_env();
-            let dbs = env.dbs().await;
-            let env_ref = env.guard().await;
+            let dbs = env.dbs();
+            let env_ref = env.guard();
 
             // Setup
             let (network, cell_network, recv_task, _) =
@@ -492,8 +490,8 @@ mod tests {
 
                 // Create test env
                 let env = test_cell_env();
-                let dbs = env.dbs().await;
-                let env_ref = env.guard().await;
+                let dbs = env.dbs();
+                let env_ref = env.guard();
 
                 // Setup data
                 let original_entry = fixt!(Entry);
@@ -510,8 +508,7 @@ mod tests {
 
                 // Genesis and produce ops to clear these from the chains
                 {
-                    let mut source_chain =
-                        SourceChain::new(env.clone().into(), &dbs).await.unwrap();
+                    let mut source_chain = SourceChain::new(env.clone().into(), &dbs).unwrap();
                     fake_genesis(&mut source_chain).await.unwrap();
                     env_ref
                         .with_commit::<SourceChainError, _, _>(|writer| {
@@ -521,9 +518,7 @@ mod tests {
                         .unwrap();
                 }
                 {
-                    let workspace = ProduceDhtOpsWorkspace::new(env.clone().into(), &dbs)
-                        .await
-                        .unwrap();
+                    let workspace = ProduceDhtOpsWorkspace::new(env.clone().into(), &dbs).unwrap();
                     let (mut qt, _rx) = TriggerSender::new();
                     let complete =
                         produce_dht_ops_workflow(workspace, env.env.clone().into(), &mut qt)
@@ -532,9 +527,8 @@ mod tests {
                     assert_matches!(complete, WorkComplete::Complete);
                 }
                 {
-                    let mut workspace = ProduceDhtOpsWorkspace::new(env.clone().into(), &dbs)
-                        .await
-                        .unwrap();
+                    let mut workspace =
+                        ProduceDhtOpsWorkspace::new(env.clone().into(), &dbs).unwrap();
                     env_ref
                         .with_commit::<SourceChainError, _, _>(|writer| {
                             workspace.authored_dht_ops.clear_all(writer)?;
@@ -545,8 +539,7 @@ mod tests {
 
                 // Put data in elements
                 let (entry_create_header, entry_update_header) = {
-                    let mut source_chain =
-                        SourceChain::new(env.clone().into(), &dbs).await.unwrap();
+                    let mut source_chain = SourceChain::new(env.clone().into(), &dbs).unwrap();
                     let original_header_address = source_chain
                         .put(
                             builder::EntryCreate {
@@ -663,9 +656,7 @@ mod tests {
 
                 // Create and fill authored ops db in the workspace
                 {
-                    let workspace = ProduceDhtOpsWorkspace::new(env.clone().into(), &dbs)
-                        .await
-                        .unwrap();
+                    let workspace = ProduceDhtOpsWorkspace::new(env.clone().into(), &dbs).unwrap();
                     let (mut qt, _rx) = TriggerSender::new();
                     let complete =
                         produce_dht_ops_workflow(workspace, env.env.clone().into(), &mut qt)
