@@ -16,13 +16,13 @@ pub fn capability_grants(
 }
 
 #[cfg(test)]
-// #[cfg(feature = "slow_test")]
+#[cfg(feature = "slow_tests")]
 pub mod wasm_test {
 
+    use crate::fixt::ZomeCallHostAccessFixturator;
     use fixt::prelude::*;
     use hdk3::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
-    use crate::fixt::ZomeCallHostAccessFixturator;
 
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_capability_secret_test<'a>() {
@@ -41,10 +41,7 @@ pub mod wasm_test {
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = raw_workspace.clone();
 
-        // get the result of a commit entry
-        let output: CapSecret =
+        let _output: CapSecret =
             crate::call_test_ribosome!(host_access, TestWasm::Capability, "cap_secret", ());
-
-        dbg!(&output);
     }
 }
