@@ -1268,7 +1268,7 @@ mod slow_tests {
         let r = interface.handle_admin_request(request).await;
         assert_matches!(r, AdminResponse::AppActivated);
 
-        let mut entry_fixt = SerializedBytesFixturator::new(Predictable).map(|b| Entry::App(b));
+        let mut entry_fixt = AppEntryBytesFixturator::new(Predictable).map(|b| Entry::App(b));
 
         let base_entry = entry_fixt.next().unwrap();
         let base_entry_hash = EntryHashed::from_content(base_entry.clone())

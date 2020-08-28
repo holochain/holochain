@@ -18,7 +18,7 @@ use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
 use futures::future::{Either, FutureExt};
 use ghost_actor::GhostControlSender;
-use hdk3::prelude::EntryVisibility;
+use hdk3::prelude::{EntryError, EntryVisibility};
 use holo_hash::{
     hash_type::{self, AnyDht},
     AnyDhtHash, EntryHash, HasHash, HeaderHash,
@@ -593,17 +593,17 @@ async fn get_links_from_another_agent() {
 struct Post(String);
 
 impl TryFrom<Post> for Entry {
-    type Error = SerializedBytesError;
+    type Error = EntryError;
     fn try_from(post: Post) -> Result<Self, Self::Error> {
-        Ok(Entry::App(post.try_into()?))
+        Entry::app(post.try_into()?)
     }
 }
 
 impl TryFrom<Entry> for Post {
-    type Error = SerializedBytesError;
+    type Error = EntryError;
     fn try_from(entry: Entry) -> Result<Self, Self::Error> {
         let entry = unwrap_to!(entry => Entry::App).clone();
-        Ok(Post::try_from(entry)?)
+        Ok(Post::try_from(entry.into_sb())?)
     }
 }
 
