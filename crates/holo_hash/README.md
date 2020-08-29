@@ -86,7 +86,7 @@ use holo_hash::*;
 
 let entry_content = b"test entry content";
 
-let content_hash = EntryHash::with_data(entry_content.to_vec()).await.into();
+let content_hash = EntryHash::with_data_sync(entry_content.to_vec()).into();
 
 assert_eq!(
     "EntryHash(uhCEkhPbA5vaw3Fk-ZvPSKuyyjg8eoX98fve75qiUEFgAE3BO7D4d)",

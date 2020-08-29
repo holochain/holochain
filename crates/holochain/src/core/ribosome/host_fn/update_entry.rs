@@ -29,7 +29,7 @@ pub fn update_entry<'a>(
     // build the entry hash
     let async_entry = entry.clone();
     let entry_hash = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-        holochain_types::entry::EntryHashed::from_content(async_entry).await
+        holochain_types::entry::EntryHashed::from_content_sync(async_entry)
     })
     .into_hash();
 

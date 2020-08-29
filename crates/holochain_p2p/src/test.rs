@@ -42,7 +42,7 @@ mod tests {
     use futures::future::FutureExt;
     use ghost_actor::GhostControlSender;
     use holochain_types::element::{Element, SignedHeaderHashed, WireElement};
-    use holochain_types::fixt::*;
+    use holochain_types::{fixt::*, HeaderHashed};
 
     macro_rules! newhash {
         ($p:ident, $c:expr) => {
@@ -200,7 +200,7 @@ mod tests {
         let test_1 = GetElementResponse::GetHeader(Some(Box::new(WireElement::from_element(
             Element::new(
                 SignedHeaderHashed::with_presigned(
-                    HoloHashed::from_content(fixt!(Header)).await,
+                    HeaderHashed::from_content_sync(fixt!(Header)),
                     fixt!(Signature),
                 ),
                 None,
@@ -210,7 +210,7 @@ mod tests {
         let test_2 = GetElementResponse::GetHeader(Some(Box::new(WireElement::from_element(
             Element::new(
                 SignedHeaderHashed::with_presigned(
-                    HoloHashed::from_content(fixt!(Header)).await,
+                    HeaderHashed::from_content_sync(fixt!(Header)),
                     fixt!(Signature),
                 ),
                 None,

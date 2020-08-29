@@ -126,6 +126,11 @@ impl HashTypeAsync for Dna {}
 impl HashTypeAsync for NetId {}
 impl HashTypeAsync for Wasm {}
 
+// FIXME: remove these when full refactor is complete
+impl HashTypeAsync for DhtOp {}
+impl HashTypeAsync for Entry {}
+impl HashTypeAsync for Header {}
+
 impl From<AgentPubKey> for EntryHash {
     fn from(hash: AgentPubKey) -> EntryHash {
         hash.retype(hash_type::Entry)
