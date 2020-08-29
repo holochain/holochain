@@ -4,7 +4,6 @@ use crate::{
         state::{
             element_buf::ElementBuf,
             metadata::{MetadataBuf, MetadataBufT},
-            workspace::Workspace,
         },
         workflow::{integrate_dht_ops_workflow::integrate_to_cache, CallZomeWorkspace},
     },
@@ -25,7 +24,7 @@ use holochain_p2p::{
 };
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::{
-    env::{EnvironmentWriteRef, ReadManager},
+    env::{EnvironmentWrite, ReadManager},
     prelude::{BufferedStore, GetDb, WriteManager},
     test_utils::test_cell_env,
 };
@@ -63,9 +62,7 @@ async fn get_updates_cache() {
     observability::test_run().ok();
     // Database setup
     let env = test_cell_env();
-    let dbs = env.dbs().await;
-    let env_ref = env.guard().await;
-    let reader = env_ref.reader().unwrap();
+    let dbs = env.dbs();
 
     let (element_fixt_store, _) = generate_fixt_store().await;
     let expected = element_fixt_store
@@ -75,7 +72,7 @@ async fn get_updates_cache() {
         .unwrap();
 
     // Create the cascade
-    let mut workspace = CallZomeWorkspace::new(&reader, &dbs).unwrap();
+    let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs).unwrap();
     let (network, shutdown) = run_fixt_network(element_fixt_store, BTreeMap::new()).await;
 
     {
@@ -108,9 +105,8 @@ async fn get_meta_updates_meta_cache() {
     observability::test_run().ok();
     // Database setup
     let env = test_cell_env();
-    let dbs = env.dbs().await;
-    let env_ref = env.guard().await;
-    let reader = env_ref.reader().unwrap();
+    let dbs = env.dbs();
+    let env_ref = env.guard();
 
     // Setup other metadata store with fixtures attached
     // to known entry hash
@@ -122,7 +118,7 @@ async fn get_meta_updates_meta_cache() {
         .unwrap();
 
     // Create the cascade
-    let mut workspace = CallZomeWorkspace::new(&reader, &dbs).unwrap();
+    let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs).unwrap();
     let (network, shutdown) = run_fixt_network(BTreeMap::new(), meta_fixt_store).await;
 
     let returned = {
@@ -145,18 +141,23 @@ async fn get_meta_updates_meta_cache() {
     // Check the returned element is correct
     assert_eq!(returned.headers.len(), 1);
     assert_eq!(returned.headers.into_iter().next().unwrap(), expected.1);
+    let result = {
+        let reader = env_ref.reader().unwrap();
 
-    // Check the cache has been updated
-    let result = workspace
-        .cache_meta
-        .get_headers(match expected.0.hash_type().clone() {
-            hash_type::AnyDht::Entry => expected.0.clone().into(),
-            _ => unreachable!(),
-        })
-        .unwrap()
-        .collect::<Vec<_>>()
-        .unwrap();
-
+        // Check the cache has been updated
+        workspace
+            .cache_meta
+            .get_headers(
+                &reader,
+                match expected.0.hash_type().clone() {
+                    hash_type::AnyDht::Entry => expected.0.clone().into(),
+                    _ => unreachable!(),
+                },
+            )
+            .unwrap()
+            .collect::<Vec<_>>()
+            .unwrap()
+    };
     assert_eq!(result[0], expected.1);
     assert_eq!(result.len(), 1);
 
@@ -220,10 +221,9 @@ async fn get_from_another_agent() {
     let entry_hash = EntryHash::with_data(&Entry::try_from(entry.clone()).unwrap()).await;
     let header_hash = {
         let (bob_env, call_data) = CallData::create(&bob_cell_id, &handle, &dna_file).await;
-        let env_ref = bob_env.guard().await;
-        let dbs = bob_env.dbs().await;
+        let dbs = bob_env.dbs();
         let header_hash = commit_entry(
-            &env_ref,
+            &bob_env,
             &dbs,
             call_data.clone(),
             entry.clone().try_into().unwrap(),
@@ -234,7 +234,7 @@ async fn get_from_another_agent() {
         // Bob is not an authority yet
         // Make Bob an "authority"
         fake_authority(
-            &env_ref,
+            &bob_env,
             &dbs,
             header_hash.clone().into(),
             call_data.clone(),
@@ -246,10 +246,9 @@ async fn get_from_another_agent() {
     // Alice get element from bob
     let element = {
         let (alice_env, call_data) = CallData::create(&alice_cell_id, &handle, &dna_file).await;
-        let env_ref = alice_env.guard().await;
-        let dbs = alice_env.dbs().await;
+        let dbs = alice_env.dbs();
         get(
-            &env_ref,
+            &alice_env,
             &dbs,
             call_data,
             entry_hash.clone().into(),
@@ -272,20 +271,19 @@ async fn get_from_another_agent() {
     let new_entry = Post("Bananas are bendy".into());
     let (remove_hash, update_hash) = {
         let (bob_env, call_data) = CallData::create(&bob_cell_id, &handle, &dna_file).await;
-        let env_ref = bob_env.guard().await;
-        let dbs = bob_env.dbs().await;
+        let dbs = bob_env.dbs();
         let remove_hash =
-            delete_entry(&env_ref, &dbs, call_data.clone(), header_hash.clone()).await;
+            delete_entry(&bob_env, &dbs, call_data.clone(), header_hash.clone()).await;
 
         fake_authority(
-            &env_ref,
+            &bob_env,
             &dbs,
             remove_hash.clone().into(),
             call_data.clone(),
         )
         .await;
         let update_hash = update_entry(
-            &env_ref,
+            &bob_env,
             &dbs,
             call_data.clone(),
             new_entry.clone().try_into().unwrap(),
@@ -294,7 +292,7 @@ async fn get_from_another_agent() {
         )
         .await;
         fake_authority(
-            &env_ref,
+            &bob_env,
             &dbs,
             update_hash.clone().into(),
             call_data.clone(),
@@ -306,11 +304,10 @@ async fn get_from_another_agent() {
     // Alice get element from bob
     let (entry_details, header_details) = {
         let (alice_env, call_data) = CallData::create(&alice_cell_id, &handle, &dna_file).await;
-        let env_ref = alice_env.guard().await;
-        let dbs = alice_env.dbs().await;
+        let dbs = alice_env.dbs();
         debug!(the_entry_hash = ?entry_hash);
         let entry_details = get_details(
-            &env_ref,
+            &alice_env,
             &dbs,
             call_data.clone(),
             entry_hash.into(),
@@ -319,7 +316,7 @@ async fn get_from_another_agent() {
         .await
         .unwrap();
         let header_details = get_details(
-            &env_ref,
+            &alice_env,
             &dbs,
             call_data.clone(),
             header_hash.clone().into(),
@@ -426,10 +423,9 @@ async fn get_links_from_another_agent() {
     let link_tag = fixt!(LinkTag);
     let link_add_hash = {
         let (bob_env, call_data) = CallData::create(&bob_cell_id, &handle, &dna_file).await;
-        let env_ref = bob_env.guard().await;
-        let dbs = bob_env.dbs().await;
+        let dbs = bob_env.dbs();
         let base_header_hash = commit_entry(
-            &env_ref,
+            &bob_env,
             &dbs,
             call_data.clone(),
             base.clone().try_into().unwrap(),
@@ -438,7 +434,7 @@ async fn get_links_from_another_agent() {
         .await;
 
         let target_header_hash = commit_entry(
-            &env_ref,
+            &bob_env,
             &dbs,
             call_data.clone(),
             target.clone().try_into().unwrap(),
@@ -447,14 +443,14 @@ async fn get_links_from_another_agent() {
         .await;
 
         fake_authority(
-            &env_ref,
+            &bob_env,
             &dbs,
             target_header_hash.clone().into(),
             call_data.clone(),
         )
         .await;
         fake_authority(
-            &env_ref,
+            &bob_env,
             &dbs,
             base_header_hash.clone().into(),
             call_data.clone(),
@@ -463,7 +459,7 @@ async fn get_links_from_another_agent() {
 
         // Link the entries
         let link_add_hash = link_entries(
-            &env_ref,
+            &bob_env,
             &dbs,
             call_data.clone(),
             base_entry_hash.clone(),
@@ -473,7 +469,7 @@ async fn get_links_from_another_agent() {
         .await;
 
         fake_authority(
-            &env_ref,
+            &bob_env,
             &dbs,
             link_add_hash.clone().into(),
             call_data.clone(),
@@ -486,11 +482,10 @@ async fn get_links_from_another_agent() {
     // Alice get links from bob
     let links = {
         let (alice_env, call_data) = CallData::create(&alice_cell_id, &handle, &dna_file).await;
-        let env_ref = alice_env.guard().await;
-        let dbs = alice_env.dbs().await;
+        let dbs = alice_env.dbs();
 
         get_links(
-            &env_ref,
+            &alice_env,
             &dbs,
             call_data.clone(),
             base_entry_hash.clone(),
@@ -512,15 +507,14 @@ async fn get_links_from_another_agent() {
     // Remove the link
     {
         let (bob_env, call_data) = CallData::create(&bob_cell_id, &handle, &dna_file).await;
-        let env_ref = bob_env.guard().await;
-        let dbs = bob_env.dbs().await;
+        let dbs = bob_env.dbs();
 
         // Link the entries
         let link_remove_hash =
-            remove_link(&env_ref, &dbs, call_data.clone(), link_add_hash.clone()).await;
+            remove_link(&bob_env, &dbs, call_data.clone(), link_add_hash.clone()).await;
 
         fake_authority(
-            &env_ref,
+            &bob_env,
             &dbs,
             link_remove_hash.clone().into(),
             call_data.clone(),
@@ -530,11 +524,10 @@ async fn get_links_from_another_agent() {
 
     let links = {
         let (alice_env, call_data) = CallData::create(&alice_cell_id, &handle, &dna_file).await;
-        let env_ref = alice_env.guard().await;
-        let dbs = alice_env.dbs().await;
+        let dbs = alice_env.dbs();
 
         get_link_details(
-            &env_ref,
+            &alice_env,
             &dbs,
             call_data.clone(),
             base_entry_hash.clone(),
@@ -696,14 +689,14 @@ async fn generate_fixt_store() -> (
 }
 
 async fn fake_authority<'env>(
-    env_ref: &'env EnvironmentWriteRef<'env>,
+    env: &EnvironmentWrite,
     dbs: &impl GetDb,
     hash: AnyDhtHash,
     call_data: CallData,
 ) {
     // Check bob can get the entry
     let element = get(
-        env_ref,
+        &env.clone().into(),
         dbs,
         call_data,
         hash.clone().into(),
@@ -712,9 +705,8 @@ async fn fake_authority<'env>(
     .await
     .unwrap();
 
-    let reader = env_ref.reader().unwrap();
-    let mut element_vault = ElementBuf::vault(&reader, dbs, false).unwrap();
-    let mut meta_vault = MetadataBuf::vault(&reader, dbs).unwrap();
+    let mut element_vault = ElementBuf::vault(env.clone().into(), dbs, false).unwrap();
+    let mut meta_vault = MetadataBuf::vault(env.clone().into(), dbs).unwrap();
 
     // Write to the meta vault to fake being an authority
     let (shh, e) = element.clone().into_inner();
@@ -726,7 +718,7 @@ async fn fake_authority<'env>(
         .await
         .unwrap();
 
-    env_ref
+    env.guard()
         .with_commit(|writer| {
             element_vault.flush_to_txn(writer)?;
             meta_vault.flush_to_txn(writer)

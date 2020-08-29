@@ -167,10 +167,34 @@ impl_hashable_content!(Header, Header);
 /// this id is an internal reference, which also serves as a canonical ordering
 /// for zome initialization.  The value should be auto-generated from the Zome Bundle def
 // TODO: Check this can never be written to > 255
-#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
+#[derive(
+    Debug,
+    Copy,
+    Clone,
+    Hash,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Serialize,
+    Deserialize,
+    SerializedBytes,
+)]
 pub struct ZomeId(u8);
 
-#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
+#[derive(
+    Debug,
+    Copy,
+    Clone,
+    Hash,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Serialize,
+    Deserialize,
+    SerializedBytes,
+)]
 pub struct EntryDefIndex(u8);
 
 /// The Dna Header is always the first header in a source chain

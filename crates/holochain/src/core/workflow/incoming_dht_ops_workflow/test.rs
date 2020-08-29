@@ -16,9 +16,8 @@ async fn incoming_ops_to_limbo() {
         .unwrap();
     rx.listen().await.unwrap();
 
-    let env_ref = env.guard().await;
-    let reader = env_ref.reader().unwrap();
-    let workspace = IncomingDhtOpsWorkspace::new(&reader, &env_ref).unwrap();
+    let env_ref = env.guard();
+    let workspace = IncomingDhtOpsWorkspace::new(env.clone().into(), &env_ref).unwrap();
     let r = workspace.validation_limbo.get(&hash).unwrap().unwrap();
     assert_eq!(r.op, op);
 }

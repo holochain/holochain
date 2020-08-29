@@ -1,11 +1,14 @@
 use super::CapSecret;
+use crate::capability::secret::CAP_SECRET_BYTES;
 use crate::zome::ZomeName;
 use holo_hash::*;
+use holochain_serialized_bytes::SerializedBytes;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashSet};
 
 /// System entry to hold a capabilities granted by the callee
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[allow(clippy::large_enum_variant)]
 pub enum CapGrant {
     /// Grants the capability of writing to the source chain for this agent key.
     /// This grant is provided by the `Entry::Agent` entry on the source chain.
@@ -15,6 +18,10 @@ pub enum CapGrant {
     /// and/or private data
     ZomeCall(ZomeCallCapGrant),
 }
+
+#[derive(Default, PartialEq, Eq, Debug, Clone, serde::Serialize, serde::Deserialize)]
+/// @todo the ability to forcibly curry payloads into functions that are called with a claim
+pub struct CurryPayloads(pub BTreeMap<GrantedFunction, SerializedBytes>);
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 /// The payload for the ZomeCall capability grant.
@@ -27,15 +34,23 @@ pub struct ZomeCallCapGrant {
     access: CapAccess,
     /// Set of functions to which this capability grants ZomeCall access
     functions: GrantedFunctions,
+    /// the payloads to curry to the functions
+    curry_payloads: CurryPayloads,
 }
 
 impl ZomeCallCapGrant {
     /// Constructor
-    pub fn new(tag: String, access: CapAccess, functions: GrantedFunctions) -> Self {
+    pub fn new(
+        tag: String,
+        access: CapAccess,
+        functions: GrantedFunctions,
+        curry_payloads: CurryPayloads,
+    ) -> Self {
         Self {
             tag,
             access,
             functions,
+            curry_payloads,
         }
     }
 }
@@ -61,7 +76,10 @@ impl CapGrant {
     pub fn access(&self) -> CapAccess {
         match self {
             CapGrant::Authorship(agent_pubkey) => CapAccess::Assigned {
-                secret: format!("{:?}", agent_pubkey).into(),
+                // there is nothing meaningful about a self-assigned secret so we might as well
+                // zero it out to (hopefully) make it very clear that this has a different security
+                // and access model (i.e. that the caller of the function is the current agent).
+                secret: [0; CAP_SECRET_BYTES].into(),
                 assignees: [agent_pubkey.clone()].iter().cloned().collect(),
             },
             CapGrant::ZomeCall(ZomeCallCapGrant { access, .. }) => access.clone(),
@@ -88,25 +106,28 @@ pub enum CapAccess {
     },
 }
 
+impl From<()> for CapAccess {
+    fn from(_: ()) -> Self {
+        Self::Unrestricted
+    }
+}
+
+impl From<CapSecret> for CapAccess {
+    fn from(secret: CapSecret) -> Self {
+        Self::Transferable { secret }
+    }
+}
+
+impl From<(CapSecret, HashSet<AgentPubKey>)> for CapAccess {
+    fn from((secret, assignees): (CapSecret, HashSet<AgentPubKey>)) -> Self {
+        Self::Assigned { secret, assignees }
+    }
+}
+
 impl CapAccess {
     /// Create a new CapAccess::Unrestricted
     pub fn unrestricted() -> Self {
         CapAccess::Unrestricted
-    }
-
-    /// Create a new CapAccess::Transferable with random secret
-    pub fn transferable() -> Self {
-        CapAccess::Transferable {
-            secret: CapSecret::random(),
-        }
-    }
-
-    /// Create a new CapAccess::Assigned with random secret and provided agents
-    pub fn assigned(assignees: HashSet<AgentPubKey>) -> Self {
-        CapAccess::Assigned {
-            secret: CapSecret::random(),
-            assignees,
-        }
     }
 
     /// Check if access is granted given the inputs
@@ -129,6 +150,9 @@ impl CapAccess {
     }
 }
 
-/// A collection of functions grouped by zome name
-/// which are authorized within a capability
-pub type GrantedFunctions = BTreeMap<ZomeName, Vec<String>>;
+/// a single function name
+pub type FunctionName = String;
+/// a single zome/function pair
+pub type GrantedFunction = (ZomeName, FunctionName);
+/// A collection of zome/function pairs
+pub type GrantedFunctions = HashSet<GrantedFunction>;

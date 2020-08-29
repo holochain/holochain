@@ -3,6 +3,7 @@ members = [
     "agent_info",
     "anchor",
     "bench",
+    "capability",
     "commit_entry",
     "crd",
     "crud",
@@ -36,3 +37,7 @@ members = [
 
 [profile.release]
 opt-level = "z"
+
+
+[patch.crates-io]
+

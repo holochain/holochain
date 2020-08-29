@@ -1,10 +1,12 @@
 use super::entry_def_store::EntryDefBufferKey;
 use fallible_iterator::FallibleIterator;
 use holochain_state::{
-    buffer::{BufferedStore, CasBuf},
+    buffer::CasBufFresh,
+    env::EnvironmentRead,
     error::{DatabaseError, DatabaseResult},
     exports::SingleStore,
-    prelude::{Reader, Writer},
+    fresh_reader,
+    prelude::*,
 };
 use holochain_types::{
     dna::{DnaDef, DnaDefHashed, DnaFile},
@@ -22,9 +24,8 @@ pub struct RealDnaStore {
     entry_defs: HashMap<EntryDefBufferKey, EntryDef>,
 }
 
-pub type DnaDefCas<'env> = CasBuf<'env, DnaDef>;
-pub struct DnaDefBuf<'env> {
-    dna_defs: DnaDefCas<'env>,
+pub struct DnaDefBuf {
+    dna_defs: CasBufFresh<DnaDef>,
 }
 
 #[automock]
@@ -81,10 +82,10 @@ impl RealDnaStore {
     }
 }
 
-impl<'env> DnaDefBuf<'env> {
-    pub fn new(reader: &'env Reader<'env>, dna_def_store: SingleStore) -> DatabaseResult<Self> {
+impl DnaDefBuf {
+    pub fn new(env: EnvironmentRead, dna_def_store: SingleStore) -> DatabaseResult<Self> {
         Ok(Self {
-            dna_defs: DnaDefCas::new(reader, dna_def_store)?,
+            dna_defs: CasBufFresh::new(env, dna_def_store),
         })
     }
 
@@ -97,15 +98,18 @@ impl<'env> DnaDefBuf<'env> {
         Ok(())
     }
 
-    pub fn get_all(&'env self) -> DatabaseResult<Vec<DnaDefHashed>> {
-        self.dna_defs.iter_fail()?.collect()
+    pub fn get_all(&self) -> DatabaseResult<Vec<DnaDefHashed>> {
+        fresh_reader!(self.dna_defs.env(), |r| self
+            .dna_defs
+            .iter_fail(&r)?
+            .collect())
     }
 }
 
-impl<'env> BufferedStore<'env> for DnaDefBuf<'env> {
+impl BufferedStore for DnaDefBuf {
     type Error = DatabaseError;
 
-    fn flush_to_txn(self, writer: &'env mut Writer) -> DatabaseResult<()> {
+    fn flush_to_txn(self, writer: &mut Writer) -> DatabaseResult<()> {
         self.dna_defs.flush_to_txn(writer)?;
         Ok(())
     }

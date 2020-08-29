@@ -27,7 +27,9 @@ use crate::core::ribosome::guest_callback::CallIterator;
 use crate::core::ribosome::host_fn::agent_info::agent_info;
 use crate::core::ribosome::host_fn::call::call;
 use crate::core::ribosome::host_fn::call_remote::call_remote;
-use crate::core::ribosome::host_fn::capability::capability;
+use crate::core::ribosome::host_fn::capability_claims::capability_claims;
+use crate::core::ribosome::host_fn::capability_grants::capability_grants;
+use crate::core::ribosome::host_fn::capability_info::capability_info;
 use crate::core::ribosome::host_fn::commit_entry::commit_entry;
 use crate::core::ribosome::host_fn::debug::debug;
 use crate::core::ribosome::host_fn::decrypt::decrypt;
@@ -111,7 +113,12 @@ impl WasmRibosome {
         // TODO: make this actually the hash of the wasm once we can do that
         // watch out for cache misses in the tests that make things slooow if you change this!
         // format!("{}{}", &self.dna.dna_hash(), zome_name).into_bytes()
-        Ok(self.dna_file.dna().get_zome(zome_name)?.wasm_hash.get_raw())
+        Ok(self
+            .dna_file
+            .dna()
+            .get_zome(zome_name)?
+            .wasm_hash
+            .get_full_bytes())
     }
 
     pub fn instance(&self, call_context: CallContext) -> RibosomeResult<Instance> {
@@ -209,12 +216,10 @@ impl WasmRibosome {
             ns.insert("__random_bytes", func!(invoke_host_function!(random_bytes)));
             ns.insert("__show_env", func!(invoke_host_function!(show_env)));
             ns.insert("__sys_time", func!(invoke_host_function!(sys_time)));
-            ns.insert("__capability", func!(invoke_host_function!(capability)));
         } else {
             ns.insert("__random_bytes", func!(invoke_host_function!(unreachable)));
             ns.insert("__show_env", func!(invoke_host_function!(unreachable)));
             ns.insert("__sys_time", func!(invoke_host_function!(unreachable)));
-            ns.insert("__capability", func!(invoke_host_function!(unreachable)));
         }
 
         if let HostFnAccess {
@@ -223,8 +228,32 @@ impl WasmRibosome {
         } = host_fn_access
         {
             ns.insert("__agent_info", func!(invoke_host_function!(agent_info)));
+            ns.insert(
+                "__capability_claims",
+                func!(invoke_host_function!(capability_claims)),
+            );
+            ns.insert(
+                "__capability_grants",
+                func!(invoke_host_function!(capability_grants)),
+            );
+            ns.insert(
+                "__capability_info",
+                func!(invoke_host_function!(capability_info)),
+            );
         } else {
             ns.insert("__agent_info", func!(invoke_host_function!(unreachable)));
+            ns.insert(
+                "__capability_claims",
+                func!(invoke_host_function!(unreachable)),
+            );
+            ns.insert(
+                "__capability_grants",
+                func!(invoke_host_function!(unreachable)),
+            );
+            ns.insert(
+                "__capability_info",
+                func!(invoke_host_function!(unreachable)),
+            );
         }
 
         if let HostFnAccess {

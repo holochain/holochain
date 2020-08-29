@@ -3,7 +3,10 @@
 use holo_hash::{AnyDhtHash, DhtOpHash};
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::{
-    buffer::KvBuf, db::VALIDATION_LIMBO, error::DatabaseResult, prelude::GetDb, transaction::Reader,
+    buffer::KvBufFresh,
+    db::VALIDATION_LIMBO,
+    error::DatabaseResult,
+    prelude::{EnvironmentRead, GetDb},
 };
 use holochain_types::{dht_op::DhtOp, Timestamp};
 use shrinkwraprs::Shrinkwrap;
@@ -11,9 +14,7 @@ use shrinkwraprs::Shrinkwrap;
 #[derive(Shrinkwrap)]
 #[shrinkwrap(mutable)]
 /// The database for putting ops into to await validation
-pub struct ValidationLimboStore<'env>(
-    pub KvBuf<'env, ValidationLimboKey, ValidationLimboValue, Reader<'env>>,
-);
+pub struct ValidationLimboStore(pub KvBufFresh<ValidationLimboKey, ValidationLimboValue>);
 
 /// Key to the validation limbo
 pub type ValidationLimboKey = DhtOpHash;
@@ -48,10 +49,10 @@ pub enum ValidationLimboStatus {
     AwaitingAppDeps(AnyDhtHash),
 }
 
-impl<'env> ValidationLimboStore<'env> {
+impl ValidationLimboStore {
     /// Create a new Validation Limbo db
-    pub fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Self> {
+    pub fn new(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
         let db = dbs.get_db(&*VALIDATION_LIMBO)?;
-        Ok(Self(KvBuf::new(reader, db)?))
+        Ok(Self(KvBufFresh::new(env, db)))
     }
 }

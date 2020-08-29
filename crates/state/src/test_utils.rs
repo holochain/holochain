@@ -1,6 +1,9 @@
 //! Helpers for unit tests
 
-use crate::env::{EnvironmentKind, EnvironmentWrite};
+use crate::{
+    env::{EnvironmentKind, EnvironmentWrite},
+    prelude::BufKey,
+};
 use holochain_types::test_utils::fake_cell_id;
 use shrinkwraprs::Shrinkwrap;
 use std::sync::Arc;
@@ -106,3 +109,36 @@ pub struct TestEnvironment {
 // /// from the filesystem
 // #[derive(Shrinkwrap)]
 // pub struct TestEnvironment(#[shrinkwrap(main_field)] EnvironmentWrite, TempDir);
+
+/// A String-based newtype suitable for database keys and values
+#[derive(
+    Clone,
+    Debug,
+    PartialOrd,
+    Ord,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    derive_more::Display,
+    derive_more::From,
+)]
+pub struct DbString(String);
+
+impl AsRef<[u8]> for DbString {
+    fn as_ref(&self) -> &[u8] {
+        self.0.as_bytes()
+    }
+}
+
+impl BufKey for DbString {
+    fn from_key_bytes_or_friendly_panic(bytes: &[u8]) -> Self {
+        Self(String::from_utf8(bytes.to_vec()).unwrap())
+    }
+}
+
+impl From<&str> for DbString {
+    fn from(s: &str) -> Self {
+        Self(s.to_owned())
+    }
+}

@@ -1,7 +1,7 @@
 //! The workflow and queue consumer for DhtOp integration
 
 use super::*;
-use crate::core::state::workspace::Workspace;
+
 use crate::{
     conductor::manager::ManagedTaskResult,
     core::workflow::integrate_dht_ops_workflow::{
@@ -32,9 +32,9 @@ pub fn spawn_integrate_dht_ops_consumer(
     let handle = tokio::spawn(async move {
         let mut trigger_sys = trigger_sys.await.expect("failed to get tx sys");
         loop {
-            let env_ref = env.guard().await;
+            let env_ref = env.guard();
             let reader = env_ref.reader().expect("Could not create LMDB reader");
-            let workspace = IntegrateDhtOpsWorkspace::new(&reader, &env_ref)
+            let workspace = IntegrateDhtOpsWorkspace::new(env.clone().into(), &env_ref)
                 .expect("Could not create Workspace");
             if let WorkComplete::Incomplete =
                 integrate_dht_ops_workflow(workspace, env.clone().into(), &mut trigger_sys)

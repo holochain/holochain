@@ -2,7 +2,11 @@ use super::*;
 /// Some keys do not store an array of bytes
 /// so can not impl AsRef<[u8]>.
 /// This is the key type for those keys to impl into
-pub type BytesKey = Vec<u8>;
+#[derive(
+    Ord, PartialOrd, Eq, PartialEq, derive_more::Into, derive_more::From, derive_more::AsRef,
+)]
+#[as_ref(forward)]
+pub struct BytesKey(pub Vec<u8>);
 
 /// The value stored in the links meta db
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
@@ -40,7 +44,7 @@ pub enum LinkMetaKey<'a> {
 pub(super) type SysMetaKey = AnyDhtHash;
 
 /// Values of [Header]s stored by the sys meta db
-#[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(Debug, Hash, PartialEq, Eq, Ord, PartialOrd, Clone, Serialize, Deserialize)]
 pub enum SysMetaVal {
     /// A header that results in a new entry
     /// Either a [EntryCreate] or [EntryUpdate]
@@ -115,6 +119,12 @@ impl LinkMetaVal {
     }
 }
 
+impl BufKey for BytesKey {
+    fn from_key_bytes_or_friendly_panic(bytes: &[u8]) -> Self {
+        bytes.into()
+    }
+}
+
 impl EntryHeader {
     pub(super) async fn into_hash(self) -> Result<TimedHeaderHash, SerializedBytesError> {
         let header = match self {
@@ -164,6 +174,7 @@ impl From<&LinkMetaKey<'_>> for BytesKey {
             BaseZomeTag(b, z, t) => [b.as_ref(), &[u8::from(*z)], t.as_ref()].concat(),
             Full(b, z, t, l) => [b.as_ref(), &[u8::from(*z)], t.as_ref(), l.as_ref()].concat(),
         }
+        .into()
     }
 }
 
@@ -244,15 +255,23 @@ impl From<MiscMetaKey> for BytesKey {
 
 impl From<&MiscMetaKey> for BytesKey {
     fn from(k: &MiscMetaKey) -> Self {
-        UnsafeBytes::from(SerializedBytes::try_from(k).expect("Type can't fail to serialize"))
-            .into()
+        let r: Vec<u8> =
+            UnsafeBytes::from(SerializedBytes::try_from(k).expect("Type can't fail to serialize"))
+                .into();
+        r.into()
     }
 }
 
 impl From<BytesKey> for MiscMetaKey {
     fn from(k: BytesKey) -> Self {
-        SerializedBytes::from(UnsafeBytes::from(k))
+        SerializedBytes::from(UnsafeBytes::from(<Vec<u8>>::from(k)))
             .try_into()
             .expect("Database MiscMetaKey failed to serialize")
+    }
+}
+
+impl From<&[u8]> for BytesKey {
+    fn from(b: &[u8]) -> Self {
+        Self(b.to_owned())
     }
 }

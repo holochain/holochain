@@ -1,7 +1,7 @@
 use crate::{
     conductor::{dna_store::MockDnaStore, ConductorHandle},
     core::{
-        state::{validation_db::ValidationLimboStatus, workspace::Workspace},
+        state::validation_db::ValidationLimboStatus,
         workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace,
     },
     test_utils::{host_fn_api::*, setup_app},
@@ -11,7 +11,7 @@ use fallible_iterator::FallibleIterator;
 use hdk3::prelude::LinkTag;
 use holo_hash::{AnyDhtHash, EntryHash, HeaderHash};
 use holochain_serialized_bytes::{SerializedBytes, UnsafeBytes};
-use holochain_state::prelude::ReadManager;
+use holochain_state::{fresh_reader_test, prelude::ReadManager};
 use holochain_types::{
     app::InstalledCell, cell::CellId, dht_op::DhtOpLight, dna::DnaDef, dna::DnaFile, fixt::*,
     test_utils::fake_agent_pubkey_1, test_utils::fake_agent_pubkey_2, validate::ValidationStatus,
@@ -80,58 +80,65 @@ async fn run_test(
     bob_links_in_a_legit_way(&bob_cell_id, &handle, &dna_file).await;
 
     // Some time for ops to reach alice and run through validation
-    tokio::time::delay_for(Duration::from_millis(500)).await;
+    tokio::time::delay_for(Duration::from_millis(1000)).await;
 
     {
         let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
-        let env_ref = alice_env.guard().await;
-        let dbs = alice_env.dbs().await;
-        let reader = env_ref.reader().unwrap();
-        let workspace = IncomingDhtOpsWorkspace::new(&reader, &dbs).unwrap();
+        let dbs = alice_env.dbs();
+
+        let workspace = IncomingDhtOpsWorkspace::new(alice_env.clone().into(), &dbs).unwrap();
         // Validation should be empty
         assert_eq!(
-            workspace.validation_limbo.iter().unwrap().count().unwrap(),
+            fresh_reader_test!(alice_env, |r| {
+                workspace
+                    .validation_limbo
+                    .iter(&r)
+                    .unwrap()
+                    .count()
+                    .unwrap()
+            }),
             0
         );
         // Integration should have 9 ops in it
         // Plus another 14 for genesis + init
         assert_eq!(
-            workspace
-                .integrated_dht_ops
-                .iter()
-                .unwrap()
-                // Every op should be valid
-                .inspect(|(_, i)| {
-                    let s = debug_span!("inspect_ops");
-                    let _g = s.enter();
-                    debug!(?i.op);
-                    assert_eq!(i.validation_status, ValidationStatus::Valid);
-                    Ok(())
-                })
-                .count()
-                .unwrap(),
+            fresh_reader_test!(alice_env, |r| {
+                workspace
+                    .integrated_dht_ops
+                    .iter(&r)
+                    .unwrap()
+                    // Every op should be valid
+                    .inspect(|(_, i)| {
+                        let s = debug_span!("inspect_ops");
+                        let _g = s.enter();
+                        debug!(?i.op);
+                        assert_eq!(i.validation_status, ValidationStatus::Valid);
+                        Ok(())
+                    })
+                    .count()
+                    .unwrap()
+            }),
             9 + 14
         );
     }
 
     let (big_entry_header, big_entry_hash, link_add_hash) =
         bob_makes_a_large_link(&bob_cell_id, &handle, &dna_file).await;
-    info!("now");
 
     // Some time for ops to reach alice and run through validation
-    tokio::time::delay_for(Duration::from_millis(500)).await;
+    // This takes a little longer due to the large entry and links
+    tokio::time::delay_for(Duration::from_millis(1500)).await;
 
     {
         let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
-        let env_ref = alice_env.guard().await;
-        let dbs = alice_env.dbs().await;
-        let reader = env_ref.reader().unwrap();
-        let workspace = IncomingDhtOpsWorkspace::new(&reader, &dbs).unwrap();
+        let dbs = alice_env.dbs();
+
+        let workspace = IncomingDhtOpsWorkspace::new(alice_env.clone().into(), &dbs).unwrap();
         // Validation should be empty
         assert_eq!(
-            workspace
+            fresh_reader_test!(alice_env, |r| workspace
                 .validation_limbo
-                .iter()
+                .iter(&r)
                 .unwrap()
                 .inspect(|(_, i)| {
                     let s = debug_span!("inspect_ops");
@@ -141,16 +148,16 @@ async fn run_test(
                     Ok(())
                 })
                 .count()
-                .unwrap(),
+                .unwrap()),
             0
         );
         let big_entry_hash: AnyDhtHash = big_entry_hash.into();
         // Integration should have 12 ops in it
         // Plus the original 23
         assert_eq!(
-            workspace
+            fresh_reader_test!(alice_env, |r| workspace
                 .integrated_dht_ops
-                .iter()
+                .iter(&r)
                 .unwrap()
                 // Every op should be valid except register updated by
                 // Store entry for the update
@@ -164,6 +171,9 @@ async fn run_test(
                         {
                             assert_eq!(i.validation_status, ValidationStatus::Rejected)
                         }
+                        DhtOpLight::StoreElement(hh, _, _) if hh == &big_entry_header => {
+                            assert_eq!(i.validation_status, ValidationStatus::Rejected)
+                        }
                         DhtOpLight::RegisterAddLink(hh, _) if hh == &link_add_hash => {
                             assert_eq!(i.validation_status, ValidationStatus::Rejected)
                         }
@@ -172,7 +182,7 @@ async fn run_test(
                     Ok(())
                 })
                 .count()
-                .unwrap(),
+                .unwrap()),
             12 + 23
         );
     }
@@ -180,40 +190,46 @@ async fn run_test(
     dodgy_bob(&bob_cell_id, &handle, &dna_file).await;
 
     // Some time for ops to reach alice and run through validation
-    tokio::time::delay_for(Duration::from_millis(500)).await;
+    tokio::time::delay_for(Duration::from_millis(1000)).await;
 
     {
         let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
-        let env_ref = alice_env.guard().await;
-        let dbs = alice_env.dbs().await;
-        let reader = env_ref.reader().unwrap();
-        let workspace = IncomingDhtOpsWorkspace::new(&reader, &dbs).unwrap();
+        let env_ref = alice_env.guard();
+        let dbs = alice_env.dbs();
+
+        let workspace = IncomingDhtOpsWorkspace::new(alice_env.clone().into(), &dbs).unwrap();
         // Validation should still contain bobs link pending because the target was missing
         assert_eq!(
-            workspace
-                .validation_limbo
-                .iter()
-                .unwrap()
-                .inspect(|(_, i)| {
-                    let s = debug_span!("inspect_ops");
-                    let _g = s.enter();
-                    debug!(?i.op);
-                    assert_eq!(i.status, ValidationLimboStatus::Pending);
-                    Ok(())
-                })
-                .count()
-                .unwrap(),
+            {
+                let r = env_ref.reader().unwrap();
+                workspace
+                    .validation_limbo
+                    .iter(&r)
+                    .unwrap()
+                    .inspect(|(_, i)| {
+                        let s = debug_span!("inspect_ops");
+                        let _g = s.enter();
+                        debug!(?i.op);
+                        assert_eq!(i.status, ValidationLimboStatus::Pending);
+                        Ok(())
+                    })
+                    .count()
+                    .unwrap()
+            },
             1
         );
         // Integration should have new 5 ops in it
         // Plus the original 35
         assert_eq!(
-            workspace
-                .integrated_dht_ops
-                .iter()
-                .unwrap()
-                .count()
-                .unwrap(),
+            {
+                let r = env_ref.reader().unwrap();
+                workspace
+                    .integrated_dht_ops
+                    .iter(&r)
+                    .unwrap()
+                    .count()
+                    .unwrap()
+            },
             5 + 35
         );
     }
@@ -230,11 +246,10 @@ async fn bob_links_in_a_legit_way(
     let target_entry_hash = EntryHash::with_data(&Entry::try_from(target.clone()).unwrap()).await;
     let link_tag = fixt!(LinkTag);
     let (bob_env, call_data) = CallData::create(bob_cell_id, handle, dna_file).await;
-    let env_ref = bob_env.guard().await;
-    let dbs = bob_env.dbs().await;
+    let dbs = bob_env.dbs();
     // 3
     commit_entry(
-        &env_ref,
+        &bob_env,
         &dbs,
         call_data.clone(),
         base.clone().try_into().unwrap(),
@@ -244,7 +259,7 @@ async fn bob_links_in_a_legit_way(
 
     // 4
     commit_entry(
-        &env_ref,
+        &bob_env,
         &dbs,
         call_data.clone(),
         target.clone().try_into().unwrap(),
@@ -255,7 +270,7 @@ async fn bob_links_in_a_legit_way(
     // 5
     // Link the entries
     let link_add_address = link_entries(
-        &env_ref,
+        &bob_env,
         &dbs,
         call_data.clone(),
         base_entry_hash.clone(),
@@ -275,7 +290,7 @@ async fn bob_makes_a_large_link(
     handle: &ConductorHandle,
     dna_file: &DnaFile,
 ) -> (HeaderHash, EntryHash, HeaderHash) {
-    let bytes = (0..16_000_000).map(|_| 0u8).into_iter().collect::<Vec<_>>();
+    let bytes = (0..16_000_001).map(|_| 0u8).into_iter().collect::<Vec<_>>();
     let big_base = Entry::App(SerializedBytes::from(UnsafeBytes::from(bytes)));
     let big_base_entry_hash =
         EntryHash::with_data(&Entry::try_from(big_base.clone()).unwrap()).await;
@@ -289,12 +304,11 @@ async fn bob_makes_a_large_link(
     let link_tag = LinkTag(bytes);
 
     let (bob_env, call_data) = CallData::create(bob_cell_id, handle, dna_file).await;
-    let env_ref = bob_env.guard().await;
-    let dbs = bob_env.dbs().await;
+    let dbs = bob_env.dbs();
 
     // 6
     commit_entry(
-        &env_ref,
+        &bob_env,
         &dbs,
         call_data.clone(),
         base.clone().try_into().unwrap(),
@@ -304,7 +318,7 @@ async fn bob_makes_a_large_link(
 
     // 7
     commit_entry(
-        &env_ref,
+        &bob_env,
         &dbs,
         call_data.clone(),
         target.clone().try_into().unwrap(),
@@ -315,7 +329,7 @@ async fn bob_makes_a_large_link(
     // 8
     // Commit a large header
     let link_add_address = link_entries(
-        &env_ref,
+        &bob_env,
         &dbs,
         call_data.clone(),
         base_entry_hash.clone(),
@@ -327,7 +341,7 @@ async fn bob_makes_a_large_link(
     // 9
     // Commit a huge entry
     let big_entry_header = commit_entry(
-        &env_ref,
+        &bob_env,
         &dbs,
         call_data.clone(),
         big_base.clone().try_into().unwrap(),
@@ -348,12 +362,11 @@ async fn dodgy_bob(bob_cell_id: &CellId, handle: &ConductorHandle, dna_file: &Dn
     let target_entry_hash = EntryHash::with_data(&Entry::try_from(target.clone()).unwrap()).await;
     let link_tag = fixt!(LinkTag);
     let (bob_env, call_data) = CallData::create(bob_cell_id, handle, dna_file).await;
-    let env_ref = bob_env.guard().await;
-    let dbs = bob_env.dbs().await;
+    let dbs = bob_env.dbs();
 
     // 11
     commit_entry(
-        &env_ref,
+        &bob_env,
         &dbs,
         call_data.clone(),
         base.clone().try_into().unwrap(),
@@ -365,7 +378,7 @@ async fn dodgy_bob(bob_cell_id: &CellId, handle: &ConductorHandle, dna_file: &Dn
 
     // Link the entries
     link_entries(
-        &env_ref,
+        &bob_env,
         &dbs,
         call_data.clone(),
         base_entry_hash.clone(),

@@ -1,5 +1,10 @@
 use crate::{has_hash::HasHash, HashType, PrimitiveHashType};
 
+pub(crate) const HASH_CORE_LEN: usize = 32;
+pub(crate) const HASH_LOC_LEN: usize = 4;
+
+pub(crate) const HASH_SERIALIZED_LEN: usize = HASH_CORE_LEN + HASH_LOC_LEN;
+
 /// A HoloHash contains a vector of 36 bytes representing a 32-byte blake2b hash
 /// plus 4 bytes representing a DHT location. It also contains a zero-sized
 /// type which specifies what it is a hash of.
@@ -9,7 +14,6 @@ use crate::{has_hash::HasHash, HashType, PrimitiveHashType};
 pub struct HoloHash<T> {
     #[serde(with = "serde_bytes")]
     hash: Vec<u8>,
-
     hash_type: T,
 }
 
@@ -17,13 +21,7 @@ impl<T: HashType> HoloHash<T> {
     /// Raw constructor: use a precomputed hash + location byte array in vec
     /// form, along with a type, to construct a hash.
     pub fn from_raw_bytes_and_type(hash: Vec<u8>, hash_type: T) -> Self {
-        if hash.len() != 36 {
-            panic!(
-                "invalid holo_hash byte count, expected: 36, found: {}. {:?}",
-                hash.len(),
-                &hash
-            );
-        }
+        assert_length(&hash);
         Self { hash, hash_type }
     }
 
@@ -41,12 +39,13 @@ impl<T: HashType> HoloHash<T> {
     }
 
     /// Get the full byte array including the base 32 bytes and the 4 byte loc
-    pub fn get_raw(&self) -> &[u8] {
+    pub fn get_full_bytes(&self) -> &[u8] {
         &self.hash
     }
 
     /// Fetch just the core 32 bytes (without the 4 location bytes)
-    pub fn get_bytes(&self) -> &[u8] {
+    // TODO: change once prefix is included [ B-02112 ]
+    pub fn get_core_bytes(&self) -> &[u8] {
         &self.hash[..self.hash.len() - 4]
     }
 
@@ -69,8 +68,10 @@ impl<P: PrimitiveHashType> HoloHash<P> {
 }
 
 impl<T: HashType> AsRef<[u8]> for HoloHash<T> {
+    // TODO: revisit this, especially after changing serialization format. [ B-02112 ]
+    // Should this be 32, 36, or 39 bytes?
     fn as_ref(&self) -> &[u8] {
-        &self.hash[0..32]
+        &self.hash[..36]
     }
 }
 
@@ -97,6 +98,17 @@ fn bytes_to_loc(bytes: &[u8]) -> u32 {
         + ((bytes[1] as u32) << 8)
         + ((bytes[2] as u32) << 16)
         + ((bytes[3] as u32) << 24)
+}
+
+fn assert_length(hash: &Vec<u8>) {
+    if hash.len() != HASH_SERIALIZED_LEN {
+        panic!(
+            "invalid holo_hash byte count, expected: {}, found: {}. {:?}",
+            HASH_SERIALIZED_LEN,
+            hash.len(),
+            hash
+        );
+    }
 }
 
 #[cfg(test)]

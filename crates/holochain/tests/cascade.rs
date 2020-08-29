@@ -6,7 +6,7 @@ use holochain::core::state::{
     source_chain::{SourceChainBuf, SourceChainResult},
 };
 use holochain::{fixt::ZomeIdFixturator, test_utils::test_network};
-use holochain_state::{env::ReadManager, test_utils::test_cell_env};
+use holochain_state::test_utils::test_cell_env;
 use holochain_types::{
     entry::EntryHashed,
     prelude::*,
@@ -69,16 +69,14 @@ fn fixtures() -> (
 #[tokio::test(threaded_scheduler)]
 async fn get_links() -> SourceChainResult<()> {
     let env = test_cell_env();
-    let dbs = env.dbs().await;
-    let env_ref = env.guard().await;
-    let reader = env_ref.reader()?;
+    let dbs = env.dbs();
 
-    let mut source_chain = SourceChainBuf::new(&reader, &dbs)?;
-    let mut element_cache = ElementBuf::cache(&reader, &dbs)?;
+    let mut source_chain = SourceChainBuf::new(env.clone().into(), &dbs)?;
+    let mut element_cache = ElementBuf::cache(env.clone().into(), &dbs)?;
 
     // create a cache and a cas for store and meta
-    let meta_vault = MetadataBuf::vault(&reader, &dbs)?;
-    let mut meta_cache = MetadataBuf::cache(&reader, &dbs)?;
+    let meta_vault = MetadataBuf::vault(env.env.clone().into(), &dbs)?;
+    let mut meta_cache = MetadataBuf::cache(env.clone().into(), &dbs)?;
 
     let (_jimbo_id, jimbo_header, jimbo_entry, _jessy_id, jessy_header, jessy_entry) = fixtures();
 
@@ -94,6 +92,7 @@ async fn get_links() -> SourceChainResult<()> {
 
     // Pass in stores as references
     let mut cascade = Cascade::new(
+        env.clone().into(),
         &source_chain.elements(),
         &meta_vault,
         &mut element_cache,

@@ -15,6 +15,7 @@
 //! hard to automate piping from tests stderr.
 //!
 
+use fixt::prelude::*;
 use hdk3::prelude::*;
 use holochain::conductor::{
     api::{AdminRequest, AdminResponse, AppRequest, AppResponse, RealAppInterfaceApi},
@@ -22,6 +23,7 @@ use holochain::conductor::{
     dna_store::MockDnaStore,
     ConductorBuilder, ConductorHandle,
 };
+use holochain::fixt::*;
 use holochain::{core::ribosome::ZomeCallInvocation, test_utils::warm_wasm_tests};
 use holochain_state::test_utils::{test_conductor_env, test_wasm_env, TestEnvironment};
 use holochain_types::app::InstalledCell;
@@ -44,7 +46,7 @@ use tracing::instrument;
 
 mod test_utils;
 
-const DEFAULT_NUM: usize = 2000;
+const DEFAULT_NUM: usize = 1000;
 
 #[tokio::test(threaded_scheduler)]
 #[ignore]
@@ -206,7 +208,7 @@ async fn speed_test(n: Option<usize>) {
         Ok(ZomeCallInvocation {
             cell_id: cell_id.clone(),
             zome_name: TestWasm::Anchor.into(),
-            cap: CapSecret::default(),
+            cap: CapSecretFixturator::new(Unpredictable).next().unwrap(),
             fn_name: func.to_string(),
             payload: HostInput::new(payload.try_into()?),
             provenance: cell_id.agent_pubkey().clone(),

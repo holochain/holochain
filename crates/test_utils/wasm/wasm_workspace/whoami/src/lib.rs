@@ -15,7 +15,7 @@ fn whoarethey(agent_pubkey: AgentPubKey) -> ExternResult<AgentInfo> {
         agent_pubkey,
         zome_info!()?.zome_name,
         "whoami".to_string(),
-        CapSecret::default(),
+        generate_cap_secret!()?,
         ().try_into()?
     )?;
 

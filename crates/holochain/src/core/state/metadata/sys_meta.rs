@@ -12,6 +12,7 @@ mod tests {
     };
     use ::fixt::prelude::*;
     use fallible_iterator::FallibleIterator;
+    use header::EntryCreate;
     use holo_hash::fixt::*;
     use holo_hash::*;
     use holochain_state::{prelude::*, test_utils::test_cell_env};
@@ -110,11 +111,10 @@ mod tests {
     /// Test that a header can be redirected a single hop
     async fn test_redirect_header_one_hop() -> anyhow::Result<()> {
         let arc = test_cell_env();
-        let env = arc.guard().await;
+        let env = arc.guard();
         let mut fx = TestFixtures::new();
         {
-            let reader = env.reader()?;
-            let mut buf = MetadataBuf::vault(&reader, &env)?;
+            let mut buf = MetadataBuf::vault(arc.clone().into(), &env)?;
             let (update, expected) = test_update(
                 fx.header_hash().into(),
                 fx.entry_hash(),
@@ -136,11 +136,10 @@ mod tests {
     /// Test that a header can be redirected three hops
     async fn test_redirect_header_three_hops() -> anyhow::Result<()> {
         let arc = test_cell_env();
-        let env = arc.guard().await;
+        let env = arc.guard();
         let mut fx = TestFixtures::new();
         {
-            let reader = env.reader()?;
-            let mut buf = MetadataBuf::vault(&reader, &env)?;
+            let mut buf = MetadataBuf::vault(arc.clone().into(), &env)?;
             let (update1, header1) = test_update(
                 fx.header_hash().into(),
                 fx.entry_hash(),
@@ -179,11 +178,10 @@ mod tests {
     /// Test that an entry can be redirected a single hop
     async fn test_redirect_entry_one_hop() -> anyhow::Result<()> {
         let arc = test_cell_env();
-        let env = arc.guard().await;
+        let env = arc.guard();
         let mut fx = TestFixtures::new();
         {
-            let reader = env.reader()?;
-            let mut buf = MetadataBuf::vault(&reader, &env)?;
+            let mut buf = MetadataBuf::vault(arc.clone().into(), &env)?;
             let original_entry = fx.entry_hash();
             let header_hash = test_create(original_entry.clone(), &mut fx)
                 .await
@@ -213,11 +211,10 @@ mod tests {
     /// Test that an entry can be redirected three hops
     async fn test_redirect_entry_three_hops() -> anyhow::Result<()> {
         let arc = test_cell_env();
-        let env = arc.guard().await;
+        let env = arc.guard();
         let mut fx = TestFixtures::new();
         {
-            let reader = env.reader()?;
-            let mut buf = MetadataBuf::vault(&reader, &env)?;
+            let mut buf = MetadataBuf::vault(arc.clone().into(), &env)?;
             let original_entry = fx.entry_hash();
             let header_hash = test_create(original_entry.clone(), &mut fx)
                 .await
@@ -262,11 +259,10 @@ mod tests {
     /// Test that a header can be redirected a single hop
     async fn test_redirect_header_and_entry() -> anyhow::Result<()> {
         let arc = test_cell_env();
-        let env = arc.guard().await;
+        let env = arc.guard();
         let mut fx = TestFixtures::new();
         {
-            let reader = env.reader()?;
-            let mut buf = MetadataBuf::vault(&reader, &env)?;
+            let mut buf = MetadataBuf::vault(arc.clone().into(), &env)?;
             let original_entry = fx.entry_hash();
             let header_hash = test_create(original_entry.clone(), &mut fx)
                 .await
@@ -308,12 +304,12 @@ mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn add_entry_get_headers() {
         let arc = test_cell_env();
-        let env = arc.guard().await;
+        let env = arc.guard();
         let mut fx = TestFixtures::new();
         let entry_hash = fx.entry_hash();
         let mut expected: Vec<TimedHeaderHash> = Vec::new();
-        let mut entry_creates = Vec::new();
-        for _ in 0..10 {
+        let mut entry_creates: Vec<EntryCreate> = Vec::new();
+        for _ in 0..10 as u32 {
             let (e, hash) = test_create(entry_hash.clone(), &mut fx).await;
             expected.push(hash.into());
             entry_creates.push(e)
@@ -322,7 +318,7 @@ mod tests {
         expected.sort_by_key(|h| h.header_hash.clone());
         {
             let reader = env.reader().unwrap();
-            let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
+            let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
             for create in entry_creates {
                 meta_buf
                     .register_header(NewEntryHeader::Create(create))
@@ -330,7 +326,7 @@ mod tests {
                     .unwrap();
             }
             let mut headers = meta_buf
-                .get_headers(entry_hash.clone())
+                .get_headers(&reader, entry_hash.clone())
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
@@ -341,9 +337,9 @@ mod tests {
         }
         {
             let reader = env.reader().unwrap();
-            let meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
+            let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
             let mut headers = meta_buf
-                .get_headers(entry_hash.clone())
+                .get_headers(&reader, entry_hash.clone())
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
@@ -355,7 +351,7 @@ mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn add_entry_get_updates() {
         let arc = test_cell_env();
-        let env = arc.guard().await;
+        let env = arc.guard();
         let mut fx = TestFixtures::new();
         let original_entry_hash = fx.entry_hash();
         let original_header_hash = test_create(original_entry_hash.clone(), &mut fx)
@@ -380,12 +376,12 @@ mod tests {
         expected.sort_by_key(|h| h.header_hash.clone());
         {
             let reader = env.reader().unwrap();
-            let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
+            let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
             for update in entry_updates {
                 meta_buf.register_update(update).await.unwrap();
             }
             let mut headers = meta_buf
-                .get_updates(original_entry_hash.clone().into())
+                .get_updates(&reader, original_entry_hash.clone().into())
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
@@ -396,9 +392,9 @@ mod tests {
         }
         {
             let reader = env.reader().unwrap();
-            let meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
+            let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
             let mut headers = meta_buf
-                .get_updates(original_entry_hash.into())
+                .get_updates(&reader, original_entry_hash.into())
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
@@ -410,7 +406,7 @@ mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn add_entry_get_updates_header() {
         let arc = test_cell_env();
-        let env = arc.guard().await;
+        let env = arc.guard();
         let mut fx = TestFixtures::new();
         let original_entry_hash = fx.entry_hash();
         let original_header_hash = test_create(original_entry_hash.clone(), &mut fx)
@@ -435,12 +431,12 @@ mod tests {
         expected.sort_by_key(|h| h.header_hash.clone());
         {
             let reader = env.reader().unwrap();
-            let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
+            let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
             for update in entry_updates {
                 meta_buf.register_update(update).await.unwrap();
             }
             let mut headers = meta_buf
-                .get_updates(original_entry_hash.clone().into())
+                .get_updates(&reader, original_entry_hash.clone().into())
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
@@ -451,9 +447,9 @@ mod tests {
         }
         {
             let reader = env.reader().unwrap();
-            let meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
+            let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
             let mut headers = meta_buf
-                .get_updates(original_entry_hash.into())
+                .get_updates(&reader, original_entry_hash.into())
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
@@ -465,7 +461,7 @@ mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn add_entry_get_deletes() {
         let arc = test_cell_env();
-        let env = arc.guard().await;
+        let env = arc.guard();
         let mut fx = TestFixtures::new();
         let header_hash = fx.header_hash();
         let entry_hash = fx.entry_hash();
@@ -480,12 +476,12 @@ mod tests {
         expected.sort_by_key(|h| h.header_hash.clone());
         {
             let reader = env.reader().unwrap();
-            let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
+            let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
             for delete in entry_deletes {
                 meta_buf.register_delete(delete).await.unwrap();
             }
             let mut headers = meta_buf
-                .get_deletes_on_header(header_hash.clone().into())
+                .get_deletes_on_header(&reader, header_hash.clone().into())
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
@@ -496,9 +492,9 @@ mod tests {
         }
         {
             let reader = env.reader().unwrap();
-            let meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
+            let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
             let mut headers = meta_buf
-                .get_deletes_on_header(header_hash.clone().into())
+                .get_deletes_on_header(&reader, header_hash.clone().into())
                 .unwrap()
                 .collect::<Vec<_>>()
                 .unwrap();
@@ -513,7 +509,7 @@ mod tests {
         update_entries: &[NewEntryHeader],
         delete_updates: &[ElementDelete],
         _entry_hash: &EntryHash,
-        meta_buf: &mut MetadataBuf<'_>,
+        meta_buf: &mut MetadataBuf,
     ) {
         for e in new_entries.iter().chain(update_entries.iter()) {
             meta_buf.register_header(e.clone()).await.unwrap();
@@ -546,7 +542,7 @@ mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn test_entry_dht_status() {
         let arc = test_cell_env();
-        let env = arc.guard().await;
+        let env = arc.guard();
         let mut fx = TestFixtures::new();
         let entry_hash = fx.entry_hash();
         let mut entry_creates = Vec::new();
@@ -565,7 +561,7 @@ mod tests {
         .await;
 
         let reader = env.reader().unwrap();
-        let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
+        let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         update_dbs(
             &entry_creates[..],
             &entry_deletes[..0],
@@ -575,7 +571,9 @@ mod tests {
             &mut meta_buf,
         )
         .await;
-        let status = meta_buf.get_dht_status(&entry_hash.clone().into()).unwrap();
+        let status = meta_buf
+            .get_dht_status(&reader, &entry_hash.clone().into())
+            .unwrap();
         assert_eq!(status, EntryDhtStatus::Live);
         update_dbs(
             &entry_creates[..0],
@@ -586,7 +584,9 @@ mod tests {
             &mut meta_buf,
         )
         .await;
-        let status = meta_buf.get_dht_status(&entry_hash.clone().into()).unwrap();
+        let status = meta_buf
+            .get_dht_status(&reader, &entry_hash.clone().into())
+            .unwrap();
         assert_eq!(status, EntryDhtStatus::Dead);
 
         // Same headers don't reanimate entry
@@ -599,7 +599,9 @@ mod tests {
             &mut meta_buf,
         )
         .await;
-        let status = meta_buf.get_dht_status(&entry_hash.clone().into()).unwrap();
+        let status = meta_buf
+            .get_dht_status(&reader, &entry_hash.clone().into())
+            .unwrap();
         assert_eq!(status, EntryDhtStatus::Dead);
 
         // Check create bring entry back to life
@@ -623,7 +625,9 @@ mod tests {
             &mut meta_buf,
         )
         .await;
-        let status = meta_buf.get_dht_status(&entry_hash.clone().into()).unwrap();
+        let status = meta_buf
+            .get_dht_status(&reader, &entry_hash.clone().into())
+            .unwrap();
         assert_eq!(status, EntryDhtStatus::Live);
 
         // New deletes should be dead
@@ -636,7 +640,9 @@ mod tests {
             &mut meta_buf,
         )
         .await;
-        let status = meta_buf.get_dht_status(&entry_hash.clone().into()).unwrap();
+        let status = meta_buf
+            .get_dht_status(&reader, &entry_hash.clone().into())
+            .unwrap();
         assert_eq!(status, EntryDhtStatus::Dead);
 
         // Check update bring entry back to life
@@ -649,7 +655,9 @@ mod tests {
             &mut meta_buf,
         )
         .await;
-        let status = meta_buf.get_dht_status(&entry_hash.clone().into()).unwrap();
+        let status = meta_buf
+            .get_dht_status(&reader, &entry_hash.clone().into())
+            .unwrap();
         assert_eq!(status, EntryDhtStatus::Live);
 
         // Check deleting update kills entry
@@ -662,14 +670,16 @@ mod tests {
             &mut meta_buf,
         )
         .await;
-        let status = meta_buf.get_dht_status(&entry_hash.clone().into()).unwrap();
+        let status = meta_buf
+            .get_dht_status(&reader, &entry_hash.clone().into())
+            .unwrap();
         assert_eq!(status, EntryDhtStatus::Dead);
     }
 
     #[tokio::test(threaded_scheduler)]
     async fn test_entry_dht_status_one_less() {
         let arc = test_cell_env();
-        let env = arc.guard().await;
+        let env = arc.guard();
         let mut fx = TestFixtures::new();
         let entry_hash = fx.entry_hash();
         let mut entry_creates = Vec::new();
@@ -688,7 +698,7 @@ mod tests {
         .await;
 
         let reader = env.reader().unwrap();
-        let mut meta_buf = MetadataBuf::vault(&reader, &env).unwrap();
+        let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
         update_dbs(
             &entry_creates[..],
             &entry_deletes[..0],
@@ -698,7 +708,9 @@ mod tests {
             &mut meta_buf,
         )
         .await;
-        let status = meta_buf.get_dht_status(&entry_hash.clone().into()).unwrap();
+        let status = meta_buf
+            .get_dht_status(&reader, &entry_hash.clone().into())
+            .unwrap();
         assert_eq!(status, EntryDhtStatus::Live);
         update_dbs(
             &entry_creates[..0],
@@ -709,7 +721,9 @@ mod tests {
             &mut meta_buf,
         )
         .await;
-        let status = meta_buf.get_dht_status(&entry_hash.clone().into()).unwrap();
+        let status = meta_buf
+            .get_dht_status(&reader, &entry_hash.clone().into())
+            .unwrap();
         assert_eq!(status, EntryDhtStatus::Live);
         update_dbs(
             &entry_creates[..0],
@@ -720,7 +734,9 @@ mod tests {
             &mut meta_buf,
         )
         .await;
-        let status = meta_buf.get_dht_status(&entry_hash.clone().into()).unwrap();
+        let status = meta_buf
+            .get_dht_status(&reader, &entry_hash.clone().into())
+            .unwrap();
         assert_eq!(status, EntryDhtStatus::Dead);
     }
 }

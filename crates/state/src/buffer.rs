@@ -1,35 +1,38 @@
-//! This crate provides the elementary BufferedStores:
-//!
-//! - [KvBuffer]: a SingleStore with a scratch space
-//! - [KvIntBuffer]: an IntegerStore with a scratch space
-//! - [KvvBuffer]: a MultiStore with a scratch space
-//! - [CasBuffer]: a [KvBuffer] which enforces that keys must be the "address" of the values (content)
+#![allow(missing_docs)]
+use crate::{
+    error::{DatabaseError, DatabaseResult},
+    transaction::Writer,
+};
 
-pub(super) mod cas;
-pub(super) mod kv;
-pub(super) mod kv_int;
-pub(super) mod kvv;
+mod cas;
+pub mod iter;
+mod kv;
+mod kvv;
 
-use crate::prelude::Writer;
-pub use cas::CasBuf;
-pub use kv::partial_key_match;
-pub use kv::KvBuf;
-pub use kv_int::IntKvBuf;
-pub use kvv::KvvBuf;
-use serde::{de::DeserializeOwned, Serialize};
-use std::hash::Hash;
+pub use cas::CasBufFresh;
+pub use kv::{KvBufFresh, KvBufUsed, KvIntBufFresh, KvIntBufUsed, KvIntStore, KvStore, KvStoreT};
+pub use kvv::KvvBufUsed;
+
+// Empty keys break lmdb
+pub(super) fn check_empty_key<K: AsRef<[u8]>>(k: &K) -> DatabaseResult<()> {
+    if k.as_ref().is_empty() {
+        Err(DatabaseError::EmptyKey)
+    } else {
+        Ok(())
+    }
+}
 
 /// General trait for transactional stores, exposing only the method which
 /// adds changes to the write transaction. This generalization is not really used,
 /// but could be used in Workspaces i.e. iterating over a Vec<dyn BufferedStore>
 /// is all that needs to happen to commit the workspace changes
-pub trait BufferedStore<'env> {
+pub trait BufferedStore {
     /// The error type for `flush_to_txn` errors
     type Error: std::error::Error;
 
     /// Flush the scratch space to the read-write transaction, staging the changes
     /// for an actual database update
-    fn flush_to_txn(self, writer: &'env mut Writer) -> Result<(), Self::Error>;
+    fn flush_to_txn(self, writer: &mut Writer) -> Result<(), Self::Error>;
 
     /// Specifies whether there are actually changes to flush. If not, the
     /// flush_to_txn method may decide to do nothing.
@@ -38,18 +41,35 @@ pub trait BufferedStore<'env> {
     }
 }
 
-/// Trait alias for the combination of constraints needed for keys in [KvBuf] and [KvvBuf]
-pub trait BufKey: Hash + Eq + AsRef<[u8]> {}
-impl<T> BufKey for T where T: Hash + Eq + AsRef<[u8]> {}
+#[macro_export]
+/// Macro to generate a fresh reader from an EnvironmentRead with less boilerplate
+macro_rules! fresh_reader {
+    ($env: expr, $f: expr) => {{
+        let g = $env.guard();
+        let r = $crate::env::ReadManager::reader(&g)?;
+        $f(r)
+    }};
+}
 
-/// Trait alias for the combination of constraints needed for keys in [IntKvBuf](kv_int::IntKvBuf)
-pub trait BufIntKey: Hash + Eq + rkv::store::integer::PrimitiveInt {}
-impl<T> BufIntKey for T where T: Hash + Eq + rkv::store::integer::PrimitiveInt {}
+#[macro_export]
+/// Macro to generate a fresh reader from an EnvironmentRead with less boilerplate
+/// Use this in tests, where everything gets unwrapped anyway
+macro_rules! fresh_reader_test {
+    ($env: expr, $f: expr) => {{
+        let g = $env.guard();
+        let r = $crate::env::ReadManager::reader(&g).unwrap();
+        $f(r)
+    }};
+}
 
-/// Trait alias for the combination of constraints needed for values in [KvBuf](kv::KvBuf) and [IntKvBuf](kv_int::IntKvBuf)
-pub trait BufVal: Clone + Serialize + DeserializeOwned + std::fmt::Debug {}
-impl<T> BufVal for T where T: Clone + Serialize + DeserializeOwned + std::fmt::Debug {}
-
-/// Trait alias for the combination of constraints needed for values in [KvvBuf]
-pub trait BufMultiVal: Hash + Eq + Clone + Serialize + DeserializeOwned {}
-impl<T> BufMultiVal for T where T: Hash + Eq + Clone + Serialize + DeserializeOwned {}
+#[macro_export]
+/// Use this variant of `fresh_reader` when the $f closure is async
+macro_rules! fresh_reader_async {
+    ($env: expr, $f: expr) => {{
+        let env = $env.clone();
+        let g = env.guard();
+        let r = $crate::env::ReadManager::reader(&g)?;
+        let val = $f(r).await;
+        val
+    }};
+}

@@ -5,6 +5,7 @@ use error::SysValidationError;
 use holo_hash::fixt::*;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_serialized_bytes::{SerializedBytes, UnsafeBytes};
+use holochain_state::{env::EnvironmentRead, test_utils::test_cell_env};
 use holochain_types::{
     dna::{DnaDef, DnaFile},
     element::{SignedHeaderHashed, SignedHeaderHashedExt},
@@ -157,27 +158,31 @@ async fn check_previous_header() {
 
 #[tokio::test(threaded_scheduler)]
 async fn check_valid_if_dna_test() {
+    let env: EnvironmentRead = test_cell_env().env.into();
     // Test data
     let activity_return = vec![fixt!(HeaderHash)];
 
     // Empty store not dna
     let header = fixt!(LinkAdd);
-    let metadata = meta_mock!();
+    let mut metadata = meta_mock!();
+    metadata.expect_env().return_const(env.clone());
+
     assert_matches!(
-        check_valid_if_dna(&header.clone().into(), &metadata),
+        check_valid_if_dna(&header.clone().into(), &metadata).await,
         Ok(())
     );
     let header = fixt!(Dna);
-    let metadata = meta_mock!(expect_get_activity);
+    let mut metadata = meta_mock!(expect_get_activity);
+    metadata.expect_env().return_const(env.clone());
     assert_matches!(
-        check_valid_if_dna(&header.clone().into(), &metadata),
+        check_valid_if_dna(&header.clone().into(), &metadata).await,
         Ok(())
     );
 
-    let header = fixt!(Dna);
-    let metadata = meta_mock!(expect_get_activity, activity_return);
+    let mut metadata = meta_mock!(expect_get_activity, activity_return);
+    metadata.expect_env().return_const(env);
     assert_matches!(
-        check_valid_if_dna(&header.clone().into(), &metadata),
+        check_valid_if_dna(&header.clone().into(), &metadata).await,
         Err(SysValidationError::ValidationError(
             ValidationError::PrevHeaderError(PrevHeaderError::InvalidRoot)
         ))
@@ -186,25 +191,29 @@ async fn check_valid_if_dna_test() {
 
 #[tokio::test(threaded_scheduler)]
 async fn check_prev_header_in_metadata_test() {
+    let env: EnvironmentRead = test_cell_env().env.into();
     // Test data
     let mut header_fixt = HeaderHashFixturator::new(Predictable);
     let prev_header_hash = header_fixt.next().unwrap();
     let author = fixt!(AgentPubKey);
     let activity_return = vec![prev_header_hash.clone()];
-    let metadata = meta_mock!(expect_get_activity, activity_return, {
+    let mut metadata = meta_mock!(expect_get_activity, activity_return, {
         let author = author.clone();
         move |a| *a == author
     });
 
+    metadata.expect_env().return_const(env);
+
     // Previous header on this hash
     assert_matches!(
-        check_prev_header_in_metadata(author.clone(), &prev_header_hash, &metadata),
+        check_prev_header_in_metadata(author.clone(), &prev_header_hash, &metadata).await,
         Ok(())
     );
 
     // No previous header on this hash
     assert_matches!(
-        check_prev_header_in_metadata(author.clone(), &header_fixt.next().unwrap(), &metadata),
+        check_prev_header_in_metadata(author.clone(), &header_fixt.next().unwrap(), &metadata)
+            .await,
         Err(SysValidationError::ValidationError(ValidationError::PrevHeaderError(_)))
     );
 }

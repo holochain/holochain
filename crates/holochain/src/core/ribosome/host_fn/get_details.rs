@@ -38,7 +38,7 @@ pub fn get_details<'a>(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    use crate::fixt::ZomeCallHostAccessFixturator;
+    use crate::{core::workflow::CallZomeWorkspace, fixt::ZomeCallHostAccessFixturator};
     use fixt::prelude::*;
     use hdk3::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
@@ -48,10 +48,8 @@ pub mod wasm_test {
         holochain_types::observability::test_run().ok();
 
         let env = holochain_state::test_utils::test_cell_env();
-        let dbs = env.dbs().await;
-        let env_ref = env.guard().await;
-        let reader = holochain_state::env::ReadManager::reader(&env_ref).unwrap();
-        let mut workspace = <crate::core::workflow::call_zome_workflow::CallZomeWorkspace as crate::core::state::workspace::Workspace>::new(&reader, &dbs).unwrap();
+        let dbs = env.dbs();
+        let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs).unwrap();
 
         crate::core::workflow::fake_genesis(&mut workspace.source_chain)
             .await

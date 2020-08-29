@@ -12,16 +12,17 @@ use crate::core::{
 use fallible_iterator::FallibleIterator;
 use holo_hash::DhtOpHash;
 use holochain_state::{
-    buffer::{BufferedStore, KvBuf},
+    buffer::{BufferedStore, KvBufFresh},
     db::INTEGRATION_LIMBO,
-    prelude::{GetDb, Reader, Writer},
+    fresh_reader,
+    prelude::*,
 };
 use holochain_types::validate::ValidationStatus;
 use tracing::*;
 
 #[instrument(skip(workspace, writer, trigger_integration))]
 pub async fn app_validation_workflow(
-    mut workspace: AppValidationWorkspace<'_>,
+    mut workspace: AppValidationWorkspace,
     writer: OneshotWriter,
     trigger_integration: &mut TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
@@ -31,9 +32,7 @@ pub async fn app_validation_workflow(
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // commit the workspace
-    writer
-        .with_writer(|writer| Ok(workspace.flush_to_txn(writer)?))
-        .await?;
+    writer.with_writer(|writer| Ok(workspace.flush_to_txn(writer)?))?;
 
     // trigger other workflows
     trigger_integration.trigger();
@@ -41,11 +40,12 @@ pub async fn app_validation_workflow(
     Ok(complete)
 }
 async fn app_validation_workflow_inner(
-    workspace: &mut AppValidationWorkspace<'_>,
+    workspace: &mut AppValidationWorkspace,
 ) -> WorkflowResult<WorkComplete> {
-    let ops: Vec<ValidationLimboValue> = workspace
+    let env = workspace.validation_limbo.env().clone();
+    let ops: Vec<ValidationLimboValue> = fresh_reader!(env, |r| workspace
         .validation_limbo
-        .drain_iter_filter(|(_, vlv)| {
+        .drain_iter_filter(&r, |(_, vlv)| {
             match vlv.status {
                 // We only want sys validated or awaiting app dependency ops
                 ValidationLimboStatus::SysValidated | ValidationLimboStatus::AwaitingAppDeps(_) => {
@@ -56,7 +56,7 @@ async fn app_validation_workflow_inner(
                 }
             }
         })?
-        .collect()?;
+        .collect())?;
     for vlv in ops {
         let op = vlv.op;
         let hash = DhtOpHash::with_data(&op).await;
@@ -69,23 +69,26 @@ async fn app_validation_workflow_inner(
     Ok(WorkComplete::Complete)
 }
 
-pub struct AppValidationWorkspace<'env> {
-    pub integration_limbo: IntegrationLimboStore<'env>,
-    pub validation_limbo: ValidationLimboStore<'env>,
+pub struct AppValidationWorkspace {
+    pub integration_limbo: IntegrationLimboStore,
+    pub validation_limbo: ValidationLimboStore,
 }
 
-impl<'env> Workspace<'env> for AppValidationWorkspace<'env> {
-    fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self> {
+impl AppValidationWorkspace {
+    pub fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
         let db = dbs.get_db(&*INTEGRATION_LIMBO)?;
-        let integration_limbo = KvBuf::new(reader, db)?;
+        let integration_limbo = KvBufFresh::new(env.clone(), db);
 
-        let validation_limbo = ValidationLimboStore::new(reader, dbs)?;
+        let validation_limbo = ValidationLimboStore::new(env, dbs)?;
 
         Ok(Self {
             integration_limbo,
             validation_limbo,
         })
     }
+}
+
+impl Workspace for AppValidationWorkspace {
     fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
         warn!("unimplemented passthrough");
         self.validation_limbo.0.flush_to_txn(writer)?;

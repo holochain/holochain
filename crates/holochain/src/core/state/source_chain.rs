@@ -6,10 +6,7 @@
 use fallible_iterator::FallibleIterator;
 use holo_hash::*;
 use holochain_state::{
-    buffer::BufferedStore,
-    db::GetDb,
-    error::DatabaseResult,
-    prelude::{Reader, Writer},
+    buffer::BufferedStore, db::GetDb, error::DatabaseResult, fresh_reader, prelude::*,
 };
 use holochain_types::{prelude::*, EntryHashed};
 use holochain_zome_types::{
@@ -29,9 +26,9 @@ mod source_chain_buffer;
 /// i.e. has undergone Genesis.
 #[derive(Shrinkwrap)]
 #[shrinkwrap(mutable)]
-pub struct SourceChain<'env>(pub SourceChainBuf<'env>);
+pub struct SourceChain(pub SourceChainBuf);
 
-impl<'env> SourceChain<'env> {
+impl SourceChain {
     pub async fn agent_pubkey(&self) -> SourceChainResult<AgentPubKey> {
         self.0
             .agent_pubkey()
@@ -45,15 +42,15 @@ impl<'env> SourceChain<'env> {
         self.0.chain_head().ok_or(SourceChainError::ChainEmpty)
     }
 
-    pub fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Self> {
-        Ok(SourceChainBuf::new(reader, dbs)?.into())
+    pub fn new(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
+        Ok(SourceChainBuf::new(env, dbs)?.into())
     }
 
-    pub fn public_only(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Self> {
-        Ok(SourceChainBuf::public_only(reader, dbs)?.into())
+    pub fn public_only(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
+        Ok(SourceChainBuf::public_only(env, dbs)?.into())
     }
 
-    pub fn into_inner(self) -> SourceChainBuf<'env> {
+    pub fn into_inner(self) -> SourceChainBuf {
         self.0
     }
 
@@ -112,14 +109,15 @@ impl<'env> SourceChain<'env> {
         &self,
         query: &CapSecret,
     ) -> SourceChainResult<Option<CapGrant>> {
-        let hashes_n_grants: Vec<_> = self
+        let hashes_n_grants: Vec<_> = fresh_reader!(self.env(), |r| {
+            self
             .0
             .elements()
             .private_entries()
             .expect(
                 "SourceChainBuf must have access to private entries in order to access CapGrants",
             )
-            .iter_fail()?
+            .iter_fail(&r)?
             .filter_map(|entry| {
                 Ok(entry.as_cap_grant().and_then(|grant| {
                     grant.access().secret().and_then(|secret| {
@@ -131,7 +129,8 @@ impl<'env> SourceChain<'env> {
                     })
                 }))
             })
-            .collect()?;
+            .collect()
+        })?;
 
         let answer = if hashes_n_grants.len() == 0 {
             None
@@ -156,14 +155,15 @@ impl<'env> SourceChain<'env> {
         &self,
         query: &CapSecret,
     ) -> SourceChainResult<Option<CapClaim>> {
-        let hashes_n_claims: Vec<_> = self
+        let hashes_n_claims: Vec<_> = fresh_reader!(self.env(), |r| {
+            self
             .0
             .elements()
             .private_entries()
             .expect(
                 "SourceChainBuf must have access to private entries in order to access CapClaims",
             )
-            .iter_fail()?
+            .iter_fail(&r)?
             .filter_map(|entry| {
                 if let (Entry::CapClaim(claim), entry_hash) = entry.into_inner() {
                     Ok(Some((entry_hash, claim)))
@@ -172,7 +172,8 @@ impl<'env> SourceChain<'env> {
                 }
             })
             .filter(|(_entry_hash, claim)| Ok(claim.secret() == query))
-            .collect()?;
+            .collect()
+        })?;
 
         let answer = if hashes_n_claims.len() == 0 {
             None
@@ -189,16 +190,16 @@ impl<'env> SourceChain<'env> {
     }
 }
 
-impl<'env> From<SourceChainBuf<'env>> for SourceChain<'env> {
-    fn from(buffer: SourceChainBuf<'env>) -> Self {
+impl From<SourceChainBuf> for SourceChain {
+    fn from(buffer: SourceChainBuf) -> Self {
         Self(buffer)
     }
 }
 
-impl<'env> BufferedStore<'env> for SourceChain<'env> {
+impl BufferedStore for SourceChain {
     type Error = SourceChainError;
 
-    fn flush_to_txn(self, writer: &'env mut Writer) -> Result<(), Self::Error> {
+    fn flush_to_txn(self, writer: &mut Writer) -> Result<(), Self::Error> {
         self.0.flush_to_txn(writer)?;
         Ok(())
     }
@@ -208,22 +209,23 @@ impl<'env> BufferedStore<'env> for SourceChain<'env> {
 pub mod tests {
 
     use super::*;
-    use holochain_state::prelude::*;
+    use crate::fixt::*;
+    use ::fixt::prelude::*;
     use holochain_state::test_utils::test_cell_env;
     use holochain_types::test_utils::{fake_agent_pubkey_1, fake_dna_hash};
     use holochain_zome_types::capability::{CapAccess, ZomeCallCapGrant};
-    use std::collections::BTreeMap;
+    use std::collections::HashSet;
 
     #[tokio::test(threaded_scheduler)]
     async fn test_get_cap_grant() -> SourceChainResult<()> {
         let arc = test_cell_env();
-        let env = arc.guard().await;
-        let access = CapAccess::transferable();
+        let env = arc.guard();
+        let access = CapAccess::from(CapSecretFixturator::new(Unpredictable).next().unwrap());
         let secret = access.secret().unwrap();
-        let grant = ZomeCallCapGrant::new("tag".into(), access.clone(), BTreeMap::new());
+        let curry = CurryPayloadsFixturator::new(Empty).next().unwrap();
+        let grant = ZomeCallCapGrant::new("tag".into(), access.clone(), HashSet::new(), curry);
         {
-            let reader = env.reader()?;
-            let mut store = SourceChainBuf::new(&reader, &env)?;
+            let mut store = SourceChainBuf::new(arc.clone().into(), &env)?;
             store
                 .genesis(fake_dna_hash(1), fake_agent_pubkey_1(), None)
                 .await?;
@@ -231,8 +233,7 @@ pub mod tests {
         }
 
         {
-            let reader = env.reader()?;
-            let mut chain = SourceChain::new(&reader, &env)?;
+            let mut chain = SourceChain::new(arc.clone().into(), &env)?;
             chain.put_cap_grant(grant.clone()).await?;
 
             // ideally the following would work, but it won't because currently
@@ -248,8 +249,7 @@ pub mod tests {
         }
 
         {
-            let reader = env.reader()?;
-            let chain = SourceChain::new(&reader, &env)?;
+            let chain = SourceChain::new(arc.clone().into(), &env)?;
             assert_eq!(
                 chain.get_persisted_cap_grant_by_secret(secret)?,
                 Some(grant.into())
@@ -262,13 +262,12 @@ pub mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn test_get_cap_claim() -> SourceChainResult<()> {
         let arc = test_cell_env();
-        let env = arc.guard().await;
-        let secret = CapSecret::random();
+        let env = arc.guard();
+        let secret = CapSecretFixturator::new(Unpredictable).next().unwrap();
         let agent_pubkey = fake_agent_pubkey_1().into();
         let claim = CapClaim::new("tag".into(), agent_pubkey, secret.clone());
         {
-            let reader = env.reader()?;
-            let mut store = SourceChainBuf::new(&reader, &env)?;
+            let mut store = SourceChainBuf::new(arc.clone().into(), &env)?;
             store
                 .genesis(fake_dna_hash(1), fake_agent_pubkey_1(), None)
                 .await?;
@@ -276,8 +275,7 @@ pub mod tests {
         }
 
         {
-            let reader = env.reader()?;
-            let mut chain = SourceChain::new(&reader, &env)?;
+            let mut chain = SourceChain::new(arc.clone().into(), &env)?;
             chain.put_cap_claim(claim.clone()).await?;
 
             // ideally the following would work, but it won't because currently
@@ -293,8 +291,7 @@ pub mod tests {
         }
 
         {
-            let reader = env.reader()?;
-            let chain = SourceChain::new(&reader, &env)?;
+            let chain = SourceChain::new(arc.clone().into(), &env)?;
             assert_eq!(
                 chain.get_persisted_cap_claim_by_secret(&secret)?,
                 Some(claim)

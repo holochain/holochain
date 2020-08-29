@@ -4,10 +4,7 @@
 //! Every Workflow has an associated Workspace type.
 
 use super::source_chain::SourceChainError;
-use holochain_state::{
-    error::DatabaseError,
-    prelude::{GetDb, Reader, Writer},
-};
+use holochain_state::{error::DatabaseError, prelude::Writer};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -24,10 +21,7 @@ pub enum WorkspaceError {
 pub type WorkspaceResult<T> = Result<T, WorkspaceError>;
 
 /// Defines a Workspace
-pub trait Workspace<'env>: Send + Sized {
-    /// Generic constructor
-    fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self>;
-
+pub trait Workspace: Send + Sized {
     /// Flush accumulated changes to the writer without committing.
     /// This consumes the Workspace.
     ///
@@ -43,25 +37,28 @@ pub mod tests {
     use super::Workspace;
     use crate::core::state::workspace::WorkspaceResult;
     use holochain_state::{
-        buffer::{BufferedStore, KvBuf},
+        buffer::{BufferedStore, KvBufFresh},
         db::{GetDb, ELEMENT_VAULT_HEADERS, ELEMENT_VAULT_PUBLIC_ENTRIES},
         prelude::*,
-        test_utils::test_cell_env,
+        test_utils::{test_cell_env, DbString},
     };
     use holochain_types::{prelude::*, test_utils::fake_header_hash};
 
-    pub struct TestWorkspace<'env> {
-        one: KvBuf<'env, HeaderHash, u32, Reader<'env>>,
-        two: KvBuf<'env, String, bool, Reader<'env>>,
+    pub struct TestWorkspace {
+        one: KvBufFresh<HeaderHash, u32>,
+        two: KvBufFresh<DbString, bool>,
     }
 
-    impl<'env> Workspace<'env> for TestWorkspace<'env> {
-        fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self> {
+    impl TestWorkspace {
+        pub fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
             Ok(Self {
-                one: KvBuf::new(reader, dbs.get_db(&*ELEMENT_VAULT_PUBLIC_ENTRIES)?)?,
-                two: KvBuf::new(reader, dbs.get_db(&*ELEMENT_VAULT_HEADERS)?)?,
+                one: KvBufFresh::new(env.clone(), dbs.get_db(&*ELEMENT_VAULT_PUBLIC_ENTRIES)?),
+                two: KvBufFresh::new(env.clone(), dbs.get_db(&*ELEMENT_VAULT_HEADERS)?),
             })
         }
+    }
+
+    impl Workspace for TestWorkspace {
         fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
             self.one.flush_to_txn(writer)?;
             self.two.flush_to_txn(writer)?;
@@ -72,13 +69,12 @@ pub mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn workspace_sanity_check() -> anyhow::Result<()> {
         let arc = test_cell_env();
-        let env = arc.guard().await;
-        let dbs = arc.dbs().await;
+        let env = arc.guard();
+        let dbs = arc.dbs();
         let addr1 = fake_header_hash(1);
-        let addr2 = "hi".to_string();
+        let addr2: DbString = "hi".into();
         {
-            let reader = env.reader()?;
-            let mut workspace = TestWorkspace::new(&reader, &dbs)?;
+            let mut workspace = TestWorkspace::new(arc.clone().into(), &dbs)?;
             assert_eq!(workspace.one.get(&addr1)?, None);
 
             workspace.one.put(addr1.clone(), 1).unwrap();
@@ -90,8 +86,7 @@ pub mod tests {
 
         // Ensure that the data was persisted
         {
-            let reader = env.reader()?;
-            let workspace = TestWorkspace::new(&reader, &dbs)?;
+            let workspace = TestWorkspace::new(arc.clone().into(), &dbs)?;
             assert_eq!(workspace.one.get(&addr1)?, Some(1));
         }
         Ok(())

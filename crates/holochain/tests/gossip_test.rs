@@ -1,10 +1,12 @@
+use fixt::prelude::*;
 use hdk3::prelude::*;
 use holochain::conductor::{
     api::{AppInterfaceApi, AppRequest, AppResponse, RealAppInterfaceApi},
     dna_store::MockDnaStore,
 };
+use holochain::core::ribosome::ZomeCallInvocation;
 use holochain::{
-    core::ribosome::ZomeCallInvocation,
+    fixt::*,
     test_utils::{install_app, setup_app},
 };
 use holochain_types::app::InstalledCell;
@@ -15,7 +17,6 @@ use holochain_types::test_utils::fake_agent_pubkey_1;
 use holochain_types::{observability, test_utils::fake_agent_pubkey_2};
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::HostInput;
-
 use matches::assert_matches;
 use test_wasm_common::{AnchorInput, TestString};
 
@@ -155,7 +156,7 @@ where
     Ok(ZomeCallInvocation {
         cell_id: cell_id.clone(),
         zome_name: TestWasm::Anchor.into(),
-        cap: CapSecret::default(),
+        cap: CapSecretFixturator::new(Unpredictable).next().unwrap(),
         fn_name: func.to_string(),
         payload: HostInput::new(payload.try_into()?),
         provenance: cell_id.agent_pubkey().clone(),

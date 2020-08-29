@@ -28,8 +28,6 @@ pub fn agent_info<'a>(
             unsafe { call_context.host_access.workspace().apply_ref(call).await }
         })??;
     Ok(AgentInfoOutput::new(AgentInfo {
-        agent_pubkey: agent_pubkey.clone(),
-        // @todo these were in redux, what to do here?
         agent_initial_pubkey: agent_pubkey.clone(),
         agent_latest_pubkey: agent_pubkey,
     }))
@@ -38,10 +36,9 @@ pub fn agent_info<'a>(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod test {
-    use crate::core::state::workspace::Workspace;
+
     use crate::fixt::ZomeCallHostAccessFixturator;
     use fixt::prelude::*;
-    use holochain_state::env::ReadManager;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::AgentInfoInput;
@@ -50,10 +47,9 @@ pub mod test {
     #[tokio::test(threaded_scheduler)]
     async fn invoke_import_agent_info_test() {
         let env = holochain_state::test_utils::test_cell_env();
-        let dbs = env.dbs().await;
-        let env_ref = env.guard().await;
-        let reader = env_ref.reader().unwrap();
-        let mut workspace = crate::core::workflow::CallZomeWorkspace::new(&reader, &dbs).unwrap();
+        let dbs = env.dbs();
+        let mut workspace =
+            crate::core::workflow::CallZomeWorkspace::new(env.clone().into(), &dbs).unwrap();
 
         crate::core::workflow::fake_genesis(&mut workspace.source_chain)
             .await
@@ -73,7 +69,6 @@ pub mod test {
             "agent_info",
             AgentInfoInput::new(())
         );
-        assert_eq!(agent_info.inner_ref().agent_pubkey, fake_agent_pubkey_1(),);
         assert_eq!(
             agent_info.inner_ref().agent_initial_pubkey,
             fake_agent_pubkey_1(),

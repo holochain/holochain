@@ -8,12 +8,14 @@
 /// When committing the ChainSequence db, a special step is taken to ensure source chain consistency.
 /// If the chain head has moved since the db was created, committing the transaction fails with a special error type.
 use crate::core::state::source_chain::{SourceChainError, SourceChainResult};
+use fallible_iterator::DoubleEndedFallibleIterator;
 use holo_hash::HeaderHash;
 use holochain_state::{
-    buffer::{BufferedStore, IntKvBuf},
+    buffer::{BufferedStore, KvIntBufFresh, KvIntStore},
     db::{GetDb, CHAIN_SEQUENCE},
-    error::DatabaseResult,
-    prelude::{Readable, Reader, Writer},
+    error::{DatabaseError, DatabaseResult},
+    fresh_reader,
+    prelude::*,
 };
 use serde::{Deserialize, Serialize};
 use tracing::*;
@@ -26,51 +28,53 @@ pub struct ChainSequenceItem {
     dht_transforms_complete: bool,
 }
 
-type Store<'env, R = Reader<'env>> = IntKvBuf<'env, u32, ChainSequenceItem, R>;
+type Store = KvIntBufFresh<ChainSequenceItem>;
 
 /// A BufferedStore for interacting with the ChainSequence database
-pub struct ChainSequenceBuf<'env, R: Readable = Reader<'env>> {
-    db: Store<'env, R>,
+pub struct ChainSequenceBuf {
+    buf: Store,
     next_index: u32,
     tx_seq: u32,
     current_head: Option<HeaderHash>,
     persisted_head: Option<HeaderHash>,
 }
 
-impl<'env, R: Readable> ChainSequenceBuf<'env, R> {
-    /// Create a new instance from a new transaction, using the same database
-    /// as an existing instance. Useful for basing an existing BufStore on
-    /// a different transaction.
-    pub fn with_reader<RR: Readable>(
-        &self,
-        txn: &'env RR,
-    ) -> DatabaseResult<ChainSequenceBuf<'env, RR>> {
-        Self::from_db(self.db.with_reader(txn))
-    }
-
-    fn from_db<RR: Readable>(db: Store<'env, RR>) -> DatabaseResult<ChainSequenceBuf<'env, RR>> {
-        let latest = db.iter_raw_reverse()?.next();
-        debug!("{:?}", latest);
-        let (next_index, tx_seq, current_head) = latest
-            .map(|(key, item)| (key + 1, item.tx_seq + 1, Some(item.header_address)))
-            .unwrap_or((0, 0, None));
+impl ChainSequenceBuf {
+    /// Create a new instance
+    pub fn new(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
+        let buf: Store = KvIntBufFresh::new(env.clone(), dbs.get_db(&*CHAIN_SEQUENCE)?);
+        let (next_index, tx_seq, current_head) =
+            fresh_reader!(env, |r| { Self::head_info(buf.store(), &r) })?;
         let persisted_head = current_head.clone();
 
         Ok(ChainSequenceBuf {
-            db,
+            buf,
             next_index,
             tx_seq,
             current_head,
             persisted_head,
         })
     }
-}
 
-impl<'env> ChainSequenceBuf<'env, Reader<'env>> {
-    /// Create a new instance from a read-only transaction and a database reference
-    pub fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> DatabaseResult<Self> {
-        let db: Store<'env> = IntKvBuf::new(reader, dbs.get_db(&*CHAIN_SEQUENCE)?)?;
-        Self::from_db(db)
+    fn head_info<R: Readable>(
+        store: &KvIntStore<ChainSequenceItem>,
+        r: &R,
+    ) -> DatabaseResult<(u32, u32, Option<HeaderHash>)> {
+        let latest = store.iter(r)?.next_back()?;
+        debug!("{:?}", latest);
+        DatabaseResult::Ok(
+            latest
+                .map(|(key, item)| {
+                    (
+                        // TODO: this is a bit ridiculous -- reevaluate whether the
+                        //       IntKey is really needed (vs simple u32)
+                        u32::from(IntKey::from_key_bytes_or_friendly_panic(key)) + 1,
+                        item.tx_seq + 1,
+                        Some(item.header_address),
+                    )
+                })
+                .unwrap_or((0, 0, None)),
+        )
     }
 
     /// Get the chain head, AKA top chain header. None if the chain is empty.
@@ -85,73 +89,82 @@ impl<'env> ChainSequenceBuf<'env, Reader<'env>> {
 
     /// Get a header at an index
     pub fn get(&self, i: u32) -> DatabaseResult<Option<HeaderHash>> {
-        self.db
-            .get(i)
+        self.buf
+            .get(&i.into())
             .map(|seq_item| seq_item.map(|si| si.header_address))
     }
 
     /// Add a header to the chain, setting all other values automatically.
     /// This is intentionally the only way to modify this database.
     #[instrument(skip(self))]
-    pub fn put_header(&mut self, header_address: HeaderHash) {
-        self.db.put(
-            self.next_index,
+    pub fn put_header(&mut self, header_address: HeaderHash) -> DatabaseResult<()> {
+        self.buf.put(
+            self.next_index.into(),
             ChainSequenceItem {
                 header_address: header_address.clone(),
                 tx_seq: self.tx_seq,
                 dht_transforms_complete: false,
             },
-        );
+        )?;
         trace!(self.next_index);
         self.next_index += 1;
         self.current_head = Some(header_address);
+        Ok(())
     }
 
-    pub fn get_items_with_incomplete_dht_ops(
+    pub fn get_items_with_incomplete_dht_ops<'txn, R: Readable>(
         &self,
-    ) -> SourceChainResult<Box<dyn Iterator<Item = (u32, HeaderHash)> + 'env>> {
-        if !self.db.is_scratch_fresh() {
+        r: &'txn R,
+    ) -> SourceChainResult<
+        Box<dyn FallibleIterator<Item = (u32, HeaderHash), Error = DatabaseError> + 'txn>,
+    > {
+        if !self.buf.is_scratch_fresh() {
             return Err(SourceChainError::ScratchNotFresh);
         }
         // TODO: PERF: Currently this checks every header but we could keep
         // a list of indices for only the headers which have been transformed.
-        Ok(Box::new(self.db.iter_raw()?.filter_map(|(i, c)| {
-            if !c.dht_transforms_complete {
-                Some((i, c.header_address))
+        Ok(Box::new(self.buf.store().iter(r)?.filter_map(|(i, c)| {
+            Ok(if !c.dht_transforms_complete {
+                Some((
+                    IntKey::from_key_bytes_or_friendly_panic(i).into(),
+                    c.header_address,
+                ))
             } else {
                 None
-            }
+            })
         })))
     }
 
     pub fn complete_dht_op(&mut self, i: u32) -> SourceChainResult<()> {
-        if let Some(mut c) = self.db.get(i)? {
+        if let Some(mut c) = self.buf.get(&i.into())? {
             c.dht_transforms_complete = true;
-            self.db.put(i, c);
+            self.buf.put(i.into(), c)?;
         }
         Ok(())
     }
 }
 
-impl<'env, R: Readable> BufferedStore<'env> for ChainSequenceBuf<'env, R> {
+impl BufferedStore for ChainSequenceBuf {
     type Error = SourceChainError;
 
     fn is_clean(&self) -> bool {
-        self.db.is_clean()
+        self.buf.is_clean()
     }
 
     /// Commit to the source chain, performing an as-at check and returning a
     /// SourceChainError::HeadMoved error if the as-at check fails
-    fn flush_to_txn(self, writer: &'env mut Writer) -> SourceChainResult<()> {
+    fn flush_to_txn(self, writer: &mut Writer) -> SourceChainResult<()> {
         if self.is_clean() {
             return Ok(());
         }
-        let fresh = self.with_reader(writer)?;
-        let (old, new) = (self.persisted_head, fresh.persisted_head);
+        let env = self.buf.env().clone();
+        let db = env.get_db(&*CHAIN_SEQUENCE)?;
+        let (_, _, persisted_head) = ChainSequenceBuf::head_info(&KvIntStore::new(db), writer)?;
+        let (old, new) = (self.persisted_head, persisted_head);
         if old != new {
             Err(SourceChainError::HeadMoved(old, new))
         } else {
-            Ok(self.db.flush_to_txn(writer)?)
+            Ok(self.buf.flush_to_txn(writer)?)
         }
     }
 }
@@ -165,6 +178,7 @@ pub mod tests {
     use holochain_state::{
         env::{ReadManager, WriteManager},
         error::DatabaseResult,
+        prelude::*,
         test_utils::test_cell_env,
     };
     use holochain_types::observability;
@@ -174,10 +188,9 @@ pub mod tests {
     async fn chain_sequence_scratch_awareness() -> DatabaseResult<()> {
         observability::test_run().ok();
         let arc = test_cell_env();
-        let env = arc.guard().await;
-        let dbs = arc.dbs().await;
-        env.with_reader(|reader| {
-            let mut buf = ChainSequenceBuf::new(&reader, &dbs)?;
+        let dbs = arc.dbs();
+        {
+            let mut buf = ChainSequenceBuf::new(arc.clone().into(), &dbs)?;
             assert_eq!(buf.chain_head(), None);
             buf.put_header(
                 HeaderHash::from_raw_bytes(vec![
@@ -185,7 +198,7 @@ pub mod tests {
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 ])
                 .into(),
-            );
+            )?;
             assert_eq!(
                 buf.chain_head(),
                 Some(
@@ -202,7 +215,7 @@ pub mod tests {
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
                 ])
                 .into(),
-            );
+            )?;
             assert_eq!(
                 buf.chain_head(),
                 Some(
@@ -219,7 +232,7 @@ pub mod tests {
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
                 ])
                 .into(),
-            );
+            )?;
             assert_eq!(
                 buf.chain_head(),
                 Some(
@@ -231,31 +244,31 @@ pub mod tests {
                 )
             );
             Ok(())
-        })
+        }
     }
 
     #[tokio::test(threaded_scheduler)]
     async fn chain_sequence_functionality() -> SourceChainResult<()> {
         let arc = test_cell_env();
-        let env = arc.guard().await;
-        let dbs = arc.dbs().await;
+        let env = arc.guard();
+        let dbs = arc.dbs();
 
-        env.with_reader::<SourceChainError, _, _>(|reader| {
-            let mut buf = ChainSequenceBuf::new(&reader, &dbs)?;
+        {
+            let mut buf = ChainSequenceBuf::new(arc.clone().into(), &dbs)?;
             buf.put_header(
                 HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 ])
                 .into(),
-            );
+            )?;
             buf.put_header(
                 HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
                 ])
                 .into(),
-            );
+            )?;
             assert_eq!(
                 buf.chain_head(),
                 Some(
@@ -272,13 +285,13 @@ pub mod tests {
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
                 ])
                 .into(),
-            );
+            )?;
             env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
-            Ok(())
-        })?;
+        }
 
-        env.with_reader::<SourceChainError, _, _>(|reader| {
-            let buf = ChainSequenceBuf::new(&reader, &dbs)?;
+        let reader = env.reader()?;
+        {
+            let buf = ChainSequenceBuf::new(arc.clone().into(), &dbs)?;
             assert_eq!(
                 buf.chain_head(),
                 Some(
@@ -289,40 +302,44 @@ pub mod tests {
                     .into()
                 )
             );
-            let items: Vec<u32> = buf.db.iter_raw()?.map(|(key, _)| key).collect();
+            let items: Vec<u32> = buf
+                .buf
+                .store()
+                .iter(&reader)?
+                .map(|(key, _)| Ok(IntKey::from_key_bytes_or_friendly_panic(key).into()))
+                .collect()?;
             assert_eq!(items, vec![0, 1, 2]);
-            Ok(())
-        })?;
+        }
 
-        env.with_reader::<SourceChainError, _, _>(|reader| {
-            let mut buf = ChainSequenceBuf::new(&reader, &dbs)?;
+        {
+            let mut buf = ChainSequenceBuf::new(arc.clone().into(), &dbs)?;
             buf.put_header(
                 HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 3,
                 ])
                 .into(),
-            );
+            )?;
             buf.put_header(
                 HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 4,
                 ])
                 .into(),
-            );
+            )?;
             buf.put_header(
                 HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 5,
                 ])
                 .into(),
-            );
+            )?;
             env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
-            Ok(())
-        })?;
+        }
 
-        env.with_reader::<SourceChainError, _, _>(|reader| {
-            let buf = ChainSequenceBuf::new(&reader, &dbs)?;
+        let reader = env.reader()?;
+        {
+            let buf = ChainSequenceBuf::new(arc.clone().into(), &dbs)?;
             assert_eq!(
                 buf.chain_head(),
                 Some(
@@ -333,10 +350,14 @@ pub mod tests {
                     .into()
                 )
             );
-            let items: Vec<u32> = buf.db.iter_raw()?.map(|(_, i)| i.tx_seq).collect();
+            let items: Vec<u32> = buf
+                .buf
+                .store()
+                .iter(&reader)?
+                .map(|(_, i)| Ok(i.tx_seq))
+                .collect()?;
             assert_eq!(items, vec![0, 0, 0, 1, 1, 1]);
-            Ok(())
-        })?;
+        }
 
         Ok(())
     }
@@ -349,31 +370,30 @@ pub mod tests {
         let (tx2, rx2) = tokio::sync::oneshot::channel();
 
         let task1 = tokio::spawn(async move {
-            let env = arc1.guard().await;
-            let dbs = arc1.dbs().await;
-            let reader = env.reader()?;
-            let mut buf = ChainSequenceBuf::new(&reader, &dbs)?;
+            let env = arc1.guard();
+            let dbs = arc1.dbs();
+            let mut buf = ChainSequenceBuf::new(arc1.clone().into(), &dbs)?;
             buf.put_header(
                 HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 ])
                 .into(),
-            );
+            )?;
             buf.put_header(
                 HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
                 ])
                 .into(),
-            );
+            )?;
             buf.put_header(
                 HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
                 ])
                 .into(),
-            );
+            )?;
 
             // let the other task run and make a commit to the chain head,
             // which will cause this one to error out when it re-enters and tries to commit
@@ -385,31 +405,30 @@ pub mod tests {
 
         let task2 = tokio::spawn(async move {
             rx1.await.unwrap();
-            let env = arc2.guard().await;
-            let dbs = arc2.dbs().await;
-            let reader = env.reader()?;
-            let mut buf = ChainSequenceBuf::new(&reader, &dbs)?;
+            let env = arc2.guard();
+            let dbs = arc2.dbs();
+            let mut buf = ChainSequenceBuf::new(arc2.clone().into(), &dbs)?;
             buf.put_header(
                 HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 3,
                 ])
                 .into(),
-            );
+            )?;
             buf.put_header(
                 HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 4,
                 ])
                 .into(),
-            );
+            )?;
             buf.put_header(
                 HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 5,
                 ])
                 .into(),
-            );
+            )?;
 
             env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
             tx2.send(()).unwrap();

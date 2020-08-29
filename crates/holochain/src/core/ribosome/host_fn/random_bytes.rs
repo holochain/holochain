@@ -32,12 +32,11 @@ pub fn random_bytes(
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use crate::core::ribosome::host_fn::random_bytes::random_bytes;
-    use crate::core::state::workspace::Workspace;
+
     use crate::fixt::CallContextFixturator;
     use crate::fixt::WasmRibosomeFixturator;
     use crate::fixt::ZomeCallHostAccessFixturator;
     use fixt::prelude::*;
-    use holochain_state::env::ReadManager;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::RandomBytesInput;
     use holochain_zome_types::RandomBytesOutput;
@@ -68,10 +67,9 @@ pub mod wasm_test {
     /// we can get some random data out of the fn via. a wasm call
     async fn ribosome_random_bytes_test() {
         let env = holochain_state::test_utils::test_cell_env();
-        let dbs = env.dbs().await;
-        let env_ref = env.guard().await;
-        let reader = env_ref.reader().unwrap();
-        let mut workspace = crate::core::workflow::CallZomeWorkspace::new(&reader, &dbs).unwrap();
+        let dbs = env.dbs();
+        let mut workspace =
+            crate::core::workflow::CallZomeWorkspace::new(env.clone().into(), &dbs).unwrap();
 
         let (_g, raw_workspace) =
             crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(

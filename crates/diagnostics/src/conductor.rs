@@ -3,7 +3,7 @@ use holochain::conductor::{state::ConductorState, ConductorStateDb};
 use holochain_state::{db::CONDUCTOR_STATE, env::EnvironmentWrite, prelude::*};
 
 pub async fn dump_conductor_state(env: EnvironmentWrite) -> anyhow::Result<ConductorState> {
-    let g = env.guard().await;
+    let g = env.guard();
     let r = g.reader()?;
     let db = ConductorStateDb::new(env.get_db(&CONDUCTOR_STATE)?)?;
     let bytes = db.get_bytes(&r, &().into())?.unwrap();

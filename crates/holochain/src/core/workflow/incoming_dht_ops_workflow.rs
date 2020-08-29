@@ -12,14 +12,14 @@ use crate::core::{
 use holo_hash::DhtOpHash;
 use holochain_state::{
     buffer::BufferedStore,
-    buffer::KvBuf,
+    buffer::KvBufFresh,
     db::{INTEGRATED_DHT_OPS, INTEGRATION_LIMBO},
     env::EnvironmentWrite,
     error::DatabaseResult,
-    prelude::{GetDb, ReadManager, Reader, Writer},
+    prelude::{EnvironmentRead, GetDb, Writer},
 };
 use holochain_types::Timestamp;
-use tracing::*;
+use tracing::instrument;
 
 #[cfg(test)]
 mod test;
@@ -31,9 +31,8 @@ pub async fn incoming_dht_ops_workflow(
     ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
 ) -> WorkflowResult<()> {
     // set up our workspace
-    let env_ref = state_env.guard().await;
-    let reader = env_ref.reader()?;
-    let mut workspace = IncomingDhtOpsWorkspace::new(&reader, &env_ref)?;
+    let env_ref = state_env.guard();
+    let mut workspace = IncomingDhtOpsWorkspace::new(state_env.clone().into(), &env_ref)?;
 
     // add incoming ops to the validation limbo
     for (hash, op) in ops {
@@ -47,7 +46,6 @@ pub async fn incoming_dht_ops_workflow(
             num_tries: 0,
         };
         if !workspace.op_exists(&hash)? {
-            debug!(?vlv.op);
             workspace.validation_limbo.put(hash, vlv)?;
         }
     }
@@ -55,9 +53,7 @@ pub async fn incoming_dht_ops_workflow(
     // commit our transaction
     let writer: crate::core::queue_consumer::OneshotWriter = state_env.clone().into();
 
-    writer
-        .with_writer(|writer| Ok(workspace.flush_to_txn(writer)?))
-        .await?;
+    writer.with_writer(|writer| Ok(workspace.flush_to_txn(writer)?))?;
 
     // trigger validation of queued ops
     sys_validation_trigger.trigger();
@@ -66,21 +62,28 @@ pub async fn incoming_dht_ops_workflow(
 }
 
 #[allow(missing_docs)]
-pub struct IncomingDhtOpsWorkspace<'env> {
-    pub integration_limbo: IntegrationLimboStore<'env>,
-    pub integrated_dht_ops: IntegratedDhtOpsStore<'env>,
-    pub validation_limbo: ValidationLimboStore<'env>,
+pub struct IncomingDhtOpsWorkspace {
+    pub integration_limbo: IntegrationLimboStore,
+    pub integrated_dht_ops: IntegratedDhtOpsStore,
+    pub validation_limbo: ValidationLimboStore,
 }
 
-impl<'env> Workspace<'env> for IncomingDhtOpsWorkspace<'env> {
-    fn new(reader: &'env Reader<'env>, dbs: &impl GetDb) -> WorkspaceResult<Self> {
+impl Workspace for IncomingDhtOpsWorkspace {
+    fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
+        self.validation_limbo.0.flush_to_txn(writer)?;
+        Ok(())
+    }
+}
+
+impl IncomingDhtOpsWorkspace {
+    pub fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
         let db = dbs.get_db(&*INTEGRATED_DHT_OPS)?;
-        let integrated_dht_ops = KvBuf::new(reader, db)?;
+        let integrated_dht_ops = KvBufFresh::new(env.clone(), db);
 
         let db = dbs.get_db(&*INTEGRATION_LIMBO)?;
-        let integration_limbo = KvBuf::new(reader, db)?;
+        let integration_limbo = KvBufFresh::new(env.clone(), db);
 
-        let validation_limbo = ValidationLimboStore::new(reader, dbs)?;
+        let validation_limbo = ValidationLimboStore::new(env, dbs)?;
 
         Ok(Self {
             integration_limbo,
@@ -88,13 +91,7 @@ impl<'env> Workspace<'env> for IncomingDhtOpsWorkspace<'env> {
             validation_limbo,
         })
     }
-    fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
-        self.validation_limbo.0.flush_to_txn(writer)?;
-        Ok(())
-    }
-}
 
-impl<'env> IncomingDhtOpsWorkspace<'env> {
     pub fn op_exists(&self, hash: &DhtOpHash) -> DatabaseResult<bool> {
         Ok(self.integrated_dht_ops.contains(&hash)?
             || self.integration_limbo.contains(&hash)?
