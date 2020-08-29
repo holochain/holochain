@@ -1,4 +1,4 @@
-/// A convenient composition of CasBufFreshsepresenting source chain data.
+/// A convenient composition of CasBufFreshAsyncsepresenting source chain data.
 ///
 /// Source chain data is split into three databases: one for headers, and two
 /// for public and private entries. Specifying the private_entries DB in a
@@ -8,9 +8,9 @@
 /// it is known that private entries should be protected, such as when handling
 /// a get_entry request from the network.
 use crate::core::state::source_chain::{ChainInvalidReason, SourceChainError, SourceChainResult};
-use holo_hash::{EntryHash, HasHash, HeaderHash};
+use holo_hash::{hash_type, EntryHash, HasHash, HeaderHash};
 use holochain_state::{
-    buffer::CasBufFresh,
+    buffer::CasBufFreshAsync,
     db::{
         GetDb, ELEMENT_CACHE_ENTRIES, ELEMENT_CACHE_HEADERS, ELEMENT_VAULT_HEADERS,
         ELEMENT_VAULT_PRIVATE_ENTRIES, ELEMENT_VAULT_PUBLIC_ENTRIES,
@@ -27,10 +27,10 @@ use holochain_zome_types::entry_def::EntryVisibility;
 use holochain_zome_types::{Entry, Header};
 use tracing::*;
 
-/// A CasBufFresh with Entries for values
-pub type EntryCas = CasBufFresh<Entry>;
-/// A CasBufFresh with SignedHeaders for values
-pub type HeaderCas = CasBufFresh<SignedHeader>;
+/// A CasBufFreshAsync with Entries for values
+pub type EntryCas = CasBufFreshAsync<Entry>;
+/// A CasBufFreshAsync with SignedHeaders for values
+pub type HeaderCas = CasBufFreshAsync<SignedHeader>;
 
 /// The representation of an ElementCache / ElementVault,
 /// using two or three DB references
@@ -48,14 +48,14 @@ impl ElementBuf {
         headers_store: SingleStore,
     ) -> DatabaseResult<Self> {
         let private_entries = if let Some(store) = private_entries_store {
-            Some(CasBufFresh::new(env.clone(), store))
+            Some(CasBufFreshAsync::new(env.clone(), store))
         } else {
             None
         };
         Ok(Self {
-            public_entries: CasBufFresh::new(env.clone(), public_entries_store),
+            public_entries: CasBufFreshAsync::new(env.clone(), public_entries_store),
             private_entries,
-            headers: CasBufFresh::new(env, headers_store),
+            headers: CasBufFreshAsync::new(env, headers_store),
         })
     }
 

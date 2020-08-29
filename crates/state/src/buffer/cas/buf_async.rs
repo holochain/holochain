@@ -7,26 +7,28 @@ use crate::{
     transaction::Readable,
 };
 use fallible_iterator::FallibleIterator;
-use holo_hash::{HasHash, HashableContent, HoloHashOf, HoloHashed, PrimitiveHashType};
+use holo_hash::{
+    hash_type::HashTypeAsync, HasHash, HashableContent, HoloHashOf, HoloHashed, PrimitiveHashType,
+};
 
 /// A wrapper around a KvBufFresh where keys are always Addresses,
 /// and values are always AddressableContent.
 ///
 /// There is no "CasStore" (which would wrap a `KvStore`), because so far
 /// there has been no need for one.
-pub struct CasBufUsed<C>(KvBufUsed<HoloHashOf<C>, C>)
+pub struct CasBufUsedAsync<C>(KvBufUsed<HoloHashOf<C>, C>)
 where
     C: HashableContent + BufVal + Send + Sync,
     HoloHashOf<C>: BufKey,
-    C::HashType: PrimitiveHashType + Send + Sync;
+    C::HashType: PrimitiveHashType + HashTypeAsync + Send + Sync;
 
-impl<C> CasBufUsed<C>
+impl<C> CasBufUsedAsync<C>
 where
     C: HashableContent + BufVal + Send + Sync,
     HoloHashOf<C>: BufKey,
-    C::HashType: PrimitiveHashType + Send + Sync,
+    C::HashType: PrimitiveHashType + HashTypeAsync + Send + Sync,
 {
-    /// Create a new CasBufUsed
+    /// Create a new CasBufUsedAsync
     pub fn new(db: rkv::SingleStore) -> Self {
         Self(KvBufUsed::new(db))
     }
@@ -45,7 +47,7 @@ where
     }
 
     /// Get a value from the underlying [KvBufUsed]
-    pub async fn get<'r, 'a: 'r, R: Readable + Send + Sync>(
+    pub async fn get<'r, 'a: 'r, R: Readable>(
         &'a self,
         r: &'r R,
         hash: &'a HoloHashOf<C>,
@@ -74,18 +76,14 @@ where
     }
 
     fn deserialize_and_hash_blocking(hash: &[u8], content: C) -> HoloHashed<C> {
-        tokio_safe_block_on::tokio_safe_block_on(
-            Self::deserialize_and_hash(hash, content),
-            std::time::Duration::from_millis(500),
-        )
-        .expect("TODO: make into stream")
+        tokio_safe_block_on::tokio_safe_block_forever_on(Self::deserialize_and_hash(hash, content))
         // TODO: make this a stream?
     }
 
     async fn deserialize_and_hash(hash_bytes: &[u8], content: C) -> HoloHashed<C> {
-        let data = HoloHashed::from_content_blocking(content);
+        let data = HoloHashed::from_content(content).await;
         fatal_db_hash_integrity_check!(
-            "CasBufUsed::get",
+            "CasBufUsedAsync::get",
             hash_bytes,
             data.as_hash().get_full_bytes(),
             data.as_content(),
@@ -102,28 +100,28 @@ where
 
 #[derive(shrinkwraprs::Shrinkwrap)]
 #[shrinkwrap(mutable, unsafe_ignore_visibility)]
-pub struct CasBufFresh<C>
+pub struct CasBufFreshAsync<C>
 where
     C: HashableContent + BufVal + Send + Sync,
     HoloHashOf<C>: BufKey,
-    C::HashType: PrimitiveHashType + Send + Sync,
+    C::HashType: PrimitiveHashType + HashTypeAsync + Send + Sync,
 {
     env: EnvironmentRead,
     #[shrinkwrap(main_field)]
-    inner: CasBufUsed<C>,
+    inner: CasBufUsedAsync<C>,
 }
 
-impl<C> CasBufFresh<C>
+impl<C> CasBufFreshAsync<C>
 where
     C: HashableContent + BufVal + Send + Sync,
     HoloHashOf<C>: BufKey,
-    C::HashType: PrimitiveHashType + Send + Sync,
+    C::HashType: PrimitiveHashType + HashTypeAsync + Send + Sync,
 {
-    /// Create a new CasBufFresh
+    /// Create a new CasBufFreshAsync
     pub fn new(env: EnvironmentRead, db: rkv::SingleStore) -> Self {
         Self {
             env,
-            inner: CasBufUsed::new(db),
+            inner: CasBufUsedAsync::new(db),
         }
     }
 
@@ -131,12 +129,21 @@ where
         &self.env
     }
 
-    /// Get a value from the underlying [KvBufFresh]
+    /// Get a value from the underlying [CasBufFresh]
     pub async fn get<'a>(
         &'a self,
         hash: &'a HoloHashOf<C>,
     ) -> DatabaseResult<Option<HoloHashed<C>>> {
-        fresh_reader_async!(self.env, |r| async move { self.inner.get(&r, hash).await })
+        Ok(
+            if let Some(content) = fresh_reader!(self.env, |r| self.0.get(&r, hash))? {
+                Some(CasBufUsedAsync::deserialize_and_hash_blocking(
+                    hash.get_full_bytes(),
+                    content,
+                ))
+            } else {
+                None
+            },
+        )
     }
 
     /// Check if a value is stored at this key
@@ -145,10 +152,10 @@ where
     }
 }
 
-impl<C> BufferedStore for CasBufUsed<C>
+impl<C> BufferedStore for CasBufUsedAsync<C>
 where
     C: HashableContent + BufVal + Send + Sync,
-    C::HashType: PrimitiveHashType + Send + Sync,
+    C::HashType: PrimitiveHashType + HashTypeAsync + Send + Sync,
 {
     type Error = DatabaseError;
 
@@ -162,10 +169,10 @@ where
     }
 }
 
-impl<C> BufferedStore for CasBufFresh<C>
+impl<C> BufferedStore for CasBufFreshAsync<C>
 where
     C: HashableContent + BufVal + Send + Sync,
-    C::HashType: PrimitiveHashType + Send + Sync,
+    C::HashType: PrimitiveHashType + HashTypeAsync + Send + Sync,
 {
     type Error = DatabaseError;
 

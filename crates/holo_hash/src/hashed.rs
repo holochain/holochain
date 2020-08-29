@@ -46,11 +46,6 @@ where
     pub fn into_inner(self) -> (C, HoloHashOf<C>) {
         (self.content, self.hash)
     }
-
-    /// Construct synchronously, whether underlying hash type is sync or async
-    pub fn from_content_blocking(c: C) -> Self {
-        todo!("implement across traits...")
-    }
 }
 
 impl<C> Clone for HoloHashed<C>
