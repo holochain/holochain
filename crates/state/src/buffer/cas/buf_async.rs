@@ -2,7 +2,7 @@ use crate::{
     buffer::{BufferedStore, KvBufUsed},
     env::EnvironmentRead,
     error::{DatabaseError, DatabaseResult},
-    fatal_db_hash_integrity_check, fresh_reader, fresh_reader_async,
+    fatal_db_hash_integrity_check, fresh_reader,
     prelude::*,
     transaction::Readable,
 };
