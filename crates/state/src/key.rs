@@ -43,7 +43,9 @@ impl<T> BufMultiVal for T where T: Ord + Eq + Clone + Serialize + DeserializeOwn
 /// A key for hashes but with a prefix for reusing databases
 // #[derive(PartialOrd, Ord, PartialEq, Eq)]
 pub struct PrefixKey {
-    prefix_and_hash: [u8; 7 + 39],
+    // TODO: B-02112 Use fixed size array when we have fixed size hash
+    //prefix_and_hash: [u8; PREFIX_KEY_SIZE],
+    prefix_and_hash: Vec<u8>,
 }
 
 /// Used for keys into integer-keyed LMDB stores.
@@ -142,15 +144,29 @@ impl AsRef<[u8]> for PrefixKey {
 impl PrefixKey {
     fn empty() -> Self {
         Self {
-            prefix_and_hash: [0; PREFIX_KEY_SIZE],
+            // TODO: B-02112 Use fixed size array when we have fixed size hash
+            // prefix_and_hash: [0; PREFIX_KEY_SIZE],
+            prefix_and_hash: vec![0; PREFIX_KEY_SIZE],
         }
     }
 
+    // TODO: B-02112 remove this when we have fixed size hash
+    // Make then len the same
+    fn initialize_key(&mut self, len: usize) {
+        self.prefix_and_hash.truncate(len + 1);
+    }
+
     fn fill_from_raw(hash: &[u8]) -> Self {
-        if hash.len() != PREFIX_KEY_SIZE {
-            panic!("Holochain detected database corruption.\n\nInvalid PrefixKey: expected {} bytes but got {}", PREFIX_KEY_SIZE, hash.len());
-        }
+        // TODO: B-02112 Add this check back
+        // if hash.len() != PREFIX_KEY_SIZE {
+        //     panic!("Holochain detected database corruption.\n\nInvalid PrefixKey: expected {} bytes but got {}", PREFIX_KEY_SIZE, hash.len());
+        // }
         let mut key = Self::empty();
+
+        // TODO: Remove B-02112
+        // Already includes the prefix
+        key.initialize_key(hash.len() - 1);
+
         let data_iter = key.prefix_and_hash.iter_mut();
         let hash_iter = hash.iter();
         Self::fill_data(data_iter, hash_iter);
@@ -158,6 +174,9 @@ impl PrefixKey {
     }
 
     fn fill(&mut self, prefix: u8, hash: &[u8]) {
+        // TODO: Remove B-02112
+        self.initialize_key(hash.len());
+
         self.prefix_and_hash[0] = prefix;
         let data_iter = self.prefix_and_hash.iter_mut().skip(1);
         let hash_iter = hash.iter();
@@ -174,7 +193,7 @@ impl PrefixKey {
     }
 
     /// Create key for integrated databases
-    pub fn integrated<C>(hash: HoloHashOf<C>) -> Self
+    pub fn integrated<C>(hash: &HoloHashOf<C>) -> Self
     where
         C: HashableContent + BufVal + Send + Sync,
         HoloHashOf<C>: BufKey,
@@ -183,6 +202,11 @@ impl PrefixKey {
         let mut key = Self::empty();
         key.fill(INTEGRATED_PREFIX, hash.as_ref());
         key
+    }
+
+    /// Get the bytes of the hash
+    pub fn as_hash_bytes(&self) -> &[u8] {
+        &self.prefix_and_hash[1..]
     }
 }
 
