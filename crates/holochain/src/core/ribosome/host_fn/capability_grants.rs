@@ -19,6 +19,7 @@ pub fn capability_grants(
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
 
+    use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
     use crate::fixt::ZomeCallHostAccessFixturator;
     use fixt::prelude::*;
     use hdk3::prelude::*;
@@ -31,12 +32,9 @@ pub mod wasm_test {
         let test_env = holochain_state::test_utils::test_cell_env();
         let env = test_env.env();
         let dbs = env.dbs().await;
-        let mut workspace = crate::core::workflow::call_zome_workflow::CallZomeWorkspace::new(
-            env.clone().into(),
-            &dbs,
-        )
-        .await
-        .unwrap();
+        let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
+            .await
+            .unwrap();
 
         crate::core::workflow::fake_genesis(&mut workspace.source_chain)
             .await
@@ -56,11 +54,12 @@ pub mod wasm_test {
     async fn ribosome_transferable_cap_grant<'a>() {
         holochain_types::observability::test_run().ok();
         // test workspace boilerplate
-        let env = holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_state::test_utils::test_cell_env();
+        let env = test_env.env();
         let dbs = env.dbs().await;
-        let env_ref = env.guard().await;
-        let reader = holochain_state::env::ReadManager::reader(&env_ref).unwrap();
-        let mut workspace = <crate::core::workflow::call_zome_workflow::CallZomeWorkspace as crate::core::state::workspace::Workspace>::new(&reader, &dbs).unwrap();
+        let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
+            .await
+            .unwrap();
 
         crate::core::workflow::fake_genesis(&mut workspace.source_chain)
             .await
