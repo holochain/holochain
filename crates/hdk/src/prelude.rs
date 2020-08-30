@@ -1,11 +1,13 @@
 pub use crate::agent_info;
 pub use crate::call_remote;
 pub use crate::commit_cap_grant;
+pub use crate::commit_cap_claim;
 pub use crate::commit_entry;
 pub use crate::debug;
 pub use crate::delete_entry;
 pub use crate::entry_def;
 pub use crate::entry_defs;
+pub use crate::simple_init;
 pub use crate::entry_hash;
 pub use crate::generate_cap_secret;
 pub use crate::get;
@@ -60,3 +62,4 @@ pub use holochain_zome_types::validate_link_add::ValidateLinkAddData;
 pub use holochain_zome_types::zome_info::ZomeInfo;
 pub use holochain_zome_types::*;
 pub use std::convert::TryFrom;
+pub use std::collections::HashSet;

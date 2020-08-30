@@ -77,3 +77,11 @@ impl From<serde_bytes::ByteBuf> for CapSecret {
         byte_buf.as_ref().into()
     }
 }
+
+/// it's fairly common (e.g. when calling unrestricted functions) to need to generate a cap secret
+/// that is not secret at all but it doesn't matter because it will be ignored by the recipient
+impl From<()> for CapSecret {
+    fn from(_: ()) -> Self {
+        Self::from([0; CAP_SECRET_BYTES])
+    }
+}

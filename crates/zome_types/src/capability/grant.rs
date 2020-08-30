@@ -130,6 +130,14 @@ impl From<(CapSecret, HashSet<AgentPubKey>)> for CapAccess {
     }
 }
 
+impl From<(CapSecret, AgentPubKey)> for CapAccess {
+    fn from((secret, assignee): (CapSecret, AgentPubKey)) -> Self {
+        let mut assignees = HashSet::new();
+        assignees.insert(assignee);
+        Self::from((secret, assignees))
+    }
+}
+
 impl CapAccess {
     /// Check if access is granted given the inputs
     pub fn is_authorized(&self, agent_key: &AgentPubKey, maybe_secret: Option<&CapSecret>) -> bool {
