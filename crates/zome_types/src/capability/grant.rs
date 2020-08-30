@@ -1,5 +1,4 @@
 use super::CapSecret;
-use crate::capability::secret::CAP_SECRET_BYTES;
 use crate::zome::ZomeName;
 use holo_hash::*;
 use holochain_serialized_bytes::SerializedBytes;
@@ -79,7 +78,7 @@ impl CapGrant {
                 // there is nothing meaningful about a self-assigned secret so we might as well
                 // zero it out to (hopefully) make it very clear that this has a different security
                 // and access model (i.e. that the caller of the function is the current agent).
-                secret: [0; CAP_SECRET_BYTES].into(),
+                secret: ().into(),
                 assignees: [agent_pubkey.clone()].iter().cloned().collect(),
             },
             CapGrant::ZomeCall(ZomeCallCapGrant { access, .. }) => access.clone(),

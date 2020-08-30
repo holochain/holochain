@@ -36,6 +36,10 @@ pub enum RibosomeError {
     #[error("Attempted to call a zome function that doesn't exist: Zome: {0} Fn {1}")]
     ZomeFnNotExists(ZomeName, String),
 
+    /// A ZomeFn invocation was called but could not be authorized
+    #[error("Unauthorized zome call")]
+    Unauthorized,
+
     /// a problem with entry defs
     #[error("An error with entry defs: {0}")]
     EntryDefs(ZomeName, String),

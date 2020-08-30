@@ -29,12 +29,15 @@ use crate::core::ribosome::guest_callback::validate_link_add::ValidateLinkAddRes
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 use crate::core::ribosome::guest_callback::CallIterator;
+use crate::core::state::cascade::error::CascadeResult;
+use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
 use crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace;
 use crate::fixt::HostInputFixturator;
 use crate::fixt::ZomeNameFixturator;
 use ::fixt::prelude::*;
 use derive_more::Constructor;
 use error::RibosomeResult;
+use futures::FutureExt;
 use guest_callback::{
     entry_defs::EntryDefsHostAccess, init::InitHostAccess, migrate_agent::MigrateAgentHostAccess,
     post_commit::PostCommitHostAccess, validate::ValidateHostAccess,
@@ -51,10 +54,12 @@ use holochain_types::dna::zome::HostFnAccess;
 use holochain_types::dna::DnaFile;
 use holochain_types::fixt::CapSecretFixturator;
 use holochain_wasm_test_utils::TestWasm;
+use holochain_zome_types::capability::CapGrant;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::GuestOutput;
 use holochain_zome_types::{capability::CapSecret, header::ZomeId, HostInput};
 use mockall::automock;
+use must_future::MustBoxFuture;
 use std::iter::Iterator;
 
 #[derive(Clone)]
@@ -216,6 +221,49 @@ pub trait Invocation: Clone {
     fn host_input(self) -> Result<HostInput, SerializedBytesError>;
 }
 
+impl ZomeCallInvocation {
+    /// to decide if a zome call is authorized:
+    /// - we need to find a live (committed and not deleted) cap grant that matches the secret
+    /// - if the live cap grant is for the current author the call is ALWAYS authorized ELSE
+    /// - the live cap grant needs to include the invocation's provenance AND zome/function name
+    #[allow(clippy::extra_unused_lifetimes)]
+    pub fn is_authorized<'a>(&self, host_access: &ZomeCallHostAccess) -> RibosomeResult<bool> {
+        // short circuit if the provenance is the same as the cell id
+        if &self.provenance == self.cell_id.agent_pubkey() {
+            Ok(true)
+        } else {
+            let cap = self.cap;
+            let grant_call = |workspace: &'a mut CallZomeWorkspace| -> MustBoxFuture<'a, CascadeResult<Option<CapGrant>>> {
+                async move {
+                    Ok(
+                            workspace.source_chain.get_persisted_cap_grant_by_secret(&cap).await?
+                    )
+                }
+                .boxed()
+                .into()
+            };
+            let maybe_grant: Option<CapGrant> =
+                tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+                    unsafe { host_access.workspace.apply_mut(grant_call).await }
+                })??;
+
+            Ok(match maybe_grant {
+                // there was a match against the secret so compare against the zome invocation
+                Some(CapGrant::ZomeCall(zome_call_cap_grant)) => {
+                    zome_call_cap_grant
+                        .functions
+                        .contains(&(self.zome_name.clone(), self.fn_name.clone()))
+                        && zome_call_cap_grant
+                            .access
+                            .is_authorized(&self.provenance, Some(&self.cap))
+                }
+                // anything else is not authorized
+                _ => false,
+            })
+        }
+    }
+}
+
 mockall::mock! {
     Invocation {}
     trait Invocation {
@@ -301,6 +349,12 @@ impl Iterator for ZomeCallInvocationFixturator<NamedInvocation> {
         ret.zome_name = self.0.curve.1.clone().into();
         ret.fn_name = self.0.curve.2.clone();
         ret.payload = self.0.curve.3.clone();
+
+        // simulate a local transaction by setting the cap to empty and matching the provenance of
+        // the call to the cell id
+        ret.cap = ().into();
+        ret.provenance = ret.cell_id.agent_pubkey().clone();
+
         Some(ret)
     }
 }

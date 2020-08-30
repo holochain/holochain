@@ -119,6 +119,7 @@ impl SourceChain {
             )
             .iter_fail(&r)?
             .filter_map(|entry| {
+                dbg!(&entry);
                 Ok(entry.as_cap_grant().and_then(|grant| {
                     grant.access().secret().and_then(|secret| {
                         if secret == query {
@@ -131,6 +132,8 @@ impl SourceChain {
             })
             .collect()
         })?;
+
+        dbg!(&hashes_n_grants);
 
         let answer = if hashes_n_grants.len() == 0 {
             None

@@ -425,19 +425,23 @@ impl RibosomeT for WasmRibosome {
         host_access: ZomeCallHostAccess,
         invocation: ZomeCallInvocation,
     ) -> RibosomeResult<ZomeCallInvocationResponse> {
-        // make a copy of these for the error handling below
-        let zome_name = invocation.zome_name.clone();
-        let fn_name = invocation.fn_name.clone();
+        if invocation.is_authorized(&host_access)? {
+            // make a copy of these for the error handling below
+            let zome_name = invocation.zome_name.clone();
+            let fn_name = invocation.fn_name.clone();
 
-        let guest_output: GuestOutput = match self
-            .call_iterator(host_access.into(), self.clone(), invocation)
-            .next()?
-        {
-            Some(result) => result.1,
-            None => return Err(RibosomeError::ZomeFnNotExists(zome_name, fn_name)),
-        };
+            let guest_output: GuestOutput = match self
+                .call_iterator(host_access.into(), self.clone(), invocation)
+                .next()?
+            {
+                Some(result) => result.1,
+                None => return Err(RibosomeError::ZomeFnNotExists(zome_name, fn_name)),
+            };
 
-        Ok(ZomeCallInvocationResponse::ZomeApiFn(guest_output))
+            Ok(ZomeCallInvocationResponse::ZomeApiFn(guest_output))
+        } else {
+            Err(RibosomeError::Unauthorized)
+        }
     }
 
     fn run_validate(

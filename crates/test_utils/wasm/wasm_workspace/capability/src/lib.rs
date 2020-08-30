@@ -79,7 +79,7 @@ fn send_assigned_cap_claim(agent: AgentPubKey) -> ExternResult<()> {
     let this_zome = zome_info!()?.zome_name;
     functions.insert((this_zome.clone(), "needs_cap_claim".into()));
     commit_cap_grant!(CapGrantEntry {
-        access: (secret.clone(), agent.clone()).into(),
+        access: (secret, agent.clone()).into(),
         functions,
         tag: tag.clone(),
         ..Default::default()
