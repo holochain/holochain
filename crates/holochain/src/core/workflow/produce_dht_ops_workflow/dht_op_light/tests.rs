@@ -243,7 +243,8 @@ async fn test_all_ops() {
 
 #[tokio::test(threaded_scheduler)]
 async fn test_dht_basis() {
-    let env = test_cell_env();
+    let test_env = test_cell_env();
+    let env = test_env.env();
     let env_ref = env.guard().await;
 
     {

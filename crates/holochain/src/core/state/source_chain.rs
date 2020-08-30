@@ -218,7 +218,8 @@ pub mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_get_cap_grant() -> SourceChainResult<()> {
-        let arc = test_cell_env();
+        let test_env = test_cell_env();
+        let arc = test_env.env();
         let env = arc.guard().await;
         let access = CapAccess::from(CapSecretFixturator::new(Unpredictable).next().unwrap());
         let secret = access.secret().unwrap();
@@ -261,7 +262,8 @@ pub mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_get_cap_claim() -> SourceChainResult<()> {
-        let arc = test_cell_env();
+        let test_env = test_cell_env();
+        let arc = test_env.env();
         let env = arc.guard().await;
         let secret = CapSecretFixturator::new(Unpredictable).next().unwrap();
         let agent_pubkey = fake_agent_pubkey_1().into();

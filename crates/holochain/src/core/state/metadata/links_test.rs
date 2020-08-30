@@ -380,7 +380,8 @@ impl TestData {
 
 #[tokio::test(threaded_scheduler)]
 async fn can_add_and_remove_link() {
-    let arc = test_cell_env();
+    let test_env = test_cell_env();
+    let arc = test_env.env();
     let env = arc.guard().await;
 
     let mut td = fixtures(arc.clone(), 1).await.into_iter().next().unwrap();
@@ -471,7 +472,8 @@ async fn can_add_and_remove_link() {
 
 #[tokio::test(threaded_scheduler)]
 async fn multiple_links() {
-    let arc = test_cell_env();
+    let test_env = test_cell_env();
+    let arc = test_env.env();
     let env = arc.guard().await;
 
     let mut td = fixtures(arc.clone().into(), 10).await;
@@ -551,7 +553,8 @@ async fn multiple_links() {
 #[tokio::test(threaded_scheduler)]
 async fn duplicate_links() {
     observability::test_run().ok();
-    let arc = test_cell_env();
+    let test_env = test_cell_env();
+    let arc = test_env.env();
     let env = arc.guard().await;
 
     let td = fixtures(arc.clone(), 10).await;
@@ -624,7 +627,8 @@ async fn duplicate_links() {
 #[tokio::test(threaded_scheduler)]
 async fn links_on_same_base() {
     observability::test_run().ok();
-    let arc = test_cell_env();
+    let test_env = test_cell_env();
+    let arc = test_env.env();
     let env = arc.guard().await;
 
     let mut td = fixtures(arc.clone(), 10).await;
@@ -707,7 +711,8 @@ async fn links_on_same_base() {
 #[tokio::test(threaded_scheduler)]
 async fn links_on_same_zome_id() {
     observability::test_run().ok();
-    let arc = test_cell_env();
+    let test_env = test_cell_env();
+    let arc = test_env.env();
     let env = arc.guard().await;
 
     let mut td = fixtures(arc.clone(), 10).await;
@@ -809,7 +814,8 @@ async fn links_on_same_zome_id() {
 #[tokio::test(threaded_scheduler)]
 async fn links_on_same_tag() {
     observability::test_run().ok();
-    let arc = test_cell_env();
+    let test_env = test_cell_env();
+    let arc = test_env.env();
     let env = arc.guard().await;
 
     let mut td = fixtures(arc.clone(), 10).await;

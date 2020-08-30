@@ -298,7 +298,8 @@ mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn can_write_private_entry_when_enabled() -> anyhow::Result<()> {
         let keystore = spawn_test_keystore(Vec::new()).await?;
-        let arc = test_cell_env();
+        let test_env = test_cell_env();
+        let arc = test_env.env();
         let env = arc.guard().await;
 
         let agent_key = AgentPubKey::new_from_pure_entropy(&keystore).await?;
@@ -344,7 +345,8 @@ mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn cannot_write_private_entry_when_disabled() -> anyhow::Result<()> {
         let keystore = spawn_test_keystore(Vec::new()).await?;
-        let arc = test_cell_env();
+        let test_env = test_cell_env();
+        let arc = test_env.env();
         let env = arc.guard().await;
 
         let agent_key = AgentPubKey::new_from_pure_entropy(&keystore).await?;

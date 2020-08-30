@@ -174,7 +174,8 @@ mod tests {
     async fn test_validation_receipts_db_populate_and_list() -> DatabaseResult<()> {
         holochain_types::observability::test_run().ok();
 
-        let env = holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_state::test_utils::test_cell_env();
+        let env = test_env.env();
         let env_ref = env.guard().await;
         let keystore = holochain_state::test_utils::test_keystore();
 

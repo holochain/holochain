@@ -49,7 +49,7 @@ mod tests {
         let env = holochain_state::test_utils::test_wasm_env();
         let dbs = env.dbs().await;
         let mut wasm_buf = WasmBuf::new(
-            env.clone().into(),
+            env.env().into(),
             dbs.get_db(&*holochain_state::db::WASM).unwrap(),
         )
         .unwrap();

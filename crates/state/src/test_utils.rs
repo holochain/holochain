@@ -90,13 +90,25 @@ fn test_env(kind: EnvironmentKind) -> TestEnvironment {
 }
 
 /// A test lmdb environment with test directory
-#[derive(Shrinkwrap)]
+#[derive(Clone, Shrinkwrap)]
 pub struct TestEnvironment {
     #[shrinkwrap(main_field)]
     /// lmdb environment
     pub env: EnvironmentWrite,
     /// temp directory for this environment
     pub tmpdir: Arc<TempDir>,
+}
+
+impl TestEnvironment {
+    /// Accessor
+    pub fn env(&self) -> EnvironmentWrite {
+        self.env.clone()
+    }
+
+    /// Accessor
+    pub fn tmpdir(&self) -> Arc<TempDir> {
+        self.tmpdir.clone()
+    }
 }
 
 // FIXME: Currently the test environments using TempDirs above immediately

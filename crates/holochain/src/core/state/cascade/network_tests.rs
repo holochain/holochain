@@ -72,7 +72,8 @@ use unwrap_to::unwrap_to;
 async fn get_updates_cache() {
     observability::test_run().ok();
     // Database setup
-    let env = test_cell_env();
+    let test_env = test_cell_env();
+    let env = test_env.env();
     let dbs = env.dbs().await;
 
     let (element_fixt_store, _) = generate_fixt_store().await;
@@ -117,7 +118,8 @@ async fn get_updates_cache() {
 async fn get_meta_updates_meta_cache() {
     observability::test_run().ok();
     // Database setup
-    let env = test_cell_env();
+    let test_env = test_cell_env();
+    let env = test_env.env();
     let dbs = env.dbs().await;
     let env_ref = env.guard().await;
 
