@@ -1,4 +1,4 @@
-/// A convenient composition of CasBufFreshAsyncsepresenting source chain data.
+/// A convenient composition of CasBufFreshSyncs representing source chain data.
 ///
 /// Source chain data is split into three databases: one for headers, and two
 /// for public and private entries. Specifying the private_entries DB in a
@@ -10,7 +10,7 @@
 use crate::core::state::source_chain::{ChainInvalidReason, SourceChainError, SourceChainResult};
 use holo_hash::{EntryHash, HasHash, HeaderHash};
 use holochain_state::{
-    buffer::CasBufFreshAsync,
+    buffer::CasBufFreshSync,
     db::{
         GetDb, ELEMENT_CACHE_ENTRIES, ELEMENT_CACHE_HEADERS, ELEMENT_VAULT_HEADERS,
         ELEMENT_VAULT_PRIVATE_ENTRIES, ELEMENT_VAULT_PUBLIC_ENTRIES,
@@ -27,10 +27,10 @@ use holochain_zome_types::entry_def::EntryVisibility;
 use holochain_zome_types::{Entry, Header};
 use tracing::*;
 
-/// A CasBufFreshAsync with Entries for values
-pub type EntryCas = CasBufFreshAsync<Entry>;
-/// A CasBufFreshAsync with SignedHeaders for values
-pub type HeaderCas = CasBufFreshAsync<SignedHeader>;
+/// A CasBufFreshSync with Entries for values
+pub type EntryCas = CasBufFreshSync<Entry>;
+/// A CasBufFreshSync with SignedHeaders for values
+pub type HeaderCas = CasBufFreshSync<SignedHeader>;
 
 /// The representation of an ElementCache / ElementVault,
 /// using two or three DB references
@@ -48,14 +48,14 @@ impl ElementBuf {
         headers_store: SingleStore,
     ) -> DatabaseResult<Self> {
         let private_entries = if let Some(store) = private_entries_store {
-            Some(CasBufFreshAsync::new(env.clone(), store))
+            Some(CasBufFreshSync::new(env.clone(), store))
         } else {
             None
         };
         Ok(Self {
-            public_entries: CasBufFreshAsync::new(env.clone(), public_entries_store),
+            public_entries: CasBufFreshSync::new(env.clone(), public_entries_store),
             private_entries,
-            headers: CasBufFreshAsync::new(env, headers_store),
+            headers: CasBufFreshSync::new(env, headers_store),
         })
     }
 

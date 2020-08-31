@@ -28,10 +28,8 @@ pub fn update_entry<'a>(
 
     // build the entry hash
     let async_entry = entry.clone();
-    let entry_hash = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-        holochain_types::entry::EntryHashed::from_content_sync(async_entry)
-    })
-    .into_hash();
+    let entry_hash =
+        holochain_types::entry::EntryHashed::from_content_sync(async_entry).into_hash();
 
     // extract the zome position
     let header_zome_id = ribosome.zome_name_to_id(&call_context.zome_name)?;
