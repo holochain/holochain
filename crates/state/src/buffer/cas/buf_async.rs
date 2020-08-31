@@ -2,7 +2,7 @@ use crate::{
     buffer::{BufferedStore, KvBufUsed},
     env::EnvironmentRead,
     error::{DatabaseError, DatabaseResult},
-    fatal_db_hash_integrity_check, fresh_reader,
+    fatal_db_hash_integrity_check, fresh_reader, fresh_reader_async,
     prelude::*,
     transaction::Readable,
 };
@@ -134,16 +134,7 @@ where
         &'a self,
         hash: &'a HoloHashOf<C>,
     ) -> DatabaseResult<Option<HoloHashed<C>>> {
-        Ok(
-            if let Some(content) = fresh_reader!(self.env, |r| self.0.get(&r, hash))? {
-                Some(CasBufUsedAsync::deserialize_and_hash_blocking(
-                    hash.get_full_bytes(),
-                    content,
-                ))
-            } else {
-                None
-            },
-        )
+        fresh_reader_async!(self.env, |r| async move { self.inner.get(&r, hash).await })
     }
 
     /// Check if a value is stored at this key
