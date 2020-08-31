@@ -75,7 +75,7 @@ mod tests {
             entry_type: fx.entry_type(),
         };
         let update = builder.build(fx.common());
-        let header = HeaderHashed::from_content(update.clone().into()).await;
+        let header = HeaderHashed::from_content_sync(update.clone().into());
         (update, header)
     }
 
@@ -88,7 +88,7 @@ mod tests {
             entry_type: fx.entry_type(),
         };
         let create = builder.build(fx.common());
-        let header = HeaderHashed::from_content(create.clone().into()).await;
+        let header = HeaderHashed::from_content_sync(create.clone().into());
         (create, header)
     }
 
@@ -102,7 +102,7 @@ mod tests {
             removes_entry_address,
         };
         let delete = builder.build(fx.common());
-        let header = HeaderHashed::from_content(delete.clone().into()).await;
+        let header = HeaderHashed::from_content_sync(delete.clone().into());
         (delete, header)
     }
 

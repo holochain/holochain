@@ -2,18 +2,18 @@ use holo_hash::WasmHash;
 use holochain_state::error::{DatabaseError, DatabaseResult};
 use holochain_state::exports::SingleStore;
 use holochain_state::{
-    buffer::CasBufFresh,
+    buffer::CasBufFreshAsync,
     prelude::{BufferedStore, EnvironmentRead},
     transaction::Writer,
 };
 use holochain_types::dna::wasm::{DnaWasm, DnaWasmHashed};
 
 /// This is where wasm lives
-pub struct WasmBuf(CasBufFresh<DnaWasm>);
+pub struct WasmBuf(CasBufFreshAsync<DnaWasm>);
 
 impl WasmBuf {
     pub fn new(env: EnvironmentRead, wasm_store: SingleStore) -> DatabaseResult<Self> {
-        Ok(Self(CasBufFresh::new(env, wasm_store)))
+        Ok(Self(CasBufFreshAsync::new(env, wasm_store)))
     }
 
     pub async fn get(&self, wasm_hash: &WasmHash) -> DatabaseResult<Option<DnaWasmHashed>> {
