@@ -8,7 +8,7 @@ use holochain_state::{
     error::DatabaseResult,
     prelude::{EnvironmentRead, GetDb},
 };
-use holochain_types::{dht_op::DhtOp, Timestamp};
+use holochain_types::{dht_op::DhtOpLight, Timestamp};
 use shrinkwraprs::Shrinkwrap;
 
 #[derive(Shrinkwrap)]
@@ -25,7 +25,7 @@ pub struct ValidationLimboValue {
     /// Status of this op in the limbo
     pub status: ValidationLimboStatus,
     /// The actual op
-    pub op: DhtOp,
+    pub op: DhtOpLight,
     /// Where the op was sent to
     pub basis: AnyDhtHash,
     /// When the op was added to limbo

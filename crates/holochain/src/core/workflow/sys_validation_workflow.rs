@@ -35,12 +35,17 @@ use holochain_zome_types::{
     header::{ElementDelete, EntryType, EntryUpdate, LinkAdd, LinkRemove},
     Header,
 };
-use std::convert::TryInto;
+use std::{collections::BinaryHeap, convert::TryInto};
 use tracing::*;
 
-use types::{DhtOpOrder, Outcome};
+use integrate_dht_ops_workflow::{
+    disintegrate_single_metadata, disintegrate_single_op, integrate_single_metadata,
+    integrate_single_op,
+};
+use produce_dht_ops_workflow::dht_op_light::light_to_op;
+use types::{DhtOpOrder, OrderedOp, Outcome};
 
-mod types;
+pub mod types;
 
 #[cfg(test)]
 mod tests;
@@ -73,7 +78,7 @@ async fn sys_validation_workflow_inner(
 ) -> WorkflowResult<WorkComplete> {
     let env = workspace.validation_limbo.env().clone();
     // Drain all the ops
-    let mut ops: Vec<ValidationLimboValue> = fresh_reader!(env, |r| workspace
+    let ops: Vec<ValidationLimboValue> = fresh_reader!(env, |r| workspace
         .validation_limbo
         .drain_iter_filter(&r, |(_, vlv)| {
             match vlv.status {
@@ -89,11 +94,29 @@ async fn sys_validation_workflow_inner(
         .collect())?;
 
     // Sort the ops
-    ops.sort_unstable_by_key(|v| DhtOpOrder::from(&v.op));
+    let mut sorted_ops = BinaryHeap::new();
+    for vlv in ops {
+        let op = light_to_op(vlv.op.clone(), &workspace.element_pending).await?;
+        let hash = DhtOpHash::with_data(&op).await;
+        let order = DhtOpOrder::from(&op);
+        let v = OrderedOp {
+            order,
+            hash,
+            op,
+            value: vlv,
+        };
+        sorted_ops.push(v);
+    }
 
     // Process each op
-    for mut vlv in ops {
-        let outcome = validate_op(&vlv.op, workspace, network.clone(), &conductor_api).await?;
+    for so in sorted_ops {
+        let OrderedOp {
+            hash: op_hash,
+            op,
+            value: mut vlv,
+            ..
+        } = so;
+        let outcome = validate_op(&op, workspace, network.clone(), &conductor_api).await?;
 
         // TODO: When we introduce abandoning ops make
         // sure they are not written to any outgoing
@@ -102,14 +125,14 @@ async fn sys_validation_workflow_inner(
         match outcome {
             Outcome::Accepted => {
                 vlv.status = ValidationLimboStatus::SysValidated;
-                to_val_limbo(vlv, workspace).await?;
+                workspace.to_val_limbo(op_hash, vlv).await?;
             }
             Outcome::SkipAppValidation => {
                 let iv = IntegrationLimboValue {
                     op: vlv.op,
                     validation_status: ValidationStatus::Valid,
                 };
-                to_int_limbo(iv, workspace).await?;
+                workspace.to_int_limbo(op_hash, iv, op).await?;
             }
             Outcome::AwaitingOpDep(missing_dep) => {
                 // TODO: Try and get this dependency to add to limbo
@@ -128,42 +151,22 @@ async fn sys_validation_workflow_inner(
                 // However we are that authority by definition so maybe we should
                 // just trigger a general gossip fetch at this point?
                 vlv.status = ValidationLimboStatus::AwaitingSysDeps(missing_dep);
-                to_val_limbo(vlv, workspace).await?;
+                workspace.to_val_limbo(op_hash, vlv).await?;
             }
             Outcome::MissingDhtDep => {
                 vlv.status = ValidationLimboStatus::Pending;
-                to_val_limbo(vlv, workspace).await?;
+                workspace.to_val_limbo(op_hash, vlv).await?;
             }
             Outcome::Rejected => {
                 let iv = IntegrationLimboValue {
                     op: vlv.op,
                     validation_status: ValidationStatus::Rejected,
                 };
-                to_int_limbo(iv, workspace).await?;
+                workspace.to_int_limbo(op_hash, iv, op).await?;
             }
         }
     }
     Ok(WorkComplete::Complete)
-}
-
-async fn to_val_limbo(
-    mut vlv: ValidationLimboValue,
-    workspace: &mut SysValidationWorkspace,
-) -> WorkflowResult<()> {
-    let hash = DhtOpHash::with_data(&vlv.op).await;
-    vlv.last_try = Some(Timestamp::now());
-    vlv.num_tries += 1;
-    workspace.validation_limbo.put(hash, vlv)?;
-    Ok(())
-}
-
-async fn to_int_limbo(
-    iv: IntegrationLimboValue,
-    workspace: &mut SysValidationWorkspace,
-) -> WorkflowResult<()> {
-    let hash = DhtOpHash::with_data(&iv.op).await;
-    workspace.integration_limbo.put(hash, iv)?;
-    Ok(())
 }
 
 async fn validate_op(
@@ -450,8 +453,16 @@ fn update_check(entry_update: &EntryUpdate, original_header: &Header) -> SysVali
 pub struct SysValidationWorkspace {
     pub integration_limbo: IntegrationLimboStore,
     pub validation_limbo: ValidationLimboStore,
+    // Integrated data
     pub element_vault: ElementBuf,
     pub meta_vault: MetadataBuf,
+    // Data pending validation
+    pub element_pending: ElementBuf<PendingPrefix>,
+    pub meta_pending: MetadataBuf<PendingPrefix>,
+    // Data that has progressed past validation and is pending Integration
+    pub element_validated: ElementBuf<ValidatedPrefix>,
+    pub meta_validated: MetadataBuf<ValidatedPrefix>,
+    // Cached data
     pub element_cache: ElementBuf,
     pub meta_cache: MetadataBuf,
 }
@@ -479,16 +490,56 @@ impl SysValidationWorkspace {
         let element_vault = ElementBuf::vault(env.clone(), dbs, false)?;
         let meta_vault = MetadataBuf::vault(env.clone(), dbs)?;
         let element_cache = ElementBuf::cache(env.clone(), dbs)?;
-        let meta_cache = MetadataBuf::cache(env, dbs)?;
+        let meta_cache = MetadataBuf::cache(env.clone(), dbs)?;
+
+        let element_pending = ElementBuf::pending(env.clone(), dbs)?;
+        let meta_pending = MetadataBuf::pending(env.clone(), dbs)?;
+
+        let element_validated = ElementBuf::validated(env.clone(), dbs)?;
+        let meta_validated = MetadataBuf::validated(env, dbs)?;
 
         Ok(Self {
             integration_limbo,
             validation_limbo,
             element_vault,
             meta_vault,
+            element_pending,
+            meta_pending,
+            element_validated,
+            meta_validated,
             element_cache,
             meta_cache,
         })
+    }
+    async fn to_val_limbo(
+        &mut self,
+        hash: DhtOpHash,
+        mut vlv: ValidationLimboValue,
+    ) -> WorkflowResult<()> {
+        vlv.last_try = Some(Timestamp::now());
+        vlv.num_tries += 1;
+        self.validation_limbo.put(hash, vlv)?;
+        Ok(())
+    }
+
+    async fn to_int_limbo(
+        &mut self,
+        hash: DhtOpHash,
+        iv: IntegrationLimboValue,
+        op: DhtOp,
+    ) -> WorkflowResult<()> {
+        disintegrate_single_metadata(iv.op.clone(), &self.element_pending, &mut self.meta_pending)
+            .await?;
+        disintegrate_single_op(iv.op.clone(), &mut self.element_pending);
+        integrate_single_op(op, &mut self.element_pending).await?;
+        integrate_single_metadata(
+            iv.op.clone(),
+            &self.element_validated,
+            &mut self.meta_validated,
+        )
+        .await?;
+        self.integration_limbo.put(hash, iv)?;
+        Ok(())
     }
 }
 
@@ -499,6 +550,11 @@ impl Workspace for SysValidationWorkspace {
         // Flush for cascade
         self.element_cache.flush_to_txn(writer)?;
         self.meta_cache.flush_to_txn(writer)?;
+
+        self.element_pending.flush_to_txn(writer)?;
+        self.meta_pending.flush_to_txn(writer)?;
+        self.element_validated.flush_to_txn(writer)?;
+        self.meta_validated.flush_to_txn(writer)?;
         Ok(())
     }
 }

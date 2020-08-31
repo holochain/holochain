@@ -26,16 +26,22 @@ use holochain_state::{
     prelude::*,
 };
 use holochain_types::{
-    dht_op::{produce_op_lights_from_elements, DhtOp, DhtOpHashed, DhtOpLight},
+    dht_op::{produce_op_lights_from_elements, DhtOp, DhtOpLight},
     element::{Element, SignedHeaderHashed, SignedHeaderHashedExt},
-    validate::ValidationStatus,
     Entry, EntryHashed, Timestamp,
 };
 use holochain_zome_types::{element::SignedHeader, Header};
-use produce_dht_ops_workflow::dht_op_light::error::{DhtOpConvertError, DhtOpConvertResult};
-use std::convert::TryInto;
+use produce_dht_ops_workflow::dht_op_light::{
+    error::{DhtOpConvertError, DhtOpConvertResult},
+    light_to_op,
+};
+use std::{collections::BinaryHeap, convert::TryInto};
+use sys_validation_workflow::types::{DhtOpOrder, OrderedOp};
 use tracing::*;
 
+pub use disintegrate::*;
+
+mod disintegrate;
 mod tests;
 
 #[instrument(skip(workspace, writer, trigger_sys))]
@@ -49,37 +55,25 @@ pub async fn integrate_dht_ops_workflow(
     // Pull ops out of queue
     // TODO: PERF: we collect() only because this iterator cannot cross awaits,
     // but is there a way to do this without collect()?
-    let ops: Vec<DatabaseResult<IntegrationLimboValue>> =
-        fresh_reader!(env, |r| DatabaseResult::Ok(
-            workspace
-                .integration_limbo
-                .drain_iter(&r)?
-                .iterator()
-                .collect::<Vec<_>>()
-        ))?;
+    let ops: Vec<IntegrationLimboValue> = fresh_reader!(env, |r| workspace
+        .integration_limbo
+        .drain_iter(&r)?
+        .collect())?;
 
-    // Compute hashes for all dht_ops, include in tuples alongside db values
-    let mut ops = futures::future::join_all(
-        ops.into_iter()
-            .map(|val| {
-                val.map(|val| async move {
-                    let IntegrationLimboValue {
-                        op,
-                        validation_status,
-                    } = val;
-                    let (op, op_hash) = DhtOpHashed::from_content(op).await.into_inner();
-                    (
-                        op_hash,
-                        IntegrationLimboValue {
-                            op,
-                            validation_status,
-                        },
-                    )
-                })
-            })
-            .collect::<Result<Vec<_>, _>>()?,
-    )
-    .await;
+    // Sort the ops
+    let mut sorted_ops = BinaryHeap::new();
+    for iv in ops {
+        let op = light_to_op(iv.op.clone(), &workspace.element_validated).await?;
+        let hash = DhtOpHash::with_data(&op).await;
+        let order = DhtOpOrder::from(&op);
+        let v = OrderedOp {
+            order,
+            hash,
+            op,
+            value: iv,
+        };
+        sorted_ops.push(v);
+    }
 
     let mut total_integrated: usize = 0;
 
@@ -88,43 +82,55 @@ pub async fn integrate_dht_ops_workflow(
     // We do this because items in the queue may depend on one another but may
     // be out-of-order wrt. dependencies, so there is a chance that by repeating
     // integration, we may be able to integrate at least one more item.
-    //
-    // A less naive approach would be to intelligently reorder the queue to
-    // guarantee that intra-queue dependencies are correctly ordered, but ain't
-    // nobody got time for that right now! TODO: make time for this?
-    while {
+    loop {
         let mut num_integrated: usize = 0;
-        let mut next_ops = Vec::new();
-        for (op_hash, value) in ops {
-            // only integrate this op if it hasn't been integrated already!
-            if workspace.integrated_dht_ops.get(&op_hash)?.is_none() {
-                match integrate_single_dht_op(value, &mut workspace.elements, &mut workspace.meta)
-                    .await?
-                {
-                    Outcome::Integrated(integrated) => {
-                        workspace.integrated_dht_ops.put(op_hash, integrated)?;
-                        num_integrated += 1;
-                        total_integrated += 1;
-                    }
-                    Outcome::Deferred(deferred) => next_ops.push((op_hash, deferred)),
+        let mut next_ops = BinaryHeap::new();
+        for so in sorted_ops {
+            let OrderedOp {
+                hash,
+                op,
+                value,
+                order,
+            } = so;
+            match integrate_single_dht_op(
+                value.clone(),
+                op,
+                &mut workspace.elements,
+                &mut workspace.meta,
+            )
+            .await?
+            {
+                Outcome::Integrated(integrated) => {
+                    workspace.integrate(hash, integrated).await?;
+                    num_integrated += 1;
+                    total_integrated += 1;
                 }
+                Outcome::Deferred(op) => next_ops.push(OrderedOp {
+                    hash,
+                    order,
+                    op,
+                    value,
+                }),
             }
         }
-        ops = next_ops;
-        ops.len() > 0 && num_integrated > 0
-    } { /* NB: this is actually a do-while loop! */ }
+        sorted_ops = next_ops;
+        // Either all ops are integrated or we couldn't integrate any on this pass
+        if sorted_ops.len() == 0 || num_integrated == 0 {
+            break;
+        }
+    }
 
-    let result = if ops.len() == 0 {
+    let result = if sorted_ops.len() == 0 {
         // There were no ops deferred, meaning we exhausted the queue
         WorkComplete::Complete
     } else {
         // Re-add the remaining ops to the queue, to be picked up next time.
-        for (op_hash, value) in ops {
+        for so in sorted_ops {
             // TODO: it may be desirable to retain the original timestamp
             // when re-adding items to the queue for later processing. This is
             // challenging for now since we don't have access to that original
             // key. Just a possible note for the future.
-            workspace.integration_limbo.put(op_hash, value)?;
+            workspace.integration_limbo.put(so.hash, so.value)?;
         }
         WorkComplete::Incomplete
     };
@@ -153,10 +159,11 @@ pub async fn integrate_dht_ops_workflow(
 #[instrument(skip(value, element_store, meta_store))]
 async fn integrate_single_dht_op(
     value: IntegrationLimboValue,
+    op: DhtOp,
     element_store: &mut ElementBuf,
     meta_store: &mut MetadataBuf,
 ) -> DhtOpConvertResult<Outcome> {
-    match integrate_single_element(value, element_store).await? {
+    match integrate_single_element(value, op, element_store).await? {
         Outcome::Integrated(v) => {
             integrate_single_metadata(v.op.clone(), element_store, meta_store).await?;
             debug!("integrating");
@@ -167,33 +174,11 @@ async fn integrate_single_dht_op(
 }
 
 async fn integrate_single_element(
-    value: IntegrationLimboValue,
+    iv: IntegrationLimboValue,
+    op: DhtOp,
     element_store: &mut ElementBuf,
 ) -> DhtOpConvertResult<Outcome> {
     {
-        // Process each op
-        let IntegrationLimboValue {
-            op,
-            validation_status,
-        } = value;
-        let light_op = op.to_light().await;
-
-        async fn put_data(
-            signature: Signature,
-            header: Header,
-            maybe_entry: Option<Entry>,
-            element_store: &mut ElementBuf,
-        ) -> DhtOpConvertResult<()> {
-            let signed_header =
-                SignedHeaderHashed::from_content(SignedHeader(header, signature)).await;
-            let maybe_entry_hashed = match maybe_entry {
-                Some(entry) => Some(EntryHashed::from_content(entry).await),
-                None => None,
-            };
-            element_store.put(signed_header, maybe_entry_hashed)?;
-            Ok(())
-        }
-
         async fn header_with_entry_is_stored(
             hash: &HeaderHash,
             element_store: &ElementBuf,
@@ -242,7 +227,7 @@ async fn integrate_single_element(
                 .await?
                 {
                     let op = DhtOp::RegisterUpdatedBy(signature, entry_update);
-                    return Outcome::deferred(op, validation_status);
+                    return Outcome::deferred(op);
                 }
                 put_data(signature, entry_update.into(), None, element_store).await?;
             }
@@ -254,7 +239,7 @@ async fn integrate_single_element(
                 {
                     // Can't combine the two delete match arms without cloning the op
                     let op = DhtOp::RegisterDeletedEntryHeader(signature, element_delete);
-                    return Outcome::deferred(op, validation_status);
+                    return Outcome::deferred(op);
                 }
                 put_data(signature, element_delete.into(), None, element_store).await?;
             }
@@ -265,7 +250,7 @@ async fn integrate_single_element(
                     .await?
                 {
                     let op = DhtOp::RegisterDeletedBy(signature, element_delete);
-                    return Outcome::deferred(op, validation_status);
+                    return Outcome::deferred(op);
                 }
                 put_data(signature, element_delete.into(), None, element_store).await?;
             }
@@ -274,7 +259,7 @@ async fn integrate_single_element(
                 // If not then this should put the op back on the queue.
                 if !entry_is_stored(&link_add.base_address).await? {
                     let op = DhtOp::RegisterAddLink(signature, link_add);
-                    return Outcome::deferred(op, validation_status);
+                    return Outcome::deferred(op);
                 }
 
                 put_data(signature, link_add.into(), None, element_store).await?;
@@ -287,7 +272,7 @@ async fn integrate_single_element(
                     || !header_is_stored(&link_remove.link_add_address).await?
                 {
                     let op = DhtOp::RegisterRemoveLink(signature, link_remove);
-                    return Outcome::deferred(op, validation_status);
+                    return Outcome::deferred(op);
                 }
 
                 put_data(signature, link_remove.into(), None, element_store).await?;
@@ -295,32 +280,19 @@ async fn integrate_single_element(
         }
 
         let value = IntegratedDhtOpsValue {
-            validation_status,
-            op: light_op,
+            validation_status: iv.validation_status,
+            op: iv.op,
             when_integrated: Timestamp::now(),
         };
         Ok(Outcome::Integrated(value))
     }
 }
 
-pub async fn integrate_single_metadata<C: MetadataBufT>(
+pub async fn integrate_single_metadata<C: MetadataBufT, P: PrefixType>(
     op: DhtOpLight,
-    element_store: &ElementBuf,
+    element_store: &ElementBuf<P>,
     meta_store: &mut C,
 ) -> DhtOpConvertResult<()> {
-    async fn get_header(
-        hash: HeaderHash,
-        element_store: &ElementBuf,
-    ) -> DhtOpConvertResult<Header> {
-        Ok(element_store
-            .get_header(&hash)
-            .await?
-            .ok_or(DhtOpConvertError::MissingData)?
-            .into_header_and_signature()
-            .0
-            .into_content())
-    }
-
     match op {
         DhtOpLight::StoreElement(hash, _, _) => {
             let header = get_header(hash, element_store).await?;
@@ -358,6 +330,76 @@ pub async fn integrate_single_metadata<C: MetadataBufT>(
     Ok(())
 }
 
+/// Store a DhtOp's data in an element buf without dependency checks
+pub async fn integrate_single_op<P: PrefixType>(
+    op: DhtOp,
+    element_store: &mut ElementBuf<P>,
+) -> DhtOpConvertResult<()> {
+    {
+        match op {
+            DhtOp::StoreElement(signature, header, maybe_entry) => {
+                put_data(signature, header, maybe_entry.map(|e| *e), element_store).await?;
+            }
+            DhtOp::StoreEntry(signature, new_entry_header, entry) => {
+                put_data(
+                    signature,
+                    new_entry_header.into(),
+                    Some(*entry),
+                    element_store,
+                )
+                .await?;
+            }
+            DhtOp::RegisterAgentActivity(signature, header) => {
+                put_data(signature, header, None, element_store).await?;
+            }
+            DhtOp::RegisterUpdatedBy(signature, entry_update) => {
+                put_data(signature, entry_update.into(), None, element_store).await?;
+            }
+            DhtOp::RegisterDeletedEntryHeader(signature, element_delete) => {
+                put_data(signature, element_delete.into(), None, element_store).await?;
+            }
+            DhtOp::RegisterDeletedBy(signature, element_delete) => {
+                put_data(signature, element_delete.into(), None, element_store).await?;
+            }
+            DhtOp::RegisterAddLink(signature, link_add) => {
+                put_data(signature, link_add.into(), None, element_store).await?;
+            }
+            DhtOp::RegisterRemoveLink(signature, link_remove) => {
+                put_data(signature, link_remove.into(), None, element_store).await?;
+            }
+        }
+        Ok(())
+    }
+}
+
+async fn put_data<P: PrefixType>(
+    signature: Signature,
+    header: Header,
+    maybe_entry: Option<Entry>,
+    element_store: &mut ElementBuf<P>,
+) -> DhtOpConvertResult<()> {
+    let signed_header = SignedHeaderHashed::from_content(SignedHeader(header, signature)).await;
+    let maybe_entry_hashed = match maybe_entry {
+        Some(entry) => Some(EntryHashed::from_content(entry).await),
+        None => None,
+    };
+    element_store.put(signed_header, maybe_entry_hashed)?;
+    Ok(())
+}
+
+async fn get_header<P: PrefixType>(
+    hash: HeaderHash,
+    element_store: &ElementBuf<P>,
+) -> DhtOpConvertResult<Header> {
+    Ok(element_store
+        .get_header(&hash)
+        .await?
+        .ok_or(DhtOpConvertError::MissingData)?
+        .into_header_and_signature()
+        .0
+        .into_content())
+}
+
 /// After writing an Element to our chain, we want to integrate the meta ops
 /// inline, so that they are immediately available in the meta cache.
 /// NB: We skip integrating the element data, since it is already available in
@@ -378,15 +420,12 @@ pub async fn integrate_to_cache<C: MetadataBufT>(
 /// The outcome of integrating a single DhtOp: either it was, or it wasn't
 enum Outcome {
     Integrated(IntegratedDhtOpsValue),
-    Deferred(IntegrationLimboValue),
+    Deferred(DhtOp),
 }
 
 impl Outcome {
-    fn deferred(op: DhtOp, validation_status: ValidationStatus) -> DhtOpConvertResult<Self> {
-        Ok(Outcome::Deferred(IntegrationLimboValue {
-            op,
-            validation_status,
-        }))
+    fn deferred(op: DhtOp) -> DhtOpConvertResult<Self> {
+        Ok(Outcome::Deferred(op))
     }
 }
 
@@ -399,6 +438,9 @@ pub struct IntegrateDhtOpsWorkspace {
     pub elements: ElementBuf,
     // metadata store
     pub meta: MetadataBuf,
+    // Data that has progressed past validation and is pending Integration
+    pub element_validated: ElementBuf<ValidatedPrefix>,
+    pub meta_validated: MetadataBuf<ValidatedPrefix>,
 }
 
 impl Workspace for IntegrateDhtOpsWorkspace {
@@ -411,6 +453,8 @@ impl Workspace for IntegrateDhtOpsWorkspace {
         self.integrated_dht_ops.flush_to_txn(writer)?;
         // flush integration queue
         self.integration_limbo.flush_to_txn(writer)?;
+        self.element_validated.flush_to_txn(writer)?;
+        self.meta_validated.flush_to_txn(writer)?;
         Ok(())
     }
 }
@@ -425,14 +469,35 @@ impl IntegrateDhtOpsWorkspace {
         let integration_limbo = KvBufFresh::new(env.clone(), db);
 
         let elements = ElementBuf::vault(env.clone(), dbs, true)?;
-        let meta = MetadataBuf::vault(env, dbs)?;
+        let meta = MetadataBuf::vault(env.clone(), dbs)?;
+
+        let element_validated = ElementBuf::validated(env.clone(), dbs)?;
+        let meta_validated = MetadataBuf::validated(env, dbs)?;
 
         Ok(Self {
             integration_limbo,
             integrated_dht_ops,
             elements,
             meta,
+            element_validated,
+            meta_validated,
         })
+    }
+
+    async fn integrate(
+        &mut self,
+        hash: DhtOpHash,
+        v: IntegratedDhtOpsValue,
+    ) -> DhtOpConvertResult<()> {
+        disintegrate_single_metadata(
+            v.op.clone(),
+            &self.element_validated,
+            &mut self.meta_validated,
+        )
+        .await?;
+        disintegrate_single_op(v.op.clone(), &mut self.element_validated);
+        self.integrated_dht_ops.put(hash, v)?;
+        Ok(())
     }
 
     pub fn op_exists(&self, hash: &DhtOpHash) -> DatabaseResult<bool> {

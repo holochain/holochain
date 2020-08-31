@@ -154,10 +154,11 @@ where
     }
 }
 
-impl<C> BufferedStore for CasBufUsed<C>
+impl<C, P> BufferedStore for CasBufUsed<C, P>
 where
     C: HashableContent + BufVal + Send + Sync,
     C::HashType: PrimitiveHashType + Send + Sync,
+    P: PrefixType,
 {
     type Error = DatabaseError;
 
@@ -171,10 +172,11 @@ where
     }
 }
 
-impl<C> BufferedStore for CasBufFresh<C>
+impl<C, P> BufferedStore for CasBufFresh<C, P>
 where
     C: HashableContent + BufVal + Send + Sync,
     C::HashType: PrimitiveHashType + Send + Sync,
+    P: PrefixType,
 {
     type Error = DatabaseError;
 

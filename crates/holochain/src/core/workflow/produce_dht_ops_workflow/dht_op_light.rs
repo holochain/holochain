@@ -12,6 +12,7 @@ use holochain_zome_types::header::{self, Header};
 pub mod error;
 
 use tracing::*;
+use holochain_state::prelude::PrefixType;
 
 #[cfg(test)]
 mod tests;
@@ -19,7 +20,7 @@ mod tests;
 /// Convert a DhtOpLight into a DhtOp (render all the hashes to values)
 /// This only checks the ElementVault so can only be used with ops that you are
 /// an authority or author of.
-pub async fn light_to_op(op: DhtOpLight, cas: &ElementBuf) -> DhtOpConvertResult<DhtOp> {
+pub async fn light_to_op<P: PrefixType>(op: DhtOpLight, cas: &ElementBuf<P>) -> DhtOpConvertResult<DhtOp> {
     let op_name = format!("{:?}", op);
     match op {
         DhtOpLight::StoreElement(h, _, _) => {
@@ -133,10 +134,10 @@ pub async fn light_to_op(op: DhtOpLight, cas: &ElementBuf) -> DhtOpConvertResult
     }
 }
 
-async fn get_element_delete(
+async fn get_element_delete<P: PrefixType>(
     header_hash: HeaderHash,
     op_name: String,
-    cas: &ElementBuf,
+    cas: &ElementBuf<P>,
 ) -> DhtOpConvertResult<(header::ElementDelete, Signature)> {
     let (header, sig) = cas
         .get_element(&header_hash)

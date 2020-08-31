@@ -263,12 +263,14 @@ where
         Ok(())
     }
 
-    pub fn delete(&mut self, header_hash: HeaderHash, entry_hash: EntryHash) {
+    pub fn delete(&mut self, header_hash: HeaderHash, entry_hash: Option<EntryHash>) {
         self.headers.delete(header_hash);
-        if let Some(db) = self.private_entries.as_mut() {
-            db.delete(entry_hash.clone())
+        if let Some(entry_hash) = entry_hash {
+            if let Some(db) = self.private_entries.as_mut() {
+                db.delete(entry_hash.clone())
+            }
+            self.public_entries.delete(entry_hash);
         }
-        self.public_entries.delete(entry_hash);
     }
 
     pub fn headers(&self) -> &HeaderCas<P> {
@@ -294,7 +296,7 @@ where
     }
 }
 
-impl BufferedStore for ElementBuf {
+impl<P: PrefixType> BufferedStore for ElementBuf<P> {
     type Error = DatabaseError;
 
     fn is_clean(&self) -> bool {

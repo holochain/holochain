@@ -1,4 +1,5 @@
 use super::*;
+use derivative::Derivative;
 
 #[derive(Debug)]
 /// The outcome of sys validation
@@ -33,6 +34,18 @@ pub enum DhtOpOrder {
     RegisterDeletedEntryHeader,
     RegisterAddLink,
     RegisterRemoveLink,
+}
+
+#[derive(Derivative, Debug, Clone)]
+#[derivative(Eq, PartialEq, Ord, PartialOrd)]
+pub struct OrderedOp<V> {
+    pub order: DhtOpOrder,
+    #[derivative(PartialEq="ignore", PartialOrd="ignore", Ord="ignore")]
+    pub hash: DhtOpHash,
+    #[derivative(PartialEq="ignore", PartialOrd="ignore", Ord="ignore")]
+    pub op: DhtOp,
+    #[derivative(PartialEq="ignore", PartialOrd="ignore", Ord="ignore")]
+    pub value: V,
 }
 
 impl From<&DhtOp> for DhtOpOrder {
