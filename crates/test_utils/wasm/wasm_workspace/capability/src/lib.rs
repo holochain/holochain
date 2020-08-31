@@ -7,32 +7,14 @@ fn init(_: ()) -> ExternResult<InitCallbackResult> {
     functions.insert((zome_info!()?.zome_name, "accept_cap_claim".into()));
     commit_cap_grant!(
         CapGrantEntry {
+            tag: "".into(),
             // empty access converts to unrestricted
             access: ().into(),
             functions,
-            ..Default::default()
         }
     )?;
 
     Ok(InitCallbackResult::Pass)
-}
-
-#[macro_export]
-macro_rules! set_externs_cap_unrestricted {
-    ( $externs:expr ) => {{
-        match $crate::prelude::zome_info!() {
-            Ok(zome_info) => {
-                $crate::prelude::commit_cap_grant!(
-                    CapGrantEntry {
-                        // a standalone secret converts to transferable access
-                        access: secret.into(),
-                        ..Default::default()
-                    }
-                )
-            },
-            Err(e) => Err(e),
-        }
-    }};
 }
 
 #[hdk_extern]
@@ -83,7 +65,6 @@ fn send_assigned_cap_claim(agent: AgentPubKey) -> ExternResult<()> {
         access: (secret, agent.clone()).into(),
         functions,
         tag: tag.clone(),
-        ..Default::default()
     })?;
 
     // send the assigned cap token
