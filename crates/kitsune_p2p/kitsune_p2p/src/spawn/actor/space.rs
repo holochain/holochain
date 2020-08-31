@@ -30,7 +30,7 @@ ghost_actor::ghost_chan! {
     pub(crate) chan SpaceInternal<crate::KitsuneP2pError> {
         /// Make a remote request right-now if we have an open connection,
         /// otherwise, return an error.
-        fn immediate_request(space: Arc<KitsuneSpace>, agent: Arc<KitsuneAgent>, data: Arc<Vec<u8>>) -> Vec<u8>;
+        fn immediate_request(space: Arc<KitsuneSpace>, to_agent: Arc<KitsuneAgent>, from_agent: Arc<KitsuneAgent>, data: Arc<Vec<u8>>) -> Vec<u8>;
 
         /// List online agents that claim to be covering a basis hash
         fn list_online_agents_for_basis_hash(space: Arc<KitsuneSpace>, basis: Arc<KitsuneBasis>) -> Vec<Arc<KitsuneAgent>>;
@@ -120,15 +120,20 @@ impl gossip::GossipEventHandler for Space {
 
     fn handle_gossip_ops(
         &mut self,
-        _from_agent: Arc<KitsuneAgent>,
+        from_agent: Arc<KitsuneAgent>,
         to_agent: Arc<KitsuneAgent>,
         ops: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
     ) -> gossip::GossipEventHandlerResult<()> {
         let all = ops
             .into_iter()
             .map(|(op_hash, op_data)| {
-                self.evt_sender
-                    .gossip(self.space.clone(), to_agent.clone(), op_hash, op_data)
+                self.evt_sender.gossip(
+                    self.space.clone(),
+                    to_agent.clone(),
+                    from_agent.clone(),
+                    op_hash,
+                    op_data,
+                )
             })
             .collect::<Vec<_>>();
         Ok(async move {
@@ -153,18 +158,19 @@ impl SpaceInternalHandler for Space {
     fn handle_immediate_request(
         &mut self,
         _space: Arc<KitsuneSpace>,
-        agent: Arc<KitsuneAgent>,
+        to_agent: Arc<KitsuneAgent>,
+        from_agent: Arc<KitsuneAgent>,
         data: Arc<Vec<u8>>,
     ) -> SpaceInternalHandlerResult<Vec<u8>> {
         // Right now we are only implementing the "short-circuit"
         // that routes messages to other agents joined on this same system.
         // I.e. we don't bother with peer discovery because we know the
         // remote is local.
-        if !self.agents.contains_key(&agent) {
-            return Err(KitsuneP2pError::RoutingAgentError(agent));
+        if !self.agents.contains_key(&to_agent) {
+            return Err(KitsuneP2pError::RoutingAgentError(to_agent));
         }
 
-        // that agent *is* joined - let's forward the request
+        // to_agent *is* joined - let's forward the request
         let space = self.space.clone();
 
         // clone the event sender
@@ -178,14 +184,18 @@ impl SpaceInternalHandler for Space {
 
         match data {
             wire::Wire::Call(payload) => {
-                Ok(async move { evt_sender.call(space, agent, payload).await }
-                    .instrument(tracing::debug_span!("wire_call"))
-                    .boxed()
-                    .into())
+                Ok(
+                    async move { evt_sender.call(space, to_agent, from_agent, payload).await }
+                        .instrument(tracing::debug_span!("wire_call"))
+                        .boxed()
+                        .into(),
+                )
             }
             wire::Wire::Notify(payload) => {
                 Ok(async move {
-                    evt_sender.notify(space, agent, payload).await?;
+                    evt_sender
+                        .notify(space, to_agent, from_agent, payload)
+                        .await?;
                     // broadcast doesn't return anything...
                     Ok(vec![])
                 }
@@ -238,7 +248,8 @@ impl KitsuneP2pHandler for Space {
     fn handle_rpc_single(
         &mut self,
         _space: Arc<KitsuneSpace>,
-        agent: Arc<KitsuneAgent>,
+        to_agent: Arc<KitsuneAgent>,
+        from_agent: Arc<KitsuneAgent>,
         payload: Vec<u8>,
     ) -> KitsuneP2pHandlerResult<Vec<u8>> {
         let space = self.space.clone();
@@ -251,7 +262,12 @@ impl KitsuneP2pHandler for Space {
             loop {
                 // attempt to send the request right now
                 let err = match internal_sender
-                    .immediate_request(space.clone(), agent.clone(), payload.clone())
+                    .immediate_request(
+                        space.clone(),
+                        to_agent.clone(),
+                        from_agent.clone(),
+                        payload.clone(),
+                    )
                     .instrument(ghost_actor::dependencies::tracing::debug_span!(
                         "handle_rpc_single_loop"
                     ))
@@ -414,7 +430,7 @@ impl Space {
 
         let i_s = self.internal_sender.clone();
         Ok(async move {
-            let mut agent = from_agent.clone();
+            let mut to_agent = from_agent.clone();
             'search_loop: for _ in 0..5 {
                 if let Ok(agent_list) = i_s
                     .list_online_agents_for_basis_hash(space.clone(), basis.clone())
@@ -422,7 +438,7 @@ impl Space {
                 {
                     for a in agent_list {
                         if a != from_agent {
-                            agent = a;
+                            to_agent = a;
                             break 'search_loop;
                         }
                     }
@@ -438,11 +454,14 @@ impl Space {
             // real networking
             if let Ok(Ok(response)) = tokio::time::timeout(
                 std::time::Duration::from_millis(20),
-                i_s.immediate_request(space, agent.clone(), payload),
+                i_s.immediate_request(space, to_agent.clone(), from_agent.clone(), payload),
             )
             .await
             {
-                out.push(actor::RpcMultiResponse { agent, response });
+                out.push(actor::RpcMultiResponse {
+                    agent: to_agent,
+                    response,
+                });
             }
 
             Ok(out)
@@ -460,6 +479,7 @@ impl Space {
     ) -> KitsuneP2pHandlerResult<u8> {
         let actor::NotifyMulti {
             space,
+            from_agent,
             basis,
             // ignore remote_agent_count for now - broadcast to everyone
             remote_agent_count: _,
@@ -496,19 +516,20 @@ impl Space {
                     .list_online_agents_for_basis_hash(space.clone(), basis.clone())
                     .await
                 {
-                    for agent in agent_list {
-                        if !sent_to.contains(&agent) {
-                            sent_to.insert(agent.clone());
+                    for to_agent in agent_list {
+                        if !sent_to.contains(&to_agent) {
+                            sent_to.insert(to_agent.clone());
                             // send the notify here - but spawn
                             // so we're not holding up this loop
                             let internal_sender = internal_sender.clone();
                             let space = space.clone();
                             let payload = payload.clone();
                             let send_success_count = send_success_count.clone();
+                            let from_agent2 = from_agent.clone();
                             tokio::task::spawn(
                                 async move {
                                     if let Ok(_) = internal_sender
-                                        .immediate_request(space, agent, payload)
+                                        .immediate_request(space, to_agent, from_agent2, payload)
                                         .await
                                     {
                                         send_success_count

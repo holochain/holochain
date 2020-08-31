@@ -136,9 +136,14 @@ mod tests {
         p2p.join(dna.clone(), a1.clone()).await.unwrap();
         p2p.join(dna.clone(), a2.clone()).await.unwrap();
 
-        p2p.send_validation_receipt(dna, a2, UnsafeBytes::from(b"receipt-test".to_vec()).into())
-            .await
-            .unwrap();
+        p2p.send_validation_receipt(
+            dna,
+            a2,
+            a1,
+            UnsafeBytes::from(b"receipt-test".to_vec()).into(),
+        )
+        .await
+        .unwrap();
 
         p2p.ghost_actor_shutdown().await.unwrap();
         r_task.await.unwrap();
