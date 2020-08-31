@@ -106,12 +106,6 @@ pub enum CapAccess {
     },
 }
 
-impl Default for CapAccess {
-    fn default() -> Self {
-        Self::Unrestricted
-    }
-}
-
 impl From<()> for CapAccess {
     fn from(_: ()) -> Self {
         Self::Unrestricted
