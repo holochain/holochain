@@ -24,20 +24,22 @@ macro_rules! entry_def {
         }
 
         impl TryFrom<&$crate::prelude::Entry> for $t {
-            type Error = $crate::prelude::SerializedBytesError;
+            type Error = $crate::prelude::HdkError;
             fn try_from(entry: &$crate::prelude::Entry) -> Result<Self, Self::Error> {
                 match entry {
-                    Entry::App(sb) => Ok(Self::try_from(sb.to_owned())?),
+                    Entry::App(eb) => Ok(Self::try_from($crate::prelude::SerializedBytes::from(
+                        eb.to_owned(),
+                    ))?),
                     _ => Err($crate::prelude::SerializedBytesError::FromBytes(format!(
                         "{:?} is not an Entry::App so has no serialized bytes",
                         entry
-                    ))),
+                    )))?,
                 }
             }
         }
 
         impl TryFrom<$crate::prelude::Entry> for $t {
-            type Error = $crate::prelude::SerializedBytesError;
+            type Error = $crate::prelude::HdkError;
             fn try_from(entry: $crate::prelude::Entry) -> Result<Self, Self::Error> {
                 Self::try_from(&entry)
             }

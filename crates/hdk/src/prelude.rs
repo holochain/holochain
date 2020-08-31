@@ -7,6 +7,7 @@ pub use crate::delete_entry;
 pub use crate::entry_def;
 pub use crate::entry_defs;
 pub use crate::entry_hash;
+pub use crate::error::HdkError;
 pub use crate::generate_cap_secret;
 pub use crate::get;
 pub use crate::get_details;

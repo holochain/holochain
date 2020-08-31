@@ -6,7 +6,7 @@ use holochain_p2p::{
     actor::HolochainP2pRefToCell, event::HolochainP2pEventReceiver, spawn_holochain_p2p,
     HolochainP2pCell, HolochainP2pRef, HolochainP2pSender,
 };
-use holochain_serialized_bytes::UnsafeBytes;
+use holochain_serialized_bytes::{SerializedBytes, UnsafeBytes};
 use holochain_types::{
     element::{SignedHeaderHashed, SignedHeaderHashedExt},
     test_utils::fake_header_hash,
@@ -30,7 +30,8 @@ pub async fn fake_unique_element(
     agent_key: AgentPubKey,
     visibility: EntryVisibility,
 ) -> anyhow::Result<(SignedHeaderHashed, EntryHashed)> {
-    let content = UnsafeBytes::from(nanoid::nanoid!().as_bytes().to_owned());
+    let content: SerializedBytes =
+        UnsafeBytes::from(nanoid::nanoid!().as_bytes().to_owned()).into();
     let entry = EntryHashed::from_content(Entry::App(content.try_into().unwrap())).await;
     let app_entry_type = holochain_types::fixt::AppEntryTypeFixturator::new(visibility)
         .next()

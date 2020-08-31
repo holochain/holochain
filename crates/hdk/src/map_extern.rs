@@ -18,4 +18,4 @@ macro_rules! map_extern {
     };
 }
 
-pub type ExternResult<T> = Result<T, crate::prelude::WasmError>;
+pub type ExternResult<T> = Result<T, crate::prelude::HdkError>;

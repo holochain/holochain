@@ -94,6 +94,7 @@ dependencies = [
  "holochain_zome_types",
  "serde",
  "serde_bytes",
+ "thiserror",
 ]
 
 [[package]]
@@ -174,6 +175,7 @@ dependencies = [
  "serde",
  "serde_bytes",
  "subtle",
+ "thiserror",
 ]
 
 [[package]]

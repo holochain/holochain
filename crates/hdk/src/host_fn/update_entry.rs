@@ -7,7 +7,7 @@ macro_rules! update_entry {
                 __update_entry,
                 $crate::prelude::UpdateEntryInput::new((
                     $input.into(),
-                    $crate::prelude::Entry::App(sb),
+                    $crate::prelude::Entry::App(sb.try_into()?),
                     $hash
                 )),
                 $crate::prelude::UpdateEntryOutput

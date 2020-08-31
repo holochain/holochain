@@ -1,4 +1,5 @@
 pub mod capability;
+pub mod error;
 pub mod guest_callback;
 pub mod hash_path;
 pub mod host_fn;
