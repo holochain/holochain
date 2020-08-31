@@ -275,3 +275,55 @@ impl From<&[u8]> for BytesKey {
         Self(b.to_owned())
     }
 }
+
+impl IntoIterator for &LinkMetaKey<'_> {
+    type Item = u8;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+    fn into_iter(self) -> Self::IntoIter {
+        let b: BytesKey = self.into();
+        b.0.into_iter()
+    }
+}
+
+impl IntoIterator for &MiscMetaKey {
+    type Item = u8;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+    fn into_iter(self) -> Self::IntoIter {
+        let b: BytesKey = self.into();
+        b.0.into_iter()
+    }
+}
+
+impl IntoIterator for LinkMetaKey<'_> {
+    type Item = u8;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+    fn into_iter(self) -> Self::IntoIter {
+        (&self).into_iter()
+    }
+}
+
+impl IntoIterator for MiscMetaKey {
+    type Item = u8;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+    fn into_iter(self) -> Self::IntoIter {
+        (&self).into_iter()
+    }
+}
+
+impl<T: PrefixType> From<MiscMetaKey> for PrefixBytesKey<T> {
+    fn from(k: MiscMetaKey) -> Self {
+        PrefixBytesKey::new(k)
+    }
+}
+
+impl<T: PrefixType> From<&LinkMetaKey<'_>> for PrefixBytesKey<T> {
+    fn from(k: &LinkMetaKey) -> Self {
+        PrefixBytesKey::new(k)
+    }
+}
+
+impl<T: PrefixType> From<LinkMetaKey<'_>> for PrefixBytesKey<T> {
+    fn from(k: LinkMetaKey) -> Self {
+        (&k).into()
+    }
+}

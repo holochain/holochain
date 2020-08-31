@@ -28,19 +28,65 @@ use holochain_zome_types::{Entry, Header};
 use tracing::*;
 
 /// A CasBufFresh with Entries for values
-pub type EntryCas = CasBufFresh<Entry>;
+pub type EntryCas<P> = CasBufFresh<Entry, P>;
 /// A CasBufFresh with SignedHeaders for values
-pub type HeaderCas = CasBufFresh<SignedHeader>;
+pub type HeaderCas<P> = CasBufFresh<SignedHeader, P>;
 
 /// The representation of an ElementCache / ElementVault,
 /// using two or three DB references
-pub struct ElementBuf {
-    public_entries: EntryCas,
-    private_entries: Option<EntryCas>,
-    headers: HeaderCas,
+pub struct ElementBuf<P = IntegratedPrefix>
+where
+    P: PrefixType,
+{
+    public_entries: EntryCas<P>,
+    private_entries: Option<EntryCas<P>>,
+    headers: HeaderCas<P>,
 }
 
-impl ElementBuf {
+impl ElementBuf<IntegratedPrefix> {
+    /// Create a ElementBuf using the Vault databases.
+    /// The `allow_private` argument allows you to specify whether private
+    /// entries should be readable or writeable with this reference.
+    /// The vault is constructed with the IntegratedPrefix.
+    pub fn vault(
+        env: EnvironmentRead,
+        dbs: &impl GetDb,
+        allow_private: bool,
+    ) -> DatabaseResult<Self> {
+        ElementBuf::new_vault(env, dbs, allow_private)
+    }
+
+    /// Create a ElementBuf using the Cache databases.
+    /// There is no cache for private entries, so private entries are disallowed
+    pub fn cache(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
+        let entries = dbs.get_db(&*ELEMENT_CACHE_ENTRIES)?;
+        let headers = dbs.get_db(&*ELEMENT_CACHE_HEADERS)?;
+        ElementBuf::new(env, entries, None, headers)
+    }
+}
+
+impl ElementBuf<PendingPrefix> {
+    /// Create a element buf for all pending elements.
+    /// This reuses the database but is the data is completely separate.
+    pub fn pending(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
+        ElementBuf::new_vault(env, dbs, true)
+    }
+}
+
+impl ElementBuf<ValidatedPrefix> {
+    /// Create a element buf for all elements that have progressed past validation.
+    /// Note this doesn't mean they are Valid only that validation has run and
+    /// come up with a [ValidationStatus].
+    /// This reuses the database but is the data is completely separate.
+    pub fn validated(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
+        ElementBuf::new_vault(env, dbs, true)
+    }
+}
+
+impl<P> ElementBuf<P>
+where
+    P: PrefixType,
+{
     fn new(
         env: EnvironmentRead,
         public_entries_store: SingleStore,
@@ -59,10 +105,8 @@ impl ElementBuf {
         })
     }
 
-    /// Create a ElementBuf using the Vault databases.
-    /// The `allow_private` argument allows you to specify whether private
-    /// entries should be readable or writeable with this reference.
-    pub fn vault(
+    /// Construct a element buf using the vault databases
+    fn new_vault(
         env: EnvironmentRead,
         dbs: &impl GetDb,
         allow_private: bool,
@@ -75,14 +119,6 @@ impl ElementBuf {
             None
         };
         Self::new(env, entries, private_entries, headers)
-    }
-
-    /// Create a ElementBuf using the Cache databases.
-    /// There is no cache for private entries, so private entries are disallowed
-    pub fn cache(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
-        let entries = dbs.get_db(&*ELEMENT_CACHE_ENTRIES)?;
-        let headers = dbs.get_db(&*ELEMENT_CACHE_HEADERS)?;
-        Self::new(env, entries, None, headers)
     }
 
     /// Get an entry by its address
@@ -235,15 +271,15 @@ impl ElementBuf {
         self.public_entries.delete(entry_hash);
     }
 
-    pub fn headers(&self) -> &HeaderCas {
+    pub fn headers(&self) -> &HeaderCas<P> {
         &self.headers
     }
 
-    pub fn public_entries(&self) -> &EntryCas {
+    pub fn public_entries(&self) -> &EntryCas<P> {
         &self.public_entries
     }
 
-    pub fn private_entries(&self) -> Option<&EntryCas> {
+    pub fn private_entries(&self) -> Option<&EntryCas<P>> {
         self.private_entries.as_ref()
     }
 

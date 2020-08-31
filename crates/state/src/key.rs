@@ -1,14 +1,12 @@
 //! Traits for defining keys and values of databases
 
-use holo_hash::{HashType, HashableContent, HoloHash, HoloHashOf, PrimitiveHashType};
+use holo_hash::{HashType, HoloHash, PrimitiveHashType};
 use holochain_serialized_bytes::prelude::*;
+pub use prefix::*;
 use serde::{de::DeserializeOwned, Serialize};
 use std::cmp::Ordering;
 
-/// Bytes for "PRE_INT"
-/// Prefix for integrated database
-const INTEGRATED_PREFIX: u8 = 0x0;
-const PREFIX_KEY_SIZE: usize = 46;
+mod prefix;
 
 /// Any key type used in a [KvStore] or [KvvStore] must implement this trait
 pub trait BufKey: Sized + Ord + Eq + AsRef<[u8]> + Send + Sync {
@@ -39,14 +37,6 @@ impl<T> BufVal for T where T: Clone + Serialize + DeserializeOwned + std::fmt::D
 /// Trait alias for the combination of constraints needed for values in [KvvStore]
 pub trait BufMultiVal: Ord + Eq + Clone + Serialize + DeserializeOwned + Send + Sync {}
 impl<T> BufMultiVal for T where T: Ord + Eq + Clone + Serialize + DeserializeOwned + Send + Sync {}
-
-/// A key for hashes but with a prefix for reusing databases
-// #[derive(PartialOrd, Ord, PartialEq, Eq)]
-pub struct PrefixKey {
-    // TODO: B-02112 Use fixed size array when we have fixed size hash
-    //prefix_and_hash: [u8; PREFIX_KEY_SIZE],
-    prefix_and_hash: Vec<u8>,
-}
 
 /// Used for keys into integer-keyed LMDB stores.
 ///
@@ -128,107 +118,3 @@ impl From<()> for UnitDbKey {
 }
 
 static ARBITRARY_BYTE_SLICE: &[u8] = &[0];
-
-impl BufKey for PrefixKey {
-    fn from_key_bytes_or_friendly_panic(bytes: &[u8]) -> Self {
-        Self::fill_from_raw(bytes)
-    }
-}
-
-impl AsRef<[u8]> for PrefixKey {
-    fn as_ref(&self) -> &[u8] {
-        &self.prefix_and_hash[..]
-    }
-}
-
-impl PrefixKey {
-    fn empty() -> Self {
-        Self {
-            // TODO: B-02112 Use fixed size array when we have fixed size hash
-            // prefix_and_hash: [0; PREFIX_KEY_SIZE],
-            prefix_and_hash: vec![0; PREFIX_KEY_SIZE],
-        }
-    }
-
-    // TODO: B-02112 remove this when we have fixed size hash
-    // Make then len the same
-    fn initialize_key(&mut self, len: usize) {
-        self.prefix_and_hash.truncate(len + 1);
-    }
-
-    fn fill_from_raw(hash: &[u8]) -> Self {
-        // TODO: B-02112 Add this check back
-        // if hash.len() != PREFIX_KEY_SIZE {
-        //     panic!("Holochain detected database corruption.\n\nInvalid PrefixKey: expected {} bytes but got {}", PREFIX_KEY_SIZE, hash.len());
-        // }
-        let mut key = Self::empty();
-
-        // TODO: Remove B-02112
-        // Already includes the prefix
-        key.initialize_key(hash.len() - 1);
-
-        let data_iter = key.prefix_and_hash.iter_mut();
-        let hash_iter = hash.iter();
-        Self::fill_data(data_iter, hash_iter);
-        key
-    }
-
-    fn fill(&mut self, prefix: u8, hash: &[u8]) {
-        // TODO: Remove B-02112
-        self.initialize_key(hash.len());
-
-        self.prefix_and_hash[0] = prefix;
-        let data_iter = self.prefix_and_hash.iter_mut().skip(1);
-        let hash_iter = hash.iter();
-        Self::fill_data(data_iter, hash_iter);
-    }
-
-    fn fill_data<'a>(
-        data_iter: impl Iterator<Item = &'a mut u8>,
-        hash_iter: impl Iterator<Item = &'a u8>,
-    ) {
-        for (data, hash) in data_iter.zip(hash_iter) {
-            *data = *hash;
-        }
-    }
-
-    /// Create key for integrated databases
-    pub fn integrated<C>(hash: &HoloHashOf<C>) -> Self
-    where
-        C: HashableContent + BufVal + Send + Sync,
-        HoloHashOf<C>: BufKey,
-        C::HashType: PrimitiveHashType + Send + Sync,
-    {
-        let mut key = Self::empty();
-        key.fill(INTEGRATED_PREFIX, hash.as_ref());
-        key
-    }
-
-    /// Get the bytes of the hash
-    pub fn as_hash_bytes(&self) -> &[u8] {
-        &self.prefix_and_hash[1..]
-    }
-}
-
-impl PartialEq for PrefixKey {
-    fn eq(&self, other: &PrefixKey) -> bool {
-        self.prefix_and_hash[..] == other.prefix_and_hash[..]
-    }
-    fn ne(&self, other: &PrefixKey) -> bool {
-        self.prefix_and_hash[..] != other.prefix_and_hash[..]
-    }
-}
-
-impl Eq for PrefixKey {}
-
-impl PartialOrd for PrefixKey {
-    fn partial_cmp(&self, other: &PrefixKey) -> Option<Ordering> {
-        PartialOrd::partial_cmp(&&self.prefix_and_hash[..], &&other.prefix_and_hash[..])
-    }
-}
-
-impl Ord for PrefixKey {
-    fn cmp(&self, other: &PrefixKey) -> Ordering {
-        Ord::cmp(&&self.prefix_and_hash[..], &&other.prefix_and_hash[..])
-    }
-}

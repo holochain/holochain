@@ -161,14 +161,55 @@ pub trait MetadataBufT {
 }
 
 /// Updates and answers queries for the links and system meta databases
-pub struct MetadataBuf {
-    system_meta: KvvBufUsed<SysMetaKey, SysMetaVal>,
-    links_meta: KvBufUsed<BytesKey, LinkMetaVal>,
-    misc_meta: KvBufUsed<BytesKey, MiscMetaValue>,
+pub struct MetadataBuf<P = IntegratedPrefix>
+where
+    P: PrefixType,
+{
+    system_meta: KvvBufUsed<PrefixBytesKey<P>, SysMetaVal>,
+    links_meta: KvBufUsed<PrefixBytesKey<P>, LinkMetaVal>,
+    misc_meta: KvBufUsed<PrefixBytesKey<P>, MiscMetaValue>,
     env: EnvironmentRead,
 }
 
-impl MetadataBuf {
+impl MetadataBuf<IntegratedPrefix> {
+    /// Create a [MetadataBuf] with the vault databases using the IntegratedPrefix.
+    /// The data in the type will be separate from the other prefixes even though the
+    /// database is shared.
+    pub fn vault(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
+        Self::new_vault(env, dbs)
+    }
+
+    /// Create a [MetadataBuf] with the cache databases
+    pub fn cache(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
+        let system_meta = dbs.get_db(&*CACHE_SYSTEM_META)?;
+        let links_meta = dbs.get_db(&*CACHE_LINKS_META)?;
+        let misc_meta = dbs.get_db(&*CACHE_STATUS_META)?;
+        Self::new(env, system_meta, links_meta, misc_meta)
+    }
+}
+
+impl MetadataBuf<PendingPrefix> {
+    /// Create a [MetadataBuf] with the vault databases using the PendingPrefix.
+    /// The data in the type will be separate from the other prefixes even though the
+    /// database is shared.
+    pub fn pending(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
+        Self::new_vault(env, dbs)
+    }
+}
+
+impl MetadataBuf<ValidatedPrefix> {
+    /// Create a [MetadataBuf] with the vault databases using the ValidatedPrefix.
+    /// The data in the type will be separate from the other prefixes even though the
+    /// database is shared.
+    pub fn validated(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
+        Self::new_vault(env, dbs)
+    }
+}
+
+impl<P> MetadataBuf<P>
+where
+    P: PrefixType,
+{
     pub(crate) fn new(
         env: EnvironmentRead,
         system_meta: MultiStore,
@@ -182,19 +223,11 @@ impl MetadataBuf {
             env,
         })
     }
-    /// Create a [MetadataBuf] with the vault databases
-    pub fn vault(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
+
+    fn new_vault(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
         let system_meta = dbs.get_db(&*META_VAULT_SYS)?;
         let links_meta = dbs.get_db(&*META_VAULT_LINKS)?;
         let misc_meta = dbs.get_db(&*META_VAULT_MISC)?;
-        Self::new(env, system_meta, links_meta, misc_meta)
-    }
-
-    /// Create a [MetadataBuf] with the cache databases
-    pub fn cache(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
-        let system_meta = dbs.get_db(&*CACHE_SYSTEM_META)?;
-        let links_meta = dbs.get_db(&*CACHE_LINKS_META)?;
-        let misc_meta = dbs.get_db(&*CACHE_STATUS_META)?;
         Self::new(env, system_meta, links_meta, misc_meta)
     }
 
@@ -209,7 +242,8 @@ impl MetadataBuf {
             h @ EntryHeader::Delete(_) => SysMetaVal::Delete(h.into_hash().await?),
             h @ EntryHeader::Activity(_) => SysMetaVal::Activity(h.into_hash().await?),
         };
-        self.system_meta.insert(key.into(), sys_val);
+        let key: SysMetaKey = key.into();
+        self.system_meta.insert(PrefixBytesKey::new(key), sys_val);
         Ok(())
     }
 
@@ -242,7 +276,10 @@ impl MetadataBuf {
 }
 
 #[async_trait::async_trait]
-impl MetadataBufT for MetadataBuf {
+impl<P> MetadataBufT for MetadataBuf<P>
+where
+    P: PrefixType,
+{
     fn get_live_links<'r, 'k, R: Readable>(
         &'r self,
         r: &'r R,
@@ -305,7 +342,8 @@ impl MetadataBufT for MetadataBuf {
         // Register the link remove address to the link add address
         let link_remove = HeaderHashed::from_content(Header::LinkRemove(link_remove)).await;
         let sys_val = SysMetaVal::LinkRemove(link_remove.into());
-        self.system_meta.insert(link_add_address.into(), sys_val);
+        self.system_meta
+            .insert(SysMetaKey::from(link_add_address).into(), sys_val);
         Ok(())
     }
 
@@ -314,12 +352,14 @@ impl MetadataBufT for MetadataBuf {
         entry_hash: EntryHash,
         value: SysMetaVal,
     ) -> DatabaseResult<()> {
-        self.system_meta.insert(entry_hash.clone().into(), value);
+        self.system_meta
+            .insert(SysMetaKey::from(entry_hash.clone()).into(), value);
         self.update_entry_dht_status(entry_hash)
     }
 
     fn register_raw_on_header(&mut self, header_hash: HeaderHash, value: SysMetaVal) {
-        self.system_meta.insert(header_hash.into(), value);
+        self.system_meta
+            .insert(SysMetaKey::from(header_hash).into(), value);
     }
 
     async fn register_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()> {
@@ -371,14 +411,16 @@ impl MetadataBufT for MetadataBuf {
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
         Ok(Box::new(
-            fallible_iterator::convert(self.system_meta.get(r, &entry_hash.into())?).filter_map(
-                |h| {
-                    Ok(match h {
-                        SysMetaVal::NewEntry(h) => Some(h),
-                        _ => None,
-                    })
-                },
-            ),
+            fallible_iterator::convert(
+                self.system_meta
+                    .get(r, &SysMetaKey::from(entry_hash).into())?,
+            )
+            .filter_map(|h| {
+                Ok(match h {
+                    SysMetaVal::NewEntry(h) => Some(h),
+                    _ => None,
+                })
+            }),
         ))
     }
 
@@ -389,7 +431,7 @@ impl MetadataBufT for MetadataBuf {
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
         Ok(Box::new(
-            fallible_iterator::convert(self.system_meta.get(r, &hash)?).filter_map(|h| {
+            fallible_iterator::convert(self.system_meta.get(r, &hash.into())?).filter_map(|h| {
                 Ok(match h {
                     SysMetaVal::Update(h) => Some(h),
                     _ => None,
@@ -405,13 +447,16 @@ impl MetadataBufT for MetadataBuf {
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
         Ok(Box::new(
-            fallible_iterator::convert(self.system_meta.get(r, &new_entry_header.into())?)
-                .filter_map(|h| {
-                    Ok(match h {
-                        SysMetaVal::Delete(h) => Some(h),
-                        _ => None,
-                    })
-                }),
+            fallible_iterator::convert(
+                self.system_meta
+                    .get(r, &SysMetaKey::from(new_entry_header).into())?,
+            )
+            .filter_map(|h| {
+                Ok(match h {
+                    SysMetaVal::Delete(h) => Some(h),
+                    _ => None,
+                })
+            }),
         ))
     }
 
@@ -422,14 +467,16 @@ impl MetadataBufT for MetadataBuf {
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
         Ok(Box::new(
-            fallible_iterator::convert(self.system_meta.get(r, &entry_hash.into())?).filter_map(
-                |h| {
-                    Ok(match h {
-                        SysMetaVal::Delete(h) => Some(h),
-                        _ => None,
-                    })
-                },
-            ),
+            fallible_iterator::convert(
+                self.system_meta
+                    .get(r, &SysMetaKey::from(entry_hash).into())?,
+            )
+            .filter_map(|h| {
+                Ok(match h {
+                    SysMetaVal::Delete(h) => Some(h),
+                    _ => None,
+                })
+            }),
         ))
     }
 
@@ -440,14 +487,16 @@ impl MetadataBufT for MetadataBuf {
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
         Ok(Box::new(
-            fallible_iterator::convert(self.system_meta.get(r, &agent_pubkey.into())?).filter_map(
-                |h| {
-                    Ok(match h {
-                        SysMetaVal::Activity(h) => Some(h),
-                        _ => None,
-                    })
-                },
-            ),
+            fallible_iterator::convert(
+                self.system_meta
+                    .get(r, &SysMetaKey::from(agent_pubkey).into())?,
+            )
+            .filter_map(|h| {
+                Ok(match h {
+                    SysMetaVal::Activity(h) => Some(h),
+                    _ => None,
+                })
+            }),
         ))
     }
 
@@ -480,14 +529,16 @@ impl MetadataBufT for MetadataBuf {
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
         Ok(Box::new(
-            fallible_iterator::convert(self.system_meta.get(r, &link_add.into())?).filter_map(
-                |h| {
-                    Ok(match h {
-                        SysMetaVal::LinkRemove(h) => Some(h),
-                        _ => None,
-                    })
-                },
-            ),
+            fallible_iterator::convert(
+                self.system_meta
+                    .get(r, &SysMetaKey::from(link_add).into())?,
+            )
+            .filter_map(|h| {
+                Ok(match h {
+                    SysMetaVal::LinkRemove(h) => Some(h),
+                    _ => None,
+                })
+            }),
         ))
     }
 
