@@ -23,7 +23,7 @@ pub enum CapGrant {
 /// @todo the ability to forcibly curry payloads into functions that are called with a claim
 pub struct CurryPayloads(pub BTreeMap<GrantedFunction, SerializedBytes>);
 
-#[derive(Default, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 /// The payload for the ZomeCall capability grant.
 /// This data is committed to the source chain as a private entry.
 pub struct ZomeCallCapGrant {
@@ -34,8 +34,8 @@ pub struct ZomeCallCapGrant {
     pub access: CapAccess,
     /// Set of functions to which this capability grants ZomeCall access
     pub functions: GrantedFunctions,
-    /// the payloads to curry to the functions
-    pub curry_payloads: CurryPayloads,
+    // the payloads to curry to the functions
+    // pub curry_payloads: CurryPayloads,
 }
 
 impl ZomeCallCapGrant {
@@ -44,13 +44,13 @@ impl ZomeCallCapGrant {
         tag: String,
         access: CapAccess,
         functions: GrantedFunctions,
-        curry_payloads: CurryPayloads,
+        // curry_payloads: CurryPayloads,
     ) -> Self {
         Self {
             tag,
             access,
             functions,
-            curry_payloads,
+            // curry_payloads,
         }
     }
 }

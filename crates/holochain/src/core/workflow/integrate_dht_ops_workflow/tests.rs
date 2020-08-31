@@ -67,9 +67,9 @@ struct TestData {
 impl TestData {
     async fn new() -> Self {
         // original entry
-        let original_entry = fixt!(Entry);
+        let original_entry = EntryFixturator::new(AppEntry).next().unwrap();
         // New entry
-        let new_entry = fixt!(Entry);
+        let new_entry = EntryFixturator::new(AppEntry).next().unwrap();
         Self::new_inner(original_entry, new_entry).await
     }
 
