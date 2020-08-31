@@ -1,10 +1,14 @@
 use hdk3::prelude::*;
 
+#[derive(serde::Serialize, serde::Deserialize, SerializedBytes)]
+pub struct CapFor(CapSecret, AgentPubKey);
+
 #[hdk_extern]
 fn init(_: ()) -> ExternResult<InitCallbackResult> {
     // grant unrestricted access to accept_cap_claim so other agents can send us claims
     let mut functions: GrantedFunctions = HashSet::new();
     functions.insert((zome_info!()?.zome_name, "accept_cap_claim".into()));
+    // functions.insert((zome_info!()?.zome_name, "needs_cap_claim".into()));
     commit_cap_grant!(
         CapGrantEntry {
             tag: "".into(),
@@ -47,8 +51,23 @@ fn accept_cap_claim(claim: CapClaim) -> ExternResult<HeaderHash> {
 
 #[hdk_extern]
 fn needs_cap_claim(_: ()) -> ExternResult<()> {
+    debug!("called!")?;
     Ok(())
 }
+
+#[hdk_extern]
+fn try_cap_claim(cap_for: CapFor) -> ExternResult<()> {
+    let result: SerializedBytes = call_remote!(
+        cap_for.1,
+        zome_info!()?.zome_name,
+        "needs_cap_claim".to_string(),
+        cap_for.0,
+        ().try_into()?
+    )?;
+
+    Ok(result.try_into()?)
+}
+
 
 #[hdk_extern]
 fn send_assigned_cap_claim(agent: AgentPubKey) -> ExternResult<()> {
