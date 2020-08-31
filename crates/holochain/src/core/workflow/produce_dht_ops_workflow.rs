@@ -99,6 +99,7 @@ mod tests {
     };
     use holochain_types::{
         dht_op::{produce_ops_from_element, DhtOp},
+        fixt::*,
         observability, Entry, EntryHashed,
     };
     use holochain_zome_types::{
@@ -115,7 +116,7 @@ mod tests {
     impl TestData {
         fn new() -> Self {
             let app_entry =
-                Box::new(SerializedBytesFixturator::new(Unpredictable).map(|b| Entry::App(b)));
+                Box::new(AppEntryBytesFixturator::new(Unpredictable).map(|b| Entry::App(b)));
             Self { app_entry }
         }
 

@@ -85,8 +85,8 @@ pub mod wasm_test {
             |details: GetDetailsOutput, count, update, delete| match details.clone().into_inner() {
                 Some(Details::Entry(entry_details)) => {
                     match entry_details.entry {
-                        Entry::App(sb) => {
-                            let countree = CounTree::try_from(sb).unwrap();
+                        Entry::App(eb) => {
+                            let countree = CounTree::try_from(eb.into_sb()).unwrap();
                             assert_eq!(countree, CounTree(count));
                         }
                         _ => panic!(

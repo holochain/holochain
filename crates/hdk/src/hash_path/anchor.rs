@@ -59,7 +59,7 @@ impl TryFrom<&Path> for Anchor {
 
 /// simple string interface to simple string based paths
 /// a.k.a "the anchor pattern" that predates paths by a few years
-pub fn anchor(anchor_type: String, anchor_text: String) -> Result<holo_hash::EntryHash, WasmError> {
+pub fn anchor(anchor_type: String, anchor_text: String) -> Result<holo_hash::EntryHash, HdkError> {
     let path: Path = (&Anchor {
         anchor_type,
         anchor_text: Some(anchor_text),
@@ -69,17 +69,17 @@ pub fn anchor(anchor_type: String, anchor_text: String) -> Result<holo_hash::Ent
     Ok(path.hash()?)
 }
 
-pub fn get_anchor(anchor_address: holo_hash::EntryHash) -> Result<Option<Anchor>, WasmError> {
+pub fn get_anchor(anchor_address: holo_hash::EntryHash) -> Result<Option<Anchor>, HdkError> {
     Ok(match get!(anchor_address)?.and_then(|el| el.into()) {
-        Some(Entry::App(sb)) => {
-            let path = Path::try_from(sb)?;
+        Some(Entry::App(eb)) => {
+            let path = Path::try_from(SerializedBytes::from(eb))?;
             Some(Anchor::try_from(&path)?)
         }
         _ => None,
     })
 }
 
-pub fn list_anchor_type_addresses() -> Result<Vec<holo_hash::EntryHash>, WasmError> {
+pub fn list_anchor_type_addresses() -> Result<Vec<holo_hash::EntryHash>, HdkError> {
     let links = Path::from(ROOT)
         .children()?
         .into_inner()
@@ -89,7 +89,7 @@ pub fn list_anchor_type_addresses() -> Result<Vec<holo_hash::EntryHash>, WasmErr
     Ok(links)
 }
 
-pub fn list_anchor_addresses(anchor_type: String) -> Result<Vec<holo_hash::EntryHash>, WasmError> {
+pub fn list_anchor_addresses(anchor_type: String) -> Result<Vec<holo_hash::EntryHash>, HdkError> {
     let path: Path = (&Anchor {
         anchor_type: anchor_type,
         anchor_text: None,
@@ -109,7 +109,7 @@ pub fn list_anchor_addresses(anchor_type: String) -> Result<Vec<holo_hash::Entry
 /// tags are a single array of bytes, so to get an external interface that is somewhat backwards
 /// compatible we need to rebuild the anchors from the paths serialized into the links and then
 /// return the
-pub fn list_anchor_tags(anchor_type: String) -> Result<Vec<String>, WasmError> {
+pub fn list_anchor_tags(anchor_type: String) -> Result<Vec<String>, HdkError> {
     let path: Path = (&Anchor {
         anchor_type: anchor_type,
         anchor_text: None,

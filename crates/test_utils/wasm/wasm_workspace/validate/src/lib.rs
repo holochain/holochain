@@ -47,13 +47,13 @@ impl From<&ThisWasmEntry> for EntryDef {
 }
 
 impl TryFrom<&Entry> for ThisWasmEntry {
-    type Error = SerializedBytesError;
+    type Error = EntryError;
     fn try_from(entry: &Entry) -> Result<Self, Self::Error> {
         match entry {
-            Entry::App(serialized_bytes) => Ok(Self::try_from(serialized_bytes.to_owned())?),
+            Entry::App(eb) => Ok(Self::try_from(SerializedBytes::from(eb.to_owned()))?),
             _ => Err(SerializedBytesError::FromBytes(
                 "failed to deserialize ThisWasmEntry".into(),
-            )),
+            ))?,
         }
     }
 }

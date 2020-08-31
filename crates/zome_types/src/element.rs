@@ -113,7 +113,7 @@ impl<'a> ElementEntry<'a> {
     /// a present entry that deserializes cleanly is returned as the provided type A
     pub fn to_app_option<A: TryFrom<SerializedBytes>>(&'a self) -> Result<Option<A>, A::Error> {
         match self.as_option() {
-            Some(Entry::App(sb)) => Ok(Some(A::try_from(sb.to_owned())?)),
+            Some(Entry::App(eb)) => Ok(Some(A::try_from(SerializedBytes::from(eb.to_owned()))?)),
             _ => Ok(None),
         }
     }

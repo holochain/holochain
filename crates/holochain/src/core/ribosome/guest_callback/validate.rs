@@ -123,7 +123,7 @@ mod test {
     use ::fixt::prelude::*;
     use holo_hash::fixt::AgentPubKeyFixturator;
     use holochain_serialized_bytes::prelude::*;
-    use holochain_types::{dna::zome::HostFnAccess, fixt::CapClaimFixturator};
+    use holochain_types::{dna::zome::HostFnAccess, fixt::*};
     use holochain_zome_types::entry::Entry;
     use holochain_zome_types::validate::ValidateCallbackResult;
     use holochain_zome_types::HostInput;
@@ -208,7 +208,7 @@ mod test {
         }
 
         let agent_entry = Entry::App(
-            SerializedBytesFixturator::new(fixt::Unpredictable)
+            AppEntryBytesFixturator::new(fixt::Unpredictable)
                 .next()
                 .unwrap()
                 .into(),
