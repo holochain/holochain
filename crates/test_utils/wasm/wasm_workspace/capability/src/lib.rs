@@ -44,8 +44,9 @@ pub fn cap_secret(_: ()) -> ExternResult<CapSecret> {
 pub fn transferable_cap_grant(secret: CapSecret) -> ExternResult<HeaderHash> {
     Ok(commit_cap_grant!(
         CapGrantEntry {
+            tag: "".into(),
             access: secret.into(),
-            ..Default::default()
+            functions: HashSet::new(),
         }
     )?)
 }

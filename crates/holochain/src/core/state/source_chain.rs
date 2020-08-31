@@ -226,8 +226,9 @@ pub mod tests {
         let env = arc.guard().await;
         let access = CapAccess::from(CapSecretFixturator::new(Unpredictable).next().unwrap());
         let secret = access.secret().unwrap();
-        let curry = CurryPayloadsFixturator::new(Empty).next().unwrap();
-        let grant = ZomeCallCapGrant::new("tag".into(), access.clone(), HashSet::new(), curry);
+        // @todo curry
+        let _curry = CurryPayloadsFixturator::new(Empty).next().unwrap();
+        let grant = ZomeCallCapGrant::new("tag".into(), access.clone(), HashSet::new());
         {
             let mut store = SourceChainBuf::new(arc.clone().into(), &env).await?;
             store
