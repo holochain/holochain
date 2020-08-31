@@ -40,15 +40,22 @@ pub fn commit_entry<'a>(
     let header_zome_id = ribosome.zome_name_to_id(&call_context.zome_name)?;
 
     // extract the entry defs for a zome
-    let (header_entry_def_id, entry_visibility) =
-        extract_entry_def(ribosome, call_context.clone(), entry_def_id)?;
-
-    let app_entry_type = AppEntryType::new(header_entry_def_id, header_zome_id, entry_visibility);
+    let entry_type = match entry_def_id {
+        EntryDefId::App(entry_def_id) => {
+            let (header_entry_def_id, entry_visibility) =
+                extract_entry_def(ribosome, call_context.clone(), entry_def_id.into())?;
+            let app_entry_type =
+                AppEntryType::new(header_entry_def_id, header_zome_id, entry_visibility);
+            EntryType::App(app_entry_type)
+        }
+        EntryDefId::CapGrant => EntryType::CapGrant,
+        EntryDefId::CapClaim => EntryType::CapClaim,
+    };
 
     // build a header for the entry being committed
     let header_builder = builder::EntryCreate {
-        entry_type: EntryType::App(app_entry_type),
-        entry_hash: entry_hash,
+        entry_type,
+        entry_hash,
     };
     let call =
         |workspace: &'a mut CallZomeWorkspace| -> BoxFuture<'a, SourceChainResult<HeaderHash>> {
@@ -175,7 +182,7 @@ pub mod wasm_test {
         host_access.workspace = raw_workspace;
         call_context.host_access = host_access.into();
         let app_entry = EntryFixturator::new(AppEntry).next().unwrap();
-        let entry_def_id = EntryDefId::from("post");
+        let entry_def_id = EntryDefId::App("post".into());
         let input = CommitEntryInput::new((entry_def_id, app_entry.clone()));
 
         let output = commit_entry(Arc::new(ribosome), Arc::new(call_context), input);
@@ -224,7 +231,7 @@ pub mod wasm_test {
         host_access.workspace = raw_workspace.clone();
         call_context.host_access = host_access.into();
         let app_entry = EntryFixturator::new(AppEntry).next().unwrap();
-        let entry_def_id = EntryDefId::from("post");
+        let entry_def_id = EntryDefId::App("post".into());
         let input = CommitEntryInput::new((entry_def_id, app_entry.clone()));
 
         let output = commit_entry(Arc::new(ribosome), Arc::new(call_context), input).unwrap();

@@ -206,8 +206,7 @@ fixturator!(
                     granted_functions.insert(GrantedFunctionFixturator::new(Empty).next().unwrap());
                 }
                 granted_functions
-            },
-            CurryPayloadsFixturator::new(Empty).next().unwrap(),
+            }, // CurryPayloadsFixturator::new(Empty).next().unwrap(),
         )
     },
     {
@@ -228,7 +227,7 @@ fixturator!(
                 }
                 granted_functions
             },
-            CurryPayloadsFixturator::new(Unpredictable).next().unwrap(),
+            // CurryPayloadsFixturator::new(Unpredictable).next().unwrap(),
         )
     },
     {
@@ -247,7 +246,7 @@ fixturator!(
                 }
                 granted_functions
             },
-            CurryPayloadsFixturator::new(Predictable).next().unwrap(),
+            // CurryPayloadsFixturator::new(Predictable).next().unwrap(),
         )
     }
 );

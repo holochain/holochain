@@ -19,6 +19,7 @@ pub fn capability_grants(
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
 
+    use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
     use crate::fixt::ZomeCallHostAccessFixturator;
     use fixt::prelude::*;
     use hdk3::prelude::*;
@@ -31,13 +32,13 @@ pub mod wasm_test {
         let test_env = holochain_state::test_utils::test_cell_env();
         let env = test_env.env();
         let dbs = env.dbs().await;
-        let mut workspace = crate::core::workflow::call_zome_workflow::CallZomeWorkspace::new(
-            env.clone().into(),
-            &dbs,
-        )
-        .await
-        .unwrap();
+        let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
+            .await
+            .unwrap();
 
+        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+            .await
+            .unwrap();
         let (_g, raw_workspace) =
             crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
                 &mut workspace,
@@ -47,5 +48,50 @@ pub mod wasm_test {
 
         let _output: CapSecret =
             crate::call_test_ribosome!(host_access, TestWasm::Capability, "cap_secret", ());
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn ribosome_transferable_cap_grant<'a>() {
+        holochain_types::observability::test_run().ok();
+        // test workspace boilerplate
+        let test_env = holochain_state::test_utils::test_cell_env();
+        let env = test_env.env();
+        let dbs = env.dbs().await;
+        let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
+            .await
+            .unwrap();
+
+        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+            .await
+            .unwrap();
+        let (_g, raw_workspace) =
+            crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
+                &mut workspace,
+            );
+        let mut host_access = fixt!(ZomeCallHostAccess);
+        host_access.workspace = raw_workspace.clone();
+
+        let secret: CapSecret =
+            crate::call_test_ribosome!(host_access, TestWasm::Capability, "cap_secret", ());
+        let header: HeaderHash = crate::call_test_ribosome!(
+            host_access,
+            TestWasm::Capability,
+            "transferable_cap_grant",
+            secret
+        );
+        let entry: GetOutput =
+            crate::call_test_ribosome!(host_access, TestWasm::Capability, "get_entry", header);
+
+        let entry_secret: CapSecret = match entry.into_inner() {
+            Some(element) => {
+                let cap_grant_entry: CapGrantEntry = element.entry().to_grant_option().unwrap();
+                match cap_grant_entry.access {
+                    CapAccess::Transferable { secret, .. } => secret,
+                    _ => unreachable!(),
+                }
+            }
+            _ => unreachable!(),
+        };
+        assert_eq!(entry_secret, secret,);
     }
 }
