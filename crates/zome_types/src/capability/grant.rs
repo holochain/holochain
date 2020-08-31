@@ -29,13 +29,13 @@ pub struct CurryPayloads(pub BTreeMap<GrantedFunction, SerializedBytes>);
 pub struct ZomeCallCapGrant {
     /// A string by which to later query for saved grants.
     /// This does not need to be unique within a source chain.
-    tag: String,
+    pub tag: String,
     /// Specifies who may claim this capability, and by what means
-    access: CapAccess,
+    pub access: CapAccess,
     /// Set of functions to which this capability grants ZomeCall access
-    functions: GrantedFunctions,
-    /// the payloads to curry to the functions
-    curry_payloads: CurryPayloads,
+    pub functions: GrantedFunctions,
+    // the payloads to curry to the functions
+    // pub curry_payloads: CurryPayloads,
 }
 
 impl ZomeCallCapGrant {
@@ -44,13 +44,13 @@ impl ZomeCallCapGrant {
         tag: String,
         access: CapAccess,
         functions: GrantedFunctions,
-        curry_payloads: CurryPayloads,
+        // curry_payloads: CurryPayloads,
     ) -> Self {
         Self {
             tag,
             access,
             functions,
-            curry_payloads,
+            // curry_payloads,
         }
     }
 }
@@ -125,11 +125,6 @@ impl From<(CapSecret, HashSet<AgentPubKey>)> for CapAccess {
 }
 
 impl CapAccess {
-    /// Create a new CapAccess::Unrestricted
-    pub fn unrestricted() -> Self {
-        CapAccess::Unrestricted
-    }
-
     /// Check if access is granted given the inputs
     pub fn is_authorized(&self, agent_key: &AgentPubKey, maybe_secret: Option<&CapSecret>) -> bool {
         match self {

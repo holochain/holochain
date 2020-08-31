@@ -723,7 +723,7 @@ async fn generate_fixt_store() -> (
 ) {
     let mut store = BTreeMap::new();
     let mut meta_store = BTreeMap::new();
-    let entry = fixt!(Entry);
+    let entry = EntryFixturator::new(AppEntry).next().unwrap();
     let entry_hash = EntryHashed::from_content_sync(entry.clone()).into_hash();
     let mut element_create = fixt!(EntryCreate);
     let entry_type = AppEntryTypeFixturator::new(EntryVisibility::Public)
