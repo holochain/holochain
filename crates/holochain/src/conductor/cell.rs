@@ -26,7 +26,7 @@ use crate::{
             call_zome_workflow, error::WorkflowError, genesis_workflow::genesis_workflow,
             incoming_dht_ops_workflow::incoming_dht_ops_workflow, initialize_zomes_workflow,
             CallZomeWorkflowArgs, CallZomeWorkspace, GenesisWorkflowArgs, GenesisWorkspace,
-            InitializeZomesWorkflowArgs, InitializeZomesWorkspace, ZomeCallInvocationResult,
+            InitializeZomesWorkflowArgs, ZomeCallInvocationResult,
         },
     },
 };
@@ -710,10 +710,9 @@ impl Cell {
             .await
             .map_err(WorkflowError::from)
             .map_err(Box::new)?;
-        let workspace = InitializeZomesWorkspace(workspace);
 
         // Check if initialization has run
-        if workspace.0.source_chain.has_initialized() {
+        if workspace.source_chain.has_initialized() {
             return Ok(());
         }
         trace!("running init");
