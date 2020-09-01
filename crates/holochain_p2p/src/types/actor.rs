@@ -198,7 +198,7 @@ ghost_actor::ghost_chan! {
         ) -> Vec<GetLinksResponse>;
 
         /// Send a validation receipt to a remote node.
-        fn send_validation_receipt(dna_hash: DnaHash, agent_pub_key: AgentPubKey, receipt: SerializedBytes) -> ();
+        fn send_validation_receipt(dna_hash: DnaHash, to_agent: AgentPubKey, from_agent: AgentPubKey, receipt: SerializedBytes) -> ();
     }
 }
 
