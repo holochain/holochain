@@ -36,10 +36,7 @@ pub mod wasm_test {
             .await
             .unwrap();
 
-        let workspace_lock =
-            crate::core::workflow::CallZomeWorkspaceLock::new(
-                workspace,
-            );
+        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
 
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock;

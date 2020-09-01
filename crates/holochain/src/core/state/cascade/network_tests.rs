@@ -8,8 +8,8 @@ use crate::{
             workspace::Workspace,
         },
         workflow::{
-            integrate_dht_ops_workflow::integrate_to_cache,
-            CallZomeWorkspaceLock, CallZomeWorkspace,
+            integrate_dht_ops_workflow::integrate_to_cache, CallZomeWorkspace,
+            CallZomeWorkspaceLock,
         },
     },
     test_utils::test_network,
