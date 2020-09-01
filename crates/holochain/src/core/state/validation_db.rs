@@ -1,5 +1,6 @@
 //! # Validation Database Types
 
+use crate::core::workflow::sys_validation_workflow::types::Dependencies;
 use holo_hash::{AnyDhtHash, DhtOpHash};
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::{
@@ -24,6 +25,11 @@ pub type ValidationLimboKey = DhtOpHash;
 pub struct ValidationLimboValue {
     /// Status of this op in the limbo
     pub status: ValidationLimboStatus,
+    /// It's possible to run through validation but using
+    /// dependencies that haven't passed validation.
+    /// When this happens we need to wait until these
+    /// dependencies have "proved" they are valid.
+    pub awaiting_proof: Dependencies,
     /// The actual op
     pub op: DhtOpLight,
     /// Where the op was sent to
@@ -47,6 +53,9 @@ pub enum ValidationLimboStatus {
     SysValidated,
     /// Is waiting for dependencies so the op can proceed to app validation
     AwaitingAppDeps(AnyDhtHash),
+    /// Has finished all validation but is still awaiting
+    /// on a dependency to pass validation.
+    AwaitingProof,
 }
 
 impl ValidationLimboStore {

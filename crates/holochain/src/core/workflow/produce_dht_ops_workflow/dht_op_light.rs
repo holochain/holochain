@@ -11,8 +11,8 @@ use holochain_zome_types::header::{self, Header};
 
 pub mod error;
 
-use tracing::*;
 use holochain_state::prelude::PrefixType;
+use tracing::*;
 
 #[cfg(test)]
 mod tests;
@@ -20,14 +20,17 @@ mod tests;
 /// Convert a DhtOpLight into a DhtOp (render all the hashes to values)
 /// This only checks the ElementVault so can only be used with ops that you are
 /// an authority or author of.
-pub async fn light_to_op<P: PrefixType>(op: DhtOpLight, cas: &ElementBuf<P>) -> DhtOpConvertResult<DhtOp> {
+pub async fn light_to_op<P: PrefixType>(
+    op: DhtOpLight,
+    cas: &ElementBuf<P>,
+) -> DhtOpConvertResult<DhtOp> {
     let op_name = format!("{:?}", op);
     match op {
         DhtOpLight::StoreElement(h, _, _) => {
             let (header, entry) = cas
                 .get_element(&h)
                 .await?
-                .ok_or(DhtOpConvertError::MissingData)?
+                .ok_or_else(|| DhtOpConvertError::MissingData(h.into()))?
                 .into_inner();
             // TODO: Could use this signature? Is it the same?
             // Should we not be storing the signature in the DhtOpLight?
@@ -39,7 +42,7 @@ pub async fn light_to_op<P: PrefixType>(op: DhtOpLight, cas: &ElementBuf<P>) -> 
             let (header, entry) = cas
                 .get_element(&h)
                 .await?
-                .ok_or(DhtOpConvertError::MissingData)?
+                .ok_or_else(|| DhtOpConvertError::MissingData(h.into()))?
                 .into_inner();
             let (header, sig) = header.into_header_and_signature();
             let header = match header.into_content() {
@@ -50,7 +53,8 @@ pub async fn light_to_op<P: PrefixType>(op: DhtOpLight, cas: &ElementBuf<P>) -> 
 
             let entry = match header.visibility() {
                 // Entry must be here because it's a StoreEntry
-                EntryVisibility::Public => entry.ok_or(DhtOpConvertError::MissingData)?,
+                EntryVisibility::Public => entry
+                    .ok_or_else(|| DhtOpConvertError::MissingData(header.entry().clone().into()))?,
                 // If the entry is not here and you were meant to have access
                 // it's because you were using a database without access to private entries
                 // If not then you should handle this error
@@ -60,11 +64,9 @@ pub async fn light_to_op<P: PrefixType>(op: DhtOpLight, cas: &ElementBuf<P>) -> 
         }
         DhtOpLight::RegisterAgentActivity(h, _) => {
             let (header, sig) = cas
-                .get_element(&h)
+                .get_header(&h)
                 .await?
-                .ok_or(DhtOpConvertError::MissingData)?
-                .into_inner()
-                .0
+                .ok_or_else(|| DhtOpConvertError::MissingData(h.into()))?
                 .into_header_and_signature();
             Ok(DhtOp::RegisterAgentActivity(sig, header.into_content()))
         }
@@ -72,7 +74,7 @@ pub async fn light_to_op<P: PrefixType>(op: DhtOpLight, cas: &ElementBuf<P>) -> 
             let (header, sig) = cas
                 .get_header(&h)
                 .await?
-                .ok_or(DhtOpConvertError::MissingData)?
+                .ok_or_else(|| DhtOpConvertError::MissingData(h.into()))?
                 .into_header_and_signature();
             let header = match header.into_content() {
                 Header::EntryUpdate(u) => u,
@@ -97,7 +99,7 @@ pub async fn light_to_op<P: PrefixType>(op: DhtOpLight, cas: &ElementBuf<P>) -> 
             let (header, sig) = cas
                 .get_element(&h)
                 .await?
-                .ok_or(DhtOpConvertError::MissingData)?
+                .ok_or_else(|| DhtOpConvertError::MissingData(h.into()))?
                 .into_inner()
                 .0
                 .into_header_and_signature();
@@ -116,7 +118,7 @@ pub async fn light_to_op<P: PrefixType>(op: DhtOpLight, cas: &ElementBuf<P>) -> 
             let (header, sig) = cas
                 .get_element(&h)
                 .await?
-                .ok_or(DhtOpConvertError::MissingData)?
+                .ok_or_else(|| DhtOpConvertError::MissingData(h.into()))?
                 .into_inner()
                 .0
                 .into_header_and_signature();
@@ -140,11 +142,9 @@ async fn get_element_delete<P: PrefixType>(
     cas: &ElementBuf<P>,
 ) -> DhtOpConvertResult<(header::ElementDelete, Signature)> {
     let (header, sig) = cas
-        .get_element(&header_hash)
+        .get_header(&header_hash)
         .await?
-        .ok_or(DhtOpConvertError::MissingData)?
-        .into_inner()
-        .0
+        .ok_or_else(|| DhtOpConvertError::MissingData(header_hash.into()))?
         .into_header_and_signature();
     match header.into_content() {
         Header::ElementDelete(u) => Ok((u, sig)),

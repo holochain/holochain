@@ -53,7 +53,7 @@ impl<T: HashType> HoloHash<T> {
         // tokio thread.
 
         if hash.len() == HASH_CORE_LEN {
-            tracing::warn!("Got core 32 bytes instead of 36, recalcuating loc.");
+            //tracing::warn!("Got core 32 bytes instead of 36, recalcuating loc.");
             hash.append(&mut encode::holo_dht_location_bytes(&hash));
         }
 
@@ -78,7 +78,7 @@ impl<P: PrimitiveHashType> HoloHash<P> {
         // TODO: DRY, write in terms of with_pre_hashed_typed
 
         if hash.len() == HASH_CORE_LEN {
-            tracing::warn!("Got core 32 bytes instead of 36, recalcuating loc.");
+            //tracing::warn!("Got core 32 bytes instead of 36, recalcuating loc.");
             hash.append(&mut encode::holo_dht_location_bytes(&hash));
         }
 

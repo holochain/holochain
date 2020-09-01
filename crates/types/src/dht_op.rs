@@ -195,11 +195,25 @@ impl DhtOpLight {
             | DhtOpLight::RegisterRemoveLink(_, b) => b,
         }
     }
+    /// Get the header hash from this op
+    pub fn header_hash(&self) -> &HeaderHash {
+        match self {
+            DhtOpLight::StoreElement(h, _, _)
+            | DhtOpLight::StoreEntry(h, _, _)
+            | DhtOpLight::RegisterAgentActivity(h, _)
+            | DhtOpLight::RegisterUpdatedBy(h, _, _)
+            | DhtOpLight::RegisterDeletedBy(h, _)
+            | DhtOpLight::RegisterDeletedEntryHeader(h, _)
+            | DhtOpLight::RegisterAddLink(h, _)
+            | DhtOpLight::RegisterRemoveLink(h, _) => h,
+        }
+    }
 }
 
 // FIXME: need to use this in HashableContent
+#[allow(missing_docs)]
 #[derive(Serialize)]
-enum UniqueForm<'a> {
+pub enum UniqueForm<'a> {
     // As an optimization, we don't include signatures. They would be redundant
     // with headers and therefore would waste hash/comparison time to include.
     StoreElement(&'a Header),
@@ -428,6 +442,21 @@ impl HashableContent for DhtOp {
         HashableContentBytes::Content(
             (&self.as_unique_form())
                 .try_into()
+                .expect("Could not serialize HashableContent"),
+        )
+    }
+}
+
+impl HashableContent for UniqueForm<'_> {
+    type HashType = hash_type::DhtOp;
+
+    fn hash_type(&self) -> Self::HashType {
+        hash_type::DhtOp
+    }
+
+    fn hashable_content(&self) -> HashableContentBytes {
+        HashableContentBytes::Content(
+            self.try_into()
                 .expect("Could not serialize HashableContent"),
         )
     }

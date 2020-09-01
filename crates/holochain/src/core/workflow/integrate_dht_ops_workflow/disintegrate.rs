@@ -41,8 +41,10 @@ pub async fn disintegrate_single_metadata<C: MetadataBufT, P: PrefixType>(
     Ok(())
 }
 
+// #[allow(unreachable_code, unused_variables)]
 /// Store a DhtOp's data in an element buf without dependency checks
 pub fn disintegrate_single_op<P: PrefixType>(op: DhtOpLight, element_store: &mut ElementBuf<P>) {
+    return;
     match op {
         DhtOpLight::StoreElement(header, maybe_entry, _) => {
             delete_data(header, maybe_entry, element_store);

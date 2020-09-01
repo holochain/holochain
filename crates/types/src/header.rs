@@ -126,6 +126,14 @@ impl NewEntryHeader {
             | NewEntryHeader::Update(EntryUpdate { entry_type, .. }) => entry_type.visibility(),
         }
     }
+
+    /// Get the timestamp of this header
+    pub fn timestamp(&self) -> &holochain_zome_types::timestamp::Timestamp {
+        match self {
+            NewEntryHeader::Create(EntryCreate { timestamp, .. })
+            | NewEntryHeader::Update(EntryUpdate { timestamp, .. }) => timestamp,
+        }
+    }
 }
 
 impl From<NewEntryHeader> for Header {

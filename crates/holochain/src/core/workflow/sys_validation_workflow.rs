@@ -43,7 +43,7 @@ use integrate_dht_ops_workflow::{
     integrate_single_op,
 };
 use produce_dht_ops_workflow::dht_op_light::light_to_op;
-use types::{DhtOpOrder, OrderedOp, Outcome};
+use types::{Dependencies, DhtOpOrder, OrderedOp, Outcome};
 
 pub mod types;
 
@@ -86,9 +86,9 @@ async fn sys_validation_workflow_inner(
                 ValidationLimboStatus::Pending | ValidationLimboStatus::AwaitingSysDeps(_) => {
                     Ok(true)
                 }
-                ValidationLimboStatus::SysValidated | ValidationLimboStatus::AwaitingAppDeps(_) => {
-                    Ok(false)
-                }
+                ValidationLimboStatus::SysValidated
+                | ValidationLimboStatus::AwaitingAppDeps(_)
+                | ValidationLimboStatus::AwaitingProof => Ok(false),
             }
         })?
         .collect())?;
@@ -96,7 +96,13 @@ async fn sys_validation_workflow_inner(
     // Sort the ops
     let mut sorted_ops = BinaryHeap::new();
     for vlv in ops {
-        let op = light_to_op(vlv.op.clone(), &workspace.element_pending).await?;
+        // let op = light_to_op(vlv.op.clone(), &workspace.element_pending).await?;
+        let op = light_to_op(vlv.op.clone(), &workspace.element_pending).await;
+        if let Err(e) = &op {
+            dbg!(e);
+        }
+        let op = op?;
+
         let hash = DhtOpHash::with_data(&op).await;
         let order = DhtOpOrder::from(&op);
         let v = OrderedOp {
@@ -105,9 +111,14 @@ async fn sys_validation_workflow_inner(
             op,
             value: vlv,
         };
-        sorted_ops.push(v);
+        // We want a min-heap
+        sorted_ops.push(std::cmp::Reverse(v));
     }
 
+    let which_agent = which_agent(conductor_api.cell_id().agent_pubkey());
+    if which_agent == "alice" {
+        debug!(%which_agent, ?sorted_ops);
+    }
     // Process each op
     for so in sorted_ops {
         let OrderedOp {
@@ -115,8 +126,30 @@ async fn sys_validation_workflow_inner(
             op,
             value: mut vlv,
             ..
-        } = so;
-        let outcome = validate_op(&op, workspace, network.clone(), &conductor_api).await?;
+        } = so.0;
+        // let outcome = validate_op(
+        //     &op,
+        //     workspace,
+        //     network.clone(),
+        //     &conductor_api,
+        //     &mut vlv.awaiting_proof,
+        // )
+        // .await?;
+        let r = validate_op(
+            &op,
+            workspace,
+            network.clone(),
+            &conductor_api,
+            &mut vlv.awaiting_proof,
+        )
+        .await;
+        if let Err(e) = &r {
+            dbg!(e);
+        }
+        let outcome = r?;
+        if which_agent == "alice" {
+            debug!(%which_agent, ?outcome, ?op_hash);
+        }
 
         // TODO: When we introduce abandoning ops make
         // sure they are not written to any outgoing
@@ -128,11 +161,16 @@ async fn sys_validation_workflow_inner(
                 workspace.to_val_limbo(op_hash, vlv).await?;
             }
             Outcome::SkipAppValidation => {
-                let iv = IntegrationLimboValue {
-                    op: vlv.op,
-                    validation_status: ValidationStatus::Valid,
-                };
-                workspace.to_int_limbo(op_hash, iv, op).await?;
+                if vlv.awaiting_proof.awaiting_proof() {
+                    vlv.status = ValidationLimboStatus::AwaitingProof;
+                    workspace.to_val_limbo(op_hash, vlv).await?;
+                } else {
+                    let iv = IntegrationLimboValue {
+                        op: vlv.op,
+                        validation_status: ValidationStatus::Valid,
+                    };
+                    workspace.to_int_limbo(op_hash, iv, op).await?;
+                }
             }
             Outcome::AwaitingOpDep(missing_dep) => {
                 // TODO: Try and get this dependency to add to limbo
@@ -174,8 +212,9 @@ async fn validate_op(
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
     conductor_api: &impl CellConductorApiT,
+    dependencies: &mut Dependencies,
 ) -> WorkflowResult<Outcome> {
-    match validate_op_inner(op, workspace, network, conductor_api).await {
+    match validate_op_inner(op, workspace, network, conductor_api, dependencies).await {
         Ok(_) => match op {
             DhtOp::RegisterAgentActivity(_, _) |
             // TODO: Check strict mode where store element 
@@ -234,6 +273,7 @@ async fn validate_op_inner(
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
     conductor_api: &impl CellConductorApiT,
+    dependencies: &mut Dependencies,
 ) -> SysValidationResult<()> {
     match op {
         DhtOp::StoreElement(signature, header, entry) => {
@@ -268,35 +308,41 @@ async fn validate_op_inner(
             Ok(())
         }
         DhtOp::RegisterAgentActivity(signature, header) => {
-            register_agent_activity(header, workspace).await?;
+            register_agent_activity(header, workspace, dependencies).await?;
 
             all_op_check(signature, header).await?;
             Ok(())
         }
         DhtOp::RegisterUpdatedBy(signature, header) => {
-            register_updated_by(header, workspace).await?;
+            register_updated_by(header, workspace, dependencies).await?;
 
             let header = header.clone().into();
             all_op_check(signature, &header).await?;
             Ok(())
         }
-        DhtOp::RegisterDeletedBy(signature, header)
-        | DhtOp::RegisterDeletedEntryHeader(signature, header) => {
-            register_deleted(header, &workspace.element_vault).await?;
+        DhtOp::RegisterDeletedBy(signature, header) => {
+            register_deleted_by(header, &workspace, dependencies).await?;
+
+            let header = header.clone().into();
+            all_op_check(signature, &header).await?;
+            Ok(())
+        }
+        DhtOp::RegisterDeletedEntryHeader(signature, header) => {
+            register_deleted_entry_header(header, &workspace, dependencies).await?;
 
             let header = header.clone().into();
             all_op_check(signature, &header).await?;
             Ok(())
         }
         DhtOp::RegisterAddLink(signature, header) => {
-            register_add_link(header, workspace, network).await?;
+            register_add_link(header, workspace, network, dependencies).await?;
 
             let header = header.clone().into();
             all_op_check(signature, &header).await?;
             Ok(())
         }
         DhtOp::RegisterRemoveLink(signature, header) => {
-            register_remove_link(header, workspace).await?;
+            register_remove_link(header, workspace, dependencies).await?;
 
             let header = header.clone().into();
             all_op_check(signature, &header).await?;
@@ -314,6 +360,7 @@ async fn all_op_check(signature: &Signature, header: &Header) -> SysValidationRe
 async fn register_agent_activity(
     header: &Header,
     workspace: &SysValidationWorkspace,
+    dependencies: &mut Dependencies,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
     let author = header.author();
@@ -323,13 +370,9 @@ async fn register_agent_activity(
     check_prev_header(&header)?;
     check_valid_if_dna(&header, &workspace.meta_vault).await?;
     if let Some(prev_header_hash) = prev_header_hash {
-        check_holding_prev_header(
-            author.clone(),
-            prev_header_hash,
-            &workspace.meta_vault,
-            &workspace.element_vault,
-        )
-        .await?;
+        let dependency =
+            check_holding_prev_header_all(author, prev_header_hash, &workspace).await?;
+        dependencies.register_agent_activity(dependency).await?;
     }
     check_chain_rollback(&header, &workspace.meta_vault, &workspace.element_vault).await?;
     Ok(())
@@ -380,33 +423,46 @@ async fn store_entry(
 async fn register_updated_by(
     entry_update: &EntryUpdate,
     workspace: &SysValidationWorkspace,
+    dependencies: &mut Dependencies,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
     let original_header_address = &entry_update.original_header_address;
-    let original_entry_address = entry_update.original_entry_address.clone();
+    let original_entry_address = &entry_update.original_entry_address;
 
-    // Checks
-    check_header_in_metadata(
-        original_entry_address,
-        original_header_address,
-        &workspace.meta_vault,
-    )
-    .await?;
-    let original_element =
-        check_holding_element(original_header_address, &workspace.element_vault).await?;
+    let dependency =
+        check_holding_store_entry_all(original_entry_address, original_header_address, &workspace)
+            .await?;
+    let original_element = dependencies.store_entry(dependency).await?;
     update_check(entry_update, original_element.header())?;
     Ok(())
 }
 
-async fn register_deleted(
+async fn register_deleted_by(
     element_delete: &ElementDelete,
-    element_vault: &ElementBuf,
+    workspace: &SysValidationWorkspace,
+    dependencies: &mut Dependencies,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
     let removed_header_address = &element_delete.removes_address;
 
     // Checks
-    let removed_header = check_holding_header(removed_header_address, element_vault).await?;
+    let dependency = check_holding_element_all(removed_header_address, workspace).await?;
+    let removed_header = dependencies.store_entry(dependency).await?;
+    check_new_entry_header(removed_header.header())?;
+    Ok(())
+}
+
+async fn register_deleted_entry_header(
+    element_delete: &ElementDelete,
+    workspace: &SysValidationWorkspace,
+    dependencies: &mut Dependencies,
+) -> SysValidationResult<()> {
+    // Get data ready to validate
+    let removed_header_address = &element_delete.removes_address;
+
+    // Checks
+    let dependency = check_holding_header_all(removed_header_address, workspace).await?;
+    let removed_header = dependencies.store_element(dependency).await?;
     check_new_entry_header(removed_header.header())?;
     Ok(())
 }
@@ -415,13 +471,15 @@ async fn register_add_link(
     link_add: &LinkAdd,
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
+    dependencies: &mut Dependencies,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
     let base_entry_address = &link_add.base_address;
     let target_entry_address = &link_add.target_address;
 
     // Checks
-    check_holding_entry(base_entry_address, &workspace.element_vault).await?;
+    let dependency = check_holding_entry_all(base_entry_address, workspace).await?;
+    dependencies.store_entry(dependency).await?;
     check_entry_exists(target_entry_address.clone(), workspace.cascade(network)).await?;
     check_tag_size(&link_add.tag)?;
     Ok(())
@@ -430,14 +488,14 @@ async fn register_add_link(
 async fn register_remove_link(
     link_remove: &LinkRemove,
     workspace: &SysValidationWorkspace,
+    dependencies: &mut Dependencies,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
     let link_add_address = &link_remove.link_add_address;
 
     // Checks
-    let link_add = check_holding_header(link_add_address, &workspace.element_vault).await?;
-    let (link_add, link_add_hash) = link_add.into_header_and_signature().0.into_inner();
-    check_link_in_metadata(link_add, &link_add_hash, &workspace.meta_vault).await?;
+    let dependency = check_holding_link_add_all(link_add_address, &workspace).await?;
+    dependencies.add_link(dependency).await?;
     Ok(())
 }
 
@@ -511,6 +569,7 @@ impl SysValidationWorkspace {
             meta_cache,
         })
     }
+
     async fn to_val_limbo(
         &mut self,
         hash: DhtOpHash,
@@ -531,7 +590,7 @@ impl SysValidationWorkspace {
         disintegrate_single_metadata(iv.op.clone(), &self.element_pending, &mut self.meta_pending)
             .await?;
         disintegrate_single_op(iv.op.clone(), &mut self.element_pending);
-        integrate_single_op(op, &mut self.element_pending).await?;
+        integrate_single_op(op, &mut self.element_validated).await?;
         integrate_single_metadata(
             iv.op.clone(),
             &self.element_validated,

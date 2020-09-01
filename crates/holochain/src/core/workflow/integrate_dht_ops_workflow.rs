@@ -72,7 +72,7 @@ pub async fn integrate_dht_ops_workflow(
             op,
             value: iv,
         };
-        sorted_ops.push(v);
+        sorted_ops.push(std::cmp::Reverse(v));
     }
 
     let mut total_integrated: usize = 0;
@@ -91,7 +91,7 @@ pub async fn integrate_dht_ops_workflow(
                 op,
                 value,
                 order,
-            } = so;
+            } = so.0;
             match integrate_single_dht_op(
                 value.clone(),
                 op,
@@ -105,12 +105,12 @@ pub async fn integrate_dht_ops_workflow(
                     num_integrated += 1;
                     total_integrated += 1;
                 }
-                Outcome::Deferred(op) => next_ops.push(OrderedOp {
+                Outcome::Deferred(op) => next_ops.push(std::cmp::Reverse(OrderedOp {
                     hash,
                     order,
                     op,
                     value,
-                }),
+                })),
             }
         }
         sorted_ops = next_ops;
@@ -126,6 +126,7 @@ pub async fn integrate_dht_ops_workflow(
     } else {
         // Re-add the remaining ops to the queue, to be picked up next time.
         for so in sorted_ops {
+            let so = so.0;
             // TODO: it may be desirable to retain the original timestamp
             // when re-adding items to the queue for later processing. This is
             // challenging for now since we don't have access to that original
@@ -394,7 +395,7 @@ async fn get_header<P: PrefixType>(
     Ok(element_store
         .get_header(&hash)
         .await?
-        .ok_or(DhtOpConvertError::MissingData)?
+        .ok_or_else(|| DhtOpConvertError::MissingData(hash.into()))?
         .into_header_and_signature()
         .0
         .into_content())
