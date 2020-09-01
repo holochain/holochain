@@ -143,8 +143,8 @@ pub async fn publish_dht_ops_workflow_inner(
 }
 
 impl Workspace for PublishDhtOpsWorkspace {
-    fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
-        self.authored_dht_ops.flush_to_txn(writer)?;
+    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> WorkspaceResult<()> {
+        self.authored_dht_ops.flush_to_txn_ref(writer)?;
         Ok(())
     }
 }

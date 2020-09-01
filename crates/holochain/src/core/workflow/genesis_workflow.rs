@@ -98,8 +98,8 @@ impl GenesisWorkspace {
 }
 
 impl Workspace for GenesisWorkspace {
-    fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
-        self.source_chain.flush_to_txn(writer)?;
+    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> WorkspaceResult<()> {
+        self.source_chain.flush_to_txn_ref(writer)?;
         Ok(())
     }
 }

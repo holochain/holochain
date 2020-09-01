@@ -270,9 +270,9 @@ impl SourceChainBuf {
 impl BufferedStore for SourceChainBuf {
     type Error = SourceChainError;
 
-    fn flush_to_txn(self, writer: &mut Writer) -> Result<(), Self::Error> {
-        self.elements.flush_to_txn(writer)?;
-        self.sequence.flush_to_txn(writer)?;
+    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> Result<(), Self::Error> {
+        self.elements.flush_to_txn_ref(writer)?;
+        self.sequence.flush_to_txn_ref(writer)?;
         Ok(())
     }
 }

@@ -44,7 +44,7 @@ pub struct CallZomeWorkflowArgs<Ribosome: RibosomeT> {
 
 #[instrument(skip(workspace, network, keystore, writer, args, trigger_produce_dht_ops))]
 pub async fn call_zome_workflow<'env, Ribosome: RibosomeT>(
-    mut workspace: CallZomeWorkspace,
+    workspace: CallZomeWorkspace,
     network: HolochainP2pCell,
     keystore: KeystoreSender,
     writer: OneshotWriter,
@@ -274,19 +274,15 @@ impl<'a> CallZomeWorkspace {
             network,
         )
     }
-
-    pub fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> WorkspaceResult<()> {
-        self.source_chain.into_inner().flush_to_txn(writer)?;
-        self.meta.flush_to_txn(writer)?;
-        self.cache_cas.flush_to_txn(writer)?;
-        self.cache_meta.flush_to_txn(writer)?;
-        Ok(())
-    }
 }
 
 impl Workspace for CallZomeWorkspace {
-    fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
-        self.flush_to_txn_ref(writer)
+    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> WorkspaceResult<()> {
+        self.source_chain.flush_to_txn_ref(writer)?;
+        self.meta.flush_to_txn_ref(writer)?;
+        self.cache_cas.flush_to_txn_ref(writer)?;
+        self.cache_meta.flush_to_txn_ref(writer)?;
+        Ok(())
     }
 }
 

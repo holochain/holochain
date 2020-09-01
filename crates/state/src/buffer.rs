@@ -26,13 +26,17 @@ pub(super) fn check_empty_key<K: AsRef<[u8]>>(k: &K) -> DatabaseResult<()> {
 /// adds changes to the write transaction. This generalization is not really used,
 /// but could be used in Workspaces i.e. iterating over a Vec<dyn BufferedStore>
 /// is all that needs to happen to commit the workspace changes
-pub trait BufferedStore {
+pub trait BufferedStore: Sized {
     /// The error type for `flush_to_txn` errors
     type Error: std::error::Error;
 
     /// Flush the scratch space to the read-write transaction, staging the changes
     /// for an actual database update
-    fn flush_to_txn(self, writer: &mut Writer) -> Result<(), Self::Error>;
+    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> Result<(), Self::Error>;
+
+    fn flush_to_txn(mut self, writer: &mut Writer) -> Result<(), Self::Error> {
+        self.flush_to_txn_ref(writer)
+    }
 
     /// Specifies whether there are actually changes to flush. If not, the
     /// flush_to_txn method may decide to do nothing.

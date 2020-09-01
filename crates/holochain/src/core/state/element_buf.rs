@@ -268,15 +268,15 @@ impl BufferedStore for ElementBuf {
                 .unwrap_or(true)
     }
 
-    fn flush_to_txn(self, writer: &mut Writer) -> DatabaseResult<()> {
+    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
         if self.is_clean() {
             return Ok(());
         }
-        self.public_entries.flush_to_txn(writer)?;
-        if let Some(db) = self.private_entries {
-            db.flush_to_txn(writer)?
+        self.public_entries.flush_to_txn_ref(writer)?;
+        if let Some(ref mut db) = self.private_entries {
+            db.flush_to_txn_ref(writer)?
         };
-        self.headers.flush_to_txn(writer)?;
+        self.headers.flush_to_txn_ref(writer)?;
         Ok(())
     }
 }

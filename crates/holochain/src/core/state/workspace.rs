@@ -23,12 +23,20 @@ pub type WorkspaceResult<T> = Result<T, WorkspaceError>;
 /// Defines a Workspace
 pub trait Workspace: Send + Sized {
     /// Flush accumulated changes to the writer without committing.
-    /// This consumes the Workspace.
     ///
     /// No method is provided to commit the writer as well, because Writers
     /// should be managed such that write failures are properly handled, which
     /// is outside the scope of the workspace.
-    fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()>;
+    ///
+    /// This method is provided and shouldn't need to be implemented. It is
+    /// preferred to use this over `flush_to_txn_ref` since it's generally not
+    /// valid to flush the same data twice.
+    fn flush_to_txn(mut self, writer: &mut Writer) -> WorkspaceResult<()> {
+        self.flush_to_txn_ref(writer)
+    }
+
+    /// Flush accumulated changes to the writer, without consuming the Workspace
+    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> WorkspaceResult<()>;
 }
 
 #[cfg(test)]
@@ -59,7 +67,7 @@ pub mod tests {
     }
 
     impl Workspace for TestWorkspace {
-        fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
+        fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> WorkspaceResult<()> {
             self.one.flush_to_txn(writer)?;
             self.two.flush_to_txn(writer)?;
             Ok(())

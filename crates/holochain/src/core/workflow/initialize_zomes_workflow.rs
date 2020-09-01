@@ -1,6 +1,4 @@
-use super::{
-    error::WorkflowResult, CallZomeWorkspaceLock, CallZomeWorkspace,
-};
+use super::{error::WorkflowResult, CallZomeWorkspace, CallZomeWorkspaceLock};
 use crate::core::{
     queue_consumer::OneshotWriter,
     ribosome::{
@@ -81,11 +79,11 @@ impl InitializeZomesWorkspace {
 }
 
 impl Workspace for InitializeZomesWorkspace {
-    fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
-        self.0.source_chain.into_inner().flush_to_txn(writer)?;
-        self.0.meta.flush_to_txn(writer)?;
-        self.0.cache_cas.flush_to_txn(writer)?;
-        self.0.cache_meta.flush_to_txn(writer)?;
+    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> WorkspaceResult<()> {
+        self.0.source_chain.flush_to_txn_ref(writer)?;
+        self.0.meta.flush_to_txn_ref(writer)?;
+        self.0.cache_cas.flush_to_txn_ref(writer)?;
+        self.0.cache_meta.flush_to_txn_ref(writer)?;
         Ok(())
     }
 }

@@ -76,9 +76,9 @@ impl ProduceDhtOpsWorkspace {
 }
 
 impl Workspace for ProduceDhtOpsWorkspace {
-    fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
-        self.source_chain.flush_to_txn(writer)?;
-        self.authored_dht_ops.flush_to_txn(writer)?;
+    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> WorkspaceResult<()> {
+        self.source_chain.flush_to_txn_ref(writer)?;
+        self.authored_dht_ops.flush_to_txn_ref(writer)?;
         Ok(())
     }
 }

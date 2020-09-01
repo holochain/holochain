@@ -336,7 +336,7 @@ where
         self.scratch.is_empty()
     }
 
-    fn flush_to_txn(self, writer: &mut Writer) -> DatabaseResult<()> {
+    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
         use KvOp::*;
 
         if self.is_clean() {
@@ -371,7 +371,7 @@ where
         self.scratch.is_empty()
     }
 
-    fn flush_to_txn(self, writer: &mut Writer) -> DatabaseResult<()> {
+    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
         use KvOp::*;
 
         if self.is_clean() {
@@ -415,8 +415,8 @@ where
         self.scratch.is_empty()
     }
 
-    fn flush_to_txn(self, writer: &mut Writer) -> DatabaseResult<()> {
-        self.inner.flush_to_txn(writer)
+    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
+        self.inner.flush_to_txn_ref(writer)
     }
 }
 
@@ -430,7 +430,7 @@ where
         self.scratch.is_empty()
     }
 
-    fn flush_to_txn(self, writer: &mut Writer) -> DatabaseResult<()> {
-        self.inner.flush_to_txn(writer)
+    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
+        self.inner.flush_to_txn_ref(writer)
     }
 }

@@ -137,11 +137,11 @@ impl ValidationReceiptsBuf {
 impl BufferedStore for ValidationReceiptsBuf {
     type Error = DatabaseError;
 
-    fn flush_to_txn(self, writer: &mut Writer) -> DatabaseResult<()> {
+    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
         // we are in no_dup_data mode
         // so even if someone else added a dup in the mean time
         // it will not get written to the DB
-        self.0.flush_to_txn(writer)?;
+        self.0.flush_to_txn_ref(writer)?;
         Ok(())
     }
 }

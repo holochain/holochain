@@ -398,15 +398,15 @@ pub struct IntegrateDhtOpsWorkspace {
 }
 
 impl Workspace for IntegrateDhtOpsWorkspace {
-    fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
+    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> WorkspaceResult<()> {
         // flush elements
-        self.elements.flush_to_txn(writer)?;
+        self.elements.flush_to_txn_ref(writer)?;
         // flush metadata store
-        self.meta.flush_to_txn(writer)?;
+        self.meta.flush_to_txn_ref(writer)?;
         // flush integrated
-        self.integrated_dht_ops.flush_to_txn(writer)?;
+        self.integrated_dht_ops.flush_to_txn_ref(writer)?;
         // flush integration queue
-        self.integration_limbo.flush_to_txn(writer)?;
+        self.integration_limbo.flush_to_txn_ref(writer)?;
         Ok(())
     }
 }

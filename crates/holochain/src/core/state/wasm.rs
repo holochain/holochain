@@ -28,8 +28,8 @@ impl WasmBuf {
 impl BufferedStore for WasmBuf {
     type Error = DatabaseError;
 
-    fn flush_to_txn(self, writer: &mut Writer) -> DatabaseResult<()> {
-        self.0.flush_to_txn(writer)?;
+    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
+        self.0.flush_to_txn_ref(writer)?;
         Ok(())
     }
 }

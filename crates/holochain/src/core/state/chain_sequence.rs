@@ -153,18 +153,21 @@ impl BufferedStore for ChainSequenceBuf {
 
     /// Commit to the source chain, performing an as-at check and returning a
     /// SourceChainError::HeadMoved error if the as-at check fails
-    fn flush_to_txn(self, writer: &mut Writer) -> SourceChainResult<()> {
+    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> SourceChainResult<()> {
         if self.is_clean() {
             return Ok(());
         }
         let env = self.buf.env().clone();
         let db = env.get_db(&*CHAIN_SEQUENCE)?;
         let (_, _, persisted_head) = ChainSequenceBuf::head_info(&KvIntStore::new(db), writer)?;
-        let (old, new) = (self.persisted_head, persisted_head);
+        let (old, new) = (self.persisted_head.as_ref(), persisted_head.as_ref());
         if old != new {
-            Err(SourceChainError::HeadMoved(old, new))
+            Err(SourceChainError::HeadMoved(
+                old.map(|x| x.to_owned()),
+                new.map(|x| x.to_owned()),
+            ))
         } else {
-            Ok(self.buf.flush_to_txn(writer)?)
+            Ok(self.buf.flush_to_txn_ref(writer)?)
         }
     }
 }

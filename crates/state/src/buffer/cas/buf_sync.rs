@@ -151,8 +151,8 @@ where
         self.0.is_clean()
     }
 
-    fn flush_to_txn(self, writer: &mut Writer) -> DatabaseResult<()> {
-        self.0.flush_to_txn(writer)?;
+    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
+        self.0.flush_to_txn_ref(writer)?;
         Ok(())
     }
 }
@@ -168,8 +168,8 @@ where
         self.inner.is_clean()
     }
 
-    fn flush_to_txn(self, writer: &mut Writer) -> DatabaseResult<()> {
-        self.inner.flush_to_txn(writer)?;
+    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
+        self.inner.flush_to_txn_ref(writer)?;
         Ok(())
     }
 }
