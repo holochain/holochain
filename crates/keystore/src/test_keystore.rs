@@ -29,10 +29,6 @@ pub async fn spawn_test_keystore(
         .channel_factory()
         .create_channel::<TestKeystoreInternal>()
         .await?;
-    let _sender = builder
-        .channel_factory()
-        .create_channel::<KeystoreApi>()
-        .await?;
     let sender = builder
         .channel_factory()
         .create_channel::<LairClientApi>()
@@ -98,35 +94,6 @@ impl TestKeystoreInternalHandler for TestKeystore {
     ) -> TestKeystoreInternalHandlerResult<()> {
         self.active_keypairs.insert(pub_key, (idx, priv_key));
         Ok(async move { Ok(()) }.boxed().into())
-    }
-}
-
-impl ghost_actor::GhostHandler<KeystoreApi> for TestKeystore {}
-
-impl KeystoreApiHandler for TestKeystore {
-    fn handle_generate_sign_keypair_from_pure_entropy(
-        &mut self,
-    ) -> KeystoreApiHandlerResult<holo_hash::AgentPubKey> {
-        let fut = self.handle_sign_ed25519_new_from_entropy()?;
-        Ok(async move {
-            let (_, pk) = fut.await?;
-            Ok(holo_hash::AgentPubKey::with_pre_hashed(pk.to_vec()))
-        }
-        .boxed()
-        .into())
-    }
-
-    fn handle_sign(&mut self, input: SignInput) -> KeystoreApiHandlerResult<Signature> {
-        let fut = self.handle_sign_ed25519_sign_by_pub_key(
-            input.key.as_ref().to_vec().into(),
-            <Vec<u8>>::from(UnsafeBytes::from(input.data)).into(),
-        )?;
-        Ok(async move {
-            let res = fut.await?;
-            Ok(Signature(res.to_vec()))
-        }
-        .boxed()
-        .into())
     }
 }
 

@@ -4,20 +4,15 @@
 use crate::*;
 use ghost_actor::dependencies::futures::future::FutureExt;
 
-ghost_actor::ghost_chan! {
-    /// A "Keystore" actor keeps private keys secure while allowing them to be
-    /// used for signing, encryption, etc.
-    pub chan KeystoreApi<KeystoreError> {
-        /// Generates a new pure entropy keypair in the keystore, returning the public key.
-        fn generate_sign_keypair_from_pure_entropy() -> holo_hash::AgentPubKey;
-
-        /// Generate a signature for a given blob of binary data.
-        fn sign(input: SignInput) -> Signature;
-    }
-}
-
 /// GhostSender type for the KeystoreApi
 pub type KeystoreSender = ghost_actor::GhostSender<lair_keystore_api::actor::LairClientApi>;
+
+/// Result type for legacy API calls.
+pub type KeystoreApiResult<T> = Result<T, KeystoreError>;
+
+/// Future type for legacy API calls.
+pub type KeystoreApiFuture<T> =
+    ghost_actor::dependencies::must_future::MustBoxFuture<'static, KeystoreApiResult<T>>;
 
 /// Some legacy APIs to make refactor easier.
 pub trait KeystoreSenderExt {
