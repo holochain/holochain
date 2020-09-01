@@ -1,10 +1,6 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::{CallContext, RibosomeT};
-use crate::core::state::cascade::error::CascadeResult;
-use crate::core::workflow::CallZomeWorkspace;
-use futures::future::FutureExt;
-use holochain_zome_types::{metadata::Details, GetDetailsInput, GetDetailsOutput};
-use must_future::MustBoxFuture;
+use holochain_zome_types::{GetDetailsInput, GetDetailsOutput};
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
@@ -18,21 +14,18 @@ pub fn get_details<'a>(
     // Get the network from the context
     let network = call_context.host_access.network().clone();
 
-    let call =
-        |workspace: &'a mut CallZomeWorkspace| -> MustBoxFuture<'a, CascadeResult<Option<Details>>> {
-            async move {
-                let mut cascade = workspace.cascade(network);
-                Ok(cascade.get_details(hash, options.into()).await?)
-            }
-            .boxed()
-            .into()
-        };
     // timeouts must be handled by the network
-    let maybe_details: Option<Details> =
-        tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-            unsafe { call_context.host_access.workspace().apply_mut(call).await }
-        })??;
-    Ok(GetDetailsOutput::new(maybe_details))
+    tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+        let maybe_details = call_context
+            .host_access
+            .workspace()
+            .write()
+            .await
+            .cascade(network)
+            .get_details(hash, options.into())
+            .await?;
+        Ok(GetDetailsOutput::new(maybe_details))
+    })
 }
 
 #[cfg(test)]
@@ -58,10 +51,7 @@ pub mod wasm_test {
             .await
             .unwrap();
 
-        let workspace_lock =
-            crate::core::workflow::CallZomeWorkspaceLock::new(
-                workspace,
-            );
+        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
 
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock.clone();
