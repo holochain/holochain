@@ -271,13 +271,13 @@ where
     }
 
     /// See if a value exists, avoiding deserialization
-    pub async fn contains(&self, k: &K) -> DatabaseResult<bool> {
+    pub fn contains(&self, k: &K) -> DatabaseResult<bool> {
         fresh_reader!(self.env, |reader| self.inner.contains(&reader, k))
     }
 
     /// Get a value, taking the scratch space into account,
     /// or from persistence if needed
-    pub async fn get(&self, k: &K) -> DatabaseResult<Option<V>> {
+    pub fn get(&self, k: &K) -> DatabaseResult<Option<V>> {
         fresh_reader!(self.env, |reader| self.inner.get(&reader, k))
     }
 
@@ -305,7 +305,7 @@ where
     // NB: this cannot return an iterator due to lifetime issues
     #[deprecated = "this doesn't actually return an iterator"]
     pub async fn drain<R: Readable + Send + Sync>(&mut self) -> DatabaseResult<Vec<V>> {
-        let g = self.env.guard().await;
+        let g = self.env.guard();
         let r = g.reader()?;
         let v = self.inner.drain_iter(&r)?.collect()?;
         Ok(v)
@@ -313,7 +313,7 @@ where
 
     /// Iterator that returns all partial matches to this key
     #[deprecated = "this doesn't actually return an iterator"]
-    pub async fn iter_all_key_matches<R: Readable + Send + Sync>(
+    pub fn iter_all_key_matches<R: Readable + Send + Sync>(
         &self,
         k: K,
     ) -> DatabaseResult<IterOwned<V>> {
@@ -323,15 +323,6 @@ where
             .map(|(k, v)| { Ok((k.to_vec(), v)) })
             .collect()?))
     }
-
-    // /// Iterate from a key onwards
-    // TODO: remove, not much point in collecting the entire DB, right?
-    // pub async fn iter_from<'a, R: Readable + Send + Sync>(
-    //     &'a self,
-    //     k: K,
-    // ) -> DatabaseResult<SingleIterFrom<'a, '_, V>> {
-    //     fresh_reader!(self.env, |reader| self.inner.iter_from(&reader, k))
-    // }
 }
 
 impl<K, V> BufferedStore for KvBufUsed<K, V>

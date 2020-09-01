@@ -49,7 +49,7 @@ pub mod wasm_test {
 
         let test_env = holochain_state::test_utils::test_cell_env();
         let env = test_env.env();
-        let dbs = env.dbs().await;
+        let dbs = env.dbs();
         let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
             .await
             .unwrap();

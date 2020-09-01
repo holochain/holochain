@@ -23,8 +23,8 @@ pub async fn handle_get_entry(
     options: holochain_p2p::event::GetOptions,
 ) -> CellResult<GetElementResponse> {
     // Get the vaults
-    let env_ref = state_env.guard().await;
-    let dbs = state_env.dbs().await;
+    let env_ref = state_env.guard();
+    let dbs = state_env.dbs();
     let reader = env_ref.reader()?;
     let element_vault = ElementBuf::vault(state_env.clone().into(), &dbs, false)?;
     let meta_vault = MetadataBuf::vault(state_env.clone().into(), &dbs)?;
@@ -36,8 +36,7 @@ pub async fn handle_get_entry(
     let render_header = |timed_header_hash: TimedHeaderHash| async {
         let header_hash = timed_header_hash.header_hash;
         let r = element_vault
-            .get_header(&header_hash)
-            .await?
+            .get_header(&header_hash)?
             .ok_or_else(|| AuthorityDataError::missing_data(header_hash))?;
         CellResult::Ok(r)
     };
@@ -55,8 +54,7 @@ pub async fn handle_get_entry(
 
         // Can we get the actual entry
         let entry_data = element_vault
-            .get_entry(&eh)
-            .await?
+            .get_entry(&eh)?
             .map(|e| (e.into_content(), et.clone()))
             // Missing the entry
             .ok_or_else(|| AuthorityDataError::missing_data_entry(header))?;

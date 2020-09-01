@@ -68,7 +68,7 @@ pub mod slow_tests {
     async fn ribosome_entry_hash_path_children() {
         let test_env = holochain_state::test_utils::test_cell_env();
         let env = test_env.env();
-        let dbs = env.dbs().await;
+        let dbs = env.dbs();
 
         let mut workspace = crate::core::workflow::CallZomeWorkspace::new(env.clone().into(), &dbs)
             .await
@@ -148,7 +148,7 @@ pub mod slow_tests {
     async fn hash_path_anchor_get_anchor() {
         let test_env = holochain_state::test_utils::test_cell_env();
         let env = test_env.env();
-        let dbs = env.dbs().await;
+        let dbs = env.dbs();
 
         let mut workspace = crate::core::workflow::CallZomeWorkspace::new(env.clone().into(), &dbs)
             .await

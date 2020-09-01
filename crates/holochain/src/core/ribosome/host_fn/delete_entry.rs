@@ -37,8 +37,7 @@ pub fn delete_entry<'a>(
                 };
                 let header_hash = source_chain.put(header_builder, None).await?;
                 let element = source_chain
-                    .get_element(&header_hash)
-                    .await?
+                    .get_element(&header_hash)?
                     .expect("Element we just put in SourceChain must be gettable");
                 tracing::debug!(in_delete_entry = ?header_hash);
                 integrate_to_cache(
@@ -131,7 +130,7 @@ pub mod wasm_test {
 
         let test_env = holochain_state::test_utils::test_cell_env();
         let env = test_env.env();
-        let dbs = env.dbs().await;
+        let dbs = env.dbs();
         let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
             .await
             .unwrap();

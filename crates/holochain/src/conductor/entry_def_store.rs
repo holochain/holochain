@@ -88,8 +88,8 @@ impl EntryDefBuf {
     }
 
     /// Get an entry def
-    pub async fn get(&self, k: EntryDefBufferKey) -> DatabaseResult<Option<EntryDef>> {
-        self.0.get(&k.into()).await
+    pub fn get(&self, k: EntryDefBufferKey) -> DatabaseResult<Option<EntryDef>> {
+        self.0.get(&k.into())
     }
 
     /// Store an entry def

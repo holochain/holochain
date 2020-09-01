@@ -19,7 +19,7 @@ pub fn agent_info<'a>(
 ) -> RibosomeResult<AgentInfoOutput> {
     let call =
         |workspace: &'a CallZomeWorkspace| -> MustBoxFuture<'a, SourceChainResult<AgentPubKey>> {
-            async move { Ok(workspace.source_chain.agent_pubkey().await?) }
+            async move { Ok(workspace.source_chain.agent_pubkey()?) }
                 .boxed()
                 .into()
         };
@@ -49,7 +49,7 @@ pub mod test {
     async fn invoke_import_agent_info_test() {
         let test_env = holochain_state::test_utils::test_cell_env();
         let env = test_env.env();
-        let dbs = env.dbs().await;
+        let dbs = env.dbs();
         let mut workspace = crate::core::workflow::CallZomeWorkspace::new(env.clone().into(), &dbs)
             .await
             .unwrap();

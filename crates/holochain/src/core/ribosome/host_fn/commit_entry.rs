@@ -65,8 +65,7 @@ pub fn commit_entry<'a>(
                 let header_hash = source_chain.put(header_builder, Some(entry)).await?;
                 // fetch the element we just added so we can integrate its DhtOps
                 let element = source_chain
-                    .get_element(&header_hash)
-                    .await?
+                    .get_element(&header_hash)?
                     .expect("Element we just put in SourceChain must be gettable");
                 integrate_to_cache(
                     &element,
@@ -160,7 +159,7 @@ pub mod wasm_test {
         // test workspace boilerplate
         let test_env = holochain_state::test_utils::test_cell_env();
         let env = test_env.env();
-        let dbs = env.dbs().await;
+        let dbs = env.dbs();
         let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
             .await
             .unwrap();
@@ -204,7 +203,7 @@ pub mod wasm_test {
         // test workspace boilerplate
         let test_env = holochain_state::test_utils::test_cell_env();
         let env = test_env.env();
-        let dbs = env.dbs().await;
+        let dbs = env.dbs();
         let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
             .await
             .unwrap();
@@ -262,7 +261,7 @@ pub mod wasm_test {
         // test workspace boilerplate
         let test_env = holochain_state::test_utils::test_cell_env();
         let env = test_env.env();
-        let dbs = env.dbs().await;
+        let dbs = env.dbs();
         let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
             .await
             .unwrap();

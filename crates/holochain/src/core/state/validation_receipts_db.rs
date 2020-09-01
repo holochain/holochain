@@ -176,7 +176,7 @@ mod tests {
 
         let test_env = holochain_state::test_utils::test_cell_env();
         let env = test_env.env();
-        let env_ref = env.guard().await;
+        let env_ref = env.guard();
         let keystore = holochain_state::test_utils::test_keystore();
 
         let test_op_hash = fake_dht_op_hash(1);

@@ -119,11 +119,10 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT>(
         while let Some(header) = new_headers.next()? {
             let chain_element = workspace
                 .source_chain
-                .get_element(header.header_address())
-                .await?;
+                .get_element(header.header_address())?;
             let prev_chain_element = match chain_element {
                 Some(ref c) => match c.header().prev_header() {
-                    Some(h) => workspace.source_chain.get_element(&h).await?,
+                    Some(h) => workspace.source_chain.get_element(&h)?,
                     None => None,
                 },
                 None => None,
@@ -310,8 +309,8 @@ pub mod tests {
     async fn private_zome_call() {
         let test_env = test_cell_env();
         let env = test_env.env();
-        let dbs = env.dbs().await;
-        let env_ref = env.guard().await;
+        let dbs = env.dbs();
+        let env_ref = env.guard();
         let reader = env_ref.reader().unwrap();
         let workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
             .await
@@ -376,7 +375,7 @@ pub mod tests {
         observability::test_run().ok();
         let test_env = test_cell_env();
         let env = test_env.env();
-        let dbs = env.dbs().await;
+        let dbs = env.dbs();
         let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
             .await
             .unwrap();
@@ -430,7 +429,7 @@ pub mod tests {
     async fn calls_app_validation() {
         let test_env = test_cell_env();
         let env = test_env.env();
-        let dbs = env.dbs().await;
+        let dbs = env.dbs();
         let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
             .await
             .unwrap();
@@ -463,7 +462,7 @@ pub mod tests {
     async fn creates_outputs() {
         let test_env = test_cell_env();
         let env = test_env.env();
-        let dbs = env.dbs().await;
+        let dbs = env.dbs();
         let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
             .await
             .unwrap();

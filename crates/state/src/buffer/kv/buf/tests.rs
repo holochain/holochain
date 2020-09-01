@@ -50,7 +50,7 @@ fn test_buf(a: &BTreeMap<Vec<u8>, KvOp<V>>, b: impl Iterator<Item = (&'static st
 async fn kv_iterators() -> DatabaseResult<()> {
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let env = arc.guard().await;
+    let env = arc.guard();
     let db = env.inner().open_single("kv", StoreOptions::create())?;
 
     {
@@ -93,7 +93,7 @@ async fn kv_iterators() -> DatabaseResult<()> {
 async fn kv_empty_iterators() -> DatabaseResult<()> {
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let env = arc.guard().await;
+    let env = arc.guard();
     let db = env
         .inner()
         .open_single("kv", StoreOptions::create())
@@ -116,7 +116,7 @@ async fn kv_empty_iterators() -> DatabaseResult<()> {
 async fn kv_store_sanity_check() -> DatabaseResult<()> {
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let env = arc.guard().await;
+    let env = arc.guard();
     let db1 = env.inner().open_single("kv1", StoreOptions::create())?;
     let db2 = env.inner().open_single("kv1", StoreOptions::create())?;
 
@@ -166,7 +166,7 @@ async fn kv_indicate_value_overwritten() -> DatabaseResult<()> {
     holochain_types::observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let env = arc.guard().await;
+    let env = arc.guard();
     let db = env.inner().open_single("kv", StoreOptions::create())?;
     env.with_reader(|reader| {
         let mut buf = Store::new(db);
@@ -185,7 +185,7 @@ async fn kv_deleted_persisted() -> DatabaseResult<()> {
     holochain_types::observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let env = arc.guard().await;
+    let env = arc.guard();
     let db = env.inner().open_single("kv", StoreOptions::create())?;
 
     env.with_reader(|reader| {
@@ -227,7 +227,7 @@ async fn kv_deleted_buffer() -> DatabaseResult<()> {
     holochain_types::observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let env = arc.guard().await;
+    let env = arc.guard();
     let db = env.inner().open_single("kv", StoreOptions::create())?;
 
     {
@@ -266,7 +266,7 @@ async fn kv_get_buffer() -> DatabaseResult<()> {
     holochain_types::observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let env = arc.guard().await;
+    let env = arc.guard();
     let db = env.inner().open_single("kv", StoreOptions::create())?;
 
     env.with_reader(|reader| {
@@ -287,7 +287,7 @@ async fn kv_get_persisted() -> DatabaseResult<()> {
     holochain_types::observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let env = arc.guard().await;
+    let env = arc.guard();
     let db = env.inner().open_single("kv", StoreOptions::create())?;
 
     {
@@ -315,7 +315,7 @@ async fn kv_get_del_buffer() -> DatabaseResult<()> {
     holochain_types::observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let env = arc.guard().await;
+    let env = arc.guard();
     let db = env.inner().open_single("kv", StoreOptions::create())?;
 
     env.with_reader(|reader| {
@@ -337,7 +337,7 @@ async fn kv_get_del_persisted() -> DatabaseResult<()> {
     holochain_types::observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let env = arc.guard().await;
+    let env = arc.guard();
     let db = env.inner().open_single("kv", StoreOptions::create())?;
 
     {

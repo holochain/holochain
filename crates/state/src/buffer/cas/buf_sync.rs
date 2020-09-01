@@ -130,15 +130,12 @@ where
     }
 
     /// Get a value from the underlying [KvBufFresh]
-    pub async fn get<'a>(
-        &'a self,
-        hash: &'a HoloHashOf<C>,
-    ) -> DatabaseResult<Option<HoloHashed<C>>> {
+    pub fn get<'a>(&'a self, hash: &'a HoloHashOf<C>) -> DatabaseResult<Option<HoloHashed<C>>> {
         fresh_reader!(self.env, |r| self.inner.get(&r, hash))
     }
 
     /// Check if a value is stored at this key
-    pub async fn contains(&self, k: &HoloHashOf<C>) -> DatabaseResult<bool> {
+    pub fn contains(&self, k: &HoloHashOf<C>) -> DatabaseResult<bool> {
         fresh_reader!(self.env, |r| self.inner.contains(&r, k))
     }
 }

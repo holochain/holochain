@@ -34,8 +34,7 @@ pub fn link_entries<'a>(
                 // push the header into the source chain
                 let header_hash = source_chain.put(header_builder, None).await?;
                 let element = source_chain
-                    .get_element(&header_hash)
-                    .await?
+                    .get_element(&header_hash)?
                     .expect("Element we just put in SourceChain must be gettable");
                 integrate_to_cache(
                     &element,

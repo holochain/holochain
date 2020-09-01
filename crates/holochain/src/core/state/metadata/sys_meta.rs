@@ -112,7 +112,7 @@ mod tests {
     async fn test_redirect_header_one_hop() -> anyhow::Result<()> {
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let env = arc.guard().await;
+        let env = arc.guard();
         let mut fx = TestFixtures::new();
         {
             let mut buf = MetadataBuf::vault(arc.clone().into(), &env)?;
@@ -138,7 +138,7 @@ mod tests {
     async fn test_redirect_header_three_hops() -> anyhow::Result<()> {
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let env = arc.guard().await;
+        let env = arc.guard();
         let mut fx = TestFixtures::new();
         {
             let mut buf = MetadataBuf::vault(arc.clone().into(), &env)?;
@@ -181,7 +181,7 @@ mod tests {
     async fn test_redirect_entry_one_hop() -> anyhow::Result<()> {
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let env = arc.guard().await;
+        let env = arc.guard();
         let mut fx = TestFixtures::new();
         {
             let mut buf = MetadataBuf::vault(arc.clone().into(), &env)?;
@@ -215,7 +215,7 @@ mod tests {
     async fn test_redirect_entry_three_hops() -> anyhow::Result<()> {
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let env = arc.guard().await;
+        let env = arc.guard();
         let mut fx = TestFixtures::new();
         {
             let mut buf = MetadataBuf::vault(arc.clone().into(), &env)?;
@@ -264,7 +264,7 @@ mod tests {
     async fn test_redirect_header_and_entry() -> anyhow::Result<()> {
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let env = arc.guard().await;
+        let env = arc.guard();
         let mut fx = TestFixtures::new();
         {
             let mut buf = MetadataBuf::vault(arc.clone().into(), &env)?;
@@ -310,7 +310,7 @@ mod tests {
     async fn add_entry_get_headers() {
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let env = arc.guard().await;
+        let env = arc.guard();
         let mut fx = TestFixtures::new();
         let entry_hash = fx.entry_hash();
         let mut expected: Vec<TimedHeaderHash> = Vec::new();
@@ -358,7 +358,7 @@ mod tests {
     async fn add_entry_get_updates() {
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let env = arc.guard().await;
+        let env = arc.guard();
         let mut fx = TestFixtures::new();
         let original_entry_hash = fx.entry_hash();
         let original_header_hash = test_create(original_entry_hash.clone(), &mut fx)
@@ -414,7 +414,7 @@ mod tests {
     async fn add_entry_get_updates_header() {
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let env = arc.guard().await;
+        let env = arc.guard();
         let mut fx = TestFixtures::new();
         let original_entry_hash = fx.entry_hash();
         let original_header_hash = test_create(original_entry_hash.clone(), &mut fx)
@@ -470,7 +470,7 @@ mod tests {
     async fn add_entry_get_deletes() {
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let env = arc.guard().await;
+        let env = arc.guard();
         let mut fx = TestFixtures::new();
         let header_hash = fx.header_hash();
         let entry_hash = fx.entry_hash();
@@ -552,7 +552,7 @@ mod tests {
     async fn test_entry_dht_status() {
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let env = arc.guard().await;
+        let env = arc.guard();
         let mut fx = TestFixtures::new();
         let entry_hash = fx.entry_hash();
         let mut entry_creates = Vec::new();
@@ -690,7 +690,7 @@ mod tests {
     async fn test_entry_dht_status_one_less() {
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let env = arc.guard().await;
+        let env = arc.guard();
         let mut fx = TestFixtures::new();
         let entry_hash = fx.entry_hash();
         let mut entry_creates = Vec::new();

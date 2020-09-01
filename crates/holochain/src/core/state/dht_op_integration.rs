@@ -113,11 +113,8 @@ impl IntegratedDhtOpsBuf {
     }
 
     /// simple get by dht_op_hash
-    pub async fn get(
-        &'_ self,
-        op_hash: &DhtOpHash,
-    ) -> DatabaseResult<Option<IntegratedDhtOpsValue>> {
-        self.store.get(op_hash).await
+    pub fn get(&'_ self, op_hash: &DhtOpHash) -> DatabaseResult<Option<IntegratedDhtOpsValue>> {
+        self.store.get(op_hash)
     }
 
     /// Get ops that match optional queries:
@@ -178,8 +175,8 @@ mod tests {
     async fn test_query() {
         let test_env = test_cell_env();
         let env = test_env.env();
-        let dbs = env.dbs().await;
-        let env_ref = env.guard().await;
+        let dbs = env.dbs();
+        let env_ref = env.guard();
 
         // Create some integration values
         let mut expected = Vec::new();

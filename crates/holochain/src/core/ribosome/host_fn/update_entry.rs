@@ -58,8 +58,7 @@ pub fn update_entry<'a>(
                 let header_hash = source_chain.put(header_builder, Some(entry)).await?;
                 // fetch the element we just added so we can integrate its DhtOps
                 let element = source_chain
-                    .get_element(&header_hash)
-                    .await?
+                    .get_element(&header_hash)?
                     .expect("Element we just put in SourceChain must be gettable");
                 integrate_to_cache(
                     &element,
