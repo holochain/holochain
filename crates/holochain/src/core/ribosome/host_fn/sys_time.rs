@@ -36,13 +36,13 @@ pub mod wasm_test {
             .await
             .unwrap();
 
-        let (_g, raw_workspace) =
-            crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
-                &mut workspace,
+        let workspace_lock =
+            crate::core::workflow::CallZomeWorkspaceLock::new(
+                workspace,
             );
 
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = raw_workspace;
+        host_access.workspace = workspace_lock;
         let _: SysTimeOutput =
             crate::call_test_ribosome!(host_access, TestWasm::SysTime, "sys_time", ());
     }

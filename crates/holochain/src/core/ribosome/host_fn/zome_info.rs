@@ -42,13 +42,13 @@ pub mod test {
             .await
             .unwrap();
 
-        let (_g, raw_workspace) =
-            crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
-                &mut workspace,
+        let workspace_lock =
+            crate::core::workflow::CallZomeWorkspaceLock::new(
+                workspace,
             );
 
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = raw_workspace;
+        host_access.workspace = workspace_lock;
         let zome_info: ZomeInfoOutput =
             crate::call_test_ribosome!(host_access, TestWasm::ZomeInfo, "zome_info", ());
         assert_eq!(zome_info.inner_ref().dna_name, "test",);

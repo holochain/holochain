@@ -39,12 +39,12 @@ pub mod wasm_test {
         crate::core::workflow::fake_genesis(&mut workspace.source_chain)
             .await
             .unwrap();
-        let (_g, raw_workspace) =
-            crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
-                &mut workspace,
+        let workspace_lock =
+            crate::core::workflow::CallZomeWorkspaceLock::new(
+                workspace,
             );
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = raw_workspace.clone();
+        host_access.workspace = workspace_lock.clone();
 
         let _output: CapSecret =
             crate::call_test_ribosome!(host_access, TestWasm::Capability, "cap_secret", ());
@@ -64,12 +64,12 @@ pub mod wasm_test {
         crate::core::workflow::fake_genesis(&mut workspace.source_chain)
             .await
             .unwrap();
-        let (_g, raw_workspace) =
-            crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
-                &mut workspace,
+        let workspace_lock =
+            crate::core::workflow::CallZomeWorkspaceLock::new(
+                workspace,
             );
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = raw_workspace.clone();
+        host_access.workspace = workspace_lock.clone();
 
         let secret: CapSecret =
             crate::call_test_ribosome!(host_access, TestWasm::Capability, "cap_secret", ());

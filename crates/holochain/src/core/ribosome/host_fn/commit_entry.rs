@@ -164,9 +164,9 @@ pub mod wasm_test {
             .await
             .unwrap();
 
-        let (_g, raw_workspace) =
-            crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
-                &mut workspace,
+        let workspace_lock =
+            crate::core::workflow::CallZomeWorkspaceLock::new(
+                workspace,
             );
 
         let ribosome =
@@ -178,7 +178,7 @@ pub mod wasm_test {
             .unwrap();
         call_context.zome_name = TestWasm::CommitEntry.into();
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = raw_workspace;
+        host_access.workspace = workspace_lock;
         call_context.host_access = host_access.into();
         let app_entry = EntryFixturator::new(AppEntry).next().unwrap();
         let entry_def_id = EntryDefId::App("post".into());
@@ -213,9 +213,9 @@ pub mod wasm_test {
             .await
             .unwrap();
 
-        let (_g, raw_workspace) =
-            crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
-                &mut workspace,
+        let workspace_lock =
+            crate::core::workflow::CallZomeWorkspaceLock::new(
+                workspace,
             );
 
         let ribosome =
@@ -227,7 +227,7 @@ pub mod wasm_test {
             .unwrap();
         call_context.zome_name = TestWasm::CommitEntry.into();
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = raw_workspace.clone();
+        host_access.workspace = workspace_lock.clone();
         call_context.host_access = host_access.into();
         let app_entry = EntryFixturator::new(AppEntry).next().unwrap();
         let entry_def_id = EntryDefId::App("post".into());
@@ -246,7 +246,7 @@ pub mod wasm_test {
             };
         let chain_head =
             tokio_safe_block_on::tokio_safe_block_forever_on(tokio::task::spawn(async move {
-                unsafe { raw_workspace.apply_mut(call).await }
+                unsafe { workspace_lock.apply_mut(call).await }
             }))
             .unwrap()
             .unwrap()
@@ -270,12 +270,12 @@ pub mod wasm_test {
         crate::core::workflow::fake_genesis(&mut workspace.source_chain)
             .await
             .unwrap();
-        let (_g, raw_workspace) =
-            crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
-                &mut workspace,
+        let workspace_lock =
+            crate::core::workflow::CallZomeWorkspaceLock::new(
+                workspace,
             );
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = raw_workspace.clone();
+        host_access.workspace = workspace_lock.clone();
 
         // get the result of a commit entry
         let output: CommitEntryOutput =
@@ -290,7 +290,7 @@ pub mod wasm_test {
                 }
                 .boxed()
             };
-        let cloned_workspace = raw_workspace.clone();
+        let cloned_workspace = workspace_lock.clone();
         let chain_head =
             tokio_safe_block_on::tokio_safe_block_forever_on(tokio::task::spawn(async move {
                 unsafe { cloned_workspace.apply_mut(call).await }

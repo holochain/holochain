@@ -9,7 +9,7 @@ use crate::{
         },
         workflow::{
             integrate_dht_ops_workflow::integrate_to_cache,
-            unsafe_call_zome_workspace::UnsafeCallZomeWorkspace, CallZomeWorkspace,
+            CallZomeWorkspaceLock, CallZomeWorkspace,
         },
     },
     test_utils::test_network,
@@ -765,8 +765,8 @@ async fn commit_entry(
     let input = CommitEntryInput::new((entry_def_id.clone(), entry.clone()));
 
     let output = {
-        let (_g, raw_workspace) = UnsafeCallZomeWorkspace::from_mut(&mut workspace);
-        let host_access = ZomeCallHostAccess::new(raw_workspace, keystore, network);
+        let (_g, workspace_lock) = CallZomeWorkspaceLock::from_mut(&mut workspace);
+        let host_access = ZomeCallHostAccess::new(workspace_lock, keystore, network);
         let call_context = CallContext::new(zome_name, host_access.into());
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
@@ -800,8 +800,8 @@ async fn delete_entry<'env>(
     let input = DeleteEntryInput::new(hash);
 
     let output = {
-        let (_g, raw_workspace) = UnsafeCallZomeWorkspace::from_mut(&mut workspace);
-        let host_access = ZomeCallHostAccess::new(raw_workspace, keystore, network);
+        let (_g, workspace_lock) = CallZomeWorkspaceLock::from_mut(&mut workspace);
+        let host_access = ZomeCallHostAccess::new(workspace_lock, keystore, network);
         let call_context = CallContext::new(zome_name, host_access.into());
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
@@ -842,8 +842,8 @@ async fn update_entry<'env>(
     let input = UpdateEntryInput::new((entry_def_id.clone(), entry.clone(), original_header_hash));
 
     let output = {
-        let (_g, raw_workspace) = UnsafeCallZomeWorkspace::from_mut(&mut workspace);
-        let host_access = ZomeCallHostAccess::new(raw_workspace, keystore, network);
+        let (_g, workspace_lock) = CallZomeWorkspaceLock::from_mut(&mut workspace);
+        let host_access = ZomeCallHostAccess::new(workspace_lock, keystore, network);
         let call_context = CallContext::new(zome_name, host_access.into());
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
@@ -885,8 +885,8 @@ async fn get<'env>(
     ));
 
     let output = {
-        let (_g, raw_workspace) = UnsafeCallZomeWorkspace::from_mut(&mut workspace);
-        let host_access = ZomeCallHostAccess::new(raw_workspace, keystore, network);
+        let (_g, workspace_lock) = CallZomeWorkspaceLock::from_mut(&mut workspace);
+        let host_access = ZomeCallHostAccess::new(workspace_lock, keystore, network);
         let call_context = CallContext::new(zome_name, host_access.into());
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
@@ -918,8 +918,8 @@ async fn get_details<'env>(
     ));
 
     let output = {
-        let (_g, raw_workspace) = UnsafeCallZomeWorkspace::from_mut(&mut workspace);
-        let host_access = ZomeCallHostAccess::new(raw_workspace, keystore, network);
+        let (_g, workspace_lock) = CallZomeWorkspaceLock::from_mut(&mut workspace);
+        let host_access = ZomeCallHostAccess::new(workspace_lock, keystore, network);
         let call_context = CallContext::new(zome_name, host_access.into());
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
@@ -949,8 +949,8 @@ async fn link_entries<'env>(
     let input = LinkEntriesInput::new((base.clone(), target.clone(), link_tag));
 
     let output = {
-        let (_g, raw_workspace) = UnsafeCallZomeWorkspace::from_mut(&mut workspace);
-        let host_access = ZomeCallHostAccess::new(raw_workspace, keystore, network);
+        let (_g, workspace_lock) = CallZomeWorkspaceLock::from_mut(&mut workspace);
+        let host_access = ZomeCallHostAccess::new(workspace_lock, keystore, network);
         let call_context = CallContext::new(zome_name, host_access.into());
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
@@ -984,8 +984,8 @@ async fn remove_link<'env>(
     let input = RemoveLinkInput::new(link_add_hash);
 
     let output = {
-        let (_g, raw_workspace) = UnsafeCallZomeWorkspace::from_mut(&mut workspace);
-        let host_access = ZomeCallHostAccess::new(raw_workspace, keystore, network);
+        let (_g, workspace_lock) = CallZomeWorkspaceLock::from_mut(&mut workspace);
+        let host_access = ZomeCallHostAccess::new(workspace_lock, keystore, network);
         let call_context = CallContext::new(zome_name, host_access.into());
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
@@ -1021,8 +1021,8 @@ async fn get_links<'env>(
     let input = GetLinksInput::new((base.clone(), link_tag));
 
     let output = {
-        let (_g, raw_workspace) = UnsafeCallZomeWorkspace::from_mut(&mut workspace);
-        let host_access = ZomeCallHostAccess::new(raw_workspace, keystore, network);
+        let (_g, workspace_lock) = CallZomeWorkspaceLock::from_mut(&mut workspace);
+        let host_access = ZomeCallHostAccess::new(workspace_lock, keystore, network);
         let call_context = CallContext::new(zome_name, host_access.into());
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);

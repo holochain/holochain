@@ -80,12 +80,9 @@ pub mod slow_tests {
             .unwrap();
 
         // ensure foo.bar twice to ensure idempotency
-        let (_g, raw_workspace) =
-            crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
-                &mut workspace,
-            );
+        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = raw_workspace;
+        host_access.workspace = workspace_lock;
 
         let _: () = crate::call_test_ribosome!(
             host_access,
@@ -159,12 +156,9 @@ pub mod slow_tests {
             .await
             .unwrap();
 
-        let (_g, raw_workspace) =
-            crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
-                &mut workspace,
-            );
+        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = raw_workspace;
+        host_access.workspace = workspace_lock;
 
         // anchor foo bar
         let anchor_address_one: EntryHash = crate::call_test_ribosome!(

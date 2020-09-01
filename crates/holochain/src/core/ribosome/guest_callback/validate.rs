@@ -267,7 +267,7 @@ mod slow_tests {
     use super::ValidateResult;
     use crate::core::ribosome::RibosomeT;
     use crate::core::state::source_chain::SourceChainResult;
-    use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
+    use crate::core::workflow::{call_zome_workflow::CallZomeWorkspace, CallZomeWorkspaceLock};
     use crate::fixt::curve::Zomes;
     use crate::fixt::ValidateInvocationFixturator;
     use crate::fixt::WasmRibosomeFixturator;
@@ -369,12 +369,9 @@ mod slow_tests {
             .await
             .unwrap();
 
-        let (_g, raw_workspace) =
-            crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
-                &mut workspace,
-            );
+        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = raw_workspace.clone();
+        host_access.workspace = workspace_lock.clone();
 
         let output: CommitEntryOutput =
             crate::call_test_ribosome!(host_access, TestWasm::Validate, "always_validates", ());
@@ -390,7 +387,7 @@ mod slow_tests {
             };
         let chain_head =
             tokio_safe_block_on::tokio_safe_block_forever_on(tokio::task::spawn(async move {
-                unsafe { raw_workspace.apply_mut(call).await }
+                unsafe { workspace_lock.apply_mut(call).await }
             }))
             .unwrap()
             .unwrap()
@@ -414,13 +411,10 @@ mod slow_tests {
             .await
             .unwrap();
 
-        let (_g, raw_workspace) =
-            crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
-                &mut workspace,
-            );
+        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
 
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = raw_workspace.clone();
+        host_access.workspace = workspace_lock.clone();
 
         let output: CommitEntryOutput =
             crate::call_test_ribosome!(host_access, TestWasm::Validate, "never_validates", ());
@@ -436,7 +430,7 @@ mod slow_tests {
             };
         let chain_head =
             tokio_safe_block_on::tokio_safe_block_forever_on(tokio::task::spawn(async move {
-                unsafe { raw_workspace.apply_mut(call).await }
+                unsafe { workspace_lock.apply_mut(call).await }
             }))
             .unwrap()
             .unwrap()

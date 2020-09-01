@@ -18,6 +18,7 @@ use crate::core::{
     },
     sys_validate_element,
 };
+pub use call_zome_workspace_lock::CallZomeWorkspaceLock;
 use fallible_iterator::FallibleIterator;
 use holo_hash::AnyDhtHash;
 use holochain_keystore::KeystoreSender;
@@ -28,10 +29,8 @@ use holochain_zome_types::entry::GetOptions;
 use holochain_zome_types::header::Header;
 use std::sync::Arc;
 use tracing::instrument;
-use tracing::*;
-use unsafe_call_zome_workspace::UnsafeCallZomeWorkspace;
 
-pub mod unsafe_call_zome_workspace;
+pub mod call_zome_workspace_lock;
 
 /// Placeholder for the return value of a zome invocation
 /// TODO: do we want this to be the same as ZomeCallInvocationRESPONSE?
@@ -87,8 +86,8 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT>(
     tracing::trace!(line = line!());
     // Create the unsafe sourcechain for use with wasm closure
     let result = {
-        let (_g, raw_workspace) = UnsafeCallZomeWorkspace::from_mut(workspace);
-        let host_access = ZomeCallHostAccess::new(raw_workspace, keystore, network.clone());
+        let (_g, workspace_lock) = CallZomeWorkspaceLock::from_mut(workspace);
+        let host_access = ZomeCallHostAccess::new(workspace_lock, keystore, network.clone());
         ribosome.call_zome_function(host_access, invocation)
     };
     tracing::trace!(line = line!());
