@@ -32,10 +32,12 @@ impl HolochainP2pActor {
     }
 
     /// receiving an incoming request from a remote node
+    #[allow(clippy::too_many_arguments)]
     fn handle_incoming_call_remote(
         &mut self,
         dna_hash: DnaHash,
-        agent_pub_key: AgentPubKey,
+        to_agent: AgentPubKey,
+        from_agent: AgentPubKey,
         zome_name: ZomeName,
         fn_name: String,
         cap: CapSecret,
@@ -45,7 +47,9 @@ impl HolochainP2pActor {
         let evt_sender = self.evt_sender.clone();
         Ok(async move {
             let res = evt_sender
-                .call_remote(dna_hash, agent_pub_key, zome_name, fn_name, cap, data)
+                .call_remote(
+                    dna_hash, to_agent, from_agent, zome_name, fn_name, cap, data,
+                )
                 .await;
             res.map_err(kitsune_p2p::KitsuneP2pError::from)
                 .map(|res| UnsafeBytes::from(res).into())
@@ -171,15 +175,17 @@ impl HolochainP2pActor {
 impl ghost_actor::GhostHandler<kitsune_p2p::event::KitsuneP2pEvent> for HolochainP2pActor {}
 
 impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
-    #[tracing::instrument(skip(self, space, agent, payload))]
+    #[tracing::instrument(skip(self, space, to_agent, from_agent, payload))]
     fn handle_call(
         &mut self,
         space: Arc<kitsune_p2p::KitsuneSpace>,
-        agent: Arc<kitsune_p2p::KitsuneAgent>,
+        to_agent: Arc<kitsune_p2p::KitsuneAgent>,
+        from_agent: Arc<kitsune_p2p::KitsuneAgent>,
         payload: Vec<u8>,
     ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<Vec<u8>> {
         let space = DnaHash::from_kitsune(&space);
-        let agent = AgentPubKey::from_kitsune(&agent);
+        let to_agent = AgentPubKey::from_kitsune(&to_agent);
+        let from_agent = AgentPubKey::from_kitsune(&from_agent);
 
         let request = crate::wire::WireMessage::decode(payload).map_err(HolochainP2pError::from)?;
 
@@ -189,15 +195,17 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
                 fn_name,
                 cap,
                 data,
-            } => self.handle_incoming_call_remote(space, agent, zome_name, fn_name, cap, data),
+            } => self.handle_incoming_call_remote(
+                space, to_agent, from_agent, zome_name, fn_name, cap, data,
+            ),
             crate::wire::WireMessage::Get { dht_hash, options } => {
-                self.handle_incoming_get(space, agent, dht_hash, options)
+                self.handle_incoming_get(space, to_agent, dht_hash, options)
             }
             crate::wire::WireMessage::GetMeta { dht_hash, options } => {
-                self.handle_incoming_get_meta(space, agent, dht_hash, options)
+                self.handle_incoming_get_meta(space, to_agent, dht_hash, options)
             }
             crate::wire::WireMessage::GetLinks { link_key, options } => {
-                self.handle_incoming_get_links(space, agent, link_key, options)
+                self.handle_incoming_get_links(space, to_agent, link_key, options)
             }
             // holochain_p2p never publishes via request
             // these only occur on broadcasts
@@ -208,7 +216,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
                 .into())
             }
             crate::wire::WireMessage::ValidationReceipt { receipt } => {
-                self.handle_incoming_validation_receipt(space, agent, receipt)
+                self.handle_incoming_validation_receipt(space, to_agent, receipt)
             }
         }
     }
@@ -216,11 +224,13 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
     fn handle_notify(
         &mut self,
         space: Arc<kitsune_p2p::KitsuneSpace>,
-        agent: Arc<kitsune_p2p::KitsuneAgent>,
+        to_agent: Arc<kitsune_p2p::KitsuneAgent>,
+        from_agent: Arc<kitsune_p2p::KitsuneAgent>,
         payload: Vec<u8>,
     ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<()> {
         let space = DnaHash::from_kitsune(&space);
-        let agent = AgentPubKey::from_kitsune(&agent);
+        let to_agent = AgentPubKey::from_kitsune(&to_agent);
+        let from_agent = AgentPubKey::from_kitsune(&from_agent);
 
         let request = crate::wire::WireMessage::decode(payload).map_err(HolochainP2pError::from)?;
 
@@ -237,13 +247,12 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
                 .into())
             }
             crate::wire::WireMessage::Publish {
-                from_agent,
                 request_validation_receipt,
                 dht_hash,
                 ops,
             } => self.handle_incoming_publish(
                 space,
-                agent,
+                to_agent,
                 from_agent,
                 request_validation_receipt,
                 dht_hash,
@@ -255,18 +264,20 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
     fn handle_gossip(
         &mut self,
         space: Arc<kitsune_p2p::KitsuneSpace>,
-        agent: Arc<kitsune_p2p::KitsuneAgent>,
+        to_agent: Arc<kitsune_p2p::KitsuneAgent>,
+        from_agent: Arc<kitsune_p2p::KitsuneAgent>,
         op_hash: Arc<kitsune_p2p::KitsuneOpHash>,
         op_data: Vec<u8>,
     ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<()> {
         let space = DnaHash::from_kitsune(&space);
-        let agent = AgentPubKey::from_kitsune(&agent);
+        let to_agent = AgentPubKey::from_kitsune(&to_agent);
+        let _from_agent = AgentPubKey::from_kitsune(&from_agent);
         let op_hash = DhtOpHash::from_kitsune(&op_hash);
         let op_data =
             crate::wire::WireDhtOpData::decode(op_data).map_err(HolochainP2pError::from)?;
         self.handle_incoming_publish(
             space,
-            agent,
+            to_agent,
             op_data.from_agent,
             false,
             op_data.dht_hash,
@@ -388,7 +399,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
     fn handle_call_remote(
         &mut self,
         dna_hash: DnaHash,
-        _from_agent: AgentPubKey,
+        from_agent: AgentPubKey,
         to_agent: AgentPubKey,
         zome_name: ZomeName,
         fn_name: String,
@@ -397,13 +408,16 @@ impl HolochainP2pHandler for HolochainP2pActor {
     ) -> HolochainP2pHandlerResult<SerializedBytes> {
         let space = dna_hash.into_kitsune();
         let to_agent = to_agent.into_kitsune();
+        let from_agent = from_agent.into_kitsune();
 
         let req =
             crate::wire::WireMessage::call_remote(zome_name, fn_name, cap, request).encode()?;
 
         let kitsune_p2p = self.kitsune_p2p.clone();
         Ok(async move {
-            let result = kitsune_p2p.rpc_single(space, to_agent, req).await?;
+            let result = kitsune_p2p
+                .rpc_single(space, to_agent, from_agent, req)
+                .await?;
             let result = UnsafeBytes::from(result).into();
             Ok(result)
         }
@@ -421,21 +435,18 @@ impl HolochainP2pHandler for HolochainP2pActor {
         timeout_ms: Option<u64>,
     ) -> HolochainP2pHandlerResult<()> {
         let space = dna_hash.into_kitsune();
+        let from_agent = from_agent.into_kitsune();
         let basis = dht_hash.to_kitsune();
 
-        let payload = crate::wire::WireMessage::publish(
-            from_agent,
-            request_validation_receipt,
-            dht_hash,
-            ops,
-        )
-        .encode()?;
+        let payload = crate::wire::WireMessage::publish(request_validation_receipt, dht_hash, ops)
+            .encode()?;
 
         let kitsune_p2p = self.kitsune_p2p.clone();
         Ok(async move {
             kitsune_p2p
                 .notify_multi(kitsune_p2p::actor::NotifyMulti {
                     space,
+                    from_agent,
                     basis,
                     remote_agent_count: None, // default best-effort
                     timeout_ms,
@@ -586,17 +597,21 @@ impl HolochainP2pHandler for HolochainP2pActor {
     fn handle_send_validation_receipt(
         &mut self,
         dna_hash: DnaHash,
-        agent_pub_key: AgentPubKey,
+        to_agent: AgentPubKey,
+        from_agent: AgentPubKey,
         receipt: SerializedBytes,
     ) -> HolochainP2pHandlerResult<()> {
         let space = dna_hash.into_kitsune();
-        let agent = agent_pub_key.into_kitsune();
+        let to_agent = to_agent.into_kitsune();
+        let from_agent = from_agent.into_kitsune();
 
         let req = crate::wire::WireMessage::validation_receipt(receipt).encode()?;
 
         let kitsune_p2p = self.kitsune_p2p.clone();
         Ok(async move {
-            kitsune_p2p.rpc_single(space, agent, req).await?;
+            kitsune_p2p
+                .rpc_single(space, to_agent, from_agent, req)
+                .await?;
             Ok(())
         }
         .boxed()

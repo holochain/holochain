@@ -43,6 +43,8 @@ pub struct RpcMultiResponse {
 pub struct NotifyMulti {
     /// The "space" context.
     pub space: Arc<super::KitsuneSpace>,
+    /// The agent making the request.
+    pub from_agent: Arc<super::KitsuneAgent>,
     /// The "basis" hash/coordinate of destination neigborhood.
     pub basis: Arc<super::KitsuneBasis>,
     /// The desired count of remote nodes to reach.
@@ -71,7 +73,7 @@ ghost_actor::ghost_chan! {
 
         /// Make a request of a single remote agent, expecting a response.
         /// The remote side will receive a "Call" event.
-        fn rpc_single(space: Arc<super::KitsuneSpace>, agent: Arc<super::KitsuneAgent>, payload: Vec<u8>) -> Vec<u8>;
+        fn rpc_single(space: Arc<super::KitsuneSpace>, to_agent: Arc<super::KitsuneAgent>, from_agent: Arc<super::KitsuneAgent>, payload: Vec<u8>) -> Vec<u8>;
 
         /// Make a request to multiple destination agents - awaiting/aggregating the responses.
         /// The remote sides will see these messages as "Call" events.

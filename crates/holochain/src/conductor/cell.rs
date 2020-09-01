@@ -232,7 +232,7 @@ impl Cell {
         match evt {
             CallRemote {
                 span: _span,
-                to_agent,
+                from_agent,
                 zome_name,
                 fn_name,
                 cap,
@@ -242,7 +242,7 @@ impl Cell {
             } => {
                 async {
                     let res = self
-                        .handle_call_remote(to_agent, zome_name, fn_name, cap, request)
+                        .handle_call_remote(from_agent, zome_name, fn_name, cap, request)
                         .await
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
@@ -644,11 +644,11 @@ impl Cell {
         }
     }
 
-    #[instrument(skip(self, provenance, fn_name, cap, payload))]
+    #[instrument(skip(self, from_agent, fn_name, cap, payload))]
     /// a remote agent is attempting a "call_remote" on this cell.
     async fn handle_call_remote(
         &self,
-        provenance: AgentPubKey,
+        from_agent: AgentPubKey,
         zome_name: ZomeName,
         fn_name: String,
         cap: CapSecret,
@@ -659,7 +659,7 @@ impl Cell {
             zome_name: zome_name.clone(),
             cap,
             payload: HostInput::new(payload),
-            provenance,
+            provenance: from_agent,
             fn_name,
         };
         // double ? because
