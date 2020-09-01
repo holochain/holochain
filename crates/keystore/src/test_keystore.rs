@@ -3,7 +3,11 @@
 use crate::*;
 use ghost_actor::dependencies::futures::future::FutureExt;
 use holochain_crypto::*;
+use lair_keystore_api::actor::*;
+use lair_keystore_api::*;
 use std::collections::HashMap;
+use std::sync::Arc;
+impl ghost_actor::GhostHandler<LairClientApi> for TestKeystore {}
 
 /// DANGER! These Mock Keypairs should NEVER be used in production
 /// The private keys have not been handled securely!
@@ -25,9 +29,13 @@ pub async fn spawn_test_keystore(
         .channel_factory()
         .create_channel::<TestKeystoreInternal>()
         .await?;
-    let sender = builder
+    let _sender = builder
         .channel_factory()
         .create_channel::<KeystoreApi>()
+        .await?;
+    let sender = builder
+        .channel_factory()
+        .create_channel::<LairClientApi>()
         .await?;
     tokio::task::spawn(builder.spawn(TestKeystore::new(internal_sender, fixture_keypairs)));
     Ok(sender)
@@ -42,6 +50,7 @@ ghost_actor::ghost_chan! {
     chan TestKeystoreInternal<KeystoreError> {
         /// we have generated a keypair, now track it
         fn finalize_new_keypair(
+            idx: u32,
             pub_key: holo_hash::AgentPubKey,
             priv_key: PrivateKey,
         ) -> ();
@@ -52,7 +61,8 @@ ghost_actor::ghost_chan! {
 struct TestKeystore {
     internal_sender: ghost_actor::GhostSender<TestKeystoreInternal>,
     fixture_keypairs: Vec<MockKeypair>,
-    active_keypairs: HashMap<holo_hash::AgentPubKey, PrivateKey>,
+    active_keypairs: HashMap<holo_hash::AgentPubKey, (u32, PrivateKey)>,
+    next_idx: u32,
 }
 
 impl TestKeystore {
@@ -63,8 +73,15 @@ impl TestKeystore {
         Self {
             internal_sender,
             fixture_keypairs,
-            active_keypairs: HashMap::<holo_hash::AgentPubKey, _>::new(),
+            active_keypairs: HashMap::new(),
+            next_idx: 0,
         }
+    }
+
+    fn next_idx(&mut self) -> u32 {
+        let out = self.next_idx;
+        self.next_idx += 1;
+        out
     }
 }
 
@@ -75,10 +92,11 @@ impl ghost_actor::GhostHandler<TestKeystoreInternal> for TestKeystore {}
 impl TestKeystoreInternalHandler for TestKeystore {
     fn handle_finalize_new_keypair(
         &mut self,
+        idx: u32,
         pub_key: holo_hash::AgentPubKey,
         priv_key: PrivateKey,
     ) -> TestKeystoreInternalHandlerResult<()> {
-        self.active_keypairs.insert(pub_key, priv_key);
+        self.active_keypairs.insert(pub_key, (idx, priv_key));
         Ok(async move { Ok(()) }.boxed().into())
     }
 }
@@ -89,43 +107,151 @@ impl KeystoreApiHandler for TestKeystore {
     fn handle_generate_sign_keypair_from_pure_entropy(
         &mut self,
     ) -> KeystoreApiHandlerResult<holo_hash::AgentPubKey> {
-        if !self.fixture_keypairs.is_empty() {
-            let MockKeypair { pub_key, sec_key } = self.fixture_keypairs.remove(0);
-            // we're loading this out of insecure memory - but this is just a mock
-            let sec_key = PrivateKey(danger_crypto_secure_buffer_from_bytes(&sec_key)?);
-            self.active_keypairs.insert(pub_key.clone(), sec_key);
-            return Ok(async move { Ok(pub_key) }.boxed().into());
-        }
-        let i_s = self.internal_sender.clone();
+        let fut = self.handle_sign_ed25519_new_from_entropy()?;
         Ok(async move {
-            let (pub_key, sec_key) = crypto_sign_keypair(None).await?;
-            let pub_key = pub_key.read().to_vec();
-            let agent_pubkey = holo_hash::AgentPubKey::with_pre_hashed(pub_key);
-            let sec_key = PrivateKey(sec_key);
-            i_s.finalize_new_keypair(agent_pubkey.clone(), sec_key)
-                .await?;
-            Ok(agent_pubkey)
+            let (_, pk) = fut.await?;
+            Ok(holo_hash::AgentPubKey::with_pre_hashed(pk.to_vec()))
         }
         .boxed()
         .into())
     }
 
-    fn handle_list_sign_keys(&mut self) -> KeystoreApiHandlerResult<Vec<holo_hash::AgentPubKey>> {
-        let keys = self.active_keypairs.keys().cloned().collect();
-        Ok(async move { Ok(keys) }.boxed().into())
-    }
-
     fn handle_sign(&mut self, input: SignInput) -> KeystoreApiHandlerResult<Signature> {
-        let SignInput { key, data } = input;
-        let mut data = crypto_insecure_buffer_from_bytes(data.bytes())?;
-        let mut sec_key = match self.active_keypairs.get(&key) {
-            Some(sec_key) => sec_key.0.clone(),
-            None => return Err(format!("Signature Failure, Unknown Agent: {}", key).into()),
+        let fut = self.handle_sign_ed25519_sign_by_pub_key(
+            input.key.as_ref().to_vec().into(),
+            <Vec<u8>>::from(UnsafeBytes::from(input.data)).into(),
+        )?;
+        Ok(async move {
+            let res = fut.await?;
+            Ok(Signature(res.to_vec()))
+        }
+        .boxed()
+        .into())
+    }
+}
+
+impl LairClientApiHandler for TestKeystore {
+    fn handle_lair_get_server_info(&mut self) -> LairClientApiHandlerResult<LairServerInfo> {
+        unimplemented!()
+    }
+    fn handle_lair_get_last_entry_index(&mut self) -> LairClientApiHandlerResult<KeystoreIndex> {
+        unimplemented!()
+    }
+    fn handle_lair_get_entry_type(
+        &mut self,
+        _keystore_index: KeystoreIndex,
+    ) -> LairClientApiHandlerResult<LairEntryType> {
+        unimplemented!()
+    }
+    fn handle_tls_cert_new_self_signed_from_entropy(
+        &mut self,
+        _options: TlsCertOptions,
+    ) -> LairClientApiHandlerResult<(KeystoreIndex, CertSni, CertDigest)> {
+        unimplemented!()
+    }
+    fn handle_tls_cert_get(
+        &mut self,
+        _keystore_index: KeystoreIndex,
+    ) -> LairClientApiHandlerResult<(CertSni, CertDigest)> {
+        unimplemented!()
+    }
+    fn handle_tls_cert_get_cert_by_index(
+        &mut self,
+        _keystore_index: KeystoreIndex,
+    ) -> LairClientApiHandlerResult<Cert> {
+        unimplemented!()
+    }
+    fn handle_tls_cert_get_cert_by_digest(
+        &mut self,
+        _cert_digest: CertDigest,
+    ) -> LairClientApiHandlerResult<Cert> {
+        unimplemented!()
+    }
+    fn handle_tls_cert_get_cert_by_sni(
+        &mut self,
+        _cert_sni: CertSni,
+    ) -> LairClientApiHandlerResult<Cert> {
+        unimplemented!()
+    }
+    fn handle_tls_cert_get_priv_key_by_index(
+        &mut self,
+        _keystore_index: KeystoreIndex,
+    ) -> LairClientApiHandlerResult<CertPrivKey> {
+        unimplemented!()
+    }
+    fn handle_tls_cert_get_priv_key_by_digest(
+        &mut self,
+        _cert_digest: CertDigest,
+    ) -> LairClientApiHandlerResult<CertPrivKey> {
+        unimplemented!()
+    }
+    fn handle_tls_cert_get_priv_key_by_sni(
+        &mut self,
+        _cert_sni: CertSni,
+    ) -> LairClientApiHandlerResult<CertPrivKey> {
+        unimplemented!()
+    }
+    fn handle_sign_ed25519_new_from_entropy(
+        &mut self,
+    ) -> LairClientApiHandlerResult<(KeystoreIndex, SignEd25519PubKey)> {
+        if !self.fixture_keypairs.is_empty() {
+            let MockKeypair { pub_key, sec_key } = self.fixture_keypairs.remove(0);
+            // we're loading this out of insecure memory - but this is just a mock
+            let sec_key = PrivateKey(
+                danger_crypto_secure_buffer_from_bytes(&sec_key).map_err(LairError::other)?,
+            );
+            let idx = self.next_idx();
+            self.active_keypairs.insert(pub_key.clone(), (idx, sec_key));
+            return Ok(
+                async move { Ok((0.into(), pub_key.as_ref().to_vec().into())) }
+                    .boxed()
+                    .into(),
+            );
+        }
+        let i_s = self.internal_sender.clone();
+        let idx = self.next_idx();
+        Ok(async move {
+            let (pub_key, sec_key) = crypto_sign_keypair(None).await.map_err(LairError::other)?;
+            let pub_key = pub_key.read().to_vec();
+            let agent_pubkey = holo_hash::AgentPubKey::with_pre_hashed(pub_key);
+            let sec_key = PrivateKey(sec_key);
+            i_s.finalize_new_keypair(idx, agent_pubkey.clone(), sec_key)
+                .await?;
+            Ok((idx.into(), agent_pubkey.as_ref().to_vec().into()))
+        }
+        .boxed()
+        .into())
+    }
+    fn handle_sign_ed25519_get(
+        &mut self,
+        _keystore_index: KeystoreIndex,
+    ) -> LairClientApiHandlerResult<SignEd25519PubKey> {
+        unimplemented!()
+    }
+    fn handle_sign_ed25519_sign_by_index(
+        &mut self,
+        _keystore_index: KeystoreIndex,
+        _message: Arc<Vec<u8>>,
+    ) -> LairClientApiHandlerResult<SignEd25519Signature> {
+        unimplemented!()
+    }
+    fn handle_sign_ed25519_sign_by_pub_key(
+        &mut self,
+        pub_key: SignEd25519PubKey,
+        message: Arc<Vec<u8>>,
+    ) -> LairClientApiHandlerResult<SignEd25519Signature> {
+        let pub_key = holo_hash::AgentPubKey::with_pre_hashed(pub_key.to_vec());
+        let mut data = crypto_insecure_buffer_from_bytes(&message).map_err(LairError::other)?;
+        let mut sec_key = match self.active_keypairs.get(&pub_key) {
+            Some((_, sec_key)) => sec_key.0.clone(),
+            None => return Err(format!("Signature Failure, Unknown Agent: {}", pub_key).into()),
         };
         Ok(async move {
-            let signature = crypto_sign(&mut data, &mut sec_key).await?;
+            let signature = crypto_sign(&mut data, &mut sec_key)
+                .await
+                .map_err(LairError::other)?;
             let signature = signature.read().to_vec();
-            Ok(Signature(signature))
+            Ok(signature.into())
         }
         .boxed()
         .into())
@@ -184,21 +310,7 @@ mod tests {
                 "uhCAkomHzekU0-x7p62WmrusdxD2w9wcjdajC88688JGSTEo6cbEK",
                 &agent2.to_string(),
             );
-            assert_ne!(&agent1.to_string(), &agent3.to_string(),);
-
-            let mut sign_keys = keystore
-                .list_sign_keys()
-                .await
-                .unwrap()
-                .iter()
-                .map(|agent| agent.to_string())
-                .collect::<Vec<_>>();
-            sign_keys.sort();
-
-            let mut expected = vec![agent1.to_string(), agent2.to_string(), agent3.to_string()];
-            expected.sort();
-
-            assert_eq!(&format!("{:?}", expected), &format!("{:?}", sign_keys),);
+            assert_ne!(&agent1.to_string(), &agent3.to_string());
         })
         .await
         .unwrap();

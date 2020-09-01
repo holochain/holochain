@@ -149,7 +149,7 @@ impl BufferedStore for ValidationReceiptsBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use holochain_keystore::KeystoreApiSender;
+    use holochain_keystore::KeystoreSenderExt;
     use holochain_state::{env::ReadManager, prelude::*};
     use holochain_types::test_utils::fake_dht_op_hash;
 

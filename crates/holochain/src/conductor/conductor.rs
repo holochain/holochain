@@ -39,7 +39,7 @@ use crate::{
 };
 use holochain_keystore::{
     test_keystore::{spawn_test_keystore, MockKeypair},
-    KeystoreApiSender, KeystoreSender,
+    KeystoreSender, KeystoreSenderExt,
 };
 use holochain_state::{
     buffer::BufferedStore,

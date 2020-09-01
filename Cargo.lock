@@ -712,6 +712,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "directories"
+version = "3.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f8fed639d60b58d0f53498ab13d26f621fd77569cc6edb031f4cc36a2ad9da0f"
+dependencies = [
+ "dirs-sys",
+]
+
+[[package]]
 name = "dirs"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1215,7 +1224,7 @@ dependencies = [
  "chrono",
  "criterion",
  "derive_more",
- "directories",
+ "directories 2.0.2",
  "either",
  "fallible-iterator",
  "fixt",
@@ -1291,6 +1300,8 @@ dependencies = [
  "holochain_crypto",
  "holochain_serialized_bytes",
  "holochain_zome_types",
+ "lair_keystore_api",
+ "lair_keystore_client",
  "serde",
  "serde_bytes",
  "thiserror",
@@ -1715,6 +1726,36 @@ dependencies = [
  "thiserror",
  "tokio",
  "url2",
+]
+
+[[package]]
+name = "lair_keystore_api"
+version = "0.0.1-alpha.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d756484cbe01d4e167f2f9b0ea8f7a6317371f2d62fab853209d9ac1bd61c2e8"
+dependencies = [
+ "byteorder",
+ "derive_more",
+ "directories 3.0.1",
+ "futures",
+ "ghost_actor",
+ "ring",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "lair_keystore_client"
+version = "0.0.1-alpha.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "11d731e33c2f68177d4e8c8006bb50eb242e9f3252a47d3b15efc548a44df9fe"
+dependencies = [
+ "ghost_actor",
+ "lair_keystore_api",
+ "tempfile",
+ "tokio",
+ "toml",
+ "tracing",
 ]
 
 [[package]]

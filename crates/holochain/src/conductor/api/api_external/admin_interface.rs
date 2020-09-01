@@ -9,7 +9,7 @@ use crate::conductor::{
     ConductorHandle,
 };
 use holo_hash::*;
-use holochain_keystore::KeystoreApiSender;
+use holochain_keystore::KeystoreSenderExt;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::{
     app::{AppId, InstallAppDnaPayload, InstallAppPayload, InstalledApp, InstalledCell},
@@ -135,15 +135,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::GenerateAgentPubKey(agent_pub_key))
             }
-            ListAgentPubKeys => {
-                let pub_key_list = self
-                    .conductor_handle
-                    .keystore()
-                    .clone()
-                    .list_sign_keys()
-                    .await?;
-                Ok(AdminResponse::ListAgentPubKeys(pub_key_list))
-            }
+            ListAgentPubKeys => unimplemented!(),
             ActivateApp { app_id } => {
                 // Activate app
                 self.conductor_handle.activate_app(app_id.clone()).await?;

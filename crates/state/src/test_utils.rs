@@ -27,7 +27,7 @@ pub fn test_wasm_env() -> TestEnvironment {
 
 /// Generate a test keystore pre-populated with a couple test keypairs.
 pub fn test_keystore() -> holochain_keystore::KeystoreSender {
-    use holochain_keystore::KeystoreApiSender;
+    use holochain_keystore::KeystoreSenderExt;
     use std::convert::TryFrom;
     let _ = holochain_crypto::crypto_init_sodium();
 

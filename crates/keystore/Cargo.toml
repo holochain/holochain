@@ -16,6 +16,8 @@ holo_hash = { version = "0.0.1", path = "../holo_hash", features = ["full"] }
 holochain_crypto = { version = "0.0.1", path = "../crypto" }
 holochain_serialized_bytes = "=0.0.43"
 holochain_zome_types = { path = "../zome_types" }
+lair_keystore_api = "=0.0.1-alpha.1"
+lair_keystore_client = "=0.0.1-alpha.1"
 serde = { version = "1.0.104", features = [ "derive" ] }
 serde_bytes = "0.11"
 thiserror = "1"
