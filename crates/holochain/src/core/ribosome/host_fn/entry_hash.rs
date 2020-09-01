@@ -15,7 +15,7 @@ pub fn entry_hash(
     let entry: Entry = input.into_inner();
 
     let entry_hash = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-        holochain_types::entry::EntryHashed::from_content(entry).await
+        holochain_types::entry::EntryHashed::from_content_sync(entry)
     })
     .into_hash();
 
@@ -108,9 +108,9 @@ pub mod wasm_test {
         let expected_path = hdk3::hash_path::path::Path::from("foo.bar");
 
         let expected_hash = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-            holochain_types::entry::EntryHashed::from_content(Entry::App(
-                (&expected_path).try_into().unwrap(),
-            ))
+            holochain_types::entry::EntryHashed::from_content(
+                Entry::app((&expected_path).try_into().unwrap()).unwrap(),
+            )
             .await
         })
         .into_hash();

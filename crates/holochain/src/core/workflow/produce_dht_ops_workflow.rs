@@ -99,6 +99,7 @@ mod tests {
     };
     use holochain_types::{
         dht_op::{produce_ops_from_element, DhtOp},
+        fixt::*,
         observability, Entry, EntryHashed,
     };
     use holochain_zome_types::{
@@ -115,7 +116,7 @@ mod tests {
     impl TestData {
         fn new() -> Self {
             let app_entry =
-                Box::new(SerializedBytesFixturator::new(Unpredictable).map(|b| Entry::App(b)));
+                Box::new(AppEntryBytesFixturator::new(Unpredictable).map(|b| Entry::App(b)));
             Self { app_entry }
         }
 
@@ -125,7 +126,7 @@ mod tests {
             visibility: EntryVisibility,
         ) -> Vec<DhtOp> {
             let app_entry = self.app_entry.next().unwrap();
-            let (app_entry, entry_hash) = EntryHashed::from_content(app_entry).await.into();
+            let (app_entry, entry_hash) = EntryHashed::from_content_sync(app_entry).into();
             let app_entry_type = holochain_types::fixt::AppEntryTypeFixturator::new(visibility)
                 .next()
                 .unwrap();
@@ -207,15 +208,10 @@ mod tests {
                 .with_commit(|writer| source_chain.flush_to_txn(writer))
                 .unwrap();
 
-            futures::future::join_all(
-                all_ops
-                    .into_iter()
-                    .flatten()
-                    .map(|o| DhtOpHash::from_data(o)),
-            )
-            .await
-            .into_iter()
-            .collect()
+            futures::future::join_all(all_ops.iter().flatten().map(|o| DhtOpHash::with_data(o)))
+                .await
+                .into_iter()
+                .collect()
         };
 
         // Run the workflow and commit it

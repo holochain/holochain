@@ -93,9 +93,8 @@ impl TestData {
             NewEntryHeader::Update(u) => u.entry_hash = original_entry_hash.clone(),
         }
 
-        let original_header_hash = HeaderHashed::from_content(original_header.clone().into())
-            .await
-            .into_hash();
+        let original_header_hash =
+            HeaderHashed::from_content_sync(original_header.clone().into()).into_hash();
 
         // Header for the new entry
         let mut new_entry_header = fixt!(NewEntryHeader);
@@ -128,9 +127,7 @@ impl TestData {
         link_add.zome_id = fixt!(ZomeId);
         link_add.tag = fixt!(LinkTag);
 
-        let link_add_hash = HeaderHashed::from_content(link_add.clone().into())
-            .await
-            .into_hash();
+        let link_add_hash = HeaderHashed::from_content_sync(link_add.clone().into()).into_hash();
 
         // Link remove
         let mut link_remove = fixt!(LinkRemove);
@@ -220,7 +217,7 @@ impl Db {
                     assert_eq!(&res[..], &exp[..], "{}", here,);
                 }
                 Db::CasHeader(header, _) => {
-                    let hash = HeaderHashed::from_content(header.clone()).await;
+                    let hash = HeaderHashed::from_content_sync(header.clone());
                     assert_eq!(
                         workspace
                             .elements
@@ -238,7 +235,7 @@ impl Db {
                     );
                 }
                 Db::CasEntry(entry, _, _) => {
-                    let hash = EntryHashed::from_content(entry.clone()).await.into_hash();
+                    let hash = EntryHashed::from_content_sync(entry.clone()).into_hash();
                     assert_eq!(
                         workspace
                             .elements
@@ -256,9 +253,9 @@ impl Db {
                     );
                 }
                 Db::MetaHeader(entry, header) => {
-                    let header_hash = HeaderHashed::from_content(header.clone()).await;
+                    let header_hash = HeaderHashed::from_content_sync(header.clone());
                     let header_hash = TimedHeaderHash::from(header_hash);
-                    let entry_hash = EntryHashed::from_content(entry.clone()).await.into_hash();
+                    let entry_hash = EntryHashed::from_content_sync(entry.clone()).into_hash();
                     let res = workspace
                         .meta
                         .get_headers(&reader, entry_hash)
@@ -269,7 +266,7 @@ impl Db {
                     assert_eq!(&res[..], &exp[..], "{}", here,);
                 }
                 Db::MetaActivity(header) => {
-                    let header_hash = HeaderHashed::from_content(header.clone()).await;
+                    let header_hash = HeaderHashed::from_content_sync(header.clone());
                     let header_hash = TimedHeaderHash::from(header_hash);
                     let res = workspace
                         .meta
@@ -281,7 +278,7 @@ impl Db {
                     assert_eq!(&res[..], &exp[..], "{}", here,);
                 }
                 Db::MetaUpdate(base, header) => {
-                    let header_hash = HeaderHashed::from_content(header.clone()).await;
+                    let header_hash = HeaderHashed::from_content_sync(header.clone());
                     let header_hash = TimedHeaderHash::from(header_hash);
                     let res = workspace
                         .meta
@@ -293,7 +290,7 @@ impl Db {
                     assert_eq!(&res[..], &exp[..], "{}", here,);
                 }
                 Db::MetaDelete(deleted_header_hash, header) => {
-                    let header_hash = HeaderHashed::from_content(header.clone()).await;
+                    let header_hash = HeaderHashed::from_content_sync(header.clone());
                     let header_hash = TimedHeaderHash::from(header_hash);
                     let res = workspace
                         .meta
@@ -346,9 +343,8 @@ impl Db {
                     // TODO: Not currently possible because kvv bufs have no iterator over all keys
                 }
                 Db::MetaLink(link_add, target_hash) => {
-                    let link_add_hash = HeaderHashed::from_content(link_add.clone().into())
-                        .await
-                        .into_hash();
+                    let link_add_hash =
+                        HeaderHashed::from_content_sync(link_add.clone().into()).into_hash();
 
                     // LinkMetaKey
                     let mut link_meta_keys = Vec::new();
@@ -385,9 +381,8 @@ impl Db {
                     }
                 }
                 Db::MetaLinkEmpty(link_add) => {
-                    let link_add_hash = HeaderHashed::from_content(link_add.clone().into())
-                        .await
-                        .into_hash();
+                    let link_add_hash =
+                        HeaderHashed::from_content_sync(link_add.clone().into()).into_hash();
 
                     // LinkMetaKey
                     let mut link_meta_keys = Vec::new();
@@ -443,15 +438,15 @@ impl Db {
                         .unwrap();
                 }
                 Db::CasHeader(header, signature) => {
-                    let header_hash = HeaderHashed::from_content(header.clone()).await;
+                    let header_hash = HeaderHashed::from_content_sync(header.clone());
                     debug!(header_hash = %header_hash.as_hash());
                     let signed_header =
                         SignedHeaderHashed::with_presigned(header_hash, signature.unwrap());
                     workspace.elements.put(signed_header, None).unwrap();
                 }
                 Db::CasEntry(entry, header, signature) => {
-                    let header_hash = HeaderHashed::from_content(header.unwrap().clone()).await;
-                    let entry_hash = EntryHashed::from_content(entry.clone()).await;
+                    let header_hash = HeaderHashed::from_content_sync(header.unwrap().clone());
+                    let entry_hash = EntryHashed::from_content_sync(entry.clone());
                     let signed_header =
                         SignedHeaderHashed::with_presigned(header_hash, signature.unwrap());
                     workspace
@@ -1268,7 +1263,7 @@ mod slow_tests {
         let r = interface.handle_admin_request(request).await;
         assert_matches!(r, AdminResponse::AppActivated);
 
-        let mut entry_fixt = SerializedBytesFixturator::new(Predictable).map(|b| Entry::App(b));
+        let mut entry_fixt = AppEntryBytesFixturator::new(Predictable).map(|b| Entry::App(b));
 
         let base_entry = entry_fixt.next().unwrap();
         let base_entry_hash = EntryHashed::from_content(base_entry.clone())

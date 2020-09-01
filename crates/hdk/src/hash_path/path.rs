@@ -254,17 +254,17 @@ impl TryFrom<&LinkTag> for Path {
 
 impl Path {
     /// what is the hash for the current Path
-    pub fn hash(&self) -> Result<holo_hash::EntryHash, WasmError> {
+    pub fn hash(&self) -> Result<holo_hash::EntryHash, HdkError> {
         Ok(entry_hash!(self)?)
     }
 
     /// does an entry exist at the hash we expect?
-    pub fn exists(&self) -> Result<bool, WasmError> {
+    pub fn exists(&self) -> Result<bool, HdkError> {
         Ok(get!(self.hash()?)?.is_some())
     }
 
     /// recursively touch this and every parent that doesn't exist yet
-    pub fn ensure(&self) -> Result<(), WasmError> {
+    pub fn ensure(&self) -> Result<(), HdkError> {
         if !self.exists()? {
             commit_entry!(self)?;
             match self.parent() {
@@ -289,7 +289,7 @@ impl Path {
 
     /// touch and list all the links from this anchor to anchors below it
     /// only returns links between anchors, not to other entries that might have their own links
-    pub fn children(&self) -> Result<holochain_zome_types::link::Links, WasmError> {
+    pub fn children(&self) -> Result<holochain_zome_types::link::Links, HdkError> {
         Self::ensure(&self)?;
         let links = get_links!(self.hash()?, holochain_zome_types::link::LinkTag::new(NAME))?;
         // only need one of each hash to build the tree
@@ -299,7 +299,7 @@ impl Path {
         Ok(holochain_zome_types::link::Links::from(unwrapped))
     }
 
-    pub fn children_details(&self) -> Result<holochain_zome_types::link::LinkDetails, WasmError> {
+    pub fn children_details(&self) -> Result<holochain_zome_types::link::LinkDetails, HdkError> {
         Self::ensure(&self)?;
         Ok(get_link_details!(
             self.hash()?,

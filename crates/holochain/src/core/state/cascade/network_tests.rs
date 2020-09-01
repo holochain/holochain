@@ -18,7 +18,7 @@ use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
 use futures::future::{Either, FutureExt};
 use ghost_actor::GhostControlSender;
-use hdk3::prelude::EntryVisibility;
+use hdk3::prelude::{EntryError, EntryVisibility};
 use holo_hash::{
     hash_type::{self, AnyDht},
     AnyDhtHash, EntryHash, HasHash, HeaderHash,
@@ -234,7 +234,7 @@ async fn get_from_another_agent() {
 
     // Bob store element
     let entry = Post("Bananas are good for you".into());
-    let entry_hash = EntryHash::with_data(&Entry::try_from(entry.clone()).unwrap()).await;
+    let entry_hash = EntryHash::with_data_sync(&Entry::try_from(entry.clone()).unwrap());
     let header_hash = {
         let (bob_env, call_data) =
             make_call_data(bob_cell_id.clone(), handle.clone(), dna_file.clone()).await;
@@ -361,31 +361,28 @@ async fn get_from_another_agent() {
     assert_eq!(entry_details.updates.len(), 1);
     assert_eq!(entry_details.entry_dht_status, EntryDhtStatus::Dead);
     assert_eq!(
-        HeaderHash::with_data(entry_details.headers.get(0).unwrap()).await,
+        HeaderHash::with_data_sync(entry_details.headers.get(0).unwrap()),
         header_hash
     );
     assert_eq!(
-        HeaderHash::with_data(&Header::ElementDelete(
+        HeaderHash::with_data_sync(&Header::ElementDelete(
             entry_details.deletes.get(0).unwrap().clone()
-        ))
-        .await,
+        )),
         remove_hash
     );
     assert_eq!(
-        HeaderHash::with_data(&Header::EntryUpdate(
+        HeaderHash::with_data_sync(&Header::EntryUpdate(
             entry_details.updates.get(0).unwrap().clone()
-        ))
-        .await,
+        )),
         update_hash
     );
 
     assert_eq!(header_details.deletes.len(), 1);
     assert_eq!(*header_details.element.header_address(), header_hash);
     assert_eq!(
-        HeaderHash::with_data(&Header::ElementDelete(
+        HeaderHash::with_data_sync(&Header::ElementDelete(
             header_details.deletes.get(0).unwrap().clone()
-        ))
-        .await,
+        )),
         remove_hash
     );
 
@@ -442,8 +439,8 @@ async fn get_links_from_another_agent() {
     // Bob store links
     let base = Post("Bananas are good for you".into());
     let target = Post("Potassium is radioactive".into());
-    let base_entry_hash = EntryHash::with_data(&Entry::try_from(base.clone()).unwrap()).await;
-    let target_entry_hash = EntryHash::with_data(&Entry::try_from(target.clone()).unwrap()).await;
+    let base_entry_hash = EntryHash::with_data_sync(&Entry::try_from(base.clone()).unwrap());
+    let target_entry_hash = EntryHash::with_data_sync(&Entry::try_from(target.clone()).unwrap());
     let link_tag = fixt!(LinkTag);
     let link_add_hash = {
         let (bob_env, call_data) =
@@ -579,7 +576,7 @@ async fn get_links_from_another_agent() {
     assert_eq!(link_add.base_address, base_entry_hash);
     assert_eq!(
         link_remove.link_add_address,
-        HeaderHash::with_data(&Header::LinkAdd(link_add)).await
+        HeaderHash::with_data_sync(&Header::LinkAdd(link_add))
     );
 
     let shutdown = handle.take_shutdown_handle().await.unwrap();
@@ -593,17 +590,17 @@ async fn get_links_from_another_agent() {
 struct Post(String);
 
 impl TryFrom<Post> for Entry {
-    type Error = SerializedBytesError;
+    type Error = EntryError;
     fn try_from(post: Post) -> Result<Self, Self::Error> {
-        Ok(Entry::App(post.try_into()?))
+        Entry::app(post.try_into()?)
     }
 }
 
 impl TryFrom<Entry> for Post {
-    type Error = SerializedBytesError;
+    type Error = EntryError;
     fn try_from(entry: Entry) -> Result<Self, Self::Error> {
         let entry = unwrap_to!(entry => Entry::App).clone();
-        Ok(Post::try_from(entry)?)
+        Ok(Post::try_from(entry.into_sb())?)
     }
 }
 
@@ -727,7 +724,7 @@ async fn generate_fixt_store() -> (
     let mut store = BTreeMap::new();
     let mut meta_store = BTreeMap::new();
     let entry = EntryFixturator::new(AppEntry).next().unwrap();
-    let entry_hash = EntryHashed::from_content(entry.clone()).await.into_hash();
+    let entry_hash = EntryHashed::from_content_sync(entry.clone()).into_hash();
     let mut element_create = fixt!(EntryCreate);
     let entry_type = AppEntryTypeFixturator::new(EntryVisibility::Public)
         .map(EntryType::App)
@@ -735,7 +732,7 @@ async fn generate_fixt_store() -> (
         .unwrap();
     element_create.entry_type = entry_type;
     element_create.entry_hash = entry_hash.clone();
-    let header = HeaderHashed::from_content(Header::EntryCreate(element_create)).await;
+    let header = HeaderHashed::from_content_sync(Header::EntryCreate(element_create));
     let hash = header.as_hash().clone();
     let signed_header = SignedHeaderHashed::with_presigned(header, fixt!(Signature));
     meta_store.insert(

@@ -30,3 +30,8 @@ pub trait HashType:
     /// Get a Display-worthy name for this hash type
     fn hash_name(self) -> &'static str;
 }
+
+/// HashTypes whose content are hashable synchronously, i.e. the content is guaranteed to be small
+pub trait HashTypeSync: HashType {}
+/// HashTypes whose content are only hashable asynchronously, i.e. the content is unbounded in size
+pub trait HashTypeAsync: HashType {}

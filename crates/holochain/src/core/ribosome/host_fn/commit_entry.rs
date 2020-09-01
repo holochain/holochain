@@ -32,7 +32,7 @@ pub fn commit_entry<'a>(
     // build the entry hash
     let async_entry = entry.clone();
     let entry_hash = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-        holochain_types::entry::EntryHashed::from_content(async_entry).await
+        holochain_types::entry::EntryHashed::from_content_sync(async_entry)
     })
     .into_hash();
 
@@ -146,6 +146,7 @@ pub mod wasm_test {
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::fixt::AppEntry;
     use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::entry::EntryError;
     use holochain_zome_types::entry_def::EntryDefId;
     use holochain_zome_types::CommitEntryInput;
     use holochain_zome_types::CommitEntryOutput;
@@ -304,8 +305,8 @@ pub mod wasm_test {
         let round: GetOutput =
             crate::call_test_ribosome!(host_access, TestWasm::CommitEntry, "get_entry", ());
 
-        let sb = match round.into_inner().and_then(|el| el.into()) {
-            Some(holochain_zome_types::entry::Entry::App(serialized_bytes)) => serialized_bytes,
+        let sb: SerializedBytes = match round.into_inner().and_then(|el| el.into()) {
+            Some(holochain_zome_types::entry::Entry::App(entry_bytes)) => entry_bytes.into(),
             other => panic!(format!("unexpected output: {:?}", other)),
         };
         // this should be the content "foo" of the committed post
@@ -320,15 +321,15 @@ pub mod wasm_test {
         #[serde(transparent)]
         struct Post(String);
         impl TryFrom<&Post> for Entry {
-            type Error = SerializedBytesError;
+            type Error = EntryError;
             fn try_from(post: &Post) -> Result<Self, Self::Error> {
-                Ok(Entry::App(post.try_into()?))
+                Entry::app(post.try_into()?)
             }
         }
 
         // This is normal trip that works as expected
         let entry: Entry = (&Post("foo".into())).try_into().unwrap();
-        let entry_hash = EntryHash::with_data(&entry).await;
+        let entry_hash = EntryHash::with_data_sync(&entry);
         assert_eq!(
             "uhCEkPjYXxw4ztKx3wBsxzm-q3Rfoy1bXWbIQohifqC3_HNle3-SO",
             &entry_hash.to_string()

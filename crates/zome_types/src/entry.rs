@@ -11,6 +11,14 @@ use crate::capability::ZomeCallCapGrant;
 use holo_hash::{hash_type, AgentPubKey, HashableContent, HashableContentBytes};
 use holochain_serialized_bytes::prelude::*;
 
+mod app_entry_bytes;
+mod error;
+pub use app_entry_bytes::*;
+pub use error::*;
+
+/// Entries larger than this number of bytes cannot be created
+pub const ENTRY_SIZE_LIMIT: usize = 16 * 1000 * 1000; // 16MiB
+
 /// The data type written to the source chain when explicitly granting a capability.
 /// NB: this is not simply `CapGrant`, because the `CapGrant::Authorship`
 /// grant is already implied by `Entry::Agent`, so that should not be committed
@@ -27,14 +35,13 @@ pub struct GetOptions;
 
 /// Structure holding the entry portion of a chain element.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
-#[allow(clippy::large_enum_variant)]
 #[serde(tag = "entry_type", content = "entry")]
 pub enum Entry {
     /// The `Agent` system entry, the third entry of every source chain,
     /// which grants authoring capability for this agent.
     Agent(AgentPubKey),
     /// The application entry data for entries that aren't system created entries
-    App(SerializedBytes),
+    App(AppEntryBytes),
     /// The capability claim system entry which allows committing a granted permission
     /// for later use
     CapClaim(CapClaimEntry),
@@ -59,6 +66,21 @@ impl Entry {
             Entry::CapClaim(claim) => Some(claim),
             _ => None,
         }
+    }
+
+    /// Create an Entry::App from SerializedBytes
+    pub fn app(sb: SerializedBytes) -> Result<Self, EntryError> {
+        Ok(Entry::App(AppEntryBytes::try_from(sb)?))
+    }
+
+    /// Create an Entry::App from SerializedBytes
+    pub fn app_fancy<
+        E: Into<EntryError>,
+        SB: TryInto<SerializedBytes, Error = SerializedBytesError>,
+    >(
+        sb: SB,
+    ) -> Result<Self, EntryError> {
+        Ok(Entry::App(AppEntryBytes::try_from(sb.try_into()?)?))
     }
 }
 
