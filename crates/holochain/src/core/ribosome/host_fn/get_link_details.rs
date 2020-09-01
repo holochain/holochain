@@ -145,10 +145,8 @@ pub mod slow_tests {
 
         let to_remove: LinkAdd = (link_details[0]).0.clone();
 
-        let to_remove_hash = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-            holochain_types::header::HeaderHashed::from_content(to_remove.into()).await
-        })
-        .into_hash();
+        let to_remove_hash =
+            holochain_types::header::HeaderHashed::from_content_sync(to_remove.into()).into_hash();
 
         let _remove_hash: holo_hash::HeaderHash = crate::call_test_ribosome!(
             host_access,

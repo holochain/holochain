@@ -32,7 +32,7 @@ pub fn commit_entry<'a>(
     // build the entry hash
     let async_entry = entry.clone();
     let entry_hash = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-        holochain_types::entry::EntryHashed::from_content(async_entry).await
+        holochain_types::entry::EntryHashed::from_content_sync(async_entry)
     })
     .into_hash();
 
@@ -329,7 +329,7 @@ pub mod wasm_test {
 
         // This is normal trip that works as expected
         let entry: Entry = (&Post("foo".into())).try_into().unwrap();
-        let entry_hash = EntryHash::with_data(&entry).await;
+        let entry_hash = EntryHash::with_data_sync(&entry);
         assert_eq!(
             "uhCEkPjYXxw4ztKx3wBsxzm-q3Rfoy1bXWbIQohifqC3_HNle3-SO",
             &entry_hash.to_string()

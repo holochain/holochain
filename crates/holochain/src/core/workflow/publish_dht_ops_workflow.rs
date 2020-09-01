@@ -252,7 +252,7 @@ mod tests {
             // Get the hash from the op
             let op_hashed = DhtOpHashed::from_content(op.clone()).await;
             // Convert op to DhtOpLight
-            let header_hash = HeaderHashed::from_content(link_add.clone().into()).await;
+            let header_hash = HeaderHashed::from_content_sync(link_add.clone().into());
             let op_light = DhtOpLight::RegisterAddLink(
                 header_hash.as_hash().clone(),
                 link_add.base_address.into(),
@@ -501,8 +501,8 @@ mod tests {
                 // Setup data
                 let original_entry = fixt!(Entry);
                 let new_entry = fixt!(Entry);
-                let original_entry_hash = EntryHash::with_data(&original_entry).await;
-                let new_entry_hash = EntryHash::with_data(&new_entry).await;
+                let original_entry_hash = EntryHash::with_data_sync(&original_entry);
+                let new_entry_hash = EntryHash::with_data_sync(&new_entry);
 
                 // Make them private
                 let visibility = EntryVisibility::Private;

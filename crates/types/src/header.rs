@@ -157,8 +157,7 @@ impl From<(EntryUpdate, Signature)> for WireEntryUpdate {
 impl WireElementDelete {
     pub async fn into_element(self) -> Element {
         Element::new(
-            SignedHeaderHashed::from_content(SignedHeader(self.delete.into(), self.signature))
-                .await,
+            SignedHeaderHashed::from_content_sync(SignedHeader(self.delete.into(), self.signature)),
             None,
         )
     }
@@ -179,8 +178,10 @@ impl WireEntryUpdateRelationship {
             entry_hash: self.new_entry_address,
         };
         Element::new(
-            SignedHeaderHashed::from_content(SignedHeader(Header::EntryUpdate(eu), self.signature))
-                .await,
+            SignedHeaderHashed::from_content_sync(SignedHeader(
+                Header::EntryUpdate(eu),
+                self.signature,
+            )),
             None,
         )
     }
@@ -234,7 +235,7 @@ impl TryFrom<SignedHeaderHashed> for WireEntryUpdateRelationship {
 
 impl WireNewEntryHeader {
     pub async fn into_element(self, entry_type: EntryType, entry: Entry) -> Element {
-        let entry_hash = EntryHash::with_data(&entry).await;
+        let entry_hash = EntryHash::with_data_sync(&entry);
         Element::new(self.into_header(entry_type, entry_hash).await, Some(entry))
     }
 
@@ -254,7 +255,7 @@ impl WireNewEntryHeader {
                     entry_type,
                     entry_hash,
                 };
-                SignedHeaderHashed::from_content(SignedHeader(ec.into(), signature)).await
+                SignedHeaderHashed::from_content_sync(SignedHeader(ec.into(), signature))
             }
             WireNewEntryHeader::Update(eu) => {
                 let signature = eu.signature;
@@ -268,7 +269,7 @@ impl WireNewEntryHeader {
                     entry_type,
                     entry_hash,
                 };
-                SignedHeaderHashed::from_content(SignedHeader(eu.into(), signature)).await
+                SignedHeaderHashed::from_content_sync(SignedHeader(eu.into(), signature))
             }
         }
     }
