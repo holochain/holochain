@@ -6,6 +6,7 @@ use crate::{
         workflow::{unsafe_call_zome_workspace::UnsafeCallZomeWorkspace, CallZomeWorkspace},
     },
 };
+use hdk3::prelude::EntryError;
 use holo_hash::{AnyDhtHash, EntryHash, HeaderHash};
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::{
@@ -370,9 +371,9 @@ pub async fn get_link_details<'env>(
 }
 
 impl TryFrom<Post> for Entry {
-    type Error = SerializedBytesError;
+    type Error = EntryError;
     fn try_from(post: Post) -> Result<Self, Self::Error> {
-        Ok(Entry::App(post.try_into()?))
+        Ok(Entry::App(SerializedBytes::try_from(post)?.try_into()?))
     }
 }
 
@@ -380,6 +381,6 @@ impl TryFrom<Entry> for Post {
     type Error = SerializedBytesError;
     fn try_from(entry: Entry) -> Result<Self, Self::Error> {
         let entry = unwrap_to!(entry => Entry::App).clone();
-        Ok(Post::try_from(entry)?)
+        Ok(Post::try_from(entry.into_sb())?)
     }
 }

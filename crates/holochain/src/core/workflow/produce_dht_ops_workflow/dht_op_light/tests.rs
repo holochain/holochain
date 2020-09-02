@@ -243,7 +243,8 @@ async fn test_all_ops() {
 
 #[tokio::test(threaded_scheduler)]
 async fn test_dht_basis() {
-    let env = test_cell_env();
+    let test_env = test_cell_env();
+    let env = test_env.env();
     let env_ref = env.guard();
 
     {
@@ -253,7 +254,7 @@ async fn test_dht_basis() {
         let expected_entry_hash: AnyDhtHash = original_header.entry_hash.clone().into();
 
         let original_header_hash =
-            HeaderHashed::from_content(Header::EntryCreate(original_header.clone())).await;
+            HeaderHashed::from_content_sync(Header::EntryCreate(original_header.clone()));
         let signed_header =
             SignedHeaderHashed::with_presigned(original_header_hash.clone(), fixt!(Signature));
         let original_header_hash = original_header_hash.into_inner().1;

@@ -33,11 +33,8 @@ use holochain_types::dna::DnaFile;
 use holochain_types::test_utils::fake_agent_pubkey_1;
 use holochain_types::{observability, test_utils::fake_agent_pubkey_2};
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::HostInput;
-use std::sync::Arc;
-use tempdir::TempDir;
-
 use holochain_websocket::WebsocketSender;
+use holochain_zome_types::HostInput;
 use matches::assert_matches;
 use test_case::test_case;
 use test_utils::*;
@@ -46,7 +43,7 @@ use tracing::instrument;
 
 mod test_utils;
 
-const DEFAULT_NUM: usize = 1000;
+const DEFAULT_NUM: usize = 2000;
 
 #[tokio::test(threaded_scheduler)]
 #[ignore]
@@ -98,6 +95,25 @@ async fn speed_test_normal() {
     observability::test_run().unwrap();
     speed_test(None).await;
 }
+
+/// Run this test to execute the speed test, but then keep the LMDB env files
+/// around in temp dirs for inspection by e.g. `mdb_stat`
+#[tokio::test(threaded_scheduler)]
+#[ignore]
+async fn speed_test_persisted() {
+    observability::test_run().unwrap();
+    let env = speed_test(None).await;
+    let tmpdir = env.tmpdir();
+    drop(env);
+    let tmpdir = std::sync::Arc::try_unwrap(tmpdir).unwrap();
+    let path = tmpdir.into_path();
+    println!("Run the following to see info about the test that just ran,");
+    println!("with the correct cell env dir appended to the path:");
+    println!();
+    println!("    $ mdb_stat -afe {}/", path.to_string_lossy());
+    println!();
+}
+
 #[test_case(1)]
 #[test_case(10)]
 #[test_case(100)]
@@ -110,7 +126,7 @@ fn speed_test_all(n: usize) {
 }
 
 #[instrument]
-async fn speed_test(n: Option<usize>) {
+async fn speed_test(n: Option<usize>) -> TestEnvironment {
     let num = n.unwrap_or(DEFAULT_NUM);
 
     // ////////////
@@ -174,7 +190,7 @@ async fn speed_test(n: Option<usize>) {
         .return_const(());
     dna_store.expect_get_entry_def().return_const(None);
 
-    let (_tmpdir, _app_api, handle) = setup_app(
+    let (test_env, _app_api, handle) = setup_app(
         vec![(alice_installed_cell, None), (bob_installed_cell, None)],
         dna_store,
     )
@@ -303,18 +319,18 @@ async fn speed_test(n: Option<usize>) {
     let shutdown = handle.take_shutdown_handle().await.unwrap();
     handle.shutdown().await;
     shutdown.await.unwrap();
+    test_env
 }
 
 pub async fn setup_app(
     cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
     dna_store: MockDnaStore,
-) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
+) -> (TestEnvironment, RealAppInterfaceApi, ConductorHandle) {
     let test_env = test_conductor_env();
     let TestEnvironment {
         env: wasm_env,
         tmpdir: _tmpdir,
     } = test_wasm_env();
-    let tmpdir = test_env.tmpdir.clone();
 
     let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
         .config(ConductorConfig {
@@ -323,7 +339,7 @@ pub async fn setup_app(
             }]),
             ..Default::default()
         })
-        .test(test_env, wasm_env)
+        .test(test_env.clone(), wasm_env)
         .await
         .unwrap();
 
@@ -344,5 +360,5 @@ pub async fn setup_app(
 
     let handle = conductor_handle.clone();
 
-    (tmpdir, RealAppInterfaceApi::new(conductor_handle), handle)
+    (test_env, RealAppInterfaceApi::new(conductor_handle), handle)
 }

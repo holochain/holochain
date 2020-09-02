@@ -61,7 +61,8 @@ use crate::test_utils::host_fn_api::*;
 async fn get_updates_cache() {
     observability::test_run().ok();
     // Database setup
-    let env = test_cell_env();
+    let test_env = test_cell_env();
+    let env = test_env.env();
     let dbs = env.dbs();
 
     let (element_fixt_store, _) = generate_fixt_store().await;
@@ -104,7 +105,8 @@ async fn get_updates_cache() {
 async fn get_meta_updates_meta_cache() {
     observability::test_run().ok();
     // Database setup
-    let env = test_cell_env();
+    let test_env = test_cell_env();
+    let env = test_env.env();
     let dbs = env.dbs();
     let env_ref = env.guard();
 
@@ -218,7 +220,7 @@ async fn get_from_another_agent() {
 
     // Bob store element
     let entry = Post("Bananas are good for you".into());
-    let entry_hash = EntryHash::with_data(&Entry::try_from(entry.clone()).unwrap()).await;
+    let entry_hash = EntryHash::with_data_sync(&Entry::try_from(entry.clone()).unwrap());
     let header_hash = {
         let (bob_env, call_data) = CallData::create(&bob_cell_id, &handle, &dna_file).await;
         let dbs = bob_env.dbs();
@@ -336,31 +338,28 @@ async fn get_from_another_agent() {
     assert_eq!(entry_details.updates.len(), 1);
     assert_eq!(entry_details.entry_dht_status, EntryDhtStatus::Dead);
     assert_eq!(
-        HeaderHash::with_data(entry_details.headers.get(0).unwrap()).await,
+        HeaderHash::with_data_sync(entry_details.headers.get(0).unwrap()),
         header_hash
     );
     assert_eq!(
-        HeaderHash::with_data(&Header::ElementDelete(
+        HeaderHash::with_data_sync(&Header::ElementDelete(
             entry_details.deletes.get(0).unwrap().clone()
-        ))
-        .await,
+        )),
         remove_hash
     );
     assert_eq!(
-        HeaderHash::with_data(&Header::EntryUpdate(
+        HeaderHash::with_data_sync(&Header::EntryUpdate(
             entry_details.updates.get(0).unwrap().clone()
-        ))
-        .await,
+        )),
         update_hash
     );
 
     assert_eq!(header_details.deletes.len(), 1);
     assert_eq!(*header_details.element.header_address(), header_hash);
     assert_eq!(
-        HeaderHash::with_data(&Header::ElementDelete(
+        HeaderHash::with_data_sync(&Header::ElementDelete(
             header_details.deletes.get(0).unwrap().clone()
-        ))
-        .await,
+        )),
         remove_hash
     );
 
@@ -418,8 +417,8 @@ async fn get_links_from_another_agent() {
     // Bob store links
     let base = Post("Bananas are good for you".into());
     let target = Post("Potassium is radioactive".into());
-    let base_entry_hash = EntryHash::with_data(&Entry::try_from(base.clone()).unwrap()).await;
-    let target_entry_hash = EntryHash::with_data(&Entry::try_from(target.clone()).unwrap()).await;
+    let base_entry_hash = EntryHash::with_data_sync(&Entry::try_from(base.clone()).unwrap());
+    let target_entry_hash = EntryHash::with_data_sync(&Entry::try_from(target.clone()).unwrap());
     let link_tag = fixt!(LinkTag);
     let link_add_hash = {
         let (bob_env, call_data) = CallData::create(&bob_cell_id, &handle, &dna_file).await;
@@ -546,7 +545,7 @@ async fn get_links_from_another_agent() {
     assert_eq!(link_add.base_address, base_entry_hash);
     assert_eq!(
         link_remove.link_add_address,
-        HeaderHash::with_data(&Header::LinkAdd(link_add)).await
+        HeaderHash::with_data_sync(&Header::LinkAdd(link_add))
     );
 
     let shutdown = handle.take_shutdown_handle().await.unwrap();
@@ -665,8 +664,8 @@ async fn generate_fixt_store() -> (
 ) {
     let mut store = BTreeMap::new();
     let mut meta_store = BTreeMap::new();
-    let entry = fixt!(Entry);
-    let entry_hash = EntryHashed::from_content(entry.clone()).await.into_hash();
+    let entry = EntryFixturator::new(AppEntry).next().unwrap();
+    let entry_hash = EntryHashed::from_content_sync(entry.clone()).into_hash();
     let mut element_create = fixt!(EntryCreate);
     let entry_type = AppEntryTypeFixturator::new(EntryVisibility::Public)
         .map(EntryType::App)
@@ -674,7 +673,7 @@ async fn generate_fixt_store() -> (
         .unwrap();
     element_create.entry_type = entry_type;
     element_create.entry_hash = entry_hash.clone();
-    let header = HeaderHashed::from_content(Header::EntryCreate(element_create)).await;
+    let header = HeaderHashed::from_content_sync(Header::EntryCreate(element_create));
     let hash = header.as_hash().clone();
     let signed_header = SignedHeaderHashed::with_presigned(header, fixt!(Signature));
     meta_store.insert(

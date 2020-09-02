@@ -48,8 +48,8 @@ fn setup_env(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Chains> {
     let (jimbo_entry, jessy_entry) = tokio_safe_block_on::tokio_safe_block_on(
         async {
             (
-                EntryHashed::from_content(Entry::Agent(jimbo_id.clone().into())).await,
-                EntryHashed::from_content(Entry::Agent(jessy_id.clone().into())).await,
+                EntryHashed::from_content_sync(Entry::Agent(jimbo_id.clone().into())),
+                EntryHashed::from_content_sync(Entry::Agent(jessy_id.clone().into())),
             )
         },
         std::time::Duration::from_secs(1),
@@ -95,7 +95,8 @@ fn setup_env(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Chains> {
 #[tokio::test(threaded_scheduler)]
 async fn live_local_return() -> SourceChainResult<()> {
     // setup some data thats in the scratch
-    let env = test_cell_env();
+    let test_env = test_cell_env();
+    let env = test_env.env();
     let dbs = env.dbs();
     let env_ref = env.guard();
     let reader = env_ref.reader()?;
@@ -141,7 +142,8 @@ async fn live_local_return() -> SourceChainResult<()> {
 async fn dead_local_none() -> SourceChainResult<()> {
     observability::test_run().ok();
     // setup some data thats in the scratch
-    let env = test_cell_env();
+    let test_env = test_cell_env();
+    let env = test_env.env();
     let dbs = env.dbs();
     let env_ref = env.guard();
     let reader = env_ref.reader()?;
@@ -187,7 +189,8 @@ async fn dead_local_none() -> SourceChainResult<()> {
 async fn notfound_goto_cache_live() -> SourceChainResult<()> {
     observability::test_run().ok();
     // setup some data thats in the scratch
-    let env = test_cell_env();
+    let test_env = test_cell_env();
+    let env = test_env.env();
     let dbs = env.dbs();
     let env_ref = env.guard();
     let reader = env_ref.reader()?;
@@ -201,7 +204,7 @@ async fn notfound_goto_cache_live() -> SourceChainResult<()> {
         mut mock_meta_cache,
         ..
     } = setup_env(env.clone().into(), &dbs)?;
-    let h = HeaderHashed::from_content(jimbo_header.clone()).await;
+    let h = HeaderHashed::from_content_sync(jimbo_header.clone());
     let h = SignedHeaderHashed::with_presigned(h, fixt!(Signature));
     cache.put(h, Some(jimbo_entry.clone()))?;
     let address = jimbo_entry.as_hash();
@@ -235,7 +238,8 @@ async fn notfound_goto_cache_live() -> SourceChainResult<()> {
 async fn notfound_cache() -> DatabaseResult<()> {
     observability::test_run().ok();
     // setup some data thats in the scratch
-    let env = test_cell_env();
+    let test_env = test_cell_env();
+    let env = test_env.env();
     let dbs = env.dbs();
     let env_ref = env.guard();
     let reader = env_ref.reader()?;
@@ -272,7 +276,8 @@ async fn notfound_cache() -> DatabaseResult<()> {
 #[tokio::test(threaded_scheduler)]
 async fn links_local_return() -> SourceChainResult<()> {
     // setup some data thats in the scratch
-    let env = test_cell_env();
+    let test_env = test_cell_env();
+    let env = test_env.env();
     let dbs = env.dbs();
     let env_ref = env.guard();
     let reader = env_ref.reader()?;
@@ -347,7 +352,8 @@ async fn links_local_return() -> SourceChainResult<()> {
 async fn links_cache_return() -> SourceChainResult<()> {
     observability::test_run().ok();
     // setup some data thats in the scratch
-    let env = test_cell_env();
+    let test_env = test_cell_env();
+    let env = test_env.env();
     let dbs = env.dbs();
     let env_ref = env.guard();
     let reader = env_ref.reader()?;
@@ -440,7 +446,8 @@ async fn links_cache_return() -> SourceChainResult<()> {
 async fn links_notauth_cache() -> DatabaseResult<()> {
     observability::test_run().ok();
     // setup some data thats in the scratch
-    let env = test_cell_env();
+    let test_env = test_cell_env();
+    let env = test_env.env();
     let dbs = env.dbs();
     let env_ref = env.guard();
     let reader = env_ref.reader()?;

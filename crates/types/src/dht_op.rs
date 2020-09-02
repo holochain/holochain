@@ -130,37 +130,37 @@ impl DhtOp {
         match self {
             DhtOp::StoreElement(_, h, _) => {
                 let e = h.entry_data().map(|(e, _)| e.clone());
-                let h = HeaderHash::with_data(h).await;
+                let h = HeaderHash::with_data_sync(h);
                 DhtOpLight::StoreElement(h, e, basis)
             }
             DhtOp::StoreEntry(_, h, _) => {
                 let e = h.entry().clone();
-                let h = HeaderHash::with_data(&Header::from(h.clone())).await;
+                let h = HeaderHash::with_data_sync(&Header::from(h.clone()));
                 DhtOpLight::StoreEntry(h, e, basis)
             }
             DhtOp::RegisterAgentActivity(_, h) => {
-                let h = HeaderHash::with_data(h).await;
+                let h = HeaderHash::with_data_sync(h);
                 DhtOpLight::RegisterAgentActivity(h, basis)
             }
             DhtOp::RegisterUpdatedBy(_, h) => {
                 let e = h.entry_hash.clone();
-                let h = HeaderHash::with_data(&Header::from(h.clone())).await;
+                let h = HeaderHash::with_data_sync(&Header::from(h.clone()));
                 DhtOpLight::RegisterUpdatedBy(h, e, basis)
             }
             DhtOp::RegisterDeletedBy(_, h) => {
-                let h = HeaderHash::with_data(&Header::from(h.clone())).await;
+                let h = HeaderHash::with_data_sync(&Header::from(h.clone()));
                 DhtOpLight::RegisterDeletedBy(h, basis)
             }
             DhtOp::RegisterDeletedEntryHeader(_, h) => {
-                let h = HeaderHash::with_data(&Header::from(h.clone())).await;
+                let h = HeaderHash::with_data_sync(&Header::from(h.clone()));
                 DhtOpLight::RegisterDeletedEntryHeader(h, basis)
             }
             DhtOp::RegisterAddLink(_, h) => {
-                let h = HeaderHash::with_data(&Header::from(h.clone())).await;
+                let h = HeaderHash::with_data_sync(&Header::from(h.clone()));
                 DhtOpLight::RegisterAddLink(h, basis)
             }
             DhtOp::RegisterRemoveLink(_, h) => {
-                let h = HeaderHash::with_data(&Header::from(h.clone())).await;
+                let h = HeaderHash::with_data_sync(&Header::from(h.clone()));
                 DhtOpLight::RegisterRemoveLink(h, basis)
             }
         }
@@ -229,7 +229,7 @@ pub enum UniqueForm<'a> {
 impl<'a> UniqueForm<'a> {
     async fn basis(&'a self) -> AnyDhtHash {
         match self {
-            UniqueForm::StoreElement(header) => HeaderHash::with_data(*header).await.into(),
+            UniqueForm::StoreElement(header) => HeaderHash::with_data_sync(*header).into(),
             UniqueForm::StoreEntry(header) => header.entry().clone().into(),
             UniqueForm::RegisterAgentActivity(header) => header.author().clone().into(),
             UniqueForm::RegisterUpdatedBy(header) => header.original_entry_address.clone().into(),

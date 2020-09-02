@@ -238,6 +238,13 @@ pub struct EnvironmentReadRef<'e> {
     keystore: KeystoreSender,
 }
 
+impl<'e> EnvironmentReadRef<'e> {
+    /// Access the wrapped Rkv
+    pub fn rkv(&self) -> &Rkv {
+        &self.rkv
+    }
+}
+
 /// Implementors are able to create a new read-only LMDB transaction
 pub trait ReadManager<'e> {
     /// Create a new read-only LMDB transaction

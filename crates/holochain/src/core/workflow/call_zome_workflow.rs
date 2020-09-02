@@ -306,7 +306,8 @@ pub mod tests {
     #[allow(unused_variables, unreachable_code)]
     #[tokio::test]
     async fn private_zome_call() {
-        let env = test_cell_env();
+        let test_env = test_cell_env();
+        let env = test_env.env();
         let dbs = env.dbs();
         let env_ref = env.guard();
         let reader = env_ref.reader().unwrap();
@@ -369,7 +370,8 @@ pub mod tests {
     #[tokio::test]
     async fn calls_system_validation<'a>() {
         observability::test_run().ok();
-        let env = test_cell_env();
+        let test_env = test_cell_env();
+        let env = test_env.env();
         let dbs = env.dbs();
         let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs).unwrap();
 
@@ -420,7 +422,8 @@ pub mod tests {
     #[ignore]
     #[tokio::test]
     async fn calls_app_validation() {
-        let env = test_cell_env();
+        let test_env = test_cell_env();
+        let env = test_env.env();
         let dbs = env.dbs();
         let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs).unwrap();
         let ribosome = MockRibosomeT::new();
@@ -450,7 +453,8 @@ pub mod tests {
     #[ignore]
     #[tokio::test]
     async fn creates_outputs() {
-        let env = test_cell_env();
+        let test_env = test_cell_env();
+        let env = test_env.env();
         let dbs = env.dbs();
         let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs).unwrap();
         let ribosome = MockRibosomeT::new();

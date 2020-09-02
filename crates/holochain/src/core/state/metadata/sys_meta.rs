@@ -75,7 +75,7 @@ mod tests {
             entry_type: fx.entry_type(),
         };
         let update = builder.build(fx.common());
-        let header = HeaderHashed::from_content(update.clone().into()).await;
+        let header = HeaderHashed::from_content_sync(update.clone().into());
         (update, header)
     }
 
@@ -88,7 +88,7 @@ mod tests {
             entry_type: fx.entry_type(),
         };
         let create = builder.build(fx.common());
-        let header = HeaderHashed::from_content(create.clone().into()).await;
+        let header = HeaderHashed::from_content_sync(create.clone().into());
         (create, header)
     }
 
@@ -102,7 +102,7 @@ mod tests {
             removes_entry_address,
         };
         let delete = builder.build(fx.common());
-        let header = HeaderHashed::from_content(delete.clone().into()).await;
+        let header = HeaderHashed::from_content_sync(delete.clone().into());
         (delete, header)
     }
 
@@ -110,7 +110,8 @@ mod tests {
     #[ignore]
     /// Test that a header can be redirected a single hop
     async fn test_redirect_header_one_hop() -> anyhow::Result<()> {
-        let arc = test_cell_env();
+        let test_env = test_cell_env();
+        let arc = test_env.env();
         let env = arc.guard();
         let mut fx = TestFixtures::new();
         {
@@ -135,7 +136,8 @@ mod tests {
     #[ignore]
     /// Test that a header can be redirected three hops
     async fn test_redirect_header_three_hops() -> anyhow::Result<()> {
-        let arc = test_cell_env();
+        let test_env = test_cell_env();
+        let arc = test_env.env();
         let env = arc.guard();
         let mut fx = TestFixtures::new();
         {
@@ -177,7 +179,8 @@ mod tests {
     #[ignore]
     /// Test that an entry can be redirected a single hop
     async fn test_redirect_entry_one_hop() -> anyhow::Result<()> {
-        let arc = test_cell_env();
+        let test_env = test_cell_env();
+        let arc = test_env.env();
         let env = arc.guard();
         let mut fx = TestFixtures::new();
         {
@@ -210,7 +213,8 @@ mod tests {
     #[ignore]
     /// Test that an entry can be redirected three hops
     async fn test_redirect_entry_three_hops() -> anyhow::Result<()> {
-        let arc = test_cell_env();
+        let test_env = test_cell_env();
+        let arc = test_env.env();
         let env = arc.guard();
         let mut fx = TestFixtures::new();
         {
@@ -258,7 +262,8 @@ mod tests {
     #[ignore]
     /// Test that a header can be redirected a single hop
     async fn test_redirect_header_and_entry() -> anyhow::Result<()> {
-        let arc = test_cell_env();
+        let test_env = test_cell_env();
+        let arc = test_env.env();
         let env = arc.guard();
         let mut fx = TestFixtures::new();
         {
@@ -303,7 +308,8 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn add_entry_get_headers() {
-        let arc = test_cell_env();
+        let test_env = test_cell_env();
+        let arc = test_env.env();
         let env = arc.guard();
         let mut fx = TestFixtures::new();
         let entry_hash = fx.entry_hash();
@@ -350,7 +356,8 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn add_entry_get_updates() {
-        let arc = test_cell_env();
+        let test_env = test_cell_env();
+        let arc = test_env.env();
         let env = arc.guard();
         let mut fx = TestFixtures::new();
         let original_entry_hash = fx.entry_hash();
@@ -405,7 +412,8 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn add_entry_get_updates_header() {
-        let arc = test_cell_env();
+        let test_env = test_cell_env();
+        let arc = test_env.env();
         let env = arc.guard();
         let mut fx = TestFixtures::new();
         let original_entry_hash = fx.entry_hash();
@@ -460,7 +468,8 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn add_entry_get_deletes() {
-        let arc = test_cell_env();
+        let test_env = test_cell_env();
+        let arc = test_env.env();
         let env = arc.guard();
         let mut fx = TestFixtures::new();
         let header_hash = fx.header_hash();
@@ -541,7 +550,8 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_entry_dht_status() {
-        let arc = test_cell_env();
+        let test_env = test_cell_env();
+        let arc = test_env.env();
         let env = arc.guard();
         let mut fx = TestFixtures::new();
         let entry_hash = fx.entry_hash();
@@ -678,7 +688,8 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_entry_dht_status_one_less() {
-        let arc = test_cell_env();
+        let test_env = test_cell_env();
+        let arc = test_env.env();
         let env = arc.guard();
         let mut fx = TestFixtures::new();
         let entry_hash = fx.entry_hash();

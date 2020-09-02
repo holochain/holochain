@@ -30,14 +30,14 @@ mod tests {
                     Call {
                         respond,
                         space,
-                        agent,
+                        to_agent,
                         payload,
                         ..
                     } => {
                         if space != space1_clone {
                             panic!("unexpected space");
                         }
-                        if agent != a2_clone {
+                        if to_agent != a2_clone {
                             panic!("unexpected agent");
                         }
                         if &*payload != b"hello" {
@@ -55,7 +55,10 @@ mod tests {
         p2p.join(space1.clone(), a1.clone()).await.unwrap();
         p2p.join(space1.clone(), a2.clone()).await.unwrap();
 
-        let res = p2p.rpc_single(space1, a2, b"hello".to_vec()).await.unwrap();
+        let res = p2p
+            .rpc_single(space1, a2, a1, b"hello".to_vec())
+            .await
+            .unwrap();
         assert_eq!(b"echo: hello".to_vec(), res);
 
         p2p.ghost_actor_shutdown().await.unwrap();
@@ -111,6 +114,7 @@ mod tests {
         let res = p2p
             .notify_multi(actor::NotifyMulti {
                 space: space1,
+                from_agent: a1,
                 // this is just a dummy value right now
                 basis: Arc::new(b"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_vec().into()),
                 remote_agent_count: Some(42),

@@ -250,7 +250,7 @@ mod tests {
             // Get the hash from the op
             let op_hashed = DhtOpHashed::from_content(op.clone()).await;
             // Convert op to DhtOpLight
-            let header_hash = HeaderHashed::from_content(link_add.clone().into()).await;
+            let header_hash = HeaderHashed::from_content_sync(link_add.clone().into());
             let op_light = DhtOpLight::RegisterAddLink(
                 header_hash.as_hash().clone(),
                 link_add.base_address.into(),
@@ -353,13 +353,14 @@ mod tests {
             observability::test_run().ok();
 
             // Create test env
-            let env = test_cell_env();
+            let test_env = test_cell_env();
+            let env = test_env.env();
 
             // Setup
             let (network, cell_network, recv_task, rx_complete) =
                 setup(env.clone(), num_agents, num_hash, false).await;
 
-            call_workflow(env.env.clone().into(), cell_network).await;
+            call_workflow(env.clone().into(), cell_network).await;
 
             // Wait for expected # of responses, or timeout
             tokio::select! {
@@ -407,7 +408,8 @@ mod tests {
             observability::test_run().ok();
 
             // Create test env
-            let env = test_cell_env();
+            let test_env = test_cell_env();
+            let env = test_env.env();
             let dbs = env.dbs();
             let env_ref = env.guard();
 
@@ -446,7 +448,7 @@ mod tests {
             }
 
             // Call the workflow
-            call_workflow(env.env.clone().into(), cell_network).await;
+            call_workflow(env.clone().into(), cell_network).await;
 
             // If we can wait a while without receiving any publish, we have succeeded
             tokio::time::delay_for(Duration::from_millis(
@@ -489,15 +491,16 @@ mod tests {
                 observability::test_run().ok();
 
                 // Create test env
-                let env = test_cell_env();
+                let test_env = test_cell_env();
+                let env = test_env.env();
                 let dbs = env.dbs();
                 let env_ref = env.guard();
 
                 // Setup data
                 let original_entry = fixt!(Entry);
                 let new_entry = fixt!(Entry);
-                let original_entry_hash = EntryHash::with_data(&original_entry).await;
-                let new_entry_hash = EntryHash::with_data(&new_entry).await;
+                let original_entry_hash = EntryHash::with_data_sync(&original_entry);
+                let new_entry_hash = EntryHash::with_data_sync(&new_entry);
 
                 // Make them private
                 let visibility = EntryVisibility::Private;
@@ -520,10 +523,9 @@ mod tests {
                 {
                     let workspace = ProduceDhtOpsWorkspace::new(env.clone().into(), &dbs).unwrap();
                     let (mut qt, _rx) = TriggerSender::new();
-                    let complete =
-                        produce_dht_ops_workflow(workspace, env.env.clone().into(), &mut qt)
-                            .await
-                            .unwrap();
+                    let complete = produce_dht_ops_workflow(workspace, env.clone().into(), &mut qt)
+                        .await
+                        .unwrap();
                     assert_matches!(complete, WorkComplete::Complete);
                 }
                 {
@@ -658,10 +660,9 @@ mod tests {
                 {
                     let workspace = ProduceDhtOpsWorkspace::new(env.clone().into(), &dbs).unwrap();
                     let (mut qt, _rx) = TriggerSender::new();
-                    let complete =
-                        produce_dht_ops_workflow(workspace, env.env.clone().into(), &mut qt)
-                            .await
-                            .unwrap();
+                    let complete = produce_dht_ops_workflow(workspace, env.clone().into(), &mut qt)
+                        .await
+                        .unwrap();
                     assert_matches!(complete, WorkComplete::Complete);
                 }
 
@@ -728,7 +729,7 @@ mod tests {
                     network.join(dna.clone(), agent).await.unwrap();
                 }
 
-                call_workflow(env.env.clone().into(), cell_network).await;
+                call_workflow(env.clone().into(), cell_network).await;
 
                 // Wait for expected # of responses, or timeout
                 tokio::select! {

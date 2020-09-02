@@ -134,7 +134,7 @@ impl EntryHeader {
             | EntryHeader::Activity(h) => h,
         };
         let (header, header_hash): (Header, HeaderHash) =
-            HeaderHashed::from_content(header).await.into();
+            HeaderHashed::from_content_sync(header).into();
         Ok(TimedHeaderHash {
             timestamp: header.timestamp().into(),
             header_hash,

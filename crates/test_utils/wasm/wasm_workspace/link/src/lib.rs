@@ -2,17 +2,17 @@ use hdk3::prelude::*;
 
 entry_defs![Path::entry_def()];
 
-fn path(s: &str) -> Result<EntryHash, WasmError> {
+fn path(s: &str) -> ExternResult<EntryHash> {
     let path = Path::from(s);
     path.ensure()?;
     Ok(path.hash()?)
 }
 
-fn base() -> Result<EntryHash, WasmError> {
+fn base() -> ExternResult<EntryHash> {
     path("a")
 }
 
-fn target() -> Result<EntryHash, WasmError> {
+fn target() -> ExternResult<EntryHash> {
     path("b")
 }
 

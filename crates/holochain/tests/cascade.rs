@@ -31,8 +31,8 @@ fn fixtures() -> (
     let (jimbo_entry, jessy_entry) = tokio_safe_block_on::tokio_safe_block_on(
         async {
             (
-                EntryHashed::from_content(Entry::Agent(jimbo_id.clone().into())).await,
-                EntryHashed::from_content(Entry::Agent(jessy_id.clone().into())).await,
+                EntryHashed::from_content_sync(Entry::Agent(jimbo_id.clone().into())),
+                EntryHashed::from_content_sync(Entry::Agent(jessy_id.clone().into())),
             )
         },
         std::time::Duration::from_secs(1),
@@ -68,14 +68,15 @@ fn fixtures() -> (
 
 #[tokio::test(threaded_scheduler)]
 async fn get_links() -> SourceChainResult<()> {
-    let env = test_cell_env();
+    let test_env = test_cell_env();
+    let env = test_env.env();
     let dbs = env.dbs();
 
     let mut source_chain = SourceChainBuf::new(env.clone().into(), &dbs)?;
     let mut element_cache = ElementBuf::cache(env.clone().into(), &dbs)?;
 
     // create a cache and a cas for store and meta
-    let meta_vault = MetadataBuf::vault(env.env.clone().into(), &dbs)?;
+    let meta_vault = MetadataBuf::vault(env.clone().into(), &dbs)?;
     let mut meta_cache = MetadataBuf::cache(env.clone().into(), &dbs)?;
 
     let (_jimbo_id, jimbo_header, jimbo_entry, _jessy_id, jessy_header, jessy_entry) = fixtures();

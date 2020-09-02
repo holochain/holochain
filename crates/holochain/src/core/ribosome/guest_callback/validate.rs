@@ -123,7 +123,7 @@ mod test {
     use ::fixt::prelude::*;
     use holo_hash::fixt::AgentPubKeyFixturator;
     use holochain_serialized_bytes::prelude::*;
-    use holochain_types::{dna::zome::HostFnAccess, fixt::CapClaimFixturator};
+    use holochain_types::{dna::zome::HostFnAccess, fixt::*};
     use holochain_zome_types::entry::Entry;
     use holochain_zome_types::validate::ValidateCallbackResult;
     use holochain_zome_types::HostInput;
@@ -208,7 +208,7 @@ mod test {
         }
 
         let agent_entry = Entry::App(
-            SerializedBytesFixturator::new(fixt::Unpredictable)
+            AppEntryBytesFixturator::new(fixt::Unpredictable)
                 .next()
                 .unwrap()
                 .into(),
@@ -357,7 +357,8 @@ mod slow_tests {
     #[tokio::test(threaded_scheduler)]
     async fn pass_validate_test<'a>() {
         // test workspace boilerplate
-        let env = holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_state::test_utils::test_cell_env();
+        let env = test_env.env();
         let dbs = env.dbs();
         let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs).unwrap();
 
@@ -399,7 +400,8 @@ mod slow_tests {
     #[tokio::test(threaded_scheduler)]
     async fn fail_validate_test<'a>() {
         // test workspace boilerplate
-        let env = holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_state::test_utils::test_cell_env();
+        let env = test_env.env();
         let dbs = env.dbs();
         let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs).unwrap();
 

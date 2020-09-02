@@ -319,7 +319,11 @@ async fn bob_makes_a_large_link(
     dna_file: &DnaFile,
 ) -> (HeaderHash, EntryHash, HeaderHash) {
     let bytes = (0..16_000_001).map(|_| 0u8).into_iter().collect::<Vec<_>>();
-    let big_base = Entry::App(SerializedBytes::from(UnsafeBytes::from(bytes)));
+    let big_base = Entry::App(
+        SerializedBytes::from(UnsafeBytes::from(bytes))
+            .try_into()
+            .unwrap(),
+    );
     let big_base_entry_hash =
         EntryHash::with_data(&Entry::try_from(big_base.clone()).unwrap()).await;
 

@@ -7,7 +7,7 @@ macro_rules! commit_entry {
                 __commit_entry,
                 $crate::prelude::CommitEntryInput::new((
                     $input.into(),
-                    $crate::prelude::Entry::App(sb)
+                    $crate::prelude::Entry::App(sb.try_into()?)
                 )),
                 $crate::prelude::CommitEntryOutput
             ),

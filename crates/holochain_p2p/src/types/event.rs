@@ -1,3 +1,4 @@
+#![allow(clippy::too_many_arguments)]
 //! Module containing incoming events from the HolochainP2p actor.
 
 use crate::*;
@@ -50,6 +51,7 @@ ghost_actor::ghost_chan! {
         fn call_remote(
             dna_hash: DnaHash,
             to_agent: AgentPubKey,
+            from_agent: AgentPubKey,
             zome_name: ZomeName,
             fn_name: String,
             cap: CapSecret,

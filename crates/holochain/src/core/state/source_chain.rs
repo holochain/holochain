@@ -218,12 +218,14 @@ pub mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_get_cap_grant() -> SourceChainResult<()> {
-        let arc = test_cell_env();
+        let test_env = test_cell_env();
+        let arc = test_env.env();
         let env = arc.guard();
         let access = CapAccess::from(CapSecretFixturator::new(Unpredictable).next().unwrap());
         let secret = access.secret().unwrap();
-        let curry = CurryPayloadsFixturator::new(Empty).next().unwrap();
-        let grant = ZomeCallCapGrant::new("tag".into(), access.clone(), HashSet::new(), curry);
+        // @todo curry
+        let _curry = CurryPayloadsFixturator::new(Empty).next().unwrap();
+        let grant = ZomeCallCapGrant::new("tag".into(), access.clone(), HashSet::new());
         {
             let mut store = SourceChainBuf::new(arc.clone().into(), &env)?;
             store
@@ -261,7 +263,8 @@ pub mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_get_cap_claim() -> SourceChainResult<()> {
-        let arc = test_cell_env();
+        let test_env = test_cell_env();
+        let arc = test_env.env();
         let env = arc.guard();
         let secret = CapSecretFixturator::new(Unpredictable).next().unwrap();
         let agent_pubkey = fake_agent_pubkey_1().into();

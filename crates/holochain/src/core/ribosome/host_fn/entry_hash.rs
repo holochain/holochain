@@ -15,7 +15,7 @@ pub fn entry_hash(
     let entry: Entry = input.into_inner();
 
     let entry_hash = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-        holochain_types::entry::EntryHashed::from_content(entry).await
+        holochain_types::entry::EntryHashed::from_content_sync(entry)
     })
     .into_hash();
 
@@ -62,7 +62,8 @@ pub mod wasm_test {
     #[tokio::test(threaded_scheduler)]
     /// we can get an entry hash out of the fn via. a wasm call
     async fn ribosome_entry_hash_test() {
-        let env = holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_state::test_utils::test_cell_env();
+        let env = test_env.env();
         let dbs = env.dbs();
         let mut workspace =
             crate::core::workflow::CallZomeWorkspace::new(env.clone().into(), &dbs).unwrap();
@@ -84,7 +85,8 @@ pub mod wasm_test {
     #[tokio::test(threaded_scheduler)]
     /// the hash path underlying anchors wraps entry_hash
     async fn ribosome_hash_path_pwd_test() {
-        let env = holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_state::test_utils::test_cell_env();
+        let env = test_env.env();
         let dbs = env.dbs();
         let mut workspace =
             crate::core::workflow::CallZomeWorkspace::new(env.clone().into(), &dbs).unwrap();
@@ -103,9 +105,9 @@ pub mod wasm_test {
         let expected_path = hdk3::hash_path::path::Path::from("foo.bar");
 
         let expected_hash = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-            holochain_types::entry::EntryHashed::from_content(Entry::App(
-                (&expected_path).try_into().unwrap(),
-            ))
+            holochain_types::entry::EntryHashed::from_content(
+                Entry::app((&expected_path).try_into().unwrap()).unwrap(),
+            )
             .await
         })
         .into_hash();

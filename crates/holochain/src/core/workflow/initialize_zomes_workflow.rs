@@ -104,7 +104,8 @@ pub mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn adds_init_marker() {
-        let env = test_cell_env();
+        let test_env = test_cell_env();
+        let env = test_env.env();
         let dbs = env.dbs();
         let mut workspace =
             InitializeZomesWorkspace(CallZomeWorkspace::new(env.clone().into(), &dbs).unwrap());

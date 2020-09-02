@@ -47,7 +47,8 @@ pub mod wasm_test {
     async fn ribosome_get_details_test<'a>() {
         holochain_types::observability::test_run().ok();
 
-        let env = holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_state::test_utils::test_cell_env();
+        let env = test_env.env();
         let dbs = env.dbs();
         let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs).unwrap();
 
@@ -82,8 +83,8 @@ pub mod wasm_test {
             |details: GetDetailsOutput, count, update, delete| match details.clone().into_inner() {
                 Some(Details::Entry(entry_details)) => {
                     match entry_details.entry {
-                        Entry::App(sb) => {
-                            let countree = CounTree::try_from(sb).unwrap();
+                        Entry::App(eb) => {
+                            let countree = CounTree::try_from(eb.into_sb()).unwrap();
                             assert_eq!(countree, CounTree(count));
                         }
                         _ => panic!(

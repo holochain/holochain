@@ -187,7 +187,8 @@ pub mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn chain_sequence_scratch_awareness() -> DatabaseResult<()> {
         observability::test_run().ok();
-        let arc = test_cell_env();
+        let test_env = test_cell_env();
+        let arc = test_env.env();
         let dbs = arc.dbs();
         {
             let mut buf = ChainSequenceBuf::new(arc.clone().into(), &dbs)?;
@@ -249,7 +250,8 @@ pub mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn chain_sequence_functionality() -> SourceChainResult<()> {
-        let arc = test_cell_env();
+        let test_env = test_cell_env();
+        let arc = test_env.env();
         let env = arc.guard();
         let dbs = arc.dbs();
 
@@ -364,8 +366,9 @@ pub mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn chain_sequence_head_moved() -> anyhow::Result<()> {
-        let arc1 = test_cell_env();
-        let arc2 = arc1.clone();
+        let test_env = test_cell_env();
+        let arc1 = test_env.env();
+        let arc2 = test_env.env();
         let (tx1, rx1) = tokio::sync::oneshot::channel();
         let (tx2, rx2) = tokio::sync::oneshot::channel();
 

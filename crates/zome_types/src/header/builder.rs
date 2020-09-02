@@ -5,6 +5,7 @@ use header::Dna;
 use holo_hash::{AgentPubKey, DnaHash, EntryHash, HeaderHash};
 use holochain_serialized_bytes::SerializedBytes;
 
+#[derive(Debug)]
 pub struct HeaderBuilderCommon {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,

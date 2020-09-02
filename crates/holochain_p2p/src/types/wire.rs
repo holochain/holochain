@@ -29,7 +29,6 @@ pub(crate) enum WireMessage {
         data: Vec<u8>,
     },
     Publish {
-        from_agent: holo_hash::AgentPubKey,
         request_validation_receipt: bool,
         dht_hash: holo_hash::AnyDhtHash,
         ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
@@ -77,13 +76,11 @@ impl WireMessage {
     }
 
     pub fn publish(
-        from_agent: holo_hash::AgentPubKey,
         request_validation_receipt: bool,
         dht_hash: holo_hash::AnyDhtHash,
         ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     ) -> WireMessage {
         Self::Publish {
-            from_agent,
             request_validation_receipt,
             dht_hash,
             ops,

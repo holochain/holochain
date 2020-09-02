@@ -294,7 +294,8 @@ mod slow_tests {
     #[tokio::test(threaded_scheduler)]
     async fn pass_validate_link_add_test<'a>() {
         // test workspace boilerplate
-        let env = holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_state::test_utils::test_cell_env();
+        let env = test_env.env();
         let dbs = env.dbs();
         let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs).unwrap();
 
@@ -336,7 +337,8 @@ mod slow_tests {
     #[tokio::test(threaded_scheduler)]
     async fn fail_validate_link_add_test<'a>() {
         // test workspace boilerplate
-        let env = holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_state::test_utils::test_cell_env();
+        let env = test_env.env();
         let dbs = env.dbs();
         let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs).unwrap();
 

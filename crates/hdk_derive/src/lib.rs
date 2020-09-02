@@ -13,7 +13,7 @@ struct RequiredValidations(holochain_zome_types::entry_def::RequiredValidations)
 
 impl Parse for EntryDef {
     fn parse(input: ParseStream) -> Result<Self> {
-        let mut id = holochain_zome_types::entry_def::EntryDefId::default();
+        let mut id = holochain_zome_types::entry_def::EntryDefId::App(String::default());
         let mut required_validations =
             holochain_zome_types::entry_def::RequiredValidations::default();
         let mut visibility = holochain_zome_types::entry_def::EntryVisibility::default();
@@ -26,7 +26,9 @@ impl Parse for EntryDef {
                     match segment.ident.to_string().as_str() {
                         "id" => match var.lit {
                             syn::Lit::Str(s) => {
-                                id = holochain_zome_types::entry_def::EntryDefId::from(s.value())
+                                id = holochain_zome_types::entry_def::EntryDefId::App(
+                                    s.value().to_string(),
+                                )
                             }
                             _ => unreachable!(),
                         },
@@ -81,10 +83,14 @@ impl quote::ToTokens for CrdtType {
 
 impl quote::ToTokens for EntryDefId {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        let s = String::from(&self.0);
-        tokens.append_all(quote::quote! {
-            hdk3::prelude::EntryDefId::from(#s)
-        });
+        match &self.0 {
+            holochain_zome_types::entry_def::EntryDefId::App(s) => {
+                tokens.append_all(quote::quote! {
+                    hdk3::prelude::EntryDefId::App(String::from(#s))
+                });
+            }
+            _ => unreachable!(),
+        }
     }
 }
 

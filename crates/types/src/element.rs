@@ -6,7 +6,6 @@ use crate::{
     EntryHashed, HeaderHashed,
 };
 use error::{ElementGroupError, ElementGroupResult};
-use futures::future::FutureExt;
 use holochain_keystore::KeystoreError;
 use holochain_serialized_bytes::prelude::*;
 pub use holochain_zome_types::element::*;
@@ -15,7 +14,6 @@ use holochain_zome_types::{
     entry_def::EntryVisibility,
     header::{EntryType, Header},
 };
-use must_future::MustBoxFuture;
 use std::{borrow::Cow, collections::BTreeSet};
 
 #[allow(missing_docs)]
@@ -83,7 +81,7 @@ impl<'a> ElementGroup<'a> {
     ) -> ElementGroupResult<ElementGroup<'a>> {
         let iter = headers_iter.into_iter();
         let mut headers = Vec::with_capacity(iter.size_hint().0);
-        let entry = EntryHashed::from_content(entry).await;
+        let entry = EntryHashed::from_content_sync(entry);
         let entry_hash = entry.as_hash().clone();
         let entry = Cow::Owned(entry);
         for header in iter {
@@ -225,7 +223,7 @@ impl ElementExt for Element {
 #[async_trait::async_trait]
 pub trait SignedHeaderHashedExt {
     /// Create a hash from data
-    fn from_content(signed_header: SignedHeader) -> MustBoxFuture<'static, SignedHeaderHashed>;
+    fn from_content_sync(signed_header: SignedHeader) -> SignedHeaderHashed;
     /// Sign some content
     async fn new(
         keystore: &KeystoreSender,
@@ -238,16 +236,12 @@ pub trait SignedHeaderHashedExt {
 #[allow(missing_docs)]
 #[async_trait::async_trait]
 impl SignedHeaderHashedExt for SignedHeaderHashed {
-    fn from_content(signed_header: SignedHeader) -> MustBoxFuture<'static, Self>
+    fn from_content_sync(signed_header: SignedHeader) -> Self
     where
         Self: Sized,
     {
-        async move {
-            let (header, signature) = signed_header.into();
-            Self::with_presigned(HeaderHashed::from_content(header).await, signature)
-        }
-        .boxed()
-        .into()
+        let (header, signature) = signed_header.into();
+        Self::with_presigned(HeaderHashed::from_content_sync(header), signature)
     }
     /// SignedHeader constructor
     async fn new(keystore: &KeystoreSender, header: HeaderHashed) -> Result<Self, KeystoreError> {
@@ -276,7 +270,7 @@ impl WireElement {
     /// Convert into a [Element] when receiving from the network
     pub async fn into_element_and_delete(self) -> (Element, Option<Element>) {
         let header = Element::new(
-            SignedHeaderHashed::from_content(self.signed_header).await,
+            SignedHeaderHashed::from_content_sync(self.signed_header),
             self.maybe_entry,
         );
         let deleted = match self.deleted {
@@ -316,7 +310,7 @@ mod tests {
         let signature = SignatureFixturator::new(Unpredictable).next().unwrap();
         let header = HeaderFixturator::new(Unpredictable).next().unwrap();
         let signed_header = SignedHeader(header, signature);
-        let hashed: HoloHashed<SignedHeader> = HoloHashed::from_content(signed_header).await;
+        let hashed: HoloHashed<SignedHeader> = HoloHashed::from_content_sync(signed_header);
         let shh: SignedHeaderHashed = hashed.clone().into();
 
         assert_eq!(shh.header_address(), hashed.as_hash());

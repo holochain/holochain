@@ -412,9 +412,9 @@ async fn put_data<P: PrefixType>(
     maybe_entry: Option<Entry>,
     element_store: &mut ElementBuf<P>,
 ) -> DhtOpConvertResult<()> {
-    let signed_header = SignedHeaderHashed::from_content(SignedHeader(header, signature)).await;
+    let signed_header = SignedHeaderHashed::from_content_sync(SignedHeader(header, signature));
     let maybe_entry_hashed = match maybe_entry {
-        Some(entry) => Some(EntryHashed::from_content(entry).await),
+        Some(entry) => Some(EntryHashed::from_content_sync(entry)),
         None => None,
     };
     element_store.put(signed_header, maybe_entry_hashed)?;

@@ -1,4 +1,4 @@
-/// A convenient composition of CasBufFreshsepresenting source chain data.
+/// A convenient composition of CasBufFreshSyncs representing source chain data.
 ///
 /// Source chain data is split into three databases: one for headers, and two
 /// for public and private entries. Specifying the private_entries DB in a
@@ -10,7 +10,7 @@
 use crate::core::state::source_chain::{ChainInvalidReason, SourceChainError, SourceChainResult};
 use holo_hash::{EntryHash, HasHash, HeaderHash};
 use holochain_state::{
-    buffer::CasBufFresh,
+    buffer::CasBufFreshSync,
     db::{
         GetDb, ELEMENT_CACHE_ENTRIES, ELEMENT_CACHE_HEADERS, ELEMENT_VAULT_HEADERS,
         ELEMENT_VAULT_PRIVATE_ENTRIES, ELEMENT_VAULT_PUBLIC_ENTRIES,
@@ -28,9 +28,9 @@ use holochain_zome_types::{Entry, Header};
 use tracing::*;
 
 /// A CasBufFresh with Entries for values
-pub type EntryCas<P> = CasBufFresh<Entry, P>;
+pub type EntryCas<P> = CasBufFreshSync<Entry, P>;
 /// A CasBufFresh with SignedHeaders for values
-pub type HeaderCas<P> = CasBufFresh<SignedHeader, P>;
+pub type HeaderCas<P> = CasBufFreshSync<SignedHeader, P>;
 
 /// The representation of an ElementCache / ElementVault,
 /// using two or three DB references
@@ -102,14 +102,14 @@ where
         headers_store: SingleStore,
     ) -> DatabaseResult<Self> {
         let private_entries = if let Some(store) = private_entries_store {
-            Some(CasBufFresh::new(env.clone(), store))
+            Some(CasBufFreshSync::new(env.clone(), store))
         } else {
             None
         };
         Ok(Self {
-            public_entries: CasBufFresh::new(env.clone(), public_entries_store),
+            public_entries: CasBufFreshSync::new(env.clone(), public_entries_store),
             private_entries,
-            headers: CasBufFresh::new(env, headers_store),
+            headers: CasBufFreshSync::new(env, headers_store),
         })
     }
 
@@ -134,11 +134,11 @@ where
     /// First attempt to get from the public entry DB. If not present, and
     /// private DB access is specified, attempt to get as a private entry.
     pub async fn get_entry(&self, entry_hash: &EntryHash) -> DatabaseResult<Option<EntryHashed>> {
-        match self.public_entries.get(entry_hash).await? {
+        match self.public_entries.get(entry_hash)? {
             Some(entry) => Ok(Some(entry)),
             None => {
                 if let Some(ref db) = (self).private_entries {
-                    db.get(entry_hash).await
+                    db.get(entry_hash)
                 } else {
                     Ok(None)
                 }
@@ -167,7 +167,7 @@ where
         &self,
         header_address: &HeaderHash,
     ) -> DatabaseResult<Option<SignedHeaderHashed>> {
-        Ok(self.headers.get(header_address).await?.map(Into::into))
+        Ok(self.headers.get(header_address)?.map(Into::into))
     }
 
     /// Get the Entry out of Header if it exists.
@@ -185,7 +185,7 @@ where
                     // if the header references an entry and the database is
                     // available, it better have been stored!
                     EntryVisibility::Public => {
-                        Some(self.public_entries.get(entry_hash).await?.ok_or_else(|| {
+                        Some(self.public_entries.get(entry_hash)?.ok_or_else(|| {
                             SourceChainError::InvalidStructure(ChainInvalidReason::MissingData(
                                 entry_hash.clone(),
                             ))
@@ -193,7 +193,7 @@ where
                     }
                     EntryVisibility::Private => {
                         if let Some(ref db) = self.private_entries {
-                            Some(db.get(entry_hash).await?.ok_or_else(|| {
+                            Some(db.get(entry_hash)?.ok_or_else(|| {
                                 SourceChainError::InvalidStructure(ChainInvalidReason::MissingData(
                                     entry_hash.clone(),
                                 ))
@@ -344,7 +344,8 @@ mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn can_write_private_entry_when_enabled() -> anyhow::Result<()> {
         let keystore = spawn_test_keystore(Vec::new()).await?;
-        let arc = test_cell_env();
+        let test_env = test_cell_env();
+        let arc = test_env.env();
         let env = arc.guard();
 
         let agent_key = AgentPubKey::new_from_pure_entropy(&keystore).await?;
@@ -390,7 +391,8 @@ mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn cannot_write_private_entry_when_disabled() -> anyhow::Result<()> {
         let keystore = spawn_test_keystore(Vec::new()).await?;
-        let arc = test_cell_env();
+        let test_env = test_cell_env();
+        let arc = test_env.env();
         let env = arc.guard();
 
         let agent_key = AgentPubKey::new_from_pure_entropy(&keystore).await?;

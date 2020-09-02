@@ -201,7 +201,7 @@ mod tests {
         } = test_wasm_env();
         let _tmpdir = test_env.tmpdir.clone();
         let test_env_2 = TestEnvironment {
-            env: test_env.env.clone().into(),
+            env: test_env.env().into(),
             tmpdir: test_env.tmpdir.clone(),
         };
         let handle = Conductor::builder()

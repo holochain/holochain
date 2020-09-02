@@ -47,7 +47,8 @@ fn collect_sorted<T: Ord, E, I: IntoIterator<Item = Result<T, E>>>(
 
 #[tokio::test(threaded_scheduler)]
 async fn kvvbuf_basics() {
-    let arc = test_cell_env();
+    let test_env = test_cell_env();
+    let arc = test_env.env();
     let env = arc.guard();
 
     let multi_store = env
@@ -152,7 +153,8 @@ async fn kvvbuf_basics() {
 #[tokio::test(threaded_scheduler)]
 async fn delete_all() {
     holochain_types::observability::test_run().ok();
-    let arc = test_cell_env();
+    let test_env = test_cell_env();
+    let arc = test_env.env();
     let env = arc.guard();
 
     let multi_store = env
@@ -260,7 +262,8 @@ async fn delete_all() {
 /// that duplicates are not returned on get
 #[tokio::test(threaded_scheduler)]
 async fn idempotent_inserts() {
-    let arc = test_cell_env();
+    let test_env = test_cell_env();
+    let arc = test_env.env();
     let env = arc.guard();
 
     let multi_store = env
@@ -327,7 +330,8 @@ async fn idempotent_inserts() {
 #[tokio::test(threaded_scheduler)]
 async fn kvv_indicate_value_appends() -> DatabaseResult<()> {
     holochain_types::observability::test_run().ok();
-    let arc = test_cell_env();
+    let test_env = test_cell_env();
+    let arc = test_env.env();
     let env = arc.guard();
     let db = env.inner().open_multi("kvv", StoreOptions::create())?;
     env.with_reader(|reader| {
@@ -347,7 +351,8 @@ async fn kvv_indicate_value_appends() -> DatabaseResult<()> {
 #[tokio::test(threaded_scheduler)]
 async fn kvv_indicate_value_overwritten() -> DatabaseResult<()> {
     holochain_types::observability::test_run().ok();
-    let arc = test_cell_env();
+    let test_env = test_cell_env();
+    let arc = test_env.env();
     let env = arc.guard();
     let db = env.inner().open_multi("kvv", StoreOptions::create())?;
     env.with_reader(|reader| {
@@ -368,7 +373,8 @@ async fn kvv_indicate_value_overwritten() -> DatabaseResult<()> {
 #[tokio::test(threaded_scheduler)]
 async fn kvv_deleted_persisted() -> DatabaseResult<()> {
     holochain_types::observability::test_run().ok();
-    let arc = test_cell_env();
+    let test_env = test_cell_env();
+    let arc = test_env.env();
     let env = arc.guard();
     let db = env.inner().open_multi("kv", StoreOptions::create())?;
 
@@ -405,7 +411,8 @@ async fn kvv_deleted_persisted() -> DatabaseResult<()> {
 async fn kvv_deleted_buffer() -> DatabaseResult<()> {
     use KvvOp::*;
     holochain_types::observability::test_run().ok();
-    let arc = test_cell_env();
+    let test_env = test_cell_env();
+    let arc = test_env.env();
     let env = arc.guard();
     let db = env.inner().open_multi("kv", StoreOptions::create())?;
 
@@ -455,7 +462,8 @@ async fn kvv_deleted_buffer() -> DatabaseResult<()> {
 #[tokio::test(threaded_scheduler)]
 async fn kvv_get_buffer() -> DatabaseResult<()> {
     holochain_types::observability::test_run().ok();
-    let arc = test_cell_env();
+    let test_env = test_cell_env();
+    let arc = test_env.env();
     let env = arc.guard();
     let db = env.inner().open_multi("kv", StoreOptions::create())?;
 
@@ -475,7 +483,8 @@ async fn kvv_get_buffer() -> DatabaseResult<()> {
 #[tokio::test(threaded_scheduler)]
 async fn kvv_get_persisted() -> DatabaseResult<()> {
     holochain_types::observability::test_run().ok();
-    let arc = test_cell_env();
+    let test_env = test_cell_env();
+    let arc = test_env.env();
     let env = arc.guard();
     let db = env.inner().open_multi("kv", StoreOptions::create())?;
 
@@ -501,7 +510,8 @@ async fn kvv_get_persisted() -> DatabaseResult<()> {
 #[tokio::test(threaded_scheduler)]
 async fn kvv_get_del_buffer() -> DatabaseResult<()> {
     holochain_types::observability::test_run().ok();
-    let arc = test_cell_env();
+    let test_env = test_cell_env();
+    let arc = test_env.env();
     let env = arc.guard();
     let db = env.inner().open_multi("kv", StoreOptions::create())?;
 
@@ -521,7 +531,8 @@ async fn kvv_get_del_buffer() -> DatabaseResult<()> {
 #[tokio::test(threaded_scheduler)]
 async fn kvv_get_del_persisted() -> DatabaseResult<()> {
     holochain_types::observability::test_run().ok();
-    let arc = test_cell_env();
+    let test_env = test_cell_env();
+    let arc = test_env.env();
     let env = arc.guard();
     let db = env.inner().open_multi("kv", StoreOptions::create())?;
 

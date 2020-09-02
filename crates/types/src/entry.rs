@@ -15,7 +15,7 @@ pub type EntryHashed = HoloHashed<Entry>;
 /// a Option EntryHashed
 pub async fn option_entry_hashed(entry: Option<Entry>) -> Option<EntryHashed> {
     match entry {
-        Some(e) => Some(EntryHashed::from_content(e).await),
+        Some(e) => Some(EntryHashed::from_content_sync(e)),
         None => None,
     }
 }

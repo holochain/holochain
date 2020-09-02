@@ -113,8 +113,19 @@ impl<'a> ElementEntry<'a> {
     /// a present entry that deserializes cleanly is returned as the provided type A
     pub fn to_app_option<A: TryFrom<SerializedBytes>>(&'a self) -> Result<Option<A>, A::Error> {
         match self.as_option() {
-            Some(Entry::App(sb)) => Ok(Some(A::try_from(sb.to_owned())?)),
+            Some(Entry::App(eb)) => Ok(Some(A::try_from(SerializedBytes::from(eb.to_owned()))?)),
             _ => Ok(None),
+        }
+    }
+
+    /// Provides CapGrantEntry if it exists
+    ///
+    /// same as as_option but handles cap grants
+    /// anything other than ElementEntry::Present for a Entry::CapGrant returns None
+    pub fn to_grant_option(&self) -> Option<crate::entry::CapGrantEntry> {
+        match self.as_option() {
+            Some(Entry::CapGrant(cap_grant_entry)) => Some(cap_grant_entry.to_owned()),
+            _ => None,
         }
     }
 }

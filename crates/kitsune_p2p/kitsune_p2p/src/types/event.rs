@@ -44,15 +44,16 @@ ghost_actor::ghost_chan! {
     /// KitsuneP2p actor.
     pub chan KitsuneP2pEvent<super::KitsuneP2pError> {
         /// We are receiving a request from a remote node.
-        fn call(space: Arc<super::KitsuneSpace>, agent: Arc<super::KitsuneAgent>, payload: Vec<u8>) -> Vec<u8>;
+        fn call(space: Arc<super::KitsuneSpace>, to_agent: Arc<super::KitsuneAgent>, from_agent: Arc<super::KitsuneAgent>, payload: Vec<u8>) -> Vec<u8>;
 
         /// We are receiving a notification from a remote node.
-        fn notify(space: Arc<super::KitsuneSpace>, agent: Arc<super::KitsuneAgent>, payload: Vec<u8>) -> ();
+        fn notify(space: Arc<super::KitsuneSpace>, to_agent: Arc<super::KitsuneAgent>, from_agent: Arc<super::KitsuneAgent>, payload: Vec<u8>) -> ();
 
         /// We are receiving a dht op we may need to hold distributed via gossip.
         fn gossip(
             space: Arc<super::KitsuneSpace>,
-            agent: Arc<super::KitsuneAgent>,
+            to_agent: Arc<super::KitsuneAgent>,
+            from_agent: Arc<super::KitsuneAgent>,
             op_hash: Arc<super::KitsuneOpHash>,
             op_data: Vec<u8>,
         ) -> ();

@@ -69,29 +69,34 @@ impl KitsuneP2pEventHandler for KitsuneP2pActor {
     fn handle_call(
         &mut self,
         space: Arc<KitsuneSpace>,
-        agent: Arc<KitsuneAgent>,
+        to_agent: Arc<KitsuneAgent>,
+        from_agent: Arc<KitsuneAgent>,
         payload: Vec<u8>,
     ) -> KitsuneP2pEventHandlerResult<Vec<u8>> {
-        Ok(self.evt_sender.call(space, agent, payload))
+        Ok(self.evt_sender.call(space, to_agent, from_agent, payload))
     }
 
     fn handle_notify(
         &mut self,
         space: Arc<KitsuneSpace>,
-        agent: Arc<KitsuneAgent>,
+        to_agent: Arc<KitsuneAgent>,
+        from_agent: Arc<KitsuneAgent>,
         payload: Vec<u8>,
     ) -> KitsuneP2pEventHandlerResult<()> {
-        Ok(self.evt_sender.notify(space, agent, payload))
+        Ok(self.evt_sender.notify(space, to_agent, from_agent, payload))
     }
 
     fn handle_gossip(
         &mut self,
         space: Arc<KitsuneSpace>,
-        agent: Arc<KitsuneAgent>,
+        to_agent: Arc<KitsuneAgent>,
+        from_agent: Arc<KitsuneAgent>,
         op_hash: Arc<KitsuneOpHash>,
         op_data: Vec<u8>,
     ) -> KitsuneP2pEventHandlerResult<()> {
-        Ok(self.evt_sender.gossip(space, agent, op_hash, op_data))
+        Ok(self
+            .evt_sender
+            .gossip(space, to_agent, from_agent, op_hash, op_data))
     }
 
     fn handle_fetch_op_hashes_for_constraints(
@@ -165,18 +170,22 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
     fn handle_rpc_single(
         &mut self,
         space: Arc<KitsuneSpace>,
-        agent: Arc<KitsuneAgent>,
+        to_agent: Arc<KitsuneAgent>,
+        from_agent: Arc<KitsuneAgent>,
         payload: Vec<u8>,
     ) -> KitsuneP2pHandlerResult<Vec<u8>> {
         let space_sender = match self.spaces.get_mut(&space) {
             None => return Err(KitsuneP2pError::RoutingSpaceError(space)),
             Some(space) => space.get(),
         };
-        Ok(
-            async move { space_sender.await.rpc_single(space, agent, payload).await }
-                .boxed()
-                .into(),
-        )
+        Ok(async move {
+            space_sender
+                .await
+                .rpc_single(space, to_agent, from_agent, payload)
+                .await
+        }
+        .boxed()
+        .into())
     }
 
     #[tracing::instrument(skip(self, input))]

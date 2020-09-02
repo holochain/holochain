@@ -97,6 +97,7 @@ mod tests {
     };
     use holochain_types::{
         dht_op::{produce_ops_from_element, DhtOp},
+        fixt::*,
         observability, Entry, EntryHashed,
     };
     use holochain_zome_types::{
@@ -113,7 +114,7 @@ mod tests {
     impl TestData {
         fn new() -> Self {
             let app_entry =
-                Box::new(SerializedBytesFixturator::new(Unpredictable).map(|b| Entry::App(b)));
+                Box::new(AppEntryBytesFixturator::new(Unpredictable).map(|b| Entry::App(b)));
             Self { app_entry }
         }
 
@@ -123,7 +124,7 @@ mod tests {
             visibility: EntryVisibility,
         ) -> Vec<DhtOp> {
             let app_entry = self.app_entry.next().unwrap();
-            let (app_entry, entry_hash) = EntryHashed::from_content(app_entry).await.into();
+            let (app_entry, entry_hash) = EntryHashed::from_content_sync(app_entry).into();
             let app_entry_type = holochain_types::fixt::AppEntryTypeFixturator::new(visibility)
                 .next()
                 .unwrap();
@@ -149,14 +150,15 @@ mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn elements_produce_ops() {
         observability::test_run().ok();
-        let env = test_cell_env();
+        let test_env = test_cell_env();
+        let env = test_env.env();
         let dbs = env.dbs();
         let env_ref = env.guard();
 
         // Setup the database and expected data
         let expected_hashes: HashSet<_> = {
             let mut td = TestData::new();
-            let mut source_chain = SourceChain::new(env.env.clone().into(), &dbs).unwrap();
+            let mut source_chain = SourceChain::new(env.clone().into(), &dbs).unwrap();
 
             // Add genesis so we can use the source chain
             fake_genesis(&mut source_chain).await.unwrap();
@@ -204,20 +206,15 @@ mod tests {
                 .with_commit(|writer| source_chain.flush_to_txn(writer))
                 .unwrap();
 
-            futures::future::join_all(
-                all_ops
-                    .into_iter()
-                    .flatten()
-                    .map(|o| DhtOpHash::from_data(o)),
-            )
-            .await
-            .into_iter()
-            .collect()
+            futures::future::join_all(all_ops.iter().flatten().map(|o| DhtOpHash::with_data(o)))
+                .await
+                .into_iter()
+                .collect()
         };
 
         // Run the workflow and commit it
         {
-            let mut workspace = ProduceDhtOpsWorkspace::new(env.env.clone().into(), &dbs).unwrap();
+            let mut workspace = ProduceDhtOpsWorkspace::new(env.clone().into(), &dbs).unwrap();
             let complete = produce_dht_ops_workflow_inner(&mut workspace)
                 .await
                 .unwrap();

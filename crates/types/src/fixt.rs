@@ -14,6 +14,29 @@ use crate::Timestamp;
 use ::fixt::prelude::*;
 use holo_hash::fixt::AgentPubKeyFixturator;
 use holo_hash::fixt::DnaHashFixturator;
+use holo_hash::fixt::EntryHashFixturator;
+use holo_hash::fixt::HeaderHashFixturator;
+use holo_hash::fixt::WasmHashFixturator;
+use holo_hash::AgentPubKey;
+use holo_hash::EntryHash;
+use holochain_keystore::Signature;
+use holochain_serialized_bytes::SerializedBytes;
+use holochain_zome_types::capability::CapAccess;
+use holochain_zome_types::capability::CapClaim;
+use holochain_zome_types::capability::CapGrant;
+use holochain_zome_types::capability::CapSecret;
+use holochain_zome_types::capability::CurryPayloads;
+use holochain_zome_types::capability::GrantedFunction;
+use holochain_zome_types::capability::GrantedFunctions;
+use holochain_zome_types::capability::ZomeCallCapGrant;
+use holochain_zome_types::capability::CAP_SECRET_BYTES;
+use holochain_zome_types::crdt::CrdtType;
+use holochain_zome_types::entry::AppEntryBytes;
+use holochain_zome_types::entry_def::EntryDef;
+use holochain_zome_types::entry_def::EntryDefId;
+use holochain_zome_types::entry_def::EntryDefs;
+use holochain_zome_types::entry_def::EntryVisibility;
+use holochain_zome_types::entry_def::RequiredValidations;
 use holochain_zome_types::header::builder::HeaderBuilderCommon;
 use holochain_zome_types::header::AgentValidationPkg;
 use holochain_zome_types::header::AppEntryType;
@@ -29,33 +52,9 @@ use holochain_zome_types::header::InitZomesComplete;
 use holochain_zome_types::header::LinkAdd;
 use holochain_zome_types::header::LinkRemove;
 use holochain_zome_types::header::ZomeId;
-use holochain_zome_types::timestamp::Timestamp as ZomeTimestamp;
-
-use holo_hash::fixt::EntryHashFixturator;
-use holo_hash::fixt::HeaderHashFixturator;
-use holo_hash::fixt::WasmHashFixturator;
-
-use holo_hash::AgentPubKey;
-use holo_hash::EntryHash;
-use holochain_keystore::Signature;
-use holochain_serialized_bytes::SerializedBytes;
-use holochain_zome_types::capability::CapAccess;
-use holochain_zome_types::capability::CapClaim;
-use holochain_zome_types::capability::CapGrant;
-use holochain_zome_types::capability::CapSecret;
-use holochain_zome_types::capability::CurryPayloads;
-use holochain_zome_types::capability::GrantedFunction;
-use holochain_zome_types::capability::GrantedFunctions;
-use holochain_zome_types::capability::ZomeCallCapGrant;
-use holochain_zome_types::capability::CAP_SECRET_BYTES;
-use holochain_zome_types::crdt::CrdtType;
-use holochain_zome_types::entry_def::EntryDef;
-use holochain_zome_types::entry_def::EntryDefId;
-use holochain_zome_types::entry_def::EntryDefs;
-use holochain_zome_types::entry_def::EntryVisibility;
-use holochain_zome_types::entry_def::RequiredValidations;
 use holochain_zome_types::link::LinkTag;
 use holochain_zome_types::migrate_agent::MigrateAgent;
+use holochain_zome_types::timestamp::Timestamp as ZomeTimestamp;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::Entry;
 use rand::seq::IteratorRandom;
@@ -211,8 +210,7 @@ fixturator!(
                     granted_functions.insert(GrantedFunctionFixturator::new(Empty).next().unwrap());
                 }
                 granted_functions
-            },
-            CurryPayloadsFixturator::new(Empty).next().unwrap(),
+            }, // CurryPayloadsFixturator::new(Empty).next().unwrap(),
         )
     },
     {
@@ -233,7 +231,7 @@ fixturator!(
                 }
                 granted_functions
             },
-            CurryPayloadsFixturator::new(Unpredictable).next().unwrap(),
+            // CurryPayloadsFixturator::new(Unpredictable).next().unwrap(),
         )
     },
     {
@@ -252,7 +250,7 @@ fixturator!(
                 }
                 granted_functions
             },
-            CurryPayloadsFixturator::new(Predictable).next().unwrap(),
+            // CurryPayloadsFixturator::new(Predictable).next().unwrap(),
         )
     }
 );
@@ -323,14 +321,38 @@ fixturator!(
     Entry;
     variants [
         Agent(AgentPubKey)
-        App(SerializedBytes)
+        App(AppEntryBytes)
         CapClaim(CapClaim)
         CapGrant(ZomeCallCapGrant)
     ];
 
     curve AppEntry {
-        Entry::App(SerializedBytesFixturator::new_indexed(Unpredictable, self.0.index).next().unwrap())
+        Entry::App(
+            AppEntryBytesFixturator::new_indexed(Unpredictable, self.0.index).next().unwrap()
+        )
     };
+);
+use std::convert::TryFrom;
+
+fixturator!(
+    AppEntryBytes;
+    curve Empty AppEntryBytes::try_from(
+        SerializedBytesFixturator::new_indexed(Empty, self.0.index)
+            .next()
+            .unwrap()
+        ).unwrap();
+
+    curve Predictable AppEntryBytes::try_from(
+        SerializedBytesFixturator::new_indexed(Predictable, self.0.index)
+            .next()
+            .unwrap()
+        ).unwrap();
+
+    curve Unpredictable AppEntryBytes::try_from(
+        SerializedBytesFixturator::new_indexed(Unpredictable, self.0.index)
+            .next()
+            .unwrap()
+        ).unwrap();
 );
 
 fixturator!(
