@@ -188,6 +188,15 @@ impl EnvironmentWrite {
         Ok(env)
     }
 
+    /// Create a Cell environment (slight shorthand)
+    pub fn new_cell(
+        path_prefix: &Path,
+        cell_id: CellId,
+        keystore: KeystoreSender,
+    ) -> DatabaseResult<Self> {
+        Self::new(path_prefix, EnvironmentKind::Cell(cell_id), keystore)
+    }
+
     /// Get a read-only lock guard on the environment.
     /// This reference can create read-write transactions.
     pub fn guard(&self) -> EnvironmentWriteRef<'_> {

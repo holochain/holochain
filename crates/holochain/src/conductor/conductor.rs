@@ -388,28 +388,45 @@ where
                     // Task that creates the cells
                     async move {
                         // Only create cells not already created
-                        let cells_to_create =
-                            cell_ids.filter(|cell_id| !self.cells.contains_key(cell_id));
+                        let cells_to_create = cell_ids
+                            .filter(|cell_id| !self.cells.contains_key(cell_id))
+                            .map(|cell_id| {
+                                (
+                                    cell_id,
+                                    root_env_dir.clone(),
+                                    keystore.clone(),
+                                    conductor_handle.clone(),
+                                )
+                            });
 
                         use holochain_p2p::actor::HolochainP2pRefToCell;
 
                         // Create each cell
-                        let cells_tasks = cells_to_create.map(move |cell_id| {
-                            let holochain_p2p_cell = self.holochain_p2p.to_cell(
-                                cell_id.dna_hash().clone(),
-                                cell_id.agent_pubkey().clone(),
-                            );
+                        let cells_tasks = cells_to_create.map(
+                            |(cell_id, dir, keystore, conductor_handle)| async move {
+                                let holochain_p2p_cell = self.holochain_p2p.to_cell(
+                                    cell_id.dna_hash().clone(),
+                                    cell_id.agent_pubkey().clone(),
+                                );
 
-                            Cell::create(
-                                cell_id,
-                                conductor_handle.clone(),
-                                root_env_dir.clone(),
-                                keystore.clone(),
-                                holochain_p2p_cell,
-                                self.managed_task_add_sender.clone(),
-                                self.managed_task_stop_broadcaster.clone(),
-                            )
-                        });
+                                let env = EnvironmentWrite::new_cell(
+                                    &dir,
+                                    cell_id.clone(),
+                                    keystore.clone(),
+                                )?;
+                                // .and_then(|env| {
+                                Cell::create(
+                                    cell_id.clone(),
+                                    conductor_handle.clone(),
+                                    env,
+                                    holochain_p2p_cell,
+                                    self.managed_task_add_sender.clone(),
+                                    self.managed_task_stop_broadcaster.clone(),
+                                )
+                                .await
+                                // })
+                            },
+                        );
 
                         // Join all the cell create tasks for this app
                         // and seperate any errors
