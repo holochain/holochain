@@ -36,6 +36,7 @@ use unwrap_to::unwrap_to;
 // Useful for when you want to commit something
 // that will match entry defs
 pub const POST_ID: &str = "post";
+pub const MSG_ID: &str = "msg";
 
 #[derive(
     Default, Debug, PartialEq, Clone, SerializedBytes, serde::Serialize, serde::Deserialize,
@@ -43,6 +44,12 @@ pub const POST_ID: &str = "post";
 #[repr(transparent)]
 #[serde(transparent)]
 pub struct Post(pub String);
+#[derive(
+    Default, Debug, PartialEq, Clone, SerializedBytes, serde::Serialize, serde::Deserialize,
+)]
+#[repr(transparent)]
+#[serde(transparent)]
+pub struct Msg(pub String);
 
 #[derive(Clone)]
 pub struct CallData {
@@ -382,5 +389,20 @@ impl TryFrom<Entry> for Post {
     fn try_from(entry: Entry) -> Result<Self, Self::Error> {
         let entry = unwrap_to!(entry => Entry::App).clone();
         Ok(Post::try_from(entry.into_sb())?)
+    }
+}
+
+impl TryFrom<Msg> for Entry {
+    type Error = EntryError;
+    fn try_from(msg: Msg) -> Result<Self, Self::Error> {
+        Ok(Entry::App(SerializedBytes::try_from(msg)?.try_into()?))
+    }
+}
+
+impl TryFrom<Entry> for Msg {
+    type Error = SerializedBytesError;
+    fn try_from(entry: Entry) -> Result<Self, Self::Error> {
+        let entry = unwrap_to!(entry => Entry::App).clone();
+        Ok(Msg::try_from(entry.into_sb())?)
     }
 }

@@ -38,6 +38,7 @@ pub enum DhtOpOrder {
     RegisterRemoveLink(holochain_zome_types::timestamp::Timestamp),
 }
 
+/// Op data that will be ordered by [DhtOpOrder]
 #[derive(Derivative, Debug, Clone)]
 #[derivative(Eq, PartialEq, Ord, PartialOrd)]
 pub struct OrderedOp<V> {
@@ -50,17 +51,26 @@ pub struct OrderedOp<V> {
     pub value: V,
 }
 
+/// Ops have dependencies when validating that can be found from
+/// different sources.
+/// It is useful too know where a dependency is from because
+/// we might need to wait for it to be validated or we might
+/// need a stronger form of dependency.
 pub enum Dependency<T> {
     /// This agent is holding this dependency and it has passed validation
     Proof(T),
     /// Another agent is holding this dependency and is claiming they ran validation
     Claim(T),
-    /// This agent is has this dependency but has not passed validation
+    /// This agent is has this dependency but has not passed validation yet
     AwaitingProof(T),
 }
 
+/// The dependencies that an op is awaiting to be validated.
+/// Only AwaitingProof dependencies are stored to be awaited on.
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Dependencies {
+    /// Dependencies that hadn't finished validation at the
+    /// time we used them to validate this op.
     pub deps: Vec<DepType>,
 }
 
@@ -69,7 +79,9 @@ pub struct Dependencies {
 /// dependencies that turn out to be invalid.
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub enum DepType {
+    /// The dependency is a specific element
     Fixed(DhtOpHash),
+    /// The dependency is any element for an entry
     Any(DhtOpHash),
 }
 
@@ -84,9 +96,10 @@ pub enum CheckLevel {
 
 impl<T> Dependency<T> {
     /// Change this dep to the minimum of the two.
-    /// Lowest to highest: AwaitingProof, Claim, Proof
+    /// Lowest to highest: AwaitingProof, Claim, Proof.
+    /// Useful when you are chaining related dependencies together
+    /// and need to treat them as the least strong source of the set.
     pub fn min<A>(self, other: &Dependency<A>) -> Dependency<T> {
-        // Dependency::Proof(_) => Dependency::Proof(self.into_inner()),
         use Dependency::*;
         match (&self, other) {
             (Proof(_), Proof(_)) => Proof(self.into_inner()),
@@ -118,9 +131,12 @@ impl Dependencies {
     pub fn new() -> Self {
         Self { deps: Vec::new() }
     }
+
+    /// Are there any dependencies to wait for?
     pub fn awaiting_proof(&self) -> bool {
         self.deps.len() > 0
     }
+
     /// A store entry dependency where you don't care which element was found
     pub async fn store_entry_any(
         &mut self,
@@ -128,6 +144,7 @@ impl Dependencies {
     ) -> SysValidationResult<Element> {
         self.store_entry(dep, true).await
     }
+
     /// A store entry dependency with a dependency on a specific element
     pub async fn store_entry_fixed(
         &mut self,
@@ -135,6 +152,8 @@ impl Dependencies {
     ) -> SysValidationResult<Element> {
         self.store_entry(dep, false).await
     }
+
+    /// Create a store entry dependency
     async fn store_entry(
         &mut self,
         dep: Dependency<Element>,
@@ -143,6 +162,9 @@ impl Dependencies {
         let el = match dep {
             Dependency::Proof(el) => el,
             Dependency::AwaitingProof(el) => {
+                // This op is awaiting proof.
+                // Add the DhtOpHash to the dependencies
+                // so we can await it validating.
                 let header = el
                     .header()
                     .clone()

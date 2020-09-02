@@ -168,6 +168,8 @@ enum Db {
     IntQueueEmpty,
     CasHeader(Header, Option<Signature>),
     CasEntry(Entry, Option<Header>, Option<Signature>),
+    JudgedHeader(Header, Option<Signature>),
+    JudgedEntry(Entry, Option<Header>, Option<Signature>),
     MetaEmpty,
     MetaHeader(Entry, Header),
     MetaActivity(Header),
@@ -235,6 +237,42 @@ impl Db {
                     assert_eq!(
                         workspace
                             .elements
+                            .get_entry(&hash)
+                            .await
+                            .unwrap()
+                            .expect(&format!(
+                                "Entry {:?} not in element vault for {}",
+                                entry, here
+                            ))
+                            .into_content(),
+                        entry,
+                        "{}",
+                        here,
+                    );
+                }
+                Db::JudgedHeader(header, _) => {
+                    let hash = HeaderHashed::from_content_sync(header.clone());
+                    assert_eq!(
+                        workspace
+                            .element_judged
+                            .get_header(hash.as_hash())
+                            .await
+                            .unwrap()
+                            .expect(&format!(
+                                "Header {:?} not in element vault for {}",
+                                header, here
+                            ))
+                            .header(),
+                        &header,
+                        "{}",
+                        here,
+                    );
+                }
+                Db::JudgedEntry(entry, _, _) => {
+                    let hash = EntryHashed::from_content_sync(entry.clone()).into_hash();
+                    assert_eq!(
+                        workspace
+                            .element_judged
                             .get_entry(&hash)
                             .await
                             .unwrap()
@@ -450,6 +488,22 @@ impl Db {
                         .put(signed_header, Some(entry_hash))
                         .unwrap();
                 }
+                Db::JudgedHeader(header, signature) => {
+                    let header_hash = HeaderHashed::from_content_sync(header.clone());
+                    let signed_header =
+                        SignedHeaderHashed::with_presigned(header_hash, signature.unwrap());
+                    workspace.element_judged.put(signed_header, None).unwrap();
+                }
+                Db::JudgedEntry(entry, header, signature) => {
+                    let header_hash = HeaderHashed::from_content_sync(header.unwrap().clone());
+                    let entry_hash = EntryHashed::from_content_sync(entry.clone());
+                    let signed_header =
+                        SignedHeaderHashed::with_presigned(header_hash, signature.unwrap());
+                    workspace
+                        .element_judged
+                        .put(signed_header, Some(entry_hash))
+                        .unwrap();
+                }
                 Db::MetaHeader(_, _) => {}
                 Db::MetaActivity(_) => {}
                 Db::MetaUpdate(_, _) => {}
@@ -491,10 +545,59 @@ fn clear_dbs(env: EnvironmentWrite) {
             workspace.integration_limbo.clear_all(writer)?;
             workspace.integrated_dht_ops.clear_all(writer)?;
             workspace.elements.clear_all(writer)?;
+            workspace.element_judged.clear_all(writer)?;
             workspace.meta.clear_all(writer)?;
             Ok(())
         })
         .unwrap();
+}
+
+fn add_op_to_judged(mut ps: Vec<Db>, op: &DhtOp) -> Vec<Db> {
+    match op {
+        DhtOp::StoreElement(s, h, e) => {
+            ps.push(Db::JudgedHeader(h.clone(), Some(s.clone())));
+            if let Some(e) = e {
+                ps.push(Db::JudgedEntry(
+                    *e.clone(),
+                    Some(h.clone()),
+                    Some(s.clone()),
+                ));
+            }
+        }
+        DhtOp::StoreEntry(s, h, e) => {
+            let h: Header = h.clone().try_into().unwrap();
+            ps.push(Db::JudgedHeader(h.clone(), Some(s.clone())));
+            ps.push(Db::JudgedEntry(
+                *e.clone(),
+                Some(h.clone()),
+                Some(s.clone()),
+            ));
+        }
+        DhtOp::RegisterAgentActivity(s, h) => {
+            ps.push(Db::JudgedHeader(h.clone(), Some(s.clone())));
+        }
+        DhtOp::RegisterUpdatedBy(s, h) => {
+            let h: Header = h.clone().try_into().unwrap();
+            ps.push(Db::JudgedHeader(h.clone(), Some(s.clone())));
+        }
+        DhtOp::RegisterDeletedBy(s, h) => {
+            let h: Header = h.clone().try_into().unwrap();
+            ps.push(Db::JudgedHeader(h.clone(), Some(s.clone())));
+        }
+        DhtOp::RegisterDeletedEntryHeader(s, h) => {
+            let h: Header = h.clone().try_into().unwrap();
+            ps.push(Db::JudgedHeader(h.clone(), Some(s.clone())));
+        }
+        DhtOp::RegisterAddLink(s, h) => {
+            let h: Header = h.clone().try_into().unwrap();
+            ps.push(Db::JudgedHeader(h.clone(), Some(s.clone())));
+        }
+        DhtOp::RegisterRemoveLink(s, h) => {
+            let h: Header = h.clone().try_into().unwrap();
+            ps.push(Db::JudgedHeader(h.clone(), Some(s.clone())));
+        }
+    }
+    ps
 }
 
 // TESTS BEGIN HERE
@@ -513,6 +616,8 @@ fn store_element(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
         entry.clone(),
     );
     let pre_state = vec![Db::IntQueue(op.clone())];
+    // Add op data to pending
+    let pre_state = add_op_to_judged(pre_state, &op);
     let mut expect = vec![
         Db::Integrated(op.clone()),
         Db::CasHeader(a.any_header.clone().into(), None),
@@ -531,6 +636,7 @@ fn store_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     );
     debug!(?a.original_header);
     let pre_state = vec![Db::IntQueue(op.clone())];
+    let pre_state = add_op_to_judged(pre_state, &op);
     let expect = vec![
         Db::Integrated(op.clone()),
         Db::CasHeader(a.original_header.clone().into(), None),
@@ -543,6 +649,7 @@ fn store_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
 fn register_agent_activity(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let op = DhtOp::RegisterAgentActivity(a.signature.clone(), a.any_header.clone());
     let pre_state = vec![Db::IntQueue(op.clone())];
+    let pre_state = add_op_to_judged(pre_state, &op);
     let expect = vec![
         Db::Integrated(op.clone()),
         Db::MetaActivity(a.any_header.clone()),
@@ -557,6 +664,7 @@ fn register_replaced_by_for_header(a: TestData) -> (Vec<Db>, Vec<Db>, &'static s
         Db::IntQueue(op.clone()),
         Db::CasHeader(a.original_header.clone().into(), Some(a.signature.clone())),
     ];
+    let pre_state = add_op_to_judged(pre_state, &op);
     let expect = vec![
         Db::Integrated(op.clone()),
         Db::MetaUpdate(
@@ -577,6 +685,7 @@ fn register_replaced_by_for_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static st
             Some(a.signature.clone()),
         ),
     ];
+    let pre_state = add_op_to_judged(pre_state, &op);
     let expect = vec![
         Db::Integrated(op.clone()),
         Db::MetaUpdate(
@@ -597,6 +706,7 @@ fn register_deleted_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
             Some(a.signature.clone()),
         ),
     ];
+    let pre_state = add_op_to_judged(pre_state, &op);
     let expect = vec![
         Db::IntQueueEmpty,
         Db::Integrated(op.clone()),
@@ -618,6 +728,7 @@ fn register_deleted_header_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
             Some(a.signature.clone()),
         ),
     ];
+    let pre_state = add_op_to_judged(pre_state, &op);
     let expect = vec![
         Db::Integrated(op.clone()),
         Db::MetaDelete(
@@ -638,6 +749,7 @@ fn register_add_link(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
             Some(a.signature.clone()),
         ),
     ];
+    let pre_state = add_op_to_judged(pre_state, &op);
     let expect = vec![
         Db::Integrated(op.clone()),
         Db::MetaLink(a.link_add.clone(), a.new_entry_hash.clone().into()),
@@ -657,6 +769,7 @@ fn register_remove_link(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
         ),
         Db::MetaLink(a.link_add.clone(), a.new_entry_hash.clone().into()),
     ];
+    let pre_state = add_op_to_judged(pre_state, &op);
     let expect = vec![
         Db::Integrated(op.clone()),
         Db::MetaLinkEmpty(a.link_add.clone()),
@@ -668,6 +781,7 @@ fn register_remove_link(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
 fn register_remove_link_missing_base(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let op = DhtOp::RegisterRemoveLink(a.signature.clone(), a.link_remove.clone());
     let pre_state = vec![Db::IntQueue(op.clone())];
+    let pre_state = add_op_to_judged(pre_state, &op);
     let expect = vec![Db::IntegratedEmpty, Db::IntQueue(op.clone()), Db::MetaEmpty];
     (
         pre_state,
@@ -1389,7 +1503,7 @@ mod slow_tests {
         let request = AppRequest::ZomeCallInvocation(request);
         let _r = app_interface.handle_app_request(request).await;
 
-        tokio::time::delay_for(std::time::Duration::from_secs(4)).await;
+        tokio::time::delay_for(std::time::Duration::from_millis(500)).await;
 
         // Check the ops
         {

@@ -143,9 +143,6 @@ impl<P: PrefixType> PartialEq for PrefixHashKey<P> {
     fn eq(&self, other: &PrefixHashKey<P>) -> bool {
         self.prefix_and_hash[..] == other.prefix_and_hash[..]
     }
-    fn ne(&self, other: &PrefixHashKey<P>) -> bool {
-        self.prefix_and_hash[..] != other.prefix_and_hash[..]
-    }
 }
 
 impl<P: PrefixType> Eq for PrefixHashKey<P> {}

@@ -10,7 +10,7 @@ use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
 use hdk3::prelude::LinkTag;
 use holo_hash::{AnyDhtHash, DhtOpHash, EntryHash, HeaderHash};
-use holochain_serialized_bytes::{SerializedBytes, UnsafeBytes};
+use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::{fresh_reader_test, prelude::ReadManager};
 use holochain_types::{
     app::InstalledCell, cell::CellId, dht_op::DhtOpLight, dna::DnaDef, dna::DnaFile, fixt::*,
@@ -80,7 +80,7 @@ async fn run_test(
     bob_links_in_a_legit_way(&bob_cell_id, &handle, &dna_file).await;
 
     // Some time for ops to reach alice and run through validation
-    tokio::time::delay_for(Duration::from_millis(1000)).await;
+    tokio::time::delay_for(Duration::from_millis(500)).await;
 
     {
         let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
@@ -150,12 +150,12 @@ async fn run_test(
         assert_eq!(res.len(), 9 + 14);
     }
 
-    let (big_entry_header, big_entry_hash, link_add_hash) =
+    let (bad_update_header, bad_update_entry_hash, link_add_hash) =
         bob_makes_a_large_link(&bob_cell_id, &handle, &dna_file).await;
 
     // Some time for ops to reach alice and run through validation
     // This takes a little longer due to the large entry and links
-    tokio::time::delay_for(Duration::from_millis(1500)).await;
+    tokio::time::delay_for(Duration::from_millis(1000)).await;
 
     {
         let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
@@ -179,7 +179,7 @@ async fn run_test(
                 .unwrap()),
             0
         );
-        let big_entry_hash: AnyDhtHash = big_entry_hash.into();
+        let bad_update_entry_hash: AnyDhtHash = bad_update_entry_hash.into();
         // Integration should have 12 ops in it
         // Plus the original 23
         assert_eq!(
@@ -195,11 +195,11 @@ async fn run_test(
                     debug!(?i.op);
                     match &i.op {
                         DhtOpLight::StoreEntry(hh, _, eh)
-                            if eh == &big_entry_hash && hh == &big_entry_header =>
+                            if eh == &bad_update_entry_hash && hh == &bad_update_header =>
                         {
                             assert_eq!(i.validation_status, ValidationStatus::Rejected)
                         }
-                        DhtOpLight::StoreElement(hh, _, _) if hh == &big_entry_header => {
+                        DhtOpLight::StoreElement(hh, _, _) if hh == &bad_update_header => {
                             assert_eq!(i.validation_status, ValidationStatus::Rejected)
                         }
                         DhtOpLight::RegisterAddLink(hh, _) if hh == &link_add_hash => {
@@ -218,7 +218,7 @@ async fn run_test(
     dodgy_bob(&bob_cell_id, &handle, &dna_file).await;
 
     // Some time for ops to reach alice and run through validation
-    tokio::time::delay_for(Duration::from_millis(1000)).await;
+    tokio::time::delay_for(Duration::from_millis(500)).await;
 
     {
         let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
@@ -318,19 +318,13 @@ async fn bob_makes_a_large_link(
     handle: &ConductorHandle,
     dna_file: &DnaFile,
 ) -> (HeaderHash, EntryHash, HeaderHash) {
-    let bytes = (0..16_000_001).map(|_| 0u8).into_iter().collect::<Vec<_>>();
-    let big_base = Entry::App(
-        SerializedBytes::from(UnsafeBytes::from(bytes))
-            .try_into()
-            .unwrap(),
-    );
-    let big_base_entry_hash =
-        EntryHash::with_data(&Entry::try_from(big_base.clone()).unwrap()).await;
-
     let base = Post("Small time base".into());
     let target = Post("Spam it big time".into());
+    let bad_update = Msg("This is not the msg you were looking for".into());
     let base_entry_hash = EntryHash::with_data(&Entry::try_from(base.clone()).unwrap()).await;
     let target_entry_hash = EntryHash::with_data(&Entry::try_from(target.clone()).unwrap()).await;
+    let bad_update_entry_hash =
+        EntryHash::with_data(&Entry::try_from(bad_update.clone()).unwrap()).await;
 
     let bytes = (0..401).map(|_| 0u8).into_iter().collect::<Vec<_>>();
     let link_tag = LinkTag(bytes);
@@ -339,7 +333,7 @@ async fn bob_makes_a_large_link(
     let dbs = bob_env.dbs();
 
     // 6
-    commit_entry(
+    let original_header_address = commit_entry(
         &bob_env,
         &dbs,
         call_data.clone(),
@@ -371,20 +365,21 @@ async fn bob_makes_a_large_link(
     .await;
 
     // 9
-    // Commit a huge entry
-    let big_entry_header = commit_entry(
+    // Commit a bad update entry
+    let bad_update_header = update_entry(
         &bob_env,
         &dbs,
         call_data.clone(),
-        big_base.clone().try_into().unwrap(),
-        POST_ID,
+        bad_update.clone().try_into().unwrap(),
+        MSG_ID,
+        original_header_address,
     )
     .await;
 
     // Produce and publish these commits
     let mut triggers = handle.get_cell_triggers(&bob_cell_id).await.unwrap();
     triggers.produce_dht_ops.trigger();
-    (big_entry_header, big_base_entry_hash, link_add_address)
+    (bad_update_header, bad_update_entry_hash, link_add_address)
 }
 
 async fn dodgy_bob(bob_cell_id: &CellId, handle: &ConductorHandle, dna_file: &DnaFile) {

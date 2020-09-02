@@ -7,7 +7,7 @@
 /// using the ElementBuf for caching non-authored data, or for situations where
 /// it is known that private entries should be protected, such as when handling
 /// a get_entry request from the network.
-use crate::core::state::source_chain::{ChainInvalidReason, SourceChainError, SourceChainResult};
+use crate::core::state::source_chain::SourceChainResult;
 use holo_hash::{EntryHash, HasHash, HeaderHash};
 use holochain_state::{
     buffer::CasBufFreshSync,
@@ -184,20 +184,10 @@ where
                 match entry_type.visibility() {
                     // if the header references an entry and the database is
                     // available, it better have been stored!
-                    EntryVisibility::Public => {
-                        Some(self.public_entries.get(entry_hash)?.ok_or_else(|| {
-                            SourceChainError::InvalidStructure(ChainInvalidReason::MissingData(
-                                entry_hash.clone(),
-                            ))
-                        })?)
-                    }
+                    EntryVisibility::Public => self.public_entries.get(entry_hash)?,
                     EntryVisibility::Private => {
                         if let Some(ref db) = self.private_entries {
-                            Some(db.get(entry_hash)?.ok_or_else(|| {
-                                SourceChainError::InvalidStructure(ChainInvalidReason::MissingData(
-                                    entry_hash.clone(),
-                                ))
-                            })?)
+                            db.get(entry_hash)?
                         } else {
                             // If the private DB is disabled, just return None
                             None
