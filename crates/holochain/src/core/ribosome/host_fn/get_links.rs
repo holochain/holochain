@@ -58,10 +58,9 @@ pub mod slow_tests {
     async fn ribosome_entry_hash_path_children() {
         let test_env = holochain_state::test_utils::test_cell_env();
         let env = test_env.env();
-        let dbs = env.dbs();
 
-        let mut workspace = crate::core::workflow::CallZomeWorkspace::new(env.clone().into())
-            .unwrap();
+        let mut workspace =
+            crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
 
         // commits fail validation if we don't do genesis
         crate::core::workflow::fake_genesis(&mut workspace.source_chain)
@@ -134,10 +133,9 @@ pub mod slow_tests {
     async fn hash_path_anchor_get_anchor() {
         let test_env = holochain_state::test_utils::test_cell_env();
         let env = test_env.env();
-        let dbs = env.dbs();
 
-        let mut workspace = crate::core::workflow::CallZomeWorkspace::new(env.clone().into())
-            .unwrap();
+        let mut workspace =
+            crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
 
         // commits fail validation if we don't do genesis
         crate::core::workflow::fake_genesis(&mut workspace.source_chain)

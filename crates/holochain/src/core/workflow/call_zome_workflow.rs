@@ -398,7 +398,6 @@ pub mod tests {
         observability::test_run().ok();
         let test_env = test_cell_env();
         let env = test_env.env();
-        let dbs = env.dbs();
         let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
 
         // Genesis
@@ -450,7 +449,6 @@ pub mod tests {
     async fn calls_app_validation() {
         let test_env = test_cell_env();
         let env = test_env.env();
-        let dbs = env.dbs();
         let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
         let ribosome = MockRibosomeT::new();
         let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(
@@ -481,7 +479,6 @@ pub mod tests {
     async fn creates_outputs() {
         let test_env = test_cell_env();
         let env = test_env.env();
-        let dbs = env.dbs();
         let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
         let ribosome = MockRibosomeT::new();
         // TODO: Make this mock return an output

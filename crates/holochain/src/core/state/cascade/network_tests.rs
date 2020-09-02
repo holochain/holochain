@@ -74,7 +74,6 @@ async fn get_updates_cache() {
     // Database setup
     let test_env = test_cell_env();
     let env = test_env.env();
-    let dbs = env.dbs();
 
     let (element_fixt_store, _) = generate_fixt_store().await;
     let expected = element_fixt_store
@@ -117,7 +116,6 @@ async fn get_meta_updates_meta_cache() {
     // Database setup
     let test_env = test_cell_env();
     let env = test_env.env();
-    let dbs = env.dbs();
     let env_ref = env.guard();
 
     // Setup other metadata store with fixtures attached
@@ -743,7 +741,7 @@ async fn generate_fixt_store() -> (
 
 async fn commit_entry(
     env: EnvironmentWrite,
-    dbs: &impl GetDb,
+    _dbs: &impl GetDb,
     call_data: CallData,
     entry: Entry,
     entry_def_id: entry_def::EntryDefId,
@@ -780,7 +778,7 @@ async fn commit_entry(
 
 async fn delete_entry<'env>(
     env: EnvironmentWrite,
-    dbs: &impl GetDb,
+    _dbs: &impl GetDb,
     call_data: CallData,
     hash: HeaderHash,
 ) -> HeaderHash {
@@ -821,7 +819,7 @@ async fn delete_entry<'env>(
 
 async fn update_entry<'env>(
     env: EnvironmentWrite,
-    dbs: &impl GetDb,
+    _dbs: &impl GetDb,
     call_data: CallData,
     entry: Entry,
     entry_def_id: entry_def::EntryDefId,
@@ -859,7 +857,7 @@ async fn update_entry<'env>(
 
 async fn get<'env>(
     env: EnvironmentWrite,
-    dbs: &impl GetDb,
+    _dbs: &impl GetDb,
     call_data: CallData,
     entry_hash: AnyDhtHash,
     _options: GetOptions,
@@ -894,7 +892,7 @@ async fn get<'env>(
 
 async fn get_details<'env>(
     env: EnvironmentWrite,
-    dbs: &impl GetDb,
+    _dbs: &impl GetDb,
     call_data: CallData,
     entry_hash: AnyDhtHash,
     _options: GetOptions,
@@ -925,7 +923,7 @@ async fn get_details<'env>(
 
 async fn link_entries<'env>(
     env: EnvironmentWrite,
-    dbs: &impl GetDb,
+    _dbs: &impl GetDb,
     call_data: CallData,
     base: EntryHash,
     target: EntryHash,
@@ -963,7 +961,7 @@ async fn link_entries<'env>(
 
 async fn remove_link<'env>(
     env: EnvironmentWrite,
-    dbs: &impl GetDb,
+    _dbs: &impl GetDb,
     call_data: CallData,
     link_add_hash: HeaderHash,
 ) -> HeaderHash {
@@ -999,7 +997,7 @@ async fn remove_link<'env>(
 
 async fn get_links<'env>(
     env: EnvironmentWrite,
-    dbs: &impl GetDb,
+    _dbs: &impl GetDb,
     call_data: CallData,
     base: EntryHash,
     link_tag: Option<LinkTag>,
@@ -1037,7 +1035,7 @@ async fn get_links<'env>(
 
 async fn get_link_details<'env>(
     env: EnvironmentWrite,
-    dbs: &impl GetDb,
+    _dbs: &impl GetDb,
     call_data: CallData,
     base: EntryHash,
     tag: LinkTag,

@@ -714,7 +714,6 @@ async fn produce_dht_ops<'env>(env: EnvironmentWrite) {
 
 /// Run genesis on the source chain
 async fn genesis<'env>(env: EnvironmentWrite) {
-    let env_ref = env.guard();
     let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
     fake_genesis(&mut workspace.source_chain).await.unwrap();
     {
@@ -729,7 +728,6 @@ async fn commit_entry<'env>(
     env: EnvironmentWrite,
     zome_name: ZomeName,
 ) -> (EntryHash, HeaderHash) {
-    let env_ref = env.guard();
     let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
     let workspace_lock = CallZomeWorkspaceLock::new(workspace);
 
@@ -809,7 +807,6 @@ async fn commit_entry<'env>(
 }
 
 async fn get_entry(env: EnvironmentWrite, entry_hash: EntryHash) -> Option<Entry> {
-    let env_ref = env.guard();
     let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
     let workspace_lock = CallZomeWorkspaceLock::new(workspace);
 
@@ -839,7 +836,6 @@ async fn link_entries(
     zome_name: ZomeName,
     link_tag: LinkTag,
 ) -> HeaderHash {
-    let env_ref = env.guard();
     let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
     let workspace_lock = CallZomeWorkspaceLock::new(workspace);
 
@@ -893,7 +889,6 @@ async fn get_links(
     zome_name: ZomeName,
     link_tag: LinkTag,
 ) -> Links {
-    let env_ref = env.guard();
     let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
     let workspace_lock = CallZomeWorkspaceLock::new(workspace);
 
@@ -1012,7 +1007,6 @@ async fn test_wasm_api_without_integration_links() {
     observability::test_run().ok();
     let test_env = holochain_state::test_utils::test_cell_env();
     let env = test_env.env();
-    let _dbs = env.dbs();
     clear_dbs(env.clone()).await;
 
     // Generate fixture data
@@ -1066,7 +1060,6 @@ async fn test_wasm_api_without_integration_delete() {
     observability::test_run().ok();
     let test_env = holochain_state::test_utils::test_cell_env();
     let env = test_env.env();
-    let dbs = env.dbs();
     let env_ref = env.guard();
     clear_dbs(env.clone()).await;
 
@@ -1263,7 +1256,6 @@ mod slow_tests {
         // Put commit entry into source chain
         {
             let cell_env = conductor.get_cell_env(&cell_id).await.unwrap();
-            let dbs = cell_env.dbs();
             let env_ref = cell_env.guard();
 
             let mut workspace = CallZomeWorkspace::new(cell_env.clone().into()).unwrap();

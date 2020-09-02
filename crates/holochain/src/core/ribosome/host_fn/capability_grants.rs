@@ -31,9 +31,7 @@ pub mod wasm_test {
         // test workspace boilerplate
         let test_env = holochain_state::test_utils::test_cell_env();
         let env = test_env.env();
-        let dbs = env.dbs();
-        let mut workspace = CallZomeWorkspace::new(env.clone().into())
-            .unwrap();
+        let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
 
         crate::core::workflow::fake_genesis(&mut workspace.source_chain)
             .await
@@ -52,9 +50,7 @@ pub mod wasm_test {
         // test workspace boilerplate
         let test_env = holochain_state::test_utils::test_cell_env();
         let env = test_env.env();
-        let dbs = env.dbs();
-        let mut workspace = CallZomeWorkspace::new(env.clone().into())
-            .unwrap();
+        let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
 
         crate::core::workflow::fake_genesis(&mut workspace.source_chain)
             .await
