@@ -376,9 +376,7 @@ pub mod tests {
         let (tx2, rx2) = tokio::sync::oneshot::channel();
 
         let task1 = tokio::spawn(async move {
-            let env = arc1.guard();
-            let dbs = arc1.dbs();
-            let mut buf = ChainSequenceBuf::new(arc1.clone().into(), &dbs)?;
+            let mut buf = ChainSequenceBuf::new(arc1.clone().into(), &arc1)?;
             buf.put_header(
                 HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -406,14 +404,13 @@ pub mod tests {
             tx1.send(()).unwrap();
             rx2.await.unwrap();
 
+            let env = arc1.guard();
             env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
         });
 
         let task2 = tokio::spawn(async move {
             rx1.await.unwrap();
-            let env = arc2.guard();
-            let dbs = arc2.dbs();
-            let mut buf = ChainSequenceBuf::new(arc2.clone().into(), &dbs)?;
+            let mut buf = ChainSequenceBuf::new(arc2.clone().into(), &arc2)?;
             buf.put_header(
                 HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -436,6 +433,7 @@ pub mod tests {
                 .into(),
             )?;
 
+            let env = arc2.guard();
             env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
             tx2.send(()).unwrap();
             Result::<_, SourceChainError>::Ok(())

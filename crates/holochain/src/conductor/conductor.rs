@@ -594,8 +594,7 @@ where
         &self,
         dna: DnaFile,
     ) -> ConductorResult<Vec<(EntryDefBufferKey, EntryDef)>> {
-        let environ = &self.wasm_env;
-        let env = environ.guard();
+        let environ = self.wasm_env.clone();
         let wasm = environ.get_db(&*holochain_state::db::WASM)?;
         let dna_def_db = environ.get_db(&*holochain_state::db::DNA_DEF)?;
         let entry_def_db = environ.get_db(&*holochain_state::db::ENTRY_DEF)?;
@@ -619,24 +618,25 @@ where
         if let None = dna_def_buf.get(dna.dna_hash()).await? {
             dna_def_buf.put(dna.dna().clone()).await?;
         }
+        {
+            let env = environ.guard();
+            // write the wasm db
+            env.with_commit(|writer| wasm_buf.flush_to_txn(writer))?;
 
-        // write the wasm db
-        env.with_commit(|writer| wasm_buf.flush_to_txn(writer))?;
+            // write the dna_def db
+            env.with_commit(|writer| dna_def_buf.flush_to_txn(writer))?;
 
-        // write the dna_def db
-        env.with_commit(|writer| dna_def_buf.flush_to_txn(writer))?;
-
-        // write the entry_def db
-        env.with_commit(|writer| entry_def_buf.flush_to_txn(writer))?;
-
+            // write the entry_def db
+            env.with_commit(|writer| entry_def_buf.flush_to_txn(writer))?;
+        }
         Ok(zome_defs)
     }
 
     pub(super) async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
         let cell = self.cell_by_id(cell_id)?;
         let arc = cell.env();
-        let env = arc.guard();
-        let source_chain = SourceChainBuf::new(arc.clone().into(), &env)?;
+        let source_chain = SourceChainBuf::new(arc.clone().into(), arc)?;
+        drop(arc);
         Ok(source_chain.dump_as_json().await?)
     }
 

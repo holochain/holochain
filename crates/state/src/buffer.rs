@@ -66,14 +66,14 @@ macro_rules! fresh_reader_test {
     }};
 }
 
-#[macro_export]
-/// Use this variant of `fresh_reader` when the $f closure is async
-macro_rules! fresh_reader_async {
-    ($env: expr, $f: expr) => {{
-        let env = $env.clone();
-        let g = env.guard();
-        let r = g.reader()?;
-        let val = $f(r).await;
-        val
-    }};
-}
+// #[macro_export]
+// /// Use this variant of `fresh_reader` when the $f closure is async
+// macro_rules! fresh_reader_async {
+//     ($env: expr, $f: expr) => {{
+//         let env = $env.clone();
+//         let g = env.guard();
+//         let r = g.reader()?;
+//         let val = $f(r).await;
+//         val
+//     }};
+// }

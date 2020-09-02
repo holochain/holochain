@@ -651,8 +651,7 @@ impl Cell {
 
         let arc = self.env();
         let keystore = arc.keystore().clone();
-        let _env = arc.guard();
-        let workspace = CallZomeWorkspace::new(self.env().clone().into())?;
+        let workspace = CallZomeWorkspace::new(arc.clone().into())?;
 
         let args = CallZomeWorkflowArgs {
             ribosome: self.get_ribosome().await?,
@@ -662,7 +661,7 @@ impl Cell {
             workspace,
             self.holochain_p2p_cell.clone(),
             keystore,
-            self.env().clone().into(),
+            arc.clone().into(),
             args,
             self.queue_triggers.produce_dht_ops.clone(),
         )
