@@ -36,15 +36,9 @@ async fn test_cell_handle_publish() {
 
     let mock_handler: crate::conductor::handle::ConductorHandle = Arc::new(mock_handler);
 
-    super::Cell::genesis(
-        cell_id.clone(),
-        mock_handler.clone(),
-        path.clone(),
-        keystore.clone(),
-        None,
-    )
-    .await
-    .unwrap();
+    super::Cell::genesis(cell_id.clone(), mock_handler.clone(), env.clone(), None)
+        .await
+        .unwrap();
 
     let (add_task_sender, shutdown) = spawn_task_manager();
     let (stop_tx, _) = sync::broadcast::channel(1);
@@ -52,8 +46,7 @@ async fn test_cell_handle_publish() {
     let cell = super::Cell::create(
         cell_id,
         mock_handler,
-        path,
-        keystore,
+        env.clone(),
         holochain_p2p_cell,
         add_task_sender,
         stop_tx.clone(),
@@ -81,8 +74,8 @@ async fn test_cell_handle_publish() {
     .await
     .unwrap();
 
-    let env_ref = cell.state_env.guard();
-    let workspace = IncomingDhtOpsWorkspace::new(cell.state_env.clone().into(), &env_ref)
+    let env_ref = cell.env.guard();
+    let workspace = IncomingDhtOpsWorkspace::new(cell.env.clone().into(), &env_ref)
         .expect("Could not create Workspace");
 
     workspace.op_exists(&op_hash).await.unwrap();

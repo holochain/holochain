@@ -101,7 +101,7 @@ where
 {
     id: CellId,
     conductor_api: CA,
-    state_env: EnvironmentWrite,
+    env: EnvironmentWrite,
     holochain_p2p_cell: holochain_p2p::HolochainP2pCell,
     queue_triggers: InitialQueueTriggers,
 }
@@ -110,35 +110,26 @@ impl Cell {
     /// Constructor for a Cell. The SourceChain will be created, and genesis
     /// will be run if necessary. A Cell will not be created if the SourceChain
     /// is not ready to be used.
-    pub async fn create<P: AsRef<Path>>(
+    pub async fn create(
         id: CellId,
         conductor_handle: ConductorHandle,
-        env_path: P,
-        keystore: KeystoreSender,
+        env: EnvironmentWrite,
         mut holochain_p2p_cell: holochain_p2p::HolochainP2pCell,
         managed_task_add_sender: sync::mpsc::Sender<ManagedTaskAdd>,
         managed_task_stop_broadcaster: sync::broadcast::Sender<()>,
     ) -> CellResult<Self> {
         let conductor_api = CellConductorApi::new(conductor_handle.clone(), id.clone());
 
-        // get the environment
-        let state_env = EnvironmentWrite::new(
-            env_path.as_ref(),
-            EnvironmentKind::Cell(id.clone()),
-            keystore,
-        )?;
-
         // check if genesis has been run
         let has_genesis = {
             // check if genesis ran on source chain buf
-            let env_ref = state_env.guard();
-            SourceChainBuf::new(state_env.clone().into(), &env_ref)?.has_genesis()
+            SourceChainBuf::new(env.clone().into(), &env)?.has_genesis()
         };
 
         if has_genesis {
             holochain_p2p_cell.join().await?;
             let queue_triggers = spawn_queue_consumer_tasks(
-                &state_env,
+                &env,
                 holochain_p2p_cell.clone(),
                 managed_task_add_sender,
                 managed_task_stop_broadcaster,
@@ -148,7 +139,7 @@ impl Cell {
             Ok(Self {
                 id,
                 conductor_api,
-                state_env,
+                env,
                 holochain_p2p_cell,
                 queue_triggers,
             })
@@ -160,24 +151,12 @@ impl Cell {
     /// Performs the Genesis workflow the Cell, ensuring that its initial
     /// elements are committed. This is a prerequisite for any other interaction
     /// with the SourceChain
-    pub async fn genesis<P: AsRef<Path>>(
+    pub async fn genesis(
         id: CellId,
         conductor_handle: ConductorHandle,
-        env_path: P,
-        keystore: KeystoreSender,
+        cell_env: EnvironmentWrite,
         membrane_proof: Option<SerializedBytes>,
-    ) -> CellResult<EnvironmentWrite> {
-        // create the environment
-        let state_env = EnvironmentWrite::new(
-            env_path.as_ref(),
-            EnvironmentKind::Cell(id.clone()),
-            keystore,
-        )?;
-
-        // get a reader
-        let arc = state_env.clone();
-        let env = arc.guard();
-
+    ) -> CellResult<()> {
         // get the dna
         let dna_file = conductor_handle
             .get_dna(id.dna_hash())
@@ -187,18 +166,18 @@ impl Cell {
         let conductor_api = CellConductorApi::new(conductor_handle, id.clone());
 
         // run genesis
-        let workspace = GenesisWorkspace::new(arc.clone().into(), &env)
+        let workspace = GenesisWorkspace::new(cell_env.clone().into(), &cell_env)
             .await
             .map_err(ConductorApiError::from)
             .map_err(Box::new)?;
         let args = GenesisWorkflowArgs::new(dna_file, id.agent_pubkey().clone(), membrane_proof);
 
-        genesis_workflow(workspace, state_env.clone().into(), conductor_api, args)
+        genesis_workflow(workspace, cell_env.clone().into(), conductor_api, args)
             .await
             .map_err(Box::new)
             .map_err(ConductorApiError::from)
             .map_err(Box::new)?;
-        Ok(state_env)
+        Ok(())
     }
 
     fn dna_hash(&self) -> &DnaHash {
@@ -411,15 +390,11 @@ impl Cell {
         _dht_hash: holo_hash::AnyDhtHash,
         ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     ) -> CellResult<()> {
-        incoming_dht_ops_workflow(
-            &self.state_env,
-            self.queue_triggers.sys_validation.clone(),
-            ops,
-        )
-        .await
-        .map_err(Box::new)
-        .map_err(ConductorApiError::from)
-        .map_err(Box::new)?;
+        incoming_dht_ops_workflow(&self.env, self.queue_triggers.sys_validation.clone(), ops)
+            .await
+            .map_err(Box::new)
+            .map_err(ConductorApiError::from)
+            .map_err(Box::new)?;
         Ok(())
     }
 
@@ -455,17 +430,17 @@ impl Cell {
         hash: EntryHash,
         options: holochain_p2p::event::GetOptions,
     ) -> CellResult<GetElementResponse> {
-        let state_env = self.state_env.clone();
-        authority::handle_get_entry(state_env, hash, options).await
+        let env = self.env.clone();
+        authority::handle_get_entry(env, hash, options).await
     }
 
     async fn handle_get_element(&self, hash: HeaderHash) -> CellResult<GetElementResponse> {
         // Get the vaults
-        let env_ref = self.state_env.guard();
-        let dbs = self.state_env.dbs();
+        let env_ref = self.env.guard();
+        let dbs = self.env.dbs();
         let reader = env_ref.reader()?;
-        let element_vault = ElementBuf::vault(self.state_env.clone().into(), &dbs, false)?;
-        let meta_vault = MetadataBuf::vault(self.state_env.clone().into(), &dbs)?;
+        let element_vault = ElementBuf::vault(self.env.clone().into(), &dbs, false)?;
+        let meta_vault = MetadataBuf::vault(self.env.clone().into(), &dbs)?;
 
         // Look for a delete on the header and collect it
         let deleted = meta_vault
@@ -514,11 +489,11 @@ impl Cell {
         _options: holochain_p2p::event::GetLinksOptions,
     ) -> CellResult<GetLinksResponse> {
         // Get the vaults
-        let env_ref = self.state_env.guard();
-        let dbs = self.state_env.dbs();
+        let env_ref = self.env.guard();
+        let dbs = self.env.dbs();
         let reader = env_ref.reader()?;
-        let element_vault = ElementBuf::vault(self.state_env.clone().into(), &dbs, false)?;
-        let meta_vault = MetadataBuf::vault(self.state_env.clone().into(), &dbs)?;
+        let element_vault = ElementBuf::vault(self.env.clone().into(), &dbs, false)?;
+        let meta_vault = MetadataBuf::vault(self.env.clone().into(), &dbs)?;
         debug!(id = ?self.id());
 
         let links = meta_vault
@@ -582,10 +557,9 @@ impl Cell {
         since: Timestamp,
         until: Timestamp,
     ) -> CellResult<Vec<DhtOpHash>> {
-        let env_ref = self.state_env.guard();
+        let env_ref = self.env.guard();
         let reader = env_ref.reader()?;
-        let integrated_dht_ops =
-            IntegratedDhtOpsBuf::new(self.state_env().clone().into(), &env_ref)?;
+        let integrated_dht_ops = IntegratedDhtOpsBuf::new(self.env().clone().into(), &env_ref)?;
         let result: Vec<DhtOpHash> = integrated_dht_ops
             .query(&reader, Some(since), Some(until), Some(dht_arc))?
             .map(|(k, _)| Ok(k))
@@ -605,10 +579,9 @@ impl Cell {
             holochain_types::dht_op::DhtOp,
         )>,
     > {
-        let env_ref = self.state_env.guard();
-        let integrated_dht_ops =
-            IntegratedDhtOpsBuf::new(self.state_env().clone().into(), &env_ref)?;
-        let cas = ElementBuf::vault(self.state_env.clone().into(), &env_ref, false)?;
+        let env_ref = self.env.guard();
+        let integrated_dht_ops = IntegratedDhtOpsBuf::new(self.env().clone().into(), &env_ref)?;
+        let cas = ElementBuf::vault(self.env.clone().into(), &env_ref, false)?;
         let mut out = vec![];
         for op_hash in op_hashes {
             let val = integrated_dht_ops.get(&op_hash)?;
@@ -676,10 +649,10 @@ impl Cell {
         // Check if init has run if not run it
         self.check_or_run_zome_init().await?;
 
-        let arc = self.state_env();
+        let arc = self.env();
         let keystore = arc.keystore().clone();
         let _env = arc.guard();
-        let workspace = CallZomeWorkspace::new(self.state_env().clone().into())?;
+        let workspace = CallZomeWorkspace::new(self.env().clone().into())?;
 
         let args = CallZomeWorkflowArgs {
             ribosome: self.get_ribosome().await?,
@@ -689,7 +662,7 @@ impl Cell {
             workspace,
             self.holochain_p2p_cell.clone(),
             keystore,
-            self.state_env().clone().into(),
+            self.env().clone().into(),
             args,
             self.queue_triggers.produce_dht_ops.clone(),
         )
@@ -700,12 +673,12 @@ impl Cell {
     /// Check if each Zome's init callback has been run, and if not, run it.
     async fn check_or_run_zome_init(&self) -> CellResult<()> {
         // If not run it
-        let state_env = self.state_env.clone();
-        let keystore = state_env.keystore().clone();
+        let env = self.env.clone();
+        let keystore = env.keystore().clone();
         let id = self.id.clone();
         let conductor_api = self.conductor_api.clone();
         // Create the workspace
-        let workspace = CallZomeWorkspace::new(self.state_env().clone().into())
+        let workspace = CallZomeWorkspace::new(self.env().clone().into())
             .map_err(WorkflowError::from)
             .map_err(Box::new)?;
 
@@ -731,7 +704,7 @@ impl Cell {
             workspace,
             self.holochain_p2p_cell.clone(),
             keystore,
-            state_env.clone().into(),
+            env.clone().into(),
             args,
         )
         .await
@@ -747,10 +720,10 @@ impl Cell {
     /// Delete all data associated with this Cell by deleting the associated
     /// LMDB environment. Completely reverses Cell creation.
     pub async fn destroy(self) -> CellResult<()> {
-        let path = self.state_env.path().clone();
+        let path = self.env.path().clone();
         // Remove db from global map
         // Delete directory
-        self.state_env
+        self.env
             .remove()
             .await
             .map_err(|e| CellError::Cleanup(e.to_string(), path))?;
@@ -768,8 +741,8 @@ impl Cell {
 
     /// Accessor for the LMDB environment backing this Cell
     // TODO: reevaluate once Workflows are fully implemented (after B-01567)
-    pub(crate) fn state_env(&self) -> &EnvironmentWrite {
-        &self.state_env
+    pub(crate) fn env(&self) -> &EnvironmentWrite {
+        &self.env
     }
 }
 

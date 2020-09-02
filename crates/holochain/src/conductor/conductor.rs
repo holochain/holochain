@@ -45,7 +45,7 @@ use holochain_state::{
     buffer::BufferedStore,
     buffer::{KvStore, KvStoreT},
     db,
-    env::{EnvironmentWrite, ReadManager},
+    env::{EnvironmentKind, EnvironmentWrite, ReadManager},
     exports::SingleStore,
     fresh_reader,
     prelude::*,
@@ -307,23 +307,26 @@ where
         cell_ids_with_proofs: Vec<(CellId, Option<MembraneProof>)>,
         conductor_handle: ConductorHandle,
     ) -> ConductorResult<()> {
-        let root_env_dir = self.root_env_dir.clone();
+        let root_env_dir = std::path::PathBuf::from(self.root_env_dir.clone());
         let keystore = self.keystore.clone();
 
-        let cells_tasks = cell_ids_with_proofs
-            .into_iter()
-            .map(move |(cell_id, proof)| {
-                let root_env_dir = std::path::PathBuf::from(root_env_dir.clone());
-                tokio::spawn(Cell::genesis(
-                    cell_id.clone(),
-                    conductor_handle.clone(),
-                    root_env_dir,
-                    keystore.clone(),
-                    proof,
-                ))
-                .map_err(|e| CellError::from(e))
-                .and_then(|result| async { result.map(|env| (cell_id, env)) })
-            });
+        let cells_tasks = cell_ids_with_proofs.into_iter().map(|(cell_id, proof)| {
+            let root_env_dir = root_env_dir.clone();
+            let env = EnvironmentWrite::new(
+                &root_env_dir,
+                EnvironmentKind::Cell(cell_id.clone()),
+                keystore.clone(),
+            )
+            .unwrap();
+            tokio::spawn(Cell::genesis(
+                cell_id.clone(),
+                conductor_handle.clone(),
+                env,
+                proof,
+            ))
+            .map_err(|e| CellError::from(e))
+            .and_then(|result| async { result.map(|env| (cell_id, env)) })
+        });
         let (success, errors): (Vec<_>, Vec<_>) = futures::future::join_all(cells_tasks)
             .await
             .into_iter()
@@ -334,8 +337,13 @@ where
 
         // If there was errors, cleanup and return the errors
         if !errors.is_empty() {
-            for (_, state_env) in success {
-                state_env.remove().await?;
+            for (cell_id, state_env) in success {
+                let env = EnvironmentWrite::new(
+                    &root_env_dir,
+                    EnvironmentKind::Cell(cell_id),
+                    keystore.clone(),
+                )?;
+                env.remove().await?;
             }
 
             // match needed to avoid Debug requirement on unwrap_err
@@ -609,7 +617,7 @@ where
 
     pub(super) async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
         let cell = self.cell_by_id(cell_id)?;
-        let arc = cell.state_env();
+        let arc = cell.env();
         let env = arc.guard();
         let source_chain = SourceChainBuf::new(arc.clone().into(), &env)?;
         Ok(source_chain.dump_as_json().await?)
