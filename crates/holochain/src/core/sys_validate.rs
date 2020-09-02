@@ -1,3 +1,6 @@
+//! # System Validation Checks
+//! This module contains all the checks we run for sys validation
+
 use super::{
     state::{
         element_buf::ElementBuf,
@@ -42,8 +45,15 @@ mod tests;
 /// Consider splitting large entries up.
 pub const MAX_ENTRY_SIZE: usize = 16_000_000;
 
-/// 10kb limit on LinkTags.
+/// 400b limit on LinkTags.
+/// Tags are used as keys to the database to allow
+/// fast lookup so they need to be small.
 pub const MAX_TAG_SIZE: usize = 400;
+
+/////////////
+// TODO: These checks are old and should probably be removed when
+// we implement the direct sys validation call
+/////////////
 
 /// Ensure that a given pre-fetched element is actually valid on this chain.
 ///
@@ -153,6 +163,10 @@ pub fn sys_validate_header(
     Ok(())
 }
 
+///////////////////////////////
+// Sys validation starts here
+//////////////////////////////
+
 /// Verify the signature for this header
 pub async fn verify_header_signature(sig: &Signature, header: &Header) -> SysValidationResult<()> {
     if header.author().verify_signature(sig, header).await? {
@@ -259,7 +273,6 @@ pub fn check_entry_type(entry_type: &EntryType, entry: &Entry) -> SysValidationR
     }
 }
 
-// entry_type: &AppEntryType,
 /// Check the AppEntryType is valid for the zome.
 /// Check the EntryDefId and ZomeId are in range.
 pub async fn check_app_entry_type(
@@ -335,8 +348,6 @@ pub fn check_new_entry_header(header: &Header) -> SysValidationResult<()> {
 }
 
 /// Check the entry size is under the MAX_ENTRY_SIZE
-// TODO: This could be bad if someone just keeps sending large entries.
-// Getting the size of a large vec over and over might be a DDOS?
 pub fn check_entry_size(entry: &Entry) -> SysValidationResult<()> {
     match entry {
         Entry::App(bytes) => {
@@ -353,8 +364,6 @@ pub fn check_entry_size(entry: &Entry) -> SysValidationResult<()> {
 }
 
 /// Check the link tag size is under the MAX_TAG_SIZE
-// TODO: This could be bad if someone just keeps sending large tags.
-// Getting the size of a large vec over and over might be a DDOS?
 pub fn check_tag_size(tag: &LinkTag) -> SysValidationResult<()> {
     let size = std::mem::size_of_val(&tag.0[..]);
     if size < MAX_TAG_SIZE {
@@ -364,9 +373,8 @@ pub fn check_tag_size(tag: &LinkTag) -> SysValidationResult<()> {
     }
 }
 
-/// Check a EntryUpdate's entry schema is the same for
+/// Check a EntryUpdate's entry type is the same for
 /// original and new entry.
-/// If EntryType::App Check the EntryDefId, ZomeId and visibility match
 pub fn check_update_reference(
     eu: &EntryUpdate,
     original_entry_header: &NewEntryHeaderRef<'_>,

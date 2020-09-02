@@ -54,8 +54,8 @@ pub async fn integrate_dht_ops_workflow(
     // one of many possible ways to access the env
     let env = workspace.elements.headers().env().clone();
     // Pull ops out of queue
-    // TODO: PERF: we collect() only because this iterator cannot cross awaits,
-    // but is there a way to do this without collect()?
+    // TODO: PERF: Combine this collect with the sort when ElementBuf gets
+    // aren't async
     let ops: Vec<IntegrationLimboValue> = fresh_reader!(env, |r| workspace
         .integration_limbo
         .drain_iter(&r)?
@@ -120,10 +120,10 @@ pub async fn integrate_dht_ops_workflow(
             };
             match outcome {
                 Outcome::Integrated(integrated) => {
-                    // TODO should we check for rejected?
-                    // We are checking here for ops that are "valid" for deps
-                    // so we should probably not put reject ops here?
-                    // We could add a postfix to the integrated ops and limbo keys
+                    // TODO We could create a prefix for the integrated ops db
+                    // and separate rejected ops from valid ops.
+                    // Currently you need to check the IntegratedDhtOpsValue for
+                    // the status
                     workspace.integrate(hash, integrated).await?;
                     num_integrated += 1;
                     total_integrated += 1;
@@ -193,7 +193,10 @@ async fn integrate_single_dht_op<P: PrefixType>(
             debug!("integrating");
             Ok(Outcome::Integrated(v))
         }
-        v @ Outcome::Deferred(_) => Ok(v),
+        v @ Outcome::Deferred(_) => {
+            debug!("deferring");
+            Ok(v)
+        }
     }
 }
 

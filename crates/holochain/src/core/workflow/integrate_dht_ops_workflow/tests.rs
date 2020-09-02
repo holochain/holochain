@@ -135,11 +135,22 @@ impl TestData {
         link_remove.base_address = original_entry_hash.clone();
         link_remove.link_add_address = link_add_hash.clone();
 
+        let mut any_header = fixt!(Header, PublicCurve);
+        match &mut any_header {
+            Header::EntryCreate(ec) => {
+                ec.entry_hash = original_entry_hash.clone();
+            }
+            Header::EntryUpdate(eu) => {
+                eu.entry_hash = original_entry_hash.clone();
+            }
+            _ => (),
+        };
+
         Self {
             signature: fixt!(Signature),
             original_entry,
             new_entry,
-            any_header: fixt!(Header, PublicCurve),
+            any_header,
             entry_update_header,
             entry_update_entry,
             original_header,
@@ -241,8 +252,8 @@ impl Db {
                             .await
                             .unwrap()
                             .expect(&format!(
-                                "Entry {:?} not in element vault for {}",
-                                entry, here
+                                "Entry {:?} with hash {:?} not in element vault for {}",
+                                entry, hash, here
                             ))
                             .into_content(),
                         entry,
@@ -259,7 +270,7 @@ impl Db {
                             .await
                             .unwrap()
                             .expect(&format!(
-                                "Header {:?} not in element vault for {}",
+                                "Header {:?} not in element judged for {}",
                                 header, here
                             ))
                             .header(),
@@ -277,7 +288,7 @@ impl Db {
                             .await
                             .unwrap()
                             .expect(&format!(
-                                "Entry {:?} not in element vault for {}",
+                                "Entry {:?} not in element judged for {}",
                                 entry, here
                             ))
                             .into_content(),

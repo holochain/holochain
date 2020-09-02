@@ -506,7 +506,7 @@ pub mod wasm_test {
                 };
                 // this is convenient for now as we flesh out the zome i/o behaviour
                 // maybe in the future this will be too noisy and we might want to remove it...
-                dbg!(&output);
+                $crate::tracing::debug!(?output);
                 output
             })
             .await
