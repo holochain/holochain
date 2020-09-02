@@ -9,7 +9,7 @@ use derive_more::Into;
 use holochain_keystore::KeystoreSender;
 use holochain_types::cell::CellId;
 use lazy_static::lazy_static;
-use parking_lot::RwLock as RwLockSync;
+use parking_lot::{RwLock, RwLockReadGuard};
 use rkv::{EnvironmentFlags, Rkv};
 use shrinkwraprs::Shrinkwrap;
 use std::{
@@ -22,7 +22,7 @@ const DEFAULT_INITIAL_MAP_SIZE: usize = 100 * 1024 * 1024; // 100MB
 const MAX_DBS: u32 = 32;
 
 lazy_static! {
-    static ref ENVIRONMENTS: RwLockSync<HashMap<PathBuf, EnvironmentWrite>> = {
+    static ref ENVIRONMENTS: RwLock<HashMap<PathBuf, EnvironmentWrite>> = {
         // This is just a convenient place that we know gets initialized
         // both in the final binary holochain && in all relevant tests
         //
@@ -44,7 +44,7 @@ lazy_static! {
             // std::process::abort();
         }));
 
-        RwLockSync::new(HashMap::new())
+        RwLock::new(HashMap::new())
     };
 }
 
@@ -86,10 +86,7 @@ fn rkv_builder(
 /// This environment can only generate read-only transactions, never read-write.
 #[derive(Clone)]
 pub struct EnvironmentRead {
-    // FIXME [ B-03180 ]: Use some synchronization strategy so we can get
-    //       mutable access to this
-    // arc: Arc<RwLockSync<Rkv>>,
-    arc: Arc<Rkv>,
+    arc: Arc<RwLock<Rkv>>,
     kind: EnvironmentKind,
     path: PathBuf,
     keystore: KeystoreSender,
@@ -102,7 +99,7 @@ impl EnvironmentRead {
     /// explicitly.
     pub fn guard(&self) -> EnvironmentReadRef<'_> {
         EnvironmentReadRef {
-            rkv: self.arc.clone(),
+            rkv: self.arc.read(),
             path: &self.path,
             keystore: self.keystore.clone(),
         }
@@ -180,7 +177,7 @@ impl EnvironmentWrite {
                     tracing::debug!("Initializing databases for path {:?}", path);
                     initialize_databases(&rkv, &kind)?;
                     EnvironmentWrite(EnvironmentRead {
-                        arc: Arc::new(rkv),
+                        arc: Arc::new(RwLock::new(rkv)),
                         kind,
                         keystore,
                         path,
@@ -233,7 +230,7 @@ impl EnvironmentKind {
 /// This has the distinction of being unable to create a read-write transaction,
 /// because unlike [EnvironmentWriteRef], this does not implement WriteManager
 pub struct EnvironmentReadRef<'e> {
-    rkv: Arc<Rkv>,
+    rkv: RwLockReadGuard<'e, Rkv>,
     path: &'e Path,
     keystore: KeystoreSender,
 }
