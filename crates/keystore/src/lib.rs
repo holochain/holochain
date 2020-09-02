@@ -46,4 +46,5 @@ pub use keystore_actor::{KeystoreSender, KeystoreSenderExt};
 mod agent_pubkey_ext;
 pub use agent_pubkey_ext::*;
 
+pub mod lair_keystore;
 pub mod test_keystore;

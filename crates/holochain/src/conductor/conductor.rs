@@ -38,6 +38,7 @@ use crate::{
     core::state::{source_chain::SourceChainBuf, wasm::WasmBuf},
 };
 use holochain_keystore::{
+    lair_keystore::spawn_lair_keystore,
     test_keystore::{spawn_test_keystore, MockKeypair},
     KeystoreSender, KeystoreSenderExt,
 };
@@ -805,7 +806,8 @@ mod builder {
             let keystore = if let Some(keystore) = self.keystore {
                 keystore
             } else {
-                delete_me_create_test_keystore().await
+                //delete_me_create_test_keystore().await
+                spawn_lair_keystore(None).await?
             };
             let env_path = self.config.environment_path.clone();
 
