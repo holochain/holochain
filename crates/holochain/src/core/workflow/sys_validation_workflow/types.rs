@@ -153,7 +153,8 @@ impl Dependencies {
         self.store_entry(dep, false).await
     }
 
-    /// Create a store entry dependency
+    /// Create a dependency on a store entry op
+    /// from an element.
     async fn store_entry(
         &mut self,
         dep: Dependency<Element>,
@@ -182,6 +183,9 @@ impl Dependencies {
         };
         Ok(el)
     }
+
+    /// Create a dependency on a store element op
+    /// from a header.
     pub async fn store_element(
         &mut self,
         dep: Dependency<SignedHeaderHashed>,
@@ -199,6 +203,8 @@ impl Dependencies {
         Ok(shh)
     }
 
+    /// Create a dependency on a add link op
+    /// from a header.
     pub async fn add_link(
         &mut self,
         dep: Dependency<SignedHeaderHashed>,
@@ -220,6 +226,8 @@ impl Dependencies {
         Ok(shh)
     }
 
+    /// Create a dependency on a register agent activity op
+    /// from a header.
     pub async fn register_agent_activity(
         &mut self,
         dep: Dependency<SignedHeaderHashed>,
