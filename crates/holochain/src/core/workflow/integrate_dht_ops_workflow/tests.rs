@@ -732,7 +732,7 @@ async fn commit_entry<'env>(
     zome_name: ZomeName,
 ) -> (EntryHash, HeaderHash) {
     let env_ref = env.guard();
-    let mut workspace = CallZomeWorkspace::new(env.clone().into(), &env_ref)
+    let workspace = CallZomeWorkspace::new(env.clone().into(), &env_ref)
         .await
         .unwrap();
     let workspace_lock = CallZomeWorkspaceLock::new(workspace);
@@ -814,7 +814,7 @@ async fn commit_entry<'env>(
 
 async fn get_entry(env: EnvironmentWrite, entry_hash: EntryHash) -> Option<Entry> {
     let env_ref = env.guard();
-    let mut workspace = CallZomeWorkspace::new(env.clone().into(), &env_ref)
+    let workspace = CallZomeWorkspace::new(env.clone().into(), &env_ref)
         .await
         .unwrap();
     let workspace_lock = CallZomeWorkspaceLock::new(workspace);
@@ -846,7 +846,7 @@ async fn link_entries(
     link_tag: LinkTag,
 ) -> HeaderHash {
     let env_ref = env.guard();
-    let mut workspace = CallZomeWorkspace::new(env.clone().into(), &env_ref)
+    let workspace = CallZomeWorkspace::new(env.clone().into(), &env_ref)
         .await
         .unwrap();
     let workspace_lock = CallZomeWorkspaceLock::new(workspace);
@@ -902,7 +902,7 @@ async fn get_links(
     link_tag: LinkTag,
 ) -> Links {
     let env_ref = env.guard();
-    let mut workspace = CallZomeWorkspace::new(env.clone().into(), &env_ref)
+    let workspace = CallZomeWorkspace::new(env.clone().into(), &env_ref)
         .await
         .unwrap();
     let workspace_lock = CallZomeWorkspaceLock::new(workspace);

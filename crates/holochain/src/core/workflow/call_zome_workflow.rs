@@ -455,7 +455,7 @@ pub mod tests {
         let test_env = test_cell_env();
         let env = test_env.env();
         let dbs = env.dbs();
-        let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
+        let workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
             .await
             .unwrap();
         let ribosome = MockRibosomeT::new();
@@ -488,7 +488,7 @@ pub mod tests {
         let test_env = test_cell_env();
         let env = test_env.env();
         let dbs = env.dbs();
-        let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
+        let workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
             .await
             .unwrap();
         let ribosome = MockRibosomeT::new();
