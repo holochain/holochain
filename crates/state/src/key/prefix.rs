@@ -3,8 +3,12 @@ use holo_hash::AnyDhtHash;
 use std::marker::PhantomData;
 /// Prefix for integrated database
 const INTEGRATED_PREFIX: u8 = 0x0;
+/// Prefix for the database awaiting validation ( judgement :) )
 const PENDING_PREFIX: u8 = 0x1;
-const VALIDATED_PREFIX: u8 = 0x2;
+/// Prefix for the database awaiting integration (has been judged)
+const JUDGED_PREFIX: u8 = 0x2;
+/// Prefix for the database of rejected data (has been judged and found invalid)
+const REJECTED_PREFIX: u8 = 0x3;
 
 /// Prefix length 1 + hash length 36
 // TODO: B-02112 change to 39 bytes
@@ -40,16 +44,20 @@ pub trait PrefixType: Ord + Clone + std::fmt::Debug + Send + Sync {
 }
 
 #[derive(PartialOrd, Clone, Ord, PartialEq, Eq, Debug)]
-/// PrefixBytes keys for data that is integrated
+/// Prefix key for data that is integrated
 pub struct IntegratedPrefix;
 
 #[derive(PartialOrd, Clone, Ord, PartialEq, Eq, Debug)]
-/// PrefixBytes keys for data that is pending validation
+/// Prefix key for data that is pending validation
 pub struct PendingPrefix;
 
 #[derive(PartialOrd, Clone, Ord, PartialEq, Eq, Debug)]
-/// PrefixBytes keys for data that is validated and pending integration
-pub struct ValidatedPrefix;
+/// Prefix key for data that is post validated and pending integration
+pub struct JudgedPrefix;
+
+#[derive(PartialOrd, Clone, Ord, PartialEq, Eq, Debug)]
+/// Prefix key for data that has been rejected
+pub struct RejectedPrefix;
 
 impl PrefixType for IntegratedPrefix {
     const PREFIX: u8 = INTEGRATED_PREFIX;
@@ -59,8 +67,12 @@ impl PrefixType for PendingPrefix {
     const PREFIX: u8 = PENDING_PREFIX;
 }
 
-impl PrefixType for ValidatedPrefix {
-    const PREFIX: u8 = VALIDATED_PREFIX;
+impl PrefixType for JudgedPrefix {
+    const PREFIX: u8 = JUDGED_PREFIX;
+}
+
+impl PrefixType for RejectedPrefix {
+    const PREFIX: u8 = REJECTED_PREFIX;
 }
 
 impl<P: PrefixType> PrefixHashKey<P> {

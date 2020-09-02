@@ -28,6 +28,7 @@ use holochain_state::{
 use holochain_types::{
     dht_op::{produce_op_lights_from_elements, DhtOp, DhtOpLight},
     element::{Element, SignedHeaderHashed, SignedHeaderHashedExt},
+    validate::ValidationStatus,
     Entry, EntryHashed, Timestamp,
 };
 use holochain_zome_types::{element::SignedHeader, Header};
@@ -63,7 +64,7 @@ pub async fn integrate_dht_ops_workflow(
     // Sort the ops
     let mut sorted_ops = BinaryHeap::new();
     for iv in ops {
-        let op = light_to_op(iv.op.clone(), &workspace.element_validated).await?;
+        let op = light_to_op(iv.op.clone(), &workspace.element_judged).await?;
         let hash = DhtOpHash::with_data(&op).await;
         let order = DhtOpOrder::from(&op);
         let v = OrderedOp {
@@ -92,15 +93,37 @@ pub async fn integrate_dht_ops_workflow(
                 value,
                 order,
             } = so.0;
-            match integrate_single_dht_op(
-                value.clone(),
-                op,
-                &mut workspace.elements,
-                &mut workspace.meta,
-            )
-            .await?
-            {
+            // TODO: Check validation status and put in correct dbs
+            let outcome = match value.validation_status {
+                ValidationStatus::Valid => {
+                    integrate_single_dht_op(
+                        value.clone(),
+                        op,
+                        &mut workspace.elements,
+                        &mut workspace.meta,
+                    )
+                    .await?
+                }
+                ValidationStatus::Rejected => {
+                    integrate_single_dht_op(
+                        value.clone(),
+                        op,
+                        &mut workspace.element_rejected,
+                        &mut workspace.meta_rejected,
+                    )
+                    .await?
+                }
+                ValidationStatus::Abandoned => {
+                    // Throwing away abandoned ops
+                    continue;
+                }
+            };
+            match outcome {
                 Outcome::Integrated(integrated) => {
+                    // TODO should we check for rejected?
+                    // We are checking here for ops that are "valid" for deps
+                    // so we should probably not put reject ops here?
+                    // We could add a postfix to the integrated ops and limbo keys
                     workspace.integrate(hash, integrated).await?;
                     num_integrated += 1;
                     total_integrated += 1;
@@ -158,11 +181,11 @@ pub async fn integrate_dht_ops_workflow(
 /// We can skip integrating element data when integrating data as an Author
 /// rather than as an Authority, hence the last parameter.
 #[instrument(skip(value, element_store, meta_store))]
-async fn integrate_single_dht_op(
+async fn integrate_single_dht_op<P: PrefixType>(
     value: IntegrationLimboValue,
     op: DhtOp,
-    element_store: &mut ElementBuf,
-    meta_store: &mut MetadataBuf,
+    element_store: &mut ElementBuf<P>,
+    meta_store: &mut MetadataBuf<P>,
 ) -> DhtOpConvertResult<Outcome> {
     match integrate_single_element(value, op, element_store).await? {
         Outcome::Integrated(v) => {
@@ -174,15 +197,15 @@ async fn integrate_single_dht_op(
     }
 }
 
-async fn integrate_single_element(
+async fn integrate_single_element<P: PrefixType>(
     iv: IntegrationLimboValue,
     op: DhtOp,
-    element_store: &mut ElementBuf,
+    element_store: &mut ElementBuf<P>,
 ) -> DhtOpConvertResult<Outcome> {
     {
-        async fn header_with_entry_is_stored(
+        async fn header_with_entry_is_stored<P: PrefixType>(
             hash: &HeaderHash,
-            element_store: &ElementBuf,
+            element_store: &ElementBuf<P>,
         ) -> DhtOpConvertResult<bool> {
             match element_store.get_header(hash).await?.map(|e| {
                 e.header()
@@ -198,7 +221,7 @@ async fn integrate_single_element(
             }
         }
 
-        let entry_is_stored = |hash| element_store.contains_entry(hash);
+        // let entry_is_stored = |hash| element_store.contains_entry(hash);
 
         let header_is_stored = |hash| element_store.contains_header(hash);
 
@@ -256,22 +279,28 @@ async fn integrate_single_element(
                 put_data(signature, element_delete.into(), None, element_store).await?;
             }
             DhtOp::RegisterAddLink(signature, link_add) => {
-                // Check whether we have the base address in the Vault.
-                // If not then this should put the op back on the queue.
-                if !entry_is_stored(&link_add.base_address).await? {
-                    let op = DhtOp::RegisterAddLink(signature, link_add);
-                    return Outcome::deferred(op);
-                }
+                // TODO: Not sure what to do here as the base might be rejected
+                // // Check whether we have the base address in the Vault.
+                // // If not then this should put the op back on the queue.
+                // if !entry_is_stored(&link_add.base_address).await? {
+                //     let op = DhtOp::RegisterAddLink(signature, link_add);
+                //     return Outcome::deferred(op);
+                // }
 
                 put_data(signature, link_add.into(), None, element_store).await?;
             }
             DhtOp::RegisterRemoveLink(signature, link_remove) => {
-                // Check whether we have the base address and link add address
-                // are in the Vault.
-                // If not then this should put the op back on the queue.
-                if !entry_is_stored(&link_remove.base_address).await?
-                    || !header_is_stored(&link_remove.link_add_address).await?
-                {
+                // TODO: Not sure what to do here as the base might be rejected
+                // // Check whether we have the base address and link add address
+                // // are in the Vault.
+                // // If not then this should put the op back on the queue.
+                // if !entry_is_stored(&link_remove.base_address).await?
+                //     || !header_is_stored(&link_remove.link_add_address).await?
+                // {
+                //     let op = DhtOp::RegisterRemoveLink(signature, link_remove);
+                //     return Outcome::deferred(op);
+                // }
+                if !header_is_stored(&link_remove.link_add_address).await? {
                     let op = DhtOp::RegisterRemoveLink(signature, link_remove);
                     return Outcome::deferred(op);
                 }
@@ -289,11 +318,15 @@ async fn integrate_single_element(
     }
 }
 
-pub async fn integrate_single_metadata<C: MetadataBufT, P: PrefixType>(
+pub async fn integrate_single_metadata<C, P>(
     op: DhtOpLight,
     element_store: &ElementBuf<P>,
     meta_store: &mut C,
-) -> DhtOpConvertResult<()> {
+) -> DhtOpConvertResult<()>
+where
+    P: PrefixType,
+    C: MetadataBufT<P>,
+{
     match op {
         DhtOpLight::StoreElement(hash, _, _) => {
             let header = get_header(hash, element_store).await?;
@@ -440,8 +473,10 @@ pub struct IntegrateDhtOpsWorkspace {
     // metadata store
     pub meta: MetadataBuf,
     // Data that has progressed past validation and is pending Integration
-    pub element_validated: ElementBuf<ValidatedPrefix>,
-    pub meta_validated: MetadataBuf<ValidatedPrefix>,
+    pub element_judged: ElementBuf<JudgedPrefix>,
+    pub meta_judged: MetadataBuf<JudgedPrefix>,
+    pub element_rejected: ElementBuf<RejectedPrefix>,
+    pub meta_rejected: MetadataBuf<RejectedPrefix>,
 }
 
 impl Workspace for IntegrateDhtOpsWorkspace {
@@ -454,8 +489,10 @@ impl Workspace for IntegrateDhtOpsWorkspace {
         self.integrated_dht_ops.flush_to_txn(writer)?;
         // flush integration queue
         self.integration_limbo.flush_to_txn(writer)?;
-        self.element_validated.flush_to_txn(writer)?;
-        self.meta_validated.flush_to_txn(writer)?;
+        self.element_judged.flush_to_txn(writer)?;
+        self.meta_judged.flush_to_txn(writer)?;
+        self.element_rejected.flush_to_txn(writer)?;
+        self.meta_rejected.flush_to_txn(writer)?;
         Ok(())
     }
 }
@@ -472,16 +509,21 @@ impl IntegrateDhtOpsWorkspace {
         let elements = ElementBuf::vault(env.clone(), dbs, true)?;
         let meta = MetadataBuf::vault(env.clone(), dbs)?;
 
-        let element_validated = ElementBuf::validated(env.clone(), dbs)?;
-        let meta_validated = MetadataBuf::validated(env, dbs)?;
+        let element_judged = ElementBuf::judged(env.clone(), dbs)?;
+        let meta_judged = MetadataBuf::judged(env.clone(), dbs)?;
+
+        let element_rejected = ElementBuf::rejected(env.clone(), dbs)?;
+        let meta_rejected = MetadataBuf::rejected(env, dbs)?;
 
         Ok(Self {
             integration_limbo,
             integrated_dht_ops,
             elements,
             meta,
-            element_validated,
-            meta_validated,
+            element_judged,
+            meta_judged,
+            element_rejected,
+            meta_rejected,
         })
     }
 
@@ -490,13 +532,9 @@ impl IntegrateDhtOpsWorkspace {
         hash: DhtOpHash,
         v: IntegratedDhtOpsValue,
     ) -> DhtOpConvertResult<()> {
-        disintegrate_single_metadata(
-            v.op.clone(),
-            &self.element_validated,
-            &mut self.meta_validated,
-        )
-        .await?;
-        disintegrate_single_op(v.op.clone(), &mut self.element_validated);
+        disintegrate_single_metadata(v.op.clone(), &self.element_judged, &mut self.meta_judged)
+            .await?;
+        disintegrate_single_op(v.op.clone(), &mut self.element_judged);
         self.integrated_dht_ops.put(hash, v)?;
         Ok(())
     }

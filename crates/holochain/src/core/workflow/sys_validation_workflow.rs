@@ -43,7 +43,7 @@ use integrate_dht_ops_workflow::{
     integrate_single_op,
 };
 use produce_dht_ops_workflow::dht_op_light::light_to_op;
-use types::{Dependencies, DhtOpOrder, OrderedOp, Outcome};
+use types::{CheckLevel, Dependencies, DhtOpOrder, OrderedOp, Outcome};
 
 pub mod types;
 
@@ -99,7 +99,7 @@ async fn sys_validation_workflow_inner(
         // let op = light_to_op(vlv.op.clone(), &workspace.element_pending).await?;
         let op = light_to_op(vlv.op.clone(), &workspace.element_pending).await;
         if let Err(e) = &op {
-            dbg!(e);
+            dbg!(e, &vlv.op);
         }
         let op = op?;
 
@@ -141,10 +141,11 @@ async fn sys_validation_workflow_inner(
             network.clone(),
             &conductor_api,
             &mut vlv.awaiting_proof,
+            CheckLevel::Holding,
         )
         .await;
         if let Err(e) = &r {
-            dbg!(e);
+            dbg!(e, &vlv.op);
         }
         let outcome = r?;
         if which_agent == "alice" {
@@ -213,8 +214,18 @@ async fn validate_op(
     network: HolochainP2pCell,
     conductor_api: &impl CellConductorApiT,
     dependencies: &mut Dependencies,
+    check_level: CheckLevel,
 ) -> WorkflowResult<Outcome> {
-    match validate_op_inner(op, workspace, network, conductor_api, dependencies).await {
+    match validate_op_inner(
+        op,
+        workspace,
+        network,
+        conductor_api,
+        dependencies,
+        check_level,
+    )
+    .await
+    {
         Ok(_) => match op {
             DhtOp::RegisterAgentActivity(_, _) |
             // TODO: Check strict mode where store element 
@@ -274,10 +285,11 @@ async fn validate_op_inner(
     network: HolochainP2pCell,
     conductor_api: &impl CellConductorApiT,
     dependencies: &mut Dependencies,
+    check_level: CheckLevel,
 ) -> SysValidationResult<()> {
     match op {
         DhtOp::StoreElement(signature, header, entry) => {
-            store_element(header, workspace.cascade(network.clone())).await?;
+            store_element(header, workspace, network.clone(), dependencies).await?;
             if let Some(entry) = entry {
                 store_entry(
                     (header)
@@ -285,7 +297,9 @@ async fn validate_op_inner(
                         .map_err(|_| ValidationError::NotNewEntry(header.clone()))?,
                     entry.as_ref(),
                     conductor_api,
-                    workspace.cascade(network),
+                    workspace,
+                    network,
+                    dependencies,
                 )
                 .await?;
             }
@@ -298,51 +312,61 @@ async fn validate_op_inner(
                 (header).into(),
                 entry.as_ref(),
                 conductor_api,
-                workspace.cascade(network.clone()),
+                workspace,
+                network.clone(),
+                dependencies,
             )
             .await?;
 
             let header = header.clone().into();
-            store_element(&header, workspace.cascade(network)).await?;
+            store_element(&header, workspace, network, dependencies).await?;
             all_op_check(signature, &header).await?;
             Ok(())
         }
         DhtOp::RegisterAgentActivity(signature, header) => {
-            register_agent_activity(header, workspace, dependencies).await?;
-
+            register_agent_activity(
+                header,
+                workspace,
+                network.clone(),
+                dependencies,
+                check_level,
+            )
+            .await?;
+            store_element(header, workspace, network, dependencies).await?;
             all_op_check(signature, header).await?;
             Ok(())
         }
         DhtOp::RegisterUpdatedBy(signature, header) => {
-            register_updated_by(header, workspace, dependencies).await?;
+            register_updated_by(header, workspace, network, dependencies, check_level).await?;
 
             let header = header.clone().into();
             all_op_check(signature, &header).await?;
             Ok(())
         }
         DhtOp::RegisterDeletedBy(signature, header) => {
-            register_deleted_by(header, &workspace, dependencies).await?;
+            register_deleted_by(header, workspace, network, dependencies, check_level).await?;
 
             let header = header.clone().into();
             all_op_check(signature, &header).await?;
             Ok(())
         }
         DhtOp::RegisterDeletedEntryHeader(signature, header) => {
-            register_deleted_entry_header(header, &workspace, dependencies).await?;
+            register_deleted_entry_header(header, workspace, network, dependencies, check_level)
+                .await?;
 
             let header = header.clone().into();
             all_op_check(signature, &header).await?;
             Ok(())
         }
         DhtOp::RegisterAddLink(signature, header) => {
-            register_add_link(header, workspace, network, dependencies).await?;
+            register_add_link(header, workspace, network, dependencies, check_level).await?;
 
             let header = header.clone().into();
             all_op_check(signature, &header).await?;
             Ok(())
         }
         DhtOp::RegisterRemoveLink(signature, header) => {
-            register_remove_link(header, workspace, dependencies).await?;
+            register_remove_link(header, workspace, network, dependencies, check_level).await?;
 
             let header = header.clone().into();
             all_op_check(signature, &header).await?;
@@ -359,8 +383,10 @@ async fn all_op_check(signature: &Signature, header: &Header) -> SysValidationRe
 
 async fn register_agent_activity(
     header: &Header,
-    workspace: &SysValidationWorkspace,
+    workspace: &mut SysValidationWorkspace,
+    network: HolochainP2pCell,
     dependencies: &mut Dependencies,
+    check_level: CheckLevel,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
     let author = header.author();
@@ -370,22 +396,34 @@ async fn register_agent_activity(
     check_prev_header(&header)?;
     check_valid_if_dna(&header, &workspace.meta_vault).await?;
     if let Some(prev_header_hash) = prev_header_hash {
-        let dependency =
-            check_holding_prev_header_all(author, prev_header_hash, &workspace).await?;
+        let dependency = check_holding_prev_header_all(
+            author,
+            prev_header_hash,
+            workspace,
+            network,
+            check_level,
+        )
+        .await?;
         dependencies.register_agent_activity(dependency).await?;
     }
     check_chain_rollback(&header, &workspace.meta_vault, &workspace.element_vault).await?;
     Ok(())
 }
 
-async fn store_element(header: &Header, cascade: Cascade<'_>) -> SysValidationResult<()> {
+async fn store_element(
+    header: &Header,
+    workspace: &mut SysValidationWorkspace,
+    network: HolochainP2pCell,
+    dependencies: &mut Dependencies,
+) -> SysValidationResult<()> {
     // Get data ready to validate
     let prev_header_hash = header.prev_header();
 
     // Checks
     check_prev_header(header)?;
     if let Some(prev_header_hash) = prev_header_hash {
-        let prev_header = check_header_exists(prev_header_hash.clone(), cascade).await?;
+        let dependency = check_header_exists(prev_header_hash.clone(), workspace, network).await?;
+        let prev_header = dependencies.store_element(dependency).await?;
         check_prev_timestamp(&header, prev_header.header())?;
         check_prev_seq(&header, prev_header.header())?;
     }
@@ -396,7 +434,9 @@ async fn store_entry(
     header: NewEntryHeaderRef<'_>,
     entry: &Entry,
     conductor_api: &impl CellConductorApiT,
-    cascade: Cascade<'_>,
+    workspace: &mut SysValidationWorkspace,
+    network: HolochainP2pCell,
+    dependencies: &mut Dependencies,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
     let entry_type = header.entry_type();
@@ -413,8 +453,13 @@ async fn store_entry(
 
     // Additional checks if this is an EntryUpdate
     if let NewEntryHeaderRef::Update(entry_update) = header {
-        let original_header =
-            check_header_exists(entry_update.original_header_address.clone(), cascade).await?;
+        let dependency = check_header_exists(
+            entry_update.original_header_address.clone(),
+            workspace,
+            network,
+        )
+        .await?;
+        let original_header = dependencies.store_element(dependency).await?;
         update_check(entry_update, original_header.header())?;
     }
     Ok(())
@@ -422,46 +467,59 @@ async fn store_entry(
 
 async fn register_updated_by(
     entry_update: &EntryUpdate,
-    workspace: &SysValidationWorkspace,
+    workspace: &mut SysValidationWorkspace,
+    network: HolochainP2pCell,
     dependencies: &mut Dependencies,
+    check_level: CheckLevel,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
     let original_header_address = &entry_update.original_header_address;
     let original_entry_address = &entry_update.original_entry_address;
 
-    let dependency =
-        check_holding_store_entry_all(original_entry_address, original_header_address, &workspace)
-            .await?;
-    let original_element = dependencies.store_entry(dependency).await?;
+    let dependency = check_holding_store_entry_all(
+        original_entry_address,
+        original_header_address,
+        workspace,
+        network,
+        check_level,
+    )
+    .await?;
+    let original_element = dependencies.store_entry_fixed(dependency).await?;
     update_check(entry_update, original_element.header())?;
     Ok(())
 }
 
 async fn register_deleted_by(
     element_delete: &ElementDelete,
-    workspace: &SysValidationWorkspace,
+    workspace: &mut SysValidationWorkspace,
+    network: HolochainP2pCell,
     dependencies: &mut Dependencies,
+    check_level: CheckLevel,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
     let removed_header_address = &element_delete.removes_address;
 
     // Checks
-    let dependency = check_holding_element_all(removed_header_address, workspace).await?;
-    let removed_header = dependencies.store_entry(dependency).await?;
+    let dependency =
+        check_holding_element_all(removed_header_address, workspace, network, check_level).await?;
+    let removed_header = dependencies.store_entry_fixed(dependency).await?;
     check_new_entry_header(removed_header.header())?;
     Ok(())
 }
 
 async fn register_deleted_entry_header(
     element_delete: &ElementDelete,
-    workspace: &SysValidationWorkspace,
+    workspace: &mut SysValidationWorkspace,
+    network: HolochainP2pCell,
     dependencies: &mut Dependencies,
+    check_level: CheckLevel,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
     let removed_header_address = &element_delete.removes_address;
 
     // Checks
-    let dependency = check_holding_header_all(removed_header_address, workspace).await?;
+    let dependency =
+        check_holding_header_all(removed_header_address, workspace, network, check_level).await?;
     let removed_header = dependencies.store_element(dependency).await?;
     check_new_entry_header(removed_header.header())?;
     Ok(())
@@ -472,29 +530,36 @@ async fn register_add_link(
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
     dependencies: &mut Dependencies,
+    check_level: CheckLevel,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
     let base_entry_address = &link_add.base_address;
     let target_entry_address = &link_add.target_address;
 
     // Checks
-    let dependency = check_holding_entry_all(base_entry_address, workspace).await?;
-    dependencies.store_entry(dependency).await?;
-    check_entry_exists(target_entry_address.clone(), workspace.cascade(network)).await?;
+    let dependency =
+        check_holding_entry_all(base_entry_address, workspace, network.clone(), check_level)
+            .await?;
+    dependencies.store_entry_any(dependency).await?;
+    let dependency = check_entry_exists(target_entry_address.clone(), workspace, network).await?;
+    dependencies.store_entry_any(dependency).await?;
     check_tag_size(&link_add.tag)?;
     Ok(())
 }
 
 async fn register_remove_link(
     link_remove: &LinkRemove,
-    workspace: &SysValidationWorkspace,
+    workspace: &mut SysValidationWorkspace,
+    network: HolochainP2pCell,
     dependencies: &mut Dependencies,
+    check_level: CheckLevel,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
     let link_add_address = &link_remove.link_add_address;
 
     // Checks
-    let dependency = check_holding_link_add_all(link_add_address, &workspace).await?;
+    let dependency =
+        check_holding_link_add_all(link_add_address, workspace, network, check_level).await?;
     dependencies.add_link(dependency).await?;
     Ok(())
 }
@@ -518,8 +583,8 @@ pub struct SysValidationWorkspace {
     pub element_pending: ElementBuf<PendingPrefix>,
     pub meta_pending: MetadataBuf<PendingPrefix>,
     // Data that has progressed past validation and is pending Integration
-    pub element_validated: ElementBuf<ValidatedPrefix>,
-    pub meta_validated: MetadataBuf<ValidatedPrefix>,
+    pub element_judged: ElementBuf<JudgedPrefix>,
+    pub meta_judged: MetadataBuf<JudgedPrefix>,
     // Cached data
     pub element_cache: ElementBuf,
     pub meta_cache: MetadataBuf,
@@ -553,8 +618,8 @@ impl SysValidationWorkspace {
         let element_pending = ElementBuf::pending(env.clone(), dbs)?;
         let meta_pending = MetadataBuf::pending(env.clone(), dbs)?;
 
-        let element_validated = ElementBuf::validated(env.clone(), dbs)?;
-        let meta_validated = MetadataBuf::validated(env, dbs)?;
+        let element_judged = ElementBuf::judged(env.clone(), dbs)?;
+        let meta_judged = MetadataBuf::judged(env, dbs)?;
 
         Ok(Self {
             integration_limbo,
@@ -563,8 +628,8 @@ impl SysValidationWorkspace {
             meta_vault,
             element_pending,
             meta_pending,
-            element_validated,
-            meta_validated,
+            element_judged,
+            meta_judged,
             element_cache,
             meta_cache,
         })
@@ -590,13 +655,9 @@ impl SysValidationWorkspace {
         disintegrate_single_metadata(iv.op.clone(), &self.element_pending, &mut self.meta_pending)
             .await?;
         disintegrate_single_op(iv.op.clone(), &mut self.element_pending);
-        integrate_single_op(op, &mut self.element_validated).await?;
-        integrate_single_metadata(
-            iv.op.clone(),
-            &self.element_validated,
-            &mut self.meta_validated,
-        )
-        .await?;
+        integrate_single_op(op, &mut self.element_judged).await?;
+        integrate_single_metadata(iv.op.clone(), &self.element_judged, &mut self.meta_judged)
+            .await?;
         self.integration_limbo.put(hash, iv)?;
         Ok(())
     }
@@ -612,8 +673,8 @@ impl Workspace for SysValidationWorkspace {
 
         self.element_pending.flush_to_txn(writer)?;
         self.meta_pending.flush_to_txn(writer)?;
-        self.element_validated.flush_to_txn(writer)?;
-        self.meta_validated.flush_to_txn(writer)?;
+        self.element_judged.flush_to_txn(writer)?;
+        self.meta_judged.flush_to_txn(writer)?;
         Ok(())
     }
 }

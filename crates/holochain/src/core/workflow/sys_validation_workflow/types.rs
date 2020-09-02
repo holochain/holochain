@@ -61,7 +61,25 @@ pub enum Dependency<T> {
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Dependencies {
-    pub deps: Vec<DhtOpHash>,
+    pub deps: Vec<DepType>,
+}
+
+/// Dependencies can either be fixed to a specific element or
+/// any element with the same entry. This changes how we handle
+/// dependencies that turn out to be invalid.
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub enum DepType {
+    Fixed(DhtOpHash),
+    Any(DhtOpHash),
+}
+
+/// Sets the level required for validation
+#[derive(Clone, Debug, Copy)]
+pub enum CheckLevel {
+    /// Selected dependencies must be held by this agent
+    Holding,
+    /// Selected dependencies must be held by another authority
+    Dht,
 }
 
 impl<T> Dependency<T> {
@@ -103,7 +121,25 @@ impl Dependencies {
     pub fn awaiting_proof(&self) -> bool {
         self.deps.len() > 0
     }
-    pub async fn store_entry(&mut self, dep: Dependency<Element>) -> SysValidationResult<Element> {
+    /// A store entry dependency where you don't care which element was found
+    pub async fn store_entry_any(
+        &mut self,
+        dep: Dependency<Element>,
+    ) -> SysValidationResult<Element> {
+        self.store_entry(dep, true).await
+    }
+    /// A store entry dependency with a dependency on a specific element
+    pub async fn store_entry_fixed(
+        &mut self,
+        dep: Dependency<Element>,
+    ) -> SysValidationResult<Element> {
+        self.store_entry(dep, false).await
+    }
+    async fn store_entry(
+        &mut self,
+        dep: Dependency<Element>,
+        any: bool,
+    ) -> SysValidationResult<Element> {
         let el = match dep {
             Dependency::Proof(el) => el,
             Dependency::AwaitingProof(el) => {
@@ -113,7 +149,11 @@ impl Dependencies {
                     .try_into()
                     .map_err(|_| ValidationError::NotNewEntry(el.header().clone()))?;
                 let hash = DhtOpHash::with_data(&UniqueForm::StoreEntry(&header)).await;
-                self.deps.push(hash);
+                if any {
+                    self.deps.push(DepType::Any(hash));
+                } else {
+                    self.deps.push(hash.into());
+                }
                 el
             }
             Dependency::Claim(el) => el,
@@ -129,7 +169,7 @@ impl Dependencies {
             Dependency::AwaitingProof(shh) => {
                 let header = shh.header();
                 let hash = DhtOpHash::with_data(&UniqueForm::StoreElement(header)).await;
-                self.deps.push(hash);
+                self.deps.push(hash.into());
                 shh
             }
             Dependency::Claim(shh) => shh,
@@ -150,7 +190,7 @@ impl Dependencies {
                     .try_into()
                     .map_err(|_| ValidationError::NotLinkAdd(shh.header_address().clone()))?;
                 let hash = DhtOpHash::with_data(&UniqueForm::RegisterAddLink(&header)).await;
-                self.deps.push(hash);
+                self.deps.push(hash.into());
                 shh
             }
             Dependency::Claim(shh) => shh,
@@ -167,7 +207,7 @@ impl Dependencies {
             Dependency::AwaitingProof(shh) => {
                 let header = shh.header();
                 let hash = DhtOpHash::with_data(&UniqueForm::RegisterAgentActivity(header)).await;
-                self.deps.push(hash);
+                self.deps.push(hash.into());
                 shh
             }
             Dependency::Claim(shh) => shh,
@@ -188,6 +228,29 @@ impl From<&DhtOp> for DhtOpOrder {
             DhtOp::RegisterDeletedEntryHeader(_, h) => RegisterDeletedEntryHeader(h.timestamp),
             DhtOp::RegisterAddLink(_, h) => RegisterAddLink(h.timestamp),
             DhtOp::RegisterRemoveLink(_, h) => RegisterRemoveLink(h.timestamp),
+        }
+    }
+}
+
+impl From<DepType> for DhtOpHash {
+    fn from(d: DepType) -> Self {
+        match d {
+            DepType::Fixed(h) | DepType::Any(h) => h,
+        }
+    }
+}
+
+impl From<DhtOpHash> for DepType {
+    /// Creates a fixed dependency type
+    fn from(d: DhtOpHash) -> Self {
+        DepType::Fixed(d)
+    }
+}
+
+impl AsRef<DhtOpHash> for DepType {
+    fn as_ref(&self) -> &DhtOpHash {
+        match self {
+            DepType::Fixed(h) | DepType::Any(h) => h,
         }
     }
 }

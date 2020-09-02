@@ -66,19 +66,27 @@ impl ElementBuf<IntegratedPrefix> {
 }
 
 impl ElementBuf<PendingPrefix> {
-    /// Create a element buf for all pending elements.
+    /// Create a element buf for all elements pending validation.
     /// This reuses the database but is the data is completely separate.
     pub fn pending(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
         ElementBuf::new_vault(env, dbs, true)
     }
 }
 
-impl ElementBuf<ValidatedPrefix> {
+impl ElementBuf<JudgedPrefix> {
     /// Create a element buf for all elements that have progressed past validation.
     /// Note this doesn't mean they are Valid only that validation has run and
     /// come up with a [ValidationStatus].
     /// This reuses the database but is the data is completely separate.
-    pub fn validated(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
+    pub fn judged(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
+        ElementBuf::new_vault(env, dbs, true)
+    }
+}
+
+impl ElementBuf<RejectedPrefix> {
+    /// Create a element buf for all elements that have been rejected.
+    /// This reuses the database but is the data is completely separate.
+    pub fn rejected(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
         ElementBuf::new_vault(env, dbs, true)
     }
 }

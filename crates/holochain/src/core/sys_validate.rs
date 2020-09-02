@@ -1,6 +1,5 @@
 use super::{
     state::{
-        cascade::Cascade,
         element_buf::ElementBuf,
         metadata::{LinkMetaKey, MetadataBufT},
     },
@@ -13,7 +12,7 @@ use crate::conductor::{
 use fallible_iterator::FallibleIterator;
 use holochain_keystore::{AgentPubKeyExt, Signature};
 use holochain_state::{fresh_reader, prelude::PrefixType};
-use holochain_types::{header::NewEntryHeaderRef, Entry, EntryHashed};
+use holochain_types::{header::NewEntryHeaderRef, Entry};
 use holochain_zome_types::{
     element::SignedHeaderHashed,
     entry_def::{EntryDef, EntryVisibility},

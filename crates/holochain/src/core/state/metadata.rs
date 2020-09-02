@@ -46,7 +46,10 @@ mod mock;
 /// Trait for the [MetadataBuf]
 /// Needed for mocking
 #[async_trait::async_trait]
-pub trait MetadataBufT {
+pub trait MetadataBufT<P = IntegratedPrefix>
+where
+    P: PrefixType,
+{
     // Links
     /// Get all the links on this base that match the tag
     /// that do not have removes on them
@@ -221,11 +224,20 @@ impl MetadataBuf<PendingPrefix> {
     }
 }
 
-impl MetadataBuf<ValidatedPrefix> {
-    /// Create a [MetadataBuf] with the vault databases using the ValidatedPrefix.
+impl MetadataBuf<JudgedPrefix> {
+    /// Create a [MetadataBuf] with the vault databases using the JudgedPrefix.
     /// The data in the type will be separate from the other prefixes even though the
     /// database is shared.
-    pub fn validated(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
+    pub fn judged(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
+        Self::new_vault(env, dbs)
+    }
+}
+
+impl MetadataBuf<RejectedPrefix> {
+    /// Create a [MetadataBuf] with the vault databases using the RejectedPrefix.
+    /// The data in the type will be separate from the other prefixes even though the
+    /// database is shared.
+    pub fn rejected(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
         Self::new_vault(env, dbs)
     }
 }
@@ -316,7 +328,7 @@ where
 }
 
 #[async_trait::async_trait]
-impl<P> MetadataBufT for MetadataBuf<P>
+impl<P> MetadataBufT<P> for MetadataBuf<P>
 where
     P: PrefixType,
 {

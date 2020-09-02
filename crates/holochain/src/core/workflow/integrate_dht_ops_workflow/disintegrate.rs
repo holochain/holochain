@@ -1,11 +1,15 @@
 use super::*;
 use holo_hash::EntryHash;
 
-pub async fn disintegrate_single_metadata<C: MetadataBufT, P: PrefixType>(
+pub async fn disintegrate_single_metadata<C, P>(
     op: DhtOpLight,
     element_store: &ElementBuf<P>,
     meta_store: &mut C,
-) -> DhtOpConvertResult<()> {
+) -> DhtOpConvertResult<()>
+where
+    P: PrefixType,
+    C: MetadataBufT<P>,
+{
     match op {
         DhtOpLight::StoreElement(hash, _, _) => {
             meta_store.deregister_element_header(hash).await?;
@@ -41,10 +45,12 @@ pub async fn disintegrate_single_metadata<C: MetadataBufT, P: PrefixType>(
     Ok(())
 }
 
-// #[allow(unreachable_code, unused_variables)]
+/// DISABLED
+/// TODO: figure out how to garbage collect ops without removing another ops data
+pub fn disintegrate_single_op<P: PrefixType>(_op: DhtOpLight, _element_store: &mut ElementBuf<P>) {}
+
 /// Store a DhtOp's data in an element buf without dependency checks
-pub fn disintegrate_single_op<P: PrefixType>(op: DhtOpLight, element_store: &mut ElementBuf<P>) {
-    return;
+pub fn _disintegrate_single_op<P: PrefixType>(op: DhtOpLight, element_store: &mut ElementBuf<P>) {
     match op {
         DhtOpLight::StoreElement(header, maybe_entry, _) => {
             delete_data(header, maybe_entry, element_store);
