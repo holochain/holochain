@@ -16,3 +16,9 @@ impl CallZomeWorkspaceLock {
         todo!()
     }
 }
+
+impl From<CallZomeWorkspace> for CallZomeWorkspaceLock {
+    fn from(w: CallZomeWorkspace) -> Self {
+        Self::new(w)
+    }
+}

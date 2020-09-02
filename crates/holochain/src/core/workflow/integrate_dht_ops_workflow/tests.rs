@@ -719,9 +719,11 @@ async fn genesis<'env>(env: EnvironmentWrite) {
         .await
         .unwrap();
     fake_genesis(&mut workspace.source_chain).await.unwrap();
-    env_ref
-        .with_commit(|writer| workspace.flush_to_txn(writer))
-        .unwrap();
+    {
+        env.guard()
+            .with_commit(|writer| workspace.flush_to_txn(writer))
+            .unwrap();
+    }
 }
 
 async fn commit_entry<'env>(
@@ -733,6 +735,7 @@ async fn commit_entry<'env>(
     let mut workspace = CallZomeWorkspace::new(env.clone().into(), &env_ref)
         .await
         .unwrap();
+    let workspace_lock = CallZomeWorkspaceLock::new(workspace);
 
     // Create entry def with the correct zome name
     let entry_def_id = fixt!(EntryDefId);
@@ -786,9 +789,8 @@ async fn commit_entry<'env>(
     let input = CommitEntryInput::new((entry_def_id.clone(), entry.clone()));
 
     let output = {
-        let (_g, workspace_lock) = CallZomeWorkspaceLock::from_mut(&mut workspace);
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace_lock;
+        host_access.workspace = workspace_lock.clone();
         call_context.host_access = host_access.into();
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
@@ -796,9 +798,12 @@ async fn commit_entry<'env>(
     };
 
     // Write
-    env_ref
-        .with_commit(|writer| workspace.flush_to_txn(writer))
-        .unwrap();
+    {
+        let mut workspace = workspace_lock.write().await;
+        env.guard()
+            .with_commit(|writer| workspace.flush_to_txn_ref(writer))
+            .unwrap();
+    }
 
     let entry_hash = holochain_types::entry::EntryHashed::from_content(entry)
         .await
@@ -812,6 +817,7 @@ async fn get_entry(env: EnvironmentWrite, entry_hash: EntryHash) -> Option<Entry
     let mut workspace = CallZomeWorkspace::new(env.clone().into(), &env_ref)
         .await
         .unwrap();
+    let workspace_lock = CallZomeWorkspaceLock::new(workspace);
 
     // Create ribosome mock to return fixtures
     // This is a lot faster then compiling a zome
@@ -822,7 +828,6 @@ async fn get_entry(env: EnvironmentWrite, entry_hash: EntryHash) -> Option<Entry
     let input = GetInput::new((entry_hash.clone().into(), GetOptions));
 
     let output = {
-        let (_g, workspace_lock) = CallZomeWorkspaceLock::from_mut(&mut workspace);
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock;
         call_context.host_access = host_access.into();
@@ -844,6 +849,7 @@ async fn link_entries(
     let mut workspace = CallZomeWorkspace::new(env.clone().into(), &env_ref)
         .await
         .unwrap();
+    let workspace_lock = CallZomeWorkspaceLock::new(workspace);
 
     // Create data for calls
     let mut dna_file = DnaFileFixturator::new(Empty).next().unwrap();
@@ -868,10 +874,8 @@ async fn link_entries(
     let input = LinkEntriesInput::new((base_address.into(), target_address.into(), link_tag));
 
     let output = {
-        let (_g, workspace_lock) = CallZomeWorkspaceLock::from_mut(&mut workspace);
-
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace_lock;
+        host_access.workspace = workspace_lock.clone();
         call_context.host_access = host_access.into();
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
@@ -880,9 +884,12 @@ async fn link_entries(
     };
 
     // Write the changes
-    env_ref
-        .with_commit(|writer| workspace.flush_to_txn(writer))
-        .unwrap();
+    {
+        let mut workspace = workspace_lock.write().await;
+        env.guard()
+            .with_commit(|writer| workspace.flush_to_txn_ref(writer))
+            .unwrap();
+    }
 
     // Get the LinkAdd HeaderHash back
     output.into_inner()
@@ -898,6 +905,7 @@ async fn get_links(
     let mut workspace = CallZomeWorkspace::new(env.clone().into(), &env_ref)
         .await
         .unwrap();
+    let workspace_lock = CallZomeWorkspaceLock::new(workspace);
 
     // Create data for calls
     let mut dna_file = DnaFileFixturator::new(Empty).next().unwrap();
@@ -924,8 +932,6 @@ async fn get_links(
     let input = GetLinksInput::new((base_address.into(), Some(link_tag)));
 
     let output = {
-        let (_g, workspace_lock) = CallZomeWorkspaceLock::from_mut(&mut workspace);
-
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock;
         host_access.network = cell_network;

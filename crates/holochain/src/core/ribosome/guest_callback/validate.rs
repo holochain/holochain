@@ -267,16 +267,13 @@ mod slow_tests {
     use super::ValidateResult;
     use crate::core::ribosome::RibosomeT;
     use crate::core::state::source_chain::SourceChainResult;
-    use crate::core::workflow::{call_zome_workflow::CallZomeWorkspace, CallZomeWorkspaceLock};
+    use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
     use crate::fixt::curve::Zomes;
     use crate::fixt::ValidateInvocationFixturator;
     use crate::fixt::WasmRibosomeFixturator;
     use crate::fixt::ZomeCallHostAccessFixturator;
     use fixt::prelude::*;
-    use futures::future::BoxFuture;
-    use futures::future::FutureExt;
     use holo_hash::fixt::AgentPubKeyFixturator;
-    use holo_hash::HeaderHash;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::CommitEntryOutput;
     use holochain_zome_types::Entry;
@@ -377,21 +374,17 @@ mod slow_tests {
             crate::call_test_ribosome!(host_access, TestWasm::Validate, "always_validates", ());
 
         // the chain head should be the committed entry header
-        let call =
-            |workspace: &'a mut CallZomeWorkspace| -> BoxFuture<'a, SourceChainResult<HeaderHash>> {
-                async move {
-                    let source_chain = &mut workspace.source_chain;
-                    Ok(source_chain.chain_head()?.to_owned())
-                }
-                .boxed()
-            };
-        let chain_head =
-            tokio_safe_block_on::tokio_safe_block_forever_on(tokio::task::spawn(async move {
-                unsafe { workspace_lock.apply_mut(call).await }
-            }))
-            .unwrap()
-            .unwrap()
-            .unwrap();
+        let chain_head = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+            SourceChainResult::Ok(
+                workspace_lock
+                    .read()
+                    .await
+                    .source_chain
+                    .chain_head()?
+                    .to_owned(),
+            )
+        })
+        .unwrap();
 
         assert_eq!(chain_head, output.into_inner(),);
     }
@@ -420,21 +413,17 @@ mod slow_tests {
             crate::call_test_ribosome!(host_access, TestWasm::Validate, "never_validates", ());
 
         // the chain head should be the committed entry header
-        let call =
-            |workspace: &'a mut CallZomeWorkspace| -> BoxFuture<'a, SourceChainResult<HeaderHash>> {
-                async move {
-                    let source_chain = &mut workspace.source_chain;
-                    Ok(source_chain.chain_head()?.to_owned())
-                }
-                .boxed()
-            };
-        let chain_head =
-            tokio_safe_block_on::tokio_safe_block_forever_on(tokio::task::spawn(async move {
-                unsafe { workspace_lock.apply_mut(call).await }
-            }))
-            .unwrap()
-            .unwrap()
-            .unwrap();
+        let chain_head = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+            SourceChainResult::Ok(
+                workspace_lock
+                    .read()
+                    .await
+                    .source_chain
+                    .chain_head()?
+                    .to_owned(),
+            )
+        })
+        .unwrap();
 
         assert_eq!(chain_head, output.into_inner(),);
     }

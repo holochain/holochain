@@ -91,11 +91,9 @@ pub mod tests {
         let test_env = test_cell_env();
         let env = test_env.env();
         let dbs = env.dbs();
-        let mut workspace = InitializeZomesWorkspace(
-            CallZomeWorkspace::new(env.clone().into(), &dbs)
-                .await
-                .unwrap(),
-        );
+        let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
+            .await
+            .unwrap();
         let mut ribosome = MockRibosomeT::new();
 
         // Setup the ribosome mock
@@ -104,21 +102,23 @@ pub mod tests {
             .returning(move |_workspace, _invocation| Ok(InitResult::Pass));
 
         // Genesis
-        fake_genesis(&mut workspace.0.source_chain).await.unwrap();
+        fake_genesis(&mut workspace.source_chain).await.unwrap();
 
         let dna_def = DnaDefFixturator::new(Unpredictable).next().unwrap();
 
         let args = InitializeZomesWorkflowArgs { ribosome, dna_def };
         let keystore = fixt!(KeystoreSender);
         let network = fixt!(HolochainP2pCell);
-        initialize_zomes_workflow_inner(&mut workspace, network, keystore, args)
+        let workspace_lock = CallZomeWorkspaceLock::new(workspace);
+        initialize_zomes_workflow_inner(workspace_lock.clone(), network, keystore, args)
             .await
             .unwrap();
 
         // Check init is added to the workspace
         assert_matches!(
-            *workspace
-                .0
+            workspace_lock
+                .read()
+                .await
                 .source_chain
                 .get_at_index(3)
                 .unwrap()

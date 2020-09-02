@@ -132,9 +132,7 @@ pub mod wasm_test {
     use crate::fixt::WasmRibosomeFixturator;
     use crate::fixt::ZomeCallHostAccessFixturator;
     use fixt::prelude::*;
-    use futures::future::BoxFuture;
-    use futures::future::FutureExt;
-    use holo_hash::{AnyDhtHash, EntryHash, HeaderHash};
+    use holo_hash::{AnyDhtHash, EntryHash};
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::fixt::AppEntry;
     use holochain_wasm_test_utils::TestWasm;
@@ -223,21 +221,17 @@ pub mod wasm_test {
         let output = commit_entry(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
 
         // the chain head should be the committed entry header
-        let call =
-            |workspace: &'a mut CallZomeWorkspace| -> BoxFuture<'a, SourceChainResult<HeaderHash>> {
-                async move {
-                    let source_chain = &mut workspace.source_chain;
-                    Ok(source_chain.chain_head()?.to_owned())
-                }
-                .boxed()
-            };
-        let chain_head =
-            tokio_safe_block_on::tokio_safe_block_forever_on(tokio::task::spawn(async move {
-                unsafe { workspace_lock.apply_mut(call).await }
-            }))
-            .unwrap()
-            .unwrap()
-            .unwrap();
+        let chain_head = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+            SourceChainResult::Ok(
+                workspace_lock
+                    .read()
+                    .await
+                    .source_chain
+                    .chain_head()?
+                    .to_owned(),
+            )
+        })
+        .unwrap();
 
         assert_eq!(chain_head, output.into_inner(),);
     }
@@ -266,22 +260,17 @@ pub mod wasm_test {
             crate::call_test_ribosome!(host_access, TestWasm::CommitEntry, "commit_entry", ());
 
         // the chain head should be the committed entry header
-        let call =
-            |workspace: &'a mut CallZomeWorkspace| -> BoxFuture<'a, SourceChainResult<HeaderHash>> {
-                async move {
-                    let source_chain = &mut workspace.source_chain;
-                    Ok(source_chain.chain_head()?.to_owned())
-                }
-                .boxed()
-            };
-        let cloned_workspace = workspace_lock.clone();
-        let chain_head =
-            tokio_safe_block_on::tokio_safe_block_forever_on(tokio::task::spawn(async move {
-                unsafe { cloned_workspace.apply_mut(call).await }
-            }))
-            .unwrap()
-            .unwrap()
-            .unwrap();
+        let chain_head = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+            SourceChainResult::Ok(
+                workspace_lock
+                    .read()
+                    .await
+                    .source_chain
+                    .chain_head()?
+                    .to_owned(),
+            )
+        })
+        .unwrap();
 
         assert_eq!(&chain_head, output.inner_ref());
 

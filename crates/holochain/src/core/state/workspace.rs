@@ -68,8 +68,8 @@ pub mod tests {
 
     impl Workspace for TestWorkspace {
         fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> WorkspaceResult<()> {
-            self.one.flush_to_txn(writer)?;
-            self.two.flush_to_txn(writer)?;
+            self.one.flush_to_txn_ref(writer)?;
+            self.two.flush_to_txn_ref(writer)?;
             Ok(())
         }
     }
