@@ -64,9 +64,8 @@ pub mod slow_tests {
         let env = test_env.env();
         let dbs = env.dbs();
 
-        let mut workspace = crate::core::workflow::CallZomeWorkspace::new(env.clone().into(), &dbs)
-            .await
-            .unwrap();
+        let mut workspace =
+            crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
 
         // commits fail validation if we don't do genesis
         crate::core::workflow::fake_genesis(&mut workspace.source_chain)

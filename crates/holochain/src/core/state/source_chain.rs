@@ -41,7 +41,7 @@ impl SourceChain {
         self.0.chain_head().ok_or(SourceChainError::ChainEmpty)
     }
 
-    pub async fn new(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
+    pub fn new(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
         Ok(SourceChainBuf::new(env, dbs)?.into())
     }
 
@@ -232,7 +232,7 @@ pub mod tests {
         }
 
         {
-            let mut chain = SourceChain::new(arc.clone().into(), &env).await?;
+            let mut chain = SourceChain::new(arc.clone().into(), &env)?;
             chain.put_cap_grant(grant.clone()).await?;
 
             // ideally the following would work, but it won't because currently
@@ -248,7 +248,7 @@ pub mod tests {
         }
 
         {
-            let chain = SourceChain::new(arc.clone().into(), &env).await?;
+            let chain = SourceChain::new(arc.clone().into(), &env)?;
             assert_eq!(
                 chain.get_persisted_cap_grant_by_secret(secret).await?,
                 Some(grant.into())
@@ -275,7 +275,7 @@ pub mod tests {
         }
 
         {
-            let mut chain = SourceChain::new(arc.clone().into(), &env).await?;
+            let mut chain = SourceChain::new(arc.clone().into(), &env)?;
             chain.put_cap_claim(claim.clone()).await?;
 
             // ideally the following would work, but it won't because currently
@@ -291,7 +291,7 @@ pub mod tests {
         }
 
         {
-            let chain = SourceChain::new(arc.clone().into(), &env).await?;
+            let chain = SourceChain::new(arc.clone().into(), &env)?;
             assert_eq!(
                 chain.get_persisted_cap_claim_by_secret(&secret).await?,
                 Some(claim)

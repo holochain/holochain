@@ -715,9 +715,7 @@ async fn produce_dht_ops<'env>(env: EnvironmentWrite) {
 /// Run genesis on the source chain
 async fn genesis<'env>(env: EnvironmentWrite) {
     let env_ref = env.guard();
-    let mut workspace = CallZomeWorkspace::new(env.clone().into(), &env_ref)
-        .await
-        .unwrap();
+    let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
     fake_genesis(&mut workspace.source_chain).await.unwrap();
     {
         env.guard()
@@ -732,9 +730,7 @@ async fn commit_entry<'env>(
     zome_name: ZomeName,
 ) -> (EntryHash, HeaderHash) {
     let env_ref = env.guard();
-    let workspace = CallZomeWorkspace::new(env.clone().into(), &env_ref)
-        .await
-        .unwrap();
+    let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
     let workspace_lock = CallZomeWorkspaceLock::new(workspace);
 
     // Create entry def with the correct zome name
@@ -814,9 +810,7 @@ async fn commit_entry<'env>(
 
 async fn get_entry(env: EnvironmentWrite, entry_hash: EntryHash) -> Option<Entry> {
     let env_ref = env.guard();
-    let workspace = CallZomeWorkspace::new(env.clone().into(), &env_ref)
-        .await
-        .unwrap();
+    let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
     let workspace_lock = CallZomeWorkspaceLock::new(workspace);
 
     // Create ribosome mock to return fixtures
@@ -846,9 +840,7 @@ async fn link_entries(
     link_tag: LinkTag,
 ) -> HeaderHash {
     let env_ref = env.guard();
-    let workspace = CallZomeWorkspace::new(env.clone().into(), &env_ref)
-        .await
-        .unwrap();
+    let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
     let workspace_lock = CallZomeWorkspaceLock::new(workspace);
 
     // Create data for calls
@@ -902,9 +894,7 @@ async fn get_links(
     link_tag: LinkTag,
 ) -> Links {
     let env_ref = env.guard();
-    let workspace = CallZomeWorkspace::new(env.clone().into(), &env_ref)
-        .await
-        .unwrap();
+    let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
     let workspace_lock = CallZomeWorkspaceLock::new(workspace);
 
     // Create data for calls
@@ -1106,9 +1096,7 @@ async fn test_wasm_api_without_integration_delete() {
 
     {
         let reader = env_ref.reader().unwrap();
-        let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
-            .await
-            .unwrap();
+        let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
         let entry_header = workspace
             .meta
             .get_headers(&reader, base_address.clone())
@@ -1278,9 +1266,7 @@ mod slow_tests {
             let dbs = cell_env.dbs();
             let env_ref = cell_env.guard();
 
-            let mut workspace = CallZomeWorkspace::new(cell_env.clone().into(), &dbs)
-                .await
-                .unwrap();
+            let mut workspace = CallZomeWorkspace::new(cell_env.clone().into()).unwrap();
 
             let header_builder = builder::EntryCreate {
                 entry_type: EntryType::App(AppEntryType::new(

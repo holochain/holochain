@@ -91,9 +91,7 @@ pub mod tests {
         let test_env = test_cell_env();
         let env = test_env.env();
         let dbs = env.dbs();
-        let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
-            .await
-            .unwrap();
+        let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
         let mut ribosome = MockRibosomeT::new();
 
         // Setup the ribosome mock

@@ -679,7 +679,7 @@ impl Cell {
         let arc = self.state_env();
         let keystore = arc.keystore().clone();
         let env = arc.guard();
-        let workspace = CallZomeWorkspace::new(self.state_env().clone().into(), &env).await?;
+        let workspace = CallZomeWorkspace::new(self.state_env().clone().into())?;
 
         let args = CallZomeWorkflowArgs {
             ribosome: self.get_ribosome().await?,
@@ -706,8 +706,7 @@ impl Cell {
         let conductor_api = self.conductor_api.clone();
         let env_ref = state_env.guard();
         // Create the workspace
-        let workspace = CallZomeWorkspace::new(self.state_env().clone().into(), &env_ref)
-            .await
+        let workspace = CallZomeWorkspace::new(self.state_env().clone().into())
             .map_err(WorkflowError::from)
             .map_err(Box::new)?;
 

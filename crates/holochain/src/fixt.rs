@@ -21,6 +21,7 @@ use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostAccess;
 use crate::core::ribosome::ZomeCallHostAccess;
 use crate::core::state::metadata::LinkMetaVal;
+use crate::core::workflow::CallZomeWorkspace;
 use crate::core::workflow::CallZomeWorkspaceLock;
 use ::fixt::prelude::*;
 pub use holo_hash::fixt::*;
@@ -262,7 +263,12 @@ fixturator!(
 fixturator!(
     CallZomeWorkspaceLock;
     curve Empty {
-        CallZomeWorkspaceLock::null()
+        // XXX: This may not be great to just grab an environment for this purpose.
+        //      It is assumed that this value is never really used in any "real"
+        //      way, because previously, it was implemented as a null pointer
+        //      wrapped in an UnsafeZomeCallWorkspace
+        let env = holochain_state::test_utils::test_cell_env();
+        CallZomeWorkspaceLock::new(CallZomeWorkspace::new(env.env().into()).unwrap())
     };
     curve Unpredictable {
         CallZomeWorkspaceLockFixturator::new(Empty)

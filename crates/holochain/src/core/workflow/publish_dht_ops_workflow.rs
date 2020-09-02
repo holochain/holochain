@@ -513,8 +513,7 @@ mod tests {
 
                 // Genesis and produce ops to clear these from the chains
                 {
-                    let mut source_chain =
-                        SourceChain::new(env.clone().into(), &dbs).await.unwrap();
+                    let mut source_chain = SourceChain::new(env.clone().into(), &dbs).unwrap();
                     fake_genesis(&mut source_chain).await.unwrap();
                     env_ref
                         .with_commit::<SourceChainError, _, _>(|writer| {
@@ -547,8 +546,7 @@ mod tests {
 
                 // Put data in elements
                 let (entry_create_header, entry_update_header) = {
-                    let mut source_chain =
-                        SourceChain::new(env.clone().into(), &dbs).await.unwrap();
+                    let mut source_chain = SourceChain::new(env.clone().into(), &dbs).unwrap();
                     let original_header_address = source_chain
                         .put(
                             builder::EntryCreate {

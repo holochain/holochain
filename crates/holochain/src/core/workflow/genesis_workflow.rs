@@ -153,7 +153,7 @@ pub mod tests {
         }
 
         {
-            let source_chain = SourceChain::new(arc.clone().into(), &dbs).await?;
+            let source_chain = SourceChain::new(arc.clone().into(), &dbs)?;
             assert_eq!(source_chain.agent_pubkey()?, agent_pubkey);
             source_chain.chain_head().expect("chain head should be set");
 

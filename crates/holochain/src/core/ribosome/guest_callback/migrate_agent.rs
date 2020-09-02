@@ -173,8 +173,8 @@ mod test {
         }
     }
 
-    #[test]
-    fn migrate_agent_invocation_allow_side_effects() {
+    #[tokio::test(threaded_scheduler)]
+    async fn migrate_agent_invocation_allow_side_effects() {
         use holochain_types::dna::zome::Permission::*;
         let migrate_agent_host_access = MigrateAgentHostAccessFixturator::new(fixt::Unpredictable)
             .next()

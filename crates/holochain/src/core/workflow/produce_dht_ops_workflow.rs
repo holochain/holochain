@@ -159,7 +159,7 @@ mod tests {
         // Setup the database and expected data
         let expected_hashes: HashSet<_> = {
             let mut td = TestData::new();
-            let mut source_chain = SourceChain::new(env.clone().into(), &dbs).await.unwrap();
+            let mut source_chain = SourceChain::new(env.clone().into(), &dbs).unwrap();
 
             // Add genesis so we can use the source chain
             fake_genesis(&mut source_chain).await.unwrap();
