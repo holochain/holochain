@@ -8,6 +8,7 @@ async fn incoming_ops_to_limbo() {
     let TestEnvironment { env, tmpdir: _t } = holochain_state::test_utils::test_cell_env();
     let (sys_validation_trigger, mut rx) = TriggerSender::new();
     let op = DhtOp::RegisterAgentActivity(fixt!(Signature), fixt!(Header));
+    let op_light = op.to_light().await;
     let hash = DhtOpHash::with_data(&op).await;
     let ops = vec![(hash.clone(), op.clone())];
 
@@ -19,5 +20,5 @@ async fn incoming_ops_to_limbo() {
     let env_ref = env.guard();
     let workspace = IncomingDhtOpsWorkspace::new(env.clone().into(), &env_ref).unwrap();
     let r = workspace.validation_limbo.get(&hash).unwrap().unwrap();
-    assert_eq!(r.op, op);
+    assert_eq!(r.op, op_light);
 }

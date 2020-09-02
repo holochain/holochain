@@ -151,7 +151,7 @@ impl SourceChainBuf {
         Ok(header_address)
     }
 
-    pub fn headers(&self) -> &HeaderCas {
+    pub fn headers(&self) -> &HeaderCas<IntegratedPrefix> {
         &self.elements.headers()
     }
 

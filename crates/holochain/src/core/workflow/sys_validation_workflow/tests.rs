@@ -1,7 +1,7 @@
 use crate::{
     conductor::{dna_store::MockDnaStore, ConductorHandle},
     core::{
-        state::validation_db::ValidationLimboStatus,
+        state::{element_buf::ElementBuf, validation_db::ValidationLimboStatus},
         workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace,
     },
     test_utils::{host_fn_api::*, setup_app},
@@ -9,7 +9,7 @@ use crate::{
 use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
 use hdk3::prelude::LinkTag;
-use holo_hash::{AnyDhtHash, EntryHash, HeaderHash};
+use holo_hash::{AnyDhtHash, DhtOpHash, EntryHash, HeaderHash};
 use holochain_serialized_bytes::{SerializedBytes, UnsafeBytes};
 use holochain_state::{fresh_reader_test, prelude::ReadManager};
 use holochain_types::{
@@ -88,6 +88,25 @@ async fn run_test(
 
         let workspace = IncomingDhtOpsWorkspace::new(alice_env.clone().into(), &dbs).unwrap();
         // Validation should be empty
+        let res: Vec<_> = fresh_reader_test!(alice_env, |r| {
+            workspace
+                .validation_limbo
+                .iter(&r)
+                .unwrap()
+                .map(|(k, i)| Ok((k.to_vec(), i)))
+                .collect()
+                .unwrap()
+        });
+        {
+            let s = debug_span!("inspect_ops");
+            let _g = s.enter();
+            let element_buf = ElementBuf::vault(alice_env.clone().into(), &dbs, true).unwrap();
+            for (k, i) in &res {
+                let hash = DhtOpHash::from_raw_bytes(k.clone());
+                let el = element_buf.get_element(&i.op.header_hash()).await.unwrap();
+                debug!(?hash, ?i, op_in_val = ?el);
+            }
+        }
         assert_eq!(
             fresh_reader_test!(alice_env, |r| {
                 workspace
@@ -101,25 +120,34 @@ async fn run_test(
         );
         // Integration should have 9 ops in it
         // Plus another 14 for genesis + init
-        assert_eq!(
-            fresh_reader_test!(alice_env, |r| {
-                workspace
-                    .integrated_dht_ops
-                    .iter(&r)
-                    .unwrap()
-                    // Every op should be valid
-                    .inspect(|(_, i)| {
-                        let s = debug_span!("inspect_ops");
-                        let _g = s.enter();
-                        debug!(?i.op);
-                        assert_eq!(i.validation_status, ValidationStatus::Valid);
-                        Ok(())
-                    })
-                    .count()
-                    .unwrap()
-            }),
-            9 + 14
-        );
+        let res: Vec<_> = fresh_reader_test!(alice_env, |r| {
+            workspace
+                .integrated_dht_ops
+                .iter(&r)
+                .unwrap()
+                // Every op should be valid
+                .inspect(|(_, i)| {
+                    // let s = debug_span!("inspect_ops");
+                    // let _g = s.enter();
+                    debug!(?i.op);
+                    assert_eq!(i.validation_status, ValidationStatus::Valid);
+                    Ok(())
+                })
+                .map(|(_, i)| Ok(i))
+                .collect()
+                .unwrap()
+        });
+        {
+            let s = debug_span!("inspect_ops");
+            let _g = s.enter();
+            let element_buf = ElementBuf::vault(alice_env.clone().into(), &dbs, true).unwrap();
+            for i in &res {
+                let el = element_buf.get_element(&i.op.header_hash()).await.unwrap();
+                debug!(?i.op, op_in_buf = ?el);
+            }
+        }
+
+        assert_eq!(res.len(), 9 + 14);
     }
 
     let (big_entry_header, big_entry_hash, link_add_hash) =

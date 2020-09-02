@@ -1,7 +1,9 @@
-use super::state::{
-    cascade::Cascade,
-    element_buf::ElementBuf,
-    metadata::{LinkMetaKey, MetadataBufT},
+use super::{
+    state::{
+        element_buf::ElementBuf,
+        metadata::{LinkMetaKey, MetadataBufT},
+    },
+    workflow::sys_validation_workflow::SysValidationWorkspace,
 };
 use crate::conductor::{
     api::CellConductorApiT,
@@ -9,8 +11,8 @@ use crate::conductor::{
 };
 use fallible_iterator::FallibleIterator;
 use holochain_keystore::{AgentPubKeyExt, Signature};
-use holochain_state::fresh_reader;
-use holochain_types::{header::NewEntryHeaderRef, Entry, EntryHashed};
+use holochain_state::{fresh_reader, prelude::PrefixType};
+use holochain_types::{header::NewEntryHeaderRef, Entry};
 use holochain_zome_types::{
     element::SignedHeaderHashed,
     entry_def::{EntryDef, EntryVisibility},
@@ -28,8 +30,11 @@ pub use holochain_types::{
     HeaderHashed, Timestamp,
 };
 
+pub use present::*;
+
 #[allow(missing_docs)]
 mod error;
+mod present;
 #[cfg(test)]
 mod tests;
 
@@ -162,22 +167,6 @@ pub async fn verify_header_signature(sig: &Signature, header: &Header) -> SysVal
 /// TODO: This is just a stub until we have dpki.
 pub async fn author_key_is_valid(_author: &AgentPubKey) -> SysValidationResult<()> {
     Ok(())
-}
-
-/// Check the prev header is in the metadata
-pub async fn check_prev_header_in_metadata(
-    author: AgentPubKey,
-    prev_header_hash: &HeaderHash,
-    meta_vault: &impl MetadataBufT,
-) -> SysValidationResult<()> {
-    fresh_reader!(meta_vault.env(), |r| {
-        meta_vault
-            .get_activity(&r, author)?
-            .find(|activity| Ok(prev_header_hash == &activity.header_hash))?
-            .ok_or_else(|| PrevHeaderError::MissingMeta(prev_header_hash.clone()))
-            .map_err(ValidationError::from)?;
-        Ok(())
-    })
 }
 
 /// Check that previous header makes sense
@@ -391,133 +380,4 @@ pub fn check_update_reference(
         )
         .into())
     }
-}
-
-/// Check if we are holding the previous header
-/// in the element vault and metadata vault
-/// and return the header
-pub async fn check_holding_prev_header(
-    author: AgentPubKey,
-    prev_header_hash: &HeaderHash,
-    meta_vault: &impl MetadataBufT,
-    element_vault: &ElementBuf,
-) -> SysValidationResult<()> {
-    check_prev_header_in_metadata(author, prev_header_hash, meta_vault).await?;
-    check_holding_header(&prev_header_hash, &element_vault).await?;
-    Ok(())
-}
-
-/// Check we are actually holding an entry
-pub async fn check_holding_entry(
-    hash: &EntryHash,
-    element_vault: &ElementBuf,
-) -> SysValidationResult<EntryHashed> {
-    element_vault
-        .get_entry(&hash)
-        .await?
-        .ok_or_else(|| ValidationError::NotHoldingDep(hash.clone().into()).into())
-}
-
-/// Check we are actually holding an header
-pub async fn check_holding_header(
-    hash: &HeaderHash,
-    element_vault: &ElementBuf,
-) -> SysValidationResult<SignedHeaderHashed> {
-    element_vault
-        .get_header(&hash)
-        .await?
-        .ok_or_else(|| ValidationError::NotHoldingDep(hash.clone().into()).into())
-}
-
-/// Check we are actually holding an element and the entry
-pub async fn check_holding_element(
-    hash: &HeaderHash,
-    element_vault: &ElementBuf,
-) -> SysValidationResult<Element> {
-    let el = element_vault
-        .get_element(&hash)
-        .await?
-        .ok_or_else(|| ValidationError::NotHoldingDep(hash.clone().into()))?;
-    el.entry()
-        .as_option()
-        .ok_or_else(|| ValidationError::NotHoldingDep(hash.clone().into()))?;
-    Ok(el)
-}
-
-/// Check that the entry exists on the dht
-pub async fn check_entry_exists(
-    entry_hash: EntryHash,
-    mut cascade: Cascade<'_>,
-) -> SysValidationResult<EntryHashed> {
-    cascade
-        .exists_entry(entry_hash.clone(), Default::default())
-        .await?
-        .ok_or_else(|| ValidationError::DepMissingFromDht(entry_hash.into()).into())
-}
-
-/// Check that the header exists on the dht
-pub async fn check_header_exists(
-    hash: HeaderHash,
-    mut cascade: Cascade<'_>,
-) -> SysValidationResult<SignedHeaderHashed> {
-    cascade
-        .exists_header(hash.clone(), Default::default())
-        .await?
-        .ok_or_else(|| ValidationError::DepMissingFromDht(hash.into()).into())
-}
-
-/// Check that the element exists on the dht
-pub async fn check_element_exists(
-    hash: HeaderHash,
-    mut cascade: Cascade<'_>,
-) -> SysValidationResult<Element> {
-    cascade
-        .exists(hash.clone().into(), Default::default())
-        .await?
-        .ok_or_else(|| ValidationError::DepMissingFromDht(hash.into()).into())
-}
-
-/// Check we are holding the header in the metadata
-/// as a reference from the entry
-pub async fn check_header_in_metadata(
-    entry_hash: EntryHash,
-    header_hash: &HeaderHash,
-    meta_vault: &impl MetadataBufT,
-) -> SysValidationResult<()> {
-    fresh_reader!(meta_vault.env(), |r| {
-        meta_vault
-            .get_headers(&r, entry_hash)?
-            .find(|h| Ok(h.header_hash == *header_hash))?
-            .ok_or_else(|| ValidationError::NotHoldingDep(header_hash.clone().into()))?;
-        Ok(())
-    })
-}
-
-/// Check we are holding the add link in the metadata
-/// as a reference from the base entry
-pub async fn check_link_in_metadata(
-    link_add: Header,
-    link_add_hash: &HeaderHash,
-    meta_vault: &impl MetadataBufT,
-) -> SysValidationResult<()> {
-    // Check the header is a LinkAdd
-    let link_add: LinkAdd = link_add
-        .try_into()
-        .map_err(|_| ValidationError::NotLinkAdd(link_add_hash.clone()))?;
-
-    // Full key always returns just one link
-    let link_key = LinkMetaKey::from((&link_add, link_add_hash));
-
-    fresh_reader!(meta_vault.env(), |r| {
-        meta_vault
-            .get_links_all(&r, &link_key)?
-            .next()?
-            .ok_or_else(|| {
-                SysValidationError::from(ValidationError::NotHoldingDep(
-                    link_add_hash.clone().into(),
-                ))
-            })
-    })?;
-    // If the link is there we no the link add is in the metadata
-    Ok(())
 }

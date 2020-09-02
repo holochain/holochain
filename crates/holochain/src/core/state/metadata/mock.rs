@@ -13,7 +13,7 @@ mock! {
         ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError>>>;
         fn add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()>;
         fn remove_link(&mut self, link_remove: LinkRemove) -> DatabaseResult<()>;
-        fn sync_add_create(&self, create: header::EntryCreate) -> DatabaseResult<()>;
+        // fn sync_add_create(&self, create: header::EntryCreate) -> DatabaseResult<()>;
         fn sync_register_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()>;
         fn sync_register_element_header(&mut self, header: &Header) -> DatabaseResult<()>;
         fn sync_register_activity(
@@ -22,8 +22,18 @@ mock! {
         ) -> DatabaseResult<()>;
         fn sync_register_update(&mut self, update: header::EntryUpdate) -> DatabaseResult<()>;
         fn sync_register_delete(&mut self, delete: header::ElementDelete) -> DatabaseResult<()>;
+        fn sync_deregister_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()>;
+        fn sync_deregister_element_header(&mut self, header: HeaderHash) -> DatabaseResult<()>;
+        fn sync_deregister_activity(
+            &mut self,
+            header: Header,
+        ) -> DatabaseResult<()>;
+        fn sync_deregister_update(&mut self, update: header::EntryUpdate) -> DatabaseResult<()>;
+        fn sync_deregister_delete(&mut self, delete: header::ElementDelete) -> DatabaseResult<()>;
         fn register_raw_on_entry(&mut self, entry_hash: EntryHash, value: SysMetaVal) -> DatabaseResult<()>;
         fn register_raw_on_header(&mut self, header_hash: HeaderHash, value: SysMetaVal);
+        fn sync_deregister_add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()>;
+        fn sync_deregister_remove_link(&mut self, link_remove: LinkRemove) -> DatabaseResult<()>;
         fn get_dht_status(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus>;
         fn get_canonical_entry_hash(&self, entry_hash: EntryHash) -> DatabaseResult<EntryHash>;
         fn get_canonical_header_hash(&self, header_hash: HeaderHash) -> DatabaseResult<HeaderHash>;
@@ -171,6 +181,34 @@ impl MetadataBufT for MockMetadataBuf {
 
     async fn register_delete(&mut self, delete: header::ElementDelete) -> DatabaseResult<()> {
         self.sync_register_delete(delete)
+    }
+
+    async fn deregister_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()> {
+        self.sync_deregister_header(new_entry_header)
+    }
+    async fn deregister_element_header(&mut self, header: HeaderHash) -> DatabaseResult<()> {
+        self.sync_deregister_element_header(header)
+    }
+
+    async fn deregister_activity(&mut self, header: Header) -> DatabaseResult<()> {
+        self.sync_deregister_activity(header)
+    }
+
+    async fn deregister_update(&mut self, update: header::EntryUpdate) -> DatabaseResult<()> {
+        self.sync_deregister_update(update)
+    }
+
+    async fn deregister_delete(&mut self, delete: header::ElementDelete) -> DatabaseResult<()> {
+        self.sync_deregister_delete(delete)
+    }
+
+    async fn deregister_add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()> {
+        self.sync_deregister_add_link(link_add)
+    }
+
+    /// Deregister a remove link
+    async fn deregister_remove_link(&mut self, link_remove: LinkRemove) -> DatabaseResult<()> {
+        self.sync_deregister_remove_link(link_remove)
     }
 
     fn register_raw_on_entry(

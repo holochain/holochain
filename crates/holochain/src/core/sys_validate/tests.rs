@@ -206,14 +206,13 @@ async fn check_prev_header_in_metadata_test() {
 
     // Previous header on this hash
     assert_matches!(
-        check_prev_header_in_metadata(author.clone(), &prev_header_hash, &metadata).await,
+        check_prev_header_in_metadata(&author, &prev_header_hash, &metadata).await,
         Ok(())
     );
 
     // No previous header on this hash
     assert_matches!(
-        check_prev_header_in_metadata(author.clone(), &header_fixt.next().unwrap(), &metadata)
-            .await,
+        check_prev_header_in_metadata(&author, &header_fixt.next().unwrap(), &metadata).await,
         Err(SysValidationError::ValidationError(ValidationError::PrevHeaderError(_)))
     );
 }

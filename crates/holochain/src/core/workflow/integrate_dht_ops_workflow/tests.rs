@@ -203,7 +203,7 @@ impl Db {
                 Db::IntQueue(op) => {
                     let value = IntegrationLimboValue {
                         validation_status: ValidationStatus::Valid,
-                        op,
+                        op: op.to_light().await,
                     };
                     let res = workspace
                         .integration_limbo
@@ -431,7 +431,7 @@ impl Db {
                     let op_hash = DhtOpHashed::from_content(op.clone()).await.into_hash();
                     let val = IntegrationLimboValue {
                         validation_status: ValidationStatus::Valid,
-                        op,
+                        op: op.to_light().await,
                     };
                     workspace
                         .integration_limbo
