@@ -49,5 +49,5 @@ tracing-futures = "0.2"
 # holochain_test_utils = { version = "0.0.46-alpha1", path = "../../test_utils" }
 
 [features]
-default = [ "lmdb_no_tls" ]
+default = [ ]
 lmdb_no_tls = [ ]
