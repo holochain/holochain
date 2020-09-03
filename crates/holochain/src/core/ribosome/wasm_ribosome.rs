@@ -58,7 +58,6 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallInvocation;
-use crate::core::ribosome::ZomeCallInvocationResponse;
 use crate::core::ribosome::ZomesToInvoke;
 use fallible_iterator::FallibleIterator;
 use holochain_types::dna::DnaError;
@@ -76,6 +75,7 @@ use holochain_zome_types::validate::ValidationPackageCallbackResult;
 use holochain_zome_types::validate_link_add::ValidateLinkAddCallbackResult;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::CallbackResult;
+use holochain_zome_types::ZomeCallInvocationResponse;
 use holochain_zome_types::{header::ZomeId, GuestOutput};
 use std::sync::Arc;
 
@@ -425,7 +425,7 @@ impl RibosomeT for WasmRibosome {
         host_access: ZomeCallHostAccess,
         invocation: ZomeCallInvocation,
     ) -> RibosomeResult<ZomeCallInvocationResponse> {
-        if invocation.is_authorized(&host_access)? {
+        Ok(if invocation.is_authorized(&host_access)? {
             // make a copy of these for the error handling below
             let zome_name = invocation.zome_name.clone();
             let fn_name = invocation.fn_name.clone();
@@ -438,10 +438,10 @@ impl RibosomeT for WasmRibosome {
                 None => return Err(RibosomeError::ZomeFnNotExists(zome_name, fn_name)),
             };
 
-            Ok(ZomeCallInvocationResponse::ZomeApiFn(guest_output))
+            ZomeCallInvocationResponse::ZomeApiFn(guest_output)
         } else {
-            Err(RibosomeError::Unauthorized)
-        }
+            ZomeCallInvocationResponse::Unauthorized
+        })
     }
 
     fn run_validate(

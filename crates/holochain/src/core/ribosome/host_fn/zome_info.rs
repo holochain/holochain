@@ -42,6 +42,9 @@ pub mod test {
             .await
             .unwrap();
 
+        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+            .await
+            .unwrap();
         let (_g, raw_workspace) =
             crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
                 &mut workspace,

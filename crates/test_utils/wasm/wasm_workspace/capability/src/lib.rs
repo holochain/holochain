@@ -28,11 +28,14 @@ pub fn cap_secret(_: ()) -> ExternResult<CapSecret> {
 
 #[hdk_extern]
 pub fn transferable_cap_grant(secret: CapSecret) -> ExternResult<HeaderHash> {
+    let mut functions: GrantedFunctions = HashSet::new();
+    let this_zome = zome_info!()?.zome_name;
+    functions.insert((this_zome, "needs_cap_claim".into()));
     Ok(commit_cap_grant!(
         CapGrantEntry {
             tag: "".into(),
             access: secret.into(),
-            functions: HashSet::new(),
+            functions,
         }
     )?)
 }
@@ -51,13 +54,12 @@ fn accept_cap_claim(claim: CapClaim) -> ExternResult<HeaderHash> {
 
 #[hdk_extern]
 fn needs_cap_claim(_: ()) -> ExternResult<()> {
-    debug!("called!")?;
     Ok(())
 }
 
 #[hdk_extern]
-fn try_cap_claim(cap_for: CapFor) -> ExternResult<()> {
-    let result: SerializedBytes = call_remote!(
+fn try_cap_claim(cap_for: CapFor) -> ExternResult<ZomeCallInvocationResponse> {
+    let result: ZomeCallInvocationResponse = call_remote!(
         cap_for.1,
         zome_info!()?.zome_name,
         "needs_cap_claim".to_string(),
@@ -65,7 +67,7 @@ fn try_cap_claim(cap_for: CapFor) -> ExternResult<()> {
         ().try_into()?
     )?;
 
-    Ok(result.try_into()?)
+    Ok(result)
 }
 
 

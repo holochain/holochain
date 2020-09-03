@@ -10,7 +10,6 @@ use crate::conductor::api::CellConductorApiT;
 use crate::conductor::handle::ConductorHandle;
 use crate::core::queue_consumer::{spawn_queue_consumer_tasks, InitialQueueTriggers};
 use crate::core::ribosome::ZomeCallInvocation;
-use crate::core::ribosome::ZomeCallInvocationResponse;
 
 use crate::{
     conductor::{api::CellConductorApi, cell::error::CellResult},
@@ -241,10 +240,12 @@ impl Cell {
                 ..
             } => {
                 async {
+                    dbg!("handle_holochain_p2p_event");
                     let res = self
                         .handle_call_remote(from_agent, zome_name, fn_name, cap, request)
                         .await
                         .map_err(holochain_p2p::HolochainP2pError::other);
+                    dbg!(&res);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
                 .instrument(debug_span!("call_remote"))
@@ -665,11 +666,7 @@ impl Cell {
         // double ? because
         // - ConductorApiResult
         // - ZomeCallInvocationResult
-        match self.call_zome(invocation).await?? {
-            ZomeCallInvocationResponse::ZomeApiFn(guest_output) => Ok(guest_output.into_inner()),
-            //currently unreachable
-            //_ => Err(RibosomeError::ZomeFnNotExists(zome_name, "A remote zome call failed in a way that should not be possible.".into()))?,
-        }
+        Ok(self.call_zome(invocation).await??.try_into()?)
     }
 
     /// Function called by the Conductor

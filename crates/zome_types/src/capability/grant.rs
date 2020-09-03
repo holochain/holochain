@@ -18,6 +18,12 @@ pub enum CapGrant {
     ZomeCall(ZomeCallCapGrant),
 }
 
+impl From<holo_hash::AgentPubKey> for CapGrant {
+    fn from(agent_hash: holo_hash::AgentPubKey) -> Self {
+        CapGrant::Authorship(agent_hash)
+    }
+}
+
 #[derive(Default, PartialEq, Eq, Debug, Clone, serde::Serialize, serde::Deserialize)]
 /// @todo the ability to forcibly curry payloads into functions that are called with a claim
 pub struct CurryPayloads(pub BTreeMap<GrantedFunction, SerializedBytes>);
@@ -71,19 +77,56 @@ impl CapGrant {
         }
     }
 
-    /// Get the CapAccess data in order to check authorization
-    pub fn access(&self) -> CapAccess {
+    /// given a grant, is it valid in isolation?
+    /// in a world of CRUD, some new entry might update or delete an existing one, but we can check
+    /// if a grant is valid in a standalone way
+    pub fn is_valid(
+        &self,
+        check_function: &GrantedFunction,
+        check_agent: &AgentPubKey,
+        check_secret: &CapSecret,
+    ) -> bool {
         match self {
-            CapGrant::Authorship(agent_pubkey) => CapAccess::Assigned {
-                // there is nothing meaningful about a self-assigned secret so we might as well
-                // zero it out to (hopefully) make it very clear that this has a different security
-                // and access model (i.e. that the caller of the function is the current agent).
-                secret: ().into(),
-                assignees: [agent_pubkey.clone()].iter().cloned().collect(),
-            },
-            CapGrant::ZomeCall(ZomeCallCapGrant { access, .. }) => access.clone(),
+            // the grant is valid always if the author matches the check agent
+            CapGrant::Authorship(author) => author == check_agent,
+            // otherwise we need to do more work
+            CapGrant::ZomeCall(ZomeCallCapGrant {
+                access, functions, ..
+            }) => {
+                // the checked function needs to be in the grant
+                functions.contains(check_function)
+                // the agent needs to be in the grant
+                && match access {
+                    // the grant is assigned so the agent needs to match
+                    CapAccess::Assigned { assignees, .. } => assignees.contains(check_agent),
+                    // the grant has no assignees so is always valid
+                    _ => true,
+                }
+                // the secret needs to match
+                && match access {
+                    // or it doesn't...
+                    CapAccess::Unrestricted => true,
+                    // note the PartialEq implementation is constant time for secrets
+                    CapAccess::Transferable { secret, .. } => secret == check_secret,
+                    CapAccess::Assigned { secret, .. } => secret == check_secret,
+                }
+            }
         }
     }
+
+    // /// Get the CapAccess data in order to check authorization
+    // pub fn access(&self) -> CapAccess {
+    //     match self {
+    //         CapGrant::Authorship(agent_pubkey) => CapAccess::Assigned {
+    //             // there is nothing meaningful about a self-assigned secret so we might as well
+    //             // zero it out to (hopefully) make it very clear that this has a different security
+    //             // and access model (i.e. that the caller of the function is the current agent).
+    //             secret: ().into(),
+    //             assignees: [agent_pubkey.clone()].iter().cloned().collect(),
+    //         },
+    //         CapGrant::ZomeCall(ZomeCallCapGrant { access, .. }) => access.clone(),
+    //     }
+    // }
 }
 
 /// Represents access requirements for capability grants

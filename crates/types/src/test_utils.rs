@@ -6,8 +6,8 @@ use crate::{
     dna::{DnaDef, DnaFile},
     prelude::*,
 };
-
-use holo_hash::{hash_type, PrimitiveHashType};
+use ::fixt::prelude::*;
+use holo_hash::{fixt::AgentPubKeyFixturator, hash_type, PrimitiveHashType};
 use holochain_zome_types::capability::CapSecret;
 use holochain_zome_types::capability::CAP_SECRET_BYTES;
 use holochain_zome_types::zome::ZomeName;
@@ -104,13 +104,13 @@ pub fn fake_agent_pub_key(name: u8) -> AgentPubKey {
 
 /// A fixture AgentPubKey for unit testing.
 pub fn fake_agent_pubkey_1() -> AgentPubKey {
-    holo_hash::AgentPubKey::try_from("uhCAkw-zrttiYpdfAYX4fR6W8DPUdheZJ-1QsRA4cTImmzTYUcOr4")
-        .unwrap()
+    AgentPubKeyFixturator::new(Predictable).next().unwrap()
 }
 
 /// Another fixture AgentPubKey for unit testing.
 pub fn fake_agent_pubkey_2() -> AgentPubKey {
-    holo_hash::AgentPubKey::try_from("uhCAkomHzekU0-x7p62WmrusdxD2w9wcjdajC88688JGSTEo6cbEK")
+    AgentPubKeyFixturator::new_indexed(Predictable, 1)
+        .next()
         .unwrap()
 }
 

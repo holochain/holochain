@@ -1,9 +1,10 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_wasmer_host::prelude::SerializedBytes;
 use holochain_zome_types::CallRemoteInput;
 use holochain_zome_types::CallRemoteOutput;
+use holochain_zome_types::ZomeCallInvocationResponse;
+use std::convert::TryInto;
 use std::sync::Arc;
 
 pub fn call_remote(
@@ -12,19 +13,23 @@ pub fn call_remote(
     input: CallRemoteInput,
 ) -> RibosomeResult<CallRemoteOutput> {
     // it is the network's responsibility to handle timeouts and return an Err result in that case
-    let result: SerializedBytes = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-        let mut network = call_context.host_access().network().clone();
-        let call_remote = input.into_inner();
-        network
-            .call_remote(
-                call_remote.to_agent(),
-                call_remote.zome_name(),
-                call_remote.fn_name(),
-                call_remote.cap(),
-                call_remote.request(),
-            )
-            .await
-    })?;
+    let result: ZomeCallInvocationResponse =
+        tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+            let mut network = call_context.host_access().network().clone();
+            let call_remote = input.into_inner();
+            network
+                .call_remote(
+                    call_remote.to_agent(),
+                    call_remote.zome_name(),
+                    call_remote.fn_name(),
+                    call_remote.cap(),
+                    call_remote.request(),
+                )
+                .await
+        })?
+        .try_into()?;
+
+    dbg!(&result);
 
     Ok(CallRemoteOutput::new(result))
 }
@@ -55,17 +60,15 @@ pub mod wasm_test {
         // START DNA
         // ////////////
 
-        let dna_file = DnaFile::new(
-            DnaDef {
-                name: "call_remote_test".to_string(),
-                uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
-                properties: SerializedBytes::try_from(()).unwrap(),
-                zomes: vec![TestWasm::WhoAmI.into()].into(),
-            },
-            vec![TestWasm::WhoAmI.into()],
-        )
-        .await
-        .unwrap();
+        let dna_def = DnaDef {
+            name: "call_remote_test".to_string(),
+            uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
+            properties: SerializedBytes::try_from(()).unwrap(),
+            zomes: vec![TestWasm::WhoAmI.into()].into(),
+        };
+        let dna_file = DnaFile::new(dna_def, vec![TestWasm::WhoAmI.into()])
+            .await
+            .unwrap();
 
         // //////////
         // END DNA
@@ -121,6 +124,19 @@ pub mod wasm_test {
         // END CONDUCTOR
         // /////////////
 
+        // BOB INIT (to do cap grant)
+
+        let _output = handle
+            .call_zome(ZomeCallInvocation {
+                cell_id: bob_cell_id,
+                zome_name: TestWasm::WhoAmI.into(),
+                cap: ().into(),
+                fn_name: "set_access".to_string(),
+                payload: HostInput::new(().try_into().unwrap()),
+                provenance: bob_agent_id.clone(),
+            })
+            .await;
+
         // ALICE DOING A CALL
 
         let output = handle
@@ -148,6 +164,7 @@ pub mod wasm_test {
                     },
                 );
             }
+            _ => unreachable!(),
         }
 
         let shutdown = handle.take_shutdown_handle().await.unwrap();

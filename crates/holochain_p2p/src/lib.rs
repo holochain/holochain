@@ -31,6 +31,16 @@ pub struct HolochainP2pCell {
 }
 
 impl HolochainP2pCell {
+    /// returns a fresh arc to the dna
+    pub fn dna_hash(&self) -> DnaHash {
+        (*self.dna_hash).clone()
+    }
+
+    /// returns a fresh arc to the from_agent
+    pub fn from_agent(&self) -> AgentPubKey {
+        (*self.from_agent).clone()
+    }
+
     /// The p2p module must be informed at runtime which dna/agent pairs it should be tracking.
     pub async fn join(&mut self) -> actor::HolochainP2pResult<()> {
         self.sender

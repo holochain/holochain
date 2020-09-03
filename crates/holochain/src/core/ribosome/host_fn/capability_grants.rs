@@ -184,41 +184,85 @@ pub mod wasm_test {
 
         let some_secret = CapSecretFixturator::new(Unpredictable).next().unwrap();
 
-        dbg!(&alice_cell_id);
-        dbg!(&bob_cell_id);
-
         let output = handle
             .call_zome(ZomeCallInvocation {
-                cell_id: alice_cell_id,
+                cell_id: alice_cell_id.clone(),
                 zome_name: TestWasm::Capability.into(),
-                cap: some_secret,
+                cap: ().into(),
                 fn_name: "try_cap_claim".to_string(),
                 payload: HostInput::new(
                     CapFor(some_secret, bob_agent_id.clone().try_into().unwrap())
                         .try_into()
                         .unwrap(),
                 ),
-                provenance: alice_agent_id,
+                provenance: alice_agent_id.clone(),
             })
             .await
             .unwrap()
             .unwrap();
 
-        dbg!(&output);
+        // the _outer_ invocation response is to try_cap_claim for alice
+        // the _inner_ invocation response is needs_cap_claim and should be unauthorized
+        match output {
+            ZomeCallInvocationResponse::ZomeApiFn(guest_output) => {
+                let response: SerializedBytes = guest_output.into_inner();
+                let inner_response: ZomeCallInvocationResponse = response.try_into().unwrap();
+                // the inner response should be unauthorized
+                assert_eq!(inner_response, ZomeCallInvocationResponse::Unauthorized,);
+            }
+            _ => unreachable!(),
+        }
 
-        // match output {
-        //     ZomeCallInvocationResponse::ZomeApiFn(guest_output) => {
-        //         let response: SerializedBytes = guest_output.into_inner();
-        //         let agent_info: AgentInfo = response.try_into().unwrap();
-        //         assert_eq!(
-        //             agent_info,
-        //             AgentInfo {
-        //                 agent_initial_pubkey: bob_agent_id.clone(),
-        //                 agent_latest_pubkey: bob_agent_id,
-        //             },
-        //         );
-        //     }
-        // }
+        // BOB COMMITS A TRANSFERABLE GRANT WITH THE SECRET SHARED WITH ALICE
+
+        let _output = handle
+            .call_zome(ZomeCallInvocation {
+                cell_id: bob_cell_id,
+                zome_name: TestWasm::Capability.into(),
+                cap: ().into(),
+                fn_name: "transferable_cap_grant".to_string(),
+                payload: HostInput::new(some_secret.try_into().unwrap()),
+                provenance: bob_agent_id.clone(),
+            })
+            .await
+            .unwrap()
+            .unwrap();
+
+        // ALICE CAN NOW CALL THE AUTHED REMOTE FN
+
+        let output = handle
+            .call_zome(ZomeCallInvocation {
+                cell_id: alice_cell_id,
+                zome_name: TestWasm::Capability.into(),
+                cap: ().into(),
+                fn_name: "try_cap_claim".to_string(),
+                payload: HostInput::new(
+                    CapFor(some_secret, bob_agent_id.clone().try_into().unwrap())
+                        .try_into()
+                        .unwrap(),
+                ),
+                provenance: alice_agent_id.clone(),
+            })
+            .await
+            .unwrap()
+            .unwrap();
+
+        // the _outer_ invocation response is to try_cap_claim for alice
+        // the _inner_ invocation response is needs_cap_claim and should be unauthorized
+        match output.clone() {
+            ZomeCallInvocationResponse::ZomeApiFn(guest_output) => {
+                let response: SerializedBytes = guest_output.into_inner();
+                let inner_response: ZomeCallInvocationResponse = response.try_into().unwrap();
+                // the inner response should be serialized nil (authorized)
+                assert_eq!(
+                    inner_response,
+                    ZomeCallInvocationResponse::ZomeApiFn(GuestOutput::new(().try_into().unwrap())),
+                );
+            }
+            _ => unreachable!(),
+        }
+
+        dbg!(&output);
 
         let shutdown = handle.take_shutdown_handle().await.unwrap();
         handle.shutdown().await;
