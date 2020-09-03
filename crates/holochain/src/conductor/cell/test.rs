@@ -6,7 +6,7 @@ use crate::{
 use ::fixt::prelude::*;
 use holo_hash::HasHash;
 use holochain_p2p::actor::HolochainP2pRefToCell;
-use holochain_state::test_utils::{test_conductor_env, TestEnvironment};
+use holochain_state::test_utils::{test_cell_env, TestEnvironment};
 use holochain_types::{
     dht_op::{DhtOp, DhtOpHashed},
     test_utils::{fake_agent_pubkey_2, fake_cell_id},
@@ -21,8 +21,7 @@ async fn test_cell_handle_publish() {
     let TestEnvironment {
         env,
         tmpdir: _tmpdir,
-    } = test_conductor_env();
-    let _keystore = env.keystore().clone();
+    } = test_cell_env();
     let (holochain_p2p, _p2p_evt) = holochain_p2p::spawn_holochain_p2p().await.unwrap();
     let cell_id = fake_cell_id(1);
     let dna = cell_id.dna_hash().clone();

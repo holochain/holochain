@@ -35,7 +35,7 @@ use fallible_iterator::FallibleIterator;
 use futures::future::FutureExt;
 use hash_type::AnyDht;
 use holo_hash::*;
-use holochain_keystore::{Signature};
+use holochain_keystore::Signature;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::{
     db::GetDb,
