@@ -206,102 +206,133 @@ impl BufferedStore for SourceChain {
     }
 }
 
-// #[cfg(test)]
-// pub mod tests {
-//
-//     use super::*;
-//     use crate::fixt::*;
-//     use ::fixt::prelude::*;
-//     use holochain_state::test_utils::test_cell_env;
-//     use holochain_types::test_utils::{fake_agent_pubkey_1, fake_dna_hash};
-//     use holochain_zome_types::capability::{CapClaim, CapAccess, ZomeCallCapGrant};
-//     use std::collections::HashSet;
-//
-//     // #[tokio::test(threaded_scheduler)]
-//     // async fn test_get_cap_grant() -> SourceChainResult<()> {
-//     //     let test_env = test_cell_env();
-//     //     let arc = test_env.env();
-//     //     let env = arc.guard().await;
-//     //     let access = CapAccess::from(CapSecretFixturator::new(Unpredictable).next().unwrap());
-//     //     let secret = access.secret().unwrap();
-//     // // @todo curry
-//     //     let _curry = CurryPayloadsFixturator::new(Empty).next().unwrap();
-//     //     let grant = ZomeCallCapGrant::new("tag".into(), access.clone(), HashSet::new());
-//     //     {
-//     //         let mut store = SourceChainBuf::new(arc.clone().into(), &env).await?;
-//     //         store
-//     //             .genesis(fake_dna_hash(1), fake_agent_pubkey_1(), None)
-//     //             .await?;
-//     //         env.with_commit(|writer| store.flush_to_txn(writer))?;
-//     //     }
-//     //
-//     //     {
-//     //         let mut chain = SourceChain::new(arc.clone().into(), &env).await?;
-//     //         chain.put_cap_grant(grant.clone()).await?;
-//     //
-//     // // ideally the following would work, but it won't because currently
-//     // // we can't get grants from the scratch space
-//     // // this will be fixed once we add the capability index
-//     //
-//     // // assert_eq!(
-//     // //     chain.get_persisted_cap_grant_by_secret(secret)?,
-//     // //     Some(grant.clone().into())
-//     // // );
-//     //
-//     //         env.with_commit(|writer| chain.flush_to_txn(writer))?;
-//     //     }
-//     //
-//     //     {
-//     //         let chain = SourceChain::new(arc.clone().into(), &env).await?;
-//     //         assert_eq!(
-//     //             chain.valid_cap_grant(secret).await?,
-//     //             Some(grant.into())
-//     //         );
-//     //     }
-//     //
-//     //     Ok(())
-//     // }
-//
-//     // #[tokio::test(threaded_scheduler)]
-//     // async fn test_get_cap_claim() -> SourceChainResult<()> {
-//     //     let test_env = test_cell_env();
-//     //     let arc = test_env.env();
-//     //     let env = arc.guard().await;
-//     //     let secret = CapSecretFixturator::new(Unpredictable).next().unwrap();
-//     //     let agent_pubkey = fake_agent_pubkey_1().into();
-//     //     let claim = CapClaim::new("tag".into(), agent_pubkey, secret.clone());
-//     //     {
-//     //         let mut store = SourceChainBuf::new(arc.clone().into(), &env).await?;
-//     //         store
-//     //             .genesis(fake_dna_hash(1), fake_agent_pubkey_1(), None)
-//     //             .await?;
-//     //         env.with_commit(|writer| store.flush_to_txn(writer))?;
-//     //     }
-//     //
-//     //     {
-//     //         let mut chain = SourceChain::new(arc.clone().into(), &env).await?;
-//     //         chain.put_cap_claim(claim.clone()).await?;
-//     //
-//     // // ideally the following would work, but it won't because currently
-//     // // we can't get claims from the scratch space
-//     // // this will be fixed once we add the capability index
-//     //
-//     // // assert_eq!(
-//     // //     chain.get_persisted_cap_claim_by_secret(&secret)?,
-//     // //     Some(claim.clone())
-//     // // );
-//     //
-//     //         env.with_commit(|writer| chain.flush_to_txn(writer))?;
-//     //     }
-//     //
-//     //     {
-//     //         let chain = SourceChain::new(arc.clone().into(), &env).await?;
-//     //         assert_eq!(
-//     //             chain.get_persisted_cap_claim_by_secret(&secret).await?,
-//     //             Some(claim)
-//     //         );
-//     //     }
-//     //
-//     //     Ok(())
-//     // }
-// }
+#[cfg(test)]
+pub mod tests {
+
+    use super::*;
+    use crate::fixt::*;
+    use hdk3::prelude::*;
+    use ::fixt::prelude::*;
+    use holochain_state::test_utils::test_cell_env;
+    use holochain_types::test_utils::{fake_dna_hash};
+    use holochain_zome_types::capability::{CapAccess, ZomeCallCapGrant};
+    use std::collections::HashSet;
+
+    #[tokio::test(threaded_scheduler)]
+    async fn test_get_cap_grant() -> SourceChainResult<()> {
+        let test_env = test_cell_env();
+        let arc = test_env.env();
+        let env = arc.guard().await;
+        let access = CapAccess::from(CapSecretFixturator::new(Unpredictable).next().unwrap());
+        let secret = access.secret().unwrap();
+    // @todo curry
+        let _curry = CurryPayloadsFixturator::new(Empty).next().unwrap();
+        let function: GrantedFunction = ("foo".into(), "bar".into());
+        let mut functions: GrantedFunctions = HashSet::new();
+        functions.insert(function.clone());
+        let grant = ZomeCallCapGrant::new("tag".into(), access.clone(), functions);
+        let mut agents = AgentPubKeyFixturator::new(Predictable);
+        let alice = agents.next().unwrap();
+        let bob = agents.next().unwrap();
+        {
+            let mut store = SourceChainBuf::new(arc.clone().into(), &env).await?;
+            store
+                .genesis(fake_dna_hash(1), alice.clone(), None)
+                .await?;
+            env.with_commit(|writer| store.flush_to_txn(writer))?;
+        }
+
+        {
+            let chain = SourceChain::new(arc.clone().into(), &env).await?;
+            // alice should always find her authorship even if no grants have been committed
+            assert_eq!(
+                chain.valid_cap_grant(&function, &alice, secret).await?,
+                Some(CapGrant::Authorship(alice.clone())),
+            );
+
+            // bob should not match anything as the secret hasn't been committed yet
+            assert_eq!(
+                chain.valid_cap_grant(&function, &bob, secret).await?,
+                None
+            );
+        }
+
+        {
+            let mut chain = SourceChain::new(arc.clone().into(), &env).await?;
+            chain.put_cap_grant(grant.clone()).await?;
+
+            // ideally the following would work, but it won't because currently
+            // we can't get grants from the scratch space
+            // this will be fixed once we add the capability index
+
+            // assert_eq!(
+            //     chain.get_persisted_cap_grant_by_secret(secret)?,
+            //     Some(grant.clone().into())
+            // );
+
+            env.with_commit(|writer| chain.flush_to_txn(writer))?;
+        }
+
+        {
+            let chain = SourceChain::new(arc.clone().into(), &env).await?;
+            // alice should find her own authorship with higher priority than the committed grant
+            // even if she passes in the secret
+            assert_eq!(
+                chain.valid_cap_grant(&function, &alice, secret).await?,
+                Some(CapGrant::Authorship(alice)),
+            );
+
+            // bob should be granted with the committed grant as it matches the secret he passes to
+            // alice at runtime
+            assert_eq!(
+                chain.valid_cap_grant(&function, &bob, secret).await?,
+                Some(grant.into())
+            );
+        }
+
+        Ok(())
+    }
+
+    // #[tokio::test(threaded_scheduler)]
+    // async fn test_get_cap_claim() -> SourceChainResult<()> {
+    //     let test_env = test_cell_env();
+    //     let arc = test_env.env();
+    //     let env = arc.guard().await;
+    //     let secret = CapSecretFixturator::new(Unpredictable).next().unwrap();
+    //     let agent_pubkey = fake_agent_pubkey_1().into();
+    //     let claim = CapClaim::new("tag".into(), agent_pubkey, secret.clone());
+    //     {
+    //         let mut store = SourceChainBuf::new(arc.clone().into(), &env).await?;
+    //         store
+    //             .genesis(fake_dna_hash(1), fake_agent_pubkey_1(), None)
+    //             .await?;
+    //         env.with_commit(|writer| store.flush_to_txn(writer))?;
+    //     }
+    //
+    //     {
+    //         let mut chain = SourceChain::new(arc.clone().into(), &env).await?;
+    //         chain.put_cap_claim(claim.clone()).await?;
+    //
+    // // ideally the following would work, but it won't because currently
+    // // we can't get claims from the scratch space
+    // // this will be fixed once we add the capability index
+    //
+    // // assert_eq!(
+    // //     chain.get_persisted_cap_claim_by_secret(&secret)?,
+    // //     Some(claim.clone())
+    // // );
+    //
+    //         env.with_commit(|writer| chain.flush_to_txn(writer))?;
+    //     }
+    //
+    //     {
+    //         let chain = SourceChain::new(arc.clone().into(), &env).await?;
+    //         assert_eq!(
+    //             chain.get_persisted_cap_claim_by_secret(&secret).await?,
+    //             Some(claim)
+    //         );
+    //     }
+    //
+    //     Ok(())
+    // }
+}
