@@ -314,7 +314,6 @@ where
             let root_env_dir = root_env_dir.clone();
             let keystore = self.keystore.clone();
             let conductor_handle = conductor_handle.clone();
-            let cell_id = cell_id.clone();
             let cell_id_inner = cell_id.clone();
             tokio::spawn(async move {
                 let env = EnvironmentWrite::new(
@@ -636,7 +635,6 @@ where
         let cell = self.cell_by_id(cell_id)?;
         let arc = cell.env();
         let source_chain = SourceChainBuf::new(arc.clone().into())?;
-        drop(arc);
         Ok(source_chain.dump_as_json().await?)
     }
 

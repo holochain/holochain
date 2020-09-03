@@ -254,7 +254,7 @@ impl<'a> CallZomeWorkspace {
         let source_chain = SourceChain::new(env.clone())?;
         let cache_cas = ElementBuf::cache(env.clone())?;
         let meta = MetadataBuf::vault(env.clone())?;
-        let cache_meta = MetadataBuf::cache(env.clone())?;
+        let cache_meta = MetadataBuf::cache(env)?;
 
         Ok(CallZomeWorkspace {
             source_chain,
