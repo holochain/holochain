@@ -240,12 +240,10 @@ impl Cell {
                 ..
             } => {
                 async {
-                    dbg!("handle_holochain_p2p_event");
                     let res = self
                         .handle_call_remote(from_agent, zome_name, fn_name, cap, request)
                         .await
                         .map_err(holochain_p2p::HolochainP2pError::other);
-                    dbg!(&res);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
                 .instrument(debug_span!("call_remote"))

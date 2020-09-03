@@ -113,20 +113,6 @@ impl CapGrant {
             }
         }
     }
-
-    // /// Get the CapAccess data in order to check authorization
-    // pub fn access(&self) -> CapAccess {
-    //     match self {
-    //         CapGrant::Authorship(agent_pubkey) => CapAccess::Assigned {
-    //             // there is nothing meaningful about a self-assigned secret so we might as well
-    //             // zero it out to (hopefully) make it very clear that this has a different security
-    //             // and access model (i.e. that the caller of the function is the current agent).
-    //             secret: ().into(),
-    //             assignees: [agent_pubkey.clone()].iter().cloned().collect(),
-    //         },
-    //         CapGrant::ZomeCall(ZomeCallCapGrant { access, .. }) => access.clone(),
-    //     }
-    // }
 }
 
 /// Represents access requirements for capability grants

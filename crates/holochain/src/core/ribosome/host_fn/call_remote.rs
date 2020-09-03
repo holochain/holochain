@@ -29,8 +29,6 @@ pub fn call_remote(
         })?
         .try_into()?;
 
-    dbg!(&result);
-
     Ok(CallRemoteOutput::new(result))
 }
 

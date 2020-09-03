@@ -13,7 +13,6 @@ pub fn debug(
     _call_context: Arc<CallContext>,
     input: DebugInput,
 ) -> RibosomeResult<DebugOutput> {
-    dbg!(&input);
     let msg: DebugMsg = input.into_inner();
     debug!(
         "{}:{}:{} {}",
