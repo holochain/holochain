@@ -211,10 +211,10 @@ pub mod tests {
 
     use super::*;
     use crate::fixt::*;
-    use hdk3::prelude::*;
     use ::fixt::prelude::*;
+    use hdk3::prelude::*;
     use holochain_state::test_utils::test_cell_env;
-    use holochain_types::test_utils::{fake_dna_hash};
+    use holochain_types::test_utils::fake_dna_hash;
     use holochain_zome_types::capability::{CapAccess, ZomeCallCapGrant};
     use std::collections::HashSet;
 
@@ -225,7 +225,7 @@ pub mod tests {
         let env = arc.guard().await;
         let access = CapAccess::from(CapSecretFixturator::new(Unpredictable).next().unwrap());
         let secret = access.secret().unwrap();
-    // @todo curry
+        // @todo curry
         let _curry = CurryPayloadsFixturator::new(Empty).next().unwrap();
         let function: GrantedFunction = ("foo".into(), "bar".into());
         let mut functions: GrantedFunctions = HashSet::new();
@@ -236,9 +236,7 @@ pub mod tests {
         let bob = agents.next().unwrap();
         {
             let mut store = SourceChainBuf::new(arc.clone().into(), &env).await?;
-            store
-                .genesis(fake_dna_hash(1), alice.clone(), None)
-                .await?;
+            store.genesis(fake_dna_hash(1), alice.clone(), None).await?;
             env.with_commit(|writer| store.flush_to_txn(writer))?;
         }
 
@@ -251,10 +249,7 @@ pub mod tests {
             );
 
             // bob should not match anything as the secret hasn't been committed yet
-            assert_eq!(
-                chain.valid_cap_grant(&function, &bob, secret).await?,
-                None
-            );
+            assert_eq!(chain.valid_cap_grant(&function, &bob, secret).await?, None);
         }
 
         {
