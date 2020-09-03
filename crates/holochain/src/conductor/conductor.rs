@@ -312,20 +312,20 @@ where
 
         let cells_tasks = cell_ids_with_proofs.into_iter().map(|(cell_id, proof)| {
             let root_env_dir = root_env_dir.clone();
-            let env = EnvironmentWrite::new(
-                &root_env_dir,
-                EnvironmentKind::Cell(cell_id.clone()),
-                keystore.clone(),
-            )
-            .unwrap();
-            tokio::spawn(Cell::genesis(
-                cell_id.clone(),
-                conductor_handle.clone(),
-                env,
-                proof,
-            ))
+            let keystore = self.keystore.clone();
+            let conductor_handle = conductor_handle.clone();
+            let cell_id = cell_id.clone();
+            let cell_id_inner = cell_id.clone();
+            tokio::spawn(async move {
+                let env = EnvironmentWrite::new(
+                    &root_env_dir,
+                    EnvironmentKind::Cell(cell_id_inner.clone()),
+                    keystore.clone(),
+                )?;
+                Cell::genesis(cell_id_inner, conductor_handle, env, proof).await
+            })
             .map_err(|e| CellError::from(e))
-            .and_then(|result| async { result.map(|_| cell_id) })
+            .and_then(|result| async move { result.map(|_| cell_id) })
         });
         let (success, errors): (Vec<_>, Vec<_>) = futures::future::join_all(cells_tasks)
             .await
