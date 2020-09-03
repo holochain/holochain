@@ -13,11 +13,12 @@ use holochain_types::{prelude::*, EntryHashed};
 use holochain_zome_types::capability::GrantedFunction;
 use holochain_zome_types::{
     capability::{CapGrant, CapSecret},
-    entry::{CapClaimEntry, CapGrantEntry, Entry},
-    header::{builder, EntryType, HeaderBuilder, HeaderBuilderCommon, HeaderInner},
+    entry::{CapClaimEntry, Entry},
+    header::{builder, EntryType, Header, HeaderBuilder, HeaderBuilderCommon, HeaderInner},
 };
 use shrinkwraprs::Shrinkwrap;
 pub use source_chain_buffer::*;
+use std::collections::HashSet;
 
 mod error;
 mod source_chain_buffer;
@@ -71,19 +72,19 @@ impl SourceChain {
     }
 
     /// Add a CapGrantEntry to the source chain
-    pub async fn put_cap_grant(
-        &mut self,
-        grant_entry: CapGrantEntry,
-    ) -> SourceChainResult<HeaderHash> {
-        let (entry, entry_hash) = EntryHashed::from_content(Entry::CapGrant(grant_entry))
-            .await
-            .into_inner();
-        let header_builder = builder::EntryCreate {
-            entry_type: EntryType::CapGrant,
-            entry_hash,
-        };
-        self.put(header_builder, Some(entry)).await
-    }
+    // pub async fn put_cap_grant(
+    //     &mut self,
+    //     grant_entry: CapGrantEntry,
+    // ) -> SourceChainResult<HeaderHash> {
+    //     let (entry, entry_hash) = EntryHashed::from_content(Entry::CapGrant(grant_entry))
+    //         .await
+    //         .into_inner();
+    //     let header_builder = builder::EntryCreate {
+    //         entry_type: EntryType::CapGrant,
+    //         entry_hash,
+    //     };
+    //     self.put(header_builder, Some(entry)).await
+    // }
 
     /// Add a CapClaimEntry to the source chain
     pub async fn put_cap_claim(
@@ -124,6 +125,62 @@ impl SourceChain {
         }
 
         let committed_valid_grant = fresh_reader!(self.env(), |r| {
+            let (references, headers): (
+                HashSet<HeaderHash>,
+                Vec<HoloHashed<holochain_zome_types::element::SignedHeader>>,
+            ) = self
+                .0
+                .headers()
+                .iter_fail(&r)?
+                .filter(|header| {
+                    Ok(match header.as_content().header() {
+                        Header::EntryCreate(create) => match create.entry_type {
+                            EntryType::CapGrant => true,
+                            EntryType::AgentPubKey => true,
+                            _ => false,
+                        },
+                        Header::EntryUpdate(update) => match update.entry_type {
+                            EntryType::CapGrant => true,
+                            EntryType::AgentPubKey => true,
+                            _ => false,
+                        },
+                        Header::ElementDelete(_) => true,
+                        _ => false,
+                    })
+                })
+                // extract all the update/delete references into a hashmap
+                .fold(
+                    (HashSet::new(), vec![]),
+                    |(mut references, mut headers), header| {
+                        match header.as_content().header() {
+                            Header::EntryUpdate(update) => {
+                                references.insert(update.original_header_address.clone());
+                            }
+                            Header::ElementDelete(delete) => {
+                                references.insert(delete.removes_address.clone());
+                            }
+                            _ => {}
+                        }
+                        // this is a best-effort attempt to avoid putting things we already know were
+                        // referenced into the returned vec
+                        // it isn't comprehensive because it relies on ordering
+                        if !references.contains(header.as_hash()) {
+                            headers.push(header);
+                        }
+
+                        Ok((references, headers))
+                    },
+                )?;
+
+            // second pass over the headers to make sure that all referenced headers are removed
+            // this makes the process reliable even if the iterators don't follow the chain order
+            let headers: Vec<_> = headers
+                .iter()
+                .filter(|header| !references.contains(header.as_hash()))
+                .collect();
+            dbg!(&references);
+            dbg!(&headers);
+
             self
             .0
             .elements()
@@ -140,6 +197,8 @@ impl SourceChain {
             .filter(|grant| {
                 Ok(grant.is_valid(check_function, check_agent, check_secret))
             })
+            // // remove updated and deleted grants
+            // .fold(vec![]
             .next()
         })?;
         Ok(committed_valid_grant)
@@ -211,10 +270,10 @@ pub mod tests {
 
     use super::*;
     use crate::fixt::*;
-    use hdk3::prelude::*;
     use ::fixt::prelude::*;
+    use hdk3::prelude::*;
     use holochain_state::test_utils::test_cell_env;
-    use holochain_types::test_utils::{fake_dna_hash};
+    use holochain_types::test_utils::fake_dna_hash;
     use holochain_zome_types::capability::{CapAccess, ZomeCallCapGrant};
     use std::collections::HashSet;
 
@@ -225,20 +284,18 @@ pub mod tests {
         let env = arc.guard().await;
         let access = CapAccess::from(CapSecretFixturator::new(Unpredictable).next().unwrap());
         let secret = access.secret().unwrap();
-    // @todo curry
+        // @todo curry
         let _curry = CurryPayloadsFixturator::new(Empty).next().unwrap();
         let function: GrantedFunction = ("foo".into(), "bar".into());
         let mut functions: GrantedFunctions = HashSet::new();
         functions.insert(function.clone());
-        let grant = ZomeCallCapGrant::new("tag".into(), access.clone(), functions);
+        let grant = ZomeCallCapGrant::new("tag".into(), access.clone(), functions.clone());
         let mut agents = AgentPubKeyFixturator::new(Predictable);
         let alice = agents.next().unwrap();
         let bob = agents.next().unwrap();
         {
             let mut store = SourceChainBuf::new(arc.clone().into(), &env).await?;
-            store
-                .genesis(fake_dna_hash(1), alice.clone(), None)
-                .await?;
+            store.genesis(fake_dna_hash(1), alice.clone(), None).await?;
             env.with_commit(|writer| store.flush_to_txn(writer))?;
         }
 
@@ -251,24 +308,60 @@ pub mod tests {
             );
 
             // bob should not match anything as the secret hasn't been committed yet
+            assert_eq!(chain.valid_cap_grant(&function, &bob, secret).await?, None);
+        }
+
+        let (original_header_address, original_entry_address) = {
+            let mut chain = SourceChain::new(arc.clone().into(), &env).await?;
+            let (entry, entry_hash) = EntryHashed::from_content(Entry::CapGrant(grant.clone()))
+                .await
+                .into_inner();
+            let header_builder = builder::EntryCreate {
+                entry_type: EntryType::CapGrant,
+                entry_hash: entry_hash.clone(),
+            };
+            let header = chain.put(header_builder, Some(entry)).await?;
+
+            env.with_commit(|writer| chain.flush_to_txn(writer))?;
+
+            (header, entry_hash)
+        };
+
+        {
+            let chain = SourceChain::new(arc.clone().into(), &env).await?;
+            // alice should find her own authorship with higher priority than the committed grant
+            // even if she passes in the secret
+            assert_eq!(
+                chain.valid_cap_grant(&function, &alice, secret).await?,
+                Some(CapGrant::Authorship(alice.clone())),
+            );
+
+            // bob should be granted with the committed grant as it matches the secret he passes to
+            // alice at runtime
             assert_eq!(
                 chain.valid_cap_grant(&function, &bob, secret).await?,
-                None
+                Some(grant.clone().into())
             );
         }
 
+        // let's roll the secret and assign the grant to bob specifically
+        let mut assignees = HashSet::new();
+        assignees.insert(bob.clone());
+        let access = CapAccess::from((CapSecretFixturator::new(Unpredictable).next().unwrap(), assignees));
+        let updated_grant = ZomeCallCapGrant::new("tag".into(), access.clone(), functions);
+
         {
             let mut chain = SourceChain::new(arc.clone().into(), &env).await?;
-            chain.put_cap_grant(grant.clone()).await?;
-
-            // ideally the following would work, but it won't because currently
-            // we can't get grants from the scratch space
-            // this will be fixed once we add the capability index
-
-            // assert_eq!(
-            //     chain.get_persisted_cap_grant_by_secret(secret)?,
-            //     Some(grant.clone().into())
-            // );
+            let (entry, entry_hash) = EntryHashed::from_content(Entry::CapGrant(updated_grant.clone()))
+                .await
+                .into_inner();
+            let header_builder = builder::EntryUpdate {
+                entry_type: EntryType::CapGrant,
+                entry_hash: entry_hash,
+                original_header_address,
+                original_entry_address,
+            };
+            chain.put(header_builder, Some(entry)).await?;
 
             env.with_commit(|writer| chain.flush_to_txn(writer))?;
         }
