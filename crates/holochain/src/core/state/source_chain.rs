@@ -6,7 +6,7 @@
 use fallible_iterator::FallibleIterator;
 use holo_hash::*;
 use holochain_state::{
-    buffer::BufferedStore, db::GetDb, error::DatabaseResult, fresh_reader, prelude::*,
+    buffer::BufferedStore, error::DatabaseResult, fresh_reader, prelude::*,
 };
 use holochain_types::{prelude::*, EntryHashed};
 use holochain_zome_types::{

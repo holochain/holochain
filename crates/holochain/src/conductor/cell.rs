@@ -35,11 +35,11 @@ use fallible_iterator::FallibleIterator;
 use futures::future::FutureExt;
 use hash_type::AnyDht;
 use holo_hash::*;
-use holochain_keystore::{KeystoreSender, Signature};
+use holochain_keystore::{Signature};
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::{
     db::GetDb,
-    env::{EnvironmentKind, EnvironmentWrite, ReadManager},
+    env::{EnvironmentWrite, ReadManager},
 };
 use holochain_types::{
     autonomic::AutonomicProcess,
@@ -57,7 +57,6 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     convert::TryInto,
     hash::{Hash, Hasher},
-    path::Path,
 };
 use tokio::sync;
 use tracing::*;

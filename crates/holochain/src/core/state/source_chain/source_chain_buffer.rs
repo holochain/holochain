@@ -5,7 +5,6 @@ use crate::core::state::{
     source_chain::{SourceChainError, SourceChainResult},
 };
 use fallible_iterator::FallibleIterator;
-use holochain_state::db::GetDb;
 use holochain_state::{buffer::BufferedStore, error::DatabaseResult, fresh_reader, prelude::*};
 use holochain_types::{
     dht_op::{produce_ops_from_element, DhtOp},

@@ -7,7 +7,6 @@ use holochain_serialized_bytes::prelude::*;
 use holochain_state::{
     buffer::{BufferedStore, KvvBufUsed},
     db::GetDb,
-    env::EnvironmentReadRef,
     error::{DatabaseError, DatabaseResult},
     prelude::{Readable, Writer},
 };

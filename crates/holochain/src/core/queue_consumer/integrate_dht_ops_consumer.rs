@@ -10,7 +10,7 @@ use crate::{
 };
 use futures::future::Either;
 use holochain_state::env::EnvironmentWrite;
-use holochain_state::env::ReadManager;
+
 use tokio::task::JoinHandle;
 use tracing::*;
 

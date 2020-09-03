@@ -18,16 +18,17 @@ use tokio::sync;
 
 #[tokio::test(threaded_scheduler)]
 async fn test_cell_handle_publish() {
-    let TestEnvironment { env, tmpdir } = test_conductor_env();
-    let keystore = env.keystore().clone();
+    let TestEnvironment {
+        env,
+        tmpdir: _tmpdir,
+    } = test_conductor_env();
+    let _keystore = env.keystore().clone();
     let (holochain_p2p, _p2p_evt) = holochain_p2p::spawn_holochain_p2p().await.unwrap();
     let cell_id = fake_cell_id(1);
     let dna = cell_id.dna_hash().clone();
     let agent = cell_id.agent_pubkey().clone();
 
     let holochain_p2p_cell = holochain_p2p.to_cell(dna.clone(), agent.clone());
-
-    let path = tmpdir.path().to_path_buf();
 
     let mut mock_handler = crate::conductor::handle::mock::MockConductorHandle::new();
     mock_handler
@@ -74,7 +75,6 @@ async fn test_cell_handle_publish() {
     .await
     .unwrap();
 
-    let env_ref = cell.env.guard();
     let workspace =
         IncomingDhtOpsWorkspace::new(cell.env.clone().into()).expect("Could not create Workspace");
 

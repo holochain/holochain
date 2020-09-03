@@ -325,7 +325,7 @@ where
                 proof,
             ))
             .map_err(|e| CellError::from(e))
-            .and_then(|result| async { result.map(|env| cell_id) })
+            .and_then(|result| async { result.map(|_| cell_id) })
         });
         let (success, errors): (Vec<_>, Vec<_>) = futures::future::join_all(cells_tasks)
             .await

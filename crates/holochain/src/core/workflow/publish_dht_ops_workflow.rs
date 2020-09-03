@@ -333,7 +333,6 @@ mod tests {
 
     /// Call the workflow
     async fn call_workflow(env: EnvironmentWrite, mut cell_network: HolochainP2pCell) {
-        let env_ref = env.guard();
         let workspace = PublishDhtOpsWorkspace::new(env.clone().into()).unwrap();
         publish_dht_ops_workflow(workspace, env.clone().into(), &mut cell_network)
             .await

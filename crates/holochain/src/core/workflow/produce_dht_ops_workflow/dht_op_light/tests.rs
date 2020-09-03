@@ -245,7 +245,6 @@ async fn test_all_ops() {
 async fn test_dht_basis() {
     let test_env = test_cell_env();
     let env = test_env.env();
-    let env_ref = env.guard();
 
     {
         // Create a header that points to an entry

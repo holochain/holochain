@@ -100,8 +100,6 @@ impl EnvironmentRead {
     pub fn guard(&self) -> EnvironmentReadRef<'_> {
         EnvironmentReadRef {
             rkv: self.arc.read(),
-            path: &self.path,
-            keystore: self.keystore.clone(),
         }
     }
 
@@ -231,8 +229,6 @@ impl EnvironmentKind {
 /// because unlike [EnvironmentWriteRef], this does not implement WriteManager
 pub struct EnvironmentReadRef<'e> {
     rkv: RwLockReadGuard<'e, Rkv>,
-    path: &'e Path,
-    keystore: KeystoreSender,
 }
 
 impl<'e> EnvironmentReadRef<'e> {
@@ -291,12 +287,6 @@ impl<'e> WriteManager<'e> for EnvironmentWriteRef<'e> {
         let result = f(&mut writer)?;
         writer.commit().map_err(Into::into)?;
         Ok(result)
-    }
-}
-
-impl<'e> EnvironmentReadRef<'e> {
-    pub(crate) fn keystore(&self) -> KeystoreSender {
-        self.keystore.clone()
     }
 }
 

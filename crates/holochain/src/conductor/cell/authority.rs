@@ -4,7 +4,7 @@ use crate::core::state::{
     metadata::{MetadataBuf, MetadataBufT},
 };
 use fallible_iterator::FallibleIterator;
-use futures::future::try_join_all;
+
 use holo_hash::EntryHash;
 use holochain_state::{env::EnvironmentWrite, fresh_reader, prelude::ReadManager};
 use holochain_types::{

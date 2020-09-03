@@ -112,7 +112,6 @@ mod tests {
     async fn test_redirect_header_one_hop() -> anyhow::Result<()> {
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let env = arc.guard();
         let mut fx = TestFixtures::new();
         {
             let mut buf = MetadataBuf::vault(arc.clone().into())?;
@@ -138,7 +137,6 @@ mod tests {
     async fn test_redirect_header_three_hops() -> anyhow::Result<()> {
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let env = arc.guard();
         let mut fx = TestFixtures::new();
         {
             let mut buf = MetadataBuf::vault(arc.clone().into())?;
@@ -181,7 +179,6 @@ mod tests {
     async fn test_redirect_entry_one_hop() -> anyhow::Result<()> {
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let env = arc.guard();
         let mut fx = TestFixtures::new();
         {
             let mut buf = MetadataBuf::vault(arc.clone().into())?;
@@ -215,7 +212,6 @@ mod tests {
     async fn test_redirect_entry_three_hops() -> anyhow::Result<()> {
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let env = arc.guard();
         let mut fx = TestFixtures::new();
         {
             let mut buf = MetadataBuf::vault(arc.clone().into())?;
@@ -264,7 +260,6 @@ mod tests {
     async fn test_redirect_header_and_entry() -> anyhow::Result<()> {
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let env = arc.guard();
         let mut fx = TestFixtures::new();
         {
             let mut buf = MetadataBuf::vault(arc.clone().into())?;

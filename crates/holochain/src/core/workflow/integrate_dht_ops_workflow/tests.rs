@@ -471,7 +471,6 @@ impl Db {
 }
 
 async fn call_workflow<'env>(env: EnvironmentWrite) {
-    let env_ref = env.guard();
     let workspace = IntegrateDhtOpsWorkspace::new(env.clone().into()).unwrap();
     integrate_dht_ops_workflow(workspace, env.clone().into())
         .await
@@ -702,7 +701,6 @@ async fn test_ops_state() {
 
 /// Call the produce dht ops workflow
 async fn produce_dht_ops<'env>(env: EnvironmentWrite) {
-    let env_ref = env.guard();
     let (mut qt, _rx) = TriggerSender::new();
     let workspace = ProduceDhtOpsWorkspace::new(env.clone().into())
         .await

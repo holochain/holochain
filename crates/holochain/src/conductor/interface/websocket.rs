@@ -650,7 +650,6 @@ pub mod test {
 
         // Get state
         let expected = {
-            let env = cell_env.guard();
             let source_chain = SourceChainBuf::new(cell_env.clone().into()).unwrap();
             source_chain.dump_as_json().await.unwrap()
         };
