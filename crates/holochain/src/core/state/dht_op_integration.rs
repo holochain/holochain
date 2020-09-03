@@ -105,8 +105,8 @@ pub struct IntegrationLimboValue {
 
 impl IntegratedDhtOpsBuf {
     /// Create a new buffer for the IntegratedDhtOpsStore
-    pub fn new(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
-        let db = dbs.get_db(&*INTEGRATED_DHT_OPS).unwrap();
+    pub fn new(env: EnvironmentRead) -> DatabaseResult<Self> {
+        let db = env.get_db(&*INTEGRATED_DHT_OPS).unwrap();
         Ok(Self {
             store: IntegratedDhtOpsStore::new(env, db),
         })
@@ -175,7 +175,6 @@ mod tests {
     async fn test_query() {
         let test_env = test_cell_env();
         let env = test_env.env();
-        let dbs = env.dbs();
         let env_ref = env.guard();
 
         // Create some integration values
@@ -199,7 +198,7 @@ mod tests {
         // Put them in the db
         {
             let mut dht_hash = DhtOpHashFixturator::new(Predictable);
-            let mut buf = IntegratedDhtOpsBuf::new(env.clone().into(), &dbs).unwrap();
+            let mut buf = IntegratedDhtOpsBuf::new(env.clone().into()).unwrap();
             for mut value in values {
                 buf.put(dht_hash.next().unwrap(), value.clone()).unwrap();
                 expected.push(value.clone());
@@ -215,7 +214,7 @@ mod tests {
         // Check queries
         {
             let reader = env_ref.reader().unwrap();
-            let buf = IntegratedDhtOpsBuf::new(env.clone().into(), &dbs).unwrap();
+            let buf = IntegratedDhtOpsBuf::new(env.clone().into()).unwrap();
             // No filter
             let mut r = buf
                 .query(&reader, None, None, None)

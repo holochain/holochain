@@ -674,15 +674,14 @@ where
 /// Helper function for easily setting up cascades during tests
 pub fn test_dbs_and_mocks(
     env: EnvironmentRead,
-    dbs: &impl holochain_state::db::GetDb,
 ) -> (
     ElementBuf,
     super::metadata::MockMetadataBuf,
     ElementBuf,
     super::metadata::MockMetadataBuf,
 ) {
-    let cas = ElementBuf::vault(env.clone().into(), dbs, true).unwrap();
-    let element_cache = ElementBuf::cache(env.clone().into(), dbs).unwrap();
+    let cas = ElementBuf::vault(env.clone().into(), true).unwrap();
+    let element_cache = ElementBuf::cache(env.clone().into()).unwrap();
     let metadata = super::metadata::MockMetadataBuf::new();
     let metadata_cache = super::metadata::MockMetadataBuf::new();
     (cas, metadata, element_cache, metadata_cache)

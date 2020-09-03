@@ -30,7 +30,7 @@ pub fn spawn_integrate_dht_ops_consumer(
     let mut trigger_self = tx.clone();
     let handle = tokio::spawn(async move {
         loop {
-            let workspace = IntegrateDhtOpsWorkspace::new(env.clone().into(), &env)
+            let workspace = IntegrateDhtOpsWorkspace::new(env.clone().into())
                 .expect("Could not create Workspace");
             if let WorkComplete::Incomplete =
                 integrate_dht_ops_workflow(workspace, env.clone().into())

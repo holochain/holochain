@@ -75,8 +75,8 @@ async fn test_cell_handle_publish() {
     .unwrap();
 
     let env_ref = cell.env.guard();
-    let workspace = IncomingDhtOpsWorkspace::new(cell.env.clone().into(), &env_ref)
-        .expect("Could not create Workspace");
+    let workspace =
+        IncomingDhtOpsWorkspace::new(cell.env.clone().into()).expect("Could not create Workspace");
 
     workspace.op_exists(&op_hash).await.unwrap();
 

@@ -413,15 +413,15 @@ impl Workspace for IntegrateDhtOpsWorkspace {
 
 impl IntegrateDhtOpsWorkspace {
     /// Constructor
-    pub fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
-        let db = dbs.get_db(&*INTEGRATED_DHT_OPS)?;
+    pub fn new(env: EnvironmentRead) -> WorkspaceResult<Self> {
+        let db = env.get_db(&*INTEGRATED_DHT_OPS)?;
         let integrated_dht_ops = KvBufFresh::new(env.clone(), db);
 
-        let db = dbs.get_db(&*INTEGRATION_LIMBO)?;
+        let db = env.get_db(&*INTEGRATION_LIMBO)?;
         let integration_limbo = KvBufFresh::new(env.clone(), db);
 
-        let elements = ElementBuf::vault(env.clone(), dbs, true)?;
-        let meta = MetadataBuf::vault(env, dbs)?;
+        let elements = ElementBuf::vault(env.clone(), true)?;
+        let meta = MetadataBuf::vault(env)?;
 
         Ok(Self {
             integration_limbo,

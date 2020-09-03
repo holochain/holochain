@@ -325,7 +325,7 @@ where
                 proof,
             ))
             .map_err(|e| CellError::from(e))
-            .and_then(|result| async { result.map(|env| (cell_id, env)) })
+            .and_then(|result| async { result.map(|env| cell_id) })
         });
         let (success, errors): (Vec<_>, Vec<_>) = futures::future::join_all(cells_tasks)
             .await
@@ -337,7 +337,7 @@ where
 
         // If there was errors, cleanup and return the errors
         if !errors.is_empty() {
-            for (cell_id, state_env) in success {
+            for cell_id in success {
                 let env = EnvironmentWrite::new(
                     &root_env_dir,
                     EnvironmentKind::Cell(cell_id),
@@ -635,7 +635,7 @@ where
     pub(super) async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
         let cell = self.cell_by_id(cell_id)?;
         let arc = cell.env();
-        let source_chain = SourceChainBuf::new(arc.clone().into(), arc)?;
+        let source_chain = SourceChainBuf::new(arc.clone().into())?;
         drop(arc);
         Ok(source_chain.dump_as_json().await?)
     }

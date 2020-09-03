@@ -29,7 +29,7 @@ pub fn spawn_publish_dht_ops_consumer(
     let mut trigger_self = tx.clone();
     let handle = tokio::spawn(async move {
         loop {
-            let workspace = PublishDhtOpsWorkspace::new(env.clone().into(), &env)
+            let workspace = PublishDhtOpsWorkspace::new(env.clone().into())
                 .expect("Could not create Workspace");
             if let WorkComplete::Incomplete =
                 publish_dht_ops_workflow(workspace, env.clone().into(), &mut cell_network)

@@ -115,15 +115,6 @@ impl EnvironmentRead {
         &self.keystore
     }
 
-    /// Return an `impl GetDb`, which can synchronously get databases from this
-    /// environment
-    /// This function only exists because this was the pattern used by DbManager, which has
-    /// since been removed
-    // #[deprecated = "duplicate of EnvironmentRo::guard"]
-    pub fn dbs(&self) -> EnvironmentReadRef<'_> {
-        self.guard()
-    }
-
     /// The environments path
     pub fn path(&self) -> &PathBuf {
         &self.path
@@ -303,16 +294,6 @@ impl<'e> WriteManager<'e> for EnvironmentWriteRef<'e> {
     }
 }
 
-impl GetDb for EnvironmentReadRef<'_> {
-    fn get_db<V: 'static + Copy + Send + Sync>(&self, key: &'static DbKey<V>) -> DatabaseResult<V> {
-        get_db(self.path, key)
-    }
-
-    fn keystore(&self) -> KeystoreSender {
-        self.keystore()
-    }
-}
-
 impl<'e> EnvironmentReadRef<'e> {
     pub(crate) fn keystore(&self) -> KeystoreSender {
         self.keystore.clone()
@@ -350,15 +331,5 @@ impl<'e> ReadManager<'e> for EnvironmentWriteRef<'e> {
         F: FnOnce(Reader) -> Result<R, E>,
     {
         self.0.with_reader(f)
-    }
-}
-
-impl<'e> GetDb for EnvironmentWriteRef<'e> {
-    fn get_db<V: 'static + Copy + Send + Sync>(&self, key: &'static DbKey<V>) -> DatabaseResult<V> {
-        self.0.get_db(key)
-    }
-
-    fn keystore(&self) -> KeystoreSender {
-        self.0.keystore()
     }
 }

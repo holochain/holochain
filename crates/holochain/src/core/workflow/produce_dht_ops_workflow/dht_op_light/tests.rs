@@ -262,7 +262,7 @@ async fn test_dht_basis() {
         let entry_hashed = EntryHashed::with_pre_hashed(new_entry.clone(), fixt!(EntryHash));
 
         // Setup a cascade
-        let mut cas = ElementBuf::vault(env.clone().into(), &env_ref, true).unwrap();
+        let mut cas = ElementBuf::vault(env.clone().into(), true).unwrap();
 
         // Put the header into the db
         cas.put(signed_header, Some(entry_hashed)).unwrap();

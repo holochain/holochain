@@ -251,10 +251,10 @@ pub struct CallZomeWorkspace {
 
 impl<'a> CallZomeWorkspace {
     pub fn new(env: EnvironmentRead) -> WorkspaceResult<Self> {
-        let source_chain = SourceChain::new(env.clone(), &env)?;
-        let cache_cas = ElementBuf::cache(env.clone(), &env)?;
-        let meta = MetadataBuf::vault(env.clone(), &env)?;
-        let cache_meta = MetadataBuf::cache(env.clone(), &env)?;
+        let source_chain = SourceChain::new(env.clone())?;
+        let cache_cas = ElementBuf::cache(env.clone())?;
+        let meta = MetadataBuf::vault(env.clone())?;
+        let cache_meta = MetadataBuf::cache(env.clone())?;
 
         Ok(CallZomeWorkspace {
             source_chain,
@@ -334,7 +334,6 @@ pub mod tests {
     async fn private_zome_call() {
         let test_env = test_cell_env();
         let env = test_env.env();
-        let dbs = env.dbs();
         let env_ref = env.guard();
         let reader = env_ref.reader().unwrap();
         let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();

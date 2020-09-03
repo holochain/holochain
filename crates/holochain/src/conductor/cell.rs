@@ -123,7 +123,7 @@ impl Cell {
         // check if genesis has been run
         let has_genesis = {
             // check if genesis ran on source chain buf
-            SourceChainBuf::new(env.clone().into(), &env)?.has_genesis()
+            SourceChainBuf::new(env.clone().into())?.has_genesis()
         };
 
         if has_genesis {
@@ -166,7 +166,7 @@ impl Cell {
         let conductor_api = CellConductorApi::new(conductor_handle, id.clone());
 
         // run genesis
-        let workspace = GenesisWorkspace::new(cell_env.clone().into(), &cell_env)
+        let workspace = GenesisWorkspace::new(cell_env.clone().into())
             .await
             .map_err(ConductorApiError::from)
             .map_err(Box::new)?;
@@ -305,7 +305,6 @@ impl Cell {
                 async {
                     let res = self
                         .handle_get_links(link_key, options)
-                        .await
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
@@ -339,7 +338,6 @@ impl Cell {
                 async {
                     let res = self
                         .handle_fetch_op_hashes_for_constraints(dht_arc, since, until)
-                        .await
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
                 }
@@ -437,10 +435,9 @@ impl Cell {
     async fn handle_get_element(&self, hash: HeaderHash) -> CellResult<GetElementResponse> {
         // Get the vaults
         let env_ref = self.env.guard();
-        let dbs = self.env.dbs();
         let reader = env_ref.reader()?;
-        let element_vault = ElementBuf::vault(self.env.clone().into(), &dbs, false)?;
-        let meta_vault = MetadataBuf::vault(self.env.clone().into(), &dbs)?;
+        let element_vault = ElementBuf::vault(self.env.clone().into(), false)?;
+        let meta_vault = MetadataBuf::vault(self.env.clone().into())?;
 
         // Look for a delete on the header and collect it
         let deleted = meta_vault
@@ -483,17 +480,16 @@ impl Cell {
     // TODO: Right now we are returning all the full headers
     // We could probably send some smaller types instead of the full headers
     // if we are careful.
-    async fn handle_get_links(
+    fn handle_get_links(
         &self,
         link_key: WireLinkMetaKey,
         _options: holochain_p2p::event::GetLinksOptions,
     ) -> CellResult<GetLinksResponse> {
         // Get the vaults
         let env_ref = self.env.guard();
-        let dbs = self.env.dbs();
         let reader = env_ref.reader()?;
-        let element_vault = ElementBuf::vault(self.env.clone().into(), &dbs, false)?;
-        let meta_vault = MetadataBuf::vault(self.env.clone().into(), &dbs)?;
+        let element_vault = ElementBuf::vault(self.env.clone().into(), false)?;
+        let meta_vault = MetadataBuf::vault(self.env.clone().into())?;
         debug!(id = ?self.id());
 
         let links = meta_vault
@@ -551,7 +547,7 @@ impl Cell {
 
     #[instrument(skip(self, dht_arc, since, until))]
     /// the network module is requesting a list of dht op hashes
-    async fn handle_fetch_op_hashes_for_constraints(
+    fn handle_fetch_op_hashes_for_constraints(
         &self,
         dht_arc: holochain_p2p::dht_arc::DhtArc,
         since: Timestamp,
@@ -559,7 +555,7 @@ impl Cell {
     ) -> CellResult<Vec<DhtOpHash>> {
         let env_ref = self.env.guard();
         let reader = env_ref.reader()?;
-        let integrated_dht_ops = IntegratedDhtOpsBuf::new(self.env().clone().into(), &env_ref)?;
+        let integrated_dht_ops = IntegratedDhtOpsBuf::new(self.env().clone().into())?;
         let result: Vec<DhtOpHash> = integrated_dht_ops
             .query(&reader, Some(since), Some(until), Some(dht_arc))?
             .map(|(k, _)| Ok(k))
@@ -579,9 +575,8 @@ impl Cell {
             holochain_types::dht_op::DhtOp,
         )>,
     > {
-        let env_ref = self.env.guard();
-        let integrated_dht_ops = IntegratedDhtOpsBuf::new(self.env().clone().into(), &env_ref)?;
-        let cas = ElementBuf::vault(self.env.clone().into(), &env_ref, false)?;
+        let integrated_dht_ops = IntegratedDhtOpsBuf::new(self.env().clone().into())?;
+        let cas = ElementBuf::vault(self.env.clone().into(), false)?;
         let mut out = vec![];
         for op_hash in op_hashes {
             let val = integrated_dht_ops.get(&op_hash)?;

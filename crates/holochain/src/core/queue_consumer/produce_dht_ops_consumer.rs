@@ -28,7 +28,7 @@ pub fn spawn_produce_dht_ops_consumer(
     let mut trigger_self = tx.clone();
     let handle = tokio::spawn(async move {
         loop {
-            let workspace = ProduceDhtOpsWorkspace::new(env.clone().into(), &env)
+            let workspace = ProduceDhtOpsWorkspace::new(env.clone().into())
                 .await
                 .expect("Could not create Workspace");
             if let WorkComplete::Incomplete =

@@ -28,7 +28,7 @@ pub fn spawn_sys_validation_consumer(
     let mut trigger_self = tx.clone();
     let handle = tokio::spawn(async move {
         loop {
-            let workspace = SysValidationWorkspace::new(env.clone().into(), &env)
+            let workspace = SysValidationWorkspace::new(env.clone().into())
                 .expect("Could not create Workspace");
             if let WorkComplete::Incomplete =
                 sys_validation_workflow(workspace, env.clone().into(), &mut trigger_app_validation)

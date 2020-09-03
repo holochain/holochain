@@ -87,9 +87,9 @@ pub struct ValidationReceiptsBuf(KvvBufUsed<DhtOpHash, SignedValidationReceipt>)
 
 impl ValidationReceiptsBuf {
     /// Constructor given read-only transaction and db ref.
-    pub fn new(env_ref: &EnvironmentReadRef) -> DatabaseResult<ValidationReceiptsBuf> {
+    pub fn new(dbs: &impl GetDb) -> DatabaseResult<ValidationReceiptsBuf> {
         Ok(Self(KvvBufUsed::new_opts(
-            env_ref.get_db(&*holochain_state::db::VALIDATION_RECEIPTS)?,
+            dbs.get_db(&*holochain_state::db::VALIDATION_RECEIPTS)?,
             true, // set to no_dup_data mode
         )))
     }
@@ -176,20 +176,16 @@ mod tests {
 
         let test_env = holochain_state::test_utils::test_cell_env();
         let env = test_env.env();
-        let env_ref = env.guard();
         let keystore = holochain_state::test_utils::test_keystore();
 
         let test_op_hash = fake_dht_op_hash(1);
         let vr1 = fake_vr(&test_op_hash, &keystore).await;
         let vr2 = fake_vr(&test_op_hash, &keystore).await;
 
+        let env_ref = env.guard();
         {
-            // capture the readers at the same time
-            // so we can test out the resolve-dups-on-write logic
-            let _reader1 = env_ref.reader()?;
-            let mut vr_buf1 = ValidationReceiptsBuf::new(&env_ref)?;
-            let _reader2 = env_ref.reader()?;
-            let mut vr_buf2 = ValidationReceiptsBuf::new(&env_ref)?;
+            let mut vr_buf1 = ValidationReceiptsBuf::new(&env)?;
+            let mut vr_buf2 = ValidationReceiptsBuf::new(&env)?;
 
             vr_buf1.add_if_unique(vr1.clone())?;
             vr_buf1.add_if_unique(vr1.clone())?;
@@ -204,7 +200,7 @@ mod tests {
         }
 
         let reader = env_ref.reader()?;
-        let vr_buf = ValidationReceiptsBuf::new(&env_ref)?;
+        let vr_buf = ValidationReceiptsBuf::new(&env)?;
 
         assert_eq!(2, vr_buf.count_valid(&reader, &test_op_hash)?);
 
