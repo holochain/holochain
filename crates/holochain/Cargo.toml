@@ -58,7 +58,6 @@ url = "1.7.2"
 url2 = "0.0.5"
 url_serde = "0.2.0"
 uuid = { version = "0.7", features = [ "serde", "v4" ] }
-backtrace = "0.3"
 
 [dev-dependencies]
 anyhow = "1.0.26"

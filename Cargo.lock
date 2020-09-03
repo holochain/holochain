@@ -1210,7 +1210,6 @@ dependencies = [
  "anyhow",
  "assert_cmd",
  "async-trait",
- "backtrace",
  "base64 0.10.1",
  "cfg-if",
  "chrono",
