@@ -3,8 +3,8 @@
 use super::{
     error::WorkflowResult,
     integrate_dht_ops_workflow::{
-        disintegrate_single_metadata, disintegrate_single_op, integrate_single_metadata,
-        integrate_single_op,
+        disintegrate_single_data, disintegrate_single_metadata, integrate_single_data,
+        integrate_single_metadata,
     },
     produce_dht_ops_workflow::dht_op_light::light_to_op,
     sys_validation_workflow::types::DepType,
@@ -133,7 +133,7 @@ async fn app_validation_workflow_inner(
                                             .await?;
                                     let hash = DhtOpHash::with_data(&op).await;
                                     let iv = IntegrationLimboValue {
-                                        validation_status: ValidationStatus::Rejected,
+                                        validation_status: status,
                                         op: vlv.op,
                                     };
                                     workspace.to_int_limbo(hash, iv, op).await?;
@@ -246,8 +246,8 @@ impl AppValidationWorkspace {
     ) -> WorkflowResult<()> {
         disintegrate_single_metadata(iv.op.clone(), &self.element_pending, &mut self.meta_pending)
             .await?;
-        disintegrate_single_op(iv.op.clone(), &mut self.element_pending);
-        integrate_single_op(op, &mut self.element_judged).await?;
+        disintegrate_single_data(iv.op.clone(), &mut self.element_pending);
+        integrate_single_data(op, &mut self.element_judged).await?;
         integrate_single_metadata(iv.op.clone(), &self.element_judged, &mut self.meta_judged)
             .await?;
         self.integration_limbo.put(hash, iv)?;

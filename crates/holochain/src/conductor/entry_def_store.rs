@@ -123,6 +123,7 @@ impl BufferedStore for EntryDefBuf {
     }
 }
 
+#[tracing::instrument(skip(dna))]
 /// Get all the [EntryDef] for this dna
 pub(crate) fn get_entry_defs(
     dna: DnaFile,
@@ -153,6 +154,9 @@ pub(crate) fn get_entry_defs(
                         .into_iter()
                         .enumerate()
                         .map(move |(i, entry_def)| {
+                            let s = tracing::debug_span!("entry_def");
+                            let _g = s.enter();
+                            tracing::debug!(?entry_def);
                             Ok((
                                 EntryDefBufferKey {
                                     zome: zome.clone(),

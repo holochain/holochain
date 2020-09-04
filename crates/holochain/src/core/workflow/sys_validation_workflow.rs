@@ -39,8 +39,8 @@ use std::{collections::BinaryHeap, convert::TryInto};
 use tracing::*;
 
 use integrate_dht_ops_workflow::{
-    disintegrate_single_metadata, disintegrate_single_op, integrate_single_metadata,
-    integrate_single_op,
+    disintegrate_single_data, disintegrate_single_metadata, integrate_single_data,
+    integrate_single_metadata,
 };
 use produce_dht_ops_workflow::dht_op_light::light_to_op;
 use types::{CheckLevel, Dependencies, DhtOpOrder, OrderedOp, Outcome};
@@ -97,11 +97,7 @@ async fn sys_validation_workflow_inner(
     let mut sorted_ops = BinaryHeap::new();
     for vlv in ops {
         // let op = light_to_op(vlv.op.clone(), &workspace.element_pending).await?;
-        let op = light_to_op(vlv.op.clone(), &workspace.element_pending).await;
-        if let Err(e) = &op {
-            dbg!(e, &vlv.op);
-        }
-        let op = op?;
+        let op = light_to_op(vlv.op.clone(), &workspace.element_pending).await?;
 
         let hash = DhtOpHash::with_data(&op).await;
         let order = DhtOpOrder::from(&op);
@@ -115,10 +111,6 @@ async fn sys_validation_workflow_inner(
         sorted_ops.push(std::cmp::Reverse(v));
     }
 
-    let which_agent = which_agent(conductor_api.cell_id().agent_pubkey());
-    if which_agent == "alice" {
-        debug!(%which_agent, ?sorted_ops);
-    }
     // Process each op
     for so in sorted_ops {
         let OrderedOp {
@@ -127,15 +119,7 @@ async fn sys_validation_workflow_inner(
             value: mut vlv,
             ..
         } = so.0;
-        // let outcome = validate_op(
-        //     &op,
-        //     workspace,
-        //     network.clone(),
-        //     &conductor_api,
-        //     &mut vlv.awaiting_proof,
-        // )
-        // .await?;
-        let r = validate_op(
+        let outcome = validate_op(
             &op,
             workspace,
             network.clone(),
@@ -143,18 +127,7 @@ async fn sys_validation_workflow_inner(
             &mut vlv.awaiting_proof,
             CheckLevel::Holding,
         )
-        .await;
-        if let Err(e) = &r {
-            dbg!(e, &vlv.op);
-        }
-        let outcome = r?;
-        if which_agent == "alice" {
-            debug!(%which_agent, ?outcome, ?op_hash);
-        }
-
-        // TODO: When we introduce abandoning ops make
-        // sure they are not written to any outgoing
-        // database
+        .await?;
 
         match outcome {
             Outcome::Accepted => {
@@ -183,12 +156,6 @@ async fn sys_validation_workflow_inner(
                 // We need to be holding the dependency because
                 // we were meant to get a StoreElement or StoreEntry or
                 // RegisterAgentActivity or RegisterAddLink.
-                //
-                // We might be able to make sure the `missing_dep` hash below
-                // is always the correct dht basis hash for the authorities and
-                // then request gossip off that authority.
-                // However we are that authority by definition so maybe we should
-                // just trigger a general gossip fetch at this point?
                 vlv.status = ValidationLimboStatus::AwaitingSysDeps(missing_dep);
                 workspace.to_val_limbo(op_hash, vlv).await?;
             }
@@ -654,8 +621,8 @@ impl SysValidationWorkspace {
     ) -> WorkflowResult<()> {
         disintegrate_single_metadata(iv.op.clone(), &self.element_pending, &mut self.meta_pending)
             .await?;
-        disintegrate_single_op(iv.op.clone(), &mut self.element_pending);
-        integrate_single_op(op, &mut self.element_judged).await?;
+        disintegrate_single_data(iv.op.clone(), &mut self.element_pending);
+        integrate_single_data(op, &mut self.element_judged).await?;
         integrate_single_metadata(iv.op.clone(), &self.element_judged, &mut self.meta_judged)
             .await?;
         self.integration_limbo.put(hash, iv)?;

@@ -2,7 +2,7 @@
 
 use super::{
     error::WorkflowResult,
-    integrate_dht_ops_workflow::{integrate_single_metadata, integrate_single_op},
+    integrate_dht_ops_workflow::{integrate_single_data, integrate_single_metadata},
     produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertResult,
     sys_validation_workflow::types::Dependencies,
 };
@@ -104,7 +104,7 @@ impl IncomingDhtOpsWorkspace {
         let basis = op.dht_basis().await;
         let op_light = op.to_light().await;
 
-        integrate_single_op(op, &mut self.element_pending).await?;
+        integrate_single_data(op, &mut self.element_pending).await?;
         integrate_single_metadata(
             op_light.clone(),
             &self.element_pending,

@@ -292,12 +292,10 @@ async fn check_holding_entry<P: PrefixType>(
             .ok_or_else(|| ValidationError::NotHoldingDep(hash.clone().into()))?;
         SysValidationResult::Ok(eh)
     })?;
-    let r = element_vault.get_element(&entry_header).await;
-    if let Err(e) = &r {
-        dbg!(e);
-    }
-    let r = r?;
-    r.ok_or_else(|| ValidationError::NotHoldingDep(hash.clone().into()).into())
+    element_vault
+        .get_element(&entry_header)
+        .await?
+        .ok_or_else(|| ValidationError::NotHoldingDep(hash.clone().into()).into())
 }
 
 /// Check we are actually holding an header
@@ -316,12 +314,10 @@ async fn check_holding_element<P: PrefixType>(
     hash: &HeaderHash,
     element_vault: &ElementBuf<P>,
 ) -> SysValidationResult<Element> {
-    let el = dbg!(element_vault.get_element(&hash).await);
-    if let Err(e) = &el {
-        dbg!(e);
-    }
-    let el = el?;
-    let el = el.ok_or_else(|| ValidationError::NotHoldingDep(hash.clone().into()))?;
+    let el = element_vault
+        .get_element(&hash)
+        .await?
+        .ok_or_else(|| ValidationError::NotHoldingDep(hash.clone().into()))?;
 
     el.entry()
         .as_option()

@@ -80,7 +80,7 @@ async fn run_test(
     bob_links_in_a_legit_way(&bob_cell_id, &handle, &dna_file).await;
 
     // Some time for ops to reach alice and run through validation
-    tokio::time::delay_for(Duration::from_millis(500)).await;
+    tokio::time::delay_for(Duration::from_millis(1000)).await;
 
     {
         let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();

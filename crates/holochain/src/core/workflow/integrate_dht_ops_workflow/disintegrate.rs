@@ -47,10 +47,14 @@ where
 
 /// DISABLED
 /// TODO: figure out how to garbage collect ops without removing another ops data
-pub fn disintegrate_single_op<P: PrefixType>(_op: DhtOpLight, _element_store: &mut ElementBuf<P>) {}
+pub fn disintegrate_single_data<P: PrefixType>(
+    _op: DhtOpLight,
+    _element_store: &mut ElementBuf<P>,
+) {
+}
 
 /// Store a DhtOp's data in an element buf without dependency checks
-pub fn _disintegrate_single_op<P: PrefixType>(op: DhtOpLight, element_store: &mut ElementBuf<P>) {
+pub fn _disintegrate_single_data<P: PrefixType>(op: DhtOpLight, element_store: &mut ElementBuf<P>) {
     match op {
         DhtOpLight::StoreElement(header, maybe_entry, _) => {
             delete_data(header, maybe_entry, element_store);
