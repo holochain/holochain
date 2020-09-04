@@ -245,7 +245,6 @@ async fn test_all_ops() {
 async fn test_dht_basis() {
     let test_env = test_cell_env();
     let env = test_env.env();
-    let env_ref = env.guard();
 
     {
         // Create a header that points to an entry
@@ -262,7 +261,7 @@ async fn test_dht_basis() {
         let entry_hashed = EntryHashed::with_pre_hashed(new_entry.clone(), fixt!(EntryHash));
 
         // Setup a cascade
-        let mut cas = ElementBuf::vault(env.clone().into(), &env_ref, true).unwrap();
+        let mut cas = ElementBuf::vault(env.clone().into(), true).unwrap();
 
         // Put the header into the db
         cas.put(signed_header, Some(entry_hashed)).unwrap();

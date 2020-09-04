@@ -31,8 +31,7 @@ pub async fn incoming_dht_ops_workflow(
     ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
 ) -> WorkflowResult<()> {
     // set up our workspace
-    let env_ref = state_env.guard();
-    let mut workspace = IncomingDhtOpsWorkspace::new(state_env.clone().into(), &env_ref)?;
+    let mut workspace = IncomingDhtOpsWorkspace::new(state_env.clone().into())?;
 
     // add incoming ops to the validation limbo
     for (hash, op) in ops {
@@ -78,14 +77,14 @@ impl Workspace for IncomingDhtOpsWorkspace {
 }
 
 impl IncomingDhtOpsWorkspace {
-    pub fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
-        let db = dbs.get_db(&*INTEGRATED_DHT_OPS)?;
+    pub fn new(env: EnvironmentRead) -> WorkspaceResult<Self> {
+        let db = env.get_db(&*INTEGRATED_DHT_OPS)?;
         let integrated_dht_ops = KvBufFresh::new(env.clone(), db);
 
-        let db = dbs.get_db(&*INTEGRATION_LIMBO)?;
+        let db = env.get_db(&*INTEGRATION_LIMBO)?;
         let integration_limbo = KvBufFresh::new(env.clone(), db);
 
-        let validation_limbo = ValidationLimboStore::new(env, dbs)?;
+        let validation_limbo = ValidationLimboStore::new(env)?;
 
         Ok(Self {
             integration_limbo,

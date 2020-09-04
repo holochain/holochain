@@ -62,15 +62,11 @@ impl ElementBuf {
     /// Create a ElementBuf using the Vault databases.
     /// The `allow_private` argument allows you to specify whether private
     /// entries should be readable or writeable with this reference.
-    pub fn vault(
-        env: EnvironmentRead,
-        dbs: &impl GetDb,
-        allow_private: bool,
-    ) -> DatabaseResult<Self> {
-        let headers = dbs.get_db(&*ELEMENT_VAULT_HEADERS)?;
-        let entries = dbs.get_db(&*ELEMENT_VAULT_PUBLIC_ENTRIES)?;
+    pub fn vault(env: EnvironmentRead, allow_private: bool) -> DatabaseResult<Self> {
+        let headers = env.get_db(&*ELEMENT_VAULT_HEADERS)?;
+        let entries = env.get_db(&*ELEMENT_VAULT_PUBLIC_ENTRIES)?;
         let private_entries = if allow_private {
-            Some(dbs.get_db(&*ELEMENT_VAULT_PRIVATE_ENTRIES)?)
+            Some(env.get_db(&*ELEMENT_VAULT_PRIVATE_ENTRIES)?)
         } else {
             None
         };
@@ -79,9 +75,9 @@ impl ElementBuf {
 
     /// Create a ElementBuf using the Cache databases.
     /// There is no cache for private entries, so private entries are disallowed
-    pub fn cache(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
-        let entries = dbs.get_db(&*ELEMENT_CACHE_ENTRIES)?;
-        let headers = dbs.get_db(&*ELEMENT_CACHE_HEADERS)?;
+    pub fn cache(env: EnvironmentRead) -> DatabaseResult<Self> {
+        let entries = env.get_db(&*ELEMENT_CACHE_ENTRIES)?;
+        let headers = env.get_db(&*ELEMENT_CACHE_HEADERS)?;
         Self::new(env, entries, None, headers)
     }
 
@@ -307,7 +303,7 @@ mod tests {
 
         // write one public-entry header and one private-entry header
         env.with_commit(|txn| {
-            let mut store = ElementBuf::vault(arc.clone().into(), &env, true)?;
+            let mut store = ElementBuf::vault(arc.clone().into(), true)?;
             store.put(header_pub, Some(entry_pub.clone()))?;
             store.put(header_priv, Some(entry_priv.clone()))?;
             store.flush_to_txn(txn)
@@ -315,7 +311,7 @@ mod tests {
 
         // Can retrieve both entries when private entries are enabled
         {
-            let store = ElementBuf::vault(arc.clone().into(), &env, true)?;
+            let store = ElementBuf::vault(arc.clone().into(), true)?;
             assert_eq!(
                 store.get_entry(entry_pub.as_hash()),
                 Ok(Some(entry_pub.clone()))
@@ -328,7 +324,7 @@ mod tests {
 
         // Cannot retrieve private entry when disabled
         {
-            let store = ElementBuf::vault(arc.clone().into(), &env, false)?;
+            let store = ElementBuf::vault(arc.clone().into(), false)?;
             assert_eq!(
                 store.get_entry(entry_pub.as_hash()),
                 Ok(Some(entry_pub.clone()))
@@ -354,7 +350,7 @@ mod tests {
 
         // write one public-entry header and one private-entry header (which will be a noop)
         env.with_commit(|txn| {
-            let mut store = ElementBuf::vault(arc.clone().into(), &env, false)?;
+            let mut store = ElementBuf::vault(arc.clone().into(), false)?;
             store.put(header_pub, Some(entry_pub.clone()))?;
             store.put(header_priv, Some(entry_priv.clone()))?;
             store.flush_to_txn(txn)
@@ -362,7 +358,7 @@ mod tests {
 
         // Can retrieve both entries when private entries are enabled
         {
-            let store = ElementBuf::vault(arc.clone().into(), &env, true)?;
+            let store = ElementBuf::vault(arc.clone().into(), true)?;
             assert_eq!(
                 store.get_entry(entry_pub.as_hash()),
                 Ok(Some(entry_pub.clone()))
@@ -372,7 +368,7 @@ mod tests {
 
         // Cannot retrieve private entry when disabled
         {
-            let store = ElementBuf::vault(arc.clone().into(), &env, false)?;
+            let store = ElementBuf::vault(arc.clone().into(), false)?;
             assert_eq!(store.get_entry(entry_pub.as_hash()), Ok(Some(entry_pub)));
             assert_eq!(store.get_entry(entry_priv.as_hash()), Ok(None));
         }

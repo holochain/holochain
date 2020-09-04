@@ -182,7 +182,7 @@ impl Db {
     async fn check(expects: Vec<Self>, env: EnvironmentWrite, here: String) {
         let env_ref = env.guard();
         let reader = env_ref.reader().unwrap();
-        let workspace = IntegrateDhtOpsWorkspace::new(env.clone().into(), &env_ref).unwrap();
+        let workspace = IntegrateDhtOpsWorkspace::new(env.clone().into()).unwrap();
         for expect in expects {
             match expect {
                 Db::Integrated(op) => {
@@ -415,7 +415,7 @@ impl Db {
     #[instrument(skip(pre_state, env))]
     async fn set<'env>(pre_state: Vec<Self>, env: EnvironmentWrite) {
         let env_ref = env.guard();
-        let mut workspace = IntegrateDhtOpsWorkspace::new(env.clone().into(), &env_ref).unwrap();
+        let mut workspace = IntegrateDhtOpsWorkspace::new(env.clone().into()).unwrap();
         for state in pre_state {
             match state {
                 Db::Integrated(_) => {}
@@ -471,8 +471,7 @@ impl Db {
 }
 
 async fn call_workflow<'env>(env: EnvironmentWrite) {
-    let env_ref = env.guard();
-    let workspace = IntegrateDhtOpsWorkspace::new(env.clone().into(), &env_ref).unwrap();
+    let workspace = IntegrateDhtOpsWorkspace::new(env.clone().into()).unwrap();
     integrate_dht_ops_workflow(workspace, env.clone().into())
         .await
         .unwrap();
@@ -481,7 +480,7 @@ async fn call_workflow<'env>(env: EnvironmentWrite) {
 // Need to clear the data from the previous test
 async fn clear_dbs(env: EnvironmentWrite) {
     let env_ref = env.guard();
-    let mut workspace = IntegrateDhtOpsWorkspace::new(env.clone().into(), &env_ref).unwrap();
+    let mut workspace = IntegrateDhtOpsWorkspace::new(env.clone().into()).unwrap();
     env_ref
         .with_commit::<DatabaseError, _, _>(|writer| {
             workspace.integration_limbo.clear_all(writer)?;
@@ -702,9 +701,8 @@ async fn test_ops_state() {
 
 /// Call the produce dht ops workflow
 async fn produce_dht_ops<'env>(env: EnvironmentWrite) {
-    let env_ref = env.guard();
     let (mut qt, _rx) = TriggerSender::new();
-    let workspace = ProduceDhtOpsWorkspace::new(env.clone().into(), &env_ref)
+    let workspace = ProduceDhtOpsWorkspace::new(env.clone().into())
         .await
         .unwrap();
     produce_dht_ops_workflow(workspace, env.clone().into(), &mut qt)
@@ -1373,18 +1371,17 @@ mod slow_tests {
         // Check the ops
         {
             let cell_env = conductor.get_cell_env(&cell_id).await.unwrap();
-            let dbs = cell_env.dbs();
             let env_ref = cell_env.guard();
 
             let reader = env_ref.reader().unwrap();
-            let db = dbs.get_db(&*INTEGRATED_DHT_OPS).unwrap();
+            let db = cell_env.get_db(&*INTEGRATED_DHT_OPS).unwrap();
             let ops_db = IntegratedDhtOpsStore::new(cell_env.clone().into(), db);
             let ops = ops_db.iter(&reader).unwrap().collect::<Vec<_>>().unwrap();
             debug!(?ops);
             assert!(!ops.is_empty());
 
-            let meta = MetadataBuf::vault(cell_env.clone().into(), &dbs).unwrap();
-            let mut meta_cache = MetadataBuf::cache(cell_env.clone().into(), &dbs).unwrap();
+            let meta = MetadataBuf::vault(cell_env.clone().into()).unwrap();
+            let mut meta_cache = MetadataBuf::cache(cell_env.clone().into()).unwrap();
             let key = LinkMetaKey::Base(&base_entry_hash);
             let links = meta
                 .get_live_links(&reader, &key)
@@ -1395,7 +1392,7 @@ mod slow_tests {
             assert_eq!(link.target, target_entry_hash);
 
             let (elements, _metadata, mut element_cache, _metadata_cache) =
-                test_dbs_and_mocks(cell_env.clone().into(), &dbs);
+                test_dbs_and_mocks(cell_env.clone().into());
             let cell_network = conductor
                 .holochain_p2p()
                 .to_cell(cell_id.dna_hash().clone(), cell_id.agent_pubkey().clone());

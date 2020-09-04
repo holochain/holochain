@@ -41,8 +41,8 @@ pub struct ChainSequenceBuf {
 
 impl ChainSequenceBuf {
     /// Create a new instance
-    pub fn new(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
-        let buf: Store = KvIntBufFresh::new(env.clone(), dbs.get_db(&*CHAIN_SEQUENCE)?);
+    pub fn new(env: EnvironmentRead) -> DatabaseResult<Self> {
+        let buf: Store = KvIntBufFresh::new(env.clone(), env.get_db(&*CHAIN_SEQUENCE)?);
         let (next_index, tx_seq, current_head) =
             fresh_reader!(env, |r| { Self::head_info(buf.store(), &r) })?;
         let persisted_head = current_head.clone();
@@ -192,9 +192,8 @@ pub mod tests {
         observability::test_run().ok();
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let dbs = arc.dbs();
         {
-            let mut buf = ChainSequenceBuf::new(arc.clone().into(), &dbs)?;
+            let mut buf = ChainSequenceBuf::new(arc.clone().into())?;
             assert_eq!(buf.chain_head(), None);
             buf.put_header(
                 HeaderHash::from_raw_bytes(vec![
@@ -256,10 +255,9 @@ pub mod tests {
         let test_env = test_cell_env();
         let arc = test_env.env();
         let env = arc.guard();
-        let dbs = arc.dbs();
 
         {
-            let mut buf = ChainSequenceBuf::new(arc.clone().into(), &dbs)?;
+            let mut buf = ChainSequenceBuf::new(arc.clone().into())?;
             buf.put_header(
                 HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -296,7 +294,7 @@ pub mod tests {
 
         let reader = env.reader()?;
         {
-            let buf = ChainSequenceBuf::new(arc.clone().into(), &dbs)?;
+            let buf = ChainSequenceBuf::new(arc.clone().into())?;
             assert_eq!(
                 buf.chain_head(),
                 Some(
@@ -317,7 +315,7 @@ pub mod tests {
         }
 
         {
-            let mut buf = ChainSequenceBuf::new(arc.clone().into(), &dbs)?;
+            let mut buf = ChainSequenceBuf::new(arc.clone().into())?;
             buf.put_header(
                 HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -344,7 +342,7 @@ pub mod tests {
 
         let reader = env.reader()?;
         {
-            let buf = ChainSequenceBuf::new(arc.clone().into(), &dbs)?;
+            let buf = ChainSequenceBuf::new(arc.clone().into())?;
             assert_eq!(
                 buf.chain_head(),
                 Some(
@@ -376,9 +374,7 @@ pub mod tests {
         let (tx2, rx2) = tokio::sync::oneshot::channel();
 
         let task1 = tokio::spawn(async move {
-            let env = arc1.guard();
-            let dbs = arc1.dbs();
-            let mut buf = ChainSequenceBuf::new(arc1.clone().into(), &dbs)?;
+            let mut buf = ChainSequenceBuf::new(arc1.clone().into())?;
             buf.put_header(
                 HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -406,14 +402,13 @@ pub mod tests {
             tx1.send(()).unwrap();
             rx2.await.unwrap();
 
+            let env = arc1.guard();
             env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
         });
 
         let task2 = tokio::spawn(async move {
             rx1.await.unwrap();
-            let env = arc2.guard();
-            let dbs = arc2.dbs();
-            let mut buf = ChainSequenceBuf::new(arc2.clone().into(), &dbs)?;
+            let mut buf = ChainSequenceBuf::new(arc2.clone().into())?;
             buf.put_header(
                 HeaderHash::from_raw_bytes(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -436,6 +431,7 @@ pub mod tests {
                 .into(),
             )?;
 
+            let env = arc2.guard();
             env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
             tx2.send(()).unwrap();
             Result::<_, SourceChainError>::Ok(())

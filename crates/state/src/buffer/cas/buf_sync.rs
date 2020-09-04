@@ -50,7 +50,7 @@ where
     }
 
     /// Get a value from the underlying [KvBufUsed]
-    pub fn get<'r, 'a: 'r, R: Readable + Send + Sync>(
+    pub fn get<'r, 'a: 'r, R: Readable>(
         &'a self,
         r: &'r R,
         hash: &'a HoloHashOf<C>,

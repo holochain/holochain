@@ -5,9 +5,7 @@
 
 use fallible_iterator::FallibleIterator;
 use holo_hash::*;
-use holochain_state::{
-    buffer::BufferedStore, db::GetDb, error::DatabaseResult, fresh_reader, prelude::*,
-};
+use holochain_state::{buffer::BufferedStore, error::DatabaseResult, fresh_reader, prelude::*};
 use holochain_types::{prelude::*, EntryHashed};
 use holochain_zome_types::{
     capability::{CapClaim, CapGrant, CapSecret},
@@ -41,12 +39,12 @@ impl SourceChain {
         self.0.chain_head().ok_or(SourceChainError::ChainEmpty)
     }
 
-    pub fn new(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
-        Ok(SourceChainBuf::new(env, dbs)?.into())
+    pub fn new(env: EnvironmentRead) -> DatabaseResult<Self> {
+        Ok(SourceChainBuf::new(env)?.into())
     }
 
-    pub async fn public_only(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
-        Ok(SourceChainBuf::public_only(env, dbs)?.into())
+    pub async fn public_only(env: EnvironmentRead) -> DatabaseResult<Self> {
+        Ok(SourceChainBuf::public_only(env)?.into())
     }
 
     pub fn into_inner(self) -> SourceChainBuf {
@@ -224,7 +222,7 @@ pub mod tests {
         let _curry = CurryPayloadsFixturator::new(Empty).next().unwrap();
         let grant = ZomeCallCapGrant::new("tag".into(), access.clone(), HashSet::new());
         {
-            let mut store = SourceChainBuf::new(arc.clone().into(), &env)?;
+            let mut store = SourceChainBuf::new(arc.clone().into())?;
             store
                 .genesis(fake_dna_hash(1), fake_agent_pubkey_1(), None)
                 .await?;
@@ -232,7 +230,7 @@ pub mod tests {
         }
 
         {
-            let mut chain = SourceChain::new(arc.clone().into(), &env)?;
+            let mut chain = SourceChain::new(arc.clone().into())?;
             chain.put_cap_grant(grant.clone()).await?;
 
             // ideally the following would work, but it won't because currently
@@ -248,7 +246,7 @@ pub mod tests {
         }
 
         {
-            let chain = SourceChain::new(arc.clone().into(), &env)?;
+            let chain = SourceChain::new(arc.clone().into())?;
             assert_eq!(
                 chain.get_persisted_cap_grant_by_secret(secret).await?,
                 Some(grant.into())
@@ -267,7 +265,7 @@ pub mod tests {
         let agent_pubkey = fake_agent_pubkey_1().into();
         let claim = CapClaim::new("tag".into(), agent_pubkey, secret.clone());
         {
-            let mut store = SourceChainBuf::new(arc.clone().into(), &env)?;
+            let mut store = SourceChainBuf::new(arc.clone().into())?;
             store
                 .genesis(fake_dna_hash(1), fake_agent_pubkey_1(), None)
                 .await?;
@@ -275,7 +273,7 @@ pub mod tests {
         }
 
         {
-            let mut chain = SourceChain::new(arc.clone().into(), &env)?;
+            let mut chain = SourceChain::new(arc.clone().into())?;
             chain.put_cap_claim(claim.clone()).await?;
 
             // ideally the following would work, but it won't because currently
@@ -291,7 +289,7 @@ pub mod tests {
         }
 
         {
-            let chain = SourceChain::new(arc.clone().into(), &env)?;
+            let chain = SourceChain::new(arc.clone().into())?;
             assert_eq!(
                 chain.get_persisted_cap_claim_by_secret(&secret).await?,
                 Some(claim)

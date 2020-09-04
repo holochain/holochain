@@ -5,7 +5,6 @@ use crate::core::state::{
     source_chain::{SourceChainError, SourceChainResult},
 };
 use fallible_iterator::FallibleIterator;
-use holochain_state::db::GetDb;
 use holochain_state::{buffer::BufferedStore, error::DatabaseResult, fresh_reader, prelude::*};
 use holochain_types::{
     dht_op::{produce_ops_from_element, DhtOp},
@@ -26,20 +25,20 @@ pub struct SourceChainBuf {
 }
 
 impl SourceChainBuf {
-    pub fn new(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
+    pub fn new(env: EnvironmentRead) -> DatabaseResult<Self> {
         Ok(Self {
-            elements: ElementBuf::vault(env.clone(), dbs, true)?,
-            sequence: ChainSequenceBuf::new(env.clone(), dbs)?,
-            keystore: dbs.keystore(),
+            elements: ElementBuf::vault(env.clone(), true)?,
+            sequence: ChainSequenceBuf::new(env.clone())?,
+            keystore: env.keystore().clone(),
             env,
         })
     }
 
-    pub fn public_only(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
+    pub fn public_only(env: EnvironmentRead) -> DatabaseResult<Self> {
         Ok(Self {
-            elements: ElementBuf::vault(env.clone(), dbs, false)?,
-            sequence: ChainSequenceBuf::new(env.clone(), dbs)?,
-            keystore: dbs.keystore(),
+            elements: ElementBuf::vault(env.clone(), false)?,
+            sequence: ChainSequenceBuf::new(env.clone())?,
+            keystore: env.keystore().clone(),
             env,
         })
     }
@@ -51,11 +50,11 @@ impl SourceChainBuf {
     // add a cache test only method that allows this to
     // be used with the cache database for testing
     // FIXME This should only be cfg(test) but that doesn't work with integration tests
-    pub fn cache(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
+    pub fn cache(env: EnvironmentRead) -> DatabaseResult<Self> {
         Ok(Self {
-            elements: ElementBuf::cache(env.clone(), dbs)?,
-            sequence: ChainSequenceBuf::new(env.clone(), dbs)?,
-            keystore: dbs.keystore(),
+            elements: ElementBuf::cache(env.clone())?,
+            sequence: ChainSequenceBuf::new(env.clone())?,
+            keystore: env.keystore().clone(),
             env,
         })
     }
@@ -384,13 +383,11 @@ pub mod tests {
     async fn source_chain_buffer_iter_back() -> SourceChainResult<()> {
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let env = arc.guard();
-        let dbs = arc.dbs();
 
         let (_agent_pubkey, dna_header, dna_entry, agent_header, agent_entry) = fixtures();
 
         {
-            let mut store = SourceChainBuf::new(arc.clone().into(), &dbs).unwrap();
+            let mut store = SourceChainBuf::new(arc.clone().into()).unwrap();
             assert!(store.chain_head().is_none());
             store
                 .put_raw(dna_header.as_content().clone(), dna_entry.clone())
@@ -398,11 +395,12 @@ pub mod tests {
             store
                 .put_raw(agent_header.as_content().clone(), agent_entry.clone())
                 .await?;
-            env.with_commit(|writer| store.flush_to_txn(writer))?;
+            arc.guard()
+                .with_commit(|writer| store.flush_to_txn(writer))?;
         };
 
         {
-            let store = SourceChainBuf::new(arc.clone().into(), &dbs).unwrap();
+            let store = SourceChainBuf::new(arc.clone().into()).unwrap();
             assert!(store.chain_head().is_some());
 
             // get the full element
@@ -452,12 +450,11 @@ pub mod tests {
     async fn source_chain_buffer_dump_entries_json() -> SourceChainResult<()> {
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let env = arc.guard();
 
         let (_agent_pubkey, dna_header, dna_entry, agent_header, agent_entry) = fixtures();
 
         {
-            let mut store = SourceChainBuf::new(arc.clone().into(), &env).unwrap();
+            let mut store = SourceChainBuf::new(arc.clone().into()).unwrap();
             store
                 .put_raw(dna_header.as_content().clone(), dna_entry)
                 .await?;
@@ -465,11 +462,12 @@ pub mod tests {
                 .put_raw(agent_header.as_content().clone(), agent_entry)
                 .await?;
 
-            env.with_commit(|writer| store.flush_to_txn(writer))?;
+            arc.guard()
+                .with_commit(|writer| store.flush_to_txn(writer))?;
         }
 
         {
-            let store = SourceChainBuf::new(arc.clone().into(), &env).unwrap();
+            let store = SourceChainBuf::new(arc.clone().into()).unwrap();
             let json = store.dump_as_json().await?;
             let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
 
@@ -492,8 +490,7 @@ pub mod tests {
     async fn test_header_cas_roundtrip() {
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let env = arc.guard();
-        let mut store = SourceChainBuf::new(arc.clone().into(), &env).unwrap();
+        let mut store = SourceChainBuf::new(arc.clone().into()).unwrap();
 
         let (_, hashed, _, _, _) = fixtures();
         let header = hashed.into_content();

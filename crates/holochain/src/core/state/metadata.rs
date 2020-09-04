@@ -379,18 +379,18 @@ impl MetadataBuf {
         })
     }
     /// Create a [MetadataBuf] with the vault databases
-    pub fn vault(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
-        let system_meta = dbs.get_db(&*META_VAULT_SYS)?;
-        let links_meta = dbs.get_db(&*META_VAULT_LINKS)?;
-        let status_meta = dbs.get_db(&*META_VAULT_STATUS)?;
+    pub fn vault(env: EnvironmentRead) -> DatabaseResult<Self> {
+        let system_meta = env.get_db(&*META_VAULT_SYS)?;
+        let links_meta = env.get_db(&*META_VAULT_LINKS)?;
+        let status_meta = env.get_db(&*META_VAULT_STATUS)?;
         Self::new(env, system_meta, links_meta, status_meta)
     }
 
     /// Create a [MetadataBuf] with the cache databases
-    pub fn cache(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
-        let system_meta = dbs.get_db(&*CACHE_SYSTEM_META)?;
-        let links_meta = dbs.get_db(&*CACHE_LINKS_META)?;
-        let status_meta = dbs.get_db(&*CACHE_STATUS_META)?;
+    pub fn cache(env: EnvironmentRead) -> DatabaseResult<Self> {
+        let system_meta = env.get_db(&*CACHE_SYSTEM_META)?;
+        let links_meta = env.get_db(&*CACHE_LINKS_META)?;
+        let status_meta = env.get_db(&*CACHE_STATUS_META)?;
         Self::new(env, system_meta, links_meta, status_meta)
     }
 

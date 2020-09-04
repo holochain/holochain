@@ -231,8 +231,6 @@ where
     inner: Used<K, V, Store>,
 }
 
-type IterOwned<V> = Vec<(Vec<u8>, V)>;
-
 impl<K, V> Fresh<K, V, KvStore<K, V>>
 where
     K: BufKey,
@@ -279,49 +277,6 @@ where
     /// or from persistence if needed
     pub fn get(&self, k: &K) -> DatabaseResult<Option<V>> {
         fresh_reader!(self.env, |reader| self.inner.get(&reader, k))
-    }
-
-    /// TODO: clean up fresh/used distinction
-    pub fn contains_used<R: Readable>(&self, r: &R, k: &K) -> DatabaseResult<bool> {
-        self.inner.contains(r, k)
-    }
-
-    /// TODO: clean up fresh/used distinction
-    pub fn get_used<R: Readable>(&self, r: &R, k: &K) -> DatabaseResult<Option<V>> {
-        self.inner.get(r, k)
-    }
-
-    // /// Iterator that checks the scratch space
-    // TODO: remove, not much point in collecting the entire DB, right?
-    // pub async fn iter<'a, R: Readable + Send + Sync>(&'a self) -> DatabaseResult<IterOwned<V>> {
-    //     fresh_reader!(self.env, |reader| Ok(self
-    //         .inner
-    //         .iter(&reader)?
-    //         .map(|(k, v)| { Ok((k.to_vec(), v)) })
-    //         .collect()?))
-    // }
-
-    /// Iterator that tracks elements so they can be deleted
-    // NB: this cannot return an iterator due to lifetime issues
-    #[deprecated = "this doesn't actually return an iterator"]
-    pub async fn drain<R: Readable + Send + Sync>(&mut self) -> DatabaseResult<Vec<V>> {
-        let g = self.env.guard();
-        let r = g.reader()?;
-        let v = self.inner.drain_iter(&r)?.collect()?;
-        Ok(v)
-    }
-
-    /// Iterator that returns all partial matches to this key
-    #[deprecated = "this doesn't actually return an iterator"]
-    pub fn iter_all_key_matches<R: Readable + Send + Sync>(
-        &self,
-        k: K,
-    ) -> DatabaseResult<IterOwned<V>> {
-        fresh_reader!(self.env, |reader| Ok(self
-            .inner
-            .iter_all_key_matches(&reader, k)?
-            .map(|(k, v)| { Ok((k.to_vec(), v)) })
-            .collect()?))
     }
 }
 
