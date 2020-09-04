@@ -93,8 +93,8 @@ impl SourceChain {
     ///
     /// Else the secret and assignees of a grant will be checked and may be returned.
     ///
-    /// @todo there is no order/guarantee what grant will be returned if there are multiple matches
-    /// this means that CRUD probably doesn't work for grants atm.
+    /// @todo this is not particularly fast, there are several ways to speed this up in the future
+    /// such as indexing secrets and prefixing cap grants in lmdb for direct lookup
     ///
     /// NB: [B-01676] the entry must be persisted for this to work. Once we have a
     /// proper capability index DB, OR a proper iterator that respects the
@@ -105,11 +105,16 @@ impl SourceChain {
         check_agent: &AgentPubKey,
         check_secret: &CapSecret,
     ) -> SourceChainResult<Option<CapGrant>> {
+        // most calls for most apps are going to be the local agent calling itself locally
+        // for this case we want to short circuit without iterating the whole source chain
         let author_grant = CapGrant::from(self.agent_pubkey().await?);
         if author_grant.is_valid(check_function, check_agent, check_secret) {
             return Ok(Some(author_grant));
         }
 
+        // if we are here then the caller is not the current agent so we need to search the source
+        // chain to see if there is a local grant that is valid for the provided secret/agent
+        // combination
         let committed_valid_grant = fresh_reader!(self.env(), |r| {
             let (references, headers): (
                 HashSet<HeaderHash>,
@@ -122,19 +127,22 @@ impl SourceChain {
                     Ok(match header.as_content().header() {
                         Header::EntryCreate(create) => match create.entry_type {
                             EntryType::CapGrant => true,
-                            EntryType::AgentPubKey => true,
+                            // filter out authorship and everything else
                             _ => false,
                         },
                         Header::EntryUpdate(update) => match update.entry_type {
                             EntryType::CapGrant => true,
-                            EntryType::AgentPubKey => true,
+                            // filter out authorship and everything else
                             _ => false,
                         },
                         Header::ElementDelete(_) => true,
+                        // no other headers are relevant
                         _ => false,
                     })
                 })
-                // extract all the update/delete references into a hashmap
+                // extract all the header references
+                // if a header is referenced by an update/delete then it is no longer valid
+                // with all the references in a bucket we can use it to filter out entries below
                 .fold(
                     (HashSet::new(), vec![]),
                     |(mut references, mut headers), header| {
@@ -179,13 +187,11 @@ impl SourceChain {
                 "SourceChainBuf must have access to private entries in order to access CapGrants",
             )
             .iter_fail(&r)?
+            // ensure we respect the header filtering we already did above
             .filter(|entry| {
                 Ok(live_cap_grants.contains(entry.as_hash()))
             })
-            // filter all entries down to only cap grant entries
-            .filter_map(|entry| {
-                Ok(entry.as_cap_grant())
-            })
+            .filter_map(|entry| Ok(entry.as_cap_grant()))
             // filter down to only the grants for this function
             .filter(|grant| {
                 Ok(grant.is_valid(check_function, check_agent, check_secret))
@@ -194,12 +200,9 @@ impl SourceChain {
             // authorship > assigned > transferable > unrestricted
             .fold(None, |mut acc, grant| {
                 acc = match &grant {
-                    CapGrant::Authorship(_) => Some(grant),
                     CapGrant::ZomeCall(zome_call_cap_grant) => {
                         match &zome_call_cap_grant.access {
                             CapAccess::Assigned { .. } => match &acc {
-                                // authorship acc takes precedence
-                                Some(CapGrant::Authorship(_)) => acc,
                                 Some(CapGrant::ZomeCall(acc_zome_call_cap_grant)) => {
                                     match acc_zome_call_cap_grant.access {
                                         // an assigned acc takes precedence
@@ -209,10 +212,10 @@ impl SourceChain {
                                     }
                                 }
                                 None => Some(grant),
+                                // authorship should be short circuit and filtered
+                                _ => unreachable!(),
                             },
                             CapAccess::Transferable { .. } => match &acc {
-                                // authorship acc takes precedence
-                                Some(CapGrant::Authorship(_)) => acc,
                                 Some(CapGrant::ZomeCall(acc_zome_call_cap_grant)) => {
                                     match acc_zome_call_cap_grant.access {
                                         // an assigned acc takes precedence
@@ -224,13 +227,17 @@ impl SourceChain {
                                     }
                                 }
                                 None => Some(grant),
+                                // authorship should be short circuited and filtered by now
+                                _ => unreachable!(),
                             }
                             CapAccess::Unrestricted => match acc {
                                 Some(_) => acc,
                                 None => Some(grant),
                             }
                         }
-                    }
+                    },
+                    // Authorship should have short circuited and be filtered out already
+                    _ => unreachable!(),
                 };
                 Ok(acc)
             })
