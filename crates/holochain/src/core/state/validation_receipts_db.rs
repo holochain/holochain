@@ -137,11 +137,11 @@ impl ValidationReceiptsBuf {
 impl BufferedStore for ValidationReceiptsBuf {
     type Error = DatabaseError;
 
-    fn flush_to_txn(self, writer: &mut Writer) -> DatabaseResult<()> {
+    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
         // we are in no_dup_data mode
         // so even if someone else added a dup in the mean time
         // it will not get written to the DB
-        self.0.flush_to_txn(writer)?;
+        self.0.flush_to_txn_ref(writer)?;
         Ok(())
     }
 }
@@ -176,7 +176,7 @@ mod tests {
 
         let test_env = holochain_state::test_utils::test_cell_env();
         let env = test_env.env();
-        let env_ref = env.guard().await;
+        let env_ref = env.guard();
         let keystore = holochain_state::test_utils::test_keystore();
 
         let test_op_hash = fake_dht_op_hash(1);

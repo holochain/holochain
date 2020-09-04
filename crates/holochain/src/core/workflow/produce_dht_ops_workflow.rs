@@ -54,7 +54,7 @@ async fn produce_dht_ops_workflow_inner(
             workspace.authored_dht_ops.put(hash, value)?;
         }
         // Mark the dht op as complete
-        workspace.source_chain.complete_dht_op(index).await?;
+        workspace.source_chain.complete_dht_op(index)?;
     }
 
     Ok(WorkComplete::Complete)
@@ -76,9 +76,9 @@ impl ProduceDhtOpsWorkspace {
 }
 
 impl Workspace for ProduceDhtOpsWorkspace {
-    fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
-        self.source_chain.flush_to_txn(writer)?;
-        self.authored_dht_ops.flush_to_txn(writer)?;
+    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> WorkspaceResult<()> {
+        self.source_chain.flush_to_txn_ref(writer)?;
+        self.authored_dht_ops.flush_to_txn_ref(writer)?;
         Ok(())
     }
 }
@@ -142,7 +142,6 @@ mod tests {
                 .unwrap();
             let element = source_chain
                 .get_element(source_chain.chain_head().unwrap())
-                .await
                 .unwrap()
                 .unwrap();
             produce_ops_from_element(&element).await.unwrap()
@@ -154,13 +153,13 @@ mod tests {
         observability::test_run().ok();
         let test_env = test_cell_env();
         let env = test_env.env();
-        let dbs = env.dbs().await;
-        let env_ref = env.guard().await;
+        let dbs = env.dbs();
+        let env_ref = env.guard();
 
         // Setup the database and expected data
         let expected_hashes: HashSet<_> = {
             let mut td = TestData::new();
-            let mut source_chain = SourceChain::new(env.clone().into(), &dbs).await.unwrap();
+            let mut source_chain = SourceChain::new(env.clone().into(), &dbs).unwrap();
 
             // Add genesis so we can use the source chain
             fake_genesis(&mut source_chain).await.unwrap();
@@ -171,11 +170,7 @@ mod tests {
             // Collect the ops from genesis
             for h in headers {
                 let ops = produce_ops_from_element(
-                    &source_chain
-                        .get_element(h.as_hash())
-                        .await
-                        .unwrap()
-                        .unwrap(),
+                    &source_chain.get_element(h.as_hash()).unwrap().unwrap(),
                 )
                 .await
                 .unwrap();
@@ -281,7 +276,7 @@ mod tests {
             let workspace = ProduceDhtOpsWorkspace::new(env.clone().into(), &dbs)
                 .await
                 .unwrap();
-            let env_ref = env.guard().await;
+            let env_ref = env.guard();
             let reader = env_ref.reader().unwrap();
             let authored_count = workspace
                 .authored_dht_ops

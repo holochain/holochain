@@ -96,7 +96,7 @@ pub async fn integrate_dht_ops_workflow(
         let mut next_ops = Vec::new();
         for (op_hash, value) in ops {
             // only integrate this op if it hasn't been integrated already!
-            if workspace.integrated_dht_ops.get(&op_hash).await?.is_none() {
+            if workspace.integrated_dht_ops.get(&op_hash)?.is_none() {
                 match integrate_single_dht_op(value, &mut workspace.elements, &mut workspace.meta)
                     .await?
                 {
@@ -198,7 +198,7 @@ async fn integrate_single_element(
             hash: &HeaderHash,
             element_store: &ElementBuf,
         ) -> DhtOpConvertResult<bool> {
-            match element_store.get_header(hash).await?.map(|e| {
+            match element_store.get_header(hash)?.map(|e| {
                 e.header()
                     .entry_data()
                     .map(|(h, _)| h.clone())
@@ -207,7 +207,7 @@ async fn integrate_single_element(
                         DhtOpConvertError::MissingEntryDataForHeader(hash.clone())
                     })
             }) {
-                Some(r) => Ok(element_store.contains_entry(&r?).await?),
+                Some(r) => Ok(element_store.contains_entry(&r?)?),
                 None => Ok(false),
             }
         }
@@ -272,7 +272,7 @@ async fn integrate_single_element(
             DhtOp::RegisterAddLink(signature, link_add) => {
                 // Check whether we have the base address in the Vault.
                 // If not then this should put the op back on the queue.
-                if !entry_is_stored(&link_add.base_address).await? {
+                if !entry_is_stored(&link_add.base_address)? {
                     let op = DhtOp::RegisterAddLink(signature, link_add);
                     return Outcome::deferred(op, validation_status);
                 }
@@ -283,8 +283,8 @@ async fn integrate_single_element(
                 // Check whether we have the base address and link add address
                 // are in the Vault.
                 // If not then this should put the op back on the queue.
-                if !entry_is_stored(&link_remove.base_address).await?
-                    || !header_is_stored(&link_remove.link_add_address).await?
+                if !entry_is_stored(&link_remove.base_address)?
+                    || !header_is_stored(&link_remove.link_add_address)?
                 {
                     let op = DhtOp::RegisterRemoveLink(signature, link_remove);
                     return Outcome::deferred(op, validation_status);
@@ -313,8 +313,7 @@ pub async fn integrate_single_metadata<C: MetadataBufT>(
         element_store: &ElementBuf,
     ) -> DhtOpConvertResult<Header> {
         Ok(element_store
-            .get_header(&hash)
-            .await?
+            .get_header(&hash)?
             .ok_or(DhtOpConvertError::MissingData)?
             .into_header_and_signature()
             .0
@@ -399,15 +398,15 @@ pub struct IntegrateDhtOpsWorkspace {
 }
 
 impl Workspace for IntegrateDhtOpsWorkspace {
-    fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
+    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> WorkspaceResult<()> {
         // flush elements
-        self.elements.flush_to_txn(writer)?;
+        self.elements.flush_to_txn_ref(writer)?;
         // flush metadata store
-        self.meta.flush_to_txn(writer)?;
+        self.meta.flush_to_txn_ref(writer)?;
         // flush integrated
-        self.integrated_dht_ops.flush_to_txn(writer)?;
+        self.integrated_dht_ops.flush_to_txn_ref(writer)?;
         // flush integration queue
-        self.integration_limbo.flush_to_txn(writer)?;
+        self.integration_limbo.flush_to_txn_ref(writer)?;
         Ok(())
     }
 }
@@ -433,7 +432,6 @@ impl IntegrateDhtOpsWorkspace {
     }
 
     pub async fn op_exists(&self, hash: &DhtOpHash) -> DatabaseResult<bool> {
-        Ok(self.integrated_dht_ops.contains(&hash).await?
-            || self.integration_limbo.contains(&hash).await?)
+        Ok(self.integrated_dht_ops.contains(&hash)? || self.integration_limbo.contains(&hash)?)
     }
 }

@@ -26,7 +26,7 @@ use crate::{
             call_zome_workflow, error::WorkflowError, genesis_workflow::genesis_workflow,
             incoming_dht_ops_workflow::incoming_dht_ops_workflow, initialize_zomes_workflow,
             CallZomeWorkflowArgs, CallZomeWorkspace, GenesisWorkflowArgs, GenesisWorkspace,
-            InitializeZomesWorkflowArgs, InitializeZomesWorkspace, ZomeCallInvocationResult,
+            InitializeZomesWorkflowArgs, ZomeCallInvocationResult,
         },
     },
 };
@@ -131,10 +131,8 @@ impl Cell {
         // check if genesis has been run
         let has_genesis = {
             // check if genesis ran on source chain buf
-            let env_ref = state_env.guard().await;
-            SourceChainBuf::new(state_env.clone().into(), &env_ref)
-                .await?
-                .has_genesis()
+            let env_ref = state_env.guard();
+            SourceChainBuf::new(state_env.clone().into(), &env_ref)?.has_genesis()
         };
 
         if has_genesis {
@@ -178,7 +176,7 @@ impl Cell {
 
         // get a reader
         let arc = state_env.clone();
-        let env = arc.guard().await;
+        let env = arc.guard();
 
         // get the dna
         let dna_file = conductor_handle
@@ -463,8 +461,8 @@ impl Cell {
 
     async fn handle_get_element(&self, hash: HeaderHash) -> CellResult<GetElementResponse> {
         // Get the vaults
-        let env_ref = self.state_env.guard().await;
-        let dbs = self.state_env.dbs().await;
+        let env_ref = self.state_env.guard();
+        let dbs = self.state_env.dbs();
         let reader = env_ref.reader()?;
         let element_vault = ElementBuf::vault(self.state_env.clone().into(), &dbs, false)?;
         let meta_vault = MetadataBuf::vault(self.state_env.clone().into(), &dbs)?;
@@ -476,7 +474,7 @@ impl Cell {
         let deleted = match deleted {
             Some(delete_header) => {
                 let delete = delete_header.header_hash;
-                match element_vault.get_header(&delete).await? {
+                match element_vault.get_header(&delete)? {
                     Some(delete) => Some(delete.try_into().map_err(AuthorityDataError::from)?),
                     None => {
                         return Err(AuthorityDataError::missing_data(delete));
@@ -488,8 +486,7 @@ impl Cell {
 
         // Get the actual header and return it with proof of deleted if there is any
         let r = element_vault
-            .get_element(&hash)
-            .await?
+            .get_element(&hash)?
             .map(|e| WireElement::from_element(e, deleted))
             .map(Box::new);
 
@@ -517,8 +514,8 @@ impl Cell {
         _options: holochain_p2p::event::GetLinksOptions,
     ) -> CellResult<GetLinksResponse> {
         // Get the vaults
-        let env_ref = self.state_env.guard().await;
-        let dbs = self.state_env.dbs().await;
+        let env_ref = self.state_env.guard();
+        let dbs = self.state_env.dbs();
         let reader = env_ref.reader()?;
         let element_vault = ElementBuf::vault(self.state_env.clone().into(), &dbs, false)?;
         let meta_vault = MetadataBuf::vault(self.state_env.clone().into(), &dbs)?;
@@ -545,11 +542,9 @@ impl Cell {
         let mut result_adds: Vec<(LinkAdd, Signature)> = Vec::with_capacity(links.len());
         let mut result_removes: Vec<(LinkRemove, Signature)> = Vec::with_capacity(links.len());
         for (link_add, link_removes) in links {
-            if let Some(link_add) = element_vault.get_header(&link_add.header_hash).await? {
+            if let Some(link_add) = element_vault.get_header(&link_add.header_hash)? {
                 for link_remove in link_removes {
-                    if let Some(link_remove) =
-                        element_vault.get_header(&link_remove.header_hash).await?
-                    {
+                    if let Some(link_remove) = element_vault.get_header(&link_remove.header_hash)? {
                         let (h, s) = link_remove.into_header_and_signature();
                         let h = h
                             .into_content()
@@ -587,7 +582,7 @@ impl Cell {
         since: Timestamp,
         until: Timestamp,
     ) -> CellResult<Vec<DhtOpHash>> {
-        let env_ref = self.state_env.guard().await;
+        let env_ref = self.state_env.guard();
         let reader = env_ref.reader()?;
         let integrated_dht_ops =
             IntegratedDhtOpsBuf::new(self.state_env().clone().into(), &env_ref)?;
@@ -610,13 +605,13 @@ impl Cell {
             holochain_types::dht_op::DhtOp,
         )>,
     > {
-        let env_ref = self.state_env.guard().await;
+        let env_ref = self.state_env.guard();
         let integrated_dht_ops =
             IntegratedDhtOpsBuf::new(self.state_env().clone().into(), &env_ref)?;
         let cas = ElementBuf::vault(self.state_env.clone().into(), &env_ref, false)?;
         let mut out = vec![];
         for op_hash in op_hashes {
-            let val = integrated_dht_ops.get(&op_hash).await?;
+            let val = integrated_dht_ops.get(&op_hash)?;
             if let Some(val) = val {
                 let full_op =
                     crate::core::workflow::produce_dht_ops_workflow::dht_op_light::light_to_op(
@@ -683,8 +678,8 @@ impl Cell {
 
         let arc = self.state_env();
         let keystore = arc.keystore().clone();
-        let env = arc.guard().await;
-        let workspace = CallZomeWorkspace::new(self.state_env().clone().into(), &env).await?;
+        let _env = arc.guard();
+        let workspace = CallZomeWorkspace::new(self.state_env().clone().into())?;
 
         let args = CallZomeWorkflowArgs {
             ribosome: self.get_ribosome().await?,
@@ -709,16 +704,13 @@ impl Cell {
         let keystore = state_env.keystore().clone();
         let id = self.id.clone();
         let conductor_api = self.conductor_api.clone();
-        let env_ref = state_env.guard().await;
         // Create the workspace
-        let workspace = CallZomeWorkspace::new(self.state_env().clone().into(), &env_ref)
-            .await
+        let workspace = CallZomeWorkspace::new(self.state_env().clone().into())
             .map_err(WorkflowError::from)
             .map_err(Box::new)?;
-        let workspace = InitializeZomesWorkspace(workspace);
 
         // Check if initialization has run
-        if workspace.0.source_chain.has_initialized() {
+        if workspace.source_chain.has_initialized() {
             return Ok(());
         }
         trace!("running init");

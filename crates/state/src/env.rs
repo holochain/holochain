@@ -100,7 +100,7 @@ impl EnvironmentRead {
     /// to get a lock in order to create a read-only transaction. The lock guard
     /// must outlive the transaction, so it has to be returned here and managed
     /// explicitly.
-    pub async fn guard(&self) -> EnvironmentReadRef<'_> {
+    pub fn guard(&self) -> EnvironmentReadRef<'_> {
         EnvironmentReadRef {
             rkv: self.arc.clone(),
             path: &self.path,
@@ -123,8 +123,8 @@ impl EnvironmentRead {
     /// This function only exists because this was the pattern used by DbManager, which has
     /// since been removed
     // #[deprecated = "duplicate of EnvironmentRo::guard"]
-    pub async fn dbs(&self) -> EnvironmentReadRef<'_> {
-        self.guard().await
+    pub fn dbs(&self) -> EnvironmentReadRef<'_> {
+        self.guard()
     }
 
     /// The environments path
@@ -193,8 +193,8 @@ impl EnvironmentWrite {
 
     /// Get a read-only lock guard on the environment.
     /// This reference can create read-write transactions.
-    pub async fn guard(&self) -> EnvironmentWriteRef<'_> {
-        EnvironmentWriteRef(self.0.guard().await)
+    pub fn guard(&self) -> EnvironmentWriteRef<'_> {
+        EnvironmentWriteRef(self.0.guard())
     }
 
     /// Remove the db and directory

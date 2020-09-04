@@ -65,20 +65,14 @@ pub mod wasm_test {
     async fn ribosome_entry_hash_test() {
         let test_env = holochain_state::test_utils::test_cell_env();
         let env = test_env.env();
-        let dbs = env.dbs().await;
-        let mut workspace = crate::core::workflow::CallZomeWorkspace::new(env.clone().into(), &dbs)
-            .await
-            .unwrap();
+        let workspace = crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
 
-        let (_g, raw_workspace) =
-            crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
-                &mut workspace,
-            );
+        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
 
         let entry = EntryFixturator::new(fixt::Predictable).next().unwrap();
         let input = EntryHashInput::new(entry);
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = raw_workspace;
+        host_access.workspace = workspace_lock;
         let output: EntryHashOutput =
             crate::call_test_ribosome!(host_access, TestWasm::EntryHash, "entry_hash", input);
         assert_eq!(output.into_inner().get_full_bytes().to_vec().len(), 36,);
@@ -89,18 +83,12 @@ pub mod wasm_test {
     async fn ribosome_hash_path_pwd_test() {
         let test_env = holochain_state::test_utils::test_cell_env();
         let env = test_env.env();
-        let dbs = env.dbs().await;
-        let mut workspace = crate::core::workflow::CallZomeWorkspace::new(env.clone().into(), &dbs)
-            .await
-            .unwrap();
+        let workspace = crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
 
-        let (_g, raw_workspace) =
-            crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
-                &mut workspace,
-            );
+        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
 
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = raw_workspace;
+        host_access.workspace = workspace_lock;
         let input = TestString::from("foo.bar".to_string());
         let output: EntryHash =
             crate::call_test_ribosome!(host_access, TestWasm::HashPath, "hash", input);

@@ -57,10 +57,10 @@ impl AppValidationWorkspace {
 }
 
 impl Workspace for AppValidationWorkspace {
-    fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
+    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> WorkspaceResult<()> {
         warn!("unimplemented passthrough");
-        self.validation_limbo.0.flush_to_txn(writer)?;
-        self.integration_limbo.flush_to_txn(writer)?;
+        self.validation_limbo.0.flush_to_txn_ref(writer)?;
+        self.integration_limbo.flush_to_txn_ref(writer)?;
         Ok(())
     }
 }

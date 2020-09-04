@@ -31,7 +31,7 @@ pub async fn incoming_dht_ops_workflow(
     ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
 ) -> WorkflowResult<()> {
     // set up our workspace
-    let env_ref = state_env.guard().await;
+    let env_ref = state_env.guard();
     let mut workspace = IncomingDhtOpsWorkspace::new(state_env.clone().into(), &env_ref)?;
 
     // add incoming ops to the validation limbo
@@ -71,8 +71,8 @@ pub struct IncomingDhtOpsWorkspace {
 }
 
 impl Workspace for IncomingDhtOpsWorkspace {
-    fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
-        self.validation_limbo.0.flush_to_txn(writer)?;
+    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> WorkspaceResult<()> {
+        self.validation_limbo.0.flush_to_txn_ref(writer)?;
         Ok(())
     }
 }
@@ -95,8 +95,8 @@ impl IncomingDhtOpsWorkspace {
     }
 
     pub async fn op_exists(&self, hash: &DhtOpHash) -> DatabaseResult<bool> {
-        Ok(self.integrated_dht_ops.contains(&hash).await?
-            || self.integration_limbo.contains(&hash).await?
-            || self.validation_limbo.contains(&hash).await?)
+        Ok(self.integrated_dht_ops.contains(&hash)?
+            || self.integration_limbo.contains(&hash)?
+            || self.validation_limbo.contains(&hash)?)
     }
 }

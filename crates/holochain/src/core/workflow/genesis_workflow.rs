@@ -92,14 +92,14 @@ impl GenesisWorkspace {
     /// Constructor
     pub async fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
         Ok(Self {
-            source_chain: SourceChainBuf::new(env, dbs).await?,
+            source_chain: SourceChainBuf::new(env, dbs)?,
         })
     }
 }
 
 impl Workspace for GenesisWorkspace {
-    fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
-        self.source_chain.flush_to_txn(writer)?;
+    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> WorkspaceResult<()> {
+        self.source_chain.flush_to_txn_ref(writer)?;
         Ok(())
     }
 }
@@ -135,7 +135,7 @@ pub mod tests {
         observability::test_run()?;
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let dbs = arc.dbs().await;
+        let dbs = arc.dbs();
         let dna = fake_dna_file("a");
         let agent_pubkey = fake_agent_pubkey_1();
 
@@ -153,8 +153,8 @@ pub mod tests {
         }
 
         {
-            let source_chain = SourceChain::new(arc.clone().into(), &dbs).await?;
-            assert_eq!(source_chain.agent_pubkey().await?, agent_pubkey);
+            let source_chain = SourceChain::new(arc.clone().into(), &dbs)?;
+            assert_eq!(source_chain.agent_pubkey()?, agent_pubkey);
             source_chain.chain_head().expect("chain head should be set");
 
             let mut iter = source_chain.iter_back();

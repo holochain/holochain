@@ -3,7 +3,7 @@ use holochain_state::{db, env::EnvironmentWrite, prelude::*};
 
 pub async fn dump_wasm_state(env: EnvironmentWrite) -> anyhow::Result<()> {
     use db::*;
-    let g = env.guard().await;
+    let g = env.guard();
     let r = g.reader()?;
 
     dump_kv(&r, "wasm", env.get_db(&WASM)?)?;

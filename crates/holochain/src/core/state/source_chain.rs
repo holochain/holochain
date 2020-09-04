@@ -29,10 +29,9 @@ mod source_chain_buffer;
 pub struct SourceChain(pub SourceChainBuf);
 
 impl SourceChain {
-    pub async fn agent_pubkey(&self) -> SourceChainResult<AgentPubKey> {
+    pub fn agent_pubkey(&self) -> SourceChainResult<AgentPubKey> {
         self.0
-            .agent_pubkey()
-            .await?
+            .agent_pubkey()?
             .ok_or(SourceChainError::InvalidStructure(
                 ChainInvalidReason::GenesisDataMissing,
             ))
@@ -42,12 +41,12 @@ impl SourceChain {
         self.0.chain_head().ok_or(SourceChainError::ChainEmpty)
     }
 
-    pub async fn new(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
-        Ok(SourceChainBuf::new(env, dbs).await?.into())
+    pub fn new(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
+        Ok(SourceChainBuf::new(env, dbs)?.into())
     }
 
     pub async fn public_only(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
-        Ok(SourceChainBuf::public_only(env, dbs).await?.into())
+        Ok(SourceChainBuf::public_only(env, dbs)?.into())
     }
 
     pub fn into_inner(self) -> SourceChainBuf {
@@ -61,7 +60,7 @@ impl SourceChain {
         maybe_entry: Option<Entry>,
     ) -> SourceChainResult<HeaderHash> {
         let common = HeaderBuilderCommon {
-            author: self.agent_pubkey().await?,
+            author: self.agent_pubkey()?,
             timestamp: Timestamp::now().into(),
             header_seq: self.len() as u32,
             prev_header: self.chain_head()?.to_owned(),
@@ -75,9 +74,8 @@ impl SourceChain {
         &mut self,
         grant_entry: CapGrantEntry,
     ) -> SourceChainResult<HeaderHash> {
-        let (entry, entry_hash) = EntryHashed::from_content(Entry::CapGrant(grant_entry))
-            .await
-            .into_inner();
+        let (entry, entry_hash) =
+            EntryHashed::from_content_sync(Entry::CapGrant(grant_entry)).into_inner();
         let header_builder = builder::EntryCreate {
             entry_type: EntryType::CapGrant,
             entry_hash,
@@ -90,9 +88,8 @@ impl SourceChain {
         &mut self,
         claim_entry: CapClaimEntry,
     ) -> SourceChainResult<HeaderHash> {
-        let (entry, entry_hash) = EntryHashed::from_content(Entry::CapClaim(claim_entry))
-            .await
-            .into_inner();
+        let (entry, entry_hash) =
+            EntryHashed::from_content_sync(Entry::CapClaim(claim_entry)).into_inner();
         let header_builder = builder::EntryCreate {
             entry_type: EntryType::CapClaim,
             entry_hash,
@@ -199,8 +196,8 @@ impl From<SourceChainBuf> for SourceChain {
 impl BufferedStore for SourceChain {
     type Error = SourceChainError;
 
-    fn flush_to_txn(self, writer: &mut Writer) -> Result<(), Self::Error> {
-        self.0.flush_to_txn(writer)?;
+    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> Result<(), Self::Error> {
+        self.0.flush_to_txn_ref(writer)?;
         Ok(())
     }
 }
@@ -220,14 +217,14 @@ pub mod tests {
     async fn test_get_cap_grant() -> SourceChainResult<()> {
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let env = arc.guard().await;
+        let env = arc.guard();
         let access = CapAccess::from(CapSecretFixturator::new(Unpredictable).next().unwrap());
         let secret = access.secret().unwrap();
         // @todo curry
         let _curry = CurryPayloadsFixturator::new(Empty).next().unwrap();
         let grant = ZomeCallCapGrant::new("tag".into(), access.clone(), HashSet::new());
         {
-            let mut store = SourceChainBuf::new(arc.clone().into(), &env).await?;
+            let mut store = SourceChainBuf::new(arc.clone().into(), &env)?;
             store
                 .genesis(fake_dna_hash(1), fake_agent_pubkey_1(), None)
                 .await?;
@@ -235,7 +232,7 @@ pub mod tests {
         }
 
         {
-            let mut chain = SourceChain::new(arc.clone().into(), &env).await?;
+            let mut chain = SourceChain::new(arc.clone().into(), &env)?;
             chain.put_cap_grant(grant.clone()).await?;
 
             // ideally the following would work, but it won't because currently
@@ -251,7 +248,7 @@ pub mod tests {
         }
 
         {
-            let chain = SourceChain::new(arc.clone().into(), &env).await?;
+            let chain = SourceChain::new(arc.clone().into(), &env)?;
             assert_eq!(
                 chain.get_persisted_cap_grant_by_secret(secret).await?,
                 Some(grant.into())
@@ -265,12 +262,12 @@ pub mod tests {
     async fn test_get_cap_claim() -> SourceChainResult<()> {
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let env = arc.guard().await;
+        let env = arc.guard();
         let secret = CapSecretFixturator::new(Unpredictable).next().unwrap();
         let agent_pubkey = fake_agent_pubkey_1().into();
         let claim = CapClaim::new("tag".into(), agent_pubkey, secret.clone());
         {
-            let mut store = SourceChainBuf::new(arc.clone().into(), &env).await?;
+            let mut store = SourceChainBuf::new(arc.clone().into(), &env)?;
             store
                 .genesis(fake_dna_hash(1), fake_agent_pubkey_1(), None)
                 .await?;
@@ -278,7 +275,7 @@ pub mod tests {
         }
 
         {
-            let mut chain = SourceChain::new(arc.clone().into(), &env).await?;
+            let mut chain = SourceChain::new(arc.clone().into(), &env)?;
             chain.put_cap_claim(claim.clone()).await?;
 
             // ideally the following would work, but it won't because currently
@@ -294,7 +291,7 @@ pub mod tests {
         }
 
         {
-            let chain = SourceChain::new(arc.clone().into(), &env).await?;
+            let chain = SourceChain::new(arc.clone().into(), &env)?;
             assert_eq!(
                 chain.get_persisted_cap_claim_by_secret(&secret).await?,
                 Some(claim)

@@ -328,15 +328,15 @@ where
     }
 
     async fn get_element_local_raw(&self, hash: &HeaderHash) -> CascadeResult<Option<Element>> {
-        match self.element_vault.get_element(hash).await? {
-            None => Ok(self.element_cache.get_element(hash).await?),
+        match self.element_vault.get_element(hash)? {
+            None => Ok(self.element_cache.get_element(hash)?),
             r => Ok(r),
         }
     }
 
     async fn get_entry_local_raw(&self, hash: &EntryHash) -> CascadeResult<Option<EntryHashed>> {
-        match self.element_vault.get_entry(hash).await? {
-            None => Ok(self.element_cache.get_entry(hash).await?),
+        match self.element_vault.get_entry(hash)? {
+            None => Ok(self.element_cache.get_entry(hash)?),
             r => Ok(r),
         }
     }
@@ -344,14 +344,12 @@ where
     async fn get_header_local_raw(&self, hash: &HeaderHash) -> CascadeResult<Option<HeaderHashed>> {
         match self
             .element_vault
-            .get_header(hash)
-            .await?
+            .get_header(hash)?
             .map(|h| h.into_header_and_signature().0)
         {
             None => Ok(self
                 .element_cache
-                .get_header(hash)
-                .await?
+                .get_header(hash)?
                 .map(|h| h.into_header_and_signature().0)),
             r => Ok(r),
         }
