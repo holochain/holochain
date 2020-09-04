@@ -413,7 +413,6 @@ where
                                     cell_id.clone(),
                                     keystore.clone(),
                                 )?;
-                                // .and_then(|env| {
                                 Cell::create(
                                     cell_id.clone(),
                                     conductor_handle.clone(),
@@ -423,7 +422,6 @@ where
                                     self.managed_task_stop_broadcaster.clone(),
                                 )
                                 .await
-                                // })
                             },
                         );
 
