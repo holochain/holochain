@@ -10,6 +10,7 @@ use holochain_state::{
     buffer::BufferedStore, db::GetDb, error::DatabaseResult, fresh_reader, prelude::*,
 };
 use holochain_types::{prelude::*, EntryHashed};
+use holochain_zome_types::capability::CapAccess;
 use holochain_zome_types::capability::GrantedFunction;
 use holochain_zome_types::{
     capability::{CapGrant, CapSecret},
@@ -19,7 +20,6 @@ use holochain_zome_types::{
 use shrinkwraprs::Shrinkwrap;
 pub use source_chain_buffer::*;
 use std::collections::HashSet;
-use holochain_zome_types::capability::CapAccess;
 
 mod error;
 mod source_chain_buffer;
@@ -179,16 +179,10 @@ impl SourceChain {
             let live_cap_grants: HashSet<_> = headers
                 .iter()
                 .filter(|header| !references.contains(header.as_hash()))
-                .filter_map(|header| {
-                    match header.as_content().header() {
-                        Header::EntryCreate(create) => {
-                            Some(create.entry_hash.clone())
-                        },
-                        Header::EntryUpdate(update) => {
-                            Some(update.entry_hash.clone())
-                        },
-                        _ => None
-                    }
+                .filter_map(|header| match header.as_content().header() {
+                    Header::EntryCreate(create) => Some(create.entry_hash.clone()),
+                    Header::EntryUpdate(update) => Some(update.entry_hash.clone()),
+                    _ => None,
                 })
                 .collect();
 
@@ -434,7 +428,9 @@ pub mod tests {
                 Some(CapGrant::Authorship(alice.clone())),
             );
             assert_eq!(
-                chain.valid_cap_grant(&function, &alice, &updated_secret).await?,
+                chain
+                    .valid_cap_grant(&function, &alice, &updated_secret)
+                    .await?,
                 Some(CapGrant::Authorship(alice.clone())),
             );
 
@@ -467,7 +463,9 @@ pub mod tests {
                 Some(CapGrant::Authorship(alice.clone())),
             );
             assert_eq!(
-                chain.valid_cap_grant(&function, &alice, &updated_secret).await?,
+                chain
+                    .valid_cap_grant(&function, &alice, &updated_secret)
+                    .await?,
                 Some(CapGrant::Authorship(alice)),
             );
 
