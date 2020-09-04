@@ -217,7 +217,7 @@ async fn op_dependencies_held<P: PrefixType>(
             hash: &HeaderHash,
             element_store: &ElementBuf<P>,
         ) -> DhtOpConvertResult<bool> {
-            match element_store.get_header(hash).await?.map(|e| {
+            match element_store.get_header(hash)?.map(|e| {
                 e.header()
                     .entry_data()
                     .map(|(h, _)| h.clone())
@@ -226,7 +226,7 @@ async fn op_dependencies_held<P: PrefixType>(
                         DhtOpConvertError::MissingEntryDataForHeader(hash.clone())
                     })
             }) {
-                Some(r) => Ok(element_store.contains_entry(&r?).await?),
+                Some(r) => Ok(element_store.contains_entry(&r?)?),
                 None => Ok(false),
             }
         }
@@ -273,7 +273,7 @@ async fn op_dependencies_held<P: PrefixType>(
                 // TODO: Not sure what to do here as the base might be rejected
                 // // Check whether we have the base address in the Vault.
                 // // If not then this should put the op back on the queue.
-                // if !entry_is_stored(&link_add.base_address).await? {
+                // if !entry_is_stored(&link_add.base_address)? {
                 //     let op = DhtOp::RegisterAddLink(signature, link_add);
                 //     return Outcome::deferred(op);
                 // }
@@ -283,12 +283,12 @@ async fn op_dependencies_held<P: PrefixType>(
                 // // Check whether we have the base address and link add address
                 // // are in the Vault.
                 // // If not then this should put the op back on the queue.
-                // if !entry_is_stored(&link_remove.base_address).await?
-                //     || !header_is_stored(&link_remove.link_add_address).await?
+                // if !entry_is_stored(&link_remove.base_address)?
+                //     || !header_is_stored(&link_remove.link_add_address)?
                 // {
                 //      return false;
                 // }
-                if !header_is_stored(&link_remove.link_add_address).await? {
+                if !header_is_stored(&link_remove.link_add_address)? {
                     return Ok(false);
                 }
             }
@@ -405,8 +405,7 @@ async fn get_header<P: PrefixType>(
     element_store: &ElementBuf<P>,
 ) -> DhtOpConvertResult<Header> {
     Ok(element_store
-        .get_header(&hash)
-        .await?
+        .get_header(&hash)?
         .ok_or_else(|| DhtOpConvertError::MissingData(hash.into()))?
         .into_header_and_signature()
         .0
@@ -453,40 +452,40 @@ pub struct IntegrateDhtOpsWorkspace {
 }
 
 impl Workspace for IntegrateDhtOpsWorkspace {
-    fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
+    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> WorkspaceResult<()> {
         // flush elements
-        self.elements.flush_to_txn(writer)?;
+        self.elements.flush_to_txn_ref(writer)?;
         // flush metadata store
-        self.meta.flush_to_txn(writer)?;
+        self.meta.flush_to_txn_ref(writer)?;
         // flush integrated
-        self.integrated_dht_ops.flush_to_txn(writer)?;
+        self.integrated_dht_ops.flush_to_txn_ref(writer)?;
         // flush integration queue
-        self.integration_limbo.flush_to_txn(writer)?;
-        self.element_judged.flush_to_txn(writer)?;
-        self.meta_judged.flush_to_txn(writer)?;
-        self.element_rejected.flush_to_txn(writer)?;
-        self.meta_rejected.flush_to_txn(writer)?;
+        self.integration_limbo.flush_to_txn_ref(writer)?;
+        self.element_judged.flush_to_txn_ref(writer)?;
+        self.meta_judged.flush_to_txn_ref(writer)?;
+        self.element_rejected.flush_to_txn_ref(writer)?;
+        self.meta_rejected.flush_to_txn_ref(writer)?;
         Ok(())
     }
 }
 
 impl IntegrateDhtOpsWorkspace {
     /// Constructor
-    pub fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
-        let db = dbs.get_db(&*INTEGRATED_DHT_OPS)?;
+    pub fn new(env: EnvironmentRead) -> WorkspaceResult<Self> {
+        let db = env.get_db(&*INTEGRATED_DHT_OPS)?;
         let integrated_dht_ops = KvBufFresh::new(env.clone(), db);
 
-        let db = dbs.get_db(&*INTEGRATION_LIMBO)?;
+        let db = env.get_db(&*INTEGRATION_LIMBO)?;
         let integration_limbo = KvBufFresh::new(env.clone(), db);
 
-        let elements = ElementBuf::vault(env.clone(), dbs, true)?;
-        let meta = MetadataBuf::vault(env.clone(), dbs)?;
+        let elements = ElementBuf::vault(env.clone(), true)?;
+        let meta = MetadataBuf::vault(env.clone())?;
 
-        let element_judged = ElementBuf::judged(env.clone(), dbs)?;
-        let meta_judged = MetadataBuf::judged(env.clone(), dbs)?;
+        let element_judged = ElementBuf::judged(env.clone())?;
+        let meta_judged = MetadataBuf::judged(env.clone())?;
 
-        let element_rejected = ElementBuf::rejected(env.clone(), dbs)?;
-        let meta_rejected = MetadataBuf::rejected(env, dbs)?;
+        let element_rejected = ElementBuf::rejected(env.clone())?;
+        let meta_rejected = MetadataBuf::rejected(env)?;
 
         Ok(Self {
             integration_limbo,

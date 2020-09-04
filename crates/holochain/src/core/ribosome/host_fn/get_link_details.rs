@@ -1,15 +1,12 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::{
     ribosome::{CallContext, RibosomeT},
-    state::{cascade::error::CascadeResult, metadata::LinkMetaKey},
-    workflow::CallZomeWorkspace,
+    state::metadata::LinkMetaKey,
 };
-use futures::future::FutureExt;
 use holochain_p2p::actor::GetLinksOptions;
 use holochain_zome_types::link::LinkDetails;
 use holochain_zome_types::GetLinkDetailsInput;
 use holochain_zome_types::GetLinkDetailsOutput;
-use must_future::MustBoxFuture;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
@@ -26,33 +23,27 @@ pub fn get_link_details<'a>(
     // Get the network from the context
     let network = call_context.host_access.network().clone();
 
-    let call =
-        |workspace: &'a mut CallZomeWorkspace| -> MustBoxFuture<'a, CascadeResult<LinkDetails>> {
-            async move {
-                let mut cascade = workspace.cascade(network);
-
-                // Create the key
-                let key = match tag.as_ref() {
-                    Some(tag) => LinkMetaKey::BaseZomeTag(&base_address, zome_id, tag),
-                    None => LinkMetaKey::BaseZome(&base_address, zome_id),
-                };
-
-                // Get the links from the dht
-                Ok(LinkDetails::from(
-                    cascade
-                        .get_link_details(&key, GetLinksOptions::default())
-                        .await?,
-                ))
-            }
-            .boxed()
-            .into()
+    tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+        // Create the key
+        let key = match tag.as_ref() {
+            Some(tag) => LinkMetaKey::BaseZomeTag(&base_address, zome_id, tag),
+            None => LinkMetaKey::BaseZome(&base_address, zome_id),
         };
 
-    let link_details = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-        unsafe { call_context.host_access.workspace().apply_mut(call).await }
-    })??;
+        // Get the links from the dht
+        let link_details = LinkDetails::from(
+            call_context
+                .host_access
+                .workspace()
+                .write()
+                .await
+                .cascade(network)
+                .get_link_details(&key, GetLinksOptions::default())
+                .await?,
+        );
 
-    Ok(GetLinkDetailsOutput::new(link_details))
+        Ok(GetLinkDetailsOutput::new(link_details))
+    })
 }
 
 #[cfg(test)]
@@ -70,10 +61,9 @@ pub mod slow_tests {
     async fn ribosome_entry_hash_path_children_details() {
         let test_env = holochain_state::test_utils::test_cell_env();
         let env = test_env.env();
-        let dbs = env.dbs();
 
         let mut workspace =
-            crate::core::workflow::CallZomeWorkspace::new(env.clone().into(), &dbs).unwrap();
+            crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
 
         // commits fail validation if we don't do genesis
         crate::core::workflow::fake_genesis(&mut workspace.source_chain)
@@ -81,12 +71,9 @@ pub mod slow_tests {
             .unwrap();
 
         // ensure foo.bar twice to ensure idempotency
-        let (_g, raw_workspace) =
-            crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
-                &mut workspace,
-            );
+        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = raw_workspace;
+        host_access.workspace = workspace_lock;
 
         let _: () = crate::call_test_ribosome!(
             host_access,

@@ -1,14 +1,9 @@
 use crate::core::ribosome::error::{RibosomeError, RibosomeResult};
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use crate::core::state::{
-    cascade::error::{CascadeError, CascadeResult},
-    source_chain::SourceChainResult,
-};
+use crate::core::state::cascade::error::CascadeError;
 use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
-use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_cache;
-use futures::future::BoxFuture;
-use futures::future::FutureExt;
+use crate::core::{workflow::integrate_dht_ops_workflow::integrate_to_cache, SourceChainError};
 use holo_hash::{EntryHash, HeaderHash};
 use holochain_p2p::actor::GetOptions;
 use holochain_zome_types::header::builder;
@@ -27,39 +22,32 @@ pub fn delete_entry<'a>(
     let removes_entry_address =
         get_original_address(call_context.clone(), removes_address.clone())?;
 
-    let call =
-        |workspace: &'a mut CallZomeWorkspace| -> BoxFuture<'a, SourceChainResult<HeaderHash>> {
-            async move {
-                let source_chain = &mut workspace.source_chain;
-                let header_builder = builder::ElementDelete {
-                    removes_address,
-                    removes_entry_address,
-                };
-                let header_hash = source_chain.put(header_builder, None).await?;
-                let element = source_chain
-                    .get_element(&header_hash)
-                    .await?
-                    .expect("Element we just put in SourceChain must be gettable");
-                tracing::debug!(in_delete_entry = ?header_hash);
-                integrate_to_cache(
-                    &element,
-                    workspace.source_chain.elements(),
-                    &mut workspace.cache_meta,
-                )
-                .await
-                .map_err(Box::new)?;
-                Ok(header_hash)
-            }
-            .boxed()
-        };
+    let host_access = call_context.host_access();
 
     // handle timeouts at the source chain layer
-    let header_address =
-        tokio_safe_block_on::tokio_safe_block_forever_on(tokio::task::spawn(async move {
-            unsafe { call_context.host_access.workspace().apply_mut(call).await }
-        }))???;
-
-    Ok(DeleteEntryOutput::new(header_address))
+    tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+        let mut guard = host_access.workspace().write().await;
+        let workspace: &mut CallZomeWorkspace = &mut guard;
+        let source_chain = &mut workspace.source_chain;
+        let header_builder = builder::ElementDelete {
+            removes_address,
+            removes_entry_address,
+        };
+        let header_hash = source_chain.put(header_builder, None).await?;
+        let element = source_chain
+            .get_element(&header_hash)?
+            .expect("Element we just put in SourceChain must be gettable");
+        tracing::debug!(in_delete_entry = ?header_hash);
+        integrate_to_cache(
+            &element,
+            workspace.source_chain.elements(),
+            &mut workspace.cache_meta,
+        )
+        .await
+        .map_err(Box::new)
+        .map_err(SourceChainError::from)?;
+        Ok(DeleteEntryOutput::new(header_hash))
+    })
 }
 
 #[allow(clippy::extra_unused_lifetimes)]
@@ -68,53 +56,39 @@ pub(crate) fn get_original_address<'a>(
     address: HeaderHash,
 ) -> RibosomeResult<EntryHash> {
     let network = call_context.host_access.network().clone();
-    let original_element_get_call = {
-        let address = address.clone();
-        |workspace: &'a mut CallZomeWorkspace| -> BoxFuture<
-        'a,
-        CascadeResult<Option<SignedHeaderHashed>>,
-    > {
-        async move {
-            let mut cascade = workspace.cascade(network);
-            // TODO: Think about what options to use here
-            cascade
-                .get_details(address.clone().into(), GetOptions::default())
-                .await?
-                .map(|el| {
-                    match el {
-                        holochain_zome_types::metadata::Details::Element(e) => Ok(e.element.into_inner().0),
-                        // Should not be trying to get original headers via EntryHash
-                        holochain_zome_types::metadata::Details::Entry(_) => Err(CascadeError::InvalidResponse(address.into())),
-                    }
-                })
-                .transpose()
-        }
-        .boxed()
-    }
-    };
-    // handle timeouts at the network layer
-    let async_call_context = call_context;
-    let maybe_original_element: Option<SignedHeaderHashed> =
-        tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-            unsafe {
-                async_call_context
-                    .host_access
-                    .workspace()
-                    .apply_mut(original_element_get_call)
-                    .await
-            }
-        })??;
+    let workspace_lock = call_context.host_access.workspace();
 
-    let entry_address = match maybe_original_element {
-        Some(original_element_signed_header_hash) => {
-            match original_element_signed_header_hash.header().entry_data() {
-                Some((entry_hash, _)) => Ok(entry_hash.clone()),
-                _ => Err(RibosomeError::ElementDeps(address.into())),
+    tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+        let mut workspace = workspace_lock.write().await;
+        let mut cascade = workspace.cascade(network);
+        // TODO: Think about what options to use here
+        let maybe_original_element: Option<SignedHeaderHashed> = cascade
+            .get_details(address.clone().into(), GetOptions::default())
+            .await?
+            .map(|el| {
+                match el {
+                    holochain_zome_types::metadata::Details::Element(e) => {
+                        Ok(e.element.into_inner().0)
+                    }
+                    // Should not be trying to get original headers via EntryHash
+                    holochain_zome_types::metadata::Details::Entry(_) => {
+                        Err(CascadeError::InvalidResponse(address.clone().into()))
+                    }
+                }
+            })
+            .transpose()?;
+
+        let entry_address = match maybe_original_element {
+            Some(original_element_signed_header_hash) => {
+                match original_element_signed_header_hash.header().entry_data() {
+                    Some((entry_hash, _)) => Ok(entry_hash.clone()),
+                    _ => Err(RibosomeError::ElementDeps(address.into())),
+                }
             }
-        }
-        None => Err(RibosomeError::ElementDeps(address.into())),
-    }?;
-    Ok(entry_address)
+            None => Err(RibosomeError::ElementDeps(address.into())),
+        };
+        entry_address
+    })
 }
 
 #[cfg(test)]
@@ -131,20 +105,16 @@ pub mod wasm_test {
 
         let test_env = holochain_state::test_utils::test_cell_env();
         let env = test_env.env();
-        let dbs = env.dbs();
-        let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs).unwrap();
+        let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
 
         crate::core::workflow::fake_genesis(&mut workspace.source_chain)
             .await
             .unwrap();
 
-        let (_g, raw_workspace) =
-            crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
-                &mut workspace,
-            );
+        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
 
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = raw_workspace.clone();
+        host_access.workspace = workspace_lock.clone();
 
         let thing_a: HeaderHash =
             crate::call_test_ribosome!(host_access, TestWasm::Crd, "create", ());

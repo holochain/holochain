@@ -6,7 +6,6 @@ use crate::buffer::{
     kv::KvStore,
     BufferedStore,
 };
-use crate::env::ReadManager;
 use crate::{
     env::EnvironmentRead,
     error::{DatabaseError, DatabaseResult},
@@ -248,8 +247,6 @@ where
     inner: Used<K, V, Store>,
 }
 
-type IterOwned<V> = Vec<(Vec<u8>, V)>;
-
 impl<K, V> Fresh<K, V, KvStore<K, V>>
 where
     K: BufKey,
@@ -297,58 +294,6 @@ where
     pub fn get(&self, k: &K) -> DatabaseResult<Option<V>> {
         fresh_reader!(self.env, |reader| self.inner.get(&reader, k))
     }
-
-    /// TODO: clean up fresh/used distinction
-    pub fn contains_used<R: Readable>(&self, r: &R, k: &K) -> DatabaseResult<bool> {
-        self.inner.contains(r, k)
-    }
-
-    /// TODO: clean up fresh/used distinction
-    pub fn get_used<R: Readable>(&self, r: &R, k: &K) -> DatabaseResult<Option<V>> {
-        self.inner.get(r, k)
-    }
-
-    // /// Iterator that checks the scratch space
-    // TODO: remove, not much point in collecting the entire DB, right?
-    // pub fn iter<'a, R: Readable + Send + Sync>(&'a self) -> DatabaseResult<IterOwned<V>> {
-    //     fresh_reader!(self.env, |reader| Ok(self
-    //         .inner
-    //         .iter(&reader)?
-    //         .map(|(k, v)| { Ok((k.to_vec(), v)) })
-    //         .collect()?))
-    // }
-
-    /// Iterator that tracks elements so they can be deleted
-    // NB: this cannot return an iterator due to lifetime issues
-    #[deprecated = "this doesn't actually return an iterator"]
-    pub fn drain<R: Readable + Send + Sync>(&mut self) -> DatabaseResult<Vec<V>> {
-        let g = self.env.guard();
-        let r = g.reader()?;
-        let v = self.inner.drain_iter(&r)?.collect()?;
-        Ok(v)
-    }
-
-    /// Iterator that returns all partial matches to this key
-    #[deprecated = "this doesn't actually return an iterator"]
-    pub fn iter_all_key_matches<R: Readable + Send + Sync>(
-        &self,
-        k: K,
-    ) -> DatabaseResult<IterOwned<V>> {
-        fresh_reader!(self.env, |reader| Ok(self
-            .inner
-            .iter_all_key_matches(&reader, k)?
-            .map(|(k, v)| { Ok((k.to_vec(), v)) })
-            .collect()?))
-    }
-
-    // /// Iterate from a key onwards
-    // TODO: remove, not much point in collecting the entire DB, right?
-    // pub fn iter_from<'a, R: Readable + Send + Sync>(
-    //     &'a self,
-    //     k: K,
-    // ) -> DatabaseResult<SingleIterFrom<'a, '_, V>> {
-    //     fresh_reader!(self.env, |reader| self.inner.iter_from(&reader, k))
-    // }
 }
 
 impl<K, V> BufferedStore for KvBufUsed<K, V>
@@ -362,7 +307,7 @@ where
         self.scratch.is_empty()
     }
 
-    fn flush_to_txn(self, writer: &mut Writer) -> DatabaseResult<()> {
+    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
         use KvOp::*;
 
         if self.is_clean() {
@@ -397,7 +342,7 @@ where
         self.scratch.is_empty()
     }
 
-    fn flush_to_txn(self, writer: &mut Writer) -> DatabaseResult<()> {
+    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
         use KvOp::*;
 
         if self.is_clean() {
@@ -441,8 +386,8 @@ where
         self.scratch.is_empty()
     }
 
-    fn flush_to_txn(self, writer: &mut Writer) -> DatabaseResult<()> {
-        self.inner.flush_to_txn(writer)
+    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
+        self.inner.flush_to_txn_ref(writer)
     }
 }
 
@@ -456,7 +401,7 @@ where
         self.scratch.is_empty()
     }
 
-    fn flush_to_txn(self, writer: &mut Writer) -> DatabaseResult<()> {
-        self.inner.flush_to_txn(writer)
+    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
+        self.inner.flush_to_txn_ref(writer)
     }
 }

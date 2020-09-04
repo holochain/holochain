@@ -234,8 +234,6 @@ mod slow_tests {
     use crate::fixt::WasmRibosomeFixturator;
     use crate::fixt::ZomeCallHostAccessFixturator;
     use fixt::prelude::*;
-    use futures::future::BoxFuture;
-    use futures::future::FutureExt;
     use holo_hash::HeaderHash;
     use holochain_wasm_test_utils::TestWasm;
 
@@ -296,40 +294,32 @@ mod slow_tests {
         // test workspace boilerplate
         let test_env = holochain_state::test_utils::test_cell_env();
         let env = test_env.env();
-        let dbs = env.dbs();
-        let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs).unwrap();
+        let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
 
         // commits fail validation if we don't do genesis
         crate::core::workflow::fake_genesis(&mut workspace.source_chain)
             .await
             .unwrap();
 
-        let (_g, raw_workspace) =
-            crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
-                &mut workspace,
-            );
+        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = raw_workspace.clone();
+        host_access.workspace = workspace_lock.clone();
 
         let output: HeaderHash =
             crate::call_test_ribosome!(host_access, TestWasm::ValidateLink, "add_valid_link", ());
 
         // the chain head should be the committed entry header
-        let call =
-            |workspace: &'a mut CallZomeWorkspace| -> BoxFuture<'a, SourceChainResult<HeaderHash>> {
-                async move {
-                    let source_chain = &mut workspace.source_chain;
-                    Ok(source_chain.chain_head()?.to_owned())
-                }
-                .boxed()
-            };
-        let chain_head =
-            tokio_safe_block_on::tokio_safe_block_forever_on(tokio::task::spawn(async move {
-                unsafe { raw_workspace.apply_mut(call).await }
-            }))
-            .unwrap()
-            .unwrap()
-            .unwrap();
+        let chain_head = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+            SourceChainResult::Ok(
+                workspace_lock
+                    .read()
+                    .await
+                    .source_chain
+                    .chain_head()?
+                    .to_owned(),
+            )
+        })
+        .unwrap();
 
         assert_eq!(chain_head, output,);
     }
@@ -339,41 +329,33 @@ mod slow_tests {
         // test workspace boilerplate
         let test_env = holochain_state::test_utils::test_cell_env();
         let env = test_env.env();
-        let dbs = env.dbs();
-        let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs).unwrap();
+        let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
 
         // commits fail validation if we don't do genesis
         crate::core::workflow::fake_genesis(&mut workspace.source_chain)
             .await
             .unwrap();
 
-        let (_g, raw_workspace) =
-            crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace::from_mut(
-                &mut workspace,
-            );
+        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
 
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = raw_workspace.clone();
+        host_access.workspace = workspace_lock.clone();
 
         let output: HeaderHash =
             crate::call_test_ribosome!(host_access, TestWasm::ValidateLink, "add_invalid_link", ());
 
         // the chain head should be the committed entry header
-        let call =
-            |workspace: &'a mut CallZomeWorkspace| -> BoxFuture<'a, SourceChainResult<HeaderHash>> {
-                async move {
-                    let source_chain = &mut workspace.source_chain;
-                    Ok(source_chain.chain_head()?.to_owned())
-                }
-                .boxed()
-            };
-        let chain_head =
-            tokio_safe_block_on::tokio_safe_block_forever_on(tokio::task::spawn(async move {
-                unsafe { raw_workspace.apply_mut(call).await }
-            }))
-            .unwrap()
-            .unwrap()
-            .unwrap();
+        let chain_head = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+            SourceChainResult::Ok(
+                workspace_lock
+                    .read()
+                    .await
+                    .source_chain
+                    .chain_head()?
+                    .to_owned(),
+            )
+        })
+        .unwrap();
 
         assert_eq!(chain_head, output,);
     }

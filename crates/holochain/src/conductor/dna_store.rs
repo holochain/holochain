@@ -109,8 +109,8 @@ impl DnaDefBuf {
 impl BufferedStore for DnaDefBuf {
     type Error = DatabaseError;
 
-    fn flush_to_txn(self, writer: &mut Writer) -> DatabaseResult<()> {
-        self.dna_defs.flush_to_txn(writer)?;
+    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
+        self.dna_defs.flush_to_txn_ref(writer)?;
         Ok(())
     }
 }

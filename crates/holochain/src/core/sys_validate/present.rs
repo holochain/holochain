@@ -293,8 +293,7 @@ async fn check_holding_entry<P: PrefixType>(
         SysValidationResult::Ok(eh)
     })?;
     element_vault
-        .get_element(&entry_header)
-        .await?
+        .get_element(&entry_header)?
         .ok_or_else(|| ValidationError::NotHoldingDep(hash.clone().into()).into())
 }
 
@@ -304,8 +303,7 @@ async fn check_holding_header<P: PrefixType>(
     element_vault: &ElementBuf<P>,
 ) -> SysValidationResult<SignedHeaderHashed> {
     element_vault
-        .get_header(&hash)
-        .await?
+        .get_header(&hash)?
         .ok_or_else(|| ValidationError::NotHoldingDep(hash.clone().into()).into())
 }
 
@@ -315,8 +313,7 @@ async fn check_holding_element<P: PrefixType>(
     element_vault: &ElementBuf<P>,
 ) -> SysValidationResult<Element> {
     let el = element_vault
-        .get_element(&hash)
-        .await?
+        .get_element(&hash)?
         .ok_or_else(|| ValidationError::NotHoldingDep(hash.clone().into()))?;
 
     el.entry()

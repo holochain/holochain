@@ -48,19 +48,15 @@ impl ElementBuf<IntegratedPrefix> {
     /// The `allow_private` argument allows you to specify whether private
     /// entries should be readable or writeable with this reference.
     /// The vault is constructed with the IntegratedPrefix.
-    pub fn vault(
-        env: EnvironmentRead,
-        dbs: &impl GetDb,
-        allow_private: bool,
-    ) -> DatabaseResult<Self> {
-        ElementBuf::new_vault(env, dbs, allow_private)
+    pub fn vault(env: EnvironmentRead, allow_private: bool) -> DatabaseResult<Self> {
+        ElementBuf::new_vault(env, allow_private)
     }
 
     /// Create a ElementBuf using the Cache databases.
     /// There is no cache for private entries, so private entries are disallowed
-    pub fn cache(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
-        let entries = dbs.get_db(&*ELEMENT_CACHE_ENTRIES)?;
-        let headers = dbs.get_db(&*ELEMENT_CACHE_HEADERS)?;
+    pub fn cache(env: EnvironmentRead) -> DatabaseResult<Self> {
+        let entries = env.get_db(&*ELEMENT_CACHE_ENTRIES)?;
+        let headers = env.get_db(&*ELEMENT_CACHE_HEADERS)?;
         ElementBuf::new(env, entries, None, headers)
     }
 }
@@ -68,8 +64,8 @@ impl ElementBuf<IntegratedPrefix> {
 impl ElementBuf<PendingPrefix> {
     /// Create a element buf for all elements pending validation.
     /// This reuses the database but is the data is completely separate.
-    pub fn pending(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
-        ElementBuf::new_vault(env, dbs, true)
+    pub fn pending(env: EnvironmentRead) -> DatabaseResult<Self> {
+        ElementBuf::new_vault(env, true)
     }
 }
 
@@ -78,16 +74,16 @@ impl ElementBuf<JudgedPrefix> {
     /// Note this doesn't mean they are Valid only that validation has run and
     /// come up with a [ValidationStatus].
     /// This reuses the database but is the data is completely separate.
-    pub fn judged(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
-        ElementBuf::new_vault(env, dbs, true)
+    pub fn judged(env: EnvironmentRead) -> DatabaseResult<Self> {
+        ElementBuf::new_vault(env, true)
     }
 }
 
 impl ElementBuf<RejectedPrefix> {
     /// Create a element buf for all elements that have been rejected.
     /// This reuses the database but is the data is completely separate.
-    pub fn rejected(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
-        ElementBuf::new_vault(env, dbs, true)
+    pub fn rejected(env: EnvironmentRead) -> DatabaseResult<Self> {
+        ElementBuf::new_vault(env, true)
     }
 }
 
@@ -114,15 +110,11 @@ where
     }
 
     /// Construct a element buf using the vault databases
-    fn new_vault(
-        env: EnvironmentRead,
-        dbs: &impl GetDb,
-        allow_private: bool,
-    ) -> DatabaseResult<Self> {
-        let headers = dbs.get_db(&*ELEMENT_VAULT_HEADERS)?;
-        let entries = dbs.get_db(&*ELEMENT_VAULT_PUBLIC_ENTRIES)?;
+    fn new_vault(env: EnvironmentRead, allow_private: bool) -> DatabaseResult<Self> {
+        let headers = env.get_db(&*ELEMENT_VAULT_HEADERS)?;
+        let entries = env.get_db(&*ELEMENT_VAULT_PUBLIC_ENTRIES)?;
         let private_entries = if allow_private {
-            Some(dbs.get_db(&*ELEMENT_VAULT_PRIVATE_ENTRIES)?)
+            Some(env.get_db(&*ELEMENT_VAULT_PRIVATE_ENTRIES)?)
         } else {
             None
         };
@@ -133,7 +125,7 @@ where
     ///
     /// First attempt to get from the public entry DB. If not present, and
     /// private DB access is specified, attempt to get as a private entry.
-    pub async fn get_entry(&self, entry_hash: &EntryHash) -> DatabaseResult<Option<EntryHashed>> {
+    pub fn get_entry(&self, entry_hash: &EntryHash) -> DatabaseResult<Option<EntryHashed>> {
         match self.public_entries.get(entry_hash)? {
             Some(entry) => Ok(Some(entry)),
             None => {
@@ -146,7 +138,7 @@ where
         }
     }
 
-    pub async fn contains_entry(&self, entry_hash: &EntryHash) -> DatabaseResult<bool> {
+    pub fn contains_entry(&self, entry_hash: &EntryHash) -> DatabaseResult<bool> {
         Ok(if self.public_entries.contains(entry_hash)? {
             true
         } else {
@@ -159,11 +151,11 @@ where
         })
     }
 
-    pub async fn contains_header(&self, header_hash: &HeaderHash) -> DatabaseResult<bool> {
+    pub fn contains_header(&self, header_hash: &HeaderHash) -> DatabaseResult<bool> {
         self.headers.contains(header_hash)
     }
 
-    pub async fn get_header(
+    pub fn get_header(
         &self,
         header_address: &HeaderHash,
     ) -> DatabaseResult<Option<SignedHeaderHashed>> {
@@ -177,7 +169,7 @@ where
     /// - if it is a public entry, but the entry cannot be found, return error
     /// - if it is a private entry and cannot be found, return error
     /// - if it is a private entry but the private DB is disabled, return None
-    async fn get_entry_from_header(&self, header: &Header) -> SourceChainResult<Option<Entry>> {
+    fn get_entry_from_header(&self, header: &Header) -> SourceChainResult<Option<Entry>> {
         Ok(match header.entry_data() {
             None => None,
             Some((entry_hash, entry_type)) => {
@@ -200,12 +192,9 @@ where
     }
 
     /// given a header address return the full chain element for that address
-    pub async fn get_element(
-        &self,
-        header_address: &HeaderHash,
-    ) -> SourceChainResult<Option<Element>> {
-        if let Some(signed_header) = self.get_header(header_address).await? {
-            let maybe_entry = self.get_entry_from_header(signed_header.header()).await?;
+    pub fn get_element(&self, header_address: &HeaderHash) -> SourceChainResult<Option<Element>> {
+        if let Some(signed_header) = self.get_header(header_address)? {
+            let maybe_entry = self.get_entry_from_header(signed_header.header())?;
             Ok(Some(Element::new(signed_header, maybe_entry)))
         } else {
             Ok(None)
@@ -307,15 +296,15 @@ impl<P: PrefixType> BufferedStore for ElementBuf<P> {
                 .unwrap_or(true)
     }
 
-    fn flush_to_txn(self, writer: &mut Writer) -> DatabaseResult<()> {
+    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
         if self.is_clean() {
             return Ok(());
         }
-        self.public_entries.flush_to_txn(writer)?;
-        if let Some(db) = self.private_entries {
-            db.flush_to_txn(writer)?
+        self.public_entries.flush_to_txn_ref(writer)?;
+        if let Some(ref mut db) = self.private_entries {
+            db.flush_to_txn_ref(writer)?
         };
-        self.headers.flush_to_txn(writer)?;
+        self.headers.flush_to_txn_ref(writer)?;
         Ok(())
     }
 }
@@ -346,7 +335,7 @@ mod tests {
 
         // write one public-entry header and one private-entry header
         env.with_commit(|txn| {
-            let mut store = ElementBuf::vault(arc.clone().into(), &env, true)?;
+            let mut store = ElementBuf::vault(arc.clone().into(), true)?;
             store.put(header_pub, Some(entry_pub.clone()))?;
             store.put(header_priv, Some(entry_priv.clone()))?;
             store.flush_to_txn(txn)
@@ -354,25 +343,25 @@ mod tests {
 
         // Can retrieve both entries when private entries are enabled
         {
-            let store = ElementBuf::vault(arc.clone().into(), &env, true)?;
+            let store = ElementBuf::vault(arc.clone().into(), true)?;
             assert_eq!(
-                store.get_entry(entry_pub.as_hash()).await,
+                store.get_entry(entry_pub.as_hash()),
                 Ok(Some(entry_pub.clone()))
             );
             assert_eq!(
-                store.get_entry(entry_priv.as_hash()).await,
+                store.get_entry(entry_priv.as_hash()),
                 Ok(Some(entry_priv.clone()))
             );
         }
 
         // Cannot retrieve private entry when disabled
         {
-            let store = ElementBuf::vault(arc.clone().into(), &env, false)?;
+            let store = ElementBuf::vault(arc.clone().into(), false)?;
             assert_eq!(
-                store.get_entry(entry_pub.as_hash()).await,
+                store.get_entry(entry_pub.as_hash()),
                 Ok(Some(entry_pub.clone()))
             );
-            assert_eq!(store.get_entry(entry_priv.as_hash()).await, Ok(None));
+            assert_eq!(store.get_entry(entry_priv.as_hash()), Ok(None));
         }
 
         Ok(())
@@ -393,7 +382,7 @@ mod tests {
 
         // write one public-entry header and one private-entry header (which will be a noop)
         env.with_commit(|txn| {
-            let mut store = ElementBuf::vault(arc.clone().into(), &env, false)?;
+            let mut store = ElementBuf::vault(arc.clone().into(), false)?;
             store.put(header_pub, Some(entry_pub.clone()))?;
             store.put(header_priv, Some(entry_priv.clone()))?;
             store.flush_to_txn(txn)
@@ -401,22 +390,19 @@ mod tests {
 
         // Can retrieve both entries when private entries are enabled
         {
-            let store = ElementBuf::vault(arc.clone().into(), &env, true)?;
+            let store = ElementBuf::vault(arc.clone().into(), true)?;
             assert_eq!(
-                store.get_entry(entry_pub.as_hash()).await,
+                store.get_entry(entry_pub.as_hash()),
                 Ok(Some(entry_pub.clone()))
             );
-            assert_eq!(store.get_entry(entry_priv.as_hash()).await, Ok(None));
+            assert_eq!(store.get_entry(entry_priv.as_hash()), Ok(None));
         }
 
         // Cannot retrieve private entry when disabled
         {
-            let store = ElementBuf::vault(arc.clone().into(), &env, false)?;
-            assert_eq!(
-                store.get_entry(entry_pub.as_hash()).await,
-                Ok(Some(entry_pub))
-            );
-            assert_eq!(store.get_entry(entry_priv.as_hash()).await, Ok(None));
+            let store = ElementBuf::vault(arc.clone().into(), false)?;
+            assert_eq!(store.get_entry(entry_pub.as_hash()), Ok(Some(entry_pub)));
+            assert_eq!(store.get_entry(entry_priv.as_hash()), Ok(None));
         }
 
         Ok(())

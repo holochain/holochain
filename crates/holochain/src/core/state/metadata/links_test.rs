@@ -372,12 +372,12 @@ async fn can_add_and_remove_link() {
     let mut td = fixtures(arc.clone(), 1).await.into_iter().next().unwrap();
 
     // Check it's empty
-    let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
+    let meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
     td.empty(here!("empty at start"), &meta_buf).await;
 
     // Add a link
     {
-        let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
+        let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
         // Add
         td.add_link(&mut meta_buf).await;
         // Is in scratch
@@ -405,13 +405,13 @@ async fn can_add_and_remove_link() {
     }
 
     // Check it's in db
-    let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
+    let meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
     td.only_on_full_key(here!("It's in the db"), &meta_buf)
         .await;
 
     // Remove the link
     {
-        let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
+        let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
         td.remove_link(&mut meta_buf).await;
         // Is empty
         td.empty(here!("empty after remove"), &meta_buf).await;
@@ -420,13 +420,13 @@ async fn can_add_and_remove_link() {
     }
 
     // Check it's empty
-    let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
+    let meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
     // Is empty
     td.empty(here!("empty after remove in db"), &meta_buf).await;
 
     // Add a link
     {
-        let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
+        let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
         let new_td = TestData::with_same_keys(td.clone()).await;
         td = new_td;
         // Add
@@ -445,7 +445,7 @@ async fn can_add_and_remove_link() {
     }
 
     // Partial matching
-    let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
+    let meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
     td.only_on_full_key(here!("db"), &meta_buf).await;
     // No zome, no tag
     td.only_on_base(here!("db"), &meta_buf).await;
@@ -465,7 +465,7 @@ async fn multiple_links() {
 
     // Add links
     {
-        let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
+        let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
         // Add
         for d in td.iter() {
             d.add_link(&mut meta_buf).await;
@@ -509,7 +509,7 @@ async fn multiple_links() {
     }
 
     {
-        let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
+        let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
         for d in td.iter() {
             d.only_on_full_key(here!("all in db"), &meta_buf).await;
         }
@@ -527,7 +527,7 @@ async fn multiple_links() {
             .unwrap();
     }
 
-    let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
+    let meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
     for d in &td[1..] {
         d.only_on_full_key(here!("all except 0"), &meta_buf).await;
     }
@@ -545,7 +545,7 @@ async fn duplicate_links() {
     let td = fixtures(arc.clone(), 10).await;
     // Add to db then the same to scratch and expect on one result
     {
-        let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
+        let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
         // Add
         for d in td.iter() {
             d.add_link(&mut meta_buf).await;
@@ -578,7 +578,7 @@ async fn duplicate_links() {
             .unwrap();
     }
     {
-        let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
+        let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
         // Add
         for d in td.iter() {
             d.add_link(&mut meta_buf).await;
@@ -596,7 +596,7 @@ async fn duplicate_links() {
         env.with_commit(|writer| meta_buf.flush_to_txn(writer))
             .unwrap();
     }
-    let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
+    let meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
     // Is in db
     for d in td.iter() {
         d.only_on_full_key(here!("re add"), &meta_buf).await;
@@ -629,7 +629,7 @@ async fn links_on_same_base() {
         d.link_remove.link_add_address = link_add_hash;
     }
     {
-        let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
+        let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
         // Add
         for d in td.iter() {
             d.add_link(&mut meta_buf).await;
@@ -646,7 +646,7 @@ async fn links_on_same_base() {
             .unwrap();
     }
     {
-        let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
+        let meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
         // In db
         for d in td.iter() {
             d.only_on_full_key(here!("same base"), &meta_buf).await;
@@ -660,7 +660,7 @@ async fn links_on_same_base() {
     {
         let span = debug_span!("check_remove");
         let _g = span.enter();
-        let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
+        let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
         td[0].remove_link(&mut meta_buf).await;
         for d in &td[1..] {
             d.only_on_full_key(here!("same base"), &meta_buf).await;
@@ -676,7 +676,7 @@ async fn links_on_same_base() {
             .unwrap();
     }
     {
-        let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
+        let meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
         for d in &td[1..] {
             d.only_on_full_key(here!("same base"), &meta_buf).await;
             d.only_on_zome_id(here!("same base"), &meta_buf).await;
@@ -715,7 +715,7 @@ async fn links_on_same_zome_id() {
     {
         let span = debug_span!("check_zome_id");
         let _g = span.enter();
-        let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
+        let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
         // Add
         for d in td.iter() {
             d.add_link(&mut meta_buf).await;
@@ -732,7 +732,7 @@ async fn links_on_same_zome_id() {
             .unwrap();
     }
     {
-        let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
+        let meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
         // In db
         for d in td.iter() {
             d.only_on_full_key(here!("same base"), &meta_buf).await;
@@ -746,7 +746,7 @@ async fn links_on_same_zome_id() {
     {
         let span = debug_span!("check_remove");
         let _g = span.enter();
-        let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
+        let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
         td[9].remove_link(&mut meta_buf).await;
         for d in &td[..9] {
             d.only_on_full_key(here!("same base"), &meta_buf).await;
@@ -766,7 +766,7 @@ async fn links_on_same_zome_id() {
             .unwrap();
     }
     {
-        let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
+        let meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
         for d in &td[..9] {
             d.only_on_full_key(here!("same base"), &meta_buf).await;
             // Half the tag
@@ -813,7 +813,7 @@ async fn links_on_same_tag() {
         d.link_remove.link_add_address = link_add_hash;
     }
     {
-        let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
+        let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
         // Add
         for d in td.iter() {
             d.add_link(&mut meta_buf).await;
@@ -834,7 +834,7 @@ async fn links_on_same_tag() {
             .unwrap();
     }
     {
-        let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
+        let meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
         // In db
         TestData::only_these_on_base(&td[..], here!("check all return on same base"), &meta_buf);
         TestData::only_these_on_zome_id(&td[..], here!("check all return on same base"), &meta_buf);
@@ -853,7 +853,7 @@ async fn links_on_same_tag() {
     {
         let span = debug_span!("check_remove");
         let _g = span.enter();
-        let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
+        let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
         td[5].remove_link(&mut meta_buf).await;
         td[6].remove_link(&mut meta_buf).await;
         let partial_td = &td[..5].iter().chain(&td[7..]).cloned().collect::<Vec<_>>();
@@ -881,7 +881,7 @@ async fn links_on_same_tag() {
             .unwrap();
     }
     {
-        let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
+        let meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
         let partial_td = &td[..5].iter().chain(&td[7..]).cloned().collect::<Vec<_>>();
         TestData::only_these_on_base(
             &partial_td[..],

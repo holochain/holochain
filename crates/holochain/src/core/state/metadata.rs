@@ -181,7 +181,7 @@ where
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>;
 
     /// Finds if there is a StoreElement under this header
-    async fn has_element_header(&self, hash: &HeaderHash) -> DatabaseResult<bool>;
+    fn has_element_header(&self, hash: &HeaderHash) -> DatabaseResult<bool>;
 
     /// Get the environment for creating readers
     fn env(&self) -> &EnvironmentRead;
@@ -202,15 +202,15 @@ impl MetadataBuf<IntegratedPrefix> {
     /// Create a [MetadataBuf] with the vault databases using the IntegratedPrefix.
     /// The data in the type will be separate from the other prefixes even though the
     /// database is shared.
-    pub fn vault(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
-        Self::new_vault(env, dbs)
+    pub fn vault(env: EnvironmentRead) -> DatabaseResult<Self> {
+        Self::new_vault(env)
     }
 
     /// Create a [MetadataBuf] with the cache databases
-    pub fn cache(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
-        let system_meta = dbs.get_db(&*CACHE_SYSTEM_META)?;
-        let links_meta = dbs.get_db(&*CACHE_LINKS_META)?;
-        let misc_meta = dbs.get_db(&*CACHE_STATUS_META)?;
+    pub fn cache(env: EnvironmentRead) -> DatabaseResult<Self> {
+        let system_meta = env.get_db(&*CACHE_SYSTEM_META)?;
+        let links_meta = env.get_db(&*CACHE_LINKS_META)?;
+        let misc_meta = env.get_db(&*CACHE_STATUS_META)?;
         Self::new(env, system_meta, links_meta, misc_meta)
     }
 }
@@ -219,8 +219,8 @@ impl MetadataBuf<PendingPrefix> {
     /// Create a [MetadataBuf] with the vault databases using the PendingPrefix.
     /// The data in the type will be separate from the other prefixes even though the
     /// database is shared.
-    pub fn pending(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
-        Self::new_vault(env, dbs)
+    pub fn pending(env: EnvironmentRead) -> DatabaseResult<Self> {
+        Self::new_vault(env)
     }
 }
 
@@ -228,8 +228,8 @@ impl MetadataBuf<JudgedPrefix> {
     /// Create a [MetadataBuf] with the vault databases using the JudgedPrefix.
     /// The data in the type will be separate from the other prefixes even though the
     /// database is shared.
-    pub fn judged(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
-        Self::new_vault(env, dbs)
+    pub fn judged(env: EnvironmentRead) -> DatabaseResult<Self> {
+        Self::new_vault(env)
     }
 }
 
@@ -237,8 +237,8 @@ impl MetadataBuf<RejectedPrefix> {
     /// Create a [MetadataBuf] with the vault databases using the RejectedPrefix.
     /// The data in the type will be separate from the other prefixes even though the
     /// database is shared.
-    pub fn rejected(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
-        Self::new_vault(env, dbs)
+    pub fn rejected(env: EnvironmentRead) -> DatabaseResult<Self> {
+        Self::new_vault(env)
     }
 }
 
@@ -260,10 +260,10 @@ where
         })
     }
 
-    fn new_vault(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
-        let system_meta = dbs.get_db(&*META_VAULT_SYS)?;
-        let links_meta = dbs.get_db(&*META_VAULT_LINKS)?;
-        let misc_meta = dbs.get_db(&*META_VAULT_MISC)?;
+    fn new_vault(env: EnvironmentRead) -> DatabaseResult<Self> {
+        let system_meta = env.get_db(&*META_VAULT_SYS)?;
+        let links_meta = env.get_db(&*META_VAULT_LINKS)?;
+        let misc_meta = env.get_db(&*META_VAULT_MISC)?;
         Self::new(env, system_meta, links_meta, misc_meta)
     }
 
@@ -650,7 +650,7 @@ where
         ))
     }
 
-    async fn has_element_header(&self, hash: &HeaderHash) -> DatabaseResult<bool> {
+    fn has_element_header(&self, hash: &HeaderHash) -> DatabaseResult<bool> {
         fresh_reader!(self.env, |r| self
             .misc_meta
             .contains(&r, &MiscMetaKey::StoreElement(hash.clone()).into()))
@@ -664,10 +664,10 @@ where
 impl<P: PrefixType> BufferedStore for MetadataBuf<P> {
     type Error = DatabaseError;
 
-    fn flush_to_txn(self, writer: &mut Writer) -> DatabaseResult<()> {
-        self.system_meta.flush_to_txn(writer)?;
-        self.links_meta.flush_to_txn(writer)?;
-        self.misc_meta.flush_to_txn(writer)?;
+    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
+        self.system_meta.flush_to_txn_ref(writer)?;
+        self.links_meta.flush_to_txn_ref(writer)?;
+        self.misc_meta.flush_to_txn_ref(writer)?;
         Ok(())
     }
 }

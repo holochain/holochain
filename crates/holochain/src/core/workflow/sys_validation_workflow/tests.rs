@@ -84,9 +84,8 @@ async fn run_test(
 
     {
         let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
-        let dbs = alice_env.dbs();
 
-        let workspace = IncomingDhtOpsWorkspace::new(alice_env.clone().into(), &dbs).unwrap();
+        let workspace = IncomingDhtOpsWorkspace::new(alice_env.clone().into()).unwrap();
         // Validation should be empty
         let res: Vec<_> = fresh_reader_test!(alice_env, |r| {
             workspace
@@ -100,10 +99,10 @@ async fn run_test(
         {
             let s = debug_span!("inspect_ops");
             let _g = s.enter();
-            let element_buf = ElementBuf::vault(alice_env.clone().into(), &dbs, true).unwrap();
+            let element_buf = ElementBuf::vault(alice_env.clone().into(), true).unwrap();
             for (k, i) in &res {
                 let hash = DhtOpHash::from_raw_bytes(k.clone());
-                let el = element_buf.get_element(&i.op.header_hash()).await.unwrap();
+                let el = element_buf.get_element(&i.op.header_hash()).unwrap();
                 debug!(?hash, ?i, op_in_val = ?el);
             }
         }
@@ -140,9 +139,9 @@ async fn run_test(
         {
             let s = debug_span!("inspect_ops");
             let _g = s.enter();
-            let element_buf = ElementBuf::vault(alice_env.clone().into(), &dbs, true).unwrap();
+            let element_buf = ElementBuf::vault(alice_env.clone().into(), true).unwrap();
             for i in &res {
-                let el = element_buf.get_element(&i.op.header_hash()).await.unwrap();
+                let el = element_buf.get_element(&i.op.header_hash()).unwrap();
                 debug!(?i.op, op_in_buf = ?el);
             }
         }
@@ -159,9 +158,8 @@ async fn run_test(
 
     {
         let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
-        let dbs = alice_env.dbs();
 
-        let workspace = IncomingDhtOpsWorkspace::new(alice_env.clone().into(), &dbs).unwrap();
+        let workspace = IncomingDhtOpsWorkspace::new(alice_env.clone().into()).unwrap();
         // Validation should be empty
         assert_eq!(
             fresh_reader_test!(alice_env, |r| workspace
@@ -223,9 +221,8 @@ async fn run_test(
     {
         let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
         let env_ref = alice_env.guard();
-        let dbs = alice_env.dbs();
 
-        let workspace = IncomingDhtOpsWorkspace::new(alice_env.clone().into(), &dbs).unwrap();
+        let workspace = IncomingDhtOpsWorkspace::new(alice_env.clone().into()).unwrap();
         // Validation should still contain bobs link pending because the target was missing
         assert_eq!(
             {
@@ -274,11 +271,9 @@ async fn bob_links_in_a_legit_way(
     let target_entry_hash = EntryHash::with_data(&Entry::try_from(target.clone()).unwrap()).await;
     let link_tag = fixt!(LinkTag);
     let (bob_env, call_data) = CallData::create(bob_cell_id, handle, dna_file).await;
-    let dbs = bob_env.dbs();
     // 3
     commit_entry(
         &bob_env,
-        &dbs,
         call_data.clone(),
         base.clone().try_into().unwrap(),
         POST_ID,
@@ -288,7 +283,6 @@ async fn bob_links_in_a_legit_way(
     // 4
     commit_entry(
         &bob_env,
-        &dbs,
         call_data.clone(),
         target.clone().try_into().unwrap(),
         POST_ID,
@@ -299,7 +293,6 @@ async fn bob_links_in_a_legit_way(
     // Link the entries
     let link_add_address = link_entries(
         &bob_env,
-        &dbs,
         call_data.clone(),
         base_entry_hash.clone(),
         target_entry_hash.clone(),
@@ -330,12 +323,10 @@ async fn bob_makes_a_large_link(
     let link_tag = LinkTag(bytes);
 
     let (bob_env, call_data) = CallData::create(bob_cell_id, handle, dna_file).await;
-    let dbs = bob_env.dbs();
 
     // 6
     let original_header_address = commit_entry(
         &bob_env,
-        &dbs,
         call_data.clone(),
         base.clone().try_into().unwrap(),
         POST_ID,
@@ -345,7 +336,6 @@ async fn bob_makes_a_large_link(
     // 7
     commit_entry(
         &bob_env,
-        &dbs,
         call_data.clone(),
         target.clone().try_into().unwrap(),
         POST_ID,
@@ -356,7 +346,6 @@ async fn bob_makes_a_large_link(
     // Commit a large header
     let link_add_address = link_entries(
         &bob_env,
-        &dbs,
         call_data.clone(),
         base_entry_hash.clone(),
         target_entry_hash.clone(),
@@ -368,7 +357,6 @@ async fn bob_makes_a_large_link(
     // Commit a bad update entry
     let bad_update_header = update_entry(
         &bob_env,
-        &dbs,
         call_data.clone(),
         bad_update.clone().try_into().unwrap(),
         MSG_ID,
@@ -389,12 +377,10 @@ async fn dodgy_bob(bob_cell_id: &CellId, handle: &ConductorHandle, dna_file: &Dn
     let target_entry_hash = EntryHash::with_data(&Entry::try_from(target.clone()).unwrap()).await;
     let link_tag = fixt!(LinkTag);
     let (bob_env, call_data) = CallData::create(bob_cell_id, handle, dna_file).await;
-    let dbs = bob_env.dbs();
 
     // 11
     commit_entry(
         &bob_env,
-        &dbs,
         call_data.clone(),
         base.clone().try_into().unwrap(),
         POST_ID,
@@ -406,7 +392,6 @@ async fn dodgy_bob(bob_cell_id: &CellId, handle: &ConductorHandle, dna_file: &Dn
     // Link the entries
     link_entries(
         &bob_env,
-        &dbs,
         call_data.clone(),
         base_entry_hash.clone(),
         target_entry_hash.clone(),

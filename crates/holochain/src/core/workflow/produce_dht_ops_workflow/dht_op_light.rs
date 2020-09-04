@@ -28,8 +28,7 @@ pub async fn light_to_op<P: PrefixType>(
     match op {
         DhtOpLight::StoreElement(h, _, _) => {
             let (header, entry) = cas
-                .get_element(&h)
-                .await?
+                .get_element(&h)?
                 .ok_or_else(|| DhtOpConvertError::MissingData(h.into()))?
                 .into_inner();
             // TODO: Could use this signature? Is it the same?
@@ -40,8 +39,7 @@ pub async fn light_to_op<P: PrefixType>(
         }
         DhtOpLight::StoreEntry(h, _, _) => {
             let (header, entry) = cas
-                .get_element(&h)
-                .await?
+                .get_element(&h)?
                 .ok_or_else(|| DhtOpConvertError::MissingData(h.into()))?
                 .into_inner();
             let (header, sig) = header.into_header_and_signature();
@@ -64,16 +62,14 @@ pub async fn light_to_op<P: PrefixType>(
         }
         DhtOpLight::RegisterAgentActivity(h, _) => {
             let (header, sig) = cas
-                .get_header(&h)
-                .await?
+                .get_header(&h)?
                 .ok_or_else(|| DhtOpConvertError::MissingData(h.into()))?
                 .into_header_and_signature();
             Ok(DhtOp::RegisterAgentActivity(sig, header.into_content()))
         }
         DhtOpLight::RegisterUpdatedBy(h, _, _) => {
             let (header, sig) = cas
-                .get_header(&h)
-                .await?
+                .get_header(&h)?
                 .ok_or_else(|| DhtOpConvertError::MissingData(h.into()))?
                 .into_header_and_signature();
             let header = match header.into_content() {
@@ -88,17 +84,16 @@ pub async fn light_to_op<P: PrefixType>(
             Ok(DhtOp::RegisterUpdatedBy(sig, header))
         }
         DhtOpLight::RegisterDeletedBy(header_hash, _) => {
-            let (header, sig) = get_element_delete(header_hash, op_name.clone(), &cas).await?;
+            let (header, sig) = get_element_delete(header_hash, op_name, &cas)?;
             Ok(DhtOp::RegisterDeletedBy(sig, header))
         }
         DhtOpLight::RegisterDeletedEntryHeader(header_hash, _) => {
-            let (header, sig) = get_element_delete(header_hash, op_name.clone(), &cas).await?;
+            let (header, sig) = get_element_delete(header_hash, op_name, &cas)?;
             Ok(DhtOp::RegisterDeletedEntryHeader(sig, header))
         }
         DhtOpLight::RegisterAddLink(h, _) => {
             let (header, sig) = cas
-                .get_element(&h)
-                .await?
+                .get_element(&h)?
                 .ok_or_else(|| DhtOpConvertError::MissingData(h.into()))?
                 .into_inner()
                 .0
@@ -116,8 +111,7 @@ pub async fn light_to_op<P: PrefixType>(
         }
         DhtOpLight::RegisterRemoveLink(h, _) => {
             let (header, sig) = cas
-                .get_element(&h)
-                .await?
+                .get_element(&h)?
                 .ok_or_else(|| DhtOpConvertError::MissingData(h.into()))?
                 .into_inner()
                 .0
@@ -136,14 +130,13 @@ pub async fn light_to_op<P: PrefixType>(
     }
 }
 
-async fn get_element_delete<P: PrefixType>(
+fn get_element_delete<P: PrefixType>(
     header_hash: HeaderHash,
     op_name: String,
     cas: &ElementBuf<P>,
 ) -> DhtOpConvertResult<(header::ElementDelete, Signature)> {
     let (header, sig) = cas
-        .get_header(&header_hash)
-        .await?
+        .get_header(&header_hash)?
         .ok_or_else(|| DhtOpConvertError::MissingData(header_hash.into()))?
         .into_header_and_signature();
     match header.into_content() {
@@ -162,8 +155,7 @@ async fn get_entry_hash_for_header(
 ) -> DhtOpConvertResult<EntryHash> {
     debug!(%header_hash);
     let entry = cas
-        .get_header(header_hash)
-        .await?
+        .get_header(header_hash)?
         .and_then(|e| e.header().entry_data().map(|(hash, _)| hash.clone()));
     entry.ok_or_else(|| DhtOpConvertError::MissingEntryDataForHeader(header_hash.clone()))
 }

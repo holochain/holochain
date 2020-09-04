@@ -2,7 +2,7 @@ use super::{BufferedStore, KvBufUsed, KvOp};
 use crate::buffer::kv::generic::KvStoreT;
 use crate::{
     env::{ReadManager, WriteManager},
-    error::{DatabaseError, DatabaseResult},
+    error::DatabaseResult,
     test_utils::{test_cell_env, DbString},
 };
 use ::fixt::prelude::*;
@@ -122,30 +122,21 @@ async fn kv_store_sanity_check() -> DatabaseResult<()> {
 
     let testval = TestVal { name: "Joe".into() };
 
-    env.with_reader::<DatabaseError, _, _>(|reader| {
-        let mut kv1: KvBufUsed<DbString, TestVal> = KvBufUsed::new(db1);
-        let mut kv2: KvBufUsed<DbString, DbString> = KvBufUsed::new(db2);
+    let mut kv1: KvBufUsed<DbString, TestVal> = KvBufUsed::new(db1);
+    let mut kv2: KvBufUsed<DbString, DbString> = KvBufUsed::new(db2);
 
-        env.with_commit(|writer| {
-            kv1.put("hi".into(), testval.clone()).unwrap();
-            kv2.put("salutations".into(), "folks".into()).unwrap();
-            // Check that the underlying store contains no changes yet
-            assert_eq!(kv1.store().get(&reader, &"hi".into())?, None);
-            assert_eq!(kv2.store().get(&reader, &"salutations".into())?, None);
-            kv1.flush_to_txn(writer)
-        })?;
-
-        assert_eq!(kv2.scratch().len(), 1);
-
-        // Ensure that mid-transaction, there has still been no persistence,
-        // just for kicks
-
-        env.with_commit(|writer| {
-            let kv1a: KvBufUsed<DbString, TestVal> = KvBufUsed::new(db1);
-            assert_eq!(kv1a.store().get(&reader, &"hi".into())?, None);
-            kv2.flush_to_txn(writer)
-        })
+    env.with_commit(|txn| {
+        kv1.put("hi".into(), testval.clone()).unwrap();
+        kv2.put("salutations".into(), "folks".into()).unwrap();
+        // Check that the underlying store contains no changes yet
+        assert_eq!(kv1.store().get(txn, &"hi".into())?, None);
+        assert_eq!(kv2.store().get(txn, &"salutations".into())?, None);
+        kv1.flush_to_txn(txn)
     })?;
+
+    assert_eq!(kv2.scratch().len(), 1);
+
+    env.with_commit(|txn| kv2.flush_to_txn(txn))?;
 
     env.with_reader(|reader| {
         // Now open some fresh Readers to see that our data was persisted

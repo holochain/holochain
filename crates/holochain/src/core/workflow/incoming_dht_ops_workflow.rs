@@ -38,8 +38,7 @@ pub async fn incoming_dht_ops_workflow(
     ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
 ) -> WorkflowResult<()> {
     // set up our workspace
-    let env_ref = state_env.guard();
-    let mut workspace = IncomingDhtOpsWorkspace::new(state_env.clone().into(), &env_ref)?;
+    let mut workspace = IncomingDhtOpsWorkspace::new(state_env.clone().into())?;
 
     // add incoming ops to the validation limbo
     for (hash, op) in ops {
@@ -70,26 +69,26 @@ pub struct IncomingDhtOpsWorkspace {
 }
 
 impl Workspace for IncomingDhtOpsWorkspace {
-    fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
-        self.validation_limbo.0.flush_to_txn(writer)?;
-        self.element_pending.flush_to_txn(writer)?;
-        self.meta_pending.flush_to_txn(writer)?;
+    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> WorkspaceResult<()> {
+        self.validation_limbo.0.flush_to_txn_ref(writer)?;
+        self.element_pending.flush_to_txn_ref(writer)?;
+        self.meta_pending.flush_to_txn_ref(writer)?;
         Ok(())
     }
 }
 
 impl IncomingDhtOpsWorkspace {
-    pub fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
-        let db = dbs.get_db(&*INTEGRATED_DHT_OPS)?;
+    pub fn new(env: EnvironmentRead) -> WorkspaceResult<Self> {
+        let db = env.get_db(&*INTEGRATED_DHT_OPS)?;
         let integrated_dht_ops = KvBufFresh::new(env.clone(), db);
 
-        let db = dbs.get_db(&*INTEGRATION_LIMBO)?;
+        let db = env.get_db(&*INTEGRATION_LIMBO)?;
         let integration_limbo = KvBufFresh::new(env.clone(), db);
 
-        let validation_limbo = ValidationLimboStore::new(env.clone(), dbs)?;
+        let validation_limbo = ValidationLimboStore::new(env.clone())?;
 
-        let element_pending = ElementBuf::pending(env.clone(), dbs)?;
-        let meta_pending = MetadataBuf::pending(env, dbs)?;
+        let element_pending = ElementBuf::pending(env.clone())?;
+        let meta_pending = MetadataBuf::pending(env)?;
 
         Ok(Self {
             integration_limbo,

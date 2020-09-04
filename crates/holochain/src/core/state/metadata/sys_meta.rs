@@ -112,10 +112,9 @@ mod tests {
     async fn test_redirect_header_one_hop() -> anyhow::Result<()> {
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let env = arc.guard();
         let mut fx = TestFixtures::new();
         {
-            let mut buf = MetadataBuf::vault(arc.clone().into(), &env)?;
+            let mut buf = MetadataBuf::vault(arc.clone().into())?;
             let (update, expected) = test_update(
                 fx.header_hash().into(),
                 fx.entry_hash(),
@@ -138,10 +137,9 @@ mod tests {
     async fn test_redirect_header_three_hops() -> anyhow::Result<()> {
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let env = arc.guard();
         let mut fx = TestFixtures::new();
         {
-            let mut buf = MetadataBuf::vault(arc.clone().into(), &env)?;
+            let mut buf = MetadataBuf::vault(arc.clone().into())?;
             let (update1, header1) = test_update(
                 fx.header_hash().into(),
                 fx.entry_hash(),
@@ -181,10 +179,9 @@ mod tests {
     async fn test_redirect_entry_one_hop() -> anyhow::Result<()> {
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let env = arc.guard();
         let mut fx = TestFixtures::new();
         {
-            let mut buf = MetadataBuf::vault(arc.clone().into(), &env)?;
+            let mut buf = MetadataBuf::vault(arc.clone().into())?;
             let original_entry = fx.entry_hash();
             let header_hash = test_create(original_entry.clone(), &mut fx)
                 .await
@@ -215,10 +212,9 @@ mod tests {
     async fn test_redirect_entry_three_hops() -> anyhow::Result<()> {
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let env = arc.guard();
         let mut fx = TestFixtures::new();
         {
-            let mut buf = MetadataBuf::vault(arc.clone().into(), &env)?;
+            let mut buf = MetadataBuf::vault(arc.clone().into())?;
             let original_entry = fx.entry_hash();
             let header_hash = test_create(original_entry.clone(), &mut fx)
                 .await
@@ -264,10 +260,9 @@ mod tests {
     async fn test_redirect_header_and_entry() -> anyhow::Result<()> {
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let env = arc.guard();
         let mut fx = TestFixtures::new();
         {
-            let mut buf = MetadataBuf::vault(arc.clone().into(), &env)?;
+            let mut buf = MetadataBuf::vault(arc.clone().into())?;
             let original_entry = fx.entry_hash();
             let header_hash = test_create(original_entry.clone(), &mut fx)
                 .await
@@ -324,7 +319,7 @@ mod tests {
         expected.sort_by_key(|h| h.header_hash.clone());
         {
             let reader = env.reader().unwrap();
-            let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
+            let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
             for create in entry_creates {
                 meta_buf
                     .register_header(NewEntryHeader::Create(create))
@@ -343,7 +338,7 @@ mod tests {
         }
         {
             let reader = env.reader().unwrap();
-            let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
+            let meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
             let mut headers = meta_buf
                 .get_headers(&reader, entry_hash.clone())
                 .unwrap()
@@ -383,7 +378,7 @@ mod tests {
         expected.sort_by_key(|h| h.header_hash.clone());
         {
             let reader = env.reader().unwrap();
-            let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
+            let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
             for update in entry_updates {
                 meta_buf.register_update(update).await.unwrap();
             }
@@ -399,7 +394,7 @@ mod tests {
         }
         {
             let reader = env.reader().unwrap();
-            let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
+            let meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
             let mut headers = meta_buf
                 .get_updates(&reader, original_entry_hash.into())
                 .unwrap()
@@ -439,7 +434,7 @@ mod tests {
         expected.sort_by_key(|h| h.header_hash.clone());
         {
             let reader = env.reader().unwrap();
-            let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
+            let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
             for update in entry_updates {
                 meta_buf.register_update(update).await.unwrap();
             }
@@ -455,7 +450,7 @@ mod tests {
         }
         {
             let reader = env.reader().unwrap();
-            let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
+            let meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
             let mut headers = meta_buf
                 .get_updates(&reader, original_entry_hash.into())
                 .unwrap()
@@ -485,7 +480,7 @@ mod tests {
         expected.sort_by_key(|h| h.header_hash.clone());
         {
             let reader = env.reader().unwrap();
-            let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
+            let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
             for delete in entry_deletes {
                 meta_buf.register_delete(delete).await.unwrap();
             }
@@ -501,7 +496,7 @@ mod tests {
         }
         {
             let reader = env.reader().unwrap();
-            let meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
+            let meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
             let mut headers = meta_buf
                 .get_deletes_on_header(&reader, header_hash.clone().into())
                 .unwrap()
@@ -571,7 +566,7 @@ mod tests {
         .await;
 
         let reader = env.reader().unwrap();
-        let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
+        let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
         update_dbs(
             &entry_creates[..],
             &entry_deletes[..0],
@@ -709,7 +704,7 @@ mod tests {
         .await;
 
         let reader = env.reader().unwrap();
-        let mut meta_buf = MetadataBuf::vault(arc.clone().into(), &env).unwrap();
+        let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
         update_dbs(
             &entry_creates[..],
             &entry_deletes[..0],

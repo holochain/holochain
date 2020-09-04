@@ -2,7 +2,7 @@ use crate::{
     buffer::{BufferedStore, KvBufUsed},
     env::EnvironmentRead,
     error::{DatabaseError, DatabaseResult},
-    fatal_db_hash_integrity_check, fresh_reader, fresh_reader_async,
+    fatal_db_hash_integrity_check, fresh_reader,
     prelude::*,
     transaction::Readable,
 };
@@ -59,6 +59,23 @@ where
         let k = PrefixHashKey::new(hash.as_hash());
         Ok(if let Some(content) = self.0.get(r, &k)? {
             Some(Self::deserialize_and_hash(hash.get_full_bytes(), content).await)
+        } else {
+            None
+        })
+    }
+
+    /// Get a value from the underlying [KvBufUsed]
+    pub fn get_blocking<'r, 'a: 'r, R: Readable>(
+        &'a self,
+        r: &'r R,
+        hash: &'a HoloHashOf<C>,
+    ) -> DatabaseResult<Option<HoloHashed<C>>> {
+        let k = PrefixHashKey::new(hash.as_hash());
+        Ok(if let Some(content) = self.0.get(r, &k)? {
+            Some(Self::deserialize_and_hash_blocking(
+                k.as_hash_bytes(),
+                content,
+            ))
         } else {
             None
         })
@@ -143,7 +160,7 @@ where
         &'a self,
         hash: &'a HoloHashOf<C>,
     ) -> DatabaseResult<Option<HoloHashed<C>>> {
-        fresh_reader_async!(self.env, |r| async move { self.inner.get(&r, hash).await })
+        fresh_reader!(self.env, |r| { self.inner.get_blocking(&r, hash) })
     }
 
     /// Check if a value is stored at this key
@@ -164,8 +181,8 @@ where
         self.0.is_clean()
     }
 
-    fn flush_to_txn(self, writer: &mut Writer) -> DatabaseResult<()> {
-        self.0.flush_to_txn(writer)?;
+    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
+        self.0.flush_to_txn_ref(writer)?;
         Ok(())
     }
 }
@@ -182,8 +199,8 @@ where
         self.inner.is_clean()
     }
 
-    fn flush_to_txn(self, writer: &mut Writer) -> DatabaseResult<()> {
-        self.inner.flush_to_txn(writer)?;
+    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
+        self.inner.flush_to_txn_ref(writer)?;
         Ok(())
     }
 }

@@ -222,7 +222,7 @@ impl MetadataBufT for MockMetadataBuf {
     fn register_raw_on_header(&mut self, header_hash: HeaderHash, value: SysMetaVal) {
         self.register_raw_on_header(header_hash, value)
     }
-    async fn has_element_header(&self, hash: &HeaderHash) -> DatabaseResult<bool> {
+    fn has_element_header(&self, hash: &HeaderHash) -> DatabaseResult<bool> {
         self.has_element_header(hash)
     }
 
