@@ -66,7 +66,7 @@ pub async fn integrate_dht_ops_workflow(
                         op,
                         validation_status,
                     } = val;
-                    let (op, op_hash) = DhtOpHashed::from_content(op).await.into_inner();
+                    let (op, op_hash) = DhtOpHashed::from_content_sync(op).into_inner();
                     (
                         op_hash,
                         IntegrationLimboValue {

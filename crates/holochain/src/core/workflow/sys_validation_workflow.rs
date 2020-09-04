@@ -54,12 +54,16 @@ async fn sys_validation_workflow_inner(
         .collect())?;
     for vlv in ops {
         let op = vlv.op;
-        let hash = DhtOpHash::with_data(&op).await;
+        let hash = DhtOpHash::with_data_sync(&op);
         let v = IntegrationLimboValue {
             validation_status: ValidationStatus::Valid,
             op,
         };
         workspace.integration_limbo.put(hash, v)?;
+
+        // Since we are processing DhtOps in a loop, yield between each one,
+        // since hashing could take a while
+        tokio::task::yield_now().await;
     }
     Ok(WorkComplete::Complete)
 }

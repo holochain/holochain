@@ -62,7 +62,7 @@ async fn test_cell_handle_publish() {
         header_seq: 42,
     });
     let op = DhtOp::StoreElement(sig, header.clone(), None);
-    let op_hash = DhtOpHashed::from_content(op.clone()).await.into_hash();
+    let op_hash = DhtOpHashed::from_content_sync(op.clone()).into_hash();
     let header_hash = HeaderHashed::from_content_sync(header.clone()).into_hash();
 
     cell.handle_publish(
