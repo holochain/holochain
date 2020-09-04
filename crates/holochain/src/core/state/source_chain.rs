@@ -72,21 +72,6 @@ impl SourceChain {
         self.put_raw(header, maybe_entry).await
     }
 
-    /// Add a CapGrantEntry to the source chain
-    // pub async fn put_cap_grant(
-    //     &mut self,
-    //     grant_entry: CapGrantEntry,
-    // ) -> SourceChainResult<HeaderHash> {
-    //     let (entry, entry_hash) = EntryHashed::from_content(Entry::CapGrant(grant_entry))
-    //         .await
-    //         .into_inner();
-    //     let header_builder = builder::EntryCreate {
-    //         entry_type: EntryType::CapGrant,
-    //         entry_hash,
-    //     };
-    //     self.put(header_builder, Some(entry)).await
-    // }
-
     /// Add a CapClaimEntry to the source chain
     pub async fn put_cap_claim(
         &mut self,
