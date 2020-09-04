@@ -10,6 +10,10 @@ fn anchor(input: AnchorInput) -> ExternResult<EntryHash> {
 
 #[hdk_extern]
 fn get_anchor(address: EntryHash) -> ExternResult<MaybeAnchor> {
+    for _ in 0..25 {
+        get!(address.clone())?;
+    }
+
     Ok(MaybeAnchor(hdk3::prelude::get_anchor(address)?))
 }
 
