@@ -19,6 +19,7 @@ use holochain_zome_types::{
 use shrinkwraprs::Shrinkwrap;
 pub use source_chain_buffer::*;
 use std::collections::HashSet;
+use holochain_zome_types::capability::CapAccess;
 
 mod error;
 mod source_chain_buffer;
@@ -161,9 +162,10 @@ impl SourceChain {
                             }
                             _ => {}
                         }
-                        // this is a best-effort attempt to avoid putting things we already know were
+                        // this is a best-effort attempt to avoid putting things we already know as
                         // referenced into the returned vec
-                        // it isn't comprehensive because it relies on ordering
+                        // it isn't comprehensive because it relies on ordering but it's an easy
+                        // and relatively safe optimisation to not do further processing here
                         if !references.contains(header.as_hash()) {
                             headers.push(header);
                         }
@@ -174,12 +176,21 @@ impl SourceChain {
 
             // second pass over the headers to make sure that all referenced headers are removed
             // this makes the process reliable even if the iterators don't follow the chain order
-            let headers: Vec<_> = headers
+            let live_cap_grants: HashSet<_> = headers
                 .iter()
                 .filter(|header| !references.contains(header.as_hash()))
+                .filter_map(|header| {
+                    match header.as_content().header() {
+                        Header::EntryCreate(create) => {
+                            Some(create.entry_hash.clone())
+                        },
+                        Header::EntryUpdate(update) => {
+                            Some(update.entry_hash.clone())
+                        },
+                        _ => None
+                    }
+                })
                 .collect();
-            dbg!(&references);
-            dbg!(&headers);
 
             self
             .0
@@ -189,6 +200,9 @@ impl SourceChain {
                 "SourceChainBuf must have access to private entries in order to access CapGrants",
             )
             .iter_fail(&r)?
+            .filter(|entry| {
+                Ok(live_cap_grants.contains(entry.as_hash()))
+            })
             // filter all entries down to only cap grant entries
             .filter_map(|entry| {
                 Ok(entry.as_cap_grant())
@@ -197,9 +211,50 @@ impl SourceChain {
             .filter(|grant| {
                 Ok(grant.is_valid(check_function, check_agent, check_secret))
             })
-            // // remove updated and deleted grants
-            // .fold(vec![]
-            .next()
+            // if there are still multiple grants, fold them down based on specificity
+            // authorship > assigned > transferable > unrestricted
+            .fold(None, |mut acc, grant| {
+                acc = match &grant {
+                    CapGrant::Authorship(_) => Some(grant),
+                    CapGrant::ZomeCall(zome_call_cap_grant) => {
+                        match &zome_call_cap_grant.access {
+                            CapAccess::Assigned { .. } => match &acc {
+                                // authorship acc takes precedence
+                                Some(CapGrant::Authorship(_)) => acc,
+                                Some(CapGrant::ZomeCall(acc_zome_call_cap_grant)) => {
+                                    match acc_zome_call_cap_grant.access {
+                                        // an assigned acc takes precedence
+                                        CapAccess::Assigned { .. } => acc,
+                                        // current grant takes precedence over all other accs
+                                        _ => Some(grant),
+                                    }
+                                }
+                                None => Some(grant),
+                            },
+                            CapAccess::Transferable { .. } => match &acc {
+                                // authorship acc takes precedence
+                                Some(CapGrant::Authorship(_)) => acc,
+                                Some(CapGrant::ZomeCall(acc_zome_call_cap_grant)) => {
+                                    match acc_zome_call_cap_grant.access {
+                                        // an assigned acc takes precedence
+                                        CapAccess::Assigned { .. } => acc,
+                                        // transferable acc takes precedence
+                                        CapAccess::Transferable { .. } => acc,
+                                        // current grant takes preference over other accs
+                                        _ => Some(grant),
+                                    }
+                                }
+                                None => Some(grant),
+                            }
+                            CapAccess::Unrestricted => match acc {
+                                Some(_) => acc,
+                                None => Some(grant),
+                            }
+                        }
+                    }
+                };
+                Ok(acc)
+            })
         })?;
         Ok(committed_valid_grant)
     }
@@ -282,8 +337,8 @@ pub mod tests {
         let test_env = test_cell_env();
         let arc = test_env.env();
         let env = arc.guard().await;
-        let access = CapAccess::from(CapSecretFixturator::new(Unpredictable).next().unwrap());
-        let secret = access.secret().unwrap();
+        let secret = CapSecretFixturator::new(Unpredictable).next().unwrap();
+        let access = CapAccess::from(secret.clone());
         // @todo curry
         let _curry = CurryPayloadsFixturator::new(Empty).next().unwrap();
         let function: GrantedFunction = ("foo".into(), "bar".into());
@@ -303,12 +358,12 @@ pub mod tests {
             let chain = SourceChain::new(arc.clone().into(), &env).await?;
             // alice should always find her authorship even if no grants have been committed
             assert_eq!(
-                chain.valid_cap_grant(&function, &alice, secret).await?,
+                chain.valid_cap_grant(&function, &alice, &secret).await?,
                 Some(CapGrant::Authorship(alice.clone())),
             );
 
             // bob should not match anything as the secret hasn't been committed yet
-            assert_eq!(chain.valid_cap_grant(&function, &bob, secret).await?, None);
+            assert_eq!(chain.valid_cap_grant(&function, &bob, &secret).await?, None);
         }
 
         let (original_header_address, original_entry_address) = {
@@ -332,14 +387,14 @@ pub mod tests {
             // alice should find her own authorship with higher priority than the committed grant
             // even if she passes in the secret
             assert_eq!(
-                chain.valid_cap_grant(&function, &alice, secret).await?,
+                chain.valid_cap_grant(&function, &alice, &secret).await?,
                 Some(CapGrant::Authorship(alice.clone())),
             );
 
             // bob should be granted with the committed grant as it matches the secret he passes to
             // alice at runtime
             assert_eq!(
-                chain.valid_cap_grant(&function, &bob, secret).await?,
+                chain.valid_cap_grant(&function, &bob, &secret).await?,
                 Some(grant.clone().into())
             );
         }
@@ -347,39 +402,82 @@ pub mod tests {
         // let's roll the secret and assign the grant to bob specifically
         let mut assignees = HashSet::new();
         assignees.insert(bob.clone());
-        let access = CapAccess::from((CapSecretFixturator::new(Unpredictable).next().unwrap(), assignees));
-        let updated_grant = ZomeCallCapGrant::new("tag".into(), access.clone(), functions);
+        let updated_secret = CapSecretFixturator::new(Unpredictable).next().unwrap();
+        let updated_access = CapAccess::from((updated_secret.clone(), assignees));
+        let updated_grant = ZomeCallCapGrant::new("tag".into(), updated_access.clone(), functions);
 
-        {
+        let (updated_header_hash, updated_entry_hash) = {
             let mut chain = SourceChain::new(arc.clone().into(), &env).await?;
-            let (entry, entry_hash) = EntryHashed::from_content(Entry::CapGrant(updated_grant.clone()))
-                .await
-                .into_inner();
+            let (entry, entry_hash) =
+                EntryHashed::from_content(Entry::CapGrant(updated_grant.clone()))
+                    .await
+                    .into_inner();
             let header_builder = builder::EntryUpdate {
                 entry_type: EntryType::CapGrant,
-                entry_hash: entry_hash,
+                entry_hash: entry_hash.clone(),
                 original_header_address,
                 original_entry_address,
             };
-            chain.put(header_builder, Some(entry)).await?;
+            let header = chain.put(header_builder, Some(entry)).await?;
 
             env.with_commit(|writer| chain.flush_to_txn(writer))?;
-        }
+
+            (header, entry_hash)
+        };
 
         {
             let chain = SourceChain::new(arc.clone().into(), &env).await?;
             // alice should find her own authorship with higher priority than the committed grant
             // even if she passes in the secret
             assert_eq!(
-                chain.valid_cap_grant(&function, &alice, secret).await?,
+                chain.valid_cap_grant(&function, &alice, &secret).await?,
+                Some(CapGrant::Authorship(alice.clone())),
+            );
+            assert_eq!(
+                chain.valid_cap_grant(&function, &alice, &updated_secret).await?,
+                Some(CapGrant::Authorship(alice.clone())),
+            );
+
+            // bob MUST provide the updated secret as the old one is invalidated by the new one
+            assert_eq!(chain.valid_cap_grant(&function, &bob, &secret).await?, None);
+            assert_eq!(
+                chain
+                    .valid_cap_grant(&function, &bob, &updated_secret)
+                    .await?,
+                Some(updated_grant.into())
+            );
+        }
+
+        {
+            let mut chain = SourceChain::new(arc.clone().into(), &env).await?;
+            let header_builder = builder::ElementDelete {
+                removes_address: updated_header_hash,
+                removes_entry_address: updated_entry_hash,
+            };
+            chain.put(header_builder, None).await?;
+
+            env.with_commit(|writer| chain.flush_to_txn(writer))?;
+        }
+
+        {
+            let chain = SourceChain::new(arc.clone().into(), &env).await?;
+            // alice should find her own authorship
+            assert_eq!(
+                chain.valid_cap_grant(&function, &alice, &secret).await?,
+                Some(CapGrant::Authorship(alice.clone())),
+            );
+            assert_eq!(
+                chain.valid_cap_grant(&function, &alice, &updated_secret).await?,
                 Some(CapGrant::Authorship(alice)),
             );
 
-            // bob should be granted with the committed grant as it matches the secret he passes to
-            // alice at runtime
+            // bob has no access
+            assert_eq!(chain.valid_cap_grant(&function, &bob, &secret).await?, None);
             assert_eq!(
-                chain.valid_cap_grant(&function, &bob, secret).await?,
-                Some(grant.into())
+                chain
+                    .valid_cap_grant(&function, &bob, &updated_secret)
+                    .await?,
+                None
             );
         }
 
