@@ -113,7 +113,7 @@ impl SourceChain {
         check_agent: &AgentPubKey,
         check_secret: &CapSecret,
     ) -> SourceChainResult<Option<CapGrant>> {
-        let author_grant = CapGrant::from(self.agent_pubkey().await?);
+        let author_grant = CapGrant::from(self.agent_pubkey()?);
         if author_grant.is_valid(check_function, check_agent, check_secret) {
             return Ok(Some(author_grant));
         }
@@ -231,18 +231,8 @@ pub mod tests {
         let bob = agents.next().unwrap();
         {
             let mut store = SourceChainBuf::new(arc.clone().into())?;
-            store
-                .genesis(fake_dna_hash(1), alice.clone(), None)
-                .await?;
+            store.genesis(fake_dna_hash(1), alice.clone(), None).await?;
             env.with_commit(|writer| store.flush_to_txn(writer))?;
-        }
-
-        {
-            // alice should always find her authorship even if no grants have been committed
-            let mut chain = SourceChain::new(arc.clone().into())?;
-            chain.put_cap_grant(grant.clone()).await?;
-
-            env.with_commit(|writer| chain.flush_to_txn(writer))?;
         }
 
         {
@@ -257,7 +247,7 @@ pub mod tests {
         }
 
         {
-            let mut chain = SourceChain::new(arc.clone().into(), &env).await?;
+            let mut chain = SourceChain::new(arc.clone().into())?;
             chain.put_cap_grant(grant.clone()).await?;
 
             // ideally the following would work, but it won't because currently
@@ -273,7 +263,7 @@ pub mod tests {
         }
 
         {
-            let chain = SourceChain::new(arc.clone().into(), &env).await?;
+            let chain = SourceChain::new(arc.clone().into())?;
             // alice should find her own authorship with higher priority than the committed grant
             // even if she passes in the secret
             assert_eq!(

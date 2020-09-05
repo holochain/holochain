@@ -35,7 +35,6 @@ use crate::fixt::ZomeNameFixturator;
 use ::fixt::prelude::*;
 use derive_more::Constructor;
 use error::RibosomeResult;
-use futures::FutureExt;
 use guest_callback::{
     entry_defs::EntryDefsHostAccess, init::InitHostAccess, migrate_agent::MigrateAgentHostAccess,
     post_commit::PostCommitHostAccess, validate::ValidateHostAccess,
@@ -58,7 +57,6 @@ use holochain_zome_types::GuestOutput;
 use holochain_zome_types::ZomeCallInvocationResponse;
 use holochain_zome_types::{capability::CapSecret, header::ZomeId, HostInput};
 use mockall::automock;
-use must_future::MustBoxFuture;
 use std::iter::Iterator;
 
 #[derive(Clone)]
@@ -231,19 +229,29 @@ impl ZomeCallInvocation {
         let check_agent = self.provenance.clone();
         let check_secret = self.cap;
 
-        let call = |workspace: &'a mut CallZomeWorkspace| -> MustBoxFuture<'a, CascadeResult<Option<CapGrant>>> {
-            async move {
-                Ok(workspace.source_chain.valid_cap_grant(&check_function, &check_agent, &check_secret).await?)
-            }
-            .boxed()
-            .into()
-        };
-        let maybe_grant: Option<CapGrant> =
-            tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-                unsafe { host_access.workspace.apply_mut(call).await }
-            })??;
+        tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+            let maybe_grant: Option<CapGrant> = host_access
+                .workspace
+                .read()
+                .await
+                .source_chain
+                .valid_cap_grant(&check_function, &check_agent, &check_secret)
+                .await?;
 
-        Ok(maybe_grant.is_some())
+            // let call = |workspace: &'a mut CallZomeWorkspace| -> MustBoxFuture<'a, CascadeResult<Option<CapGrant>>> {
+            //     async move {
+            //         Ok(workspace.source_chain.valid_cap_grant(&check_function, &check_agent, &check_secret).await?)
+            //     }
+            //     .boxed()
+            //     .into()
+            // };
+            // let maybe_grant: Option<CapGrant> =
+            //     tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+            //         unsafe { host_access.workspace.apply_mut(call).await }
+            //     })??;
+
+            Ok(maybe_grant.is_some())
+        })
     }
 }
 
