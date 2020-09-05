@@ -364,7 +364,7 @@ pub mod tests {
         };
 
         {
-            let chain = SourceChain::new(arc.clone().into(), &env).await?;
+            let chain = SourceChain::new(arc.clone().into())?;
             // alice should find her own authorship with higher priority than the committed grant
             // even if she passes in the secret
             assert_eq!(
@@ -388,7 +388,7 @@ pub mod tests {
         let updated_grant = ZomeCallCapGrant::new("tag".into(), updated_access.clone(), functions);
 
         let (updated_header_hash, updated_entry_hash) = {
-            let mut chain = SourceChain::new(arc.clone().into(), &env).await?;
+            let mut chain = SourceChain::new(arc.clone().into())?;
             let (entry, entry_hash) =
                 EntryHashed::from_content(Entry::CapGrant(updated_grant.clone()))
                     .await
@@ -432,7 +432,7 @@ pub mod tests {
         }
 
         {
-            let mut chain = SourceChain::new(arc.clone().into(), &env).await?;
+            let mut chain = SourceChain::new(arc.clone().into())?;
             let header_builder = builder::ElementDelete {
                 removes_address: updated_header_hash,
                 removes_entry_address: updated_entry_hash,
@@ -443,7 +443,7 @@ pub mod tests {
         }
 
         {
-            let chain = SourceChain::new(arc.clone().into(), &env).await?;
+            let chain = SourceChain::new(arc.clone().into())?;
             // alice should find her own authorship
             assert_eq!(
                 chain.valid_cap_grant(&function, &alice, &secret).await?,
