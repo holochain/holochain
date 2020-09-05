@@ -13,7 +13,6 @@ mock! {
         ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError>>>;
         fn add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()>;
         fn remove_link(&mut self, link_remove: LinkRemove) -> DatabaseResult<()>;
-        // fn sync_add_create(&self, create: header::EntryCreate) -> DatabaseResult<()>;
         fn sync_register_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()>;
         fn sync_register_element_header(&mut self, header: &Header) -> DatabaseResult<()>;
         fn sync_register_activity(
@@ -156,58 +155,58 @@ impl MetadataBufT for MockMetadataBuf {
         self.get_link_removes_on_link_add(link_add)
     }
 
-    async fn add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()> {
+    fn add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()> {
         self.add_link(link_add)
     }
 
-    async fn remove_link(&mut self, link_remove: LinkRemove) -> DatabaseResult<()> {
+    fn remove_link(&mut self, link_remove: LinkRemove) -> DatabaseResult<()> {
         self.remove_link(link_remove)
     }
 
-    async fn register_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()> {
+    fn register_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()> {
         self.sync_register_header(new_entry_header)
     }
-    async fn register_element_header(&mut self, header: &Header) -> DatabaseResult<()> {
+    fn register_element_header(&mut self, header: &Header) -> DatabaseResult<()> {
         self.sync_register_element_header(header)
     }
 
-    async fn register_activity(&mut self, header: Header) -> DatabaseResult<()> {
+    fn register_activity(&mut self, header: Header) -> DatabaseResult<()> {
         self.sync_register_activity(header)
     }
 
-    async fn register_update(&mut self, update: header::EntryUpdate) -> DatabaseResult<()> {
+    fn register_update(&mut self, update: header::EntryUpdate) -> DatabaseResult<()> {
         self.sync_register_update(update)
     }
 
-    async fn register_delete(&mut self, delete: header::ElementDelete) -> DatabaseResult<()> {
+    fn register_delete(&mut self, delete: header::ElementDelete) -> DatabaseResult<()> {
         self.sync_register_delete(delete)
     }
 
-    async fn deregister_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()> {
+    fn deregister_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()> {
         self.sync_deregister_header(new_entry_header)
     }
-    async fn deregister_element_header(&mut self, header: HeaderHash) -> DatabaseResult<()> {
+    fn deregister_element_header(&mut self, header: HeaderHash) -> DatabaseResult<()> {
         self.sync_deregister_element_header(header)
     }
 
-    async fn deregister_activity(&mut self, header: Header) -> DatabaseResult<()> {
+    fn deregister_activity(&mut self, header: Header) -> DatabaseResult<()> {
         self.sync_deregister_activity(header)
     }
 
-    async fn deregister_update(&mut self, update: header::EntryUpdate) -> DatabaseResult<()> {
+    fn deregister_update(&mut self, update: header::EntryUpdate) -> DatabaseResult<()> {
         self.sync_deregister_update(update)
     }
 
-    async fn deregister_delete(&mut self, delete: header::ElementDelete) -> DatabaseResult<()> {
+    fn deregister_delete(&mut self, delete: header::ElementDelete) -> DatabaseResult<()> {
         self.sync_deregister_delete(delete)
     }
 
-    async fn deregister_add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()> {
+    fn deregister_add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()> {
         self.sync_deregister_add_link(link_add)
     }
 
     /// Deregister a remove link
-    async fn deregister_remove_link(&mut self, link_remove: LinkRemove) -> DatabaseResult<()> {
+    fn deregister_remove_link(&mut self, link_remove: LinkRemove) -> DatabaseResult<()> {
         self.sync_deregister_remove_link(link_remove)
     }
 

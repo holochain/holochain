@@ -12,34 +12,34 @@ where
 {
     match op {
         DhtOpLight::StoreElement(hash, _, _) => {
-            meta_store.deregister_element_header(hash).await?;
+            meta_store.deregister_element_header(hash)?;
         }
         DhtOpLight::StoreEntry(hash, _, _) => {
             let new_entry_header = get_header(hash, element_store).await?.try_into()?;
             // Reference to headers
-            meta_store.deregister_header(new_entry_header).await?;
+            meta_store.deregister_header(new_entry_header)?;
         }
         DhtOpLight::RegisterAgentActivity(hash, _) => {
             let header = get_header(hash, element_store).await?;
             // register agent activity on this agents pub key
-            meta_store.deregister_activity(header).await?;
+            meta_store.deregister_activity(header)?;
         }
         DhtOpLight::RegisterUpdatedBy(hash, _, _) => {
             let header = get_header(hash, element_store).await?.try_into()?;
-            meta_store.deregister_update(header).await?;
+            meta_store.deregister_update(header)?;
         }
         DhtOpLight::RegisterDeletedEntryHeader(hash, _)
         | DhtOpLight::RegisterDeletedBy(hash, _) => {
             let header = get_header(hash, element_store).await?.try_into()?;
-            meta_store.deregister_delete(header).await?
+            meta_store.deregister_delete(header)?
         }
         DhtOpLight::RegisterAddLink(hash, _) => {
             let header = get_header(hash, element_store).await?.try_into()?;
-            meta_store.deregister_add_link(header).await?;
+            meta_store.deregister_add_link(header)?;
         }
         DhtOpLight::RegisterRemoveLink(hash, _) => {
             let header = get_header(hash, element_store).await?.try_into()?;
-            meta_store.deregister_remove_link(header).await?;
+            meta_store.deregister_remove_link(header)?;
         }
     }
     Ok(())

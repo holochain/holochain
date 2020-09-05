@@ -67,7 +67,7 @@ where
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError> + 'r>>;
 
     /// Add a link
-    async fn add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()>;
+    fn add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()>;
 
     /// Register a HeaderHash directly on an entry hash.
     /// Also updates the entry dht status.
@@ -83,47 +83,47 @@ where
     fn register_raw_on_header(&mut self, header_hash: HeaderHash, value: SysMetaVal);
 
     /// Remove a link
-    async fn remove_link(&mut self, link_remove: LinkRemove) -> DatabaseResult<()>;
+    fn remove_link(&mut self, link_remove: LinkRemove) -> DatabaseResult<()>;
 
     /// Deregister an add link
     /// Not the same as remove like.
     /// "deregister" removes the data from the metadata store.
-    async fn deregister_add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()>;
+    fn deregister_add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()>;
 
     /// Deregister a remove link
-    async fn deregister_remove_link(&mut self, link_remove: LinkRemove) -> DatabaseResult<()>;
+    fn deregister_remove_link(&mut self, link_remove: LinkRemove) -> DatabaseResult<()>;
 
     /// Registers a [Header::NewEntryHeader] on the referenced [Entry]
-    async fn register_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()>;
+    fn register_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()>;
 
     /// Deregister a [Header::NewEntryHeader] on the referenced [Entry]
-    async fn deregister_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()>;
+    fn deregister_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()>;
 
     /// Registers a [Header] when a StoreElement is processed.
     /// Useful for knowing if we can serve a header from our element vault
-    async fn register_element_header(&mut self, header: &Header) -> DatabaseResult<()>;
+    fn register_element_header(&mut self, header: &Header) -> DatabaseResult<()>;
 
     /// Deregister a [Header] when a StoreElement is processed.
     /// Useful for knowing if we can serve a header from our element vault
-    async fn deregister_element_header(&mut self, header: HeaderHash) -> DatabaseResult<()>;
+    fn deregister_element_header(&mut self, header: HeaderHash) -> DatabaseResult<()>;
 
     /// Registers a published [Header] on the authoring agent's public key
-    async fn register_activity(&mut self, header: Header) -> DatabaseResult<()>;
+    fn register_activity(&mut self, header: Header) -> DatabaseResult<()>;
 
     /// Deregister a published [Header] on the authoring agent's public key
-    async fn deregister_activity(&mut self, header: Header) -> DatabaseResult<()>;
+    fn deregister_activity(&mut self, header: Header) -> DatabaseResult<()>;
 
     /// Registers a [Header::EntryUpdate] on the referenced [Header] or [Entry]
-    async fn register_update(&mut self, update: header::EntryUpdate) -> DatabaseResult<()>;
+    fn register_update(&mut self, update: header::EntryUpdate) -> DatabaseResult<()>;
 
     /// Deregister a [Header::EntryUpdate] on the referenced [Header] or [Entry]
-    async fn deregister_update(&mut self, update: header::EntryUpdate) -> DatabaseResult<()>;
+    fn deregister_update(&mut self, update: header::EntryUpdate) -> DatabaseResult<()>;
 
     /// Registers a [Header::ElementDelete] on the Header of an Entry
-    async fn register_delete(&mut self, delete: header::ElementDelete) -> DatabaseResult<()>;
+    fn register_delete(&mut self, delete: header::ElementDelete) -> DatabaseResult<()>;
 
     /// Deregister a [Header::ElementDelete] on the Header of an Entry
-    async fn deregister_delete(&mut self, delete: header::ElementDelete) -> DatabaseResult<()>;
+    fn deregister_delete(&mut self, delete: header::ElementDelete) -> DatabaseResult<()>;
 
     /// Returns all the [HeaderHash]es of headers that created this [Entry]
     fn get_headers<'r, R: Readable>(
@@ -267,32 +267,32 @@ where
         Self::new(env, system_meta, links_meta, misc_meta)
     }
 
-    async fn register_header_on_basis<K, H>(&mut self, key: K, header: H) -> DatabaseResult<()>
+    fn register_header_on_basis<K, H>(&mut self, key: K, header: H) -> DatabaseResult<()>
     where
         H: Into<EntryHeader>,
         K: Into<SysMetaKey>,
     {
         let sys_val = match header.into() {
-            h @ EntryHeader::NewEntry(_) => SysMetaVal::NewEntry(h.into_hash().await?),
-            h @ EntryHeader::Update(_) => SysMetaVal::Update(h.into_hash().await?),
-            h @ EntryHeader::Delete(_) => SysMetaVal::Delete(h.into_hash().await?),
-            h @ EntryHeader::Activity(_) => SysMetaVal::Activity(h.into_hash().await?),
+            h @ EntryHeader::NewEntry(_) => SysMetaVal::NewEntry(h.into_hash()?),
+            h @ EntryHeader::Update(_) => SysMetaVal::Update(h.into_hash()?),
+            h @ EntryHeader::Delete(_) => SysMetaVal::Delete(h.into_hash()?),
+            h @ EntryHeader::Activity(_) => SysMetaVal::Activity(h.into_hash()?),
         };
         let key: SysMetaKey = key.into();
         self.system_meta.insert(PrefixBytesKey::new(key), sys_val);
         Ok(())
     }
 
-    async fn deregister_header_on_basis<K, H>(&mut self, key: K, header: H) -> DatabaseResult<()>
+    fn deregister_header_on_basis<K, H>(&mut self, key: K, header: H) -> DatabaseResult<()>
     where
         H: Into<EntryHeader>,
         K: Into<SysMetaKey>,
     {
         let sys_val = match header.into() {
-            h @ EntryHeader::NewEntry(_) => SysMetaVal::NewEntry(h.into_hash().await?),
-            h @ EntryHeader::Update(_) => SysMetaVal::Update(h.into_hash().await?),
-            h @ EntryHeader::Delete(_) => SysMetaVal::Delete(h.into_hash().await?),
-            h @ EntryHeader::Activity(_) => SysMetaVal::Activity(h.into_hash().await?),
+            h @ EntryHeader::NewEntry(_) => SysMetaVal::NewEntry(h.into_hash()?),
+            h @ EntryHeader::Update(_) => SysMetaVal::Update(h.into_hash()?),
+            h @ EntryHeader::Delete(_) => SysMetaVal::Delete(h.into_hash()?),
+            h @ EntryHeader::Activity(_) => SysMetaVal::Activity(h.into_hash()?),
         };
         let key: SysMetaKey = key.into();
         self.system_meta.delete(PrefixBytesKey::new(key), sys_val);
@@ -367,8 +367,7 @@ where
         ))
     }
 
-    #[allow(clippy::needless_lifetimes)]
-    async fn add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()> {
+    fn add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()> {
         // Register the add link onto the base
         let link_add_hash =
             HeaderHashed::from_content_sync(Header::LinkAdd(link_add.clone())).into_hash();
@@ -388,14 +387,13 @@ where
         )
     }
 
-    #[allow(clippy::needless_lifetimes)]
-    async fn deregister_add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()> {
-        let link_add_hash = HeaderHash::with_data(&Header::LinkAdd(link_add.clone())).await;
+    fn deregister_add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()> {
+        let link_add_hash = HeaderHash::with_data_sync(&Header::LinkAdd(link_add.clone()));
         let key = LinkMetaKey::from((&link_add, &link_add_hash));
         self.links_meta.delete(key.into())
     }
 
-    async fn remove_link(&mut self, link_remove: LinkRemove) -> DatabaseResult<()> {
+    fn remove_link(&mut self, link_remove: LinkRemove) -> DatabaseResult<()> {
         let link_add_address = link_remove.link_add_address.clone();
         // Register the link remove address to the link add address
         let link_remove = HeaderHashed::from_content_sync(Header::LinkRemove(link_remove));
@@ -405,10 +403,10 @@ where
         Ok(())
     }
 
-    async fn deregister_remove_link(&mut self, link_remove: LinkRemove) -> DatabaseResult<()> {
+    fn deregister_remove_link(&mut self, link_remove: LinkRemove) -> DatabaseResult<()> {
         let link_add_address = link_remove.link_add_address.clone();
         // Register the link remove address to the link add address
-        let link_remove = HeaderHashed::from_content(Header::LinkRemove(link_remove)).await;
+        let link_remove = HeaderHashed::from_content_sync(Header::LinkRemove(link_remove));
         let sys_val = SysMetaVal::LinkRemove(link_remove.into());
         self.system_meta
             .delete(SysMetaKey::from(link_add_address).into(), sys_val);
@@ -430,86 +428,70 @@ where
             .insert(SysMetaKey::from(header_hash).into(), value);
     }
 
-    async fn register_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()> {
+    fn register_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()> {
         let basis = new_entry_header.entry().clone();
-        self.register_header_on_basis(basis.clone(), new_entry_header)
-            .await?;
+        self.register_header_on_basis(basis.clone(), new_entry_header)?;
         self.update_entry_dht_status(basis)?;
         Ok(())
     }
 
-    async fn deregister_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()> {
+    fn deregister_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()> {
         let basis = new_entry_header.entry().clone();
-        self.deregister_header_on_basis(basis.clone(), new_entry_header)
-            .await?;
+        self.deregister_header_on_basis(basis.clone(), new_entry_header)?;
         self.update_entry_dht_status(basis)?;
         Ok(())
     }
 
-    async fn register_element_header(&mut self, header: &Header) -> DatabaseResult<()> {
+    fn register_element_header(&mut self, header: &Header) -> DatabaseResult<()> {
         self.misc_meta.put(
-            MiscMetaKey::StoreElement(HeaderHash::with_data(header).await).into(),
+            MiscMetaKey::StoreElement(HeaderHash::with_data_sync(header)).into(),
             MiscMetaValue::new_store_element(),
         )
     }
 
-    async fn deregister_element_header(&mut self, hash: HeaderHash) -> DatabaseResult<()> {
+    fn deregister_element_header(&mut self, hash: HeaderHash) -> DatabaseResult<()> {
         self.misc_meta
             .delete(MiscMetaKey::StoreElement(hash).into())
     }
 
-    #[allow(clippy::needless_lifetimes)]
-    async fn register_update(&mut self, update: header::EntryUpdate) -> DatabaseResult<()> {
+    fn register_update(&mut self, update: header::EntryUpdate) -> DatabaseResult<()> {
         self.register_header_on_basis(
             AnyDhtHash::from(update.original_entry_address.clone()),
             update,
         )
-        .await
     }
 
-    #[allow(clippy::needless_lifetimes)]
-    async fn deregister_update(&mut self, update: header::EntryUpdate) -> DatabaseResult<()> {
+    fn deregister_update(&mut self, update: header::EntryUpdate) -> DatabaseResult<()> {
         self.deregister_header_on_basis(
             AnyDhtHash::from(update.original_entry_address.clone()),
             update,
         )
-        .await
     }
 
-    #[allow(clippy::needless_lifetimes)]
-    async fn register_delete(&mut self, delete: header::ElementDelete) -> DatabaseResult<()> {
+    fn register_delete(&mut self, delete: header::ElementDelete) -> DatabaseResult<()> {
         let remove = delete.removes_address.to_owned();
         let entry_hash = delete.removes_entry_address.clone();
-        self.register_header_on_basis(remove, delete.clone())
-            .await?;
-        self.register_header_on_basis(entry_hash.clone(), delete)
-            .await?;
+        self.register_header_on_basis(remove, delete.clone())?;
+        self.register_header_on_basis(entry_hash.clone(), delete)?;
         self.update_entry_dht_status(entry_hash)
     }
 
-    #[allow(clippy::needless_lifetimes)]
-    async fn deregister_delete(&mut self, delete: header::ElementDelete) -> DatabaseResult<()> {
+    fn deregister_delete(&mut self, delete: header::ElementDelete) -> DatabaseResult<()> {
         let remove = delete.removes_address.to_owned();
         let entry_hash = delete.removes_entry_address.clone();
-        self.deregister_header_on_basis(remove, delete.clone())
-            .await?;
-        self.deregister_header_on_basis(entry_hash.clone(), delete)
-            .await?;
+        self.deregister_header_on_basis(remove, delete.clone())?;
+        self.deregister_header_on_basis(entry_hash.clone(), delete)?;
         self.update_entry_dht_status(entry_hash)
     }
 
-    #[allow(clippy::needless_lifetimes)]
-    async fn register_activity(&mut self, header: Header) -> DatabaseResult<()> {
+    fn register_activity(&mut self, header: Header) -> DatabaseResult<()> {
         let author = header.author().clone();
         self.register_header_on_basis(author, EntryHeader::Activity(header))
-            .await
     }
 
-    #[allow(clippy::needless_lifetimes)]
-    async fn deregister_activity(&mut self, header: Header) -> DatabaseResult<()> {
+    fn deregister_activity(&mut self, header: Header) -> DatabaseResult<()> {
         let author = header.author().clone();
         self.deregister_header_on_basis(author, EntryHeader::Activity(header))
-            .await
     }
 
     fn get_headers<'r, R: Readable>(

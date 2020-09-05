@@ -126,7 +126,7 @@ impl BufKey for BytesKey {
 }
 
 impl EntryHeader {
-    pub(super) async fn into_hash(self) -> Result<TimedHeaderHash, SerializedBytesError> {
+    pub(super) fn into_hash(self) -> Result<TimedHeaderHash, SerializedBytesError> {
         let header = match self {
             EntryHeader::NewEntry(h)
             | EntryHeader::Update(h)

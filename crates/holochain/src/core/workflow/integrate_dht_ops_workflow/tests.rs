@@ -518,7 +518,7 @@ impl Db {
                 Db::MetaEmpty => {}
                 Db::MetaDelete(_, _) => {}
                 Db::MetaLink(link_add, _) => {
-                    workspace.meta.add_link(link_add).await.unwrap();
+                    workspace.meta.add_link(link_add).unwrap();
                 }
                 Db::MetaLinkEmpty(_) => {}
                 Db::IntQueueEmpty => {}
