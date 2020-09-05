@@ -43,11 +43,11 @@ pub struct AppValidationWorkspace {
 }
 
 impl AppValidationWorkspace {
-    pub fn new(env: EnvironmentRead, dbs: &impl GetDb) -> WorkspaceResult<Self> {
-        let db = dbs.get_db(&*INTEGRATION_LIMBO)?;
+    pub fn new(env: EnvironmentRead) -> WorkspaceResult<Self> {
+        let db = env.get_db(&*INTEGRATION_LIMBO)?;
         let integration_limbo = KvBufFresh::new(env.clone(), db);
 
-        let validation_limbo = ValidationLimboStore::new(env, dbs)?;
+        let validation_limbo = ValidationLimboStore::new(env)?;
 
         Ok(Self {
             integration_limbo,
@@ -57,10 +57,10 @@ impl AppValidationWorkspace {
 }
 
 impl Workspace for AppValidationWorkspace {
-    fn flush_to_txn(self, writer: &mut Writer) -> WorkspaceResult<()> {
+    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> WorkspaceResult<()> {
         warn!("unimplemented passthrough");
-        self.validation_limbo.0.flush_to_txn(writer)?;
-        self.integration_limbo.flush_to_txn(writer)?;
+        self.validation_limbo.0.flush_to_txn_ref(writer)?;
+        self.integration_limbo.flush_to_txn_ref(writer)?;
         Ok(())
     }
 }

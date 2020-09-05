@@ -19,7 +19,7 @@ pub(super) type Store = KvBufUsed<DbString, V>;
 async fn kv_iter_from_partial() {
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let env = arc.guard().await;
+    let env = arc.guard();
     let db = env
         .inner()
         .open_single("kv", StoreOptions::create())
@@ -242,7 +242,7 @@ async fn kv_single_iter() {
     let mut rng = rand::thread_rng();
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let env = arc.guard().await;
+    let env = arc.guard();
     let db = env
         .inner()
         .open_single("kv", StoreOptions::create())
@@ -488,7 +488,7 @@ async fn kv_single_iter_found_4() {
 async fn exhaust_both_ends() {
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let env = arc.guard().await;
+    let env = arc.guard();
     let db = env
         .inner()
         .open_single("kv", StoreOptions::create())
@@ -584,7 +584,7 @@ async fn kv_single_iter_runner(
 ) {
     let test_env = test_cell_env();
     let arc = test_env.env();
-    let env = arc.guard().await;
+    let env = arc.guard();
     let db = env
         .inner()
         .open_single("kv", StoreOptions::create())

@@ -4,12 +4,9 @@ use crate::core::ribosome::CallContext;
 use crate::core::{
     ribosome::RibosomeT,
     workflow::{integrate_dht_ops_workflow::integrate_to_cache, CallZomeWorkspace},
-    SourceChainResult,
+    SourceChainError,
 };
-use futures::future::BoxFuture;
-use futures::future::FutureExt;
 use holo_hash::HasHash;
-use holo_hash::HeaderHash;
 use holochain_zome_types::UpdateEntryInput;
 use holochain_zome_types::{
     header::{builder, AppEntryType, EntryType},
@@ -50,38 +47,33 @@ pub fn update_entry<'a>(
         original_header_address: original_header_hash,
         original_entry_address,
     };
-    let call =
-        |workspace: &'a mut CallZomeWorkspace| -> BoxFuture<'a, SourceChainResult<HeaderHash>> {
-            async move {
-                let source_chain = &mut workspace.source_chain;
-                // push the header and the entry into the source chain
-                let header_hash = source_chain.put(header_builder, Some(entry)).await?;
-                // fetch the element we just added so we can integrate its DhtOps
-                let element = source_chain
-                    .get_element(&header_hash)
-                    .await?
-                    .expect("Element we just put in SourceChain must be gettable");
-                integrate_to_cache(
-                    &element,
-                    workspace.source_chain.elements(),
-                    &mut workspace.cache_meta,
-                )
-                .await
-                .map_err(Box::new)?;
-                Ok(header_hash)
-            }
-            .boxed()
-        };
-    let header_address =
-        tokio_safe_block_on::tokio_safe_block_forever_on(tokio::task::spawn(async move {
-            unsafe { call_context.host_access.workspace().apply_mut(call).await }
-        }))???;
+
+    let workspace_lock = call_context.host_access.workspace();
 
     // return the hash of the updated entry
     // note that validation is handled by the workflow
     // if the validation fails this update will be rolled back by virtue of the lmdb transaction
     // being atomic
-    Ok(UpdateEntryOutput::new(header_address))
+    tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+        let mut guard = workspace_lock.write().await;
+        let workspace: &mut CallZomeWorkspace = &mut guard;
+        let source_chain = &mut workspace.source_chain;
+        // push the header and the entry into the source chain
+        let header_hash = source_chain.put(header_builder, Some(entry)).await?;
+        // fetch the element we just added so we can integrate its DhtOps
+        let element = source_chain
+            .get_element(&header_hash)?
+            .expect("Element we just put in SourceChain must be gettable");
+        integrate_to_cache(
+            &element,
+            workspace.source_chain.elements(),
+            &mut workspace.cache_meta,
+        )
+        .await
+        .map_err(Box::new)
+        .map_err(SourceChainError::from)?;
+        Ok(UpdateEntryOutput::new(header_hash))
+    })
 }
 
 // relying on tests for get_details

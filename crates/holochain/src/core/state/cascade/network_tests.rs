@@ -8,8 +8,8 @@ use crate::{
             workspace::Workspace,
         },
         workflow::{
-            integrate_dht_ops_workflow::integrate_to_cache,
-            unsafe_call_zome_workspace::UnsafeCallZomeWorkspace, CallZomeWorkspace,
+            integrate_dht_ops_workflow::integrate_to_cache, CallZomeWorkspace,
+            CallZomeWorkspaceLock,
         },
     },
     test_utils::test_network,
@@ -74,7 +74,6 @@ async fn get_updates_cache() {
     // Database setup
     let test_env = test_cell_env();
     let env = test_env.env();
-    let dbs = env.dbs().await;
 
     let (element_fixt_store, _) = generate_fixt_store().await;
     let expected = element_fixt_store
@@ -84,9 +83,7 @@ async fn get_updates_cache() {
         .unwrap();
 
     // Create the cascade
-    let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
-        .await
-        .unwrap();
+    let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
     let (network, shutdown) = run_fixt_network(element_fixt_store, BTreeMap::new()).await;
 
     {
@@ -104,7 +101,6 @@ async fn get_updates_cache() {
     let result = workspace
         .cache_cas
         .get_element(&expected.0)
-        .await
         .unwrap()
         .unwrap();
     assert_eq!(result.header(), expected.1.header());
@@ -120,8 +116,7 @@ async fn get_meta_updates_meta_cache() {
     // Database setup
     let test_env = test_cell_env();
     let env = test_env.env();
-    let dbs = env.dbs().await;
-    let env_ref = env.guard().await;
+    let env_ref = env.guard();
 
     // Setup other metadata store with fixtures attached
     // to known entry hash
@@ -133,9 +128,7 @@ async fn get_meta_updates_meta_cache() {
         .unwrap();
 
     // Create the cascade
-    let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
-        .await
-        .unwrap();
+    let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
     let (network, shutdown) = run_fixt_network(BTreeMap::new(), meta_fixt_store).await;
 
     let returned = {
@@ -238,10 +231,8 @@ async fn get_from_another_agent() {
     let header_hash = {
         let (bob_env, call_data) =
             make_call_data(bob_cell_id.clone(), handle.clone(), dna_file.clone()).await;
-        let dbs = bob_env.dbs().await;
         let header_hash = commit_entry(
             bob_env.clone(),
-            &dbs,
             call_data.clone(),
             entry.clone().try_into().unwrap(),
             "post".into(),
@@ -252,7 +243,6 @@ async fn get_from_another_agent() {
         // Make Bob an "authority"
         fake_authority(
             bob_env.clone(),
-            &dbs,
             header_hash.clone().into(),
             call_data.clone(),
         )
@@ -264,10 +254,8 @@ async fn get_from_another_agent() {
     let element = {
         let (alice_env, call_data) =
             make_call_data(alice_cell_id.clone(), handle.clone(), dna_file.clone()).await;
-        let dbs = alice_env.dbs().await;
         get(
             alice_env.clone(),
-            &dbs,
             call_data,
             entry_hash.clone().into(),
             options.clone(),
@@ -290,25 +278,17 @@ async fn get_from_another_agent() {
     let (remove_hash, update_hash) = {
         let (bob_env, call_data) =
             make_call_data(bob_cell_id.clone(), handle.clone(), dna_file.clone()).await;
-        let dbs = bob_env.dbs().await;
-        let remove_hash = delete_entry(
-            bob_env.clone(),
-            &dbs,
-            call_data.clone(),
-            header_hash.clone(),
-        )
-        .await;
+        let remove_hash =
+            delete_entry(bob_env.clone(), call_data.clone(), header_hash.clone()).await;
 
         fake_authority(
             bob_env.clone(),
-            &dbs,
             remove_hash.clone().into(),
             call_data.clone(),
         )
         .await;
         let update_hash = update_entry(
             bob_env.clone(),
-            &dbs,
             call_data.clone(),
             new_entry.clone().try_into().unwrap(),
             "post".into(),
@@ -317,7 +297,6 @@ async fn get_from_another_agent() {
         .await;
         fake_authority(
             bob_env.clone(),
-            &dbs,
             update_hash.clone().into(),
             call_data.clone(),
         )
@@ -329,11 +308,9 @@ async fn get_from_another_agent() {
     let (entry_details, header_details) = {
         let (alice_env, call_data) =
             make_call_data(alice_cell_id.clone(), handle.clone(), dna_file.clone()).await;
-        let dbs = alice_env.dbs().await;
         debug!(the_entry_hash = ?entry_hash);
         let entry_details = get_details(
             alice_env.clone(),
-            &dbs,
             call_data.clone(),
             entry_hash.into(),
             options.clone(),
@@ -342,7 +319,6 @@ async fn get_from_another_agent() {
         .unwrap();
         let header_details = get_details(
             alice_env.clone(),
-            &dbs,
             call_data.clone(),
             header_hash.clone().into(),
             options.clone(),
@@ -445,10 +421,8 @@ async fn get_links_from_another_agent() {
     let link_add_hash = {
         let (bob_env, call_data) =
             make_call_data(bob_cell_id.clone(), handle.clone(), dna_file.clone()).await;
-        let dbs = bob_env.dbs().await;
         let base_header_hash = commit_entry(
             bob_env.clone(),
-            &dbs,
             call_data.clone(),
             base.clone().try_into().unwrap(),
             "post".into(),
@@ -457,7 +431,6 @@ async fn get_links_from_another_agent() {
 
         let target_header_hash = commit_entry(
             bob_env.clone(),
-            &dbs,
             call_data.clone(),
             target.clone().try_into().unwrap(),
             "post".into(),
@@ -466,14 +439,12 @@ async fn get_links_from_another_agent() {
 
         fake_authority(
             bob_env.clone(),
-            &dbs,
             target_header_hash.clone().into(),
             call_data.clone(),
         )
         .await;
         fake_authority(
             bob_env.clone(),
-            &dbs,
             base_header_hash.clone().into(),
             call_data.clone(),
         )
@@ -482,7 +453,6 @@ async fn get_links_from_another_agent() {
         // Link the entries
         let link_add_hash = link_entries(
             bob_env.clone(),
-            &dbs,
             call_data.clone(),
             base_entry_hash.clone(),
             target_entry_hash.clone(),
@@ -492,7 +462,6 @@ async fn get_links_from_another_agent() {
 
         fake_authority(
             bob_env.clone(),
-            &dbs,
             link_add_hash.clone().into(),
             call_data.clone(),
         )
@@ -505,11 +474,9 @@ async fn get_links_from_another_agent() {
     let links = {
         let (alice_env, call_data) =
             make_call_data(alice_cell_id.clone(), handle.clone(), dna_file.clone()).await;
-        let dbs = alice_env.dbs().await;
 
         get_links(
             alice_env.clone(),
-            &dbs,
             call_data.clone(),
             base_entry_hash.clone(),
             None,
@@ -531,20 +498,13 @@ async fn get_links_from_another_agent() {
     {
         let (bob_env, call_data) =
             make_call_data(bob_cell_id.clone(), handle.clone(), dna_file.clone()).await;
-        let dbs = bob_env.dbs().await;
 
         // Link the entries
-        let link_remove_hash = remove_link(
-            bob_env.clone(),
-            &dbs,
-            call_data.clone(),
-            link_add_hash.clone(),
-        )
-        .await;
+        let link_remove_hash =
+            remove_link(bob_env.clone(), call_data.clone(), link_add_hash.clone()).await;
 
         fake_authority(
             bob_env.clone(),
-            &dbs,
             link_remove_hash.clone().into(),
             call_data.clone(),
         )
@@ -554,11 +514,9 @@ async fn get_links_from_another_agent() {
     let links = {
         let (alice_env, call_data) =
             make_call_data(alice_cell_id.clone(), handle.clone(), dna_file.clone()).await;
-        let dbs = alice_env.dbs().await;
 
         get_link_details(
             alice_env.clone(),
-            &dbs,
             call_data.clone(),
             base_entry_hash.clone(),
             link_tag.clone(),
@@ -748,7 +706,6 @@ async fn generate_fixt_store() -> (
 
 async fn commit_entry(
     env: EnvironmentWrite,
-    dbs: &impl GetDb,
     call_data: CallData,
     entry: Entry,
     entry_def_id: entry_def::EntryDefId,
@@ -759,15 +716,13 @@ async fn commit_entry(
         ribosome,
         zome_name,
     } = call_data;
-    let mut workspace = CallZomeWorkspace::new(env.clone().into(), dbs)
-        .await
-        .unwrap();
+    let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
+    let workspace_lock = CallZomeWorkspaceLock::new(workspace);
 
     let input = CommitEntryInput::new((entry_def_id.clone(), entry.clone()));
 
     let output = {
-        let (_g, raw_workspace) = UnsafeCallZomeWorkspace::from_mut(&mut workspace);
-        let host_access = ZomeCallHostAccess::new(raw_workspace, keystore, network);
+        let host_access = ZomeCallHostAccess::new(workspace_lock.clone(), keystore, network);
         let call_context = CallContext::new(zome_name, host_access.into());
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
@@ -775,17 +730,18 @@ async fn commit_entry(
     };
 
     // Write
-    env.guard()
-        .await
-        .with_commit(|writer| workspace.flush_to_txn(writer))
-        .unwrap();
+    {
+        let mut workspace = workspace_lock.write().await;
+        env.guard()
+            .with_commit(|writer| workspace.flush_to_txn_ref(writer))
+            .unwrap();
+    }
 
     output.into_inner()
 }
 
 async fn delete_entry<'env>(
     env: EnvironmentWrite,
-    dbs: &impl GetDb,
     call_data: CallData,
     hash: HeaderHash,
 ) -> HeaderHash {
@@ -795,15 +751,13 @@ async fn delete_entry<'env>(
         ribosome,
         zome_name,
     } = call_data;
-    let mut workspace = CallZomeWorkspace::new(env.clone().into(), dbs)
-        .await
-        .unwrap();
+    let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
+    let workspace_lock = CallZomeWorkspaceLock::new(workspace);
 
     let input = DeleteEntryInput::new(hash);
 
     let output = {
-        let (_g, raw_workspace) = UnsafeCallZomeWorkspace::from_mut(&mut workspace);
-        let host_access = ZomeCallHostAccess::new(raw_workspace, keystore, network);
+        let host_access = ZomeCallHostAccess::new(workspace_lock.clone(), keystore, network);
         let call_context = CallContext::new(zome_name, host_access.into());
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
@@ -816,17 +770,18 @@ async fn delete_entry<'env>(
     };
 
     // Write
-    env.guard()
-        .await
-        .with_commit(|writer| workspace.flush_to_txn(writer))
-        .unwrap();
+    {
+        let mut workspace = workspace_lock.write().await;
+        env.guard()
+            .with_commit(|writer| workspace.flush_to_txn_ref(writer))
+            .unwrap();
+    }
 
     output.into_inner()
 }
 
 async fn update_entry<'env>(
     env: EnvironmentWrite,
-    dbs: &impl GetDb,
     call_data: CallData,
     entry: Entry,
     entry_def_id: entry_def::EntryDefId,
@@ -838,15 +793,13 @@ async fn update_entry<'env>(
         ribosome,
         zome_name,
     } = call_data;
-    let mut workspace = CallZomeWorkspace::new(env.clone().into(), dbs)
-        .await
-        .unwrap();
+    let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
+    let workspace_lock = CallZomeWorkspaceLock::new(workspace);
 
     let input = UpdateEntryInput::new((entry_def_id.clone(), entry.clone(), original_header_hash));
 
     let output = {
-        let (_g, raw_workspace) = UnsafeCallZomeWorkspace::from_mut(&mut workspace);
-        let host_access = ZomeCallHostAccess::new(raw_workspace, keystore, network);
+        let host_access = ZomeCallHostAccess::new(workspace_lock.clone(), keystore, network);
         let call_context = CallContext::new(zome_name, host_access.into());
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
@@ -854,17 +807,18 @@ async fn update_entry<'env>(
     };
 
     // Write
-    env.guard()
-        .await
-        .with_commit(|writer| workspace.flush_to_txn(writer))
-        .unwrap();
+    {
+        let mut workspace = workspace_lock.write().await;
+        env.guard()
+            .with_commit(|writer| workspace.flush_to_txn_ref(writer))
+            .unwrap();
+    }
 
     output.into_inner()
 }
 
 async fn get<'env>(
     env: EnvironmentWrite,
-    dbs: &impl GetDb,
     call_data: CallData,
     entry_hash: AnyDhtHash,
     _options: GetOptions,
@@ -875,9 +829,8 @@ async fn get<'env>(
         ribosome,
         zome_name,
     } = call_data;
-    let mut workspace = CallZomeWorkspace::new(env.clone().into(), dbs)
-        .await
-        .unwrap();
+    let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
+    let workspace_lock = CallZomeWorkspaceLock::new(workspace);
 
     // let mut cascade = workspace.cascade(call_data.network);
     // cascade.dht_get(entry_hash, options).await.unwrap()
@@ -889,8 +842,7 @@ async fn get<'env>(
     ));
 
     let output = {
-        let (_g, raw_workspace) = UnsafeCallZomeWorkspace::from_mut(&mut workspace);
-        let host_access = ZomeCallHostAccess::new(raw_workspace, keystore, network);
+        let host_access = ZomeCallHostAccess::new(workspace_lock.clone(), keystore, network);
         let call_context = CallContext::new(zome_name, host_access.into());
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
@@ -901,7 +853,6 @@ async fn get<'env>(
 
 async fn get_details<'env>(
     env: EnvironmentWrite,
-    dbs: &impl GetDb,
     call_data: CallData,
     entry_hash: AnyDhtHash,
     _options: GetOptions,
@@ -912,9 +863,8 @@ async fn get_details<'env>(
         ribosome,
         zome_name,
     } = call_data;
-    let mut workspace = CallZomeWorkspace::new(env.clone().into(), dbs)
-        .await
-        .unwrap();
+    let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
+    let workspace_lock = CallZomeWorkspaceLock::new(workspace);
 
     let input = GetDetailsInput::new((
         entry_hash.clone().into(),
@@ -922,8 +872,7 @@ async fn get_details<'env>(
     ));
 
     let output = {
-        let (_g, raw_workspace) = UnsafeCallZomeWorkspace::from_mut(&mut workspace);
-        let host_access = ZomeCallHostAccess::new(raw_workspace, keystore, network);
+        let host_access = ZomeCallHostAccess::new(workspace_lock.clone(), keystore, network);
         let call_context = CallContext::new(zome_name, host_access.into());
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
@@ -934,7 +883,6 @@ async fn get_details<'env>(
 
 async fn link_entries<'env>(
     env: EnvironmentWrite,
-    dbs: &impl GetDb,
     call_data: CallData,
     base: EntryHash,
     target: EntryHash,
@@ -946,15 +894,13 @@ async fn link_entries<'env>(
         ribosome,
         zome_name,
     } = call_data;
-    let mut workspace = CallZomeWorkspace::new(env.clone().into(), dbs)
-        .await
-        .unwrap();
+    let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
+    let workspace_lock = CallZomeWorkspaceLock::new(workspace);
 
     let input = LinkEntriesInput::new((base.clone(), target.clone(), link_tag));
 
     let output = {
-        let (_g, raw_workspace) = UnsafeCallZomeWorkspace::from_mut(&mut workspace);
-        let host_access = ZomeCallHostAccess::new(raw_workspace, keystore, network);
+        let host_access = ZomeCallHostAccess::new(workspace_lock.clone(), keystore, network);
         let call_context = CallContext::new(zome_name, host_access.into());
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
@@ -962,17 +908,18 @@ async fn link_entries<'env>(
     };
 
     // Write
-    env.guard()
-        .await
-        .with_commit(|writer| workspace.flush_to_txn(writer))
-        .unwrap();
+    {
+        let mut workspace = workspace_lock.write().await;
+        env.guard()
+            .with_commit(|writer| workspace.flush_to_txn_ref(writer))
+            .unwrap();
+    }
 
     output.into_inner()
 }
 
 async fn remove_link<'env>(
     env: EnvironmentWrite,
-    dbs: &impl GetDb,
     call_data: CallData,
     link_add_hash: HeaderHash,
 ) -> HeaderHash {
@@ -982,15 +929,13 @@ async fn remove_link<'env>(
         ribosome,
         zome_name,
     } = call_data;
-    let mut workspace = CallZomeWorkspace::new(env.clone().into(), dbs)
-        .await
-        .unwrap();
+    let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
+    let workspace_lock = CallZomeWorkspaceLock::new(workspace);
 
     let input = RemoveLinkInput::new(link_add_hash);
 
     let output = {
-        let (_g, raw_workspace) = UnsafeCallZomeWorkspace::from_mut(&mut workspace);
-        let host_access = ZomeCallHostAccess::new(raw_workspace, keystore, network);
+        let host_access = ZomeCallHostAccess::new(workspace_lock.clone(), keystore, network);
         let call_context = CallContext::new(zome_name, host_access.into());
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
@@ -998,17 +943,18 @@ async fn remove_link<'env>(
     };
 
     // Write
-    env.guard()
-        .await
-        .with_commit(|writer| workspace.flush_to_txn(writer))
-        .unwrap();
+    {
+        let mut workspace = workspace_lock.write().await;
+        env.guard()
+            .with_commit(|writer| workspace.flush_to_txn_ref(writer))
+            .unwrap();
+    }
 
     output.into_inner()
 }
 
 async fn get_links<'env>(
     env: EnvironmentWrite,
-    dbs: &impl GetDb,
     call_data: CallData,
     base: EntryHash,
     link_tag: Option<LinkTag>,
@@ -1020,15 +966,13 @@ async fn get_links<'env>(
         ribosome,
         zome_name,
     } = call_data;
-    let mut workspace = CallZomeWorkspace::new(env.clone().into(), dbs)
-        .await
-        .unwrap();
+    let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
+    let workspace_lock = CallZomeWorkspaceLock::new(workspace);
 
     let input = GetLinksInput::new((base.clone(), link_tag));
 
     let output = {
-        let (_g, raw_workspace) = UnsafeCallZomeWorkspace::from_mut(&mut workspace);
-        let host_access = ZomeCallHostAccess::new(raw_workspace, keystore, network);
+        let host_access = ZomeCallHostAccess::new(workspace_lock.clone(), keystore, network);
         let call_context = CallContext::new(zome_name, host_access.into());
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
@@ -1036,41 +980,34 @@ async fn get_links<'env>(
     };
 
     // Write
-    env.guard()
-        .await
-        .with_commit(|writer| workspace.flush_to_txn(writer))
-        .unwrap();
+    {
+        let mut workspace = workspace_lock.write().await;
+        env.guard()
+            .with_commit(|writer| workspace.flush_to_txn_ref(writer))
+            .unwrap();
+    }
 
     output.into_inner().into()
 }
 
 async fn get_link_details<'env>(
     env: EnvironmentWrite,
-    dbs: &impl GetDb,
     call_data: CallData,
     base: EntryHash,
     tag: LinkTag,
     options: GetLinksOptions,
 ) -> Vec<(LinkAdd, Vec<LinkRemove>)> {
-    let mut workspace = CallZomeWorkspace::new(env.clone().into(), dbs)
-        .await
-        .unwrap();
+    let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
 
     let mut cascade = workspace.cascade(call_data.network);
     let key = LinkMetaKey::BaseZomeTag(&base, 0.into(), &tag);
     cascade.get_link_details(&key, options).await.unwrap()
 }
 
-async fn fake_authority<'env>(
-    env: EnvironmentWrite,
-    dbs: &impl GetDb,
-    hash: AnyDhtHash,
-    call_data: CallData,
-) {
+async fn fake_authority<'env>(env: EnvironmentWrite, hash: AnyDhtHash, call_data: CallData) {
     // Check bob can get the entry
     let element = get(
         env.clone(),
-        dbs,
         call_data,
         hash.clone().into(),
         GetOptions::default(),
@@ -1078,8 +1015,8 @@ async fn fake_authority<'env>(
     .await
     .unwrap();
 
-    let mut element_vault = ElementBuf::vault(env.clone().into(), dbs, false).unwrap();
-    let mut meta_vault = MetadataBuf::vault(env.clone().into(), dbs).unwrap();
+    let mut element_vault = ElementBuf::vault(env.clone().into(), false).unwrap();
+    let mut meta_vault = MetadataBuf::vault(env.clone().into()).unwrap();
 
     // Write to the meta vault to fake being an authority
     let (shh, e) = element.clone().into_inner();
@@ -1092,7 +1029,6 @@ async fn fake_authority<'env>(
         .unwrap();
 
     env.guard()
-        .await
         .with_commit(|writer| {
             element_vault.flush_to_txn(writer)?;
             meta_vault.flush_to_txn(writer)

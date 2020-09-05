@@ -58,7 +58,7 @@ use holochain_p2p::{
     actor::{GetLinksOptions, GetMetaOptions, GetOptions},
     HolochainP2pCell,
 };
-use holochain_state::{fresh_reader, fresh_reader_async, prelude::*};
+use holochain_state::{error::DatabaseResult, fresh_reader, prelude::*};
 use holochain_types::{
     dht_op::{produce_op_lights_from_element_group, produce_op_lights_from_elements},
     element::{
@@ -327,48 +327,42 @@ where
         Ok(())
     }
 
-    async fn get_element_local_raw(&self, hash: &HeaderHash) -> CascadeResult<Option<Element>> {
-        match self.element_vault.get_element(hash).await? {
-            None => Ok(self.element_cache.get_element(hash).await?),
+    fn get_element_local_raw(&self, hash: &HeaderHash) -> CascadeResult<Option<Element>> {
+        match self.element_vault.get_element(hash)? {
+            None => Ok(self.element_cache.get_element(hash)?),
             r => Ok(r),
         }
     }
 
-    async fn get_entry_local_raw(&self, hash: &EntryHash) -> CascadeResult<Option<EntryHashed>> {
-        match self.element_vault.get_entry(hash).await? {
-            None => Ok(self.element_cache.get_entry(hash).await?),
+    fn get_entry_local_raw(&self, hash: &EntryHash) -> CascadeResult<Option<EntryHashed>> {
+        match self.element_vault.get_entry(hash)? {
+            None => Ok(self.element_cache.get_entry(hash)?),
             r => Ok(r),
         }
     }
 
-    async fn get_header_local_raw(&self, hash: &HeaderHash) -> CascadeResult<Option<HeaderHashed>> {
+    fn get_header_local_raw(&self, hash: &HeaderHash) -> CascadeResult<Option<HeaderHashed>> {
         match self
             .element_vault
-            .get_header(hash)
-            .await?
+            .get_header(hash)?
             .map(|h| h.into_header_and_signature().0)
         {
             None => Ok(self
                 .element_cache
-                .get_header(hash)
-                .await?
+                .get_header(hash)?
                 .map(|h| h.into_header_and_signature().0)),
             r => Ok(r),
         }
     }
 
-    async fn render_headers<T, F>(
-        &self,
-        headers: Vec<TimedHeaderHash>,
-        f: F,
-    ) -> CascadeResult<Vec<T>>
+    fn render_headers<T, F>(&self, headers: Vec<TimedHeaderHash>, f: F) -> CascadeResult<Vec<T>>
     where
         F: Fn(Header) -> DhtOpConvertResult<T>,
     {
         let mut result = Vec::with_capacity(headers.len());
         for h in headers {
             let hash = h.header_hash;
-            let h = self.get_header_local_raw(&hash).await?;
+            let h = self.get_header_local_raw(&hash)?;
             match h {
                 Some(h) => result.push(f(HeaderHashed::into_content(h))?),
                 None => continue,
@@ -378,28 +372,24 @@ where
     }
 
     async fn create_entry_details(&self, hash: EntryHash) -> CascadeResult<Option<EntryDetails>> {
-        match self.get_entry_local_raw(&hash).await? {
-            Some(entry) => fresh_reader_async!(self.env, |r| async move {
+        match self.get_entry_local_raw(&hash)? {
+            Some(entry) => fresh_reader!(self.env, |r| {
                 let entry_dht_status = self.meta_cache.get_dht_status(&r, &hash)?;
                 let headers = self
                     .meta_cache
                     .get_headers(&r, hash.clone())?
                     .collect::<Vec<_>>()?;
-                let headers = self.render_headers(headers, |h| Ok(h)).await?;
+                let headers = self.render_headers(headers, |h| Ok(h))?;
                 let deletes = self
                     .meta_cache
                     .get_deletes_on_entry(&r, hash.clone())?
                     .collect::<Vec<_>>()?;
-                let deletes = self
-                    .render_headers(deletes, |h| Ok(ElementDelete::try_from(h)?))
-                    .await?;
+                let deletes = self.render_headers(deletes, |h| Ok(ElementDelete::try_from(h)?))?;
                 let updates = self
                     .meta_cache
                     .get_updates(&r, hash.into())?
                     .collect::<Vec<_>>()?;
-                let updates = self
-                    .render_headers(updates, |h| Ok(EntryUpdate::try_from(h)?))
-                    .await?;
+                let updates = self.render_headers(updates, |h| Ok(EntryUpdate::try_from(h)?))?;
                 Ok(Some(EntryDetails {
                     entry: entry.into_content(),
                     headers,
@@ -412,20 +402,15 @@ where
         }
     }
 
-    async fn create_element_details(
-        &self,
-        hash: HeaderHash,
-    ) -> CascadeResult<Option<ElementDetails>> {
-        match self.get_element_local_raw(&hash).await? {
+    fn create_element_details(&self, hash: HeaderHash) -> CascadeResult<Option<ElementDetails>> {
+        match self.get_element_local_raw(&hash)? {
             Some(element) => {
                 let hash = element.header_address().clone();
                 let deletes = fresh_reader!(self.env, |r| self
                     .meta_cache
                     .get_deletes_on_header(&r, hash)?
                     .collect::<Vec<_>>())?;
-                let deletes = self
-                    .render_headers(deletes, |h| Ok(ElementDelete::try_from(h)?))
-                    .await?;
+                let deletes = self.render_headers(deletes, |h| Ok(ElementDelete::try_from(h)?))?;
                 Ok(Some(ElementDetails { element, deletes }))
             }
             None => Ok(None),
@@ -456,13 +441,13 @@ where
         options: GetOptions,
     ) -> CascadeResult<Option<Element>> {
         debug!("in get entry");
-        fresh_reader_async!(self.env.clone(), |r| async move {
-            // Update the cache from the network
-            self.fetch_element_via_entry(entry_hash.clone(), options.clone())
-                .await?;
+        // Update the cache from the network
+        self.fetch_element_via_entry(entry_hash.clone(), options.clone())
+            .await?;
 
-            // Meta Cache
-            let oldest_live_element = match self.meta_cache.get_dht_status(&r, &entry_hash)? {
+        // Meta Cache
+        let oldest_live_element = fresh_reader!(self.env, |r| {
+            match self.meta_cache.get_dht_status(&r, &entry_hash)? {
                 EntryDhtStatus::Live => {
                     let oldest_live_header = self
                         .meta_cache
@@ -482,11 +467,12 @@ where
                         .expect("Status is live but no headers?");
 
                     // We have an oldest live header now get the element
-                    self.get_element_local_raw(&oldest_live_header.header_hash)
-                        .await?
-                        .map(Search::Found)
-                        // It's not local so check the network
-                        .unwrap_or(Search::Continue(oldest_live_header.header_hash))
+                    CascadeResult::Ok(
+                        self.get_element_local_raw(&oldest_live_header.header_hash)?
+                            .map(Search::Found)
+                            // It's not local so check the network
+                            .unwrap_or(Search::Continue(oldest_live_header.header_hash)),
+                    )
                 }
                 EntryDhtStatus::Dead
                 | EntryDhtStatus::Pending
@@ -494,18 +480,18 @@ where
                 | EntryDhtStatus::Abandoned
                 | EntryDhtStatus::Conflict
                 | EntryDhtStatus::Withdrawn
-                | EntryDhtStatus::Purged => Search::NotInCascade,
-            };
-
-            // Network
-            match oldest_live_element {
-                Search::Found(element) => Ok(Some(element)),
-                Search::Continue(oldest_live_header) => {
-                    self.dht_get_header(oldest_live_header, options).await
-                }
-                Search::NotInCascade => Ok(None),
+                | EntryDhtStatus::Purged => CascadeResult::Ok(Search::NotInCascade),
             }
-        })
+        })?;
+
+        // Network
+        match oldest_live_element {
+            Search::Found(element) => Ok(Some(element)),
+            Search::Continue(oldest_live_header) => {
+                self.dht_get_header(oldest_live_header, options).await
+            }
+            Search::NotInCascade => Ok(None),
+        }
     }
 
     #[instrument(skip(self, options))]
@@ -520,7 +506,7 @@ where
             .await?;
 
         // Get the element and the metadata
-        self.create_element_details(header_hash).await
+        self.create_element_details(header_hash)
     }
 
     #[instrument(skip(self, options))]
@@ -534,28 +520,33 @@ where
         options: GetOptions,
     ) -> CascadeResult<Option<Element>> {
         debug!("in get header");
-        fresh_reader_async!(self.env, |r| async move {
-            // Meta Cache
-            if let Some(_) = self
-                .meta_cache
-                .get_deletes_on_header(&r, header_hash.clone())?
-                .next()?
-            {
-                // Final tombstone found
-                return Ok(None);
-            // Meta Vault
-            } else if let Some(_) = self
-                .meta_vault
-                .get_deletes_on_header(&r, header_hash.clone())?
-                .next()?
-            {
-                // Final tombstone found
-                return Ok(None);
-            }
-            // Network
-            self.fetch_element_via_header(header_hash.clone(), options)
-                .await?;
+        let found_local_delete = fresh_reader!(self.env, |r| {
+            let in_cache = || {
+                DatabaseResult::Ok({
+                    self.meta_cache
+                        .get_deletes_on_header(&r, header_hash.clone())?
+                        .next()?
+                        .is_some()
+                })
+            };
+            let in_vault = || {
+                DatabaseResult::Ok({
+                    self.meta_vault
+                        .get_deletes_on_header(&r, header_hash.clone())?
+                        .next()?
+                        .is_some()
+                })
+            };
+            DatabaseResult::Ok(in_cache()? || in_vault()?)
+        })?;
+        if found_local_delete {
+            return Ok(None);
+        }
+        // Network
+        self.fetch_element_via_header(header_hash.clone(), options)
+            .await?;
 
+        fresh_reader!(self.env, |r| {
             // Check if header is alive after fetch
             let is_live = self
                 .meta_cache
@@ -564,7 +555,7 @@ where
                 .is_none();
 
             if is_live {
-                self.get_element_local_raw(&header_hash).await
+                self.get_element_local_raw(&header_hash)
             } else {
                 Ok(None)
             }
@@ -663,11 +654,11 @@ where
         // Get the headers from the element stores
         let mut result: Vec<(LinkAdd, _)> = Vec::with_capacity(links.len());
         for (link_add, link_removes) in links {
-            if let Some(link_add) = self.get_element_local_raw(&link_add.header_hash).await? {
+            if let Some(link_add) = self.get_element_local_raw(&link_add.header_hash)? {
                 let mut r: Vec<LinkRemove> = Vec::with_capacity(link_removes.len());
                 for link_remove in link_removes {
                     if let Some(link_remove) =
-                        self.get_element_local_raw(&link_remove.header_hash).await?
+                        self.get_element_local_raw(&link_remove.header_hash)?
                     {
                         r.push(link_remove.try_into()?);
                     }
@@ -683,15 +674,14 @@ where
 /// Helper function for easily setting up cascades during tests
 pub fn test_dbs_and_mocks(
     env: EnvironmentRead,
-    dbs: &impl holochain_state::db::GetDb,
 ) -> (
     ElementBuf,
     super::metadata::MockMetadataBuf,
     ElementBuf,
     super::metadata::MockMetadataBuf,
 ) {
-    let cas = ElementBuf::vault(env.clone().into(), dbs, true).unwrap();
-    let element_cache = ElementBuf::cache(env.clone().into(), dbs).unwrap();
+    let cas = ElementBuf::vault(env.clone().into(), true).unwrap();
+    let element_cache = ElementBuf::cache(env.clone().into()).unwrap();
     let metadata = super::metadata::MockMetadataBuf::new();
     let metadata_cache = super::metadata::MockMetadataBuf::new();
     (cas, metadata, element_cache, metadata_cache)

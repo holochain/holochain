@@ -21,7 +21,8 @@ use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostAccess;
 use crate::core::ribosome::ZomeCallHostAccess;
 use crate::core::state::metadata::LinkMetaVal;
-use crate::core::workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace;
+use crate::core::workflow::CallZomeWorkspace;
+use crate::core::workflow::CallZomeWorkspaceLock;
 use ::fixt::prelude::*;
 pub use holo_hash::fixt::*;
 use holo_hash::EntryHash;
@@ -260,17 +261,22 @@ fixturator!(
 );
 
 fixturator!(
-    UnsafeCallZomeWorkspace;
+    CallZomeWorkspaceLock;
     curve Empty {
-        UnsafeCallZomeWorkspace::null()
+        // XXX: This may not be great to just grab an environment for this purpose.
+        //      It is assumed that this value is never really used in any "real"
+        //      way, because previously, it was implemented as a null pointer
+        //      wrapped in an UnsafeZomeCallWorkspace
+        let env = holochain_state::test_utils::test_cell_env();
+        CallZomeWorkspaceLock::new(CallZomeWorkspace::new(env.env().into()).unwrap())
     };
     curve Unpredictable {
-        UnsafeCallZomeWorkspaceFixturator::new(Empty)
+        CallZomeWorkspaceLockFixturator::new(Empty)
             .next()
             .unwrap()
     };
     curve Predictable {
-        UnsafeCallZomeWorkspaceFixturator::new(Empty)
+        CallZomeWorkspaceLockFixturator::new(Empty)
             .next()
             .unwrap()
     };
@@ -278,7 +284,7 @@ fixturator!(
 
 fixturator!(
     ZomeCallHostAccess;
-    constructor fn new(UnsafeCallZomeWorkspace, KeystoreSender, HolochainP2pCell);
+    constructor fn new(CallZomeWorkspaceLock, KeystoreSender, HolochainP2pCell);
 );
 
 fixturator!(
@@ -298,7 +304,7 @@ fixturator!(
 
 fixturator!(
     InitHostAccess;
-    constructor fn new(UnsafeCallZomeWorkspace, KeystoreSender, HolochainP2pCell);
+    constructor fn new(CallZomeWorkspaceLock, KeystoreSender, HolochainP2pCell);
 );
 
 fixturator!(
@@ -308,7 +314,7 @@ fixturator!(
 
 fixturator!(
     MigrateAgentHostAccess;
-    constructor fn new(UnsafeCallZomeWorkspace);
+    constructor fn new(CallZomeWorkspaceLock);
 );
 
 fixturator!(
@@ -318,7 +324,7 @@ fixturator!(
 
 fixturator!(
     PostCommitHostAccess;
-    constructor fn new(UnsafeCallZomeWorkspace, KeystoreSender, HolochainP2pCell);
+    constructor fn new(CallZomeWorkspaceLock, KeystoreSender, HolochainP2pCell);
 );
 
 fixturator!(
@@ -348,7 +354,7 @@ fixturator!(
 
 fixturator!(
     ValidationPackageHostAccess;
-    constructor fn new(UnsafeCallZomeWorkspace);
+    constructor fn new(CallZomeWorkspaceLock);
 );
 
 fixturator!(
