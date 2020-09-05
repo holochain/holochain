@@ -118,11 +118,16 @@ pub fn fake_agent_pubkey_2() -> AgentPubKey {
 /// and bob is pubkey 2 the this helps make test
 /// logging easier to read.
 pub fn which_agent(key: &AgentPubKey) -> String {
-    match key.to_string().as_ref() {
-        "uhCAkw-zrttiYpdfAYX4fR6W8DPUdheZJ-1QsRA4cTImmzTYUcOr4" => "alice".to_string(),
-        "uhCAkomHzekU0-x7p62WmrusdxD2w9wcjdajC88688JGSTEo6cbEK" => "bob".to_string(),
-        a => a.to_string(),
+    let key = key.to_string();
+    let alice = fake_agent_pubkey_1().to_string();
+    let bob = fake_agent_pubkey_2().to_string();
+    if key == alice {
+        return "alice".to_string();
     }
+    if key == bob {
+        return "alice".to_string();
+    }
+    key
 }
 
 /// A fixture CapSecret for unit testing.
