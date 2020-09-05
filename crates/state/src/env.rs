@@ -9,7 +9,7 @@ use derive_more::Into;
 use holochain_keystore::KeystoreSender;
 use holochain_types::cell::CellId;
 use lazy_static::lazy_static;
-use parking_lot::RwLock as RwLockSync;
+use parking_lot::{RwLock, RwLockReadGuard};
 use rkv::{EnvironmentFlags, Rkv};
 use shrinkwraprs::Shrinkwrap;
 use std::{
@@ -22,7 +22,7 @@ const DEFAULT_INITIAL_MAP_SIZE: usize = 100 * 1024 * 1024; // 100MB
 const MAX_DBS: u32 = 32;
 
 lazy_static! {
-    static ref ENVIRONMENTS: RwLockSync<HashMap<PathBuf, EnvironmentWrite>> = {
+    static ref ENVIRONMENTS: RwLock<HashMap<PathBuf, EnvironmentWrite>> = {
         // This is just a convenient place that we know gets initialized
         // both in the final binary holochain && in all relevant tests
         //
@@ -44,7 +44,7 @@ lazy_static! {
             // std::process::abort();
         }));
 
-        RwLockSync::new(HashMap::new())
+        RwLock::new(HashMap::new())
     };
 }
 
@@ -86,10 +86,7 @@ fn rkv_builder(
 /// This environment can only generate read-only transactions, never read-write.
 #[derive(Clone)]
 pub struct EnvironmentRead {
-    // FIXME [ B-03180 ]: Use some synchronization strategy so we can get
-    //       mutable access to this
-    // arc: Arc<RwLockSync<Rkv>>,
-    arc: Arc<Rkv>,
+    arc: Arc<RwLock<Rkv>>,
     kind: EnvironmentKind,
     path: PathBuf,
     keystore: KeystoreSender,
@@ -100,11 +97,9 @@ impl EnvironmentRead {
     /// to get a lock in order to create a read-only transaction. The lock guard
     /// must outlive the transaction, so it has to be returned here and managed
     /// explicitly.
-    pub async fn guard(&self) -> EnvironmentReadRef<'_> {
+    pub fn guard(&self) -> EnvironmentReadRef<'_> {
         EnvironmentReadRef {
-            rkv: self.arc.clone(),
-            path: &self.path,
-            keystore: self.keystore.clone(),
+            rkv: self.arc.read(),
         }
     }
 
@@ -116,15 +111,6 @@ impl EnvironmentRead {
     /// Request access to this conductor's keystore
     pub fn keystore(&self) -> &KeystoreSender {
         &self.keystore
-    }
-
-    /// Return an `impl GetDb`, which can synchronously get databases from this
-    /// environment
-    /// This function only exists because this was the pattern used by DbManager, which has
-    /// since been removed
-    // #[deprecated = "duplicate of EnvironmentRo::guard"]
-    pub async fn dbs(&self) -> EnvironmentReadRef<'_> {
-        self.guard().await
     }
 
     /// The environments path
@@ -180,7 +166,7 @@ impl EnvironmentWrite {
                     tracing::debug!("Initializing databases for path {:?}", path);
                     initialize_databases(&rkv, &kind)?;
                     EnvironmentWrite(EnvironmentRead {
-                        arc: Arc::new(rkv),
+                        arc: Arc::new(RwLock::new(rkv)),
                         kind,
                         keystore,
                         path,
@@ -191,10 +177,19 @@ impl EnvironmentWrite {
         Ok(env)
     }
 
+    /// Create a Cell environment (slight shorthand)
+    pub fn new_cell(
+        path_prefix: &Path,
+        cell_id: CellId,
+        keystore: KeystoreSender,
+    ) -> DatabaseResult<Self> {
+        Self::new(path_prefix, EnvironmentKind::Cell(cell_id), keystore)
+    }
+
     /// Get a read-only lock guard on the environment.
     /// This reference can create read-write transactions.
-    pub async fn guard(&self) -> EnvironmentWriteRef<'_> {
-        EnvironmentWriteRef(self.0.guard().await)
+    pub fn guard(&self) -> EnvironmentWriteRef<'_> {
+        EnvironmentWriteRef(self.0.guard())
     }
 
     /// Remove the db and directory
@@ -233,9 +228,7 @@ impl EnvironmentKind {
 /// This has the distinction of being unable to create a read-write transaction,
 /// because unlike [EnvironmentWriteRef], this does not implement WriteManager
 pub struct EnvironmentReadRef<'e> {
-    rkv: Arc<Rkv>,
-    path: &'e Path,
-    keystore: KeystoreSender,
+    rkv: RwLockReadGuard<'e, Rkv>,
 }
 
 impl<'e> EnvironmentReadRef<'e> {
@@ -297,22 +290,6 @@ impl<'e> WriteManager<'e> for EnvironmentWriteRef<'e> {
     }
 }
 
-impl GetDb for EnvironmentReadRef<'_> {
-    fn get_db<V: 'static + Copy + Send + Sync>(&self, key: &'static DbKey<V>) -> DatabaseResult<V> {
-        get_db(self.path, key)
-    }
-
-    fn keystore(&self) -> KeystoreSender {
-        self.keystore()
-    }
-}
-
-impl<'e> EnvironmentReadRef<'e> {
-    pub(crate) fn keystore(&self) -> KeystoreSender {
-        self.keystore.clone()
-    }
-}
-
 impl<'e> EnvironmentWriteRef<'e> {
     /// Access the underlying Rkv lock guard
     #[cfg(test)]
@@ -344,15 +321,5 @@ impl<'e> ReadManager<'e> for EnvironmentWriteRef<'e> {
         F: FnOnce(Reader) -> Result<R, E>,
     {
         self.0.with_reader(f)
-    }
-}
-
-impl<'e> GetDb for EnvironmentWriteRef<'e> {
-    fn get_db<V: 'static + Copy + Send + Sync>(&self, key: &'static DbKey<V>) -> DatabaseResult<V> {
-        self.0.get_db(key)
-    }
-
-    fn keystore(&self) -> KeystoreSender {
-        self.0.keystore()
     }
 }

@@ -6,9 +6,7 @@
 pub use error::*;
 use fallible_iterator::FallibleIterator;
 use holo_hash::*;
-use holochain_state::{
-    buffer::BufferedStore, db::GetDb, error::DatabaseResult, fresh_reader, prelude::*,
-};
+use holochain_state::{buffer::BufferedStore, error::DatabaseResult, fresh_reader, prelude::*};
 use holochain_types::{prelude::*, EntryHashed};
 use holochain_zome_types::capability::CapAccess;
 use holochain_zome_types::capability::GrantedFunction;
@@ -31,10 +29,9 @@ mod source_chain_buffer;
 pub struct SourceChain(pub SourceChainBuf);
 
 impl SourceChain {
-    pub async fn agent_pubkey(&self) -> SourceChainResult<AgentPubKey> {
+    pub fn agent_pubkey(&self) -> SourceChainResult<AgentPubKey> {
         self.0
-            .agent_pubkey()
-            .await?
+            .agent_pubkey()?
             .ok_or(SourceChainError::InvalidStructure(
                 ChainInvalidReason::GenesisDataMissing,
             ))
@@ -44,12 +41,12 @@ impl SourceChain {
         self.0.chain_head().ok_or(SourceChainError::ChainEmpty)
     }
 
-    pub async fn new(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
-        Ok(SourceChainBuf::new(env, dbs).await?.into())
+    pub fn new(env: EnvironmentRead) -> DatabaseResult<Self> {
+        Ok(SourceChainBuf::new(env)?.into())
     }
 
-    pub async fn public_only(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Self> {
-        Ok(SourceChainBuf::public_only(env, dbs).await?.into())
+    pub async fn public_only(env: EnvironmentRead) -> DatabaseResult<Self> {
+        Ok(SourceChainBuf::public_only(env)?.into())
     }
 
     pub fn into_inner(self) -> SourceChainBuf {
@@ -63,7 +60,7 @@ impl SourceChain {
         maybe_entry: Option<Entry>,
     ) -> SourceChainResult<HeaderHash> {
         let common = HeaderBuilderCommon {
-            author: self.agent_pubkey().await?,
+            author: self.agent_pubkey()?,
             timestamp: Timestamp::now().into(),
             header_seq: self.len() as u32,
             prev_header: self.chain_head()?.to_owned(),
@@ -77,9 +74,8 @@ impl SourceChain {
         &mut self,
         claim_entry: CapClaimEntry,
     ) -> SourceChainResult<HeaderHash> {
-        let (entry, entry_hash) = EntryHashed::from_content(Entry::CapClaim(claim_entry))
-            .await
-            .into_inner();
+        let (entry, entry_hash) =
+            EntryHashed::from_content_sync(Entry::CapClaim(claim_entry)).into_inner();
         let header_builder = builder::EntryCreate {
             entry_type: EntryType::CapClaim,
             entry_hash,
@@ -107,7 +103,7 @@ impl SourceChain {
     ) -> SourceChainResult<Option<CapGrant>> {
         // most calls for most apps are going to be the local agent calling itself locally
         // for this case we want to short circuit without iterating the whole source chain
-        let author_grant = CapGrant::from(self.agent_pubkey().await?);
+        let author_grant = CapGrant::from(self.agent_pubkey()?);
         if author_grant.is_valid(check_function, check_agent, check_secret) {
             return Ok(Some(author_grant));
         }
@@ -300,8 +296,8 @@ impl From<SourceChainBuf> for SourceChain {
 impl BufferedStore for SourceChain {
     type Error = SourceChainError;
 
-    fn flush_to_txn(self, writer: &mut Writer) -> Result<(), Self::Error> {
-        self.0.flush_to_txn(writer)?;
+    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> Result<(), Self::Error> {
+        self.0.flush_to_txn_ref(writer)?;
         Ok(())
     }
 }
@@ -322,7 +318,7 @@ pub mod tests {
     async fn test_get_cap_grant() -> SourceChainResult<()> {
         let test_env = test_cell_env();
         let arc = test_env.env();
-        let env = arc.guard().await;
+        let env = arc.guard();
         let secret = CapSecretFixturator::new(Unpredictable).next().unwrap();
         let access = CapAccess::from(secret.clone());
         // @todo curry
@@ -335,14 +331,13 @@ pub mod tests {
         let alice = agents.next().unwrap();
         let bob = agents.next().unwrap();
         {
-            let mut store = SourceChainBuf::new(arc.clone().into(), &env).await?;
+            let mut store = SourceChainBuf::new(arc.clone().into())?;
             store.genesis(fake_dna_hash(1), alice.clone(), None).await?;
             env.with_commit(|writer| store.flush_to_txn(writer))?;
         }
 
         {
-            let chain = SourceChain::new(arc.clone().into(), &env).await?;
-            // alice should always find her authorship even if no grants have been committed
+            let chain = SourceChain::new(arc.clone().into())?;
             assert_eq!(
                 chain.valid_cap_grant(&function, &alice, &secret).await?,
                 Some(CapGrant::Authorship(alice.clone())),
@@ -353,7 +348,7 @@ pub mod tests {
         }
 
         let (original_header_address, original_entry_address) = {
-            let mut chain = SourceChain::new(arc.clone().into(), &env).await?;
+            let mut chain = SourceChain::new(arc.clone().into())?;
             let (entry, entry_hash) = EntryHashed::from_content(Entry::CapGrant(grant.clone()))
                 .await
                 .into_inner();
@@ -412,7 +407,7 @@ pub mod tests {
         };
 
         {
-            let chain = SourceChain::new(arc.clone().into(), &env).await?;
+            let chain = SourceChain::new(arc.clone().into())?;
             // alice should find her own authorship with higher priority than the committed grant
             // even if she passes in the secret
             assert_eq!(

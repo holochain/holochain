@@ -24,8 +24,7 @@ pub async fn light_to_op(op: DhtOpLight, cas: &ElementBuf) -> DhtOpConvertResult
     match op {
         DhtOpLight::StoreElement(h, _, _) => {
             let (header, entry) = cas
-                .get_element(&h)
-                .await?
+                .get_element(&h)?
                 .ok_or(DhtOpConvertError::MissingData)?
                 .into_inner();
             // TODO: Could use this signature? Is it the same?
@@ -36,8 +35,7 @@ pub async fn light_to_op(op: DhtOpLight, cas: &ElementBuf) -> DhtOpConvertResult
         }
         DhtOpLight::StoreEntry(h, _, _) => {
             let (header, entry) = cas
-                .get_element(&h)
-                .await?
+                .get_element(&h)?
                 .ok_or(DhtOpConvertError::MissingData)?
                 .into_inner();
             let (header, sig) = header.into_header_and_signature();
@@ -59,8 +57,7 @@ pub async fn light_to_op(op: DhtOpLight, cas: &ElementBuf) -> DhtOpConvertResult
         }
         DhtOpLight::RegisterAgentActivity(h, _) => {
             let (header, sig) = cas
-                .get_element(&h)
-                .await?
+                .get_element(&h)?
                 .ok_or(DhtOpConvertError::MissingData)?
                 .into_inner()
                 .0
@@ -69,8 +66,7 @@ pub async fn light_to_op(op: DhtOpLight, cas: &ElementBuf) -> DhtOpConvertResult
         }
         DhtOpLight::RegisterUpdatedBy(h, _, _) => {
             let (header, sig) = cas
-                .get_header(&h)
-                .await?
+                .get_header(&h)?
                 .ok_or(DhtOpConvertError::MissingData)?
                 .into_header_and_signature();
             let header = match header.into_content() {
@@ -94,8 +90,7 @@ pub async fn light_to_op(op: DhtOpLight, cas: &ElementBuf) -> DhtOpConvertResult
         }
         DhtOpLight::RegisterAddLink(h, _) => {
             let (header, sig) = cas
-                .get_element(&h)
-                .await?
+                .get_element(&h)?
                 .ok_or(DhtOpConvertError::MissingData)?
                 .into_inner()
                 .0
@@ -113,8 +108,7 @@ pub async fn light_to_op(op: DhtOpLight, cas: &ElementBuf) -> DhtOpConvertResult
         }
         DhtOpLight::RegisterRemoveLink(h, _) => {
             let (header, sig) = cas
-                .get_element(&h)
-                .await?
+                .get_element(&h)?
                 .ok_or(DhtOpConvertError::MissingData)?
                 .into_inner()
                 .0
@@ -139,8 +133,7 @@ async fn get_element_delete(
     cas: &ElementBuf,
 ) -> DhtOpConvertResult<(header::ElementDelete, Signature)> {
     let (header, sig) = cas
-        .get_element(&header_hash)
-        .await?
+        .get_element(&header_hash)?
         .ok_or(DhtOpConvertError::MissingData)?
         .into_inner()
         .0
@@ -161,8 +154,7 @@ async fn get_entry_hash_for_header(
 ) -> DhtOpConvertResult<EntryHash> {
     debug!(%header_hash);
     let entry = cas
-        .get_header(header_hash)
-        .await?
+        .get_header(header_hash)?
         .and_then(|e| e.header().entry_data().map(|(hash, _)| hash.clone()));
     entry.ok_or_else(|| DhtOpConvertError::MissingEntryDataForHeader(header_hash.clone()))
 }
