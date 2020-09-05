@@ -1,0 +1,15 @@
+[package]
+name = "sourcechainsize"
+version = "0.0.1"
+authors = [ "guillemcordoba" ]
+edition = "2018"
+
+[lib]
+name = "sourcechainsize"
+crate-type = [ "cdylib", "rlib" ]
+
+[dependencies]
+serde = "1"
+derive_more = "0"
+
+hdk3 = { path = "../../../../../crates/hdk" }

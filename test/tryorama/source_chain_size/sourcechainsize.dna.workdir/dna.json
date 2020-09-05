@@ -1,0 +1,10 @@
+{
+  "name": "multsourcechainsizeiplecalls",
+  "uuid": "",
+  "properties": null,
+  "zomes": {
+    "sourcechainsize": {
+      "wasm_path": "../target/wasm32-unknown-unknown/release/sourcechainsize.wasm"
+    }
+  }
+}
