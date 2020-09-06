@@ -18,6 +18,7 @@ members = [
     "link",
     "migrate_agent_fail",
     "migrate_agent_pass",
+    "multiple_calls",
     "post_commit_fail",
     "post_commit_success",
     "random_bytes",

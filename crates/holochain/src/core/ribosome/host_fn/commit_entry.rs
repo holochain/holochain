@@ -277,6 +277,60 @@ pub mod wasm_test {
     }
 
     #[tokio::test(threaded_scheduler)]
+    async fn ribosome_multiple_commit_entry_test<'a>() {
+        holochain_types::observability::test_run().ok();
+        // test workspace boilerplate
+        let test_env = holochain_state::test_utils::test_cell_env();
+        let env = test_env.env();
+        let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
+
+        // commits fail validation if we don't do genesis
+        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+            .await
+            .unwrap();
+        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let mut host_access = fixt!(ZomeCallHostAccess);
+        host_access.workspace = workspace_lock.clone();
+
+        // get the result of a commit entry
+        let output: CommitEntryOutput = crate::call_test_ribosome!(
+            host_access,
+            TestWasm::MultipleCalls,
+            "commit_entry_multiple",
+            ()
+        );
+
+        // the chain head should be the committed entry header
+        let chain_head = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+            SourceChainResult::Ok(
+                workspace_lock
+                    .read()
+                    .await
+                    .source_chain
+                    .chain_head()?
+                    .to_owned(),
+            )
+        })
+        .unwrap();
+
+        assert_eq!(&chain_head, output.inner_ref());
+
+        let round: GetOutput = crate::call_test_ribosome!(
+            host_access,
+            TestWasm::MultipleCalls,
+            "get_entry_multiple",
+            ()
+        );
+
+        let sb: SerializedBytes = match round.into_inner().and_then(|el| el.into()) {
+            Some(holochain_zome_types::entry::Entry::App(entry_bytes)) => entry_bytes.into(),
+            other => panic!(format!("unexpected output: {:?}", other)),
+        };
+        // this should be the content "foo" of the committed post
+        assert_eq!(&vec![163, 102, 111, 111], sb.bytes(),)
+    }
+
+    #[tokio::test(threaded_scheduler)]
     async fn test_serialize_bytes_hash() {
         holochain_types::observability::test_run().ok();
         #[derive(Default, SerializedBytes, Serialize, Deserialize)]
