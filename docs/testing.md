@@ -43,6 +43,7 @@ The unit tests can access and call WASM-compiled zomes that are present in the `
 - Add the zome's name in TitleCase in the `TestWasm` enum.
 - Add a match arm inside the `impl From<TestWasm> for ZomeName` implementation that points to the folder you have created.
 - Add a new match arm inside the `impl From<TestWasm> for DnaWasm` implementation with the same path as all other arms but with the zome's name.
+3. In the `members` property of the `crates/test_utils/wasm/wasm_worskpace/Cargo.toml` file, add the folder name for your zome.
 
 ### Calling zome functions from a unit test
 
