@@ -1,8 +1,11 @@
 # Testing
 
+This is a small guide for holochain core testing.
+
 ## Requirements
 
-Having `nix-shell` installed ([instructions](https://nixos.org/download.html)).
+- Having `nix-shell` installed ([instructions](https://nixos.org/download.html)).
+- Having rust and `cargo` installed and in the stable toolchain version 1.45.2 (to change when `fixt` compiles on 1.46).
 
 ## Unit tests
 
