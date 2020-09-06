@@ -25,7 +25,7 @@ hc-merge-test
 - To run only one test from your crate, run this command:
 
 ```bash
-cargo test --manifest-path=crates/holochain/Cargo.toml --features slow_tests -- --nocapture [NAME_OF_THE_TEST_FUNCTION]
+cargo test --manifest-path=crates/holochain/Cargo.toml --features slow_tests build_wasms -- --nocapture [NAME_OF_THE_TEST_FUNCTION]
 ```
 
 If the test is located in a crate other than `holochain`, point to that crate in the `--manifest-path` argument.
