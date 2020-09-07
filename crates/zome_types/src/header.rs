@@ -9,7 +9,7 @@ pub mod builder;
 pub mod conversions;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, SerializedBytes)]
-pub struct HeaderHashes(Vec<HeaderHash>);
+pub struct HeaderHashes(pub Vec<HeaderHash>);
 
 impl From<Vec<HeaderHash>> for HeaderHashes {
     fn from(vs: Vec<HeaderHash>) -> Self {
@@ -52,6 +52,11 @@ macro_rules! write_into_header {
                 }
             }
         )*
+
+        #[derive(serde::Serialize, serde::Deserialize, SerializedBytes, PartialEq, Clone, Debug)]
+        pub enum HeaderType {
+            $($n,)*
+        }
     };
 }
 

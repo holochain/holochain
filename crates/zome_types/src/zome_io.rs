@@ -1,4 +1,7 @@
+use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
+
+use crate::header::HeaderHashes;
 
 /// all wasm shared I/O types need to share the same basic behaviours to cross the host/guest
 /// boundary in a predictable way
@@ -62,9 +65,9 @@ wasm_io_types!(
     // @TODO
     pub struct PropertyInput(());
     pub struct PropertyOutput(());
-    // @TODO
-    pub struct QueryInput(());
-    pub struct QueryOutput(());
+    // Query the source chain for data
+    pub struct QueryInput(crate::query::ChainQuery);
+    pub struct QueryOutput(HeaderHashes);
     // the length of random bytes to create
     pub struct RandomBytesInput(u32);
     pub struct RandomBytesOutput(crate::bytes::Bytes);

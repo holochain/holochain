@@ -67,11 +67,11 @@ pub mod slow_tests {
             .await
             .unwrap();
 
-        // ensure foo.bar twice to ensure idempotency
         let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock;
 
+        // ensure foo.bar twice to ensure idempotency
         let _: () = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
