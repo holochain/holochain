@@ -12,11 +12,12 @@ use tokio::task::JoinHandle;
 use tracing::*;
 
 /// Spawn the QueueConsumer for AppValidation workflow
-#[instrument(skip(env, stop, trigger_integration))]
+#[instrument(skip(env, stop, trigger_integration, conductor_api))]
 pub fn spawn_app_validation_consumer(
     env: EnvironmentWrite,
     mut stop: sync::broadcast::Receiver<()>,
     mut trigger_integration: TriggerSender,
+    conductor_api: impl CellConductorApiT + 'static,
 ) -> (
     TriggerSender,
     tokio::sync::oneshot::Receiver<()>,
@@ -30,10 +31,14 @@ pub fn spawn_app_validation_consumer(
         loop {
             let workspace = AppValidationWorkspace::new(env.clone().into())
                 .expect("Could not create Workspace");
-            if let WorkComplete::Incomplete =
-                app_validation_workflow(workspace, env.clone().into(), &mut trigger_integration)
-                    .await
-                    .expect("Error running Workflow")
+            if let WorkComplete::Incomplete = app_validation_workflow(
+                workspace,
+                env.clone().into(),
+                &mut trigger_integration,
+                conductor_api.clone(),
+            )
+            .await
+            .expect("Error running Workflow")
             {
                 trigger_self.trigger()
             };

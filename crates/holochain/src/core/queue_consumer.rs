@@ -78,8 +78,12 @@ pub async fn spawn_queue_consumer_tasks(
         .expect("Failed to manage workflow handle");
 
     // App validation
-    let (tx_app, rx3, handle) =
-        spawn_app_validation_consumer(env.clone(), stop.subscribe(), tx_integration.clone());
+    let (tx_app, rx3, handle) = spawn_app_validation_consumer(
+        env.clone(),
+        stop.subscribe(),
+        tx_integration.clone(),
+        conductor_api.clone(),
+    );
     task_sender
         .send(ManagedTaskAdd::dont_handle(handle))
         .await

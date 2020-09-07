@@ -117,8 +117,9 @@ async fn run_test(
             }),
             0
         );
-        // Integration should have 9 ops in it
-        // Plus another 14 for genesis + init
+        // Integration should have 9 ops in it.
+        // Plus another 14 for genesis.
+        // Init is not run because we aren't calling the zome.
         let res: Vec<_> = fresh_reader_test!(alice_env, |r| {
             workspace
                 .integrated_dht_ops

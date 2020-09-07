@@ -1,5 +1,7 @@
 //! The workflow and queue consumer for sys validation
 
+use std::sync::Arc;
+
 use super::{
     error::WorkflowResult,
     integrate_dht_ops_workflow::{
@@ -9,18 +11,31 @@ use super::{
     produce_dht_ops_workflow::dht_op_light::light_to_op,
     sys_validation_workflow::types::DepType,
 };
-use crate::core::{
-    queue_consumer::{OneshotWriter, TriggerSender, WorkComplete},
-    state::{
-        dht_op_integration::{IntegratedDhtOpsStore, IntegrationLimboStore, IntegrationLimboValue},
-        element_buf::ElementBuf,
-        metadata::MetadataBuf,
-        validation_db::{ValidationLimboStatus, ValidationLimboStore, ValidationLimboValue},
-        workspace::{Workspace, WorkspaceResult},
+use crate::{
+    conductor::api::CellConductorApiT,
+    core::ribosome::wasm_ribosome::WasmRibosome,
+    core::ValidationError,
+    core::{
+        queue_consumer::{OneshotWriter, TriggerSender, WorkComplete},
+        ribosome::guest_callback::validate::ValidateHostAccess,
+        ribosome::guest_callback::validate::ValidateInvocation,
+        ribosome::guest_callback::validate::ValidateResult,
+        ribosome::RibosomeT,
+        state::{
+            dht_op_integration::{
+                IntegratedDhtOpsStore, IntegrationLimboStore, IntegrationLimboValue,
+            },
+            element_buf::ElementBuf,
+            metadata::MetadataBuf,
+            validation_db::{ValidationLimboStatus, ValidationLimboStore, ValidationLimboValue},
+            workspace::{Workspace, WorkspaceResult},
+        },
     },
 };
+use error::AppValidationResult;
+pub use error::*;
 use fallible_iterator::FallibleIterator;
-use holo_hash::DhtOpHash;
+use holo_hash::{AnyDhtHash, DhtOpHash};
 use holochain_state::{
     buffer::{BufferedStore, KvBufFresh},
     db::{INTEGRATED_DHT_OPS, INTEGRATION_LIMBO},
@@ -28,18 +43,28 @@ use holochain_state::{
     fresh_reader,
     prelude::*,
 };
-use holochain_types::{dht_op::DhtOp, validate::ValidationStatus, Timestamp};
+use holochain_types::{
+    dht_op::DhtOp, dna::DnaFile, test_utils::which_agent, validate::ValidationStatus, Entry,
+    Timestamp,
+};
+use holochain_zome_types::{header::AppEntryType, header::EntryType, zome::ZomeName};
 use tracing::*;
+use types::*;
 
-#[instrument(skip(workspace, writer, trigger_integration))]
+#[cfg(test)]
+mod tests;
+
+mod error;
+mod types;
+
+#[instrument(skip(workspace, writer, trigger_integration, conductor_api))]
 pub async fn app_validation_workflow(
     mut workspace: AppValidationWorkspace,
     writer: OneshotWriter,
     trigger_integration: &mut TriggerSender,
+    conductor_api: impl CellConductorApiT,
 ) -> WorkflowResult<WorkComplete> {
-    warn!("unimplemented passthrough");
-
-    let complete = app_validation_workflow_inner(&mut workspace).await?;
+    let complete = app_validation_workflow_inner(&mut workspace, conductor_api).await?;
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // commit the workspace
@@ -52,6 +77,7 @@ pub async fn app_validation_workflow(
 }
 async fn app_validation_workflow_inner(
     workspace: &mut AppValidationWorkspace,
+    conductor_api: impl CellConductorApiT,
 ) -> WorkflowResult<WorkComplete> {
     let env = workspace.validation_limbo.env().clone();
     let (ops, mut awaiting_ops): (Vec<ValidationLimboValue>, Vec<ValidationLimboValue>) =
@@ -76,23 +102,36 @@ async fn app_validation_workflow_inner(
     debug!(?ops, ?awaiting_ops);
     for mut vlv in ops {
         match &vlv.status {
-            ValidationLimboStatus::AwaitingAppDeps(_) => {
+            ValidationLimboStatus::AwaitingAppDeps(_) | ValidationLimboStatus::SysValidated => {
                 let op = light_to_op(vlv.op.clone(), &workspace.element_pending).await?;
-                let hash = DhtOpHash::with_data(&op).await;
-                workspace.to_val_limbo(hash, vlv).await?;
-            }
-            ValidationLimboStatus::SysValidated => {
-                if vlv.awaiting_proof.awaiting_proof() {
-                    vlv.status = ValidationLimboStatus::AwaitingProof;
-                    awaiting_ops.push(vlv);
-                } else {
-                    let op = light_to_op(vlv.op.clone(), &workspace.element_pending).await?;
-                    let hash = DhtOpHash::with_data(&op).await;
-                    let iv = IntegrationLimboValue {
-                        validation_status: ValidationStatus::Valid,
-                        op: vlv.op,
-                    };
-                    workspace.to_int_limbo(hash, iv, op).await?;
+                let outcome = validate_op(op.clone(), &conductor_api).await?;
+                match outcome {
+                    Outcome::Accepted => {
+                        if vlv.awaiting_proof.awaiting_proof() {
+                            vlv.status = ValidationLimboStatus::AwaitingProof;
+                            awaiting_ops.push(vlv);
+                        } else {
+                            let hash = DhtOpHash::with_data(&op).await;
+                            let iv = IntegrationLimboValue {
+                                validation_status: ValidationStatus::Valid,
+                                op: vlv.op,
+                            };
+                            workspace.to_int_limbo(hash, iv, op).await?;
+                        }
+                    }
+                    Outcome::AwaitingDeps(deps) => {
+                        let hash = DhtOpHash::with_data(&op).await;
+                        vlv.status = ValidationLimboStatus::AwaitingAppDeps(deps);
+                        workspace.to_val_limbo(hash, vlv).await?;
+                    }
+                    Outcome::Rejected(_) => {
+                        let hash = DhtOpHash::with_data(&op).await;
+                        let iv = IntegrationLimboValue {
+                            op: vlv.op,
+                            validation_status: ValidationStatus::Rejected,
+                        };
+                        workspace.to_int_limbo(hash, iv, op).await?;
+                    }
                 }
             }
             _ => unreachable!("Should not contain any other status"),
@@ -172,6 +211,107 @@ async fn app_validation_workflow_inner(
         }
     }
     Ok(WorkComplete::Complete)
+}
+
+async fn validate_op(
+    op: DhtOp,
+    conductor_api: &impl CellConductorApiT,
+) -> AppValidationResult<Outcome> {
+    // Create the element
+    // TODO: remove clone of op
+    let (_, header, entry) = op.clone().into_inner();
+    let entry = match entry {
+        Some(e) => e,
+        // TODO: Change run validate to take an element
+        // and don't just accept elements without entries
+        None => return Ok(Outcome::Accepted),
+    };
+    // Get the app entry type
+    let app_entry_type = header.entry_data().and_then(|(_, et)| match et.clone() {
+        EntryType::App(aet) => Some(aet),
+        EntryType::AgentPubKey | EntryType::CapClaim | EntryType::CapGrant => None,
+    });
+    // Get the dna file
+    let dna_file = { conductor_api.get_this_dna().await };
+    let dna_file =
+        dna_file.ok_or_else(|| ValidationError::DnaMissing(conductor_api.cell_id().clone()))?;
+    // Get the zome names
+    let zome_names = get_zome_names(&app_entry_type, &dna_file)?;
+    // Create the ribosome
+    let ribosome = WasmRibosome::new(dna_file);
+    // Call the callback
+    // TODO: Not sure if this is correct? Calling every zome
+    // for an agent key etc. If so we should change run_validation
+    // to a Vec<ZomeName>
+    let entry = Arc::new(entry);
+    let outcome = zome_names
+        .into_iter()
+        // TODO: don't want to clone the entry here so
+        .map(|zome_name| run_validation_callback(zome_name, entry.clone(), &ribosome))
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .find(|o| match o {
+            Outcome::AwaitingDeps(_) | Outcome::Rejected(_) => true,
+            Outcome::Accepted => false,
+        })
+        .unwrap_or(Outcome::Accepted);
+    if let Outcome::AwaitingDeps(_) | Outcome::Rejected(_) = &outcome {
+        warn!(
+            agent = %which_agent(conductor_api.cell_id().agent_pubkey()),
+            msg = "DhtOp has failed app validation",
+            ?op,
+            outcome = ?outcome,
+        );
+    }
+    Ok(outcome)
+}
+
+fn get_zome_names(
+    app_entry_type: &Option<AppEntryType>,
+    dna_file: &DnaFile,
+) -> AppValidationResult<Vec<ZomeName>> {
+    Ok(match app_entry_type {
+        Some(aet) => vec![get_zome_name(aet, &dna_file)?],
+        None => dna_file
+            .dna()
+            .zomes
+            .iter()
+            .map(|(z, _)| z.clone())
+            .collect(),
+    })
+}
+
+fn get_zome_name(entry_type: &AppEntryType, dna_file: &DnaFile) -> AppValidationResult<ZomeName> {
+    let zome_index = u8::from(entry_type.zome_id()) as usize;
+    Ok(dna_file
+        .dna()
+        .zomes
+        .get(zome_index)
+        .ok_or_else(|| ValidationError::ZomeId(entry_type.clone()))?
+        .0
+        .clone())
+}
+
+fn run_validation_callback(
+    zome_name: ZomeName,
+    entry: Arc<Entry>,
+    ribosome: &impl RibosomeT,
+) -> AppValidationResult<Outcome> {
+    let validate: ValidateResult = ribosome.run_validate(
+        ValidateHostAccess,
+        ValidateInvocation {
+            zome_name: zome_name,
+            entry: entry,
+        },
+    )?;
+    match validate {
+        ValidateResult::Valid => Ok(Outcome::Accepted),
+        ValidateResult::Invalid(reason) => Ok(Outcome::Rejected(reason)),
+        ValidateResult::UnresolvedDependencies(hashes) => {
+            let deps = hashes.into_iter().map(AnyDhtHash::from).collect();
+            Ok(Outcome::AwaitingDeps(deps))
+        }
+    }
 }
 
 pub struct AppValidationWorkspace {
@@ -257,7 +397,6 @@ impl AppValidationWorkspace {
 
 impl Workspace for AppValidationWorkspace {
     fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> WorkspaceResult<()> {
-        warn!("unimplemented passthrough");
         self.validation_limbo.0.flush_to_txn_ref(writer)?;
         self.integration_limbo.flush_to_txn_ref(writer)?;
         self.element_pending.flush_to_txn_ref(writer)?;

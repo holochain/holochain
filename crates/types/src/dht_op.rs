@@ -179,6 +179,20 @@ impl DhtOp {
             | DhtOp::RegisterRemoveLink(s, _) => s,
         }
     }
+
+    /// Extract inner Signature, Header and Option<Entry> from an op
+    pub fn into_inner(self) -> (Signature, Header, Option<Entry>) {
+        match self {
+            DhtOp::StoreElement(s, h, e) => (s, h, e.map(|e| *e)),
+            DhtOp::StoreEntry(s, h, e) => (s, h.into(), Some(*e)),
+            DhtOp::RegisterAgentActivity(s, h) => (s, h, None),
+            DhtOp::RegisterUpdatedBy(s, h) => (s, h.into(), None),
+            DhtOp::RegisterDeletedBy(s, h) => (s, h.into(), None),
+            DhtOp::RegisterDeletedEntryHeader(s, h) => (s, h.into(), None),
+            DhtOp::RegisterAddLink(s, h) => (s, h.into(), None),
+            DhtOp::RegisterRemoveLink(s, h) => (s, h.into(), None),
+        }
+    }
 }
 
 impl DhtOpLight {
