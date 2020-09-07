@@ -122,7 +122,7 @@ pub fn extract_entry_def(
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use super::commit_entry;
-    use crate::core::ribosome::error::RibosomeError;
+    use crate::conductor::dna_store::MockDnaStore;
     use crate::core::state::source_chain::ChainInvalidReason;
     use crate::core::state::source_chain::SourceChainError;
     use crate::core::state::source_chain::SourceChainResult;
@@ -131,17 +131,31 @@ pub mod wasm_test {
     use crate::fixt::EntryFixturator;
     use crate::fixt::WasmRibosomeFixturator;
     use crate::fixt::ZomeCallHostAccessFixturator;
+    use crate::{
+        conductor::interface::websocket::test::setup_app,
+        core::ribosome::{error::RibosomeError, ZomeCallInvocation, ZomeCallInvocationResponse},
+    };
     use fixt::prelude::*;
     use holo_hash::{AnyDhtHash, EntryHash};
     use holochain_serialized_bytes::prelude::*;
-    use holochain_types::fixt::AppEntry;
+    use holochain_types::{
+        app::InstalledCell,
+        cell::CellId,
+        dna::DnaDef,
+        dna::DnaFile,
+        fixt::{AppEntry, CapSecretFixturator},
+        observability,
+        test_utils::fake_agent_pubkey_1,
+        test_utils::fake_agent_pubkey_2,
+    };
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::entry::EntryError;
     use holochain_zome_types::entry_def::EntryDefId;
     use holochain_zome_types::CommitEntryInput;
     use holochain_zome_types::CommitEntryOutput;
     use holochain_zome_types::Entry;
     use holochain_zome_types::GetOutput;
+    use holochain_zome_types::{entry::EntryError, HostInput};
+    use matches::assert_matches;
     use std::sync::Arc;
 
     #[tokio::test(threaded_scheduler)]
@@ -277,6 +291,90 @@ pub mod wasm_test {
     }
 
     #[tokio::test(threaded_scheduler)]
+    async fn multiple_commit_entry_limit_test() {
+        observability::test_run().unwrap();
+        let dna_file = DnaFile::new(
+            DnaDef {
+                name: "commit_multi_test".to_string(),
+                uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
+                properties: SerializedBytes::try_from(()).unwrap(),
+                zomes: vec![TestWasm::MultipleCalls.into()].into(),
+            },
+            vec![TestWasm::MultipleCalls.into()],
+        )
+        .await
+        .unwrap();
+
+        // //////////
+        // END DNA
+        // //////////
+
+        // ///////////
+        // START ALICE
+        // ///////////
+
+        let alice_agent_id = fake_agent_pubkey_1();
+        let alice_cell_id = CellId::new(dna_file.dna_hash().to_owned(), alice_agent_id.clone());
+        let alice_installed_cell = InstalledCell::new(alice_cell_id.clone(), "alice_handle".into());
+
+        // /////////
+        // END ALICE
+        // /////////
+
+        // /////////
+        // START BOB
+        // /////////
+
+        let bob_agent_id = fake_agent_pubkey_2();
+        let bob_cell_id = CellId::new(dna_file.dna_hash().to_owned(), bob_agent_id.clone());
+        let bob_installed_cell = InstalledCell::new(bob_cell_id.clone(), "bob_handle".into());
+
+        // ///////
+        // END BOB
+        // ///////
+
+        // ///////////////
+        // START CONDUCTOR
+        // ///////////////
+
+        let mut dna_store = MockDnaStore::new();
+
+        dna_store.expect_get().return_const(Some(dna_file.clone()));
+        dna_store.expect_add_dnas::<Vec<_>>().return_const(());
+        dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
+
+        let (_tmpdir, _app_api, handle) = setup_app(
+            vec![(alice_installed_cell, None), (bob_installed_cell, None)],
+            dna_store,
+        )
+        .await;
+
+        // /////////////
+        // END CONDUCTOR
+        // /////////////
+
+        // ALICE DOING A CALL
+
+        let output = handle
+            .call_zome(ZomeCallInvocation {
+                cell_id: alice_cell_id,
+                zome_name: TestWasm::MultipleCalls.into(),
+                cap: CapSecretFixturator::new(Empty).next().unwrap(),
+                fn_name: "commit_entry_multiple".to_string(),
+                payload: HostInput::new(().try_into().unwrap()),
+                provenance: alice_agent_id,
+            })
+            .await
+            .unwrap()
+            .unwrap();
+        assert_matches!(output, ZomeCallInvocationResponse::ZomeApiFn(_));
+
+        let shutdown = handle.take_shutdown_handle().await.unwrap();
+        handle.shutdown().await;
+        shutdown.await.unwrap();
+    }
+    #[tokio::test(threaded_scheduler)]
+    #[ignore]
     async fn ribosome_multiple_commit_entry_test<'a>() {
         holochain_types::observability::test_run().ok();
         // test workspace boilerplate
