@@ -223,6 +223,7 @@ fn handle_failed(error: ValidationError) -> Outcome {
     use Outcome::*;
     match error {
         ValidationError::DepMissingFromDht(_) => MissingDhtDep,
+        // TODO: remove this from validation error
         ValidationError::DnaMissing(cell_id) => {
             panic!("Cell {:?} is missing the Dna code", cell_id)
         }

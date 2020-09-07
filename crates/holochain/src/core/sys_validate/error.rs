@@ -31,6 +31,10 @@ pub enum SysValidationError {
 
 pub type SysValidationResult<T> = Result<T, SysValidationError>;
 
+// TODO: make this private
+// TODO: use try guard crate to refactor this so it's not an "Error"
+// https://docs.rs/try-guard/0.2.0/try_guard/
+
 /// All the errors that can come from validation
 #[derive(Error, Debug)]
 pub enum ValidationError {
