@@ -1,6 +1,6 @@
 # Core Testing
 
-This is a small guide for holochain core testing.
+This is a small guide for holochain core testing. This should not be used to test your hApp's code, but instead to test holochain's core code. To test hApp code, use [tryorama](https://github.com/holo-host/tryorama).
 
 Holochain's unit tests for holochain core are located just beside the source code. You can open any rust source code file, and it will have at the end its own tests. Also you can find integration tests in the `test` folder in each crate. To know where you should place your tests, follow [Rust's conventions for testing](https://doc.rust-lang.org/book/ch11-03-test-organization.html).
 
