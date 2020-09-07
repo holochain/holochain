@@ -2,7 +2,7 @@
 
 This is a small guide for holochain core testing.
 
-Both unit tests and integration tests for holochain core are located just beside the source code. You can open any rust source code file, and it will have at the end its own tests. 
+Holochain's unit tests for holochain core are located just beside the source code. You can open any rust source code file, and it will have at the end its own tests. Also you can find integration tests in the `test` folder in each crate. To know where you should place your tests, follow [Rust's conventions for testing](https://doc.rust-lang.org/book/ch11-03-test-organization.html).
 
 There are tests at different levels of integration, so you can tailor your tests to whatever components or flows you want. For example, there are tests that only call functions for a workflow to validate its procedure, but there are also tests that boot up a conductor and call functions to it simulating a UI.
 
@@ -22,6 +22,8 @@ First of all, from the root folder, run `nix-shell`.
 ```bash
 hc-merge-test
 ```
+
+You can also use `hc-test` if you don't want to run cargo fmt and cargo clippy, but both of this will be RUN on CircleCI.
 
 - To run only one test from your crate, run this command:
 
