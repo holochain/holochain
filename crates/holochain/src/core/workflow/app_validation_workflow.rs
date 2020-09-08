@@ -2,6 +2,7 @@
 
 use super::{
     error::WorkflowResult,
+    integrate_dht_ops_workflow::reintegrate_single_data,
     integrate_dht_ops_workflow::{
         disintegrate_single_data, disintegrate_single_metadata, integrate_single_data,
         integrate_single_metadata,
@@ -28,7 +29,7 @@ use holochain_state::{
     fresh_reader,
     prelude::*,
 };
-use holochain_types::{dht_op::DhtOp, validate::ValidationStatus, Timestamp};
+use holochain_types::{dht_op::DhtOp, dht_op::DhtOpLight, validate::ValidationStatus, Timestamp};
 use tracing::*;
 
 #[instrument(skip(workspace, writer, trigger_integration))]
@@ -79,7 +80,7 @@ async fn app_validation_workflow_inner(
             ValidationLimboStatus::AwaitingAppDeps(_) => {
                 let op = light_to_op(vlv.op.clone(), &workspace.element_pending).await?;
                 let hash = DhtOpHash::with_data(&op).await;
-                workspace.to_val_limbo(hash, vlv).await?;
+                workspace.to_val_limbo(hash, vlv)?;
             }
             ValidationLimboStatus::SysValidated => {
                 if vlv.awaiting_proof.awaiting_proof() {
@@ -92,7 +93,7 @@ async fn app_validation_workflow_inner(
                         validation_status: ValidationStatus::Valid,
                         op: vlv.op,
                     };
-                    workspace.to_int_limbo(hash, iv, op).await?;
+                    workspace.to_int_limbo(hash, iv, op)?;
                 }
             }
             _ => unreachable!("Should not contain any other status"),
@@ -136,7 +137,7 @@ async fn app_validation_workflow_inner(
                                         validation_status: status,
                                         op: vlv.op,
                                     };
-                                    workspace.to_int_limbo(hash, iv, op).await?;
+                                    workspace.to_int_limbo(hash, iv, op)?;
 
                                     // Continue to the next op
                                     continue 'op_loop;
@@ -162,13 +163,13 @@ async fn app_validation_workflow_inner(
         let hash = DhtOpHash::with_data(&op).await;
         if still_awaiting.len() > 0 {
             vlv.awaiting_proof.deps = still_awaiting;
-            workspace.to_val_limbo(hash, vlv).await?;
+            workspace.to_val_limbo(hash, vlv)?;
         } else {
             let iv = IntegrationLimboValue {
                 validation_status: ValidationStatus::Valid,
                 op: vlv.op,
             };
-            workspace.to_int_limbo(hash, iv, op).await?;
+            workspace.to_int_limbo(hash, iv, op)?;
         }
     }
     Ok(WorkComplete::Complete)
@@ -190,6 +191,8 @@ pub struct AppValidationWorkspace {
     // Cached data
     pub element_cache: ElementBuf,
     pub meta_cache: MetadataBuf,
+    // Ops to disintegrate
+    pub to_disintegrate_pending: Vec<DhtOpLight>,
 }
 
 impl AppValidationWorkspace {
@@ -224,10 +227,11 @@ impl AppValidationWorkspace {
             meta_judged,
             element_cache,
             meta_cache,
+            to_disintegrate_pending: Vec::new(),
         })
     }
 
-    async fn to_val_limbo(
+    fn to_val_limbo(
         &mut self,
         hash: DhtOpHash,
         mut vlv: ValidationLimboValue,
@@ -238,19 +242,32 @@ impl AppValidationWorkspace {
         Ok(())
     }
 
-    async fn to_int_limbo(
+    #[tracing::instrument(skip(self, hash))]
+    fn to_int_limbo(
         &mut self,
         hash: DhtOpHash,
         iv: IntegrationLimboValue,
         op: DhtOp,
     ) -> WorkflowResult<()> {
-        disintegrate_single_metadata(iv.op.clone(), &self.element_pending, &mut self.meta_pending)
-            .await?;
-        disintegrate_single_data(iv.op.clone(), &mut self.element_pending);
-        integrate_single_data(op, &mut self.element_judged).await?;
-        integrate_single_metadata(iv.op.clone(), &self.element_judged, &mut self.meta_judged)
-            .await?;
+        disintegrate_single_metadata(iv.op.clone(), &self.element_pending, &mut self.meta_pending)?;
+        self.to_disintegrate_pending.push(iv.op.clone());
+        integrate_single_data(op, &mut self.element_judged)?;
+        integrate_single_metadata(iv.op.clone(), &self.element_judged, &mut self.meta_judged)?;
         self.integration_limbo.put(hash, iv)?;
+        Ok(())
+    }
+
+    #[tracing::instrument(skip(self, writer))]
+    /// We need to cancel any deletes for the pending data
+    /// where the ops still in validation limbo reference that data
+    fn update_element_stores(&mut self, writer: &mut Writer) -> WorkspaceResult<()> {
+        for op in self.to_disintegrate_pending.drain(..) {
+            disintegrate_single_data(op, &mut self.element_pending);
+        }
+        let mut val_iter = self.validation_limbo.iter(writer)?;
+        while let Some((_, vlv)) = val_iter.next()? {
+            reintegrate_single_data(vlv.op, &mut self.element_pending);
+        }
         Ok(())
     }
 }
@@ -258,6 +275,7 @@ impl AppValidationWorkspace {
 impl Workspace for AppValidationWorkspace {
     fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> WorkspaceResult<()> {
         warn!("unimplemented passthrough");
+        self.update_element_stores(writer)?;
         self.validation_limbo.0.flush_to_txn_ref(writer)?;
         self.integration_limbo.flush_to_txn_ref(writer)?;
         self.element_pending.flush_to_txn_ref(writer)?;

@@ -95,24 +95,18 @@ pub async fn integrate_dht_ops_workflow(
             } = so.0;
             // Check validation status and put in correct dbs
             let outcome = match value.validation_status {
-                ValidationStatus::Valid => {
-                    integrate_single_dht_op(
-                        value.clone(),
-                        op,
-                        &mut workspace.elements,
-                        &mut workspace.meta,
-                    )
-                    .await?
-                }
-                ValidationStatus::Rejected => {
-                    integrate_single_dht_op(
-                        value.clone(),
-                        op,
-                        &mut workspace.element_rejected,
-                        &mut workspace.meta_rejected,
-                    )
-                    .await?
-                }
+                ValidationStatus::Valid => integrate_single_dht_op(
+                    value.clone(),
+                    op,
+                    &mut workspace.elements,
+                    &mut workspace.meta,
+                )?,
+                ValidationStatus::Rejected => integrate_single_dht_op(
+                    value.clone(),
+                    op,
+                    &mut workspace.element_rejected,
+                    &mut workspace.meta_rejected,
+                )?,
                 ValidationStatus::Abandoned => {
                     // Throwing away abandoned ops
                     // TODO: keep abandoned ops but remove the entries
@@ -126,7 +120,7 @@ pub async fn integrate_dht_ops_workflow(
                     // and separate rejected ops from valid ops.
                     // Currently you need to check the IntegratedDhtOpsValue for
                     // the status
-                    workspace.integrate(hash, integrated).await?;
+                    workspace.integrate(hash, integrated)?;
                     num_integrated += 1;
                     total_integrated += 1;
                 }
@@ -183,15 +177,15 @@ pub async fn integrate_dht_ops_workflow(
 /// We can skip integrating element data when integrating data as an Author
 /// rather than as an Authority, hence the last parameter.
 #[instrument(skip(iv, element_store, meta_store))]
-async fn integrate_single_dht_op<P: PrefixType>(
+fn integrate_single_dht_op<P: PrefixType>(
     iv: IntegrationLimboValue,
     op: DhtOp,
     element_store: &mut ElementBuf<P>,
     meta_store: &mut MetadataBuf<P>,
 ) -> DhtOpConvertResult<Outcome> {
-    if op_dependencies_held(&op, element_store).await? {
-        integrate_single_data(op, element_store).await?;
-        integrate_single_metadata(iv.op.clone(), element_store, meta_store).await?;
+    if op_dependencies_held(&op, element_store)? {
+        integrate_single_data(op, element_store)?;
+        integrate_single_metadata(iv.op.clone(), element_store, meta_store)?;
         let integrated = IntegratedDhtOpsValue {
             validation_status: iv.validation_status,
             op: iv.op,
@@ -208,12 +202,12 @@ async fn integrate_single_dht_op<P: PrefixType>(
 /// Check if we have the required dependencies held before integrating.
 // TODO: This doesn't really check why we are holding the values.
 // We could have them for other reasons.
-async fn op_dependencies_held<P: PrefixType>(
+fn op_dependencies_held<P: PrefixType>(
     op: &DhtOp,
     element_store: &ElementBuf<P>,
 ) -> DhtOpConvertResult<bool> {
     {
-        async fn header_with_entry_is_stored<P: PrefixType>(
+        fn header_with_entry_is_stored<P: PrefixType>(
             hash: &HeaderHash,
             element_store: &ElementBuf<P>,
         ) -> DhtOpConvertResult<bool> {
@@ -245,27 +239,21 @@ async fn op_dependencies_held<P: PrefixType>(
                 if !header_with_entry_is_stored(
                     &entry_update.original_header_address,
                     element_store,
-                )
-                .await?
-                {
+                )? {
                     return Ok(false);
                 }
             }
             DhtOp::RegisterDeletedEntryHeader(_, element_delete) => {
                 // Check if we have the header with the entry that we are removing in the vault
                 // or defer the op.
-                if !header_with_entry_is_stored(&element_delete.removes_address, element_store)
-                    .await?
-                {
+                if !header_with_entry_is_stored(&element_delete.removes_address, element_store)? {
                     return Ok(false);
                 }
             }
             DhtOp::RegisterDeletedBy(_, element_delete) => {
                 // Check if we have the header with the entry that we are removing in the vault
                 // or defer the op.
-                if !header_with_entry_is_stored(&element_delete.removes_address, element_store)
-                    .await?
-                {
+                if !header_with_entry_is_stored(&element_delete.removes_address, element_store)? {
                     return Ok(false);
                 }
             }
@@ -298,7 +286,7 @@ async fn op_dependencies_held<P: PrefixType>(
     }
 }
 
-pub async fn integrate_single_metadata<C, P>(
+pub fn integrate_single_metadata<C, P>(
     op: DhtOpLight,
     element_store: &ElementBuf<P>,
     meta_store: &mut C,
@@ -309,34 +297,34 @@ where
 {
     match op {
         DhtOpLight::StoreElement(hash, _, _) => {
-            let header = get_header(hash, element_store).await?;
+            let header = get_header(hash, element_store)?;
             meta_store.register_element_header(&header)?;
         }
         DhtOpLight::StoreEntry(hash, _, _) => {
-            let new_entry_header = get_header(hash, element_store).await?.try_into()?;
+            let new_entry_header = get_header(hash, element_store)?.try_into()?;
             // Reference to headers
             meta_store.register_header(new_entry_header)?;
         }
         DhtOpLight::RegisterAgentActivity(hash, _) => {
-            let header = get_header(hash, element_store).await?;
+            let header = get_header(hash, element_store)?;
             // register agent activity on this agents pub key
             meta_store.register_activity(header)?;
         }
         DhtOpLight::RegisterUpdatedBy(hash, _, _) => {
-            let header = get_header(hash, element_store).await?.try_into()?;
+            let header = get_header(hash, element_store)?.try_into()?;
             meta_store.register_update(header)?;
         }
         DhtOpLight::RegisterDeletedEntryHeader(hash, _)
         | DhtOpLight::RegisterDeletedBy(hash, _) => {
-            let header = get_header(hash, element_store).await?.try_into()?;
+            let header = get_header(hash, element_store)?.try_into()?;
             meta_store.register_delete(header)?
         }
         DhtOpLight::RegisterAddLink(hash, _) => {
-            let header = get_header(hash, element_store).await?.try_into()?;
+            let header = get_header(hash, element_store)?.try_into()?;
             meta_store.add_link(header)?;
         }
         DhtOpLight::RegisterRemoveLink(hash, _) => {
-            let header = get_header(hash, element_store).await?.try_into()?;
+            let header = get_header(hash, element_store)?.try_into()?;
             meta_store.remove_link(header)?;
         }
     }
@@ -344,14 +332,14 @@ where
 }
 
 /// Store a DhtOp's data in an element buf
-pub async fn integrate_single_data<P: PrefixType>(
+pub fn integrate_single_data<P: PrefixType>(
     op: DhtOp,
     element_store: &mut ElementBuf<P>,
 ) -> DhtOpConvertResult<()> {
     {
         match op {
             DhtOp::StoreElement(signature, header, maybe_entry) => {
-                put_data(signature, header, maybe_entry.map(|e| *e), element_store).await?;
+                put_data(signature, header, maybe_entry.map(|e| *e), element_store)?;
             }
             DhtOp::StoreEntry(signature, new_entry_header, entry) => {
                 put_data(
@@ -359,33 +347,32 @@ pub async fn integrate_single_data<P: PrefixType>(
                     new_entry_header.into(),
                     Some(*entry),
                     element_store,
-                )
-                .await?;
+                )?;
             }
             DhtOp::RegisterAgentActivity(signature, header) => {
-                put_data(signature, header, None, element_store).await?;
+                put_data(signature, header, None, element_store)?;
             }
             DhtOp::RegisterUpdatedBy(signature, entry_update) => {
-                put_data(signature, entry_update.into(), None, element_store).await?;
+                put_data(signature, entry_update.into(), None, element_store)?;
             }
             DhtOp::RegisterDeletedEntryHeader(signature, element_delete) => {
-                put_data(signature, element_delete.into(), None, element_store).await?;
+                put_data(signature, element_delete.into(), None, element_store)?;
             }
             DhtOp::RegisterDeletedBy(signature, element_delete) => {
-                put_data(signature, element_delete.into(), None, element_store).await?;
+                put_data(signature, element_delete.into(), None, element_store)?;
             }
             DhtOp::RegisterAddLink(signature, link_add) => {
-                put_data(signature, link_add.into(), None, element_store).await?;
+                put_data(signature, link_add.into(), None, element_store)?;
             }
             DhtOp::RegisterRemoveLink(signature, link_remove) => {
-                put_data(signature, link_remove.into(), None, element_store).await?;
+                put_data(signature, link_remove.into(), None, element_store)?;
             }
         }
         Ok(())
     }
 }
 
-async fn put_data<P: PrefixType>(
+fn put_data<P: PrefixType>(
     signature: Signature,
     header: Header,
     maybe_entry: Option<Entry>,
@@ -400,7 +387,7 @@ async fn put_data<P: PrefixType>(
     Ok(())
 }
 
-async fn get_header<P: PrefixType>(
+fn get_header<P: PrefixType>(
     hash: HeaderHash,
     element_store: &ElementBuf<P>,
 ) -> DhtOpConvertResult<Header> {
@@ -424,7 +411,7 @@ pub async fn integrate_to_cache<C: MetadataBufT>(
     // Produce the light directly
     for op in produce_op_lights_from_elements(vec![element]).await? {
         // we don't integrate element data, because it is already in our vault.
-        integrate_single_metadata(op, element_store, meta_store).await?
+        integrate_single_metadata(op, element_store, meta_store)?
     }
     Ok(())
 }
@@ -449,10 +436,13 @@ pub struct IntegrateDhtOpsWorkspace {
     pub meta_judged: MetadataBuf<JudgedPrefix>,
     pub element_rejected: ElementBuf<RejectedPrefix>,
     pub meta_rejected: MetadataBuf<RejectedPrefix>,
+    // Ops to disintegrate
+    pub to_disintegrate_judged: Vec<DhtOpLight>,
 }
 
 impl Workspace for IntegrateDhtOpsWorkspace {
     fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> WorkspaceResult<()> {
+        self.update_element_stores(writer)?;
         // flush elements
         self.elements.flush_to_txn_ref(writer)?;
         // flush metadata store
@@ -496,22 +486,33 @@ impl IntegrateDhtOpsWorkspace {
             meta_judged,
             element_rejected,
             meta_rejected,
+            to_disintegrate_judged: Vec::new(),
         })
     }
 
-    async fn integrate(
-        &mut self,
-        hash: DhtOpHash,
-        v: IntegratedDhtOpsValue,
-    ) -> DhtOpConvertResult<()> {
-        disintegrate_single_metadata(v.op.clone(), &self.element_judged, &mut self.meta_judged)
-            .await?;
-        disintegrate_single_data(v.op.clone(), &mut self.element_judged);
+    #[tracing::instrument(skip(self, hash))]
+    fn integrate(&mut self, hash: DhtOpHash, v: IntegratedDhtOpsValue) -> DhtOpConvertResult<()> {
+        disintegrate_single_metadata(v.op.clone(), &self.element_judged, &mut self.meta_judged)?;
+        self.to_disintegrate_judged.push(v.op.clone());
         self.integrated_dht_ops.put(hash, v)?;
         Ok(())
     }
 
     pub fn op_exists(&self, hash: &DhtOpHash) -> DatabaseResult<bool> {
         Ok(self.integrated_dht_ops.contains(&hash)? || self.integration_limbo.contains(&hash)?)
+    }
+
+    #[tracing::instrument(skip(self, writer))]
+    /// We need to cancel any deletes for the judged data
+    /// where the ops still in integration limbo reference that data
+    fn update_element_stores(&mut self, writer: &mut Writer) -> WorkspaceResult<()> {
+        for op in self.to_disintegrate_judged.drain(..) {
+            disintegrate_single_data(op, &mut self.element_judged);
+        }
+        let mut val_iter = self.integration_limbo.iter(writer)?;
+        while let Some((_, vlv)) = val_iter.next()? {
+            reintegrate_single_data(vlv.op, &mut self.element_judged);
+        }
+        Ok(())
     }
 }

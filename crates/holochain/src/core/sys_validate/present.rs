@@ -331,7 +331,7 @@ pub async fn check_entry_exists(
     check_holding_entry!(workspace, check_holding_entry, &entry_hash);
     let mut cascade = workspace.cascade(network);
     let el = cascade
-        .exists(entry_hash.clone().into(), Default::default())
+        .retrieve(entry_hash.clone().into(), Default::default())
         .await?
         .ok_or_else(|| ValidationError::DepMissingFromDht(entry_hash.into()))?;
     Ok(Dependency::Claim(el))
@@ -346,7 +346,7 @@ pub async fn check_header_exists(
     check_holding_el!(workspace, check_holding_header, &hash);
     let mut cascade = workspace.cascade(network);
     let h = cascade
-        .exists_header(hash.clone(), Default::default())
+        .retrieve_header(hash.clone(), Default::default())
         .await?
         .ok_or_else(|| ValidationError::DepMissingFromDht(hash.into()))?;
     Ok(Dependency::Claim(h))
@@ -361,7 +361,7 @@ pub async fn check_element_exists(
     check_holding_el!(workspace, check_holding_element, &hash);
     let mut cascade = workspace.cascade(network);
     let el = cascade
-        .exists(hash.clone().into(), Default::default())
+        .retrieve(hash.clone().into(), Default::default())
         .await?
         .ok_or_else(|| ValidationError::DepMissingFromDht(hash.into()))?;
     Ok(Dependency::Claim(el))

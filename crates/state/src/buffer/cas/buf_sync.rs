@@ -53,6 +53,13 @@ where
         self.0.delete(k).expect("Hash key is empty");
     }
 
+    /// Remove a delete from the underlying [KvBufUsed] scratch space
+    pub fn cancel_delete(&mut self, k: HoloHashOf<C>) {
+        let k = PrefixHashKey::new(k.as_hash());
+        // These expects seem valid as it means the hashing is broken
+        self.0.cancel_delete(k).expect("Hash key is empty");
+    }
+
     /// Get a value from the underlying [KvBufUsed]
     pub fn get<'r, 'a: 'r, R: Readable>(
         &'a self,

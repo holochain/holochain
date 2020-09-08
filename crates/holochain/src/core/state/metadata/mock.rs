@@ -60,7 +60,9 @@ mock! {
             &self,
             link_add: HeaderHash,
         ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError>>>;
-        fn has_element_header(&self, hash: &HeaderHash) -> DatabaseResult<bool>;
+        fn has_registered_store_element(&self, hash: &HeaderHash) -> DatabaseResult<bool>;
+        fn has_registered_store_entry(&self, entry_hash: &EntryHash, header_hash: &HeaderHash) -> DatabaseResult<bool>;
+        fn has_any_registered_store_entry(&self, hash: &EntryHash) -> DatabaseResult<bool>;
         fn env(&self) -> &EnvironmentRead;
     }
 }
@@ -221,8 +223,18 @@ impl MetadataBufT for MockMetadataBuf {
     fn register_raw_on_header(&mut self, header_hash: HeaderHash, value: SysMetaVal) {
         self.register_raw_on_header(header_hash, value)
     }
-    fn has_element_header(&self, hash: &HeaderHash) -> DatabaseResult<bool> {
-        self.has_element_header(hash)
+    fn has_registered_store_element(&self, hash: &HeaderHash) -> DatabaseResult<bool> {
+        self.has_registered_store_element(hash)
+    }
+    fn has_registered_store_entry(
+        &self,
+        entry_hash: &EntryHash,
+        header_hash: &HeaderHash,
+    ) -> DatabaseResult<bool> {
+        self.has_registered_store_entry(entry_hash, header_hash)
+    }
+    fn has_any_registered_store_entry(&self, hash: &EntryHash) -> DatabaseResult<bool> {
+        self.has_any_registered_store_entry(hash)
     }
 
     fn env(&self) -> &EnvironmentRead {

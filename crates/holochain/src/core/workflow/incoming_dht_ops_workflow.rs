@@ -103,13 +103,12 @@ impl IncomingDhtOpsWorkspace {
         let basis = op.dht_basis().await;
         let op_light = op.to_light().await;
 
-        integrate_single_data(op, &mut self.element_pending).await?;
+        integrate_single_data(op, &mut self.element_pending)?;
         integrate_single_metadata(
             op_light.clone(),
             &self.element_pending,
             &mut self.meta_pending,
-        )
-        .await?;
+        )?;
         let vlv = ValidationLimboValue {
             status: ValidationLimboStatus::Pending,
             op: op_light,
