@@ -32,6 +32,7 @@ use crate::{
         },
     },
 };
+use either::Either;
 use error::AppValidationResult;
 pub use error::*;
 use fallible_iterator::FallibleIterator;
@@ -47,7 +48,7 @@ use holochain_types::{
     dht_op::DhtOp, dht_op::DhtOpLight, dna::DnaFile, test_utils::which_agent,
     validate::ValidationStatus, Entry, Timestamp,
 };
-use holochain_zome_types::{header::AppEntryType, header::EntryType, zome::ZomeName};
+use holochain_zome_types::{header::AppEntryType, header::EntryType, zome::ZomeName, Header};
 use tracing::*;
 use types::*;
 
@@ -213,18 +214,49 @@ async fn app_validation_workflow_inner(
     Ok(WorkComplete::Complete)
 }
 
+fn get_header_entry(op: DhtOp) -> Either<HeaderEntry, Outcome> {
+    use Either::*;
+    match op {
+        DhtOp::RegisterDeletedBy(_, _) | DhtOp::RegisterAgentActivity(_, _) => {
+            Right(Outcome::Accepted)
+        }
+        DhtOp::StoreElement(_, h, _) => match h {
+            Header::ElementDelete(_) => todo!("Get the original entry"),
+            _ => Right(Outcome::Accepted),
+        },
+        DhtOp::StoreEntry(_, h, e) => Left(HeaderEntry {
+            header: h.into(),
+            entry: *e,
+        }),
+        DhtOp::RegisterUpdatedBy(_, h) => Left(HeaderEntry {
+            header: h.into(),
+            entry: todo!("get the original entry"),
+        }),
+        DhtOp::RegisterDeletedEntryHeader(_, h) => Left(HeaderEntry {
+            header: h.into(),
+            entry: todo!("get the deleted entry"),
+        }),
+        DhtOp::RegisterAddLink(_, h) => Left(HeaderEntry {
+            header: h.into(),
+            entry: todo!("get the base entry"),
+        }),
+        DhtOp::RegisterRemoveLink(_, h) => Left(HeaderEntry {
+            header: h.into(),
+            entry: todo!("get the base entry"),
+        }),
+    }
+}
+
 async fn validate_op(
     op: DhtOp,
     conductor_api: &impl CellConductorApiT,
 ) -> AppValidationResult<Outcome> {
+    use Either::*;
     // Create the element
     // TODO: remove clone of op
-    let (_, header, entry) = op.clone().into_inner();
-    let entry = match entry {
-        Some(e) => e,
-        // TODO: Change run validate to take an element
-        // and don't just accept elements without entries
-        None => return Ok(Outcome::Accepted),
+    let HeaderEntry { header, entry } = match get_header_entry(op.clone()) {
+        Left(he) => he,
+        Right(o) => return Ok(o),
     };
     // Get the app entry type
     let app_entry_type = header.entry_data().and_then(|(_, et)| match et.clone() {
