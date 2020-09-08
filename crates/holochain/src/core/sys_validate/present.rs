@@ -18,7 +18,7 @@ macro_rules! check_holding_el {
     ($ws:expr, $f:ident, $($hash:expr),+) => {{
         check_holding!($f, $($hash),+ => Proof, &$ws.element_vault);
         check_holding!($f, $($hash),+ => Proof, &$ws.element_judged);
-        check_holding!($f, $($hash),+ => AwaitingProof, &$ws.element_pending);
+        check_holding!($f, $($hash),+ => PendingValidation, &$ws.element_pending);
     }};
 }
 
@@ -26,7 +26,7 @@ macro_rules! check_holding_entry {
     ($ws:expr, $f:ident, $($hash:expr),+) => {{
         check_holding!($f, $($hash),+ => Proof, &$ws.element_vault, &$ws.meta_vault);
         check_holding!($f, $($hash),+ => Proof, &$ws.element_judged, &$ws.meta_judged);
-        check_holding!($f, $($hash),+ => AwaitingProof, &$ws.element_pending, &$ws.meta_pending);
+        check_holding!($f, $($hash),+ => PendingValidation, &$ws.element_pending, &$ws.meta_pending);
     }};
 }
 
@@ -34,7 +34,7 @@ macro_rules! check_holding_meta {
     ($ws:expr, $f:ident, $($hash:expr),+) => {
         check_holding!($f, $($hash),+ => Proof, &$ws.meta_vault);
         check_holding!($f, $($hash),+ => Proof, &$ws.meta_judged);
-        check_holding!($f, $($hash),+ => AwaitingProof, &$ws.meta_pending);
+        check_holding!($f, $($hash),+ => PendingValidation, &$ws.meta_pending);
     };
 }
 
@@ -46,8 +46,8 @@ pub async fn check_holding_entry_all(
     check_level: CheckLevel,
 ) -> SysValidationResult<Dependency<Element>> {
     match check_level {
-        CheckLevel::Holding => check_holding_entry_inner(hash, workspace).await,
-        CheckLevel::Dht => check_entry_exists(hash.clone(), workspace, network).await,
+        CheckLevel::Proof => check_holding_entry_inner(hash, workspace).await,
+        CheckLevel::Claim => check_entry_exists(hash.clone(), workspace, network).await,
     }
 }
 
@@ -67,8 +67,8 @@ pub async fn check_holding_header_all(
     check_level: CheckLevel,
 ) -> SysValidationResult<Dependency<SignedHeaderHashed>> {
     match check_level {
-        CheckLevel::Holding => check_holding_header_inner(hash, workspace).await,
-        CheckLevel::Dht => check_header_exists(hash.clone(), workspace, network).await,
+        CheckLevel::Proof => check_holding_header_inner(hash, workspace).await,
+        CheckLevel::Claim => check_header_exists(hash.clone(), workspace, network).await,
     }
 }
 async fn check_holding_header_inner(
@@ -87,8 +87,8 @@ pub async fn check_holding_element_all(
     check_level: CheckLevel,
 ) -> SysValidationResult<Dependency<Element>> {
     match check_level {
-        CheckLevel::Holding => check_holding_element_inner(hash, workspace).await,
-        CheckLevel::Dht => check_element_exists(hash.clone(), workspace, network).await,
+        CheckLevel::Proof => check_holding_element_inner(hash, workspace).await,
+        CheckLevel::Claim => check_element_exists(hash.clone(), workspace, network).await,
     }
 }
 async fn check_holding_element_inner(
@@ -110,10 +110,12 @@ pub async fn check_holding_prev_header_all(
     check_level: CheckLevel,
 ) -> SysValidationResult<Dependency<SignedHeaderHashed>> {
     match check_level {
-        CheckLevel::Holding => {
+        CheckLevel::Proof => {
             check_holding_prev_header_inner(author, prev_header_hash, workspace).await
         }
-        CheckLevel::Dht => check_header_exists(prev_header_hash.clone(), workspace, network).await,
+        CheckLevel::Claim => {
+            check_header_exists(prev_header_hash.clone(), workspace, network).await
+        }
     }
 }
 
@@ -123,7 +125,7 @@ async fn check_holding_prev_header_inner(
     workspace: &SysValidationWorkspace,
 ) -> SysValidationResult<Dependency<SignedHeaderHashed>> {
     // Need to check these are both the same dependency type.
-    // If either is AwaitingProof then the return type must also be etc.
+    // If either is PendingValidation then the return type must also be etc.
     let dep = check_prev_header_in_metadata_all(author, prev_header_hash, workspace).await?;
     Ok(check_holding_header_inner(&prev_header_hash, &workspace)
         .await?
@@ -139,10 +141,10 @@ pub async fn check_holding_store_entry_all(
     check_level: CheckLevel,
 ) -> SysValidationResult<Dependency<Element>> {
     match check_level {
-        CheckLevel::Holding => {
+        CheckLevel::Proof => {
             check_holding_store_entry_inner(entry_hash, header_hash, workspace).await
         }
-        CheckLevel::Dht => check_element_exists(header_hash.clone(), workspace, network).await,
+        CheckLevel::Claim => check_element_exists(header_hash.clone(), workspace, network).await,
     }
 }
 
@@ -152,7 +154,7 @@ async fn check_holding_store_entry_inner(
     workspace: &SysValidationWorkspace,
 ) -> SysValidationResult<Dependency<Element>> {
     // Need to check these are both the same dependency type.
-    // If either is AwaitingProof then the return type must also be etc.
+    // If either is PendingValidation then the return type must also be etc.
     let dep = check_header_in_metadata_all(entry_hash, header_hash, workspace).await?;
     Ok(check_holding_element_inner(&header_hash, &workspace)
         .await?
@@ -167,8 +169,8 @@ pub async fn check_holding_link_add_all(
     check_level: CheckLevel,
 ) -> SysValidationResult<Dependency<SignedHeaderHashed>> {
     match check_level {
-        CheckLevel::Holding => check_holding_link_add_inner(header_hash, workspace).await,
-        CheckLevel::Dht => check_header_exists(header_hash.clone(), workspace, network).await,
+        CheckLevel::Proof => check_holding_link_add_inner(header_hash, workspace).await,
+        CheckLevel::Claim => check_header_exists(header_hash.clone(), workspace, network).await,
     }
 }
 
@@ -177,7 +179,7 @@ async fn check_holding_link_add_inner(
     workspace: &SysValidationWorkspace,
 ) -> SysValidationResult<Dependency<SignedHeaderHashed>> {
     // Need to check these are both the same dependency type.
-    // If either is AwaitingProof then the return type must also be etc.
+    // If either is PendingValidation then the return type must also be etc.
     let dep = check_holding_header_inner(&header_hash, &workspace).await?;
     let meta_dep =
         check_link_in_metadata_all(dep.as_inner().header(), header_hash, workspace).await?;

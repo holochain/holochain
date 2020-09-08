@@ -43,7 +43,7 @@ use integrate_dht_ops_workflow::{
     integrate_single_metadata, reintegrate_single_data,
 };
 use produce_dht_ops_workflow::dht_op_light::light_to_op;
-use types::{CheckLevel, Dependencies, DhtOpOrder, OrderedOp, Outcome};
+use types::{CheckLevel, DhtOpOrder, OrderedOp, Outcome, PendingDependencies};
 
 pub mod types;
 
@@ -88,7 +88,7 @@ async fn sys_validation_workflow_inner(
                 }
                 ValidationLimboStatus::SysValidated
                 | ValidationLimboStatus::AwaitingAppDeps(_)
-                | ValidationLimboStatus::AwaitingProof => Ok(false),
+                | ValidationLimboStatus::PendingValidation => Ok(false),
             }
         })?
         .collect())?;
@@ -124,8 +124,8 @@ async fn sys_validation_workflow_inner(
             workspace,
             network.clone(),
             &conductor_api,
-            &mut vlv.awaiting_proof,
-            CheckLevel::Holding,
+            &mut vlv.pending_dependencies,
+            CheckLevel::Proof,
         )
         .await?;
 
@@ -135,8 +135,8 @@ async fn sys_validation_workflow_inner(
                 workspace.to_val_limbo(op_hash, vlv)?;
             }
             Outcome::SkipAppValidation => {
-                if vlv.awaiting_proof.awaiting_proof() {
-                    vlv.status = ValidationLimboStatus::AwaitingProof;
+                if vlv.pending_dependencies.pending_dependencies() {
+                    vlv.status = ValidationLimboStatus::PendingValidation;
                     workspace.to_val_limbo(op_hash, vlv)?;
                 } else {
                     let iv = IntegrationLimboValue {
@@ -180,7 +180,7 @@ async fn validate_op(
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
     conductor_api: &impl CellConductorApiT,
-    dependencies: &mut Dependencies,
+    dependencies: &mut PendingDependencies,
     check_level: CheckLevel,
 ) -> WorkflowResult<Outcome> {
     match validate_op_inner(
@@ -248,7 +248,7 @@ async fn validate_op_inner(
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
     conductor_api: &impl CellConductorApiT,
-    dependencies: &mut Dependencies,
+    dependencies: &mut PendingDependencies,
     check_level: CheckLevel,
 ) -> SysValidationResult<()> {
     match op {
@@ -349,7 +349,7 @@ async fn register_agent_activity(
     header: &Header,
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
-    dependencies: &mut Dependencies,
+    dependencies: &mut PendingDependencies,
     check_level: CheckLevel,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
@@ -378,7 +378,7 @@ async fn store_element(
     header: &Header,
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
-    dependencies: &mut Dependencies,
+    dependencies: &mut PendingDependencies,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
     let prev_header_hash = header.prev_header();
@@ -400,7 +400,7 @@ async fn store_entry(
     conductor_api: &impl CellConductorApiT,
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
-    dependencies: &mut Dependencies,
+    dependencies: &mut PendingDependencies,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
     let entry_type = header.entry_type();
@@ -433,7 +433,7 @@ async fn register_updated_by(
     entry_update: &EntryUpdate,
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
-    dependencies: &mut Dependencies,
+    dependencies: &mut PendingDependencies,
     check_level: CheckLevel,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
@@ -457,7 +457,7 @@ async fn register_deleted_by(
     element_delete: &ElementDelete,
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
-    dependencies: &mut Dependencies,
+    dependencies: &mut PendingDependencies,
     check_level: CheckLevel,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
@@ -475,7 +475,7 @@ async fn register_deleted_entry_header(
     element_delete: &ElementDelete,
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
-    dependencies: &mut Dependencies,
+    dependencies: &mut PendingDependencies,
     check_level: CheckLevel,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
@@ -493,7 +493,7 @@ async fn register_add_link(
     link_add: &LinkAdd,
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
-    dependencies: &mut Dependencies,
+    dependencies: &mut PendingDependencies,
     check_level: CheckLevel,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
@@ -515,7 +515,7 @@ async fn register_remove_link(
     link_remove: &LinkRemove,
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
-    dependencies: &mut Dependencies,
+    dependencies: &mut PendingDependencies,
     check_level: CheckLevel,
 ) -> SysValidationResult<()> {
     // Get data ready to validate

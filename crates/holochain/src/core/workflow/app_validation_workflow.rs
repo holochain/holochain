@@ -63,7 +63,7 @@ async fn app_validation_workflow_inner(
                     // We only want sys validated or awaiting app dependency ops
                     ValidationLimboStatus::SysValidated
                     | ValidationLimboStatus::AwaitingAppDeps(_)
-                    | ValidationLimboStatus::AwaitingProof => Ok(true),
+                    | ValidationLimboStatus::PendingValidation => Ok(true),
                     ValidationLimboStatus::Pending | ValidationLimboStatus::AwaitingSysDeps(_) => {
                         Ok(false)
                     }
@@ -71,7 +71,7 @@ async fn app_validation_workflow_inner(
             })?
             // Partition awaiting proof into a separate vec
             .partition(|vlv| match vlv.status {
-                ValidationLimboStatus::AwaitingProof => Ok(false),
+                ValidationLimboStatus::PendingValidation => Ok(false),
                 _ => Ok(true),
             }))?;
     debug!(?ops, ?awaiting_ops);
@@ -83,8 +83,8 @@ async fn app_validation_workflow_inner(
                 workspace.to_val_limbo(hash, vlv)?;
             }
             ValidationLimboStatus::SysValidated => {
-                if vlv.awaiting_proof.awaiting_proof() {
-                    vlv.status = ValidationLimboStatus::AwaitingProof;
+                if vlv.pending_dependencies.pending_dependencies() {
+                    vlv.status = ValidationLimboStatus::PendingValidation;
                     awaiting_ops.push(vlv);
                 } else {
                     let op = light_to_op(vlv.op.clone(), &workspace.element_pending).await?;
@@ -117,7 +117,7 @@ async fn app_validation_workflow_inner(
     // Including any awaiting proof from this run.
     'op_loop: for mut vlv in awaiting_ops {
         let mut still_awaiting = Vec::new();
-        for dep in vlv.awaiting_proof.deps.drain(..) {
+        for dep in vlv.pending_dependencies.pending.drain(..) {
             match check_dep_status(dep.as_ref(), &workspace)? {
                 Some(status) => {
                     match status {
@@ -126,7 +126,7 @@ async fn app_validation_workflow_inner(
                         }
                         ValidationStatus::Rejected | ValidationStatus::Abandoned => {
                             match dep {
-                                DepType::Fixed(_) => {
+                                DepType::FixedElement(_) => {
                                     // Mark this op as invalid and integrate it.
                                     // There is no reason to check the other deps as it is rejected.
                                     let op =
@@ -142,7 +142,7 @@ async fn app_validation_workflow_inner(
                                     // Continue to the next op
                                     continue 'op_loop;
                                 }
-                                DepType::Any(_) => {
+                                DepType::AnyElement(_) => {
                                     // The dependency is any element with for an entry
                                     // So we can't say that it is invalid because there could
                                     // always be a valid entry.
@@ -162,7 +162,7 @@ async fn app_validation_workflow_inner(
         let op = light_to_op(vlv.op.clone(), &workspace.element_pending).await?;
         let hash = DhtOpHash::with_data(&op).await;
         if still_awaiting.len() > 0 {
-            vlv.awaiting_proof.deps = still_awaiting;
+            vlv.pending_dependencies.pending = still_awaiting;
             workspace.to_val_limbo(hash, vlv)?;
         } else {
             let iv = IntegrationLimboValue {
