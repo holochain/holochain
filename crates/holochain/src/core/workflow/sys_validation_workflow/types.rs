@@ -170,7 +170,7 @@ impl Dependencies {
                     .header()
                     .clone()
                     .try_into()
-                    .map_err(|_| ValidationError::NotNewEntry(el.header().clone()))?;
+                    .map_err(|_| ValidationOutcome::NotNewEntry(el.header().clone()))?;
                 let hash = DhtOpHash::with_data(&UniqueForm::StoreEntry(&header)).await;
                 if any {
                     self.deps.push(DepType::Any(hash));
@@ -216,7 +216,7 @@ impl Dependencies {
                     .header()
                     .clone()
                     .try_into()
-                    .map_err(|_| ValidationError::NotLinkAdd(shh.header_address().clone()))?;
+                    .map_err(|_| ValidationOutcome::NotLinkAdd(shh.header_address().clone()))?;
                 let hash = DhtOpHash::with_data(&UniqueForm::RegisterAddLink(&header)).await;
                 self.deps.push(hash.into());
                 shh

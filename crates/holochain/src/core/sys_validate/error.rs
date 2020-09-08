@@ -13,6 +13,14 @@ use holochain_zome_types::{
 };
 use thiserror::Error;
 
+/// Validation can result in either
+/// - An Error
+/// - Failed validation
+/// - Successful validation
+/// It is a lot cleaner to express this using
+/// ? try's unfortunately try for custom types is
+/// unstable but when it lands we should use:
+/// https://docs.rs/try-guard/0.2.0/try_guard/
 #[derive(Error, Debug)]
 pub enum SysValidationError {
     #[error(transparent)]
@@ -25,23 +33,23 @@ pub enum SysValidationError {
     KeystoreError(#[from] KeystoreError),
     #[error(transparent)]
     SourceChainError(#[from] SourceChainError),
+    #[error("Dna is missing for this cell {0:?}. Cannot validate without dna.")]
+    DnaMissing(CellId),
     #[error(transparent)]
-    ValidationError(#[from] ValidationError),
+    ValidationOutcome(#[from] ValidationOutcome),
 }
 
 pub type SysValidationResult<T> = Result<T, SysValidationError>;
 
-// TODO: make this private
 // TODO: use try guard crate to refactor this so it's not an "Error"
 // https://docs.rs/try-guard/0.2.0/try_guard/
-
-/// All the errors that can come from validation
+/// All the outcomes that can come from validation
+/// This is not an error type it is the outcome of
+/// failed validation.
 #[derive(Error, Debug)]
-pub enum ValidationError {
+pub enum ValidationOutcome {
     #[error("The dependency {0:?} was not found on the DHT")]
     DepMissingFromDht(AnyDhtHash),
-    #[error("Dna is missing for this cell {0:?}. Cannot validate without dna.")]
-    DnaMissing(CellId),
     #[error("The app entry type {0:?} entry def id was out of range")]
     EntryDefId(AppEntryType),
     #[error("The entry has a different hash to the header's entry hash")]

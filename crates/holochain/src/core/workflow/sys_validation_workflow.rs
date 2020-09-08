@@ -201,7 +201,7 @@ async fn validate_op(
             _ => Ok(Outcome::Accepted)
         },
         // Handle the errors that result in pending or awaiting deps
-        Err(SysValidationError::ValidationError(e)) => {
+        Err(SysValidationError::ValidationOutcome(e)) => {
             warn!(
                 agent = %which_agent(conductor_api.cell_id().agent_pubkey()),
                 msg = "DhtOp has failed system validation",
@@ -219,31 +219,27 @@ async fn validate_op(
 /// we might find it useful to include the reason something
 /// was rejected etc.
 /// This is why the errors contain data but is currently unread.
-fn handle_failed(error: ValidationError) -> Outcome {
+fn handle_failed(error: ValidationOutcome) -> Outcome {
     use Outcome::*;
     match error {
-        ValidationError::DepMissingFromDht(_) => MissingDhtDep,
-        // TODO: remove this from validation error
-        ValidationError::DnaMissing(cell_id) => {
-            panic!("Cell {:?} is missing the Dna code", cell_id)
-        }
-        ValidationError::EntryDefId(_) => Rejected,
-        ValidationError::EntryHash => Rejected,
-        ValidationError::EntryTooLarge(_, _) => Rejected,
-        ValidationError::EntryType => Rejected,
-        ValidationError::EntryVisibility(_) => Rejected,
-        ValidationError::TagTooLarge(_, _) => Rejected,
-        ValidationError::NotLinkAdd(_) => Rejected,
-        ValidationError::NotNewEntry(_) => Rejected,
-        ValidationError::NotHoldingDep(dep) => AwaitingOpDep(dep),
-        ValidationError::PrevHeaderError(PrevHeaderError::MissingMeta(dep)) => {
+        ValidationOutcome::DepMissingFromDht(_) => MissingDhtDep,
+        ValidationOutcome::EntryDefId(_) => Rejected,
+        ValidationOutcome::EntryHash => Rejected,
+        ValidationOutcome::EntryTooLarge(_, _) => Rejected,
+        ValidationOutcome::EntryType => Rejected,
+        ValidationOutcome::EntryVisibility(_) => Rejected,
+        ValidationOutcome::TagTooLarge(_, _) => Rejected,
+        ValidationOutcome::NotLinkAdd(_) => Rejected,
+        ValidationOutcome::NotNewEntry(_) => Rejected,
+        ValidationOutcome::NotHoldingDep(dep) => AwaitingOpDep(dep),
+        ValidationOutcome::PrevHeaderError(PrevHeaderError::MissingMeta(dep)) => {
             AwaitingOpDep(dep.into())
         }
-        ValidationError::PrevHeaderError(_) => Rejected,
-        ValidationError::PrivateEntry => Rejected,
-        ValidationError::UpdateTypeMismatch(_, _) => Rejected,
-        ValidationError::VerifySignature(_, _) => Rejected,
-        ValidationError::ZomeId(_) => Rejected,
+        ValidationOutcome::PrevHeaderError(_) => Rejected,
+        ValidationOutcome::PrivateEntry => Rejected,
+        ValidationOutcome::UpdateTypeMismatch(_, _) => Rejected,
+        ValidationOutcome::VerifySignature(_, _) => Rejected,
+        ValidationOutcome::ZomeId(_) => Rejected,
     }
 }
 
@@ -262,7 +258,7 @@ async fn validate_op_inner(
                 store_entry(
                     (header)
                         .try_into()
-                        .map_err(|_| ValidationError::NotNewEntry(header.clone()))?,
+                        .map_err(|_| ValidationOutcome::NotNewEntry(header.clone()))?,
                     entry.as_ref(),
                     conductor_api,
                     workspace,

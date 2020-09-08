@@ -26,7 +26,8 @@ use holochain_zome_types::{
 use std::convert::TryInto;
 
 pub use crate::core::state::source_chain::{SourceChainError, SourceChainResult};
-pub use error::{PrevHeaderError, SysValidationError, SysValidationResult, ValidationError};
+pub(super) use error::ValidationOutcome;
+pub(super) use error::{PrevHeaderError, SysValidationError, SysValidationResult};
 pub use holo_hash::*;
 pub use holochain_types::{
     element::{Element, ElementExt},
@@ -172,7 +173,7 @@ pub async fn verify_header_signature(sig: &Signature, header: &Header) -> SysVal
     if header.author().verify_signature(sig, header).await? {
         Ok(())
     } else {
-        Err(ValidationError::VerifySignature(sig.clone(), header.clone()).into())
+        Err(ValidationOutcome::VerifySignature(sig.clone(), header.clone()).into())
     }
 }
 
@@ -195,10 +196,10 @@ pub fn check_prev_header(header: &Header) -> SysValidationResult<()> {
                 header
                     .prev_header()
                     .ok_or(PrevHeaderError::MissingPrev)
-                    .map_err(ValidationError::from)?;
+                    .map_err(ValidationOutcome::from)?;
                 Ok(())
             } else {
-                Err(PrevHeaderError::InvalidRoot).map_err(|e| ValidationError::from(e).into())
+                Err(PrevHeaderError::InvalidRoot).map_err(|e| ValidationOutcome::from(e).into())
             }
         }
     }
@@ -215,7 +216,7 @@ pub async fn check_valid_if_dna(
                 .get_activity(&r, header.author().clone())?
                 .next()?
                 .map_or(Ok(()), |_| {
-                    Err(PrevHeaderError::InvalidRoot).map_err(|e| ValidationError::from(e).into())
+                    Err(PrevHeaderError::InvalidRoot).map_err(|e| ValidationOutcome::from(e).into())
                 }),
             _ => Ok(()),
         }
@@ -246,7 +247,7 @@ pub fn check_prev_timestamp(header: &Header, prev_header: &Header) -> SysValidat
     if header.timestamp() > prev_header.timestamp() {
         Ok(())
     } else {
-        Err(PrevHeaderError::Timestamp).map_err(|e| ValidationError::from(e).into())
+        Err(PrevHeaderError::Timestamp).map_err(|e| ValidationOutcome::from(e).into())
     }
 }
 
@@ -258,7 +259,7 @@ pub fn check_prev_seq(header: &Header, prev_header: &Header) -> SysValidationRes
         Ok(())
     } else {
         Err(PrevHeaderError::InvalidSeq(header_seq, prev_seq))
-            .map_err(|e| ValidationError::from(e).into())
+            .map_err(|e| ValidationOutcome::from(e).into())
     }
 }
 
@@ -269,7 +270,7 @@ pub fn check_entry_type(entry_type: &EntryType, entry: &Entry) -> SysValidationR
         (EntryType::App(_), Entry::App(_)) => Ok(()),
         (EntryType::CapClaim, Entry::CapClaim(_)) => Ok(()),
         (EntryType::CapGrant, Entry::CapGrant(_)) => Ok(()),
-        _ => Err(ValidationError::EntryType.into()),
+        _ => Err(ValidationOutcome::EntryType.into()),
     }
 }
 
@@ -285,14 +286,14 @@ pub async fn check_app_entry_type(
     // so calls are made in blocks
     let dna_file = { conductor_api.get_this_dna().await };
     let dna_file =
-        dna_file.ok_or_else(|| ValidationError::DnaMissing(conductor_api.cell_id().clone()))?;
+        dna_file.ok_or_else(|| SysValidationError::DnaMissing(conductor_api.cell_id().clone()))?;
 
     // Check if the zome is found
     let zome = dna_file
         .dna()
         .zomes
         .get(zome_index)
-        .ok_or_else(|| ValidationError::ZomeId(entry_type.clone()))?
+        .ok_or_else(|| ValidationOutcome::ZomeId(entry_type.clone()))?
         .1
         .clone();
 
@@ -314,10 +315,10 @@ pub async fn check_app_entry_type(
             if entry_def.visibility == *entry_type.visibility() {
                 Ok(entry_def)
             } else {
-                Err(ValidationError::EntryVisibility(entry_type.clone()).into())
+                Err(ValidationOutcome::EntryVisibility(entry_type.clone()).into())
             }
         }
-        None => Err(ValidationError::EntryDefId(entry_type.clone()).into()),
+        None => Err(ValidationOutcome::EntryDefId(entry_type.clone()).into()),
     }
 }
 
@@ -325,7 +326,7 @@ pub async fn check_app_entry_type(
 pub fn check_not_private(entry_def: &EntryDef) -> SysValidationResult<()> {
     match entry_def.visibility {
         EntryVisibility::Public => Ok(()),
-        EntryVisibility::Private => Err(ValidationError::PrivateEntry.into()),
+        EntryVisibility::Private => Err(ValidationOutcome::PrivateEntry.into()),
     }
 }
 
@@ -334,7 +335,7 @@ pub async fn check_entry_hash(hash: &EntryHash, entry: &Entry) -> SysValidationR
     if *hash == EntryHash::with_data(entry).await {
         Ok(())
     } else {
-        Err(ValidationError::EntryHash.into())
+        Err(ValidationOutcome::EntryHash.into())
     }
 }
 
@@ -343,7 +344,7 @@ pub async fn check_entry_hash(hash: &EntryHash, entry: &Entry) -> SysValidationR
 pub fn check_new_entry_header(header: &Header) -> SysValidationResult<()> {
     match header {
         Header::EntryCreate(_) | Header::EntryUpdate(_) => Ok(()),
-        _ => Err(ValidationError::NotNewEntry(header.clone()).into()),
+        _ => Err(ValidationOutcome::NotNewEntry(header.clone()).into()),
     }
 }
 
@@ -355,7 +356,7 @@ pub fn check_entry_size(entry: &Entry) -> SysValidationResult<()> {
             if size < MAX_ENTRY_SIZE {
                 Ok(())
             } else {
-                Err(ValidationError::EntryTooLarge(size, MAX_ENTRY_SIZE).into())
+                Err(ValidationOutcome::EntryTooLarge(size, MAX_ENTRY_SIZE).into())
             }
         }
         // Other entry types are small
@@ -369,7 +370,7 @@ pub fn check_tag_size(tag: &LinkTag) -> SysValidationResult<()> {
     if size < MAX_TAG_SIZE {
         Ok(())
     } else {
-        Err(ValidationError::TagTooLarge(size, MAX_TAG_SIZE).into())
+        Err(ValidationOutcome::TagTooLarge(size, MAX_TAG_SIZE).into())
     }
 }
 
@@ -382,7 +383,7 @@ pub fn check_update_reference(
     if eu.entry_type == *original_entry_header.entry_type() {
         Ok(())
     } else {
-        Err(ValidationError::UpdateTypeMismatch(
+        Err(ValidationOutcome::UpdateTypeMismatch(
             eu.entry_type.clone(),
             original_entry_header.entry_type().clone(),
         )

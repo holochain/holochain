@@ -7,7 +7,7 @@ use holochain_p2p::HolochainP2pCell;
 macro_rules! check_holding {
     ($f:ident, $($hash:expr),+ => $dep:ident, $($ws:expr),+ ) => {{
         match $f($($hash),+, $($ws),+).await {
-            Err(SysValidationError::ValidationError(ValidationError::NotHoldingDep(_))) => (),
+            Err(SysValidationError::ValidationOutcome(ValidationOutcome::NotHoldingDep(_))) => (),
             Err(e) => return Err(e),
             Ok(e) => return Ok(Dependency::$dep(e)),
         }
@@ -56,7 +56,7 @@ async fn check_holding_entry_inner(
     workspace: &SysValidationWorkspace,
 ) -> SysValidationResult<Dependency<Element>> {
     check_holding_entry!(workspace, check_holding_entry, hash);
-    Err(ValidationError::NotHoldingDep(hash.clone().into()).into())
+    Err(ValidationOutcome::NotHoldingDep(hash.clone().into()).into())
 }
 
 /// Check validated and integrated stores for a dependant op
@@ -76,7 +76,7 @@ async fn check_holding_header_inner(
     workspace: &SysValidationWorkspace,
 ) -> SysValidationResult<Dependency<SignedHeaderHashed>> {
     check_holding_el!(workspace, check_holding_header, hash);
-    Err(ValidationError::NotHoldingDep(hash.clone().into()).into())
+    Err(ValidationOutcome::NotHoldingDep(hash.clone().into()).into())
 }
 
 /// Check validated and integrated stores for a dependant op
@@ -96,7 +96,7 @@ async fn check_holding_element_inner(
     workspace: &SysValidationWorkspace,
 ) -> SysValidationResult<Dependency<Element>> {
     check_holding_el!(workspace, check_holding_element, hash);
-    Err(ValidationError::NotHoldingDep(hash.clone().into()).into())
+    Err(ValidationOutcome::NotHoldingDep(hash.clone().into()).into())
 }
 
 /// Check if we are holding the previous header
@@ -194,7 +194,7 @@ pub(super) async fn check_prev_header_in_metadata<P: PrefixType>(
         meta_vault
             .get_activity(&r, author.clone())?
             .find(|activity| Ok(prev_header_hash == &activity.header_hash))?
-            .ok_or_else(|| ValidationError::NotHoldingDep(prev_header_hash.clone().into()))?;
+            .ok_or_else(|| ValidationOutcome::NotHoldingDep(prev_header_hash.clone().into()))?;
         Ok(())
     })
 }
@@ -210,7 +210,7 @@ pub(super) async fn check_header_in_metadata<P: PrefixType>(
         meta_vault
             .get_headers(&r, entry_hash.clone())?
             .find(|h| Ok(h.header_hash == *header_hash))?
-            .ok_or_else(|| ValidationError::NotHoldingDep(header_hash.clone().into()))?;
+            .ok_or_else(|| ValidationOutcome::NotHoldingDep(header_hash.clone().into()))?;
         Ok(())
     })
 }
@@ -226,7 +226,7 @@ pub(super) async fn check_link_in_metadata<P: PrefixType>(
     let link_add: LinkAdd = link_add
         .clone()
         .try_into()
-        .map_err(|_| ValidationError::NotLinkAdd(link_add_hash.clone()))?;
+        .map_err(|_| ValidationOutcome::NotLinkAdd(link_add_hash.clone()))?;
 
     // Full key always returns just one link
     let link_key = LinkMetaKey::from((&link_add, link_add_hash));
@@ -236,7 +236,7 @@ pub(super) async fn check_link_in_metadata<P: PrefixType>(
             .get_links_all(&r, &link_key)?
             .next()?
             .ok_or_else(|| {
-                SysValidationError::from(ValidationError::NotHoldingDep(
+                SysValidationError::from(ValidationOutcome::NotHoldingDep(
                     link_add_hash.clone().into(),
                 ))
             })
@@ -257,7 +257,7 @@ async fn check_prev_header_in_metadata_all(
         author,
         prev_header_hash
     );
-    Err(ValidationError::NotHoldingDep(prev_header_hash.clone().into()).into())
+    Err(ValidationOutcome::NotHoldingDep(prev_header_hash.clone().into()).into())
 }
 
 async fn check_header_in_metadata_all(
@@ -266,7 +266,7 @@ async fn check_header_in_metadata_all(
     workspace: &SysValidationWorkspace,
 ) -> SysValidationResult<Dependency<()>> {
     check_holding_meta!(workspace, check_header_in_metadata, entry_hash, header_hash);
-    Err(ValidationError::NotHoldingDep(header_hash.clone().into()).into())
+    Err(ValidationOutcome::NotHoldingDep(header_hash.clone().into()).into())
 }
 
 async fn check_link_in_metadata_all(
@@ -275,7 +275,7 @@ async fn check_link_in_metadata_all(
     workspace: &SysValidationWorkspace,
 ) -> SysValidationResult<Dependency<()>> {
     check_holding_meta!(workspace, check_link_in_metadata, link_add, header_hash);
-    Err(ValidationError::NotHoldingDep(header_hash.clone().into()).into())
+    Err(ValidationOutcome::NotHoldingDep(header_hash.clone().into()).into())
 }
 
 /// Check we are actually holding an entry
@@ -289,12 +289,12 @@ async fn check_holding_entry<P: PrefixType>(
             .get_headers(&r, hash.clone())?
             .next()?
             .map(|h| h.header_hash)
-            .ok_or_else(|| ValidationError::NotHoldingDep(hash.clone().into()))?;
+            .ok_or_else(|| ValidationOutcome::NotHoldingDep(hash.clone().into()))?;
         SysValidationResult::Ok(eh)
     })?;
     element_vault
         .get_element(&entry_header)?
-        .ok_or_else(|| ValidationError::NotHoldingDep(hash.clone().into()).into())
+        .ok_or_else(|| ValidationOutcome::NotHoldingDep(hash.clone().into()).into())
 }
 
 /// Check we are actually holding an header
@@ -304,7 +304,7 @@ async fn check_holding_header<P: PrefixType>(
 ) -> SysValidationResult<SignedHeaderHashed> {
     element_vault
         .get_header(&hash)?
-        .ok_or_else(|| ValidationError::NotHoldingDep(hash.clone().into()).into())
+        .ok_or_else(|| ValidationOutcome::NotHoldingDep(hash.clone().into()).into())
 }
 
 /// Check we are actually holding an element and the entry
@@ -314,11 +314,11 @@ async fn check_holding_element<P: PrefixType>(
 ) -> SysValidationResult<Element> {
     let el = element_vault
         .get_element(&hash)?
-        .ok_or_else(|| ValidationError::NotHoldingDep(hash.clone().into()))?;
+        .ok_or_else(|| ValidationOutcome::NotHoldingDep(hash.clone().into()))?;
 
     el.entry()
         .as_option()
-        .ok_or_else(|| ValidationError::NotHoldingDep(hash.clone().into()))?;
+        .ok_or_else(|| ValidationOutcome::NotHoldingDep(hash.clone().into()))?;
     Ok(el)
 }
 
@@ -333,7 +333,7 @@ pub async fn check_entry_exists(
     let el = cascade
         .retrieve(entry_hash.clone().into(), Default::default())
         .await?
-        .ok_or_else(|| ValidationError::DepMissingFromDht(entry_hash.into()))?;
+        .ok_or_else(|| ValidationOutcome::DepMissingFromDht(entry_hash.into()))?;
     Ok(Dependency::Claim(el))
 }
 
@@ -348,7 +348,7 @@ pub async fn check_header_exists(
     let h = cascade
         .retrieve_header(hash.clone(), Default::default())
         .await?
-        .ok_or_else(|| ValidationError::DepMissingFromDht(hash.into()))?;
+        .ok_or_else(|| ValidationOutcome::DepMissingFromDht(hash.into()))?;
     Ok(Dependency::Claim(h))
 }
 
@@ -363,6 +363,6 @@ pub async fn check_element_exists(
     let el = cascade
         .retrieve(hash.clone().into(), Default::default())
         .await?
-        .ok_or_else(|| ValidationError::DepMissingFromDht(hash.into()))?;
+        .ok_or_else(|| ValidationOutcome::DepMissingFromDht(hash.into()))?;
     Ok(Dependency::Claim(el))
 }
