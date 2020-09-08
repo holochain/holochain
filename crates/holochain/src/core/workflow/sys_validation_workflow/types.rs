@@ -62,41 +62,32 @@ pub enum Dependency<T> {
     /// Another agent is holding this dependency and is claiming they ran validation
     Claim(T),
     /// This agent is has this dependency but has not passed validation yet
-    AwaitingProof(T),
+    PendingValidation(T),
 }
 
-/// The dependencies that an op is awaiting to be validated.
-/// Only AwaitingProof dependencies are stored to be awaited on.
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
-pub struct Dependencies {
-    /// Dependencies that hadn't finished validation at the
-    /// time we used them to validate this op.
-    pub deps: Vec<DepType>,
-}
-
-/// Dependencies can either be fixed to a specific element or
+/// PendingDependencies can either be fixed to a specific element or
 /// any element with the same entry. This changes how we handle
 /// dependencies that turn out to be invalid.
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub enum DepType {
     /// The dependency is a specific element
-    Fixed(DhtOpHash),
+    FixedElement(DhtOpHash),
     /// The dependency is any element for an entry
-    Any(DhtOpHash),
+    AnyElement(DhtOpHash),
 }
 
-/// Sets the level required for validation
+/// Sets the level required for validation dependencies
 #[derive(Clone, Debug, Copy)]
 pub enum CheckLevel {
-    /// Selected dependencies must be held by this agent
-    Holding,
-    /// Selected dependencies must be held by another authority
-    Dht,
+    /// Selected dependencies must be validated by this agent
+    Proof,
+    /// Selected dependencies must be validated by another authority
+    Claim,
 }
 
 impl<T> Dependency<T> {
     /// Change this dep to the minimum of the two.
-    /// Lowest to highest: AwaitingProof, Claim, Proof.
+    /// Lowest to highest: PendingValidation, Claim, Proof.
     /// Useful when you are chaining related dependencies together
     /// and need to treat them as the least strong source of the set.
     pub fn min<A>(self, other: &Dependency<A>) -> Dependency<T> {
@@ -104,39 +95,81 @@ impl<T> Dependency<T> {
         match (&self, other) {
             (Proof(_), Proof(_)) => Proof(self.into_inner()),
             (Proof(_), Claim(_)) => Claim(self.into_inner()),
-            (Proof(_), AwaitingProof(_)) => AwaitingProof(self.into_inner()),
+            (Proof(_), PendingValidation(_)) => PendingValidation(self.into_inner()),
             (Claim(_), Proof(_)) => Claim(self.into_inner()),
             (Claim(_), Claim(_)) => Claim(self.into_inner()),
-            (Claim(_), AwaitingProof(_)) => AwaitingProof(self.into_inner()),
-            (AwaitingProof(_), Proof(_)) => AwaitingProof(self.into_inner()),
-            (AwaitingProof(_), Claim(_)) => AwaitingProof(self.into_inner()),
-            (AwaitingProof(_), AwaitingProof(_)) => AwaitingProof(self.into_inner()),
+            (Claim(_), PendingValidation(_)) => PendingValidation(self.into_inner()),
+            (PendingValidation(_), Proof(_)) => PendingValidation(self.into_inner()),
+            (PendingValidation(_), Claim(_)) => PendingValidation(self.into_inner()),
+            (PendingValidation(_), PendingValidation(_)) => PendingValidation(self.into_inner()),
         }
     }
 
     pub fn into_inner(self) -> T {
         match self {
-            Dependency::Proof(t) | Dependency::Claim(t) | Dependency::AwaitingProof(t) => t,
+            Dependency::Proof(t) | Dependency::Claim(t) | Dependency::PendingValidation(t) => t,
         }
     }
 
     pub fn as_inner(&self) -> &T {
         match self {
-            Dependency::Proof(t) | Dependency::Claim(t) | Dependency::AwaitingProof(t) => t,
+            Dependency::Proof(t) | Dependency::Claim(t) | Dependency::PendingValidation(t) => t,
         }
     }
 }
 
-impl Dependencies {
+/// This type allows ops to be optimistically validated using dependencies
+/// that are in the limbo but have not themselves passed validation yet.
+/// ## Example
+/// Op A needs a Header (DH) to validate.
+/// Op B contains a copy of this header (B-DH)
+/// At the moment when Op A is looking for DH it finds B-DH.
+/// At this same moment Op B has not finished validating so therefor
+/// B-DH is still pending validation.
+/// Op A can still use B-DH as the Header to continue it's own validation.
+/// Now both Op A and Op B are running though validation.
+/// However because Op A has B-DH as a PendingDependency it must
+/// recheck if Op B has finished validating before Op A can be
+/// considered valid.
+///
+/// ## Failed validation
+/// If in the above scenario Op B fails to validate then
+/// Op A will also fail validation.
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub struct PendingDependencies {
+    /// PendingDependencies that hadn't finished validation at the
+    /// time we used them to validate this op.
+    pub pending: Vec<DepType>,
+}
+
+impl PendingDependencies {
+    /// Create a new pending deps
     pub fn new() -> Self {
-        Self { deps: Vec::new() }
+        Self {
+            pending: Vec::new(),
+        }
     }
 
-    /// Are there any dependencies to wait for?
-    pub fn awaiting_proof(&self) -> bool {
-        self.deps.len() > 0
+    /// Are there any dependencies that we need to check?
+    pub fn pending_dependencies(&self) -> bool {
+        self.pending.len() > 0
     }
+}
 
+/// ## Helpers
+/// These functions help create the DhtOpHash
+/// for the type DhtOp that you need to await for.
+/// ## Dimensions
+/// There are two dimensions to a dependency:
+/// 1. The type of DhtOp (e.g. StoreElement or StoreEntry)
+/// 2. If you require s specific (fixed) element or
+/// any element for an entry. See [DepType]
+///
+/// The functions here are intended to make it simple
+/// to go from a dependency that you have found to it's
+/// inner type whilst recording the correct DhtOp and DepType
+/// to check when the op reaches the end of validation
+impl PendingDependencies {
     /// A store entry dependency where you don't care which element was found
     pub async fn store_entry_any(
         &mut self,
@@ -161,25 +194,21 @@ impl Dependencies {
         any: bool,
     ) -> SysValidationResult<Element> {
         let el = match dep {
-            Dependency::Proof(el) => el,
-            Dependency::AwaitingProof(el) => {
-                // This op is awaiting proof.
-                // Add the DhtOpHash to the dependencies
-                // so we can await it validating.
+            Dependency::Claim(el) | Dependency::Proof(el) => el,
+            Dependency::PendingValidation(el) => {
                 let header = el
                     .header()
                     .clone()
                     .try_into()
-                    .map_err(|_| ValidationError::NotNewEntry(el.header().clone()))?;
+                    .map_err(|_| ValidationOutcome::NotNewEntry(el.header().clone()))?;
                 let hash = DhtOpHash::with_data(&UniqueForm::StoreEntry(&header)).await;
                 if any {
-                    self.deps.push(DepType::Any(hash));
+                    self.pending.push(DepType::AnyElement(hash));
                 } else {
-                    self.deps.push(hash.into());
+                    self.pending.push(hash.into());
                 }
                 el
             }
-            Dependency::Claim(el) => el,
         };
         Ok(el)
     }
@@ -191,14 +220,13 @@ impl Dependencies {
         dep: Dependency<SignedHeaderHashed>,
     ) -> SysValidationResult<SignedHeaderHashed> {
         let shh = match dep {
-            Dependency::Proof(shh) => shh,
-            Dependency::AwaitingProof(shh) => {
+            Dependency::Claim(shh) | Dependency::Proof(shh) => shh,
+            Dependency::PendingValidation(shh) => {
                 let header = shh.header();
                 let hash = DhtOpHash::with_data(&UniqueForm::StoreElement(header)).await;
-                self.deps.push(hash.into());
+                self.pending.push(hash.into());
                 shh
             }
-            Dependency::Claim(shh) => shh,
         };
         Ok(shh)
     }
@@ -210,18 +238,17 @@ impl Dependencies {
         dep: Dependency<SignedHeaderHashed>,
     ) -> SysValidationResult<SignedHeaderHashed> {
         let shh = match dep {
-            Dependency::Proof(shh) => shh,
-            Dependency::AwaitingProof(shh) => {
+            Dependency::Claim(shh) | Dependency::Proof(shh) => shh,
+            Dependency::PendingValidation(shh) => {
                 let header = shh
                     .header()
                     .clone()
                     .try_into()
-                    .map_err(|_| ValidationError::NotLinkAdd(shh.header_address().clone()))?;
+                    .map_err(|_| ValidationOutcome::NotLinkAdd(shh.header_address().clone()))?;
                 let hash = DhtOpHash::with_data(&UniqueForm::RegisterAddLink(&header)).await;
-                self.deps.push(hash.into());
+                self.pending.push(hash.into());
                 shh
             }
-            Dependency::Claim(shh) => shh,
         };
         Ok(shh)
     }
@@ -233,14 +260,13 @@ impl Dependencies {
         dep: Dependency<SignedHeaderHashed>,
     ) -> SysValidationResult<SignedHeaderHashed> {
         let shh = match dep {
-            Dependency::Proof(shh) => shh,
-            Dependency::AwaitingProof(shh) => {
+            Dependency::Claim(shh) | Dependency::Proof(shh) => shh,
+            Dependency::PendingValidation(shh) => {
                 let header = shh.header();
                 let hash = DhtOpHash::with_data(&UniqueForm::RegisterAgentActivity(header)).await;
-                self.deps.push(hash.into());
+                self.pending.push(hash.into());
                 shh
             }
-            Dependency::Claim(shh) => shh,
         };
         Ok(shh)
     }
@@ -265,7 +291,7 @@ impl From<&DhtOp> for DhtOpOrder {
 impl From<DepType> for DhtOpHash {
     fn from(d: DepType) -> Self {
         match d {
-            DepType::Fixed(h) | DepType::Any(h) => h,
+            DepType::FixedElement(h) | DepType::AnyElement(h) => h,
         }
     }
 }
@@ -273,14 +299,14 @@ impl From<DepType> for DhtOpHash {
 impl From<DhtOpHash> for DepType {
     /// Creates a fixed dependency type
     fn from(d: DhtOpHash) -> Self {
-        DepType::Fixed(d)
+        DepType::FixedElement(d)
     }
 }
 
 impl AsRef<DhtOpHash> for DepType {
     fn as_ref(&self) -> &DhtOpHash {
         match self {
-            DepType::Fixed(h) | DepType::Any(h) => h,
+            DepType::FixedElement(h) | DepType::AnyElement(h) => h,
         }
     }
 }

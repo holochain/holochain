@@ -28,8 +28,8 @@ use holochain_state::{
     prelude::*,
 };
 use holochain_types::{
-    dht_op::DhtOp, header::NewEntryHeaderRef, test_utils::which_agent, validate::ValidationStatus,
-    Entry, Timestamp,
+    dht_op::DhtOp, dht_op::DhtOpLight, header::NewEntryHeaderRef, test_utils::which_agent,
+    validate::ValidationStatus, Entry, Timestamp,
 };
 use holochain_zome_types::{
     header::{ElementDelete, EntryType, EntryUpdate, LinkAdd, LinkRemove},
@@ -40,10 +40,10 @@ use tracing::*;
 
 use integrate_dht_ops_workflow::{
     disintegrate_single_data, disintegrate_single_metadata, integrate_single_data,
-    integrate_single_metadata,
+    integrate_single_metadata, reintegrate_single_data,
 };
 use produce_dht_ops_workflow::dht_op_light::light_to_op;
-use types::{CheckLevel, Dependencies, DhtOpOrder, OrderedOp, Outcome};
+use types::{CheckLevel, DhtOpOrder, OrderedOp, Outcome, PendingDependencies};
 
 pub mod types;
 
@@ -88,7 +88,7 @@ async fn sys_validation_workflow_inner(
                 }
                 ValidationLimboStatus::SysValidated
                 | ValidationLimboStatus::AwaitingAppDeps(_)
-                | ValidationLimboStatus::AwaitingProof => Ok(false),
+                | ValidationLimboStatus::PendingValidation => Ok(false),
             }
         })?
         .collect())?;
@@ -124,26 +124,26 @@ async fn sys_validation_workflow_inner(
             workspace,
             network.clone(),
             &conductor_api,
-            &mut vlv.awaiting_proof,
-            CheckLevel::Holding,
+            &mut vlv.pending_dependencies,
+            CheckLevel::Proof,
         )
         .await?;
 
         match outcome {
             Outcome::Accepted => {
                 vlv.status = ValidationLimboStatus::SysValidated;
-                workspace.to_val_limbo(op_hash, vlv).await?;
+                workspace.to_val_limbo(op_hash, vlv)?;
             }
             Outcome::SkipAppValidation => {
-                if vlv.awaiting_proof.awaiting_proof() {
-                    vlv.status = ValidationLimboStatus::AwaitingProof;
-                    workspace.to_val_limbo(op_hash, vlv).await?;
+                if vlv.pending_dependencies.pending_dependencies() {
+                    vlv.status = ValidationLimboStatus::PendingValidation;
+                    workspace.to_val_limbo(op_hash, vlv)?;
                 } else {
                     let iv = IntegrationLimboValue {
                         op: vlv.op,
                         validation_status: ValidationStatus::Valid,
                     };
-                    workspace.to_int_limbo(op_hash, iv, op).await?;
+                    workspace.to_int_limbo(op_hash, iv, op)?;
                 }
             }
             Outcome::AwaitingOpDep(missing_dep) => {
@@ -157,18 +157,18 @@ async fn sys_validation_workflow_inner(
                 // we were meant to get a StoreElement or StoreEntry or
                 // RegisterAgentActivity or RegisterAddLink.
                 vlv.status = ValidationLimboStatus::AwaitingSysDeps(missing_dep);
-                workspace.to_val_limbo(op_hash, vlv).await?;
+                workspace.to_val_limbo(op_hash, vlv)?;
             }
             Outcome::MissingDhtDep => {
                 vlv.status = ValidationLimboStatus::Pending;
-                workspace.to_val_limbo(op_hash, vlv).await?;
+                workspace.to_val_limbo(op_hash, vlv)?;
             }
             Outcome::Rejected => {
                 let iv = IntegrationLimboValue {
                     op: vlv.op,
                     validation_status: ValidationStatus::Rejected,
                 };
-                workspace.to_int_limbo(op_hash, iv, op).await?;
+                workspace.to_int_limbo(op_hash, iv, op)?;
             }
         }
     }
@@ -180,7 +180,7 @@ async fn validate_op(
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
     conductor_api: &impl CellConductorApiT,
-    dependencies: &mut Dependencies,
+    dependencies: &mut PendingDependencies,
     check_level: CheckLevel,
 ) -> WorkflowResult<Outcome> {
     match validate_op_inner(
@@ -201,7 +201,7 @@ async fn validate_op(
             _ => Ok(Outcome::Accepted)
         },
         // Handle the errors that result in pending or awaiting deps
-        Err(SysValidationError::ValidationError(e)) => {
+        Err(SysValidationError::ValidationOutcome(e)) => {
             warn!(
                 agent = %which_agent(conductor_api.cell_id().agent_pubkey()),
                 msg = "DhtOp has failed system validation",
@@ -219,30 +219,27 @@ async fn validate_op(
 /// we might find it useful to include the reason something
 /// was rejected etc.
 /// This is why the errors contain data but is currently unread.
-fn handle_failed(error: ValidationError) -> Outcome {
+fn handle_failed(error: ValidationOutcome) -> Outcome {
     use Outcome::*;
     match error {
-        ValidationError::DepMissingFromDht(_) => MissingDhtDep,
-        ValidationError::DnaMissing(cell_id) => {
-            panic!("Cell {:?} is missing the Dna code", cell_id)
-        }
-        ValidationError::EntryDefId(_) => Rejected,
-        ValidationError::EntryHash => Rejected,
-        ValidationError::EntryTooLarge(_, _) => Rejected,
-        ValidationError::EntryType => Rejected,
-        ValidationError::EntryVisibility(_) => Rejected,
-        ValidationError::TagTooLarge(_, _) => Rejected,
-        ValidationError::NotLinkAdd(_) => Rejected,
-        ValidationError::NotNewEntry(_) => Rejected,
-        ValidationError::NotHoldingDep(dep) => AwaitingOpDep(dep),
-        ValidationError::PrevHeaderError(PrevHeaderError::MissingMeta(dep)) => {
+        ValidationOutcome::DepMissingFromDht(_) => MissingDhtDep,
+        ValidationOutcome::EntryDefId(_) => Rejected,
+        ValidationOutcome::EntryHash => Rejected,
+        ValidationOutcome::EntryTooLarge(_, _) => Rejected,
+        ValidationOutcome::EntryType => Rejected,
+        ValidationOutcome::EntryVisibility(_) => Rejected,
+        ValidationOutcome::TagTooLarge(_, _) => Rejected,
+        ValidationOutcome::NotLinkAdd(_) => Rejected,
+        ValidationOutcome::NotNewEntry(_) => Rejected,
+        ValidationOutcome::NotHoldingDep(dep) => AwaitingOpDep(dep),
+        ValidationOutcome::PrevHeaderError(PrevHeaderError::MissingMeta(dep)) => {
             AwaitingOpDep(dep.into())
         }
-        ValidationError::PrevHeaderError(_) => Rejected,
-        ValidationError::PrivateEntry => Rejected,
-        ValidationError::UpdateTypeMismatch(_, _) => Rejected,
-        ValidationError::VerifySignature(_, _) => Rejected,
-        ValidationError::ZomeId(_) => Rejected,
+        ValidationOutcome::PrevHeaderError(_) => Rejected,
+        ValidationOutcome::PrivateEntry => Rejected,
+        ValidationOutcome::UpdateTypeMismatch(_, _) => Rejected,
+        ValidationOutcome::VerifySignature(_, _) => Rejected,
+        ValidationOutcome::ZomeId(_) => Rejected,
     }
 }
 
@@ -251,7 +248,7 @@ async fn validate_op_inner(
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
     conductor_api: &impl CellConductorApiT,
-    dependencies: &mut Dependencies,
+    dependencies: &mut PendingDependencies,
     check_level: CheckLevel,
 ) -> SysValidationResult<()> {
     match op {
@@ -261,7 +258,7 @@ async fn validate_op_inner(
                 store_entry(
                     (header)
                         .try_into()
-                        .map_err(|_| ValidationError::NotNewEntry(header.clone()))?,
+                        .map_err(|_| ValidationOutcome::NotNewEntry(header.clone()))?,
                     entry.as_ref(),
                     conductor_api,
                     workspace,
@@ -352,7 +349,7 @@ async fn register_agent_activity(
     header: &Header,
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
-    dependencies: &mut Dependencies,
+    dependencies: &mut PendingDependencies,
     check_level: CheckLevel,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
@@ -381,7 +378,7 @@ async fn store_element(
     header: &Header,
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
-    dependencies: &mut Dependencies,
+    dependencies: &mut PendingDependencies,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
     let prev_header_hash = header.prev_header();
@@ -403,7 +400,7 @@ async fn store_entry(
     conductor_api: &impl CellConductorApiT,
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
-    dependencies: &mut Dependencies,
+    dependencies: &mut PendingDependencies,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
     let entry_type = header.entry_type();
@@ -436,7 +433,7 @@ async fn register_updated_by(
     entry_update: &EntryUpdate,
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
-    dependencies: &mut Dependencies,
+    dependencies: &mut PendingDependencies,
     check_level: CheckLevel,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
@@ -460,7 +457,7 @@ async fn register_deleted_by(
     element_delete: &ElementDelete,
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
-    dependencies: &mut Dependencies,
+    dependencies: &mut PendingDependencies,
     check_level: CheckLevel,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
@@ -478,7 +475,7 @@ async fn register_deleted_entry_header(
     element_delete: &ElementDelete,
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
-    dependencies: &mut Dependencies,
+    dependencies: &mut PendingDependencies,
     check_level: CheckLevel,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
@@ -496,7 +493,7 @@ async fn register_add_link(
     link_add: &LinkAdd,
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
-    dependencies: &mut Dependencies,
+    dependencies: &mut PendingDependencies,
     check_level: CheckLevel,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
@@ -518,7 +515,7 @@ async fn register_remove_link(
     link_remove: &LinkRemove,
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
-    dependencies: &mut Dependencies,
+    dependencies: &mut PendingDependencies,
     check_level: CheckLevel,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
@@ -555,6 +552,8 @@ pub struct SysValidationWorkspace {
     // Cached data
     pub element_cache: ElementBuf,
     pub meta_cache: MetadataBuf,
+    // Ops to disintegrate
+    pub to_disintegrate_pending: Vec<DhtOpLight>,
 }
 
 impl<'a> SysValidationWorkspace {
@@ -599,10 +598,11 @@ impl SysValidationWorkspace {
             meta_judged,
             element_cache,
             meta_cache,
+            to_disintegrate_pending: Vec::new(),
         })
     }
 
-    async fn to_val_limbo(
+    fn to_val_limbo(
         &mut self,
         hash: DhtOpHash,
         mut vlv: ValidationLimboValue,
@@ -613,25 +613,39 @@ impl SysValidationWorkspace {
         Ok(())
     }
 
-    async fn to_int_limbo(
+    #[tracing::instrument(skip(self, hash, op))]
+    fn to_int_limbo(
         &mut self,
         hash: DhtOpHash,
         iv: IntegrationLimboValue,
         op: DhtOp,
     ) -> WorkflowResult<()> {
-        disintegrate_single_metadata(iv.op.clone(), &self.element_pending, &mut self.meta_pending)
-            .await?;
-        disintegrate_single_data(iv.op.clone(), &mut self.element_pending);
-        integrate_single_data(op, &mut self.element_judged).await?;
-        integrate_single_metadata(iv.op.clone(), &self.element_judged, &mut self.meta_judged)
-            .await?;
+        disintegrate_single_metadata(iv.op.clone(), &self.element_pending, &mut self.meta_pending)?;
+        self.to_disintegrate_pending.push(iv.op.clone());
+        integrate_single_data(op, &mut self.element_judged)?;
+        integrate_single_metadata(iv.op.clone(), &self.element_judged, &mut self.meta_judged)?;
         self.integration_limbo.put(hash, iv)?;
+        Ok(())
+    }
+
+    #[tracing::instrument(skip(self, writer))]
+    /// We need to cancel any deletes for the pending data
+    /// where the ops still in validation limbo reference that data
+    fn update_element_stores(&mut self, writer: &mut Writer) -> WorkspaceResult<()> {
+        for op in self.to_disintegrate_pending.drain(..) {
+            disintegrate_single_data(op, &mut self.element_pending);
+        }
+        let mut val_iter = self.validation_limbo.iter(writer)?;
+        while let Some((_, vlv)) = val_iter.next()? {
+            reintegrate_single_data(vlv.op, &mut self.element_pending);
+        }
         Ok(())
     }
 }
 
 impl Workspace for SysValidationWorkspace {
     fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> WorkspaceResult<()> {
+        self.update_element_stores(writer)?;
         self.validation_limbo.0.flush_to_txn_ref(writer)?;
         self.integration_limbo.flush_to_txn_ref(writer)?;
         // Flush for cascade

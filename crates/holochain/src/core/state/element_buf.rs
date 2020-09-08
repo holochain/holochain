@@ -260,6 +260,17 @@ where
         }
     }
 
+    /// Removes a delete if there was one previously added
+    pub fn cancel_delete(&mut self, header_hash: HeaderHash, entry_hash: Option<EntryHash>) {
+        self.headers.cancel_delete(header_hash);
+        if let Some(entry_hash) = entry_hash {
+            if let Some(db) = self.private_entries.as_mut() {
+                db.cancel_delete(entry_hash.clone())
+            }
+            self.public_entries.cancel_delete(entry_hash);
+        }
+    }
+
     pub fn headers(&self) -> &HeaderCas<P> {
         &self.headers
     }

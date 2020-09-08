@@ -180,8 +180,18 @@ where
         link_add: HeaderHash,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>;
 
-    /// Finds if there is a StoreElement under this header
-    fn has_element_header(&self, hash: &HeaderHash) -> DatabaseResult<bool>;
+    /// Finds if there is a StoreElement for this header
+    fn has_registered_store_element(&self, hash: &HeaderHash) -> DatabaseResult<bool>;
+
+    /// Finds if there is a StoreEntry for this header
+    fn has_registered_store_entry(
+        &self,
+        entry_hash: &EntryHash,
+        header_hash: &HeaderHash,
+    ) -> DatabaseResult<bool>;
+
+    /// Finds if there is a StoreEntry for this entry
+    fn has_any_registered_store_entry(&self, hash: &EntryHash) -> DatabaseResult<bool>;
 
     /// Get the environment for creating readers
     fn env(&self) -> &EnvironmentRead;
@@ -304,10 +314,10 @@ where
         let status = fresh_reader!(self.env, |r| self.get_headers(&r, basis.clone())?.find_map(
             |header| {
                 if let None = self.get_deletes_on_header(&r, header.header_hash)?.next()? {
-                    debug!("found live header");
+                    trace!("found live header");
                     Ok(Some(EntryDhtStatus::Live))
                 } else {
-                    debug!("found dead header");
+                    trace!("found dead header");
                     Ok(None)
                 }
             }
@@ -632,10 +642,27 @@ where
         ))
     }
 
-    fn has_element_header(&self, hash: &HeaderHash) -> DatabaseResult<bool> {
+    fn has_registered_store_element(&self, hash: &HeaderHash) -> DatabaseResult<bool> {
         fresh_reader!(self.env, |r| self
             .misc_meta
             .contains(&r, &MiscMetaKey::StoreElement(hash.clone()).into()))
+    }
+
+    fn has_registered_store_entry(
+        &self,
+        entry_hash: &EntryHash,
+        header_hash: &HeaderHash,
+    ) -> DatabaseResult<bool> {
+        fresh_reader!(self.env, |r| self
+            .get_headers(&r, entry_hash.clone())?
+            .any(|h| Ok(h.header_hash == *header_hash)))
+    }
+
+    fn has_any_registered_store_entry(&self, hash: &EntryHash) -> DatabaseResult<bool> {
+        fresh_reader!(self.env, |r| Ok(self
+            .get_headers(&r, hash.clone())?
+            .next()?
+            .is_some()))
     }
 
     fn env(&self) -> &EnvironmentRead {

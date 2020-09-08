@@ -129,7 +129,7 @@ async fn verify_header_signature_test() {
 
     assert_matches!(
         verify_header_signature(&wrong_signature, &header).await,
-        Err(SysValidationError::ValidationError(ValidationError::VerifySignature(_, _)))
+        Err(SysValidationError::ValidationOutcome(ValidationOutcome::VerifySignature(_, _)))
     );
 
     assert_matches!(
@@ -147,8 +147,8 @@ async fn check_previous_header() {
     header.header_seq = 0;
     assert_matches!(
         check_prev_header(&header.clone().into()),
-        Err(SysValidationError::ValidationError(
-            ValidationError::PrevHeaderError(PrevHeaderError::InvalidRoot)
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::PrevHeaderError(PrevHeaderError::InvalidRoot)
         ))
     );
     // Dna is always ok because of the type system
@@ -183,8 +183,8 @@ async fn check_valid_if_dna_test() {
     metadata.expect_env().return_const(env);
     assert_matches!(
         check_valid_if_dna(&header.clone().into(), &metadata).await,
-        Err(SysValidationError::ValidationError(
-            ValidationError::PrevHeaderError(PrevHeaderError::InvalidRoot)
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::PrevHeaderError(PrevHeaderError::InvalidRoot)
         ))
     );
 }
@@ -213,7 +213,7 @@ async fn check_prev_header_in_metadata_test() {
     // No previous header on this hash
     assert_matches!(
         check_prev_header_in_metadata(&author, &header_fixt.next().unwrap(), &metadata).await,
-        Err(SysValidationError::ValidationError(ValidationError::NotHoldingDep(_)))
+        Err(SysValidationError::ValidationOutcome(ValidationOutcome::NotHoldingDep(_)))
     );
 }
 
@@ -233,8 +233,8 @@ async fn check_previous_timestamp() {
     let r = check_prev_timestamp(&header.clone().into(), &prev_header.clone().into());
     assert_matches!(
         r,
-        Err(SysValidationError::ValidationError(
-            ValidationError::PrevHeaderError(PrevHeaderError::Timestamp)
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::PrevHeaderError(PrevHeaderError::Timestamp)
         ))
     );
 }
@@ -255,8 +255,8 @@ async fn check_previous_seq() {
     assert_matches!(
         check_prev_seq(&header.clone().into(), &prev_header.clone().into()),
         Err(
-            SysValidationError::ValidationError(
-                ValidationError::PrevHeaderError(PrevHeaderError::InvalidSeq(_, _)),
+            SysValidationError::ValidationOutcome(
+                ValidationOutcome::PrevHeaderError(PrevHeaderError::InvalidSeq(_, _)),
             ),
         )
     );
@@ -265,8 +265,8 @@ async fn check_previous_seq() {
     assert_matches!(
         check_prev_seq(&header.clone().into(), &prev_header.clone().into()),
         Err(
-            SysValidationError::ValidationError(
-                ValidationError::PrevHeaderError(PrevHeaderError::InvalidSeq(_, _)),
+            SysValidationError::ValidationOutcome(
+                ValidationOutcome::PrevHeaderError(PrevHeaderError::InvalidSeq(_, _)),
             ),
         )
     );
@@ -276,8 +276,8 @@ async fn check_previous_seq() {
     assert_matches!(
         check_prev_seq(&header.clone().into(), &prev_header.clone().into()),
         Err(
-            SysValidationError::ValidationError(
-                ValidationError::PrevHeaderError(PrevHeaderError::InvalidSeq(_, _)),
+            SysValidationError::ValidationOutcome(
+                ValidationOutcome::PrevHeaderError(PrevHeaderError::InvalidSeq(_, _)),
             ),
         )
     );
@@ -300,8 +300,8 @@ async fn check_entry_type_test() {
     for (e, et) in entry_fixt.zip(et_fixt).take(4) {
         assert_matches!(
             check_entry_type(&et, &e),
-            Err(SysValidationError::ValidationError(
-                ValidationError::EntryType
+            Err(SysValidationError::ValidationOutcome(
+                ValidationOutcome::EntryType
             ))
         );
     }
@@ -320,8 +320,8 @@ async fn check_entry_hash_test() {
     let eh = header.entry_data().map(|(h, _)| h).unwrap();
     assert_matches!(
         check_entry_hash(&eh, &entry).await,
-        Err(SysValidationError::ValidationError(
-            ValidationError::EntryHash
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::EntryHash
         ))
     );
 
@@ -332,7 +332,7 @@ async fn check_entry_hash_test() {
     assert_matches!(check_entry_hash(&eh, &entry).await, Ok(()));
     assert_matches!(
         check_new_entry_header(&fixt!(LinkAdd).into()),
-        Err(SysValidationError::ValidationError(ValidationError::NotNewEntry(_)))
+        Err(SysValidationError::ValidationOutcome(ValidationOutcome::NotNewEntry(_)))
     );
 }
 
@@ -345,7 +345,7 @@ async fn check_entry_size_test() {
 
     // assert_matches!(
     //     check_entry_size(&huge),
-    //     Err(SysValidationError::ValidationError(ValidationError::EntryTooLarge(_, _)))
+    //     Err(SysValidationError::ValidationOutcome(ValidationOutcome::EntryTooLarge(_, _)))
     // );
 }
 
@@ -372,7 +372,7 @@ async fn check_update_reference_test() {
 
     assert_matches!(
         check_update_reference(&eu, &NewEntryHeaderRef::from(&ec)),
-        Err(SysValidationError::ValidationError(ValidationError::UpdateTypeMismatch(_, _)))
+        Err(SysValidationError::ValidationOutcome(ValidationOutcome::UpdateTypeMismatch(_, _)))
     );
 
     // Different entry type
@@ -380,7 +380,7 @@ async fn check_update_reference_test() {
 
     assert_matches!(
         check_update_reference(&eu, &NewEntryHeaderRef::from(&ec)),
-        Err(SysValidationError::ValidationError(ValidationError::UpdateTypeMismatch(_, _)))
+        Err(SysValidationError::ValidationOutcome(ValidationOutcome::UpdateTypeMismatch(_, _)))
     );
 }
 
@@ -393,7 +393,7 @@ async fn check_link_tag_size_test() {
 
     assert_matches!(
         check_tag_size(&huge),
-        Err(SysValidationError::ValidationError(ValidationError::TagTooLarge(_, _)))
+        Err(SysValidationError::ValidationOutcome(ValidationOutcome::TagTooLarge(_, _)))
     );
 }
 
@@ -426,7 +426,7 @@ async fn check_app_entry_type_test() {
     let aet = AppEntryType::new(0.into(), 0.into(), EntryVisibility::Public);
     assert_matches!(
         check_app_entry_type(&aet, &conductor_api).await,
-        Err(SysValidationError::ValidationError(ValidationError::DnaMissing(_)))
+        Err(SysValidationError::DnaMissing(_))
     );
 
     // # Dna but no entry def in buffer
@@ -439,14 +439,14 @@ async fn check_app_entry_type_test() {
     let aet = AppEntryType::new(0.into(), 1.into(), EntryVisibility::Public);
     assert_matches!(
         check_app_entry_type(&aet, &conductor_api).await,
-        Err(SysValidationError::ValidationError(ValidationError::ZomeId(_)))
+        Err(SysValidationError::ValidationOutcome(ValidationOutcome::ZomeId(_)))
     );
 
     // ## EntryId is out of range
     let aet = AppEntryType::new(10.into(), 0.into(), EntryVisibility::Public);
     assert_matches!(
         check_app_entry_type(&aet, &conductor_api).await,
-        Err(SysValidationError::ValidationError(ValidationError::EntryDefId(_)))
+        Err(SysValidationError::ValidationOutcome(ValidationOutcome::EntryDefId(_)))
     );
 
     // ## EntryId is in range for dna
@@ -455,7 +455,7 @@ async fn check_app_entry_type_test() {
     let aet = AppEntryType::new(0.into(), 0.into(), EntryVisibility::Private);
     assert_matches!(
         check_app_entry_type(&aet, &conductor_api).await,
-        Err(SysValidationError::ValidationError(ValidationError::EntryVisibility(_)))
+        Err(SysValidationError::ValidationOutcome(ValidationOutcome::EntryVisibility(_)))
     );
 
     // # Add an entry def to the buffer
@@ -477,8 +477,8 @@ async fn check_entry_not_private_test() {
     ed.visibility = EntryVisibility::Private;
     assert_matches!(
         check_not_private(&ed),
-        Err(SysValidationError::ValidationError(
-            ValidationError::PrivateEntry
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::PrivateEntry
         ))
     );
 }

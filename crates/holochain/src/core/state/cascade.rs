@@ -1,44 +1,8 @@
 //! # Cascade
-//! ALL OUTDATED
-// TODO: Update or remove these docs
-//! This module is still a work in progress.
-//! Here is some pseudocode we are using to build it.
-//! ## Dimensions
-//! get vs get_links
-//! default vs options
-//! fast vs strict (is set by app dev)
-//!
-//! ## Get
-//! ### Default - Get's the latest version
-//! Scratch Live -> Return
-//! Scratch NotInCascade -> Goto Cas
-//! Scratch _ -> None
-//! Cas Live -> Return
-//! Cas NotInCascade -> Goto cache
-//! Cas _ -> None
-//! Cache Live -> Return
-//! Cache Pending -> Goto Network
-//! Cache NotInCascade -> Goto Network
-//! Cache _ -> None
-//!
-//! ## Get Links
-//! ### Default - Get's the latest version
-//! if I'm an authority
-//! Scratch Found-> Return
-//! Scratch NotInCascade -> Goto Cas
-//! Cas Found -> Return
-//! Cas NotInCascade -> Goto Network
-//! else
-//! Network Found -> Return
-//! Network NotInCascade -> Goto Cache
-//! Cache Found -> Return
-//! Cache NotInCascade -> None
-//!
-//! ## Pagination
-//! gets most recent N links with default N (50)
-//! Page number
-//! ## Loading
-//! load_true loads the results into cache
+//! ## Retrieve vs Get
+//! Get checks CRUD metadata before returning an the data
+//! where as retrieve only checks that where the data was found
+//! the appropriate validation has been run.
 
 use super::{
     element_buf::ElementBuf,
@@ -154,7 +118,7 @@ where
         let (shh, e) = element.into_inner();
         self.element_cache.put(shh, option_entry_hashed(e).await)?;
         for op in op_lights {
-            integrate_single_metadata(op, &self.element_cache, self.meta_cache).await?
+            integrate_single_metadata(op, &self.element_cache, self.meta_cache)?
         }
         Ok(())
     }
@@ -167,7 +131,7 @@ where
         let op_lights = produce_op_lights_from_element_group(&elements).await?;
         self.element_cache.put_element_group(elements)?;
         for op in op_lights {
-            integrate_single_metadata(op, &self.element_cache, self.meta_cache).await?
+            integrate_single_metadata(op, &self.element_cache, self.meta_cache)?
         }
         Ok(())
     }
@@ -475,32 +439,20 @@ where
     }
 
     fn valid_header(&self, hash: &HeaderHash) -> CascadeResult<bool> {
-        Ok(self.meta_vault.has_element_header(&hash)?
-            || self.meta_cache.has_element_header(&hash)?)
+        Ok(self.meta_vault.has_registered_store_element(&hash)?
+            || self.meta_cache.has_registered_store_element(&hash)?)
     }
 
     fn valid_entry(&self, hash: &EntryHash) -> CascadeResult<bool> {
-        fresh_reader!(self.meta_vault.env(), |r| {
-            if self
-                .meta_cache
-                .get_headers(&r, hash.clone())?
-                .next()?
-                .is_some()
-            {
-                // Found a entry header in the cache
-                return Ok(true);
-            }
-            if self
-                .meta_vault
-                .get_headers(&r, hash.clone())?
-                .next()?
-                .is_some()
-            {
-                // Found a entry header in the vault
-                return Ok(true);
-            }
-            Ok(false)
-        })
+        if self.meta_cache.has_any_registered_store_entry(hash)? {
+            // Found a entry header in the cache
+            return Ok(true);
+        }
+        if self.meta_vault.has_any_registered_store_entry(hash)? {
+            // Found a entry header in the vault
+            return Ok(true);
+        }
+        Ok(false)
     }
 
     /// Check if we have a valid reason to return an element from the cascade
@@ -512,27 +464,23 @@ where
         if self.valid_header(&header_hash)? {
             return Ok(true);
         }
-        fresh_reader!(self.meta_vault.env(), |r| {
-            if let Some(eh) = entry_hash {
-                if self
-                    .meta_cache
-                    .get_headers(&r, eh.clone())?
-                    .any(|h| Ok(h.header_hash == *header_hash))?
-                {
-                    // Found a entry header in the cache
-                    return Ok(true);
-                }
-                if self
-                    .meta_vault
-                    .get_headers(&r, eh.clone())?
-                    .any(|h| Ok(h.header_hash == *header_hash))?
-                {
-                    // Found a entry header in the vault
-                    return Ok(true);
-                }
+        if let Some(eh) = entry_hash {
+            if self
+                .meta_cache
+                .has_registered_store_entry(eh, header_hash)?
+            {
+                // Found a entry header in the cache
+                return Ok(true);
             }
-            Ok(false)
-        })
+            if self
+                .meta_vault
+                .has_registered_store_entry(eh, header_hash)?
+            {
+                // Found a entry header in the vault
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 
     #[instrument(skip(self, options))]
@@ -684,8 +632,8 @@ where
     /// This call has the opportunity to hit the local cache
     /// and avoid a network call.
     // TODO: This still fetches the full element and metadata.
-    // Need to add a fetch_exists_entry that only gets data.
-    pub async fn exists_entry(
+    // Need to add a fetch_retrieve_entry that only gets data.
+    pub async fn retrieve_entry(
         &mut self,
         hash: EntryHash,
         options: GetOptions,
@@ -704,8 +652,8 @@ where
     /// This call has the opportunity to hit the local cache
     /// and avoid a network call.
     // TODO: This still fetches the full element and metadata.
-    // Need to add a fetch_exists_header that only gets data.
-    pub async fn exists_header(
+    // Need to add a fetch_retrieve_header that only gets data.
+    pub async fn retrieve_header(
         &mut self,
         hash: HeaderHash,
         options: GetOptions,
@@ -726,8 +674,8 @@ where
     /// Note we still need to return the element as proof they are really
     /// holding it unless we create a byte challenge function.
     // TODO: This still fetches the full element and metadata.
-    // Need to add a fetch_exists that only gets data.
-    pub async fn exists(
+    // Need to add a fetch_retrieve that only gets data.
+    pub async fn retrieve(
         &mut self,
         hash: AnyDhtHash,
         options: GetOptions,

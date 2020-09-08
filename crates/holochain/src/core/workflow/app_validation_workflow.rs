@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use super::{
     error::WorkflowResult,
+    integrate_dht_ops_workflow::reintegrate_single_data,
     integrate_dht_ops_workflow::{
         disintegrate_single_data, disintegrate_single_metadata, integrate_single_data,
         integrate_single_metadata,
@@ -14,7 +15,6 @@ use super::{
 use crate::{
     conductor::api::CellConductorApiT,
     core::ribosome::wasm_ribosome::WasmRibosome,
-    core::ValidationError,
     core::{
         queue_consumer::{OneshotWriter, TriggerSender, WorkComplete},
         ribosome::guest_callback::validate::ValidateHostAccess,
@@ -44,8 +44,8 @@ use holochain_state::{
     prelude::*,
 };
 use holochain_types::{
-    dht_op::DhtOp, dna::DnaFile, test_utils::which_agent, validate::ValidationStatus, Entry,
-    Timestamp,
+    dht_op::DhtOp, dht_op::DhtOpLight, dna::DnaFile, test_utils::which_agent,
+    validate::ValidationStatus, Entry, Timestamp,
 };
 use holochain_zome_types::{header::AppEntryType, header::EntryType, zome::ZomeName};
 use tracing::*;
@@ -88,7 +88,7 @@ async fn app_validation_workflow_inner(
                     // We only want sys validated or awaiting app dependency ops
                     ValidationLimboStatus::SysValidated
                     | ValidationLimboStatus::AwaitingAppDeps(_)
-                    | ValidationLimboStatus::AwaitingProof => Ok(true),
+                    | ValidationLimboStatus::PendingValidation => Ok(true),
                     ValidationLimboStatus::Pending | ValidationLimboStatus::AwaitingSysDeps(_) => {
                         Ok(false)
                     }
@@ -96,7 +96,7 @@ async fn app_validation_workflow_inner(
             })?
             // Partition awaiting proof into a separate vec
             .partition(|vlv| match vlv.status {
-                ValidationLimboStatus::AwaitingProof => Ok(false),
+                ValidationLimboStatus::PendingValidation => Ok(false),
                 _ => Ok(true),
             }))?;
     debug!(?ops, ?awaiting_ops);
@@ -107,8 +107,8 @@ async fn app_validation_workflow_inner(
                 let outcome = validate_op(op.clone(), &conductor_api).await?;
                 match outcome {
                     Outcome::Accepted => {
-                        if vlv.awaiting_proof.awaiting_proof() {
-                            vlv.status = ValidationLimboStatus::AwaitingProof;
+                        if vlv.pending_dependencies.pending_dependencies() {
+                            vlv.status = ValidationLimboStatus::PendingValidation;
                             awaiting_ops.push(vlv);
                         } else {
                             let hash = DhtOpHash::with_data(&op).await;
@@ -116,13 +116,13 @@ async fn app_validation_workflow_inner(
                                 validation_status: ValidationStatus::Valid,
                                 op: vlv.op,
                             };
-                            workspace.to_int_limbo(hash, iv, op).await?;
+                            workspace.to_int_limbo(hash, iv, op)?;
                         }
                     }
                     Outcome::AwaitingDeps(deps) => {
                         let hash = DhtOpHash::with_data(&op).await;
                         vlv.status = ValidationLimboStatus::AwaitingAppDeps(deps);
-                        workspace.to_val_limbo(hash, vlv).await?;
+                        workspace.to_val_limbo(hash, vlv)?;
                     }
                     Outcome::Rejected(_) => {
                         let hash = DhtOpHash::with_data(&op).await;
@@ -130,7 +130,7 @@ async fn app_validation_workflow_inner(
                             op: vlv.op,
                             validation_status: ValidationStatus::Rejected,
                         };
-                        workspace.to_int_limbo(hash, iv, op).await?;
+                        workspace.to_int_limbo(hash, iv, op)?;
                     }
                 }
             }
@@ -155,7 +155,7 @@ async fn app_validation_workflow_inner(
     // Including any awaiting proof from this run.
     'op_loop: for mut vlv in awaiting_ops {
         let mut still_awaiting = Vec::new();
-        for dep in vlv.awaiting_proof.deps.drain(..) {
+        for dep in vlv.pending_dependencies.pending.drain(..) {
             match check_dep_status(dep.as_ref(), &workspace)? {
                 Some(status) => {
                     match status {
@@ -164,7 +164,7 @@ async fn app_validation_workflow_inner(
                         }
                         ValidationStatus::Rejected | ValidationStatus::Abandoned => {
                             match dep {
-                                DepType::Fixed(_) => {
+                                DepType::FixedElement(_) => {
                                     // Mark this op as invalid and integrate it.
                                     // There is no reason to check the other deps as it is rejected.
                                     let op =
@@ -175,12 +175,12 @@ async fn app_validation_workflow_inner(
                                         validation_status: status,
                                         op: vlv.op,
                                     };
-                                    workspace.to_int_limbo(hash, iv, op).await?;
+                                    workspace.to_int_limbo(hash, iv, op)?;
 
                                     // Continue to the next op
                                     continue 'op_loop;
                                 }
-                                DepType::Any(_) => {
+                                DepType::AnyElement(_) => {
                                     // The dependency is any element with for an entry
                                     // So we can't say that it is invalid because there could
                                     // always be a valid entry.
@@ -200,14 +200,14 @@ async fn app_validation_workflow_inner(
         let op = light_to_op(vlv.op.clone(), &workspace.element_pending).await?;
         let hash = DhtOpHash::with_data(&op).await;
         if still_awaiting.len() > 0 {
-            vlv.awaiting_proof.deps = still_awaiting;
-            workspace.to_val_limbo(hash, vlv).await?;
+            vlv.pending_dependencies.pending = still_awaiting;
+            workspace.to_val_limbo(hash, vlv)?;
         } else {
             let iv = IntegrationLimboValue {
                 validation_status: ValidationStatus::Valid,
                 op: vlv.op,
             };
-            workspace.to_int_limbo(hash, iv, op).await?;
+            workspace.to_int_limbo(hash, iv, op)?;
         }
     }
     Ok(WorkComplete::Complete)
@@ -234,7 +234,7 @@ async fn validate_op(
     // Get the dna file
     let dna_file = { conductor_api.get_this_dna().await };
     let dna_file =
-        dna_file.ok_or_else(|| ValidationError::DnaMissing(conductor_api.cell_id().clone()))?;
+        dna_file.ok_or_else(|| AppValidationError::DnaMissing(conductor_api.cell_id().clone()))?;
     // Get the zome names
     let zome_names = get_zome_names(&app_entry_type, &dna_file)?;
     // Create the ribosome
@@ -287,7 +287,7 @@ fn get_zome_name(entry_type: &AppEntryType, dna_file: &DnaFile) -> AppValidation
         .dna()
         .zomes
         .get(zome_index)
-        .ok_or_else(|| ValidationError::ZomeId(entry_type.clone()))?
+        .ok_or_else(|| AppValidationError::ZomeId(entry_type.clone()))?
         .0
         .clone())
 }
@@ -330,6 +330,8 @@ pub struct AppValidationWorkspace {
     // Cached data
     pub element_cache: ElementBuf,
     pub meta_cache: MetadataBuf,
+    // Ops to disintegrate
+    pub to_disintegrate_pending: Vec<DhtOpLight>,
 }
 
 impl AppValidationWorkspace {
@@ -364,10 +366,11 @@ impl AppValidationWorkspace {
             meta_judged,
             element_cache,
             meta_cache,
+            to_disintegrate_pending: Vec::new(),
         })
     }
 
-    async fn to_val_limbo(
+    fn to_val_limbo(
         &mut self,
         hash: DhtOpHash,
         mut vlv: ValidationLimboValue,
@@ -378,25 +381,40 @@ impl AppValidationWorkspace {
         Ok(())
     }
 
-    async fn to_int_limbo(
+    #[tracing::instrument(skip(self, hash))]
+    fn to_int_limbo(
         &mut self,
         hash: DhtOpHash,
         iv: IntegrationLimboValue,
         op: DhtOp,
     ) -> WorkflowResult<()> {
-        disintegrate_single_metadata(iv.op.clone(), &self.element_pending, &mut self.meta_pending)
-            .await?;
-        disintegrate_single_data(iv.op.clone(), &mut self.element_pending);
-        integrate_single_data(op, &mut self.element_judged).await?;
-        integrate_single_metadata(iv.op.clone(), &self.element_judged, &mut self.meta_judged)
-            .await?;
+        disintegrate_single_metadata(iv.op.clone(), &self.element_pending, &mut self.meta_pending)?;
+        self.to_disintegrate_pending.push(iv.op.clone());
+        integrate_single_data(op, &mut self.element_judged)?;
+        integrate_single_metadata(iv.op.clone(), &self.element_judged, &mut self.meta_judged)?;
         self.integration_limbo.put(hash, iv)?;
+        Ok(())
+    }
+
+    #[tracing::instrument(skip(self, writer))]
+    /// We need to cancel any deletes for the pending data
+    /// where the ops still in validation limbo reference that data
+    fn update_element_stores(&mut self, writer: &mut Writer) -> WorkspaceResult<()> {
+        for op in self.to_disintegrate_pending.drain(..) {
+            disintegrate_single_data(op, &mut self.element_pending);
+        }
+        let mut val_iter = self.validation_limbo.iter(writer)?;
+        while let Some((_, vlv)) = val_iter.next()? {
+            reintegrate_single_data(vlv.op, &mut self.element_pending);
+        }
         Ok(())
     }
 }
 
 impl Workspace for AppValidationWorkspace {
     fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> WorkspaceResult<()> {
+        warn!("unimplemented passthrough");
+        self.update_element_stores(writer)?;
         self.validation_limbo.0.flush_to_txn_ref(writer)?;
         self.integration_limbo.flush_to_txn_ref(writer)?;
         self.element_pending.flush_to_txn_ref(writer)?;

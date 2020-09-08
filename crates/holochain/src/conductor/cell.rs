@@ -441,7 +441,7 @@ impl Cell {
 
         // Check that we have the authority to serve this request because we have
         // done the StoreElement validation
-        if !meta_vault.has_element_header(&hash)? {
+        if !meta_vault.has_registered_store_element(&hash)? {
             return Ok(GetElementResponse::GetHeader(None));
         }
 
