@@ -62,17 +62,17 @@ impl AsRef<[u8]> for IntKey {
 
 impl From<u32> for IntKey {
     fn from(u: u32) -> Self {
-        use byteorder::{BigEndian, WriteBytesExt};
+        use byteorder::{NativeEndian, WriteBytesExt};
         let mut wtr = vec![];
-        wtr.write_u32::<BigEndian>(u).unwrap();
+        wtr.write_u32::<NativeEndian>(u).unwrap();
         Self::from_key_bytes_or_friendly_panic(&wtr)
     }
 }
 
 impl From<IntKey> for u32 {
     fn from(k: IntKey) -> u32 {
-        use byteorder::{BigEndian, ByteOrder};
-        BigEndian::read_u32(&k.0)
+        use byteorder::{ByteOrder, NativeEndian};
+        NativeEndian::read_u32(&k.0)
     }
 }
 
