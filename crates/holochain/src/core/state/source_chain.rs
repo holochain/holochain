@@ -43,7 +43,7 @@ impl SourceChain {
         Ok(SourceChainBuf::new(env)?.into())
     }
 
-    pub async fn public_only(env: EnvironmentRead) -> DatabaseResult<Self> {
+    pub fn public_only(env: EnvironmentRead) -> DatabaseResult<Self> {
         Ok(SourceChainBuf::public_only(env)?.into())
     }
 
@@ -100,7 +100,7 @@ impl SourceChain {
     /// NB: [B-01676] the entry must be persisted for this to work. Once we have a
     /// proper capability index DB, OR a proper iterator that respects the
     /// scratch space, that will no longer be the case.
-    pub async fn get_persisted_cap_grant_by_secret(
+    pub fn get_persisted_cap_grant_by_secret(
         &self,
         query: &CapSecret,
     ) -> SourceChainResult<Option<CapGrant>> {
@@ -146,7 +146,7 @@ impl SourceChain {
     /// NB: [B-01676] the entry must be persisted for this to work. Once we have a
     /// proper capability index DB, OR a proper iterator that respects the
     /// scratch space, that will no longer be the case.
-    pub async fn get_persisted_cap_claim_by_secret(
+    pub fn get_persisted_cap_claim_by_secret(
         &self,
         query: &CapSecret,
     ) -> SourceChainResult<Option<CapClaim>> {
@@ -248,7 +248,7 @@ pub mod tests {
         {
             let chain = SourceChain::new(arc.clone().into())?;
             assert_eq!(
-                chain.get_persisted_cap_grant_by_secret(secret).await?,
+                chain.get_persisted_cap_grant_by_secret(secret)?,
                 Some(grant.into())
             );
         }
@@ -291,7 +291,7 @@ pub mod tests {
         {
             let chain = SourceChain::new(arc.clone().into())?;
             assert_eq!(
-                chain.get_persisted_cap_claim_by_secret(&secret).await?,
+                chain.get_persisted_cap_claim_by_secret(&secret)?,
                 Some(claim)
             );
         }

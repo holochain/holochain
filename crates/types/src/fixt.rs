@@ -4,6 +4,7 @@
 
 #![allow(missing_docs)]
 
+use crate::cell::CellId;
 use crate::dna::zome::Zome;
 use crate::dna::zome::{HostFnAccess, Permission};
 use crate::dna::DnaDef;
@@ -65,6 +66,9 @@ use std::iter::Iterator;
 
 /// a curve to spit out Entry::App values
 pub struct AppEntry;
+
+/// A curve to make headers have public entry types
+pub struct PublicCurve;
 
 fixturator!(
     Zome;
@@ -541,6 +545,10 @@ fixturator! {
         EntryTypeVariant::CapClaim => EntryType::CapClaim,
         EntryTypeVariant::CapGrant => EntryType::CapGrant,
     };
+    curve PublicCurve {
+        let aet = fixt!(AppEntryType);
+        EntryType::App(AppEntryType::new(aet.id(), aet.zome_id(), EntryVisibility::Public))
+    };
 }
 
 fixturator!(
@@ -566,11 +574,23 @@ fixturator!(
 fixturator!(
     EntryCreate;
     constructor fn from_builder(HeaderBuilderCommon, EntryType, EntryHash);
+
+    curve PublicCurve {
+        let mut ec = fixt!(EntryCreate);
+        ec.entry_type = fixt!(EntryType, PublicCurve);
+        ec
+    };
 );
 
 fixturator!(
     EntryUpdate;
     constructor fn from_builder(HeaderBuilderCommon, EntryHash, HeaderHash, EntryType, EntryHash);
+
+    curve PublicCurve {
+        let mut eu = fixt!(EntryUpdate);
+        eu.entry_type = fixt!(EntryType, PublicCurve);
+        eu
+    };
 );
 
 fixturator!(
@@ -592,6 +612,14 @@ fixturator!(
         EntryUpdate(EntryUpdate)
         ElementDelete(ElementDelete)
     ];
+
+    curve PublicCurve {
+        match fixt!(Header) {
+            Header::EntryCreate(_) => Header::EntryCreate(fixt!(EntryCreate, PublicCurve)),
+            Header::EntryUpdate(_) => Header::EntryUpdate(fixt!(EntryUpdate, PublicCurve)),
+            other_type => other_type,
+        }
+    };
 );
 
 fixturator!(
@@ -600,6 +628,14 @@ fixturator!(
         Create(EntryCreate)
         Update(EntryUpdate)
     ];
+
+
+    curve PublicCurve {
+        match fixt!(NewEntryHeader) {
+            NewEntryHeader::Create(_) => NewEntryHeader::Create(fixt!(EntryCreate, PublicCurve)),
+            NewEntryHeader::Update(_) => NewEntryHeader::Update(fixt!(EntryUpdate, PublicCurve)),
+        }
+    };
 );
 
 fixturator!(
@@ -610,4 +646,9 @@ fixturator!(
 fixturator!(
     HostFnAccess;
     constructor fn new(Permission, Permission, Permission, Permission, Permission, Permission, Permission);
+);
+
+fixturator!(
+    CellId;
+    constructor fn new(DnaHash, AgentPubKey);
 );

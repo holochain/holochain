@@ -50,7 +50,6 @@ pub mod slow_tests {
     use crate::fixt::ZomeCallHostAccessFixturator;
     use fixt::prelude::*;
     use hdk3::prelude::*;
-
     use holochain_wasm_test_utils::TestWasm;
     use test_wasm_common::*;
 

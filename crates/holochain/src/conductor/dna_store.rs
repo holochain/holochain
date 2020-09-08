@@ -98,7 +98,7 @@ impl DnaDefBuf {
         Ok(())
     }
 
-    pub async fn get_all(&self) -> DatabaseResult<Vec<DnaDefHashed>> {
+    pub fn get_all(&self) -> DatabaseResult<Vec<DnaDefHashed>> {
         fresh_reader!(self.dna_defs.env(), |r| self
             .dna_defs
             .iter_fail(&r)?

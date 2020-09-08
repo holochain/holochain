@@ -29,7 +29,6 @@ pub fn spawn_produce_dht_ops_consumer(
     let handle = tokio::spawn(async move {
         loop {
             let workspace = ProduceDhtOpsWorkspace::new(env.clone().into())
-                .await
                 .expect("Could not create Workspace");
             if let WorkComplete::Incomplete =
                 produce_dht_ops_workflow(workspace, env.clone().into(), &mut trigger_publish)

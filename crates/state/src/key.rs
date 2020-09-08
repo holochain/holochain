@@ -1,8 +1,12 @@
 //! Traits for defining keys and values of databases
 
-use holo_hash::{HashType, HoloHash};
+use holo_hash::{HashType, HoloHash, PrimitiveHashType};
 use holochain_serialized_bytes::prelude::*;
+pub use prefix::*;
 use serde::{de::DeserializeOwned, Serialize};
+use std::cmp::Ordering;
+
+mod prefix;
 
 /// Any key type used in a [KvStore] or [KvvStore] must implement this trait
 pub trait BufKey: Sized + Ord + Eq + AsRef<[u8]> + Send + Sync {

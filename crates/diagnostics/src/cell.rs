@@ -43,7 +43,7 @@ pub async fn dump_cell_state(
     );
     kv!("element vault - headers", ELEMENT_VAULT_HEADERS);
     kv!("metadata vault - links", META_VAULT_LINKS);
-    kv!("metadata vault - status", META_VAULT_STATUS);
+    kv!("metadata vault - misc", META_VAULT_MISC);
 
     kv!("element cache - entries", ELEMENT_CACHE_ENTRIES);
     kv!("element cache - headers", ELEMENT_CACHE_HEADERS);
