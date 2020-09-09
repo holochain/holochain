@@ -1,11 +1,11 @@
 use super::CapSecret;
 use holo_hash::*;
-use serde::{Deserialize, Serialize};
+use holochain_serialized_bytes::prelude::*;
 
 /// System entry to hold a capability token claim for use as a caller
 /// Stored by a claimant so they can remember what's necessary to exercise
 /// this capability by sending the secret to the grantor
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, SerializedBytes)]
 pub struct CapClaim {
     /// A string by which to later query for saved claims.
     /// This does not need to be unique within a source chain.

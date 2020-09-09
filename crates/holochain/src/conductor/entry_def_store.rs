@@ -88,8 +88,8 @@ impl EntryDefBuf {
     }
 
     /// Get an entry def
-    pub async fn get(&self, k: EntryDefBufferKey) -> DatabaseResult<Option<EntryDef>> {
-        self.0.get(&k.into()).await
+    pub fn get(&self, k: EntryDefBufferKey) -> DatabaseResult<Option<EntryDef>> {
+        self.0.get(&k.into())
     }
 
     /// Store an entry def
@@ -116,15 +116,15 @@ impl EntryDefBuf {
 impl BufferedStore for EntryDefBuf {
     type Error = DatabaseError;
 
-    fn flush_to_txn(self, writer: &mut Writer) -> DatabaseResult<()> {
-        let store = self.0;
-        store.flush_to_txn(writer)?;
+    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
+        self.0.flush_to_txn_ref(writer)?;
         Ok(())
     }
 }
 
+#[tracing::instrument(skip(dna))]
 /// Get all the [EntryDef] for this dna
-pub(crate) async fn get_entry_defs(
+pub(crate) fn get_entry_defs(
     dna: DnaFile,
 ) -> EntryDefStoreResult<Vec<(EntryDefBufferKey, EntryDef)>> {
     let invocation = EntryDefsInvocation::new();
@@ -153,6 +153,9 @@ pub(crate) async fn get_entry_defs(
                         .into_iter()
                         .enumerate()
                         .map(move |(i, entry_def)| {
+                            let s = tracing::debug_span!("entry_def");
+                            let _g = s.enter();
+                            tracing::debug!(?entry_def);
                             Ok((
                                 EntryDefBufferKey {
                                     zome: zome.clone(),

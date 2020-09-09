@@ -217,15 +217,15 @@ where
         self.scratch.is_empty()
     }
 
-    fn flush_to_txn(self, writer: &mut Writer) -> DatabaseResult<()> {
+    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
         use KvvOp::*;
         if self.is_clean() {
             return Ok(());
         }
-        for (k, ValuesDelta { delete_all, deltas }) in self.scratch {
+        for (k, ValuesDelta { delete_all, deltas }) in self.scratch.iter() {
             // If delete_all is set, that we should delete everything persisted,
             // but then continue to add inserts from the ops, if present
-            if delete_all {
+            if *delete_all {
                 self.db.delete_all(writer, k.clone())?;
             }
             trace!(?k);
@@ -263,7 +263,7 @@ where
                     }
                     // Skip deleting unnecessarily if we have already deleted
                     // everything
-                    Delete if delete_all => {}
+                    Delete if *delete_all => {}
                     Delete => {
                         let buf = holochain_serialized_bytes::encode(&v)?;
                         let encoded = rkv::Value::Blob(&buf);

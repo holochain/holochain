@@ -2,7 +2,7 @@ use crate::{
     buffer::{BufferedStore, KvBufUsed},
     env::EnvironmentRead,
     error::{DatabaseError, DatabaseResult},
-    fatal_db_hash_integrity_check, fresh_reader, fresh_reader_async,
+    fatal_db_hash_integrity_check, fresh_reader,
     prelude::*,
     transaction::Readable,
 };
@@ -16,17 +16,19 @@ use holo_hash::{
 ///
 /// There is no "CasStore" (which would wrap a `KvStore`), because so far
 /// there has been no need for one.
-pub struct CasBufUsedAsync<C>(KvBufUsed<HoloHashOf<C>, C>)
-where
-    C: HashableContent + BufVal + Send + Sync,
-    HoloHashOf<C>: BufKey,
-    C::HashType: PrimitiveHashType + HashTypeAsync + Send + Sync;
-
-impl<C> CasBufUsedAsync<C>
+pub struct CasBufUsedAsync<C, P = IntegratedPrefix>(KvBufUsed<PrefixHashKey<P>, C>)
 where
     C: HashableContent + BufVal + Send + Sync,
     HoloHashOf<C>: BufKey,
     C::HashType: PrimitiveHashType + HashTypeAsync + Send + Sync,
+    P: PrefixType;
+
+impl<C, P> CasBufUsedAsync<C, P>
+where
+    C: HashableContent + BufVal + Send + Sync,
+    HoloHashOf<C>: BufKey,
+    C::HashType: PrimitiveHashType + HashTypeAsync + Send + Sync,
+    P: PrefixType,
 {
     /// Create a new CasBufUsedAsync
     pub fn new(db: rkv::SingleStore) -> Self {
@@ -35,13 +37,15 @@ where
 
     /// Put a value into the underlying [KvBufUsed]
     pub fn put(&mut self, h: HoloHashed<C>) {
-        let (content, hash) = h.into_inner();
+        let key = PrefixHashKey::new(h.as_hash());
+        let content = h.into_content();
         // These expects seem valid as it means the hashing is broken
-        self.0.put(hash, content).expect("Hash should not be empty");
+        self.0.put(key, content).expect("Hash should not be empty");
     }
 
     /// Delete a value from the underlying [KvBufUsed]
     pub fn delete(&mut self, k: HoloHashOf<C>) {
+        let k = PrefixHashKey::new(k.as_hash());
         // These expects seem valid as it means the hashing is broken
         self.0.delete(k).expect("Hash key is empty");
     }
@@ -52,8 +56,26 @@ where
         r: &'r R,
         hash: &'a HoloHashOf<C>,
     ) -> DatabaseResult<Option<HoloHashed<C>>> {
-        Ok(if let Some(content) = self.0.get(r, hash)? {
+        let k = PrefixHashKey::new(hash.as_hash());
+        Ok(if let Some(content) = self.0.get(r, &k)? {
             Some(Self::deserialize_and_hash(hash.get_full_bytes(), content).await)
+        } else {
+            None
+        })
+    }
+
+    /// Get a value from the underlying [KvBufUsed]
+    pub fn get_blocking<'r, 'a: 'r, R: Readable>(
+        &'a self,
+        r: &'r R,
+        hash: &'a HoloHashOf<C>,
+    ) -> DatabaseResult<Option<HoloHashed<C>>> {
+        let k = PrefixHashKey::new(hash.as_hash());
+        Ok(if let Some(content) = self.0.get(r, &k)? {
+            Some(Self::deserialize_and_hash_blocking(
+                k.as_hash_bytes(),
+                content,
+            ))
         } else {
             None
         })
@@ -61,7 +83,8 @@ where
 
     /// Check if a value is stored at this key
     pub fn contains<'r, R: Readable>(&self, r: &'r R, k: &HoloHashOf<C>) -> DatabaseResult<bool> {
-        self.0.contains(r, k)
+        let k = PrefixHashKey::new(k.as_hash());
+        self.0.contains(r, &k)
     }
 
     /// Iterate over the underlying persisted data taking the scratch space into consideration
@@ -71,7 +94,8 @@ where
     ) -> DatabaseResult<impl FallibleIterator<Item = HoloHashed<C>, Error = DatabaseError> + 'r>
     {
         Ok(Box::new(self.0.iter(r)?.map(|(h, c)| {
-            Ok(Self::deserialize_and_hash_blocking(&h[..], c))
+            let k: PrefixHashKey<P> = PrefixHashKey::from_key_bytes_or_friendly_panic(h);
+            Ok(Self::deserialize_and_hash_blocking(k.as_hash_bytes(), c))
         })))
     }
 
@@ -100,22 +124,24 @@ where
 
 #[derive(shrinkwraprs::Shrinkwrap)]
 #[shrinkwrap(mutable, unsafe_ignore_visibility)]
-pub struct CasBufFreshAsync<C>
+pub struct CasBufFreshAsync<C, P = IntegratedPrefix>
 where
     C: HashableContent + BufVal + Send + Sync,
     HoloHashOf<C>: BufKey,
     C::HashType: PrimitiveHashType + HashTypeAsync + Send + Sync,
+    P: PrefixType,
 {
     env: EnvironmentRead,
     #[shrinkwrap(main_field)]
-    inner: CasBufUsedAsync<C>,
+    inner: CasBufUsedAsync<C, P>,
 }
 
-impl<C> CasBufFreshAsync<C>
+impl<C, P> CasBufFreshAsync<C, P>
 where
     C: HashableContent + BufVal + Send + Sync,
     HoloHashOf<C>: BufKey,
     C::HashType: PrimitiveHashType + HashTypeAsync + Send + Sync,
+    P: PrefixType,
 {
     /// Create a new CasBufFreshAsync
     pub fn new(env: EnvironmentRead, db: rkv::SingleStore) -> Self {
@@ -134,19 +160,20 @@ where
         &'a self,
         hash: &'a HoloHashOf<C>,
     ) -> DatabaseResult<Option<HoloHashed<C>>> {
-        fresh_reader_async!(self.env, |r| async move { self.inner.get(&r, hash).await })
+        fresh_reader!(self.env, |r| { self.inner.get_blocking(&r, hash) })
     }
 
     /// Check if a value is stored at this key
-    pub async fn contains(&self, k: &HoloHashOf<C>) -> DatabaseResult<bool> {
+    pub fn contains(&self, k: &HoloHashOf<C>) -> DatabaseResult<bool> {
         fresh_reader!(self.env, |r| self.inner.contains(&r, k))
     }
 }
 
-impl<C> BufferedStore for CasBufUsedAsync<C>
+impl<C, P> BufferedStore for CasBufUsedAsync<C, P>
 where
     C: HashableContent + BufVal + Send + Sync,
     C::HashType: PrimitiveHashType + HashTypeAsync + Send + Sync,
+    P: PrefixType,
 {
     type Error = DatabaseError;
 
@@ -154,16 +181,17 @@ where
         self.0.is_clean()
     }
 
-    fn flush_to_txn(self, writer: &mut Writer) -> DatabaseResult<()> {
-        self.0.flush_to_txn(writer)?;
+    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
+        self.0.flush_to_txn_ref(writer)?;
         Ok(())
     }
 }
 
-impl<C> BufferedStore for CasBufFreshAsync<C>
+impl<C, P> BufferedStore for CasBufFreshAsync<C, P>
 where
     C: HashableContent + BufVal + Send + Sync,
     C::HashType: PrimitiveHashType + HashTypeAsync + Send + Sync,
+    P: PrefixType,
 {
     type Error = DatabaseError;
 
@@ -171,8 +199,8 @@ where
         self.inner.is_clean()
     }
 
-    fn flush_to_txn(self, writer: &mut Writer) -> DatabaseResult<()> {
-        self.inner.flush_to_txn(writer)?;
+    fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
+        self.inner.flush_to_txn_ref(writer)?;
         Ok(())
     }
 }

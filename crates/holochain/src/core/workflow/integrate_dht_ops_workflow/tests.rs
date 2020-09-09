@@ -10,7 +10,7 @@ use crate::{
         queue_consumer::TriggerSender,
         ribosome::{guest_callback::entry_defs::EntryDefsResult, host_fn, MockRibosomeT},
         state::{metadata::LinkMetaKey, workspace::WorkspaceError},
-        workflow::unsafe_call_zome_workspace::UnsafeCallZomeWorkspace,
+        workflow::CallZomeWorkspaceLock,
     },
     fixt::*,
     test_utils::test_network,
@@ -86,7 +86,8 @@ impl TestData {
             .into_hash();
 
         // Original entry and header for updates
-        let mut original_header = fixt!(NewEntryHeader);
+        let mut original_header = fixt!(NewEntryHeader, PublicCurve);
+        debug!(?original_header);
 
         match &mut original_header {
             NewEntryHeader::Create(c) => c.entry_hash = original_entry_hash.clone(),
@@ -97,7 +98,7 @@ impl TestData {
             HeaderHashed::from_content_sync(original_header.clone().into()).into_hash();
 
         // Header for the new entry
-        let mut new_entry_header = fixt!(NewEntryHeader);
+        let mut new_entry_header = fixt!(NewEntryHeader, PublicCurve);
 
         // Update to new entry
         match &mut new_entry_header {
@@ -106,12 +107,12 @@ impl TestData {
         }
 
         // Entry update for header
-        let mut entry_update_header = fixt!(EntryUpdate);
+        let mut entry_update_header = fixt!(EntryUpdate, PublicCurve);
         entry_update_header.entry_hash = new_entry_hash.clone();
         entry_update_header.original_header_address = original_header_hash.clone();
 
         // Entry update for entry
-        let mut entry_update_entry = fixt!(EntryUpdate);
+        let mut entry_update_entry = fixt!(EntryUpdate, PublicCurve);
         entry_update_entry.entry_hash = new_entry_hash.clone();
         entry_update_entry.original_entry_address = original_entry_hash.clone();
         entry_update_entry.original_header_address = original_header_hash.clone();
@@ -134,11 +135,22 @@ impl TestData {
         link_remove.base_address = original_entry_hash.clone();
         link_remove.link_add_address = link_add_hash.clone();
 
+        let mut any_header = fixt!(Header, PublicCurve);
+        match &mut any_header {
+            Header::EntryCreate(ec) => {
+                ec.entry_hash = original_entry_hash.clone();
+            }
+            Header::EntryUpdate(eu) => {
+                eu.entry_hash = original_entry_hash.clone();
+            }
+            _ => (),
+        };
+
         Self {
             signature: fixt!(Signature),
             original_entry,
             new_entry,
-            any_header: fixt!(Header),
+            any_header,
             entry_update_header,
             entry_update_entry,
             original_header,
@@ -167,6 +179,8 @@ enum Db {
     IntQueueEmpty,
     CasHeader(Header, Option<Signature>),
     CasEntry(Entry, Option<Header>, Option<Signature>),
+    JudgedHeader(Header, Option<Signature>),
+    JudgedEntry(Entry, Option<Header>, Option<Signature>),
     MetaEmpty,
     MetaHeader(Entry, Header),
     MetaActivity(Header),
@@ -180,9 +194,9 @@ impl Db {
     /// Checks that the database is in a state
     #[instrument(skip(expects, env))]
     async fn check(expects: Vec<Self>, env: EnvironmentWrite, here: String) {
-        let env_ref = env.guard().await;
+        let env_ref = env.guard();
         let reader = env_ref.reader().unwrap();
-        let workspace = IntegrateDhtOpsWorkspace::new(env.clone().into(), &env_ref).unwrap();
+        let workspace = IntegrateDhtOpsWorkspace::new(env.clone().into()).unwrap();
         for expect in expects {
             match expect {
                 Db::Integrated(op) => {
@@ -192,19 +206,14 @@ impl Db {
                         op: op.to_light().await,
                         when_integrated: Timestamp::now().into(),
                     };
-                    let mut r = workspace
-                        .integrated_dht_ops
-                        .get(&op_hash)
-                        .await
-                        .unwrap()
-                        .unwrap();
+                    let mut r = workspace.integrated_dht_ops.get(&op_hash).unwrap().unwrap();
                     r.when_integrated = value.when_integrated;
                     assert_eq!(r, value, "{}", here);
                 }
                 Db::IntQueue(op) => {
                     let value = IntegrationLimboValue {
                         validation_status: ValidationStatus::Valid,
-                        op,
+                        op: op.to_light().await,
                     };
                     let res = workspace
                         .integration_limbo
@@ -222,7 +231,6 @@ impl Db {
                         workspace
                             .elements
                             .get_header(hash.as_hash())
-                            .await
                             .unwrap()
                             .expect(&format!(
                                 "Header {:?} not in element vault for {}",
@@ -240,10 +248,43 @@ impl Db {
                         workspace
                             .elements
                             .get_entry(&hash)
-                            .await
                             .unwrap()
                             .expect(&format!(
-                                "Entry {:?} not in element vault for {}",
+                                "Entry {:?} with hash {:?} not in element vault for {}",
+                                entry, hash, here
+                            ))
+                            .into_content(),
+                        entry,
+                        "{}",
+                        here,
+                    );
+                }
+                Db::JudgedHeader(header, _) => {
+                    let hash = HeaderHashed::from_content_sync(header.clone());
+                    assert_eq!(
+                        workspace
+                            .element_judged
+                            .get_header(hash.as_hash())
+                            .unwrap()
+                            .expect(&format!(
+                                "Header {:?} not in element judged for {}",
+                                header, here
+                            ))
+                            .header(),
+                        &header,
+                        "{}",
+                        here,
+                    );
+                }
+                Db::JudgedEntry(entry, _, _) => {
+                    let hash = EntryHashed::from_content_sync(entry.clone()).into_hash();
+                    assert_eq!(
+                        workspace
+                            .element_judged
+                            .get_entry(&hash)
+                            .unwrap()
+                            .expect(&format!(
+                                "Entry {:?} not in element judged for {}",
                                 entry, here
                             ))
                             .into_content(),
@@ -421,8 +462,8 @@ impl Db {
     // Sets the database to a certain state
     #[instrument(skip(pre_state, env))]
     async fn set<'env>(pre_state: Vec<Self>, env: EnvironmentWrite) {
-        let env_ref = env.guard().await;
-        let mut workspace = IntegrateDhtOpsWorkspace::new(env.clone().into(), &env_ref).unwrap();
+        let env_ref = env.guard();
+        let mut workspace = IntegrateDhtOpsWorkspace::new(env.clone().into()).unwrap();
         for state in pre_state {
             match state {
                 Db::Integrated(_) => {}
@@ -430,7 +471,7 @@ impl Db {
                     let op_hash = DhtOpHashed::from_content(op.clone()).await.into_hash();
                     let val = IntegrationLimboValue {
                         validation_status: ValidationStatus::Valid,
-                        op,
+                        op: op.to_light().await,
                     };
                     workspace
                         .integration_limbo
@@ -454,6 +495,22 @@ impl Db {
                         .put(signed_header, Some(entry_hash))
                         .unwrap();
                 }
+                Db::JudgedHeader(header, signature) => {
+                    let header_hash = HeaderHashed::from_content_sync(header.clone());
+                    let signed_header =
+                        SignedHeaderHashed::with_presigned(header_hash, signature.unwrap());
+                    workspace.element_judged.put(signed_header, None).unwrap();
+                }
+                Db::JudgedEntry(entry, header, signature) => {
+                    let header_hash = HeaderHashed::from_content_sync(header.unwrap().clone());
+                    let entry_hash = EntryHashed::from_content_sync(entry.clone());
+                    let signed_header =
+                        SignedHeaderHashed::with_presigned(header_hash, signature.unwrap());
+                    workspace
+                        .element_judged
+                        .put(signed_header, Some(entry_hash))
+                        .unwrap();
+                }
                 Db::MetaHeader(_, _) => {}
                 Db::MetaActivity(_) => {}
                 Db::MetaUpdate(_, _) => {}
@@ -461,7 +518,7 @@ impl Db {
                 Db::MetaEmpty => {}
                 Db::MetaDelete(_, _) => {}
                 Db::MetaLink(link_add, _) => {
-                    workspace.meta.add_link(link_add).await.unwrap();
+                    workspace.meta.add_link(link_add).unwrap();
                 }
                 Db::MetaLinkEmpty(_) => {}
                 Db::IntQueueEmpty => {}
@@ -478,26 +535,75 @@ impl Db {
 }
 
 async fn call_workflow<'env>(env: EnvironmentWrite) {
-    let env_ref = env.guard().await;
-    let workspace = IntegrateDhtOpsWorkspace::new(env.clone().into(), &env_ref).unwrap();
-    integrate_dht_ops_workflow(workspace, env.clone().into())
+    let workspace = IntegrateDhtOpsWorkspace::new(env.clone().into()).unwrap();
+    let (mut qt, _rx) = TriggerSender::new();
+    integrate_dht_ops_workflow(workspace, env.clone().into(), &mut qt)
         .await
         .unwrap();
 }
 
 // Need to clear the data from the previous test
-async fn clear_dbs(env: EnvironmentWrite) {
-    let env_ref = env.guard().await;
-    let mut workspace = IntegrateDhtOpsWorkspace::new(env.clone().into(), &env_ref).unwrap();
+fn clear_dbs(env: EnvironmentWrite) {
+    let env_ref = env.guard();
+    let mut workspace = IntegrateDhtOpsWorkspace::new(env.clone().into()).unwrap();
     env_ref
         .with_commit::<DatabaseError, _, _>(|writer| {
             workspace.integration_limbo.clear_all(writer)?;
             workspace.integrated_dht_ops.clear_all(writer)?;
             workspace.elements.clear_all(writer)?;
+            workspace.element_judged.clear_all(writer)?;
             workspace.meta.clear_all(writer)?;
             Ok(())
         })
         .unwrap();
+}
+
+fn add_op_to_judged(mut ps: Vec<Db>, op: &DhtOp) -> Vec<Db> {
+    match op {
+        DhtOp::StoreElement(s, h, e) => {
+            ps.push(Db::JudgedHeader(h.clone(), Some(s.clone())));
+            if let Some(e) = e {
+                ps.push(Db::JudgedEntry(
+                    *e.clone(),
+                    Some(h.clone()),
+                    Some(s.clone()),
+                ));
+            }
+        }
+        DhtOp::StoreEntry(s, h, e) => {
+            let h: Header = h.clone().try_into().unwrap();
+            ps.push(Db::JudgedHeader(h.clone(), Some(s.clone())));
+            ps.push(Db::JudgedEntry(
+                *e.clone(),
+                Some(h.clone()),
+                Some(s.clone()),
+            ));
+        }
+        DhtOp::RegisterAgentActivity(s, h) => {
+            ps.push(Db::JudgedHeader(h.clone(), Some(s.clone())));
+        }
+        DhtOp::RegisterUpdatedBy(s, h) => {
+            let h: Header = h.clone().try_into().unwrap();
+            ps.push(Db::JudgedHeader(h.clone(), Some(s.clone())));
+        }
+        DhtOp::RegisterDeletedBy(s, h) => {
+            let h: Header = h.clone().try_into().unwrap();
+            ps.push(Db::JudgedHeader(h.clone(), Some(s.clone())));
+        }
+        DhtOp::RegisterDeletedEntryHeader(s, h) => {
+            let h: Header = h.clone().try_into().unwrap();
+            ps.push(Db::JudgedHeader(h.clone(), Some(s.clone())));
+        }
+        DhtOp::RegisterAddLink(s, h) => {
+            let h: Header = h.clone().try_into().unwrap();
+            ps.push(Db::JudgedHeader(h.clone(), Some(s.clone())));
+        }
+        DhtOp::RegisterRemoveLink(s, h) => {
+            let h: Header = h.clone().try_into().unwrap();
+            ps.push(Db::JudgedHeader(h.clone(), Some(s.clone())));
+        }
+    }
+    ps
 }
 
 // TESTS BEGIN HERE
@@ -516,6 +622,8 @@ fn store_element(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
         entry.clone(),
     );
     let pre_state = vec![Db::IntQueue(op.clone())];
+    // Add op data to pending
+    let pre_state = add_op_to_judged(pre_state, &op);
     let mut expect = vec![
         Db::Integrated(op.clone()),
         Db::CasHeader(a.any_header.clone().into(), None),
@@ -532,7 +640,9 @@ fn store_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
         a.original_header.clone(),
         a.original_entry.clone().into(),
     );
+    debug!(?a.original_header);
     let pre_state = vec![Db::IntQueue(op.clone())];
+    let pre_state = add_op_to_judged(pre_state, &op);
     let expect = vec![
         Db::Integrated(op.clone()),
         Db::CasHeader(a.original_header.clone().into(), None),
@@ -545,6 +655,7 @@ fn store_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
 fn register_agent_activity(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let op = DhtOp::RegisterAgentActivity(a.signature.clone(), a.any_header.clone());
     let pre_state = vec![Db::IntQueue(op.clone())];
+    let pre_state = add_op_to_judged(pre_state, &op);
     let expect = vec![
         Db::Integrated(op.clone()),
         Db::MetaActivity(a.any_header.clone()),
@@ -559,6 +670,7 @@ fn register_replaced_by_for_header(a: TestData) -> (Vec<Db>, Vec<Db>, &'static s
         Db::IntQueue(op.clone()),
         Db::CasHeader(a.original_header.clone().into(), Some(a.signature.clone())),
     ];
+    let pre_state = add_op_to_judged(pre_state, &op);
     let expect = vec![
         Db::Integrated(op.clone()),
         Db::MetaUpdate(
@@ -579,6 +691,7 @@ fn register_replaced_by_for_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static st
             Some(a.signature.clone()),
         ),
     ];
+    let pre_state = add_op_to_judged(pre_state, &op);
     let expect = vec![
         Db::Integrated(op.clone()),
         Db::MetaUpdate(
@@ -599,6 +712,7 @@ fn register_deleted_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
             Some(a.signature.clone()),
         ),
     ];
+    let pre_state = add_op_to_judged(pre_state, &op);
     let expect = vec![
         Db::IntQueueEmpty,
         Db::Integrated(op.clone()),
@@ -620,6 +734,7 @@ fn register_deleted_header_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
             Some(a.signature.clone()),
         ),
     ];
+    let pre_state = add_op_to_judged(pre_state, &op);
     let expect = vec![
         Db::Integrated(op.clone()),
         Db::MetaDelete(
@@ -640,6 +755,7 @@ fn register_add_link(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
             Some(a.signature.clone()),
         ),
     ];
+    let pre_state = add_op_to_judged(pre_state, &op);
     let expect = vec![
         Db::Integrated(op.clone()),
         Db::MetaLink(a.link_add.clone(), a.new_entry_hash.clone().into()),
@@ -659,6 +775,7 @@ fn register_remove_link(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
         ),
         Db::MetaLink(a.link_add.clone(), a.new_entry_hash.clone().into()),
     ];
+    let pre_state = add_op_to_judged(pre_state, &op);
     let expect = vec![
         Db::Integrated(op.clone()),
         Db::MetaLinkEmpty(a.link_add.clone()),
@@ -670,6 +787,7 @@ fn register_remove_link(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
 fn register_remove_link_missing_base(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let op = DhtOp::RegisterRemoveLink(a.signature.clone(), a.link_remove.clone());
     let pre_state = vec![Db::IntQueue(op.clone())];
+    let pre_state = add_op_to_judged(pre_state, &op);
     let expect = vec![Db::IntegratedEmpty, Db::IntQueue(op.clone()), Db::MetaEmpty];
     (
         pre_state,
@@ -698,7 +816,7 @@ async fn test_ops_state() {
     ];
 
     for t in tests.iter() {
-        clear_dbs(env.clone()).await;
+        clear_dbs(env.clone());
         let td = TestData::new().await;
         let (pre_state, expect, name) = t(td);
         Db::set(pre_state, env.clone()).await;
@@ -709,11 +827,8 @@ async fn test_ops_state() {
 
 /// Call the produce dht ops workflow
 async fn produce_dht_ops<'env>(env: EnvironmentWrite) {
-    let env_ref = env.guard().await;
     let (mut qt, _rx) = TriggerSender::new();
-    let workspace = ProduceDhtOpsWorkspace::new(env.clone().into(), &env_ref)
-        .await
-        .unwrap();
+    let workspace = ProduceDhtOpsWorkspace::new(env.clone().into()).unwrap();
     produce_dht_ops_workflow(workspace, env.clone().into(), &mut qt)
         .await
         .unwrap();
@@ -721,14 +836,13 @@ async fn produce_dht_ops<'env>(env: EnvironmentWrite) {
 
 /// Run genesis on the source chain
 async fn genesis<'env>(env: EnvironmentWrite) {
-    let env_ref = env.guard().await;
-    let mut workspace = CallZomeWorkspace::new(env.clone().into(), &env_ref)
-        .await
-        .unwrap();
+    let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
     fake_genesis(&mut workspace.source_chain).await.unwrap();
-    env_ref
-        .with_commit(|writer| workspace.flush_to_txn(writer))
-        .unwrap();
+    {
+        env.guard()
+            .with_commit(|writer| workspace.flush_to_txn(writer))
+            .unwrap();
+    }
 }
 
 async fn commit_entry<'env>(
@@ -736,10 +850,8 @@ async fn commit_entry<'env>(
     env: EnvironmentWrite,
     zome_name: ZomeName,
 ) -> (EntryHash, HeaderHash) {
-    let env_ref = env.guard().await;
-    let mut workspace = CallZomeWorkspace::new(env.clone().into(), &env_ref)
-        .await
-        .unwrap();
+    let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
+    let workspace_lock = CallZomeWorkspaceLock::new(workspace);
 
     // Create entry def with the correct zome name
     let entry_def_id = fixt!(EntryDefId);
@@ -793,9 +905,8 @@ async fn commit_entry<'env>(
     let input = CommitEntryInput::new((entry_def_id.clone(), entry.clone()));
 
     let output = {
-        let (_g, raw_workspace) = UnsafeCallZomeWorkspace::from_mut(&mut workspace);
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = raw_workspace;
+        host_access.workspace = workspace_lock.clone();
         call_context.host_access = host_access.into();
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
@@ -803,9 +914,12 @@ async fn commit_entry<'env>(
     };
 
     // Write
-    env_ref
-        .with_commit(|writer| workspace.flush_to_txn(writer))
-        .unwrap();
+    {
+        let mut workspace = workspace_lock.write().await;
+        env.guard()
+            .with_commit(|writer| workspace.flush_to_txn_ref(writer))
+            .unwrap();
+    }
 
     let entry_hash = holochain_types::entry::EntryHashed::from_content(entry)
         .await
@@ -815,10 +929,8 @@ async fn commit_entry<'env>(
 }
 
 async fn get_entry(env: EnvironmentWrite, entry_hash: EntryHash) -> Option<Entry> {
-    let env_ref = env.guard().await;
-    let mut workspace = CallZomeWorkspace::new(env.clone().into(), &env_ref)
-        .await
-        .unwrap();
+    let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
+    let workspace_lock = CallZomeWorkspaceLock::new(workspace);
 
     // Create ribosome mock to return fixtures
     // This is a lot faster then compiling a zome
@@ -829,9 +941,8 @@ async fn get_entry(env: EnvironmentWrite, entry_hash: EntryHash) -> Option<Entry
     let input = GetInput::new((entry_hash.clone().into(), GetOptions));
 
     let output = {
-        let (_g, raw_workspace) = UnsafeCallZomeWorkspace::from_mut(&mut workspace);
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = raw_workspace;
+        host_access.workspace = workspace_lock;
         call_context.host_access = host_access.into();
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
@@ -847,10 +958,8 @@ async fn link_entries(
     zome_name: ZomeName,
     link_tag: LinkTag,
 ) -> HeaderHash {
-    let env_ref = env.guard().await;
-    let mut workspace = CallZomeWorkspace::new(env.clone().into(), &env_ref)
-        .await
-        .unwrap();
+    let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
+    let workspace_lock = CallZomeWorkspaceLock::new(workspace);
 
     // Create data for calls
     let mut dna_file = DnaFileFixturator::new(Empty).next().unwrap();
@@ -875,10 +984,8 @@ async fn link_entries(
     let input = LinkEntriesInput::new((base_address.into(), target_address.into(), link_tag));
 
     let output = {
-        let (_g, raw_workspace) = UnsafeCallZomeWorkspace::from_mut(&mut workspace);
-
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = raw_workspace;
+        host_access.workspace = workspace_lock.clone();
         call_context.host_access = host_access.into();
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
@@ -887,9 +994,12 @@ async fn link_entries(
     };
 
     // Write the changes
-    env_ref
-        .with_commit(|writer| workspace.flush_to_txn(writer))
-        .unwrap();
+    {
+        let mut workspace = workspace_lock.write().await;
+        env.guard()
+            .with_commit(|writer| workspace.flush_to_txn_ref(writer))
+            .unwrap();
+    }
 
     // Get the LinkAdd HeaderHash back
     output.into_inner()
@@ -901,10 +1011,8 @@ async fn get_links(
     zome_name: ZomeName,
     link_tag: LinkTag,
 ) -> Links {
-    let env_ref = env.guard().await;
-    let mut workspace = CallZomeWorkspace::new(env.clone().into(), &env_ref)
-        .await
-        .unwrap();
+    let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
+    let workspace_lock = CallZomeWorkspaceLock::new(workspace);
 
     // Create data for calls
     let mut dna_file = DnaFileFixturator::new(Empty).next().unwrap();
@@ -931,10 +1039,8 @@ async fn get_links(
     let input = GetLinksInput::new((base_address.into(), Some(link_tag)));
 
     let output = {
-        let (_g, raw_workspace) = UnsafeCallZomeWorkspace::from_mut(&mut workspace);
-
         let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = raw_workspace;
+        host_access.workspace = workspace_lock;
         host_access.network = cell_network;
         call_context.host_access = host_access.into();
         let ribosome = Arc::new(ribosome);
@@ -956,7 +1062,7 @@ async fn test_metadata_from_wasm_api() {
     observability::test_run().ok();
     let test_env = holochain_state::test_utils::test_cell_env();
     let env = test_env.env();
-    clear_dbs(env.clone()).await;
+    clear_dbs(env.clone());
 
     // Generate fixture data
     let mut td = TestData::with_app_entry_type().await;
@@ -1023,8 +1129,7 @@ async fn test_wasm_api_without_integration_links() {
     observability::test_run().ok();
     let test_env = holochain_state::test_utils::test_cell_env();
     let env = test_env.env();
-    let _dbs = env.dbs().await;
-    clear_dbs(env.clone()).await;
+    clear_dbs(env.clone());
 
     // Generate fixture data
     let mut td = TestData::with_app_entry_type().await;
@@ -1077,9 +1182,8 @@ async fn test_wasm_api_without_integration_delete() {
     observability::test_run().ok();
     let test_env = holochain_state::test_utils::test_cell_env();
     let env = test_env.env();
-    let dbs = env.dbs().await;
-    let env_ref = env.guard().await;
-    clear_dbs(env.clone()).await;
+    let env_ref = env.guard();
+    clear_dbs(env.clone());
 
     // Generate fixture data
     let mut td = TestData::with_app_entry_type().await;
@@ -1107,9 +1211,7 @@ async fn test_wasm_api_without_integration_delete() {
 
     {
         let reader = env_ref.reader().unwrap();
-        let mut workspace = CallZomeWorkspace::new(env.clone().into(), &dbs)
-            .await
-            .unwrap();
+        let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
         let entry_header = workspace
             .meta
             .get_headers(&reader, base_address.clone())
@@ -1276,12 +1378,9 @@ mod slow_tests {
         // Put commit entry into source chain
         {
             let cell_env = conductor.get_cell_env(&cell_id).await.unwrap();
-            let dbs = cell_env.dbs().await;
-            let env_ref = cell_env.guard().await;
+            let env_ref = cell_env.guard();
 
-            let mut workspace = CallZomeWorkspace::new(cell_env.clone().into(), &dbs)
-                .await
-                .unwrap();
+            let mut workspace = CallZomeWorkspace::new(cell_env.clone().into()).unwrap();
 
             let header_builder = builder::EntryCreate {
                 entry_type: EntryType::App(AppEntryType::new(
@@ -1313,12 +1412,7 @@ mod slow_tests {
                 .unwrap();
 
             // Integrate the ops to cache
-            let element = workspace
-                .source_chain
-                .get_element(&hh)
-                .await
-                .unwrap()
-                .unwrap();
+            let element = workspace.source_chain.get_element(&hh).unwrap().unwrap();
             integrate_to_cache(
                 &element,
                 workspace.source_chain.elements(),
@@ -1343,12 +1437,7 @@ mod slow_tests {
                 .unwrap();
 
             // Integrate the ops to cache
-            let element = workspace
-                .source_chain
-                .get_element(&hh)
-                .await
-                .unwrap()
-                .unwrap();
+            let element = workspace.source_chain.get_element(&hh).unwrap().unwrap();
             integrate_to_cache(
                 &element,
                 workspace.source_chain.elements(),
@@ -1370,12 +1459,7 @@ mod slow_tests {
                 .unwrap();
 
             // Integrate the ops to cache
-            let element = workspace
-                .source_chain
-                .get_element(&hh)
-                .await
-                .unwrap()
-                .unwrap();
+            let element = workspace.source_chain.get_element(&hh).unwrap().unwrap();
             integrate_to_cache(
                 &element,
                 workspace.source_chain.elements(),
@@ -1406,23 +1490,22 @@ mod slow_tests {
         let request = AppRequest::ZomeCallInvocation(request);
         let _r = app_interface.handle_app_request(request).await;
 
-        tokio::time::delay_for(std::time::Duration::from_secs(4)).await;
+        tokio::time::delay_for(std::time::Duration::from_millis(500)).await;
 
         // Check the ops
         {
             let cell_env = conductor.get_cell_env(&cell_id).await.unwrap();
-            let dbs = cell_env.dbs().await;
-            let env_ref = cell_env.guard().await;
+            let env_ref = cell_env.guard();
 
             let reader = env_ref.reader().unwrap();
-            let db = dbs.get_db(&*INTEGRATED_DHT_OPS).unwrap();
+            let db = cell_env.get_db(&*INTEGRATED_DHT_OPS).unwrap();
             let ops_db = IntegratedDhtOpsStore::new(cell_env.clone().into(), db);
             let ops = ops_db.iter(&reader).unwrap().collect::<Vec<_>>().unwrap();
             debug!(?ops);
             assert!(!ops.is_empty());
 
-            let meta = MetadataBuf::vault(cell_env.clone().into(), &dbs).unwrap();
-            let mut meta_cache = MetadataBuf::cache(cell_env.clone().into(), &dbs).unwrap();
+            let meta = MetadataBuf::vault(cell_env.clone().into()).unwrap();
+            let mut meta_cache = MetadataBuf::cache(cell_env.clone().into()).unwrap();
             let key = LinkMetaKey::Base(&base_entry_hash);
             let links = meta
                 .get_live_links(&reader, &key)
@@ -1433,7 +1516,7 @@ mod slow_tests {
             assert_eq!(link.target, target_entry_hash);
 
             let (elements, _metadata, mut element_cache, _metadata_cache) =
-                test_dbs_and_mocks(cell_env.clone().into(), &dbs);
+                test_dbs_and_mocks(cell_env.clone().into());
             let cell_network = conductor
                 .holochain_p2p()
                 .to_cell(cell_id.dna_hash().clone(), cell_id.agent_pubkey().clone());

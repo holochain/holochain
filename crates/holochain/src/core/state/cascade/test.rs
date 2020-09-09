@@ -40,7 +40,7 @@ struct Chains {
     mock_meta_cache: MockMetadataBuf,
 }
 
-fn setup_env(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Chains> {
+fn setup_env(env: EnvironmentRead) -> DatabaseResult<Chains> {
     let previous_header = fake_header_hash(1);
 
     let jimbo_id = fake_agent_pubkey_1();
@@ -74,7 +74,7 @@ fn setup_env(env: EnvironmentRead, dbs: &impl GetDb) -> DatabaseResult<Chains> {
         entry_hash: jessy_entry.as_hash().clone(),
     });
 
-    let source_chain = SourceChainBuf::new(env, dbs)?;
+    let source_chain = SourceChainBuf::new(env)?;
     let cache = ElementBuf::cache(reader, dbs)?;
     let mock_meta_vault = MockMetadataBuf::new();
     let mock_meta_cache = MockMetadataBuf::new();
@@ -97,8 +97,7 @@ async fn live_local_return() -> SourceChainResult<()> {
     // setup some data thats in the scratch
     let test_env = test_cell_env();
     let env = test_env.env();
-    let dbs = env.dbs().await;
-    let env_ref = env.guard().await;
+    let env_ref = env.guard();
     let reader = env_ref.reader()?;
     let Chains {
         mut source_chain,
@@ -108,7 +107,7 @@ async fn live_local_return() -> SourceChainResult<()> {
         mut mock_meta_vault,
         mut mock_meta_cache,
         ..
-    } = setup_env(env.clone().into(), &dbs)?;
+    } = setup_env(env.clone().into())?;
     source_chain
         .put_raw(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
         .await?;
@@ -144,8 +143,7 @@ async fn dead_local_none() -> SourceChainResult<()> {
     // setup some data thats in the scratch
     let test_env = test_cell_env();
     let env = test_env.env();
-    let dbs = env.dbs().await;
-    let env_ref = env.guard().await;
+    let env_ref = env.guard();
     let reader = env_ref.reader()?;
     let Chains {
         mut source_chain,
@@ -156,7 +154,7 @@ async fn dead_local_none() -> SourceChainResult<()> {
         mut mock_meta_vault,
         mut mock_meta_cache,
         ..
-    } = setup_env(env.clone().into(), &dbs)?;
+    } = setup_env(env.clone().into())?;
     source_chain
         .put_raw(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
         .await?;
@@ -191,8 +189,7 @@ async fn notfound_goto_cache_live() -> SourceChainResult<()> {
     // setup some data thats in the scratch
     let test_env = test_cell_env();
     let env = test_env.env();
-    let dbs = env.dbs().await;
-    let env_ref = env.guard().await;
+    let env_ref = env.guard();
     let reader = env_ref.reader()?;
     let Chains {
         source_chain,
@@ -203,7 +200,7 @@ async fn notfound_goto_cache_live() -> SourceChainResult<()> {
         mock_meta_vault,
         mut mock_meta_cache,
         ..
-    } = setup_env(env.clone().into(), &dbs)?;
+    } = setup_env(env.clone().into())?;
     let h = HeaderHashed::from_content_sync(jimbo_header.clone());
     let h = SignedHeaderHashed::with_presigned(h, fixt!(Signature));
     cache.put(h, Some(jimbo_entry.clone()))?;
@@ -240,8 +237,7 @@ async fn notfound_cache() -> DatabaseResult<()> {
     // setup some data thats in the scratch
     let test_env = test_cell_env();
     let env = test_env.env();
-    let dbs = env.dbs().await;
-    let env_ref = env.guard().await;
+    let env_ref = env.guard();
     let reader = env_ref.reader()?;
     let Chains {
         source_chain,
@@ -251,7 +247,7 @@ async fn notfound_cache() -> DatabaseResult<()> {
         mock_meta_vault,
         mut mock_meta_cache,
         ..
-    } = setup_env(env.clone().into(), &dbs)?;
+    } = setup_env(env.clone().into())?;
     let address = jimbo_entry.as_hash();
 
     let (_n, _r, cell_network) = test_network().await;
@@ -278,8 +274,7 @@ async fn links_local_return() -> SourceChainResult<()> {
     // setup some data thats in the scratch
     let test_env = test_cell_env();
     let env = test_env.env();
-    let dbs = env.dbs().await;
-    let env_ref = env.guard().await;
+    let env_ref = env.guard();
     let reader = env_ref.reader()?;
     let Chains {
         mut source_chain,
@@ -292,7 +287,7 @@ async fn links_local_return() -> SourceChainResult<()> {
         jessy_entry,
         mut mock_meta_vault,
         mut mock_meta_cache,
-    } = setup_env(env.clone().into(), &dbs)?;
+    } = setup_env(env.clone().into())?;
     source_chain
         .put_raw(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
         .await?;
@@ -354,8 +349,7 @@ async fn links_cache_return() -> SourceChainResult<()> {
     // setup some data thats in the scratch
     let test_env = test_cell_env();
     let env = test_env.env();
-    let dbs = env.dbs().await;
-    let env_ref = env.guard().await;
+    let env_ref = env.guard();
     let reader = env_ref.reader()?;
     let Chains {
         mut source_chain,
@@ -368,7 +362,7 @@ async fn links_cache_return() -> SourceChainResult<()> {
         jessy_entry,
         mut mock_meta_vault,
         mut mock_meta_cache,
-    } = setup_env(env.clone().into(), &dbs)?;
+    } = setup_env(env.clone().into())?;
     source_chain
         .put_raw(jimbo_header.clone(), Some(jimbo_entry.as_content().clone()))
         .await?;
@@ -448,8 +442,7 @@ async fn links_notauth_cache() -> DatabaseResult<()> {
     // setup some data thats in the scratch
     let test_env = test_cell_env();
     let env = test_env.env();
-    let dbs = env.dbs().await;
-    let env_ref = env.guard().await;
+    let env_ref = env.guard();
     let reader = env_ref.reader()?;
     let Chains {
         source_chain,
@@ -462,7 +455,7 @@ async fn links_notauth_cache() -> DatabaseResult<()> {
         mock_meta_vault,
         mut mock_meta_cache,
         ..
-    } = setup_env(env.clone().into(), &dbs)?;
+    } = setup_env(env.clone().into())?;
 
     let base = jimbo_entry.as_hash().clone();
     let target = jessy_entry.as_hash().clone();

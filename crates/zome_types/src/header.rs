@@ -130,7 +130,19 @@ impl Header {
 
     /// returns the sequence ordinal of this header
     pub fn header_seq(&self) -> u32 {
-        match_header!(self => |i| { i.header_seq })
+        match self {
+            // Dna is always 0
+            Self::Dna(Dna { .. }) => 0,
+            Self::AgentValidationPkg(AgentValidationPkg { header_seq, .. })
+            | Self::InitZomesComplete(InitZomesComplete { header_seq, .. })
+            | Self::LinkAdd(LinkAdd { header_seq, .. })
+            | Self::LinkRemove(LinkRemove { header_seq, .. })
+            | Self::ElementDelete(ElementDelete { header_seq, .. })
+            | Self::ChainClose(ChainClose { header_seq, .. })
+            | Self::ChainOpen(ChainOpen { header_seq, .. })
+            | Self::EntryCreate(EntryCreate { header_seq, .. })
+            | Self::EntryUpdate(EntryUpdate { header_seq, .. }) => *header_seq,
+        }
     }
 
     /// returns the previous header except for the DNA header which doesn't have a previous
@@ -190,7 +202,6 @@ pub struct EntryDefIndex(u8);
 pub struct Dna {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
-    pub header_seq: u32,
     // No previous header, because DNA is always first chain entry
     pub hash: DnaHash,
 }
@@ -400,5 +411,11 @@ impl AppEntryType {
     }
     pub fn visibility(&self) -> &EntryVisibility {
         &self.visibility
+    }
+}
+
+impl From<EntryDefIndex> for u8 {
+    fn from(ei: EntryDefIndex) -> Self {
+        ei.0
     }
 }

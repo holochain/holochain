@@ -7,16 +7,17 @@ use crate::{
 };
 use futures::future::Either;
 use holochain_state::env::EnvironmentWrite;
-use holochain_state::env::ReadManager;
 use tokio::task::JoinHandle;
 use tracing::*;
 
 /// Spawn the QueueConsumer for SysValidation workflow
-#[instrument(skip(env, stop, trigger_app_validation))]
+#[instrument(skip(env, stop, trigger_app_validation, network, conductor_api))]
 pub fn spawn_sys_validation_consumer(
     env: EnvironmentWrite,
     mut stop: sync::broadcast::Receiver<()>,
     mut trigger_app_validation: TriggerSender,
+    network: HolochainP2pCell,
+    conductor_api: impl CellConductorApiT + 'static,
 ) -> (
     TriggerSender,
     tokio::sync::oneshot::Receiver<()>,
@@ -28,14 +29,17 @@ pub fn spawn_sys_validation_consumer(
     let mut trigger_self = tx.clone();
     let handle = tokio::spawn(async move {
         loop {
-            let env_ref = env.guard().await;
-            let reader = env_ref.reader().expect("Could not create LMDB reader");
-            let workspace = SysValidationWorkspace::new(env.clone().into(), &env_ref)
+            let workspace = SysValidationWorkspace::new(env.clone().into())
                 .expect("Could not create Workspace");
-            if let WorkComplete::Incomplete =
-                sys_validation_workflow(workspace, env.clone().into(), &mut trigger_app_validation)
-                    .await
-                    .expect("Error running Workflow")
+            if let WorkComplete::Incomplete = sys_validation_workflow(
+                workspace,
+                env.clone().into(),
+                &mut trigger_app_validation,
+                network.clone(),
+                conductor_api.clone(),
+            )
+            .await
+            .expect("Error running Workflow")
             {
                 trigger_self.trigger()
             };
@@ -49,9 +53,6 @@ pub fn spawn_sys_validation_consumer(
             let kill = stop.recv();
             tokio::pin!(next_job);
             tokio::pin!(kill);
-
-            // drop the reader so we don't lock it until the next job!
-            drop(reader);
 
             if let Either::Left((Err(_), _)) | Either::Right((_, _)) =
                 futures::future::select(next_job, kill).await

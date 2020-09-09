@@ -10,15 +10,16 @@ use crate::{
 };
 use futures::future::Either;
 use holochain_state::env::EnvironmentWrite;
-use holochain_state::env::ReadManager;
+
 use tokio::task::JoinHandle;
 use tracing::*;
 
 /// Spawn the QueueConsumer for DhtOpIntegration workflow
-#[instrument(skip(env, stop))]
+#[instrument(skip(env, stop, trigger_sys))]
 pub fn spawn_integrate_dht_ops_consumer(
     env: EnvironmentWrite,
     mut stop: sync::broadcast::Receiver<()>,
+    trigger_sys: sync::oneshot::Receiver<TriggerSender>,
 ) -> (
     TriggerSender,
     tokio::sync::oneshot::Receiver<()>,
@@ -29,13 +30,12 @@ pub fn spawn_integrate_dht_ops_consumer(
     let mut tx_first = Some(tx_first);
     let mut trigger_self = tx.clone();
     let handle = tokio::spawn(async move {
+        let mut trigger_sys = trigger_sys.await.expect("failed to get tx sys");
         loop {
-            let env_ref = env.guard().await;
-            let reader = env_ref.reader().expect("Could not create LMDB reader");
-            let workspace = IntegrateDhtOpsWorkspace::new(env.clone().into(), &env_ref)
+            let workspace = IntegrateDhtOpsWorkspace::new(env.clone().into())
                 .expect("Could not create Workspace");
             if let WorkComplete::Incomplete =
-                integrate_dht_ops_workflow(workspace, env.clone().into())
+                integrate_dht_ops_workflow(workspace, env.clone().into(), &mut trigger_sys)
                     .await
                     .expect("Error running Workflow")
             {
@@ -50,9 +50,6 @@ pub fn spawn_integrate_dht_ops_consumer(
             let kill = stop.recv();
             tokio::pin!(next_job);
             tokio::pin!(kill);
-
-            // drop the reader so we don't lock it until the next job!
-            drop(reader);
 
             if let Either::Left((Err(_), _)) | Either::Right((_, _)) =
                 futures::future::select(next_job, kill).await
