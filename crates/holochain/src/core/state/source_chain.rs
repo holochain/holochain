@@ -140,6 +140,7 @@ impl SourceChain {
         Ok(committed_valid_grant)
     }
 
+    // @todo bring all this back when we want to administer cap claims better
     //         /// Fetch a CapClaim from the private entries.
     //         ///
     //         /// NB: [B-01676] the entry must be persisted for this to work. Once we have a
@@ -282,6 +283,7 @@ pub mod tests {
         Ok(())
     }
 
+    // @todo bring all this back when we want to administer cap claims better
     // #[tokio::test(threaded_scheduler)]
     // async fn test_get_cap_claim() -> SourceChainResult<()> {
     //     let test_env = test_cell_env();
