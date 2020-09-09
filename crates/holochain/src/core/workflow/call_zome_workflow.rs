@@ -205,13 +205,23 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT>(
                 _ => {}
             }
 
-            match chain_element.entry() {
-                holochain_types::element::ElementEntry::Present(entry) => {
+            match chain_element.header() {
+                Header::Dna(_)
+                | Header::AgentValidationPkg(_)
+                | Header::ChainOpen(_)
+                | Header::ChainClose(_)
+                | Header::InitZomesComplete(_) => {
+                    // These headers don't get validated
+                }
+                Header::LinkAdd(_) | Header::LinkRemove(_) => {
+                    // These get validate via validate link
+                }
+                Header::EntryCreate(_) | Header::EntryUpdate(_) | Header::ElementDelete(_) => {
                     let validate: ValidateResult = ribosome.run_validate(
                         ValidateHostAccess,
                         ValidateInvocation {
                             zome_name: zome_name.clone(),
-                            entry: Arc::new(entry.clone()),
+                            element: Arc::new(chain_element.clone()),
                         },
                     )?;
                     match validate {
@@ -231,8 +241,6 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT>(
                         }
                     }
                 }
-                // if there is no entry this is a noop
-                _ => {}
             }
         }
     }

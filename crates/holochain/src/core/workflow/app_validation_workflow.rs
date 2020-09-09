@@ -46,7 +46,7 @@ use holochain_state::{
 };
 use holochain_types::{
     dht_op::DhtOp, dht_op::DhtOpLight, dna::DnaFile, test_utils::which_agent,
-    validate::ValidationStatus, Entry, HeaderHashed, Timestamp,
+    validate::ValidationStatus, HeaderHashed, Timestamp,
 };
 use holochain_zome_types::{
     element::Element, element::SignedHeaderHashed, header::AppEntryType, header::EntryType,
@@ -261,12 +261,6 @@ async fn validate_op(
         Left(el) => el,
         Right(o) => return Ok(o),
     };
-    // TODO: remove this when we can pass elements into
-    // the validation callback
-    let entry = match element.entry().as_option() {
-        Some(e) => e.clone(),
-        None => return Ok(Outcome::Accepted),
-    };
     // Get the app entry type
     let app_entry_type = element
         .header()
@@ -287,10 +281,10 @@ async fn validate_op(
     // TODO: Not sure if this is correct? Calling every zome
     // for an agent key etc. If so we should change run_validation
     // to a Vec<ZomeName>
-    let entry = Arc::new(entry);
+    let element = Arc::new(element);
     let outcome = zome_names
         .into_iter()
-        .map(|zome_name| run_validation_callback(zome_name, entry.clone(), &ribosome))
+        .map(|zome_name| run_validation_callback(zome_name, element.clone(), &ribosome))
         .collect::<Result<Vec<_>, _>>()?
         .into_iter()
         .find(|o| match o {
@@ -337,15 +331,12 @@ fn get_zome_name(entry_type: &AppEntryType, dna_file: &DnaFile) -> AppValidation
 
 fn run_validation_callback(
     zome_name: ZomeName,
-    entry: Arc<Entry>,
+    element: Arc<Element>,
     ribosome: &impl RibosomeT,
 ) -> AppValidationResult<Outcome> {
     let validate: ValidateResult = ribosome.run_validate(
         ValidateHostAccess,
-        ValidateInvocation {
-            zome_name: zome_name,
-            entry: entry,
-        },
+        ValidateInvocation { zome_name, element },
     )?;
     match validate {
         ValidateResult::Valid => Ok(Outcome::Accepted),

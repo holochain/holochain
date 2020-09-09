@@ -21,7 +21,6 @@ use holo_hash::AgentPubKey;
 use holo_hash::EntryHash;
 use holochain_keystore::Signature;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_zome_types::capability::CapAccess;
 use holochain_zome_types::capability::CapClaim;
 use holochain_zome_types::capability::CapGrant;
 use holochain_zome_types::capability::CapSecret;
@@ -57,6 +56,9 @@ use holochain_zome_types::migrate_agent::MigrateAgent;
 use holochain_zome_types::timestamp::Timestamp as ZomeTimestamp;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::Entry;
+use holochain_zome_types::{
+    capability::CapAccess, element::Element, element::SignedHeaderHashed, header::HeaderHashed,
+};
 use rand::seq::IteratorRandom;
 use rand::thread_rng;
 use rand::Rng;
@@ -315,6 +317,32 @@ fixturator!(
 fixturator!(
     CapGrant;
     variants [ Authorship(AgentPubKey) ZomeCall(ZomeCallCapGrant) ];
+);
+
+fn element_with_no_entry(signature: Signature, header: Header) -> Element {
+    let shh =
+        SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(header), signature);
+    Element::new(shh, None)
+}
+
+fixturator!(
+    Element;
+    vanilla fn element_with_no_entry(Signature, Header);
+    curve NewEntryHeader {
+        let s = SignatureFixturator::new_indexed(Unpredictable, self.0.index).next().unwrap();
+        element_with_no_entry(s, self.0.curve.clone().into())
+    };
+    curve Entry {
+        let et = match self.0.curve {
+            Entry::App(_) => EntryType::App(AppEntryTypeFixturator::new_indexed(Unpredictable, self.0.index).next().unwrap()),
+            Entry::Agent(_) => EntryType::AgentPubKey,
+            Entry::CapClaim(_) => EntryType::CapClaim,
+            Entry::CapGrant(_) => EntryType::CapGrant,
+        };
+        let new = NewEntryHeaderFixturator::new_indexed(et, self.0.index).next().unwrap();
+        let (shh, _) = ElementFixturator::new_indexed(new, self.0.index).next().unwrap().into_inner();
+        Element::new(shh, Some(self.0.curve.clone()))
+    };
 );
 
 fixturator!(
@@ -580,6 +608,11 @@ fixturator!(
         ec.entry_type = fixt!(EntryType, PublicCurve);
         ec
     };
+    curve EntryType {
+        let mut ec = EntryCreateFixturator::new_indexed(Unpredictable, self.0.index).next().unwrap();
+        ec.entry_type = self.0.curve.clone();
+        ec
+    };
 );
 
 fixturator!(
@@ -589,6 +622,12 @@ fixturator!(
     curve PublicCurve {
         let mut eu = fixt!(EntryUpdate);
         eu.entry_type = fixt!(EntryType, PublicCurve);
+        eu
+    };
+
+    curve EntryType {
+        let mut eu = EntryUpdateFixturator::new_indexed(Unpredictable, self.0.index).next().unwrap();
+        eu.entry_type = self.0.curve.clone();
         eu
     };
 );
@@ -634,6 +673,19 @@ fixturator!(
         match fixt!(NewEntryHeader) {
             NewEntryHeader::Create(_) => NewEntryHeader::Create(fixt!(EntryCreate, PublicCurve)),
             NewEntryHeader::Update(_) => NewEntryHeader::Update(fixt!(EntryUpdate, PublicCurve)),
+        }
+    };
+
+    curve EntryType {
+        match fixt!(NewEntryHeader) {
+            NewEntryHeader::Create(_) => {
+                let ec = EntryCreateFixturator::new_indexed(self.0.curve.clone(), self.0.index).next().unwrap();
+                NewEntryHeader::Create(ec)
+            },
+            NewEntryHeader::Update(_) => {
+                let eu = EntryUpdateFixturator::new_indexed(self.0.curve.clone(), self.0.index).next().unwrap();
+                NewEntryHeader::Update(eu)
+            },
         }
     };
 );

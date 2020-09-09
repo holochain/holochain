@@ -329,7 +329,7 @@ fixturator!(
 
 fixturator!(
     ValidateInvocation;
-    constructor fn new(ZomeName, Entry);
+    constructor fn new(ZomeName, Element);
 );
 
 fixturator!(

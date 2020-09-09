@@ -10,23 +10,24 @@ use holochain_zome_types::entry::Entry;
 use holochain_zome_types::validate::ValidateCallbackResult;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::HostInput;
+use holochain_zome_types::{element::Element, Header};
 use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct ValidateInvocation {
     pub zome_name: ZomeName,
     // Arc here as entry may be very large
-    // don't want to clone the Entry just to validate it
-    // we can SerializedBytes off an Entry reference
+    // don't want to clone the Element just to validate it
+    // we can SerializedBytes off an Element reference
     // lifetimes on invocations are a pain
-    pub entry: Arc<Entry>,
+    pub element: Arc<Element>,
 }
 
 impl ValidateInvocation {
-    pub fn new(zome_name: ZomeName, entry: Entry) -> Self {
+    pub fn new(zome_name: ZomeName, element: Element) -> Self {
         Self {
             zome_name,
-            entry: Arc::new(entry),
+            element: Arc::new(element),
         }
     }
 }
@@ -54,27 +55,29 @@ impl Invocation for ValidateInvocation {
         ZomesToInvoke::One(self.zome_name.clone())
     }
     fn fn_components(&self) -> FnComponents {
-        vec![
-            "validate".into(),
-            match *self.entry {
-                Entry::Agent(_) => "agent",
-                Entry::App(_) => "entry",
-                Entry::CapClaim(_) => "cap_claim",
-                Entry::CapGrant(_) => "cap_grant",
-            }
-            .into(),
-        ]
-        .into()
+        let mut fns = vec!["validate".into()];
+        match self.element.entry().as_option() {
+            Some(Entry::Agent(_)) => fns.push("agent".into()),
+            Some(Entry::App(_)) => fns.push("entry".into()),
+            Some(Entry::CapClaim(_)) => fns.push("cap_claim".into()),
+            Some(Entry::CapGrant(_)) => fns.push("cap_grant".into()),
+            None => match self.element.header() {
+                Header::ElementDelete(_) => fns.push("delete".into()),
+                Header::EntryUpdate(_) => fns.push("update".into()),
+                _ => (),
+            },
+        }
+        fns.into()
     }
     fn host_input(self) -> Result<HostInput, SerializedBytesError> {
-        Ok(HostInput::new((&*self.entry).try_into()?))
+        Ok(HostInput::new((&*self.element).try_into()?))
     }
 }
 
 impl TryFrom<ValidateInvocation> for HostInput {
     type Error = SerializedBytesError;
     fn try_from(validate_invocation: ValidateInvocation) -> Result<Self, Self::Error> {
-        Ok(Self::new((&*validate_invocation.entry).try_into()?))
+        Ok(Self::new((&*validate_invocation.element).try_into()?))
     }
 }
 
@@ -201,7 +204,8 @@ mod test {
                 .unwrap()
                 .into(),
         );
-        validate_invocation.entry = Arc::new(agent_entry);
+        let el = fixt!(Element, agent_entry);
+        validate_invocation.element = Arc::new(el);
         let mut expected = vec!["validate", "validate_agent"];
         for fn_component in validate_invocation.fn_components() {
             assert_eq!(fn_component, expected.pop().unwrap(),);
@@ -213,7 +217,8 @@ mod test {
                 .unwrap()
                 .into(),
         );
-        validate_invocation.entry = Arc::new(agent_entry);
+        let el = fixt!(Element, agent_entry);
+        validate_invocation.element = Arc::new(el);
         let mut expected = vec!["validate", "validate_entry"];
         for fn_component in validate_invocation.fn_components() {
             assert_eq!(fn_component, expected.pop().unwrap(),);
@@ -225,7 +230,8 @@ mod test {
                 .unwrap()
                 .into(),
         );
-        validate_invocation.entry = Arc::new(agent_entry);
+        let el = fixt!(Element, agent_entry);
+        validate_invocation.element = Arc::new(el);
         let mut expected = vec!["validate", "validate_cap_claim"];
         for fn_component in validate_invocation.fn_components() {
             assert_eq!(fn_component, expected.pop().unwrap(),);
@@ -237,7 +243,8 @@ mod test {
                 .unwrap()
                 .into(),
         );
-        validate_invocation.entry = Arc::new(agent_entry);
+        let el = fixt!(Element, agent_entry);
+        validate_invocation.element = Arc::new(el);
         let mut expected = vec!["validate", "validate_cap_grant"];
         for fn_component in validate_invocation.fn_components() {
             assert_eq!(fn_component, expected.pop().unwrap(),);
@@ -254,7 +261,7 @@ mod test {
 
         assert_eq!(
             host_input,
-            HostInput::new(SerializedBytes::try_from(&*validate_invocation.entry).unwrap()),
+            HostInput::new(SerializedBytes::try_from(&*validate_invocation.element).unwrap()),
         );
     }
 }
@@ -274,6 +281,7 @@ mod slow_tests {
     use crate::fixt::ZomeCallHostAccessFixturator;
     use fixt::prelude::*;
     use holo_hash::fixt::AgentPubKeyFixturator;
+    use holochain_types::fixt::*;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::CommitEntryOutput;
     use holochain_zome_types::Entry;
@@ -343,7 +351,8 @@ mod slow_tests {
         );
 
         validate_invocation.zome_name = TestWasm::ValidateInvalid.into();
-        validate_invocation.entry = Arc::new(entry);
+        let el = fixt!(Element, entry);
+        validate_invocation.element = Arc::new(el);
 
         let result = ribosome
             .run_validate(ValidateHostAccess, validate_invocation)

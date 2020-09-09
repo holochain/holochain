@@ -64,7 +64,12 @@ entry_defs![
 ];
 
 #[hdk_extern]
-fn validate(entry: Entry) -> ExternResult<ValidateCallbackResult> {
+fn validate(element: Element) -> ExternResult<ValidateCallbackResult> {
+    let (_, entry) = element.into_inner();
+    let entry = match entry {
+        Some(e) => e,
+        None => return Ok(ValidateCallbackResult::Valid),
+    };
     if let Entry::Agent(_) = entry {
         return Ok(ValidateCallbackResult::Valid);
     }
