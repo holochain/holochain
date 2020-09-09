@@ -188,6 +188,7 @@ async fn speed_test(n: Option<usize>) -> TestEnvironment {
         .expect_add_entry_defs::<Vec<_>>()
         .times(2)
         .return_const(());
+    dna_store.expect_get_entry_def().return_const(None);
 
     let (test_env, _app_api, handle) = setup_app(
         vec![(alice_installed_cell, None), (bob_installed_cell, None)],

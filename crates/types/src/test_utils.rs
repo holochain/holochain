@@ -114,6 +114,22 @@ pub fn fake_agent_pubkey_2() -> AgentPubKey {
         .unwrap()
 }
 
+/// Keeping with convention if Alice is pubkey 1
+/// and bob is pubkey 2 the this helps make test
+/// logging easier to read.
+pub fn which_agent(key: &AgentPubKey) -> String {
+    let key = key.to_string();
+    let alice = fake_agent_pubkey_1().to_string();
+    let bob = fake_agent_pubkey_2().to_string();
+    if key == alice {
+        return "alice".to_string();
+    }
+    if key == bob {
+        return "alice".to_string();
+    }
+    key
+}
+
 /// A fixture CapSecret for unit testing.
 pub fn fake_cap_secret() -> CapSecret {
     [0; CAP_SECRET_BYTES].into()

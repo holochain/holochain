@@ -122,7 +122,7 @@ mod tests {
                 &mut fx,
             )
             .await;
-            buf.register_update(update.clone()).await?;
+            buf.register_update(update.clone())?;
             let original = update.original_header_address;
             let canonical = buf.get_canonical_header_hash(original.clone())?;
 
@@ -161,9 +161,9 @@ mod tests {
                 &mut fx,
             )
             .await;
-            let _ = buf.register_update(update1.clone()).await?;
-            let _ = buf.register_update(update2).await?;
-            buf.register_update(update3.clone()).await?;
+            let _ = buf.register_update(update1.clone())?;
+            let _ = buf.register_update(update2)?;
+            buf.register_update(update3.clone())?;
 
             let original = update1.original_header_address;
             let canonical = buf.get_canonical_header_hash(original.clone())?;
@@ -196,7 +196,7 @@ mod tests {
                 &mut fx,
             )
             .await;
-            let _ = buf.register_update(update.clone()).await?;
+            let _ = buf.register_update(update.clone())?;
 
             let canonical = buf.get_canonical_entry_hash(original_entry)?;
 
@@ -242,9 +242,9 @@ mod tests {
                 &mut fx,
             )
             .await;
-            let _ = buf.register_update(update1.clone()).await?;
-            let _ = buf.register_update(update2.clone()).await?;
-            let _ = buf.register_update(update3.clone()).await?;
+            let _ = buf.register_update(update1.clone())?;
+            let _ = buf.register_update(update2.clone())?;
+            let _ = buf.register_update(update3.clone())?;
 
             let canonical = buf.get_canonical_entry_hash(original_entry)?;
 
@@ -286,8 +286,8 @@ mod tests {
             )
             .await;
 
-            let _ = buf.register_update(update_header.clone()).await?;
-            let _ = buf.register_update(update_entry.clone()).await?;
+            let _ = buf.register_update(update_header.clone())?;
+            let _ = buf.register_update(update_entry.clone())?;
             let expected_entry_hash = update_entry.entry_hash;
 
             let original_header_hash = update_header.original_header_address;
@@ -323,7 +323,6 @@ mod tests {
             for create in entry_creates {
                 meta_buf
                     .register_header(NewEntryHeader::Create(create))
-                    .await
                     .unwrap();
             }
             let mut headers = meta_buf
@@ -380,7 +379,7 @@ mod tests {
             let reader = env.reader().unwrap();
             let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
             for update in entry_updates {
-                meta_buf.register_update(update).await.unwrap();
+                meta_buf.register_update(update).unwrap();
             }
             let mut headers = meta_buf
                 .get_updates(&reader, original_entry_hash.clone().into())
@@ -436,7 +435,7 @@ mod tests {
             let reader = env.reader().unwrap();
             let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
             for update in entry_updates {
-                meta_buf.register_update(update).await.unwrap();
+                meta_buf.register_update(update).unwrap();
             }
             let mut headers = meta_buf
                 .get_updates(&reader, original_entry_hash.clone().into())
@@ -482,7 +481,7 @@ mod tests {
             let reader = env.reader().unwrap();
             let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
             for delete in entry_deletes {
-                meta_buf.register_delete(delete).await.unwrap();
+                meta_buf.register_delete(delete).unwrap();
             }
             let mut headers = meta_buf
                 .get_deletes_on_header(&reader, header_hash.clone().into())
@@ -516,10 +515,10 @@ mod tests {
         meta_buf: &mut MetadataBuf,
     ) {
         for e in new_entries.iter().chain(update_entries.iter()) {
-            meta_buf.register_header(e.clone()).await.unwrap();
+            meta_buf.register_header(e.clone()).unwrap();
         }
         for delete in entry_deletes.iter().chain(delete_updates.iter()) {
-            meta_buf.register_delete(delete.clone()).await.unwrap();
+            meta_buf.register_delete(delete.clone()).unwrap();
         }
     }
 

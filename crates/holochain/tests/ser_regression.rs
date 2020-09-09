@@ -106,6 +106,7 @@ async fn ser_regression_test() {
         .expect_add_entry_defs::<Vec<_>>()
         .times(2)
         .return_const(());
+    dna_store.expect_get_entry_def().return_const(None);
 
     let (_tmpdir, app_api, handle) = setup_app(
         vec![(alice_installed_cell, None), (bob_installed_cell, None)],

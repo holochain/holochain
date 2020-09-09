@@ -7,7 +7,7 @@
 /// using the ElementBuf for caching non-authored data, or for situations where
 /// it is known that private entries should be protected, such as when handling
 /// a get_entry request from the network.
-use crate::core::state::source_chain::{ChainInvalidReason, SourceChainError, SourceChainResult};
+use crate::core::state::source_chain::SourceChainResult;
 use holo_hash::{EntryHash, HasHash, HeaderHash};
 use holochain_state::{
     buffer::CasBufFreshSync,
@@ -27,20 +27,70 @@ use holochain_zome_types::entry_def::EntryVisibility;
 use holochain_zome_types::{Entry, Header};
 use tracing::*;
 
-/// A CasBufFreshSync with Entries for values
-pub type EntryCas = CasBufFreshSync<Entry>;
-/// A CasBufFreshSync with SignedHeaders for values
-pub type HeaderCas = CasBufFreshSync<SignedHeader>;
+/// A CasBufFresh with Entries for values
+pub type EntryCas<P> = CasBufFreshSync<Entry, P>;
+/// A CasBufFresh with SignedHeaders for values
+pub type HeaderCas<P> = CasBufFreshSync<SignedHeader, P>;
 
 /// The representation of an ElementCache / ElementVault,
 /// using two or three DB references
-pub struct ElementBuf {
-    public_entries: EntryCas,
-    private_entries: Option<EntryCas>,
-    headers: HeaderCas,
+pub struct ElementBuf<P = IntegratedPrefix>
+where
+    P: PrefixType,
+{
+    public_entries: EntryCas<P>,
+    private_entries: Option<EntryCas<P>>,
+    headers: HeaderCas<P>,
 }
 
-impl ElementBuf {
+impl ElementBuf<IntegratedPrefix> {
+    /// Create a ElementBuf using the Vault databases.
+    /// The `allow_private` argument allows you to specify whether private
+    /// entries should be readable or writeable with this reference.
+    /// The vault is constructed with the IntegratedPrefix.
+    pub fn vault(env: EnvironmentRead, allow_private: bool) -> DatabaseResult<Self> {
+        ElementBuf::new_vault(env, allow_private)
+    }
+
+    /// Create a ElementBuf using the Cache databases.
+    /// There is no cache for private entries, so private entries are disallowed
+    pub fn cache(env: EnvironmentRead) -> DatabaseResult<Self> {
+        let entries = env.get_db(&*ELEMENT_CACHE_ENTRIES)?;
+        let headers = env.get_db(&*ELEMENT_CACHE_HEADERS)?;
+        ElementBuf::new(env, entries, None, headers)
+    }
+}
+
+impl ElementBuf<PendingPrefix> {
+    /// Create a element buf for all elements pending validation.
+    /// This reuses the database but is the data is completely separate.
+    pub fn pending(env: EnvironmentRead) -> DatabaseResult<Self> {
+        ElementBuf::new_vault(env, true)
+    }
+}
+
+impl ElementBuf<JudgedPrefix> {
+    /// Create a element buf for all elements that have progressed past validation.
+    /// Note this doesn't mean they are Valid only that validation has run and
+    /// come up with a [ValidationStatus].
+    /// This reuses the database but is the data is completely separate.
+    pub fn judged(env: EnvironmentRead) -> DatabaseResult<Self> {
+        ElementBuf::new_vault(env, true)
+    }
+}
+
+impl ElementBuf<RejectedPrefix> {
+    /// Create a element buf for all elements that have been rejected.
+    /// This reuses the database but is the data is completely separate.
+    pub fn rejected(env: EnvironmentRead) -> DatabaseResult<Self> {
+        ElementBuf::new_vault(env, true)
+    }
+}
+
+impl<P> ElementBuf<P>
+where
+    P: PrefixType,
+{
     fn new(
         env: EnvironmentRead,
         public_entries_store: SingleStore,
@@ -59,10 +109,8 @@ impl ElementBuf {
         })
     }
 
-    /// Create a ElementBuf using the Vault databases.
-    /// The `allow_private` argument allows you to specify whether private
-    /// entries should be readable or writeable with this reference.
-    pub fn vault(env: EnvironmentRead, allow_private: bool) -> DatabaseResult<Self> {
+    /// Construct a element buf using the vault databases
+    fn new_vault(env: EnvironmentRead, allow_private: bool) -> DatabaseResult<Self> {
         let headers = env.get_db(&*ELEMENT_VAULT_HEADERS)?;
         let entries = env.get_db(&*ELEMENT_VAULT_PUBLIC_ENTRIES)?;
         let private_entries = if allow_private {
@@ -71,14 +119,6 @@ impl ElementBuf {
             None
         };
         Self::new(env, entries, private_entries, headers)
-    }
-
-    /// Create a ElementBuf using the Cache databases.
-    /// There is no cache for private entries, so private entries are disallowed
-    pub fn cache(env: EnvironmentRead) -> DatabaseResult<Self> {
-        let entries = env.get_db(&*ELEMENT_CACHE_ENTRIES)?;
-        let headers = env.get_db(&*ELEMENT_CACHE_HEADERS)?;
-        Self::new(env, entries, None, headers)
     }
 
     /// Get an entry by its address
@@ -136,20 +176,10 @@ impl ElementBuf {
                 match entry_type.visibility() {
                     // if the header references an entry and the database is
                     // available, it better have been stored!
-                    EntryVisibility::Public => {
-                        Some(self.public_entries.get(entry_hash)?.ok_or_else(|| {
-                            SourceChainError::InvalidStructure(ChainInvalidReason::MissingData(
-                                entry_hash.clone(),
-                            ))
-                        })?)
-                    }
+                    EntryVisibility::Public => self.public_entries.get(entry_hash)?,
                     EntryVisibility::Private => {
                         if let Some(ref db) = self.private_entries {
-                            Some(db.get(entry_hash)?.ok_or_else(|| {
-                                SourceChainError::InvalidStructure(ChainInvalidReason::MissingData(
-                                    entry_hash.clone(),
-                                ))
-                            })?)
+                            db.get(entry_hash)?
                         } else {
                             // If the private DB is disabled, just return None
                             None
@@ -220,23 +250,36 @@ impl ElementBuf {
         Ok(())
     }
 
-    pub fn delete(&mut self, header_hash: HeaderHash, entry_hash: EntryHash) {
+    pub fn delete(&mut self, header_hash: HeaderHash, entry_hash: Option<EntryHash>) {
         self.headers.delete(header_hash);
-        if let Some(db) = self.private_entries.as_mut() {
-            db.delete(entry_hash.clone())
+        if let Some(entry_hash) = entry_hash {
+            if let Some(db) = self.private_entries.as_mut() {
+                db.delete(entry_hash.clone())
+            }
+            self.public_entries.delete(entry_hash);
         }
-        self.public_entries.delete(entry_hash);
     }
 
-    pub fn headers(&self) -> &HeaderCas {
+    /// Removes a delete if there was one previously added
+    pub fn cancel_delete(&mut self, header_hash: HeaderHash, entry_hash: Option<EntryHash>) {
+        self.headers.cancel_delete(header_hash);
+        if let Some(entry_hash) = entry_hash {
+            if let Some(db) = self.private_entries.as_mut() {
+                db.cancel_delete(entry_hash.clone())
+            }
+            self.public_entries.cancel_delete(entry_hash);
+        }
+    }
+
+    pub fn headers(&self) -> &HeaderCas<P> {
         &self.headers
     }
 
-    pub fn public_entries(&self) -> &EntryCas {
+    pub fn public_entries(&self) -> &EntryCas<P> {
         &self.public_entries
     }
 
-    pub fn private_entries(&self) -> Option<&EntryCas> {
+    pub fn private_entries(&self) -> Option<&EntryCas<P>> {
         self.private_entries.as_ref()
     }
 
@@ -251,7 +294,7 @@ impl ElementBuf {
     }
 }
 
-impl BufferedStore for ElementBuf {
+impl<P: PrefixType> BufferedStore for ElementBuf<P> {
     type Error = DatabaseError;
 
     fn is_clean(&self) -> bool {

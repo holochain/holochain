@@ -43,7 +43,7 @@ impl SourceChain {
         Ok(SourceChainBuf::new(env)?.into())
     }
 
-    pub async fn public_only(env: EnvironmentRead) -> DatabaseResult<Self> {
+    pub fn public_only(env: EnvironmentRead) -> DatabaseResult<Self> {
         Ok(SourceChainBuf::public_only(env)?.into())
     }
 
@@ -107,7 +107,7 @@ impl SourceChain {
     /// NB: [B-01676] the entry must be persisted for this to work. Once we have a
     /// proper capability index DB, OR a proper iterator that respects the
     /// scratch space, that will no longer be the case.
-    pub async fn valid_cap_grant(
+    pub fn valid_cap_grant(
         &self,
         check_function: &GrantedFunction,
         check_agent: &AgentPubKey,
@@ -238,7 +238,7 @@ pub mod tests {
         {
             let chain = SourceChain::new(arc.clone().into())?;
             assert_eq!(
-                chain.valid_cap_grant(&function, &alice, secret).await?,
+                chain.valid_cap_grant(&function, &alice, secret)?,
                 Some(CapGrant::Authorship(alice.clone())),
             );
 
@@ -274,7 +274,7 @@ pub mod tests {
             // bob should be granted with the committed grant as it matches the secret he passes to
             // alice at runtime
             assert_eq!(
-                chain.valid_cap_grant(&function, &bob, secret).await?,
+                chain.valid_cap_grant(&function, &bob, secret)?,
                 Some(grant.into())
             );
         }

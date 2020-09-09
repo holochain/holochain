@@ -2,7 +2,7 @@
 #![allow(clippy::ptr_arg)]
 
 use super::CellConductorApiT;
-use crate::conductor::api::error::ConductorApiResult;
+use crate::conductor::{api::error::ConductorApiResult, entry_def_store::EntryDefBufferKey};
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::workflow::ZomeCallInvocationResult;
 use async_trait::async_trait;
@@ -10,6 +10,7 @@ use holo_hash::DnaHash;
 use holochain_keystore::KeystoreSender;
 use holochain_types::dna::DnaFile;
 use holochain_types::{autonomic::AutonomicCue, cell::CellId};
+use holochain_zome_types::entry_def::EntryDef;
 use mockall::mock;
 
 // Unfortunate workaround to get mockall to work with async_trait, due to the complexity of each.
@@ -19,7 +20,7 @@ use mockall::mock;
 mock! {
 
     pub CellConductorApi {
-
+        fn cell_id(&self) -> &CellId;
         fn sync_call_zome(
             &self,
             cell_id: &CellId,
@@ -32,6 +33,8 @@ mock! {
 
         fn mock_keystore(&self) -> &KeystoreSender;
         fn sync_get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile>;
+        fn sync_get_this_dna(&self) -> Option<DnaFile>;
+        fn sync_get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef>;
     }
 
     trait Clone {
@@ -41,6 +44,10 @@ mock! {
 
 #[async_trait]
 impl CellConductorApiT for MockCellConductorApi {
+    fn cell_id(&self) -> &CellId {
+        self.cell_id()
+    }
+
     async fn call_zome(
         &self,
         cell_id: &CellId,
@@ -62,5 +69,11 @@ impl CellConductorApiT for MockCellConductorApi {
     }
     async fn get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile> {
         self.sync_get_dna(dna_hash)
+    }
+    async fn get_this_dna(&self) -> Option<DnaFile> {
+        self.sync_get_this_dna()
+    }
+    async fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef> {
+        self.sync_get_entry_def(key)
     }
 }

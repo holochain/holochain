@@ -156,7 +156,6 @@ impl Dna {
         Self {
             author: builder.author,
             timestamp: builder.timestamp,
-            header_seq: builder.header_seq,
             hash,
         }
     }
