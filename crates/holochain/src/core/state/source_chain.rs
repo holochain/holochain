@@ -11,6 +11,7 @@ use holochain_zome_types::{
     capability::{CapClaim, CapGrant, CapSecret},
     entry::{CapClaimEntry, CapGrantEntry, Entry},
     header::{builder, EntryType, HeaderBuilder, HeaderBuilderCommon, HeaderInner},
+    query::ChainQuery,
 };
 use shrinkwraprs::Shrinkwrap;
 
@@ -182,6 +183,10 @@ impl SourceChain {
             todo!("Find proper claim or implement capability index")
         };
         Ok(answer)
+    }
+
+    pub fn query(&self, _query: &ChainQuery) -> SourceChainResult<Vec<HeaderHash>> {
+        unimplemented!("todo, implement and test")
     }
 }
 

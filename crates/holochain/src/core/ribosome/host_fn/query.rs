@@ -1,16 +1,27 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
+use holo_hash::HeaderHash;
+use holochain_zome_types::header::HeaderHashes;
 use holochain_zome_types::QueryInput;
 use holochain_zome_types::QueryOutput;
 use std::sync::Arc;
 
 pub fn query(
     _ribosome: Arc<impl RibosomeT>,
-    _call_context: Arc<CallContext>,
-    _input: QueryInput,
+    call_context: Arc<CallContext>,
+    input: QueryInput,
 ) -> RibosomeResult<QueryOutput> {
-    unimplemented!();
+    tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+        let hashes: Vec<HeaderHash> = call_context
+            .host_access
+            .workspace()
+            .write()
+            .await
+            .source_chain
+            .query(input.inner_ref())?;
+        Ok(QueryOutput::new(HeaderHashes(hashes)))
+    })
 }
 
 #[cfg(test)]

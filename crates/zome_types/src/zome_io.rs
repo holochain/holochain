@@ -1,4 +1,3 @@
-use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
 
 use crate::header::HeaderHashes;
