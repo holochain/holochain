@@ -124,7 +124,7 @@ pub mod wasm_test {
 
         // BOB INIT (to do cap grant)
 
-        let _output = handle
+        let _ = handle
             .call_zome(ZomeCallInvocation {
                 cell_id: bob_cell_id,
                 zome_name: TestWasm::WhoAmI.into(),
@@ -133,7 +133,8 @@ pub mod wasm_test {
                 payload: HostInput::new(().try_into().unwrap()),
                 provenance: bob_agent_id.clone(),
             })
-            .await;
+            .await
+            .unwrap();
 
         // ALICE DOING A CALL
 
