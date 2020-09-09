@@ -31,12 +31,10 @@ pub struct HolochainP2pCell {
 }
 
 impl HolochainP2pCell {
-    /// returns a fresh arc to the dna
     pub fn dna_hash(&self) -> DnaHash {
         (*self.dna_hash).clone()
     }
 
-    /// returns a fresh arc to the from_agent
     pub fn from_agent(&self) -> AgentPubKey {
         (*self.from_agent).clone()
     }
