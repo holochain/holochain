@@ -243,7 +243,7 @@ pub mod tests {
             );
 
             // bob should not match anything as the secret hasn't been committed yet
-            assert_eq!(chain.valid_cap_grant(&function, &bob, secret).await?, None);
+            assert_eq!(chain.valid_cap_grant(&function, &bob, secret)?, None);
         }
 
         {
@@ -267,7 +267,7 @@ pub mod tests {
             // alice should find her own authorship with higher priority than the committed grant
             // even if she passes in the secret
             assert_eq!(
-                chain.valid_cap_grant(&function, &alice, secret).await?,
+                chain.valid_cap_grant(&function, &alice, secret)?,
                 Some(CapGrant::Authorship(alice)),
             );
 

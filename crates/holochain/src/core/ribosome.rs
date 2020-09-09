@@ -235,20 +235,7 @@ impl ZomeCallInvocation {
                 .read()
                 .await
                 .source_chain
-                .valid_cap_grant(&check_function, &check_agent, &check_secret)
-                .await?;
-
-            // let call = |workspace: &'a mut CallZomeWorkspace| -> MustBoxFuture<'a, CascadeResult<Option<CapGrant>>> {
-            //     async move {
-            //         Ok(workspace.source_chain.valid_cap_grant(&check_function, &check_agent, &check_secret).await?)
-            //     }
-            //     .boxed()
-            //     .into()
-            // };
-            // let maybe_grant: Option<CapGrant> =
-            //     tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-            //         unsafe { host_access.workspace.apply_mut(call).await }
-            //     })??;
+                .valid_cap_grant(&check_function, &check_agent, &check_secret)?;
 
             Ok(maybe_grant.is_some())
         })
