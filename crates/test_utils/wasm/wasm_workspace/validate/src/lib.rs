@@ -65,6 +65,9 @@ entry_defs![
 
 #[hdk_extern]
 fn validate(entry: Entry) -> ExternResult<ValidateCallbackResult> {
+    if let Entry::Agent(_) = entry {
+        return Ok(ValidateCallbackResult::Valid);
+    }
     Ok(match ThisWasmEntry::try_from(&entry) {
         Ok(ThisWasmEntry::AlwaysValidates) => ValidateCallbackResult::Valid,
         Ok(ThisWasmEntry::NeverValidates) => {

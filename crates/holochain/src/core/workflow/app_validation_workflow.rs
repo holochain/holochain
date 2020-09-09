@@ -46,9 +46,12 @@ use holochain_state::{
 };
 use holochain_types::{
     dht_op::DhtOp, dht_op::DhtOpLight, dna::DnaFile, test_utils::which_agent,
-    validate::ValidationStatus, Entry, Timestamp,
+    validate::ValidationStatus, Entry, HeaderHashed, Timestamp,
 };
-use holochain_zome_types::{header::AppEntryType, header::EntryType, zome::ZomeName, Header};
+use holochain_zome_types::{
+    element::Element, element::SignedHeaderHashed, header::AppEntryType, header::EntryType,
+    zome::ZomeName, Header,
+};
 use tracing::*;
 use types::*;
 
@@ -214,7 +217,7 @@ async fn app_validation_workflow_inner(
     Ok(WorkComplete::Complete)
 }
 
-fn get_header_entry(op: DhtOp) -> Either<HeaderEntry, Outcome> {
+fn get_element(op: DhtOp) -> Either<Element, Outcome> {
     use Either::*;
     match op {
         DhtOp::RegisterDeletedBy(_, _) | DhtOp::RegisterAgentActivity(_, _) => {
@@ -224,26 +227,26 @@ fn get_header_entry(op: DhtOp) -> Either<HeaderEntry, Outcome> {
             Header::ElementDelete(_) => todo!("Get the original entry"),
             _ => Right(Outcome::Accepted),
         },
-        DhtOp::StoreEntry(_, h, e) => Left(HeaderEntry {
-            header: h.into(),
-            entry: *e,
-        }),
-        DhtOp::RegisterUpdatedBy(_, h) => Left(HeaderEntry {
-            header: h.into(),
-            entry: todo!("get the original entry"),
-        }),
-        DhtOp::RegisterDeletedEntryHeader(_, h) => Left(HeaderEntry {
-            header: h.into(),
-            entry: todo!("get the deleted entry"),
-        }),
-        DhtOp::RegisterAddLink(_, h) => Left(HeaderEntry {
-            header: h.into(),
-            entry: todo!("get the base entry"),
-        }),
-        DhtOp::RegisterRemoveLink(_, h) => Left(HeaderEntry {
-            header: h.into(),
-            entry: todo!("get the base entry"),
-        }),
+        DhtOp::StoreEntry(s, h, e) => Left(Element::new(
+            SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(h.into()), s),
+            Some(*e),
+        )),
+        DhtOp::RegisterUpdatedBy(s, h) => Left(Element::new(
+            SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(h.into()), s),
+            None,
+        )),
+        DhtOp::RegisterDeletedEntryHeader(s, h) => Left(Element::new(
+            SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(h.into()), s),
+            None,
+        )),
+        DhtOp::RegisterAddLink(s, h) => Left(Element::new(
+            SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(h.into()), s),
+            None,
+        )),
+        DhtOp::RegisterRemoveLink(s, h) => Left(Element::new(
+            SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(h.into()), s),
+            None,
+        )),
     }
 }
 
@@ -254,15 +257,24 @@ async fn validate_op(
     use Either::*;
     // Create the element
     // TODO: remove clone of op
-    let HeaderEntry { header, entry } = match get_header_entry(op.clone()) {
-        Left(he) => he,
+    let element = match get_element(op.clone()) {
+        Left(el) => el,
         Right(o) => return Ok(o),
     };
+    // TODO: remove this when we can pass elements into
+    // the validation callback
+    let entry = match element.entry().as_option() {
+        Some(e) => e.clone(),
+        None => return Ok(Outcome::Accepted),
+    };
     // Get the app entry type
-    let app_entry_type = header.entry_data().and_then(|(_, et)| match et.clone() {
-        EntryType::App(aet) => Some(aet),
-        EntryType::AgentPubKey | EntryType::CapClaim | EntryType::CapGrant => None,
-    });
+    let app_entry_type = element
+        .header()
+        .entry_data()
+        .and_then(|(_, et)| match et.clone() {
+            EntryType::App(aet) => Some(aet),
+            EntryType::AgentPubKey | EntryType::CapClaim | EntryType::CapGrant => None,
+        });
     // Get the dna file
     let dna_file = { conductor_api.get_this_dna().await };
     let dna_file =
@@ -278,7 +290,6 @@ async fn validate_op(
     let entry = Arc::new(entry);
     let outcome = zome_names
         .into_iter()
-        // TODO: don't want to clone the entry here so
         .map(|zome_name| run_validation_callback(zome_name, entry.clone(), &ribosome))
         .collect::<Result<Vec<_>, _>>()?
         .into_iter()
