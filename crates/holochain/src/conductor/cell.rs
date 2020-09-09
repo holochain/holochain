@@ -10,7 +10,6 @@ use crate::conductor::api::CellConductorApiT;
 use crate::conductor::handle::ConductorHandle;
 use crate::core::queue_consumer::{spawn_queue_consumer_tasks, InitialQueueTriggers};
 use crate::core::ribosome::ZomeCallInvocation;
-use crate::core::ribosome::ZomeCallInvocationResponse;
 
 use crate::{
     conductor::{api::CellConductorApi, cell::error::CellResult},
@@ -634,11 +633,7 @@ impl Cell {
         // double ? because
         // - ConductorApiResult
         // - ZomeCallInvocationResult
-        match self.call_zome(invocation).await?? {
-            ZomeCallInvocationResponse::ZomeApiFn(guest_output) => Ok(guest_output.into_inner()),
-            //currently unreachable
-            //_ => Err(RibosomeError::ZomeFnNotExists(zome_name, "A remote zome call failed in a way that should not be possible.".into()))?,
-        }
+        Ok(self.call_zome(invocation).await??.try_into()?)
     }
 
     /// Function called by the Conductor

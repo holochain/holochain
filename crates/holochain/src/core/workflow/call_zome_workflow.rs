@@ -6,7 +6,6 @@ use crate::core::ribosome::guest_callback::validate_link_add::ValidateLinkAddHos
 use crate::core::ribosome::guest_callback::validate_link_add::ValidateLinkAddInvocation;
 use crate::core::ribosome::guest_callback::validate_link_add::ValidateLinkAddResult;
 use crate::core::ribosome::ZomeCallInvocation;
-use crate::core::ribosome::ZomeCallInvocationResponse;
 use crate::core::ribosome::{error::RibosomeResult, RibosomeT, ZomeCallHostAccess};
 use crate::core::state::source_chain::SourceChainError;
 use crate::core::state::workspace::Workspace;
@@ -27,6 +26,7 @@ use holochain_state::prelude::*;
 use holochain_types::element::Element;
 use holochain_zome_types::entry::GetOptions;
 use holochain_zome_types::header::Header;
+use holochain_zome_types::ZomeCallInvocationResponse;
 use std::sync::Arc;
 use tracing::instrument;
 

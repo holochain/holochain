@@ -59,7 +59,12 @@ pub mod wasm_test {
     async fn ribosome_debug_test() {
         let test_env = holochain_state::test_utils::test_cell_env();
         let env = test_env.env();
-        let workspace = crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
+        let mut workspace =
+            crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
+
+        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+            .await
+            .unwrap();
 
         let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
         let mut host_access = fixt!(ZomeCallHostAccess);
@@ -80,7 +85,12 @@ pub mod wasm_test {
     async fn wasm_line_numbers_test() {
         let test_env = holochain_state::test_utils::test_cell_env();
         let env = test_env.env();
-        let workspace = crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
+        let mut workspace =
+            crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
+
+        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+            .await
+            .unwrap();
 
         let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
         let mut host_access = fixt!(ZomeCallHostAccess);
