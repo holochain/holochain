@@ -826,8 +826,11 @@ mod builder {
             let keystore = if let Some(keystore) = self.keystore {
                 keystore
             } else {
-                //delete_me_create_test_keystore().await
-                spawn_lair_keystore(None).await?
+                if std::env::var("HOLOCHAIN_LAIR_KEYSTORE").is_ok() {
+                    spawn_lair_keystore(None).await?
+                } else {
+                    delete_me_create_test_keystore().await
+                }
             };
             let env_path = self.config.environment_path.clone();
 
