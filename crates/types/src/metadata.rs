@@ -45,3 +45,12 @@ impl From<HeaderHashed> for TimedHeaderHash {
         }
     }
 }
+
+impl From<HeaderHash> for TimedHeaderHash {
+    fn from(h: HeaderHash) -> Self {
+        TimedHeaderHash {
+            timestamp: Timestamp::now(),
+            header_hash: h,
+        }
+    }
+}

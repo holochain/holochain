@@ -71,9 +71,7 @@ pub async fn publish_dht_ops_workflow(
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // commit the workspace
-    writer
-        .with_writer(|writer| Ok(workspace.flush_to_txn(writer)?))
-        .await?;
+    writer.with_writer(|writer| Ok(workspace.flush_to_txn(writer)?))?;
 
     Ok(WorkComplete::Complete)
 }
@@ -519,9 +517,7 @@ mod tests {
                         .unwrap();
                 }
                 {
-                    let workspace = ProduceDhtOpsWorkspace::new(env.clone().into())
-                        .await
-                        .unwrap();
+                    let workspace = ProduceDhtOpsWorkspace::new(env.clone().into()).unwrap();
                     let (mut qt, _rx) = TriggerSender::new();
                     let complete = produce_dht_ops_workflow(workspace, env.clone().into(), &mut qt)
                         .await
@@ -529,9 +525,7 @@ mod tests {
                     assert_matches!(complete, WorkComplete::Complete);
                 }
                 {
-                    let mut workspace = ProduceDhtOpsWorkspace::new(env.clone().into())
-                        .await
-                        .unwrap();
+                    let mut workspace = ProduceDhtOpsWorkspace::new(env.clone().into()).unwrap();
                     env_ref
                         .with_commit::<SourceChainError, _, _>(|writer| {
                             workspace.authored_dht_ops.clear_all(writer)?;
@@ -657,9 +651,7 @@ mod tests {
 
                 // Create and fill authored ops db in the workspace
                 {
-                    let workspace = ProduceDhtOpsWorkspace::new(env.clone().into())
-                        .await
-                        .unwrap();
+                    let workspace = ProduceDhtOpsWorkspace::new(env.clone().into()).unwrap();
                     let (mut qt, _rx) = TriggerSender::new();
                     let complete = produce_dht_ops_workflow(workspace, env.clone().into(), &mut qt)
                         .await

@@ -1,13 +1,14 @@
 //! The CellConductorApi allows Cells to talk to their Conductor
 
 use super::error::{ConductorApiError, ConductorApiResult};
-use crate::conductor::ConductorHandle;
+use crate::conductor::{entry_def_store::EntryDefBufferKey, ConductorHandle};
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::workflow::ZomeCallInvocationResult;
 use async_trait::async_trait;
 use holo_hash::DnaHash;
 use holochain_keystore::KeystoreSender;
 use holochain_types::{autonomic::AutonomicCue, cell::CellId, dna::DnaFile};
+use holochain_zome_types::entry_def::EntryDef;
 use tracing::*;
 
 /// The concrete implementation of [CellConductorApiT], which is used to give
@@ -31,6 +32,10 @@ impl CellConductorApi {
 
 #[async_trait]
 impl CellConductorApiT for CellConductorApi {
+    fn cell_id(&self) -> &CellId {
+        &self.cell_id
+    }
+
     async fn call_zome(
         &self,
         cell_id: &CellId,
@@ -67,11 +72,22 @@ impl CellConductorApiT for CellConductorApi {
     async fn get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile> {
         self.conductor_handle.get_dna(dna_hash).await
     }
+
+    async fn get_this_dna(&self) -> Option<DnaFile> {
+        self.conductor_handle.get_dna(self.cell_id.dna_hash()).await
+    }
+
+    async fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef> {
+        self.conductor_handle.get_entry_def(key).await
+    }
 }
 
 /// The "internal" Conductor API interface, for a Cell to talk to its calling Conductor.
 #[async_trait]
 pub trait CellConductorApiT: Clone + Send + Sync + Sized {
+    /// Get this cell id
+    fn cell_id(&self) -> &CellId;
+
     /// Invoke a zome function on any cell in this conductor.
     /// An invocation on a different Cell than this one corresponds to a bridged call.
     async fn call_zome(
@@ -93,4 +109,10 @@ pub trait CellConductorApiT: Clone + Send + Sync + Sized {
 
     /// Get a [Dna] from the [DnaStore]
     async fn get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile>;
+
+    /// Get the [Dna] of this cell from the [DnaStore]
+    async fn get_this_dna(&self) -> Option<DnaFile>;
+
+    /// Get a [EntryDef] from the [EntryDefBuf]
+    async fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef>;
 }

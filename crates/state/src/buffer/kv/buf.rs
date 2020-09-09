@@ -6,7 +6,6 @@ use crate::buffer::{
     kv::KvStore,
     BufferedStore,
 };
-use crate::env::ReadManager;
 use crate::{
     env::EnvironmentRead,
     error::{DatabaseError, DatabaseResult},
@@ -143,6 +142,16 @@ where
         Ok(())
     }
 
+    /// Update the scratch space to remove a Delete operation for the KV
+    pub fn cancel_delete(&mut self, k: K) -> DatabaseResult<()> {
+        check_empty_key(&k)?;
+        let k = k.to_key_bytes();
+        if let Some(&KvOp::Delete) = self.scratch.get(&k) {
+            self.scratch.remove(&k);
+        }
+        Ok(())
+    }
+
     pub fn is_scratch_fresh(&self) -> bool {
         self.scratch.is_empty()
     }
@@ -167,6 +176,26 @@ where
         r: &'a R,
     ) -> DatabaseResult<DrainIter<'a, '_, V>> {
         Ok(DrainIter::new(&mut self.scratch, self.store.iter(r)?))
+    }
+
+    /// Iterator that tracks elements so they can be deleted.
+    /// This allows filtering before the deletes are added
+    ///
+    /// NB: if we ever have to implement other iter methods, we should
+    /// consider passing in a raw iter to DrainIter
+    pub fn drain_iter_filter<'a, F, R>(
+        &mut self,
+        r: &'a R,
+        filter: F,
+    ) -> DatabaseResult<DrainIter<'a, '_, V>>
+    where
+        F: FnMut(&(&[u8], V)) -> Result<bool, DatabaseError> + 'a,
+        R: Readable,
+    {
+        Ok(DrainIter::new(
+            &mut self.scratch,
+            self.store.iter(r)?.filter(filter),
+        ))
     }
 
     /// Iterator that returns all partial matches to this key

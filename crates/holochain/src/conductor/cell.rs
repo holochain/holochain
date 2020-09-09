@@ -130,6 +130,7 @@ impl Cell {
             let queue_triggers = spawn_queue_consumer_tasks(
                 &env,
                 holochain_p2p_cell.clone(),
+                conductor_api.clone(),
                 managed_task_add_sender,
                 managed_task_stop_broadcaster,
             )
@@ -438,6 +439,12 @@ impl Cell {
         let element_vault = ElementBuf::vault(self.env.clone().into(), false)?;
         let meta_vault = MetadataBuf::vault(self.env.clone().into())?;
 
+        // Check that we have the authority to serve this request because we have
+        // done the StoreElement validation
+        if !meta_vault.has_registered_store_element(&hash)? {
+            return Ok(GetElementResponse::GetHeader(None));
+        }
+
         // Look for a delete on the header and collect it
         let deleted = meta_vault
             .get_deletes_on_header(&reader, hash.clone())?
@@ -736,6 +743,14 @@ impl Cell {
     // TODO: reevaluate once Workflows are fully implemented (after B-01567)
     pub(crate) fn env(&self) -> &EnvironmentWrite {
         &self.env
+    }
+
+    #[cfg(test)]
+    /// Get the triggers for the cell
+    /// Useful for testing when you want to
+    /// Cause workflows to trigger
+    pub(crate) fn triggers(&self) -> &InitialQueueTriggers {
+        &self.queue_triggers
     }
 }
 

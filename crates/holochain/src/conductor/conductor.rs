@@ -551,8 +551,7 @@ where
         let entry_def_buf = EntryDefBuf::new(environ.clone().into(), entry_def_db)?;
         // Load out all dna defs
         let wasm_tasks = dna_def_buf
-            .get_all()
-            .await?
+            .get_all()?
             .into_iter()
             .map(|dna_def| {
                 // Load all wasms for each dna_def from the wasm db into memory
@@ -596,7 +595,7 @@ where
         let dna_def_db = environ.get_db(&*holochain_state::db::DNA_DEF)?;
         let entry_def_db = environ.get_db(&*holochain_state::db::ENTRY_DEF)?;
 
-        let zome_defs = get_entry_defs(dna.clone()).await?;
+        let zome_defs = get_entry_defs(dna.clone())?;
 
         let mut entry_def_buf = EntryDefBuf::new(environ.clone().into(), entry_def_db)?;
 
