@@ -14,7 +14,14 @@ use super::{
 };
 use crate::{
     conductor::api::CellConductorApiT,
+    core::present::retrieve_entry,
+    core::present::DataSource,
+    core::present::DbPair,
+    core::ribosome::guest_callback::validate_link_add::ValidateLinkAddHostAccess,
+    core::ribosome::guest_callback::validate_link_add::ValidateLinkAddInvocation,
+    core::ribosome::guest_callback::validate_link_add::ValidateLinkAddResult,
     core::ribosome::wasm_ribosome::WasmRibosome,
+    core::state::cascade::Cascade,
     core::{
         queue_consumer::{OneshotWriter, TriggerSender, WorkComplete},
         ribosome::guest_callback::validate::ValidateHostAccess,
@@ -37,6 +44,7 @@ use error::AppValidationResult;
 pub use error::*;
 use fallible_iterator::FallibleIterator;
 use holo_hash::{AnyDhtHash, DhtOpHash};
+use holochain_p2p::HolochainP2pCell;
 use holochain_state::{
     buffer::{BufferedStore, KvBufFresh},
     db::{INTEGRATED_DHT_OPS, INTEGRATION_LIMBO},
@@ -46,14 +54,15 @@ use holochain_state::{
 };
 use holochain_types::{
     dht_op::DhtOp, dht_op::DhtOpLight, dna::DnaFile, test_utils::which_agent,
-    validate::ValidationStatus, HeaderHashed, Timestamp,
+    validate::ValidationStatus, Entry, HeaderHashed, Timestamp,
 };
 use holochain_zome_types::{
     element::Element, element::SignedHeaderHashed, header::AppEntryType, header::EntryType,
-    zome::ZomeName, Header,
+    header::LinkAdd, zome::ZomeName, Header,
 };
 use tracing::*;
 use types::*;
+use Either::*;
 
 #[cfg(test)]
 mod tests;
@@ -61,12 +70,13 @@ mod tests;
 mod error;
 mod types;
 
-#[instrument(skip(workspace, writer, trigger_integration, conductor_api))]
+#[instrument(skip(workspace, writer, trigger_integration, conductor_api, network))]
 pub async fn app_validation_workflow(
     mut workspace: AppValidationWorkspace,
     writer: OneshotWriter,
     trigger_integration: &mut TriggerSender,
     conductor_api: impl CellConductorApiT,
+    network: HolochainP2pCell,
 ) -> WorkflowResult<WorkComplete> {
     let complete = app_validation_workflow_inner(&mut workspace, conductor_api).await?;
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
@@ -82,6 +92,7 @@ pub async fn app_validation_workflow(
 async fn app_validation_workflow_inner(
     workspace: &mut AppValidationWorkspace,
     conductor_api: impl CellConductorApiT,
+    network: &HolochainP2pCell,
 ) -> WorkflowResult<WorkComplete> {
     let env = workspace.validation_limbo.env().clone();
     let (ops, mut awaiting_ops): (Vec<ValidationLimboValue>, Vec<ValidationLimboValue>) =
@@ -108,7 +119,7 @@ async fn app_validation_workflow_inner(
         match &vlv.status {
             ValidationLimboStatus::AwaitingAppDeps(_) | ValidationLimboStatus::SysValidated => {
                 let op = light_to_op(vlv.op.clone(), &workspace.element_pending).await?;
-                let outcome = validate_op(op.clone(), &conductor_api).await?;
+                let outcome = validate_op(op.clone(), &conductor_api, workspace, &network).await?;
                 match outcome {
                     Outcome::Accepted => {
                         if vlv.pending_dependencies.pending_dependencies() {
@@ -253,6 +264,8 @@ fn get_element(op: DhtOp) -> Either<Element, Outcome> {
 async fn validate_op(
     op: DhtOp,
     conductor_api: &impl CellConductorApiT,
+    workspace: &mut AppValidationWorkspace,
+    network: &HolochainP2pCell,
 ) -> AppValidationResult<Outcome> {
     use Either::*;
     // Create the element
@@ -261,37 +274,57 @@ async fn validate_op(
         Left(el) => el,
         Right(o) => return Ok(o),
     };
-    // Get the app entry type
-    let app_entry_type = element
-        .header()
-        .entry_data()
-        .and_then(|(_, et)| match et.clone() {
-            EntryType::App(aet) => Some(aet),
-            EntryType::AgentPubKey | EntryType::CapClaim | EntryType::CapGrant => None,
-        });
     // Get the dna file
     let dna_file = { conductor_api.get_this_dna().await };
     let dna_file =
         dna_file.ok_or_else(|| AppValidationError::DnaMissing(conductor_api.cell_id().clone()))?;
+    // TODO: If not an entry then need to get the entry that can
+    // say which zome to call
+    // Get the app entry type
+
     // Get the zome names
-    let zome_names = get_zome_names(&app_entry_type, &dna_file)?;
+    let mut data_source = workspace.data_source(network);
+    let zome_names = get_zome_names(&element, &dna_file, &mut data_source).await?;
+    let zome_names = match zome_names {
+        Left(zn) => zn,
+        Right(o) => return Ok(o),
+    };
     // Create the ribosome
     let ribosome = WasmRibosome::new(dna_file);
-    // Call the callback
-    // TODO: Not sure if this is correct? Calling every zome
-    // for an agent key etc. If so we should change run_validation
-    // to a Vec<ZomeName>
-    let element = Arc::new(element);
-    let outcome = zome_names
-        .into_iter()
-        .map(|zome_name| run_validation_callback(zome_name, element.clone(), &ribosome))
-        .collect::<Result<Vec<_>, _>>()?
-        .into_iter()
-        .find(|o| match o {
-            Outcome::AwaitingDeps(_) | Outcome::Rejected(_) => true,
-            Outcome::Accepted => false,
-        })
-        .unwrap_or(Outcome::Accepted);
+
+    let outcome = match element.header() {
+        Header::LinkAdd(link_add) => {
+            let zome_name = todo!();
+            let base = todo!();
+            let target = todo!();
+            run_link_validation_callback(
+                zome_name,
+                Arc::new(link_add.clone()),
+                Arc::new(base),
+                Arc::new(target),
+                &ribosome,
+            )?
+        }
+        _ => {
+            // Entry
+
+            // Call the callback
+            // TODO: Not sure if this is correct? Calling every zome
+            // for an agent key etc. If so we should change run_validation
+            // to a Vec<ZomeName>
+            let element = Arc::new(element);
+            zome_names
+                .into_iter()
+                .map(|zome_name| run_validation_callback(zome_name, element.clone(), &ribosome))
+                .collect::<Result<Vec<_>, _>>()?
+                .into_iter()
+                .find(|o| match o {
+                    Outcome::AwaitingDeps(_) | Outcome::Rejected(_) => true,
+                    Outcome::Accepted => false,
+                })
+                .unwrap_or(Outcome::Accepted)
+        }
+    };
     if let Outcome::AwaitingDeps(_) | Outcome::Rejected(_) = &outcome {
         warn!(
             agent = %which_agent(conductor_api.cell_id().agent_pubkey()),
@@ -300,22 +333,62 @@ async fn validate_op(
             outcome = ?outcome,
         );
     }
+
     Ok(outcome)
 }
 
-fn get_zome_names(
-    app_entry_type: &Option<AppEntryType>,
+async fn get_app_entry_type(
+    element: &Element,
+    data_source: &mut AppValDataSource<'_>,
+) -> AppValidationResult<Either<Option<AppEntryType>, Outcome>> {
+    match element.header().entry_data() {
+        Some((_, et)) => match et.clone() {
+            EntryType::App(aet) => Ok(Left(Some(aet))),
+            EntryType::AgentPubKey | EntryType::CapClaim | EntryType::CapGrant => Ok(Left(None)),
+        },
+        None => get_app_entry_type_from_dep(element, data_source).await,
+    }
+}
+
+async fn get_app_entry_type_from_dep(
+    element: &Element,
+    data_source: &mut AppValDataSource<'_>,
+) -> AppValidationResult<Either<Option<AppEntryType>, Outcome>> {
+    match element.header() {
+        Header::LinkAdd(la) => match retrieve_entry(&la.base_address, data_source).await? {
+            Some(dep) => todo!(),
+            None => {
+                return Ok(Right(Outcome::AwaitingDeps(vec![la
+                    .base_address
+                    .clone()
+                    .into()])))
+            }
+        },
+        Header::LinkRemove(_) => {}
+        Header::EntryUpdate(_) => {}
+        Header::ElementDelete(_) => {}
+        _ => (),
+    }
+    todo!()
+}
+
+async fn get_zome_names(
+    element: &Element,
     dna_file: &DnaFile,
-) -> AppValidationResult<Vec<ZomeName>> {
-    Ok(match app_entry_type {
-        Some(aet) => vec![get_zome_name(aet, &dna_file)?],
-        None => dna_file
-            .dna()
-            .zomes
-            .iter()
-            .map(|(z, _)| z.clone())
-            .collect(),
-    })
+    data_source: &mut AppValDataSource<'_>,
+) -> AppValidationResult<Either<Vec<ZomeName>, Outcome>> {
+    match get_app_entry_type(element, data_source).await? {
+        Left(Some(aet)) => Ok(Left(vec![get_zome_name(&aet, &dna_file)?])),
+        Left(None) => Ok(Left(
+            dna_file
+                .dna()
+                .zomes
+                .iter()
+                .map(|(z, _)| z.clone())
+                .collect(),
+        )),
+        Right(o) => Ok(Right(o)),
+    }
 }
 
 fn get_zome_name(entry_type: &AppEntryType, dna_file: &DnaFile) -> AppValidationResult<ZomeName> {
@@ -345,6 +418,26 @@ fn run_validation_callback(
             let deps = hashes.into_iter().map(AnyDhtHash::from).collect();
             Ok(Outcome::AwaitingDeps(deps))
         }
+    }
+}
+
+fn run_link_validation_callback(
+    zome_name: ZomeName,
+    link_add: Arc<LinkAdd>,
+    base: Arc<Entry>,
+    target: Arc<Entry>,
+    ribosome: &impl RibosomeT,
+) -> AppValidationResult<Outcome> {
+    let invocation = ValidateLinkAddInvocation {
+        zome_name,
+        link_add,
+        base,
+        target,
+    };
+    let validate = ribosome.run_validate_link_add(ValidateLinkAddHostAccess, invocation)?;
+    match validate {
+        ValidateLinkAddResult::Valid => Ok(Outcome::Accepted),
+        ValidateLinkAddResult::Invalid(reason) => Ok(Outcome::Rejected(reason)),
     }
 }
 
@@ -404,6 +497,13 @@ impl AppValidationWorkspace {
         })
     }
 
+    fn data_source<'a>(&'a mut self, network: &'a HolochainP2pCell) -> AppValDataSource<'a> {
+        AppValDataSource {
+            workspace: self,
+            network,
+        }
+    }
+
     fn to_val_limbo(
         &mut self,
         hash: DhtOpHash,
@@ -447,7 +547,6 @@ impl AppValidationWorkspace {
 
 impl Workspace for AppValidationWorkspace {
     fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> WorkspaceResult<()> {
-        warn!("unimplemented passthrough");
         self.update_element_stores(writer)?;
         self.validation_limbo.0.flush_to_txn_ref(writer)?;
         self.integration_limbo.flush_to_txn_ref(writer)?;
@@ -456,5 +555,37 @@ impl Workspace for AppValidationWorkspace {
         self.element_judged.flush_to_txn_ref(writer)?;
         self.meta_judged.flush_to_txn_ref(writer)?;
         Ok(())
+    }
+}
+struct AppValDataSource<'a> {
+    workspace: &'a mut AppValidationWorkspace,
+    network: &'a HolochainP2pCell,
+}
+
+impl DataSource for AppValDataSource<'_> {
+    fn cascade(&mut self) -> Cascade {
+        let workspace = &mut self.workspace;
+        Cascade::new(
+            workspace.validation_limbo.env().clone(),
+            &workspace.element_vault,
+            &workspace.meta_vault,
+            &mut workspace.element_cache,
+            &mut workspace.meta_cache,
+            self.network.clone(),
+        )
+    }
+
+    fn pending(&self) -> DbPair<PendingPrefix, MetadataBuf<PendingPrefix>> {
+        DbPair {
+            element: &self.workspace.element_pending,
+            meta: &self.workspace.meta_pending,
+        }
+    }
+
+    fn judged(&self) -> DbPair<JudgedPrefix, MetadataBuf<JudgedPrefix>> {
+        DbPair {
+            element: &self.workspace.element_judged,
+            meta: &self.workspace.meta_judged,
+        }
     }
 }
