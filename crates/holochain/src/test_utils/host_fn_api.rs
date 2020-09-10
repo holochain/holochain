@@ -1,5 +1,8 @@
 use crate::{
     conductor::ConductorHandle,
+    core::ribosome::RibosomeT,
+    core::ribosome::ZomeCallInvocation,
+    core::ribosome::ZomeCallInvocationResponse,
     core::{
         ribosome::{host_fn, wasm_ribosome::WasmRibosome, CallContext, ZomeCallHostAccess},
         state::{metadata::LinkMetaKey, workspace::Workspace},
@@ -60,6 +63,12 @@ pub struct Msg(pub String);
 pub enum ThisWasmEntry {
     AlwaysValidates,
     NeverValidates,
+}
+
+#[derive(Deserialize, Serialize, SerializedBytes, Debug, Clone)]
+enum MaybeLinkable {
+    AlwaysLinkable,
+    NeverLinkable,
 }
 
 #[derive(Clone)]
@@ -391,6 +400,40 @@ pub async fn get_link_details<'env>(
     cascade.get_link_details(&key, options).await.unwrap()
 }
 
+pub async fn call_zome_direct(
+    env: &EnvironmentWrite,
+    call_data: CallData,
+    invocation: ZomeCallInvocation,
+) -> SerializedBytes {
+    let CallData {
+        network,
+        keystore,
+        ribosome,
+        ..
+    } = call_data;
+
+    let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
+    let workspace_lock = CallZomeWorkspaceLock::new(workspace);
+
+    let output = {
+        let host_access = ZomeCallHostAccess::new(workspace_lock.clone(), keystore, network);
+        let ribosome = Arc::new(ribosome);
+        ribosome
+            .call_zome_function(host_access, invocation)
+            .unwrap()
+    };
+
+    // Write
+    let mut guard = workspace_lock.write().await;
+    let workspace = &mut guard;
+    env.guard()
+        .with_commit(|writer| workspace.flush_to_txn_ref(writer))
+        .unwrap();
+    let output = unwrap_to!(output => ZomeCallInvocationResponse::ZomeApiFn).clone();
+
+    output.into_inner()
+}
+
 macro_rules! test_entry_impl {
     ($type:ident) => {
         impl TryFrom<$type> for Entry {
@@ -413,3 +456,4 @@ macro_rules! test_entry_impl {
 test_entry_impl!(ThisWasmEntry);
 test_entry_impl!(Post);
 test_entry_impl!(Msg);
+test_entry_impl!(MaybeLinkable);

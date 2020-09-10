@@ -1,6 +1,8 @@
 use crate::{
     conductor::{dna_store::MockDnaStore, ConductorHandle},
     core::ribosome::ZomeCallInvocation,
+    core::state::dht_op_integration::IntegratedDhtOpsValue,
+    core::state::validation_db::ValidationLimboValue,
     core::{
         state::element_buf::ElementBuf,
         workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace,
@@ -12,14 +14,14 @@ use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
 use holo_hash::{AnyDhtHash, DhtOpHash, EntryHash, HeaderHash};
 use holochain_serialized_bytes::{SerializedBytes, SerializedBytesError};
-use holochain_state::fresh_reader_test;
+use holochain_state::{env::EnvironmentWrite, fresh_reader_test};
 use holochain_types::{
     app::InstalledCell, cell::CellId, dht_op::DhtOpLight, dna::DnaDef, dna::DnaFile, fixt::*,
     test_utils::fake_agent_pubkey_1, test_utils::fake_agent_pubkey_2, validate::ValidationStatus,
     Entry,
 };
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::HostInput;
+use holochain_zome_types::{element::Element, zome::ZomeName, HostInput};
 use std::{
     convert::{TryFrom, TryInto},
     time::Duration,
@@ -35,9 +37,9 @@ async fn app_validation_workflow_test() {
             name: "app_validation_workflow_test".to_string(),
             uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
             properties: SerializedBytes::try_from(()).unwrap(),
-            zomes: vec![TestWasm::Validate.into()].into(),
+            zomes: vec![TestWasm::Validate.into(), TestWasm::ValidateLink.into()].into(),
         },
-        vec![TestWasm::Validate.into()],
+        vec![TestWasm::Validate.into(), TestWasm::ValidateLink.into()],
     )
     .await
     .unwrap();
@@ -79,7 +81,8 @@ async fn run_test(
     handle: ConductorHandle,
     dna_file: &DnaFile,
 ) {
-    let invocation = new_invocation(&bob_cell_id, "always_validates", ()).unwrap();
+    let invocation =
+        new_invocation(&bob_cell_id, "always_validates", (), TestWasm::Validate).unwrap();
     handle.call_zome(invocation).await.unwrap().unwrap();
     // Some time for ops to reach alice and run through validation
     tokio::time::delay_for(Duration::from_millis(1000)).await;
@@ -89,66 +92,16 @@ async fn run_test(
 
         let workspace = IncomingDhtOpsWorkspace::new(alice_env.clone().into()).unwrap();
         // Validation should be empty
-        let res: Vec<_> = fresh_reader_test!(alice_env, |r| {
-            workspace
-                .validation_limbo
-                .iter(&r)
-                .unwrap()
-                .map(|(k, i)| Ok((k.to_vec(), i)))
-                .collect()
-                .unwrap()
-        });
-        {
-            let s = debug_span!("inspect_ops");
-            let _g = s.enter();
-            let element_buf = ElementBuf::vault(alice_env.clone().into(), true).unwrap();
-            for (k, i) in &res {
-                let hash = DhtOpHash::from_raw_bytes(k.clone());
-                let el = element_buf.get_element(&i.op.header_hash()).unwrap();
-                debug!(?hash, ?i, op_in_val = ?el);
-            }
-        }
-        assert_eq!(
-            fresh_reader_test!(alice_env, |r| {
-                workspace
-                    .validation_limbo
-                    .iter(&r)
-                    .unwrap()
-                    .count()
-                    .unwrap()
-            }),
-            0
-        );
+        let val = inspect_val_limbo(&alice_env, &workspace);
+        assert_eq!(val.len(), 0);
         // Integration should have 3 ops in it
         // Plus another 16 for genesis + init
-        let res: Vec<_> = fresh_reader_test!(alice_env, |r| {
-            workspace
-                .integrated_dht_ops
-                .iter(&r)
-                .unwrap()
-                // Every op should be valid
-                .inspect(|(_, i)| {
-                    // let s = debug_span!("inspect_ops");
-                    // let _g = s.enter();
-                    debug!(?i.op);
-                    assert_eq!(i.validation_status, ValidationStatus::Valid);
-                    Ok(())
-                })
-                .map(|(_, i)| Ok(i))
-                .collect()
-                .unwrap()
-        });
-        {
-            let s = debug_span!("inspect_ops");
-            let _g = s.enter();
-            let element_buf = ElementBuf::vault(alice_env.clone().into(), true).unwrap();
-            for i in &res {
-                let el = element_buf.get_element(&i.op.header_hash()).unwrap();
-                debug!(?i.op, op_in_buf = ?el);
-            }
+        let int = inspect_integrated(&alice_env, &workspace);
+        for (_, i, _) in &int {
+            assert_eq!(i.validation_status, ValidationStatus::Valid);
         }
 
-        assert_eq!(res.len(), 3 + 16);
+        assert_eq!(int.len(), 3 + 16);
     }
 
     let (invalid_header_hash, invalid_entry_hash) =
@@ -162,62 +115,183 @@ async fn run_test(
 
         let workspace = IncomingDhtOpsWorkspace::new(alice_env.clone().into()).unwrap();
         // Validation should be empty
-        assert_eq!(
-            fresh_reader_test!(alice_env, |r| {
-                workspace
-                    .validation_limbo
-                    .iter(&r)
-                    .unwrap()
-                    .count()
-                    .unwrap()
-            }),
-            0
-        );
+        let val = inspect_val_limbo(&alice_env, &workspace);
+        assert_eq!(val.len(), 0);
         // Integration should have 3 ops in it
         // StoreEntry should be invalid.
         // RegisterAgentActivity and StoreElement don't run app validation
         // So they will be valid.
         // Plus another 19 from the previous calls
-        let res: Vec<_> = fresh_reader_test!(alice_env, |r| {
-            workspace
-                .integrated_dht_ops
-                .iter(&r)
-                .unwrap()
-                // Every op should be valid
-                .inspect(|(_, i)| {
-                    match &i.op {
-                        DhtOpLight::StoreEntry(hh, _, eh)
-                            if eh == &invalid_entry_hash && hh == &invalid_header_hash =>
-                        {
-                            assert_eq!(i.validation_status, ValidationStatus::Rejected)
-                        }
-                        // DhtOpLight::StoreElement(hh, _, _) if hh == &invalid_header_hash => {
-                        //     assert_eq!(i.validation_status, ValidationStatus::Rejected)
-                        // }
-                        _ => assert_eq!(i.validation_status, ValidationStatus::Valid),
-                    }
-                    Ok(())
-                })
-                .map(|(_, i)| Ok(i))
-                .collect()
-                .unwrap()
-        });
+        let int = inspect_integrated(&alice_env, &workspace);
+        for (_, i, _) in &int {
+            match &i.op {
+                DhtOpLight::StoreEntry(hh, _, eh)
+                    if eh == &invalid_entry_hash && hh == &invalid_header_hash =>
+                {
+                    assert_eq!(i.validation_status, ValidationStatus::Rejected)
+                }
+                _ => assert_eq!(i.validation_status, ValidationStatus::Valid),
+            }
+        }
 
-        assert_eq!(res.len(), 3 + 19);
+        assert_eq!(int.len(), 3 + 19);
+    }
+
+    let invocation =
+        new_invocation(&bob_cell_id, "add_valid_link", (), TestWasm::ValidateLink).unwrap();
+    handle.call_zome(invocation).await.unwrap().unwrap();
+
+    tokio::time::delay_for(Duration::from_millis(1000)).await;
+
+    {
+        let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
+
+        let workspace = IncomingDhtOpsWorkspace::new(alice_env.clone().into()).unwrap();
+        // Validation should be empty
+        let val = inspect_val_limbo(&alice_env, &workspace);
+        assert_eq!(val.len(), 0);
+        // Integration should have 6 ops in it
+        // Plus another 22 from the previous calls
+        let int = inspect_integrated(&alice_env, &workspace);
+        for (_, i, _) in &int {
+            match &i.op {
+                DhtOpLight::StoreEntry(hh, _, eh)
+                    if eh == &invalid_entry_hash && hh == &invalid_header_hash =>
+                {
+                    assert_eq!(i.validation_status, ValidationStatus::Rejected)
+                }
+                _ => assert_eq!(i.validation_status, ValidationStatus::Valid),
+            }
+        }
+        assert_eq!(int.len(), 6 + 22);
+    }
+    let invocation =
+        new_invocation(&bob_cell_id, "add_invalid_link", (), TestWasm::ValidateLink).unwrap();
+    let invalid_link_hash: HeaderHash =
+        call_zome_directly(&bob_cell_id, &handle, dna_file, invocation)
+            .await
+            .try_into()
+            .unwrap();
+    tokio::time::delay_for(Duration::from_millis(1000)).await;
+
+    {
+        let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
+
+        let workspace = IncomingDhtOpsWorkspace::new(alice_env.clone().into()).unwrap();
+        // Validation should be empty
+        let val = inspect_val_limbo(&alice_env, &workspace);
+        assert_eq!(val.len(), 0);
+        // Integration should have 9 ops in it
+        // Plus another 28 from the previous calls
+        let int = inspect_integrated(&alice_env, &workspace);
+        for (_, i, _) in &int {
+            match &i.op {
+                DhtOpLight::StoreEntry(hh, _, eh)
+                    if eh == &invalid_entry_hash && hh == &invalid_header_hash =>
+                {
+                    assert_eq!(i.validation_status, ValidationStatus::Rejected)
+                }
+                DhtOpLight::RegisterAddLink(hh, _) if hh == &invalid_link_hash => {
+                    assert_eq!(i.validation_status, ValidationStatus::Rejected)
+                }
+                _ => assert_eq!(i.validation_status, ValidationStatus::Valid),
+            }
+        }
+        assert_eq!(int.len(), 9 + 28);
+    }
+
+    let invocation = new_invocation(
+        &bob_cell_id,
+        "remove_valid_link",
+        (),
+        TestWasm::ValidateLink,
+    )
+    .unwrap();
+    call_zome_directly(&bob_cell_id, &handle, dna_file, invocation).await;
+    tokio::time::delay_for(Duration::from_millis(1000)).await;
+
+    {
+        let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
+
+        let workspace = IncomingDhtOpsWorkspace::new(alice_env.clone().into()).unwrap();
+        // Validation should be empty
+        let val = inspect_val_limbo(&alice_env, &workspace);
+        assert_eq!(val.len(), 0);
+        // Integration should have 9 ops in it
+        // Plus another 37 from the previous calls
+        let int = inspect_integrated(&alice_env, &workspace);
+        for (_, i, _) in &int {
+            match &i.op {
+                DhtOpLight::StoreEntry(hh, _, eh)
+                    if eh == &invalid_entry_hash && hh == &invalid_header_hash =>
+                {
+                    assert_eq!(i.validation_status, ValidationStatus::Rejected)
+                }
+                DhtOpLight::RegisterAddLink(hh, _) if hh == &invalid_link_hash => {
+                    assert_eq!(i.validation_status, ValidationStatus::Rejected)
+                }
+                _ => assert_eq!(i.validation_status, ValidationStatus::Valid),
+            }
+        }
+        assert_eq!(int.len(), 9 + 37);
+    }
+
+    let invocation = new_invocation(
+        &bob_cell_id,
+        "remove_invalid_link",
+        (),
+        TestWasm::ValidateLink,
+    )
+    .unwrap();
+    let invalid_remove_hash: HeaderHash =
+        call_zome_directly(&bob_cell_id, &handle, dna_file, invocation)
+            .await
+            .try_into()
+            .unwrap();
+    tokio::time::delay_for(Duration::from_millis(1000)).await;
+
+    {
+        let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
+
+        let workspace = IncomingDhtOpsWorkspace::new(alice_env.clone().into()).unwrap();
+        // Validation should be empty
+        let val = inspect_val_limbo(&alice_env, &workspace);
+        assert_eq!(val.len(), 0);
+        // Integration should have 12 ops in it
+        // Plus another 46 from the previous calls
+        let int = inspect_integrated(&alice_env, &workspace);
+        for (_, i, _) in &int {
+            match &i.op {
+                DhtOpLight::StoreEntry(hh, _, eh)
+                    if eh == &invalid_entry_hash && hh == &invalid_header_hash =>
+                {
+                    assert_eq!(i.validation_status, ValidationStatus::Rejected)
+                }
+                DhtOpLight::RegisterAddLink(hh, _) if hh == &invalid_link_hash => {
+                    assert_eq!(i.validation_status, ValidationStatus::Rejected)
+                }
+                DhtOpLight::RegisterRemoveLink(hh, _) if hh == &invalid_remove_hash => {
+                    assert_eq!(i.validation_status, ValidationStatus::Rejected)
+                }
+                _ => assert_eq!(i.validation_status, ValidationStatus::Valid),
+            }
+        }
+        assert_eq!(int.len(), 12 + 46);
     }
 }
 
-fn new_invocation<P>(
+fn new_invocation<P, Z: Into<ZomeName>>(
     cell_id: &CellId,
     func: &str,
     payload: P,
+    zome_name: Z,
 ) -> Result<ZomeCallInvocation, SerializedBytesError>
 where
     P: TryInto<SerializedBytes, Error = SerializedBytesError>,
 {
     Ok(ZomeCallInvocation {
         cell_id: cell_id.clone(),
-        zome_name: TestWasm::Validate.into(),
+        zome_name: zome_name.into(),
         cap: CapSecretFixturator::new(Unpredictable).next().unwrap(),
         fn_name: func.to_string(),
         payload: HostInput::new(payload.try_into()?),
@@ -248,4 +322,70 @@ async fn commit_invalid(
     let mut triggers = handle.get_cell_triggers(&bob_cell_id).await.unwrap();
     triggers.produce_dht_ops.trigger();
     (invalid_header_hash, entry_hash)
+}
+
+async fn call_zome_directly(
+    bob_cell_id: &CellId,
+    handle: &ConductorHandle,
+    dna_file: &DnaFile,
+    invocation: ZomeCallInvocation,
+) -> SerializedBytes {
+    let (bob_env, call_data) = CallData::create(bob_cell_id, handle, dna_file).await;
+    // 4
+    let output = call_zome_direct(&bob_env, call_data.clone(), invocation).await;
+
+    // Produce and publish these commits
+    let mut triggers = handle.get_cell_triggers(&bob_cell_id).await.unwrap();
+    triggers.produce_dht_ops.trigger();
+    output
+}
+
+#[instrument(skip(env, workspace))]
+fn inspect_val_limbo(
+    env: &EnvironmentWrite,
+    workspace: &IncomingDhtOpsWorkspace,
+) -> Vec<(DhtOpHash, ValidationLimboValue, Option<Element>)> {
+    debug!("start");
+    let element_buf = ElementBuf::pending(env.clone().into()).unwrap();
+    fresh_reader_test!(env, |r| {
+        workspace
+            .validation_limbo
+            .iter(&r)
+            .unwrap()
+            .map(|(k, i)| {
+                let hash = DhtOpHash::from_raw_bytes(k.to_vec());
+                let el = element_buf.get_element(&i.op.header_hash()).unwrap();
+                debug!(?hash, ?i, op_in_val = ?el);
+                Ok((hash, i, el))
+            })
+            .collect()
+            .unwrap()
+    })
+}
+
+#[instrument(skip(env, workspace))]
+fn inspect_integrated(
+    env: &EnvironmentWrite,
+    workspace: &IncomingDhtOpsWorkspace,
+) -> Vec<(DhtOpHash, IntegratedDhtOpsValue, Option<Element>)> {
+    debug!("start");
+    let element_buf = ElementBuf::vault(env.clone().into(), true).unwrap();
+    let element_buf_reject = ElementBuf::rejected(env.clone().into()).unwrap();
+    fresh_reader_test!(env, |r| {
+        workspace
+            .integrated_dht_ops
+            .iter(&r)
+            .unwrap()
+            .map(|(k, i)| {
+                let hash = DhtOpHash::from_raw_bytes(k.to_vec());
+                let el = element_buf
+                    .get_element(&i.op.header_hash())
+                    .unwrap()
+                    .or_else(|| element_buf_reject.get_element(&i.op.header_hash()).unwrap());
+                debug!(?hash, ?i, op_in_int = ?el);
+                Ok((hash, i, el))
+            })
+            .collect()
+            .unwrap()
+    })
 }

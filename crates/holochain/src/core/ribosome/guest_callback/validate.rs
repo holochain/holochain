@@ -64,6 +64,7 @@ impl Invocation for ValidateInvocation {
             None => match self.element.header() {
                 Header::ElementDelete(_) => fns.push("delete".into()),
                 Header::EntryUpdate(_) => fns.push("update".into()),
+                Header::LinkRemove(_) => fns.push("remove_link".into()),
                 _ => (),
             },
         }

@@ -258,9 +258,6 @@ async fn validate_op(
     let dna_file = { conductor_api.get_this_dna().await };
     let dna_file =
         dna_file.ok_or_else(|| AppValidationError::DnaMissing(conductor_api.cell_id().clone()))?;
-    // TODO: If not an entry then need to get the entry that can
-    // say which zome to call
-    // Get the app entry type
 
     // Get the zome names
     let mut data_source = workspace.data_source(network);
