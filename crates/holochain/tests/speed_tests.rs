@@ -15,7 +15,7 @@
 //! hard to automate piping from tests stderr.
 //!
 
-use fixt::prelude::*;
+use ::fixt::prelude::*;
 use hdk3::prelude::*;
 use holochain::conductor::{
     api::{AdminRequest, AdminResponse, AppRequest, AppResponse, RealAppInterfaceApi},

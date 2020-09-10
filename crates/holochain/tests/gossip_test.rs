@@ -1,4 +1,4 @@
-use fixt::prelude::*;
+use ::fixt::prelude::*;
 use hdk3::prelude::*;
 use holochain::conductor::{
     api::{AppInterfaceApi, AppRequest, AppResponse, RealAppInterfaceApi},
