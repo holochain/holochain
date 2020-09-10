@@ -46,13 +46,15 @@ use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::cell::CellId;
-use holochain_types::cell::CellIdFixturator;
 use holochain_types::dna::zome::HostFnAccess;
 use holochain_types::dna::DnaFile;
 use holochain_types::fixt::CapSecretFixturator;
+use holochain_types::fixt::CellIdFixturator;
 use holochain_wasm_test_utils::TestWasm;
+use holochain_zome_types::capability::CapGrant;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::GuestOutput;
+use holochain_zome_types::ZomeCallInvocationResponse;
 use holochain_zome_types::{capability::CapSecret, header::ZomeId, HostInput};
 use mockall::automock;
 use std::iter::Iterator;
@@ -216,6 +218,30 @@ pub trait Invocation: Clone {
     fn host_input(self) -> Result<HostInput, SerializedBytesError>;
 }
 
+impl ZomeCallInvocation {
+    /// to decide if a zome call is authorized:
+    /// - we need to find a live (committed and not deleted) cap grant that matches the secret
+    /// - if the live cap grant is for the current author the call is ALWAYS authorized ELSE
+    /// - the live cap grant needs to include the invocation's provenance AND zome/function name
+    #[allow(clippy::extra_unused_lifetimes)]
+    pub fn is_authorized<'a>(&self, host_access: &ZomeCallHostAccess) -> RibosomeResult<bool> {
+        let check_function = (self.zome_name.clone(), self.fn_name.clone());
+        let check_agent = self.provenance.clone();
+        let check_secret = self.cap;
+
+        tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+            let maybe_grant: Option<CapGrant> = host_access
+                .workspace
+                .read()
+                .await
+                .source_chain
+                .valid_cap_grant(&check_function, &check_agent, &check_secret)?;
+
+            Ok(maybe_grant.is_some())
+        })
+    }
+}
+
 mockall::mock! {
     Invocation {}
     trait Invocation {
@@ -301,6 +327,12 @@ impl Iterator for ZomeCallInvocationFixturator<NamedInvocation> {
         ret.zome_name = self.0.curve.1.clone().into();
         ret.fn_name = self.0.curve.2.clone();
         ret.payload = self.0.curve.3.clone();
+
+        // simulate a local transaction by setting the cap to empty and matching the provenance of
+        // the call to the cell id
+        ret.cap = ().into();
+        ret.provenance = ret.cell_id.agent_pubkey().clone();
+
         Some(ret)
     }
 }
@@ -315,13 +347,6 @@ impl Invocation for ZomeCallInvocation {
     fn host_input(self) -> Result<HostInput, SerializedBytesError> {
         Ok(self.payload)
     }
-}
-
-/// Response to a zome invocation
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
-pub enum ZomeCallInvocationResponse {
-    /// arbitrary functions exposed by zome devs to the outside world
-    ZomeApiFn(GuestOutput),
 }
 
 #[derive(Clone, Constructor)]
@@ -460,8 +485,8 @@ pub mod wasm_test {
             let input = $input.clone();
             tokio::task::spawn(async move {
                 // ensure type of test wasm
-                use crate::core::ribosome::RibosomeT;
                 use std::convert::TryInto;
+                use $crate::core::ribosome::RibosomeT;
 
                 let ribosome =
                     $crate::fixt::WasmRibosomeFixturator::new($crate::fixt::curve::Zomes(vec![
@@ -470,19 +495,25 @@ pub mod wasm_test {
                     .next()
                     .unwrap();
 
+                let author = $crate::fixt::AgentPubKeyFixturator::new(Predictable)
+                    .next()
+                    .unwrap();
+
                 // Required because otherwise the network will return routing errors
                 let (_network, _r, cell_network) = crate::test_utils::test_network(
                     Some(ribosome.dna_file().dna_hash().clone()),
-                    None,
+                    Some(author),
                 )
                 .await;
+                let cell_id = holochain_types::cell::CellId::new(
+                    cell_network.dna_hash(),
+                    cell_network.from_agent(),
+                );
                 host_access.network = cell_network;
 
                 let invocation = $crate::core::ribosome::ZomeCallInvocationFixturator::new(
                     $crate::core::ribosome::NamedInvocation(
-                        holochain_types::cell::CellIdFixturator::new(fixt::Unpredictable)
-                            .next()
-                            .unwrap(),
+                        cell_id,
                         $test_wasm.into(),
                         $fn_name.into(),
                         holochain_zome_types::HostInput::new(input.try_into().unwrap()),
@@ -503,10 +534,10 @@ pub mod wasm_test {
                     crate::core::ribosome::ZomeCallInvocationResponse::ZomeApiFn(guest_output) => {
                         guest_output.into_inner().try_into().unwrap()
                     }
+                    crate::core::ribosome::ZomeCallInvocationResponse::Unauthorized => {
+                        unreachable!()
+                    }
                 };
-                // this is convenient for now as we flesh out the zome i/o behaviour
-                // maybe in the future this will be too noisy and we might want to remove it...
-                dbg!(&output);
                 output
             })
             .await
@@ -527,50 +558,8 @@ pub mod wasm_test {
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
 
-    use crate::core::ribosome::RibosomeT;
-    use crate::core::ribosome::ZomeCallInvocationResponse;
-    use crate::fixt::WasmRibosomeFixturator;
-    use crate::fixt::ZomeCallHostAccessFixturator;
-    use holochain_serialized_bytes::prelude::*;
-    use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::*;
-    use test_wasm_common::TestString;
-
     #[tokio::test(threaded_scheduler)]
     async fn warm_wasm_tests() {
         crate::test_utils::warm_wasm_tests();
-    }
-
-    #[tokio::test(threaded_scheduler)]
-    async fn invoke_foo_test() {
-        let host_access = ZomeCallHostAccessFixturator::new(fixt::Unpredictable)
-            .next()
-            .unwrap();
-
-        let ribosome = WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::Foo]))
-            .next()
-            .unwrap();
-
-        let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(
-            crate::core::ribosome::NamedInvocation(
-                holochain_types::cell::CellIdFixturator::new(fixt::Unpredictable)
-                    .next()
-                    .unwrap(),
-                TestWasm::Foo.into(),
-                "foo".into(),
-                HostInput::new(().try_into().unwrap()),
-            ),
-        )
-        .next()
-        .unwrap();
-
-        assert_eq!(
-            ZomeCallInvocationResponse::ZomeApiFn(GuestOutput::new(
-                TestString::from(String::from("foo")).try_into().unwrap()
-            )),
-            ribosome
-                .call_zome_function(host_access, invocation)
-                .unwrap()
-        );
     }
 }

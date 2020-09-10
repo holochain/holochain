@@ -85,20 +85,28 @@ where
 }
 
 /// Draining iterator that only touches the db on commit
-pub struct DrainIter<'env, 'a, V>
+pub struct DrainIter<'env, 'a: 'env, V>
 where
     V: BufVal,
 {
     scratch: &'a mut BTreeMap<Vec<u8>, KvOp<V>>,
-    iter: SingleIterRaw<'env, V>,
+    iter: Box<
+        dyn DoubleEndedFallibleIterator<Item = IterItem<'env, V>, Error = DatabaseError> + 'env,
+    >,
 }
 
-impl<'env, 'a, V> DrainIter<'env, 'a, V>
+impl<'env, 'a: 'env, V> DrainIter<'env, 'a, V>
 where
     V: BufVal,
 {
-    pub fn new(scratch: &'a mut BTreeMap<Vec<u8>, KvOp<V>>, iter: SingleIterRaw<'env, V>) -> Self {
-        Self { scratch, iter }
+    pub fn new(
+        scratch: &'a mut BTreeMap<Vec<u8>, KvOp<V>>,
+        iter: impl DoubleEndedFallibleIterator<Item = IterItem<'env, V>, Error = DatabaseError> + 'env,
+    ) -> Self {
+        Self {
+            scratch,
+            iter: Box::new(iter),
+        }
     }
 }
 

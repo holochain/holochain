@@ -10,7 +10,6 @@ use crate::conductor::api::CellConductorApiT;
 use crate::conductor::handle::ConductorHandle;
 use crate::core::queue_consumer::{spawn_queue_consumer_tasks, InitialQueueTriggers};
 use crate::core::ribosome::ZomeCallInvocation;
-use crate::core::ribosome::ZomeCallInvocationResponse;
 
 use crate::{
     conductor::{api::CellConductorApi, cell::error::CellResult},
@@ -130,6 +129,7 @@ impl Cell {
             let queue_triggers = spawn_queue_consumer_tasks(
                 &env,
                 holochain_p2p_cell.clone(),
+                conductor_api.clone(),
                 managed_task_add_sender,
                 managed_task_stop_broadcaster,
             )
@@ -438,6 +438,12 @@ impl Cell {
         let element_vault = ElementBuf::vault(self.env.clone().into(), false)?;
         let meta_vault = MetadataBuf::vault(self.env.clone().into())?;
 
+        // Check that we have the authority to serve this request because we have
+        // done the StoreElement validation
+        if !meta_vault.has_registered_store_element(&hash)? {
+            return Ok(GetElementResponse::GetHeader(None));
+        }
+
         // Look for a delete on the header and collect it
         let deleted = meta_vault
             .get_deletes_on_header(&reader, hash.clone())?
@@ -627,11 +633,7 @@ impl Cell {
         // double ? because
         // - ConductorApiResult
         // - ZomeCallInvocationResult
-        match self.call_zome(invocation).await?? {
-            ZomeCallInvocationResponse::ZomeApiFn(guest_output) => Ok(guest_output.into_inner()),
-            //currently unreachable
-            //_ => Err(RibosomeError::ZomeFnNotExists(zome_name, "A remote zome call failed in a way that should not be possible.".into()))?,
-        }
+        Ok(self.call_zome(invocation).await??.try_into()?)
     }
 
     /// Function called by the Conductor
@@ -736,6 +738,14 @@ impl Cell {
     // TODO: reevaluate once Workflows are fully implemented (after B-01567)
     pub(crate) fn env(&self) -> &EnvironmentWrite {
         &self.env
+    }
+
+    #[cfg(test)]
+    /// Get the triggers for the cell
+    /// Useful for testing when you want to
+    /// Cause workflows to trigger
+    pub(crate) fn triggers(&self) -> &InitialQueueTriggers {
+        &self.queue_triggers
     }
 }
 
