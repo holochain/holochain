@@ -65,6 +65,12 @@ pub struct ConductorConfig {
 
     /// Setup admin interfaces to control this conductor through a websocket connection
     pub admin_interfaces: Option<Vec<AdminInterfaceConfig>>,
+
+    /// Enabling this will use a test keystore instead of lair.
+    /// This generates publicly accessible private keys.
+    /// DO NOT USE THIS IN PRODUCTION!
+    #[serde(default)]
+    pub use_dangerous_test_keystore: bool,
     //
     //
     // /// Which signals to emit
@@ -142,6 +148,7 @@ pub mod tests {
                 dpki: None,
                 passphrase_service: Some(PassphraseServiceConfig::Cmd),
                 admin_interfaces: None,
+                use_dangerous_test_keystore: false,
             }
         );
     }
@@ -150,6 +157,7 @@ pub mod tests {
     fn test_config_complete_config() {
         let toml = r#"
     environment_path = "/path/to/env"
+    use_dangerous_test_keystore = true
 
     [passphrase_service]
     type = "cmd"
@@ -190,6 +198,7 @@ pub mod tests {
                 admin_interfaces: Some(vec![AdminInterfaceConfig {
                     driver: InterfaceDriver::Websocket { port: 1234 }
                 }]),
+                use_dangerous_test_keystore: true,
             }
         );
     }
