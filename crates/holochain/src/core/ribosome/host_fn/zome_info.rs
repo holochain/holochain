@@ -28,7 +28,7 @@ pub fn zome_info(
 pub mod test {
 
     use crate::fixt::ZomeCallHostAccessFixturator;
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::ZomeInfoOutput;
 

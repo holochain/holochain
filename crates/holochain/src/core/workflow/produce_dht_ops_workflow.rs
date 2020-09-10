@@ -42,7 +42,7 @@ async fn produce_dht_ops_workflow_inner(
 
     for (index, ops) in all_ops {
         for op in ops {
-            let (op, hash) = DhtOpHashed::from_content(op).await.into_inner();
+            let (op, hash) = DhtOpHashed::from_content_sync(op).into_inner();
             debug!(?hash, ?op);
             let value = AuthoredDhtOpsValue {
                 op: op.to_light().await,
@@ -200,9 +200,10 @@ mod tests {
                 .with_commit(|writer| source_chain.flush_to_txn(writer))
                 .unwrap();
 
-            futures::future::join_all(all_ops.iter().flatten().map(|o| DhtOpHash::with_data(o)))
-                .await
-                .into_iter()
+            all_ops
+                .iter()
+                .flatten()
+                .map(|o| DhtOpHash::with_data_sync(o))
                 .collect()
         };
 

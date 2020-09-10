@@ -9,10 +9,19 @@ pub mod builder;
 pub mod conversions;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, SerializedBytes)]
-pub struct HeaderHashes(Vec<HeaderHash>);
+pub struct HeaderHashes(pub Vec<HeaderHash>);
 
 impl From<Vec<HeaderHash>> for HeaderHashes {
     fn from(vs: Vec<HeaderHash>) -> Self {
+        Self(vs)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, SerializedBytes)]
+pub struct HeaderHashedVec(pub Vec<HeaderHashed>);
+
+impl From<Vec<HeaderHashed>> for HeaderHashedVec {
+    fn from(vs: Vec<HeaderHashed>) -> Self {
         Self(vs)
     }
 }
@@ -52,6 +61,23 @@ macro_rules! write_into_header {
                 }
             }
         )*
+
+        /// A unit enum which just maps onto the different Header variants,
+        /// without containing any extra data
+        #[derive(serde::Serialize, serde::Deserialize, SerializedBytes, PartialEq, Clone, Debug)]
+        pub enum HeaderType {
+            $($n,)*
+        }
+
+        impl From<&Header> for HeaderType {
+            fn from(header: &Header) -> HeaderType {
+                match header {
+                    $(
+                        Header::$n(_) => HeaderType::$n,
+                    )*
+                }
+            }
+        }
     };
 }
 
@@ -116,6 +142,18 @@ impl Header {
             }) => Some((entry_hash, entry_type)),
             _ => None,
         }
+    }
+
+    pub fn entry_hash(&self) -> Option<&EntryHash> {
+        self.entry_data().map(|d| d.0)
+    }
+
+    pub fn entry_type(&self) -> Option<&EntryType> {
+        self.entry_data().map(|d| d.1)
+    }
+
+    pub fn header_type(&self) -> HeaderType {
+        self.into()
     }
 
     /// returns the public key of the agent who signed this header.

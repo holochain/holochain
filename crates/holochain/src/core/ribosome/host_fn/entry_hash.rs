@@ -32,7 +32,7 @@ pub mod wasm_test {
     use crate::fixt::EntryFixturator;
     use crate::fixt::WasmRibosomeFixturator;
     use crate::fixt::ZomeCallHostAccessFixturator;
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
     use holo_hash::EntryHash;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::EntryHashInput;
@@ -102,12 +102,9 @@ pub mod wasm_test {
 
         let expected_path = hdk3::hash_path::path::Path::from("foo.bar");
 
-        let expected_hash = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-            holochain_types::entry::EntryHashed::from_content(
-                Entry::app((&expected_path).try_into().unwrap()).unwrap(),
-            )
-            .await
-        })
+        let expected_hash = holochain_types::entry::EntryHashed::from_content_sync(
+            Entry::app((&expected_path).try_into().unwrap()).unwrap(),
+        )
         .into_hash();
 
         assert_eq!(expected_hash.into_inner(), output.into_inner(),);

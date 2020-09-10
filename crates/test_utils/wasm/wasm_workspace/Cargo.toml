@@ -20,6 +20,7 @@ members = [
     "migrate_agent_pass",
     "post_commit_fail",
     "post_commit_success",
+    "query",
     "random_bytes",
     "ser_regression",
     "sys_time",
