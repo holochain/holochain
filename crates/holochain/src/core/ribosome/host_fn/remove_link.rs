@@ -74,8 +74,8 @@ pub fn remove_link<'a>(
         let workspace: &mut CallZomeWorkspace = &mut guard;
         let source_chain = &mut workspace.source_chain;
         let header_builder = builder::LinkRemove {
-            link_add_address: link_add_address,
-            base_address: base_address,
+            link_add_address,
+            base_address,
         };
         let header_hash = source_chain.put(header_builder, None).await?;
         let element = source_chain

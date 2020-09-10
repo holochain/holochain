@@ -5,7 +5,7 @@ extern crate strum_macros;
 use holochain_types::dna::zome::Zome;
 use holochain_zome_types::zome::ZomeName;
 
-const WASM_WORKSPACE_TARGET: &'static str = "wasm_workspace/target";
+const WASM_WORKSPACE_TARGET: &str = "wasm_workspace/target";
 
 #[derive(EnumIter, Clone, Copy)]
 pub enum TestWasm {

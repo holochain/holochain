@@ -267,12 +267,9 @@ impl Path {
     pub fn ensure(&self) -> Result<(), HdkError> {
         if !self.exists()? {
             commit_entry!(self)?;
-            match self.parent() {
-                Some(parent) => {
-                    parent.ensure()?;
-                    link_entries!(parent.hash()?, self.hash()?, LinkTag::try_from(self)?)?;
-                }
-                _ => {}
+            if let Some(parent) = self.parent() {
+                parent.ensure()?;
+                link_entries!(parent.hash()?, self.hash()?, LinkTag::try_from(self)?)?;
             }
         }
         Ok(())

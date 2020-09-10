@@ -177,7 +177,7 @@ pub mod wasm_test {
                 cell_id: alice_cell_id.clone(),
                 zome_name: TestWasm::Capability.into(),
                 cap: ().into(),
-                fn_name: "try_cap_claim".to_string(),
+                fn_name: "try_cap_claim".into(),
                 payload: HostInput::new(
                     CapFor(some_secret, bob_agent_id.clone().try_into().unwrap())
                         .try_into()
@@ -208,7 +208,7 @@ pub mod wasm_test {
                 cell_id: bob_cell_id,
                 zome_name: TestWasm::Capability.into(),
                 cap: ().into(),
-                fn_name: "transferable_cap_grant".to_string(),
+                fn_name: "transferable_cap_grant".into(),
                 payload: HostInput::new(some_secret.try_into().unwrap()),
                 provenance: bob_agent_id.clone(),
             })
@@ -223,7 +223,7 @@ pub mod wasm_test {
                 cell_id: alice_cell_id,
                 zome_name: TestWasm::Capability.into(),
                 cap: ().into(),
-                fn_name: "try_cap_claim".to_string(),
+                fn_name: "try_cap_claim".into(),
                 payload: HostInput::new(
                     CapFor(some_secret, bob_agent_id.clone().try_into().unwrap())
                         .try_into()

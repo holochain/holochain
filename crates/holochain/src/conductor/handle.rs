@@ -172,6 +172,7 @@ pub trait ConductorHandleT: Send + Sync {
     async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String>;
 
     /// Get info about an installed App, whether active or inactive
+    #[allow(clippy::ptr_arg)]
     async fn get_app_info(&self, app_id: &AppId) -> ConductorResult<Option<InstalledApp>>;
 
     // HACK: remove when B-01593 lands

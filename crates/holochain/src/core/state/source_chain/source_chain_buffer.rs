@@ -63,6 +63,11 @@ impl SourceChainBuf {
         self.sequence.chain_head()
     }
 
+    /// true if len is 0
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     pub fn len(&self) -> usize {
         self.sequence.len()
     }
@@ -308,7 +313,7 @@ impl<'a> FallibleIterator for SourceChainBackwardIterator<'a> {
                 )??;
                 self.current = match &header {
                     None => None,
-                    Some(header) => header.header().prev_header().map(|h| h.clone()),
+                    Some(header) => header.header().prev_header().cloned(),
                 };
                 Ok(header)
             }

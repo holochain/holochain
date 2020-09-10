@@ -6,6 +6,7 @@ use crate::types::AgentPubKeyExt;
 
 use ghost_actor::dependencies::{tracing, tracing_futures::Instrument};
 use holochain_types::{element::GetElementResponse, Timestamp};
+use holochain_zome_types::zome::FunctionName;
 use kitsune_p2p::actor::KitsuneP2pSender;
 
 pub(crate) struct HolochainP2pActor {
@@ -39,7 +40,7 @@ impl HolochainP2pActor {
         to_agent: AgentPubKey,
         from_agent: AgentPubKey,
         zome_name: ZomeName,
-        fn_name: String,
+        fn_name: FunctionName,
         cap: CapSecret,
         data: Vec<u8>,
     ) -> kitsune_p2p::actor::KitsuneP2pHandlerResult<Vec<u8>> {
@@ -210,7 +211,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
             // holochain_p2p never publishes via request
             // these only occur on broadcasts
             crate::wire::WireMessage::Publish { .. } => {
-                return Err(HolochainP2pError::invalid_p2p_message(
+                Err(HolochainP2pError::invalid_p2p_message(
                     "invalid: publish is a broadcast type, not a request".to_string(),
                 )
                 .into())
@@ -241,7 +242,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
             | crate::wire::WireMessage::GetMeta { .. }
             | crate::wire::WireMessage::GetLinks { .. }
             | crate::wire::WireMessage::ValidationReceipt { .. } => {
-                return Err(HolochainP2pError::invalid_p2p_message(
+                Err(HolochainP2pError::invalid_p2p_message(
                     "invalid call type message in a notify".to_string(),
                 )
                 .into())
@@ -402,7 +403,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         from_agent: AgentPubKey,
         to_agent: AgentPubKey,
         zome_name: ZomeName,
-        fn_name: String,
+        fn_name: FunctionName,
         cap: CapSecret,
         request: SerializedBytes,
     ) -> HolochainP2pHandlerResult<SerializedBytes> {

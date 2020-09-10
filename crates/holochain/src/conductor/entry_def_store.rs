@@ -127,7 +127,7 @@ impl BufferedStore for EntryDefBuf {
 pub(crate) fn get_entry_defs(
     dna: DnaFile,
 ) -> EntryDefStoreResult<Vec<(EntryDefBufferKey, EntryDef)>> {
-    let invocation = EntryDefsInvocation::new();
+    let invocation = EntryDefsInvocation;
 
     // Get the zomes hashes
     let zomes = dna
@@ -171,7 +171,7 @@ pub(crate) fn get_entry_defs(
                 .collect()
         }
         EntryDefsResult::Err(zome_name, msg) => {
-            return Err(EntryDefStoreError::CallbackFailed(zome_name, msg))
+            Err(EntryDefStoreError::CallbackFailed(zome_name, msg))
         }
     }
 }
