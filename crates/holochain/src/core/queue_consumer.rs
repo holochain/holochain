@@ -83,6 +83,7 @@ pub async fn spawn_queue_consumer_tasks(
         stop.subscribe(),
         tx_integration.clone(),
         conductor_api.clone(),
+        cell_network.clone(),
     );
     task_sender
         .send(ManagedTaskAdd::dont_handle(handle))

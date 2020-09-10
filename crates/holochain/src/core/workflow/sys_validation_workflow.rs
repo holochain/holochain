@@ -14,6 +14,7 @@ use crate::{
             workspace::{Workspace, WorkspaceResult},
         },
         sys_validate::*,
+        validation::*,
     },
 };
 use error::WorkflowResult;
@@ -43,7 +44,7 @@ use integrate_dht_ops_workflow::{
     integrate_single_metadata, reintegrate_single_data,
 };
 use produce_dht_ops_workflow::dht_op_light::light_to_op;
-use types::{CheckLevel, DhtOpOrder, OrderedOp, Outcome, PendingDependencies};
+use types::{DhtOpOrder, OrderedOp, Outcome};
 
 pub mod types;
 
@@ -96,7 +97,6 @@ async fn sys_validation_workflow_inner(
     // Sort the ops
     let mut sorted_ops = BinaryHeap::new();
     for vlv in ops {
-        // let op = light_to_op(vlv.op.clone(), &workspace.element_pending).await?;
         let op = light_to_op(vlv.op.clone(), &workspace.element_pending).await?;
 
         let hash = DhtOpHash::with_data(&op).await;
@@ -368,7 +368,7 @@ async fn register_agent_activity(
             check_level,
         )
         .await?;
-        dependencies.register_agent_activity(dependency).await?;
+        dependencies.register_agent_activity(dependency);
     }
     check_chain_rollback(&header, &workspace.meta_vault, &workspace.element_vault).await?;
     Ok(())
@@ -387,7 +387,7 @@ async fn store_element(
     check_prev_header(header)?;
     if let Some(prev_header_hash) = prev_header_hash {
         let dependency = check_header_exists(prev_header_hash.clone(), workspace, network).await?;
-        let prev_header = dependencies.store_element(dependency).await?;
+        let prev_header = dependencies.store_element(dependency);
         check_prev_timestamp(&header, prev_header.header())?;
         check_prev_seq(&header, prev_header.header())?;
     }
@@ -423,7 +423,7 @@ async fn store_entry(
             network,
         )
         .await?;
-        let original_header = dependencies.store_element(dependency).await?;
+        let original_header = dependencies.store_element(dependency);
         update_check(entry_update, original_header.header())?;
     }
     Ok(())
@@ -448,7 +448,9 @@ async fn register_updated_by(
         check_level,
     )
     .await?;
-    let original_element = dependencies.store_entry_fixed(dependency).await?;
+    let original_element = dependencies
+        .store_entry_fixed(dependency)
+        .ok_or_else(|| ValidationOutcome::not_holding(original_header_address))?;
     update_check(entry_update, original_element.header())?;
     Ok(())
 }
@@ -466,7 +468,9 @@ async fn register_deleted_by(
     // Checks
     let dependency =
         check_holding_element_all(removed_header_address, workspace, network, check_level).await?;
-    let removed_header = dependencies.store_entry_fixed(dependency).await?;
+    let removed_header = dependencies
+        .store_entry_fixed(dependency)
+        .ok_or_else(|| ValidationOutcome::not_holding(removed_header_address))?;
     check_new_entry_header(removed_header.header())?;
     Ok(())
 }
@@ -484,7 +488,7 @@ async fn register_deleted_entry_header(
     // Checks
     let dependency =
         check_holding_header_all(removed_header_address, workspace, network, check_level).await?;
-    let removed_header = dependencies.store_element(dependency).await?;
+    let removed_header = dependencies.store_element(dependency);
     check_new_entry_header(removed_header.header())?;
     Ok(())
 }
@@ -504,9 +508,13 @@ async fn register_add_link(
     let dependency =
         check_holding_entry_all(base_entry_address, workspace, network.clone(), check_level)
             .await?;
-    dependencies.store_entry_any(dependency).await?;
+    dependencies
+        .store_entry_any(dependency)
+        .ok_or_else(|| ValidationOutcome::not_holding(base_entry_address))?;
     let dependency = check_entry_exists(target_entry_address.clone(), workspace, network).await?;
-    dependencies.store_entry_any(dependency).await?;
+    dependencies
+        .store_entry_any(dependency)
+        .ok_or_else(|| ValidationOutcome::not_found(target_entry_address))?;
     check_tag_size(&link_add.tag)?;
     Ok(())
 }
@@ -524,7 +532,9 @@ async fn register_remove_link(
     // Checks
     let dependency =
         check_holding_link_add_all(link_add_address, workspace, network, check_level).await?;
-    dependencies.add_link(dependency).await?;
+    dependencies
+        .add_link(dependency)
+        .ok_or_else(|| ValidationOutcome::not_holding(link_add_address))?;
     Ok(())
 }
 

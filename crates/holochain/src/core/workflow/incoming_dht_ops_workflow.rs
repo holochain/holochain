@@ -4,7 +4,6 @@ use super::{
     error::WorkflowResult,
     integrate_dht_ops_workflow::{integrate_single_data, integrate_single_metadata},
     produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertResult,
-    sys_validation_workflow::types::PendingDependencies,
 };
 use crate::core::{
     queue_consumer::TriggerSender,
@@ -15,6 +14,7 @@ use crate::core::{
         validation_db::{ValidationLimboStatus, ValidationLimboStore, ValidationLimboValue},
         workspace::{Workspace, WorkspaceResult},
     },
+    validation::PendingDependencies,
 };
 use holo_hash::DhtOpHash;
 use holochain_state::{

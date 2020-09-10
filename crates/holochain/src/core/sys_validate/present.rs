@@ -1,7 +1,7 @@
 //! Functions for checking the presence of data
 //! either being held locally or existing on the DHT
 use super::*;
-use crate::core::workflow::sys_validation_workflow::types::{CheckLevel, Dependency};
+use crate::core::validation::{CheckLevel, Dependency};
 use holochain_p2p::HolochainP2pCell;
 
 macro_rules! check_holding {

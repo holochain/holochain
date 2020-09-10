@@ -1,6 +1,6 @@
 //! # Validation Database Types
 
-use crate::core::workflow::sys_validation_workflow::types::PendingDependencies;
+use crate::core::validation::PendingDependencies;
 use holo_hash::{AnyDhtHash, DhtOpHash};
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::{

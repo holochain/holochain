@@ -1,4 +1,4 @@
-use holo_hash::EntryHash;
+use holo_hash::{EntryHash, HeaderHash};
 use holochain_state::{
     error::DatabaseResult,
     fresh_reader,
@@ -13,7 +13,7 @@ pub use error::*;
 
 use super::{
     state::element_buf::ElementBuf, state::metadata::MetadataBuf, state::metadata::MetadataBufT,
-    workflow::sys_validation_workflow::types::Dependency,
+    validation::Dependency,
 };
 
 mod error;
@@ -48,7 +48,20 @@ pub async fn retrieve_entry(
     use Dependency::*;
     found!(retrieve_entry_from(hash, data_source.judged())?.map(Proof));
     found!(retrieve_entry_from(hash, data_source.pending())?.map(PendingValidation));
-    // check_holding_entry!(workspace, check_holding_entry, &entry_hash);
+    let mut cascade = data_source.cascade();
+    let el = cascade
+        .retrieve(hash.clone().into(), Default::default())
+        .await?;
+    Ok(el.map(Claim))
+}
+
+pub async fn retrieve_element(
+    hash: &HeaderHash,
+    data_source: &mut impl DataSource,
+) -> PresentResult<Option<Dependency<Element>>> {
+    use Dependency::*;
+    found!(retrieve_element_from(hash, data_source.judged())?.map(Proof));
+    found!(retrieve_element_from(hash, data_source.pending())?.map(PendingValidation));
     let mut cascade = data_source.cascade();
     let el = cascade
         .retrieve(hash.clone().into(), Default::default())
@@ -71,6 +84,30 @@ where
     })?;
     match eh {
         Some(entry_header) => Ok(dbs.element.get_element(&entry_header)?),
+        None => Ok(None),
+    }
+}
+
+fn retrieve_element_from<P, M>(
+    hash: &HeaderHash,
+    dbs: DbPair<P, M>,
+) -> PresentResult<Option<Element>>
+where
+    P: PrefixType,
+    M: MetadataBufT<P>,
+{
+    match dbs.element.get_element(&hash)? {
+        Some(el) => {
+            let mut has_op = dbs.meta.has_registered_store_element(hash)?;
+            if let Some(eh) = el.header().entry_data().map(|(eh, _)| eh) {
+                has_op = has_op || dbs.meta.has_registered_store_entry(eh, hash)?;
+            }
+            if has_op {
+                Ok(Some(el))
+            } else {
+                Ok(None)
+            }
+        }
         None => Ok(None),
     }
 }

@@ -1,6 +1,6 @@
 //! The workflow and queue consumer for sys validation
 
-use std::sync::Arc;
+use std::{convert::TryInto, sync::Arc};
 
 use super::{
     error::WorkflowResult,
@@ -10,10 +10,10 @@ use super::{
         integrate_single_metadata,
     },
     produce_dht_ops_workflow::dht_op_light::light_to_op,
-    sys_validation_workflow::types::DepType,
 };
 use crate::{
     conductor::api::CellConductorApiT,
+    core::present::retrieve_element,
     core::present::retrieve_entry,
     core::present::DataSource,
     core::present::DbPair,
@@ -37,6 +37,8 @@ use crate::{
             validation_db::{ValidationLimboStatus, ValidationLimboStore, ValidationLimboValue},
             workspace::{Workspace, WorkspaceResult},
         },
+        validation::DepType,
+        validation::PendingDependencies,
     },
 };
 use either::Either;
@@ -62,7 +64,6 @@ use holochain_zome_types::{
 };
 use tracing::*;
 use types::*;
-use Either::*;
 
 #[cfg(test)]
 mod tests;
@@ -78,7 +79,7 @@ pub async fn app_validation_workflow(
     conductor_api: impl CellConductorApiT,
     network: HolochainP2pCell,
 ) -> WorkflowResult<WorkComplete> {
-    let complete = app_validation_workflow_inner(&mut workspace, conductor_api).await?;
+    let complete = app_validation_workflow_inner(&mut workspace, conductor_api, &network).await?;
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // commit the workspace
@@ -119,7 +120,18 @@ async fn app_validation_workflow_inner(
         match &vlv.status {
             ValidationLimboStatus::AwaitingAppDeps(_) | ValidationLimboStatus::SysValidated => {
                 let op = light_to_op(vlv.op.clone(), &workspace.element_pending).await?;
-                let outcome = validate_op(op.clone(), &conductor_api, workspace, &network).await?;
+
+                // Validation
+                let outcome = validate_op(
+                    op.clone(),
+                    &conductor_api,
+                    workspace,
+                    &network,
+                    &mut vlv.pending_dependencies,
+                )
+                .await
+                .or_else(|outcome_or_err| outcome_or_err.try_into())?;
+
                 match outcome {
                     Outcome::Accepted => {
                         if vlv.pending_dependencies.pending_dependencies() {
@@ -228,45 +240,13 @@ async fn app_validation_workflow_inner(
     Ok(WorkComplete::Complete)
 }
 
-fn get_element(op: DhtOp) -> Either<Element, Outcome> {
-    use Either::*;
-    match op {
-        DhtOp::RegisterDeletedBy(_, _) | DhtOp::RegisterAgentActivity(_, _) => {
-            Right(Outcome::Accepted)
-        }
-        DhtOp::StoreElement(_, h, _) => match h {
-            Header::ElementDelete(_) => todo!("Get the original entry"),
-            _ => Right(Outcome::Accepted),
-        },
-        DhtOp::StoreEntry(s, h, e) => Left(Element::new(
-            SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(h.into()), s),
-            Some(*e),
-        )),
-        DhtOp::RegisterUpdatedBy(s, h) => Left(Element::new(
-            SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(h.into()), s),
-            None,
-        )),
-        DhtOp::RegisterDeletedEntryHeader(s, h) => Left(Element::new(
-            SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(h.into()), s),
-            None,
-        )),
-        DhtOp::RegisterAddLink(s, h) => Left(Element::new(
-            SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(h.into()), s),
-            None,
-        )),
-        DhtOp::RegisterRemoveLink(s, h) => Left(Element::new(
-            SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(h.into()), s),
-            None,
-        )),
-    }
-}
-
 async fn validate_op(
     op: DhtOp,
     conductor_api: &impl CellConductorApiT,
     workspace: &mut AppValidationWorkspace,
     network: &HolochainP2pCell,
-) -> AppValidationResult<Outcome> {
+    dependencies: &mut PendingDependencies,
+) -> AppValidationOutcome<Outcome> {
     use Either::*;
     // Create the element
     // TODO: remove clone of op
@@ -284,26 +264,44 @@ async fn validate_op(
 
     // Get the zome names
     let mut data_source = workspace.data_source(network);
-    let zome_names = get_zome_names(&element, &dna_file, &mut data_source).await?;
-    let zome_names = match zome_names {
-        Left(zn) => zn,
-        Right(o) => return Ok(o),
-    };
+    let zome_names = get_zome_names(&element, &dna_file, &mut data_source, dependencies).await?;
     // Create the ribosome
     let ribosome = WasmRibosome::new(dna_file);
 
     let outcome = match element.header() {
         Header::LinkAdd(link_add) => {
-            let zome_name = todo!();
-            let base = todo!();
-            let target = todo!();
-            run_link_validation_callback(
-                zome_name,
-                Arc::new(link_add.clone()),
-                Arc::new(base),
-                Arc::new(target),
-                &ribosome,
-            )?
+            let base = retrieve_entry(&link_add.base_address, &mut data_source)
+                .await?
+                .and_then(|dep| dependencies.store_entry_any(dep))
+                .and_then(|e| e.into_inner().1)
+                .ok_or_else(|| Outcome::awaiting(&link_add.base_address))?;
+            let target = retrieve_entry(&link_add.target_address, &mut data_source)
+                .await?
+                .and_then(|dep| dependencies.store_entry_any(dep))
+                .and_then(|e| e.into_inner().1)
+                .ok_or_else(|| Outcome::awaiting(&link_add.target_address))?;
+
+            let link_add = Arc::new(link_add.clone());
+            let base = Arc::new(base);
+            let target = Arc::new(target);
+            zome_names
+                .into_iter()
+                .map(|zome_name| {
+                    run_link_validation_callback(
+                        zome_name,
+                        link_add.clone(),
+                        base.clone(),
+                        target.clone(),
+                        &ribosome,
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()?
+                .into_iter()
+                .find(|o| match o {
+                    Outcome::AwaitingDeps(_) | Outcome::Rejected(_) => true,
+                    Outcome::Accepted => false,
+                })
+                .unwrap_or(Outcome::Accepted)
         }
         _ => {
             // Entry
@@ -337,57 +335,115 @@ async fn validate_op(
     Ok(outcome)
 }
 
+fn get_element(op: DhtOp) -> Either<Element, Outcome> {
+    use Either::*;
+    match op {
+        DhtOp::RegisterDeletedBy(_, _) | DhtOp::RegisterAgentActivity(_, _) => {
+            Right(Outcome::Accepted)
+        }
+        DhtOp::StoreElement(_, h, _) => match h {
+            Header::ElementDelete(_) => todo!("Get the original entry"),
+            _ => Right(Outcome::Accepted),
+        },
+        DhtOp::StoreEntry(s, h, e) => Left(Element::new(
+            SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(h.into()), s),
+            Some(*e),
+        )),
+        DhtOp::RegisterUpdatedBy(s, h) => Left(Element::new(
+            SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(h.into()), s),
+            None,
+        )),
+        DhtOp::RegisterDeletedEntryHeader(s, h) => Left(Element::new(
+            SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(h.into()), s),
+            None,
+        )),
+        DhtOp::RegisterAddLink(s, h) => Left(Element::new(
+            SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(h.into()), s),
+            None,
+        )),
+        DhtOp::RegisterRemoveLink(s, h) => Left(Element::new(
+            SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(h.into()), s),
+            None,
+        )),
+    }
+}
+
 async fn get_app_entry_type(
     element: &Element,
     data_source: &mut AppValDataSource<'_>,
-) -> AppValidationResult<Either<Option<AppEntryType>, Outcome>> {
+    dependencies: &mut PendingDependencies,
+) -> AppValidationOutcome<Option<AppEntryType>> {
     match element.header().entry_data() {
         Some((_, et)) => match et.clone() {
-            EntryType::App(aet) => Ok(Left(Some(aet))),
-            EntryType::AgentPubKey | EntryType::CapClaim | EntryType::CapGrant => Ok(Left(None)),
+            EntryType::App(aet) => Ok(Some(aet)),
+            EntryType::AgentPubKey | EntryType::CapClaim | EntryType::CapGrant => Ok(None),
         },
-        None => get_app_entry_type_from_dep(element, data_source).await,
+        None => get_app_entry_type_from_dep(element, data_source, dependencies).await,
     }
 }
 
 async fn get_app_entry_type_from_dep(
     element: &Element,
     data_source: &mut AppValDataSource<'_>,
-) -> AppValidationResult<Either<Option<AppEntryType>, Outcome>> {
+    dependencies: &mut PendingDependencies,
+) -> AppValidationOutcome<Option<AppEntryType>> {
     match element.header() {
-        Header::LinkAdd(la) => match retrieve_entry(&la.base_address, data_source).await? {
-            Some(dep) => todo!(),
-            None => {
-                return Ok(Right(Outcome::AwaitingDeps(vec![la
-                    .base_address
-                    .clone()
-                    .into()])))
-            }
-        },
-        Header::LinkRemove(_) => {}
-        Header::EntryUpdate(_) => {}
-        Header::ElementDelete(_) => {}
-        _ => (),
+        Header::LinkAdd(la) => {
+            let el = retrieve_entry(&la.base_address, data_source)
+                .await?
+                .and_then(|dep| dependencies.store_entry_any(dep))
+                .ok_or_else(|| Outcome::awaiting(&la.base_address))?;
+            Ok(extract_app_type(&el))
+        }
+        Header::LinkRemove(lr) => {
+            let el = retrieve_entry(&lr.base_address, data_source)
+                .await?
+                .and_then(|dep| dependencies.store_entry_any(dep))
+                .ok_or_else(|| Outcome::awaiting(&lr.base_address))?;
+            Ok(extract_app_type(&el))
+        }
+        Header::EntryUpdate(eu) => {
+            let el = retrieve_element(&eu.original_header_address, data_source)
+                .await?
+                .and_then(|dep| dependencies.store_entry_fixed(dep))
+                .ok_or_else(|| Outcome::awaiting(&eu.original_header_address))?;
+            Ok(extract_app_type(&el))
+        }
+        Header::ElementDelete(ed) => {
+            let el = retrieve_element(&ed.removes_address, data_source)
+                .await?
+                .and_then(|dep| dependencies.store_entry_fixed(dep))
+                .ok_or_else(|| Outcome::awaiting(&ed.removes_address))?;
+            Ok(extract_app_type(&el))
+        }
+        _ => todo!(),
     }
-    todo!()
+}
+
+fn extract_app_type(element: &Element) -> Option<AppEntryType> {
+    element
+        .header()
+        .entry_data()
+        .and_then(|(_, entry_type)| match entry_type {
+            EntryType::App(aet) => Some(aet.clone()),
+            _ => None,
+        })
 }
 
 async fn get_zome_names(
     element: &Element,
     dna_file: &DnaFile,
     data_source: &mut AppValDataSource<'_>,
-) -> AppValidationResult<Either<Vec<ZomeName>, Outcome>> {
-    match get_app_entry_type(element, data_source).await? {
-        Left(Some(aet)) => Ok(Left(vec![get_zome_name(&aet, &dna_file)?])),
-        Left(None) => Ok(Left(
-            dna_file
-                .dna()
-                .zomes
-                .iter()
-                .map(|(z, _)| z.clone())
-                .collect(),
-        )),
-        Right(o) => Ok(Right(o)),
+    dependencies: &mut PendingDependencies,
+) -> AppValidationOutcome<Vec<ZomeName>> {
+    match get_app_entry_type(element, data_source, dependencies).await? {
+        Some(aet) => Ok(vec![get_zome_name(&aet, &dna_file)?]),
+        None => Ok(dna_file
+            .dna()
+            .zomes
+            .iter()
+            .map(|(z, _)| z.clone())
+            .collect()),
     }
 }
 
