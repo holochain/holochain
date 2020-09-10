@@ -29,6 +29,7 @@ pub enum TestWasm {
     MigrateAgentPass,
     PostCommitFail,
     PostCommitSuccess,
+    Query,
     RandomBytes,
     SerRegression,
     SysTime,
@@ -67,6 +68,7 @@ impl From<TestWasm> for ZomeName {
             TestWasm::MigrateAgentPass => "migrate_agent_pass",
             TestWasm::PostCommitFail => "post_commit_fail",
             TestWasm::PostCommitSuccess => "post_commit_success",
+            TestWasm::Query => "query",
             TestWasm::RandomBytes => "random_bytes",
             TestWasm::SerRegression => "ser_regression",
             TestWasm::SysTime => "sys_time",
@@ -131,6 +133,7 @@ impl From<TestWasm> for DnaWasm {
             TestWasm::PostCommitSuccess => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_post_commit_success.wasm")
             }
+            TestWasm::Query => get_code("wasm32-unknown-unknown/release/test_wasm_query.wasm"),
             TestWasm::RandomBytes => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_random_bytes.wasm")
             }

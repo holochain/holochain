@@ -305,12 +305,7 @@ impl<'a> FallibleIterator for SourceChainBackwardIterator<'a> {
             None => Ok(None),
             Some(top) => {
                 let top = top.to_owned();
-                // TODO - Using a block_on here due to FallibleIterator.
-                //        We should switch `iter_back()` to produce an async Stream.
-                let header: Option<SignedHeaderHashed> = tokio_safe_block_on::tokio_safe_block_on(
-                    async { self.store.get_header(&top) },
-                    std::time::Duration::from_secs(10),
-                )??;
+                let header: Option<SignedHeaderHashed> = self.store.get_header(&top)?;
                 self.current = match &header {
                     None => None,
                     Some(header) => header.header().prev_header().cloned(),

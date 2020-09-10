@@ -175,11 +175,9 @@ pub trait ConductorHandleT: Send + Sync {
     #[allow(clippy::ptr_arg)]
     async fn get_app_info(&self, app_id: &AppId) -> ConductorResult<Option<InstalledApp>>;
 
-    // HACK: remove when B-01593 lands
     #[cfg(test)]
     async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite>;
 
-    // HACK: remove when B-01593 lands
     #[cfg(test)]
     async fn get_cell_triggers(&self, cell_id: &CellId)
         -> ConductorApiResult<InitialQueueTriggers>;
@@ -623,13 +621,11 @@ pub mod mock {
             self.sync_get_app_info(app_id)
         }
 
-        // HACK: remove when B-01593 lands
         #[cfg(test)]
         async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite> {
             self.sync_get_cell_env(cell_id)
         }
 
-        // HACK: remove when B-01593 lands
         #[cfg(test)]
         async fn get_cell_triggers(
             &self,

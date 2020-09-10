@@ -336,7 +336,7 @@ fn hash_path_linktag() {
 fn hash_path_component() {
     use ::fixt::prelude::*;
 
-    let bytes: Vec<u8> = U8Fixturator::new(fixt::Unpredictable).take(5).collect();
+    let bytes: Vec<u8> = U8Fixturator::new(Unpredictable).take(5).collect();
 
     let component = Component::from(bytes.clone());
 
@@ -377,7 +377,7 @@ fn hash_path_path() {
     let components: Vec<Component> = {
         let mut vec = vec![];
         for _ in 0..10 {
-            let bytes: Vec<u8> = U8Fixturator::new(fixt::Unpredictable).take(10).collect();
+            let bytes: Vec<u8> = U8Fixturator::new(Unpredictable).take(10).collect();
             vec.push(Component::from(bytes))
         }
         vec

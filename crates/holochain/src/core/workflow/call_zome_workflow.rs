@@ -276,7 +276,7 @@ pub mod tests {
         workflow::{error::WorkflowError, genesis_workflow::tests::fake_genesis},
     };
     use crate::fixt::KeystoreSenderFixturator;
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
     use holochain_p2p::HolochainP2pCellFixturator;
     use holochain_serialized_bytes::prelude::*;
     use holochain_state::{env::ReadManager, test_utils::test_cell_env};

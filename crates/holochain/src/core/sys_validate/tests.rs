@@ -29,7 +29,7 @@ async fn test_gen(ts: Timestamp, seq: u32, prev: HeaderHash) -> Element {
         prev_header: prev,
     };
 
-    let hashed = HeaderHashed::from_content(header.into()).await;
+    let hashed = HeaderHashed::from_content_sync(header.into());
     let signed = SignedHeaderHashed::new(&keystore, hashed).await.unwrap();
     Element::new(signed, None)
 }
@@ -311,7 +311,7 @@ async fn check_entry_type_test() {
 async fn check_entry_hash_test() {
     let mut ec = fixt!(EntryCreate);
     let entry = fixt!(Entry);
-    let hash = EntryHash::with_data(&entry).await;
+    let hash = EntryHash::with_data_sync(&entry);
     let header: Header = ec.clone().into();
 
     // First check it should have an entry

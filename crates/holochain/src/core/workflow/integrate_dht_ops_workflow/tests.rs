@@ -70,20 +70,17 @@ impl TestData {
         let original_entry = EntryFixturator::new(AppEntry).next().unwrap();
         // New entry
         let new_entry = EntryFixturator::new(AppEntry).next().unwrap();
-        Self::new_inner(original_entry, new_entry).await
+        Self::new_inner(original_entry, new_entry)
     }
 
     #[instrument()]
-    async fn new_inner(original_entry: Entry, new_entry: Entry) -> Self {
+    fn new_inner(original_entry: Entry, new_entry: Entry) -> Self {
         // original entry
-        let original_entry_hash = EntryHashed::from_content(original_entry.clone())
-            .await
-            .into_hash();
+        let original_entry_hash =
+            EntryHashed::from_content_sync(original_entry.clone()).into_hash();
 
         // New entry
-        let new_entry_hash = EntryHashed::from_content(new_entry.clone())
-            .await
-            .into_hash();
+        let new_entry_hash = EntryHashed::from_content_sync(new_entry.clone()).into_hash();
 
         // Original entry and header for updates
         let mut original_header = fixt!(NewEntryHeader, PublicCurve);
@@ -167,7 +164,7 @@ impl TestData {
     async fn with_app_entry_type() -> Self {
         let original_entry = EntryFixturator::new(AppEntry).next().unwrap();
         let new_entry = EntryFixturator::new(AppEntry).next().unwrap();
-        Self::new_inner(original_entry, new_entry).await
+        Self::new_inner(original_entry, new_entry)
     }
 }
 
@@ -200,7 +197,7 @@ impl Db {
         for expect in expects {
             match expect {
                 Db::Integrated(op) => {
-                    let op_hash = DhtOpHashed::from_content(op.clone()).await.into_hash();
+                    let op_hash = DhtOpHashed::from_content_sync(op.clone()).into_hash();
                     let value = IntegratedDhtOpsValue {
                         validation_status: ValidationStatus::Valid,
                         op: op.to_light().await,
@@ -468,7 +465,7 @@ impl Db {
             match state {
                 Db::Integrated(_) => {}
                 Db::IntQueue(op) => {
-                    let op_hash = DhtOpHashed::from_content(op.clone()).await.into_hash();
+                    let op_hash = DhtOpHashed::from_content_sync(op.clone()).into_hash();
                     let val = IntegrationLimboValue {
                         validation_status: ValidationStatus::Valid,
                         op: op.to_light().await,
@@ -921,9 +918,7 @@ async fn commit_entry<'env>(
             .unwrap();
     }
 
-    let entry_hash = holochain_types::entry::EntryHashed::from_content(entry)
-        .await
-        .into_hash();
+    let entry_hash = holochain_types::entry::EntryHashed::from_content_sync(entry).into_hash();
 
     (entry_hash, output.into_inner().try_into().unwrap())
 }
@@ -1368,13 +1363,9 @@ mod slow_tests {
         let mut entry_fixt = AppEntryBytesFixturator::new(Predictable).map(|b| Entry::App(b));
 
         let base_entry = entry_fixt.next().unwrap();
-        let base_entry_hash = EntryHashed::from_content(base_entry.clone())
-            .await
-            .into_hash();
+        let base_entry_hash = EntryHashed::from_content_sync(base_entry.clone()).into_hash();
         let target_entry = entry_fixt.next().unwrap();
-        let target_entry_hash = EntryHashed::from_content(target_entry.clone())
-            .await
-            .into_hash();
+        let target_entry_hash = EntryHashed::from_content_sync(target_entry.clone()).into_hash();
         // Put commit entry into source chain
         {
             let cell_env = conductor.get_cell_env(&cell_id).await.unwrap();

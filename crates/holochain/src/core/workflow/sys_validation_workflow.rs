@@ -99,7 +99,7 @@ async fn sys_validation_workflow_inner(
         // let op = light_to_op(vlv.op.clone(), &workspace.element_pending).await?;
         let op = light_to_op(vlv.op.clone(), &workspace.element_pending).await?;
 
-        let hash = DhtOpHash::with_data(&op).await;
+        let hash = DhtOpHash::with_data_sync(&op);
         let order = DhtOpOrder::from(&op);
         let v = OrderedOp {
             order,
@@ -109,6 +109,10 @@ async fn sys_validation_workflow_inner(
         };
         // We want a min-heap
         sorted_ops.push(std::cmp::Reverse(v));
+
+        // Since we are processing DhtOps in a loop, make sure we yield
+        // between each one, since hashing could take a while
+        tokio::task::yield_now().await;
     }
 
     // Process each op

@@ -207,7 +207,7 @@ impl PendingDependencies {
                     .clone()
                     .try_into()
                     .map_err(|_| ValidationOutcome::NotNewEntry(el.header().clone()))?;
-                let hash = DhtOpHash::with_data(&UniqueForm::StoreEntry(&header)).await;
+                let hash = DhtOpHash::with_data_sync(&UniqueForm::StoreEntry(&header));
                 if any {
                     self.pending.push(DepType::AnyElement(hash));
                 } else {
@@ -229,7 +229,7 @@ impl PendingDependencies {
             Dependency::Claim(shh) | Dependency::Proof(shh) => shh,
             Dependency::PendingValidation(shh) => {
                 let header = shh.header();
-                let hash = DhtOpHash::with_data(&UniqueForm::StoreElement(header)).await;
+                let hash = DhtOpHash::with_data_sync(&UniqueForm::StoreElement(header));
                 self.pending.push(hash.into());
                 shh
             }
@@ -251,7 +251,7 @@ impl PendingDependencies {
                     .clone()
                     .try_into()
                     .map_err(|_| ValidationOutcome::NotLinkAdd(shh.header_address().clone()))?;
-                let hash = DhtOpHash::with_data(&UniqueForm::RegisterAddLink(&header)).await;
+                let hash = DhtOpHash::with_data_sync(&UniqueForm::RegisterAddLink(&header));
                 self.pending.push(hash.into());
                 shh
             }
@@ -269,7 +269,7 @@ impl PendingDependencies {
             Dependency::Claim(shh) | Dependency::Proof(shh) => shh,
             Dependency::PendingValidation(shh) => {
                 let header = shh.header();
-                let hash = DhtOpHash::with_data(&UniqueForm::RegisterAgentActivity(header)).await;
+                let hash = DhtOpHash::with_data_sync(&UniqueForm::RegisterAgentActivity(header));
                 self.pending.push(hash.into());
                 shh
             }
