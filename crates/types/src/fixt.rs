@@ -49,6 +49,7 @@ use holochain_zome_types::header::Header;
 use holochain_zome_types::header::InitZomesComplete;
 use holochain_zome_types::header::ZomeId;
 use holochain_zome_types::migrate_agent::MigrateAgent;
+use holochain_zome_types::zome::FunctionName;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::Entry;
 use rand::seq::IteratorRandom;
@@ -57,7 +58,6 @@ use rand::Rng;
 use std::collections::BTreeMap;
 use std::collections::HashSet;
 use std::iter::Iterator;
-use holochain_zome_types::zome::FunctionName;
 
 pub use holochain_zome_types::fixt::{TimestampFixturator as ZomeTimestampFixturator, *};
 
