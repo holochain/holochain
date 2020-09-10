@@ -48,6 +48,7 @@ pub mod zome_info;
 #[allow(missing_docs)]
 mod zome_io;
 
+#[allow(missing_docs)]
 #[cfg(feature = "fixturators")]
 pub mod fixt;
 

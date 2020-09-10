@@ -11,6 +11,7 @@ pub use holochain_serialized_bytes::prelude::*;
 pub struct ChainQueryFilter {
     /// The range of source chain sequence numbers to match.
     /// Inclusive start, exclusive end.
+    // TODO: can we generalize this over RangeBounds to allow unbounded ranges?
     pub sequence_range: Option<std::ops::Range<u32>>,
     /// Filter by EntryType
     pub entry_type: Option<EntryType>,
@@ -71,62 +72,51 @@ impl ChainQueryFilter {
 #[cfg(test)]
 #[cfg(feature = "fixturators")]
 mod tests {
-    use crate::header::{builder, EntryType, HeaderBuilderCommon};
-    use crate::{fixt::AppEntryTypeFixturator, link::LinkTag};
+    use crate::header::{builder, EntryType, HeaderType};
+    use crate::{fixt::AppEntryTypeFixturator};
     use crate::{fixt::*, Header};
     use ::fixt::prelude::*;
-    use builder::HeaderBuilder;
 
     use super::ChainQueryFilter;
 
     /// Create three Headers with various properties.
     /// Also return the EntryTypes used to construct the first two headers.
-    fn fixtures() -> ([Header; 3], (EntryType, EntryType)) {
+    fn fixtures() -> ([Header; 6], (EntryType, EntryType)) {
         let author = fixt!(AgentPubKey);
         let entry_type_1 = EntryType::App(fixt!(AppEntryType));
         let entry_type_2 = EntryType::AgentPubKey;
 
-        let header_1 = builder::EntryCreate {
-            entry_type: entry_type_1.clone(),
-            entry_hash: fixt!(EntryHash),
-        }
-        .build(HeaderBuilderCommon::new(
-            author.clone(),
-            fixt!(Timestamp),
-            3,
-            fixt!(HeaderHash),
-        ))
-        .into();
+        let mut h1 = fixt!(EntryCreate);
+        h1.entry_type = entry_type_1.clone();
+        h1.header_seq = 0;
 
-        let header_2 = builder::EntryUpdate {
-            entry_type: entry_type_2.clone(),
-            entry_hash: fixt!(EntryHash),
-            original_entry_address: fixt!(EntryHash),
-            original_header_address: fixt!(HeaderHash),
-        }
-        .build(HeaderBuilderCommon::new(
-            author.clone(),
-            fixt!(Timestamp),
-            5,
-            fixt!(HeaderHash),
-        ))
-        .into();
+        let mut h2 = fixt!(EntryUpdate);
+        h2.entry_type = entry_type_2.clone();
+        h2.header_seq = 1;
 
-        let header_3 = builder::LinkAdd {
-            base_address: fixt!(EntryHash),
-            target_address: fixt!(EntryHash),
-            zome_id: 0.into(),
-            tag: LinkTag::new([0]),
-        }
-        .build(HeaderBuilderCommon::new(
-            author.clone(),
-            fixt!(Timestamp),
-            5,
-            fixt!(HeaderHash),
-        ))
-        .into();
+        let mut h3 = fixt!(LinkAdd);
+        h3.header_seq = 2;
 
-        ([header_1, header_2, header_3], (entry_type_1, entry_type_2))
+        let mut h4 = fixt!(EntryCreate);
+        h4.entry_type = entry_type_2.clone();
+        h4.header_seq = 3;
+
+        let mut h5 = fixt!(EntryUpdate);
+        h5.entry_type = entry_type_1.clone();
+        h5.header_seq = 4;
+
+        let mut h6 = fixt!(LinkAdd);
+        h6.header_seq = 5;
+
+        let headers = [
+            h1.into(),
+            h2.into(),
+            h3.into(),
+            h4.into(),
+            h5.into(),
+            h6.into(),
+        ];
+        (headers, (entry_type_1, entry_type_2))
     }
 
     fn map_query(query: &ChainQueryFilter, headers: &[Header]) -> Vec<bool> {
@@ -140,17 +130,78 @@ mod tests {
         let query_1 = ChainQueryFilter::new().entry_type(entry_type_1);
         let query_2 = ChainQueryFilter::new().entry_type(entry_type_2);
 
-        assert_eq!(map_query(&query_1, &headers), [true, false, true].to_vec(),);
-        assert_eq!(map_query(&query_2, &headers), [false, true, true].to_vec(),);
+        assert_eq!(
+            map_query(&query_1, &headers),
+            [true, false, true, false, true, true].to_vec()
+        );
+        assert_eq!(
+            map_query(&query_2, &headers),
+            [false, true, true, true, false, true].to_vec()
+        );
     }
 
     #[test]
     fn filter_by_header_type() {
-        todo!()
+        let (headers, _) = fixtures();
+
+        let query_1 = ChainQueryFilter::new().header_type(HeaderType::EntryCreate);
+        let query_2 = ChainQueryFilter::new().header_type(HeaderType::EntryUpdate);
+        let query_3 = ChainQueryFilter::new().header_type(HeaderType::LinkAdd);
+
+        assert_eq!(
+            map_query(&query_1, &headers),
+            [true, false, false, true, false, false].to_vec()
+        );
+        assert_eq!(
+            map_query(&query_2, &headers),
+            [false, true, false, false, true, false].to_vec()
+        );
+        assert_eq!(
+            map_query(&query_3, &headers),
+            [false, false, true, false, false, true].to_vec()
+        );
     }
 
     #[test]
     fn filter_by_chain_sequence() {
-        todo!()
+        let (headers, _) = fixtures();
+
+        let query_1 = ChainQueryFilter::new().sequence_range(0..1);
+        let query_2 = ChainQueryFilter::new().sequence_range(0..2);
+        let query_3 = ChainQueryFilter::new().sequence_range(1..3);
+        let query_4 = ChainQueryFilter::new().sequence_range(2..1000);
+
+        assert_eq!(
+            map_query(&query_1, &headers),
+            [true, false, false, false, false, false].to_vec()
+        );
+        assert_eq!(
+            map_query(&query_2, &headers),
+            [true, true, false, false, false, false].to_vec()
+        );
+        assert_eq!(
+            map_query(&query_3, &headers),
+            [false, true, true, false, false, false].to_vec()
+        );
+        assert_eq!(
+            map_query(&query_4, &headers),
+            [false, false, true, true, true, true].to_vec()
+        );
+    }
+
+    #[test]
+    fn filter_by_multi() {
+        let (headers, (entry_type_1, entry_type_2)) = fixtures();
+
+        assert_eq!(
+            map_query(
+                &ChainQueryFilter::new()
+                    .header_type(HeaderType::EntryCreate)
+                    .entry_type(entry_type_1.clone())
+                    .sequence_range(0..1),
+                &headers
+            ),
+            [true, false, false, false, false, false].to_vec()
+        );
     }
 }

@@ -106,8 +106,19 @@ fixturator!(
 );
 
 fixturator!(
-    HeaderBuilderCommon;
-    constructor fn new(AgentPubKey, ZomeTimestamp, u32, HeaderHash);
+    Header;
+    variants [
+        Dna(Dna)
+        AgentValidationPkg(AgentValidationPkg)
+        InitZomesComplete(InitZomesComplete)
+        LinkAdd(LinkAdd)
+        LinkRemove(LinkRemove)
+        ChainOpen(ChainOpen)
+        ChainClose(ChainClose)
+        EntryCreate(EntryCreate)
+        EntryUpdate(EntryUpdate)
+        ElementDelete(ElementDelete)
+    ];
 );
 
 newtype_fixturator!(Signature<Bytes>);
@@ -430,139 +441,8 @@ fixturator!(
 );
 
 fixturator!(
-    LinkTag; from Bytes;
-);
-
-fixturator!(
     Dna;
     constructor fn from_builder(DnaHash, HeaderBuilderCommon);
-);
-
-fixturator!(
-    LinkRemove;
-    constructor fn from_builder(HeaderBuilderCommon, HeaderHash, EntryHash);
-);
-
-fixturator!(
-    LinkAdd;
-    constructor fn from_builder(HeaderBuilderCommon, EntryHash, EntryHash, u8, LinkTag);
-);
-
-pub struct KnownLinkAdd {
-    pub base_address: EntryHash,
-    pub target_address: EntryHash,
-    pub tag: LinkTag,
-    pub zome_id: ZomeId,
-}
-
-pub struct KnownLinkRemove {
-    pub link_add_address: holo_hash::HeaderHash,
-}
-
-impl Iterator for LinkAddFixturator<KnownLinkAdd> {
-    type Item = LinkAdd;
-    fn next(&mut self) -> Option<Self::Item> {
-        let mut f = fixt!(LinkAdd);
-        f.base_address = self.0.curve.base_address.clone();
-        f.target_address = self.0.curve.target_address.clone();
-        f.tag = self.0.curve.tag.clone();
-        f.zome_id = self.0.curve.zome_id;
-        Some(f)
-    }
-}
-
-impl Iterator for LinkRemoveFixturator<KnownLinkRemove> {
-    type Item = LinkRemove;
-    fn next(&mut self) -> Option<Self::Item> {
-        let mut f = fixt!(LinkRemove);
-        f.link_add_address = self.0.curve.link_add_address.clone();
-        Some(f)
-    }
-}
-
-pub type MaybeSerializedBytes = Option<SerializedBytes>;
-
-fixturator! {
-    MaybeSerializedBytes;
-    enum [ Some None ];
-    curve Empty MaybeSerializedBytes::None;
-    curve Unpredictable match MaybeSerializedBytesVariant::random() {
-        MaybeSerializedBytesVariant::None => MaybeSerializedBytes::None,
-        MaybeSerializedBytesVariant::Some => MaybeSerializedBytes::Some(fixt!(SerializedBytes)),
-    };
-    curve Predictable match MaybeSerializedBytesVariant::nth(self.0.index) {
-        MaybeSerializedBytesVariant::None => MaybeSerializedBytes::None,
-        MaybeSerializedBytesVariant::Some => MaybeSerializedBytes::Some(SerializedBytesFixturator::new_indexed(Predictable, self.0.index).next().unwrap()),
-    };
-}
-
-fixturator! {
-    EntryType;
-    enum [ AgentPubKey App CapClaim CapGrant ];
-    curve Empty EntryType::AgentPubKey;
-    curve Unpredictable match EntryTypeVariant::random() {
-        EntryTypeVariant::AgentPubKey => EntryType::AgentPubKey,
-        EntryTypeVariant::App => EntryType::App(fixt!(AppEntryType)),
-        EntryTypeVariant::CapClaim => EntryType::CapClaim,
-        EntryTypeVariant::CapGrant => EntryType::CapGrant,
-    };
-    curve Predictable match EntryTypeVariant::nth(self.0.index) {
-        EntryTypeVariant::AgentPubKey => EntryType::AgentPubKey,
-        EntryTypeVariant::App => EntryType::App(AppEntryTypeFixturator::new_indexed(Predictable, self.0.index).next().unwrap()),
-        EntryTypeVariant::CapClaim => EntryType::CapClaim,
-        EntryTypeVariant::CapGrant => EntryType::CapGrant,
-    };
-}
-
-fixturator!(
-    AgentValidationPkg;
-    constructor fn from_builder(HeaderBuilderCommon, MaybeSerializedBytes);
-);
-
-fixturator!(
-    InitZomesComplete;
-    constructor fn from_builder(HeaderBuilderCommon);
-);
-
-fixturator!(
-    ChainOpen;
-    constructor fn from_builder(HeaderBuilderCommon, DnaHash);
-);
-
-fixturator!(
-    ChainClose;
-    constructor fn from_builder(HeaderBuilderCommon, DnaHash);
-);
-
-fixturator!(
-    EntryCreate;
-    constructor fn from_builder(HeaderBuilderCommon, EntryType, EntryHash);
-);
-
-fixturator!(
-    EntryUpdate;
-    constructor fn from_builder(HeaderBuilderCommon, EntryHash, HeaderHash, EntryType, EntryHash);
-);
-
-fixturator!(
-    ElementDelete;
-    constructor fn from_builder(HeaderBuilderCommon, HeaderHash, EntryHash);
-);
-
-fixturator!(
-    Header;
-    variants [
-        Dna(Dna)
-        AgentValidationPkg(AgentValidationPkg)
-        InitZomesComplete(InitZomesComplete)
-        LinkAdd(LinkAdd)
-        LinkRemove(LinkRemove)
-        ChainOpen(ChainOpen)
-        ChainClose(ChainClose)
-        EntryCreate(EntryCreate)
-        EntryUpdate(EntryUpdate)
-        ElementDelete(ElementDelete)
-    ];
 );
 
 fixturator!(
