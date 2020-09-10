@@ -1,4 +1,4 @@
-use fixt::prelude::*;
+use ::fixt::prelude::*;
 use hdk3::prelude::*;
 use holo_hash::fixt::*;
 use holochain::conductor::{

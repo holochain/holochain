@@ -38,7 +38,7 @@ pub mod wasm_test {
     use crate::core::ribosome::ZomeCallInvocation;
     use crate::core::ribosome::ZomeCallInvocationResponse;
     use crate::fixt::*;
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
     use hdk3::prelude::*;
     use holochain_types::app::InstalledCell;
     use holochain_types::cell::CellId;

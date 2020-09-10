@@ -51,7 +51,7 @@ pub fn get_link_details<'a>(
 pub mod slow_tests {
 
     use crate::fixt::ZomeCallHostAccessFixturator;
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
     use holo_hash::HasHash;
 
     use holochain_wasm_test_utils::TestWasm;

@@ -1,5 +1,5 @@
 use super::*;
-use fixt::prelude::*;
+use ::fixt::prelude::*;
 use holochain_state::test_utils::TestEnvironment;
 use holochain_types::{dht_op::DhtOp, fixt::*};
 

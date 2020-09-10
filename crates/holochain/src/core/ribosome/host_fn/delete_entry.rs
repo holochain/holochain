@@ -95,7 +95,7 @@ pub(crate) fn get_original_address<'a>(
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use crate::{core::workflow::CallZomeWorkspace, fixt::ZomeCallHostAccessFixturator};
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
     use hdk3::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
 

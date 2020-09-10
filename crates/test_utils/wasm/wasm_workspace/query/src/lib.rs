@@ -12,7 +12,7 @@ fn path(s: &str) -> ExternResult<EntryHash> {
 }
 
 #[hdk_extern]
-fn query(args: ChainQuery) -> ExternResult<HeaderHashes> {
+fn query(args: QueryFilter) -> ExternResult<HeaderHashes> {
     Ok(query!(args)?)
 }
 

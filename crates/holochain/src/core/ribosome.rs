@@ -480,7 +480,7 @@ pub mod wasm_test {
 
                 let invocation = $crate::core::ribosome::ZomeCallInvocationFixturator::new(
                     $crate::core::ribosome::NamedInvocation(
-                        holochain_types::cell::CellIdFixturator::new(fixt::Unpredictable)
+                        holochain_types::cell::CellIdFixturator::new(::fixt::Unpredictable)
                             .next()
                             .unwrap(),
                         $test_wasm.into(),
@@ -543,7 +543,7 @@ mod slow_tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn invoke_foo_test() {
-        let host_access = ZomeCallHostAccessFixturator::new(fixt::Unpredictable)
+        let host_access = ZomeCallHostAccessFixturator::new(::fixt::Unpredictable)
             .next()
             .unwrap();
 
@@ -553,7 +553,7 @@ mod slow_tests {
 
         let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(
             crate::core::ribosome::NamedInvocation(
-                holochain_types::cell::CellIdFixturator::new(fixt::Unpredictable)
+                holochain_types::cell::CellIdFixturator::new(::fixt::Unpredictable)
                     .next()
                     .unwrap(),
                 TestWasm::Foo.into(),

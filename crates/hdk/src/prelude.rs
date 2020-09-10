@@ -54,7 +54,7 @@ pub use holochain_zome_types::metadata::Details;
 pub use holochain_zome_types::migrate_agent::MigrateAgent;
 pub use holochain_zome_types::migrate_agent::MigrateAgentCallbackResult;
 pub use holochain_zome_types::post_commit::PostCommitCallbackResult;
-pub use holochain_zome_types::query::ChainQuery;
+pub use holochain_zome_types::query::ChainQueryFilter as QueryFilter;
 pub use holochain_zome_types::validate::ValidateCallbackResult;
 pub use holochain_zome_types::validate::ValidationPackage;
 pub use holochain_zome_types::validate::ValidationPackageCallbackResult;

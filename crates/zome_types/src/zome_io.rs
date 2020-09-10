@@ -65,7 +65,7 @@ wasm_io_types!(
     pub struct PropertyInput(());
     pub struct PropertyOutput(());
     // Query the source chain for data
-    pub struct QueryInput(crate::query::ChainQuery);
+    pub struct QueryInput(crate::query::ChainQueryFilter);
     pub struct QueryOutput(HeaderHashes);
     // the length of random bytes to create
     pub struct RandomBytesInput(u32);

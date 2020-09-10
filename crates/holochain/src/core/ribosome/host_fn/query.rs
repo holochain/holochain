@@ -29,14 +29,15 @@ pub fn query(
 pub mod slow_tests {
 
     use crate::{core::ribosome::ZomeCallHostAccess, fixt::ZomeCallHostAccessFixturator};
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
     use hdk3::prelude::*;
     use holochain_state::test_utils::TestEnvironment;
-    use query::ChainQuery;
+    use query::ChainQueryFilter;
 
     use holochain_wasm_test_utils::TestWasm;
     use test_wasm_common::*;
 
+    // TODO: use this setup function to DRY up a lot of duplicated code
     async fn setup() -> (TestEnvironment, ZomeCallHostAccess) {
         let test_env = holochain_state::test_utils::test_cell_env();
         let env = test_env.env();
@@ -56,16 +57,16 @@ pub mod slow_tests {
     }
 
     #[tokio::test(threaded_scheduler)]
-    async fn query_chain() {
+    async fn query_smoke_test() {
         let (_test_env, host_access) = setup().await;
 
-        let _: () = crate::call_test_ribosome!(
+        let _hash_a: EntryHash = crate::call_test_ribosome!(
             host_access,
             TestWasm::Query,
             "add_path",
             TestString::from("a".to_string())
         );
-        let _: () = crate::call_test_ribosome!(
+        let _hash_b: EntryHash = crate::call_test_ribosome!(
             host_access,
             TestWasm::Query,
             "add_path",
@@ -76,7 +77,7 @@ pub mod slow_tests {
             host_access,
             TestWasm::Query,
             "query",
-            ChainQuery::default()
+            ChainQueryFilter::default()
         );
 
         assert_eq!(elements.0.len(), 2);

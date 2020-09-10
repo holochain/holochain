@@ -48,7 +48,7 @@ pub fn get_links<'a>(
 pub mod slow_tests {
 
     use crate::fixt::ZomeCallHostAccessFixturator;
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
     use hdk3::prelude::*;
 
     use holochain_wasm_test_utils::TestWasm;

@@ -63,6 +63,8 @@ use std::collections::BTreeMap;
 use std::collections::HashSet;
 use std::iter::Iterator;
 
+pub use holochain_zome_types::fixt::{TimestampFixturator as ZomeTimestampFixturator, *};
+
 /// a curve to spit out Entry::App values
 pub struct AppEntry;
 
@@ -99,39 +101,8 @@ fixturator!(
 );
 
 fixturator!(
-    EntryVisibility;
-    unit variants [ Public Private ] empty Public;
-);
-
-fixturator!(
-    AppEntryType;
-    constructor fn new(U8, U8, EntryVisibility);
-);
-
-impl Iterator for AppEntryTypeFixturator<EntryVisibility> {
-    type Item = AppEntryType;
-    fn next(&mut self) -> Option<Self::Item> {
-        let app_entry = AppEntryTypeFixturator::new(Unpredictable).next().unwrap();
-        Some(AppEntryType::new(
-            app_entry.id(),
-            app_entry.zome_id(),
-            self.0.curve,
-        ))
-    }
-}
-
-fixturator!(
     Timestamp;
     constructor fn now();
-);
-
-fn from_timestamp(ts: Timestamp) -> ZomeTimestamp {
-    ts.into()
-}
-
-fixturator!(
-    ZomeTimestamp;
-    vanilla fn from_timestamp(Timestamp);
 );
 
 fixturator!(

@@ -79,7 +79,7 @@ pub mod tests {
     use crate::core::workflow::fake_genesis;
     use crate::fixt::DnaDefFixturator;
     use crate::fixt::KeystoreSenderFixturator;
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
     use fixt::Unpredictable;
     use holochain_p2p::HolochainP2pCellFixturator;
     use holochain_state::test_utils::test_cell_env;

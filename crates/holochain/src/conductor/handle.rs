@@ -172,11 +172,9 @@ pub trait ConductorHandleT: Send + Sync {
     /// Get info about an installed App, whether active or inactive
     async fn get_app_info(&self, app_id: &AppId) -> ConductorResult<Option<InstalledApp>>;
 
-    // HACK: remove when B-01593 lands
     #[cfg(test)]
     async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite>;
 
-    // HACK: remove when B-01593 lands
     #[cfg(test)]
     async fn get_state_from_handle(&self) -> ConductorApiResult<ConductorState>;
 }
@@ -599,13 +597,11 @@ pub mod mock {
             self.sync_get_app_info(app_id)
         }
 
-        // HACK: remove when B-01593 lands
         #[cfg(test)]
         async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite> {
             self.sync_get_cell_env(cell_id)
         }
 
-        // HACK: remove when B-01593 lands
         #[cfg(test)]
         async fn get_state_from_handle(&self) -> ConductorApiResult<ConductorState> {
             self.sync_get_state_from_handle()

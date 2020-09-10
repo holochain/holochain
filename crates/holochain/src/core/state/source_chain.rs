@@ -11,7 +11,7 @@ use holochain_zome_types::{
     capability::{CapClaim, CapGrant, CapSecret},
     entry::{CapClaimEntry, CapGrantEntry, Entry},
     header::{builder, EntryType, HeaderBuilder, HeaderBuilderCommon, HeaderInner},
-    query::ChainQuery,
+    query::ChainQueryFilter,
 };
 use shrinkwraprs::Shrinkwrap;
 
@@ -185,8 +185,9 @@ impl SourceChain {
         Ok(answer)
     }
 
-    pub fn query(&self, _query: &ChainQuery) -> SourceChainResult<Vec<HeaderHash>> {
-        unimplemented!("todo, implement and test")
+    pub fn query(&self, query: &ChainQueryFilter) -> SourceChainResult<Vec<HeaderHash>> {
+        todo!()
+        // self.iter_back().filter(|shh| h)
     }
 }
 
@@ -211,31 +212,36 @@ pub mod tests {
     use super::*;
     use crate::fixt::*;
     use ::fixt::prelude::*;
-    use holochain_state::test_utils::test_cell_env;
+    use holochain_state::test_utils::{test_cell_env, TestEnvironment};
     use holochain_types::test_utils::{fake_agent_pubkey_1, fake_dna_hash};
     use holochain_zome_types::capability::{CapAccess, ZomeCallCapGrant};
     use std::collections::HashSet;
 
+    async fn setup() -> SourceChainResult<TestEnvironment> {
+        let test_env = test_cell_env();
+        let env = test_env.env();
+        let mut store = SourceChainBuf::new(env.clone().into())?;
+        store
+            .genesis(fake_dna_hash(1), fake_agent_pubkey_1(), None)
+            .await?;
+        env.guard()
+            .with_commit(|writer| store.flush_to_txn(writer))?;
+        Ok(test_env)
+    }
+
     #[tokio::test(threaded_scheduler)]
     async fn test_get_cap_grant() -> SourceChainResult<()> {
-        let test_env = test_cell_env();
-        let arc = test_env.env();
-        let env = arc.guard();
+        let test_env = setup().await?;
+
+        let env = test_env.env();
         let access = CapAccess::from(CapSecretFixturator::new(Unpredictable).next().unwrap());
         let secret = access.secret().unwrap();
         // @todo curry
         let _curry = CurryPayloadsFixturator::new(Empty).next().unwrap();
         let grant = ZomeCallCapGrant::new("tag".into(), access.clone(), HashSet::new());
-        {
-            let mut store = SourceChainBuf::new(arc.clone().into())?;
-            store
-                .genesis(fake_dna_hash(1), fake_agent_pubkey_1(), None)
-                .await?;
-            env.with_commit(|writer| store.flush_to_txn(writer))?;
-        }
 
         {
-            let mut chain = SourceChain::new(arc.clone().into())?;
+            let mut chain = SourceChain::new(env.clone().into())?;
             chain.put_cap_grant(grant.clone()).await?;
 
             // ideally the following would work, but it won't because currently
@@ -247,11 +253,12 @@ pub mod tests {
             //     Some(grant.clone().into())
             // );
 
-            env.with_commit(|writer| chain.flush_to_txn(writer))?;
+            env.guard()
+                .with_commit(|writer| chain.flush_to_txn(writer))?;
         }
 
         {
-            let chain = SourceChain::new(arc.clone().into())?;
+            let chain = SourceChain::new(env.clone().into())?;
             assert_eq!(
                 chain.get_persisted_cap_grant_by_secret(secret).await?,
                 Some(grant.into())
@@ -263,22 +270,15 @@ pub mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_get_cap_claim() -> SourceChainResult<()> {
-        let test_env = test_cell_env();
-        let arc = test_env.env();
-        let env = arc.guard();
+        let test_env = setup().await?;
+
+        let env = test_env.env();
         let secret = CapSecretFixturator::new(Unpredictable).next().unwrap();
         let agent_pubkey = fake_agent_pubkey_1().into();
         let claim = CapClaim::new("tag".into(), agent_pubkey, secret.clone());
-        {
-            let mut store = SourceChainBuf::new(arc.clone().into())?;
-            store
-                .genesis(fake_dna_hash(1), fake_agent_pubkey_1(), None)
-                .await?;
-            env.with_commit(|writer| store.flush_to_txn(writer))?;
-        }
 
         {
-            let mut chain = SourceChain::new(arc.clone().into())?;
+            let mut chain = SourceChain::new(env.clone().into())?;
             chain.put_cap_claim(claim.clone()).await?;
 
             // ideally the following would work, but it won't because currently
@@ -290,15 +290,29 @@ pub mod tests {
             //     Some(claim.clone())
             // );
 
-            env.with_commit(|writer| chain.flush_to_txn(writer))?;
+            env.guard()
+                .with_commit(|writer| chain.flush_to_txn(writer))?;
         }
 
         {
-            let chain = SourceChain::new(arc.clone().into())?;
+            let chain = SourceChain::new(env.clone().into())?;
             assert_eq!(
                 chain.get_persisted_cap_claim_by_secret(&secret).await?,
                 Some(claim)
             );
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn test_query() -> SourceChainResult<()> {
+        let test_env = setup().await?;
+        let env = test_env.env();
+        {
+            let mut chain = SourceChain::new(env.clone().into())?;
+            let results = chain.query(&ChainQueryFilter::default())?;
+            assert_eq!(results.len(), 3);
         }
 
         Ok(())

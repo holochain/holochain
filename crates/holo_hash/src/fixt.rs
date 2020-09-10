@@ -4,7 +4,7 @@ use crate::{
     encode::holo_dht_location_bytes, hash_type, AgentPubKey, AnyDhtHash, DhtOpHash, DnaHash,
     EntryHash, HeaderHash, NetIdHash, WasmHash,
 };
-use fixt::prelude::*;
+use ::fixt::prelude::*;
 
 pub type HashTypeEntry = hash_type::Entry;
 pub type HashTypeAnyDht = hash_type::AnyDht;
