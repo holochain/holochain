@@ -4,6 +4,7 @@
 
 #![allow(missing_docs)]
 
+use crate::cell::CellId;
 use crate::dna::zome::Zome;
 use crate::dna::zome::{HostFnAccess, Permission};
 use crate::dna::DnaDef;
@@ -17,7 +18,6 @@ use holo_hash::fixt::EntryHashFixturator;
 use holo_hash::fixt::HeaderHashFixturator;
 use holo_hash::fixt::WasmHashFixturator;
 use holo_hash::AgentPubKey;
-use holo_hash::EntryHash;
 use holochain_keystore::Signature;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_zome_types::capability::CapAccess;
@@ -36,7 +36,6 @@ use holochain_zome_types::entry_def::EntryDefId;
 use holochain_zome_types::entry_def::EntryDefs;
 use holochain_zome_types::entry_def::EntryVisibility;
 use holochain_zome_types::entry_def::RequiredValidations;
-use holochain_zome_types::header::builder::HeaderBuilderCommon;
 use holochain_zome_types::header::AgentValidationPkg;
 use holochain_zome_types::header::AppEntryType;
 use holochain_zome_types::header::ChainClose;
@@ -67,6 +66,9 @@ pub use holochain_zome_types::fixt::{TimestampFixturator as ZomeTimestampFixtura
 
 /// a curve to spit out Entry::App values
 pub struct AppEntry;
+
+/// A curve to make headers have public entry types
+pub struct PublicCurve;
 
 fixturator!(
     Zome;
@@ -103,22 +105,6 @@ fixturator!(
 fixturator!(
     Timestamp;
     constructor fn now();
-);
-
-fixturator!(
-    Header;
-    variants [
-        Dna(Dna)
-        AgentValidationPkg(AgentValidationPkg)
-        InitZomesComplete(InitZomesComplete)
-        LinkAdd(LinkAdd)
-        LinkRemove(LinkRemove)
-        ChainOpen(ChainOpen)
-        ChainClose(ChainClose)
-        EntryCreate(EntryCreate)
-        EntryUpdate(EntryUpdate)
-        ElementDelete(ElementDelete)
-    ];
 );
 
 newtype_fixturator!(Signature<Bytes>);
@@ -445,12 +431,127 @@ fixturator!(
     constructor fn from_builder(DnaHash, HeaderBuilderCommon);
 );
 
+fixturator! {
+    MaybeSerializedBytes;
+    enum [ Some None ];
+    curve Empty MaybeSerializedBytes::None;
+    curve Unpredictable match MaybeSerializedBytesVariant::random() {
+        MaybeSerializedBytesVariant::None => MaybeSerializedBytes::None,
+        MaybeSerializedBytesVariant::Some => MaybeSerializedBytes::Some(fixt!(SerializedBytes)),
+    };
+    curve Predictable match MaybeSerializedBytesVariant::nth(self.0.index) {
+        MaybeSerializedBytesVariant::None => MaybeSerializedBytes::None,
+        MaybeSerializedBytesVariant::Some => MaybeSerializedBytes::Some(SerializedBytesFixturator::new_indexed(Predictable, self.0.index).next().unwrap()),
+    };
+}
+
+fixturator! {
+    EntryType;
+    enum [ AgentPubKey App CapClaim CapGrant ];
+    curve Empty EntryType::AgentPubKey;
+    curve Unpredictable match EntryTypeVariant::random() {
+        EntryTypeVariant::AgentPubKey => EntryType::AgentPubKey,
+        EntryTypeVariant::App => EntryType::App(fixt!(AppEntryType)),
+        EntryTypeVariant::CapClaim => EntryType::CapClaim,
+        EntryTypeVariant::CapGrant => EntryType::CapGrant,
+    };
+    curve Predictable match EntryTypeVariant::nth(self.0.index) {
+        EntryTypeVariant::AgentPubKey => EntryType::AgentPubKey,
+        EntryTypeVariant::App => EntryType::App(AppEntryTypeFixturator::new_indexed(Predictable, self.0.index).next().unwrap()),
+        EntryTypeVariant::CapClaim => EntryType::CapClaim,
+        EntryTypeVariant::CapGrant => EntryType::CapGrant,
+    };
+    curve PublicCurve {
+        let aet = fixt!(AppEntryType);
+        EntryType::App(AppEntryType::new(aet.id(), aet.zome_id(), EntryVisibility::Public))
+    };
+}
+
+fixturator!(
+    AgentValidationPkg;
+    constructor fn from_builder(HeaderBuilderCommon, MaybeSerializedBytes);
+);
+
+fixturator!(
+    InitZomesComplete;
+    constructor fn from_builder(HeaderBuilderCommon);
+);
+
+fixturator!(
+    ChainOpen;
+    constructor fn from_builder(HeaderBuilderCommon, DnaHash);
+);
+
+fixturator!(
+    ChainClose;
+    constructor fn from_builder(HeaderBuilderCommon, DnaHash);
+);
+
+fixturator!(
+    EntryCreate;
+    constructor fn from_builder(HeaderBuilderCommon, EntryType, EntryHash);
+
+    curve PublicCurve {
+        let mut ec = fixt!(EntryCreate);
+        ec.entry_type = fixt!(EntryType, PublicCurve);
+        ec
+    };
+);
+
+fixturator!(
+    EntryUpdate;
+    constructor fn from_builder(HeaderBuilderCommon, EntryHash, HeaderHash, EntryType, EntryHash);
+
+    curve PublicCurve {
+        let mut eu = fixt!(EntryUpdate);
+        eu.entry_type = fixt!(EntryType, PublicCurve);
+        eu
+    };
+);
+
+fixturator!(
+    ElementDelete;
+    constructor fn from_builder(HeaderBuilderCommon, HeaderHash, EntryHash);
+);
+
+fixturator!(
+    Header;
+    variants [
+        Dna(Dna)
+        AgentValidationPkg(AgentValidationPkg)
+        InitZomesComplete(InitZomesComplete)
+        LinkAdd(LinkAdd)
+        LinkRemove(LinkRemove)
+        ChainOpen(ChainOpen)
+        ChainClose(ChainClose)
+        EntryCreate(EntryCreate)
+        EntryUpdate(EntryUpdate)
+        ElementDelete(ElementDelete)
+    ];
+
+    curve PublicCurve {
+        match fixt!(Header) {
+            Header::EntryCreate(_) => Header::EntryCreate(fixt!(EntryCreate, PublicCurve)),
+            Header::EntryUpdate(_) => Header::EntryUpdate(fixt!(EntryUpdate, PublicCurve)),
+            other_type => other_type,
+        }
+    };
+);
+
 fixturator!(
     NewEntryHeader;
     variants [
         Create(EntryCreate)
         Update(EntryUpdate)
     ];
+
+
+    curve PublicCurve {
+        match fixt!(NewEntryHeader) {
+            NewEntryHeader::Create(_) => NewEntryHeader::Create(fixt!(EntryCreate, PublicCurve)),
+            NewEntryHeader::Update(_) => NewEntryHeader::Update(fixt!(EntryUpdate, PublicCurve)),
+        }
+    };
 );
 
 fixturator!(
@@ -461,4 +562,9 @@ fixturator!(
 fixturator!(
     HostFnAccess;
     constructor fn new(Permission, Permission, Permission, Permission, Permission, Permission, Permission);
+);
+
+fixturator!(
+    CellId;
+    constructor fn new(DnaHash, AgentPubKey);
 );

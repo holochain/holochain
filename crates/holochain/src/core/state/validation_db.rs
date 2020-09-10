@@ -1,5 +1,6 @@
 //! # Validation Database Types
 
+use crate::core::workflow::sys_validation_workflow::types::PendingDependencies;
 use holo_hash::{AnyDhtHash, DhtOpHash};
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::{
@@ -8,7 +9,7 @@ use holochain_state::{
     error::DatabaseResult,
     prelude::{EnvironmentRead, GetDb},
 };
-use holochain_types::{dht_op::DhtOp, Timestamp};
+use holochain_types::{dht_op::DhtOpLight, Timestamp};
 use shrinkwraprs::Shrinkwrap;
 
 #[derive(Shrinkwrap)]
@@ -24,8 +25,13 @@ pub type ValidationLimboKey = DhtOpHash;
 pub struct ValidationLimboValue {
     /// Status of this op in the limbo
     pub status: ValidationLimboStatus,
+    /// It's possible to run through validation but using
+    /// dependencies that haven't passed validation.
+    /// When this happens we need to wait until these
+    /// dependencies have "proved" they are valid.
+    pub pending_dependencies: PendingDependencies,
     /// The actual op
-    pub op: DhtOp,
+    pub op: DhtOpLight,
     /// Where the op was sent to
     pub basis: AnyDhtHash,
     /// When the op was added to limbo
@@ -42,11 +48,14 @@ pub enum ValidationLimboStatus {
     /// Is awaiting to be system validated
     Pending,
     /// Is waiting for dependencies so the op can proceed to system validation
-    AwaitingSysDeps,
+    AwaitingSysDeps(AnyDhtHash),
     /// Is awaiting to be app validated
     SysValidated,
     /// Is waiting for dependencies so the op can proceed to app validation
-    AwaitingAppDeps,
+    AwaitingAppDeps(AnyDhtHash),
+    /// Has finished all validation but is still awaiting
+    /// on a dependency to pass validation.
+    PendingValidation,
 }
 
 impl ValidationLimboStore {

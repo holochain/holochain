@@ -72,8 +72,8 @@ impl ChainQueryFilter {
 #[cfg(test)]
 #[cfg(feature = "fixturators")]
 mod tests {
-    use crate::header::{builder, EntryType, HeaderType};
-    use crate::{fixt::AppEntryTypeFixturator};
+    use crate::fixt::AppEntryTypeFixturator;
+    use crate::header::{EntryType, HeaderType};
     use crate::{fixt::*, Header};
     use ::fixt::prelude::*;
 
@@ -82,7 +82,6 @@ mod tests {
     /// Create three Headers with various properties.
     /// Also return the EntryTypes used to construct the first two headers.
     fn fixtures() -> ([Header; 6], (EntryType, EntryType)) {
-        let author = fixt!(AgentPubKey);
         let entry_type_1 = EntryType::App(fixt!(AppEntryType));
         let entry_type_2 = EntryType::AgentPubKey;
 

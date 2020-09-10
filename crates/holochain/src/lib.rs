@@ -11,3 +11,4 @@ pub mod fixt;
 pub mod test_utils;
 
 use holochain_wasmer_host;
+pub use tracing;

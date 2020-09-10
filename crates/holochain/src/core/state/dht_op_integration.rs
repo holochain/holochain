@@ -10,11 +10,7 @@ use holochain_state::{
     error::{DatabaseError, DatabaseResult},
     prelude::{BufferedStore, EnvironmentRead, GetDb, Readable},
 };
-use holochain_types::{
-    dht_op::{DhtOp, DhtOpLight},
-    validate::ValidationStatus,
-    Timestamp,
-};
+use holochain_types::{dht_op::DhtOpLight, validate::ValidationStatus, Timestamp};
 
 /// Database type for AuthoredDhtOps
 /// Buffer for accessing [DhtOp]s that you authored and finding the amount of validation receipts
@@ -100,7 +96,7 @@ pub struct IntegrationLimboValue {
     /// The op's validation status
     pub validation_status: ValidationStatus,
     /// The op
-    pub op: DhtOp,
+    pub op: DhtOpLight,
 }
 
 impl IntegratedDhtOpsBuf {

@@ -75,7 +75,7 @@ wasm_io_types!(
     // the header hash of the LinkRemove element
     pub struct RemoveLinkOutput(holo_hash::HeaderHash);
     pub struct CallRemoteInput(crate::call_remote::CallRemote);
-    pub struct CallRemoteOutput(SerializedBytes);
+    pub struct CallRemoteOutput(ZomeCallInvocationResponse);
     // @TODO
     pub struct SendInput(());
     pub struct SendOutput(());
@@ -158,3 +158,12 @@ wasm_io_types!(
     pub struct HostInput(crate::SerializedBytes);
     pub struct GuestOutput(crate::SerializedBytes);
 );
+
+/// Response to a zome invocation
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes, PartialEq)]
+pub enum ZomeCallInvocationResponse {
+    /// arbitrary functions exposed by zome devs to the outside world
+    ZomeApiFn(GuestOutput),
+    /// cap grant failure
+    Unauthorized,
+}

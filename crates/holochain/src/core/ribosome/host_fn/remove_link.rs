@@ -100,7 +100,6 @@ pub mod slow_tests {
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use holo_hash::HeaderHash;
-
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::link::Links;
     use holochain_zome_types::RemoveLinkInput;

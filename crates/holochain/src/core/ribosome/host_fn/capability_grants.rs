@@ -19,10 +19,20 @@ pub fn capability_grants(
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
 
+    use crate::conductor::dna_store::MockDnaStore;
+    use crate::conductor::interface::websocket::test::setup_app;
+    use crate::core::ribosome::ZomeCallInvocation;
     use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use hdk3::prelude::*;
+    use holochain_types::app::InstalledCell;
+    use holochain_types::cell::CellId;
+    use holochain_types::dna::DnaDef;
+    use holochain_types::dna::DnaFile;
+    use holochain_types::fixt::CapSecretFixturator;
+    use holochain_types::test_utils::fake_agent_pubkey_1;
+    use holochain_types::test_utils::fake_agent_pubkey_2;
     use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(threaded_scheduler)]
@@ -81,5 +91,167 @@ pub mod wasm_test {
             _ => unreachable!(),
         };
         assert_eq!(entry_secret, secret,);
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn ribosome_authorized_call() {
+        // /////////
+        // START DNA
+        // /////////
+
+        let dna_file = DnaFile::new(
+            DnaDef {
+                name: "ribosome_authorized_call".to_string(),
+                uuid: "c2f5ccfb-42b4-4927-a32c-60a642265c5a".to_string(),
+                properties: SerializedBytes::try_from(()).unwrap(),
+                zomes: vec![TestWasm::Capability.into()].into(),
+            },
+            vec![TestWasm::Capability.into()],
+        )
+        .await
+        .unwrap();
+
+        // ///////
+        // END DNA
+        // ///////
+
+        // ///////////
+        // START ALICE
+        // ///////////
+
+        let alice_agent_id = fake_agent_pubkey_1();
+        let alice_cell_id = CellId::new(dna_file.dna_hash().to_owned(), alice_agent_id.clone());
+        let alice_installed_cell = InstalledCell::new(alice_cell_id.clone(), "alice_handle".into());
+
+        // /////////
+        // END ALICE
+        // /////////
+
+        // /////////
+        // START BOB
+        // /////////
+
+        let bob_agent_id = fake_agent_pubkey_2();
+        let bob_cell_id = CellId::new(dna_file.dna_hash().to_owned(), bob_agent_id.clone());
+        let bob_installed_cell = InstalledCell::new(bob_cell_id.clone(), "bob_handle".into());
+
+        // ///////
+        // END BOB
+        // ///////
+
+        // ///////////////
+        // START CONDUCTOR
+        // ///////////////
+
+        let mut dna_store = MockDnaStore::new();
+
+        dna_store.expect_get().return_const(Some(dna_file.clone()));
+        dna_store
+            .expect_add_dnas::<Vec<_>>()
+            .times(2)
+            .return_const(());
+        dna_store
+            .expect_add_entry_defs::<Vec<_>>()
+            .times(2)
+            .return_const(());
+
+        let (_tmpdir, _app_api, handle) = setup_app(
+            vec![(alice_installed_cell, None), (bob_installed_cell, None)],
+            dna_store,
+        )
+        .await;
+
+        // /////////////
+        // END CONDUCTOR
+        // /////////////
+
+        // ALICE FALING AN UNAUTHED CALL
+
+        #[derive(serde::Serialize, serde::Deserialize, SerializedBytes)]
+        pub struct CapFor(CapSecret, AgentPubKey);
+
+        let some_secret = CapSecretFixturator::new(Unpredictable).next().unwrap();
+
+        let output = handle
+            .call_zome(ZomeCallInvocation {
+                cell_id: alice_cell_id.clone(),
+                zome_name: TestWasm::Capability.into(),
+                cap: ().into(),
+                fn_name: "try_cap_claim".to_string(),
+                payload: HostInput::new(
+                    CapFor(some_secret, bob_agent_id.clone().try_into().unwrap())
+                        .try_into()
+                        .unwrap(),
+                ),
+                provenance: alice_agent_id.clone(),
+            })
+            .await
+            .unwrap()
+            .unwrap();
+
+        // the _outer_ invocation response is to try_cap_claim for alice
+        // the _inner_ invocation response is needs_cap_claim and should be unauthorized
+        match output {
+            ZomeCallInvocationResponse::ZomeApiFn(guest_output) => {
+                let response: SerializedBytes = guest_output.into_inner();
+                let inner_response: ZomeCallInvocationResponse = response.try_into().unwrap();
+                // the inner response should be unauthorized
+                assert_eq!(inner_response, ZomeCallInvocationResponse::Unauthorized,);
+            }
+            _ => unreachable!(),
+        }
+
+        // BOB COMMITS A TRANSFERABLE GRANT WITH THE SECRET SHARED WITH ALICE
+
+        let _output = handle
+            .call_zome(ZomeCallInvocation {
+                cell_id: bob_cell_id,
+                zome_name: TestWasm::Capability.into(),
+                cap: ().into(),
+                fn_name: "transferable_cap_grant".to_string(),
+                payload: HostInput::new(some_secret.try_into().unwrap()),
+                provenance: bob_agent_id.clone(),
+            })
+            .await
+            .unwrap()
+            .unwrap();
+
+        // ALICE CAN NOW CALL THE AUTHED REMOTE FN
+
+        let output = handle
+            .call_zome(ZomeCallInvocation {
+                cell_id: alice_cell_id,
+                zome_name: TestWasm::Capability.into(),
+                cap: ().into(),
+                fn_name: "try_cap_claim".to_string(),
+                payload: HostInput::new(
+                    CapFor(some_secret, bob_agent_id.clone().try_into().unwrap())
+                        .try_into()
+                        .unwrap(),
+                ),
+                provenance: alice_agent_id.clone(),
+            })
+            .await
+            .unwrap()
+            .unwrap();
+
+        // the _outer_ invocation response is to try_cap_claim for alice
+        // the _inner_ invocation response is needs_cap_claim and should be unauthorized
+        match output.clone() {
+            ZomeCallInvocationResponse::ZomeApiFn(guest_output) => {
+                let response: SerializedBytes = guest_output.into_inner();
+                let inner_response: ZomeCallInvocationResponse = response.try_into().unwrap();
+                // the inner response should be serialized nil (authorized)
+                assert_eq!(
+                    inner_response,
+                    ZomeCallInvocationResponse::ZomeApiFn(GuestOutput::new(().try_into().unwrap())),
+                );
+            }
+            _ => unreachable!(),
+        }
+
+        let shutdown = handle.take_shutdown_handle().await.unwrap();
+        handle.shutdown().await;
+        shutdown.await.unwrap();
     }
 }
