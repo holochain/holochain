@@ -49,6 +49,7 @@ use holochain_zome_types::header::Header;
 use holochain_zome_types::header::InitZomesComplete;
 use holochain_zome_types::header::ZomeId;
 use holochain_zome_types::migrate_agent::MigrateAgent;
+use holochain_zome_types::zome::FunctionName;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::Entry;
 use rand::seq::IteratorRandom;
@@ -71,7 +72,15 @@ fixturator!(
     constructor fn from_hash(WasmHash);
 );
 
-newtype_fixturator!(ZomeName<String>);
+fixturator!(
+    ZomeName;
+    from String;
+);
+
+fixturator!(
+    FunctionName;
+    from String;
+);
 
 fixturator!(
     CapSecret;
@@ -114,15 +123,15 @@ fixturator!(
     GrantedFunction;
     curve Empty (
         ZomeNameFixturator::new_indexed(Empty, self.0.index).next().unwrap(),
-        StringFixturator::new_indexed(Empty, self.0.index).next().unwrap()
+        FunctionNameFixturator::new_indexed(Empty, self.0.index).next().unwrap()
     );
     curve Unpredictable (
         ZomeNameFixturator::new_indexed(Unpredictable, self.0.index).next().unwrap(),
-        StringFixturator::new_indexed(Unpredictable, self.0.index).next().unwrap()
+        FunctionNameFixturator::new_indexed(Unpredictable, self.0.index).next().unwrap()
     );
     curve Predictable (
         ZomeNameFixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
-        StringFixturator::new_indexed(Predictable, self.0.index).next().unwrap()
+        FunctionNameFixturator::new_indexed(Predictable, self.0.index).next().unwrap()
     );
 );
 

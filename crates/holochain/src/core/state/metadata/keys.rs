@@ -166,21 +166,29 @@ impl MiscMetaValue {
 }
 
 impl From<&LinkMetaKey<'_>> for BytesKey {
-    fn from(k: &LinkMetaKey<'_>) -> Self {
+    fn from(key: &LinkMetaKey<'_>) -> Self {
         use LinkMetaKey::*;
-        match k {
-            Base(b) => b.as_ref().to_vec(),
-            BaseZome(b, z) => [b.as_ref(), &[u8::from(*z)]].concat(),
-            BaseZomeTag(b, z, t) => [b.as_ref(), &[u8::from(*z)], t.as_ref()].concat(),
-            Full(b, z, t, l) => [b.as_ref(), &[u8::from(*z)], t.as_ref(), l.as_ref()].concat(),
+        match key {
+            Base(base) => base.as_ref().to_vec(),
+            BaseZome(base, zome) => [base.as_ref(), &[u8::from(*zome)]].concat(),
+            BaseZomeTag(base, zome, tag) => {
+                [base.as_ref(), &[u8::from(*zome)], tag.as_ref()].concat()
+            }
+            Full(base, zome, tag, link) => [
+                base.as_ref(),
+                &[u8::from(*zome)],
+                tag.as_ref(),
+                link.as_ref(),
+            ]
+            .concat(),
         }
         .into()
     }
 }
 
 impl From<LinkMetaKey<'_>> for BytesKey {
-    fn from(k: LinkMetaKey<'_>) -> Self {
-        (&k).into()
+    fn from(key: LinkMetaKey<'_>) -> Self {
+        (&key).into()
     }
 }
 
@@ -226,23 +234,27 @@ impl<'a> From<(&'a LinkAdd, &'a HeaderHash)> for LinkMetaKey<'a> {
 }
 
 impl<'a> From<&'a WireLinkMetaKey> for LinkMetaKey<'a> {
-    fn from(w: &'a WireLinkMetaKey) -> Self {
-        match w {
-            WireLinkMetaKey::Base(b) => Self::Base(b),
-            WireLinkMetaKey::BaseZome(b, z) => Self::BaseZome(b, *z),
-            WireLinkMetaKey::BaseZomeTag(b, z, t) => Self::BaseZomeTag(b, *z, t),
-            WireLinkMetaKey::Full(b, z, t, l) => Self::Full(b, *z, t, l),
+    fn from(wire_link_meta_key: &'a WireLinkMetaKey) -> Self {
+        match wire_link_meta_key {
+            WireLinkMetaKey::Base(base) => Self::Base(base),
+            WireLinkMetaKey::BaseZome(base, zome) => Self::BaseZome(base, *zome),
+            WireLinkMetaKey::BaseZomeTag(base, zome, tag) => Self::BaseZomeTag(base, *zome, tag),
+            WireLinkMetaKey::Full(base, zome, tag, link) => Self::Full(base, *zome, tag, link),
         }
     }
 }
 
 impl From<&LinkMetaKey<'_>> for WireLinkMetaKey {
-    fn from(k: &LinkMetaKey) -> Self {
-        match k.clone() {
-            LinkMetaKey::Base(b) => Self::Base(b.clone()),
-            LinkMetaKey::BaseZome(b, z) => Self::BaseZome(b.clone(), z),
-            LinkMetaKey::BaseZomeTag(b, z, t) => Self::BaseZomeTag(b.clone(), z, t.clone()),
-            LinkMetaKey::Full(b, z, t, l) => Self::Full(b.clone(), z, t.clone(), l.clone()),
+    fn from(key: &LinkMetaKey) -> Self {
+        match key.clone() {
+            LinkMetaKey::Base(base) => Self::Base(base.clone()),
+            LinkMetaKey::BaseZome(base, zome) => Self::BaseZome(base.clone(), zome),
+            LinkMetaKey::BaseZomeTag(base, zome, tag) => {
+                Self::BaseZomeTag(base.clone(), zome, tag.clone())
+            }
+            LinkMetaKey::Full(base, zome, tag, link) => {
+                Self::Full(base.clone(), zome, tag.clone(), link.clone())
+            }
         }
     }
 }

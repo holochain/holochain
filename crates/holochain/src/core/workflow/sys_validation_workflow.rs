@@ -136,18 +136,18 @@ async fn sys_validation_workflow_inner(
         match outcome {
             Outcome::Accepted => {
                 vlv.status = ValidationLimboStatus::SysValidated;
-                workspace.to_val_limbo(op_hash, vlv)?;
+                workspace.put_val_limbo(op_hash, vlv)?;
             }
             Outcome::SkipAppValidation => {
                 if vlv.pending_dependencies.pending_dependencies() {
                     vlv.status = ValidationLimboStatus::PendingValidation;
-                    workspace.to_val_limbo(op_hash, vlv)?;
+                    workspace.put_val_limbo(op_hash, vlv)?;
                 } else {
                     let iv = IntegrationLimboValue {
                         op: vlv.op,
                         validation_status: ValidationStatus::Valid,
                     };
-                    workspace.to_int_limbo(op_hash, iv, op)?;
+                    workspace.put_int_limbo(op_hash, iv, op)?;
                 }
             }
             Outcome::AwaitingOpDep(missing_dep) => {
@@ -161,18 +161,18 @@ async fn sys_validation_workflow_inner(
                 // we were meant to get a StoreElement or StoreEntry or
                 // RegisterAgentActivity or RegisterAddLink.
                 vlv.status = ValidationLimboStatus::AwaitingSysDeps(missing_dep);
-                workspace.to_val_limbo(op_hash, vlv)?;
+                workspace.put_val_limbo(op_hash, vlv)?;
             }
             Outcome::MissingDhtDep => {
                 vlv.status = ValidationLimboStatus::Pending;
-                workspace.to_val_limbo(op_hash, vlv)?;
+                workspace.put_val_limbo(op_hash, vlv)?;
             }
             Outcome::Rejected => {
                 let iv = IntegrationLimboValue {
                     op: vlv.op,
                     validation_status: ValidationStatus::Rejected,
                 };
-                workspace.to_int_limbo(op_hash, iv, op)?;
+                workspace.put_int_limbo(op_hash, iv, op)?;
             }
         }
     }
@@ -606,7 +606,7 @@ impl SysValidationWorkspace {
         })
     }
 
-    fn to_val_limbo(
+    fn put_val_limbo(
         &mut self,
         hash: DhtOpHash,
         mut vlv: ValidationLimboValue,
@@ -618,7 +618,7 @@ impl SysValidationWorkspace {
     }
 
     #[tracing::instrument(skip(self, hash, op))]
-    fn to_int_limbo(
+    fn put_int_limbo(
         &mut self,
         hash: DhtOpHash,
         iv: IntegrationLimboValue,
