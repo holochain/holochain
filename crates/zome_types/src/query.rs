@@ -73,7 +73,7 @@ impl ChainQueryFilter {
 #[cfg(feature = "fixturators")]
 mod tests {
     use crate::fixt::AppEntryTypeFixturator;
-    use crate::header::{EntryType, HeaderType};
+    use crate::header::EntryType;
     use crate::{fixt::*, Header};
     use ::fixt::prelude::*;
 
@@ -81,7 +81,7 @@ mod tests {
 
     /// Create three Headers with various properties.
     /// Also return the EntryTypes used to construct the first two headers.
-    fn fixtures() -> ([Header; 6], (EntryType, EntryType)) {
+    fn fixtures() -> [Header; 6] {
         let entry_type_1 = EntryType::App(fixt!(AppEntryType));
         let entry_type_2 = EntryType::AgentPubKey;
 
@@ -115,7 +115,7 @@ mod tests {
             h5.into(),
             h6.into(),
         ];
-        (headers, (entry_type_1, entry_type_2))
+        headers
     }
 
     fn map_query(query: &ChainQueryFilter, headers: &[Header]) -> Vec<bool> {
@@ -124,10 +124,12 @@ mod tests {
 
     #[test]
     fn filter_by_entry_type() {
-        let (headers, (entry_type_1, entry_type_2)) = fixtures();
+        let headers = fixtures();
 
-        let query_1 = ChainQueryFilter::new().entry_type(entry_type_1);
-        let query_2 = ChainQueryFilter::new().entry_type(entry_type_2);
+        let query_1 =
+            ChainQueryFilter::new().entry_type(headers[0].entry_type().unwrap().to_owned());
+        let query_2 =
+            ChainQueryFilter::new().entry_type(headers[1].entry_type().unwrap().to_owned());
 
         assert_eq!(
             map_query(&query_1, &headers),
@@ -141,11 +143,11 @@ mod tests {
 
     #[test]
     fn filter_by_header_type() {
-        let (headers, _) = fixtures();
+        let headers = fixtures();
 
-        let query_1 = ChainQueryFilter::new().header_type(HeaderType::EntryCreate);
-        let query_2 = ChainQueryFilter::new().header_type(HeaderType::EntryUpdate);
-        let query_3 = ChainQueryFilter::new().header_type(HeaderType::LinkAdd);
+        let query_1 = ChainQueryFilter::new().header_type(headers[0].header_type());
+        let query_2 = ChainQueryFilter::new().header_type(headers[1].header_type());
+        let query_3 = ChainQueryFilter::new().header_type(headers[2].header_type());
 
         assert_eq!(
             map_query(&query_1, &headers),
@@ -163,7 +165,7 @@ mod tests {
 
     #[test]
     fn filter_by_chain_sequence() {
-        let (headers, _) = fixtures();
+        let headers = fixtures();
 
         let query_1 = ChainQueryFilter::new().sequence_range(0..1);
         let query_2 = ChainQueryFilter::new().sequence_range(0..2);
@@ -190,17 +192,38 @@ mod tests {
 
     #[test]
     fn filter_by_multi() {
-        let (headers, (entry_type_1, entry_type_2)) = fixtures();
+        let headers = fixtures();
 
         assert_eq!(
             map_query(
                 &ChainQueryFilter::new()
-                    .header_type(HeaderType::EntryCreate)
-                    .entry_type(entry_type_1.clone())
+                    .header_type(headers[0].header_type())
+                    .entry_type(headers[0].entry_type().unwrap().clone())
                     .sequence_range(0..1),
                 &headers
             ),
             [true, false, false, false, false, false].to_vec()
+        );
+
+        assert_eq!(
+            map_query(
+                &ChainQueryFilter::new()
+                    .header_type(headers[1].header_type())
+                    .entry_type(headers[0].entry_type().unwrap().clone())
+                    .sequence_range(0..1000),
+                &headers
+            ),
+            [false, false, false, false, true, false].to_vec()
+        );
+
+        assert_eq!(
+            map_query(
+                &ChainQueryFilter::new()
+                    .entry_type(headers[0].entry_type().unwrap().clone())
+                    .sequence_range(0..1000),
+                &headers
+            ),
+            [true, false, true, false, true, true].to_vec()
         );
     }
 }
