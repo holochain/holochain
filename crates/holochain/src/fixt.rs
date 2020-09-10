@@ -1,6 +1,5 @@
 pub mod curve;
 
-use crate::conductor::delete_me_create_test_keystore;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsHostAccess;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
 use crate::core::ribosome::guest_callback::init::InitHostAccess;
@@ -241,21 +240,18 @@ fixturator!(
     KeystoreSender;
     curve Empty {
         tokio_safe_block_on::tokio_safe_block_forever_on(async {
-            let _ = holochain_crypto::crypto_init_sodium();
-            delete_me_create_test_keystore().await
+            holochain_keystore::test_keystore::spawn_test_keystore().await.unwrap()
         })
     };
     curve Unpredictable {
         // TODO: Make this unpredictable
         tokio_safe_block_on::tokio_safe_block_forever_on(async {
-            let _ = holochain_crypto::crypto_init_sodium();
-            delete_me_create_test_keystore().await
+            holochain_keystore::test_keystore::spawn_test_keystore().await.unwrap()
         })
     };
     curve Predictable {
         tokio_safe_block_on::tokio_safe_block_forever_on(async {
-            let _ = holochain_crypto::crypto_init_sodium();
-            delete_me_create_test_keystore().await
+            holochain_keystore::test_keystore::spawn_test_keystore().await.unwrap()
         })
     };
 );

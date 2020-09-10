@@ -38,9 +38,8 @@ use crate::{
     core::state::{source_chain::SourceChainBuf, wasm::WasmBuf},
 };
 use holochain_keystore::{
-    lair_keystore::spawn_lair_keystore,
-    test_keystore::{spawn_test_keystore, MockKeypair},
-    KeystoreSender, KeystoreSenderExt,
+    lair_keystore::spawn_lair_keystore, test_keystore::spawn_test_keystore, KeystoreSender,
+    KeystoreSenderExt,
 };
 use holochain_state::{
     buffer::BufferedStore,
@@ -642,54 +641,6 @@ where
     }
 }
 
-// -- TODO - delete this helper when we have a real keystore -- //
-
-pub(crate) async fn delete_me_create_test_keystore() -> KeystoreSender {
-    use std::convert::TryFrom;
-    let keystore = spawn_test_keystore(vec![
-        MockKeypair {
-            pub_key: holo_hash::AgentPubKey::try_from(
-                "uhCAkw-zrttiYpdfAYX4fR6W8DPUdheZJ-1QsRA4cTImmzTYUcOr4",
-            )
-            .unwrap(),
-            sec_key: vec![
-                220, 218, 15, 212, 178, 51, 204, 96, 121, 97, 6, 205, 179, 84, 80, 159, 84, 163,
-                193, 46, 127, 15, 47, 91, 134, 106, 72, 72, 51, 76, 26, 16, 195, 236, 235, 182,
-                216, 152, 165, 215, 192, 97, 126, 31, 71, 165, 188, 12, 245, 29, 133, 230, 73, 251,
-                84, 44, 68, 14, 28, 76, 137, 166, 205, 54,
-            ],
-        },
-        MockKeypair {
-            pub_key: holo_hash::AgentPubKey::try_from(
-                "uhCAkomHzekU0-x7p62WmrusdxD2w9wcjdajC88688JGSTEo6cbEK",
-            )
-            .unwrap(),
-            sec_key: vec![
-                170, 205, 134, 46, 233, 225, 100, 162, 101, 124, 207, 157, 12, 131, 239, 244, 216,
-                190, 244, 161, 209, 56, 159, 135, 240, 134, 88, 28, 48, 75, 227, 244, 162, 97, 243,
-                122, 69, 52, 251, 30, 233, 235, 101, 166, 174, 235, 29, 196, 61, 176, 247, 7, 35,
-                117, 168, 194, 243, 206, 188, 240, 145, 146, 76, 74,
-            ],
-        },
-    ])
-    .await
-    .unwrap();
-
-    // pre-populate with our two fixture agent keypairs
-    keystore
-        .generate_sign_keypair_from_pure_entropy()
-        .await
-        .unwrap();
-    keystore
-        .generate_sign_keypair_from_pure_entropy()
-        .await
-        .unwrap();
-
-    keystore
-}
-
-// -- TODO - end -- //
-
 //-----------------------------------------------------------------------------
 // Private methods
 //-----------------------------------------------------------------------------
@@ -829,7 +780,17 @@ mod builder {
                 if std::env::var("HOLOCHAIN_LAIR_KEYSTORE").is_ok() {
                     spawn_lair_keystore(None).await?
                 } else {
-                    delete_me_create_test_keystore().await
+                    let keystore = spawn_test_keystore().await?;
+                    // pre-populate with our two fixture agent keypairs
+                    keystore
+                        .generate_sign_keypair_from_pure_entropy()
+                        .await
+                        .unwrap();
+                    keystore
+                        .generate_sign_keypair_from_pure_entropy()
+                        .await
+                        .unwrap();
+                    keystore
                 }
             };
             let env_path = self.config.environment_path.clone();

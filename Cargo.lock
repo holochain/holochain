@@ -1735,31 +1735,37 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore_api"
-version = "0.0.1-alpha.2"
+version = "0.0.1-alpha.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5ebd66fcfa33202689dfb4e571e596a5a2e1b536e069ecd1ec90d5f7ca02e8e"
+checksum = "ad1d362d2ae9453803b627fcb07da14bca2efdd464262f8f758b331a77a631eb"
 dependencies = [
+ "blake2b_simd",
  "byteorder",
  "derive_more",
  "directories 3.0.1",
  "futures",
  "ghost_actor",
+ "nanoid",
+ "num_cpus",
+ "once_cell",
+ "rayon",
+ "rcgen",
  "ring",
  "thiserror",
  "tokio",
+ "toml",
 ]
 
 [[package]]
 name = "lair_keystore_client"
-version = "0.0.1-alpha.2"
+version = "0.0.1-alpha.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6b4b48d9e6840603179e4f842f599673beccd1995c6fb2fbe7177e7616917d4c"
+checksum = "fcb0ea59c6bb96e553853115cc0a474c8152b2143e6ff0d493e05151aaa5d9cd"
 dependencies = [
  "ghost_actor",
  "lair_keystore_api",
  "tempfile",
  "tokio",
- "toml",
  "tracing",
 ]
 
@@ -2301,12 +2307,12 @@ dependencies = [
 
 [[package]]
 name = "pem"
-version = "0.7.0"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1581760c757a756a41f0ee3ff01256227bdf64cb752839779b95ffb01c59793"
+checksum = "59698ea79df9bf77104aefd39cc3ec990cb9693fb59c3b0a70ddf2646fdffb4b"
 dependencies = [
- "base64 0.11.0",
- "lazy_static",
+ "base64 0.12.3",
+ "once_cell",
  "regex",
 ]
 
@@ -2794,9 +2800,9 @@ dependencies = [
 
 [[package]]
 name = "rcgen"
-version = "0.8.0"
+version = "0.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "473b47fadc41518b93a9fde7401fe30736f1a2f33708f0d5bc747c6d2daee37f"
+checksum = "4974f7e96ee51fa3c90c3022e02c3a7117e71cb2a84518a55e44360135200c25"
 dependencies = [
  "chrono",
  "pem",

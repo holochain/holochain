@@ -40,7 +40,7 @@ pub async fn load_conductor_from_legacy_config(
     builder: ConductorBuilder,
 ) -> Result<ConductorHandle, CompatConfigError> {
     let config = config_from_legacy(&legacy);
-    let keystore = spawn_test_keystore(Vec::new()).await?;
+    let keystore = spawn_test_keystore().await?;
 
     let conductor: ConductorHandle = builder
         .config(config)
