@@ -17,6 +17,15 @@ impl From<Vec<HeaderHash>> for HeaderHashes {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, SerializedBytes)]
+pub struct HeaderHashedVec(pub Vec<HeaderHashed>);
+
+impl From<Vec<HeaderHashed>> for HeaderHashedVec {
+    fn from(vs: Vec<HeaderHashed>) -> Self {
+        Self(vs)
+    }
+}
+
 /// Header contains variants for each type of header.
 ///
 /// This struct really defines a local source chain, in the sense that it

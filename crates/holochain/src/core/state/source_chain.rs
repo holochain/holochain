@@ -7,7 +7,7 @@ pub use error::*;
 use fallible_iterator::FallibleIterator;
 use holo_hash::*;
 use holochain_state::{buffer::BufferedStore, error::DatabaseResult, fresh_reader, prelude::*};
-use holochain_types::{prelude::*, EntryHashed};
+use holochain_types::{prelude::*, EntryHashed, HeaderHashed};
 use holochain_zome_types::capability::GrantedFunction;
 use holochain_zome_types::{
     capability::{CapGrant, CapSecret},
@@ -187,9 +187,14 @@ impl SourceChain {
     //     }
     // }
 
-    pub fn query(&self, query: &ChainQueryFilter) -> SourceChainResult<Vec<HeaderHash>> {
-        todo!()
-        // self.iter_back().filter(|shh| h)
+    /// Query Headers in the source chain.
+    /// This returns a Vec rather than an iterator because it is intended to be
+    /// used by the `query` host function, which crosses the wasm boundary
+    pub fn query(&self, query: &ChainQueryFilter) -> SourceChainResult<Vec<HeaderHashed>> {
+        self.iter_back()
+            .filter(|shh| Ok(query.check(shh.header())))
+            .map(|shh| Ok(shh.header_hashed().clone()))
+            .collect()
     }
 }
 
@@ -238,7 +243,8 @@ pub mod tests {
         {
             let mut store = SourceChainBuf::new(env.clone().into())?;
             store.genesis(fake_dna_hash(1), alice.clone(), None).await?;
-            env.with_commit(|writer| store.flush_to_txn(writer))?;
+            env.guard()
+                .with_commit(|writer| store.flush_to_txn(writer))?;
         }
 
         {
