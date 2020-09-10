@@ -332,7 +332,7 @@ pub fn check_not_private(entry_def: &EntryDef) -> SysValidationResult<()> {
 
 /// Check the headers entry hash matches the hash of the entry
 pub async fn check_entry_hash(hash: &EntryHash, entry: &Entry) -> SysValidationResult<()> {
-    if *hash == EntryHash::with_data(entry).await {
+    if *hash == EntryHash::with_data_sync(entry) {
         Ok(())
     } else {
         Err(ValidationOutcome::EntryHash.into())
