@@ -146,54 +146,51 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT>(
 
     {
         for chain_element in to_app_validate {
-            match chain_element.header() {
-                Header::LinkAdd(link_add) => {
-                    let (base, target) = {
-                        let mut workspace = workspace_lock.write().await;
-                        let mut cascade = workspace.cascade(network.clone());
-                        let base_address: AnyDhtHash = link_add.base_address.clone().into();
-                        let base = cascade
-                            .retrieve(base_address.clone(), GetOptions.into())
-                            .await
-                            .map_err(|e| RibosomeError::from(e))?
-                            .ok_or_else(|| RibosomeError::ElementDeps(base_address.clone()))?
-                            .into_inner()
-                            .1
-                            .ok_or_else(|| RibosomeError::ElementDeps(base_address.clone()))?;
-                        let base = Arc::new(base);
-                        let target_address: AnyDhtHash = link_add.target_address.clone().into();
-                        let target = cascade
-                            .retrieve(target_address.clone(), GetOptions.into())
-                            .await
-                            .map_err(|e| RibosomeError::from(e))?
-                            .ok_or_else(|| RibosomeError::ElementDeps(target_address.clone()))?
-                            .into_inner()
-                            .1
-                            .ok_or_else(|| RibosomeError::ElementDeps(target_address.clone()))?;
-                        let target = Arc::new(target);
-                        (base, target)
-                    };
-                    let link_add = Arc::new(link_add.clone());
-                    let outcome = app_validation_workflow::run_link_validation_callback(
-                        zome_name.clone(),
-                        link_add,
-                        base,
-                        target,
-                        &ribosome,
-                        workspace_lock.clone(),
-                        network.clone(),
-                    )?;
-                    match outcome {
-                        app_validation_workflow::Outcome::Accepted => (),
-                        app_validation_workflow::Outcome::Rejected(reason) => {
-                            return Err(SourceChainError::InvalidLinkAdd(reason).into())
-                        }
-                        app_validation_workflow::Outcome::AwaitingDeps(hashes) => {
-                            return Err(SourceChainError::InvalidCommit(format!("{:?}", hashes)))?
-                        }
+            if let Header::LinkAdd(link_add) = chain_element.header() {
+                let (base, target) = {
+                    let mut workspace = workspace_lock.write().await;
+                    let mut cascade = workspace.cascade(network.clone());
+                    let base_address: AnyDhtHash = link_add.base_address.clone().into();
+                    let base = cascade
+                        .retrieve(base_address.clone(), GetOptions.into())
+                        .await
+                        .map_err(RibosomeError::from)?
+                        .ok_or_else(|| RibosomeError::ElementDeps(base_address.clone()))?
+                        .into_inner()
+                        .1
+                        .ok_or_else(|| RibosomeError::ElementDeps(base_address.clone()))?;
+                    let base = Arc::new(base);
+                    let target_address: AnyDhtHash = link_add.target_address.clone().into();
+                    let target = cascade
+                        .retrieve(target_address.clone(), GetOptions.into())
+                        .await
+                        .map_err(RibosomeError::from)?
+                        .ok_or_else(|| RibosomeError::ElementDeps(target_address.clone()))?
+                        .into_inner()
+                        .1
+                        .ok_or_else(|| RibosomeError::ElementDeps(target_address.clone()))?;
+                    let target = Arc::new(target);
+                    (base, target)
+                };
+                let link_add = Arc::new(link_add.clone());
+                let outcome = app_validation_workflow::run_link_validation_callback(
+                    zome_name.clone(),
+                    link_add,
+                    base,
+                    target,
+                    &ribosome,
+                    workspace_lock.clone(),
+                    network.clone(),
+                )?;
+                match outcome {
+                    app_validation_workflow::Outcome::Accepted => (),
+                    app_validation_workflow::Outcome::Rejected(reason) => {
+                        return Err(SourceChainError::InvalidLinkAdd(reason).into());
+                    }
+                    app_validation_workflow::Outcome::AwaitingDeps(hashes) => {
+                        return Err(SourceChainError::InvalidCommit(format!("{:?}", hashes)).into());
                     }
                 }
-                _ => (),
             }
 
             match chain_element.header() {

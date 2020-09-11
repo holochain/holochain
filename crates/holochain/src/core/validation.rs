@@ -89,7 +89,7 @@ impl<T> Dependency<T> {
 /// ## Failed validation
 /// If in the above scenario Op B fails to validate then
 /// Op A will also fail validation.
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Default)]
 pub struct PendingDependencies {
     /// PendingDependencies that hadn't finished validation at the
     /// time we used them to validate this op.
@@ -99,14 +99,12 @@ pub struct PendingDependencies {
 impl PendingDependencies {
     /// Create a new pending deps
     pub fn new() -> Self {
-        Self {
-            pending: Vec::new(),
-        }
+        Default::default()
     }
 
     /// Are there any dependencies that we need to check?
     pub fn pending_dependencies(&self) -> bool {
-        self.pending.len() > 0
+        !self.pending.is_empty()
     }
 }
 
@@ -156,7 +154,7 @@ impl PendingDependencies {
     /// Create a dependency on a store element op
     /// from a header.
     pub fn store_element(&mut self, dep: Dependency<SignedHeaderHashed>) -> SignedHeaderHashed {
-        let shh = match dep {
+        match dep {
             Dependency::Claim(shh) | Dependency::Proof(shh) => shh,
             Dependency::PendingValidation(shh) => {
                 let header = shh.header();
@@ -164,8 +162,7 @@ impl PendingDependencies {
                 self.pending.push(hash.into());
                 shh
             }
-        };
-        shh
+        }
     }
 
     /// Create a dependency on a add link op
@@ -189,7 +186,7 @@ impl PendingDependencies {
         &mut self,
         dep: Dependency<SignedHeaderHashed>,
     ) -> SignedHeaderHashed {
-        let shh = match dep {
+        match dep {
             Dependency::Claim(shh) | Dependency::Proof(shh) => shh,
             Dependency::PendingValidation(shh) => {
                 let header = shh.header();
@@ -197,8 +194,7 @@ impl PendingDependencies {
                 self.pending.push(hash.into());
                 shh
             }
-        };
-        shh
+        }
     }
 }
 
