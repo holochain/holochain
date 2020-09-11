@@ -152,7 +152,13 @@ impl PendingDependencies {
 
     /// Are there any dependencies that we need to check?
     pub fn pending_dependencies(&self) -> bool {
-        self.pending.len() > 0
+        !self.pending.is_empty()
+    }
+}
+
+impl Default for PendingDependencies {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

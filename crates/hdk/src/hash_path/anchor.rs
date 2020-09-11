@@ -91,7 +91,7 @@ pub fn list_anchor_type_addresses() -> Result<Vec<holo_hash::EntryHash>, HdkErro
 
 pub fn list_anchor_addresses(anchor_type: String) -> Result<Vec<holo_hash::EntryHash>, HdkError> {
     let path: Path = (&Anchor {
-        anchor_type: anchor_type,
+        anchor_type,
         anchor_text: None,
     })
         .into();
@@ -111,7 +111,7 @@ pub fn list_anchor_addresses(anchor_type: String) -> Result<Vec<holo_hash::Entry
 /// return the
 pub fn list_anchor_tags(anchor_type: String) -> Result<Vec<String>, HdkError> {
     let path: Path = (&Anchor {
-        anchor_type: anchor_type,
+        anchor_type,
         anchor_text: None,
     })
         .into();

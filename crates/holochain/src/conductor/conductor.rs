@@ -249,7 +249,7 @@ where
                 .into_iter()
                 .collect();
         // Exit if the admin interfaces fail to be created
-        let handles = handles.map_err(|e| Box::new(e))?;
+        let handles = handles.map_err(Box::new)?;
 
         {
             let mut ports = Vec::new();
@@ -323,7 +323,7 @@ where
                 )?;
                 Cell::genesis(cell_id_inner, conductor_handle, env, proof).await
             })
-            .map_err(|e| CellError::from(e))
+            .map_err(CellError::from)
             .and_then(|result| async move { result.map(|_| cell_id) })
         });
         let (success, errors): (Vec<_>, Vec<_>) = futures::future::join_all(cells_tasks)
@@ -607,11 +607,11 @@ where
         let mut dna_def_buf = DnaDefBuf::new(environ.clone().into(), dna_def_db)?;
         // TODO: PERF: This loop might be slow
         for (wasm_hash, dna_wasm) in dna.code().clone().into_iter() {
-            if let None = wasm_buf.get(&wasm_hash).await? {
+            if wasm_buf.get(&wasm_hash).await?.is_none() {
                 wasm_buf.put(DnaWasmHashed::from_content(dna_wasm).await);
             }
         }
-        if let None = dna_def_buf.get(dna.dna_hash()).await? {
+        if dna_def_buf.get(dna.dna_hash()).await?.is_none() {
             dna_def_buf.put(dna.dna().clone()).await?;
         }
         {

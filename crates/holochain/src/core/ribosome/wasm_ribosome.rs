@@ -73,6 +73,7 @@ use holochain_zome_types::post_commit::PostCommitCallbackResult;
 use holochain_zome_types::validate::ValidateCallbackResult;
 use holochain_zome_types::validate::ValidationPackageCallbackResult;
 use holochain_zome_types::validate_link_add::ValidateLinkAddCallbackResult;
+use holochain_zome_types::zome::FunctionName;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::CallbackResult;
 use holochain_zome_types::ZomeCallInvocationResponse;
@@ -80,7 +81,7 @@ use holochain_zome_types::{header::ZomeId, GuestOutput};
 use std::sync::Arc;
 
 /// Path to the wasm cache path
-const WASM_CACHE_PATH_ENV: &'static str = "HC_WASM_CACHE_PATH";
+const WASM_CACHE_PATH_ENV: &str = "HC_WASM_CACHE_PATH";
 
 /// The only WasmRibosome is a Wasm ribosome.
 /// note that this is cloned on every invocation so keep clones cheap!
@@ -358,17 +359,16 @@ impl RibosomeT for WasmRibosome {
     }
 
     fn zome_name_to_id(&self, zome_name: &ZomeName) -> RibosomeResult<ZomeId> {
-        let header_zome_id: holochain_zome_types::header::ZomeId = match self
+        match self
             .dna_file()
             .dna
             .zomes
             .iter()
             .position(|(name, _)| name == zome_name)
         {
-            Some(index) => holochain_zome_types::header::ZomeId::from(index as u8),
-            None => Err(RibosomeError::ZomeNotExists(zome_name.clone()))?,
-        };
-        Ok(header_zome_id)
+            Some(index) => Ok(holochain_zome_types::header::ZomeId::from(index as u8)),
+            None => Err(RibosomeError::ZomeNotExists(zome_name.to_owned())),
+        }
     }
 
     /// call a function in a zome for an invocation if it exists
@@ -378,7 +378,7 @@ impl RibosomeT for WasmRibosome {
         host_access: HostAccess,
         invocation: &I,
         zome_name: &ZomeName,
-        to_call: String,
+        to_call: &FunctionName,
     ) -> Result<Option<GuestOutput>, RibosomeError> {
         let call_context = CallContext {
             zome_name: zome_name.clone(),
@@ -386,7 +386,7 @@ impl RibosomeT for WasmRibosome {
         };
         let module = self.module(call_context.clone())?;
 
-        if module.info().exports.contains_key(&to_call) {
+        if module.info().exports.contains_key(to_call.as_ref()) {
             // there is a callback to_call and it is implemented in the wasm
             // it is important to fully instantiate this (e.g. don't try to use the module above)
             // because it builds guards against memory leaks and handles imports correctly
@@ -394,7 +394,7 @@ impl RibosomeT for WasmRibosome {
 
             let result: GuestOutput = holochain_wasmer_host::guest::call(
                 &mut instance,
-                &to_call,
+                to_call.as_ref(),
                 // be aware of this clone!
                 // the whole invocation is cloned!
                 // @todo - is this a problem for large payloads like entries?

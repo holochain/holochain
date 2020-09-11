@@ -30,7 +30,7 @@ fn whoarethey(agent_pubkey: AgentPubKey) -> ExternResult<AgentInfo> {
     let response: ZomeCallInvocationResponse = call_remote!(
         agent_pubkey,
         zome_info!()?.zome_name,
-        "whoami".to_string(),
+        "whoami".to_string().into(),
         ().into(),
         ().try_into()?
     )?;

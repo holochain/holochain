@@ -134,12 +134,12 @@ pub async fn integrate_dht_ops_workflow(
         }
         sorted_ops = next_ops;
         // Either all ops are integrated or we couldn't integrate any on this pass
-        if sorted_ops.len() == 0 || num_integrated == 0 {
+        if sorted_ops.is_empty() || num_integrated == 0 {
             break;
         }
     }
 
-    let result = if sorted_ops.len() == 0 {
+    let result = if sorted_ops.is_empty() {
         // There were no ops deferred, meaning we exhausted the queue
         WorkComplete::Complete
     } else {

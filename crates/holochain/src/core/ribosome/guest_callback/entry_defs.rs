@@ -14,6 +14,7 @@ use std::collections::BTreeMap;
 pub struct EntryDefsInvocation;
 
 impl EntryDefsInvocation {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self
     }

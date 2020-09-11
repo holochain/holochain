@@ -4,6 +4,7 @@
 use holo_hash::*;
 use holochain_keystore::*;
 use holochain_serialized_bytes::prelude::*;
+use holochain_zome_types::zome::FunctionName;
 use holochain_zome_types::{capability::CapSecret, zome::ZomeName};
 use std::sync::Arc;
 
@@ -60,7 +61,7 @@ impl HolochainP2pCell {
         &mut self,
         to_agent: AgentPubKey,
         zome_name: ZomeName,
-        fn_name: String,
+        fn_name: FunctionName,
         cap: CapSecret,
         request: SerializedBytes,
     ) -> actor::HolochainP2pResult<SerializedBytes> {
