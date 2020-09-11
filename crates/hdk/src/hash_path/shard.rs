@@ -37,7 +37,7 @@ impl FromStr for ShardStrategy {
     /// a shard strategy is parsed as "width:depth#..." at the start of a string
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         // the first char needs to be a digit
-        match s.chars().nth(0) {
+        match s.chars().next() {
             Some(first_char) => {
                 match u32::from_str(&first_char.to_string()) {
                     Ok(_) => {

@@ -4,7 +4,6 @@ use super::{
 };
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::ZomeCallInvocation;
-use crate::core::ribosome::ZomeCallInvocationResponse;
 use crate::core::ribosome::{error::RibosomeResult, RibosomeT, ZomeCallHostAccess};
 use crate::core::state::source_chain::SourceChainError;
 use crate::core::state::workspace::Workspace;
@@ -25,6 +24,7 @@ use holochain_state::prelude::*;
 use holochain_types::element::Element;
 use holochain_zome_types::entry::GetOptions;
 use holochain_zome_types::header::Header;
+use holochain_zome_types::ZomeCallInvocationResponse;
 use std::sync::Arc;
 use tracing::instrument;
 
@@ -147,7 +147,6 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT>(
     {
         for chain_element in to_app_validate {
             match chain_element.header() {
-                // @todo have app validate in its own workflow
                 Header::LinkAdd(link_add) => {
                     let (base, target) = {
                         let mut workspace = workspace_lock.write().await;
@@ -194,7 +193,7 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT>(
                         }
                     }
                 }
-                _ => {}
+                _ => (),
             }
 
             match chain_element.header() {
@@ -205,10 +204,13 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT>(
                 | Header::InitZomesComplete(_) => {
                     // These headers don't get validated
                 }
-                Header::LinkAdd(_) | Header::LinkRemove(_) => {
+                Header::LinkAdd(_) => {
                     // These get validate via validate link
                 }
-                Header::EntryCreate(_) | Header::EntryUpdate(_) | Header::ElementDelete(_) => {
+                Header::EntryCreate(_)
+                | Header::EntryUpdate(_)
+                | Header::ElementDelete(_)
+                | Header::LinkRemove(_) => {
                     let element = Arc::new(chain_element);
                     let outcome = app_validation_workflow::run_validation_callback(
                         zome_name.clone(),
@@ -295,7 +297,7 @@ pub mod tests {
         workflow::{error::WorkflowError, genesis_workflow::tests::fake_genesis},
     };
     use crate::fixt::KeystoreSenderFixturator;
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
     use holochain_p2p::HolochainP2pCellFixturator;
     use holochain_serialized_bytes::prelude::*;
     use holochain_state::{env::ReadManager, test_utils::test_cell_env};

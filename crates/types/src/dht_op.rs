@@ -116,8 +116,7 @@ impl DhtOp {
 
     /// Returns the basis hash which determines which agents will receive this DhtOp
     pub async fn dht_basis(&self) -> AnyDhtHash {
-        let basis = self.as_unique_form().basis().await;
-        basis
+        self.as_unique_form().basis().await
     }
 
     /// Convert a [DhtOp] to a [DhtOpLight] and basis

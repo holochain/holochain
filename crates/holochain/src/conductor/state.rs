@@ -35,6 +35,7 @@ pub type AppInterfaceNick = String;
 
 impl ConductorState {
     /// Retrieve info about an installed App by its AppId
+    #[allow(clippy::ptr_arg)]
     pub fn get_app_info(&self, app_id: &AppId) -> Option<InstalledApp> {
         self.active_apps
             .get(app_id)

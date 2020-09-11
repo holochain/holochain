@@ -25,15 +25,13 @@ holo_hash = { version = "0.0.1", path = "../holo_hash" }
 holochain_crypto = { version = "0.0.1", path = "../crypto" }
 holochain_keystore = { version = "0.0.1", path = "../keystore" }
 holochain_serialized_bytes = "=0.0.43"
-holochain_zome_types = { path = "../zome_types" }
+holochain_zome_types = { path = "../zome_types", features = ["fixturators"] }
 lazy_static = "1.4.0"
-multihash = "0.8.0"
 must_future = "0.1.1"
 nanoid = "0.3"
 observability = { path = "../observability" }
 rand = "0.7"
 regex = "1.1.2"
-rust-base58 = "0.0.4"
 serde = { version = "1.0.104", features = [ "derive", "rc" ] }
 serde_bytes = "0.11"
 serde_derive = "1.0.104"

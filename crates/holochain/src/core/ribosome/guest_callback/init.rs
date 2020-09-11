@@ -105,7 +105,7 @@ mod test {
     use crate::fixt::InitHostAccessFixturator;
     use crate::fixt::InitInvocationFixturator;
     use crate::fixt::ZomeNameFixturator;
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::dna::zome::HostFnAccess;
     use holochain_zome_types::init::InitCallbackResult;
@@ -228,7 +228,7 @@ mod slow_tests {
     use crate::fixt::InitHostAccessFixturator;
     use crate::fixt::InitInvocationFixturator;
     use crate::fixt::WasmRibosomeFixturator;
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(threaded_scheduler)]

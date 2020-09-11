@@ -348,7 +348,7 @@ where
         cell_id: cell_id.clone(),
         zome_name: zome_name.into(),
         cap: CapSecretFixturator::new(Unpredictable).next().unwrap(),
-        fn_name: func.to_string(),
+        fn_name: func.into(),
         payload: HostInput::new(payload.try_into()?),
         provenance: cell_id.agent_pubkey().clone(),
     })
@@ -362,7 +362,7 @@ async fn commit_invalid(
     dna_file: &DnaFile,
 ) -> (HeaderHash, EntryHash) {
     let entry = ThisWasmEntry::NeverValidates;
-    let entry_hash = EntryHash::with_data(&Entry::try_from(entry.clone()).unwrap()).await;
+    let entry_hash = EntryHash::with_data_sync(&Entry::try_from(entry.clone()).unwrap());
     let (bob_env, call_data) = CallData::create(bob_cell_id, handle, dna_file).await;
     // 4
     let invalid_header_hash = commit_entry(

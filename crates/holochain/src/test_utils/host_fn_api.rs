@@ -2,7 +2,6 @@ use crate::{
     conductor::ConductorHandle,
     core::ribosome::RibosomeT,
     core::ribosome::ZomeCallInvocation,
-    core::ribosome::ZomeCallInvocationResponse,
     core::{
         ribosome::{host_fn, wasm_ribosome::WasmRibosome, CallContext, ZomeCallHostAccess},
         state::{metadata::LinkMetaKey, workspace::Workspace},
@@ -29,7 +28,7 @@ use holochain_zome_types::{
     metadata::Details,
     zome::ZomeName,
     CommitEntryInput, DeleteEntryInput, GetDetailsInput, GetInput, GetLinksInput, LinkEntriesInput,
-    RemoveLinkInput, UpdateEntryInput,
+    RemoveLinkInput, UpdateEntryInput, ZomeCallInvocationResponse,
 };
 use std::sync::Arc;
 use tracing::*;

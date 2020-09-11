@@ -53,7 +53,7 @@ impl TryFrom<&Entry> for ThisWasmEntry {
             Entry::App(eb) => Ok(Self::try_from(SerializedBytes::from(eb.to_owned()))?),
             _ => Err(SerializedBytesError::FromBytes(
                 "failed to deserialize ThisWasmEntry".into(),
-            ))?,
+            ).into()),
         }
     }
 }

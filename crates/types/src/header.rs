@@ -315,7 +315,7 @@ impl TryFrom<SignedHeaderHashed> for WireNewEntryHeader {
         match header {
             Header::EntryCreate(ec) => Ok(Self::Create((ec, s).into())),
             Header::EntryUpdate(eu) => Ok(Self::Update((eu, s).into())),
-            _ => return Err(HeaderError::NotNewEntry),
+            _ => Err(HeaderError::NotNewEntry),
         }
     }
 }

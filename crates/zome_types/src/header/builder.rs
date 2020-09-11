@@ -52,6 +52,7 @@ macro_rules! builder_variant {
             $(pub $field : $t),*
         }
 
+        #[allow(clippy::new_without_default)]
         impl $name {
             pub fn new($($field : $t),* ) -> Self {
                 Self {

@@ -235,7 +235,7 @@ mod slow_tests {
     use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
     use crate::fixt::curve::Zomes;
     use crate::fixt::*;
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
     use holo_hash::HeaderHash;
     use holochain_wasm_test_utils::TestWasm;
 

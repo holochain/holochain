@@ -65,7 +65,7 @@ pub async fn integrate_dht_ops_workflow(
     let mut sorted_ops = BinaryHeap::new();
     for iv in ops {
         let op = light_to_op(iv.op.clone(), &workspace.element_judged).await?;
-        let hash = DhtOpHash::with_data(&op).await;
+        let hash = DhtOpHash::with_data_sync(&op);
         let order = DhtOpOrder::from(&op);
         let v = OrderedOp {
             order,
@@ -134,12 +134,12 @@ pub async fn integrate_dht_ops_workflow(
         }
         sorted_ops = next_ops;
         // Either all ops are integrated or we couldn't integrate any on this pass
-        if sorted_ops.len() == 0 || num_integrated == 0 {
+        if sorted_ops.is_empty() || num_integrated == 0 {
             break;
         }
     }
 
-    let result = if sorted_ops.len() == 0 {
+    let result = if sorted_ops.is_empty() {
         // There were no ops deferred, meaning we exhausted the queue
         WorkComplete::Complete
     } else {

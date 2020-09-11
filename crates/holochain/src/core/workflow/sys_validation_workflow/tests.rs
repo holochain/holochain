@@ -268,8 +268,8 @@ async fn bob_links_in_a_legit_way(
 ) -> HeaderHash {
     let base = Post("Bananas are good for you".into());
     let target = Post("Potassium is radioactive".into());
-    let base_entry_hash = EntryHash::with_data(&Entry::try_from(base.clone()).unwrap()).await;
-    let target_entry_hash = EntryHash::with_data(&Entry::try_from(target.clone()).unwrap()).await;
+    let base_entry_hash = EntryHash::with_data_sync(&Entry::try_from(base.clone()).unwrap());
+    let target_entry_hash = EntryHash::with_data_sync(&Entry::try_from(target.clone()).unwrap());
     let link_tag = fixt!(LinkTag);
     let (bob_env, call_data) = CallData::create(bob_cell_id, handle, dna_file).await;
     // 3
@@ -315,10 +315,10 @@ async fn bob_makes_a_large_link(
     let base = Post("Small time base".into());
     let target = Post("Spam it big time".into());
     let bad_update = Msg("This is not the msg you were looking for".into());
-    let base_entry_hash = EntryHash::with_data(&Entry::try_from(base.clone()).unwrap()).await;
-    let target_entry_hash = EntryHash::with_data(&Entry::try_from(target.clone()).unwrap()).await;
+    let base_entry_hash = EntryHash::with_data_sync(&Entry::try_from(base.clone()).unwrap());
+    let target_entry_hash = EntryHash::with_data_sync(&Entry::try_from(target.clone()).unwrap());
     let bad_update_entry_hash =
-        EntryHash::with_data(&Entry::try_from(bad_update.clone()).unwrap()).await;
+        EntryHash::with_data_sync(&Entry::try_from(bad_update.clone()).unwrap());
 
     let bytes = (0..401).map(|_| 0u8).into_iter().collect::<Vec<_>>();
     let link_tag = LinkTag(bytes);
@@ -374,8 +374,8 @@ async fn bob_makes_a_large_link(
 async fn dodgy_bob(bob_cell_id: &CellId, handle: &ConductorHandle, dna_file: &DnaFile) {
     let base = Post("Bob is the best and I'll link to proof so you can check".into());
     let target = Post("Dodgy proof Bob is the best".into());
-    let base_entry_hash = EntryHash::with_data(&Entry::try_from(base.clone()).unwrap()).await;
-    let target_entry_hash = EntryHash::with_data(&Entry::try_from(target.clone()).unwrap()).await;
+    let base_entry_hash = EntryHash::with_data_sync(&Entry::try_from(base.clone()).unwrap());
+    let target_entry_hash = EntryHash::with_data_sync(&Entry::try_from(target.clone()).unwrap());
     let link_tag = fixt!(LinkTag);
     let (bob_env, call_data) = CallData::create(bob_cell_id, handle, dna_file).await;
 

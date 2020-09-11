@@ -4,6 +4,7 @@
 use holo_hash::*;
 use holochain_keystore::*;
 use holochain_serialized_bytes::prelude::*;
+use holochain_zome_types::zome::FunctionName;
 use holochain_zome_types::{capability::CapSecret, zome::ZomeName};
 use std::sync::Arc;
 
@@ -31,6 +32,16 @@ pub struct HolochainP2pCell {
 }
 
 impl HolochainP2pCell {
+    /// owned getter
+    pub fn dna_hash(&self) -> DnaHash {
+        (*self.dna_hash).clone()
+    }
+
+    /// owned getter
+    pub fn from_agent(&self) -> AgentPubKey {
+        (*self.from_agent).clone()
+    }
+
     /// The p2p module must be informed at runtime which dna/agent pairs it should be tracking.
     pub async fn join(&mut self) -> actor::HolochainP2pResult<()> {
         self.sender
@@ -50,7 +61,7 @@ impl HolochainP2pCell {
         &mut self,
         to_agent: AgentPubKey,
         zome_name: ZomeName,
-        fn_name: String,
+        fn_name: FunctionName,
         cap: CapSecret,
         request: SerializedBytes,
     ) -> actor::HolochainP2pResult<SerializedBytes> {

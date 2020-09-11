@@ -102,7 +102,7 @@ pub async fn spawn_queue_consumer_tasks(
         .send(ManagedTaskAdd::dont_handle(handle))
         .await
         .expect("Failed to manage workflow handle");
-    if let Err(_) = create_tx_sys.send(tx_sys.clone()) {
+    if create_tx_sys.send(tx_sys.clone()).is_err() {
         panic!("Failed to send tx_sys");
     }
 
@@ -175,7 +175,7 @@ impl TriggerReceiver {
         use tokio::sync::mpsc::error::TryRecvError;
 
         // wait for next item
-        if let Some(_) = self.0.recv().await {
+        if self.0.recv().await.is_some() {
             // drain the channel
             loop {
                 match self.0.try_recv() {
@@ -185,7 +185,7 @@ impl TriggerReceiver {
                 }
             }
         } else {
-            return Err(QueueTriggerClosedError);
+            Err(QueueTriggerClosedError)
         }
     }
 }

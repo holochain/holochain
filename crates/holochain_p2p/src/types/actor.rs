@@ -3,6 +3,7 @@
 
 use crate::*;
 use holochain_zome_types::request::MetadataRequest;
+use holochain_zome_types::zome::FunctionName;
 
 /// Request a validation package.
 pub struct GetValidationPackage {
@@ -155,7 +156,7 @@ ghost_actor::ghost_chan! {
             from_agent: AgentPubKey,
             to_agent: AgentPubKey,
             zome_name: ZomeName,
-            fn_name: String,
+            fn_name: FunctionName,
             cap: CapSecret,
             request: SerializedBytes,
         ) -> SerializedBytes;
