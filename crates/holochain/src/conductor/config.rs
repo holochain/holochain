@@ -32,6 +32,12 @@ pub struct ConductorConfig {
     /// If omitted, chooses a default path.
     pub environment_path: EnvironmentRootPath,
 
+    /// Enabling this will use a test keystore instead of lair.
+    /// This generates publicly accessible private keys.
+    /// DO NOT USE THIS IN PRODUCTION!
+    #[serde(default)]
+    pub use_dangerous_test_keystore: bool,
+
     /// Config options for the network module. Optional.
     pub network: Option<NetworkConfig>,
 
@@ -65,12 +71,6 @@ pub struct ConductorConfig {
 
     /// Setup admin interfaces to control this conductor through a websocket connection
     pub admin_interfaces: Option<Vec<AdminInterfaceConfig>>,
-
-    /// Enabling this will use a test keystore instead of lair.
-    /// This generates publicly accessible private keys.
-    /// DO NOT USE THIS IN PRODUCTION!
-    #[serde(default)]
-    pub use_dangerous_test_keystore: bool,
     //
     //
     // /// Which signals to emit
