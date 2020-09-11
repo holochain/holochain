@@ -224,11 +224,15 @@ impl AsRef<DhtOpHash> for DepType {
         }
     }
 }
+
+/// Exit early with either an outcome or an error
 pub enum OutcomeOrError<T, E> {
     Outcome(T),
     Err(E),
 }
 
+/// Helper macro for implementing from sub error types
+/// for the error in OutcomeOrError
 #[macro_export]
 macro_rules! from_sub_error {
     ($error_type:ident, $sub_error_type:ident) => {
