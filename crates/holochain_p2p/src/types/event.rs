@@ -53,7 +53,7 @@ ghost_actor::ghost_chan! {
             to_agent: AgentPubKey,
             from_agent: AgentPubKey,
             zome_name: ZomeName,
-            fn_name: String,
+            fn_name: FunctionName,
             cap: CapSecret,
             request: SerializedBytes,
         ) -> SerializedBytes;

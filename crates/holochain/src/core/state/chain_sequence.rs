@@ -82,6 +82,11 @@ impl ChainSequenceBuf {
         self.current_head.as_ref()
     }
 
+    /// empty if len is 0
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     /// The length is just the next index
     pub fn len(&self) -> usize {
         self.next_index as usize

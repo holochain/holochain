@@ -85,6 +85,7 @@ impl InterfaceApi for RealAppInterfaceApi {
             self.conductor_handle
                 .check_running()
                 .await
+                .map_err(Box::new)
                 .map_err(InterfaceError::RequestHandler)?;
         }
         match request {

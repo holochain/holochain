@@ -7,13 +7,13 @@ pub use error::*;
 use fallible_iterator::FallibleIterator;
 use holo_hash::*;
 use holochain_state::{buffer::BufferedStore, error::DatabaseResult, fresh_reader, prelude::*};
-use holochain_types::{prelude::*, EntryHashed};
-use holochain_zome_types::capability::CapAccess;
+use holochain_types::{prelude::*, EntryHashed, HeaderHashed};
 use holochain_zome_types::capability::GrantedFunction;
 use holochain_zome_types::{
     capability::{CapGrant, CapSecret},
-    entry::{CapClaimEntry, Entry},
-    header::{builder, EntryType, Header, HeaderBuilder, HeaderBuilderCommon, HeaderInner},
+    entry::{CapClaimEntry, CapGrantEntry, Entry},
+    header::{builder, EntryType, HeaderBuilder, HeaderBuilderCommon, HeaderInner},
+    query::ChainQueryFilter,
 };
 use shrinkwraprs::Shrinkwrap;
 pub use source_chain_buffer::*;
@@ -45,7 +45,7 @@ impl SourceChain {
         Ok(SourceChainBuf::new(env)?.into())
     }
 
-    pub async fn public_only(env: EnvironmentRead) -> DatabaseResult<Self> {
+    pub fn public_only(env: EnvironmentRead) -> DatabaseResult<Self> {
         Ok(SourceChainBuf::public_only(env)?.into())
     }
 
@@ -95,7 +95,7 @@ impl SourceChain {
     /// NB: [B-01676] the entry must be persisted for this to work. Once we have a
     /// proper capability index DB, OR a proper iterator that respects the
     /// scratch space, that will no longer be the case.
-    pub async fn valid_cap_grant(
+    pub fn valid_cap_grant(
         &self,
         check_function: &GrantedFunction,
         check_agent: &AgentPubKey,
@@ -241,6 +241,7 @@ impl SourceChain {
         Ok(committed_valid_grant)
     }
 
+    // @todo bring all this back when we want to administer cap claims better
     //         /// Fetch a CapClaim from the private entries.
     //         ///
     //         /// NB: [B-01676] the entry must be persisted for this to work. Once we have a
@@ -285,6 +286,16 @@ impl SourceChain {
     //         }
     //     }
     // }
+
+    /// Query Headers in the source chain.
+    /// This returns a Vec rather than an iterator because it is intended to be
+    /// used by the `query` host function, which crosses the wasm boundary
+    pub fn query(&self, query: &ChainQueryFilter) -> SourceChainResult<Vec<HeaderHashed>> {
+        self.iter_back()
+            .filter(|shh| Ok(query.check(shh.header())))
+            .map(|shh| Ok(shh.header_hashed().clone()))
+            .collect()
+    }
 }
 
 impl From<SourceChainBuf> for SourceChain {
@@ -317,10 +328,10 @@ pub mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn test_get_cap_grant() -> SourceChainResult<()> {
         let test_env = test_cell_env();
-        let arc = test_env.env();
-        let env = arc.guard();
-        let secret = CapSecretFixturator::new(Unpredictable).next().unwrap();
+        let env = test_env.env();
+        let secret = access.secret().unwrap();
         let access = CapAccess::from(secret.clone());
+
         // @todo curry
         let _curry = CurryPayloadsFixturator::new(Empty).next().unwrap();
         let function: GrantedFunction = ("foo".into(), "bar".into());
@@ -331,15 +342,16 @@ pub mod tests {
         let alice = agents.next().unwrap();
         let bob = agents.next().unwrap();
         {
-            let mut store = SourceChainBuf::new(arc.clone().into())?;
+            let mut store = SourceChainBuf::new(env.clone().into())?;
             store.genesis(fake_dna_hash(1), alice.clone(), None).await?;
-            env.with_commit(|writer| store.flush_to_txn(writer))?;
+            env.guard()
+                .with_commit(|writer| store.flush_to_txn(writer))?;
         }
 
         {
-            let chain = SourceChain::new(arc.clone().into())?;
+            let chain = SourceChain::new(env.clone().into())?;
             assert_eq!(
-                chain.valid_cap_grant(&function, &alice, &secret).await?,
+                chain.valid_cap_grant(&function, &alice, secret)?,
                 Some(CapGrant::Authorship(alice.clone())),
             );
 
@@ -407,7 +419,7 @@ pub mod tests {
         };
 
         {
-            let chain = SourceChain::new(arc.clone().into())?;
+            let chain = SourceChain::new(env.clone().into())?;
             // alice should find her own authorship with higher priority than the committed grant
             // even if she passes in the secret
             assert_eq!(
@@ -469,16 +481,17 @@ pub mod tests {
         Ok(())
     }
 
+    // @todo bring all this back when we want to administer cap claims better
     // #[tokio::test(threaded_scheduler)]
     // async fn test_get_cap_claim() -> SourceChainResult<()> {
     //     let test_env = test_cell_env();
-    //     let arc = test_env.env();
-    //     let env = arc.guard().await;
+    //     let env = test_env.env();
+    //     let env = env.guard().await;
     //     let secret = CapSecretFixturator::new(Unpredictable).next().unwrap();
     //     let agent_pubkey = fake_agent_pubkey_1().into();
     //     let claim = CapClaim::new("tag".into(), agent_pubkey, secret.clone());
     //     {
-    //         let mut store = SourceChainBuf::new(arc.clone().into(), &env).await?;
+    //         let mut store = SourceChainBuf::new(env.clone().into(), &env).await?;
     //         store
     //             .genesis(fake_dna_hash(1), fake_agent_pubkey_1(), None)
     //             .await?;
@@ -486,7 +499,7 @@ pub mod tests {
     //     }
     //
     //     {
-    //         let mut chain = SourceChain::new(arc.clone().into(), &env).await?;
+    //         let mut chain = SourceChain::new(env.clone().into(), &env).await?;
     //         chain.put_cap_claim(claim.clone()).await?;
     //
     // // ideally the following would work, but it won't because currently
@@ -502,7 +515,7 @@ pub mod tests {
     //     }
     //
     //     {
-    //         let chain = SourceChain::new(arc.clone().into(), &env).await?;
+    //         let chain = SourceChain::new(env.clone().into(), &env).await?;
     //         assert_eq!(
     //             chain.get_persisted_cap_claim_by_secret(&secret).await?,
     //             Some(claim)

@@ -51,9 +51,8 @@ pub fn get_link_details<'a>(
 pub mod slow_tests {
 
     use crate::fixt::ZomeCallHostAccessFixturator;
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
     use holo_hash::HasHash;
-
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::header::LinkAdd;
     use test_wasm_common::*;
@@ -71,11 +70,11 @@ pub mod slow_tests {
             .await
             .unwrap();
 
-        // ensure foo.bar twice to ensure idempotency
         let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock;
 
+        // ensure foo.bar twice to ensure idempotency
         let _: () = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,

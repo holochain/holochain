@@ -59,10 +59,9 @@ async fn test_cell_handle_publish() {
         author: agent.clone(),
         timestamp: Timestamp::now().into(),
         hash: dna.clone(),
-        header_seq: 42,
     });
     let op = DhtOp::StoreElement(sig, header.clone(), None);
-    let op_hash = DhtOpHashed::from_content(op.clone()).await.into_hash();
+    let op_hash = DhtOpHashed::from_content_sync(op.clone()).into_hash();
     let header_hash = HeaderHashed::from_content_sync(header.clone()).into_hash();
 
     cell.handle_publish(
@@ -77,7 +76,7 @@ async fn test_cell_handle_publish() {
     let workspace =
         IncomingDhtOpsWorkspace::new(cell.env.clone().into()).expect("Could not create Workspace");
 
-    workspace.op_exists(&op_hash).await.unwrap();
+    workspace.op_exists(&op_hash).unwrap();
 
     stop_tx.send(()).unwrap();
     shutdown.await.unwrap();

@@ -38,9 +38,7 @@ impl<R: RibosomeT, I: Invocation + 'static> FallibleIterator for CallIterator<R,
     type Item = (ZomeName, GuestOutput);
     type Error = RibosomeError;
     fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
-        let next = Ok(match self.remaining_zomes.first() {
-            // there are no zomes left, we are finished
-            None => None,
+        Ok(match self.remaining_zomes.first() {
             Some(zome_name) => {
                 match self.remaining_components.next() {
                     Some(to_call) => {
@@ -48,7 +46,7 @@ impl<R: RibosomeT, I: Invocation + 'static> FallibleIterator for CallIterator<R,
                             self.host_access.clone(),
                             &self.invocation,
                             zome_name,
-                            to_call,
+                            &to_call.into(),
                         )? {
                             Some(result) => Some((zome_name.clone(), result)),
                             None => self.next()?,
@@ -63,8 +61,8 @@ impl<R: RibosomeT, I: Invocation + 'static> FallibleIterator for CallIterator<R,
                     }
                 }
             }
-        });
-        next
+            None => None,
+        })
     }
 }
 
@@ -82,6 +80,7 @@ mod tests {
     use crate::fixt::ZomeNameFixturator;
     use fallible_iterator::FallibleIterator;
     use holochain_zome_types::init::InitCallbackResult;
+    use holochain_zome_types::zome::FunctionName;
     use holochain_zome_types::zome::ZomeName;
     use holochain_zome_types::GuestOutput;
     use mockall::predicate::*;
@@ -132,7 +131,12 @@ mod tests {
                 // the invocation zome name and component will be called by the ribosome
                 ribosome
                     .expect_maybe_call::<MockInvocation>()
-                    .with(always(), always(), eq(zome_name.clone()), eq(fn_component))
+                    .with(
+                        always(),
+                        always(),
+                        eq(zome_name.clone()),
+                        eq(FunctionName::from(fn_component)),
+                    )
                     .times(1)
                     .in_sequence(&mut sequence)
                     .returning(|_, _, _, _| {

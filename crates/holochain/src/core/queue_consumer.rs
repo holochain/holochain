@@ -43,7 +43,7 @@ mod produce_dht_ops_consumer;
 use produce_dht_ops_consumer::*;
 mod publish_dht_ops_consumer;
 use super::state::workspace::WorkspaceError;
-use crate::conductor::manager::ManagedTaskAdd;
+use crate::conductor::{api::CellConductorApiT, manager::ManagedTaskAdd};
 use holochain_p2p::HolochainP2pCell;
 use publish_dht_ops_consumer::*;
 
@@ -55,33 +55,53 @@ use publish_dht_ops_consumer::*;
 pub async fn spawn_queue_consumer_tasks(
     env: &EnvironmentWrite,
     cell_network: HolochainP2pCell,
+    conductor_api: impl CellConductorApiT + 'static,
     mut task_sender: sync::mpsc::Sender<ManagedTaskAdd>,
     stop: sync::broadcast::Sender<()>,
 ) -> InitialQueueTriggers {
+    // Publish
     let (tx_publish, rx1, handle) =
-        spawn_publish_dht_ops_consumer(env.clone(), stop.subscribe(), cell_network);
+        spawn_publish_dht_ops_consumer(env.clone(), stop.subscribe(), cell_network.clone());
     task_sender
         .send(ManagedTaskAdd::dont_handle(handle))
         .await
         .expect("Failed to manage workflow handle");
+
+    let (create_tx_sys, get_tx_sys) = tokio::sync::oneshot::channel();
+
+    // Integration
     let (tx_integration, rx2, handle) =
-        spawn_integrate_dht_ops_consumer(env.clone(), stop.subscribe());
+        spawn_integrate_dht_ops_consumer(env.clone(), stop.subscribe(), get_tx_sys);
     task_sender
         .send(ManagedTaskAdd::dont_handle(handle))
         .await
         .expect("Failed to manage workflow handle");
+
+    // App validation
     let (tx_app, rx3, handle) =
         spawn_app_validation_consumer(env.clone(), stop.subscribe(), tx_integration.clone());
     task_sender
         .send(ManagedTaskAdd::dont_handle(handle))
         .await
         .expect("Failed to manage workflow handle");
-    let (tx_sys, rx4, handle) =
-        spawn_sys_validation_consumer(env.clone(), stop.subscribe(), tx_app);
+
+    // Sys validation
+    let (tx_sys, rx4, handle) = spawn_sys_validation_consumer(
+        env.clone(),
+        stop.subscribe(),
+        tx_app,
+        cell_network,
+        conductor_api,
+    );
     task_sender
         .send(ManagedTaskAdd::dont_handle(handle))
         .await
         .expect("Failed to manage workflow handle");
+    if create_tx_sys.send(tx_sys.clone()).is_err() {
+        panic!("Failed to send tx_sys");
+    }
+
+    // Produce
     let (tx_produce, rx5, handle) =
         spawn_produce_dht_ops_consumer(env.clone(), stop.subscribe(), tx_publish.clone());
     task_sender
@@ -102,6 +122,7 @@ pub async fn spawn_queue_consumer_tasks(
     }
 }
 
+#[derive(Clone)]
 /// The entry points for kicking off a chain reaction of queue activity
 pub struct InitialQueueTriggers {
     /// Notify the SysValidation workflow to run, i.e. after handling gossip
@@ -149,7 +170,7 @@ impl TriggerReceiver {
         use tokio::sync::mpsc::error::TryRecvError;
 
         // wait for next item
-        if let Some(_) = self.0.recv().await {
+        if self.0.recv().await.is_some() {
             // drain the channel
             loop {
                 match self.0.try_recv() {
@@ -159,7 +180,7 @@ impl TriggerReceiver {
                 }
             }
         } else {
-            return Err(QueueTriggerClosedError);
+            Err(QueueTriggerClosedError)
         }
     }
 }
@@ -173,7 +194,7 @@ pub struct OneshotWriter(EnvironmentWrite);
 
 impl OneshotWriter {
     /// Create the writer and pass it into a closure.
-    pub async fn with_writer<F>(self, f: F) -> Result<(), WorkspaceError>
+    pub fn with_writer<F>(self, f: F) -> Result<(), WorkspaceError>
     where
         F: FnOnce(&mut Writer) -> Result<(), WorkspaceError> + Send,
     {

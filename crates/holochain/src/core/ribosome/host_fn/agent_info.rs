@@ -27,7 +27,7 @@ pub fn agent_info<'a>(
 pub mod test {
 
     use crate::fixt::ZomeCallHostAccessFixturator;
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
 
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_wasm_test_utils::TestWasm;

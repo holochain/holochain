@@ -1,4 +1,4 @@
-use fixt::prelude::*;
+use ::fixt::prelude::*;
 use hdk3::prelude::*;
 use holo_hash::fixt::*;
 use holochain::conductor::{
@@ -106,6 +106,7 @@ async fn ser_regression_test() {
         .expect_add_entry_defs::<Vec<_>>()
         .times(2)
         .return_const(());
+    dna_store.expect_get_entry_def().return_const(None);
 
     let (_tmpdir, app_api, handle) = setup_app(
         vec![(alice_installed_cell, None), (bob_installed_cell, None)],
@@ -125,7 +126,7 @@ async fn ser_regression_test() {
         cell_id: alice_cell_id.clone(),
         zome_name: TestWasm::SerRegression.into(),
         cap: CapSecretFixturator::new(Unpredictable).next().unwrap(),
-        fn_name: "create_channel".to_string(),
+        fn_name: "create_channel".into(),
         payload: HostInput::new(channel.try_into().unwrap()),
         provenance: alice_agent_id.clone(),
     };
@@ -162,7 +163,7 @@ async fn ser_regression_test() {
         cell_id: alice_cell_id.clone(),
         zome_name: TestWasm::SerRegression.into(),
         cap: CapSecretFixturator::new(Unpredictable).next().unwrap(),
-        fn_name: "create_message".to_string(),
+        fn_name: "create_message".into(),
         payload: HostInput::new(message.try_into().unwrap()),
         provenance: alice_agent_id.clone(),
     };

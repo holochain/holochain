@@ -33,6 +33,8 @@ pub mod metadata;
 pub mod migrate_agent;
 #[allow(missing_docs)]
 pub mod post_commit;
+pub mod query;
+pub mod request;
 pub mod signature;
 pub mod timestamp;
 #[allow(missing_docs)]
@@ -46,7 +48,11 @@ pub mod zome_info;
 #[allow(missing_docs)]
 mod zome_io;
 
-pub mod request;
+#[allow(missing_docs)]
+#[cfg(feature = "fixturators")]
+pub mod fixt;
+
+pub mod test_utils;
 
 pub use entry::Entry;
 pub use header::Header;

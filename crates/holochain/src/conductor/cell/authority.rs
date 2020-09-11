@@ -6,7 +6,7 @@ use crate::core::state::{
 use fallible_iterator::FallibleIterator;
 
 use holo_hash::EntryHash;
-use holochain_state::{env::EnvironmentWrite, fresh_reader, prelude::ReadManager};
+use holochain_state::{env::EnvironmentWrite, fresh_reader};
 use holochain_types::{
     element::{GetElementResponse, RawGetEntryResponse},
     header::WireEntryUpdateRelationship,

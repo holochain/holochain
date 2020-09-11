@@ -24,7 +24,7 @@ pub mod wasm_test {
     use crate::core::ribosome::ZomeCallInvocation;
     use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
     use crate::fixt::ZomeCallHostAccessFixturator;
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
     use hdk3::prelude::*;
     use holochain_types::app::InstalledCell;
     use holochain_types::cell::CellId;
@@ -177,7 +177,7 @@ pub mod wasm_test {
                 cell_id: alice_cell_id.clone(),
                 zome_name: TestWasm::Capability.into(),
                 cap: ().into(),
-                fn_name: "try_cap_claim".to_string(),
+                fn_name: "try_cap_claim".into(),
                 payload: HostInput::new(
                     CapFor(original_secret, bob_agent_id.clone().try_into().unwrap())
                         .try_into()
@@ -208,8 +208,13 @@ pub mod wasm_test {
                 cell_id: bob_cell_id.clone(),
                 zome_name: TestWasm::Capability.into(),
                 cap: ().into(),
+<<<<<<< HEAD
                 fn_name: "transferable_cap_grant".to_string(),
                 payload: HostInput::new(original_secret.try_into().unwrap()),
+=======
+                fn_name: "transferable_cap_grant".into(),
+                payload: HostInput::new(some_secret.try_into().unwrap()),
+>>>>>>> eb0eb3a2c6229d8c8567567cdd0858f3da9173e6
                 provenance: bob_agent_id.clone(),
             })
             .await
@@ -230,7 +235,7 @@ pub mod wasm_test {
                 cell_id: alice_cell_id.clone(),
                 zome_name: TestWasm::Capability.into(),
                 cap: ().into(),
-                fn_name: "try_cap_claim".to_string(),
+                fn_name: "try_cap_claim".into(),
                 payload: HostInput::new(
                     CapFor(original_secret, bob_agent_id.clone().try_into().unwrap())
                         .try_into()

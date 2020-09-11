@@ -15,7 +15,7 @@ let
    url = "https://github.com/${config.holonix.github.owner}/${config.holonix.github.repo}/tarball/${config.holonix.github.ref}";
    sha256 = config.holonix.github.sha256;
   }
- ) { config = config; };
+ ) { config = config; use-stable-rust = true; };
  # END HOLONIX IMPORT BOILERPLATE
 
 in

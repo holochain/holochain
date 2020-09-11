@@ -39,9 +39,7 @@ pub async fn initialize_zomes_workflow<'env, Ribosome: RibosomeT>(
         let mut guard = workspace_lock.write().await;
         let workspace: &mut CallZomeWorkspace = &mut guard;
         // commit the workspace
-        writer
-            .with_writer(|writer| Ok(workspace.flush_to_txn_ref(writer)?))
-            .await?;
+        writer.with_writer(|writer| Ok(workspace.flush_to_txn_ref(writer)?))?;
     }
     Ok(result)
 }
@@ -79,7 +77,7 @@ pub mod tests {
     use crate::core::workflow::fake_genesis;
     use crate::fixt::DnaDefFixturator;
     use crate::fixt::KeystoreSenderFixturator;
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
     use fixt::Unpredictable;
     use holochain_p2p::HolochainP2pCellFixturator;
     use holochain_state::test_utils::test_cell_env;

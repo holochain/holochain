@@ -26,9 +26,7 @@ pub async fn produce_dht_ops_workflow(
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // commit the workspace
-    writer
-        .with_writer(|writer| Ok(workspace.flush_to_txn(writer)?))
-        .await?;
+    writer.with_writer(|writer| Ok(workspace.flush_to_txn(writer)?))?;
 
     // trigger other workflows
     trigger_publish.trigger();
@@ -44,7 +42,7 @@ async fn produce_dht_ops_workflow_inner(
 
     for (index, ops) in all_ops {
         for op in ops {
-            let (op, hash) = DhtOpHashed::from_content(op).await.into_inner();
+            let (op, hash) = DhtOpHashed::from_content_sync(op).into_inner();
             debug!(?hash, ?op);
             let value = AuthoredDhtOpsValue {
                 op: op.to_light().await,
@@ -66,11 +64,11 @@ pub struct ProduceDhtOpsWorkspace {
 }
 
 impl ProduceDhtOpsWorkspace {
-    pub async fn new(env: EnvironmentRead) -> WorkspaceResult<Self> {
+    pub fn new(env: EnvironmentRead) -> WorkspaceResult<Self> {
         let authored_dht_ops = env.get_db(&*AUTHORED_DHT_OPS)?;
         Ok(Self {
-            source_chain: SourceChain::public_only(env.clone()).await?,
-            authored_dht_ops: KvBufFresh::new(env.clone(), authored_dht_ops),
+            source_chain: SourceChain::public_only(env.clone())?,
+            authored_dht_ops: KvBufFresh::new(env, authored_dht_ops),
         })
     }
 }
@@ -202,17 +200,16 @@ mod tests {
                 .with_commit(|writer| source_chain.flush_to_txn(writer))
                 .unwrap();
 
-            futures::future::join_all(all_ops.iter().flatten().map(|o| DhtOpHash::with_data(o)))
-                .await
-                .into_iter()
+            all_ops
+                .iter()
+                .flatten()
+                .map(|o| DhtOpHash::with_data_sync(o))
                 .collect()
         };
 
         // Run the workflow and commit it
         {
-            let mut workspace = ProduceDhtOpsWorkspace::new(env.clone().into())
-                .await
-                .unwrap();
+            let mut workspace = ProduceDhtOpsWorkspace::new(env.clone().into()).unwrap();
             let complete = produce_dht_ops_workflow_inner(&mut workspace)
                 .await
                 .unwrap();
@@ -225,9 +222,7 @@ mod tests {
         // Pull out the results and check them
         let last_count = {
             let reader = env_ref.reader().unwrap();
-            let workspace = ProduceDhtOpsWorkspace::new(env.clone().into())
-                .await
-                .unwrap();
+            let workspace = ProduceDhtOpsWorkspace::new(env.clone().into()).unwrap();
 
             // Get the authored ops
             let authored_results = workspace
@@ -258,9 +253,7 @@ mod tests {
         // Call the workflow again now the queue should be the same length as last time
         // because no new ops should hav been added
         {
-            let mut workspace = ProduceDhtOpsWorkspace::new(env.clone().into())
-                .await
-                .unwrap();
+            let mut workspace = ProduceDhtOpsWorkspace::new(env.clone().into()).unwrap();
             let complete = produce_dht_ops_workflow_inner(&mut workspace)
                 .await
                 .unwrap();
@@ -272,9 +265,7 @@ mod tests {
 
         // Check the lengths are unchanged
         {
-            let workspace = ProduceDhtOpsWorkspace::new(env.clone().into())
-                .await
-                .unwrap();
+            let workspace = ProduceDhtOpsWorkspace::new(env.clone().into()).unwrap();
             let env_ref = env.guard();
             let reader = env_ref.reader().unwrap();
             let authored_count = workspace

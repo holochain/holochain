@@ -80,7 +80,7 @@ fn try_cap_claim(cap_for: CapFor) -> ExternResult<ZomeCallInvocationResponse> {
     let result: ZomeCallInvocationResponse = call_remote!(
         cap_for.1,
         zome_info!()?.zome_name,
-        "needs_cap_claim".to_string(),
+        "needs_cap_claim".to_string().into(),
         cap_for.0,
         ().try_into()?
     )?;

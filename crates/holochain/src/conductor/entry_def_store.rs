@@ -122,11 +122,12 @@ impl BufferedStore for EntryDefBuf {
     }
 }
 
+#[tracing::instrument(skip(dna))]
 /// Get all the [EntryDef] for this dna
-pub(crate) async fn get_entry_defs(
+pub(crate) fn get_entry_defs(
     dna: DnaFile,
 ) -> EntryDefStoreResult<Vec<(EntryDefBufferKey, EntryDef)>> {
-    let invocation = EntryDefsInvocation::new();
+    let invocation = EntryDefsInvocation;
 
     // Get the zomes hashes
     let zomes = dna
@@ -152,6 +153,9 @@ pub(crate) async fn get_entry_defs(
                         .into_iter()
                         .enumerate()
                         .map(move |(i, entry_def)| {
+                            let s = tracing::debug_span!("entry_def");
+                            let _g = s.enter();
+                            tracing::debug!(?entry_def);
                             Ok((
                                 EntryDefBufferKey {
                                     zome: zome.clone(),
@@ -167,7 +171,7 @@ pub(crate) async fn get_entry_defs(
                 .collect()
         }
         EntryDefsResult::Err(zome_name, msg) => {
-            return Err(EntryDefStoreError::CallbackFailed(zome_name, msg))
+            Err(EntryDefStoreError::CallbackFailed(zome_name, msg))
         }
     }
 }

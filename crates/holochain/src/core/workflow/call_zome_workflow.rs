@@ -60,9 +60,7 @@ pub async fn call_zome_workflow<'env, Ribosome: RibosomeT>(
     {
         let mut guard = workspace_lock.write().await;
         let workspace = &mut guard;
-        writer
-            .with_writer(|writer| Ok(workspace.flush_to_txn_ref(writer)?))
-            .await?;
+        writer.with_writer(|writer| Ok(workspace.flush_to_txn_ref(writer)?))?;
     }
 
     trigger_produce_dht_ops.trigger();
@@ -152,89 +150,73 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT>(
         let mut workspace = workspace_lock.write().await;
         let mut cascade = workspace.cascade(network);
         for chain_element in to_app_validate {
-            match chain_element.header() {
-                // @todo have app validate in its own workflow
-                Header::LinkAdd(link_add) => {
-                    let validate: ValidateLinkAddResult = ribosome.run_validate_link_add(
-                        ValidateLinkAddHostAccess,
-                        ValidateLinkAddInvocation {
-                            zome_name: zome_name.clone(),
-                            base: Arc::new({
-                                let base_address: AnyDhtHash = link_add.base_address.clone().into();
-                                #[allow(clippy::eval_order_dependence)]
-                                cascade
-                                    .dht_get(base_address.clone(), GetOptions.into())
-                                    .await
-                                    .map_err(|e| RibosomeError::from(e))?
-                                    .ok_or_else(|| {
-                                        RibosomeError::ElementDeps(base_address.clone())
-                                    })?
-                                    .entry()
-                                    .as_option()
-                                    .ok_or_else(|| {
-                                        RibosomeError::ElementDeps(base_address.clone())
-                                    })?
-                                    .to_owned()
-                            }),
-                            target: Arc::new({
-                                let target_address: AnyDhtHash =
-                                    link_add.target_address.clone().into();
-                                #[allow(clippy::eval_order_dependence)]
-                                cascade
-                                    .dht_get(target_address.clone(), GetOptions.into())
-                                    .await
-                                    .map_err(|e| RibosomeError::from(e))?
-                                    .ok_or_else(|| {
-                                        RibosomeError::ElementDeps(target_address.clone())
-                                    })?
-                                    .entry()
-                                    .as_option()
-                                    .ok_or_else(|| {
-                                        RibosomeError::ElementDeps(target_address.clone())
-                                    })?
-                                    .to_owned()
-                            }),
-                            link_add: Arc::new(link_add.to_owned()),
-                        },
-                    )?;
-                    match validate {
-                        ValidateLinkAddResult::Valid => {}
-                        ValidateLinkAddResult::Invalid(reason) => {
-                            Err(SourceChainError::InvalidLinkAdd(reason))?
-                        }
+            // @todo have app validate in its own workflow
+            if let Header::LinkAdd(link_add) = chain_element.header() {
+                let validate: ValidateLinkAddResult = ribosome.run_validate_link_add(
+                    ValidateLinkAddHostAccess,
+                    ValidateLinkAddInvocation {
+                        zome_name: zome_name.clone(),
+                        base: Arc::new({
+                            let base_address: AnyDhtHash = link_add.base_address.clone().into();
+                            #[allow(clippy::eval_order_dependence)]
+                            cascade
+                                .dht_get(base_address.clone(), GetOptions.into())
+                                .await
+                                .map_err(RibosomeError::from)?
+                                .ok_or_else(|| RibosomeError::ElementDeps(base_address.clone()))?
+                                .entry()
+                                .as_option()
+                                .ok_or_else(|| RibosomeError::ElementDeps(base_address.clone()))?
+                                .to_owned()
+                        }),
+                        target: Arc::new({
+                            let target_address: AnyDhtHash = link_add.target_address.clone().into();
+                            #[allow(clippy::eval_order_dependence)]
+                            cascade
+                                .dht_get(target_address.clone(), GetOptions.into())
+                                .await
+                                .map_err(RibosomeError::from)?
+                                .ok_or_else(|| RibosomeError::ElementDeps(target_address.clone()))?
+                                .entry()
+                                .as_option()
+                                .ok_or_else(|| RibosomeError::ElementDeps(target_address.clone()))?
+                                .to_owned()
+                        }),
+                        link_add: Arc::new(link_add.to_owned()),
+                    },
+                )?;
+                match validate {
+                    ValidateLinkAddResult::Valid => {}
+                    ValidateLinkAddResult::Invalid(reason) => {
+                        return Err(SourceChainError::InvalidLinkAdd(reason).into());
                     }
                 }
-                _ => {}
             }
 
-            match chain_element.entry() {
-                holochain_types::element::ElementEntry::Present(entry) => {
-                    let validate: ValidateResult = ribosome.run_validate(
-                        ValidateHostAccess,
-                        ValidateInvocation {
-                            zome_name: zome_name.clone(),
-                            entry: Arc::new(entry.clone()),
-                        },
-                    )?;
-                    match validate {
-                        ValidateResult::Valid => {}
-                        // when the wasm is being called directly in a zome invocation any
-                        // state other than valid is not allowed for new entries
-                        // e.g. we require that all dependencies are met when committing an
-                        // entry to a local source chain
-                        // this is different to the case where we are validating data coming in
-                        // from the network where unmet dependencies would need to be
-                        // rescheduled to attempt later due to partitions etc.
-                        ValidateResult::Invalid(reason) => {
-                            Err(SourceChainError::InvalidCommit(reason))?
-                        }
-                        ValidateResult::UnresolvedDependencies(hashes) => {
-                            Err(SourceChainError::InvalidCommit(format!("{:?}", hashes)))?
-                        }
+            if let holochain_types::element::ElementEntry::Present(entry) = chain_element.entry() {
+                let validate: ValidateResult = ribosome.run_validate(
+                    ValidateHostAccess,
+                    ValidateInvocation {
+                        zome_name: zome_name.clone(),
+                        entry: Arc::new(entry.clone()),
+                    },
+                )?;
+                match validate {
+                    ValidateResult::Valid => {}
+                    // when the wasm is being called directly in a zome invocation any
+                    // state other than valid is not allowed for new entries
+                    // e.g. we require that all dependencies are met when committing an
+                    // entry to a local source chain
+                    // this is different to the case where we are validating data coming in
+                    // from the network where unmet dependencies would need to be
+                    // rescheduled to attempt later due to partitions etc.
+                    ValidateResult::Invalid(reason) => {
+                        return Err(SourceChainError::InvalidCommit(reason).into());
+                    }
+                    ValidateResult::UnresolvedDependencies(hashes) => {
+                        return Err(SourceChainError::InvalidCommit(format!("{:?}", hashes)).into());
                     }
                 }
-                // if there is no entry this is a noop
-                _ => {}
             }
         }
     }
@@ -294,7 +276,7 @@ pub mod tests {
         workflow::{error::WorkflowError, genesis_workflow::tests::fake_genesis},
     };
     use crate::fixt::KeystoreSenderFixturator;
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
     use holochain_p2p::HolochainP2pCellFixturator;
     use holochain_serialized_bytes::prelude::*;
     use holochain_state::{env::ReadManager, test_utils::test_cell_env};
@@ -341,7 +323,7 @@ pub mod tests {
         // FIXME: CAP: Set this function to private
         let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(
             crate::core::ribosome::NamedInvocation(
-                holochain_types::cell::CellIdFixturator::new(fixt::Unpredictable)
+                holochain_types::fixt::CellIdFixturator::new(fixt::Unpredictable)
                     .next()
                     .unwrap(),
                 TestWasm::Foo.into(),
@@ -415,7 +397,7 @@ pub mod tests {
 
         let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(
             crate::core::ribosome::NamedInvocation(
-                holochain_types::cell::CellIdFixturator::new(fixt::Unpredictable)
+                holochain_types::fixt::CellIdFixturator::new(fixt::Unpredictable)
                     .next()
                     .unwrap(),
                 TestWasm::Foo.into(),
@@ -452,7 +434,7 @@ pub mod tests {
         let ribosome = MockRibosomeT::new();
         let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(
             crate::core::ribosome::NamedInvocation(
-                holochain_types::cell::CellIdFixturator::new(fixt::Unpredictable)
+                holochain_types::fixt::CellIdFixturator::new(fixt::Unpredictable)
                     .next()
                     .unwrap(),
                 TestWasm::Foo.into(),
@@ -483,7 +465,7 @@ pub mod tests {
         // TODO: Make this mock return an output
         let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(
             crate::core::ribosome::NamedInvocation(
-                holochain_types::cell::CellIdFixturator::new(fixt::Unpredictable)
+                holochain_types::fixt::CellIdFixturator::new(fixt::Unpredictable)
                     .next()
                     .unwrap(),
                 TestWasm::Foo.into(),

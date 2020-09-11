@@ -35,7 +35,7 @@ impl Drop for ReaderSpanInfo {
         let ms = Local::now()
             .signed_duration_since(self.start_time)
             .num_milliseconds();
-        if ms >= 20 {
+        if ms >= 100 {
             tracing::warn!("long-lived reader: {} ms", ms);
         }
     }
