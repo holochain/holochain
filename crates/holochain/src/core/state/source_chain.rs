@@ -8,11 +8,12 @@ use fallible_iterator::FallibleIterator;
 use holo_hash::*;
 use holochain_state::{buffer::BufferedStore, error::DatabaseResult, fresh_reader, prelude::*};
 use holochain_types::{prelude::*, EntryHashed, HeaderHashed};
+use holochain_zome_types::capability::CapAccess;
 use holochain_zome_types::capability::GrantedFunction;
 use holochain_zome_types::{
     capability::{CapGrant, CapSecret},
-    entry::{CapClaimEntry, CapGrantEntry, Entry},
-    header::{builder, EntryType, HeaderBuilder, HeaderBuilderCommon, HeaderInner},
+    entry::{CapClaimEntry, Entry},
+    header::{builder, EntryType, Header, HeaderBuilder, HeaderBuilderCommon, HeaderInner},
     query::ChainQueryFilter,
 };
 use shrinkwraprs::Shrinkwrap;

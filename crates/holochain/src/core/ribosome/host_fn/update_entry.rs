@@ -50,15 +50,9 @@ pub fn update_entry<'a>(
 
     // build a header for the entry being updated
     let header_builder = builder::EntryUpdate {
-<<<<<<< HEAD
         entry_type,
-        entry_hash: entry_hash,
-        original_header_address: original_header_hash,
-=======
-        entry_type: EntryType::App(app_entry_type),
         entry_hash,
         original_header_address,
->>>>>>> eb0eb3a2c6229d8c8567567cdd0858f3da9173e6
         original_entry_address,
     };
 

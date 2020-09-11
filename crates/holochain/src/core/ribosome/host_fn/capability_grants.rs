@@ -208,13 +208,8 @@ pub mod wasm_test {
                 cell_id: bob_cell_id.clone(),
                 zome_name: TestWasm::Capability.into(),
                 cap: ().into(),
-<<<<<<< HEAD
-                fn_name: "transferable_cap_grant".to_string(),
-                payload: HostInput::new(original_secret.try_into().unwrap()),
-=======
                 fn_name: "transferable_cap_grant".into(),
-                payload: HostInput::new(some_secret.try_into().unwrap()),
->>>>>>> eb0eb3a2c6229d8c8567567cdd0858f3da9173e6
+                payload: HostInput::new(original_secret.try_into().unwrap()),
                 provenance: bob_agent_id.clone(),
             })
             .await
