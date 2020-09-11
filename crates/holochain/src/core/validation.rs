@@ -1,12 +1,10 @@
 //! Types needed for all validation
 
-pub use error::*;
 use holo_hash::DhtOpHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::dht_op::UniqueForm;
 use holochain_zome_types::element::{Element, SignedHeaderHashed};
 
-mod error;
 /// Ops have dependencies when validating that can be found from
 /// different sources.
 /// It is useful too know where a dependency is from because

@@ -18,6 +18,7 @@ use holochain_types::{
     Entry,
 };
 use holochain_wasm_test_utils::TestWasm;
+use matches::assert_matches;
 use std::{
     convert::{TryFrom, TryInto},
     time::Duration,
@@ -236,15 +237,15 @@ async fn run_test(
                         let s = debug_span!("inspect_ops");
                         let _g = s.enter();
                         debug!(?i.op);
-                        assert_eq!(i.status, ValidationLimboStatus::Pending);
+                        assert_matches!(i.status, ValidationLimboStatus::Pending | ValidationLimboStatus::AwaitingAppDeps(_));
                         Ok(())
                     })
                     .count()
                     .unwrap()
             },
-            1
+            2
         );
-        // Integration should have new 5 ops in it
+        // Integration should have new 4 ops in it
         // Plus the original 35
         assert_eq!(
             {
@@ -256,7 +257,7 @@ async fn run_test(
                     .count()
                     .unwrap()
             },
-            5 + 35
+            4 + 35
         );
     }
 }

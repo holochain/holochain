@@ -59,8 +59,8 @@ fn add_invalid_link_inner() -> ExternResult<HeaderHash> {
     commit_entry!(MaybeLinkable::NeverLinkable)?;
 
     Ok(link_entries!(
-        always_linkable_entry_hash,
-        never_linkable_entry_hash
+        never_linkable_entry_hash,
+        always_linkable_entry_hash
     )?)
 }
 

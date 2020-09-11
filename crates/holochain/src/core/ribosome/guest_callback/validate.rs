@@ -133,7 +133,7 @@ mod test {
     use ::fixt::prelude::*;
     use holo_hash::fixt::AgentPubKeyFixturator;
     use holochain_serialized_bytes::prelude::*;
-    use holochain_types::{dna::zome::HostFnAccess, fixt::*};
+    use holochain_types::{dna::zome::HostFnAccess, dna::zome::Permission, fixt::*};
     use holochain_zome_types::entry::Entry;
     use holochain_zome_types::validate::ValidateCallbackResult;
     use holochain_zome_types::HostInput;
@@ -184,10 +184,9 @@ mod test {
         let validate_host_access = ValidateHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
-        assert_eq!(
-            HostFnAccess::from(&validate_host_access),
-            HostFnAccess::none(),
-        );
+        let mut access = HostFnAccess::none();
+        access.read_workspace = Permission::Allow;
+        assert_eq!(HostFnAccess::from(&validate_host_access), access);
     }
 
     #[tokio::test(threaded_scheduler)]

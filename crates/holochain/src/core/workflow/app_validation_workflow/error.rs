@@ -23,6 +23,8 @@ pub enum AppValidationError {
 }
 
 pub type AppValidationResult<T> = Result<T, AppValidationError>;
+/// This is a way to return a success or immediately exit with an outcome
+/// or immediately exit with an error
 pub(super) type AppValidationOutcome<T> = Result<T, OutcomeOrError<Outcome, AppValidationError>>;
 
 impl<T> From<AppValidationError> for OutcomeOrError<T, AppValidationError> {
@@ -31,5 +33,6 @@ impl<T> From<AppValidationError> for OutcomeOrError<T, AppValidationError> {
     }
 }
 
+// These need to match the #[from] in AppValidationError
 from_sub_error!(AppValidationError, PresentError);
 from_sub_error!(AppValidationError, RibosomeError);

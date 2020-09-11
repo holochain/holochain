@@ -110,6 +110,7 @@ async fn run_test(
 
     tokio::time::delay_for(Duration::from_millis(1000)).await;
 
+    // These are the expected invalid ops
     fn expected_invalid_entry(
         (hash, i, el): &(DhtOpHash, IntegratedDhtOpsValue, Element),
         line: u32,
@@ -118,11 +119,13 @@ async fn run_test(
     ) -> bool {
         let s = format!("\nline:{}\n{:?}\n{:?}\n{:?}", line, hash, i, el);
         match &i.op {
+            // A Store entry that matches these hashes
             DhtOpLight::StoreEntry(hh, _, eh)
                 if eh == invalid_entry_hash && hh == invalid_header_hash =>
             {
                 assert_eq!(i.validation_status, ValidationStatus::Rejected, "{}", s)
             }
+            // And the store element
             DhtOpLight::StoreElement(hh, _, _) if hh == invalid_header_hash => {
                 assert_eq!(i.validation_status, ValidationStatus::Rejected, "{}", s);
             }
@@ -131,6 +134,7 @@ async fn run_test(
         true
     }
 
+    // All others must be valid
     fn others((hash, i, el): &(DhtOpHash, IntegratedDhtOpsValue, Element), line: u32) {
         let s = format!("\nline:{}\n{:?}\n{:?}\n{:?}", line, hash, i, el);
         match &i.op {
@@ -194,8 +198,10 @@ async fn run_test(
             .await
             .try_into()
             .unwrap();
+
     tokio::time::delay_for(Duration::from_millis(1000)).await;
 
+    // Now we expect an invalid link
     fn expected_invalid_link(
         (hash, i, el): &(DhtOpHash, IntegratedDhtOpsValue, Element),
         line: u32,
@@ -207,6 +213,7 @@ async fn run_test(
             DhtOpLight::RegisterAddLink(hh, _) if hh == invalid_link_hash => {
                 assert_eq!(i.validation_status, ValidationStatus::Rejected, "{}", s)
             }
+            // The store element for this LinkAdd header is also rejected
             DhtOpLight::StoreElement(hh, _, _) if hh == invalid_link_hash => {
                 assert_eq!(i.validation_status, ValidationStatus::Rejected, "{}", s)
             }
@@ -279,17 +286,23 @@ async fn run_test(
 
     tokio::time::delay_for(Duration::from_millis(1000)).await;
 
+    // Now we're trying to remove an invalid link
     fn expected_invalid_remove_link(
         (hash, i, el): &(DhtOpHash, IntegratedDhtOpsValue, Element),
         line: u32,
         invalid_remove_hash: &HeaderHash,
     ) -> bool {
+        let s = format!("\nline:{}\n{:?}\n{:?}\n{:?}", line, hash, i, el);
+
+        // To make it simple we want to skip this op
         if let DhtOpLight::RegisterAgentActivity(_, _) = &i.op {
             return false;
         }
-        let s = format!("\nline:{}\n{:?}\n{:?}\n{:?}", line, hash, i, el);
+
+        // Get the hash of the entry that makes the link invalid
         let sb = SerializedBytes::try_from(&MaybeLinkable::NeverLinkable).unwrap();
         let invalid_link_entry_hash = EntryHash::with_data_sync(&Entry::app(sb).unwrap());
+
         // Link adds with these base / target are invalid
         if let Header::LinkAdd(la) = el.header() {
             if invalid_link_entry_hash == la.base_address

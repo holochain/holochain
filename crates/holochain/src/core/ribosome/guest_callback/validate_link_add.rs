@@ -129,7 +129,7 @@ mod test {
     use crate::fixt::*;
     use ::fixt::prelude::*;
     use holochain_serialized_bytes::prelude::*;
-    use holochain_types::dna::zome::HostFnAccess;
+    use holochain_types::dna::zome::{HostFnAccess, Permission};
     use holochain_zome_types::validate_link_add::ValidateLinkAddCallbackResult;
     use holochain_zome_types::validate_link_add::ValidateLinkAddData;
     use holochain_zome_types::HostInput;
@@ -174,10 +174,9 @@ mod test {
             ValidateLinkAddHostAccessFixturator::new(fixt::Unpredictable)
                 .next()
                 .unwrap();
-        assert_eq!(
-            HostFnAccess::from(&validate_link_add_host_access),
-            HostFnAccess::none(),
-        );
+        let mut access = HostFnAccess::none();
+        access.read_workspace = Permission::Allow;
+        assert_eq!(HostFnAccess::from(&validate_link_add_host_access), access,);
     }
 
     #[tokio::test(threaded_scheduler)]

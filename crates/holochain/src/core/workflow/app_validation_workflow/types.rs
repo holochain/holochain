@@ -20,6 +20,8 @@ pub enum Outcome {
 }
 
 impl Outcome {
+    /// Helper function for creating awaiting deps and exiting
+    /// when the dependency isn't found
     pub fn awaiting<E, I: Into<AnyDhtHash> + Clone>(h: &I) -> OutcomeOrError<Self, E> {
         OutcomeOrError::Outcome(Outcome::AwaitingDeps(vec![h.clone().into()]))
     }
@@ -29,6 +31,7 @@ impl Outcome {
     }
 }
 
+/// Turn the OutcomeOrError into an Outcome or and Error
 impl<E> TryFrom<OutcomeOrError<Outcome, E>> for Outcome {
     type Error = E;
 
