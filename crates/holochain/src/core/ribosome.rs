@@ -30,6 +30,7 @@ use crate::core::ribosome::guest_callback::validation_package::ValidationPackage
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 use crate::core::ribosome::guest_callback::CallIterator;
 use crate::core::workflow::CallZomeWorkspaceLock;
+use crate::fixt::FunctionNameFixturator;
 use crate::fixt::HostInputFixturator;
 use crate::fixt::ZomeNameFixturator;
 use ::fixt::prelude::*;
@@ -52,6 +53,7 @@ use holochain_types::fixt::CapSecretFixturator;
 use holochain_types::fixt::CellIdFixturator;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::capability::CapGrant;
+use holochain_zome_types::zome::FunctionName;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::GuestOutput;
 use holochain_zome_types::ZomeCallInvocationResponse;
@@ -266,7 +268,7 @@ pub struct ZomeCallInvocation {
     /// The capability request authorization required
     pub cap: CapSecret,
     /// The name of the Zome function to call
-    pub fn_name: String,
+    pub fn_name: FunctionName,
     /// The serialized data to pass an an argument to the Zome call
     pub payload: HostInput,
     /// the provenance of the call
@@ -279,7 +281,7 @@ fixturator!(
         cell_id: CellIdFixturator::new(Empty).next().unwrap(),
         zome_name: ZomeNameFixturator::new(Empty).next().unwrap(),
         cap: CapSecretFixturator::new(Empty).next().unwrap(),
-        fn_name: StringFixturator::new(Empty).next().unwrap(),
+        fn_name: FunctionNameFixturator::new(Empty).next().unwrap(),
         payload: HostInputFixturator::new(Empty).next().unwrap(),
         provenance: AgentPubKeyFixturator::new(Empty).next().unwrap(),
     };
@@ -287,7 +289,7 @@ fixturator!(
         cell_id: CellIdFixturator::new(Unpredictable).next().unwrap(),
         zome_name: ZomeNameFixturator::new(Unpredictable).next().unwrap(),
         cap: CapSecretFixturator::new(Unpredictable).next().unwrap(),
-        fn_name: StringFixturator::new(Unpredictable).next().unwrap(),
+        fn_name: FunctionNameFixturator::new(Unpredictable).next().unwrap(),
         payload: HostInputFixturator::new(Unpredictable).next().unwrap(),
         provenance: AgentPubKeyFixturator::new(Unpredictable).next().unwrap(),
     };
@@ -301,7 +303,7 @@ fixturator!(
         cap: CapSecretFixturator::new_indexed(Predictable, self.0.index)
             .next()
             .unwrap(),
-        fn_name: StringFixturator::new_indexed(Predictable, self.0.index)
+        fn_name: FunctionNameFixturator::new_indexed(Predictable, self.0.index)
             .next()
             .unwrap(),
         payload: HostInputFixturator::new_indexed(Predictable, self.0.index)
@@ -325,7 +327,7 @@ impl Iterator for ZomeCallInvocationFixturator<NamedInvocation> {
             .unwrap();
         ret.cell_id = self.0.curve.0.clone();
         ret.zome_name = self.0.curve.1.clone().into();
-        ret.fn_name = self.0.curve.2.clone();
+        ret.fn_name = self.0.curve.2.clone().into();
         ret.payload = self.0.curve.3.clone();
 
         // simulate a local transaction by setting the cap to empty and matching the provenance of
@@ -342,7 +344,7 @@ impl Invocation for ZomeCallInvocation {
         ZomesToInvoke::One(self.zome_name.to_owned())
     }
     fn fn_components(&self) -> FnComponents {
-        vec![self.fn_name.to_owned()].into()
+        vec![self.fn_name.to_owned().into()].into()
     }
     fn host_input(self) -> Result<HostInput, SerializedBytesError> {
         Ok(self.payload)
@@ -383,7 +385,7 @@ pub trait RibosomeT: Sized + std::fmt::Debug {
         access: HostAccess,
         invocation: &I,
         zome_name: &ZomeName,
-        to_call: String,
+        to_call: &FunctionName,
     ) -> Result<Option<GuestOutput>, RibosomeError>;
 
     /// @todo list out all the available callbacks and maybe cache them somewhere

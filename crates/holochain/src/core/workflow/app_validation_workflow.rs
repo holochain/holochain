@@ -79,8 +79,8 @@ async fn app_validation_workflow_inner(
         match &vlv.status {
             ValidationLimboStatus::AwaitingAppDeps(_) => {
                 let op = light_to_op(vlv.op.clone(), &workspace.element_pending).await?;
-                let hash = DhtOpHash::with_data(&op).await;
-                workspace.to_val_limbo(hash, vlv)?;
+                let hash = DhtOpHash::with_data_sync(&op);
+                workspace.put_val_limbo(hash, vlv)?;
             }
             ValidationLimboStatus::SysValidated => {
                 if vlv.pending_dependencies.pending_dependencies() {
@@ -88,12 +88,12 @@ async fn app_validation_workflow_inner(
                     awaiting_ops.push(vlv);
                 } else {
                     let op = light_to_op(vlv.op.clone(), &workspace.element_pending).await?;
-                    let hash = DhtOpHash::with_data(&op).await;
+                    let hash = DhtOpHash::with_data_sync(&op);
                     let iv = IntegrationLimboValue {
                         validation_status: ValidationStatus::Valid,
                         op: vlv.op,
                     };
-                    workspace.to_int_limbo(hash, iv, op)?;
+                    workspace.put_int_limbo(hash, iv, op)?;
                 }
             }
             _ => unreachable!("Should not contain any other status"),
@@ -111,7 +111,7 @@ async fn app_validation_workflow_inner(
         if let Some(iv) = iv {
             return Ok(Some(iv.validation_status));
         }
-        return Ok(None);
+        Ok(None)
     }
     // Check awaiting proof that might be able to be progressed now.
     // Including any awaiting proof from this run.
@@ -132,12 +132,12 @@ async fn app_validation_workflow_inner(
                                     let op =
                                         light_to_op(vlv.op.clone(), &workspace.element_pending)
                                             .await?;
-                                    let hash = DhtOpHash::with_data(&op).await;
+                                    let hash = DhtOpHash::with_data_sync(&op);
                                     let iv = IntegrationLimboValue {
                                         validation_status: status,
                                         op: vlv.op,
                                     };
-                                    workspace.to_int_limbo(hash, iv, op)?;
+                                    workspace.put_int_limbo(hash, iv, op)?;
 
                                     // Continue to the next op
                                     continue 'op_loop;
@@ -160,16 +160,16 @@ async fn app_validation_workflow_inner(
             }
         }
         let op = light_to_op(vlv.op.clone(), &workspace.element_pending).await?;
-        let hash = DhtOpHash::with_data(&op).await;
-        if still_awaiting.len() > 0 {
+        let hash = DhtOpHash::with_data_sync(&op);
+        if !still_awaiting.is_empty() {
             vlv.pending_dependencies.pending = still_awaiting;
-            workspace.to_val_limbo(hash, vlv)?;
+            workspace.put_val_limbo(hash, vlv)?;
         } else {
             let iv = IntegrationLimboValue {
                 validation_status: ValidationStatus::Valid,
                 op: vlv.op,
             };
-            workspace.to_int_limbo(hash, iv, op)?;
+            workspace.put_int_limbo(hash, iv, op)?;
         }
     }
     Ok(WorkComplete::Complete)
@@ -231,7 +231,7 @@ impl AppValidationWorkspace {
         })
     }
 
-    fn to_val_limbo(
+    fn put_val_limbo(
         &mut self,
         hash: DhtOpHash,
         mut vlv: ValidationLimboValue,
@@ -243,7 +243,7 @@ impl AppValidationWorkspace {
     }
 
     #[tracing::instrument(skip(self, hash))]
-    fn to_int_limbo(
+    fn put_int_limbo(
         &mut self,
         hash: DhtOpHash,
         iv: IntegrationLimboValue,

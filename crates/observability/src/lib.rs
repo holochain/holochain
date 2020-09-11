@@ -213,7 +213,7 @@ pub fn test_run_timed_ice(path: Option<&str>) -> Result<Option<impl Drop>, error
 /// an integration test like:
 /// `cargo test --test my_integration_test --release`.
 pub fn flame_run() -> Result<Option<impl Drop>, errors::TracingError> {
-    if let None = std::env::var_os("RUST_LOG") {
+    if std::env::var_os("RUST_LOG").is_none() {
         return Ok(None);
     }
     let filter = EnvFilter::from_default_env();

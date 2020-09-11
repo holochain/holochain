@@ -33,7 +33,8 @@ macro_rules! entry_def {
                     _ => Err($crate::prelude::SerializedBytesError::FromBytes(format!(
                         "{:?} is not an Entry::App so has no serialized bytes",
                         entry
-                    )))?,
+                    ))
+                    .into()),
                 }
             }
         }

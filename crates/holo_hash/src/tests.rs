@@ -29,7 +29,7 @@ async fn check_hashed_type() {
         i: 42,
     };
 
-    let my_type_hashed = TestDhtOpHashed::from_content(my_type).await;
+    let my_type_hashed = TestDhtOpHashed::from_content_sync(my_type);
 
     assert_eq!(
         "uhCQkQFRMcbVVfPJ5AbAv0HJq0geatTakGEEj5rpv_Dp0pjmJob3P",

@@ -27,7 +27,7 @@ pub fn wasm_call_n(c: &mut Criterion) {
             let sb: SerializedBytes = bytes.try_into().unwrap();
 
             let mut host_access_fixturator =
-                holochain::fixt::ZomeCallHostAccessFixturator::new(fixt::Unpredictable);
+                holochain::fixt::ZomeCallHostAccessFixturator::new(Unpredictable);
 
             tokio::runtime::Builder::new()
                 .threaded_scheduler()
@@ -39,7 +39,7 @@ pub fn wasm_call_n(c: &mut Criterion) {
                     )
                     .next()
                     .unwrap();
-                    let cell_id = holochain_types::fixt::CellIdFixturator::new(fixt::Unpredictable)
+                    let cell_id = holochain_types::fixt::CellIdFixturator::new(Unpredictable)
                         .next()
                         .unwrap();
                     let cap = CapSecretFixturator::new(Unpredictable).next().unwrap();

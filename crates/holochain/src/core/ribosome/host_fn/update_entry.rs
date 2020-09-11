@@ -21,7 +21,7 @@ pub fn update_entry<'a>(
     input: UpdateEntryInput,
 ) -> RibosomeResult<UpdateEntryOutput> {
     // destructure the args out into an app type def id and entry
-    let (entry_def_id, entry, original_header_hash) = input.into_inner();
+    let (entry_def_id, entry, original_header_address) = input.into_inner();
 
     // build the entry hash
     let async_entry = entry.clone();
@@ -38,13 +38,13 @@ pub fn update_entry<'a>(
     let app_entry_type = AppEntryType::new(header_entry_def_id, header_zome_id, entry_visibility);
 
     let original_entry_address =
-        get_original_address(call_context.clone(), original_header_hash.clone())?;
+        get_original_address(call_context.clone(), original_header_address.clone())?;
 
     // build a header for the entry being updated
     let header_builder = builder::EntryUpdate {
         entry_type: EntryType::App(app_entry_type),
-        entry_hash: entry_hash,
-        original_header_address: original_header_hash,
+        entry_hash,
+        original_header_address,
         original_entry_address,
     };
 

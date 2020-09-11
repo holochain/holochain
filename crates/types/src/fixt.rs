@@ -18,7 +18,6 @@ use holo_hash::fixt::EntryHashFixturator;
 use holo_hash::fixt::HeaderHashFixturator;
 use holo_hash::fixt::WasmHashFixturator;
 use holo_hash::AgentPubKey;
-use holo_hash::EntryHash;
 use holochain_keystore::Signature;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_zome_types::capability::CapAccess;
@@ -37,7 +36,6 @@ use holochain_zome_types::entry_def::EntryDefId;
 use holochain_zome_types::entry_def::EntryDefs;
 use holochain_zome_types::entry_def::EntryVisibility;
 use holochain_zome_types::entry_def::RequiredValidations;
-use holochain_zome_types::header::builder::HeaderBuilderCommon;
 use holochain_zome_types::header::AgentValidationPkg;
 use holochain_zome_types::header::AppEntryType;
 use holochain_zome_types::header::ChainClose;
@@ -49,12 +47,9 @@ use holochain_zome_types::header::EntryType;
 use holochain_zome_types::header::EntryUpdate;
 use holochain_zome_types::header::Header;
 use holochain_zome_types::header::InitZomesComplete;
-use holochain_zome_types::header::LinkAdd;
-use holochain_zome_types::header::LinkRemove;
 use holochain_zome_types::header::ZomeId;
-use holochain_zome_types::link::LinkTag;
 use holochain_zome_types::migrate_agent::MigrateAgent;
-use holochain_zome_types::timestamp::Timestamp as ZomeTimestamp;
+use holochain_zome_types::zome::FunctionName;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::Entry;
 use rand::seq::IteratorRandom;
@@ -63,6 +58,8 @@ use rand::Rng;
 use std::collections::BTreeMap;
 use std::collections::HashSet;
 use std::iter::Iterator;
+
+pub use holochain_zome_types::fixt::{TimestampFixturator as ZomeTimestampFixturator, *};
 
 /// a curve to spit out Entry::App values
 pub struct AppEntry;
@@ -75,7 +72,15 @@ fixturator!(
     constructor fn from_hash(WasmHash);
 );
 
-newtype_fixturator!(ZomeName<String>);
+fixturator!(
+    ZomeName;
+    from String;
+);
+
+fixturator!(
+    FunctionName;
+    from String;
+);
 
 fixturator!(
     CapSecret;
@@ -103,44 +108,8 @@ fixturator!(
 );
 
 fixturator!(
-    EntryVisibility;
-    unit variants [ Public Private ] empty Public;
-);
-
-fixturator!(
-    AppEntryType;
-    constructor fn new(U8, U8, EntryVisibility);
-);
-
-impl Iterator for AppEntryTypeFixturator<EntryVisibility> {
-    type Item = AppEntryType;
-    fn next(&mut self) -> Option<Self::Item> {
-        let app_entry = AppEntryTypeFixturator::new(Unpredictable).next().unwrap();
-        Some(AppEntryType::new(
-            app_entry.id(),
-            app_entry.zome_id(),
-            self.0.curve,
-        ))
-    }
-}
-
-fixturator!(
     Timestamp;
     constructor fn now();
-);
-
-fn from_timestamp(ts: Timestamp) -> ZomeTimestamp {
-    ts.into()
-}
-
-fixturator!(
-    ZomeTimestamp;
-    vanilla fn from_timestamp(Timestamp);
-);
-
-fixturator!(
-    HeaderBuilderCommon;
-    constructor fn new(AgentPubKey, ZomeTimestamp, u32, HeaderHash);
 );
 
 newtype_fixturator!(Signature<Bytes>);
@@ -154,15 +123,15 @@ fixturator!(
     GrantedFunction;
     curve Empty (
         ZomeNameFixturator::new_indexed(Empty, self.0.index).next().unwrap(),
-        StringFixturator::new_indexed(Empty, self.0.index).next().unwrap()
+        FunctionNameFixturator::new_indexed(Empty, self.0.index).next().unwrap()
     );
     curve Unpredictable (
         ZomeNameFixturator::new_indexed(Unpredictable, self.0.index).next().unwrap(),
-        StringFixturator::new_indexed(Unpredictable, self.0.index).next().unwrap()
+        FunctionNameFixturator::new_indexed(Unpredictable, self.0.index).next().unwrap()
     );
     curve Predictable (
         ZomeNameFixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
-        StringFixturator::new_indexed(Predictable, self.0.index).next().unwrap()
+        FunctionNameFixturator::new_indexed(Predictable, self.0.index).next().unwrap()
     );
 );
 
@@ -463,57 +432,9 @@ fixturator!(
 );
 
 fixturator!(
-    LinkTag; from Bytes;
-);
-
-fixturator!(
     Dna;
     constructor fn from_builder(DnaHash, HeaderBuilderCommon);
 );
-
-fixturator!(
-    LinkRemove;
-    constructor fn from_builder(HeaderBuilderCommon, HeaderHash, EntryHash);
-);
-
-fixturator!(
-    LinkAdd;
-    constructor fn from_builder(HeaderBuilderCommon, EntryHash, EntryHash, u8, LinkTag);
-);
-
-pub struct KnownLinkAdd {
-    pub base_address: EntryHash,
-    pub target_address: EntryHash,
-    pub tag: LinkTag,
-    pub zome_id: ZomeId,
-}
-
-pub struct KnownLinkRemove {
-    pub link_add_address: holo_hash::HeaderHash,
-}
-
-impl Iterator for LinkAddFixturator<KnownLinkAdd> {
-    type Item = LinkAdd;
-    fn next(&mut self) -> Option<Self::Item> {
-        let mut f = fixt!(LinkAdd);
-        f.base_address = self.0.curve.base_address.clone();
-        f.target_address = self.0.curve.target_address.clone();
-        f.tag = self.0.curve.tag.clone();
-        f.zome_id = self.0.curve.zome_id;
-        Some(f)
-    }
-}
-
-impl Iterator for LinkRemoveFixturator<KnownLinkRemove> {
-    type Item = LinkRemove;
-    fn next(&mut self) -> Option<Self::Item> {
-        let mut f = fixt!(LinkRemove);
-        f.link_add_address = self.0.curve.link_add_address.clone();
-        Some(f)
-    }
-}
-
-pub type MaybeSerializedBytes = Option<SerializedBytes>;
 
 fixturator! {
     MaybeSerializedBytes;

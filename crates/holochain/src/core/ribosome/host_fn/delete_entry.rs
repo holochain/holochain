@@ -78,7 +78,7 @@ pub(crate) fn get_original_address<'a>(
             })
             .transpose()?;
 
-        let entry_address = match maybe_original_element {
+        match maybe_original_element {
             Some(original_element_signed_header_hash) => {
                 match original_element_signed_header_hash.header().entry_data() {
                     Some((entry_hash, _)) => Ok(entry_hash.clone()),
@@ -86,8 +86,7 @@ pub(crate) fn get_original_address<'a>(
                 }
             }
             None => Err(RibosomeError::ElementDeps(address.into())),
-        };
-        entry_address
+        }
     })
 }
 
@@ -95,7 +94,7 @@ pub(crate) fn get_original_address<'a>(
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use crate::{core::workflow::CallZomeWorkspace, fixt::ZomeCallHostAccessFixturator};
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
     use hdk3::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
 
