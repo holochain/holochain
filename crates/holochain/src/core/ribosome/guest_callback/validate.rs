@@ -1,11 +1,12 @@
-use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostAccess;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
+use crate::core::{ribosome::FnComponents, workflow::CallZomeWorkspaceLock};
 use derive_more::Constructor;
 use holo_hash::EntryHash;
+use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::dna::zome::HostFnAccess;
+use holochain_types::dna::zome::{HostFnAccess, Permission};
 use holochain_zome_types::entry::Entry;
 use holochain_zome_types::validate::ValidateCallbackResult;
 use holochain_zome_types::zome::ZomeName;
@@ -33,7 +34,10 @@ impl ValidateInvocation {
 }
 
 #[derive(Clone, Constructor)]
-pub struct ValidateHostAccess;
+pub struct ValidateHostAccess {
+    pub workspace: CallZomeWorkspaceLock,
+    pub network: HolochainP2pCell,
+}
 
 impl From<ValidateHostAccess> for HostAccess {
     fn from(validate_host_access: ValidateHostAccess) -> Self {
@@ -43,7 +47,9 @@ impl From<ValidateHostAccess> for HostAccess {
 
 impl From<&ValidateHostAccess> for HostFnAccess {
     fn from(_: &ValidateHostAccess) -> Self {
-        Self::none()
+        let mut access = Self::none();
+        access.read_workspace = Permission::Allow;
+        access
     }
 }
 
@@ -271,15 +277,12 @@ mod test {
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
 
-    use super::ValidateHostAccess;
     use super::ValidateResult;
     use crate::core::ribosome::RibosomeT;
     use crate::core::state::source_chain::SourceChainResult;
     use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
     use crate::fixt::curve::Zomes;
-    use crate::fixt::ValidateInvocationFixturator;
-    use crate::fixt::WasmRibosomeFixturator;
-    use crate::fixt::ZomeCallHostAccessFixturator;
+    use crate::fixt::*;
     use fixt::prelude::*;
     use holo_hash::fixt::AgentPubKeyFixturator;
     use holochain_types::fixt::*;
@@ -299,7 +302,7 @@ mod slow_tests {
         validate_invocation.zome_name = TestWasm::Foo.into();
 
         let result = ribosome
-            .run_validate(ValidateHostAccess, validate_invocation)
+            .run_validate(fixt!(ValidateHostAccess), validate_invocation)
             .unwrap();
         assert_eq!(result, ValidateResult::Valid,);
     }
@@ -315,7 +318,7 @@ mod slow_tests {
         validate_invocation.zome_name = TestWasm::ValidateValid.into();
 
         let result = ribosome
-            .run_validate(ValidateHostAccess, validate_invocation)
+            .run_validate(fixt!(ValidateHostAccess), validate_invocation)
             .unwrap();
         assert_eq!(result, ValidateResult::Valid,);
     }
@@ -331,7 +334,7 @@ mod slow_tests {
         validate_invocation.zome_name = TestWasm::ValidateInvalid.into();
 
         let result = ribosome
-            .run_validate(ValidateHostAccess, validate_invocation)
+            .run_validate(fixt!(ValidateHostAccess), validate_invocation)
             .unwrap();
         assert_eq!(result, ValidateResult::Invalid("esoteric edge case".into()),);
     }
@@ -356,7 +359,7 @@ mod slow_tests {
         validate_invocation.element = Arc::new(el);
 
         let result = ribosome
-            .run_validate(ValidateHostAccess, validate_invocation)
+            .run_validate(fixt!(ValidateHostAccess), validate_invocation)
             .unwrap();
         assert_eq!(result, ValidateResult::Invalid("esoteric edge case".into()));
     }

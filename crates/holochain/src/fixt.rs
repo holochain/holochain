@@ -339,12 +339,12 @@ fixturator!(
 
 fixturator!(
     ValidateLinkAddHostAccess;
-    constructor fn new();
+    constructor fn new(CallZomeWorkspaceLock, HolochainP2pCell);
 );
 
 fixturator!(
     ValidateHostAccess;
-    constructor fn new();
+    constructor fn new(CallZomeWorkspaceLock, HolochainP2pCell);
 );
 
 fixturator!(

@@ -4,9 +4,11 @@ use holo_hash::AnyDhtHash;
 
 use crate::core::validation::OutcomeOrError;
 
+use super::AppValidationOutcome;
+
 #[derive(Debug)]
 /// The outcome of sys validation
-pub(super) enum Outcome {
+pub enum Outcome {
     /// Moves to integration
     Accepted,
     /// Stays in limbo because a
@@ -20,6 +22,10 @@ pub(super) enum Outcome {
 impl Outcome {
     pub fn awaiting<E, I: Into<AnyDhtHash> + Clone>(h: &I) -> OutcomeOrError<Self, E> {
         OutcomeOrError::Outcome(Outcome::AwaitingDeps(vec![h.clone().into()]))
+    }
+    /// Early exits with an accepted outcome
+    pub fn accepted<T>() -> AppValidationOutcome<T> {
+        Err(OutcomeOrError::Outcome(Outcome::Accepted))
     }
 }
 

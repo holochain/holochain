@@ -87,6 +87,7 @@ fn validate_remove_link(element: Element) -> ExternResult<ValidateCallbackResult
                     ]))
                 }
             };
+            return Ok(ValidateCallbackResult::Valid);
             let base = match base {
                 Some(b) => b,
                 None => {

@@ -118,7 +118,10 @@ impl HostAccess {
             Self::Init(InitHostAccess{workspace, .. }) |
             Self::MigrateAgent(MigrateAgentHostAccess{workspace, .. }) |
             Self::ValidationPackage(ValidationPackageHostAccess{workspace, .. }) |
-            Self::PostCommit(PostCommitHostAccess{workspace, .. }) => {
+            Self::PostCommit(PostCommitHostAccess{workspace, .. }) 
+            | Self::Validate(ValidateHostAccess { workspace, .. })
+            | Self::ValidateLinkAdd(ValidateLinkAddHostAccess { workspace, .. })
+            => {
                 workspace
             }
             _ => panic!("Gave access to a host function that uses the workspace without providing a workspace"),
@@ -142,7 +145,9 @@ impl HostAccess {
         match self {
             Self::ZomeCall(ZomeCallHostAccess { network, .. })
             | Self::Init(InitHostAccess { network, .. })
-            | Self::PostCommit(PostCommitHostAccess { network, .. }) => network,
+            | Self::PostCommit(PostCommitHostAccess { network, .. })
+            | Self::Validate(ValidateHostAccess { network, .. })
+            | Self::ValidateLinkAdd(ValidateLinkAddHostAccess { network, .. }) => network,
             _ => panic!(
                 "Gave access to a host function that uses the network without providing a network"
             ),

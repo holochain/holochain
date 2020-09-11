@@ -10,6 +10,7 @@ use super::{
         integrate_single_metadata,
     },
     produce_dht_ops_workflow::dht_op_light::light_to_op,
+    CallZomeWorkspace, CallZomeWorkspaceLock,
 };
 use crate::{
     conductor::api::CellConductorApiT,
@@ -41,7 +42,6 @@ use crate::{
         validation::PendingDependencies,
     },
 };
-use either::Either;
 use error::AppValidationResult;
 pub use error::*;
 use fallible_iterator::FallibleIterator;
@@ -63,7 +63,7 @@ use holochain_zome_types::{
     header::LinkAdd, zome::ZomeName, Header,
 };
 use tracing::*;
-use types::*;
+pub use types::Outcome;
 
 #[cfg(test)]
 mod tests;
@@ -247,13 +247,10 @@ async fn validate_op(
     network: &HolochainP2pCell,
     dependencies: &mut PendingDependencies,
 ) -> AppValidationOutcome<Outcome> {
-    use Either::*;
+    let workspace_lock = workspace.validation_workspace();
     // Create the element
     // TODO: remove clone of op
-    let element = match get_element(op.clone()) {
-        Left(el) => el,
-        Right(o) => return Ok(o),
-    };
+    let element = get_element(op.clone())?;
     // Get the dna file
     let dna_file = { conductor_api.get_this_dna().await };
     let dna_file =
@@ -290,6 +287,8 @@ async fn validate_op(
                         base.clone(),
                         target.clone(),
                         &ribosome,
+                        workspace_lock.clone(),
+                        network.clone(),
                     )
                 })
                 .collect::<Result<Vec<_>, _>>()?
@@ -310,7 +309,15 @@ async fn validate_op(
             let element = Arc::new(element);
             zome_names
                 .into_iter()
-                .map(|zome_name| run_validation_callback(zome_name, element.clone(), &ribosome))
+                .map(|zome_name| {
+                    run_validation_callback(
+                        zome_name,
+                        element.clone(),
+                        &ribosome,
+                        workspace_lock.clone(),
+                        network.clone(),
+                    )
+                })
                 .collect::<Result<Vec<_>, _>>()?
                 .into_iter()
                 .find(|o| match o {
@@ -332,33 +339,35 @@ async fn validate_op(
     Ok(outcome)
 }
 
-fn get_element(op: DhtOp) -> Either<Element, Outcome> {
-    use Either::*;
+fn get_element(op: DhtOp) -> AppValidationOutcome<Element> {
     match op {
-        DhtOp::RegisterDeletedBy(_, _) | DhtOp::RegisterAgentActivity(_, _) => {
-            Right(Outcome::Accepted)
-        }
+        DhtOp::RegisterDeletedBy(_, _) | DhtOp::RegisterAgentActivity(_, _) => Outcome::accepted(),
         DhtOp::StoreElement(_, h, _) => match h {
+            // TODO: Add the rest of the ops and entry's
             Header::ElementDelete(_) => todo!("Get the original entry"),
-            _ => Right(Outcome::Accepted),
+            Header::EntryUpdate(_) => todo!("Get the original entry"),
+            Header::LinkAdd(_) => todo!(),
+            Header::LinkRemove(_) => todo!(),
+            Header::EntryCreate(_) => todo!(),
+            _ => Outcome::accepted(),
         },
-        DhtOp::StoreEntry(s, h, e) => Left(Element::new(
+        DhtOp::StoreEntry(s, h, e) => Ok(Element::new(
             SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(h.into()), s),
             Some(*e),
         )),
-        DhtOp::RegisterUpdatedBy(s, h) => Left(Element::new(
+        DhtOp::RegisterUpdatedBy(s, h) => Ok(Element::new(
             SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(h.into()), s),
             None,
         )),
-        DhtOp::RegisterDeletedEntryHeader(s, h) => Left(Element::new(
+        DhtOp::RegisterDeletedEntryHeader(s, h) => Ok(Element::new(
             SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(h.into()), s),
             None,
         )),
-        DhtOp::RegisterAddLink(s, h) => Left(Element::new(
+        DhtOp::RegisterAddLink(s, h) => Ok(Element::new(
             SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(h.into()), s),
             None,
         )),
-        DhtOp::RegisterRemoveLink(s, h) => Left(Element::new(
+        DhtOp::RegisterRemoveLink(s, h) => Ok(Element::new(
             SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(h.into()), s),
             None,
         )),
@@ -455,13 +464,15 @@ fn get_zome_name(entry_type: &AppEntryType, dna_file: &DnaFile) -> AppValidation
         .clone())
 }
 
-fn run_validation_callback(
+pub fn run_validation_callback(
     zome_name: ZomeName,
     element: Arc<Element>,
     ribosome: &impl RibosomeT,
+    workspace_lock: CallZomeWorkspaceLock,
+    network: HolochainP2pCell,
 ) -> AppValidationResult<Outcome> {
     let validate: ValidateResult = ribosome.run_validate(
-        ValidateHostAccess,
+        ValidateHostAccess::new(workspace_lock, network),
         ValidateInvocation { zome_name, element },
     )?;
     match validate {
@@ -474,12 +485,14 @@ fn run_validation_callback(
     }
 }
 
-fn run_link_validation_callback(
+pub fn run_link_validation_callback(
     zome_name: ZomeName,
     link_add: Arc<LinkAdd>,
     base: Arc<Entry>,
     target: Arc<Entry>,
     ribosome: &impl RibosomeT,
+    workspace_lock: CallZomeWorkspaceLock,
+    network: HolochainP2pCell,
 ) -> AppValidationResult<Outcome> {
     let invocation = ValidateLinkAddInvocation {
         zome_name,
@@ -487,7 +500,8 @@ fn run_link_validation_callback(
         base,
         target,
     };
-    let validate = ribosome.run_validate_link_add(ValidateLinkAddHostAccess, invocation)?;
+    let access = ValidateLinkAddHostAccess::new(workspace_lock, network);
+    let validate = ribosome.run_validate_link_add(access, invocation)?;
     match validate {
         ValidateLinkAddResult::Valid => Ok(Outcome::Accepted),
         ValidateLinkAddResult::Invalid(reason) => Ok(Outcome::Rejected(reason)),
@@ -512,6 +526,7 @@ pub struct AppValidationWorkspace {
     pub meta_cache: MetadataBuf,
     // Ops to disintegrate
     pub to_disintegrate_pending: Vec<DhtOpLight>,
+    pub call_zome_workspace_lock: Option<CallZomeWorkspaceLock>,
 }
 
 impl AppValidationWorkspace {
@@ -532,7 +547,14 @@ impl AppValidationWorkspace {
         let meta_pending = MetadataBuf::pending(env.clone())?;
 
         let element_judged = ElementBuf::judged(env.clone())?;
-        let meta_judged = MetadataBuf::judged(env)?;
+        let meta_judged = MetadataBuf::judged(env.clone())?;
+
+        // TODO: We probably want to use the app validation workspace instead of the call zome workspace
+        // but we don't have a lock for that.
+        // If we decide to allow app validation callbacks to be able to get dependencies from the
+        // pending / judged stores then this will be needed as well.
+        let call_zome_workspace = CallZomeWorkspace::new(env)?;
+        let call_zome_workspace_lock = Some(CallZomeWorkspaceLock::new(call_zome_workspace));
 
         Ok(Self {
             integrated_dht_ops,
@@ -547,6 +569,7 @@ impl AppValidationWorkspace {
             element_cache,
             meta_cache,
             to_disintegrate_pending: Vec::new(),
+            call_zome_workspace_lock,
         })
     }
 
@@ -555,6 +578,12 @@ impl AppValidationWorkspace {
             workspace: self,
             network,
         }
+    }
+
+    fn validation_workspace(&self) -> CallZomeWorkspaceLock {
+        self.call_zome_workspace_lock
+            .clone()
+            .expect("Tried to use the validation workspace after it was flushed")
     }
 
     fn to_val_limbo(
@@ -607,6 +636,18 @@ impl Workspace for AppValidationWorkspace {
         self.meta_pending.flush_to_txn_ref(writer)?;
         self.element_judged.flush_to_txn_ref(writer)?;
         self.meta_judged.flush_to_txn_ref(writer)?;
+        // Need to flush the call zome workspace because of the cache.
+        // TODO: If cache becomes a separate env then remove this
+        if let Some(czws) = self
+            .call_zome_workspace_lock
+            .take()
+            .and_then(|o| Arc::try_unwrap(o.into_inner()).ok())
+        {
+            let mut czws: CallZomeWorkspace = czws.into_inner();
+            czws.flush_to_txn_ref(writer)?;
+        } else {
+            warn!("Failed to write to validate call zome workspace");
+        }
         Ok(())
     }
 }

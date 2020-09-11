@@ -1,10 +1,11 @@
-use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostAccess;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
+use crate::core::{ribosome::FnComponents, workflow::CallZomeWorkspaceLock};
 use derive_more::Constructor;
+use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::dna::zome::HostFnAccess;
+use holochain_types::dna::zome::{HostFnAccess, Permission};
 use holochain_zome_types::entry::Entry;
 use holochain_zome_types::header::LinkAdd;
 use holochain_zome_types::validate_link_add::ValidateLinkAddCallbackResult;
@@ -44,7 +45,10 @@ impl From<ValidateLinkAddInvocation> for ValidateLinkAddData {
 }
 
 #[derive(Clone, Constructor)]
-pub struct ValidateLinkAddHostAccess;
+pub struct ValidateLinkAddHostAccess {
+    pub workspace: CallZomeWorkspaceLock,
+    pub network: HolochainP2pCell,
+}
 
 impl From<ValidateLinkAddHostAccess> for HostAccess {
     fn from(validate_link_add_host_access: ValidateLinkAddHostAccess) -> Self {
@@ -54,7 +58,9 @@ impl From<ValidateLinkAddHostAccess> for HostAccess {
 
 impl From<&ValidateLinkAddHostAccess> for HostFnAccess {
     fn from(_: &ValidateLinkAddHostAccess) -> Self {
-        Self::none()
+        let mut access = Self::none();
+        access.read_workspace = Permission::Allow;
+        access
     }
 }
 
@@ -120,8 +126,7 @@ mod test {
     use super::ValidateLinkAddResult;
     use crate::core::ribosome::Invocation;
     use crate::core::ribosome::ZomesToInvoke;
-    use crate::fixt::ValidateLinkAddHostAccessFixturator;
-    use crate::fixt::ValidateLinkAddInvocationFixturator;
+    use crate::fixt::*;
     use ::fixt::prelude::*;
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::dna::zome::HostFnAccess;
@@ -224,15 +229,12 @@ mod test {
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
 
-    use super::ValidateLinkAddHostAccess;
     use super::ValidateLinkAddResult;
     use crate::core::ribosome::RibosomeT;
     use crate::core::state::source_chain::SourceChainResult;
     use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
     use crate::fixt::curve::Zomes;
-    use crate::fixt::ValidateLinkAddInvocationFixturator;
-    use crate::fixt::WasmRibosomeFixturator;
-    use crate::fixt::ZomeCallHostAccessFixturator;
+    use crate::fixt::*;
     use fixt::prelude::*;
     use holo_hash::HeaderHash;
     use holochain_wasm_test_utils::TestWasm;
@@ -248,7 +250,7 @@ mod slow_tests {
         validate_invocation.zome_name = TestWasm::Foo.into();
 
         let result = ribosome
-            .run_validate_link_add(ValidateLinkAddHostAccess, validate_invocation)
+            .run_validate_link_add(fixt!(ValidateLinkAddHostAccess), validate_invocation)
             .unwrap();
         assert_eq!(result, ValidateLinkAddResult::Valid,);
     }
@@ -264,7 +266,7 @@ mod slow_tests {
         validate_invocation.zome_name = TestWasm::ValidateLinkAddValid.into();
 
         let result = ribosome
-            .run_validate_link_add(ValidateLinkAddHostAccess, validate_invocation)
+            .run_validate_link_add(fixt!(ValidateLinkAddHostAccess), validate_invocation)
             .unwrap();
         assert_eq!(result, ValidateLinkAddResult::Valid,);
     }
@@ -281,7 +283,10 @@ mod slow_tests {
         validate_link_add_invocation.zome_name = TestWasm::ValidateLinkAddInvalid.into();
 
         let result = ribosome
-            .run_validate_link_add(ValidateLinkAddHostAccess, validate_link_add_invocation)
+            .run_validate_link_add(
+                fixt!(ValidateLinkAddHostAccess),
+                validate_link_add_invocation,
+            )
             .unwrap();
         assert_eq!(
             result,
