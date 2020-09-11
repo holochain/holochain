@@ -777,9 +777,7 @@ mod builder {
             let keystore = if let Some(keystore) = self.keystore {
                 keystore
             } else {
-                if std::env::var("HOLOCHAIN_LAIR_KEYSTORE").is_ok() {
-                    spawn_lair_keystore(None).await?
-                } else {
+                if self.config.use_dangerous_test_keystore {
                     let keystore = spawn_test_keystore().await?;
                     // pre-populate with our two fixture agent keypairs
                     keystore
@@ -791,6 +789,8 @@ mod builder {
                         .await
                         .unwrap();
                     keystore
+                } else {
+                    spawn_lair_keystore(None).await?
                 }
             };
             let env_path = self.config.environment_path.clone();
