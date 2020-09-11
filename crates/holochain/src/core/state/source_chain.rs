@@ -330,8 +330,8 @@ pub mod tests {
     async fn test_get_cap_grant() -> SourceChainResult<()> {
         let test_env = test_cell_env();
         let env = test_env.env();
+        let access = CapAccess::from(CapSecretFixturator::new(Unpredictable).next().unwrap());
         let secret = access.secret().unwrap();
-        let access = CapAccess::from(secret.clone());
 
         // @todo curry
         let _curry = CurryPayloadsFixturator::new(Empty).next().unwrap();
@@ -357,38 +357,38 @@ pub mod tests {
             );
 
             // bob should not match anything as the secret hasn't been committed yet
-            assert_eq!(chain.valid_cap_grant(&function, &bob, &secret).await?, None);
+            assert_eq!(chain.valid_cap_grant(&function, &bob, &secret)?, None);
         }
 
         let (original_header_address, original_entry_address) = {
-            let mut chain = SourceChain::new(arc.clone().into())?;
-            let (entry, entry_hash) = EntryHashed::from_content(Entry::CapGrant(grant.clone()))
-                .await
-                .into_inner();
+            let mut chain = SourceChain::new(env.clone().into())?;
+            let (entry, entry_hash) =
+                EntryHashed::from_content_sync(Entry::CapGrant(grant.clone())).into_inner();
             let header_builder = builder::EntryCreate {
                 entry_type: EntryType::CapGrant,
                 entry_hash: entry_hash.clone(),
             };
             let header = chain.put(header_builder, Some(entry)).await?;
 
-            env.with_commit(|writer| chain.flush_to_txn(writer))?;
+            env.guard()
+                .with_commit(|writer| chain.flush_to_txn(writer))?;
 
             (header, entry_hash)
         };
 
         {
-            let chain = SourceChain::new(arc.clone().into())?;
+            let chain = SourceChain::new(env.clone().into())?;
             // alice should find her own authorship with higher priority than the committed grant
             // even if she passes in the secret
             assert_eq!(
-                chain.valid_cap_grant(&function, &alice, &secret).await?,
+                chain.valid_cap_grant(&function, &alice, &secret)?,
                 Some(CapGrant::Authorship(alice.clone())),
             );
 
             // bob should be granted with the committed grant as it matches the secret he passes to
             // alice at runtime
             assert_eq!(
-                chain.valid_cap_grant(&function, &bob, &secret).await?,
+                chain.valid_cap_grant(&function, &bob, &secret)?,
                 Some(grant.clone().into())
             );
         }
@@ -401,11 +401,9 @@ pub mod tests {
         let updated_grant = ZomeCallCapGrant::new("tag".into(), updated_access.clone(), functions);
 
         let (updated_header_hash, updated_entry_hash) = {
-            let mut chain = SourceChain::new(arc.clone().into())?;
+            let mut chain = SourceChain::new(env.clone().into())?;
             let (entry, entry_hash) =
-                EntryHashed::from_content(Entry::CapGrant(updated_grant.clone()))
-                    .await
-                    .into_inner();
+                EntryHashed::from_content_sync(Entry::CapGrant(updated_grant.clone())).into_inner();
             let header_builder = builder::EntryUpdate {
                 entry_type: EntryType::CapGrant,
                 entry_hash: entry_hash.clone(),
@@ -414,7 +412,8 @@ pub mod tests {
             };
             let header = chain.put(header_builder, Some(entry)).await?;
 
-            env.with_commit(|writer| chain.flush_to_txn(writer))?;
+            env.guard()
+                .with_commit(|writer| chain.flush_to_txn(writer))?;
 
             (header, entry_hash)
         };
@@ -424,57 +423,50 @@ pub mod tests {
             // alice should find her own authorship with higher priority than the committed grant
             // even if she passes in the secret
             assert_eq!(
-                chain.valid_cap_grant(&function, &alice, &secret).await?,
+                chain.valid_cap_grant(&function, &alice, &secret)?,
                 Some(CapGrant::Authorship(alice.clone())),
             );
             assert_eq!(
-                chain
-                    .valid_cap_grant(&function, &alice, &updated_secret)
-                    .await?,
+                chain.valid_cap_grant(&function, &alice, &updated_secret)?,
                 Some(CapGrant::Authorship(alice.clone())),
             );
 
             // bob MUST provide the updated secret as the old one is invalidated by the new one
-            assert_eq!(chain.valid_cap_grant(&function, &bob, &secret).await?, None);
+            assert_eq!(chain.valid_cap_grant(&function, &bob, &secret)?, None);
             assert_eq!(
-                chain
-                    .valid_cap_grant(&function, &bob, &updated_secret)
-                    .await?,
+                chain.valid_cap_grant(&function, &bob, &updated_secret)?,
                 Some(updated_grant.into())
             );
         }
 
         {
-            let mut chain = SourceChain::new(arc.clone().into())?;
+            let mut chain = SourceChain::new(env.clone().into())?;
             let header_builder = builder::ElementDelete {
                 removes_address: updated_header_hash,
                 removes_entry_address: updated_entry_hash,
             };
             chain.put(header_builder, None).await?;
 
-            env.with_commit(|writer| chain.flush_to_txn(writer))?;
+            env.guard()
+                .with_commit(|writer| chain.flush_to_txn(writer))?;
         }
 
         {
-            let chain = SourceChain::new(arc.clone().into())?;
+            let chain = SourceChain::new(env.clone().into())?;
             // alice should find her own authorship
             assert_eq!(
-                chain.valid_cap_grant(&function, &alice, &secret).await?,
+                chain.valid_cap_grant(&function, &alice, &secret)?,
                 Some(CapGrant::Authorship(alice.clone())),
             );
             assert_eq!(
-                chain
-                    .valid_cap_grant(&function, &alice, &updated_secret)
-                    .await?,
+                chain.valid_cap_grant(&function, &alice, &updated_secret)?,
                 Some(CapGrant::Authorship(alice)),
             );
 
             // bob has no access
-            assert_eq!(chain.valid_cap_grant(&function, &bob, &secret).await?, None);
+            assert_eq!(chain.valid_cap_grant(&function, &bob, &secret)?, None);
             assert_eq!(
-                chain
-                    .valid_cap_grant(&function, &bob, &updated_secret)
-                    .await?,
+                chain.valid_cap_grant(&function, &bob, &updated_secret)?,
                 None
             );
         }
