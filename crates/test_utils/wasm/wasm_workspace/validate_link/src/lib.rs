@@ -83,11 +83,10 @@ fn validate_remove_link(element: Element) -> ExternResult<ValidateCallbackResult
                 Some(b) => b.entry().to_app_option()?,
                 None => {
                     return Ok(ValidateCallbackResult::UnresolvedDependencies(vec![
-                        link_remove.base_address.clone(),
+                        link_remove.base_address,
                     ]))
                 }
             };
-            return Ok(ValidateCallbackResult::Valid);
             let base = match base {
                 Some(b) => b,
                 None => {

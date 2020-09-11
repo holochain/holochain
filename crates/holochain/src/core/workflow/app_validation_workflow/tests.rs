@@ -21,7 +21,7 @@ use holochain_types::{
     Entry,
 };
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::{element::Element, zome::ZomeName, HostInput};
+use holochain_zome_types::{element::Element, zome::ZomeName, Header, HostInput};
 use std::{
     convert::{TryFrom, TryInto},
     time::Duration,
@@ -110,6 +110,38 @@ async fn run_test(
 
     tokio::time::delay_for(Duration::from_millis(1000)).await;
 
+    fn expected_invalid_entry(
+        (hash, i, el): &(DhtOpHash, IntegratedDhtOpsValue, Element),
+        line: u32,
+        invalid_header_hash: &HeaderHash,
+        invalid_entry_hash: &AnyDhtHash,
+    ) -> bool {
+        let s = format!("\nline:{}\n{:?}\n{:?}\n{:?}", line, hash, i, el);
+        match &i.op {
+            DhtOpLight::StoreEntry(hh, _, eh)
+                if eh == invalid_entry_hash && hh == invalid_header_hash =>
+            {
+                assert_eq!(i.validation_status, ValidationStatus::Rejected, "{}", s)
+            }
+            DhtOpLight::StoreElement(hh, _, _) if hh == invalid_header_hash => {
+                assert_eq!(i.validation_status, ValidationStatus::Rejected, "{}", s);
+            }
+            _ => return false,
+        }
+        true
+    }
+
+    fn others((hash, i, el): &(DhtOpHash, IntegratedDhtOpsValue, Element), line: u32) {
+        let s = format!("\nline:{}\n{:?}\n{:?}\n{:?}", line, hash, i, el);
+        match &i.op {
+            // Register agent activity will be invalid if the previous header is invalid
+            // This is very hard to track in these tests and this op also doesn't
+            // go through app validation so it's more productive to skip it
+            DhtOpLight::RegisterAgentActivity(_, _) => (),
+            _ => assert_eq!(i.validation_status, ValidationStatus::Valid, "{}", s),
+        }
+    };
+
     {
         let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
 
@@ -119,18 +151,13 @@ async fn run_test(
         assert_eq!(val.len(), 0);
         // Integration should have 3 ops in it
         // StoreEntry should be invalid.
-        // RegisterAgentActivity and StoreElement don't run app validation
+        // RegisterAgentActivity doesn't run app validation
         // So they will be valid.
         // Plus another 19 from the previous calls
         let int = inspect_integrated(&alice_env, &workspace);
-        for (_, i, _) in &int {
-            match &i.op {
-                DhtOpLight::StoreEntry(hh, _, eh)
-                    if eh == &invalid_entry_hash && hh == &invalid_header_hash =>
-                {
-                    assert_eq!(i.validation_status, ValidationStatus::Rejected)
-                }
-                _ => assert_eq!(i.validation_status, ValidationStatus::Valid),
+        for v in &int {
+            if !expected_invalid_entry(v, line!(), &invalid_header_hash, &invalid_entry_hash) {
+                others(v, line!())
             }
         }
 
@@ -153,14 +180,9 @@ async fn run_test(
         // Integration should have 6 ops in it
         // Plus another 22 from the previous calls
         let int = inspect_integrated(&alice_env, &workspace);
-        for (_, i, _) in &int {
-            match &i.op {
-                DhtOpLight::StoreEntry(hh, _, eh)
-                    if eh == &invalid_entry_hash && hh == &invalid_header_hash =>
-                {
-                    assert_eq!(i.validation_status, ValidationStatus::Rejected)
-                }
-                _ => assert_eq!(i.validation_status, ValidationStatus::Valid),
+        for v in &int {
+            if !expected_invalid_entry(v, line!(), &invalid_header_hash, &invalid_entry_hash) {
+                others(v, line!())
             }
         }
         assert_eq!(int.len(), 6 + 22);
@@ -174,6 +196,24 @@ async fn run_test(
             .unwrap();
     tokio::time::delay_for(Duration::from_millis(1000)).await;
 
+    fn expected_invalid_link(
+        (hash, i, el): &(DhtOpHash, IntegratedDhtOpsValue, Element),
+        line: u32,
+        invalid_link_hash: &HeaderHash,
+    ) -> bool {
+        let s = format!("\nline:{}\n{:?}\n{:?}\n{:?}", line, hash, i, el);
+        match &i.op {
+            // Invalid link
+            DhtOpLight::RegisterAddLink(hh, _) if hh == invalid_link_hash => {
+                assert_eq!(i.validation_status, ValidationStatus::Rejected, "{}", s)
+            }
+            DhtOpLight::StoreElement(hh, _, _) if hh == invalid_link_hash => {
+                assert_eq!(i.validation_status, ValidationStatus::Rejected, "{}", s)
+            }
+            _ => return false,
+        }
+        true
+    };
     {
         let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
 
@@ -184,17 +224,11 @@ async fn run_test(
         // Integration should have 9 ops in it
         // Plus another 28 from the previous calls
         let int = inspect_integrated(&alice_env, &workspace);
-        for (_, i, _) in &int {
-            match &i.op {
-                DhtOpLight::StoreEntry(hh, _, eh)
-                    if eh == &invalid_entry_hash && hh == &invalid_header_hash =>
-                {
-                    assert_eq!(i.validation_status, ValidationStatus::Rejected)
-                }
-                DhtOpLight::RegisterAddLink(hh, _) if hh == &invalid_link_hash => {
-                    assert_eq!(i.validation_status, ValidationStatus::Rejected)
-                }
-                _ => assert_eq!(i.validation_status, ValidationStatus::Valid),
+        for v in &int {
+            if !expected_invalid_entry(v, line!(), &invalid_header_hash, &invalid_entry_hash)
+                && !expected_invalid_link(v, line!(), &invalid_link_hash)
+            {
+                others(v, line!())
             }
         }
         assert_eq!(int.len(), 9 + 28);
@@ -220,17 +254,11 @@ async fn run_test(
         // Integration should have 9 ops in it
         // Plus another 37 from the previous calls
         let int = inspect_integrated(&alice_env, &workspace);
-        for (_, i, _) in &int {
-            match &i.op {
-                DhtOpLight::StoreEntry(hh, _, eh)
-                    if eh == &invalid_entry_hash && hh == &invalid_header_hash =>
-                {
-                    assert_eq!(i.validation_status, ValidationStatus::Rejected)
-                }
-                DhtOpLight::RegisterAddLink(hh, _) if hh == &invalid_link_hash => {
-                    assert_eq!(i.validation_status, ValidationStatus::Rejected)
-                }
-                _ => assert_eq!(i.validation_status, ValidationStatus::Valid),
+        for v in &int {
+            if !expected_invalid_entry(v, line!(), &invalid_header_hash, &invalid_entry_hash)
+                && !expected_invalid_link(v, line!(), &invalid_link_hash)
+            {
+                others(v, line!())
             }
         }
         assert_eq!(int.len(), 9 + 37);
@@ -248,7 +276,42 @@ async fn run_test(
             .await
             .try_into()
             .unwrap();
+
     tokio::time::delay_for(Duration::from_millis(1000)).await;
+
+    fn expected_invalid_remove_link(
+        (hash, i, el): &(DhtOpHash, IntegratedDhtOpsValue, Element),
+        line: u32,
+        invalid_remove_hash: &HeaderHash,
+    ) -> bool {
+        if let DhtOpLight::RegisterAgentActivity(_, _) = &i.op {
+            return false;
+        }
+        let s = format!("\nline:{}\n{:?}\n{:?}\n{:?}", line, hash, i, el);
+        let sb = SerializedBytes::try_from(&MaybeLinkable::NeverLinkable).unwrap();
+        let invalid_link_entry_hash = EntryHash::with_data_sync(&Entry::app(sb).unwrap());
+        // Link adds with these base / target are invalid
+        if let Header::LinkAdd(la) = el.header() {
+            if invalid_link_entry_hash == la.base_address
+                || invalid_link_entry_hash == la.target_address
+            {
+                assert_eq!(i.validation_status, ValidationStatus::Rejected, "{}", s);
+                return true;
+            }
+        }
+        match &i.op {
+            // The store element for the LinkRemove is invalid
+            DhtOpLight::StoreElement(hh, _, _) if hh == invalid_remove_hash => {
+                assert_eq!(i.validation_status, ValidationStatus::Rejected, "{}", s)
+            }
+            // The remove link op is also invalid
+            DhtOpLight::RegisterRemoveLink(hh, _) if hh == invalid_remove_hash => {
+                assert_eq!(i.validation_status, ValidationStatus::Rejected, "{}", s)
+            }
+            _ => return false,
+        }
+        true
+    };
 
     {
         let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
@@ -260,20 +323,12 @@ async fn run_test(
         // Integration should have 12 ops in it
         // Plus another 46 from the previous calls
         let int = inspect_integrated(&alice_env, &workspace);
-        for (_, i, _) in &int {
-            match &i.op {
-                DhtOpLight::StoreEntry(hh, _, eh)
-                    if eh == &invalid_entry_hash && hh == &invalid_header_hash =>
-                {
-                    assert_eq!(i.validation_status, ValidationStatus::Rejected)
-                }
-                DhtOpLight::RegisterAddLink(hh, _) if hh == &invalid_link_hash => {
-                    assert_eq!(i.validation_status, ValidationStatus::Rejected)
-                }
-                DhtOpLight::RegisterRemoveLink(hh, _) if hh == &invalid_remove_hash => {
-                    assert_eq!(i.validation_status, ValidationStatus::Rejected)
-                }
-                _ => assert_eq!(i.validation_status, ValidationStatus::Valid),
+        for v in &int {
+            if !expected_invalid_entry(v, line!(), &invalid_header_hash, &invalid_entry_hash)
+                && !expected_invalid_link(v, line!(), &invalid_link_hash)
+                && !expected_invalid_remove_link(v, line!(), &invalid_remove_hash)
+            {
+                others(v, line!())
             }
         }
         assert_eq!(int.len(), 12 + 46);
@@ -367,7 +422,7 @@ fn inspect_val_limbo(
 fn inspect_integrated(
     env: &EnvironmentWrite,
     workspace: &IncomingDhtOpsWorkspace,
-) -> Vec<(DhtOpHash, IntegratedDhtOpsValue, Option<Element>)> {
+) -> Vec<(DhtOpHash, IntegratedDhtOpsValue, Element)> {
     debug!("start");
     let element_buf = ElementBuf::vault(env.clone().into(), true).unwrap();
     let element_buf_reject = ElementBuf::rejected(env.clone().into()).unwrap();
@@ -381,7 +436,8 @@ fn inspect_integrated(
                 let el = element_buf
                     .get_element(&i.op.header_hash())
                     .unwrap()
-                    .or_else(|| element_buf_reject.get_element(&i.op.header_hash()).unwrap());
+                    .or_else(|| element_buf_reject.get_element(&i.op.header_hash()).unwrap())
+                    .expect("missing element");
                 debug!(?hash, ?i, op_in_int = ?el);
                 Ok((hash, i, el))
             })

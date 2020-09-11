@@ -66,7 +66,7 @@ pub enum ThisWasmEntry {
 }
 
 #[derive(Deserialize, Serialize, SerializedBytes, Debug, Clone)]
-enum MaybeLinkable {
+pub enum MaybeLinkable {
     AlwaysLinkable,
     NeverLinkable,
 }

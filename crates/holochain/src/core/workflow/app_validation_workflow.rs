@@ -342,13 +342,25 @@ async fn validate_op(
 fn get_element(op: DhtOp) -> AppValidationOutcome<Element> {
     match op {
         DhtOp::RegisterDeletedBy(_, _) | DhtOp::RegisterAgentActivity(_, _) => Outcome::accepted(),
-        DhtOp::StoreElement(_, h, _) => match h {
-            // TODO: Add the rest of the ops and entry's
-            Header::ElementDelete(_) => todo!("Get the original entry"),
-            Header::EntryUpdate(_) => todo!("Get the original entry"),
-            Header::LinkAdd(_) => todo!(),
-            Header::LinkRemove(_) => todo!(),
-            Header::EntryCreate(_) => todo!(),
+        DhtOp::StoreElement(s, h, e) => match h {
+            Header::ElementDelete(_) | Header::LinkAdd(_) | Header::LinkRemove(_) => {
+                Ok(Element::new(
+                    SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(h), s),
+                    None,
+                ))
+            }
+            Header::EntryUpdate(_) | Header::EntryCreate(_) => match e {
+                Some(e) => Ok(Element::new(
+                    SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(h), s),
+                    Some(*e),
+                )),
+                // TODO: Not sure if this is correct.
+                // This is basically private entries. We can't get them
+                // so we can run app validation but maybe we should pass in
+                // element without the entry for a validate_private_entry_header
+                // style call?
+                None => Outcome::accepted(),
+            },
             _ => Outcome::accepted(),
         },
         DhtOp::StoreEntry(s, h, e) => Ok(Element::new(
@@ -636,6 +648,7 @@ impl Workspace for AppValidationWorkspace {
         self.meta_pending.flush_to_txn_ref(writer)?;
         self.element_judged.flush_to_txn_ref(writer)?;
         self.meta_judged.flush_to_txn_ref(writer)?;
+
         // Need to flush the call zome workspace because of the cache.
         // TODO: If cache becomes a separate env then remove this
         if let Some(czws) = self
@@ -645,8 +658,6 @@ impl Workspace for AppValidationWorkspace {
         {
             let mut czws: CallZomeWorkspace = czws.into_inner();
             czws.flush_to_txn_ref(writer)?;
-        } else {
-            warn!("Failed to write to validate call zome workspace");
         }
         Ok(())
     }

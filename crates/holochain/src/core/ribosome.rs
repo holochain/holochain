@@ -118,10 +118,9 @@ impl HostAccess {
             Self::Init(InitHostAccess{workspace, .. }) |
             Self::MigrateAgent(MigrateAgentHostAccess{workspace, .. }) |
             Self::ValidationPackage(ValidationPackageHostAccess{workspace, .. }) |
-            Self::PostCommit(PostCommitHostAccess{workspace, .. }) 
-            | Self::Validate(ValidateHostAccess { workspace, .. })
-            | Self::ValidateLinkAdd(ValidateLinkAddHostAccess { workspace, .. })
-            => {
+            Self::PostCommit(PostCommitHostAccess{workspace, .. }) |
+            Self::Validate(ValidateHostAccess { workspace, .. }) |
+            Self::ValidateLinkAdd(ValidateLinkAddHostAccess { workspace, .. }) => {
                 workspace
             }
             _ => panic!("Gave access to a host function that uses the workspace without providing a workspace"),

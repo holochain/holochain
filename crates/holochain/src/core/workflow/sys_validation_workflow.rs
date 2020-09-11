@@ -194,11 +194,10 @@ async fn validate_op(
     .await
     {
         Ok(_) => match op {
-            DhtOp::RegisterAgentActivity(_, _) |
-            // TODO: Check strict mode where store element 
+            // TODO: Check strict mode where store element
             // is also run through app validation
-            DhtOp::StoreElement(_, _, _) => Ok(Outcome::SkipAppValidation),
-            _ => Ok(Outcome::Accepted)
+            DhtOp::RegisterAgentActivity(_, _) => Ok(Outcome::SkipAppValidation),
+            _ => Ok(Outcome::Accepted),
         },
         // Handle the errors that result in pending or awaiting deps
         Err(SysValidationError::ValidationOutcome(e)) => {
