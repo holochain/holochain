@@ -32,7 +32,7 @@ use holochain_types::{
     validate::ValidationStatus, Entry, Timestamp,
 };
 use holochain_zome_types::{
-    header::{ElementDelete, EntryType, LinkAdd, LinkRemove, UpdateEntry},
+    header::{DeleteElement, EntryType, LinkAdd, LinkRemove, UpdateEntry},
     Header,
 };
 use std::{collections::BinaryHeap, convert::TryInto};
@@ -458,7 +458,7 @@ async fn register_updated_by(
 }
 
 async fn register_deleted_by(
-    element_delete: &ElementDelete,
+    element_delete: &DeleteElement,
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
     dependencies: &mut PendingDependencies,
@@ -476,7 +476,7 @@ async fn register_deleted_by(
 }
 
 async fn register_deleted_entry_header(
-    element_delete: &ElementDelete,
+    element_delete: &DeleteElement,
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
     dependencies: &mut PendingDependencies,

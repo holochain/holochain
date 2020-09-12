@@ -22,7 +22,7 @@ mod tests {
         HeaderHashed,
     };
     use holochain_zome_types::header::{self, builder, EntryType, HeaderBuilder};
-    use holochain_zome_types::header::{ElementDelete, HeaderBuilderCommon};
+    use holochain_zome_types::header::{DeleteElement, HeaderBuilderCommon};
 
     struct TestFixtures {
         header_hashes: Box<dyn Iterator<Item = HeaderHash>>,
@@ -96,8 +96,8 @@ mod tests {
         removes_address: HeaderHash,
         removes_entry_address: EntryHash,
         fx: &mut TestFixtures,
-    ) -> (header::ElementDelete, HeaderHashed) {
-        let builder = builder::ElementDelete {
+    ) -> (header::DeleteElement, HeaderHashed) {
+        let builder = builder::DeleteElement {
             removes_address,
             removes_entry_address,
         };
@@ -508,9 +508,9 @@ mod tests {
 
     async fn update_dbs(
         new_entries: &[NewEntryHeader],
-        entry_deletes: &[ElementDelete],
+        entry_deletes: &[DeleteElement],
         update_entries: &[NewEntryHeader],
-        delete_updates: &[ElementDelete],
+        delete_updates: &[DeleteElement],
         _entry_hash: &EntryHash,
         meta_buf: &mut MetadataBuf,
     ) {
@@ -524,9 +524,9 @@ mod tests {
 
     async fn create_data(
         entry_creates: &mut Vec<NewEntryHeader>,
-        entry_deletes: &mut Vec<ElementDelete>,
+        entry_deletes: &mut Vec<DeleteElement>,
         entry_updates: &mut Vec<NewEntryHeader>,
-        delete_updates: &mut Vec<ElementDelete>,
+        delete_updates: &mut Vec<DeleteElement>,
         entry_hash: &EntryHash,
         fx: &mut TestFixtures,
     ) {

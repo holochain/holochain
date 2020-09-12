@@ -311,7 +311,7 @@ async fn get_from_another_agent() {
         header_hash
     );
     assert_eq!(
-        HeaderHash::with_data_sync(&Header::ElementDelete(
+        HeaderHash::with_data_sync(&Header::DeleteElement(
             entry_details.deletes.get(0).unwrap().clone()
         )),
         remove_hash
@@ -326,7 +326,7 @@ async fn get_from_another_agent() {
     assert_eq!(header_details.deletes.len(), 1);
     assert_eq!(*header_details.element.header_address(), header_hash);
     assert_eq!(
-        HeaderHash::with_data_sync(&Header::ElementDelete(
+        HeaderHash::with_data_sync(&Header::DeleteElement(
             header_details.deletes.get(0).unwrap().clone()
         )),
         remove_hash

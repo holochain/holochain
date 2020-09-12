@@ -41,8 +41,8 @@ use holochain_zome_types::header::AppEntryType;
 use holochain_zome_types::header::ChainClose;
 use holochain_zome_types::header::ChainOpen;
 use holochain_zome_types::header::CreateEntry;
+use holochain_zome_types::header::DeleteElement;
 use holochain_zome_types::header::Dna;
-use holochain_zome_types::header::ElementDelete;
 use holochain_zome_types::header::EntryType;
 use holochain_zome_types::header::Header;
 use holochain_zome_types::header::InitZomesComplete;
@@ -515,7 +515,7 @@ fixturator!(
 );
 
 fixturator!(
-    ElementDelete;
+    DeleteElement;
     constructor fn from_builder(HeaderBuilderCommon, HeaderHash, EntryHash);
 );
 
@@ -531,7 +531,7 @@ fixturator!(
         ChainClose(ChainClose)
         CreateEntry(CreateEntry)
         UpdateEntry(UpdateEntry)
-        ElementDelete(ElementDelete)
+        DeleteElement(DeleteElement)
     ];
 
     curve PublicCurve {

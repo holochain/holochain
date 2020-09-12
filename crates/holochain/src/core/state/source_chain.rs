@@ -132,7 +132,7 @@ impl SourceChain {
                             // filter out authorship and everything else
                             _ => false,
                         },
-                        Header::ElementDelete(_) => true,
+                        Header::DeleteElement(_) => true,
                         // no other headers are relevant
                         _ => false,
                     })
@@ -147,7 +147,7 @@ impl SourceChain {
                             Header::UpdateEntry(update) => {
                                 references.insert(update.original_header_address.clone());
                             }
-                            Header::ElementDelete(delete) => {
+                            Header::DeleteElement(delete) => {
                                 references.insert(delete.removes_address.clone());
                             }
                             _ => {}
@@ -441,7 +441,7 @@ pub mod tests {
 
         {
             let mut chain = SourceChain::new(env.clone().into())?;
-            let header_builder = builder::ElementDelete {
+            let header_builder = builder::DeleteElement {
                 removes_address: updated_header_hash,
                 removes_entry_address: updated_entry_hash,
             };

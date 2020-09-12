@@ -51,7 +51,7 @@ pub enum SysMetaVal {
     NewEntry(TimedHeaderHash),
     /// An [UpdateEntry] [Header]
     Update(TimedHeaderHash),
-    /// An [Header::ElementDelete]
+    /// An [Header::DeleteElement]
     Delete(TimedHeaderHash),
     /// Activity on an agent's public key
     Activity(TimedHeaderHash),
@@ -216,9 +216,9 @@ impl From<header::UpdateEntry> for EntryHeader {
     }
 }
 
-impl From<header::ElementDelete> for EntryHeader {
-    fn from(h: header::ElementDelete) -> Self {
-        EntryHeader::Delete(Header::ElementDelete(h))
+impl From<header::DeleteElement> for EntryHeader {
+    fn from(h: header::DeleteElement) -> Self {
+        EntryHeader::Delete(Header::DeleteElement(h))
     }
 }
 

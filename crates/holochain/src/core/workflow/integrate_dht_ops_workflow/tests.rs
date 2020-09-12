@@ -35,7 +35,7 @@ use holochain_types::{
 use holochain_zome_types::{
     entry::GetOptions,
     entry_def::EntryDefs,
-    header::{builder, ElementDelete, LinkAdd, LinkRemove, UpdateEntry, ZomeId},
+    header::{builder, DeleteElement, LinkAdd, LinkRemove, UpdateEntry, ZomeId},
     link::{LinkTag, Links},
     zome::ZomeName,
     CreateEntryInput, GetInput, GetLinksInput, Header, LinkEntriesInput,
@@ -59,7 +59,7 @@ struct TestData {
     original_entry_hash: EntryHash,
     new_entry_hash: EntryHash,
     original_header: NewEntryHeader,
-    entry_delete: ElementDelete,
+    entry_delete: DeleteElement,
     link_add: LinkAdd,
     link_remove: LinkRemove,
 }
@@ -115,7 +115,7 @@ impl TestData {
         entry_update_entry.original_header_address = original_header_hash.clone();
 
         // Entry delete
-        let mut entry_delete = fixt!(ElementDelete);
+        let mut entry_delete = fixt!(DeleteElement);
         entry_delete.removes_address = original_header_hash.clone();
 
         // Link add
@@ -334,7 +334,7 @@ impl Db {
                         .meta
                         .get_deletes_on_entry(
                             &reader,
-                            ElementDelete::try_from(header)
+                            DeleteElement::try_from(header)
                                 .unwrap()
                                 .removes_entry_address,
                         )
@@ -1214,7 +1214,7 @@ async fn test_wasm_api_without_integration_delete() {
             .next()
             .unwrap()
             .unwrap();
-        let delete = builder::ElementDelete {
+        let delete = builder::DeleteElement {
             removes_address: entry_header.header_hash,
             removes_entry_address: base_address.clone(),
         };
@@ -1258,7 +1258,7 @@ async fn test_integrate_single_register_replaced_by_for_entry() {
 #[ignore]
 async fn test_integrate_single_register_delete_on_headerd_by() {
     // For RegisterDeletedBy
-    // metadata has ElementDelete on HeaderHash
+    // metadata has DeleteElement on HeaderHash
     todo!()
 }
 

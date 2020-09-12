@@ -141,7 +141,7 @@ impl ElementTest {
     }
 
     fn entry_delete(mut self) -> (Element, Vec<DhtOp>) {
-        let entry_delete = builder::ElementDelete {
+        let entry_delete = builder::DeleteElement {
             removes_address: self.header_hash.clone(),
             removes_entry_address: self.entry_hash.clone(),
         }

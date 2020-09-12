@@ -117,7 +117,7 @@ fixturator!(
 );
 
 fixturator!(
-    ElementDelete;
+    DeleteElement;
     constructor fn from_builder(HeaderBuilderCommon, HeaderHash, EntryHash);
 );
 

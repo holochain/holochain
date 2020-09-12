@@ -105,8 +105,8 @@ pub struct WireUpdateEntryRelationship {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
-pub struct WireElementDelete {
-    pub delete: ElementDelete,
+pub struct WireDeleteElement {
+    pub delete: DeleteElement,
     pub signature: Signature,
 }
 
@@ -171,7 +171,7 @@ impl From<(UpdateEntry, Signature)> for WireUpdateEntry {
     }
 }
 
-impl WireElementDelete {
+impl WireDeleteElement {
     pub async fn into_element(self) -> Element {
         Element::new(
             SignedHeaderHashed::from_content_sync(SignedHeader(self.delete.into(), self.signature)),
@@ -219,7 +219,7 @@ impl NewEntryHeaderRef<'_> {
     }
 }
 
-impl TryFrom<SignedHeaderHashed> for WireElementDelete {
+impl TryFrom<SignedHeaderHashed> for WireDeleteElement {
     type Error = WrongHeaderError;
     fn try_from(shh: SignedHeaderHashed) -> Result<Self, Self::Error> {
         let (h, signature) = shh.into_header_and_signature();

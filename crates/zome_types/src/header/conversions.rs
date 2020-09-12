@@ -55,21 +55,21 @@ impl<'a> TryFrom<&'a Header> for &'a UpdateEntry {
     }
 }
 
-impl TryFrom<Header> for ElementDelete {
+impl TryFrom<Header> for DeleteElement {
     type Error = WrongHeaderError;
     fn try_from(value: Header) -> Result<Self, Self::Error> {
         match value {
-            Header::ElementDelete(h) => Ok(h),
+            Header::DeleteElement(h) => Ok(h),
             _ => Err(WrongHeaderError(format!("{:?}", value))),
         }
     }
 }
 
-impl<'a> TryFrom<&'a Header> for &'a ElementDelete {
+impl<'a> TryFrom<&'a Header> for &'a DeleteElement {
     type Error = WrongHeaderError;
     fn try_from(value: &'a Header) -> Result<Self, Self::Error> {
         match value {
-            Header::ElementDelete(h) => Ok(h),
+            Header::DeleteElement(h) => Ok(h),
             _ => Err(WrongHeaderError(format!("{:?}", value))),
         }
     }

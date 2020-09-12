@@ -134,13 +134,13 @@ fn get_element_delete<P: PrefixType>(
     header_hash: HeaderHash,
     op_name: String,
     cas: &ElementBuf<P>,
-) -> DhtOpConvertResult<(header::ElementDelete, Signature)> {
+) -> DhtOpConvertResult<(header::DeleteElement, Signature)> {
     let (header, sig) = cas
         .get_header(&header_hash)?
         .ok_or_else(|| DhtOpConvertError::MissingData(header_hash.into()))?
         .into_header_and_signature();
     match header.into_content() {
-        Header::ElementDelete(u) => Ok((u, sig)),
+        Header::DeleteElement(u) => Ok((u, sig)),
         h => Err(DhtOpConvertError::HeaderMismatch(
             format!("{:?}", h),
             op_name,

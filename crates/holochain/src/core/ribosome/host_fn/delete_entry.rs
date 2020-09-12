@@ -29,7 +29,7 @@ pub fn delete_entry<'a>(
         let mut guard = host_access.workspace().write().await;
         let workspace: &mut CallZomeWorkspace = &mut guard;
         let source_chain = &mut workspace.source_chain;
-        let header_builder = builder::ElementDelete {
+        let header_builder = builder::DeleteElement {
             removes_address,
             removes_entry_address,
         };

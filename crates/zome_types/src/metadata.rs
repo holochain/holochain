@@ -1,7 +1,7 @@
 //! Metadata types for use in wasm
 use crate::{
     element::Element,
-    header::{ElementDelete, UpdateEntry},
+    header::{DeleteElement, UpdateEntry},
     Entry, Header,
 };
 use holochain_serialized_bytes::prelude::*;
@@ -25,8 +25,8 @@ pub struct ElementDetails {
     /// The specific element.
     /// Either an CreateEntry or an UpdateEntry.
     pub element: Element,
-    /// Any ElementDelete on this element.
-    pub deletes: Vec<ElementDelete>,
+    /// Any DeleteElement on this element.
+    pub deletes: Vec<DeleteElement>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, SerializedBytes)]
@@ -38,7 +38,7 @@ pub struct EntryDetails {
     /// These can only be CreateEntry or UpdateEntry headers
     pub headers: Vec<Header>,
     /// Delete relationships
-    pub deletes: Vec<ElementDelete>,
+    pub deletes: Vec<DeleteElement>,
     /// Update relationships.
     /// ## Warning
     /// This is just the relationship and you will need call get

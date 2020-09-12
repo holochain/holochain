@@ -1,7 +1,7 @@
 //! Defines a Element, the basic unit of Holochain data.
 
 use crate::{
-    header::{WireElementDelete, WireNewEntryHeader, WireUpdateEntryRelationship},
+    header::{WireDeleteElement, WireNewEntryHeader, WireUpdateEntryRelationship},
     prelude::*,
     EntryHashed, HeaderHashed,
 };
@@ -28,7 +28,7 @@ pub struct WireElement {
     maybe_entry: Option<Entry>,
     /// If this element is deleted then we require a single delete
     /// in the cache as proof of the tombstone
-    deleted: Option<WireElementDelete>,
+    deleted: Option<WireDeleteElement>,
 }
 
 /// A group of elements with a common entry
@@ -130,7 +130,7 @@ pub struct RawGetEntryResponse {
     // header being deleted but we would need to only ever store
     // if there was a header delete in our MetadataBuf and
     // not the delete header hash as we do now.
-    pub deletes: Vec<WireElementDelete>,
+    pub deletes: Vec<WireDeleteElement>,
     /// Any updates on this entry.
     /// Note you will need to ask for "all_live_headers_with_metadata"
     /// to get this back
@@ -152,7 +152,7 @@ impl RawGetEntryResponse {
     /// or there is no entry or the entry hash is different
     pub fn from_elements<E>(
         elements: E,
-        deletes: Vec<WireElementDelete>,
+        deletes: Vec<WireDeleteElement>,
         updates: Vec<WireUpdateEntryRelationship>,
     ) -> Option<Self>
     where
@@ -284,7 +284,7 @@ impl WireElement {
         (header, deleted)
     }
     /// Convert from a [Element] when sending to the network
-    pub fn from_element(e: Element, deleted: Option<WireElementDelete>) -> Self {
+    pub fn from_element(e: Element, deleted: Option<WireDeleteElement>) -> Self {
         let (signed_header, maybe_entry) = e.into_inner();
         Self {
             signed_header: signed_header.into_inner().0,

@@ -46,7 +46,7 @@ pub enum Header {
     ChainClose(ChainClose),
     CreateEntry(CreateEntry),
     UpdateEntry(UpdateEntry),
-    ElementDelete(ElementDelete),
+    DeleteElement(DeleteElement),
 }
 
 pub type HeaderHashed = HoloHashed<Header>;
@@ -103,7 +103,7 @@ write_into_header! {
     ChainClose,
     CreateEntry,
     UpdateEntry,
-    ElementDelete,
+    DeleteElement,
 }
 
 /// a utility macro just to not have to type in the match statement everywhere.
@@ -119,7 +119,7 @@ macro_rules! match_header {
             Header::ChainClose($i) => { $($t)* }
             Header::CreateEntry($i) => { $($t)* }
             Header::UpdateEntry($i) => { $($t)* }
-            Header::ElementDelete($i) => { $($t)* }
+            Header::DeleteElement($i) => { $($t)* }
         }
     };
 }
@@ -175,7 +175,7 @@ impl Header {
             | Self::InitZomesComplete(InitZomesComplete { header_seq, .. })
             | Self::LinkAdd(LinkAdd { header_seq, .. })
             | Self::LinkRemove(LinkRemove { header_seq, .. })
-            | Self::ElementDelete(ElementDelete { header_seq, .. })
+            | Self::DeleteElement(DeleteElement { header_seq, .. })
             | Self::ChainClose(ChainClose { header_seq, .. })
             | Self::ChainOpen(ChainOpen { header_seq, .. })
             | Self::CreateEntry(CreateEntry { header_seq, .. })
@@ -191,7 +191,7 @@ impl Header {
             Self::InitZomesComplete(InitZomesComplete { prev_header, .. }) => prev_header,
             Self::LinkAdd(LinkAdd { prev_header, .. }) => prev_header,
             Self::LinkRemove(LinkRemove { prev_header, .. }) => prev_header,
-            Self::ElementDelete(ElementDelete { prev_header, .. }) => prev_header,
+            Self::DeleteElement(DeleteElement { prev_header, .. }) => prev_header,
             Self::ChainClose(ChainClose { prev_header, .. }) => prev_header,
             Self::ChainOpen(ChainOpen { prev_header, .. }) => prev_header,
             Self::CreateEntry(CreateEntry { prev_header, .. }) => prev_header,
@@ -381,7 +381,7 @@ pub struct HeaderUpdate {
 /// that a previously published Entry will become inaccessible if all of its
 /// Headers are marked deleted.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
-pub struct ElementDelete {
+pub struct DeleteElement {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub header_seq: u32,

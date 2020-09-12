@@ -67,11 +67,11 @@ pub enum DhtOp {
     RegisterUpdatedBy(Signature, header::UpdateEntry),
 
     /// Op for registering a Header deletion with the Header authority
-    RegisterDeletedBy(Signature, header::ElementDelete),
+    RegisterDeletedBy(Signature, header::DeleteElement),
 
     /// Op for registering a Header deletion with the Entry authority, so that
     /// the Entry can be marked Dead if all of its Headers have been deleted
-    RegisterDeletedEntryHeader(Signature, header::ElementDelete),
+    RegisterDeletedEntryHeader(Signature, header::DeleteElement),
 
     /// Op for adding a link
     RegisterAddLink(Signature, header::LinkAdd),
@@ -219,8 +219,8 @@ pub enum UniqueForm<'a> {
     StoreEntry(&'a NewEntryHeader),
     RegisterAgentActivity(&'a Header),
     RegisterUpdatedBy(&'a header::UpdateEntry),
-    RegisterDeletedBy(&'a header::ElementDelete),
-    RegisterDeletedEntryHeader(&'a header::ElementDelete),
+    RegisterDeletedBy(&'a header::DeleteElement),
+    RegisterDeletedEntryHeader(&'a header::DeleteElement),
     RegisterAddLink(&'a header::LinkAdd),
     RegisterRemoveLink(&'a header::LinkRemove),
 }
@@ -393,7 +393,7 @@ async fn produce_op_lights_from_iter(
                     UniqueForm::RegisterUpdatedBy(entry_update).basis().await,
                 ));
             }
-            Header::ElementDelete(entry_delete) => {
+            Header::DeleteElement(entry_delete) => {
                 // TODO: VALIDATION: This only works if entry_delete.remove_address is either CreateEntry
                 // or UpdateEntry
                 ops.push(DhtOpLight::RegisterDeletedBy(
