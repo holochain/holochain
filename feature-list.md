@@ -1,5 +1,7 @@
 # Feature List
 
+These are the features that are currently implemented or planned and their status.
+
 ## HDK features
 | Feature                  | Status      | Example     | Comment |
 |--------------------------|-------------|-------------|---------|
