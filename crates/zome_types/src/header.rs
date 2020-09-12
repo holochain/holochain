@@ -33,7 +33,7 @@ impl From<Vec<HeaderHashed>> for HeaderHashedVec {
 /// are then used to check the integrity of data using cryptographic hash
 /// functions.
 #[allow(missing_docs)]
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, SerializedBytes)]
 #[serde(tag = "type")]
 pub enum Header {
     // The first header in a chain (for the DNA) doesn't have a previous header
@@ -236,7 +236,7 @@ pub struct ZomeId(u8);
 pub struct EntryDefIndex(u8);
 
 /// The Dna Header is always the first header in a source chain
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, SerializedBytes)]
 pub struct Dna {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
@@ -246,7 +246,7 @@ pub struct Dna {
 
 /// Header for an agent validation package, used to determine whether an agent
 /// is allowed to participate in this DNA
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, SerializedBytes)]
 pub struct AgentValidationPkg {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
@@ -258,7 +258,7 @@ pub struct AgentValidationPkg {
 
 /// A header which declares that all zome init functions have successfully
 /// completed, and the chain is ready for commits. Contains no explicit data.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, SerializedBytes)]
 pub struct InitZomesComplete {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
@@ -267,7 +267,7 @@ pub struct InitZomesComplete {
 }
 
 /// Declares that a metadata Link should be made between two EntryHashes
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, SerializedBytes)]
 pub struct LinkAdd {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
@@ -281,7 +281,7 @@ pub struct LinkAdd {
 }
 
 /// Declares that a previously made Link should be nullified and considered removed.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, SerializedBytes)]
 pub struct LinkRemove {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
@@ -298,7 +298,7 @@ pub struct LinkRemove {
 
 /// When migrating to a new version of a DNA, this header is committed to the
 /// new chain to declare the migration path taken. **Currently unused**
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, SerializedBytes)]
 pub struct ChainOpen {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
@@ -310,7 +310,7 @@ pub struct ChainOpen {
 
 /// When migrating to a new version of a DNA, this header is committed to the
 /// old chain to declare the migration path taken. **Currently unused**
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, SerializedBytes)]
 pub struct ChainClose {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
@@ -322,7 +322,9 @@ pub struct ChainClose {
 
 /// A header which "speaks" Entry content into being. The same content can be
 /// referenced by multiple such headers.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
+#[derive(
+    Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, SerializedBytes, Hash,
+)]
 pub struct EntryCreate {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
@@ -345,7 +347,9 @@ pub struct EntryCreate {
 /// The original header is required to prevent update loops:
 /// If you update A to B and B back to A, and then you don't know which one came first,
 /// or how to break the loop.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
+#[derive(
+    Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, SerializedBytes, Hash,
+)]
 pub struct EntryUpdate {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
@@ -361,7 +365,9 @@ pub struct EntryUpdate {
 
 /// Placeholder for future when we want to have updates on headers
 /// Not currently in use.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
+#[derive(
+    Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, SerializedBytes, Hash,
+)]
 pub struct HeaderUpdate {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
@@ -380,7 +386,7 @@ pub struct HeaderUpdate {
 /// Via the associated [DhtOp], this also has an effect on Entries: namely,
 /// that a previously published Entry will become inaccessible if all of its
 /// Headers are marked deleted.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, SerializedBytes)]
 pub struct ElementDelete {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
@@ -395,7 +401,9 @@ pub struct ElementDelete {
 /// Allows Headers which reference Entries to know what type of Entry it is
 /// referencing. Useful for examining Headers without needing to fetch the
 /// corresponding Entries.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
+#[derive(
+    Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, SerializedBytes, Hash,
+)]
 pub enum EntryType {
     /// An AgentPubKey
     AgentPubKey,
@@ -419,7 +427,9 @@ impl EntryType {
 }
 
 /// Information about a class of Entries provided by the DNA
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
+#[derive(
+    Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, SerializedBytes, Hash,
+)]
 pub struct AppEntryType {
     /// u8 identifier of what entry type this is
     /// this needs to match the position of the entry type returned by entry defs

@@ -1,8 +1,8 @@
 //! Traits and types for declaring how BufferedStores can work with
 //! database fixture data
 
-use crate::{error::DatabaseResult, prelude::BufKey, prelude::BufVal, prelude::Readable};
-use std::{collections::BTreeSet, hash::Hash};
+use crate::prelude::Readable;
+use std::collections::BTreeSet;
 
 /// Adds methods to load and read out test fixture data. For tests only!
 pub trait LoadDbFixture {

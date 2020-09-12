@@ -24,7 +24,19 @@ impl From<&str> for EntryDefId {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Copy, Hash)]
+#[derive(
+    Debug,
+    Clone,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    SerializedBytes,
+    Copy,
+    Hash,
+)]
 pub enum EntryVisibility {
     Public,
     Private,
