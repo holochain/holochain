@@ -77,7 +77,7 @@ impl SourceChain {
     ) -> SourceChainResult<HeaderHash> {
         let (entry, entry_hash) =
             EntryHashed::from_content_sync(Entry::CapClaim(claim_entry)).into_inner();
-        let header_builder = builder::EntryCreate {
+        let header_builder = builder::CreateEntry {
             entry_type: EntryType::CapClaim,
             entry_hash,
         };
@@ -122,7 +122,7 @@ impl SourceChain {
                 .iter_fail(&r)?
                 .filter(|header| {
                     Ok(match header.as_content().header() {
-                        Header::EntryCreate(create) => match create.entry_type {
+                        Header::CreateEntry(create) => match create.entry_type {
                             EntryType::CapGrant => true,
                             // filter out authorship and everything else
                             _ => false,
@@ -170,7 +170,7 @@ impl SourceChain {
                 .iter()
                 .filter(|header| !references.contains(header.as_hash()))
                 .filter_map(|header| match header.as_content().header() {
-                    Header::EntryCreate(create) => Some(create.entry_hash.clone()),
+                    Header::CreateEntry(create) => Some(create.entry_hash.clone()),
                     Header::EntryUpdate(update) => Some(update.entry_hash.clone()),
                     _ => None,
                 })
@@ -364,7 +364,7 @@ pub mod tests {
             let mut chain = SourceChain::new(env.clone().into())?;
             let (entry, entry_hash) =
                 EntryHashed::from_content_sync(Entry::CapGrant(grant.clone())).into_inner();
-            let header_builder = builder::EntryCreate {
+            let header_builder = builder::CreateEntry {
                 entry_type: EntryType::CapGrant,
                 entry_hash: entry_hash.clone(),
             };

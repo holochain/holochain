@@ -29,7 +29,7 @@ pub mod error;
 /// A header of one of the two types that create a new entry.
 pub enum NewEntryHeader {
     /// A header which simply creates a new entry
-    Create(EntryCreate),
+    Create(CreateEntry),
     /// A header which creates a new entry that is semantically related to a
     /// previously created entry or header
     Update(EntryUpdate),
@@ -39,21 +39,21 @@ pub enum NewEntryHeader {
 #[derive(Debug, From)]
 /// Same as NewEntryHeader but takes headers as reference
 pub enum NewEntryHeaderRef<'a> {
-    Create(&'a EntryCreate),
+    Create(&'a CreateEntry),
     Update(&'a EntryUpdate),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Ord, PartialOrd)]
 /// A header of one of the two types that create a new entry.
 pub enum WireNewEntryHeader {
-    Create(WireEntryCreate),
+    Create(WireCreateEntry),
     Update(WireEntryUpdate),
 }
 
-/// The minimum unique data for EntryCreate headers
+/// The minimum unique data for CreateEntry headers
 /// that share a common entry
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Ord, PartialOrd)]
-pub struct WireEntryCreate {
+pub struct WireCreateEntry {
     /// Timestamp is first so that deriving Ord results in
     /// order by time
     pub timestamp: holochain_zome_types::timestamp::Timestamp,
@@ -114,7 +114,7 @@ impl NewEntryHeader {
     /// Get the entry on this header
     pub fn entry(&self) -> &EntryHash {
         match self {
-            NewEntryHeader::Create(EntryCreate { entry_hash, .. })
+            NewEntryHeader::Create(CreateEntry { entry_hash, .. })
             | NewEntryHeader::Update(EntryUpdate { entry_hash, .. }) => entry_hash,
         }
     }
@@ -122,7 +122,7 @@ impl NewEntryHeader {
     /// Get the visibility of this header
     pub fn visibility(&self) -> &EntryVisibility {
         match self {
-            NewEntryHeader::Create(EntryCreate { entry_type, .. })
+            NewEntryHeader::Create(CreateEntry { entry_type, .. })
             | NewEntryHeader::Update(EntryUpdate { entry_type, .. }) => entry_type.visibility(),
         }
     }
@@ -130,7 +130,7 @@ impl NewEntryHeader {
     /// Get the timestamp of this header
     pub fn timestamp(&self) -> &holochain_zome_types::timestamp::Timestamp {
         match self {
-            NewEntryHeader::Create(EntryCreate { timestamp, .. })
+            NewEntryHeader::Create(CreateEntry { timestamp, .. })
             | NewEntryHeader::Update(EntryUpdate { timestamp, .. }) => timestamp,
         }
     }
@@ -139,14 +139,14 @@ impl NewEntryHeader {
 impl From<NewEntryHeader> for Header {
     fn from(h: NewEntryHeader) -> Self {
         match h {
-            NewEntryHeader::Create(h) => Header::EntryCreate(h),
+            NewEntryHeader::Create(h) => Header::CreateEntry(h),
             NewEntryHeader::Update(h) => Header::EntryUpdate(h),
         }
     }
 }
 
-impl From<(EntryCreate, Signature)> for WireEntryCreate {
-    fn from((ec, signature): (EntryCreate, Signature)) -> Self {
+impl From<(CreateEntry, Signature)> for WireCreateEntry {
+    fn from((ec, signature): (CreateEntry, Signature)) -> Self {
         Self {
             timestamp: ec.timestamp,
             author: ec.author,
@@ -207,13 +207,13 @@ impl WireEntryUpdateRelationship {
 impl NewEntryHeaderRef<'_> {
     pub fn entry_type(&self) -> &EntryType {
         match self {
-            NewEntryHeaderRef::Create(EntryCreate { entry_type, .. })
+            NewEntryHeaderRef::Create(CreateEntry { entry_type, .. })
             | NewEntryHeaderRef::Update(EntryUpdate { entry_type, .. }) => entry_type,
         }
     }
     pub fn entry_hash(&self) -> &EntryHash {
         match self {
-            NewEntryHeaderRef::Create(EntryCreate { entry_hash, .. })
+            NewEntryHeaderRef::Create(CreateEntry { entry_hash, .. })
             | NewEntryHeaderRef::Update(EntryUpdate { entry_hash, .. }) => entry_hash,
         }
     }
@@ -279,7 +279,7 @@ impl WireNewEntryHeader {
         match self {
             WireNewEntryHeader::Create(ec) => {
                 let signature = ec.signature;
-                let ec = EntryCreate {
+                let ec = CreateEntry {
                     author: ec.author,
                     timestamp: ec.timestamp,
                     header_seq: ec.header_seq,
@@ -313,7 +313,7 @@ impl TryFrom<SignedHeaderHashed> for WireNewEntryHeader {
         let (sh, _) = shh.into_inner();
         let (header, s) = sh.into();
         match header {
-            Header::EntryCreate(ec) => Ok(Self::Create((ec, s).into())),
+            Header::CreateEntry(ec) => Ok(Self::Create((ec, s).into())),
             Header::EntryUpdate(eu) => Ok(Self::Update((eu, s).into())),
             _ => Err(HeaderError::NotNewEntry),
         }
@@ -324,7 +324,7 @@ impl TryFrom<Header> for NewEntryHeader {
     type Error = WrongHeaderError;
     fn try_from(value: Header) -> Result<Self, Self::Error> {
         match value {
-            Header::EntryCreate(h) => Ok(NewEntryHeader::Create(h)),
+            Header::CreateEntry(h) => Ok(NewEntryHeader::Create(h)),
             Header::EntryUpdate(h) => Ok(NewEntryHeader::Update(h)),
             _ => Err(WrongHeaderError(format!("{:?}", value))),
         }
@@ -335,7 +335,7 @@ impl<'a> TryFrom<&'a Header> for NewEntryHeaderRef<'a> {
     type Error = WrongHeaderError;
     fn try_from(value: &'a Header) -> Result<Self, Self::Error> {
         match value {
-            Header::EntryCreate(h) => Ok(NewEntryHeaderRef::Create(h)),
+            Header::CreateEntry(h) => Ok(NewEntryHeaderRef::Create(h)),
             Header::EntryUpdate(h) => Ok(NewEntryHeaderRef::Update(h)),
             _ => Err(WrongHeaderError(format!("{:?}", value))),
         }
@@ -375,8 +375,8 @@ mod tests {
     }
 
     #[test]
-    fn test_entrycreate_msgpack_roundtrip() {
-        let orig: Header = EntryCreate::from_builder(
+    fn test_create_entry_msgpack_roundtrip() {
+        let orig: Header = CreateEntry::from_builder(
             HeaderBuilderCommonFixturator::new(Unpredictable)
                 .next()
                 .unwrap(),
@@ -395,8 +395,8 @@ mod tests {
     }
 
     #[test]
-    fn test_entrycreate_serializedbytes_roundtrip() {
-        let orig: Header = EntryCreate::from_builder(
+    fn test_create_entry_serializedbytes_roundtrip() {
+        let orig: Header = CreateEntry::from_builder(
             HeaderBuilderCommonFixturator::new(Unpredictable)
                 .next()
                 .unwrap(),

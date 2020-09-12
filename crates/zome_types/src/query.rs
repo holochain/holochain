@@ -85,7 +85,7 @@ mod tests {
         let entry_type_1 = EntryType::App(fixt!(AppEntryType));
         let entry_type_2 = EntryType::AgentPubKey;
 
-        let mut h1 = fixt!(EntryCreate);
+        let mut h1 = fixt!(CreateEntry);
         h1.entry_type = entry_type_1.clone();
         h1.header_seq = 0;
 
@@ -96,7 +96,7 @@ mod tests {
         let mut h3 = fixt!(LinkAdd);
         h3.header_seq = 2;
 
-        let mut h4 = fixt!(EntryCreate);
+        let mut h4 = fixt!(CreateEntry);
         h4.entry_type = entry_type_2.clone();
         h4.header_seq = 3;
 

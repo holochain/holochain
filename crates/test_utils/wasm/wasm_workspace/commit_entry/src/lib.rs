@@ -14,7 +14,7 @@ fn post() -> Post {
 
 #[hdk_extern]
 fn commit_entry(_: ()) -> ExternResult<HeaderHash> {
-    Ok(commit_entry!(post())?)
+    Ok(create_entry!(post())?)
 }
 
 #[hdk_extern]

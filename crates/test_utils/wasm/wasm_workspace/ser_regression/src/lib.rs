@@ -40,7 +40,7 @@ fn create_channel(name: ChannelName) -> ExternResult<EntryHash> {
     let channel = Channel::new(name.into());
     let channel_hash = entry_hash!(&channel)?;
     let sb: SerializedBytes = channel_hash.clone().try_into().unwrap();
-    commit_entry!(&channel)?;
+    create_entry!(&channel)?;
     debug!(format!("sb in channel {:?}", sb))?;
     link_entries!(entry_hash!(&path)?, channel_hash.clone())?;
     Ok(channel_hash)
@@ -55,7 +55,7 @@ fn create_message(input: CreateMessageInput) -> ExternResult<EntryHash> {
     } = input;
     let message = ChannelMessage::new(content);
     let message_hash = entry_hash!(&message)?;
-    commit_entry!(&message)?;
+    create_entry!(&message)?;
     link_entries!(channel_hash, message_hash.clone())?;
     Ok(message_hash)
 }

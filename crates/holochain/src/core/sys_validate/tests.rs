@@ -309,7 +309,7 @@ async fn check_entry_type_test() {
 
 #[tokio::test(threaded_scheduler)]
 async fn check_entry_hash_test() {
-    let mut ec = fixt!(EntryCreate);
+    let mut ec = fixt!(CreateEntry);
     let entry = fixt!(Entry);
     let hash = EntryHash::with_data_sync(&entry);
     let header: Header = ec.clone().into();
@@ -351,7 +351,7 @@ async fn check_entry_size_test() {
 
 #[tokio::test(threaded_scheduler)]
 async fn check_update_reference_test() {
-    let mut ec = fixt!(EntryCreate);
+    let mut ec = fixt!(CreateEntry);
     let mut eu = fixt!(EntryUpdate);
     let et_cap = EntryType::CapClaim;
     let mut aet_fixt = AppEntryTypeFixturator::new(Predictable).map(EntryType::App);

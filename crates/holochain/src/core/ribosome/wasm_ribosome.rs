@@ -297,7 +297,7 @@ impl WasmRibosome {
         } = host_fn_access
         {
             ns.insert("__call", func!(invoke_host_function!(call)));
-            ns.insert("__commit_entry", func!(invoke_host_function!(commit_entry)));
+            ns.insert("__create_entry", func!(invoke_host_function!(commit_entry)));
             ns.insert("__emit_signal", func!(invoke_host_function!(emit_signal)));
             ns.insert("__link_entries", func!(invoke_host_function!(link_entries)));
             ns.insert("__remove_link", func!(invoke_host_function!(remove_link)));
@@ -306,7 +306,7 @@ impl WasmRibosome {
             ns.insert("__schedule", func!(invoke_host_function!(schedule)));
         } else {
             ns.insert("__call", func!(invoke_host_function!(unreachable)));
-            ns.insert("__commit_entry", func!(invoke_host_function!(unreachable)));
+            ns.insert("__create_entry", func!(invoke_host_function!(unreachable)));
             ns.insert("__emit_signal", func!(invoke_host_function!(unreachable)));
             ns.insert("__link_entries", func!(invoke_host_function!(unreachable)));
             ns.insert("__remove_link", func!(invoke_host_function!(unreachable)));

@@ -1,9 +1,9 @@
 use crate::{
     core::state::element_buf::ElementBuf,
     fixt::{
-        AgentValidationPkgFixturator, ChainCloseFixturator, ChainOpenFixturator, DnaFixturator,
-        EntryCreateFixturator, EntryFixturator, EntryHashFixturator, EntryTypeFixturator,
-        EntryUpdateFixturator, InitZomesCompleteFixturator, LinkAddFixturator,
+        AgentValidationPkgFixturator, ChainCloseFixturator, ChainOpenFixturator,
+        CreateEntryFixturator, DnaFixturator, EntryFixturator, EntryHashFixturator,
+        EntryTypeFixturator, EntryUpdateFixturator, InitZomesCompleteFixturator, LinkAddFixturator,
         LinkRemoveFixturator,
     },
 };
@@ -20,7 +20,7 @@ use holochain_types::{
 };
 use holochain_zome_types::header::{
     builder::{self, HeaderBuilder},
-    AgentValidationPkg, ChainClose, ChainOpen, Dna, EntryCreate, EntryType, EntryUpdate, Header,
+    AgentValidationPkg, ChainClose, ChainOpen, CreateEntry, Dna, EntryType, EntryUpdate, Header,
     HeaderBuilderCommon, InitZomesComplete, LinkAdd, LinkRemove,
 };
 use pretty_assertions::assert_eq;
@@ -77,8 +77,8 @@ impl ElementTest {
         }
     }
 
-    fn create_element(&mut self) -> (EntryCreate, Element) {
-        let entry_create = builder::EntryCreate {
+    fn create_element(&mut self) -> (CreateEntry, Element) {
+        let entry_create = builder::CreateEntry {
             entry_type: self.entry_type.clone(),
             entry_hash: self.entry_hash.clone(),
         }
@@ -249,11 +249,11 @@ async fn test_dht_basis() {
     {
         // Create a header that points to an entry
         let new_entry = fixt!(Entry);
-        let original_header = fixt!(EntryCreate);
+        let original_header = fixt!(CreateEntry);
         let expected_entry_hash: AnyDhtHash = original_header.entry_hash.clone().into();
 
         let original_header_hash =
-            HeaderHashed::from_content_sync(Header::EntryCreate(original_header.clone()));
+            HeaderHashed::from_content_sync(Header::CreateEntry(original_header.clone()));
         let signed_header =
             SignedHeaderHashed::with_presigned(original_header_hash.clone(), fixt!(Signature));
         let original_header_hash = original_header_hash.into_inner().1;

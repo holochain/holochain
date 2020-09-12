@@ -128,7 +128,7 @@ builder_variant!(ChainClose {
     new_dna_hash: DnaHash,
 });
 
-builder_variant!(EntryCreate {
+builder_variant!(CreateEntry {
     entry_type: EntryType,
     entry_hash: EntryHash,
 });

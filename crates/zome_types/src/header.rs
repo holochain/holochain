@@ -44,7 +44,7 @@ pub enum Header {
     LinkRemove(LinkRemove),
     ChainOpen(ChainOpen),
     ChainClose(ChainClose),
-    EntryCreate(EntryCreate),
+    CreateEntry(CreateEntry),
     EntryUpdate(EntryUpdate),
     ElementDelete(ElementDelete),
 }
@@ -101,7 +101,7 @@ write_into_header! {
     LinkRemove,
     ChainOpen,
     ChainClose,
-    EntryCreate,
+    CreateEntry,
     EntryUpdate,
     ElementDelete,
 }
@@ -117,7 +117,7 @@ macro_rules! match_header {
             Header::LinkRemove($i) => { $($t)* }
             Header::ChainOpen($i) => { $($t)* }
             Header::ChainClose($i) => { $($t)* }
-            Header::EntryCreate($i) => { $($t)* }
+            Header::CreateEntry($i) => { $($t)* }
             Header::EntryUpdate($i) => { $($t)* }
             Header::ElementDelete($i) => { $($t)* }
         }
@@ -127,10 +127,10 @@ macro_rules! match_header {
 impl Header {
     /// Returns the address and entry type of the Entry, if applicable.
     // TODO: DRY: possibly create an `EntryData` struct which is used by both
-    // EntryCreate and EntryUpdate
+    // CreateEntry and EntryUpdate
     pub fn entry_data(&self) -> Option<(&EntryHash, &EntryType)> {
         match self {
-            Self::EntryCreate(EntryCreate {
+            Self::CreateEntry(CreateEntry {
                 entry_hash,
                 entry_type,
                 ..
@@ -178,7 +178,7 @@ impl Header {
             | Self::ElementDelete(ElementDelete { header_seq, .. })
             | Self::ChainClose(ChainClose { header_seq, .. })
             | Self::ChainOpen(ChainOpen { header_seq, .. })
-            | Self::EntryCreate(EntryCreate { header_seq, .. })
+            | Self::CreateEntry(CreateEntry { header_seq, .. })
             | Self::EntryUpdate(EntryUpdate { header_seq, .. }) => *header_seq,
         }
     }
@@ -194,7 +194,7 @@ impl Header {
             Self::ElementDelete(ElementDelete { prev_header, .. }) => prev_header,
             Self::ChainClose(ChainClose { prev_header, .. }) => prev_header,
             Self::ChainOpen(ChainOpen { prev_header, .. }) => prev_header,
-            Self::EntryCreate(EntryCreate { prev_header, .. }) => prev_header,
+            Self::CreateEntry(CreateEntry { prev_header, .. }) => prev_header,
             Self::EntryUpdate(EntryUpdate { prev_header, .. }) => prev_header,
         })
     }
@@ -323,7 +323,7 @@ pub struct ChainClose {
 /// A header which "speaks" Entry content into being. The same content can be
 /// referenced by multiple such headers.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
-pub struct EntryCreate {
+pub struct CreateEntry {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub header_seq: u32,

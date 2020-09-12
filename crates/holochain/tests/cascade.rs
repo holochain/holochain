@@ -39,7 +39,7 @@ fn fixtures() -> (
     )
     .unwrap();
 
-    let jimbo_header = Header::EntryCreate(header::EntryCreate {
+    let jimbo_header = Header::CreateEntry(header::CreateEntry {
         author: jimbo_id.clone(),
         timestamp: Timestamp::now().into(),
         header_seq: 0,
@@ -48,7 +48,7 @@ fn fixtures() -> (
         entry_hash: jimbo_entry.as_hash().clone(),
     });
 
-    let jessy_header = Header::EntryCreate(header::EntryCreate {
+    let jessy_header = Header::CreateEntry(header::CreateEntry {
         author: jessy_id.clone(),
         timestamp: Timestamp::now().into(),
         header_seq: 0,

@@ -15,8 +15,8 @@ use holochain_zome_types::entry_def::{EntryDefId, EntryVisibility};
 use holochain_zome_types::header::builder;
 use holochain_zome_types::header::AppEntryType;
 use holochain_zome_types::header::EntryType;
-use holochain_zome_types::CommitEntryInput;
-use holochain_zome_types::CommitEntryOutput;
+use holochain_zome_types::CreateEntryInput;
+use holochain_zome_types::CreateEntryOutput;
 use std::sync::Arc;
 
 /// commit an entry
@@ -24,8 +24,8 @@ use std::sync::Arc;
 pub fn commit_entry<'a>(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: CommitEntryInput,
-) -> RibosomeResult<CommitEntryOutput> {
+    input: CreateEntryInput,
+) -> RibosomeResult<CreateEntryOutput> {
     // destructure the args out into an app type def id and entry
     let (entry_def_id, entry) = input.into_inner();
 
@@ -51,7 +51,7 @@ pub fn commit_entry<'a>(
     };
 
     // build a header for the entry being committed
-    let header_builder = builder::EntryCreate {
+    let header_builder = builder::CreateEntry {
         entry_type,
         entry_hash,
     };
@@ -79,7 +79,7 @@ pub fn commit_entry<'a>(
         .await
         .map_err(Box::new)
         .map_err(SourceChainError::from)?;
-        Ok(CommitEntryOutput::new(header_hash))
+        Ok(CreateEntryOutput::new(header_hash))
     })
 }
 
@@ -138,8 +138,8 @@ pub mod wasm_test {
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::entry::EntryError;
     use holochain_zome_types::entry_def::EntryDefId;
-    use holochain_zome_types::CommitEntryInput;
-    use holochain_zome_types::CommitEntryOutput;
+    use holochain_zome_types::CreateEntryInput;
+    use holochain_zome_types::CreateEntryOutput;
     use holochain_zome_types::Entry;
     use holochain_zome_types::GetOutput;
     use std::sync::Arc;
@@ -167,7 +167,7 @@ pub mod wasm_test {
         call_context.host_access = host_access.into();
         let app_entry = EntryFixturator::new(AppEntry).next().unwrap();
         let entry_def_id = EntryDefId::App("post".into());
-        let input = CommitEntryInput::new((entry_def_id, app_entry.clone()));
+        let input = CreateEntryInput::new((entry_def_id, app_entry.clone()));
 
         let output = commit_entry(Arc::new(ribosome), Arc::new(call_context), input);
 
@@ -210,7 +210,7 @@ pub mod wasm_test {
         call_context.host_access = host_access.into();
         let app_entry = EntryFixturator::new(AppEntry).next().unwrap();
         let entry_def_id = EntryDefId::App("post".into());
-        let input = CommitEntryInput::new((entry_def_id, app_entry.clone()));
+        let input = CreateEntryInput::new((entry_def_id, app_entry.clone()));
 
         let output = commit_entry(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
 
@@ -247,7 +247,7 @@ pub mod wasm_test {
         host_access.workspace = workspace_lock.clone();
 
         // get the result of a commit entry
-        let output: CommitEntryOutput =
+        let output: CreateEntryOutput =
             crate::call_test_ribosome!(host_access, TestWasm::CommitEntry, "commit_entry", ());
 
         // the chain head should be the committed entry header

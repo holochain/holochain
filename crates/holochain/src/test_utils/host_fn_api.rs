@@ -25,7 +25,7 @@ use holochain_zome_types::{
     link::{Link, LinkTag},
     metadata::Details,
     zome::ZomeName,
-    CommitEntryInput, DeleteEntryInput, GetDetailsInput, GetInput, GetLinksInput, LinkEntriesInput,
+    CreateEntryInput, DeleteEntryInput, GetDetailsInput, GetInput, GetLinksInput, LinkEntriesInput,
     RemoveLinkInput, UpdateEntryInput,
 };
 use std::sync::Arc;
@@ -99,7 +99,7 @@ pub async fn commit_entry<'env, E: Into<entry_def::EntryDefId>>(
     let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
     let workspace_lock = CallZomeWorkspaceLock::new(workspace);
 
-    let input = CommitEntryInput::new((entry_def_id.into(), entry));
+    let input = CreateEntryInput::new((entry_def_id.into(), entry));
 
     let output = {
         let host_access = ZomeCallHostAccess::new(workspace_lock.clone(), keystore, network);

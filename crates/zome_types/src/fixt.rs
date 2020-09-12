@@ -107,7 +107,7 @@ fixturator!(
 );
 
 fixturator!(
-    EntryCreate;
+    CreateEntry;
     constructor fn from_builder(HeaderBuilderCommon, EntryType, EntryHash);
 );
 

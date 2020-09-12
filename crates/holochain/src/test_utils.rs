@@ -22,7 +22,7 @@ use holochain_types::{
 };
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::entry_def::EntryVisibility;
-use holochain_zome_types::header::{EntryCreate, EntryType, Header};
+use holochain_zome_types::header::{CreateEntry, EntryType, Header};
 use std::{convert::TryInto, sync::Arc};
 use tempdir::TempDir;
 
@@ -91,7 +91,7 @@ pub async fn fake_unique_element(
     let app_entry_type = holochain_types::fixt::AppEntryTypeFixturator::new(visibility)
         .next()
         .unwrap();
-    let header_1 = Header::EntryCreate(EntryCreate {
+    let header_1 = Header::CreateEntry(CreateEntry {
         author: agent_key,
         timestamp: Timestamp::now().into(),
         header_seq: 0,

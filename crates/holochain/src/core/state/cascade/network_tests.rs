@@ -607,14 +607,14 @@ async fn generate_fixt_store() -> (
     let mut meta_store = BTreeMap::new();
     let entry = EntryFixturator::new(AppEntry).next().unwrap();
     let entry_hash = EntryHashed::from_content_sync(entry.clone()).into_hash();
-    let mut element_create = fixt!(EntryCreate);
+    let mut element_create = fixt!(CreateEntry);
     let entry_type = AppEntryTypeFixturator::new(EntryVisibility::Public)
         .map(EntryType::App)
         .next()
         .unwrap();
     element_create.entry_type = entry_type;
     element_create.entry_hash = entry_hash.clone();
-    let header = HeaderHashed::from_content_sync(Header::EntryCreate(element_create));
+    let header = HeaderHashed::from_content_sync(Header::CreateEntry(element_create));
     let hash = header.as_hash().clone();
     let signed_header = SignedHeaderHashed::with_presigned(header, fixt!(Signature));
     meta_store.insert(

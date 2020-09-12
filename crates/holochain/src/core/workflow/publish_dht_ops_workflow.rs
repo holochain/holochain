@@ -539,7 +539,7 @@ mod tests {
                     let mut source_chain = SourceChain::new(env.clone().into()).unwrap();
                     let original_header_address = source_chain
                         .put(
-                            builder::EntryCreate {
+                            builder::CreateEntry {
                                 entry_type: ec_entry_type,
                                 entry_hash: original_entry_hash.clone(),
                             },

@@ -1,13 +1,15 @@
 #[macro_export]
-macro_rules! commit_cap_grant {
+macro_rules! create_cap_grant {
     ( $input:expr ) => {{
+        $crate::prelude::host_externs!(__create_entry);
+
         $crate::host_fn!(
-            __commit_entry,
-            $crate::prelude::CommitEntryInput::new((
+            __create_entry,
+            $crate::prelude::CreateEntryInput::new((
                 $crate::prelude::EntryDefId::CapGrant,
                 $crate::prelude::Entry::CapGrant($input)
             )),
-            $crate::prelude::CommitEntryOutput
+            $crate::prelude::CreateEntryOutput
         )
     }};
 }

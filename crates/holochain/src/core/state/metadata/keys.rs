@@ -47,7 +47,7 @@ pub(super) type SysMetaKey = AnyDhtHash;
 #[derive(Debug, Hash, PartialEq, Eq, Ord, PartialOrd, Clone, Serialize, Deserialize)]
 pub enum SysMetaVal {
     /// A header that results in a new entry
-    /// Either a [EntryCreate] or [EntryUpdate]
+    /// Either a [CreateEntry] or [EntryUpdate]
     NewEntry(TimedHeaderHash),
     /// An [EntryUpdate] [Header]
     Update(TimedHeaderHash),

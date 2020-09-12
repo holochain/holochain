@@ -266,7 +266,7 @@ impl Path {
     /// recursively touch this and every parent that doesn't exist yet
     pub fn ensure(&self) -> Result<(), HdkError> {
         if !self.exists()? {
-            commit_entry!(self)?;
+            create_entry!(self)?;
             if let Some(parent) = self.parent() {
                 parent.ensure()?;
                 link_entries!(parent.hash()?, self.hash()?, LinkTag::try_from(self)?)?;

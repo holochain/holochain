@@ -40,9 +40,9 @@ use holochain_zome_types::header::AgentValidationPkg;
 use holochain_zome_types::header::AppEntryType;
 use holochain_zome_types::header::ChainClose;
 use holochain_zome_types::header::ChainOpen;
+use holochain_zome_types::header::CreateEntry;
 use holochain_zome_types::header::Dna;
 use holochain_zome_types::header::ElementDelete;
-use holochain_zome_types::header::EntryCreate;
 use holochain_zome_types::header::EntryType;
 use holochain_zome_types::header::EntryUpdate;
 use holochain_zome_types::header::Header;
@@ -493,11 +493,11 @@ fixturator!(
 );
 
 fixturator!(
-    EntryCreate;
+    CreateEntry;
     constructor fn from_builder(HeaderBuilderCommon, EntryType, EntryHash);
 
     curve PublicCurve {
-        let mut ec = fixt!(EntryCreate);
+        let mut ec = fixt!(CreateEntry);
         ec.entry_type = fixt!(EntryType, PublicCurve);
         ec
     };
@@ -529,14 +529,14 @@ fixturator!(
         LinkRemove(LinkRemove)
         ChainOpen(ChainOpen)
         ChainClose(ChainClose)
-        EntryCreate(EntryCreate)
+        CreateEntry(CreateEntry)
         EntryUpdate(EntryUpdate)
         ElementDelete(ElementDelete)
     ];
 
     curve PublicCurve {
         match fixt!(Header) {
-            Header::EntryCreate(_) => Header::EntryCreate(fixt!(EntryCreate, PublicCurve)),
+            Header::CreateEntry(_) => Header::CreateEntry(fixt!(CreateEntry, PublicCurve)),
             Header::EntryUpdate(_) => Header::EntryUpdate(fixt!(EntryUpdate, PublicCurve)),
             other_type => other_type,
         }
@@ -546,14 +546,14 @@ fixturator!(
 fixturator!(
     NewEntryHeader;
     variants [
-        Create(EntryCreate)
+        Create(CreateEntry)
         Update(EntryUpdate)
     ];
 
 
     curve PublicCurve {
         match fixt!(NewEntryHeader) {
-            NewEntryHeader::Create(_) => NewEntryHeader::Create(fixt!(EntryCreate, PublicCurve)),
+            NewEntryHeader::Create(_) => NewEntryHeader::Create(fixt!(CreateEntry, PublicCurve)),
             NewEntryHeader::Update(_) => NewEntryHeader::Update(fixt!(EntryUpdate, PublicCurve)),
         }
     };

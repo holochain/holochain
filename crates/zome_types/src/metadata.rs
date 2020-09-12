@@ -23,7 +23,7 @@ pub enum Details {
 /// This is all the metadata available for an element.
 pub struct ElementDetails {
     /// The specific element.
-    /// Either an EntryCreate or an EntryUpdate.
+    /// Either an CreateEntry or an EntryUpdate.
     pub element: Element,
     /// Any ElementDelete on this element.
     pub deletes: Vec<ElementDelete>,
@@ -35,7 +35,7 @@ pub struct EntryDetails {
     /// The data
     pub entry: Entry,
     /// Create relationships.
-    /// These can only be EntryCreate or EntryUpdate headers
+    /// These can only be CreateEntry or EntryUpdate headers
     pub headers: Vec<Header>,
     /// Delete relationships
     pub deletes: Vec<ElementDelete>,

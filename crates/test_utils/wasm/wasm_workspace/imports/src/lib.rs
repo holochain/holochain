@@ -36,12 +36,12 @@ guest_functions!(
     [__capability_claims, capability_claims, CapabilityClaimsInput, CapabilityClaimsOutput],
     [__capability_grants, capability_grants, CapabilityGrantsInput, CapabilityGrantsOutput],
     [__capability_info, capability_info, CapabilityInfoInput, CapabilityInfoOutput],
-    [
-        __commit_entry,
-        commit_entry,
-        CommitEntryInput,
-        CommitEntryOutput
-    ],
+    // [
+    //     __create_entry,
+    //     commit_entry,
+    //     CreateEntryInput,
+    //     CreateEntryOutput
+    // ],
     [__decrypt, decrypt, DecryptInput, DecryptOutput],
     [__encrypt, encrypt, EncryptInput, EncryptOutput],
     [__show_env, show_env, ShowEnvInput, ShowEnvOutput],

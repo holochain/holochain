@@ -4,7 +4,7 @@ use hdk3::prelude::*;
 fn set_access(_: ()) -> ExternResult<()> {
     let mut functions: GrantedFunctions = HashSet::new();
     functions.insert((zome_info!()?.zome_name, "whoami".into()));
-    commit_cap_grant!(
+    create_cap_grant!(
         CapGrantEntry {
             tag: "".into(),
             // empty access converts to unrestricted

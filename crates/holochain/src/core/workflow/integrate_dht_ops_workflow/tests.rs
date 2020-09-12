@@ -38,7 +38,7 @@ use holochain_zome_types::{
     header::{builder, ElementDelete, EntryUpdate, LinkAdd, LinkRemove, ZomeId},
     link::{LinkTag, Links},
     zome::ZomeName,
-    CommitEntryInput, GetInput, GetLinksInput, Header, LinkEntriesInput,
+    CreateEntryInput, GetInput, GetLinksInput, Header, LinkEntriesInput,
 };
 use produce_dht_ops_workflow::{produce_dht_ops_workflow, ProduceDhtOpsWorkspace};
 use std::{
@@ -134,7 +134,7 @@ impl TestData {
 
         let mut any_header = fixt!(Header, PublicCurve);
         match &mut any_header {
-            Header::EntryCreate(ec) => {
+            Header::CreateEntry(ec) => {
                 ec.entry_hash = original_entry_hash.clone();
             }
             Header::EntryUpdate(eu) => {
@@ -610,7 +610,7 @@ fn add_op_to_judged(mut ps: Vec<Db>, op: &DhtOp) -> Vec<Db> {
 
 fn store_element(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let entry = match &a.any_header {
-        Header::EntryCreate(_) | Header::EntryUpdate(_) => Some(a.original_entry.clone().into()),
+        Header::CreateEntry(_) | Header::EntryUpdate(_) => Some(a.original_entry.clone().into()),
         _ => None,
     };
     let op = DhtOp::StoreElement(
@@ -899,7 +899,7 @@ async fn commit_entry<'env>(
         .next()
         .unwrap();
 
-    let input = CommitEntryInput::new((entry_def_id.clone(), entry.clone()));
+    let input = CreateEntryInput::new((entry_def_id.clone(), entry.clone()));
 
     let output = {
         let mut host_access = fixt!(ZomeCallHostAccess);
@@ -1373,7 +1373,7 @@ mod slow_tests {
 
             let mut workspace = CallZomeWorkspace::new(cell_env.clone().into()).unwrap();
 
-            let header_builder = builder::EntryCreate {
+            let header_builder = builder::CreateEntry {
                 entry_type: EntryType::App(AppEntryType::new(
                     0.into(),
                     0.into(),
@@ -1388,7 +1388,7 @@ mod slow_tests {
                 .unwrap();
 
             // Commit the target
-            let header_builder = builder::EntryCreate {
+            let header_builder = builder::CreateEntry {
                 entry_type: EntryType::App(AppEntryType::new(
                     1.into(),
                     0.into(),
@@ -1413,7 +1413,7 @@ mod slow_tests {
             .unwrap();
 
             // Commit the base
-            let header_builder = builder::EntryCreate {
+            let header_builder = builder::CreateEntry {
                 entry_type: EntryType::App(AppEntryType::new(
                     2.into(),
                     0.into(),

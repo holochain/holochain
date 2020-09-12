@@ -44,7 +44,7 @@ pub async fn light_to_op<P: PrefixType>(
                 .into_inner();
             let (header, sig) = header.into_header_and_signature();
             let header = match header.into_content() {
-                Header::EntryCreate(c) => NewEntryHeader::Create(c),
+                Header::CreateEntry(c) => NewEntryHeader::Create(c),
                 Header::EntryUpdate(c) => NewEntryHeader::Update(c),
                 _ => return Err(DhtOpConvertError::HeaderEntryMismatch),
             };

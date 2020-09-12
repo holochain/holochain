@@ -148,7 +148,7 @@ impl RawGetEntryResponse {
     /// elements all have the same entry. This is not checked
     /// due to the performance cost.
     /// ### Panics
-    /// If the elements are not a header of EntryCreate or EntryDelete
+    /// If the elements are not a header of CreateEntry or EntryDelete
     /// or there is no entry or the entry hash is different
     pub fn from_elements<E>(
         elements: E,
@@ -185,7 +185,7 @@ impl RawGetEntryResponse {
         let entry = entry.expect("Get entry responses cannot be created without entries");
         let (header, signature) = shh.into_header_and_signature();
         let (new_entry_header, entry_type) = match header.into_content() {
-            Header::EntryCreate(ec) => {
+            Header::CreateEntry(ec) => {
                 let et = ec.entry_type.clone();
                 (WireNewEntryHeader::Create((ec, signature).into()), et)
             }
@@ -195,7 +195,7 @@ impl RawGetEntryResponse {
             }
             h => panic!(
                 "Get entry responses cannot be created from headers
-                    other then EntryCreate or EntryUpdate.
+                    other then CreateEntry or EntryUpdate.
                     Tried to with: {:?}",
                 h
             ),

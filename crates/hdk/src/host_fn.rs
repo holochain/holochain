@@ -1,7 +1,7 @@
 pub mod agent_info;
 pub mod call;
 pub mod call_remote;
-pub mod commit_entry;
+pub mod create_entry;
 pub mod debug;
 pub mod decrypt;
 pub mod delete_entry;

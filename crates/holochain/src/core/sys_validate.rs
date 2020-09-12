@@ -340,10 +340,10 @@ pub async fn check_entry_hash(hash: &EntryHash, entry: &Entry) -> SysValidationR
 }
 
 /// Check the header should have an entry.
-/// Is either a EntryCreate or EntryUpdate
+/// Is either a CreateEntry or EntryUpdate
 pub fn check_new_entry_header(header: &Header) -> SysValidationResult<()> {
     match header {
-        Header::EntryCreate(_) | Header::EntryUpdate(_) => Ok(()),
+        Header::CreateEntry(_) | Header::EntryUpdate(_) => Ok(()),
         _ => Err(ValidationOutcome::NotNewEntry(header.clone()).into()),
     }
 }

@@ -25,7 +25,7 @@ impl CounTree {
     pub fn ensure(countree: CounTree) -> ExternResult<HeaderHash> {
         match get!(entry_hash!(countree)?)? {
             Some(element) => Ok(element.header_address().to_owned()),
-            None => Ok(commit_entry!(countree)?)
+            None => Ok(create_entry!(countree)?)
         }
     }
 

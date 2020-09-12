@@ -12,7 +12,7 @@ mod tests {
     };
     use ::fixt::prelude::*;
     use fallible_iterator::FallibleIterator;
-    use header::EntryCreate;
+    use header::CreateEntry;
     use holo_hash::fixt::*;
     use holo_hash::*;
     use holochain_state::{prelude::*, test_utils::test_cell_env};
@@ -82,8 +82,8 @@ mod tests {
     async fn test_create(
         entry_hash: EntryHash,
         fx: &mut TestFixtures,
-    ) -> (header::EntryCreate, HeaderHashed) {
-        let builder = builder::EntryCreate {
+    ) -> (header::CreateEntry, HeaderHashed) {
+        let builder = builder::CreateEntry {
             entry_hash,
             entry_type: fx.entry_type(),
         };
@@ -309,7 +309,7 @@ mod tests {
         let mut fx = TestFixtures::new();
         let entry_hash = fx.entry_hash();
         let mut expected: Vec<TimedHeaderHash> = Vec::new();
-        let mut entry_creates: Vec<EntryCreate> = Vec::new();
+        let mut entry_creates: Vec<CreateEntry> = Vec::new();
         for _ in 0..10 as u32 {
             let (e, hash) = test_create(entry_hash.clone(), &mut fx).await;
             expected.push(hash.into());

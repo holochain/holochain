@@ -121,8 +121,8 @@ impl DhtOp {
 
     /// Convert a [DhtOp] to a [DhtOpLight] and basis
     pub async fn to_light(
-        // Hoping one day we can work out how to go from `&EntryCreate`
-        // to `&Header::EntryCreate(EntryCreate)` so punting on a reference
+        // Hoping one day we can work out how to go from `&CreateEntry`
+        // to `&Header::CreateEntry(CreateEntry)` so punting on a reference
         &self,
     ) -> DhtOpLight {
         let basis = self.dht_basis().await;
@@ -370,7 +370,7 @@ async fn produce_op_lights_from_iter(
                 header_hash,
                 UniqueForm::RegisterRemoveLink(link_remove).basis().await,
             )),
-            Header::EntryCreate(entry_create) => ops.push(DhtOpLight::StoreEntry(
+            Header::CreateEntry(entry_create) => ops.push(DhtOpLight::StoreEntry(
                 header_hash,
                 maybe_entry_hash.ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.clone()))?,
                 UniqueForm::StoreEntry(&NewEntryHeader::Create(entry_create.clone()))
@@ -394,7 +394,7 @@ async fn produce_op_lights_from_iter(
                 ));
             }
             Header::ElementDelete(entry_delete) => {
-                // TODO: VALIDATION: This only works if entry_delete.remove_address is either EntryCreate
+                // TODO: VALIDATION: This only works if entry_delete.remove_address is either CreateEntry
                 // or EntryUpdate
                 ops.push(DhtOpLight::RegisterDeletedBy(
                     header_hash.clone(),

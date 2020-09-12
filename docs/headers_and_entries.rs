@@ -25,7 +25,7 @@ pub enum Header {
     LinkRemove(header::LinkRemove),
     ChainOpen(header::ChainOpen),
     ChainClose(header::ChainClose),
-    EntryCreate(header::EntryCreate),
+    CreateEntry(header::CreateEntry),
     EntryUpdate(header::EntryUpdate),
     ElementDelete(header::ElementDelete),
 }
@@ -81,7 +81,7 @@ pub mod header {
         pub new_dna_hash: DnaHash,
     }
 
-    pub struct EntryCreate {
+    pub struct CreateEntry {
         pub author: PublicKey,
         pub timestamp: Timestamp,
         pub prev_header: HeaderHash,
@@ -132,7 +132,7 @@ impl Header {
             Self::ElementDelete(header::ElementDelete { prev_header, .. }) => prev_header,
             Self::ChainClose(header::ChainClose { prev_header, .. }) => prev_header,
             Self::ChainOpen(header::ChainOpen { prev_header, .. }) => prev_header,
-            Self::EntryCreate(header::EntryCreate { prev_header, .. }) => prev_header,
+            Self::CreateEntry(header::CreateEntry { prev_header, .. }) => prev_header,
             Self::EntryUpdate(header::EntryUpdate { prev_header, .. }) => prev_header,
         })
     }
