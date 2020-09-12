@@ -45,7 +45,7 @@ pub enum Header {
     ChainOpen(ChainOpen),
     ChainClose(ChainClose),
     CreateEntry(CreateEntry),
-    EntryUpdate(EntryUpdate),
+    UpdateEntry(UpdateEntry),
     ElementDelete(ElementDelete),
 }
 
@@ -102,7 +102,7 @@ write_into_header! {
     ChainOpen,
     ChainClose,
     CreateEntry,
-    EntryUpdate,
+    UpdateEntry,
     ElementDelete,
 }
 
@@ -118,7 +118,7 @@ macro_rules! match_header {
             Header::ChainOpen($i) => { $($t)* }
             Header::ChainClose($i) => { $($t)* }
             Header::CreateEntry($i) => { $($t)* }
-            Header::EntryUpdate($i) => { $($t)* }
+            Header::UpdateEntry($i) => { $($t)* }
             Header::ElementDelete($i) => { $($t)* }
         }
     };
@@ -127,7 +127,7 @@ macro_rules! match_header {
 impl Header {
     /// Returns the address and entry type of the Entry, if applicable.
     // TODO: DRY: possibly create an `EntryData` struct which is used by both
-    // CreateEntry and EntryUpdate
+    // CreateEntry and UpdateEntry
     pub fn entry_data(&self) -> Option<(&EntryHash, &EntryType)> {
         match self {
             Self::CreateEntry(CreateEntry {
@@ -135,7 +135,7 @@ impl Header {
                 entry_type,
                 ..
             }) => Some((entry_hash, entry_type)),
-            Self::EntryUpdate(EntryUpdate {
+            Self::UpdateEntry(UpdateEntry {
                 entry_hash,
                 entry_type,
                 ..
@@ -179,7 +179,7 @@ impl Header {
             | Self::ChainClose(ChainClose { header_seq, .. })
             | Self::ChainOpen(ChainOpen { header_seq, .. })
             | Self::CreateEntry(CreateEntry { header_seq, .. })
-            | Self::EntryUpdate(EntryUpdate { header_seq, .. }) => *header_seq,
+            | Self::UpdateEntry(UpdateEntry { header_seq, .. }) => *header_seq,
         }
     }
 
@@ -195,7 +195,7 @@ impl Header {
             Self::ChainClose(ChainClose { prev_header, .. }) => prev_header,
             Self::ChainOpen(ChainOpen { prev_header, .. }) => prev_header,
             Self::CreateEntry(CreateEntry { prev_header, .. }) => prev_header,
-            Self::EntryUpdate(EntryUpdate { prev_header, .. }) => prev_header,
+            Self::UpdateEntry(UpdateEntry { prev_header, .. }) => prev_header,
         })
     }
 }
@@ -346,7 +346,7 @@ pub struct CreateEntry {
 /// If you update A to B and B back to A, and then you don't know which one came first,
 /// or how to break the loop.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
-pub struct EntryUpdate {
+pub struct UpdateEntry {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub header_seq: u32,

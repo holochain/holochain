@@ -35,7 +35,7 @@ use holochain_types::{
 use holochain_zome_types::{
     entry::GetOptions,
     entry_def::EntryDefs,
-    header::{builder, ElementDelete, EntryUpdate, LinkAdd, LinkRemove, ZomeId},
+    header::{builder, ElementDelete, LinkAdd, LinkRemove, UpdateEntry, ZomeId},
     link::{LinkTag, Links},
     zome::ZomeName,
     CreateEntryInput, GetInput, GetLinksInput, Header, LinkEntriesInput,
@@ -53,8 +53,8 @@ struct TestData {
     original_entry: Entry,
     new_entry: Entry,
     any_header: Header,
-    entry_update_header: EntryUpdate,
-    entry_update_entry: EntryUpdate,
+    entry_update_header: UpdateEntry,
+    entry_update_entry: UpdateEntry,
     original_header_hash: HeaderHash,
     original_entry_hash: EntryHash,
     new_entry_hash: EntryHash,
@@ -104,12 +104,12 @@ impl TestData {
         }
 
         // Entry update for header
-        let mut entry_update_header = fixt!(EntryUpdate, PublicCurve);
+        let mut entry_update_header = fixt!(UpdateEntry, PublicCurve);
         entry_update_header.entry_hash = new_entry_hash.clone();
         entry_update_header.original_header_address = original_header_hash.clone();
 
         // Entry update for entry
-        let mut entry_update_entry = fixt!(EntryUpdate, PublicCurve);
+        let mut entry_update_entry = fixt!(UpdateEntry, PublicCurve);
         entry_update_entry.entry_hash = new_entry_hash.clone();
         entry_update_entry.original_entry_address = original_entry_hash.clone();
         entry_update_entry.original_header_address = original_header_hash.clone();
@@ -137,7 +137,7 @@ impl TestData {
             Header::CreateEntry(ec) => {
                 ec.entry_hash = original_entry_hash.clone();
             }
-            Header::EntryUpdate(eu) => {
+            Header::UpdateEntry(eu) => {
                 eu.entry_hash = original_entry_hash.clone();
             }
             _ => (),
@@ -610,7 +610,7 @@ fn add_op_to_judged(mut ps: Vec<Db>, op: &DhtOp) -> Vec<Db> {
 
 fn store_element(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let entry = match &a.any_header {
-        Header::CreateEntry(_) | Header::EntryUpdate(_) => Some(a.original_entry.clone().into()),
+        Header::CreateEntry(_) | Header::UpdateEntry(_) => Some(a.original_entry.clone().into()),
         _ => None,
     };
     let op = DhtOp::StoreElement(
@@ -1242,7 +1242,7 @@ async fn test_wasm_api_without_integration_delete() {
 #[ignore]
 async fn test_integrate_single_register_replaced_by_for_header() {
     // For RegisterUpdatedBy with intended_for Header
-    // metadata has EntryUpdate on HeaderHash but not EntryHash
+    // metadata has UpdateEntry on HeaderHash but not EntryHash
     todo!()
 }
 
@@ -1250,7 +1250,7 @@ async fn test_integrate_single_register_replaced_by_for_header() {
 #[ignore]
 async fn test_integrate_single_register_replaced_by_for_entry() {
     // For RegisterUpdatedBy with intended_for Entry
-    // metadata has EntryUpdate on EntryHash but not HeaderHash
+    // metadata has UpdateEntry on EntryHash but not HeaderHash
     todo!()
 }
 

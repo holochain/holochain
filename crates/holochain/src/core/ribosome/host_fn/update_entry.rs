@@ -49,7 +49,7 @@ pub fn update_entry<'a>(
         get_original_address(call_context.clone(), original_header_address.clone())?;
 
     // build a header for the entry being updated
-    let header_builder = builder::EntryUpdate {
+    let header_builder = builder::UpdateEntry {
         entry_type,
         entry_hash,
         original_header_address,

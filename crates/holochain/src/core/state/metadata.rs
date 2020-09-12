@@ -113,11 +113,11 @@ where
     /// Deregister a published [Header] on the authoring agent's public key
     fn deregister_activity(&mut self, header: Header) -> DatabaseResult<()>;
 
-    /// Registers a [Header::EntryUpdate] on the referenced [Header] or [Entry]
-    fn register_update(&mut self, update: header::EntryUpdate) -> DatabaseResult<()>;
+    /// Registers a [Header::UpdateEntry] on the referenced [Header] or [Entry]
+    fn register_update(&mut self, update: header::UpdateEntry) -> DatabaseResult<()>;
 
-    /// Deregister a [Header::EntryUpdate] on the referenced [Header] or [Entry]
-    fn deregister_update(&mut self, update: header::EntryUpdate) -> DatabaseResult<()>;
+    /// Deregister a [Header::UpdateEntry] on the referenced [Header] or [Entry]
+    fn deregister_update(&mut self, update: header::UpdateEntry) -> DatabaseResult<()>;
 
     /// Registers a [Header::ElementDelete] on the Header of an Entry
     fn register_delete(&mut self, delete: header::ElementDelete) -> DatabaseResult<()>;
@@ -139,7 +139,7 @@ where
         agent_pubkey: AgentPubKey,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>;
 
-    /// Returns all the hashes of [EntryUpdate] headers registered on an [Entry]
+    /// Returns all the hashes of [UpdateEntry] headers registered on an [Entry]
     fn get_updates<'r, R: Readable>(
         &'r self,
         reader: &'r R,
@@ -468,14 +468,14 @@ where
             .delete(MiscMetaKey::StoreElement(hash).into())
     }
 
-    fn register_update(&mut self, update: header::EntryUpdate) -> DatabaseResult<()> {
+    fn register_update(&mut self, update: header::UpdateEntry) -> DatabaseResult<()> {
         self.register_header_on_basis(
             AnyDhtHash::from(update.original_entry_address.clone()),
             update,
         )
     }
 
-    fn deregister_update(&mut self, update: header::EntryUpdate) -> DatabaseResult<()> {
+    fn deregister_update(&mut self, update: header::UpdateEntry) -> DatabaseResult<()> {
         self.deregister_header_on_basis(
             AnyDhtHash::from(update.original_entry_address.clone()),
             update,

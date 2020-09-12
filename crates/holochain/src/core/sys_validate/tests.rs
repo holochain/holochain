@@ -352,7 +352,7 @@ async fn check_entry_size_test() {
 #[tokio::test(threaded_scheduler)]
 async fn check_update_reference_test() {
     let mut ec = fixt!(CreateEntry);
-    let mut eu = fixt!(EntryUpdate);
+    let mut eu = fixt!(UpdateEntry);
     let et_cap = EntryType::CapClaim;
     let mut aet_fixt = AppEntryTypeFixturator::new(Predictable).map(EntryType::App);
     let et_app_1 = aet_fixt.next().unwrap();

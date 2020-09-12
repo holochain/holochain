@@ -19,7 +19,7 @@ mock! {
             &mut self,
             header: Header,
         ) -> DatabaseResult<()>;
-        fn sync_register_update(&mut self, update: header::EntryUpdate) -> DatabaseResult<()>;
+        fn sync_register_update(&mut self, update: header::UpdateEntry) -> DatabaseResult<()>;
         fn sync_register_delete(&mut self, delete: header::ElementDelete) -> DatabaseResult<()>;
         fn sync_deregister_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()>;
         fn sync_deregister_element_header(&mut self, header: HeaderHash) -> DatabaseResult<()>;
@@ -27,7 +27,7 @@ mock! {
             &mut self,
             header: Header,
         ) -> DatabaseResult<()>;
-        fn sync_deregister_update(&mut self, update: header::EntryUpdate) -> DatabaseResult<()>;
+        fn sync_deregister_update(&mut self, update: header::UpdateEntry) -> DatabaseResult<()>;
         fn sync_deregister_delete(&mut self, delete: header::ElementDelete) -> DatabaseResult<()>;
         fn register_raw_on_entry(&mut self, entry_hash: EntryHash, value: SysMetaVal) -> DatabaseResult<()>;
         fn register_raw_on_header(&mut self, header_hash: HeaderHash, value: SysMetaVal);
@@ -176,7 +176,7 @@ impl MetadataBufT for MockMetadataBuf {
         self.sync_register_activity(header)
     }
 
-    fn register_update(&mut self, update: header::EntryUpdate) -> DatabaseResult<()> {
+    fn register_update(&mut self, update: header::UpdateEntry) -> DatabaseResult<()> {
         self.sync_register_update(update)
     }
 
@@ -195,7 +195,7 @@ impl MetadataBufT for MockMetadataBuf {
         self.sync_deregister_activity(header)
     }
 
-    fn deregister_update(&mut self, update: header::EntryUpdate) -> DatabaseResult<()> {
+    fn deregister_update(&mut self, update: header::UpdateEntry) -> DatabaseResult<()> {
         self.sync_deregister_update(update)
     }
 

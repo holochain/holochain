@@ -1,7 +1,7 @@
 //! Defines a Element, the basic unit of Holochain data.
 
 use crate::{
-    header::{WireElementDelete, WireEntryUpdateRelationship, WireNewEntryHeader},
+    header::{WireElementDelete, WireNewEntryHeader, WireUpdateEntryRelationship},
     prelude::*,
     EntryHashed, HeaderHashed,
 };
@@ -134,7 +134,7 @@ pub struct RawGetEntryResponse {
     /// Any updates on this entry.
     /// Note you will need to ask for "all_live_headers_with_metadata"
     /// to get this back
-    pub updates: Vec<WireEntryUpdateRelationship>,
+    pub updates: Vec<WireUpdateEntryRelationship>,
     /// The entry shared across all headers
     pub entry: Entry,
     /// The entry_type shared across all headers
@@ -153,7 +153,7 @@ impl RawGetEntryResponse {
     pub fn from_elements<E>(
         elements: E,
         deletes: Vec<WireElementDelete>,
-        updates: Vec<WireEntryUpdateRelationship>,
+        updates: Vec<WireUpdateEntryRelationship>,
     ) -> Option<Self>
     where
         E: IntoIterator<Item = Element>,
@@ -189,13 +189,13 @@ impl RawGetEntryResponse {
                 let et = ec.entry_type.clone();
                 (WireNewEntryHeader::Create((ec, signature).into()), et)
             }
-            Header::EntryUpdate(eu) => {
+            Header::UpdateEntry(eu) => {
                 let et = eu.entry_type.clone();
                 (WireNewEntryHeader::Update((eu, signature).into()), et)
             }
             h => panic!(
                 "Get entry responses cannot be created from headers
-                    other then CreateEntry or EntryUpdate.
+                    other then CreateEntry or UpdateEntry.
                     Tried to with: {:?}",
                 h
             ),

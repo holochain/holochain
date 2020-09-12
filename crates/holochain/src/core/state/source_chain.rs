@@ -127,7 +127,7 @@ impl SourceChain {
                             // filter out authorship and everything else
                             _ => false,
                         },
-                        Header::EntryUpdate(update) => match update.entry_type {
+                        Header::UpdateEntry(update) => match update.entry_type {
                             EntryType::CapGrant => true,
                             // filter out authorship and everything else
                             _ => false,
@@ -144,7 +144,7 @@ impl SourceChain {
                     (HashSet::new(), vec![]),
                     |(mut references, mut headers), header| {
                         match header.as_content().header() {
-                            Header::EntryUpdate(update) => {
+                            Header::UpdateEntry(update) => {
                                 references.insert(update.original_header_address.clone());
                             }
                             Header::ElementDelete(delete) => {
@@ -171,7 +171,7 @@ impl SourceChain {
                 .filter(|header| !references.contains(header.as_hash()))
                 .filter_map(|header| match header.as_content().header() {
                     Header::CreateEntry(create) => Some(create.entry_hash.clone()),
-                    Header::EntryUpdate(update) => Some(update.entry_hash.clone()),
+                    Header::UpdateEntry(update) => Some(update.entry_hash.clone()),
                     _ => None,
                 })
                 .collect();
@@ -404,7 +404,7 @@ pub mod tests {
             let mut chain = SourceChain::new(env.clone().into())?;
             let (entry, entry_hash) =
                 EntryHashed::from_content_sync(Entry::CapGrant(updated_grant.clone())).into_inner();
-            let header_builder = builder::EntryUpdate {
+            let header_builder = builder::UpdateEntry {
                 entry_type: EntryType::CapGrant,
                 entry_hash: entry_hash.clone(),
                 original_header_address,

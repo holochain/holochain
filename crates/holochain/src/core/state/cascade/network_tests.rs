@@ -317,7 +317,7 @@ async fn get_from_another_agent() {
         remove_hash
     );
     assert_eq!(
-        HeaderHash::with_data_sync(&Header::EntryUpdate(
+        HeaderHash::with_data_sync(&Header::UpdateEntry(
             entry_details.updates.get(0).unwrap().clone()
         )),
         update_hash

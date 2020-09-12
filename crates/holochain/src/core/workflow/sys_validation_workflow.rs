@@ -32,7 +32,7 @@ use holochain_types::{
     validate::ValidationStatus, Entry, Timestamp,
 };
 use holochain_zome_types::{
-    header::{ElementDelete, EntryType, EntryUpdate, LinkAdd, LinkRemove},
+    header::{ElementDelete, EntryType, LinkAdd, LinkRemove, UpdateEntry},
     Header,
 };
 use std::{collections::BinaryHeap, convert::TryInto};
@@ -419,7 +419,7 @@ async fn store_entry(
     check_entry_hash(entry_hash, entry).await?;
     check_entry_size(entry)?;
 
-    // Additional checks if this is an EntryUpdate
+    // Additional checks if this is an UpdateEntry
     if let NewEntryHeaderRef::Update(entry_update) = header {
         let dependency = check_header_exists(
             entry_update.original_header_address.clone(),
@@ -434,7 +434,7 @@ async fn store_entry(
 }
 
 async fn register_updated_by(
-    entry_update: &EntryUpdate,
+    entry_update: &UpdateEntry,
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
     dependencies: &mut PendingDependencies,
@@ -532,7 +532,7 @@ async fn register_remove_link(
     Ok(())
 }
 
-fn update_check(entry_update: &EntryUpdate, original_header: &Header) -> SysValidationResult<()> {
+fn update_check(entry_update: &UpdateEntry, original_header: &Header) -> SysValidationResult<()> {
     check_new_entry_header(original_header)?;
     let original_header: NewEntryHeaderRef = original_header
         .try_into()

@@ -47,9 +47,9 @@ pub(super) type SysMetaKey = AnyDhtHash;
 #[derive(Debug, Hash, PartialEq, Eq, Ord, PartialOrd, Clone, Serialize, Deserialize)]
 pub enum SysMetaVal {
     /// A header that results in a new entry
-    /// Either a [CreateEntry] or [EntryUpdate]
+    /// Either a [CreateEntry] or [UpdateEntry]
     NewEntry(TimedHeaderHash),
-    /// An [EntryUpdate] [Header]
+    /// An [UpdateEntry] [Header]
     Update(TimedHeaderHash),
     /// An [Header::ElementDelete]
     Delete(TimedHeaderHash),
@@ -210,9 +210,9 @@ impl From<NewEntryHeader> for EntryHeader {
     }
 }
 
-impl From<header::EntryUpdate> for EntryHeader {
-    fn from(h: header::EntryUpdate) -> Self {
-        EntryHeader::Update(Header::EntryUpdate(h))
+impl From<header::UpdateEntry> for EntryHeader {
+    fn from(h: header::UpdateEntry) -> Self {
+        EntryHeader::Update(Header::UpdateEntry(h))
     }
 }
 

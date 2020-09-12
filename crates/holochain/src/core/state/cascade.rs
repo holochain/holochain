@@ -37,7 +37,7 @@ use holochain_types::{
 use holochain_zome_types::header::{LinkAdd, LinkRemove};
 use holochain_zome_types::{
     element::SignedHeader,
-    header::{ElementDelete, EntryUpdate},
+    header::{ElementDelete, UpdateEntry},
     link::Link,
     metadata::{Details, ElementDetails, EntryDetails},
     Header,
@@ -410,7 +410,7 @@ where
                     .meta_cache
                     .get_updates(&r, hash.into())?
                     .collect::<Vec<_>>()?;
-                let updates = self.render_headers(updates, |h| Ok(EntryUpdate::try_from(h)?))?;
+                let updates = self.render_headers(updates, |h| Ok(UpdateEntry::try_from(h)?))?;
                 Ok(Some(EntryDetails {
                     entry: entry.into_content(),
                     headers,

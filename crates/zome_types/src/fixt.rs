@@ -112,7 +112,7 @@ fixturator!(
 );
 
 fixturator!(
-    EntryUpdate;
+    UpdateEntry;
     constructor fn from_builder(HeaderBuilderCommon, EntryHash, HeaderHash, EntryType, EntryHash);
 );
 

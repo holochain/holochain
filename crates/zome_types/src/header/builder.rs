@@ -133,7 +133,7 @@ builder_variant!(CreateEntry {
     entry_hash: EntryHash,
 });
 
-builder_variant!(EntryUpdate {
+builder_variant!(UpdateEntry {
     original_entry_address: EntryHash,
     original_header_address: HeaderHash,
 

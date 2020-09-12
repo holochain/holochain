@@ -45,7 +45,7 @@ pub async fn light_to_op<P: PrefixType>(
             let (header, sig) = header.into_header_and_signature();
             let header = match header.into_content() {
                 Header::CreateEntry(c) => NewEntryHeader::Create(c),
-                Header::EntryUpdate(c) => NewEntryHeader::Update(c),
+                Header::UpdateEntry(c) => NewEntryHeader::Update(c),
                 _ => return Err(DhtOpConvertError::HeaderEntryMismatch),
             };
 
@@ -73,7 +73,7 @@ pub async fn light_to_op<P: PrefixType>(
                 .ok_or_else(|| DhtOpConvertError::MissingData(h.into()))?
                 .into_header_and_signature();
             let header = match header.into_content() {
-                Header::EntryUpdate(u) => u,
+                Header::UpdateEntry(u) => u,
                 h => {
                     return Err(DhtOpConvertError::HeaderMismatch(
                         format!("{:?}", h),

@@ -64,7 +64,7 @@ pub enum DhtOp {
     // TODO: This entry is here for validation by the entry update header holder
     // link's don't do this. The entry is validated by store entry. Maybe we either
     // need to remove the Entry here or add it to link.
-    RegisterUpdatedBy(Signature, header::EntryUpdate),
+    RegisterUpdatedBy(Signature, header::UpdateEntry),
 
     /// Op for registering a Header deletion with the Header authority
     RegisterDeletedBy(Signature, header::ElementDelete),
@@ -218,7 +218,7 @@ pub enum UniqueForm<'a> {
     StoreElement(&'a Header),
     StoreEntry(&'a NewEntryHeader),
     RegisterAgentActivity(&'a Header),
-    RegisterUpdatedBy(&'a header::EntryUpdate),
+    RegisterUpdatedBy(&'a header::UpdateEntry),
     RegisterDeletedBy(&'a header::ElementDelete),
     RegisterDeletedEntryHeader(&'a header::ElementDelete),
     RegisterAddLink(&'a header::LinkAdd),
@@ -377,7 +377,7 @@ async fn produce_op_lights_from_iter(
                     .basis()
                     .await,
             )),
-            Header::EntryUpdate(entry_update) => {
+            Header::UpdateEntry(entry_update) => {
                 let entry_hash = maybe_entry_hash
                     .ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.clone()))?;
                 ops.push(DhtOpLight::StoreEntry(
@@ -395,7 +395,7 @@ async fn produce_op_lights_from_iter(
             }
             Header::ElementDelete(entry_delete) => {
                 // TODO: VALIDATION: This only works if entry_delete.remove_address is either CreateEntry
-                // or EntryUpdate
+                // or UpdateEntry
                 ops.push(DhtOpLight::RegisterDeletedBy(
                     header_hash.clone(),
                     UniqueForm::RegisterDeletedBy(entry_delete).basis().await,

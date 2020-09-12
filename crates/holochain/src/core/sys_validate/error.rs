@@ -72,7 +72,7 @@ pub enum ValidationOutcome {
     PrevHeaderError(#[from] PrevHeaderError),
     #[error("StoreEntry should not be gossiped for private entries")]
     PrivateEntry,
-    #[error("EntryUpdate original EntryType: {0:?} doesn't match new EntryType {1:?}")]
+    #[error("UpdateEntry original EntryType: {0:?} doesn't match new EntryType {1:?}")]
     UpdateTypeMismatch(EntryType, EntryType),
     #[error("Signature {0:?} failed to verify for Header {1:?}")]
     VerifySignature(Signature, Header),

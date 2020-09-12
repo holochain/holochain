@@ -3,8 +3,8 @@ use crate::{
     fixt::{
         AgentValidationPkgFixturator, ChainCloseFixturator, ChainOpenFixturator,
         CreateEntryFixturator, DnaFixturator, EntryFixturator, EntryHashFixturator,
-        EntryTypeFixturator, EntryUpdateFixturator, InitZomesCompleteFixturator, LinkAddFixturator,
-        LinkRemoveFixturator,
+        EntryTypeFixturator, InitZomesCompleteFixturator, LinkAddFixturator, LinkRemoveFixturator,
+        UpdateEntryFixturator,
     },
 };
 use ::fixt::prelude::*;
@@ -20,8 +20,8 @@ use holochain_types::{
 };
 use holochain_zome_types::header::{
     builder::{self, HeaderBuilder},
-    AgentValidationPkg, ChainClose, ChainOpen, CreateEntry, Dna, EntryType, EntryUpdate, Header,
-    HeaderBuilderCommon, InitZomesComplete, LinkAdd, LinkRemove,
+    AgentValidationPkg, ChainClose, ChainOpen, CreateEntry, Dna, EntryType, Header,
+    HeaderBuilderCommon, InitZomesComplete, LinkAdd, LinkRemove, UpdateEntry,
 };
 use pretty_assertions::assert_eq;
 use tracing::*;
@@ -87,8 +87,8 @@ impl ElementTest {
         (entry_create, element)
     }
 
-    fn update_element(&mut self) -> (EntryUpdate, Element) {
-        let entry_update = builder::EntryUpdate {
+    fn update_element(&mut self) -> (UpdateEntry, Element) {
+        let entry_update = builder::UpdateEntry {
             original_entry_address: self.original_entry_hash.clone(),
             entry_type: self.entry_type.clone(),
             entry_hash: self.entry_hash.clone(),
@@ -267,7 +267,7 @@ async fn test_dht_basis() {
         cas.put(signed_header, Some(entry_hashed)).unwrap();
 
         // Create the update header with the same hash
-        let mut entry_update = fixt!(EntryUpdate);
+        let mut entry_update = fixt!(UpdateEntry);
         entry_update.original_entry_address = original_header.entry_hash.clone();
         entry_update.original_header_address = original_header_hash;
 

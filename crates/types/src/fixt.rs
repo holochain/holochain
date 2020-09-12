@@ -44,9 +44,9 @@ use holochain_zome_types::header::CreateEntry;
 use holochain_zome_types::header::Dna;
 use holochain_zome_types::header::ElementDelete;
 use holochain_zome_types::header::EntryType;
-use holochain_zome_types::header::EntryUpdate;
 use holochain_zome_types::header::Header;
 use holochain_zome_types::header::InitZomesComplete;
+use holochain_zome_types::header::UpdateEntry;
 use holochain_zome_types::header::ZomeId;
 use holochain_zome_types::migrate_agent::MigrateAgent;
 use holochain_zome_types::zome::FunctionName;
@@ -504,11 +504,11 @@ fixturator!(
 );
 
 fixturator!(
-    EntryUpdate;
+    UpdateEntry;
     constructor fn from_builder(HeaderBuilderCommon, EntryHash, HeaderHash, EntryType, EntryHash);
 
     curve PublicCurve {
-        let mut eu = fixt!(EntryUpdate);
+        let mut eu = fixt!(UpdateEntry);
         eu.entry_type = fixt!(EntryType, PublicCurve);
         eu
     };
@@ -530,14 +530,14 @@ fixturator!(
         ChainOpen(ChainOpen)
         ChainClose(ChainClose)
         CreateEntry(CreateEntry)
-        EntryUpdate(EntryUpdate)
+        UpdateEntry(UpdateEntry)
         ElementDelete(ElementDelete)
     ];
 
     curve PublicCurve {
         match fixt!(Header) {
             Header::CreateEntry(_) => Header::CreateEntry(fixt!(CreateEntry, PublicCurve)),
-            Header::EntryUpdate(_) => Header::EntryUpdate(fixt!(EntryUpdate, PublicCurve)),
+            Header::UpdateEntry(_) => Header::UpdateEntry(fixt!(UpdateEntry, PublicCurve)),
             other_type => other_type,
         }
     };
@@ -547,14 +547,14 @@ fixturator!(
     NewEntryHeader;
     variants [
         Create(CreateEntry)
-        Update(EntryUpdate)
+        Update(UpdateEntry)
     ];
 
 
     curve PublicCurve {
         match fixt!(NewEntryHeader) {
             NewEntryHeader::Create(_) => NewEntryHeader::Create(fixt!(CreateEntry, PublicCurve)),
-            NewEntryHeader::Update(_) => NewEntryHeader::Update(fixt!(EntryUpdate, PublicCurve)),
+            NewEntryHeader::Update(_) => NewEntryHeader::Update(fixt!(UpdateEntry, PublicCurve)),
         }
     };
 );

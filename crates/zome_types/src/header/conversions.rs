@@ -35,21 +35,21 @@ impl std::fmt::Display for WrongHeaderError {
 
 impl std::error::Error for WrongHeaderError {}
 
-impl TryFrom<Header> for EntryUpdate {
+impl TryFrom<Header> for UpdateEntry {
     type Error = WrongHeaderError;
     fn try_from(value: Header) -> Result<Self, Self::Error> {
         match value {
-            Header::EntryUpdate(h) => Ok(h),
+            Header::UpdateEntry(h) => Ok(h),
             _ => Err(WrongHeaderError(format!("{:?}", value))),
         }
     }
 }
 
-impl<'a> TryFrom<&'a Header> for &'a EntryUpdate {
+impl<'a> TryFrom<&'a Header> for &'a UpdateEntry {
     type Error = WrongHeaderError;
     fn try_from(value: &'a Header) -> Result<Self, Self::Error> {
         match value {
-            Header::EntryUpdate(h) => Ok(h),
+            Header::UpdateEntry(h) => Ok(h),
             _ => Err(WrongHeaderError(format!("{:?}", value))),
         }
     }

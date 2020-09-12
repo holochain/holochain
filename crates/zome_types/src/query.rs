@@ -89,7 +89,7 @@ mod tests {
         h1.entry_type = entry_type_1.clone();
         h1.header_seq = 0;
 
-        let mut h2 = fixt!(EntryUpdate);
+        let mut h2 = fixt!(UpdateEntry);
         h2.entry_type = entry_type_2.clone();
         h2.header_seq = 1;
 
@@ -100,7 +100,7 @@ mod tests {
         h4.entry_type = entry_type_2.clone();
         h4.header_seq = 3;
 
-        let mut h5 = fixt!(EntryUpdate);
+        let mut h5 = fixt!(UpdateEntry);
         h5.entry_type = entry_type_1.clone();
         h5.header_seq = 4;
 
