@@ -127,8 +127,8 @@ wasm_io_types!(
     pub struct EntryTypePropertiesInput(());
     pub struct EntryTypePropertiesOutput(());
     // hash an entry on the host and get a core hash back
-    pub struct EntryHashInput(crate::entry::Entry);
-    pub struct EntryHashOutput(holo_hash::EntryHash);
+    pub struct HashEntryInput(crate::entry::Entry);
+    pub struct HashEntryOutput(holo_hash::EntryHash);
     // the current system time, in the opinion of the host, as a Duration
     pub struct SysTimeInput(());
     pub struct SysTimeOutput(core::time::Duration);

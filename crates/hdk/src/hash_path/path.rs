@@ -255,7 +255,7 @@ impl TryFrom<&LinkTag> for Path {
 impl Path {
     /// what is the hash for the current Path
     pub fn hash(&self) -> Result<holo_hash::EntryHash, HdkError> {
-        Ok(entry_hash!(self)?)
+        Ok(hash_entry!(self)?)
     }
 
     /// does an entry exist at the hash we expect?

@@ -106,7 +106,7 @@ pub async fn commit_entry<'env, E: Into<entry_def::EntryDefId>>(
         let call_context = CallContext::new(zome_name, host_access.into());
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
-        host_fn::commit_entry::commit_entry(ribosome.clone(), call_context.clone(), input).unwrap()
+        host_fn::create_entry::create_entry(ribosome.clone(), call_context.clone(), input).unwrap()
     };
 
     // Write

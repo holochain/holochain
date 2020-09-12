@@ -37,7 +37,7 @@ async fn ser_entry_hash_test() {
     let eh = fixt!(EntryHash);
     let sb: SerializedBytes = eh.clone().try_into().unwrap();
     tracing::debug!(?sb);
-    let o: EntryHashOutput = sb.try_into().unwrap();
+    let o: HashEntryOutput = sb.try_into().unwrap();
     let sb: SerializedBytes = o.try_into().unwrap();
     tracing::debug!(?sb);
     let _eh: EntryHash = sb.try_into().unwrap();

@@ -13,11 +13,11 @@ fn post() -> Post {
 }
 
 #[hdk_extern]
-fn commit_entry(_: ()) -> ExternResult<HeaderHash> {
+fn create_entry(_: ()) -> ExternResult<HeaderHash> {
     Ok(create_entry!(post())?)
 }
 
 #[hdk_extern]
 fn get_entry(_: ()) -> ExternResult<GetOutput> {
-    Ok(GetOutput::new(get!(entry_hash!(post())?)?))
+    Ok(GetOutput::new(get!(hash_entry!(post())?)?))
 }

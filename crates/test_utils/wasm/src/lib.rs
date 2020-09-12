@@ -13,12 +13,12 @@ pub enum TestWasm {
     Anchor,
     Bench,
     Capability,
-    CommitEntry,
+    CreateEntry,
     Crd,
     Crud,
     Debug,
     EntryDefs,
-    EntryHash,
+    HashEntry,
     Foo,
     HashPath,
     Imports,
@@ -52,12 +52,12 @@ impl From<TestWasm> for ZomeName {
             TestWasm::Anchor => "anchor",
             TestWasm::Bench => "bench",
             TestWasm::Capability => "capability",
-            TestWasm::CommitEntry => "commit_entry",
+            TestWasm::CreateEntry => "create_entry",
             TestWasm::Crd => "crd",
             TestWasm::Crud => "crud",
             TestWasm::Debug => "debug",
             TestWasm::EntryDefs => "entry_defs",
-            TestWasm::EntryHash => "entry_hash",
+            TestWasm::HashEntry => "hash_entry",
             TestWasm::Foo => "foo",
             TestWasm::HashPath => "hash_path",
             TestWasm::Imports => "imports",
@@ -97,8 +97,8 @@ impl From<TestWasm> for DnaWasm {
             TestWasm::Capability => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_capability.wasm")
             }
-            TestWasm::CommitEntry => {
-                get_code("wasm32-unknown-unknown/release/test_wasm_commit_entry.wasm")
+            TestWasm::CreateEntry => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_create_entry.wasm")
             }
             TestWasm::Crd => get_code("wasm32-unknown-unknown/release/test_wasm_crd.wasm"),
             TestWasm::Crud => get_code("wasm32-unknown-unknown/release/test_wasm_crud.wasm"),
@@ -106,8 +106,8 @@ impl From<TestWasm> for DnaWasm {
             TestWasm::EntryDefs => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_entry_defs.wasm")
             }
-            TestWasm::EntryHash => {
-                get_code("wasm32-unknown-unknown/release/test_wasm_entry_hash.wasm")
+            TestWasm::HashEntry => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_hash_entry.wasm")
             }
             TestWasm::Foo => get_code("wasm32-unknown-unknown/release/test_wasm_foo.wasm"),
             TestWasm::HashPath => {

@@ -172,9 +172,9 @@ async fn get_from_another_agent() {
             name: "dht_get_test".to_string(),
             uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
             properties: SerializedBytes::try_from(()).unwrap(),
-            zomes: vec![TestWasm::CommitEntry.into()].into(),
+            zomes: vec![TestWasm::CreateEntry.into()].into(),
         },
-        vec![TestWasm::CommitEntry.into()],
+        vec![TestWasm::CreateEntry.into()],
     )
     .await
     .unwrap();
@@ -347,9 +347,9 @@ async fn get_links_from_another_agent() {
             name: "dht_get_test".to_string(),
             uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
             properties: SerializedBytes::try_from(()).unwrap(),
-            zomes: vec![TestWasm::CommitEntry.into()].into(),
+            zomes: vec![TestWasm::CreateEntry.into()].into(),
         },
-        vec![TestWasm::CommitEntry.into()],
+        vec![TestWasm::CreateEntry.into()],
     )
     .await
     .unwrap();

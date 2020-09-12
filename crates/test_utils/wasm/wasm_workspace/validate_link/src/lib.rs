@@ -27,7 +27,7 @@ fn validate_link(
 
 #[hdk_extern]
 fn add_valid_link(_: ()) -> ExternResult<HeaderHash> {
-    let always_linkable_entry_hash = entry_hash!(MaybeLinkable::AlwaysLinkable)?;
+    let always_linkable_entry_hash = hash_entry!(MaybeLinkable::AlwaysLinkable)?;
     create_entry!(MaybeLinkable::AlwaysLinkable)?;
 
     Ok(link_entries!(
@@ -38,8 +38,8 @@ fn add_valid_link(_: ()) -> ExternResult<HeaderHash> {
 
 #[hdk_extern]
 fn add_invalid_link(_: ()) -> ExternResult<HeaderHash> {
-    let always_linkable_entry_hash = entry_hash!(MaybeLinkable::AlwaysLinkable)?;
-    let never_linkable_entry_hash = entry_hash!(MaybeLinkable::NeverLinkable)?;
+    let always_linkable_entry_hash = hash_entry!(MaybeLinkable::AlwaysLinkable)?;
+    let never_linkable_entry_hash = hash_entry!(MaybeLinkable::NeverLinkable)?;
 
     create_entry!(MaybeLinkable::AlwaysLinkable)?;
     create_entry!(MaybeLinkable::NeverLinkable)?;

@@ -1,4 +1,4 @@
-use super::{commit_entry::extract_entry_def, delete_entry::get_original_address};
+use super::{create_entry::extract_entry_def, delete_entry::get_original_address};
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::{

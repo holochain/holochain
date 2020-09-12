@@ -30,17 +30,17 @@ use crate::core::ribosome::host_fn::call_remote::call_remote;
 use crate::core::ribosome::host_fn::capability_claims::capability_claims;
 use crate::core::ribosome::host_fn::capability_grants::capability_grants;
 use crate::core::ribosome::host_fn::capability_info::capability_info;
-use crate::core::ribosome::host_fn::commit_entry::commit_entry;
+use crate::core::ribosome::host_fn::create_entry::create_entry;
 use crate::core::ribosome::host_fn::debug::debug;
 use crate::core::ribosome::host_fn::decrypt::decrypt;
 use crate::core::ribosome::host_fn::delete_entry::delete_entry;
 use crate::core::ribosome::host_fn::emit_signal::emit_signal;
 use crate::core::ribosome::host_fn::encrypt::encrypt;
-use crate::core::ribosome::host_fn::entry_hash::entry_hash;
 use crate::core::ribosome::host_fn::get::get;
 use crate::core::ribosome::host_fn::get_details::get_details;
 use crate::core::ribosome::host_fn::get_link_details::get_link_details;
 use crate::core::ribosome::host_fn::get_links::get_links;
+use crate::core::ribosome::host_fn::hash_entry::hash_entry;
 use crate::core::ribosome::host_fn::keystore::keystore;
 use crate::core::ribosome::host_fn::link_entries::link_entries;
 use crate::core::ribosome::host_fn::property::property;
@@ -178,7 +178,7 @@ impl WasmRibosome {
 
         // imported host functions for core
         ns.insert("__debug", func!(invoke_host_function!(debug)));
-        ns.insert("__entry_hash", func!(invoke_host_function!(entry_hash)));
+        ns.insert("__hash_entry", func!(invoke_host_function!(hash_entry)));
         ns.insert("__unreachable", func!(invoke_host_function!(unreachable)));
 
         if let HostFnAccess {
@@ -297,7 +297,7 @@ impl WasmRibosome {
         } = host_fn_access
         {
             ns.insert("__call", func!(invoke_host_function!(call)));
-            ns.insert("__create_entry", func!(invoke_host_function!(commit_entry)));
+            ns.insert("__create_entry", func!(invoke_host_function!(create_entry)));
             ns.insert("__emit_signal", func!(invoke_host_function!(emit_signal)));
             ns.insert("__link_entries", func!(invoke_host_function!(link_entries)));
             ns.insert("__remove_link", func!(invoke_host_function!(remove_link)));
