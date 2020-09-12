@@ -53,6 +53,7 @@
 
 pub mod buffer;
 pub mod db;
+pub mod db_fixture;
 pub mod env;
 pub mod error;
 pub mod exports;

@@ -5,7 +5,7 @@ use holochain_serialized_bytes::prelude::*;
 /// hashes need not be calculated multiple times.
 /// Provides an easy constructor which consumes the content.
 // TODO: consider making lazy with OnceCell
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, PartialOrd, Ord)]
 pub struct HoloHashed<C: HashableContent> {
     pub(crate) content: C,
     pub(crate) hash: HoloHashOf<C>,

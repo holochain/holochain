@@ -34,7 +34,9 @@ pub type CapClaimEntry = CapClaim;
 pub struct GetOptions;
 
 /// Structure holding the entry portion of a chain element.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+#[derive(
+    Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, SerializedBytes,
+)]
 #[serde(tag = "entry_type", content = "entry")]
 pub enum Entry {
     /// The `Agent` system entry, the third entry of every source chain,

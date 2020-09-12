@@ -3,6 +3,8 @@
 
 use crate::{
     buffer::{BufferedStore, KvBufUsed},
+    db_fixture::DbFixture,
+    db_fixture::LoadDbFixture,
     env::EnvironmentRead,
     error::{DatabaseError, DatabaseResult},
     fatal_db_hash_integrity_check, fresh_reader,
@@ -187,5 +189,46 @@ where
     fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
         self.inner.flush_to_txn_ref(writer)?;
         Ok(())
+    }
+}
+
+impl<C, P> LoadDbFixture for CasBufUsedSync<C, P>
+where
+    C: Ord, // needed to put in HashSet
+    C: HashableContent + BufVal + Send + Sync,
+    C::HashType: PrimitiveHashType + HashTypeSync + Send + Sync,
+    P: PrefixType,
+{
+    type FixtureItem = HoloHashed<C>;
+
+    fn write_test_datum(&mut self, datum: Self::FixtureItem) -> () {
+        self.put(datum)
+    }
+
+    fn read_test_data<R: Readable>(&self, reader: &R) -> DbFixture<Self::FixtureItem> {
+        self.iter_fail(reader)
+            .expect("Couldn't iterate when gathering fixture data")
+            .collect()
+            .expect("Couldn't collect fixture data")
+    }
+}
+
+impl<C, P> LoadDbFixture for CasBufFreshSync<C, P>
+where
+    C: Ord, // needed to put in HashSet
+    C: HashableContent + BufVal + Send + Sync,
+    C::HashType: PrimitiveHashType + HashTypeSync + Send + Sync,
+    P: PrefixType,
+{
+    type FixtureItem = HoloHashed<C>;
+
+    fn write_test_datum(&mut self, datum: Self::FixtureItem) -> () {
+        self.put(datum)
+    }
+    fn read_test_data<R: Readable>(&self, reader: &R) -> DbFixture<Self::FixtureItem> {
+        self.iter_fail(reader)
+            .expect("Couldn't iterate when gathering fixture data")
+            .collect()
+            .expect("Couldn't collect fixture data")
     }
 }

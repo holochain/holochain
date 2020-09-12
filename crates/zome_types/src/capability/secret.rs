@@ -58,6 +58,26 @@ impl PartialEq for CapSecret {
 
 impl Eq for CapSecret {}
 
+impl PartialOrd for CapSecret {
+    #[inline]
+    fn partial_cmp(&self, other: &CapSecret) -> Option<std::cmp::Ordering> {
+        PartialOrd::partial_cmp(&&self.0[..], &&other.0[..])
+    }
+}
+
+impl Ord for CapSecret {
+    #[inline]
+    fn cmp(&self, other: &CapSecret) -> std::cmp::Ordering {
+        Ord::cmp(&&self.0[..], &&other.0[..])
+    }
+}
+
+impl std::hash::Hash for CapSecret {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        std::hash::Hash::hash(&self.0[..], state)
+    }
+}
+
 impl std::fmt::Debug for CapSecret {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(&self.0.to_vec(), f)

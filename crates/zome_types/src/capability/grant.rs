@@ -4,7 +4,7 @@ use crate::zome::ZomeName;
 use holo_hash::*;
 use holochain_serialized_bytes::SerializedBytes;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet};
 
 /// System entry to hold a capabilities granted by the callee
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -29,7 +29,7 @@ impl From<holo_hash::AgentPubKey> for CapGrant {
 /// @todo the ability to forcibly curry payloads into functions that are called with a claim
 pub struct CurryPayloads(pub BTreeMap<GrantedFunction, SerializedBytes>);
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 /// The payload for the ZomeCall capability grant.
 /// This data is committed to the source chain as a private entry.
 pub struct ZomeCallCapGrant {
@@ -117,7 +117,7 @@ impl CapGrant {
 }
 
 /// Represents access requirements for capability grants
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum CapAccess {
     /// No restriction: accessible by anyone
     Unrestricted,
@@ -131,7 +131,9 @@ pub enum CapAccess {
         /// The secret
         secret: CapSecret,
         /// The set of agents who may exercise this grant
-        assignees: HashSet<AgentPubKey>,
+        ///
+        /// This is a BTreeSet because we need the CapAccess itself to impl Hash
+        assignees: BTreeSet<AgentPubKey>,
     },
 }
 
@@ -147,15 +149,15 @@ impl From<CapSecret> for CapAccess {
     }
 }
 
-impl From<(CapSecret, HashSet<AgentPubKey>)> for CapAccess {
-    fn from((secret, assignees): (CapSecret, HashSet<AgentPubKey>)) -> Self {
+impl From<(CapSecret, BTreeSet<AgentPubKey>)> for CapAccess {
+    fn from((secret, assignees): (CapSecret, BTreeSet<AgentPubKey>)) -> Self {
         Self::Assigned { secret, assignees }
     }
 }
 
 impl From<(CapSecret, AgentPubKey)> for CapAccess {
     fn from((secret, assignee): (CapSecret, AgentPubKey)) -> Self {
-        let mut assignees = HashSet::new();
+        let mut assignees = BTreeSet::new();
         assignees.insert(assignee);
         Self::from((secret, assignees))
     }
@@ -185,4 +187,4 @@ impl CapAccess {
 /// a single zome/function pair
 pub type GrantedFunction = (ZomeName, FunctionName);
 /// A collection of zome/function pairs
-pub type GrantedFunctions = HashSet<GrantedFunction>;
+pub type GrantedFunctions = BTreeSet<GrantedFunction>;

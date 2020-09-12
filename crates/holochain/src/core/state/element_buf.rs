@@ -15,6 +15,8 @@ use holochain_state::{
         GetDb, ELEMENT_CACHE_ENTRIES, ELEMENT_CACHE_HEADERS, ELEMENT_VAULT_HEADERS,
         ELEMENT_VAULT_PRIVATE_ENTRIES, ELEMENT_VAULT_PUBLIC_ENTRIES,
     },
+    db_fixture::DbFixture,
+    db_fixture::LoadDbFixture,
     error::{DatabaseError, DatabaseResult},
     exports::SingleStore,
     prelude::*,
@@ -317,6 +319,31 @@ impl<P: PrefixType> BufferedStore for ElementBuf<P> {
         };
         self.headers.flush_to_txn_ref(writer)?;
         Ok(())
+    }
+}
+
+pub enum ElementBufFixture<P: PrefixType> {
+    PublicEntries(<EntryCas<P> as LoadDbFixture>::FixtureItem),
+    PrivateEntries(<EntryCas<P> as LoadDbFixture>::FixtureItem),
+    Headers(<HeaderCas<P> as LoadDbFixture>::FixtureItem),
+}
+
+impl<P: PrefixType> LoadDbFixture for ElementBuf<P> {
+    type FixtureItem = ElementBufFixture<P>;
+
+    fn write_test_datum(&mut self, datum: Self::FixtureItem) -> () {
+        match datum {
+            Self::FixtureItem::PublicEntries(d) => self.public_entries.write_test_datum(d),
+            Self::FixtureItem::PrivateEntries(d) => self.private_entries.write_test_datum(d),
+            Self::FixtureItem::Headers(d) => self.headers.write_test_datum(d),
+        }
+    }
+
+    fn read_test_data<R: Readable>(&self, reader: &R) -> DbFixture<Self::FixtureItem> {
+        self.iter_fail(reader)
+            .expect("Couldn't iterate when gathering fixture data")
+            .collect()
+            .expect("Couldn't collect fixture data")
     }
 }
 

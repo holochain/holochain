@@ -1,10 +1,13 @@
 use super::KvIntStore;
-use crate::buffer::kv::generic::KvStoreT;
-use crate::buffer::{
-    check_empty_key,
-    iter::{DrainIter, SingleIter, SingleIterFrom, SingleIterKeyMatch},
-    kv::KvStore,
-    BufferedStore,
+use crate::{buffer::kv::generic::KvStoreT, db_fixture::LoadDbFixture};
+use crate::{
+    buffer::{
+        check_empty_key,
+        iter::{DrainIter, SingleIter, SingleIterFrom, SingleIterKeyMatch},
+        kv::KvStore,
+        BufferedStore,
+    },
+    db_fixture::DbFixture,
 };
 use crate::{
     env::EnvironmentRead,
@@ -416,5 +419,26 @@ where
 
     fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
         self.inner.flush_to_txn_ref(writer)
+    }
+}
+
+impl<K, V> LoadDbFixture for KvBufUsed<K, V>
+where
+    K: BufKey,
+    V: BufVal + Ord,
+{
+    type FixtureItem = (K, V);
+
+    fn write_test_datum(&mut self, datum: Self::FixtureItem) -> () {
+        let (k, v) = datum;
+        self.put(k, v).expect("Couldn't put fixture datum into DB")
+    }
+
+    fn read_test_data<R: Readable>(&self, reader: &R) -> DbFixture<Self::FixtureItem> {
+        self.iter(reader)
+            .expect("Couldn't iterate when gathering fixture data")
+            .map(|(b, v)| Ok((K::from_key_bytes_or_friendly_panic(b), v)))
+            .collect()
+            .expect("Couldn't collect fixture data")
     }
 }

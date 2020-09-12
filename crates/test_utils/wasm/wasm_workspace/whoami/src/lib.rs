@@ -2,16 +2,14 @@ use hdk3::prelude::*;
 
 #[hdk_extern]
 fn set_access(_: ()) -> ExternResult<()> {
-    let mut functions: GrantedFunctions = HashSet::new();
+    let mut functions: GrantedFunctions = BTreeSet::new();
     functions.insert((zome_info!()?.zome_name, "whoami".into()));
-    commit_cap_grant!(
-        CapGrantEntry {
-            tag: "".into(),
-            // empty access converts to unrestricted
-            access: ().into(),
-            functions,
-        }
-    )?;
+    commit_cap_grant!(CapGrantEntry {
+        tag: "".into(),
+        // empty access converts to unrestricted
+        access: ().into(),
+        functions,
+    })?;
 
     Ok(())
 }
@@ -36,7 +34,9 @@ fn whoarethey(agent_pubkey: AgentPubKey) -> ExternResult<AgentInfo> {
     )?;
 
     match response {
-        ZomeCallInvocationResponse::ZomeApiFn(guest_output) => Ok(guest_output.into_inner().try_into()?),
+        ZomeCallInvocationResponse::ZomeApiFn(guest_output) => {
+            Ok(guest_output.into_inner().try_into()?)
+        }
         // we're just panicking here because our simple tests can always call set_access before
         // calling whoami, but in a real app you'd want to handle this by returning an `Ok` with
         // something meaningful to the extern's client

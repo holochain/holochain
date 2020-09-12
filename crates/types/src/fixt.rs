@@ -56,7 +56,7 @@ use rand::seq::IteratorRandom;
 use rand::thread_rng;
 use rand::Rng;
 use std::collections::BTreeMap;
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 use std::iter::Iterator;
 
 pub use holochain_zome_types::fixt::{TimestampFixturator as ZomeTimestampFixturator, *};
@@ -174,7 +174,7 @@ fixturator!(
                 let mut rng = rand::thread_rng();
                 let number_of_zomes = rng.gen_range(0, 5);
 
-                let mut granted_functions: GrantedFunctions = HashSet::new();
+                let mut granted_functions: GrantedFunctions = BTreeSet::new();
                 for _ in 0..number_of_zomes {
                     granted_functions.insert(GrantedFunctionFixturator::new(Empty).next().unwrap());
                 }
@@ -190,7 +190,7 @@ fixturator!(
                 let mut rng = rand::thread_rng();
                 let number_of_zomes = rng.gen_range(0, 5);
 
-                let mut granted_functions: GrantedFunctions = HashSet::new();
+                let mut granted_functions: GrantedFunctions = BTreeSet::new();
                 for _ in 0..number_of_zomes {
                     granted_functions.insert(
                         GrantedFunctionFixturator::new(Unpredictable)
@@ -212,7 +212,7 @@ fixturator!(
                 .next()
                 .unwrap(),
             {
-                let mut granted_functions: GrantedFunctions = HashSet::new();
+                let mut granted_functions: GrantedFunctions = BTreeSet::new();
                 for _ in 0..self.0.index % 3 {
                     granted_functions
                         .insert(GrantedFunctionFixturator::new(Predictable).next().unwrap());
@@ -235,7 +235,7 @@ fixturator!(
             CapAccessVariant::Transferable => CapAccess::from(CapSecretFixturator::new_indexed(Empty, self.0.index).next().unwrap()),
             CapAccessVariant::Assigned => CapAccess::from((
                 CapSecretFixturator::new_indexed(Empty, self.0.index).next().unwrap(),
-                HashSet::new()
+                BTreeSet::new()
             ))
         }
     };
@@ -253,7 +253,7 @@ fixturator!(
                 CapAccess::from((
                     CapSecretFixturator::new_indexed(Unpredictable, self.0.index).next().unwrap(),
                     {
-                        let mut set: HashSet<AgentPubKey> = HashSet::new();
+                        let mut set: BTreeSet<AgentPubKey> = BTreeSet::new();
                         for _ in 0..number_of_assigned {
                             set.insert(AgentPubKeyFixturator::new_indexed(Unpredictable, self.0.index).next().unwrap());
                         }
@@ -271,7 +271,7 @@ fixturator!(
             CapAccessVariant::Assigned => CapAccess::from((
                 CapSecretFixturator::new_indexed(Predictable, self.0.index).next().unwrap(),
             {
-                let mut set: HashSet<AgentPubKey> = HashSet::new();
+                let mut set: BTreeSet<AgentPubKey> = BTreeSet::new();
                 for _ in 0..self.0.index % 3 {
                     set.insert(AgentPubKeyFixturator::new_indexed(Predictable, self.0.index).next().unwrap());
                 }

@@ -223,7 +223,7 @@ pub mod tests {
     use holochain_state::test_utils::test_cell_env;
     use holochain_types::test_utils::fake_dna_hash;
     use holochain_zome_types::capability::{CapAccess, ZomeCallCapGrant};
-    use std::collections::HashSet;
+    use std::collections::BTreeSet;
 
     #[tokio::test(threaded_scheduler)]
     async fn test_get_cap_grant() -> SourceChainResult<()> {
@@ -234,7 +234,7 @@ pub mod tests {
         // @todo curry
         let _curry = CurryPayloadsFixturator::new(Empty).next().unwrap();
         let function: GrantedFunction = ("foo".into(), "bar".into());
-        let mut functions: GrantedFunctions = HashSet::new();
+        let mut functions: GrantedFunctions = BTreeSet::new();
         functions.insert(function.clone());
         let grant = ZomeCallCapGrant::new("tag".into(), access.clone(), functions);
         let mut agents = AgentPubKeyFixturator::new(Predictable);
