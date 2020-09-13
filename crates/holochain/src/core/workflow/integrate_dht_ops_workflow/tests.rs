@@ -1303,7 +1303,7 @@ mod slow_tests {
     };
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::header::{builder, AppEntryType, EntryType};
-    use holochain_zome_types::HostInput;
+    use holochain_zome_types::ExternInput;
     use matches::assert_matches;
     use unwrap_to::unwrap_to;
     use uuid::Uuid;
@@ -1471,7 +1471,7 @@ mod slow_tests {
                 cell_id.clone(),
                 TestWasm::Foo,
                 "foo".into(),
-                HostInput::new(fixt!(SerializedBytes)),
+                ExternInput::new(fixt!(SerializedBytes)),
             ))
             .next()
             .unwrap(),

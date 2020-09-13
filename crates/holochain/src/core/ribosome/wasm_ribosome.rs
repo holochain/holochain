@@ -76,8 +76,8 @@ use holochain_zome_types::validate_link_add::ValidateCreateLinkCallbackResult;
 use holochain_zome_types::zome::FunctionName;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::CallbackResult;
-use holochain_zome_types::ZomeCallInvocationResponse;
-use holochain_zome_types::{header::ZomeId, GuestOutput};
+use holochain_zome_types::ZomeCallResponse;
+use holochain_zome_types::{header::ZomeId, ExternOutput};
 use std::sync::Arc;
 
 /// Path to the wasm cache path
@@ -379,7 +379,7 @@ impl RibosomeT for WasmRibosome {
         invocation: &I,
         zome_name: &ZomeName,
         to_call: &FunctionName,
-    ) -> Result<Option<GuestOutput>, RibosomeError> {
+    ) -> Result<Option<ExternOutput>, RibosomeError> {
         let call_context = CallContext {
             zome_name: zome_name.clone(),
             host_access,
@@ -392,7 +392,7 @@ impl RibosomeT for WasmRibosome {
             // because it builds guards against memory leaks and handles imports correctly
             let mut instance = self.instance(call_context)?;
 
-            let result: GuestOutput = holochain_wasmer_host::guest::call(
+            let result: ExternOutput = holochain_wasmer_host::guest::call(
                 &mut instance,
                 to_call.as_ref(),
                 // be aware of this clone!
@@ -424,13 +424,13 @@ impl RibosomeT for WasmRibosome {
         &self,
         host_access: ZomeCallHostAccess,
         invocation: ZomeCallInvocation,
-    ) -> RibosomeResult<ZomeCallInvocationResponse> {
+    ) -> RibosomeResult<ZomeCallResponse> {
         Ok(if invocation.is_authorized(&host_access)? {
             // make a copy of these for the error handling below
             let zome_name = invocation.zome_name.clone();
             let fn_name = invocation.fn_name.clone();
 
-            let guest_output: GuestOutput = match self
+            let guest_output: ExternOutput = match self
                 .call_iterator(host_access.into(), self.clone(), invocation)
                 .next()?
             {
@@ -438,9 +438,9 @@ impl RibosomeT for WasmRibosome {
                 None => return Err(RibosomeError::ZomeFnNotExists(zome_name, fn_name)),
             };
 
-            ZomeCallInvocationResponse::ZomeApiFn(guest_output)
+            ZomeCallResponse::Ok(guest_output)
         } else {
-            ZomeCallInvocationResponse::Unauthorized
+            ZomeCallResponse::Unauthorized
         })
     }
 

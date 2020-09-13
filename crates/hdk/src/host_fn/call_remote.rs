@@ -1,13 +1,13 @@
-/// wrapper for __call_remote host function
+/// Wrapper for __call_remote host function.
 ///
-/// there are several positional arguments to the macro:
-/// - agent: the address of the agent to call the RPC style remote function on
-/// - zome: the zome to call the remote function in (use zome_info!() to get the current zome info)
-/// - fn_name: the name of the function in the zome to call
-/// - request: the payload to send to the remote function, this needs to deserialize cleanly at the
-///            other end
+/// There are several positional arguments to the macro:
 ///
-/// the response is always SerializedBytes because the HDK doesn't know anything about the function
+/// - agent: The address of the agent to call the RPC style remote function on.
+/// - zome: The zome to call the remote function in. Use zome_info!() to get the current zome info.
+/// - fn_name: The name of the function in the zome to call.
+/// - request: The payload to send to the remote function; receiver needs to deserialize cleanly.
+///
+/// Response is ZomeCallResponse which can either because the HDK doesn't know anything about the function
 /// on the other end, so you need to provide a structure that will deserialize the result correctly
 /// the easiest way to do this is to create a shared crate that includes all the shared types for
 /// cross-zome logic.

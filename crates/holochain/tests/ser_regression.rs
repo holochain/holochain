@@ -17,8 +17,8 @@ use holochain_types::test_utils::fake_agent_pubkey_1;
 use holochain_types::{observability, test_utils::fake_agent_pubkey_2};
 use holochain_wasm_test_utils::TestWasm;
 pub use holochain_zome_types::capability::CapSecret;
-use holochain_zome_types::HostInput;
-use holochain_zome_types::ZomeCallInvocationResponse;
+use holochain_zome_types::ExternInput;
+use holochain_zome_types::ZomeCallResponse;
 use std::sync::Arc;
 use tempdir::TempDir;
 
@@ -127,7 +127,7 @@ async fn ser_regression_test() {
         zome_name: TestWasm::SerRegression.into(),
         cap: CapSecretFixturator::new(Unpredictable).next().unwrap(),
         fn_name: "create_channel".into(),
-        payload: HostInput::new(channel.try_into().unwrap()),
+        payload: ExternInput::new(channel.try_into().unwrap()),
         provenance: alice_agent_id.clone(),
     };
 
@@ -147,7 +147,7 @@ async fn ser_regression_test() {
     let output = handle.call_zome(invocation).await.unwrap().unwrap();
 
     let channel_hash = match output {
-        ZomeCallInvocationResponse::ZomeApiFn(guest_output) => {
+        ZomeCallResponse::Ok(guest_output) => {
             let response: SerializedBytes = guest_output.into_inner();
             let channel_hash: EntryHash = response.try_into().unwrap();
             channel_hash
@@ -164,7 +164,7 @@ async fn ser_regression_test() {
         zome_name: TestWasm::SerRegression.into(),
         cap: CapSecretFixturator::new(Unpredictable).next().unwrap(),
         fn_name: "create_message".into(),
-        payload: HostInput::new(message.try_into().unwrap()),
+        payload: ExternInput::new(message.try_into().unwrap()),
         provenance: alice_agent_id.clone(),
     };
 
@@ -184,7 +184,7 @@ async fn ser_regression_test() {
     let output = handle.call_zome(invocation).await.unwrap().unwrap();
 
     match output {
-        ZomeCallInvocationResponse::ZomeApiFn(guest_output) => {
+        ZomeCallResponse::Ok(guest_output) => {
             let response: SerializedBytes = guest_output.into_inner();
             let _msg_hash: EntryHash = response.try_into().unwrap();
         }

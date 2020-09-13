@@ -76,8 +76,8 @@ fn needs_cap_claim(_: ()) -> ExternResult<()> {
 }
 
 #[hdk_extern]
-fn try_cap_claim(cap_for: CapFor) -> ExternResult<ZomeCallInvocationResponse> {
-    let result: ZomeCallInvocationResponse = call_remote!(
+fn try_cap_claim(cap_for: CapFor) -> ExternResult<ZomeCallResponse> {
+    let result: ZomeCallResponse = call_remote!(
         cap_for.1,
         zome_info!()?.zome_name,
         "needs_cap_claim".to_string().into(),

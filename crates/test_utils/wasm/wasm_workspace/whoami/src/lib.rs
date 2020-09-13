@@ -27,7 +27,7 @@ fn whoami(_: ()) -> ExternResult<AgentInfo> {
 // it's just that the output comes _from the opinion of the remote agent_
 #[hdk_extern]
 fn whoarethey(agent_pubkey: AgentPubKey) -> ExternResult<AgentInfo> {
-    let response: ZomeCallInvocationResponse = call_remote!(
+    let response: ZomeCallResponse = call_remote!(
         agent_pubkey,
         zome_info!()?.zome_name,
         "whoami".to_string().into(),
@@ -36,10 +36,10 @@ fn whoarethey(agent_pubkey: AgentPubKey) -> ExternResult<AgentInfo> {
     )?;
 
     match response {
-        ZomeCallInvocationResponse::ZomeApiFn(guest_output) => Ok(guest_output.into_inner().try_into()?),
+        ZomeCallResponse::Ok(guest_output) => Ok(guest_output.into_inner().try_into()?),
         // we're just panicking here because our simple tests can always call set_access before
         // calling whoami, but in a real app you'd want to handle this by returning an `Ok` with
         // something meaningful to the extern's client
-        ZomeCallInvocationResponse::Unauthorized => unreachable!(),
+        ZomeCallResponse::Unauthorized => unreachable!(),
     }
 }

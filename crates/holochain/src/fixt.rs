@@ -41,14 +41,14 @@ use holochain_wasm_test_utils::strum::IntoEnumIterator;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::header::HeaderHashes;
 use holochain_zome_types::link::LinkTag;
-use holochain_zome_types::HostInput;
+use holochain_zome_types::ExternInput;
 use rand::seq::IteratorRandom;
 use rand::thread_rng;
 use rand::Rng;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-wasm_io_fixturator!(HostInput<SerializedBytes>);
+wasm_io_fixturator!(ExternInput<SerializedBytes>);
 
 newtype_fixturator!(FnComponents<Vec<String>>);
 

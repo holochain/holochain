@@ -10,7 +10,7 @@ use holochain_zome_types::header::CreateLink;
 use holochain_zome_types::validate_link_add::ValidateCreateLinkCallbackResult;
 use holochain_zome_types::validate_link_add::ValidateCreateLinkData;
 use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::HostInput;
+use holochain_zome_types::ExternInput;
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -73,14 +73,14 @@ impl Invocation for ValidateCreateLinkInvocation {
         ]
         .into()
     }
-    fn host_input(self) -> Result<HostInput, SerializedBytesError> {
-        Ok(HostInput::new(
+    fn host_input(self) -> Result<ExternInput, SerializedBytesError> {
+        Ok(ExternInput::new(
             ValidateCreateLinkData::from(self).try_into()?,
         ))
     }
 }
 
-impl TryFrom<ValidateCreateLinkInvocation> for HostInput {
+impl TryFrom<ValidateCreateLinkInvocation> for ExternInput {
     type Error = SerializedBytesError;
     fn try_from(
         validate_link_add_invocation: ValidateCreateLinkInvocation,
@@ -129,7 +129,7 @@ mod test {
     use holochain_types::dna::zome::HostFnAccess;
     use holochain_zome_types::validate_link_add::ValidateCreateLinkCallbackResult;
     use holochain_zome_types::validate_link_add::ValidateCreateLinkData;
-    use holochain_zome_types::HostInput;
+    use holochain_zome_types::ExternInput;
     use rand::seq::SliceRandom;
 
     #[tokio::test(threaded_scheduler)]
@@ -214,7 +214,7 @@ mod test {
 
         assert_eq!(
             host_input,
-            HostInput::new(
+            ExternInput::new(
                 SerializedBytes::try_from(&ValidateCreateLinkData::from(
                     validate_link_add_invocation
                 ))

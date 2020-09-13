@@ -1,6 +1,6 @@
 use crate::entry::Entry;
 use crate::header::CreateLink;
-use crate::zome_io::GuestOutput;
+use crate::zome_io::ExternOutput;
 use crate::CallbackResult;
 use holochain_serialized_bytes::prelude::*;
 
@@ -26,8 +26,8 @@ impl CallbackResult for ValidateCreateLinkCallbackResult {
     }
 }
 
-impl From<GuestOutput> for ValidateCreateLinkCallbackResult {
-    fn from(guest_output: GuestOutput) -> Self {
+impl From<ExternOutput> for ValidateCreateLinkCallbackResult {
+    fn from(guest_output: ExternOutput) -> Self {
         match guest_output.into_inner().try_into() {
             Ok(v) => v,
             Err(e) => Self::Invalid(format!("{:?}", e)),

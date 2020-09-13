@@ -8,7 +8,7 @@ macro_rules! guest_functions {
             #[no_mangle]
             pub extern "C" fn $guest_fn(host_allocation_ptr: GuestPtr) -> GuestPtr {
                 let input = {
-                    let v: HostInput = host_args!(host_allocation_ptr);
+                    let v: ExternInput = host_args!(host_allocation_ptr);
                     let deserialized = <$input_type>::try_from(v.into_inner());
                     try_result!(deserialized, "failed to deserialize host inputs")
                 };
@@ -23,7 +23,7 @@ macro_rules! guest_functions {
                     output.try_into(),
                     "failed to serialize output for extern response"
                 );
-                ret!(GuestOutput::new(output_sb));
+                ret!(ExternOutput::new(output_sb));
             }
         )*
     }

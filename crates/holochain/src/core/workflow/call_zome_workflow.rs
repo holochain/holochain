@@ -26,7 +26,7 @@ use holochain_state::prelude::*;
 use holochain_types::element::Element;
 use holochain_zome_types::entry::GetOptions;
 use holochain_zome_types::header::Header;
-use holochain_zome_types::ZomeCallInvocationResponse;
+use holochain_zome_types::ZomeCallResponse;
 use std::sync::Arc;
 use tracing::instrument;
 
@@ -34,7 +34,7 @@ pub mod call_zome_workspace_lock;
 
 /// Placeholder for the return value of a zome invocation
 /// TODO: do we want this to be the same as ZomeCallInvocationRESPONSE?
-pub type ZomeCallInvocationResult = RibosomeResult<ZomeCallInvocationResponse>;
+pub type ZomeCallInvocationResult = RibosomeResult<ZomeCallResponse>;
 
 #[derive(Debug)]
 pub struct CallZomeWorkflowArgs<Ribosome: RibosomeT> {
@@ -283,8 +283,8 @@ pub mod tests {
     use holochain_types::{observability, test_utils::fake_agent_pubkey_1};
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::entry::Entry;
-    use holochain_zome_types::GuestOutput;
-    use holochain_zome_types::HostInput;
+    use holochain_zome_types::ExternInput;
+    use holochain_zome_types::ExternOutput;
     use matches::assert_matches;
 
     #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
@@ -328,7 +328,7 @@ pub mod tests {
                     .unwrap(),
                 TestWasm::Foo.into(),
                 "fun_times".into(),
-                HostInput::new(Payload { a: 1 }.try_into().unwrap()),
+                ExternInput::new(Payload { a: 1 }.try_into().unwrap()),
             ),
         )
         .next()
@@ -392,7 +392,7 @@ pub mod tests {
             .expect_call_zome_function()
             .returning(move |_workspace, _invocation| {
                 let x = SerializedBytes::try_from(Payload { a: 3 }).unwrap();
-                Ok(ZomeCallInvocationResponse::ZomeApiFn(GuestOutput::new(x)))
+                Ok(ZomeCallResponse::Ok(ExternOutput::new(x)))
             });
 
         let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(
@@ -402,7 +402,7 @@ pub mod tests {
                     .unwrap(),
                 TestWasm::Foo.into(),
                 "fun_times".into(),
-                HostInput::new(Payload { a: 1 }.try_into().unwrap()),
+                ExternInput::new(Payload { a: 1 }.try_into().unwrap()),
             ),
         )
         .next()
@@ -439,7 +439,7 @@ pub mod tests {
                     .unwrap(),
                 TestWasm::Foo.into(),
                 "fun_times".into(),
-                HostInput::new(Payload { a: 1 }.try_into().unwrap()),
+                ExternInput::new(Payload { a: 1 }.try_into().unwrap()),
             ),
         )
         .next()
@@ -470,7 +470,7 @@ pub mod tests {
                     .unwrap(),
                 TestWasm::Foo.into(),
                 "fun_times".into(),
-                HostInput::new(Payload { a: 1 }.try_into().unwrap()),
+                ExternInput::new(Payload { a: 1 }.try_into().unwrap()),
             ),
         )
         .next()

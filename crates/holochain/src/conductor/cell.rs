@@ -52,7 +52,7 @@ use holochain_types::{
 use holochain_zome_types::capability::CapSecret;
 use holochain_zome_types::header::{CreateLink, DeleteLink};
 use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::HostInput;
+use holochain_zome_types::ExternInput;
 use std::{
     collections::{BTreeMap, BTreeSet},
     convert::TryInto,
@@ -627,7 +627,7 @@ impl Cell {
             cell_id: self.id.clone(),
             zome_name: zome_name.clone(),
             cap,
-            payload: HostInput::new(payload),
+            payload: ExternInput::new(payload),
             provenance: from_agent,
             fn_name,
         };

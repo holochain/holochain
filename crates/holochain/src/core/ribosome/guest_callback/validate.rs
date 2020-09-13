@@ -9,7 +9,7 @@ use holochain_types::dna::zome::HostFnAccess;
 use holochain_zome_types::entry::Entry;
 use holochain_zome_types::validate::ValidateCallbackResult;
 use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::HostInput;
+use holochain_zome_types::ExternInput;
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -66,12 +66,12 @@ impl Invocation for ValidateInvocation {
         ]
         .into()
     }
-    fn host_input(self) -> Result<HostInput, SerializedBytesError> {
-        Ok(HostInput::new((&*self.entry).try_into()?))
+    fn host_input(self) -> Result<ExternInput, SerializedBytesError> {
+        Ok(ExternInput::new((&*self.entry).try_into()?))
     }
 }
 
-impl TryFrom<ValidateInvocation> for HostInput {
+impl TryFrom<ValidateInvocation> for ExternInput {
     type Error = SerializedBytesError;
     fn try_from(validate_invocation: ValidateInvocation) -> Result<Self, Self::Error> {
         Ok(Self::new((&*validate_invocation.entry).try_into()?))
@@ -126,7 +126,7 @@ mod test {
     use holochain_types::{dna::zome::HostFnAccess, fixt::*};
     use holochain_zome_types::entry::Entry;
     use holochain_zome_types::validate::ValidateCallbackResult;
-    use holochain_zome_types::HostInput;
+    use holochain_zome_types::ExternInput;
     use rand::seq::SliceRandom;
     use std::sync::Arc;
 
@@ -254,7 +254,7 @@ mod test {
 
         assert_eq!(
             host_input,
-            HostInput::new(SerializedBytes::try_from(&*validate_invocation.entry).unwrap()),
+            ExternInput::new(SerializedBytes::try_from(&*validate_invocation.entry).unwrap()),
         );
     }
 }
