@@ -2,7 +2,7 @@
 ///
 /// tag filtering is a simple bytes prefix
 ///
-/// e.g. if you had a links:
+/// e.g. if you had these links:
 ///      - a: `[ 1, 2, 3]`
 ///      - b: `[ 1, 2, 4]`
 ///      - c: `[ 1, 3, 5]`
