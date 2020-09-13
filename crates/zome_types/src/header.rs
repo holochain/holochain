@@ -41,9 +41,9 @@ pub enum Header {
     AgentValidationPkg(AgentValidationPkg),
     InitZomesComplete(InitZomesComplete),
     CreateLink(CreateLink),
-    LinkRemove(LinkRemove),
-    ChainOpen(ChainOpen),
-    ChainClose(ChainClose),
+    DeleteLink(DeleteLink),
+    OpenChain(OpenChain),
+    CloseChain(CloseChain),
     CreateEntry(CreateEntry),
     UpdateEntry(UpdateEntry),
     DeleteElement(DeleteElement),
@@ -98,9 +98,9 @@ write_into_header! {
     AgentValidationPkg,
     InitZomesComplete,
     CreateLink,
-    LinkRemove,
-    ChainOpen,
-    ChainClose,
+    DeleteLink,
+    OpenChain,
+    CloseChain,
     CreateEntry,
     UpdateEntry,
     DeleteElement,
@@ -114,9 +114,9 @@ macro_rules! match_header {
             Header::AgentValidationPkg($i) => { $($t)* }
             Header::InitZomesComplete($i) => { $($t)* }
             Header::CreateLink($i) => { $($t)* }
-            Header::LinkRemove($i) => { $($t)* }
-            Header::ChainOpen($i) => { $($t)* }
-            Header::ChainClose($i) => { $($t)* }
+            Header::DeleteLink($i) => { $($t)* }
+            Header::OpenChain($i) => { $($t)* }
+            Header::CloseChain($i) => { $($t)* }
             Header::CreateEntry($i) => { $($t)* }
             Header::UpdateEntry($i) => { $($t)* }
             Header::DeleteElement($i) => { $($t)* }
@@ -174,10 +174,10 @@ impl Header {
             Self::AgentValidationPkg(AgentValidationPkg { header_seq, .. })
             | Self::InitZomesComplete(InitZomesComplete { header_seq, .. })
             | Self::CreateLink(CreateLink { header_seq, .. })
-            | Self::LinkRemove(LinkRemove { header_seq, .. })
+            | Self::DeleteLink(DeleteLink { header_seq, .. })
             | Self::DeleteElement(DeleteElement { header_seq, .. })
-            | Self::ChainClose(ChainClose { header_seq, .. })
-            | Self::ChainOpen(ChainOpen { header_seq, .. })
+            | Self::CloseChain(CloseChain { header_seq, .. })
+            | Self::OpenChain(OpenChain { header_seq, .. })
             | Self::CreateEntry(CreateEntry { header_seq, .. })
             | Self::UpdateEntry(UpdateEntry { header_seq, .. }) => *header_seq,
         }
@@ -190,10 +190,10 @@ impl Header {
             Self::AgentValidationPkg(AgentValidationPkg { prev_header, .. }) => prev_header,
             Self::InitZomesComplete(InitZomesComplete { prev_header, .. }) => prev_header,
             Self::CreateLink(CreateLink { prev_header, .. }) => prev_header,
-            Self::LinkRemove(LinkRemove { prev_header, .. }) => prev_header,
+            Self::DeleteLink(DeleteLink { prev_header, .. }) => prev_header,
             Self::DeleteElement(DeleteElement { prev_header, .. }) => prev_header,
-            Self::ChainClose(ChainClose { prev_header, .. }) => prev_header,
-            Self::ChainOpen(ChainOpen { prev_header, .. }) => prev_header,
+            Self::CloseChain(CloseChain { prev_header, .. }) => prev_header,
+            Self::OpenChain(OpenChain { prev_header, .. }) => prev_header,
             Self::CreateEntry(CreateEntry { prev_header, .. }) => prev_header,
             Self::UpdateEntry(UpdateEntry { prev_header, .. }) => prev_header,
         })
@@ -282,7 +282,7 @@ pub struct CreateLink {
 
 /// Declares that a previously made Link should be nullified and considered removed.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
-pub struct LinkRemove {
+pub struct DeleteLink {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub header_seq: u32,
@@ -299,7 +299,7 @@ pub struct LinkRemove {
 /// When migrating to a new version of a DNA, this header is committed to the
 /// new chain to declare the migration path taken. **Currently unused**
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
-pub struct ChainOpen {
+pub struct OpenChain {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub header_seq: u32,
@@ -311,7 +311,7 @@ pub struct ChainOpen {
 /// When migrating to a new version of a DNA, this header is committed to the
 /// old chain to declare the migration path taken. **Currently unused**
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
-pub struct ChainClose {
+pub struct CloseChain {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub header_seq: u32,

@@ -97,12 +97,12 @@ fixturator!(
 );
 
 fixturator!(
-    ChainOpen;
+    OpenChain;
     constructor fn from_builder(HeaderBuilderCommon, DnaHash);
 );
 
 fixturator!(
-    ChainClose;
+    CloseChain;
     constructor fn from_builder(HeaderBuilderCommon, DnaHash);
 );
 
@@ -122,7 +122,7 @@ fixturator!(
 );
 
 fixturator!(
-    LinkRemove;
+    DeleteLink;
     constructor fn from_builder(HeaderBuilderCommon, HeaderHash, EntryHash);
 );
 
@@ -142,7 +142,7 @@ pub struct KnownCreateLink {
     pub zome_id: ZomeId,
 }
 
-pub struct KnownLinkRemove {
+pub struct KnownDeleteLink {
     pub link_add_address: holo_hash::HeaderHash,
 }
 
@@ -158,10 +158,10 @@ impl Iterator for CreateLinkFixturator<KnownCreateLink> {
     }
 }
 
-impl Iterator for LinkRemoveFixturator<KnownLinkRemove> {
-    type Item = LinkRemove;
+impl Iterator for DeleteLinkFixturator<KnownDeleteLink> {
+    type Item = DeleteLink;
     fn next(&mut self) -> Option<Self::Item> {
-        let mut f = fixt!(LinkRemove);
+        let mut f = fixt!(DeleteLink);
         f.link_add_address = self.0.curve.link_add_address.clone();
         Some(f)
     }

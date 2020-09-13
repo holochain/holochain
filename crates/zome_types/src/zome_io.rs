@@ -72,7 +72,7 @@ wasm_io_types!(
     pub struct RandomBytesOutput(crate::bytes::Bytes);
     // the header hash of the CreateLink element
     pub struct DeleteLinkInput(holo_hash::HeaderHash);
-    // the header hash of the LinkRemove element
+    // the header hash of the DeleteLink element
     pub struct DeleteLinkOutput(holo_hash::HeaderHash);
     pub struct CallRemoteInput(crate::call_remote::CallRemote);
     pub struct CallRemoteOutput(ZomeCallInvocationResponse);

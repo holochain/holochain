@@ -4,7 +4,7 @@ use holo_hash::{AnyDhtHash, EntryHash, HeaderHash};
 use holochain_keystore::Signature;
 use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::{
-    header::{CreateLink, LinkRemove, ZomeId},
+    header::{CreateLink, DeleteLink, ZomeId},
     link::LinkTag,
 };
 use regex::Regex;
@@ -39,7 +39,7 @@ pub struct GetLinksResponse {
     /// All the link adds on the key you searched for
     pub link_adds: Vec<(CreateLink, Signature)>,
     /// All the link removes on the key you searched for
-    pub link_removes: Vec<(LinkRemove, Signature)>,
+    pub link_removes: Vec<(DeleteLink, Signature)>,
 }
 
 impl WireLinkMetaKey {

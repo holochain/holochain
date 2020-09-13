@@ -95,21 +95,21 @@ impl<'a> TryFrom<&'a Header> for &'a CreateLink {
     }
 }
 
-impl TryFrom<Header> for LinkRemove {
+impl TryFrom<Header> for DeleteLink {
     type Error = WrongHeaderError;
     fn try_from(value: Header) -> Result<Self, Self::Error> {
         match value {
-            Header::LinkRemove(h) => Ok(h),
+            Header::DeleteLink(h) => Ok(h),
             _ => Err(WrongHeaderError(format!("{:?}", value))),
         }
     }
 }
 
-impl<'a> TryFrom<&'a Header> for &'a LinkRemove {
+impl<'a> TryFrom<&'a Header> for &'a DeleteLink {
     type Error = WrongHeaderError;
     fn try_from(value: &'a Header) -> Result<Self, Self::Error> {
         match value {
-            Header::LinkRemove(h) => Ok(h),
+            Header::DeleteLink(h) => Ok(h),
             _ => Err(WrongHeaderError(format!("{:?}", value))),
         }
     }

@@ -1,7 +1,7 @@
 use super::*;
 use crate::fixt::{
-    CreateLinkFixturator, EntryHashFixturator, KnownCreateLink, KnownLinkRemove,
-    LinkRemoveFixturator, ZomeIdFixturator,
+    CreateLinkFixturator, DeleteLinkFixturator, EntryHashFixturator, KnownCreateLink,
+    KnownDeleteLink, ZomeIdFixturator,
 };
 use crate::here;
 use ::fixt::prelude::*;
@@ -13,7 +13,7 @@ use holochain_types::observability;
 #[derive(Clone)]
 struct TestData {
     link_add: CreateLink,
-    link_remove: LinkRemove,
+    link_remove: DeleteLink,
     base_hash: EntryHash,
     zome_id: ZomeId,
     tag: LinkTag,
@@ -56,10 +56,10 @@ async fn fixtures(env: EnvironmentWrite, n: usize) -> Vec<TestData> {
             tag: tag.clone(),
         };
 
-        let link_remove = KnownLinkRemove {
+        let link_remove = KnownDeleteLink {
             link_add_address: link_add_hash,
         };
-        let link_remove = LinkRemoveFixturator::new(link_remove).next().unwrap();
+        let link_remove = DeleteLinkFixturator::new(link_remove).next().unwrap();
         let td = TestData {
             link_add,
             link_remove,

@@ -68,12 +68,12 @@ pub fn delete_link<'a>(
 
     // handle timeouts at the source chain layer
 
-    // add a LinkRemove to the source chain
+    // add a DeleteLink to the source chain
     tokio_safe_block_on::tokio_safe_block_forever_on(async move {
         let mut guard = workspace_lock.write().await;
         let workspace: &mut CallZomeWorkspace = &mut guard;
         let source_chain = &mut workspace.source_chain;
-        let header_builder = builder::LinkRemove {
+        let header_builder = builder::DeleteLink {
             link_add_address,
             base_address,
         };

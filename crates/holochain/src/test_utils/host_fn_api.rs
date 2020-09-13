@@ -372,7 +372,7 @@ pub async fn get_link_details<'env>(
     base: EntryHash,
     tag: LinkTag,
     options: GetLinksOptions,
-) -> Vec<(CreateLink, Vec<LinkRemove>)> {
+) -> Vec<(CreateLink, Vec<DeleteLink>)> {
     let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
 
     let mut cascade = workspace.cascade(call_data.network);

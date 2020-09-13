@@ -22,9 +22,9 @@ pub enum Header {
     // The first header in a chain (for the DNA) doesn't have a previous header
     Dna(header::Dna),
     CreateLink(header::CreateLink),
-    LinkRemove(header::LinkRemove),
-    ChainOpen(header::ChainOpen),
-    ChainClose(header::ChainClose),
+    DeleteLink(header::DeleteLink),
+    OpenChain(header::OpenChain),
+    CloseChain(header::CloseChain),
     CreateEntry(header::CreateEntry),
     UpdateEntry(header::UpdateEntry),
     DeleteElement(header::DeleteElement),
@@ -57,7 +57,7 @@ pub mod header {
         pub link_type: SerializedBytes,
     }
 
-    pub struct LinkRemove {
+    pub struct DeleteLink {
         pub author: PublicKey,
         pub timestamp: Timestamp,
         pub prev_header: HeaderHash,
@@ -65,7 +65,7 @@ pub mod header {
         pub link_add_hash: Address, // not Address byt CreateLinkHash or maybe its HeaderHash?
     }
 
-    pub struct ChainOpen {
+    pub struct OpenChain {
         pub author: PublicKey,
         pub timestamp: Timestamp,
         pub prev_header: HeaderHash,
@@ -73,7 +73,7 @@ pub mod header {
         pub prev_dna_hash: DnaHash,
     }
 
-    pub struct ChainClose {
+    pub struct CloseChain {
         pub author: PublicKey,
         pub timestamp: Timestamp,
         pub prev_header: HeaderHash,
@@ -128,10 +128,10 @@ impl Header {
         Some(match self {
             Self::Dna(header::Dna { .. }) => return None,
             Self::CreateLink(header::CreateLink { prev_header, .. }) => prev_header,
-            Self::LinkRemove(header::LinkRemove { prev_header, .. }) => prev_header,
+            Self::DeleteLink(header::DeleteLink { prev_header, .. }) => prev_header,
             Self::DeleteElement(header::DeleteElement { prev_header, .. }) => prev_header,
-            Self::ChainClose(header::ChainClose { prev_header, .. }) => prev_header,
-            Self::ChainOpen(header::ChainOpen { prev_header, .. }) => prev_header,
+            Self::CloseChain(header::CloseChain { prev_header, .. }) => prev_header,
+            Self::OpenChain(header::OpenChain { prev_header, .. }) => prev_header,
             Self::CreateEntry(header::CreateEntry { prev_header, .. }) => prev_header,
             Self::UpdateEntry(header::UpdateEntry { prev_header, .. }) => prev_header,
         })

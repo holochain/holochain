@@ -115,16 +115,16 @@ builder_variant!(CreateLink {
     tag: LinkTag,
 });
 
-builder_variant!(LinkRemove {
+builder_variant!(DeleteLink {
     link_add_address: HeaderHash,
     base_address: EntryHash,
 });
 
-builder_variant!(ChainOpen {
+builder_variant!(OpenChain {
     prev_dna_hash: DnaHash,
 });
 
-builder_variant!(ChainClose {
+builder_variant!(CloseChain {
     new_dna_hash: DnaHash,
 });
 

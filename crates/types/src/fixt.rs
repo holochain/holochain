@@ -38,14 +38,14 @@ use holochain_zome_types::entry_def::EntryVisibility;
 use holochain_zome_types::entry_def::RequiredValidations;
 use holochain_zome_types::header::AgentValidationPkg;
 use holochain_zome_types::header::AppEntryType;
-use holochain_zome_types::header::ChainClose;
-use holochain_zome_types::header::ChainOpen;
+use holochain_zome_types::header::CloseChain;
 use holochain_zome_types::header::CreateEntry;
 use holochain_zome_types::header::DeleteElement;
 use holochain_zome_types::header::Dna;
 use holochain_zome_types::header::EntryType;
 use holochain_zome_types::header::Header;
 use holochain_zome_types::header::InitZomesComplete;
+use holochain_zome_types::header::OpenChain;
 use holochain_zome_types::header::UpdateEntry;
 use holochain_zome_types::header::ZomeId;
 use holochain_zome_types::migrate_agent::MigrateAgent;
@@ -483,12 +483,12 @@ fixturator!(
 );
 
 fixturator!(
-    ChainOpen;
+    OpenChain;
     constructor fn from_builder(HeaderBuilderCommon, DnaHash);
 );
 
 fixturator!(
-    ChainClose;
+    CloseChain;
     constructor fn from_builder(HeaderBuilderCommon, DnaHash);
 );
 
@@ -526,9 +526,9 @@ fixturator!(
         AgentValidationPkg(AgentValidationPkg)
         InitZomesComplete(InitZomesComplete)
         CreateLink(CreateLink)
-        LinkRemove(LinkRemove)
-        ChainOpen(ChainOpen)
-        ChainClose(ChainClose)
+        DeleteLink(DeleteLink)
+        OpenChain(OpenChain)
+        CloseChain(CloseChain)
         CreateEntry(CreateEntry)
         UpdateEntry(UpdateEntry)
         DeleteElement(DeleteElement)

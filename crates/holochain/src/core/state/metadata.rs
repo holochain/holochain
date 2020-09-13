@@ -21,7 +21,7 @@ use holochain_state::{
 use holochain_types::metadata::{EntryDhtStatus, TimedHeaderHash};
 use holochain_types::{header::NewEntryHeader, link::WireLinkMetaKey};
 use holochain_types::{HeaderHashed, Timestamp};
-use holochain_zome_types::header::{self, CreateLink, LinkRemove, ZomeId};
+use holochain_zome_types::header::{self, CreateLink, DeleteLink, ZomeId};
 use holochain_zome_types::{link::LinkTag, Header};
 use std::fmt::Debug;
 use tracing::*;
@@ -83,7 +83,7 @@ where
     fn register_raw_on_header(&mut self, header_hash: HeaderHash, value: SysMetaVal);
 
     /// Remove a link
-    fn delete_link(&mut self, link_remove: LinkRemove) -> DatabaseResult<()>;
+    fn delete_link(&mut self, link_remove: DeleteLink) -> DatabaseResult<()>;
 
     /// Deregister an add link
     /// Not the same as remove like.
@@ -91,7 +91,7 @@ where
     fn deregister_add_link(&mut self, link_add: CreateLink) -> DatabaseResult<()>;
 
     /// Deregister a remove link
-    fn deregister_delete_link(&mut self, link_remove: LinkRemove) -> DatabaseResult<()>;
+    fn deregister_delete_link(&mut self, link_remove: DeleteLink) -> DatabaseResult<()>;
 
     /// Registers a [Header::NewEntryHeader] on the referenced [Entry]
     fn register_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()>;
@@ -407,21 +407,21 @@ where
         self.links_meta.delete(key.into())
     }
 
-    fn delete_link(&mut self, link_remove: LinkRemove) -> DatabaseResult<()> {
+    fn delete_link(&mut self, link_remove: DeleteLink) -> DatabaseResult<()> {
         let link_add_address = link_remove.link_add_address.clone();
         // Register the link remove address to the link add address
-        let link_remove = HeaderHashed::from_content_sync(Header::LinkRemove(link_remove));
-        let sys_val = SysMetaVal::LinkRemove(link_remove.into());
+        let link_remove = HeaderHashed::from_content_sync(Header::DeleteLink(link_remove));
+        let sys_val = SysMetaVal::DeleteLink(link_remove.into());
         self.system_meta
             .insert(SysMetaKey::from(link_add_address).into(), sys_val);
         Ok(())
     }
 
-    fn deregister_delete_link(&mut self, link_remove: LinkRemove) -> DatabaseResult<()> {
+    fn deregister_delete_link(&mut self, link_remove: DeleteLink) -> DatabaseResult<()> {
         let link_add_address = link_remove.link_add_address.clone();
         // Register the link remove address to the link add address
-        let link_remove = HeaderHashed::from_content_sync(Header::LinkRemove(link_remove));
-        let sys_val = SysMetaVal::LinkRemove(link_remove.into());
+        let link_remove = HeaderHashed::from_content_sync(Header::DeleteLink(link_remove));
+        let sys_val = SysMetaVal::DeleteLink(link_remove.into());
         self.system_meta
             .delete(SysMetaKey::from(link_add_address).into(), sys_val);
         Ok(())
@@ -639,7 +639,7 @@ where
             )
             .filter_map(|h| {
                 Ok(match h {
-                    SysMetaVal::LinkRemove(h) => Some(h),
+                    SysMetaVal::DeleteLink(h) => Some(h),
                     _ => None,
                 })
             }),

@@ -1,10 +1,10 @@
 use crate::{
     core::state::element_buf::ElementBuf,
     fixt::{
-        AgentValidationPkgFixturator, ChainCloseFixturator, ChainOpenFixturator,
-        CreateEntryFixturator, CreateLinkFixturator, DnaFixturator, EntryFixturator,
-        EntryHashFixturator, EntryTypeFixturator, InitZomesCompleteFixturator,
-        LinkRemoveFixturator, UpdateEntryFixturator,
+        AgentValidationPkgFixturator, CloseChainFixturator, CreateEntryFixturator,
+        CreateLinkFixturator, DeleteLinkFixturator, DnaFixturator, EntryFixturator,
+        EntryHashFixturator, EntryTypeFixturator, InitZomesCompleteFixturator, OpenChainFixturator,
+        UpdateEntryFixturator,
     },
 };
 use ::fixt::prelude::*;
@@ -20,8 +20,8 @@ use holochain_types::{
 };
 use holochain_zome_types::header::{
     builder::{self, HeaderBuilder},
-    AgentValidationPkg, ChainClose, ChainOpen, CreateEntry, CreateLink, Dna, EntryType, Header,
-    HeaderBuilderCommon, InitZomesComplete, LinkRemove, UpdateEntry,
+    AgentValidationPkg, CloseChain, CreateEntry, CreateLink, DeleteLink, Dna, EntryType, Header,
+    HeaderBuilderCommon, InitZomesComplete, OpenChain, UpdateEntry,
 };
 use pretty_assertions::assert_eq;
 use tracing::*;
@@ -35,10 +35,10 @@ struct ElementTest {
     sig: Signature,
     entry: Entry,
     link_add: CreateLink,
-    link_remove: LinkRemove,
+    link_remove: DeleteLink,
     dna: Dna,
-    chain_close: ChainClose,
-    chain_open: ChainOpen,
+    chain_close: CloseChain,
+    chain_open: OpenChain,
     agent_validation_pkg: AgentValidationPkg,
     init_zomes_complete: InitZomesComplete,
 }
@@ -53,10 +53,10 @@ impl ElementTest {
         let sig = fixt!(Signature);
         let entry = fixt!(Entry);
         let link_add = fixt!(CreateLink);
-        let link_remove = fixt!(LinkRemove);
+        let link_remove = fixt!(DeleteLink);
         let dna = fixt!(Dna);
-        let chain_open = fixt!(ChainOpen);
-        let chain_close = fixt!(ChainClose);
+        let chain_open = fixt!(OpenChain);
+        let chain_close = fixt!(CloseChain);
         let agent_validation_pkg = fixt!(AgentValidationPkg);
         let init_zomes_complete = fixt!(InitZomesComplete);
         Self {

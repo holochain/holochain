@@ -77,7 +77,7 @@ pub enum DhtOp {
     RegisterAddLink(Signature, header::CreateLink),
 
     /// Op for removing a link
-    RegisterRemoveLink(Signature, header::LinkRemove),
+    RegisterRemoveLink(Signature, header::DeleteLink),
 }
 
 /// Show that this type is used as the basis
@@ -222,7 +222,7 @@ pub enum UniqueForm<'a> {
     RegisterDeletedBy(&'a header::DeleteElement),
     RegisterDeletedEntryHeader(&'a header::DeleteElement),
     RegisterAddLink(&'a header::CreateLink),
-    RegisterRemoveLink(&'a header::LinkRemove),
+    RegisterRemoveLink(&'a header::DeleteLink),
 }
 
 impl<'a> UniqueForm<'a> {
@@ -358,15 +358,15 @@ async fn produce_op_lights_from_iter(
 
         match header {
             Header::Dna(_)
-            | Header::ChainOpen(_)
-            | Header::ChainClose(_)
+            | Header::OpenChain(_)
+            | Header::CloseChain(_)
             | Header::AgentValidationPkg(_)
             | Header::InitZomesComplete(_) => {}
             Header::CreateLink(link_add) => ops.push(DhtOpLight::RegisterAddLink(
                 header_hash,
                 UniqueForm::RegisterAddLink(link_add).basis().await,
             )),
-            Header::LinkRemove(link_remove) => ops.push(DhtOpLight::RegisterRemoveLink(
+            Header::DeleteLink(link_remove) => ops.push(DhtOpLight::RegisterRemoveLink(
                 header_hash,
                 UniqueForm::RegisterRemoveLink(link_remove).basis().await,
             )),

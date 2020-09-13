@@ -35,7 +35,7 @@ use holochain_types::{
 use holochain_zome_types::{
     entry::GetOptions,
     entry_def::EntryDefs,
-    header::{builder, CreateLink, DeleteElement, LinkRemove, UpdateEntry, ZomeId},
+    header::{builder, CreateLink, DeleteElement, DeleteLink, UpdateEntry, ZomeId},
     link::{LinkTag, Links},
     zome::ZomeName,
     CreateEntryInput, CreateLinkInput, GetInput, GetLinksInput, Header,
@@ -61,7 +61,7 @@ struct TestData {
     original_header: NewEntryHeader,
     entry_delete: DeleteElement,
     link_add: CreateLink,
-    link_remove: LinkRemove,
+    link_remove: DeleteLink,
 }
 
 impl TestData {
@@ -128,7 +128,7 @@ impl TestData {
         let link_add_hash = HeaderHashed::from_content_sync(link_add.clone().into()).into_hash();
 
         // Link remove
-        let mut link_remove = fixt!(LinkRemove);
+        let mut link_remove = fixt!(DeleteLink);
         link_remove.base_address = original_entry_hash.clone();
         link_remove.link_add_address = link_add_hash.clone();
 

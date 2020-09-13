@@ -56,7 +56,7 @@ pub enum SysMetaVal {
     /// Activity on an agent's public key
     Activity(TimedHeaderHash),
     /// Link remove on link add
-    LinkRemove(TimedHeaderHash),
+    DeleteLink(TimedHeaderHash),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize, SerializedBytes)]
@@ -198,7 +198,7 @@ impl From<SysMetaVal> for HeaderHash {
             SysMetaVal::NewEntry(h)
             | SysMetaVal::Update(h)
             | SysMetaVal::Delete(h)
-            | SysMetaVal::LinkRemove(h)
+            | SysMetaVal::DeleteLink(h)
             | SysMetaVal::Activity(h) => h.header_hash,
         }
     }
