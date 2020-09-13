@@ -442,3 +442,23 @@ where
             .expect("Couldn't collect fixture data")
     }
 }
+
+impl<V> LoadDbFixture for KvIntBufUsed<V>
+where
+    V: BufVal + Ord,
+{
+    type FixtureItem = (IntKey, V);
+
+    fn write_test_datum(&mut self, datum: Self::FixtureItem) -> () {
+        let (k, v) = datum;
+        self.put(k, v).expect("Couldn't put fixture datum into DB")
+    }
+
+    fn read_test_data<R: Readable>(&self, reader: &R) -> DbFixture<Self::FixtureItem> {
+        self.iter(reader)
+            .expect("Couldn't iterate when gathering fixture data")
+            .map(|(b, v)| Ok((IntKey::from_key_bytes_or_friendly_panic(b), v)))
+            .collect()
+            .expect("Couldn't collect fixture data")
+    }
+}

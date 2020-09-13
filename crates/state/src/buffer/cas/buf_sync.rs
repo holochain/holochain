@@ -223,12 +223,9 @@ where
     type FixtureItem = HoloHashed<C>;
 
     fn write_test_datum(&mut self, datum: Self::FixtureItem) -> () {
-        self.put(datum)
+        self.inner.write_test_datum(datum)
     }
     fn read_test_data<R: Readable>(&self, reader: &R) -> DbFixture<Self::FixtureItem> {
-        self.iter_fail(reader)
-            .expect("Couldn't iterate when gathering fixture data")
-            .collect()
-            .expect("Couldn't collect fixture data")
+        self.inner.read_test_data(reader)
     }
 }
