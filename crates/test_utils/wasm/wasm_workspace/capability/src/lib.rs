@@ -24,16 +24,31 @@ pub fn cap_secret(_: ()) -> ExternResult<CapSecret> {
     Ok(generate_cap_secret!()?)
 }
 
-#[hdk_extern]
-pub fn transferable_cap_grant(secret: CapSecret) -> ExternResult<HeaderHash> {
+fn cap_grant_entry(secret: CapSecret) -> ExternResult<CapGrantEntry> {
     let mut functions: GrantedFunctions = BTreeSet::new();
     let this_zome = zome_info!()?.zome_name;
     functions.insert((this_zome, "needs_cap_claim".into()));
-    Ok(commit_cap_grant!(CapGrantEntry {
+    Ok(CapGrantEntry {
         tag: "".into(),
         access: secret.into(),
         functions,
-    })?)
+    })
+}
+
+#[hdk_extern]
+pub fn transferable_cap_grant(secret: CapSecret) -> ExternResult<HeaderHash> {
+    Ok(commit_cap_grant!(cap_grant_entry(secret)?)?)
+}
+
+#[hdk_extern]
+pub fn roll_cap_grant(header_hash: HeaderHash) -> ExternResult<HeaderHash> {
+    let secret = generate_cap_secret!()?;
+    Ok(update_cap_grant!(header_hash, cap_grant_entry(secret)?)?)
+}
+
+#[hdk_extern]
+pub fn delete_cap_grant(header_hash: HeaderHash) -> ExternResult<HeaderHash> {
+    Ok(delete_cap_grant!(header_hash)?)
 }
 
 #[hdk_extern]
