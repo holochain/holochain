@@ -283,7 +283,7 @@ fixturator!(
 
 fixturator!(
     CapGrant;
-    variants [ Authorship(AgentPubKey) ZomeCall(ZomeCallCapGrant) ];
+    variants [ ChainAuthor(AgentPubKey) RemoteAgent(ZomeCallCapGrant) ];
 );
 
 fixturator!(
