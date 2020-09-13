@@ -325,7 +325,7 @@ where
         }
         DhtOpLight::RegisterRemoveLink(hash, _) => {
             let header = get_header(hash, element_store)?.try_into()?;
-            meta_store.remove_link(header)?;
+            meta_store.delete_link(header)?;
         }
     }
     Ok(())

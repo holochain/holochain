@@ -19,7 +19,7 @@ use holochain_types::{header::NewEntryHeaderRef, Entry};
 use holochain_zome_types::{
     element::SignedHeaderHashed,
     entry_def::{EntryDef, EntryVisibility},
-    header::{AppEntryType, EntryType, LinkAdd, UpdateEntry},
+    header::{AppEntryType, CreateLink, EntryType, UpdateEntry},
     link::LinkTag,
     Header,
 };

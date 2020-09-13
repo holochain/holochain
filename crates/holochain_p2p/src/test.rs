@@ -273,7 +273,7 @@ mod tests {
         let (p2p, mut evt) = spawn_holochain_p2p().await.unwrap();
 
         let test_1 = GetLinksResponse {
-            link_adds: vec![(fixt!(LinkAdd), fixt!(Signature))],
+            link_adds: vec![(fixt!(CreateLink), fixt!(Signature))],
             link_removes: vec![(fixt!(LinkRemove), fixt!(Signature))],
         };
 

@@ -93,7 +93,7 @@ mod tests {
         h2.entry_type = entry_type_2.clone();
         h2.header_seq = 1;
 
-        let mut h3 = fixt!(LinkAdd);
+        let mut h3 = fixt!(CreateLink);
         h3.header_seq = 2;
 
         let mut h4 = fixt!(CreateEntry);
@@ -104,7 +104,7 @@ mod tests {
         h5.entry_type = entry_type_1.clone();
         h5.header_seq = 4;
 
-        let mut h6 = fixt!(LinkAdd);
+        let mut h6 = fixt!(CreateLink);
         h6.header_seq = 5;
 
         let headers = [

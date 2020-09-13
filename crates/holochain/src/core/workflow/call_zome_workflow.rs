@@ -2,9 +2,9 @@ use super::error::{WorkflowError, WorkflowResult};
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 use crate::core::ribosome::guest_callback::validate::{ValidateHostAccess, ValidateResult};
-use crate::core::ribosome::guest_callback::validate_link_add::ValidateLinkAddHostAccess;
-use crate::core::ribosome::guest_callback::validate_link_add::ValidateLinkAddInvocation;
-use crate::core::ribosome::guest_callback::validate_link_add::ValidateLinkAddResult;
+use crate::core::ribosome::guest_callback::validate_link_add::ValidateCreateLinkHostAccess;
+use crate::core::ribosome::guest_callback::validate_link_add::ValidateCreateLinkInvocation;
+use crate::core::ribosome::guest_callback::validate_link_add::ValidateCreateLinkResult;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::ribosome::{error::RibosomeResult, RibosomeT, ZomeCallHostAccess};
 use crate::core::state::source_chain::SourceChainError;
@@ -151,10 +151,10 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT>(
         let mut cascade = workspace.cascade(network);
         for chain_element in to_app_validate {
             // @todo have app validate in its own workflow
-            if let Header::LinkAdd(link_add) = chain_element.header() {
-                let validate: ValidateLinkAddResult = ribosome.run_validate_link_add(
-                    ValidateLinkAddHostAccess,
-                    ValidateLinkAddInvocation {
+            if let Header::CreateLink(link_add) = chain_element.header() {
+                let validate: ValidateCreateLinkResult = ribosome.run_validate_link_add(
+                    ValidateCreateLinkHostAccess,
+                    ValidateCreateLinkInvocation {
                         zome_name: zome_name.clone(),
                         base: Arc::new({
                             let base_address: AnyDhtHash = link_add.base_address.clone().into();
@@ -186,9 +186,9 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT>(
                     },
                 )?;
                 match validate {
-                    ValidateLinkAddResult::Valid => {}
-                    ValidateLinkAddResult::Invalid(reason) => {
-                        return Err(SourceChainError::InvalidLinkAdd(reason).into());
+                    ValidateCreateLinkResult::Valid => {}
+                    ValidateCreateLinkResult::Invalid(reason) => {
+                        return Err(SourceChainError::InvalidCreateLink(reason).into());
                     }
                 }
             }

@@ -34,7 +34,7 @@ use holochain_types::{
     metadata::{EntryDhtStatus, MetadataSet, TimedHeaderHash},
     EntryHashed, HeaderHashed,
 };
-use holochain_zome_types::header::{LinkAdd, LinkRemove};
+use holochain_zome_types::header::{CreateLink, LinkRemove};
 use holochain_zome_types::{
     element::SignedHeader,
     header::{DeleteElement, UpdateEntry},
@@ -764,17 +764,17 @@ where
     }
 
     #[instrument(skip(self, key, options))]
-    /// Return all LinkAdd headers
+    /// Return all CreateLink headers
     /// and LinkRemove headers ordered by time.
     pub async fn get_link_details<'link>(
         &mut self,
         key: &'link LinkMetaKey<'link>,
         options: GetLinksOptions,
-    ) -> CascadeResult<Vec<(LinkAdd, Vec<LinkRemove>)>> {
+    ) -> CascadeResult<Vec<(CreateLink, Vec<LinkRemove>)>> {
         // Update the cache from the network
         self.fetch_links(key.into(), options).await?;
 
-        // Get the links and collect the LinkAdd / LinkRemove hashes by time.
+        // Get the links and collect the CreateLink / LinkRemove hashes by time.
         let links = fresh_reader!(self.env, |r| {
             self.meta_cache
                 .get_links_all(&r, key)?
@@ -795,7 +795,7 @@ where
                 .collect::<BTreeMap<_, _>>()
         })?;
         // Get the headers from the element stores
-        let mut result: Vec<(LinkAdd, _)> = Vec::with_capacity(links.len());
+        let mut result: Vec<(CreateLink, _)> = Vec::with_capacity(links.len());
         for (link_add, link_removes) in links {
             if let Some(link_add) = self.get_element_local_raw(&link_add.header_hash)? {
                 let mut r: Vec<LinkRemove> = Vec::with_capacity(link_removes.len());

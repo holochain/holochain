@@ -21,7 +21,7 @@ use holochain_state::{
 use holochain_types::metadata::{EntryDhtStatus, TimedHeaderHash};
 use holochain_types::{header::NewEntryHeader, link::WireLinkMetaKey};
 use holochain_types::{HeaderHashed, Timestamp};
-use holochain_zome_types::header::{self, LinkAdd, LinkRemove, ZomeId};
+use holochain_zome_types::header::{self, CreateLink, LinkRemove, ZomeId};
 use holochain_zome_types::{link::LinkTag, Header};
 use std::fmt::Debug;
 use tracing::*;
@@ -67,7 +67,7 @@ where
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError> + 'r>>;
 
     /// Add a link
-    fn add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()>;
+    fn add_link(&mut self, link_add: CreateLink) -> DatabaseResult<()>;
 
     /// Register a HeaderHash directly on an entry hash.
     /// Also updates the entry dht status.
@@ -83,15 +83,15 @@ where
     fn register_raw_on_header(&mut self, header_hash: HeaderHash, value: SysMetaVal);
 
     /// Remove a link
-    fn remove_link(&mut self, link_remove: LinkRemove) -> DatabaseResult<()>;
+    fn delete_link(&mut self, link_remove: LinkRemove) -> DatabaseResult<()>;
 
     /// Deregister an add link
     /// Not the same as remove like.
     /// "deregister" removes the data from the metadata store.
-    fn deregister_add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()>;
+    fn deregister_add_link(&mut self, link_add: CreateLink) -> DatabaseResult<()>;
 
     /// Deregister a remove link
-    fn deregister_remove_link(&mut self, link_remove: LinkRemove) -> DatabaseResult<()>;
+    fn deregister_delete_link(&mut self, link_remove: LinkRemove) -> DatabaseResult<()>;
 
     /// Registers a [Header::NewEntryHeader] on the referenced [Entry]
     fn register_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()>;
@@ -381,10 +381,10 @@ where
         ))
     }
 
-    fn add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()> {
+    fn add_link(&mut self, link_add: CreateLink) -> DatabaseResult<()> {
         // Register the add link onto the base
         let link_add_hash =
-            HeaderHashed::from_content_sync(Header::LinkAdd(link_add.clone())).into_hash();
+            HeaderHashed::from_content_sync(Header::CreateLink(link_add.clone())).into_hash();
 
         // Put the link add to the links table
         let key = LinkMetaKey::from((&link_add, &link_add_hash));
@@ -401,13 +401,13 @@ where
         )
     }
 
-    fn deregister_add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()> {
-        let link_add_hash = HeaderHash::with_data_sync(&Header::LinkAdd(link_add.clone()));
+    fn deregister_add_link(&mut self, link_add: CreateLink) -> DatabaseResult<()> {
+        let link_add_hash = HeaderHash::with_data_sync(&Header::CreateLink(link_add.clone()));
         let key = LinkMetaKey::from((&link_add, &link_add_hash));
         self.links_meta.delete(key.into())
     }
 
-    fn remove_link(&mut self, link_remove: LinkRemove) -> DatabaseResult<()> {
+    fn delete_link(&mut self, link_remove: LinkRemove) -> DatabaseResult<()> {
         let link_add_address = link_remove.link_add_address.clone();
         // Register the link remove address to the link add address
         let link_remove = HeaderHashed::from_content_sync(Header::LinkRemove(link_remove));
@@ -417,7 +417,7 @@ where
         Ok(())
     }
 
-    fn deregister_remove_link(&mut self, link_remove: LinkRemove) -> DatabaseResult<()> {
+    fn deregister_delete_link(&mut self, link_remove: LinkRemove) -> DatabaseResult<()> {
         let link_add_address = link_remove.link_add_address.clone();
         // Register the link remove address to the link add address
         let link_remove = HeaderHashed::from_content_sync(Header::LinkRemove(link_remove));

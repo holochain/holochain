@@ -6,23 +6,23 @@ use crate::core::{
     SourceChainResult,
 };
 use holochain_zome_types::header::builder;
-use holochain_zome_types::LinkEntriesInput;
-use holochain_zome_types::LinkEntriesOutput;
+use holochain_zome_types::CreateLinkInput;
+use holochain_zome_types::CreateLinkOutput;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
-pub fn link_entries<'a>(
+pub fn create_link<'a>(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: LinkEntriesInput,
-) -> RibosomeResult<LinkEntriesOutput> {
+    input: CreateLinkInput,
+) -> RibosomeResult<CreateLinkOutput> {
     let (base_address, target_address, tag) = input.into_inner();
 
     // extract the zome position
     let zome_id = ribosome.zome_name_to_id(&call_context.zome_name)?;
 
     // Construct the link add
-    let header_builder = builder::LinkAdd::new(base_address, target_address, zome_id, tag);
+    let header_builder = builder::CreateLink::new(base_address, target_address, zome_id, tag);
 
     let header_hash =
         tokio_safe_block_on::tokio_safe_block_forever_on(tokio::task::spawn(async move {
@@ -48,7 +48,7 @@ pub fn link_entries<'a>(
     // note that validation is handled by the workflow
     // if the validation fails this commit will be rolled back by virtue of the lmdb transaction
     // being atomic
-    Ok(LinkEntriesOutput::new(header_hash))
+    Ok(CreateLinkOutput::new(header_hash))
 }
 
 // we rely on the tests for get_links and get_link_details

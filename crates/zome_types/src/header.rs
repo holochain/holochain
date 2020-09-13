@@ -40,7 +40,7 @@ pub enum Header {
     Dna(Dna),
     AgentValidationPkg(AgentValidationPkg),
     InitZomesComplete(InitZomesComplete),
-    LinkAdd(LinkAdd),
+    CreateLink(CreateLink),
     LinkRemove(LinkRemove),
     ChainOpen(ChainOpen),
     ChainClose(ChainClose),
@@ -97,7 +97,7 @@ write_into_header! {
     Dna,
     AgentValidationPkg,
     InitZomesComplete,
-    LinkAdd,
+    CreateLink,
     LinkRemove,
     ChainOpen,
     ChainClose,
@@ -113,7 +113,7 @@ macro_rules! match_header {
             Header::Dna($i) => { $($t)* }
             Header::AgentValidationPkg($i) => { $($t)* }
             Header::InitZomesComplete($i) => { $($t)* }
-            Header::LinkAdd($i) => { $($t)* }
+            Header::CreateLink($i) => { $($t)* }
             Header::LinkRemove($i) => { $($t)* }
             Header::ChainOpen($i) => { $($t)* }
             Header::ChainClose($i) => { $($t)* }
@@ -173,7 +173,7 @@ impl Header {
             Self::Dna(Dna { .. }) => 0,
             Self::AgentValidationPkg(AgentValidationPkg { header_seq, .. })
             | Self::InitZomesComplete(InitZomesComplete { header_seq, .. })
-            | Self::LinkAdd(LinkAdd { header_seq, .. })
+            | Self::CreateLink(CreateLink { header_seq, .. })
             | Self::LinkRemove(LinkRemove { header_seq, .. })
             | Self::DeleteElement(DeleteElement { header_seq, .. })
             | Self::ChainClose(ChainClose { header_seq, .. })
@@ -189,7 +189,7 @@ impl Header {
             Self::Dna(Dna { .. }) => return None,
             Self::AgentValidationPkg(AgentValidationPkg { prev_header, .. }) => prev_header,
             Self::InitZomesComplete(InitZomesComplete { prev_header, .. }) => prev_header,
-            Self::LinkAdd(LinkAdd { prev_header, .. }) => prev_header,
+            Self::CreateLink(CreateLink { prev_header, .. }) => prev_header,
             Self::LinkRemove(LinkRemove { prev_header, .. }) => prev_header,
             Self::DeleteElement(DeleteElement { prev_header, .. }) => prev_header,
             Self::ChainClose(ChainClose { prev_header, .. }) => prev_header,
@@ -268,7 +268,7 @@ pub struct InitZomesComplete {
 
 /// Declares that a metadata Link should be made between two EntryHashes
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
-pub struct LinkAdd {
+pub struct CreateLink {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub header_seq: u32,
@@ -288,11 +288,11 @@ pub struct LinkRemove {
     pub header_seq: u32,
     pub prev_header: HeaderHash,
 
-    /// this is redundant with the `LinkAdd` header but needs to be included to facilitate DHT ops
+    /// this is redundant with the `CreateLink` header but needs to be included to facilitate DHT ops
     /// this is NOT exposed to wasm developers and is validated by the subconscious to ensure that
-    /// it always matches the `base_address` of the `LinkAdd`
+    /// it always matches the `base_address` of the `CreateLink`
     pub base_address: EntryHash,
-    /// The address of the `LinkAdd` being reversed
+    /// The address of the `CreateLink` being reversed
     pub link_add_address: HeaderHash,
 }
 

@@ -72,7 +72,7 @@ entry_def!(Bar EntryDef {
 entry_defs!(vec![Foo::entry_def(), Bar::entry_def()]);
 ```
 
-### create_entry!, get!, hash_entry!, link_entries!, get_links!, debug!
+### create_entry!, get!, hash_entry!, create_link!, get_links!, debug!
 
 ```rust
 // Create your entry types
@@ -85,7 +85,7 @@ let _bar_header_hash = create_entry!(bar.clone())?;
 let foo_entry_hash = hash_entry!(foo)?;
 let bar_entry_hash = hash_entry!(bar)?;
 // Link from foo (base) to bar (target)
-let _link_add_header_hash = link_entries!(foo_entry_hash.clone(), bar_entry_hash)?;
+let _link_add_header_hash = create_link!(foo_entry_hash.clone(), bar_entry_hash)?;
 // Get the links back
 let links = get_links!(foo_entry_hash)?;
 // Print out the links
@@ -223,7 +223,7 @@ inside core, but some illustrative examples include:
 - `commit_entry`: save some data to the local source chain and broadcast it to
   the DHT to be redundantly validated and stored
 - `get_entry`: retrieve some data from local or the network given its hash
-- `link_entries`: create graph style relationships (links) between entries
+- `create_link`: create graph style relationships (links) between entries
 - `get_links`: retrive links between entries using the DHT as a graph database
 - `send`: send data directly to a known peer on the network
 

@@ -8,17 +8,17 @@ use crate::core::{workflow::integrate_dht_ops_workflow::integrate_to_cache, Sour
 use holochain_p2p::actor::GetOptions;
 use holochain_types::element::SignedHeaderHashed;
 use holochain_zome_types::header::builder;
+use holochain_zome_types::DeleteLinkInput;
+use holochain_zome_types::DeleteLinkOutput;
 use holochain_zome_types::Header;
-use holochain_zome_types::RemoveLinkInput;
-use holochain_zome_types::RemoveLinkOutput;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
-pub fn remove_link<'a>(
+pub fn delete_link<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: RemoveLinkInput,
-) -> RibosomeResult<RemoveLinkOutput> {
+    input: DeleteLinkInput,
+) -> RibosomeResult<DeleteLinkOutput> {
     let link_add_address = input.into_inner();
 
     // get the base address from the add link header
@@ -50,7 +50,7 @@ pub fn remove_link<'a>(
     let base_address = match maybe_add_link {
         Some(add_link_signed_header_hash) => {
             match add_link_signed_header_hash.header() {
-                Header::LinkAdd(link_add_header) => Ok(link_add_header.base_address.clone()),
+                Header::CreateLink(link_add_header) => Ok(link_add_header.base_address.clone()),
                 // the add link header hash provided was found but didn't point to an AddLink
                 // header (it is something else) so we cannot proceed
                 _ => Err(RibosomeError::ElementDeps(link_add_address.clone().into())),
@@ -89,7 +89,7 @@ pub fn remove_link<'a>(
         .await
         .map_err(Box::new)
         .map_err(SourceChainError::from)?;
-        Ok(RemoveLinkOutput::new(header_hash))
+        Ok(DeleteLinkOutput::new(header_hash))
     })
 }
 
@@ -102,10 +102,10 @@ pub mod slow_tests {
     use holo_hash::HeaderHash;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::link::Links;
-    use holochain_zome_types::RemoveLinkInput;
+    use holochain_zome_types::DeleteLinkInput;
 
     #[tokio::test(threaded_scheduler)]
-    async fn ribosome_remove_link_add_remove() {
+    async fn ribosome_delete_link_add_remove() {
         let test_env = holochain_state::test_utils::test_cell_env();
         let env = test_env.env();
 
@@ -128,11 +128,11 @@ pub mod slow_tests {
 
         // add a couple of links
         let link_one: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Link, "link_entries", ());
+            crate::call_test_ribosome!(host_access, TestWasm::Link, "create_link", ());
 
         // add a couple of links
         let link_two: HeaderHash =
-            crate::call_test_ribosome!(host_access, TestWasm::Link, "link_entries", ());
+            crate::call_test_ribosome!(host_access, TestWasm::Link, "create_link", ());
 
         let links: Links = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ());
 
@@ -142,8 +142,8 @@ pub mod slow_tests {
         let _: HeaderHash = crate::call_test_ribosome!(
             host_access,
             TestWasm::Link,
-            "remove_link",
-            RemoveLinkInput::new(link_one)
+            "delete_link",
+            DeleteLinkInput::new(link_one)
         );
 
         let links: Links = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ());
@@ -154,8 +154,8 @@ pub mod slow_tests {
         let _: HeaderHash = crate::call_test_ribosome!(
             host_access,
             TestWasm::Link,
-            "remove_link",
-            RemoveLinkInput::new(link_two)
+            "delete_link",
+            DeleteLinkInput::new(link_two)
         );
 
         let links: Links = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ());

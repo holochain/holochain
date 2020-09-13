@@ -35,10 +35,10 @@ use holochain_types::{
 use holochain_zome_types::{
     entry::GetOptions,
     entry_def::EntryDefs,
-    header::{builder, DeleteElement, LinkAdd, LinkRemove, UpdateEntry, ZomeId},
+    header::{builder, CreateLink, DeleteElement, LinkRemove, UpdateEntry, ZomeId},
     link::{LinkTag, Links},
     zome::ZomeName,
-    CreateEntryInput, GetInput, GetLinksInput, Header, LinkEntriesInput,
+    CreateEntryInput, CreateLinkInput, GetInput, GetLinksInput, Header,
 };
 use produce_dht_ops_workflow::{produce_dht_ops_workflow, ProduceDhtOpsWorkspace};
 use std::{
@@ -60,7 +60,7 @@ struct TestData {
     new_entry_hash: EntryHash,
     original_header: NewEntryHeader,
     entry_delete: DeleteElement,
-    link_add: LinkAdd,
+    link_add: CreateLink,
     link_remove: LinkRemove,
 }
 
@@ -119,7 +119,7 @@ impl TestData {
         entry_delete.removes_address = original_header_hash.clone();
 
         // Link add
-        let mut link_add = fixt!(LinkAdd);
+        let mut link_add = fixt!(CreateLink);
         link_add.base_address = original_entry_hash.clone();
         link_add.target_address = new_entry_hash.clone();
         link_add.zome_id = fixt!(ZomeId);
@@ -183,8 +183,8 @@ enum Db {
     MetaActivity(Header),
     MetaUpdate(AnyDhtHash, Header),
     MetaDelete(HeaderHash, Header),
-    MetaLink(LinkAdd, EntryHash),
-    MetaLinkEmpty(LinkAdd),
+    MetaLink(CreateLink, EntryHash),
+    MetaLinkEmpty(CreateLink),
 }
 
 impl Db {
@@ -760,7 +760,7 @@ fn register_add_link(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     (pre_state, expect, "register link add")
 }
 
-fn register_remove_link(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+fn register_delete_link(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let op = DhtOp::RegisterRemoveLink(a.signature.clone(), a.link_remove.clone());
     let pre_state = vec![
         Db::IntQueue(op.clone()),
@@ -781,7 +781,7 @@ fn register_remove_link(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
 }
 
 // Link remove when not an author
-fn register_remove_link_missing_base(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+fn register_delete_link_missing_base(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let op = DhtOp::RegisterRemoveLink(a.signature.clone(), a.link_remove.clone());
     let pre_state = vec![Db::IntQueue(op.clone())];
     let pre_state = add_op_to_judged(pre_state, &op);
@@ -808,8 +808,8 @@ async fn test_ops_state() {
         register_deleted_by,
         register_deleted_header_by,
         register_add_link,
-        register_remove_link,
-        register_remove_link_missing_base,
+        register_delete_link,
+        register_delete_link_missing_base,
     ];
 
     for t in tests.iter() {
@@ -946,7 +946,7 @@ async fn get_entry(env: EnvironmentWrite, entry_hash: EntryHash) -> Option<Entry
     output.into_inner().and_then(|el| el.into())
 }
 
-async fn link_entries(
+async fn create_link(
     env: EnvironmentWrite,
     base_address: EntryHash,
     target_address: EntryHash,
@@ -975,8 +975,8 @@ async fn link_entries(
     let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
     call_context.zome_name = zome_name.clone();
 
-    // Call link_entries
-    let input = LinkEntriesInput::new((base_address.into(), target_address.into(), link_tag));
+    // Call create_link
+    let input = CreateLinkInput::new((base_address.into(), target_address.into(), link_tag));
 
     let output = {
         let mut host_access = fixt!(ZomeCallHostAccess);
@@ -984,8 +984,8 @@ async fn link_entries(
         call_context.host_access = host_access.into();
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
-        // Call the real link_entries host fn
-        host_fn::link_entries::link_entries(ribosome.clone(), call_context.clone(), input).unwrap()
+        // Call the real create_link host fn
+        host_fn::create_link::create_link(ribosome.clone(), call_context.clone(), input).unwrap()
     };
 
     // Write the changes
@@ -996,7 +996,7 @@ async fn link_entries(
             .unwrap();
     }
 
-    // Get the LinkAdd HeaderHash back
+    // Get the CreateLink HeaderHash back
     output.into_inner()
 }
 
@@ -1079,7 +1079,7 @@ async fn test_metadata_from_wasm_api() {
         .0;
 
     // Link the base to the target
-    let _link_add_address = link_entries(
+    let _link_add_address = create_link(
         env.clone(),
         base_address.clone(),
         target_entry_hash.clone(),
@@ -1146,7 +1146,7 @@ async fn test_wasm_api_without_integration_links() {
         .0;
 
     // Link the base to the target
-    let _link_add_address = link_entries(
+    let _link_add_address = create_link(
         env.clone(),
         base_address.clone(),
         target_entry_hash.clone(),
@@ -1272,7 +1272,7 @@ async fn test_integrate_single_register_add_link() {
 
 #[tokio::test(threaded_scheduler)]
 #[ignore]
-async fn test_integrate_single_register_remove_link() {
+async fn test_integrate_single_register_delete_link() {
     // For RegisterAddLink
     // metadata has link on EntryHash
     todo!()
@@ -1437,7 +1437,7 @@ mod slow_tests {
             .await
             .unwrap();
 
-            let header_builder = builder::LinkAdd {
+            let header_builder = builder::CreateLink {
                 base_address: base_entry_hash.clone(),
                 target_address: target_entry_hash.clone(),
                 zome_id: 0.into(),

@@ -11,8 +11,8 @@ mock! {
             &self,
             key: &'a LinkMetaKey<'a>,
         ) -> DatabaseResult<Box<dyn FallibleIterator<Item = LinkMetaVal, Error = DatabaseError>>>;
-        fn add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()>;
-        fn remove_link(&mut self, link_remove: LinkRemove) -> DatabaseResult<()>;
+        fn add_link(&mut self, link_add: CreateLink) -> DatabaseResult<()>;
+        fn delete_link(&mut self, link_remove: LinkRemove) -> DatabaseResult<()>;
         fn sync_register_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()>;
         fn sync_register_element_header(&mut self, header: &Header) -> DatabaseResult<()>;
         fn sync_register_activity(
@@ -31,8 +31,8 @@ mock! {
         fn sync_deregister_delete(&mut self, delete: header::DeleteElement) -> DatabaseResult<()>;
         fn register_raw_on_entry(&mut self, entry_hash: EntryHash, value: SysMetaVal) -> DatabaseResult<()>;
         fn register_raw_on_header(&mut self, header_hash: HeaderHash, value: SysMetaVal);
-        fn sync_deregister_add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()>;
-        fn sync_deregister_remove_link(&mut self, link_remove: LinkRemove) -> DatabaseResult<()>;
+        fn sync_deregister_add_link(&mut self, link_add: CreateLink) -> DatabaseResult<()>;
+        fn sync_deregister_delete_link(&mut self, link_remove: LinkRemove) -> DatabaseResult<()>;
         fn get_dht_status(&self, entry_hash: &EntryHash) -> DatabaseResult<EntryDhtStatus>;
         fn get_canonical_entry_hash(&self, entry_hash: EntryHash) -> DatabaseResult<EntryHash>;
         fn get_canonical_header_hash(&self, header_hash: HeaderHash) -> DatabaseResult<HeaderHash>;
@@ -157,12 +157,12 @@ impl MetadataBufT for MockMetadataBuf {
         self.get_link_removes_on_link_add(link_add)
     }
 
-    fn add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()> {
+    fn add_link(&mut self, link_add: CreateLink) -> DatabaseResult<()> {
         self.add_link(link_add)
     }
 
-    fn remove_link(&mut self, link_remove: LinkRemove) -> DatabaseResult<()> {
-        self.remove_link(link_remove)
+    fn delete_link(&mut self, link_remove: LinkRemove) -> DatabaseResult<()> {
+        self.delete_link(link_remove)
     }
 
     fn register_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()> {
@@ -203,13 +203,13 @@ impl MetadataBufT for MockMetadataBuf {
         self.sync_deregister_delete(delete)
     }
 
-    fn deregister_add_link(&mut self, link_add: LinkAdd) -> DatabaseResult<()> {
+    fn deregister_add_link(&mut self, link_add: CreateLink) -> DatabaseResult<()> {
         self.sync_deregister_add_link(link_add)
     }
 
     /// Deregister a remove link
-    fn deregister_remove_link(&mut self, link_remove: LinkRemove) -> DatabaseResult<()> {
-        self.sync_deregister_remove_link(link_remove)
+    fn deregister_delete_link(&mut self, link_remove: LinkRemove) -> DatabaseResult<()> {
+        self.sync_deregister_delete_link(link_remove)
     }
 
     fn register_raw_on_entry(

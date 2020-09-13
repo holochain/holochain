@@ -525,7 +525,7 @@ fixturator!(
         Dna(Dna)
         AgentValidationPkg(AgentValidationPkg)
         InitZomesComplete(InitZomesComplete)
-        LinkAdd(LinkAdd)
+        CreateLink(CreateLink)
         LinkRemove(LinkRemove)
         ChainOpen(ChainOpen)
         ChainClose(ChainClose)

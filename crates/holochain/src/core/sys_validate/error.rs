@@ -63,7 +63,7 @@ pub enum ValidationOutcome {
     #[error("The link tag size {0} was bigger then the MAX_TAG_SIZE {1}")]
     TagTooLarge(usize, usize),
     #[error("The header {0:?} was expected to be a link add header")]
-    NotLinkAdd(HeaderHash),
+    NotCreateLink(HeaderHash),
     #[error("The header was expected to be a new entry header but was a {0:?}")]
     NotNewEntry(Header),
     #[error("The dependency {0:?} is not held")]

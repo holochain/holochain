@@ -291,7 +291,7 @@ async fn bob_links_in_a_legit_way(
 
     // 5
     // Link the entries
-    let link_add_address = link_entries(
+    let link_add_address = create_link(
         &bob_env,
         call_data.clone(),
         base_entry_hash.clone(),
@@ -344,7 +344,7 @@ async fn bob_makes_a_large_link(
 
     // 8
     // Commit a large header
-    let link_add_address = link_entries(
+    let link_add_address = create_link(
         &bob_env,
         call_data.clone(),
         base_entry_hash.clone(),
@@ -390,7 +390,7 @@ async fn dodgy_bob(bob_cell_id: &CellId, handle: &ConductorHandle, dna_file: &Dn
     // Whoops forgot to commit that proof
 
     // Link the entries
-    link_entries(
+    create_link(
         &bob_env,
         call_data.clone(),
         base_entry_hash.clone(),

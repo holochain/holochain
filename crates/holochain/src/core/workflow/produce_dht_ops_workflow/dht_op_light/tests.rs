@@ -2,9 +2,9 @@ use crate::{
     core::state::element_buf::ElementBuf,
     fixt::{
         AgentValidationPkgFixturator, ChainCloseFixturator, ChainOpenFixturator,
-        CreateEntryFixturator, DnaFixturator, EntryFixturator, EntryHashFixturator,
-        EntryTypeFixturator, InitZomesCompleteFixturator, LinkAddFixturator, LinkRemoveFixturator,
-        UpdateEntryFixturator,
+        CreateEntryFixturator, CreateLinkFixturator, DnaFixturator, EntryFixturator,
+        EntryHashFixturator, EntryTypeFixturator, InitZomesCompleteFixturator,
+        LinkRemoveFixturator, UpdateEntryFixturator,
     },
 };
 use ::fixt::prelude::*;
@@ -20,8 +20,8 @@ use holochain_types::{
 };
 use holochain_zome_types::header::{
     builder::{self, HeaderBuilder},
-    AgentValidationPkg, ChainClose, ChainOpen, CreateEntry, Dna, EntryType, Header,
-    HeaderBuilderCommon, InitZomesComplete, LinkAdd, LinkRemove, UpdateEntry,
+    AgentValidationPkg, ChainClose, ChainOpen, CreateEntry, CreateLink, Dna, EntryType, Header,
+    HeaderBuilderCommon, InitZomesComplete, LinkRemove, UpdateEntry,
 };
 use pretty_assertions::assert_eq;
 use tracing::*;
@@ -34,7 +34,7 @@ struct ElementTest {
     header_hash: HeaderHash,
     sig: Signature,
     entry: Entry,
-    link_add: LinkAdd,
+    link_add: CreateLink,
     link_remove: LinkRemove,
     dna: Dna,
     chain_close: ChainClose,
@@ -52,7 +52,7 @@ impl ElementTest {
         let header_hash = fixt!(HeaderHash);
         let sig = fixt!(Signature);
         let entry = fixt!(Entry);
-        let link_add = fixt!(LinkAdd);
+        let link_add = fixt!(CreateLink);
         let link_remove = fixt!(LinkRemove);
         let dna = fixt!(Dna);
         let chain_open = fixt!(ChainOpen);

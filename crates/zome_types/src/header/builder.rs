@@ -108,7 +108,7 @@ macro_rules! builder_variant {
 
 builder_variant!(InitZomesComplete {});
 
-builder_variant!(LinkAdd {
+builder_variant!(CreateLink {
     base_address: EntryHash,
     target_address: EntryHash,
     zome_id: ZomeId,

@@ -181,7 +181,7 @@ mod tests {
             },
             SourceChainError,
         },
-        fixt::{EntryFixturator, LinkAddFixturator},
+        fixt::{CreateLinkFixturator, EntryFixturator},
     };
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
@@ -238,7 +238,7 @@ mod tests {
         let env_ref = env.guard();
         // Create data fixts for op
         let mut sig_fixt = SignatureFixturator::new(Unpredictable);
-        let mut link_add_fixt = LinkAddFixturator::new(Unpredictable);
+        let mut link_add_fixt = CreateLinkFixturator::new(Unpredictable);
 
         let mut data = Vec::new();
         for _ in 0..num_hash {

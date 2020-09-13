@@ -32,7 +32,7 @@ use holochain_types::{
     validate::ValidationStatus, Entry, Timestamp,
 };
 use holochain_zome_types::{
-    header::{DeleteElement, EntryType, LinkAdd, LinkRemove, UpdateEntry},
+    header::{CreateLink, DeleteElement, EntryType, LinkRemove, UpdateEntry},
     Header,
 };
 use std::{collections::BinaryHeap, convert::TryInto};
@@ -233,7 +233,7 @@ fn handle_failed(error: ValidationOutcome) -> Outcome {
         ValidationOutcome::EntryType => Rejected,
         ValidationOutcome::EntryVisibility(_) => Rejected,
         ValidationOutcome::TagTooLarge(_, _) => Rejected,
-        ValidationOutcome::NotLinkAdd(_) => Rejected,
+        ValidationOutcome::NotCreateLink(_) => Rejected,
         ValidationOutcome::NotNewEntry(_) => Rejected,
         ValidationOutcome::NotHoldingDep(dep) => AwaitingOpDep(dep),
         ValidationOutcome::PrevHeaderError(PrevHeaderError::MissingMeta(dep)) => {
@@ -334,7 +334,7 @@ async fn validate_op_inner(
             Ok(())
         }
         DhtOp::RegisterRemoveLink(signature, header) => {
-            register_remove_link(header, workspace, network, dependencies, check_level).await?;
+            register_delete_link(header, workspace, network, dependencies, check_level).await?;
 
             let header = header.clone().into();
             all_op_check(signature, &header).await?;
@@ -494,7 +494,7 @@ async fn register_deleted_entry_header(
 }
 
 async fn register_add_link(
-    link_add: &LinkAdd,
+    link_add: &CreateLink,
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
     dependencies: &mut PendingDependencies,
@@ -515,7 +515,7 @@ async fn register_add_link(
     Ok(())
 }
 
-async fn register_remove_link(
+async fn register_delete_link(
     link_remove: &LinkRemove,
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,

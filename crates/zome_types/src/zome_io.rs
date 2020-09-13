@@ -70,10 +70,10 @@ wasm_io_types!(
     // the length of random bytes to create
     pub struct RandomBytesInput(u32);
     pub struct RandomBytesOutput(crate::bytes::Bytes);
-    // the header hash of the LinkAdd element
-    pub struct RemoveLinkInput(holo_hash::HeaderHash);
+    // the header hash of the CreateLink element
+    pub struct DeleteLinkInput(holo_hash::HeaderHash);
     // the header hash of the LinkRemove element
-    pub struct RemoveLinkOutput(holo_hash::HeaderHash);
+    pub struct DeleteLinkOutput(holo_hash::HeaderHash);
     pub struct CallRemoteInput(crate::call_remote::CallRemote);
     pub struct CallRemoteOutput(ZomeCallInvocationResponse);
     // @TODO
@@ -102,14 +102,14 @@ wasm_io_types!(
     pub struct DeleteEntryInput(holo_hash::HeaderHash);
     pub struct DeleteEntryOutput(holo_hash::HeaderHash);
     // create link entries
-    pub struct LinkEntriesInput(
+    pub struct CreateLinkInput(
         (
             holo_hash::EntryHash,
             holo_hash::EntryHash,
             crate::link::LinkTag,
         ),
     );
-    pub struct LinkEntriesOutput(holo_hash::HeaderHash);
+    pub struct CreateLinkOutput(holo_hash::HeaderHash);
     // @TODO
     pub struct KeystoreInput(());
     pub struct KeystoreOutput(());

@@ -127,7 +127,7 @@ fixturator!(
 );
 
 fixturator!(
-    LinkAdd;
+    CreateLink;
     constructor fn from_builder(HeaderBuilderCommon, EntryHash, EntryHash, u8, LinkTag);
 );
 
@@ -135,7 +135,7 @@ fixturator!(
     LinkTag; from Bytes;
 );
 
-pub struct KnownLinkAdd {
+pub struct KnownCreateLink {
     pub base_address: EntryHash,
     pub target_address: EntryHash,
     pub tag: LinkTag,
@@ -146,10 +146,10 @@ pub struct KnownLinkRemove {
     pub link_add_address: holo_hash::HeaderHash,
 }
 
-impl Iterator for LinkAddFixturator<KnownLinkAdd> {
-    type Item = LinkAdd;
+impl Iterator for CreateLinkFixturator<KnownCreateLink> {
+    type Item = CreateLink;
     fn next(&mut self) -> Option<Self::Item> {
-        let mut f = fixt!(LinkAdd);
+        let mut f = fixt!(CreateLink);
         f.base_address = self.0.curve.base_address.clone();
         f.target_address = self.0.curve.target_address.clone();
         f.tag = self.0.curve.tag.clone();

@@ -74,7 +74,7 @@ pub enum DhtOp {
     RegisterDeletedEntryHeader(Signature, header::DeleteElement),
 
     /// Op for adding a link
-    RegisterAddLink(Signature, header::LinkAdd),
+    RegisterAddLink(Signature, header::CreateLink),
 
     /// Op for removing a link
     RegisterRemoveLink(Signature, header::LinkRemove),
@@ -221,7 +221,7 @@ pub enum UniqueForm<'a> {
     RegisterUpdatedBy(&'a header::UpdateEntry),
     RegisterDeletedBy(&'a header::DeleteElement),
     RegisterDeletedEntryHeader(&'a header::DeleteElement),
-    RegisterAddLink(&'a header::LinkAdd),
+    RegisterAddLink(&'a header::CreateLink),
     RegisterRemoveLink(&'a header::LinkRemove),
 }
 
@@ -362,7 +362,7 @@ async fn produce_op_lights_from_iter(
             | Header::ChainClose(_)
             | Header::AgentValidationPkg(_)
             | Header::InitZomesComplete(_) => {}
-            Header::LinkAdd(link_add) => ops.push(DhtOpLight::RegisterAddLink(
+            Header::CreateLink(link_add) => ops.push(DhtOpLight::RegisterAddLink(
                 header_hash,
                 UniqueForm::RegisterAddLink(link_add).basis().await,
             )),

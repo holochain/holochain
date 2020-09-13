@@ -47,12 +47,12 @@ guest_functions!(
     [__show_env, show_env, ShowEnvInput, ShowEnvOutput],
     [__property, property, PropertyInput, PropertyOutput],
     [__query, query, QueryInput, QueryOutput],
-    [
-        __remove_link,
-        remove_link,
-        RemoveLinkInput,
-        RemoveLinkOutput
-    ],
+    // [
+    //     __delete_link,
+    //     delete_link,
+    //     DeleteLinkInput,
+    //     DeleteLinkOutput
+    // ],
     [
         __random_bytes,
         random_bytes,
@@ -79,12 +79,12 @@ guest_functions!(
         DeleteEntryInput,
         DeleteEntryOutput
     ],
-    [
-        __link_entries,
-        link_entries,
-        LinkEntriesInput,
-        LinkEntriesOutput
-    ],
+    // [
+    //     __create_link,
+    //     create_link,
+    //     CreateLinkInput,
+    //     CreateLinkOutput
+    // ],
     [__keystore, keystore, KeystoreInput, KeystoreOutput],
     [__get_links, get_links, GetLinksInput, GetLinksOutput],
     [__get, get, GetInput, GetOutput],

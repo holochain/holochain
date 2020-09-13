@@ -21,7 +21,7 @@ pub struct Element(Signature, Header, Option<Entry>);
 pub enum Header {
     // The first header in a chain (for the DNA) doesn't have a previous header
     Dna(header::Dna),
-    LinkAdd(header::LinkAdd),
+    CreateLink(header::CreateLink),
     LinkRemove(header::LinkRemove),
     ChainOpen(header::ChainOpen),
     ChainClose(header::ChainClose),
@@ -46,7 +46,7 @@ pub mod header {
         pub hash: DnaHash,
     }
 
-    pub struct LinkAdd {
+    pub struct CreateLink {
         pub author: PublicKey,
         pub timestamp: Timestamp,
         pub prev_header: HeaderHash,
@@ -61,8 +61,8 @@ pub mod header {
         pub author: PublicKey,
         pub timestamp: Timestamp,
         pub prev_header: HeaderHash,
-        /// The address of the `LinkAdd` being reversed
-        pub link_add_hash: Address, // not Address byt LinkAddHash or maybe its HeaderHash?
+        /// The address of the `CreateLink` being reversed
+        pub link_add_hash: Address, // not Address byt CreateLinkHash or maybe its HeaderHash?
     }
 
     pub struct ChainOpen {
@@ -127,7 +127,7 @@ impl Header {
     pub fn prev_header(&self) -> Option<&HeaderHash> {
         Some(match self {
             Self::Dna(header::Dna { .. }) => return None,
-            Self::LinkAdd(header::LinkAdd { prev_header, .. }) => prev_header,
+            Self::CreateLink(header::CreateLink { prev_header, .. }) => prev_header,
             Self::LinkRemove(header::LinkRemove { prev_header, .. }) => prev_header,
             Self::DeleteElement(header::DeleteElement { prev_header, .. }) => prev_header,
             Self::ChainClose(header::ChainClose { prev_header, .. }) => prev_header,

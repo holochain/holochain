@@ -11,7 +11,7 @@ pub struct BytesKey(pub Vec<u8>);
 /// The value stored in the links meta db
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct LinkMetaVal {
-    /// Hash of the [LinkAdd] [Header] that created this link
+    /// Hash of the [CreateLink] [Header] that created this link
     pub link_add_hash: HeaderHash,
     /// The [Entry] being linked to
     pub target: EntryHash,
@@ -37,7 +37,7 @@ pub enum LinkMetaKey<'a> {
     BaseZome(&'a EntryHash, ZomeId),
     /// Search for all links on a base, for a zome and with a tag
     BaseZomeTag(&'a EntryHash, ZomeId, &'a LinkTag),
-    /// This will match only the link created with a certain [LinkAdd] hash
+    /// This will match only the link created with a certain [CreateLink] hash
     Full(&'a EntryHash, ZomeId, &'a LinkTag, &'a HeaderHash),
 }
 
@@ -222,8 +222,8 @@ impl From<header::DeleteElement> for EntryHeader {
     }
 }
 
-impl<'a> From<(&'a LinkAdd, &'a HeaderHash)> for LinkMetaKey<'a> {
-    fn from((link_add, hash): (&'a LinkAdd, &'a HeaderHash)) -> Self {
+impl<'a> From<(&'a CreateLink, &'a HeaderHash)> for LinkMetaKey<'a> {
+    fn from((link_add, hash): (&'a CreateLink, &'a HeaderHash)) -> Self {
         Self::Full(
             &link_add.base_address,
             link_add.zome_id,

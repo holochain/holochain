@@ -23,9 +23,9 @@ use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitResult;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
-use crate::core::ribosome::guest_callback::validate_link_add::ValidateLinkAddHostAccess;
-use crate::core::ribosome::guest_callback::validate_link_add::ValidateLinkAddInvocation;
-use crate::core::ribosome::guest_callback::validate_link_add::ValidateLinkAddResult;
+use crate::core::ribosome::guest_callback::validate_link_add::ValidateCreateLinkHostAccess;
+use crate::core::ribosome::guest_callback::validate_link_add::ValidateCreateLinkInvocation;
+use crate::core::ribosome::guest_callback::validate_link_add::ValidateCreateLinkResult;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 use crate::core::ribosome::guest_callback::CallIterator;
@@ -87,7 +87,7 @@ impl CallContext {
 pub enum HostAccess {
     ZomeCall(ZomeCallHostAccess),
     Validate(ValidateHostAccess),
-    ValidateLinkAdd(ValidateLinkAddHostAccess),
+    ValidateCreateLink(ValidateCreateLinkHostAccess),
     Init(InitHostAccess),
     EntryDefs(EntryDefsHostAccess),
     MigrateAgent(MigrateAgentHostAccess),
@@ -100,7 +100,7 @@ impl From<&HostAccess> for HostFnAccess {
         match host_access {
             HostAccess::ZomeCall(zome_call_host_access) => zome_call_host_access.into(),
             HostAccess::Validate(validate_host_access) => validate_host_access.into(),
-            HostAccess::ValidateLinkAdd(validate_link_add_host_access) => {
+            HostAccess::ValidateCreateLink(validate_link_add_host_access) => {
                 validate_link_add_host_access.into()
             }
             HostAccess::Init(init_host_access) => init_host_access.into(),
@@ -443,9 +443,9 @@ pub trait RibosomeT: Sized + std::fmt::Debug {
 
     fn run_validate_link_add(
         &self,
-        access: ValidateLinkAddHostAccess,
-        invocation: ValidateLinkAddInvocation,
-    ) -> RibosomeResult<ValidateLinkAddResult>;
+        access: ValidateCreateLinkHostAccess,
+        invocation: ValidateCreateLinkInvocation,
+    ) -> RibosomeResult<ValidateCreateLinkResult>;
 
     fn call_iterator<R: 'static + RibosomeT, I: 'static + Invocation>(
         &self,

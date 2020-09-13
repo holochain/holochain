@@ -121,9 +121,9 @@ async fn invalid_seq_headers_dont_validate() {
 async fn verify_header_signature_test() {
     let keystore = holochain_state::test_utils::test_keystore();
     let author = fake_agent_pubkey_1();
-    let mut header = fixt!(LinkAdd);
+    let mut header = fixt!(CreateLink);
     header.author = author.clone();
-    let header = Header::LinkAdd(header);
+    let header = Header::CreateLink(header);
     let real_signature = author.sign(&keystore, &header).await.unwrap();
     let wrong_signature = Signature(vec![1; 64]);
 
@@ -140,7 +140,7 @@ async fn verify_header_signature_test() {
 
 #[tokio::test(threaded_scheduler)]
 async fn check_previous_header() {
-    let mut header = fixt!(LinkAdd);
+    let mut header = fixt!(CreateLink);
     header.prev_header = fixt!(HeaderHash);
     header.header_seq = 1;
     assert_matches!(check_prev_header(&header.clone().into()), Ok(()));
@@ -163,7 +163,7 @@ async fn check_valid_if_dna_test() {
     let activity_return = vec![fixt!(HeaderHash)];
 
     // Empty store not dna
-    let header = fixt!(LinkAdd);
+    let header = fixt!(CreateLink);
     let mut metadata = meta_mock!();
     metadata.expect_env().return_const(env.clone());
 
@@ -219,8 +219,8 @@ async fn check_prev_header_in_metadata_test() {
 
 #[tokio::test(threaded_scheduler)]
 async fn check_previous_timestamp() {
-    let mut header = fixt!(LinkAdd);
-    let mut prev_header = fixt!(LinkAdd);
+    let mut header = fixt!(CreateLink);
+    let mut prev_header = fixt!(CreateLink);
     header.timestamp = Timestamp::now().into();
     let before = chrono::Utc::now() - chrono::Duration::weeks(1);
     let after = chrono::Utc::now() + chrono::Duration::weeks(1);
@@ -241,8 +241,8 @@ async fn check_previous_timestamp() {
 
 #[tokio::test(threaded_scheduler)]
 async fn check_previous_seq() {
-    let mut header = fixt!(LinkAdd);
-    let mut prev_header = fixt!(LinkAdd);
+    let mut header = fixt!(CreateLink);
+    let mut prev_header = fixt!(CreateLink);
 
     header.header_seq = 2;
     prev_header.header_seq = 1;
@@ -331,7 +331,7 @@ async fn check_entry_hash_test() {
     let eh = header.entry_data().map(|(h, _)| h).unwrap();
     assert_matches!(check_entry_hash(&eh, &entry).await, Ok(()));
     assert_matches!(
-        check_new_entry_header(&fixt!(LinkAdd).into()),
+        check_new_entry_header(&fixt!(CreateLink).into()),
         Err(SysValidationError::ValidationOutcome(ValidationOutcome::NotNewEntry(_)))
     );
 }

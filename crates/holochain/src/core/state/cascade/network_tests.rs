@@ -416,7 +416,7 @@ async fn get_links_from_another_agent() {
         fake_authority(&bob_env, base_header_hash.clone().into(), call_data.clone()).await;
 
         // Link the entries
-        let link_add_hash = link_entries(
+        let link_add_hash = create_link(
             &bob_env,
             call_data.clone(),
             base_entry_hash.clone(),
@@ -459,7 +459,7 @@ async fn get_links_from_another_agent() {
 
         // Link the entries
         let link_remove_hash =
-            remove_link(&bob_env, call_data.clone(), link_add_hash.clone()).await;
+            delete_link(&bob_env, call_data.clone(), link_add_hash.clone()).await;
 
         fake_authority(&bob_env, link_remove_hash.clone().into(), call_data.clone()).await;
     }
@@ -486,7 +486,7 @@ async fn get_links_from_another_agent() {
     assert_eq!(link_add.base_address, base_entry_hash);
     assert_eq!(
         link_remove.link_add_address,
-        HeaderHash::with_data_sync(&Header::LinkAdd(link_add))
+        HeaderHash::with_data_sync(&Header::CreateLink(link_add))
     );
 
     let shutdown = handle.take_shutdown_handle().await.unwrap();

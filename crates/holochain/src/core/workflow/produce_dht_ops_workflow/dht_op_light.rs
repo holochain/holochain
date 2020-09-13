@@ -99,7 +99,7 @@ pub async fn light_to_op<P: PrefixType>(
                 .0
                 .into_header_and_signature();
             let header = match header.into_content() {
-                Header::LinkAdd(u) => u,
+                Header::CreateLink(u) => u,
                 h => {
                     return Err(DhtOpConvertError::HeaderMismatch(
                         format!("{:?}", h),

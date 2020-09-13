@@ -18,9 +18,9 @@ use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitResult;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
-use crate::core::ribosome::guest_callback::validate_link_add::ValidateLinkAddHostAccess;
-use crate::core::ribosome::guest_callback::validate_link_add::ValidateLinkAddInvocation;
-use crate::core::ribosome::guest_callback::validate_link_add::ValidateLinkAddResult;
+use crate::core::ribosome::guest_callback::validate_link_add::ValidateCreateLinkHostAccess;
+use crate::core::ribosome::guest_callback::validate_link_add::ValidateCreateLinkInvocation;
+use crate::core::ribosome::guest_callback::validate_link_add::ValidateCreateLinkResult;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 use crate::core::ribosome::guest_callback::CallIterator;
@@ -31,9 +31,11 @@ use crate::core::ribosome::host_fn::capability_claims::capability_claims;
 use crate::core::ribosome::host_fn::capability_grants::capability_grants;
 use crate::core::ribosome::host_fn::capability_info::capability_info;
 use crate::core::ribosome::host_fn::create_entry::create_entry;
+use crate::core::ribosome::host_fn::create_link::create_link;
 use crate::core::ribosome::host_fn::debug::debug;
 use crate::core::ribosome::host_fn::decrypt::decrypt;
 use crate::core::ribosome::host_fn::delete_entry::delete_entry;
+use crate::core::ribosome::host_fn::delete_link::delete_link;
 use crate::core::ribosome::host_fn::emit_signal::emit_signal;
 use crate::core::ribosome::host_fn::encrypt::encrypt;
 use crate::core::ribosome::host_fn::get::get;
@@ -42,11 +44,9 @@ use crate::core::ribosome::host_fn::get_link_details::get_link_details;
 use crate::core::ribosome::host_fn::get_links::get_links;
 use crate::core::ribosome::host_fn::hash_entry::hash_entry;
 use crate::core::ribosome::host_fn::keystore::keystore;
-use crate::core::ribosome::host_fn::link_entries::link_entries;
 use crate::core::ribosome::host_fn::property::property;
 use crate::core::ribosome::host_fn::query::query;
 use crate::core::ribosome::host_fn::random_bytes::random_bytes;
-use crate::core::ribosome::host_fn::remove_link::remove_link;
 use crate::core::ribosome::host_fn::schedule::schedule;
 use crate::core::ribosome::host_fn::show_env::show_env;
 use crate::core::ribosome::host_fn::sign::sign;
@@ -72,7 +72,7 @@ use holochain_zome_types::migrate_agent::MigrateAgentCallbackResult;
 use holochain_zome_types::post_commit::PostCommitCallbackResult;
 use holochain_zome_types::validate::ValidateCallbackResult;
 use holochain_zome_types::validate::ValidationPackageCallbackResult;
-use holochain_zome_types::validate_link_add::ValidateLinkAddCallbackResult;
+use holochain_zome_types::validate_link_add::ValidateCreateLinkCallbackResult;
 use holochain_zome_types::zome::FunctionName;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::CallbackResult;
@@ -299,8 +299,8 @@ impl WasmRibosome {
             ns.insert("__call", func!(invoke_host_function!(call)));
             ns.insert("__create_entry", func!(invoke_host_function!(create_entry)));
             ns.insert("__emit_signal", func!(invoke_host_function!(emit_signal)));
-            ns.insert("__link_entries", func!(invoke_host_function!(link_entries)));
-            ns.insert("__remove_link", func!(invoke_host_function!(remove_link)));
+            ns.insert("__create_link", func!(invoke_host_function!(create_link)));
+            ns.insert("__delete_link", func!(invoke_host_function!(delete_link)));
             ns.insert("__update_entry", func!(invoke_host_function!(update_entry)));
             ns.insert("__delete_entry", func!(invoke_host_function!(delete_entry)));
             ns.insert("__schedule", func!(invoke_host_function!(schedule)));
@@ -308,8 +308,8 @@ impl WasmRibosome {
             ns.insert("__call", func!(invoke_host_function!(unreachable)));
             ns.insert("__create_entry", func!(invoke_host_function!(unreachable)));
             ns.insert("__emit_signal", func!(invoke_host_function!(unreachable)));
-            ns.insert("__link_entries", func!(invoke_host_function!(unreachable)));
-            ns.insert("__remove_link", func!(invoke_host_function!(unreachable)));
+            ns.insert("__create_link", func!(invoke_host_function!(unreachable)));
+            ns.insert("__delete_link", func!(invoke_host_function!(unreachable)));
             ns.insert("__update_entry", func!(invoke_host_function!(unreachable)));
             ns.insert("__delete_entry", func!(invoke_host_function!(unreachable)));
             ns.insert("__schedule", func!(invoke_host_function!(unreachable)));
@@ -454,10 +454,10 @@ impl RibosomeT for WasmRibosome {
 
     fn run_validate_link_add(
         &self,
-        access: ValidateLinkAddHostAccess,
-        invocation: ValidateLinkAddInvocation,
-    ) -> RibosomeResult<ValidateLinkAddResult> {
-        do_callback!(self, access, invocation, ValidateLinkAddCallbackResult)
+        access: ValidateCreateLinkHostAccess,
+        invocation: ValidateCreateLinkInvocation,
+    ) -> RibosomeResult<ValidateCreateLinkResult> {
+        do_callback!(self, access, invocation, ValidateCreateLinkCallbackResult)
     }
 
     fn run_init(

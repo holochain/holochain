@@ -28,11 +28,11 @@ pub trait ZomeApi {
     // fn get_links();
     // // et al...
 
-    // fn link_entries();
+    // fn create_link();
     // fn property(); // --> get_property ?
     // fn query();
     // fn query_result();
-    // fn remove_link();
+    // fn delete_link();
     // fn send();
     // fn sign();
     // fn sign_one_time();

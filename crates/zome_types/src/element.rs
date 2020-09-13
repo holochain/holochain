@@ -2,7 +2,7 @@
 
 use crate::{
     entry_def::EntryVisibility,
-    header::{conversions::WrongHeaderError, HeaderHashed, LinkAdd, LinkRemove},
+    header::{conversions::WrongHeaderError, CreateLink, HeaderHashed, LinkRemove},
     signature::Signature,
     Entry, Header,
 };
@@ -254,7 +254,7 @@ impl From<Element> for Option<Entry> {
     }
 }
 
-impl TryFrom<Element> for LinkAdd {
+impl TryFrom<Element> for CreateLink {
     type Error = WrongHeaderError;
     fn try_from(value: Element) -> Result<Self, Self::Error> {
         value
