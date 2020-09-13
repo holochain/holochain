@@ -332,7 +332,7 @@ pub enum ElementBufFixture<P: PrefixType> {
 impl<P: PrefixType> LoadDbFixture for ElementBuf<P> {
     type FixtureItem = ElementBufFixture<P>;
 
-    fn write_test_datum(&mut self, datum: Self::FixtureItem) -> () {
+    fn write_test_datum(&mut self, datum: Self::FixtureItem) {
         match datum {
             Self::FixtureItem::Headers(d) => self.headers.write_test_datum(d),
             Self::FixtureItem::PublicEntries(d) => self.public_entries.write_test_datum(d),

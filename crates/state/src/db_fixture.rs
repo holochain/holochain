@@ -11,11 +11,11 @@ pub trait LoadDbFixture {
 
     /// Write a FixtureItem to the DB.
     /// Should be used for tests only!
-    fn write_test_datum(&mut self, data: Self::FixtureItem) -> ();
+    fn write_test_datum(&mut self, data: Self::FixtureItem);
 
     /// Coerce the database to a state given by the fixture data.
     /// Should be used for tests only!
-    fn write_test_data(&mut self, data: DbFixture<Self::FixtureItem>) -> () {
+    fn write_test_data(&mut self, data: DbFixture<Self::FixtureItem>) {
         for datum in data {
             self.write_test_datum(datum)
         }

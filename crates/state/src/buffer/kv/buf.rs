@@ -429,7 +429,7 @@ where
 {
     type FixtureItem = (K, V);
 
-    fn write_test_datum(&mut self, datum: Self::FixtureItem) -> () {
+    fn write_test_datum(&mut self, datum: Self::FixtureItem) {
         let (k, v) = datum;
         self.put(k, v).expect("Couldn't put fixture datum into DB")
     }
@@ -449,7 +449,7 @@ where
 {
     type FixtureItem = (IntKey, V);
 
-    fn write_test_datum(&mut self, datum: Self::FixtureItem) -> () {
+    fn write_test_datum(&mut self, datum: Self::FixtureItem) {
         let (k, v) = datum;
         self.put(k, v).expect("Couldn't put fixture datum into DB")
     }

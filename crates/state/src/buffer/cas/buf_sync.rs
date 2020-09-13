@@ -201,7 +201,7 @@ where
 {
     type FixtureItem = HoloHashed<C>;
 
-    fn write_test_datum(&mut self, datum: Self::FixtureItem) -> () {
+    fn write_test_datum(&mut self, datum: Self::FixtureItem) {
         self.put(datum)
     }
 
@@ -222,7 +222,7 @@ where
 {
     type FixtureItem = HoloHashed<C>;
 
-    fn write_test_datum(&mut self, datum: Self::FixtureItem) -> () {
+    fn write_test_datum(&mut self, datum: Self::FixtureItem) {
         self.inner.write_test_datum(datum)
     }
     fn read_test_data<R: Readable>(&self, reader: &R) -> DbFixture<Self::FixtureItem> {
