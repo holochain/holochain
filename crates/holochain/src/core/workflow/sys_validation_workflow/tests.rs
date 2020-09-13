@@ -33,9 +33,9 @@ async fn sys_validation_workflow_test() {
             name: "sys_validation_workflow_test".to_string(),
             uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
             properties: SerializedBytes::try_from(()).unwrap(),
-            zomes: vec![TestWasm::CreateEntry.into()].into(),
+            zomes: vec![TestWasm::Create.into()].into(),
         },
-        vec![TestWasm::CreateEntry.into()],
+        vec![TestWasm::Create.into()],
     )
     .await
     .unwrap();

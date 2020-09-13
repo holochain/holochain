@@ -39,8 +39,8 @@ guest_functions!(
     // [
     //     __create_entry,
     //     commit_entry,
-    //     CreateEntryInput,
-    //     CreateEntryOutput
+    //     CreateInput,
+    //     CreateOutput
     // ],
     [__decrypt, decrypt, DecryptInput, DecryptOutput],
     [__encrypt, encrypt, EncryptInput, EncryptOutput],
@@ -64,8 +64,8 @@ guest_functions!(
     [
         __update_entry,
         update_entry,
-        UpdateEntryInput,
-        UpdateEntryOutput
+        UpdateInput,
+        UpdateOutput
     ],
     [
         __emit_signal,

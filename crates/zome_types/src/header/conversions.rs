@@ -35,41 +35,41 @@ impl std::fmt::Display for WrongHeaderError {
 
 impl std::error::Error for WrongHeaderError {}
 
-impl TryFrom<Header> for UpdateEntry {
+impl TryFrom<Header> for Update {
     type Error = WrongHeaderError;
     fn try_from(value: Header) -> Result<Self, Self::Error> {
         match value {
-            Header::UpdateEntry(h) => Ok(h),
+            Header::Update(h) => Ok(h),
             _ => Err(WrongHeaderError(format!("{:?}", value))),
         }
     }
 }
 
-impl<'a> TryFrom<&'a Header> for &'a UpdateEntry {
+impl<'a> TryFrom<&'a Header> for &'a Update {
     type Error = WrongHeaderError;
     fn try_from(value: &'a Header) -> Result<Self, Self::Error> {
         match value {
-            Header::UpdateEntry(h) => Ok(h),
+            Header::Update(h) => Ok(h),
             _ => Err(WrongHeaderError(format!("{:?}", value))),
         }
     }
 }
 
-impl TryFrom<Header> for DeleteElement {
+impl TryFrom<Header> for Delete {
     type Error = WrongHeaderError;
     fn try_from(value: Header) -> Result<Self, Self::Error> {
         match value {
-            Header::DeleteElement(h) => Ok(h),
+            Header::Delete(h) => Ok(h),
             _ => Err(WrongHeaderError(format!("{:?}", value))),
         }
     }
 }
 
-impl<'a> TryFrom<&'a Header> for &'a DeleteElement {
+impl<'a> TryFrom<&'a Header> for &'a Delete {
     type Error = WrongHeaderError;
     fn try_from(value: &'a Header) -> Result<Self, Self::Error> {
         match value {
-            Header::DeleteElement(h) => Ok(h),
+            Header::Delete(h) => Ok(h),
             _ => Err(WrongHeaderError(format!("{:?}", value))),
         }
     }

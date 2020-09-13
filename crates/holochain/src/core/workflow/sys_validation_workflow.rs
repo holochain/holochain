@@ -32,7 +32,7 @@ use holochain_types::{
     validate::ValidationStatus, Entry, Timestamp,
 };
 use holochain_zome_types::{
-    header::{CreateLink, DeleteElement, DeleteLink, EntryType, UpdateEntry},
+    header::{CreateLink, Delete, DeleteLink, EntryType, Update},
     Header,
 };
 use std::{collections::BinaryHeap, convert::TryInto};
@@ -419,7 +419,7 @@ async fn store_entry(
     check_entry_hash(entry_hash, entry).await?;
     check_entry_size(entry)?;
 
-    // Additional checks if this is an UpdateEntry
+    // Additional checks if this is an Update
     if let NewEntryHeaderRef::Update(entry_update) = header {
         let dependency = check_header_exists(
             entry_update.original_header_address.clone(),
@@ -434,7 +434,7 @@ async fn store_entry(
 }
 
 async fn register_updated_by(
-    entry_update: &UpdateEntry,
+    entry_update: &Update,
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
     dependencies: &mut PendingDependencies,
@@ -458,14 +458,14 @@ async fn register_updated_by(
 }
 
 async fn register_deleted_by(
-    element_delete: &DeleteElement,
+    element_delete: &Delete,
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
     dependencies: &mut PendingDependencies,
     check_level: CheckLevel,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
-    let removed_header_address = &element_delete.removes_address;
+    let removed_header_address = &element_delete.deletes_address;
 
     // Checks
     let dependency =
@@ -476,14 +476,14 @@ async fn register_deleted_by(
 }
 
 async fn register_deleted_entry_header(
-    element_delete: &DeleteElement,
+    element_delete: &Delete,
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
     dependencies: &mut PendingDependencies,
     check_level: CheckLevel,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
-    let removed_header_address = &element_delete.removes_address;
+    let removed_header_address = &element_delete.deletes_address;
 
     // Checks
     let dependency =
@@ -532,7 +532,7 @@ async fn register_delete_link(
     Ok(())
 }
 
-fn update_check(entry_update: &UpdateEntry, original_header: &Header) -> SysValidationResult<()> {
+fn update_check(entry_update: &Update, original_header: &Header) -> SysValidationResult<()> {
     check_new_entry_header(original_header)?;
     let original_header: NewEntryHeaderRef = original_header
         .try_into()

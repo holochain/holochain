@@ -37,7 +37,7 @@ use holochain_types::{
 use holochain_zome_types::header::{CreateLink, DeleteLink};
 use holochain_zome_types::{
     element::SignedHeader,
-    header::{DeleteElement, UpdateEntry},
+    header::{Delete, Update},
     link::Link,
     metadata::{Details, ElementDetails, EntryDetails},
     Header,
@@ -405,12 +405,12 @@ where
                     .meta_cache
                     .get_deletes_on_entry(&r, hash.clone())?
                     .collect::<Vec<_>>()?;
-                let deletes = self.render_headers(deletes, |h| Ok(DeleteElement::try_from(h)?))?;
+                let deletes = self.render_headers(deletes, |h| Ok(Delete::try_from(h)?))?;
                 let updates = self
                     .meta_cache
                     .get_updates(&r, hash.into())?
                     .collect::<Vec<_>>()?;
-                let updates = self.render_headers(updates, |h| Ok(UpdateEntry::try_from(h)?))?;
+                let updates = self.render_headers(updates, |h| Ok(Update::try_from(h)?))?;
                 Ok(Some(EntryDetails {
                     entry: entry.into_content(),
                     headers,
@@ -431,7 +431,7 @@ where
                     .meta_cache
                     .get_deletes_on_header(&r, hash)?
                     .collect::<Vec<_>>())?;
-                let deletes = self.render_headers(deletes, |h| Ok(DeleteElement::try_from(h)?))?;
+                let deletes = self.render_headers(deletes, |h| Ok(Delete::try_from(h)?))?;
                 Ok(Some(ElementDetails { element, deletes }))
             }
             None => Ok(None),

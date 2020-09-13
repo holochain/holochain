@@ -77,7 +77,7 @@ impl SourceChain {
     ) -> SourceChainResult<HeaderHash> {
         let (entry, entry_hash) =
             EntryHashed::from_content_sync(Entry::CapClaim(claim_entry)).into_inner();
-        let header_builder = builder::CreateEntry {
+        let header_builder = builder::Create {
             entry_type: EntryType::CapClaim,
             entry_hash,
         };
@@ -122,17 +122,17 @@ impl SourceChain {
                 .iter_fail(&r)?
                 .filter(|header| {
                     Ok(match header.as_content().header() {
-                        Header::CreateEntry(create) => match create.entry_type {
+                        Header::Create(create) => match create.entry_type {
                             EntryType::CapGrant => true,
                             // filter out authorship and everything else
                             _ => false,
                         },
-                        Header::UpdateEntry(update) => match update.entry_type {
+                        Header::Update(update) => match update.entry_type {
                             EntryType::CapGrant => true,
                             // filter out authorship and everything else
                             _ => false,
                         },
-                        Header::DeleteElement(_) => true,
+                        Header::Delete(_) => true,
                         // no other headers are relevant
                         _ => false,
                     })
@@ -144,11 +144,11 @@ impl SourceChain {
                     (HashSet::new(), vec![]),
                     |(mut references, mut headers), header| {
                         match header.as_content().header() {
-                            Header::UpdateEntry(update) => {
+                            Header::Update(update) => {
                                 references.insert(update.original_header_address.clone());
                             }
-                            Header::DeleteElement(delete) => {
-                                references.insert(delete.removes_address.clone());
+                            Header::Delete(delete) => {
+                                references.insert(delete.deletes_address.clone());
                             }
                             _ => {}
                         }
@@ -170,8 +170,8 @@ impl SourceChain {
                 .iter()
                 .filter(|header| !references.contains(header.as_hash()))
                 .filter_map(|header| match header.as_content().header() {
-                    Header::CreateEntry(create) => Some(create.entry_hash.clone()),
-                    Header::UpdateEntry(update) => Some(update.entry_hash.clone()),
+                    Header::Create(create) => Some(create.entry_hash.clone()),
+                    Header::Update(update) => Some(update.entry_hash.clone()),
                     _ => None,
                 })
                 .collect();
@@ -364,7 +364,7 @@ pub mod tests {
             let mut chain = SourceChain::new(env.clone().into())?;
             let (entry, entry_hash) =
                 EntryHashed::from_content_sync(Entry::CapGrant(grant.clone())).into_inner();
-            let header_builder = builder::CreateEntry {
+            let header_builder = builder::Create {
                 entry_type: EntryType::CapGrant,
                 entry_hash: entry_hash.clone(),
             };
@@ -404,7 +404,7 @@ pub mod tests {
             let mut chain = SourceChain::new(env.clone().into())?;
             let (entry, entry_hash) =
                 EntryHashed::from_content_sync(Entry::CapGrant(updated_grant.clone())).into_inner();
-            let header_builder = builder::UpdateEntry {
+            let header_builder = builder::Update {
                 entry_type: EntryType::CapGrant,
                 entry_hash: entry_hash.clone(),
                 original_header_address,
@@ -441,9 +441,9 @@ pub mod tests {
 
         {
             let mut chain = SourceChain::new(env.clone().into())?;
-            let header_builder = builder::DeleteElement {
-                removes_address: updated_header_hash,
-                removes_entry_address: updated_entry_hash,
+            let header_builder = builder::Delete {
+                deletes_address: updated_header_hash,
+                deletes_entry_address: updated_entry_hash,
             };
             chain.put(header_builder, None).await?;
 

@@ -511,10 +511,10 @@ pub extern "C" fn save_image(remote_ptr: GuestPtr) -> GuestPtr {
  //
  // the important bit for this example is that we use host_call!() and that the
  // __create_entry function on the host will enqueue a validation callback
- let _: CreateEntryOutput = host_call!(
+ let _: CreateOutput = host_call!(
   // note that all host functions from holochain start with prefix `__`
   __create_entry,
-  CreateEntryInput::new(
+  CreateInput::new(
    Entry::App(
     // this serializes the image into an Entry enum that the holochain host
     // knows what to do with
@@ -635,10 +635,10 @@ pub extern "C" fn commit_message(remote_ptr: GuestPtr) -> GuestPtr {
  // it evalutes to v from Ok(v) or short circuits with Err(e)
  // because this is inside an extern function the short circuit logic also
  // handles memory and serialization logic for the holochain host
- let commit_entry_output: CreateEntryOutput = try_result!(
+ let commit_entry_output: CreateOutput = try_result!(
   host_call!(
    __create_entry,
-   CreateEntryInput::new(
+   CreateInput::new(
     Entry::App(
      try_result!(
       message.try_into(),
@@ -716,10 +716,10 @@ struct Png([u8]);
 // the input args and return values are all native Rust types, not pointers
 // we can use `Result` and `?`
 // the only wasm-ey thing here is the `host_call!()` macro
-fn _save_image(png: Png) -> Result<CreateEntryOutput, String> {
+fn _save_image(png: Png) -> Result<CreateOutput, String> {
  Ok(host_call!(
   __create_entry,
-  CreateEntryInput::new(
+  CreateInput::new(
    Entry::App(
     png.try_into()?
    )

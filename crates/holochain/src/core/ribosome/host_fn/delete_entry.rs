@@ -17,10 +17,10 @@ pub fn delete_entry<'a>(
     call_context: Arc<CallContext>,
     input: DeleteEntryInput,
 ) -> RibosomeResult<DeleteEntryOutput> {
-    let removes_address = input.into_inner();
+    let deletes_address = input.into_inner();
 
-    let removes_entry_address =
-        get_original_address(call_context.clone(), removes_address.clone())?;
+    let deletes_entry_address =
+        get_original_address(call_context.clone(), deletes_address.clone())?;
 
     let host_access = call_context.host_access();
 
@@ -29,9 +29,9 @@ pub fn delete_entry<'a>(
         let mut guard = host_access.workspace().write().await;
         let workspace: &mut CallZomeWorkspace = &mut guard;
         let source_chain = &mut workspace.source_chain;
-        let header_builder = builder::DeleteElement {
-            removes_address,
-            removes_entry_address,
+        let header_builder = builder::Delete {
+            deletes_address,
+            deletes_entry_address,
         };
         let header_hash = source_chain.put(header_builder, None).await?;
         let element = source_chain

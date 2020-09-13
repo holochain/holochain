@@ -128,12 +128,12 @@ builder_variant!(CloseChain {
     new_dna_hash: DnaHash,
 });
 
-builder_variant!(CreateEntry {
+builder_variant!(Create {
     entry_type: EntryType,
     entry_hash: EntryHash,
 });
 
-builder_variant!(UpdateEntry {
+builder_variant!(Update {
     original_entry_address: EntryHash,
     original_header_address: HeaderHash,
 
@@ -141,9 +141,9 @@ builder_variant!(UpdateEntry {
     entry_hash: EntryHash,
 });
 
-builder_variant!(DeleteElement {
-    removes_address: HeaderHash,
-    removes_entry_address: EntryHash,
+builder_variant!(Delete {
+    deletes_address: HeaderHash,
+    deletes_entry_address: EntryHash,
 });
 
 builder_variant!(AgentValidationPkg {

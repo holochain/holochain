@@ -44,9 +44,9 @@ pub enum Header {
     DeleteLink(DeleteLink),
     OpenChain(OpenChain),
     CloseChain(CloseChain),
-    CreateEntry(CreateEntry),
-    UpdateEntry(UpdateEntry),
-    DeleteElement(DeleteElement),
+    Create(Create),
+    Update(Update),
+    Delete(Delete),
 }
 
 pub type HeaderHashed = HoloHashed<Header>;
@@ -101,9 +101,9 @@ write_into_header! {
     DeleteLink,
     OpenChain,
     CloseChain,
-    CreateEntry,
-    UpdateEntry,
-    DeleteElement,
+    Create,
+    Update,
+    Delete,
 }
 
 /// a utility macro just to not have to type in the match statement everywhere.
@@ -117,9 +117,9 @@ macro_rules! match_header {
             Header::DeleteLink($i) => { $($t)* }
             Header::OpenChain($i) => { $($t)* }
             Header::CloseChain($i) => { $($t)* }
-            Header::CreateEntry($i) => { $($t)* }
-            Header::UpdateEntry($i) => { $($t)* }
-            Header::DeleteElement($i) => { $($t)* }
+            Header::Create($i) => { $($t)* }
+            Header::Update($i) => { $($t)* }
+            Header::Delete($i) => { $($t)* }
         }
     };
 }
@@ -127,15 +127,15 @@ macro_rules! match_header {
 impl Header {
     /// Returns the address and entry type of the Entry, if applicable.
     // TODO: DRY: possibly create an `EntryData` struct which is used by both
-    // CreateEntry and UpdateEntry
+    // Create and Update
     pub fn entry_data(&self) -> Option<(&EntryHash, &EntryType)> {
         match self {
-            Self::CreateEntry(CreateEntry {
+            Self::Create(Create {
                 entry_hash,
                 entry_type,
                 ..
             }) => Some((entry_hash, entry_type)),
-            Self::UpdateEntry(UpdateEntry {
+            Self::Update(Update {
                 entry_hash,
                 entry_type,
                 ..
@@ -175,11 +175,11 @@ impl Header {
             | Self::InitZomesComplete(InitZomesComplete { header_seq, .. })
             | Self::CreateLink(CreateLink { header_seq, .. })
             | Self::DeleteLink(DeleteLink { header_seq, .. })
-            | Self::DeleteElement(DeleteElement { header_seq, .. })
+            | Self::Delete(Delete { header_seq, .. })
             | Self::CloseChain(CloseChain { header_seq, .. })
             | Self::OpenChain(OpenChain { header_seq, .. })
-            | Self::CreateEntry(CreateEntry { header_seq, .. })
-            | Self::UpdateEntry(UpdateEntry { header_seq, .. }) => *header_seq,
+            | Self::Create(Create { header_seq, .. })
+            | Self::Update(Update { header_seq, .. }) => *header_seq,
         }
     }
 
@@ -191,11 +191,11 @@ impl Header {
             Self::InitZomesComplete(InitZomesComplete { prev_header, .. }) => prev_header,
             Self::CreateLink(CreateLink { prev_header, .. }) => prev_header,
             Self::DeleteLink(DeleteLink { prev_header, .. }) => prev_header,
-            Self::DeleteElement(DeleteElement { prev_header, .. }) => prev_header,
+            Self::Delete(Delete { prev_header, .. }) => prev_header,
             Self::CloseChain(CloseChain { prev_header, .. }) => prev_header,
             Self::OpenChain(OpenChain { prev_header, .. }) => prev_header,
-            Self::CreateEntry(CreateEntry { prev_header, .. }) => prev_header,
-            Self::UpdateEntry(UpdateEntry { prev_header, .. }) => prev_header,
+            Self::Create(Create { prev_header, .. }) => prev_header,
+            Self::Update(Update { prev_header, .. }) => prev_header,
         })
     }
 }
@@ -323,7 +323,7 @@ pub struct CloseChain {
 /// A header which "speaks" Entry content into being. The same content can be
 /// referenced by multiple such headers.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
-pub struct CreateEntry {
+pub struct Create {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub header_seq: u32,
@@ -346,7 +346,7 @@ pub struct CreateEntry {
 /// If you update A to B and B back to A, and then you don't know which one came first,
 /// or how to break the loop.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
-pub struct UpdateEntry {
+pub struct Update {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub header_seq: u32,
@@ -359,21 +359,6 @@ pub struct UpdateEntry {
     pub entry_hash: EntryHash,
 }
 
-/// Placeholder for future when we want to have updates on headers
-/// Not currently in use.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
-pub struct HeaderUpdate {
-    pub author: AgentPubKey,
-    pub timestamp: Timestamp,
-    pub header_seq: u32,
-    pub prev_header: HeaderHash,
-
-    pub original_header_address: HeaderHash,
-
-    pub entry_type: EntryType,
-    pub entry_hash: EntryHash,
-}
-
 /// Declare that a previously published Header should be nullified and
 /// considered deleted.
 ///
@@ -381,15 +366,40 @@ pub struct HeaderUpdate {
 /// that a previously published Entry will become inaccessible if all of its
 /// Headers are marked deleted.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
-pub struct DeleteElement {
+pub struct Delete {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub header_seq: u32,
     pub prev_header: HeaderHash,
 
     /// Address of the Element being deleted
-    pub removes_address: HeaderHash,
-    pub removes_entry_address: EntryHash,
+    pub deletes_address: HeaderHash,
+    pub deletes_entry_address: EntryHash,
+}
+
+/// Placeholder for future when we want to have updates on headers
+/// Not currently in use.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
+pub struct UpdateHeader {
+    pub author: AgentPubKey,
+    pub timestamp: Timestamp,
+    pub header_seq: u32,
+    pub prev_header: HeaderHash,
+
+    pub original_header_address: HeaderHash,
+}
+
+/// Placeholder for future when we want to have deletes on headers
+/// Not currently in use.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
+pub struct DeleteHeader {
+    pub author: AgentPubKey,
+    pub timestamp: Timestamp,
+    pub header_seq: u32,
+    pub prev_header: HeaderHash,
+
+    /// Address of the header being deleted
+    pub deletes_address: HeaderHash,
 }
 
 /// Allows Headers which reference Entries to know what type of Entry it is

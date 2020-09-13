@@ -39,14 +39,14 @@ use holochain_zome_types::entry_def::RequiredValidations;
 use holochain_zome_types::header::AgentValidationPkg;
 use holochain_zome_types::header::AppEntryType;
 use holochain_zome_types::header::CloseChain;
-use holochain_zome_types::header::CreateEntry;
-use holochain_zome_types::header::DeleteElement;
+use holochain_zome_types::header::Create;
+use holochain_zome_types::header::Delete;
 use holochain_zome_types::header::Dna;
 use holochain_zome_types::header::EntryType;
 use holochain_zome_types::header::Header;
 use holochain_zome_types::header::InitZomesComplete;
 use holochain_zome_types::header::OpenChain;
-use holochain_zome_types::header::UpdateEntry;
+use holochain_zome_types::header::Update;
 use holochain_zome_types::header::ZomeId;
 use holochain_zome_types::migrate_agent::MigrateAgent;
 use holochain_zome_types::zome::FunctionName;
@@ -493,29 +493,29 @@ fixturator!(
 );
 
 fixturator!(
-    CreateEntry;
+    Create;
     constructor fn from_builder(HeaderBuilderCommon, EntryType, EntryHash);
 
     curve PublicCurve {
-        let mut ec = fixt!(CreateEntry);
+        let mut ec = fixt!(Create);
         ec.entry_type = fixt!(EntryType, PublicCurve);
         ec
     };
 );
 
 fixturator!(
-    UpdateEntry;
+    Update;
     constructor fn from_builder(HeaderBuilderCommon, EntryHash, HeaderHash, EntryType, EntryHash);
 
     curve PublicCurve {
-        let mut eu = fixt!(UpdateEntry);
+        let mut eu = fixt!(Update);
         eu.entry_type = fixt!(EntryType, PublicCurve);
         eu
     };
 );
 
 fixturator!(
-    DeleteElement;
+    Delete;
     constructor fn from_builder(HeaderBuilderCommon, HeaderHash, EntryHash);
 );
 
@@ -529,15 +529,15 @@ fixturator!(
         DeleteLink(DeleteLink)
         OpenChain(OpenChain)
         CloseChain(CloseChain)
-        CreateEntry(CreateEntry)
-        UpdateEntry(UpdateEntry)
-        DeleteElement(DeleteElement)
+        Create(Create)
+        Update(Update)
+        Delete(Delete)
     ];
 
     curve PublicCurve {
         match fixt!(Header) {
-            Header::CreateEntry(_) => Header::CreateEntry(fixt!(CreateEntry, PublicCurve)),
-            Header::UpdateEntry(_) => Header::UpdateEntry(fixt!(UpdateEntry, PublicCurve)),
+            Header::Create(_) => Header::Create(fixt!(Create, PublicCurve)),
+            Header::Update(_) => Header::Update(fixt!(Update, PublicCurve)),
             other_type => other_type,
         }
     };
@@ -546,15 +546,15 @@ fixturator!(
 fixturator!(
     NewEntryHeader;
     variants [
-        Create(CreateEntry)
-        Update(UpdateEntry)
+        Create(Create)
+        Update(Update)
     ];
 
 
     curve PublicCurve {
         match fixt!(NewEntryHeader) {
-            NewEntryHeader::Create(_) => NewEntryHeader::Create(fixt!(CreateEntry, PublicCurve)),
-            NewEntryHeader::Update(_) => NewEntryHeader::Update(fixt!(UpdateEntry, PublicCurve)),
+            NewEntryHeader::Create(_) => NewEntryHeader::Create(fixt!(Create, PublicCurve)),
+            NewEntryHeader::Update(_) => NewEntryHeader::Update(fixt!(Update, PublicCurve)),
         }
     };
 );

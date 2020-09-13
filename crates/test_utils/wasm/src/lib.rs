@@ -13,7 +13,7 @@ pub enum TestWasm {
     Anchor,
     Bench,
     Capability,
-    CreateEntry,
+    Create,
     Crd,
     Crud,
     Debug,
@@ -52,7 +52,7 @@ impl From<TestWasm> for ZomeName {
             TestWasm::Anchor => "anchor",
             TestWasm::Bench => "bench",
             TestWasm::Capability => "capability",
-            TestWasm::CreateEntry => "create_entry",
+            TestWasm::Create => "create_entry",
             TestWasm::Crd => "crd",
             TestWasm::Crud => "crud",
             TestWasm::Debug => "debug",
@@ -97,7 +97,7 @@ impl From<TestWasm> for DnaWasm {
             TestWasm::Capability => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_capability.wasm")
             }
-            TestWasm::CreateEntry => {
+            TestWasm::Create => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_create_entry.wasm")
             }
             TestWasm::Crd => get_code("wasm32-unknown-unknown/release/test_wasm_crd.wasm"),

@@ -205,7 +205,7 @@ mod tests {
     use holochain_zome_types::entry_def::EntryVisibility;
     use holochain_zome_types::{
         element::SignedHeaderHashed,
-        header::{builder, EntryType, UpdateEntry},
+        header::{builder, EntryType, Update},
     };
     use matches::assert_matches;
     use std::{
@@ -539,7 +539,7 @@ mod tests {
                     let mut source_chain = SourceChain::new(env.clone().into()).unwrap();
                     let original_header_address = source_chain
                         .put(
-                            builder::CreateEntry {
+                            builder::Create {
                                 entry_type: ec_entry_type,
                                 entry_hash: original_entry_hash.clone(),
                             },
@@ -556,7 +556,7 @@ mod tests {
 
                     let entry_update_hash = source_chain
                         .put(
-                            builder::UpdateEntry {
+                            builder::Update {
                                 entry_type: eu_entry_type,
                                 entry_hash: new_entry_hash,
                                 original_header_address: original_header_address.clone(),
@@ -616,7 +616,7 @@ mod tests {
                     // Op is expected to not contain the Entry
                     let (entry_update_header, sig) =
                         entry_update_header.into_header_and_signature();
-                    let entry_update_header: UpdateEntry =
+                    let entry_update_header: Update =
                         entry_update_header.into_content().try_into().unwrap();
                     let expected_op =
                         DhtOp::StoreElement(sig.clone(), entry_update_header.clone().into(), None);

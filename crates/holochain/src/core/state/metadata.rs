@@ -113,17 +113,17 @@ where
     /// Deregister a published [Header] on the authoring agent's public key
     fn deregister_activity(&mut self, header: Header) -> DatabaseResult<()>;
 
-    /// Registers a [Header::UpdateEntry] on the referenced [Header] or [Entry]
-    fn register_update(&mut self, update: header::UpdateEntry) -> DatabaseResult<()>;
+    /// Registers a [Header::Update] on the referenced [Header] or [Entry]
+    fn register_update(&mut self, update: header::Update) -> DatabaseResult<()>;
 
-    /// Deregister a [Header::UpdateEntry] on the referenced [Header] or [Entry]
-    fn deregister_update(&mut self, update: header::UpdateEntry) -> DatabaseResult<()>;
+    /// Deregister a [Header::Update] on the referenced [Header] or [Entry]
+    fn deregister_update(&mut self, update: header::Update) -> DatabaseResult<()>;
 
-    /// Registers a [Header::DeleteElement] on the Header of an Entry
-    fn register_delete(&mut self, delete: header::DeleteElement) -> DatabaseResult<()>;
+    /// Registers a [Header::Delete] on the Header of an Entry
+    fn register_delete(&mut self, delete: header::Delete) -> DatabaseResult<()>;
 
-    /// Deregister a [Header::DeleteElement] on the Header of an Entry
-    fn deregister_delete(&mut self, delete: header::DeleteElement) -> DatabaseResult<()>;
+    /// Deregister a [Header::Delete] on the Header of an Entry
+    fn deregister_delete(&mut self, delete: header::Delete) -> DatabaseResult<()>;
 
     /// Returns all the [HeaderHash]es of headers that created this [Entry]
     fn get_headers<'r, R: Readable>(
@@ -139,21 +139,21 @@ where
         agent_pubkey: AgentPubKey,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>;
 
-    /// Returns all the hashes of [UpdateEntry] headers registered on an [Entry]
+    /// Returns all the hashes of [Update] headers registered on an [Entry]
     fn get_updates<'r, R: Readable>(
         &'r self,
         reader: &'r R,
         hash: AnyDhtHash,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>;
 
-    /// Returns all the hashes of [DeleteElement] headers registered on a Header
+    /// Returns all the hashes of [Delete] headers registered on a Header
     fn get_deletes_on_header<'r, R: Readable>(
         &'r self,
         reader: &'r R,
         new_entry_header: HeaderHash,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>;
 
-    /// Returns all the hashes of [DeleteElement] headers registered on an Entry's header
+    /// Returns all the hashes of [Delete] headers registered on an Entry's header
     fn get_deletes_on_entry<'r, R: Readable>(
         &'r self,
         reader: &'r R,
@@ -468,31 +468,31 @@ where
             .delete(MiscMetaKey::StoreElement(hash).into())
     }
 
-    fn register_update(&mut self, update: header::UpdateEntry) -> DatabaseResult<()> {
+    fn register_update(&mut self, update: header::Update) -> DatabaseResult<()> {
         self.register_header_on_basis(
             AnyDhtHash::from(update.original_entry_address.clone()),
             update,
         )
     }
 
-    fn deregister_update(&mut self, update: header::UpdateEntry) -> DatabaseResult<()> {
+    fn deregister_update(&mut self, update: header::Update) -> DatabaseResult<()> {
         self.deregister_header_on_basis(
             AnyDhtHash::from(update.original_entry_address.clone()),
             update,
         )
     }
 
-    fn register_delete(&mut self, delete: header::DeleteElement) -> DatabaseResult<()> {
-        let remove = delete.removes_address.to_owned();
-        let entry_hash = delete.removes_entry_address.clone();
+    fn register_delete(&mut self, delete: header::Delete) -> DatabaseResult<()> {
+        let remove = delete.deletes_address.to_owned();
+        let entry_hash = delete.deletes_entry_address.clone();
         self.register_header_on_basis(remove, delete.clone())?;
         self.register_header_on_basis(entry_hash.clone(), delete)?;
         self.update_entry_dht_status(entry_hash)
     }
 
-    fn deregister_delete(&mut self, delete: header::DeleteElement) -> DatabaseResult<()> {
-        let remove = delete.removes_address.to_owned();
-        let entry_hash = delete.removes_entry_address.clone();
+    fn deregister_delete(&mut self, delete: header::Delete) -> DatabaseResult<()> {
+        let remove = delete.deletes_address.to_owned();
+        let entry_hash = delete.deletes_entry_address.clone();
         self.deregister_header_on_basis(remove, delete.clone())?;
         self.deregister_header_on_basis(entry_hash.clone(), delete)?;
         self.update_entry_dht_status(entry_hash)

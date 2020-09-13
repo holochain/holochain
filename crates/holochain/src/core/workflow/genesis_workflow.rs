@@ -165,7 +165,7 @@ pub mod tests {
 
             assert_matches!(
                 headers.as_slice(),
-                [Header::CreateEntry(_), Header::AgentValidationPkg(_), Header::Dna(_)]
+                [Header::Create(_), Header::AgentValidationPkg(_), Header::Dna(_)]
             );
         }
 

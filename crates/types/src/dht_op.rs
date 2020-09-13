@@ -64,14 +64,14 @@ pub enum DhtOp {
     // TODO: This entry is here for validation by the entry update header holder
     // link's don't do this. The entry is validated by store entry. Maybe we either
     // need to remove the Entry here or add it to link.
-    RegisterUpdatedBy(Signature, header::UpdateEntry),
+    RegisterUpdatedBy(Signature, header::Update),
 
     /// Op for registering a Header deletion with the Header authority
-    RegisterDeletedBy(Signature, header::DeleteElement),
+    RegisterDeletedBy(Signature, header::Delete),
 
     /// Op for registering a Header deletion with the Entry authority, so that
     /// the Entry can be marked Dead if all of its Headers have been deleted
-    RegisterDeletedEntryHeader(Signature, header::DeleteElement),
+    RegisterDeletedEntryHeader(Signature, header::Delete),
 
     /// Op for adding a link
     RegisterAddLink(Signature, header::CreateLink),
@@ -121,8 +121,8 @@ impl DhtOp {
 
     /// Convert a [DhtOp] to a [DhtOpLight] and basis
     pub async fn to_light(
-        // Hoping one day we can work out how to go from `&CreateEntry`
-        // to `&Header::CreateEntry(CreateEntry)` so punting on a reference
+        // Hoping one day we can work out how to go from `&Create`
+        // to `&Header::Create(Create)` so punting on a reference
         &self,
     ) -> DhtOpLight {
         let basis = self.dht_basis().await;
@@ -218,9 +218,9 @@ pub enum UniqueForm<'a> {
     StoreElement(&'a Header),
     StoreEntry(&'a NewEntryHeader),
     RegisterAgentActivity(&'a Header),
-    RegisterUpdatedBy(&'a header::UpdateEntry),
-    RegisterDeletedBy(&'a header::DeleteElement),
-    RegisterDeletedEntryHeader(&'a header::DeleteElement),
+    RegisterUpdatedBy(&'a header::Update),
+    RegisterDeletedBy(&'a header::Delete),
+    RegisterDeletedEntryHeader(&'a header::Delete),
     RegisterAddLink(&'a header::CreateLink),
     RegisterRemoveLink(&'a header::DeleteLink),
 }
@@ -232,9 +232,9 @@ impl<'a> UniqueForm<'a> {
             UniqueForm::StoreEntry(header) => header.entry().clone().into(),
             UniqueForm::RegisterAgentActivity(header) => header.author().clone().into(),
             UniqueForm::RegisterUpdatedBy(header) => header.original_entry_address.clone().into(),
-            UniqueForm::RegisterDeletedBy(header) => header.removes_address.clone().into(),
+            UniqueForm::RegisterDeletedBy(header) => header.deletes_address.clone().into(),
             UniqueForm::RegisterDeletedEntryHeader(header) => {
-                header.removes_entry_address.clone().into()
+                header.deletes_entry_address.clone().into()
             }
             UniqueForm::RegisterAddLink(header) => header.base_address.clone().into(),
             UniqueForm::RegisterRemoveLink(header) => header.base_address.clone().into(),
@@ -370,14 +370,14 @@ async fn produce_op_lights_from_iter(
                 header_hash,
                 UniqueForm::RegisterRemoveLink(link_remove).basis().await,
             )),
-            Header::CreateEntry(entry_create) => ops.push(DhtOpLight::StoreEntry(
+            Header::Create(entry_create) => ops.push(DhtOpLight::StoreEntry(
                 header_hash,
                 maybe_entry_hash.ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.clone()))?,
                 UniqueForm::StoreEntry(&NewEntryHeader::Create(entry_create.clone()))
                     .basis()
                     .await,
             )),
-            Header::UpdateEntry(entry_update) => {
+            Header::Update(entry_update) => {
                 let entry_hash = maybe_entry_hash
                     .ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.clone()))?;
                 ops.push(DhtOpLight::StoreEntry(
@@ -393,9 +393,9 @@ async fn produce_op_lights_from_iter(
                     UniqueForm::RegisterUpdatedBy(entry_update).basis().await,
                 ));
             }
-            Header::DeleteElement(entry_delete) => {
-                // TODO: VALIDATION: This only works if entry_delete.remove_address is either CreateEntry
-                // or UpdateEntry
+            Header::Delete(entry_delete) => {
+                // TODO: VALIDATION: This only works if entry_delete.remove_address is either Create
+                // or Update
                 ops.push(DhtOpLight::RegisterDeletedBy(
                     header_hash.clone(),
                     UniqueForm::RegisterDeletedBy(entry_delete).basis().await,

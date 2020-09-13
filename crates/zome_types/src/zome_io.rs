@@ -49,9 +49,9 @@ wasm_io_types!(
     pub struct CapabilityInfoInput(());
     pub struct CapabilityInfoOutput(());
     // the SerializedBytes will be stuffed into an Entry::App(SB) host side
-    pub struct CreateEntryInput((crate::entry_def::EntryDefId, crate::entry::Entry));
+    pub struct CreateInput((crate::entry_def::EntryDefId, crate::entry::Entry));
     // the header hash of the newly created entry
-    pub struct CreateEntryOutput(holo_hash::HeaderHash);
+    pub struct CreateOutput(holo_hash::HeaderHash);
     // @TODO
     pub struct DecryptInput(());
     pub struct DecryptOutput(());
@@ -85,8 +85,8 @@ wasm_io_types!(
     // @TODO
     pub struct ScheduleInput(core::time::Duration);
     pub struct ScheduleOutput(());
-    // Same as CreateEntryInput but also takes the HeaderHash of the entry you are replacing
-    pub struct UpdateEntryInput(
+    // Same as CreateInput but also takes the HeaderHash of the entry you are replacing
+    pub struct UpdateInput(
         (
             crate::entry_def::EntryDefId,
             crate::entry::Entry,
@@ -94,7 +94,7 @@ wasm_io_types!(
         ),
     );
     // the header hash of the newly committed entry
-    pub struct UpdateEntryOutput(holo_hash::HeaderHash);
+    pub struct UpdateOutput(holo_hash::HeaderHash);
     // @TODO
     pub struct EmitSignalInput(());
     pub struct EmitSignalOutput(());

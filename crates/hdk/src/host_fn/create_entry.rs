@@ -7,11 +7,11 @@ macro_rules! create_entry {
         match try_sb {
             Ok(sb) => $crate::host_fn!(
                 __create_entry,
-                $crate::prelude::CreateEntryInput::new((
+                $crate::prelude::CreateInput::new((
                     $input.into(),
                     $crate::prelude::Entry::App(sb.try_into()?)
                 )),
-                $crate::prelude::CreateEntryOutput
+                $crate::prelude::CreateOutput
             ),
             Err(e) => Err(e),
         }

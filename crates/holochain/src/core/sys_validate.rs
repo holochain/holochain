@@ -19,7 +19,7 @@ use holochain_types::{header::NewEntryHeaderRef, Entry};
 use holochain_zome_types::{
     element::SignedHeaderHashed,
     entry_def::{EntryDef, EntryVisibility},
-    header::{AppEntryType, CreateLink, EntryType, UpdateEntry},
+    header::{AppEntryType, CreateLink, EntryType, Update},
     link::LinkTag,
     Header,
 };
@@ -340,10 +340,10 @@ pub async fn check_entry_hash(hash: &EntryHash, entry: &Entry) -> SysValidationR
 }
 
 /// Check the header should have an entry.
-/// Is either a CreateEntry or UpdateEntry
+/// Is either a Create or Update
 pub fn check_new_entry_header(header: &Header) -> SysValidationResult<()> {
     match header {
-        Header::CreateEntry(_) | Header::UpdateEntry(_) => Ok(()),
+        Header::Create(_) | Header::Update(_) => Ok(()),
         _ => Err(ValidationOutcome::NotNewEntry(header.clone()).into()),
     }
 }
@@ -374,10 +374,10 @@ pub fn check_tag_size(tag: &LinkTag) -> SysValidationResult<()> {
     }
 }
 
-/// Check a UpdateEntry's entry type is the same for
+/// Check a Update's entry type is the same for
 /// original and new entry.
 pub fn check_update_reference(
-    eu: &UpdateEntry,
+    eu: &Update,
     original_entry_header: &NewEntryHeaderRef<'_>,
 ) -> SysValidationResult<()> {
     if eu.entry_type == *original_entry_header.entry_type() {

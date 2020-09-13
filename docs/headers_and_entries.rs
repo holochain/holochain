@@ -25,9 +25,9 @@ pub enum Header {
     DeleteLink(header::DeleteLink),
     OpenChain(header::OpenChain),
     CloseChain(header::CloseChain),
-    CreateEntry(header::CreateEntry),
-    UpdateEntry(header::UpdateEntry),
-    DeleteElement(header::DeleteElement),
+    Create(header::Create),
+    Update(header::Update),
+    Delete(header::Delete),
 }
 
 pub mod header {
@@ -81,7 +81,7 @@ pub mod header {
         pub new_dna_hash: DnaHash,
     }
 
-    pub struct CreateEntry {
+    pub struct Create {
         pub author: PublicKey,
         pub timestamp: Timestamp,
         pub prev_header: HeaderHash,
@@ -90,7 +90,7 @@ pub mod header {
         pub entry_hash: EntryHash,
     }
 
-    pub struct UpdateEntry {
+    pub struct Update {
         pub author: PublicKey,
         pub timestamp: Timestamp,
         pub prev_header: HeaderHash,
@@ -101,7 +101,7 @@ pub mod header {
         pub entry_hash: EntryHash,
     }
 
-    pub struct DeleteElement {
+    pub struct Delete {
         pub author: PublicKey,
         pub timestamp: Timestamp,
         pub prev_header: HeaderHash,
@@ -129,11 +129,11 @@ impl Header {
             Self::Dna(header::Dna { .. }) => return None,
             Self::CreateLink(header::CreateLink { prev_header, .. }) => prev_header,
             Self::DeleteLink(header::DeleteLink { prev_header, .. }) => prev_header,
-            Self::DeleteElement(header::DeleteElement { prev_header, .. }) => prev_header,
+            Self::Delete(header::Delete { prev_header, .. }) => prev_header,
             Self::CloseChain(header::CloseChain { prev_header, .. }) => prev_header,
             Self::OpenChain(header::OpenChain { prev_header, .. }) => prev_header,
-            Self::CreateEntry(header::CreateEntry { prev_header, .. }) => prev_header,
-            Self::UpdateEntry(header::UpdateEntry { prev_header, .. }) => prev_header,
+            Self::Create(header::Create { prev_header, .. }) => prev_header,
+            Self::Update(header::Update { prev_header, .. }) => prev_header,
         })
     }
 }

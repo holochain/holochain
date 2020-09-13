@@ -130,7 +130,7 @@ mod tests {
                 .unwrap();
             source_chain
                 .put(
-                    builder::CreateEntry {
+                    builder::Create {
                         entry_type: EntryType::App(app_entry_type),
                         entry_hash,
                     },

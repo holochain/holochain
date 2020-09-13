@@ -15,8 +15,8 @@ use holochain_zome_types::entry_def::{EntryDefId, EntryVisibility};
 use holochain_zome_types::header::builder;
 use holochain_zome_types::header::AppEntryType;
 use holochain_zome_types::header::EntryType;
-use holochain_zome_types::CreateEntryInput;
-use holochain_zome_types::CreateEntryOutput;
+use holochain_zome_types::CreateInput;
+use holochain_zome_types::CreateOutput;
 use std::sync::Arc;
 
 /// commit an entry
@@ -24,8 +24,8 @@ use std::sync::Arc;
 pub fn create_entry<'a>(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: CreateEntryInput,
-) -> RibosomeResult<CreateEntryOutput> {
+    input: CreateInput,
+) -> RibosomeResult<CreateOutput> {
     // destructure the args out into an app type def id and entry
     let (entry_def_id, entry) = input.into_inner();
 
@@ -51,7 +51,7 @@ pub fn create_entry<'a>(
     };
 
     // build a header for the entry being committed
-    let header_builder = builder::CreateEntry {
+    let header_builder = builder::Create {
         entry_type,
         entry_hash,
     };
@@ -79,7 +79,7 @@ pub fn create_entry<'a>(
         .await
         .map_err(Box::new)
         .map_err(SourceChainError::from)?;
-        Ok(CreateEntryOutput::new(header_hash))
+        Ok(CreateOutput::new(header_hash))
     })
 }
 
@@ -138,8 +138,8 @@ pub mod wasm_test {
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::entry::EntryError;
     use holochain_zome_types::entry_def::EntryDefId;
-    use holochain_zome_types::CreateEntryInput;
-    use holochain_zome_types::CreateEntryOutput;
+    use holochain_zome_types::CreateInput;
+    use holochain_zome_types::CreateOutput;
     use holochain_zome_types::Entry;
     use holochain_zome_types::GetOutput;
     use std::sync::Arc;
@@ -155,19 +155,19 @@ pub mod wasm_test {
         let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
 
         let ribosome =
-            WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::CreateEntry]))
+            WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::Create]))
                 .next()
                 .unwrap();
         let mut call_context = CallContextFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
-        call_context.zome_name = TestWasm::CreateEntry.into();
+        call_context.zome_name = TestWasm::Create.into();
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock;
         call_context.host_access = host_access.into();
         let app_entry = EntryFixturator::new(AppEntry).next().unwrap();
         let entry_def_id = EntryDefId::App("post".into());
-        let input = CreateEntryInput::new((entry_def_id, app_entry.clone()));
+        let input = CreateInput::new((entry_def_id, app_entry.clone()));
 
         let output = create_entry(Arc::new(ribosome), Arc::new(call_context), input);
 
@@ -198,19 +198,19 @@ pub mod wasm_test {
         let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
 
         let ribosome =
-            WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::CreateEntry]))
+            WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::Create]))
                 .next()
                 .unwrap();
         let mut call_context = CallContextFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
-        call_context.zome_name = TestWasm::CreateEntry.into();
+        call_context.zome_name = TestWasm::Create.into();
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock.clone();
         call_context.host_access = host_access.into();
         let app_entry = EntryFixturator::new(AppEntry).next().unwrap();
         let entry_def_id = EntryDefId::App("post".into());
-        let input = CreateEntryInput::new((entry_def_id, app_entry.clone()));
+        let input = CreateInput::new((entry_def_id, app_entry.clone()));
 
         let output = create_entry(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
 
@@ -247,8 +247,8 @@ pub mod wasm_test {
         host_access.workspace = workspace_lock.clone();
 
         // get the result of a commit entry
-        let output: CreateEntryOutput =
-            crate::call_test_ribosome!(host_access, TestWasm::CreateEntry, "create_entry", ());
+        let output: CreateOutput =
+            crate::call_test_ribosome!(host_access, TestWasm::Create, "create_entry", ());
 
         // the chain head should be the committed entry header
         let chain_head = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
@@ -266,7 +266,7 @@ pub mod wasm_test {
         assert_eq!(&chain_head, output.inner_ref());
 
         let round: GetOutput =
-            crate::call_test_ribosome!(host_access, TestWasm::CreateEntry, "get_entry", ());
+            crate::call_test_ribosome!(host_access, TestWasm::Create, "get_entry", ());
 
         let sb: SerializedBytes = match round.into_inner().and_then(|el| el.into()) {
             Some(holochain_zome_types::entry::Entry::App(entry_bytes)) => entry_bytes.into(),

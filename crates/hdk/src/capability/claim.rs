@@ -5,11 +5,11 @@ macro_rules! create_cap_claim {
 
         $crate::host_fn!(
             __create_entry,
-            $crate::prelude::CreateEntryInput::new((
+            $crate::prelude::CreateInput::new((
                 $crate::prelude::EntryDefId::CapClaim,
                 $crate::prelude::Entry::CapClaim($input)
             )),
-            $crate::prelude::CreateEntryOutput
+            $crate::prelude::CreateOutput
         )
     }};
 }

@@ -12,7 +12,7 @@ mod tests {
     };
     use ::fixt::prelude::*;
     use fallible_iterator::FallibleIterator;
-    use header::CreateEntry;
+    use header::Create;
     use holo_hash::fixt::*;
     use holo_hash::*;
     use holochain_state::{prelude::*, test_utils::test_cell_env};
@@ -22,7 +22,7 @@ mod tests {
         HeaderHashed,
     };
     use holochain_zome_types::header::{self, builder, EntryType, HeaderBuilder};
-    use holochain_zome_types::header::{DeleteElement, HeaderBuilderCommon};
+    use holochain_zome_types::header::{Delete, HeaderBuilderCommon};
 
     struct TestFixtures {
         header_hashes: Box<dyn Iterator<Item = HeaderHash>>,
@@ -67,8 +67,8 @@ mod tests {
         entry_hash: EntryHash,
         original_entry_address: EntryHash,
         fx: &mut TestFixtures,
-    ) -> (header::UpdateEntry, HeaderHashed) {
-        let builder = builder::UpdateEntry {
+    ) -> (header::Update, HeaderHashed) {
+        let builder = builder::Update {
             original_entry_address,
             original_header_address,
             entry_hash,
@@ -82,8 +82,8 @@ mod tests {
     async fn test_create(
         entry_hash: EntryHash,
         fx: &mut TestFixtures,
-    ) -> (header::CreateEntry, HeaderHashed) {
-        let builder = builder::CreateEntry {
+    ) -> (header::Create, HeaderHashed) {
+        let builder = builder::Create {
             entry_hash,
             entry_type: fx.entry_type(),
         };
@@ -93,13 +93,13 @@ mod tests {
     }
 
     async fn test_delete(
-        removes_address: HeaderHash,
-        removes_entry_address: EntryHash,
+        deletes_address: HeaderHash,
+        deletes_entry_address: EntryHash,
         fx: &mut TestFixtures,
-    ) -> (header::DeleteElement, HeaderHashed) {
-        let builder = builder::DeleteElement {
-            removes_address,
-            removes_entry_address,
+    ) -> (header::Delete, HeaderHashed) {
+        let builder = builder::Delete {
+            deletes_address,
+            deletes_entry_address,
         };
         let delete = builder.build(fx.common());
         let header = HeaderHashed::from_content_sync(delete.clone().into());
@@ -309,7 +309,7 @@ mod tests {
         let mut fx = TestFixtures::new();
         let entry_hash = fx.entry_hash();
         let mut expected: Vec<TimedHeaderHash> = Vec::new();
-        let mut entry_creates: Vec<CreateEntry> = Vec::new();
+        let mut entry_creates: Vec<Create> = Vec::new();
         for _ in 0..10 as u32 {
             let (e, hash) = test_create(entry_hash.clone(), &mut fx).await;
             expected.push(hash.into());
@@ -508,9 +508,9 @@ mod tests {
 
     async fn update_dbs(
         new_entries: &[NewEntryHeader],
-        entry_deletes: &[DeleteElement],
+        entry_deletes: &[Delete],
         update_entries: &[NewEntryHeader],
-        delete_updates: &[DeleteElement],
+        delete_updates: &[Delete],
         _entry_hash: &EntryHash,
         meta_buf: &mut MetadataBuf,
     ) {
@@ -524,9 +524,9 @@ mod tests {
 
     async fn create_data(
         entry_creates: &mut Vec<NewEntryHeader>,
-        entry_deletes: &mut Vec<DeleteElement>,
+        entry_deletes: &mut Vec<Delete>,
         entry_updates: &mut Vec<NewEntryHeader>,
-        delete_updates: &mut Vec<DeleteElement>,
+        delete_updates: &mut Vec<Delete>,
         entry_hash: &EntryHash,
         fx: &mut TestFixtures,
     ) {

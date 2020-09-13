@@ -5,12 +5,12 @@ macro_rules! update_entry {
         match try_sb {
             Ok(sb) => $crate::host_fn!(
                 __update_entry,
-                $crate::prelude::UpdateEntryInput::new((
+                $crate::prelude::UpdateInput::new((
                     $input.into(),
                     $crate::prelude::Entry::App(sb.try_into()?),
                     $hash
                 )),
-                $crate::prelude::UpdateEntryOutput
+                $crate::prelude::UpdateOutput
             ),
             Err(e) => Err(e),
         }

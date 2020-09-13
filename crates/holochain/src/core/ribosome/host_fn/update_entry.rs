@@ -8,10 +8,10 @@ use crate::core::{
 };
 use holo_hash::HasHash;
 use holochain_zome_types::entry_def::EntryDefId;
-use holochain_zome_types::UpdateEntryInput;
+use holochain_zome_types::UpdateInput;
 use holochain_zome_types::{
     header::{builder, AppEntryType, EntryType},
-    UpdateEntryOutput,
+    UpdateOutput,
 };
 use std::sync::Arc;
 
@@ -19,8 +19,8 @@ use std::sync::Arc;
 pub fn update_entry<'a>(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: UpdateEntryInput,
-) -> RibosomeResult<UpdateEntryOutput> {
+    input: UpdateInput,
+) -> RibosomeResult<UpdateOutput> {
     // destructure the args out into an app type def id and entry
     let (entry_def_id, entry, original_header_address) = input.into_inner();
 
@@ -49,7 +49,7 @@ pub fn update_entry<'a>(
         get_original_address(call_context.clone(), original_header_address.clone())?;
 
     // build a header for the entry being updated
-    let header_builder = builder::UpdateEntry {
+    let header_builder = builder::Update {
         entry_type,
         entry_hash,
         original_header_address,
@@ -80,7 +80,7 @@ pub fn update_entry<'a>(
         .await
         .map_err(Box::new)
         .map_err(SourceChainError::from)?;
-        Ok(UpdateEntryOutput::new(header_hash))
+        Ok(UpdateOutput::new(header_hash))
     })
 }
 

@@ -107,17 +107,17 @@ fixturator!(
 );
 
 fixturator!(
-    CreateEntry;
+    Create;
     constructor fn from_builder(HeaderBuilderCommon, EntryType, EntryHash);
 );
 
 fixturator!(
-    UpdateEntry;
+    Update;
     constructor fn from_builder(HeaderBuilderCommon, EntryHash, HeaderHash, EntryType, EntryHash);
 );
 
 fixturator!(
-    DeleteElement;
+    Delete;
     constructor fn from_builder(HeaderBuilderCommon, HeaderHash, EntryHash);
 );
 

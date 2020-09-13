@@ -35,10 +35,10 @@ use holochain_types::{
 use holochain_zome_types::{
     entry::GetOptions,
     entry_def::EntryDefs,
-    header::{builder, CreateLink, DeleteElement, DeleteLink, UpdateEntry, ZomeId},
+    header::{builder, CreateLink, Delete, DeleteLink, Update, ZomeId},
     link::{LinkTag, Links},
     zome::ZomeName,
-    CreateEntryInput, CreateLinkInput, GetInput, GetLinksInput, Header,
+    CreateInput, CreateLinkInput, GetInput, GetLinksInput, Header,
 };
 use produce_dht_ops_workflow::{produce_dht_ops_workflow, ProduceDhtOpsWorkspace};
 use std::{
@@ -53,13 +53,13 @@ struct TestData {
     original_entry: Entry,
     new_entry: Entry,
     any_header: Header,
-    entry_update_header: UpdateEntry,
-    entry_update_entry: UpdateEntry,
+    entry_update_header: Update,
+    entry_update_entry: Update,
     original_header_hash: HeaderHash,
     original_entry_hash: EntryHash,
     new_entry_hash: EntryHash,
     original_header: NewEntryHeader,
-    entry_delete: DeleteElement,
+    entry_delete: Delete,
     link_add: CreateLink,
     link_remove: DeleteLink,
 }
@@ -104,19 +104,19 @@ impl TestData {
         }
 
         // Entry update for header
-        let mut entry_update_header = fixt!(UpdateEntry, PublicCurve);
+        let mut entry_update_header = fixt!(Update, PublicCurve);
         entry_update_header.entry_hash = new_entry_hash.clone();
         entry_update_header.original_header_address = original_header_hash.clone();
 
         // Entry update for entry
-        let mut entry_update_entry = fixt!(UpdateEntry, PublicCurve);
+        let mut entry_update_entry = fixt!(Update, PublicCurve);
         entry_update_entry.entry_hash = new_entry_hash.clone();
         entry_update_entry.original_entry_address = original_entry_hash.clone();
         entry_update_entry.original_header_address = original_header_hash.clone();
 
         // Entry delete
-        let mut entry_delete = fixt!(DeleteElement);
-        entry_delete.removes_address = original_header_hash.clone();
+        let mut entry_delete = fixt!(Delete);
+        entry_delete.deletes_address = original_header_hash.clone();
 
         // Link add
         let mut link_add = fixt!(CreateLink);
@@ -134,10 +134,10 @@ impl TestData {
 
         let mut any_header = fixt!(Header, PublicCurve);
         match &mut any_header {
-            Header::CreateEntry(ec) => {
+            Header::Create(ec) => {
                 ec.entry_hash = original_entry_hash.clone();
             }
-            Header::UpdateEntry(eu) => {
+            Header::Update(eu) => {
                 eu.entry_hash = original_entry_hash.clone();
             }
             _ => (),
@@ -334,9 +334,7 @@ impl Db {
                         .meta
                         .get_deletes_on_entry(
                             &reader,
-                            DeleteElement::try_from(header)
-                                .unwrap()
-                                .removes_entry_address,
+                            Delete::try_from(header).unwrap().deletes_entry_address,
                         )
                         .unwrap()
                         .collect::<Vec<_>>()
@@ -610,7 +608,7 @@ fn add_op_to_judged(mut ps: Vec<Db>, op: &DhtOp) -> Vec<Db> {
 
 fn store_element(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let entry = match &a.any_header {
-        Header::CreateEntry(_) | Header::UpdateEntry(_) => Some(a.original_entry.clone().into()),
+        Header::Create(_) | Header::Update(_) => Some(a.original_entry.clone().into()),
         _ => None,
     };
     let op = DhtOp::StoreElement(
@@ -899,7 +897,7 @@ async fn commit_entry<'env>(
         .next()
         .unwrap();
 
-    let input = CreateEntryInput::new((entry_def_id.clone(), entry.clone()));
+    let input = CreateInput::new((entry_def_id.clone(), entry.clone()));
 
     let output = {
         let mut host_access = fixt!(ZomeCallHostAccess);
@@ -1214,9 +1212,9 @@ async fn test_wasm_api_without_integration_delete() {
             .next()
             .unwrap()
             .unwrap();
-        let delete = builder::DeleteElement {
-            removes_address: entry_header.header_hash,
-            removes_entry_address: base_address.clone(),
+        let delete = builder::Delete {
+            deletes_address: entry_header.header_hash,
+            deletes_entry_address: base_address.clone(),
         };
         workspace.source_chain.put(delete, None).await.unwrap();
         env_ref
@@ -1242,7 +1240,7 @@ async fn test_wasm_api_without_integration_delete() {
 #[ignore]
 async fn test_integrate_single_register_replaced_by_for_header() {
     // For RegisterUpdatedBy with intended_for Header
-    // metadata has UpdateEntry on HeaderHash but not EntryHash
+    // metadata has Update on HeaderHash but not EntryHash
     todo!()
 }
 
@@ -1250,7 +1248,7 @@ async fn test_integrate_single_register_replaced_by_for_header() {
 #[ignore]
 async fn test_integrate_single_register_replaced_by_for_entry() {
     // For RegisterUpdatedBy with intended_for Entry
-    // metadata has UpdateEntry on EntryHash but not HeaderHash
+    // metadata has Update on EntryHash but not HeaderHash
     todo!()
 }
 
@@ -1258,7 +1256,7 @@ async fn test_integrate_single_register_replaced_by_for_entry() {
 #[ignore]
 async fn test_integrate_single_register_delete_on_headerd_by() {
     // For RegisterDeletedBy
-    // metadata has DeleteElement on HeaderHash
+    // metadata has Delete on HeaderHash
     todo!()
 }
 
@@ -1373,7 +1371,7 @@ mod slow_tests {
 
             let mut workspace = CallZomeWorkspace::new(cell_env.clone().into()).unwrap();
 
-            let header_builder = builder::CreateEntry {
+            let header_builder = builder::Create {
                 entry_type: EntryType::App(AppEntryType::new(
                     0.into(),
                     0.into(),
@@ -1388,7 +1386,7 @@ mod slow_tests {
                 .unwrap();
 
             // Commit the target
-            let header_builder = builder::CreateEntry {
+            let header_builder = builder::Create {
                 entry_type: EntryType::App(AppEntryType::new(
                     1.into(),
                     0.into(),
@@ -1413,7 +1411,7 @@ mod slow_tests {
             .unwrap();
 
             // Commit the base
-            let header_builder = builder::CreateEntry {
+            let header_builder = builder::Create {
                 entry_type: EntryType::App(AppEntryType::new(
                     2.into(),
                     0.into(),

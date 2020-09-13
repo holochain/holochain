@@ -275,7 +275,7 @@ mod slow_tests {
     use ::fixt::prelude::*;
     use holo_hash::fixt::AgentPubKeyFixturator;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::CreateEntryOutput;
+    use holochain_zome_types::CreateOutput;
     use holochain_zome_types::Entry;
     use std::sync::Arc;
 
@@ -367,7 +367,7 @@ mod slow_tests {
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock.clone();
 
-        let output: CreateEntryOutput =
+        let output: CreateOutput =
             crate::call_test_ribosome!(host_access, TestWasm::Validate, "always_validates", ());
 
         // the chain head should be the committed entry header
@@ -403,7 +403,7 @@ mod slow_tests {
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock.clone();
 
-        let output: CreateEntryOutput =
+        let output: CreateOutput =
             crate::call_test_ribosome!(host_access, TestWasm::Validate, "never_validates", ());
 
         // the chain head should be the committed entry header

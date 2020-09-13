@@ -47,11 +47,11 @@ pub(super) type SysMetaKey = AnyDhtHash;
 #[derive(Debug, Hash, PartialEq, Eq, Ord, PartialOrd, Clone, Serialize, Deserialize)]
 pub enum SysMetaVal {
     /// A header that results in a new entry
-    /// Either a [CreateEntry] or [UpdateEntry]
+    /// Either a [Create] or [Update]
     NewEntry(TimedHeaderHash),
-    /// An [UpdateEntry] [Header]
+    /// An [Update] [Header]
     Update(TimedHeaderHash),
-    /// An [Header::DeleteElement]
+    /// An [Header::Delete]
     Delete(TimedHeaderHash),
     /// Activity on an agent's public key
     Activity(TimedHeaderHash),
@@ -210,15 +210,15 @@ impl From<NewEntryHeader> for EntryHeader {
     }
 }
 
-impl From<header::UpdateEntry> for EntryHeader {
-    fn from(h: header::UpdateEntry) -> Self {
-        EntryHeader::Update(Header::UpdateEntry(h))
+impl From<header::Update> for EntryHeader {
+    fn from(h: header::Update) -> Self {
+        EntryHeader::Update(Header::Update(h))
     }
 }
 
-impl From<header::DeleteElement> for EntryHeader {
-    fn from(h: header::DeleteElement) -> Self {
-        EntryHeader::Delete(Header::DeleteElement(h))
+impl From<header::Delete> for EntryHeader {
+    fn from(h: header::Delete) -> Self {
+        EntryHeader::Delete(Header::Delete(h))
     }
 }
 
