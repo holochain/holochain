@@ -1,9 +1,9 @@
-/// hides away the gross bit where we hook up integer pointers to length-prefixed guest memory
+/// Hides away the gross bit where we hook up integer pointers to length-prefixed guest memory
 /// to serialization and deserialization, and returning things to the host, and memory allocation
 /// and deallocation.
 ///
-/// a lot of that is handled by the holochain_wasmer crates but this handles the boilerplate of
-/// writing an extern function that has an awkward input and output signature:
+/// A lot of that is handled by the holochain_wasmer crates but this handles the boilerplate of
+/// writing an extern function as they have awkward input and output signatures:
 ///
 /// - requires remembering #[no_mangle]
 /// - requires remembering pub extern "C"

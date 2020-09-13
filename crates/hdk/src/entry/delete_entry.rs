@@ -1,5 +1,6 @@
-/// trivial wrapper around the __delete_entry host_fn
-/// takes any expression that evaluates to an entry hash
+/// Alias to delete!
+///
+/// Takes any expression that evaluates to the HeaderHash of the deleted element.
 ///
 /// ```ignore
 /// delete_entry!(entry_hash!(foo_entry)?)?;

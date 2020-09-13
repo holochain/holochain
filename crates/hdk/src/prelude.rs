@@ -70,3 +70,4 @@ pub use holochain_zome_types::zome_info::ZomeInfo;
 pub use holochain_zome_types::*;
 pub use std::collections::HashSet;
 pub use std::convert::TryFrom;
+pub use holo_hash::HasHash;

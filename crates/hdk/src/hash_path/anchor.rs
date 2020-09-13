@@ -7,17 +7,17 @@ use holochain_wasmer_guest::*;
 pub const ROOT: &str = "hdk3anchor";
 
 #[derive(PartialEq, SerializedBytes, serde::Serialize, serde::Deserialize, Debug, Clone)]
-/// historically an anchor could only be 1 or 2 levels deep as "type" and "text"
+/// Historically an anchor could only be 1 or 2 levels deep as "type" and "text".
 pub struct Anchor {
     pub anchor_type: String,
     pub anchor_text: Option<String>,
 }
 
-// provide all the default entry conventions for anchors
+// Provide all the default entry conventions for anchors.
 entry_def!(Anchor Path::entry_def());
 
-/// anchors are just a special case of path, so we can move from anchor to path losslessly
-/// we simply format the anchor structure into a string that works with the path string handling
+/// Anchors are just a special case of path, so we can move from anchor to path losslessly.
+/// We simply format the anchor structure into a string that works with the path string handling.
 impl From<&Anchor> for Path {
     fn from(anchor: &Anchor) -> Self {
         Self::from(&format!(
@@ -30,9 +30,9 @@ impl From<&Anchor> for Path {
     }
 }
 
-/// paths are more general than anchors so a path could be represented that is not a valid anchor
-/// the obvious example would be a path of binary data that is not valid utf-8 strings or a path
-/// that is more than 2 levels deep
+/// Paths are more general than anchors so a path could be represented that is not a valid anchor.
+/// The obvious example would be a path of binary data that is not valid utf-8 strings or a path
+/// that is more than 2 levels deep.
 impl TryFrom<&Path> for Anchor {
     type Error = SerializedBytesError;
     fn try_from(path: &Path) -> Result<Self, Self::Error> {
@@ -64,8 +64,8 @@ impl TryFrom<&Path> for Anchor {
     }
 }
 
-/// simple string interface to simple string based paths
-/// a.k.a "the anchor pattern" that predates paths by a few years
+/// Simple string interface to simple string based paths.
+/// a.k.a "the anchor pattern" that predates paths by a few years.
 pub fn anchor(anchor_type: String, anchor_text: String) -> Result<holo_hash::EntryHash, HdkError> {
     let path: Path = (&Anchor {
         anchor_type,
@@ -76,9 +76,9 @@ pub fn anchor(anchor_type: String, anchor_text: String) -> Result<holo_hash::Ent
     Ok(path.hash()?)
 }
 
-/// attempt to get an anchor by its hash
-/// this can return None if the hash doesn't point to an anchor
-/// we can't do anything fancy like ensure the anchor if not exists because we only have a hash
+/// Attempt to get an anchor by its hash.
+/// Returns None if the hash doesn't point to an anchor.
+/// We can't do anything fancy like ensure the anchor if not exists because we only have a hash.
 pub fn get_anchor(anchor_address: holo_hash::EntryHash) -> Result<Option<Anchor>, HdkError> {
     Ok(match get!(anchor_address)?.and_then(|el| el.into()) {
         Some(Entry::App(eb)) => {
@@ -89,8 +89,8 @@ pub fn get_anchor(anchor_address: holo_hash::EntryHash) -> Result<Option<Anchor>
     })
 }
 
-/// returns every entry hash in a vector from the root of an anchor
-/// hashes are sorted in the same way that paths sort children
+/// Returns every entry hash in a vector from the root of an anchor.
+/// Hashes are sorted in the same way that paths sort children.
 pub fn list_anchor_type_addresses() -> Result<Vec<holo_hash::EntryHash>, HdkError> {
     let links = Path::from(ROOT)
         .children()?
@@ -101,9 +101,9 @@ pub fn list_anchor_type_addresses() -> Result<Vec<holo_hash::EntryHash>, HdkErro
     Ok(links)
 }
 
-/// returns every entry hash in a vector from the second level of an anchor
-/// uses the string argument to build the path from the root
-/// hashes are sorted in the same way that paths sort children
+/// Returns every entry hash in a vector from the second level of an anchor.
+/// Uses the string argument to build the path from the root.
+/// Hashes are sorted in the same way that paths sort children.
 pub fn list_anchor_addresses(anchor_type: String) -> Result<Vec<holo_hash::EntryHash>, HdkError> {
     let path: Path = (&Anchor {
         anchor_type,
@@ -120,10 +120,10 @@ pub fn list_anchor_addresses(anchor_type: String) -> Result<Vec<holo_hash::Entry
     Ok(links)
 }
 
-/// the old version of holochain that anchors was designed for had two part link tags but now link
+/// Old version of holochain that anchors was designed for had two part link tags but now link
 /// tags are a single array of bytes, so to get an external interface that is somewhat backwards
 /// compatible we need to rebuild the anchors from the paths serialized into the links and then
-/// return the
+/// return them.
 pub fn list_anchor_tags(anchor_type: String) -> Result<Vec<String>, HdkError> {
     let path: Path = (&Anchor {
         anchor_type,

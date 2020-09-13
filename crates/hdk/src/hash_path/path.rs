@@ -5,54 +5,54 @@ use holochain_wasmer_guest::*;
 use holochain_zome_types::link::LinkTag;
 use std::str::FromStr;
 
-/// allows for "foo.bar.baz" to automatically move to/from ["foo", "bar", "baz"] components
-/// technically it's moving each string component in as bytes
-/// if this is a problem for you simply build the components yourself as a Vec<Vec<u8>>
+/// Allows for "foo.bar.baz" to automatically move to/from ["foo", "bar", "baz"] components.
+/// Technically it's moving each string component in as bytes.
+/// If this is a problem for you simply build the components yourself as a Vec<Vec<u8>>
 /// @see `impl From<String> for Path` below
 pub const DELIMITER: &str = ".";
 
 /// "hdk.path" as utf8 bytes
-/// all paths use the same link tag and entry def id
-/// different pathing schemes/systems/implementations should namespace themselves by their path
-/// components rather than trying to layer different link namespaces over the same path components
-/// similarly there is no need to define different entry types for different pathing strategies
+/// All paths use the same link tag and entry def id.
+/// Different pathing schemes/systems/implementations should namespace themselves by their path
+/// components rather than trying to layer different link namespaces over the same path components.
+/// Similarly there is no need to define different entry types for different pathing strategies.
 /// @todo - revisit whether there is a need/use-case for different link tags or entries
 /// @see anchors implementation
 pub const NAME: [u8; 8] = [0x68, 0x64, 0x6b, 0x2e, 0x70, 0x61, 0x74, 0x68];
 
-/// each path component is arbitrary bytes to be hashed together in a predictable way when the path
-/// is hashed to create something that can be linked and discovered by all DHT participants
+/// Each path component is arbitrary bytes to be hashed together in a predictable way when the path
+/// is hashed to create something that can be linked and discovered by all DHT participants.
 #[derive(Clone, PartialEq, Debug, Default, serde::Deserialize, serde::Serialize)]
 #[repr(transparent)]
 pub struct Component(#[serde(with = "serde_bytes")] Vec<u8>);
 
-/// wrap bytes
+/// Wrap bytes.
 impl From<Vec<u8>> for Component {
     fn from(v: Vec<u8>) -> Self {
         Self(v)
     }
 }
 
-/// access bytes
+/// Access bytes.
 impl AsRef<[u8]> for Component {
     fn as_ref(&self) -> &[u8] {
         self.0.as_ref()
     }
 }
 
-/// unwrap bytes
+/// Unwrap bytes.
 impl From<Component> for Vec<u8> {
     fn from(component: Component) -> Self {
         component.0
     }
 }
 
-/// build a component from a string
-/// for many simple use cases we can construct a path out of a string similar to a URI
-/// we represent this using the utf32 bytes rather than the utf8 bytes for the chars in the string
+/// Build a component from a String.
+/// For many simple use cases we can construct a path out of a string similar to a URI.
+/// We represent this using the utf32 bytes rather than the utf8 bytes for the chars in the string
 /// which gives us a fixed width encoding for strings, which gives us a clean/easy way to support
 /// sharding based on strings by iterating over u32s rather than deciding what to do with variable
-/// width u8 or u16 characters
+/// width u8 or u16 characters.
 impl From<&str> for Component {
     fn from(s: &str) -> Self {
         let bytes: Vec<u8> = s
@@ -62,20 +62,20 @@ impl From<&str> for Component {
         Self::from(bytes)
     }
 }
-/// alias From<&str>
+/// Alias From<&str>
 impl From<&String> for Component {
     fn from(s: &String) -> Self {
         Self::from(s.as_str())
     }
 }
-/// alias From<&str>
+/// Alias From<&str>
 impl From<String> for Component {
     fn from(s: String) -> Self {
         Self::from(s.as_str())
     }
 }
 
-/// restoring a String from a Component requires Vec<u8> to u32 to utf8 handling
+/// Restoring a String from a Component requires Vec<u8> to u32 to utf8 handling.
 impl TryFrom<&Component> for String {
     type Error = SerializedBytesError;
     fn try_from(component: &Component) -> Result<Self, Self::Error> {
@@ -96,8 +96,8 @@ impl TryFrom<&Component> for String {
                     if error.is_none() {
                         build.push(*b);
                         if build.len() == std::mem::size_of::<u32>() {
-                            // convert the build vector into 4 le_bytes for the u32
-                            // this is an unwrap because we already check the total length above
+                            // Convert the build vector into 4 le_bytes for the u32.
+                            // This is an unwrap because we already check the total length above.
                             let le_bytes = build[0..std::mem::size_of::<u32>()].try_into().unwrap();
                             let u = u32::from_le_bytes(le_bytes);
                             match std::char::from_u32(u) {
@@ -124,14 +124,14 @@ impl TryFrom<&Component> for String {
     }
 }
 
-/// a Path is a vector of components
-/// it represents a single traversal of a tree structure down to some arbitrary point
-/// the main intent is that we can recursively walk back up the tree, hashing, committing and
-/// linking each sub-path along the way until we reach the root
-/// at this point, it is possible to follow DHT links from the root back up the path
+/// A Path is a vector of components.
+/// It represents a single traversal of a tree structure down to some arbitrary point.
+/// The main intent is that we can recursively walk back up the tree, hashing, committing and
+/// linking each sub-path along the way until we reach the root.
+/// At this point it is possible to follow DHT links from the root back up the path.
 /// i.e. the ahead-of-time predictability of the hashes of a given path allows us to travel "up"
 /// the tree and the linking functionality of the holochain DHT allows us to travel "down" the tree
-/// after at least one DHT participant has followed the path "up"
+/// after at least one DHT participant has followed the path "up".
 #[derive(
     Clone, Debug, PartialEq, Default, serde::Deserialize, serde::Serialize, SerializedBytes,
 )]
@@ -145,32 +145,32 @@ entry_def!(Path EntryDef {
     visibility: EntryVisibility::Public,
 });
 
-/// wrap components vector
+/// Wrap components vector.
 impl From<Vec<Component>> for Path {
     fn from(components: Vec<Component>) -> Self {
         Self(components)
     }
 }
 
-/// unwrap components vector
+/// Unwrap components vector.
 impl From<Path> for Vec<Component> {
     fn from(path: Path) -> Self {
         path.0
     }
 }
 
-/// access components vector
+/// Access components vector.
 impl AsRef<Vec<Component>> for Path {
     fn as_ref(&self) -> &Vec<Component> {
         self.0.as_ref()
     }
 }
 
-/// split a string path out into a vector of components
-/// this allows us to construct pseudo-URI-path-things as strings
-/// it is a simpler scheme than URLs and file paths though
-/// leading and trailing slashes are ignored as are duplicate slashes and the empty string leads
-/// to a path with zero length (no components)
+/// Split a string path out into a vector of components.
+/// This allows us to construct pseudo-URI-path-things as strings.
+/// It is a simpler scheme than URLs and file paths.
+/// Leading and trailing slashes are ignored as are duplicate dots and the empty string leads
+/// to a path with zero length (no components).
 ///
 /// e.g. all the following result in the same components as `vec!["foo", "bar"]` (as bytes)
 /// - foo.bar
@@ -179,27 +179,27 @@ impl AsRef<Vec<Component>> for Path {
 /// - .foo.bar.
 /// - foo..bar
 ///
-/// there is no normalisation of paths, e.g. to guarantee a specific root component exists, at this
+/// There is no normalisation of paths, e.g. to guarantee a specific root component exists, at this
 /// layer so there is a risk that there are hash collisions with other data on the DHT network if
 /// some disambiguation logic is not included in higher level abstractions.
 ///
-/// this supports sharding strategies from a small inline DSL
-/// start each component with <width>:<depth># to get shards out of the string
+/// This supports sharding strategies from a small inline DSL.
+/// Start each component with <width>:<depth># to get shards out of the string.
 ///
 /// e.g.
 /// - foo.barbaz => normal path as above ["foo", "barbaz"]
 /// - foo.1:3#barbazii => width 1, depth 3, ["foo", "b", "a", "r", "barbazii"]
 /// - foo.2:3#barbazii => width 2, depth 3, ["foo", "ba", "rb", "az", "barbazii"]
 ///
-/// note that this all works because the components and sharding for strings maps to fixed-width
-/// utf32 bytes under the hood rather than variable width bytes
+/// Note that this all works because the components and sharding for strings maps to fixed-width
+/// utf32 bytes under the hood rather than variable width bytes.
 impl From<&str> for Path {
     fn from(s: &str) -> Self {
         Self(
             s.split(DELIMITER)
                 .filter(|s| !s.is_empty())
                 .flat_map(|s| match ShardStrategy::from_str(s) {
-                    // handle a strategy if one is found
+                    // Handle a strategy if one is found.
                     Ok(strategy) => {
                         let (_strategy, component) = s.split_at(s.find(SHARDEND).unwrap());
                         let component = component.trim_start_matches(SHARDEND);
@@ -208,20 +208,20 @@ impl From<&str> for Path {
                         shard_components.push(Component::from(component));
                         shard_components
                     }
-                    // no strategy just use the component directly
+                    // No strategy. Use the component directly.
                     Err(_) => vec![Component::from(s)],
                 })
                 .collect(),
         )
     }
 }
-/// alias From<&str>
+/// Alias From<&str>
 impl From<&String> for Path {
     fn from(s: &String) -> Self {
         Self::from(s.as_str())
     }
 }
-/// alias From<&str>
+/// Alias From<&str>
 impl From<String> for Path {
     fn from(s: String) -> Self {
         Self::from(s.as_str())
@@ -231,13 +231,13 @@ impl From<String> for Path {
 impl TryFrom<&Path> for LinkTag {
     type Error = SerializedBytesError;
     fn try_from(path: &Path) -> Result<Self, Self::Error> {
-        // link tag is:
+        // Link tag is:
         //
         // - the name of all anchor links to disambiguate against other links
         // - the literal serialized bytes of the path
         //
-        // this allows the value of the target to be read/dereferenced straight from the
-        // link without needing additional network calls
+        // This allows the value of the target to be read/dereferenced straight from the
+        // link without needing additional network calls.
         let path_bytes: Vec<u8> = UnsafeBytes::from(SerializedBytes::try_from(path)?).into();
         let link_tag_bytes: Vec<u8> = NAME.iter().chain(path_bytes.iter()).cloned().collect();
         Ok(LinkTag::new(link_tag_bytes))
@@ -253,17 +253,17 @@ impl TryFrom<&LinkTag> for Path {
 }
 
 impl Path {
-    /// what is the hash for the current Path
+    /// What is the hash for the current Path.
     pub fn hash(&self) -> Result<holo_hash::EntryHash, HdkError> {
         Ok(hash_entry!(self)?)
     }
 
-    /// does an entry exist at the hash we expect?
+    /// Does an entry exist at the hash we expect?
     pub fn exists(&self) -> Result<bool, HdkError> {
         Ok(get!(self.hash()?)?.is_some())
     }
 
-    /// recursively touch this and every parent that doesn't exist yet
+    /// Recursively touch this and every parent that doesn't exist yet.
     pub fn ensure(&self) -> Result<(), HdkError> {
         if !self.exists()? {
             create_entry!(self)?;
@@ -284,12 +284,12 @@ impl Path {
         }
     }
 
-    /// touch and list all the links from this anchor to anchors below it
-    /// only returns links between anchors, not to other entries that might have their own links
+    /// Touch and list all the links from this anchor to anchors below it.
+    /// Only returns links between anchors, not to other entries that might have their own links.
     pub fn children(&self) -> Result<holochain_zome_types::link::Links, HdkError> {
         Self::ensure(&self)?;
         let links = get_links!(self.hash()?, holochain_zome_types::link::LinkTag::new(NAME))?;
-        // only need one of each hash to build the tree
+        // Only need one of each hash to build the tree.
         let mut unwrapped: Vec<holochain_zome_types::link::Link> = links.into_inner();
         unwrapped.sort();
         unwrapped.dedup();
