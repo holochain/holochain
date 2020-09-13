@@ -1,11 +1,11 @@
 pub mod agent_info;
 pub mod call;
 pub mod call_remote;
-pub mod create_entry;
+pub mod create;
 pub mod create_link;
 pub mod debug;
 pub mod decrypt;
-pub mod delete_entry;
+pub mod delete;
 pub mod delete_link;
 pub mod emit_signal;
 pub mod encrypt;
@@ -24,7 +24,7 @@ pub mod show_env;
 pub mod sign;
 pub mod sys_time;
 pub mod unreachable;
-pub mod update_entry;
+pub mod update;
 pub mod zome_info;
 
 #[macro_export]

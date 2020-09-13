@@ -99,8 +99,8 @@ wasm_io_types!(
     pub struct EmitSignalInput(());
     pub struct EmitSignalOutput(());
     // @TODO
-    pub struct DeleteEntryInput(holo_hash::HeaderHash);
-    pub struct DeleteEntryOutput(holo_hash::HeaderHash);
+    pub struct DeleteInput(holo_hash::HeaderHash);
+    pub struct DeleteOutput(holo_hash::HeaderHash);
     // create link entries
     pub struct CreateLinkInput(
         (

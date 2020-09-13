@@ -1,4 +1,4 @@
-use super::{create_entry::extract_entry_def, delete_entry::get_original_address};
+use super::{create::extract_entry_def, delete::get_original_address};
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::{
@@ -16,7 +16,7 @@ use holochain_zome_types::{
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
-pub fn update_entry<'a>(
+pub fn update<'a>(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: UpdateInput,

@@ -30,11 +30,11 @@ use crate::core::ribosome::host_fn::call_remote::call_remote;
 use crate::core::ribosome::host_fn::capability_claims::capability_claims;
 use crate::core::ribosome::host_fn::capability_grants::capability_grants;
 use crate::core::ribosome::host_fn::capability_info::capability_info;
-use crate::core::ribosome::host_fn::create_entry::create_entry;
+use crate::core::ribosome::host_fn::create::create;
 use crate::core::ribosome::host_fn::create_link::create_link;
 use crate::core::ribosome::host_fn::debug::debug;
 use crate::core::ribosome::host_fn::decrypt::decrypt;
-use crate::core::ribosome::host_fn::delete_entry::delete_entry;
+use crate::core::ribosome::host_fn::delete::delete;
 use crate::core::ribosome::host_fn::delete_link::delete_link;
 use crate::core::ribosome::host_fn::emit_signal::emit_signal;
 use crate::core::ribosome::host_fn::encrypt::encrypt;
@@ -52,7 +52,7 @@ use crate::core::ribosome::host_fn::show_env::show_env;
 use crate::core::ribosome::host_fn::sign::sign;
 use crate::core::ribosome::host_fn::sys_time::sys_time;
 use crate::core::ribosome::host_fn::unreachable::unreachable;
-use crate::core::ribosome::host_fn::update_entry::update_entry;
+use crate::core::ribosome::host_fn::update::update;
 use crate::core::ribosome::host_fn::zome_info::zome_info;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::Invocation;
@@ -297,21 +297,21 @@ impl WasmRibosome {
         } = host_fn_access
         {
             ns.insert("__call", func!(invoke_host_function!(call)));
-            ns.insert("__create_entry", func!(invoke_host_function!(create_entry)));
+            ns.insert("__create", func!(invoke_host_function!(create)));
             ns.insert("__emit_signal", func!(invoke_host_function!(emit_signal)));
             ns.insert("__create_link", func!(invoke_host_function!(create_link)));
             ns.insert("__delete_link", func!(invoke_host_function!(delete_link)));
-            ns.insert("__update_entry", func!(invoke_host_function!(update_entry)));
-            ns.insert("__delete_entry", func!(invoke_host_function!(delete_entry)));
+            ns.insert("__update", func!(invoke_host_function!(update)));
+            ns.insert("__delete", func!(invoke_host_function!(delete)));
             ns.insert("__schedule", func!(invoke_host_function!(schedule)));
         } else {
             ns.insert("__call", func!(invoke_host_function!(unreachable)));
-            ns.insert("__create_entry", func!(invoke_host_function!(unreachable)));
+            ns.insert("__create", func!(invoke_host_function!(unreachable)));
             ns.insert("__emit_signal", func!(invoke_host_function!(unreachable)));
             ns.insert("__create_link", func!(invoke_host_function!(unreachable)));
             ns.insert("__delete_link", func!(invoke_host_function!(unreachable)));
-            ns.insert("__update_entry", func!(invoke_host_function!(unreachable)));
-            ns.insert("__delete_entry", func!(invoke_host_function!(unreachable)));
+            ns.insert("__update", func!(invoke_host_function!(unreachable)));
+            ns.insert("__delete", func!(invoke_host_function!(unreachable)));
             ns.insert("__schedule", func!(invoke_host_function!(unreachable)));
         }
         imports.register("env", ns);

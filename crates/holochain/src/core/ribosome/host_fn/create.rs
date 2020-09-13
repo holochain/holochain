@@ -21,7 +21,7 @@ use std::sync::Arc;
 
 /// commit an entry
 #[allow(clippy::extra_unused_lifetimes)]
-pub fn create_entry<'a>(
+pub fn create<'a>(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: CreateInput,
@@ -121,7 +121,7 @@ pub fn extract_entry_def(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    use super::create_entry;
+    use super::create;
     use crate::core::ribosome::error::RibosomeError;
     use crate::core::state::source_chain::ChainInvalidReason;
     use crate::core::state::source_chain::SourceChainError;
@@ -169,7 +169,7 @@ pub mod wasm_test {
         let entry_def_id = EntryDefId::App("post".into());
         let input = CreateInput::new((entry_def_id, app_entry.clone()));
 
-        let output = create_entry(Arc::new(ribosome), Arc::new(call_context), input);
+        let output = create(Arc::new(ribosome), Arc::new(call_context), input);
 
         assert_eq!(
             format!("{:?}", output.unwrap_err()),
@@ -212,7 +212,7 @@ pub mod wasm_test {
         let entry_def_id = EntryDefId::App("post".into());
         let input = CreateInput::new((entry_def_id, app_entry.clone()));
 
-        let output = create_entry(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
+        let output = create(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
 
         // the chain head should be the committed entry header
         let chain_head = tokio_safe_block_on::tokio_safe_block_forever_on(async move {

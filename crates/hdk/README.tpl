@@ -479,7 +479,7 @@ It consists of a few components, some new and some already demonstrated above:
 - `holochain_externs!()` to enable the holochain host to run the wasm
 - A `Png` struct to hold binary PNG data as `u8` bytes
 - An `extern` function `save_image` that will be callable over websockets RPC
-- A `host_call!` to `__create_entry` inside `save_image` to commit the image
+- A `host_call!` to `__create` inside `save_image` to commit the image
 - A `validate_entry` callback function implementation to validate the PNG
 - Some basic validation logic to ensure the PNG is under 10mb
 - Calling `host_args!()` in both externs to accept input
@@ -510,10 +510,10 @@ pub extern "C" fn save_image(remote_ptr: GuestPtr) -> GuestPtr {
  // a real application should handle it
  //
  // the important bit for this example is that we use host_call!() and that the
- // __create_entry function on the host will enqueue a validation callback
+ // __create function on the host will enqueue a validation callback
  let _: CreateOutput = host_call!(
   // note that all host functions from holochain start with prefix `__`
-  __create_entry,
+  __create,
   CreateInput::new(
    Entry::App(
     // this serializes the image into an Entry enum that the holochain host
@@ -637,7 +637,7 @@ pub extern "C" fn commit_message(remote_ptr: GuestPtr) -> GuestPtr {
  // handles memory and serialization logic for the holochain host
  let commit_entry_output: CreateOutput = try_result!(
   host_call!(
-   __create_entry,
+   __create,
    CreateInput::new(
     Entry::App(
      try_result!(
@@ -678,7 +678,7 @@ the sugar that it provides.
 The HDK macros simply expand to this extern boilerplate, saving you from typing
 out a few macros to input/output data for the host. They also offer some
 convenience wrappers around `host_call!()` that do exactly what you'd expect,
-e.g. `create_entry!( ... )` vs. `host_call!(__create_entry, ... )`.
+e.g. `create_entry!( ... )` vs. `host_call!(__create, ... )`.
 
 Think of the HDK as a tool and safety net but also don't feel you can't peek
 under the hood to see what is there.
@@ -718,7 +718,7 @@ struct Png([u8]);
 // the only wasm-ey thing here is the `host_call!()` macro
 fn _save_image(png: Png) -> Result<CreateOutput, String> {
  Ok(host_call!(
-  __create_entry,
+  __create,
   CreateInput::new(
    Entry::App(
     png.try_into()?

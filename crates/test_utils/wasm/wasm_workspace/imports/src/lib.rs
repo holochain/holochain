@@ -37,7 +37,7 @@ guest_functions!(
     [__capability_grants, capability_grants, CapabilityGrantsInput, CapabilityGrantsOutput],
     [__capability_info, capability_info, CapabilityInfoInput, CapabilityInfoOutput],
     // [
-    //     __create_entry,
+    //     __create,
     //     commit_entry,
     //     CreateInput,
     //     CreateOutput
@@ -61,24 +61,24 @@ guest_functions!(
     ],
     [__sign, sign, SignInput, SignOutput],
     [__schedule, schedule, ScheduleInput, ScheduleOutput],
-    [
-        __update_entry,
-        update_entry,
-        UpdateInput,
-        UpdateOutput
-    ],
+    // [
+    //     __update,
+    //     update_entry,
+    //     UpdateInput,
+    //     UpdateOutput
+    // ],
     [
         __emit_signal,
         emit_signal,
         EmitSignalInput,
         EmitSignalOutput
     ],
-    [
-        __delete_entry,
-        delete_entry,
-        DeleteEntryInput,
-        DeleteEntryOutput
-    ],
+    // [
+    //     __delete,
+    //     delete_entry,
+    //     DeleteInput,
+    //     DeleteOutput
+    // ],
     // [
     //     __create_link,
     //     create_link,

@@ -7,16 +7,16 @@ use crate::core::{workflow::integrate_dht_ops_workflow::integrate_to_cache, Sour
 use holo_hash::{EntryHash, HeaderHash};
 use holochain_p2p::actor::GetOptions;
 use holochain_zome_types::header::builder;
-use holochain_zome_types::DeleteEntryInput;
-use holochain_zome_types::{element::SignedHeaderHashed, DeleteEntryOutput};
+use holochain_zome_types::DeleteInput;
+use holochain_zome_types::{element::SignedHeaderHashed, DeleteOutput};
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
-pub fn delete_entry<'a>(
+pub fn delete<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: DeleteEntryInput,
-) -> RibosomeResult<DeleteEntryOutput> {
+    input: DeleteInput,
+) -> RibosomeResult<DeleteOutput> {
     let deletes_address = input.into_inner();
 
     let deletes_entry_address =
@@ -46,7 +46,7 @@ pub fn delete_entry<'a>(
         .await
         .map_err(Box::new)
         .map_err(SourceChainError::from)?;
-        Ok(DeleteEntryOutput::new(header_hash))
+        Ok(DeleteOutput::new(header_hash))
     })
 }
 

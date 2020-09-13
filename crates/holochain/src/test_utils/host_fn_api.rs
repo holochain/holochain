@@ -25,7 +25,7 @@ use holochain_zome_types::{
     link::{Link, LinkTag},
     metadata::Details,
     zome::ZomeName,
-    CreateInput, CreateLinkInput, DeleteEntryInput, DeleteLinkInput, GetDetailsInput, GetInput,
+    CreateInput, CreateLinkInput, DeleteInput, DeleteLinkInput, GetDetailsInput, GetInput,
     GetLinksInput, UpdateInput,
 };
 use std::sync::Arc;
@@ -106,7 +106,7 @@ pub async fn commit_entry<'env, E: Into<entry_def::EntryDefId>>(
         let call_context = CallContext::new(zome_name, host_access.into());
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
-        host_fn::create_entry::create_entry(ribosome.clone(), call_context.clone(), input).unwrap()
+        host_fn::create::create(ribosome.clone(), call_context.clone(), input).unwrap()
     };
 
     // Write
@@ -134,14 +134,14 @@ pub async fn delete_entry<'env>(
     let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
     let workspace_lock = CallZomeWorkspaceLock::new(workspace);
 
-    let input = DeleteEntryInput::new(hash);
+    let input = DeleteInput::new(hash);
 
     let output = {
         let host_access = ZomeCallHostAccess::new(workspace_lock.clone(), keystore, network);
         let call_context = CallContext::new(zome_name, host_access.into());
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
-        let r = host_fn::delete_entry::delete_entry(ribosome.clone(), call_context.clone(), input);
+        let r = host_fn::delete::delete(ribosome.clone(), call_context.clone(), input);
         let r = r.map_err(|e| {
             debug!(%e);
             e
@@ -183,7 +183,7 @@ pub async fn update_entry<'env, E: Into<entry_def::EntryDefId>>(
         let call_context = CallContext::new(zome_name, host_access.into());
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
-        host_fn::update_entry::update_entry(ribosome.clone(), call_context.clone(), input).unwrap()
+        host_fn::update::update(ribosome.clone(), call_context.clone(), input).unwrap()
     };
 
     // Write
