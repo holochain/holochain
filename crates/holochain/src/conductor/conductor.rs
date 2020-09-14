@@ -628,6 +628,10 @@ where
         Ok(zome_defs)
     }
 
+    pub(super) async fn list_cell_ids(&self) -> ConductorResult<Vec<CellId>> {
+        Ok(self.cells.keys().cloned().collect())
+    }
+
     pub(super) async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
         let cell = self.cell_by_id(cell_id)?;
         let arc = cell.env();
