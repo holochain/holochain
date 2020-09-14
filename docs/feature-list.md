@@ -14,7 +14,7 @@ These are the features that are currently implemented or planned and their statu
 | `commit_entry!()`        | Done        | [Example](https://github.com/Holo-Host/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/commit_entry/src/lib.rs) |         |
 | `update_entry!()`        | Done        | [Example](https://github.com/Holo-Host/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/crud/src/countree.rs) |         |
 | `delete_entry!()`        | Done        | [Example](https://github.com/Holo-Host/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/crud/src/countree.rs) |         |
-| `link_entries!()`        | Done        | [Example](https://github.com/Holo-Host/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/link/src/lib.rs) | LinkTag will be splitted in Tag and Type (REVIEW: is this right?) |
+| `link_entries!()`        | Done        | [Example](https://github.com/Holo-Host/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/link/src/lib.rs) | LinkTag may get splitted in Tag and Type in the future |
 | `zome_info!()`           | Done        | [Example](https://github.com/Holo-Host/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/zome_info/src/lib.rs) |         |
 | `agent_info!()`          | Done        | [Example](https://github.com/Holo-Host/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/agent_info/src/lib.rs) |         |
 | `call_remote!()`         | Done        | [Example](https://github.com/Holo-Host/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/capability/src/lib.rs) |         |
@@ -27,12 +27,12 @@ These are the features that are currently implemented or planned and their statu
 | `commit_cap_claim!()`    | Done        | [Example](https://github.com/Holo-Host/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/capability/src/lib.rs) |         |
 | `init`                   | In progress | Callback exists, it is not called yet |
 | `post_commit`            | In progress | Callback exists, it is not called yet |
+| `keystore!() `           | In progress    |         |         |
 | `decrypt!() `            | Not done    |         |         |
 | `encrypt!() `            | Not done    |         |         |
 | `sign!() `               | Not done    |         |         |
 | `schedule!() `           | Not done    |         |         |
 | `emit_signal!()`         | Not done    |         |         |
-| `keystore!() `           | Not done    |         |         |
 | `property!() `           | Not done    |         |         |
 
 ## Core features
@@ -43,7 +43,8 @@ These are the features that are currently implemented or planned and their statu
 | Multi-agent interaction        | Done        | Many agents only work inside one conductor |
 | Networking                     | In progress |         |
 | Keystore (key-management)      | Provisional | A mocked keystore is in place, the real one close to be completed |
-| Validation                     | In progress | Callback exists, but validation flows are still being implemented |
+| System Validation              | Done |  |
+| App Validation                     | In progress | Callback exists, but validation flows are still being implemented, and callback types may change |
 | Validation receipts (warrants) | Not done    |         |
 
 ## Ecosystem and tools
