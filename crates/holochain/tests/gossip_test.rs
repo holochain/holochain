@@ -156,7 +156,7 @@ where
     Ok(ZomeCallInvocation {
         cell_id: cell_id.clone(),
         zome_name: TestWasm::Anchor.into(),
-        cap: CapSecretFixturator::new(Unpredictable).next().unwrap(),
+        cap: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
         fn_name: func.into(),
         payload: HostInput::new(payload.try_into()?),
         provenance: cell_id.agent_pubkey().clone(),

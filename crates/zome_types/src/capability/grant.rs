@@ -85,7 +85,7 @@ impl CapGrant {
         &self,
         check_function: &GrantedFunction,
         check_agent: &AgentPubKey,
-        check_secret: &CapSecret,
+        check_secret: Option<&CapSecret>,
     ) -> bool {
         match self {
             // the grant is valid always if the author matches the check agent
@@ -108,8 +108,8 @@ impl CapGrant {
                     // or it doesn't...
                     CapAccess::Unrestricted => true,
                     // note the PartialEq implementation is constant time for secrets
-                    CapAccess::Transferable { secret, .. } => secret == check_secret,
-                    CapAccess::Assigned { secret, .. } => secret == check_secret,
+                    CapAccess::Transferable { secret, .. } => check_secret.map(|given| secret == given).unwrap_or(false),
+                    CapAccess::Assigned { secret, .. } => check_secret.map(|given| secret == given).unwrap_or(false),
                 }
             }
         }

@@ -128,7 +128,7 @@ pub mod wasm_test {
             .call_zome(ZomeCallInvocation {
                 cell_id: bob_cell_id,
                 zome_name: TestWasm::WhoAmI.into(),
-                cap: ().into(),
+                cap: None,
                 fn_name: "set_access".into(),
                 payload: HostInput::new(().try_into().unwrap()),
                 provenance: bob_agent_id.clone(),
@@ -142,7 +142,7 @@ pub mod wasm_test {
             .call_zome(ZomeCallInvocation {
                 cell_id: alice_cell_id,
                 zome_name: TestWasm::WhoAmI.into(),
-                cap: ().into(),
+                cap: None,
                 fn_name: "whoarethey".into(),
                 payload: HostInput::new(bob_agent_id.clone().try_into().unwrap()),
                 provenance: alice_agent_id,

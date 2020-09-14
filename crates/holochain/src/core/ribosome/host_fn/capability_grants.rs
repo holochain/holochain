@@ -176,7 +176,7 @@ pub mod wasm_test {
             .call_zome(ZomeCallInvocation {
                 cell_id: alice_cell_id.clone(),
                 zome_name: TestWasm::Capability.into(),
-                cap: ().into(),
+                cap: None,
                 fn_name: "try_cap_claim".into(),
                 payload: HostInput::new(
                     CapFor(original_secret, bob_agent_id.clone().try_into().unwrap())
@@ -207,7 +207,7 @@ pub mod wasm_test {
             .call_zome(ZomeCallInvocation {
                 cell_id: bob_cell_id.clone(),
                 zome_name: TestWasm::Capability.into(),
-                cap: ().into(),
+                cap: None,
                 fn_name: "transferable_cap_grant".into(),
                 payload: HostInput::new(original_secret.try_into().unwrap()),
                 provenance: bob_agent_id.clone(),
@@ -229,7 +229,7 @@ pub mod wasm_test {
             .call_zome(ZomeCallInvocation {
                 cell_id: alice_cell_id.clone(),
                 zome_name: TestWasm::Capability.into(),
-                cap: ().into(),
+                cap: None,
                 fn_name: "try_cap_claim".into(),
                 payload: HostInput::new(
                     CapFor(original_secret, bob_agent_id.clone().try_into().unwrap())
@@ -263,7 +263,7 @@ pub mod wasm_test {
             .call_zome(ZomeCallInvocation {
                 cell_id: bob_cell_id.clone(),
                 zome_name: TestWasm::Capability.into(),
-                cap: ().into(),
+                cap: None,
                 fn_name: "roll_cap_grant".into(),
                 payload: HostInput::new(original_grant_hash.try_into().unwrap()),
                 provenance: bob_agent_id.clone(),
@@ -283,7 +283,7 @@ pub mod wasm_test {
             .call_zome(ZomeCallInvocation {
                 cell_id: bob_cell_id.clone(),
                 zome_name: TestWasm::Capability.into(),
-                cap: ().into(),
+                cap: None,
                 fn_name: "get_entry".into(),
                 payload: HostInput::new(new_grant_header_hash.clone().try_into().unwrap()),
                 provenance: bob_agent_id.clone(),
@@ -313,7 +313,7 @@ pub mod wasm_test {
             .call_zome(ZomeCallInvocation {
                 cell_id: alice_cell_id.clone(),
                 zome_name: TestWasm::Capability.into(),
-                cap: ().into(),
+                cap: None,
                 fn_name: "try_cap_claim".into(),
                 payload: HostInput::new(
                     CapFor(original_secret, bob_agent_id.clone().try_into().unwrap())
@@ -342,7 +342,7 @@ pub mod wasm_test {
             .call_zome(ZomeCallInvocation {
                 cell_id: alice_cell_id.clone(),
                 zome_name: TestWasm::Capability.into(),
-                cap: ().into(),
+                cap: None,
                 fn_name: "try_cap_claim".into(),
                 payload: HostInput::new(
                     CapFor(new_secret, bob_agent_id.clone().try_into().unwrap())
@@ -376,7 +376,7 @@ pub mod wasm_test {
             .call_zome(ZomeCallInvocation {
                 cell_id: bob_cell_id,
                 zome_name: TestWasm::Capability.into(),
-                cap: ().into(),
+                cap: None,
                 fn_name: "delete_cap_grant".into(),
                 payload: HostInput::new(new_grant_header_hash.try_into().unwrap()),
                 provenance: bob_agent_id.clone(),
@@ -389,7 +389,7 @@ pub mod wasm_test {
             .call_zome(ZomeCallInvocation {
                 cell_id: alice_cell_id.clone(),
                 zome_name: TestWasm::Capability.into(),
-                cap: ().into(),
+                cap: None,
                 fn_name: "try_cap_claim".into(),
                 payload: HostInput::new(
                     CapFor(original_secret, bob_agent_id.clone().try_into().unwrap())
@@ -418,7 +418,7 @@ pub mod wasm_test {
             .call_zome(ZomeCallInvocation {
                 cell_id: alice_cell_id.clone(),
                 zome_name: TestWasm::Capability.into(),
-                cap: ().into(),
+                cap: None,
                 fn_name: "try_cap_claim".into(),
                 payload: HostInput::new(
                     CapFor(new_secret, bob_agent_id.clone().try_into().unwrap())

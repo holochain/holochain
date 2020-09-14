@@ -100,7 +100,7 @@ impl SourceChain {
         &self,
         check_function: &GrantedFunction,
         check_agent: &AgentPubKey,
-        check_secret: &CapSecret,
+        check_secret: Option<&CapSecret>,
     ) -> SourceChainResult<Option<CapGrant>> {
         // most calls for most apps are going to be the local agent calling itself locally
         // for this case we want to short circuit without iterating the whole source chain
@@ -331,7 +331,7 @@ pub mod tests {
         let test_env = test_cell_env();
         let env = test_env.env();
         let access = CapAccess::from(CapSecretFixturator::new(Unpredictable).next().unwrap());
-        let secret = access.secret().unwrap();
+        let secret = access.secret();
 
         // @todo curry
         let _curry = CurryPayloadsFixturator::new(Empty).next().unwrap();
@@ -357,7 +357,7 @@ pub mod tests {
             );
 
             // bob should not match anything as the secret hasn't been committed yet
-            assert_eq!(chain.valid_cap_grant(&function, &bob, &secret)?, None);
+            assert_eq!(chain.valid_cap_grant(&function, &bob, secret)?, None);
         }
 
         let (original_header_address, original_entry_address) = {
@@ -381,14 +381,14 @@ pub mod tests {
             // alice should find her own authorship with higher priority than the committed grant
             // even if she passes in the secret
             assert_eq!(
-                chain.valid_cap_grant(&function, &alice, &secret)?,
+                chain.valid_cap_grant(&function, &alice, secret)?,
                 Some(CapGrant::Authorship(alice.clone())),
             );
 
             // bob should be granted with the committed grant as it matches the secret he passes to
             // alice at runtime
             assert_eq!(
-                chain.valid_cap_grant(&function, &bob, &secret)?,
+                chain.valid_cap_grant(&function, &bob, secret)?,
                 Some(grant.clone().into())
             );
         }
@@ -423,18 +423,18 @@ pub mod tests {
             // alice should find her own authorship with higher priority than the committed grant
             // even if she passes in the secret
             assert_eq!(
-                chain.valid_cap_grant(&function, &alice, &secret)?,
+                chain.valid_cap_grant(&function, &alice, secret)?,
                 Some(CapGrant::Authorship(alice.clone())),
             );
             assert_eq!(
-                chain.valid_cap_grant(&function, &alice, &updated_secret)?,
+                chain.valid_cap_grant(&function, &alice, Some(&updated_secret))?,
                 Some(CapGrant::Authorship(alice.clone())),
             );
 
             // bob MUST provide the updated secret as the old one is invalidated by the new one
-            assert_eq!(chain.valid_cap_grant(&function, &bob, &secret)?, None);
+            assert_eq!(chain.valid_cap_grant(&function, &bob, secret)?, None);
             assert_eq!(
-                chain.valid_cap_grant(&function, &bob, &updated_secret)?,
+                chain.valid_cap_grant(&function, &bob, Some(&updated_secret))?,
                 Some(updated_grant.into())
             );
         }
@@ -455,18 +455,18 @@ pub mod tests {
             let chain = SourceChain::new(env.clone().into())?;
             // alice should find her own authorship
             assert_eq!(
-                chain.valid_cap_grant(&function, &alice, &secret)?,
+                chain.valid_cap_grant(&function, &alice, secret)?,
                 Some(CapGrant::Authorship(alice.clone())),
             );
             assert_eq!(
-                chain.valid_cap_grant(&function, &alice, &updated_secret)?,
+                chain.valid_cap_grant(&function, &alice, Some(&updated_secret))?,
                 Some(CapGrant::Authorship(alice)),
             );
 
             // bob has no access
-            assert_eq!(chain.valid_cap_grant(&function, &bob, &secret)?, None);
+            assert_eq!(chain.valid_cap_grant(&function, &bob, secret)?, None);
             assert_eq!(
-                chain.valid_cap_grant(&function, &bob, &updated_secret)?,
+                chain.valid_cap_grant(&function, &bob, Some(&updated_secret))?,
                 None
             );
         }

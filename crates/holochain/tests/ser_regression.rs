@@ -125,7 +125,7 @@ async fn ser_regression_test() {
     let invocation = ZomeCallInvocation {
         cell_id: alice_cell_id.clone(),
         zome_name: TestWasm::SerRegression.into(),
-        cap: CapSecretFixturator::new(Unpredictable).next().unwrap(),
+        cap: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
         fn_name: "create_channel".into(),
         payload: HostInput::new(channel.try_into().unwrap()),
         provenance: alice_agent_id.clone(),
@@ -162,7 +162,7 @@ async fn ser_regression_test() {
     let invocation = ZomeCallInvocation {
         cell_id: alice_cell_id.clone(),
         zome_name: TestWasm::SerRegression.into(),
-        cap: CapSecretFixturator::new(Unpredictable).next().unwrap(),
+        cap: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
         fn_name: "create_message".into(),
         payload: HostInput::new(message.try_into().unwrap()),
         provenance: alice_agent_id.clone(),
