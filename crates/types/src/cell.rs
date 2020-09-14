@@ -8,7 +8,7 @@ use std::fmt;
 /// Cells are uniquely determined by this pair - this pair is necessary
 /// and sufficient to refer to a cell in a conductor
 #[derive(Clone, Debug, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct CellId(DnaHash, AgentPubKey);
+pub struct CellId(pub DnaHash, pub AgentPubKey);
 
 impl fmt::Display for CellId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
