@@ -1734,9 +1734,9 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore_api"
-version = "0.0.1-alpha.3"
+version = "0.0.1-alpha.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad1d362d2ae9453803b627fcb07da14bca2efdd464262f8f758b331a77a631eb"
+checksum = "078f78d2b0cbf8011d69db557e36fbe82363ea338936a0ca0c00267e7d71cc1d"
 dependencies = [
  "blake2b_simd",
  "byteorder",

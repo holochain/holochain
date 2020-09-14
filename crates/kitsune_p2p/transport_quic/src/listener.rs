@@ -124,25 +124,11 @@ mod danger {
     #[allow(dead_code)]
     pub(crate) async fn configure_server() -> TransportResult<(ServerConfig, Vec<u8>)>
     {
-        //let options = lair_keystore_api::actor::TlsCertOptions::default();
-        //let cert = lair_keystore_api::internal::tls::tls_cert_self_signed_new_from_entropy(
-        //    lair_keystore_api::actor::TlsCertOptions::default(),
-        //).await.map_err(TransportError::other)?;
-        let sni = format!("a{}a.a{}a", nanoid::nanoid!(), nanoid::nanoid!());
-        let mut params = rcgen::CertificateParams::new(vec![sni.clone()]);
-        //params.alg = &rcgen::PKCS_ED25519;
-        //params.alg = &rcgen::PKCS_ECDSA_P256_SHA256;
-        params.alg = &rcgen::PKCS_ECDSA_P384_SHA384;
-        let cert = rcgen::Certificate::from_params(params)
-            .map_err(TransportError::other)?;
-        let priv_key_der = cert.serialize_private_key_der();
-        let cert_der = cert.serialize_der().map_err(TransportError::other)?;
-        let cert = lair_keystore_api::entry::EntryTlsCert {
-            sni: sni.into(),
-            priv_key_der: priv_key_der.into(),
-            cert_der: cert_der.into(),
-            cert_digest: vec![0; 32].into(),
-        };
+        let mut options = lair_keystore_api::actor::TlsCertOptions::default();
+        options.alg = lair_keystore_api::actor::TlsCertAlg::PkcsEcdsaP256Sha256;
+        let cert = lair_keystore_api::internal::tls::tls_cert_self_signed_new_from_entropy(
+            options,
+        ).await.map_err(TransportError::other)?;
 
         let priv_key = PrivateKey::from_der(&cert.priv_key_der).map_err(TransportError::other)?;
 
