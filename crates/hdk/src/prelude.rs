@@ -45,7 +45,7 @@ pub use holochain_zome_types::call_remote::CallRemote;
 pub use holochain_zome_types::capability::*;
 pub use holochain_zome_types::crdt::CrdtType;
 pub use holochain_zome_types::debug_msg;
-pub use holochain_zome_types::element::Element;
+pub use holochain_zome_types::element::{Element, ElementVec};
 pub use holochain_zome_types::entry::*;
 pub use holochain_zome_types::entry_def::*;
 pub use holochain_zome_types::header::*;
