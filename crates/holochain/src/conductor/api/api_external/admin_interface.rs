@@ -238,7 +238,7 @@ pub enum AdminRequest {
     ListDnas,
     /// Generate a new AgentPubKey
     GenerateAgentPubKey,
-    /// Listing all the cell ids in the conductor
+    /// List all the cell ids in the conductor
     ListCellIds,
     /// Activate an app
     ActivateApp {
