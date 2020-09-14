@@ -121,7 +121,6 @@ pub fn extract_entry_def(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    use hdk3::prelude::*;
     use super::create;
     use crate::core::ribosome::error::RibosomeError;
     use crate::core::state::source_chain::ChainInvalidReason;
@@ -133,6 +132,7 @@ pub mod wasm_test {
     use crate::fixt::WasmRibosomeFixturator;
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
+    use hdk3::prelude::*;
     use holo_hash::{AnyDhtHash, EntryHash};
     use holochain_types::fixt::AppEntry;
     use holochain_wasm_test_utils::TestWasm;
@@ -158,9 +158,7 @@ pub mod wasm_test {
             WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::Create]))
                 .next()
                 .unwrap();
-        let mut call_context = CallContextFixturator::new(Unpredictable)
-            .next()
-            .unwrap();
+        let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
         call_context.zome_name = TestWasm::Create.into();
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock;
@@ -201,9 +199,7 @@ pub mod wasm_test {
             WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::Create]))
                 .next()
                 .unwrap();
-        let mut call_context = CallContextFixturator::new(Unpredictable)
-            .next()
-            .unwrap();
+        let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
         call_context.zome_name = TestWasm::Create.into();
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock.clone();
