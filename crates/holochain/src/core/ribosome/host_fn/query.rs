@@ -72,7 +72,7 @@ pub mod slow_tests {
             TestString::from("b".to_string())
         );
 
-        let elements: HeaderHashedVec = crate::call_test_ribosome!(
+        let elements: ElementVec = crate::call_test_ribosome!(
             host_access,
             TestWasm::Query,
             "query",
