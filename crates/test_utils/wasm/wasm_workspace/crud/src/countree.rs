@@ -14,10 +14,14 @@ impl std::ops::Add for CounTree {
 }
 
 impl CounTree {
+    #[allow(clippy::new_ret_no_self)]
+    /// ensures that a default countree exists and returns the header
     pub fn new() -> ExternResult<HeaderHash> {
         Self::ensure(Self::default())
     }
 
+    /// commits if not exists else returns found header
+    /// produces redundant headers in a partition
     pub fn ensure(countree: CounTree) -> ExternResult<HeaderHash> {
         match get!(entry_hash!(countree)?)? {
             Some(element) => Ok(element.header_address().to_owned()),

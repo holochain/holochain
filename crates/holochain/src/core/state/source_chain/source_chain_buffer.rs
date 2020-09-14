@@ -63,6 +63,11 @@ impl SourceChainBuf {
         self.sequence.chain_head()
     }
 
+    /// true if len is 0
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     pub fn len(&self) -> usize {
         self.sequence.len()
     }
@@ -149,7 +154,7 @@ impl SourceChainBuf {
         Ok(header_address)
     }
 
-    pub fn headers(&self) -> &HeaderCas {
+    pub fn headers(&self) -> &HeaderCas<IntegratedPrefix> {
         &self.elements.headers()
     }
 
@@ -235,7 +240,6 @@ impl SourceChainBuf {
         let dna_header = Header::Dna(header::Dna {
             author: agent_pubkey.clone(),
             timestamp: Timestamp::now().into(),
-            header_seq: 0,
             hash: dna_hash,
         });
         let dna_header_address = self.put_raw(dna_header, None).await?;
@@ -301,15 +305,10 @@ impl<'a> FallibleIterator for SourceChainBackwardIterator<'a> {
             None => Ok(None),
             Some(top) => {
                 let top = top.to_owned();
-                // TODO - Using a block_on here due to FallibleIterator.
-                //        We should switch `iter_back()` to produce an async Stream.
-                let header: Option<SignedHeaderHashed> = tokio_safe_block_on::tokio_safe_block_on(
-                    async { self.store.get_header(&top) },
-                    std::time::Duration::from_secs(10),
-                )??;
+                let header: Option<SignedHeaderHashed> = self.store.get_header(&top)?;
                 self.current = match &header {
                     None => None,
-                    Some(header) => header.header().prev_header().map(|h| h.clone()),
+                    Some(header) => header.header().prev_header().cloned(),
                 };
                 Ok(header)
             }
@@ -349,7 +348,6 @@ pub mod tests {
                 let dna_header = Header::Dna(header::Dna {
                     author: agent_pubkey.clone(),
                     timestamp: Timestamp(0, 0).into(),
-                    header_seq: 0,
                     hash: dna.dna_hash().clone(),
                 });
                 let dna_header = HeaderHashed::from_content_sync(dna_header);

@@ -3,19 +3,22 @@
 //! which would return Option in the SourceChainBuf, like getting the source chain head, or the AgentPubKey,
 //! cannot fail, so the function return types reflect that.
 
+pub use error::*;
 use fallible_iterator::FallibleIterator;
 use holo_hash::*;
 use holochain_state::{buffer::BufferedStore, error::DatabaseResult, fresh_reader, prelude::*};
-use holochain_types::{prelude::*, EntryHashed};
+use holochain_types::{prelude::*, EntryHashed, HeaderHashed};
+use holochain_zome_types::capability::CapAccess;
+use holochain_zome_types::capability::GrantedFunction;
 use holochain_zome_types::{
-    capability::{CapClaim, CapGrant, CapSecret},
-    entry::{CapClaimEntry, CapGrantEntry, Entry},
-    header::{builder, EntryType, HeaderBuilder, HeaderBuilderCommon, HeaderInner},
+    capability::{CapGrant, CapSecret},
+    entry::{CapClaimEntry, Entry},
+    header::{builder, EntryType, Header, HeaderBuilder, HeaderBuilderCommon, HeaderInner},
+    query::ChainQueryFilter,
 };
 use shrinkwraprs::Shrinkwrap;
-
-pub use error::*;
 pub use source_chain_buffer::*;
+use std::collections::HashSet;
 
 mod error;
 mod source_chain_buffer;
@@ -43,7 +46,7 @@ impl SourceChain {
         Ok(SourceChainBuf::new(env)?.into())
     }
 
-    pub async fn public_only(env: EnvironmentRead) -> DatabaseResult<Self> {
+    pub fn public_only(env: EnvironmentRead) -> DatabaseResult<Self> {
         Ok(SourceChainBuf::public_only(env)?.into())
     }
 
@@ -67,20 +70,6 @@ impl SourceChain {
         self.put_raw(header, maybe_entry).await
     }
 
-    /// Add a CapGrantEntry to the source chain
-    pub async fn put_cap_grant(
-        &mut self,
-        grant_entry: CapGrantEntry,
-    ) -> SourceChainResult<HeaderHash> {
-        let (entry, entry_hash) =
-            EntryHashed::from_content_sync(Entry::CapGrant(grant_entry)).into_inner();
-        let header_builder = builder::EntryCreate {
-            entry_type: EntryType::CapGrant,
-            entry_hash,
-        };
-        self.put(header_builder, Some(entry)).await
-    }
-
     /// Add a CapClaimEntry to the source chain
     pub async fn put_cap_claim(
         &mut self,
@@ -95,16 +84,98 @@ impl SourceChain {
         self.put(header_builder, Some(entry)).await
     }
 
-    /// Fetch a CapGrant from the private entries.
+    /// Fetch a relevant CapGrant from the private entries.
+    ///
+    /// If a function has an Unrestricted grant against it, this may be returned.
+    ///
+    /// Else the secret and assignees of a grant will be checked and may be returned.
+    ///
+    /// @todo this is not particularly fast, there are several ways to speed this up in the future
+    /// such as indexing secrets and prefixing cap grants in lmdb for direct lookup
     ///
     /// NB: [B-01676] the entry must be persisted for this to work. Once we have a
     /// proper capability index DB, OR a proper iterator that respects the
     /// scratch space, that will no longer be the case.
-    pub async fn get_persisted_cap_grant_by_secret(
+    pub fn valid_cap_grant(
         &self,
-        query: &CapSecret,
+        check_function: &GrantedFunction,
+        check_agent: &AgentPubKey,
+        check_secret: &CapSecret,
     ) -> SourceChainResult<Option<CapGrant>> {
-        let hashes_n_grants: Vec<_> = fresh_reader!(self.env(), |r| {
+        // most calls for most apps are going to be the local agent calling itself locally
+        // for this case we want to short circuit without iterating the whole source chain
+        let author_grant = CapGrant::from(self.agent_pubkey()?);
+        if author_grant.is_valid(check_function, check_agent, check_secret) {
+            return Ok(Some(author_grant));
+        }
+
+        // if we are here then the caller is not the current agent so we need to search the source
+        // chain to see if there is a local grant that is valid for the provided secret/agent
+        // combination
+        let committed_valid_grant = fresh_reader!(self.env(), |r| {
+            let (references, headers): (
+                HashSet<HeaderHash>,
+                Vec<HoloHashed<holochain_zome_types::element::SignedHeader>>,
+            ) = self
+                .0
+                .headers()
+                .iter_fail(&r)?
+                .filter(|header| {
+                    Ok(match header.as_content().header() {
+                        Header::EntryCreate(create) => match create.entry_type {
+                            EntryType::CapGrant => true,
+                            // filter out authorship and everything else
+                            _ => false,
+                        },
+                        Header::EntryUpdate(update) => match update.entry_type {
+                            EntryType::CapGrant => true,
+                            // filter out authorship and everything else
+                            _ => false,
+                        },
+                        Header::ElementDelete(_) => true,
+                        // no other headers are relevant
+                        _ => false,
+                    })
+                })
+                // extract all the header references
+                // if a header is referenced by an update/delete then it is no longer valid
+                // with all the references in a bucket we can use it to filter out entries below
+                .fold(
+                    (HashSet::new(), vec![]),
+                    |(mut references, mut headers), header| {
+                        match header.as_content().header() {
+                            Header::EntryUpdate(update) => {
+                                references.insert(update.original_header_address.clone());
+                            }
+                            Header::ElementDelete(delete) => {
+                                references.insert(delete.removes_address.clone());
+                            }
+                            _ => {}
+                        }
+                        // this is a best-effort attempt to avoid putting things we already know as
+                        // referenced into the returned vec
+                        // it isn't comprehensive because it relies on ordering but it's an easy
+                        // and relatively safe optimisation to not do further processing here
+                        if !references.contains(header.as_hash()) {
+                            headers.push(header);
+                        }
+
+                        Ok((references, headers))
+                    },
+                )?;
+
+            // second pass over the headers to make sure that all referenced headers are removed
+            // this makes the process reliable even if the iterators don't follow the chain order
+            let live_cap_grants: HashSet<_> = headers
+                .iter()
+                .filter(|header| !references.contains(header.as_hash()))
+                .filter_map(|header| match header.as_content().header() {
+                    Header::EntryCreate(create) => Some(create.entry_hash.clone()),
+                    Header::EntryUpdate(update) => Some(update.entry_hash.clone()),
+                    _ => None,
+                })
+                .collect();
+
             self
             .0
             .elements()
@@ -113,75 +184,118 @@ impl SourceChain {
                 "SourceChainBuf must have access to private entries in order to access CapGrants",
             )
             .iter_fail(&r)?
-            .filter_map(|entry| {
-                Ok(entry.as_cap_grant().and_then(|grant| {
-                    grant.access().secret().and_then(|secret| {
-                        if secret == query {
-                            Some((entry.into_hash(), grant.clone()))
-                        } else {
-                            None
-                        }
-                    })
-                }))
+            // ensure we respect the header filtering we already did above
+            .filter(|entry| {
+                Ok(live_cap_grants.contains(entry.as_hash()))
             })
-            .collect()
+            .filter_map(|entry| Ok(entry.as_cap_grant()))
+            // filter down to only the grants for this function
+            .filter(|grant| {
+                Ok(grant.is_valid(check_function, check_agent, check_secret))
+            })
+            // if there are still multiple grants, fold them down based on specificity
+            // authorship > assigned > transferable > unrestricted
+            .fold(None, |mut acc, grant| {
+                acc = match &grant {
+                    CapGrant::ZomeCall(zome_call_cap_grant) => {
+                        match &zome_call_cap_grant.access {
+                            CapAccess::Assigned { .. } => match &acc {
+                                Some(CapGrant::ZomeCall(acc_zome_call_cap_grant)) => {
+                                    match acc_zome_call_cap_grant.access {
+                                        // an assigned acc takes precedence
+                                        CapAccess::Assigned { .. } => acc,
+                                        // current grant takes precedence over all other accs
+                                        _ => Some(grant),
+                                    }
+                                }
+                                None => Some(grant),
+                                // authorship should be short circuit and filtered
+                                _ => unreachable!(),
+                            },
+                            CapAccess::Transferable { .. } => match &acc {
+                                Some(CapGrant::ZomeCall(acc_zome_call_cap_grant)) => {
+                                    match acc_zome_call_cap_grant.access {
+                                        // an assigned acc takes precedence
+                                        CapAccess::Assigned { .. } => acc,
+                                        // transferable acc takes precedence
+                                        CapAccess::Transferable { .. } => acc,
+                                        // current grant takes preference over other accs
+                                        _ => Some(grant),
+                                    }
+                                }
+                                None => Some(grant),
+                                // authorship should be short circuited and filtered by now
+                                _ => unreachable!(),
+                            }
+                            CapAccess::Unrestricted => match acc {
+                                Some(_) => acc,
+                                None => Some(grant),
+                            }
+                        }
+                    },
+                    // Authorship should have short circuited and be filtered out already
+                    _ => unreachable!(),
+                };
+                Ok(acc)
+            })
         })?;
-
-        let answer = if hashes_n_grants.len() == 0 {
-            None
-        } else if hashes_n_grants.len() == 1 {
-            hashes_n_grants.first().map(|p| p.1.clone())
-        } else {
-            // FIXME[B-01676]: we SHOULD iterate through the chain now to find the most
-            // recent grant with this secret, in case it was updated.
-            // This will be handled in the future with an index, for simple
-            // lookup by secret
-            todo!("Find proper grant or implement capability index")
-        };
-        Ok(answer)
+        Ok(committed_valid_grant)
     }
 
-    /// Fetch a CapClaim from the private entries.
-    ///
-    /// NB: [B-01676] the entry must be persisted for this to work. Once we have a
-    /// proper capability index DB, OR a proper iterator that respects the
-    /// scratch space, that will no longer be the case.
-    pub async fn get_persisted_cap_claim_by_secret(
-        &self,
-        query: &CapSecret,
-    ) -> SourceChainResult<Option<CapClaim>> {
-        let hashes_n_claims: Vec<_> = fresh_reader!(self.env(), |r| {
-            self
-            .0
-            .elements()
-            .private_entries()
-            .expect(
-                "SourceChainBuf must have access to private entries in order to access CapClaims",
-            )
-            .iter_fail(&r)?
-            .filter_map(|entry| {
-                if let (Entry::CapClaim(claim), entry_hash) = entry.into_inner() {
-                    Ok(Some((entry_hash, claim)))
-                } else {
-                    Ok(None)
-                }
-            })
-            .filter(|(_entry_hash, claim)| Ok(claim.secret() == query))
-            .collect()
-        })?;
+    // @todo bring all this back when we want to administer cap claims better
+    //         /// Fetch a CapClaim from the private entries.
+    //         ///
+    //         /// NB: [B-01676] the entry must be persisted for this to work. Once we have a
+    //         /// proper capability index DB, OR a proper iterator that respects the
+    //         /// scratch space, that will no longer be the case.
+    //         pub async fn get_persisted_cap_claim_by_secret(
+    //             &self,
+    //             query: &CapSecret,
+    //         ) -> SourceChainResult<Option<CapClaim>> {
+    //             let hashes_n_claims: Vec<_> = fresh_reader!(self.env(), |r| {
+    //                 self
+    //                 .0
+    //                 .elements()
+    //                 .private_entries()
+    //                 .expect(
+    //                     "SourceChainBuf must have access to private entries in order to access CapClaims",
+    //                 )
+    //                 .iter_fail(&r)?
+    //                 .filter_map(|entry| {
+    //                     if let (Entry::CapClaim(claim), entry_hash) = entry.into_inner() {
+    //                         Ok(Some((entry_hash, claim)))
+    //                     } else {
+    //                         Ok(None)
+    //                     }
+    //                 })
+    //                 .filter(|(_entry_hash, claim)| Ok(claim.secret() == query))
+    //                 .collect()
+    //             })?;
+    //
+    //             let answer = if hashes_n_claims.len() == 0 {
+    //                 None
+    //             } else if hashes_n_claims.len() == 1 {
+    //                 hashes_n_claims.first().map(|p| p.1.clone())
+    //             } else {
+    //                 // FIXME[B-01676]: we SHOULD iterate through the chain now to find the most
+    //                 // recent claim with this secret, in case it was updated.
+    //                 // This will be handled in the future with an index, for simple
+    //                 // lookup by secret
+    //                 todo!("Find proper claim or implement capability index")
+    //             };
+    //             Ok(answer)
+    //         }
+    //     }
+    // }
 
-        let answer = if hashes_n_claims.len() == 0 {
-            None
-        } else if hashes_n_claims.len() == 1 {
-            hashes_n_claims.first().map(|p| p.1.clone())
-        } else {
-            // FIXME[B-01676]: we SHOULD iterate through the chain now to find the most
-            // recent claim with this secret, in case it was updated.
-            // This will be handled in the future with an index, for simple
-            // lookup by secret
-            todo!("Find proper claim or implement capability index")
-        };
-        Ok(answer)
+    /// Query Headers in the source chain.
+    /// This returns a Vec rather than an iterator because it is intended to be
+    /// used by the `query` host function, which crosses the wasm boundary
+    pub fn query(&self, query: &ChainQueryFilter) -> SourceChainResult<Vec<HeaderHashed>> {
+        self.iter_back()
+            .filter(|shh| Ok(query.check(shh.header())))
+            .map(|shh| Ok(shh.header_hashed().clone()))
+            .collect()
     }
 }
 
@@ -206,96 +320,201 @@ pub mod tests {
     use super::*;
     use crate::fixt::*;
     use ::fixt::prelude::*;
+    use hdk3::prelude::*;
     use holochain_state::test_utils::test_cell_env;
-    use holochain_types::test_utils::{fake_agent_pubkey_1, fake_dna_hash};
+    use holochain_types::test_utils::fake_dna_hash;
     use holochain_zome_types::capability::{CapAccess, ZomeCallCapGrant};
     use std::collections::HashSet;
 
     #[tokio::test(threaded_scheduler)]
     async fn test_get_cap_grant() -> SourceChainResult<()> {
         let test_env = test_cell_env();
-        let arc = test_env.env();
-        let env = arc.guard();
+        let env = test_env.env();
         let access = CapAccess::from(CapSecretFixturator::new(Unpredictable).next().unwrap());
         let secret = access.secret().unwrap();
+
         // @todo curry
         let _curry = CurryPayloadsFixturator::new(Empty).next().unwrap();
-        let grant = ZomeCallCapGrant::new("tag".into(), access.clone(), HashSet::new());
+        let function: GrantedFunction = ("foo".into(), "bar".into());
+        let mut functions: GrantedFunctions = HashSet::new();
+        functions.insert(function.clone());
+        let grant = ZomeCallCapGrant::new("tag".into(), access.clone(), functions.clone());
+        let mut agents = AgentPubKeyFixturator::new(Predictable);
+        let alice = agents.next().unwrap();
+        let bob = agents.next().unwrap();
         {
-            let mut store = SourceChainBuf::new(arc.clone().into())?;
-            store
-                .genesis(fake_dna_hash(1), fake_agent_pubkey_1(), None)
-                .await?;
-            env.with_commit(|writer| store.flush_to_txn(writer))?;
+            let mut store = SourceChainBuf::new(env.clone().into())?;
+            store.genesis(fake_dna_hash(1), alice.clone(), None).await?;
+            env.guard()
+                .with_commit(|writer| store.flush_to_txn(writer))?;
         }
 
         {
-            let mut chain = SourceChain::new(arc.clone().into())?;
-            chain.put_cap_grant(grant.clone()).await?;
-
-            // ideally the following would work, but it won't because currently
-            // we can't get grants from the scratch space
-            // this will be fixed once we add the capability index
-
-            // assert_eq!(
-            //     chain.get_persisted_cap_grant_by_secret(secret)?,
-            //     Some(grant.clone().into())
-            // );
-
-            env.with_commit(|writer| chain.flush_to_txn(writer))?;
-        }
-
-        {
-            let chain = SourceChain::new(arc.clone().into())?;
+            let chain = SourceChain::new(env.clone().into())?;
             assert_eq!(
-                chain.get_persisted_cap_grant_by_secret(secret).await?,
-                Some(grant.into())
+                chain.valid_cap_grant(&function, &alice, secret)?,
+                Some(CapGrant::Authorship(alice.clone())),
+            );
+
+            // bob should not match anything as the secret hasn't been committed yet
+            assert_eq!(chain.valid_cap_grant(&function, &bob, &secret)?, None);
+        }
+
+        let (original_header_address, original_entry_address) = {
+            let mut chain = SourceChain::new(env.clone().into())?;
+            let (entry, entry_hash) =
+                EntryHashed::from_content_sync(Entry::CapGrant(grant.clone())).into_inner();
+            let header_builder = builder::EntryCreate {
+                entry_type: EntryType::CapGrant,
+                entry_hash: entry_hash.clone(),
+            };
+            let header = chain.put(header_builder, Some(entry)).await?;
+
+            env.guard()
+                .with_commit(|writer| chain.flush_to_txn(writer))?;
+
+            (header, entry_hash)
+        };
+
+        {
+            let chain = SourceChain::new(env.clone().into())?;
+            // alice should find her own authorship with higher priority than the committed grant
+            // even if she passes in the secret
+            assert_eq!(
+                chain.valid_cap_grant(&function, &alice, &secret)?,
+                Some(CapGrant::Authorship(alice.clone())),
+            );
+
+            // bob should be granted with the committed grant as it matches the secret he passes to
+            // alice at runtime
+            assert_eq!(
+                chain.valid_cap_grant(&function, &bob, &secret)?,
+                Some(grant.clone().into())
+            );
+        }
+
+        // let's roll the secret and assign the grant to bob specifically
+        let mut assignees = HashSet::new();
+        assignees.insert(bob.clone());
+        let updated_secret = CapSecretFixturator::new(Unpredictable).next().unwrap();
+        let updated_access = CapAccess::from((updated_secret.clone(), assignees));
+        let updated_grant = ZomeCallCapGrant::new("tag".into(), updated_access.clone(), functions);
+
+        let (updated_header_hash, updated_entry_hash) = {
+            let mut chain = SourceChain::new(env.clone().into())?;
+            let (entry, entry_hash) =
+                EntryHashed::from_content_sync(Entry::CapGrant(updated_grant.clone())).into_inner();
+            let header_builder = builder::EntryUpdate {
+                entry_type: EntryType::CapGrant,
+                entry_hash: entry_hash.clone(),
+                original_header_address,
+                original_entry_address,
+            };
+            let header = chain.put(header_builder, Some(entry)).await?;
+
+            env.guard()
+                .with_commit(|writer| chain.flush_to_txn(writer))?;
+
+            (header, entry_hash)
+        };
+
+        {
+            let chain = SourceChain::new(env.clone().into())?;
+            // alice should find her own authorship with higher priority than the committed grant
+            // even if she passes in the secret
+            assert_eq!(
+                chain.valid_cap_grant(&function, &alice, &secret)?,
+                Some(CapGrant::Authorship(alice.clone())),
+            );
+            assert_eq!(
+                chain.valid_cap_grant(&function, &alice, &updated_secret)?,
+                Some(CapGrant::Authorship(alice.clone())),
+            );
+
+            // bob MUST provide the updated secret as the old one is invalidated by the new one
+            assert_eq!(chain.valid_cap_grant(&function, &bob, &secret)?, None);
+            assert_eq!(
+                chain.valid_cap_grant(&function, &bob, &updated_secret)?,
+                Some(updated_grant.into())
+            );
+        }
+
+        {
+            let mut chain = SourceChain::new(env.clone().into())?;
+            let header_builder = builder::ElementDelete {
+                removes_address: updated_header_hash,
+                removes_entry_address: updated_entry_hash,
+            };
+            chain.put(header_builder, None).await?;
+
+            env.guard()
+                .with_commit(|writer| chain.flush_to_txn(writer))?;
+        }
+
+        {
+            let chain = SourceChain::new(env.clone().into())?;
+            // alice should find her own authorship
+            assert_eq!(
+                chain.valid_cap_grant(&function, &alice, &secret)?,
+                Some(CapGrant::Authorship(alice.clone())),
+            );
+            assert_eq!(
+                chain.valid_cap_grant(&function, &alice, &updated_secret)?,
+                Some(CapGrant::Authorship(alice)),
+            );
+
+            // bob has no access
+            assert_eq!(chain.valid_cap_grant(&function, &bob, &secret)?, None);
+            assert_eq!(
+                chain.valid_cap_grant(&function, &bob, &updated_secret)?,
+                None
             );
         }
 
         Ok(())
     }
 
-    #[tokio::test(threaded_scheduler)]
-    async fn test_get_cap_claim() -> SourceChainResult<()> {
-        let test_env = test_cell_env();
-        let arc = test_env.env();
-        let env = arc.guard();
-        let secret = CapSecretFixturator::new(Unpredictable).next().unwrap();
-        let agent_pubkey = fake_agent_pubkey_1().into();
-        let claim = CapClaim::new("tag".into(), agent_pubkey, secret.clone());
-        {
-            let mut store = SourceChainBuf::new(arc.clone().into())?;
-            store
-                .genesis(fake_dna_hash(1), fake_agent_pubkey_1(), None)
-                .await?;
-            env.with_commit(|writer| store.flush_to_txn(writer))?;
-        }
-
-        {
-            let mut chain = SourceChain::new(arc.clone().into())?;
-            chain.put_cap_claim(claim.clone()).await?;
-
-            // ideally the following would work, but it won't because currently
-            // we can't get claims from the scratch space
-            // this will be fixed once we add the capability index
-
-            // assert_eq!(
-            //     chain.get_persisted_cap_claim_by_secret(&secret)?,
-            //     Some(claim.clone())
-            // );
-
-            env.with_commit(|writer| chain.flush_to_txn(writer))?;
-        }
-
-        {
-            let chain = SourceChain::new(arc.clone().into())?;
-            assert_eq!(
-                chain.get_persisted_cap_claim_by_secret(&secret).await?,
-                Some(claim)
-            );
-        }
-
-        Ok(())
-    }
+    // @todo bring all this back when we want to administer cap claims better
+    // #[tokio::test(threaded_scheduler)]
+    // async fn test_get_cap_claim() -> SourceChainResult<()> {
+    //     let test_env = test_cell_env();
+    //     let env = test_env.env();
+    //     let env = env.guard().await;
+    //     let secret = CapSecretFixturator::new(Unpredictable).next().unwrap();
+    //     let agent_pubkey = fake_agent_pubkey_1().into();
+    //     let claim = CapClaim::new("tag".into(), agent_pubkey, secret.clone());
+    //     {
+    //         let mut store = SourceChainBuf::new(env.clone().into(), &env).await?;
+    //         store
+    //             .genesis(fake_dna_hash(1), fake_agent_pubkey_1(), None)
+    //             .await?;
+    //         env.with_commit(|writer| store.flush_to_txn(writer))?;
+    //     }
+    //
+    //     {
+    //         let mut chain = SourceChain::new(env.clone().into(), &env).await?;
+    //         chain.put_cap_claim(claim.clone()).await?;
+    //
+    // // ideally the following would work, but it won't because currently
+    // // we can't get claims from the scratch space
+    // // this will be fixed once we add the capability index
+    //
+    // // assert_eq!(
+    // //     chain.get_persisted_cap_claim_by_secret(&secret)?,
+    // //     Some(claim.clone())
+    // // );
+    //
+    //         env.with_commit(|writer| chain.flush_to_txn(writer))?;
+    //     }
+    //
+    //     {
+    //         let chain = SourceChain::new(env.clone().into(), &env).await?;
+    //         assert_eq!(
+    //             chain.get_persisted_cap_claim_by_secret(&secret).await?,
+    //             Some(claim)
+    //         );
+    //     }
+    //
+    //     Ok(())
+    // }
 }

@@ -267,12 +267,9 @@ impl Path {
     pub fn ensure(&self) -> Result<(), HdkError> {
         if !self.exists()? {
             commit_entry!(self)?;
-            match self.parent() {
-                Some(parent) => {
-                    parent.ensure()?;
-                    link_entries!(parent.hash()?, self.hash()?, LinkTag::try_from(self)?)?;
-                }
-                _ => {}
+            if let Some(parent) = self.parent() {
+                parent.ensure()?;
+                link_entries!(parent.hash()?, self.hash()?, LinkTag::try_from(self)?)?;
             }
         }
         Ok(())
@@ -339,7 +336,7 @@ fn hash_path_linktag() {
 fn hash_path_component() {
     use ::fixt::prelude::*;
 
-    let bytes: Vec<u8> = U8Fixturator::new(fixt::Unpredictable).take(5).collect();
+    let bytes: Vec<u8> = U8Fixturator::new(Unpredictable).take(5).collect();
 
     let component = Component::from(bytes.clone());
 
@@ -380,7 +377,7 @@ fn hash_path_path() {
     let components: Vec<Component> = {
         let mut vec = vec![];
         for _ in 0..10 {
-            let bytes: Vec<u8> = U8Fixturator::new(fixt::Unpredictable).take(10).collect();
+            let bytes: Vec<u8> = U8Fixturator::new(Unpredictable).take(10).collect();
             vec.push(Component::from(bytes))
         }
         vec

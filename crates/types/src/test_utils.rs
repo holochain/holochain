@@ -6,13 +6,12 @@ use crate::{
     dna::{DnaDef, DnaFile},
     prelude::*,
 };
-
-use holo_hash::{hash_type, PrimitiveHashType};
 use holochain_zome_types::capability::CapSecret;
 use holochain_zome_types::capability::CAP_SECRET_BYTES;
 use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::HostInput;
 use std::path::PathBuf;
+
+pub use holochain_zome_types::test_utils::*;
 
 #[derive(Serialize, Deserialize, SerializedBytes)]
 struct FakeProperties {
@@ -73,53 +72,23 @@ pub fn fake_cell_id(name: u8) -> CellId {
     (fake_dna_hash(name), fake_agent_pubkey_1()).into()
 }
 
-fn fake_holo_hash<T: holo_hash::HashType>(name: u8, hash_type: T) -> HoloHash<T> {
-    HoloHash::from_raw_bytes_and_type([name; 36].to_vec(), hash_type)
-}
-
-/// A fixture DnaHash for unit testing.
-pub fn fake_dna_hash(name: u8) -> DnaHash {
-    fake_holo_hash(name, hash_type::Dna::new())
-}
-
-/// A fixture HeaderHash for unit testing.
-pub fn fake_header_hash(name: u8) -> HeaderHash {
-    fake_holo_hash(name, hash_type::Header::new())
-}
-
-/// A fixture DhtOpHash for unit testing.
-pub fn fake_dht_op_hash(name: u8) -> DhtOpHash {
-    fake_holo_hash(name, hash_type::DhtOp::new())
-}
-
-/// A fixture EntryHash for unit testing.
-pub fn fake_entry_hash(name: u8) -> EntryHash {
-    fake_holo_hash(name, hash_type::Entry::new())
-}
-
-/// A fixture AgentPubKey for unit testing.
-pub fn fake_agent_pub_key(name: u8) -> AgentPubKey {
-    fake_holo_hash(name, hash_type::Agent::new())
-}
-
-/// A fixture AgentPubKey for unit testing.
-pub fn fake_agent_pubkey_1() -> AgentPubKey {
-    holo_hash::AgentPubKey::try_from("uhCAkw-zrttiYpdfAYX4fR6W8DPUdheZJ-1QsRA4cTImmzTYUcOr4")
-        .unwrap()
-}
-
-/// Another fixture AgentPubKey for unit testing.
-pub fn fake_agent_pubkey_2() -> AgentPubKey {
-    holo_hash::AgentPubKey::try_from("uhCAkomHzekU0-x7p62WmrusdxD2w9wcjdajC88688JGSTEo6cbEK")
-        .unwrap()
+/// Keeping with convention if Alice is pubkey 1
+/// and bob is pubkey 2 the this helps make test
+/// logging easier to read.
+pub fn which_agent(key: &AgentPubKey) -> String {
+    let key = key.to_string();
+    let alice = fake_agent_pubkey_1().to_string();
+    let bob = fake_agent_pubkey_2().to_string();
+    if key == alice {
+        return "alice".to_string();
+    }
+    if key == bob {
+        return "alice".to_string();
+    }
+    key
 }
 
 /// A fixture CapSecret for unit testing.
 pub fn fake_cap_secret() -> CapSecret {
     [0; CAP_SECRET_BYTES].into()
-}
-
-/// A fixture ZomeCallInvocationPayload for unit testing.
-pub fn fake_zome_invocation_payload() -> HostInput {
-    HostInput::try_from(SerializedBytes::try_from(()).unwrap()).unwrap()
 }

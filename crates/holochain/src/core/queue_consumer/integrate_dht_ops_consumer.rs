@@ -15,10 +15,11 @@ use tokio::task::JoinHandle;
 use tracing::*;
 
 /// Spawn the QueueConsumer for DhtOpIntegration workflow
-#[instrument(skip(env, stop))]
+#[instrument(skip(env, stop, trigger_sys))]
 pub fn spawn_integrate_dht_ops_consumer(
     env: EnvironmentWrite,
     mut stop: sync::broadcast::Receiver<()>,
+    trigger_sys: sync::oneshot::Receiver<TriggerSender>,
 ) -> (
     TriggerSender,
     tokio::sync::oneshot::Receiver<()>,
@@ -29,11 +30,12 @@ pub fn spawn_integrate_dht_ops_consumer(
     let mut tx_first = Some(tx_first);
     let mut trigger_self = tx.clone();
     let handle = tokio::spawn(async move {
+        let mut trigger_sys = trigger_sys.await.expect("failed to get tx sys");
         loop {
             let workspace = IntegrateDhtOpsWorkspace::new(env.clone().into())
                 .expect("Could not create Workspace");
             if let WorkComplete::Incomplete =
-                integrate_dht_ops_workflow(workspace, env.clone().into())
+                integrate_dht_ops_workflow(workspace, env.clone().into(), &mut trigger_sys)
                     .await
                     .expect("Error running Workflow")
             {

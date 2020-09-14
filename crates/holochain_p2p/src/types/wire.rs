@@ -1,4 +1,5 @@
 use crate::*;
+use holochain_zome_types::zome::FunctionName;
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub(crate) struct WireDhtOpData {
@@ -23,7 +24,7 @@ impl WireDhtOpData {
 pub(crate) enum WireMessage {
     CallRemote {
         zome_name: ZomeName,
-        fn_name: String,
+        fn_name: FunctionName,
         cap: CapSecret,
         #[serde(with = "serde_bytes")]
         data: Vec<u8>,
@@ -63,7 +64,7 @@ impl WireMessage {
 
     pub fn call_remote(
         zome_name: ZomeName,
-        fn_name: String,
+        fn_name: FunctionName,
         cap: CapSecret,
         request: SerializedBytes,
     ) -> WireMessage {

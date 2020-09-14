@@ -1,4 +1,5 @@
 use crate::capability::CapSecret;
+use crate::zome::FunctionName;
 use crate::zome::ZomeName;
 use holo_hash::AgentPubKey;
 use holochain_serialized_bytes::prelude::SerializedBytes;
@@ -7,7 +8,7 @@ use holochain_serialized_bytes::prelude::SerializedBytes;
 pub struct CallRemote {
     to_agent: AgentPubKey,
     zome_name: ZomeName,
-    fn_name: String,
+    fn_name: FunctionName,
     cap: CapSecret,
     request: SerializedBytes,
 }
@@ -16,7 +17,7 @@ impl CallRemote {
     pub fn new(
         to_agent: AgentPubKey,
         zome_name: ZomeName,
-        fn_name: String,
+        fn_name: FunctionName,
         cap: CapSecret,
         request: SerializedBytes,
     ) -> Self {
@@ -37,7 +38,7 @@ impl CallRemote {
         self.zome_name.clone()
     }
 
-    pub fn fn_name(&self) -> String {
+    pub fn fn_name(&self) -> FunctionName {
         self.fn_name.clone()
     }
 

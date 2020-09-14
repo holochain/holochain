@@ -1,6 +1,6 @@
 use crate::actor::HolochainP2pRefToCell;
 use crate::HolochainP2pCell;
-use fixt::prelude::*;
+use ::fixt::prelude::*;
 use holo_hash::fixt::{AgentPubKeyFixturator, DnaHashFixturator};
 
 fixturator!(
@@ -96,7 +96,7 @@ mod tests {
                 a1,
                 a2,
                 "".into(),
-                "".to_string(),
+                "".into(),
                 [0; holochain_zome_types::capability::CAP_SECRET_BYTES].into(),
                 UnsafeBytes::from(b"yippo".to_vec()).into(),
             )

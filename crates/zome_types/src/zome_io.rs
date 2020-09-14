@@ -1,5 +1,7 @@
 use holochain_serialized_bytes::prelude::*;
 
+use crate::header::HeaderHashedVec;
+
 /// all wasm shared I/O types need to share the same basic behaviours to cross the host/guest
 /// boundary in a predictable way
 macro_rules! wasm_io_types {
@@ -62,9 +64,9 @@ wasm_io_types!(
     // @TODO
     pub struct PropertyInput(());
     pub struct PropertyOutput(());
-    // @TODO
-    pub struct QueryInput(());
-    pub struct QueryOutput(());
+    // Query the source chain for data
+    pub struct QueryInput(crate::query::ChainQueryFilter);
+    pub struct QueryOutput(HeaderHashedVec);
     // the length of random bytes to create
     pub struct RandomBytesInput(u32);
     pub struct RandomBytesOutput(crate::bytes::Bytes);
@@ -73,7 +75,7 @@ wasm_io_types!(
     // the header hash of the LinkRemove element
     pub struct RemoveLinkOutput(holo_hash::HeaderHash);
     pub struct CallRemoteInput(crate::call_remote::CallRemote);
-    pub struct CallRemoteOutput(SerializedBytes);
+    pub struct CallRemoteOutput(ZomeCallInvocationResponse);
     // @TODO
     pub struct SendInput(());
     pub struct SendOutput(());
@@ -156,3 +158,12 @@ wasm_io_types!(
     pub struct HostInput(crate::SerializedBytes);
     pub struct GuestOutput(crate::SerializedBytes);
 );
+
+/// Response to a zome invocation
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes, PartialEq)]
+pub enum ZomeCallInvocationResponse {
+    /// arbitrary functions exposed by zome devs to the outside world
+    ZomeApiFn(GuestOutput),
+    /// cap grant failure
+    Unauthorized,
+}

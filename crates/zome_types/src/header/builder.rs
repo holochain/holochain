@@ -52,6 +52,7 @@ macro_rules! builder_variant {
             $(pub $field : $t),*
         }
 
+        #[allow(clippy::new_without_default)]
         impl $name {
             pub fn new($($field : $t),* ) -> Self {
                 Self {
@@ -156,7 +157,6 @@ impl Dna {
         Self {
             author: builder.author,
             timestamp: builder.timestamp,
-            header_seq: builder.header_seq,
             hash,
         }
     }

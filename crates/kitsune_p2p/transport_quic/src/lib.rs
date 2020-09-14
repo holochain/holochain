@@ -10,7 +10,7 @@ pub mod dependencies {
 use kitsune_p2p_types::{dependencies::url2::*, transport::TransportResult};
 use std::net::SocketAddr;
 
-const SCHEME: &'static str = "kitsune-quic";
+const SCHEME: &str = "kitsune-quic";
 
 /// internal helper convert urls to socket addrs for binding / connection
 pub(crate) async fn url_to_addr(url: &Url2, scheme: &str) -> TransportResult<SocketAddr> {

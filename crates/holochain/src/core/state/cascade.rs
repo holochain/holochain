@@ -1,44 +1,8 @@
 //! # Cascade
-//! ALL OUTDATED
-// TODO: Update or remove these docs
-//! This module is still a work in progress.
-//! Here is some pseudocode we are using to build it.
-//! ## Dimensions
-//! get vs get_links
-//! default vs options
-//! fast vs strict (is set by app dev)
-//!
-//! ## Get
-//! ### Default - Get's the latest version
-//! Scratch Live -> Return
-//! Scratch NotInCascade -> Goto Cas
-//! Scratch _ -> None
-//! Cas Live -> Return
-//! Cas NotInCascade -> Goto cache
-//! Cas _ -> None
-//! Cache Live -> Return
-//! Cache Pending -> Goto Network
-//! Cache NotInCascade -> Goto Network
-//! Cache _ -> None
-//!
-//! ## Get Links
-//! ### Default - Get's the latest version
-//! if I'm an authority
-//! Scratch Found-> Return
-//! Scratch NotInCascade -> Goto Cas
-//! Cas Found -> Return
-//! Cas NotInCascade -> Goto Network
-//! else
-//! Network Found -> Return
-//! Network NotInCascade -> Goto Cache
-//! Cache Found -> Return
-//! Cache NotInCascade -> None
-//!
-//! ## Pagination
-//! gets most recent N links with default N (50)
-//! Page number
-//! ## Loading
-//! load_true loads the results into cache
+//! ## Retrieve vs Get
+//! Get checks CRUD metadata before returning an the data
+//! where as retrieve only checks that where the data was found
+//! the appropriate validation has been run.
 
 use super::{
     element_buf::ElementBuf,
@@ -52,7 +16,7 @@ use error::CascadeResult;
 use fallible_iterator::FallibleIterator;
 use holo_hash::{
     hash_type::{self, AnyDht},
-    AnyDhtHash, EntryHash, HeaderHash,
+    AnyDhtHash, EntryHash, HasHash, HeaderHash,
 };
 use holochain_p2p::{
     actor::{GetLinksOptions, GetMetaOptions, GetOptions},
@@ -154,7 +118,7 @@ where
         let (shh, e) = element.into_inner();
         self.element_cache.put(shh, option_entry_hashed(e).await)?;
         for op in op_lights {
-            integrate_single_metadata(op, &self.element_cache, self.meta_cache).await?
+            integrate_single_metadata(op, &self.element_cache, self.meta_cache)?
         }
         Ok(())
     }
@@ -167,7 +131,7 @@ where
         let op_lights = produce_op_lights_from_element_group(&elements).await?;
         self.element_cache.put_element_group(elements)?;
         for op in op_lights {
-            integrate_single_metadata(op, &self.element_cache, self.meta_cache).await?
+            integrate_single_metadata(op, &self.element_cache, self.meta_cache)?
         }
         Ok(())
     }
@@ -192,7 +156,7 @@ where
                 }
                 // Doesn't have header but not because it was deleted
                 GetElementResponse::GetHeader(None) => (),
-                r @ _ => {
+                r => {
                     error!(
                         msg = "Got an invalid response to fetch element via header",
                         ?r
@@ -246,7 +210,7 @@ where
                         ?r
                     );
                 }
-                r @ _ => unimplemented!("{:?} is unimplemented for fetching via entry", r),
+                r => unimplemented!("{:?} is unimplemented for fetching via entry", r),
             }
         }
         Ok(())
@@ -268,15 +232,14 @@ where
             let values = metadata
                 .headers
                 .into_iter()
-                .map(|h| SysMetaVal::NewEntry(h))
-                .chain(metadata.deletes.into_iter().map(|h| SysMetaVal::Delete(h)))
-                .chain(metadata.updates.into_iter().map(|h| SysMetaVal::Update(h)));
+                .map(SysMetaVal::NewEntry)
+                .chain(metadata.deletes.into_iter().map(SysMetaVal::Delete))
+                .chain(metadata.updates.into_iter().map(SysMetaVal::Update));
             match *basis.hash_type() {
                 hash_type::AnyDht::Entry => {
                     for v in values {
                         self.meta_cache
-                            .register_raw_on_entry(basis.clone().into(), v)
-                            .await?;
+                            .register_raw_on_entry(basis.clone().into(), v)?;
                     }
                 }
                 hash_type::AnyDht::Header => {
@@ -328,30 +291,88 @@ where
     }
 
     fn get_element_local_raw(&self, hash: &HeaderHash) -> CascadeResult<Option<Element>> {
-        match self.element_vault.get_element(hash)? {
-            None => Ok(self.element_cache.get_element(hash)?),
-            r => Ok(r),
+        let r = match self.element_vault.get_element(hash)? {
+            None => self.element_cache.get_element(hash)?,
+            r => r,
+        };
+        // Check we have a valid reason to return this element
+        match r {
+            Some(el)
+                if self.valid_element(
+                    el.header_address(),
+                    el.header().entry_data().map(|(h, _)| h),
+                )? =>
+            {
+                Ok(Some(el))
+            }
+            _ => Ok(None),
         }
     }
 
+    /// Gets the first element we can find for this entry locally
+    fn get_element_local_raw_via_entry(&self, hash: &EntryHash) -> CascadeResult<Option<Element>> {
+        // Get all the headers we know about.
+        let mut headers: BTreeSet<TimedHeaderHash> =
+            fresh_reader!(self.meta_cache.env(), |r| self
+                .meta_cache
+                .get_headers(&r, hash.clone())?
+                .collect())?;
+        headers.extend(fresh_reader!(self.meta_cache.env(), |r| self
+            .meta_vault
+            .get_headers(&r, hash.clone())?
+            .collect::<Vec<_>>())?);
+
+        // We might not actually be holding some of these
+        // so we need to search until we find one.
+        // We are most likely holding the newest header
+        // so iterate in reverse
+        for header in headers.into_iter().rev() {
+            // Return the first element we are actually holding
+            if let Some(el) = self.get_element_local_raw(&header.header_hash)? {
+                return Ok(Some(el));
+            }
+        }
+        // Not holding any
+        Ok(None)
+    }
+
     fn get_entry_local_raw(&self, hash: &EntryHash) -> CascadeResult<Option<EntryHashed>> {
-        match self.element_vault.get_entry(hash)? {
-            None => Ok(self.element_cache.get_entry(hash)?),
-            r => Ok(r),
+        let r = match self.element_vault.get_entry(hash)? {
+            None => self.element_cache.get_entry(hash)?,
+            r => r,
+        };
+        // Check we have a valid reason to return this element
+        match r {
+            Some(e) if self.valid_entry(e.as_hash())? => Ok(Some(e)),
+            _ => Ok(None),
         }
     }
 
     fn get_header_local_raw(&self, hash: &HeaderHash) -> CascadeResult<Option<HeaderHashed>> {
-        match self
-            .element_vault
-            .get_header(hash)?
-            .map(|h| h.into_header_and_signature().0)
-        {
-            None => Ok(self
-                .element_cache
-                .get_header(hash)?
-                .map(|h| h.into_header_and_signature().0)),
-            r => Ok(r),
+        Ok(self
+            .get_header_local_raw_with_sig(hash)?
+            .map(|h| h.into_header_and_signature().0))
+    }
+
+    fn get_header_local_raw_with_sig(
+        &self,
+        hash: &HeaderHash,
+    ) -> CascadeResult<Option<SignedHeaderHashed>> {
+        let r = match self.element_vault.get_header(hash)? {
+            None => self.element_cache.get_header(hash)?,
+            r => r,
+        };
+        // Check we have a valid reason to return this element
+        match r {
+            Some(h)
+                if self.valid_element(
+                    h.header_address(),
+                    h.header().entry_data().map(|(h, _)| h),
+                )? =>
+            {
+                Ok(Some(h))
+            }
+            _ => Ok(None),
         }
     }
 
@@ -379,7 +400,7 @@ where
                     .meta_cache
                     .get_headers(&r, hash.clone())?
                     .collect::<Vec<_>>()?;
-                let headers = self.render_headers(headers, |h| Ok(h))?;
+                let headers = self.render_headers(headers, Ok)?;
                 let deletes = self
                     .meta_cache
                     .get_deletes_on_entry(&r, hash.clone())?
@@ -415,6 +436,51 @@ where
             }
             None => Ok(None),
         }
+    }
+
+    fn valid_header(&self, hash: &HeaderHash) -> CascadeResult<bool> {
+        Ok(self.meta_vault.has_registered_store_element(&hash)?
+            || self.meta_cache.has_registered_store_element(&hash)?)
+    }
+
+    fn valid_entry(&self, hash: &EntryHash) -> CascadeResult<bool> {
+        if self.meta_cache.has_any_registered_store_entry(hash)? {
+            // Found a entry header in the cache
+            return Ok(true);
+        }
+        if self.meta_vault.has_any_registered_store_entry(hash)? {
+            // Found a entry header in the vault
+            return Ok(true);
+        }
+        Ok(false)
+    }
+
+    /// Check if we have a valid reason to return an element from the cascade
+    fn valid_element(
+        &self,
+        header_hash: &HeaderHash,
+        entry_hash: Option<&EntryHash>,
+    ) -> CascadeResult<bool> {
+        if self.valid_header(&header_hash)? {
+            return Ok(true);
+        }
+        if let Some(eh) = entry_hash {
+            if self
+                .meta_cache
+                .has_registered_store_entry(eh, header_hash)?
+            {
+                // Found a entry header in the cache
+                return Ok(true);
+            }
+            if self
+                .meta_vault
+                .has_registered_store_entry(eh, header_hash)?
+            {
+                // Found a entry header in the vault
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 
     #[instrument(skip(self, options))]
@@ -453,10 +519,11 @@ where
                         .meta_cache
                         .get_headers(&r, entry_hash)?
                         .filter_map(|header| {
-                            if let None = self
+                            if self
                                 .meta_cache
                                 .get_deletes_on_header(&r, header.header_hash.clone())?
                                 .next()?
+                                .is_none()
                             {
                                 Ok(Some(header))
                             } else {
@@ -562,11 +629,87 @@ where
         })
     }
 
+    /// Get the entry from the dht regardless of metadata.
+    /// This call has the opportunity to hit the local cache
+    /// and avoid a network call.
+    // TODO: This still fetches the full element and metadata.
+    // Need to add a fetch_retrieve_entry that only gets data.
+    pub async fn retrieve_entry(
+        &mut self,
+        hash: EntryHash,
+        options: GetOptions,
+    ) -> CascadeResult<Option<EntryHashed>> {
+        match self.get_entry_local_raw(&hash)? {
+            Some(e) => Ok(Some(e)),
+            None => {
+                self.fetch_element_via_entry(hash.clone(), options).await?;
+                self.get_entry_local_raw(&hash)
+            }
+        }
+    }
+
+    /// Get only the header from the dht regardless of metadata.
+    /// Useful for avoiding getting the Entry if you don't need it.
+    /// This call has the opportunity to hit the local cache
+    /// and avoid a network call.
+    // TODO: This still fetches the full element and metadata.
+    // Need to add a fetch_retrieve_header that only gets data.
+    pub async fn retrieve_header(
+        &mut self,
+        hash: HeaderHash,
+        options: GetOptions,
+    ) -> CascadeResult<Option<SignedHeaderHashed>> {
+        match self.get_header_local_raw_with_sig(&hash)? {
+            Some(h) => Ok(Some(h)),
+            None => {
+                self.fetch_element_via_header(hash.clone(), options).await?;
+                self.get_header_local_raw_with_sig(&hash)
+            }
+        }
+    }
+
+    /// Get an element from the dht regardless of metadata.
+    /// Useful for checking if data is held.
+    /// This call has the opportunity to hit the local cache
+    /// and avoid a network call.
+    /// Note we still need to return the element as proof they are really
+    /// holding it unless we create a byte challenge function.
+    // TODO: This still fetches the full element and metadata.
+    // Need to add a fetch_retrieve that only gets data.
+    pub async fn retrieve(
+        &mut self,
+        hash: AnyDhtHash,
+        options: GetOptions,
+    ) -> CascadeResult<Option<Element>> {
+        match *hash.hash_type() {
+            AnyDht::Entry => {
+                let hash = hash.into();
+                match self.get_element_local_raw_via_entry(&hash)? {
+                    Some(e) => Ok(Some(e)),
+                    None => {
+                        self.fetch_element_via_entry(hash.clone(), options).await?;
+                        self.get_element_local_raw_via_entry(&hash)
+                    }
+                }
+            }
+            AnyDht::Header => {
+                let hash = hash.into();
+                match self.get_element_local_raw(&hash)? {
+                    Some(e) => Ok(Some(e)),
+                    None => {
+                        self.fetch_element_via_header(hash.clone(), options).await?;
+                        self.get_element_local_raw(&hash)
+                    }
+                }
+            }
+        }
+    }
+
     #[instrument(skip(self))]
-    // Updates the cache with the latest network authority data
-    // and returns what is in the cache.
-    // This gives you the latest possible picture of the current dht state.
-    // Data from your zome call is also added to the cache.
+    /// Updates the cache with the latest network authority data
+    /// and returns what is in the cache.
+    /// This gives you the latest possible picture of the current dht state.
+    /// Data from your zome call is also added to the cache.
     pub async fn dht_get(
         &mut self,
         hash: AnyDhtHash,

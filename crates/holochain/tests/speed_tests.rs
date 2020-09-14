@@ -15,7 +15,7 @@
 //! hard to automate piping from tests stderr.
 //!
 
-use fixt::prelude::*;
+use ::fixt::prelude::*;
 use hdk3::prelude::*;
 use holochain::conductor::{
     api::{AdminRequest, AdminResponse, AppRequest, AppResponse, RealAppInterfaceApi},
@@ -188,6 +188,7 @@ async fn speed_test(n: Option<usize>) -> TestEnvironment {
         .expect_add_entry_defs::<Vec<_>>()
         .times(2)
         .return_const(());
+    dna_store.expect_get_entry_def().return_const(None);
 
     let (test_env, _app_api, handle) = setup_app(
         vec![(alice_installed_cell, None), (bob_installed_cell, None)],
@@ -224,7 +225,7 @@ async fn speed_test(n: Option<usize>) -> TestEnvironment {
             cell_id: cell_id.clone(),
             zome_name: TestWasm::Anchor.into(),
             cap: CapSecretFixturator::new(Unpredictable).next().unwrap(),
-            fn_name: func.to_string(),
+            fn_name: func.into(),
             payload: HostInput::new(payload.try_into()?),
             provenance: cell_id.agent_pubkey().clone(),
         })

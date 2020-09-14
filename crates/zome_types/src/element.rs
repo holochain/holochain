@@ -74,7 +74,7 @@ impl Element {
             (Some(_), None) => {
                 unreachable!("Entry is present for a Header type which has no entry reference")
             }
-            (None, Some(EntryVisibility::Public)) => unreachable!("Entry data missing for element"),
+            (None, Some(EntryVisibility::Public)) => ElementEntry::NotStored,
         }
     }
 }
@@ -90,6 +90,10 @@ pub enum ElementEntry<'a> {
     Hidden,
     /// The Header does not contain an entry_address reference.
     NotApplicable,
+    /// The Header has an entry but was stored without it.
+    /// This can happen when you receive gossip of just a header
+    /// when the header type is a [NewEntryHeader]
+    NotStored,
 }
 
 impl<'a> ElementEntry<'a> {

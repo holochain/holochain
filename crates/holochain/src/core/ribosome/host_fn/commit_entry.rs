@@ -131,11 +131,7 @@ pub mod wasm_test {
     use crate::fixt::EntryFixturator;
     use crate::fixt::WasmRibosomeFixturator;
     use crate::fixt::ZomeCallHostAccessFixturator;
-    use crate::{
-        conductor::interface::websocket::test::setup_app,
-        core::ribosome::{error::RibosomeError, ZomeCallInvocation, ZomeCallInvocationResponse},
-    };
-    use fixt::prelude::*;
+    use ::fixt::prelude::*;
     use holo_hash::{AnyDhtHash, EntryHash};
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::{

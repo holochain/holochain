@@ -1,4 +1,4 @@
-use fixt::prelude::*;
+use ::fixt::prelude::*;
 use hdk3::prelude::*;
 use holo_hash::fixt::*;
 use holochain::conductor::{
@@ -7,7 +7,6 @@ use holochain::conductor::{
     ConductorBuilder, ConductorHandle,
 };
 use holochain::core::ribosome::ZomeCallInvocation;
-use holochain::core::ribosome::ZomeCallInvocationResponse;
 use holochain::fixt::*;
 use holochain_state::test_utils::{test_conductor_env, test_wasm_env, TestEnvironment};
 use holochain_types::app::InstalledCell;
@@ -19,6 +18,7 @@ use holochain_types::{observability, test_utils::fake_agent_pubkey_2};
 use holochain_wasm_test_utils::TestWasm;
 pub use holochain_zome_types::capability::CapSecret;
 use holochain_zome_types::HostInput;
+use holochain_zome_types::ZomeCallInvocationResponse;
 use std::sync::Arc;
 use tempdir::TempDir;
 
@@ -106,6 +106,7 @@ async fn ser_regression_test() {
         .expect_add_entry_defs::<Vec<_>>()
         .times(2)
         .return_const(());
+    dna_store.expect_get_entry_def().return_const(None);
 
     let (_tmpdir, app_api, handle) = setup_app(
         vec![(alice_installed_cell, None), (bob_installed_cell, None)],
@@ -125,7 +126,7 @@ async fn ser_regression_test() {
         cell_id: alice_cell_id.clone(),
         zome_name: TestWasm::SerRegression.into(),
         cap: CapSecretFixturator::new(Unpredictable).next().unwrap(),
-        fn_name: "create_channel".to_string(),
+        fn_name: "create_channel".into(),
         payload: HostInput::new(channel.try_into().unwrap()),
         provenance: alice_agent_id.clone(),
     };
@@ -151,6 +152,7 @@ async fn ser_regression_test() {
             let channel_hash: EntryHash = response.try_into().unwrap();
             channel_hash
         }
+        _ => unreachable!(),
     };
 
     let message = CreateMessageInput {
@@ -161,7 +163,7 @@ async fn ser_regression_test() {
         cell_id: alice_cell_id.clone(),
         zome_name: TestWasm::SerRegression.into(),
         cap: CapSecretFixturator::new(Unpredictable).next().unwrap(),
-        fn_name: "create_message".to_string(),
+        fn_name: "create_message".into(),
         payload: HostInput::new(message.try_into().unwrap()),
         provenance: alice_agent_id.clone(),
     };
@@ -186,6 +188,7 @@ async fn ser_regression_test() {
             let response: SerializedBytes = guest_output.into_inner();
             let _msg_hash: EntryHash = response.try_into().unwrap();
         }
+        _ => unreachable!(),
     };
 
     let shutdown = handle.take_shutdown_handle().await.unwrap();

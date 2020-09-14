@@ -9,10 +9,19 @@ pub mod builder;
 pub mod conversions;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, SerializedBytes)]
-pub struct HeaderHashes(Vec<HeaderHash>);
+pub struct HeaderHashes(pub Vec<HeaderHash>);
 
 impl From<Vec<HeaderHash>> for HeaderHashes {
     fn from(vs: Vec<HeaderHash>) -> Self {
+        Self(vs)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, SerializedBytes)]
+pub struct HeaderHashedVec(pub Vec<HeaderHashed>);
+
+impl From<Vec<HeaderHashed>> for HeaderHashedVec {
+    fn from(vs: Vec<HeaderHashed>) -> Self {
         Self(vs)
     }
 }
@@ -52,6 +61,23 @@ macro_rules! write_into_header {
                 }
             }
         )*
+
+        /// A unit enum which just maps onto the different Header variants,
+        /// without containing any extra data
+        #[derive(serde::Serialize, serde::Deserialize, SerializedBytes, PartialEq, Clone, Debug)]
+        pub enum HeaderType {
+            $($n,)*
+        }
+
+        impl From<&Header> for HeaderType {
+            fn from(header: &Header) -> HeaderType {
+                match header {
+                    $(
+                        Header::$n(_) => HeaderType::$n,
+                    )*
+                }
+            }
+        }
     };
 }
 
@@ -118,6 +144,18 @@ impl Header {
         }
     }
 
+    pub fn entry_hash(&self) -> Option<&EntryHash> {
+        self.entry_data().map(|d| d.0)
+    }
+
+    pub fn entry_type(&self) -> Option<&EntryType> {
+        self.entry_data().map(|d| d.1)
+    }
+
+    pub fn header_type(&self) -> HeaderType {
+        self.into()
+    }
+
     /// returns the public key of the agent who signed this header.
     pub fn author(&self) -> &AgentPubKey {
         match_header!(self => |i| { &i.author })
@@ -130,7 +168,19 @@ impl Header {
 
     /// returns the sequence ordinal of this header
     pub fn header_seq(&self) -> u32 {
-        match_header!(self => |i| { i.header_seq })
+        match self {
+            // Dna is always 0
+            Self::Dna(Dna { .. }) => 0,
+            Self::AgentValidationPkg(AgentValidationPkg { header_seq, .. })
+            | Self::InitZomesComplete(InitZomesComplete { header_seq, .. })
+            | Self::LinkAdd(LinkAdd { header_seq, .. })
+            | Self::LinkRemove(LinkRemove { header_seq, .. })
+            | Self::ElementDelete(ElementDelete { header_seq, .. })
+            | Self::ChainClose(ChainClose { header_seq, .. })
+            | Self::ChainOpen(ChainOpen { header_seq, .. })
+            | Self::EntryCreate(EntryCreate { header_seq, .. })
+            | Self::EntryUpdate(EntryUpdate { header_seq, .. }) => *header_seq,
+        }
     }
 
     /// returns the previous header except for the DNA header which doesn't have a previous
@@ -190,7 +240,6 @@ pub struct EntryDefIndex(u8);
 pub struct Dna {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
-    pub header_seq: u32,
     // No previous header, because DNA is always first chain entry
     pub hash: DnaHash,
 }
@@ -400,5 +449,11 @@ impl AppEntryType {
     }
     pub fn visibility(&self) -> &EntryVisibility {
         &self.visibility
+    }
+}
+
+impl From<EntryDefIndex> for u8 {
+    fn from(ei: EntryDefIndex) -> Self {
+        ei.0
     }
 }

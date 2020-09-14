@@ -8,6 +8,7 @@ use crate::{
         queue_consumer::QueueTriggerClosedError,
         ribosome::error::RibosomeError,
         state::{source_chain::SourceChainError, workspace::WorkspaceError},
+        SysValidationError,
     },
 };
 use holochain_p2p::HolochainP2pError;
@@ -55,6 +56,9 @@ pub enum WorkflowError {
 
     #[error(transparent)]
     DhtOpError(#[from] DhtOpError),
+
+    #[error(transparent)]
+    SysValidationError(#[from] SysValidationError),
 }
 
 /// Internal type to handle running workflows

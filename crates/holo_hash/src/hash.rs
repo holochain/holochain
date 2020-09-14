@@ -75,6 +75,16 @@ impl<T: HashType> AsRef<[u8]> for HoloHash<T> {
     }
 }
 
+impl<T: HashType> IntoIterator for HoloHash<T> {
+    type Item = u8;
+    type IntoIter = std::iter::Take<std::vec::IntoIter<Self::Item>>;
+    // TODO: revisit this, especially after changing serialization format. [ B-02112 ]
+    // Should this be 32, 36, or 39 bytes?
+    fn into_iter(self) -> Self::IntoIter {
+        self.hash.into_iter().take(36)
+    }
+}
+
 impl<T: HashType> HasHash<T> for HoloHash<T> {
     fn as_hash(&self) -> &HoloHash<T> {
         &self
@@ -100,7 +110,7 @@ fn bytes_to_loc(bytes: &[u8]) -> u32 {
         + ((bytes[3] as u32) << 24)
 }
 
-fn assert_length(hash: &Vec<u8>) {
+fn assert_length(hash: &[u8]) {
     if hash.len() != HASH_SERIALIZED_LEN {
         panic!(
             "invalid holo_hash byte count, expected: {}, found: {}. {:?}",

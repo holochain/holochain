@@ -10,4 +10,6 @@ pub mod fixt;
 #[allow(missing_docs)]
 pub mod test_utils;
 
-use holochain_wasmer_host;
+// this is here so that wasm ribosome macros can reference it
+pub use holochain_wasmer_host;
+pub use tracing;
