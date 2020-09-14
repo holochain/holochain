@@ -11,7 +11,7 @@ use fallible_iterator::FallibleIterator;
 use hdk3::prelude::LinkTag;
 use holo_hash::{AnyDhtHash, DhtOpHash, EntryHash, HeaderHash};
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_state::{fresh_reader_test, prelude::ReadManager};
+use holochain_state::{env::EnvironmentWrite, fresh_reader_test, prelude::ReadManager};
 use holochain_types::{
     app::InstalledCell, cell::CellId, dht_op::DhtOpLight, dna::DnaDef, dna::DnaFile, fixt::*,
     test_utils::fake_agent_pubkey_1, test_utils::fake_agent_pubkey_2, validate::ValidationStatus,
@@ -24,6 +24,10 @@ use std::{
     time::Duration,
 };
 use tracing::*;
+
+/// Wait for a maximum of 10 seconds
+/// for validation to run. (100 * 100ms)
+const NUM_ATTEMPTS: usize = 100;
 
 #[tokio::test(threaded_scheduler)]
 async fn sys_validation_workflow_test() {
@@ -80,8 +84,12 @@ async fn run_test(
 ) {
     bob_links_in_a_legit_way(&bob_cell_id, &handle, &dna_file).await;
 
-    // Some time for ops to reach alice and run through validation
-    tokio::time::delay_for(Duration::from_millis(1500)).await;
+    // Integration should have 9 ops in it.
+    // Plus another 14 for genesis.
+    // Init is not run because we aren't calling the zome.
+    let expected_count = 9 + 14;
+    let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
+    wait_for_validation(&alice_env, expected_count).await;
 
     {
         let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
@@ -118,9 +126,6 @@ async fn run_test(
             }),
             0
         );
-        // Integration should have 9 ops in it.
-        // Plus another 14 for genesis.
-        // Init is not run because we aren't calling the zome.
         let res: Vec<_> = fresh_reader_test!(alice_env, |r| {
             workspace
                 .integrated_dht_ops
@@ -148,15 +153,16 @@ async fn run_test(
             }
         }
 
-        assert_eq!(res.len(), 9 + 14);
+        assert_eq!(res.len(), expected_count);
     }
 
     let (bad_update_header, bad_update_entry_hash, link_add_hash) =
         bob_makes_a_large_link(&bob_cell_id, &handle, &dna_file).await;
 
-    // Some time for ops to reach alice and run through validation
-    // This takes a little longer due to the large entry and links
-    tokio::time::delay_for(Duration::from_millis(1500)).await;
+    // Integration should have 12 ops in it
+    let expected_count = 12 + expected_count;
+    let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
+    wait_for_validation(&alice_env, expected_count).await;
 
     {
         let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
@@ -180,8 +186,6 @@ async fn run_test(
             0
         );
         let bad_update_entry_hash: AnyDhtHash = bad_update_entry_hash.into();
-        // Integration should have 12 ops in it
-        // Plus the original 23
         assert_eq!(
             fresh_reader_test!(alice_env, |r| workspace
                 .integrated_dht_ops
@@ -211,14 +215,16 @@ async fn run_test(
                 })
                 .count()
                 .unwrap()),
-            12 + 23
+            expected_count
         );
     }
 
     dodgy_bob(&bob_cell_id, &handle, &dna_file).await;
 
-    // Some time for ops to reach alice and run through validation
-    tokio::time::delay_for(Duration::from_millis(1500)).await;
+    // Integration should have new 4 ops in it
+    let expected_count = 4 + expected_count;
+    let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
+    wait_for_validation(&alice_env, expected_count).await;
 
     {
         let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
@@ -245,8 +251,6 @@ async fn run_test(
             },
             2
         );
-        // Integration should have new 4 ops in it
-        // Plus the original 35
         assert_eq!(
             {
                 let r = env_ref.reader().unwrap();
@@ -257,7 +261,7 @@ async fn run_test(
                     .count()
                     .unwrap()
             },
-            4 + 35
+            expected_count
         );
     }
 }
@@ -404,4 +408,23 @@ async fn dodgy_bob(bob_cell_id: &CellId, handle: &ConductorHandle, dna_file: &Dn
     // Produce and publish these commits
     let mut triggers = handle.get_cell_triggers(&bob_cell_id).await.unwrap();
     triggers.produce_dht_ops.trigger();
+}
+
+/// Exit early if validation has run or wait for the maximum number of attempts
+async fn wait_for_validation(alice_env: &EnvironmentWrite, expected_count: usize) {
+    for _ in 0..NUM_ATTEMPTS {
+        let workspace = IncomingDhtOpsWorkspace::new(alice_env.clone().into()).unwrap();
+        let count = fresh_reader_test!(alice_env, |r| {
+            workspace
+                .integrated_dht_ops
+                .iter(&r)
+                .unwrap()
+                .count()
+                .unwrap()
+        });
+        if count == expected_count {
+            return ();
+        }
+        tokio::time::delay_for(Duration::from_millis(100)).await;
+    }
 }
