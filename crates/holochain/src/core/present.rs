@@ -1,3 +1,12 @@
+//! # Present Data Searches
+//! Checking for data and metadata presence in different
+//! locations.
+//! Once data / metadata is found the type of dependency is
+//! recorded so that consumers of this api can make decisions
+//! about what type of dependency they require (e.g. waiting for
+//! a PendingValidation dep to validate).
+//! This is still a work in progress and will eventually
+//! replace the "present.rs" in the sys_validation_workflow.
 use holo_hash::{EntryHash, HeaderHash};
 use holochain_state::{
     error::DatabaseResult,
@@ -26,6 +35,12 @@ macro_rules! found {
     };
 }
 
+/// A pair containing an element buf and metadata buf
+/// with the same prefix.
+/// This is useful for when you want to check
+/// a level for some data. For example
+/// you might want see if an entry exists in the
+/// "judged" element buf and the metadata buf.
 pub struct DbPair<'a, P, M>
 where
     P: PrefixType,
@@ -35,12 +50,28 @@ where
     pub meta: &'a M,
 }
 
+/// A source of data that contains different levels.
+/// This trait allows different workspaces to provide
+/// the source of the data / metadata for the retrieve calls.
+/// You can think of this as a superset of the cascade where we want
+/// to be able to also check for data in our other local stores.
+// TODO: This might need to be broken into sub traits as
+// some workspaces don't have all the levels (e.g. IntegratedDhtOpsWorkspace
+// doesn't have pending).
 pub trait DataSource {
     fn cascade(&mut self) -> Cascade;
     fn pending(&self) -> DbPair<PendingPrefix, MetadataBuf<PendingPrefix>>;
     fn judged(&self) -> DbPair<JudgedPrefix, MetadataBuf<JudgedPrefix>>;
 }
 
+/// Retrieve an element via an EntryHash from the judged, pending or cascade.
+/// This call will stop at the first found so _can_ avoid network calls.
+/// The entry will only be returned if at least the StoreEntry validation
+/// has run or will run.
+/// A `Dependency::PendingValidation` will be returned in cases where
+/// validation has not run (the op hasn't been judged).
+/// _Note: This does not mean the entry is "Valid" only that it will be
+/// judged.
 pub async fn retrieve_entry(
     hash: &EntryHash,
     data_source: &mut impl DataSource,
@@ -49,12 +80,18 @@ pub async fn retrieve_entry(
     found!(retrieve_entry_from(hash, data_source.judged())?.map(Proof));
     found!(retrieve_entry_from(hash, data_source.pending())?.map(PendingValidation));
     let mut cascade = data_source.cascade();
-    let el = cascade
-        .retrieve(hash.clone().into(), Default::default())
-        .await?;
+    let el = cascade.retrieve_entry(hash, Default::default()).await?;
     Ok(el.map(Claim))
 }
 
+/// Retrieve an element via a HeaderHash from the judged, pending or cascade.
+/// This call will stop at the first found so _can_ avoid network calls.
+/// The element will only be returned if at least the StoreEntry or
+/// StoreElement validation has run or will run.
+/// A `Dependency::PendingValidation` will be returned in cases where
+/// validation has not run (the op hasn't been judged).
+/// _Note: This does not mean the entry is "Valid" only that it will be
+/// judged.
 pub async fn retrieve_element(
     hash: &HeaderHash,
     data_source: &mut impl DataSource,
@@ -99,7 +136,7 @@ where
     match dbs.element.get_element(&hash)? {
         Some(el) => {
             let mut has_op = dbs.meta.has_registered_store_element(hash)?;
-            if let Some(eh) = el.header().entry_data().map(|(eh, _)| eh) {
+            if let Some(eh) = el.header().entry_hash() {
                 has_op = has_op || dbs.meta.has_registered_store_entry(eh, hash)?;
             }
             if has_op {

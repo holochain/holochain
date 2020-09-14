@@ -28,6 +28,10 @@ use std::{
 };
 use tracing::*;
 
+/// Wait for a maximum of 10 seconds
+/// for validation to run. (100 * 100ms)
+const NUM_ATTEMPTS: usize = 100;
+
 #[tokio::test(threaded_scheduler)]
 async fn app_validation_workflow_test() {
     observability::test_run().ok();
@@ -84,8 +88,12 @@ async fn run_test(
     let invocation =
         new_invocation(&bob_cell_id, "always_validates", (), TestWasm::Validate).unwrap();
     handle.call_zome(invocation).await.unwrap().unwrap();
-    // Some time for ops to reach alice and run through validation
-    tokio::time::delay_for(Duration::from_millis(1000)).await;
+
+    // Integration should have 3 ops in it
+    // Plus another 16 for genesis + init
+    let expected_count = 3 + 16;
+    let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
+    wait_for_validation(&alice_env, expected_count).await;
 
     {
         let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
@@ -94,21 +102,25 @@ async fn run_test(
         // Validation should be empty
         let val = inspect_val_limbo(&alice_env, &workspace);
         assert_eq!(val.len(), 0);
-        // Integration should have 3 ops in it
-        // Plus another 16 for genesis + init
         let int = inspect_integrated(&alice_env, &workspace);
         for (_, i, _) in &int {
             assert_eq!(i.validation_status, ValidationStatus::Valid);
         }
 
-        assert_eq!(int.len(), 3 + 16);
+        assert_eq!(int.len(), expected_count);
     }
 
     let (invalid_header_hash, invalid_entry_hash) =
         commit_invalid(&bob_cell_id, &handle, dna_file).await;
     let invalid_entry_hash: AnyDhtHash = invalid_entry_hash.into();
 
-    tokio::time::delay_for(Duration::from_millis(1000)).await;
+    // Integration should have 3 ops in it
+    // StoreEntry should be invalid.
+    // RegisterAgentActivity doesn't run app validation
+    // So they will be valid.
+    let expected_count = 3 + expected_count;
+    let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
+    wait_for_validation(&alice_env, expected_count).await;
 
     // These are the expected invalid ops
     fn expected_invalid_entry(
@@ -153,11 +165,6 @@ async fn run_test(
         // Validation should be empty
         let val = inspect_val_limbo(&alice_env, &workspace);
         assert_eq!(val.len(), 0);
-        // Integration should have 3 ops in it
-        // StoreEntry should be invalid.
-        // RegisterAgentActivity doesn't run app validation
-        // So they will be valid.
-        // Plus another 19 from the previous calls
         let int = inspect_integrated(&alice_env, &workspace);
         for v in &int {
             if !expected_invalid_entry(v, line!(), &invalid_header_hash, &invalid_entry_hash) {
@@ -165,14 +172,17 @@ async fn run_test(
             }
         }
 
-        assert_eq!(int.len(), 3 + 19);
+        assert_eq!(int.len(), expected_count);
     }
 
     let invocation =
         new_invocation(&bob_cell_id, "add_valid_link", (), TestWasm::ValidateLink).unwrap();
     handle.call_zome(invocation).await.unwrap().unwrap();
 
-    tokio::time::delay_for(Duration::from_millis(1000)).await;
+    // Integration should have 6 ops in it
+    let expected_count = 6 + expected_count;
+    let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
+    wait_for_validation(&alice_env, expected_count).await;
 
     {
         let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
@@ -181,15 +191,13 @@ async fn run_test(
         // Validation should be empty
         let val = inspect_val_limbo(&alice_env, &workspace);
         assert_eq!(val.len(), 0);
-        // Integration should have 6 ops in it
-        // Plus another 22 from the previous calls
         let int = inspect_integrated(&alice_env, &workspace);
         for v in &int {
             if !expected_invalid_entry(v, line!(), &invalid_header_hash, &invalid_entry_hash) {
                 others(v, line!())
             }
         }
-        assert_eq!(int.len(), 6 + 22);
+        assert_eq!(int.len(), expected_count);
     }
     let invocation =
         new_invocation(&bob_cell_id, "add_invalid_link", (), TestWasm::ValidateLink).unwrap();
@@ -199,7 +207,10 @@ async fn run_test(
             .try_into()
             .unwrap();
 
-    tokio::time::delay_for(Duration::from_millis(1000)).await;
+    // Integration should have 9 ops in it
+    let expected_count = 9 + expected_count;
+    let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
+    wait_for_validation(&alice_env, expected_count).await;
 
     // Now we expect an invalid link
     fn expected_invalid_link(
@@ -228,8 +239,6 @@ async fn run_test(
         // Validation should be empty
         let val = inspect_val_limbo(&alice_env, &workspace);
         assert_eq!(val.len(), 0);
-        // Integration should have 9 ops in it
-        // Plus another 28 from the previous calls
         let int = inspect_integrated(&alice_env, &workspace);
         for v in &int {
             if !expected_invalid_entry(v, line!(), &invalid_header_hash, &invalid_entry_hash)
@@ -238,7 +247,7 @@ async fn run_test(
                 others(v, line!())
             }
         }
-        assert_eq!(int.len(), 9 + 28);
+        assert_eq!(int.len(), expected_count);
     }
 
     let invocation = new_invocation(
@@ -249,7 +258,11 @@ async fn run_test(
     )
     .unwrap();
     call_zome_directly(&bob_cell_id, &handle, dna_file, invocation).await;
-    tokio::time::delay_for(Duration::from_millis(1000)).await;
+
+    // Integration should have 9 ops in it
+    let expected_count = 9 + expected_count;
+    let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
+    wait_for_validation(&alice_env, expected_count).await;
 
     {
         let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
@@ -258,8 +271,6 @@ async fn run_test(
         // Validation should be empty
         let val = inspect_val_limbo(&alice_env, &workspace);
         assert_eq!(val.len(), 0);
-        // Integration should have 9 ops in it
-        // Plus another 37 from the previous calls
         let int = inspect_integrated(&alice_env, &workspace);
         for v in &int {
             if !expected_invalid_entry(v, line!(), &invalid_header_hash, &invalid_entry_hash)
@@ -268,7 +279,7 @@ async fn run_test(
                 others(v, line!())
             }
         }
-        assert_eq!(int.len(), 9 + 37);
+        assert_eq!(int.len(), expected_count);
     }
 
     let invocation = new_invocation(
@@ -284,7 +295,10 @@ async fn run_test(
             .try_into()
             .unwrap();
 
-    tokio::time::delay_for(Duration::from_millis(1000)).await;
+    // Integration should have 12 ops in it
+    let expected_count = 12 + expected_count;
+    let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
+    wait_for_validation(&alice_env, expected_count).await;
 
     // Now we're trying to remove an invalid link
     fn expected_invalid_remove_link(
@@ -333,8 +347,6 @@ async fn run_test(
         // Validation should be empty
         let val = inspect_val_limbo(&alice_env, &workspace);
         assert_eq!(val.len(), 0);
-        // Integration should have 12 ops in it
-        // Plus another 46 from the previous calls
         let int = inspect_integrated(&alice_env, &workspace);
         for v in &int {
             if !expected_invalid_entry(v, line!(), &invalid_header_hash, &invalid_entry_hash)
@@ -344,7 +356,26 @@ async fn run_test(
                 others(v, line!())
             }
         }
-        assert_eq!(int.len(), 12 + 46);
+        assert_eq!(int.len(), expected_count);
+    }
+}
+
+/// Exit early if validation has run or wait for the maximum number of attempts
+async fn wait_for_validation(alice_env: &EnvironmentWrite, expected_count: usize) {
+    for _ in 0..NUM_ATTEMPTS {
+        let workspace = IncomingDhtOpsWorkspace::new(alice_env.clone().into()).unwrap();
+        let count = fresh_reader_test!(alice_env, |r| {
+            workspace
+                .integrated_dht_ops
+                .iter(&r)
+                .unwrap()
+                .count()
+                .unwrap()
+        });
+        if count == expected_count {
+            return ();
+        }
+        tokio::time::delay_for(Duration::from_millis(100)).await;
     }
 }
 

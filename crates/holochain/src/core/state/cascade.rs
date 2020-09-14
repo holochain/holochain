@@ -636,14 +636,14 @@ where
     // Need to add a fetch_retrieve_entry that only gets data.
     pub async fn retrieve_entry(
         &mut self,
-        hash: EntryHash,
+        hash: &EntryHash,
         options: GetOptions,
-    ) -> CascadeResult<Option<EntryHashed>> {
-        match self.get_entry_local_raw(&hash)? {
+    ) -> CascadeResult<Option<Element>> {
+        match self.get_element_local_raw_via_entry(hash)? {
             Some(e) => Ok(Some(e)),
             None => {
                 self.fetch_element_via_entry(hash.clone(), options).await?;
-                self.get_entry_local_raw(&hash)
+                self.get_element_local_raw_via_entry(hash)
             }
         }
     }
