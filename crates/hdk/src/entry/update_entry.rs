@@ -3,7 +3,7 @@
 /// Conceptually works as an app entry delete+create.
 /// The hash evalutes to the HeaderHash of the deleted element, the input is the new app entry.
 ///
-/// Updates can reference create and update elements but not deletes.
+/// Updates can reference create and update elements (header+entry) but not deletes.
 ///
 /// As updates can reference elements on other agent's source chains across unpredictable network
 /// topologies, they are treated as a tree structure.
@@ -12,6 +12,14 @@
 /// author them against that element. It is up to happ developers to decide how to ensure the tree
 /// branches are walked appropriately and that updates point to the correct element, whatever that
 /// means for the happ.
+///
+/// ```ignore
+/// #[hdk_entry(id = "foo")]
+/// struct Foo(u32);
+///
+/// let foo_zero_header_hash: HeaderHash = commit_entry!(Foo(0))?;
+/// let foo_ten_update_header_hash: HeaderHash = update_entry!(foo_zero_header_hash, Foo(10))?;
+/// ```
 ///
 /// @see create_entry!
 /// @see update!

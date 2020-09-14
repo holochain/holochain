@@ -10,7 +10,7 @@
 /// - requires juggling GuestPtr on the input and output with the memory/serialization
 /// - doesn't support Result returns at all, so breaks things as simple as `?`
 ///
-/// this can be used directly as `map_extern!(external_facing_fn_name, internal_fn_name)` but it is
+/// This can be used directly as `map_extern!(external_facing_fn_name, internal_fn_name)` but it is
 /// more idiomatic to use the `#[hdk_extern]` attribute
 ///
 /// ```ignore
