@@ -4,6 +4,7 @@ use crate::prelude::*;
 use holochain_wasmer_guest::*;
 use holochain_zome_types::link::LinkTag;
 use std::str::FromStr;
+use validate::RequiredValidationPackage;
 
 /// allows for "foo.bar.baz" to automatically move to/from ["foo", "bar", "baz"] components
 /// technically it's moving each string component in as bytes
@@ -143,6 +144,7 @@ entry_def!(Path EntryDef {
     crdt_type: CrdtType,
     required_validations: RequiredValidations::default(),
     visibility: EntryVisibility::Public,
+    required_validation_package: RequiredValidationPackage::default(),
 });
 
 /// wrap components vector

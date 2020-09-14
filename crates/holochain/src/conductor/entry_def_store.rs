@@ -17,8 +17,11 @@ use holochain_state::{
 };
 use holochain_types::dna::{zome::Zome, DnaFile};
 use holochain_zome_types::entry_def::EntryDef;
+use holochain_zome_types::header::AppEntryType;
 use holochain_zome_types::header::EntryDefIndex;
 use std::{collections::HashMap, convert::TryInto};
+
+use super::api::CellConductorApiT;
 
 pub mod error;
 
@@ -119,6 +122,29 @@ impl BufferedStore for EntryDefBuf {
     fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
         self.0.flush_to_txn_ref(writer)?;
         Ok(())
+    }
+}
+
+/// Get an [EntryDef] from the entry def store
+/// or fallback to running the zome
+pub(crate) async fn get_entry_def(
+    entry_type: &AppEntryType,
+    zome: Zome,
+    dna_file: &DnaFile,
+    conductor_api: &impl CellConductorApiT,
+) -> EntryDefStoreResult<Option<EntryDef>> {
+    let entry_def_index = u8::from(entry_type.id()) as usize;
+
+    // Try to get the entry def from the entry def store
+    let key = EntryDefBufferKey::new(zome, entry_type.id());
+    let entry_def = { conductor_api.get_entry_def(&key).await };
+
+    // If it's not found run the ribosome and get the entry defs
+    match &entry_def {
+        Some(_) => Ok(entry_def),
+        None => Ok(get_entry_defs(dna_file.clone())?
+            .get(entry_def_index)
+            .map(|(_, v)| v.clone())),
     }
 }
 
@@ -223,12 +249,14 @@ mod tests {
             visibility: EntryVisibility::Public,
             crdt_type: CrdtType,
             required_validations: 5.into(),
+            required_validation_package: Default::default(),
         };
         let comment_def = EntryDef {
             id: "comment".into(),
             visibility: EntryVisibility::Private,
             crdt_type: CrdtType,
             required_validations: 5.into(),
+            required_validation_package: Default::default(),
         };
         let dna_wasm = DnaWasmHashed::from_content(TestWasm::EntryDefs.into())
             .await

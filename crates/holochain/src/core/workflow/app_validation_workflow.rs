@@ -14,6 +14,7 @@ use super::{
 };
 use crate::{
     conductor::api::CellConductorApiT,
+    conductor::entry_def_store::get_entry_def,
     core::present::retrieve_element,
     core::present::retrieve_entry,
     core::present::DataSource,
@@ -55,12 +56,13 @@ use holochain_state::{
     prelude::*,
 };
 use holochain_types::{
-    dht_op::DhtOp, dht_op::DhtOpLight, dna::DnaFile, test_utils::which_agent,
+    dht_op::DhtOp, dht_op::DhtOpLight, dna::zome::Zome, dna::DnaFile, test_utils::which_agent,
     validate::ValidationStatus, Entry, HeaderHashed, Timestamp,
 };
 use holochain_zome_types::{
-    element::Element, element::SignedHeaderHashed, header::AppEntryType, header::EntryType,
-    header::LinkAdd, zome::ZomeName, Header,
+    element::Element, element::SignedHeaderHashed, entry_def::EntryDef, header::AppEntryType,
+    header::EntryType, header::LinkAdd, validate::RequiredValidationPackage,
+    validate::ValidationPackage, zome::ZomeName, Header,
 };
 use tracing::*;
 pub use types::Outcome;
@@ -275,9 +277,15 @@ async fn validate_op(
     let dna_file =
         dna_file.ok_or_else(|| AppValidationError::DnaMissing(conductor_api.cell_id().clone()))?;
 
-    // Get the zome names
+    // Get the app entry type if there is one
     let mut data_source = workspace.data_source(network);
-    let zome_names = get_zome_names(&element, &dna_file, &mut data_source, dependencies).await?;
+    let app_entry_type = get_app_entry_type(&element, &mut data_source, dependencies).await?;
+
+    // Get the validation package
+    let validation_package = get_val_pack(&app_entry_type, &dna_file, conductor_api).await?;
+
+    // Get the zome names
+    let zome_names = get_zome_names(&dna_file, &app_entry_type).await?;
 
     // Create the ribosome
     let ribosome = WasmRibosome::new(dna_file);
@@ -335,6 +343,7 @@ async fn validate_op(
             // for an agent key etc. If so we should change run_validation
             // to a Vec<ZomeName>
             let element = Arc::new(element);
+            let validation_package = validation_package.map(|vp| Arc::new(vp));
             zome_names
                 .into_iter()
                 .map(|zome_name| {
@@ -342,6 +351,7 @@ async fn validate_op(
                     run_validation_callback(
                         zome_name,
                         element.clone(),
+                        validation_package.clone(),
                         &ribosome,
                         workspace_lock.clone(),
                         network.clone(),
@@ -484,16 +494,41 @@ fn extract_app_type(element: &Element) -> Option<AppEntryType> {
         })
 }
 
+/// Get the validation package based on
+/// the requirements set by the AppEntryType
+async fn get_val_pack(
+    app_entry_type: &Option<AppEntryType>,
+    dna_file: &DnaFile,
+    conductor_api: &impl CellConductorApiT,
+) -> AppValidationResult<Option<ValidationPackage>> {
+    match app_entry_type {
+        Some(aet) => {
+            let zome = get_zome_info(aet, dna_file)?.1.clone();
+            let entry_def = get_entry_def(aet, zome, dna_file, conductor_api).await?;
+            Ok(entry_def.and_then(|ed| {
+                match ed.required_validation_package {
+                    // Only needs the element
+                    RequiredValidationPackage::Element => None,
+                    RequiredValidationPackage::Chain(_) => todo!(),
+                    RequiredValidationPackage::Full => todo!(),
+                }
+            }))
+        }
+        None => {
+            // Not an entry type so no package
+            Ok(None)
+        }
+    }
+}
+
 /// Get the zome name from the app entry type
 /// or get all zome names.
 async fn get_zome_names(
-    element: &Element,
     dna_file: &DnaFile,
-    data_source: &mut AppValDataSource<'_>,
-    dependencies: &mut PendingDependencies,
+    app_entry_type: &Option<AppEntryType>,
 ) -> AppValidationOutcome<Vec<ZomeName>> {
-    match get_app_entry_type(element, data_source, dependencies).await? {
-        Some(aet) => Ok(vec![get_zome_name(&aet, &dna_file)?]),
+    match app_entry_type {
+        Some(aet) => Ok(vec![get_zome_name(aet, &dna_file)?]),
         None => Ok(dna_file
             .dna()
             .zomes
@@ -504,26 +539,36 @@ async fn get_zome_names(
 }
 
 fn get_zome_name(entry_type: &AppEntryType, dna_file: &DnaFile) -> AppValidationResult<ZomeName> {
+    Ok(get_zome_info(entry_type, dna_file)?.0.clone())
+}
+
+fn get_zome_info<'a>(
+    entry_type: &AppEntryType,
+    dna_file: &'a DnaFile,
+) -> AppValidationResult<&'a (ZomeName, Zome)> {
     let zome_index = u8::from(entry_type.zome_id()) as usize;
     Ok(dna_file
         .dna()
         .zomes
         .get(zome_index)
-        .ok_or_else(|| AppValidationError::ZomeId(entry_type.clone()))?
-        .0
-        .clone())
+        .ok_or_else(|| AppValidationError::ZomeId(entry_type.clone()))?)
 }
 
 pub fn run_validation_callback(
     zome_name: ZomeName,
     element: Arc<Element>,
+    validation_package: Option<Arc<ValidationPackage>>,
     ribosome: &impl RibosomeT,
     workspace_lock: CallZomeWorkspaceLock,
     network: HolochainP2pCell,
 ) -> AppValidationResult<Outcome> {
     let validate: ValidateResult = ribosome.run_validate(
         ValidateHostAccess::new(workspace_lock, network),
-        ValidateInvocation { zome_name, element },
+        ValidateInvocation {
+            zome_name,
+            element,
+            validation_package,
+        },
     )?;
     match validate {
         ValidateResult::Valid => Ok(Outcome::Accepted),

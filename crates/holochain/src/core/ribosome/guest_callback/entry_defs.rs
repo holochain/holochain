@@ -277,12 +277,14 @@ mod slow_tests {
                         visibility: EntryVisibility::Public,
                         crdt_type: CrdtType,
                         required_validations: 5.into(),
+                        required_validation_package: Default::default(),
                     },
                     EntryDef {
                         id: "comment".into(),
                         visibility: EntryVisibility::Private,
                         crdt_type: CrdtType,
                         required_validations: 5.into(),
+                        required_validation_package: Default::default(),
                     },
                 ]
                 .into();

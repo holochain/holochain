@@ -39,9 +39,9 @@ pub use holochain_types::fixt::*;
 use holochain_types::test_utils::fake_dna_zomes;
 use holochain_wasm_test_utils::strum::IntoEnumIterator;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::header::HeaderHashes;
 use holochain_zome_types::link::LinkTag;
 use holochain_zome_types::HostInput;
+use holochain_zome_types::{element::Element, header::HeaderHashes, zome::ZomeName};
 use rand::seq::IteratorRandom;
 use rand::thread_rng;
 use rand::Rng;
@@ -327,9 +327,17 @@ fixturator!(
     constructor fn new(CallZomeWorkspaceLock, KeystoreSender, HolochainP2pCell);
 );
 
+fn make_validate_invocation(zn: ZomeName, el: Element) -> ValidateInvocation {
+    ValidateInvocation {
+        zome_name: zn,
+        element: Arc::new(el),
+        validation_package: None,
+    }
+}
+
 fixturator!(
     ValidateInvocation;
-    constructor fn new(ZomeName, Element);
+    vanilla fn make_validate_invocation(ZomeName, Element);
 );
 
 fixturator!(

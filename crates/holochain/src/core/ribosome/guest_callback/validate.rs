@@ -7,11 +7,11 @@ use holo_hash::EntryHash;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::dna::zome::{HostFnAccess, Permission};
-use holochain_zome_types::entry::Entry;
 use holochain_zome_types::validate::ValidateCallbackResult;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::HostInput;
-use holochain_zome_types::{element::Element, Header};
+use holochain_zome_types::{element::Element, validate::ValidationPackage, Header};
+use holochain_zome_types::{entry::Entry, validate::ValidateData};
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -22,15 +22,9 @@ pub struct ValidateInvocation {
     // we can SerializedBytes off an Element reference
     // lifetimes on invocations are a pain
     pub element: Arc<Element>,
-}
-
-impl ValidateInvocation {
-    pub fn new(zome_name: ZomeName, element: Element) -> Self {
-        Self {
-            zome_name,
-            element: Arc::new(element),
-        }
-    }
+    /// Only elements with an app entry
+    /// will have a validation package
+    pub validation_package: Option<Arc<ValidationPackage>>,
 }
 
 #[derive(Clone, Constructor)]
@@ -77,16 +71,17 @@ impl Invocation for ValidateInvocation {
         fns.into()
     }
     fn host_input(self) -> Result<HostInput, SerializedBytesError> {
-        Ok(HostInput::new((&*self.element).try_into()?))
+        Ok(HostInput::new(ValidateData::from(self).try_into()?))
     }
 }
 
-impl TryFrom<ValidateInvocation> for HostInput {
-    type Error = SerializedBytesError;
-    fn try_from(validate_invocation: ValidateInvocation) -> Result<Self, Self::Error> {
-        Ok(Self::new((&*validate_invocation.element).try_into()?))
-    }
-}
+// TODO: I think this is wrong and unused?
+// impl TryFrom<ValidateInvocation> for HostInput {
+//     type Error = SerializedBytesError;
+//     fn try_from(validate_invocation: ValidateInvocation) -> Result<Self, Self::Error> {
+//         Ok(Self::new((&*validate_invocation.element).try_into()?))
+//     }
+// }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub enum ValidateResult {
@@ -118,6 +113,17 @@ impl From<Vec<ValidateCallbackResult>> for ValidateResult {
                 ValidateCallbackResult::Valid => acc,
             }
         })
+    }
+}
+
+impl From<ValidateInvocation> for ValidateData {
+    fn from(vi: ValidateInvocation) -> Self {
+        Self {
+            element: Element::clone(&vi.element),
+            validation_package: vi
+                .validation_package
+                .map(|vp| ValidationPackage::clone(&vp)),
+        }
     }
 }
 

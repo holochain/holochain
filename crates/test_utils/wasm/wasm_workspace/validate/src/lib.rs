@@ -42,6 +42,7 @@ impl From<&ThisWasmEntry> for EntryDef {
             crdt_type: entry.into(),
             required_validations: entry.into(),
             visibility: entry.into(),
+            required_validation_package: Default::default(),
         }
     }
 }
@@ -51,9 +52,10 @@ impl TryFrom<&Entry> for ThisWasmEntry {
     fn try_from(entry: &Entry) -> Result<Self, Self::Error> {
         match entry {
             Entry::App(eb) => Ok(Self::try_from(SerializedBytes::from(eb.to_owned()))?),
-            _ => Err(SerializedBytesError::FromBytes(
-                "failed to deserialize ThisWasmEntry".into(),
-            ).into()),
+            _ => Err(
+                SerializedBytesError::FromBytes("failed to deserialize ThisWasmEntry".into())
+                    .into(),
+            ),
         }
     }
 }
@@ -64,7 +66,8 @@ entry_defs![
 ];
 
 #[hdk_extern]
-fn validate(element: Element) -> ExternResult<ValidateCallbackResult> {
+fn validate(data: ValidateData) -> ExternResult<ValidateCallbackResult> {
+    let element = data.element;
     let (_, entry) = element.into_inner();
     let entry = match entry {
         Some(e) => e,

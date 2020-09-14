@@ -3,6 +3,7 @@ use holochain_zome_types::header::AppEntryType;
 use thiserror::Error;
 
 use crate::{
+    conductor::entry_def_store::error::EntryDefStoreError,
     core::validation::OutcomeOrError,
     core::{present::PresentError, ribosome::error::RibosomeError},
     from_sub_error,
@@ -14,6 +15,8 @@ use super::types::Outcome;
 pub enum AppValidationError {
     #[error("Dna is missing for this cell {0:?}. Cannot validate without dna.")]
     DnaMissing(CellId),
+    #[error(transparent)]
+    EntryDefStoreError(#[from] EntryDefStoreError),
     #[error(transparent)]
     PresentError(#[from] PresentError),
     #[error(transparent)]

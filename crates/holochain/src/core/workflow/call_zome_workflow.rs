@@ -212,6 +212,7 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT>(
                     let outcome = app_validation_workflow::run_validation_callback(
                         zome_name.clone(),
                         element,
+                        todo!("Get the app validation package"),
                         &ribosome,
                         workspace_lock.clone(),
                         network.clone(),

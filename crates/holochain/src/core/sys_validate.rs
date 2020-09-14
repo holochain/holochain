@@ -10,6 +10,7 @@ use super::{
 };
 use crate::conductor::{
     api::CellConductorApiT,
+    entry_def_store::get_entry_def,
     entry_def_store::{get_entry_defs, EntryDefBufferKey},
 };
 use fallible_iterator::FallibleIterator;
@@ -297,17 +298,7 @@ pub async fn check_app_entry_type(
         .1
         .clone();
 
-    // Try to get the entry def from the entry def store
-    let key = EntryDefBufferKey::new(zome, entry_type.id());
-    let entry_def = { conductor_api.get_entry_def(&key).await };
-
-    // If it's not found run the ribosome and get the entry defs
-    let entry_def = match entry_def {
-        Some(entry_def) => return Ok(entry_def),
-        None => get_entry_defs(dna_file.clone())?
-            .get(entry_def_index)
-            .map(|(_, v)| v.clone()),
-    };
+    let entry_def = get_entry_def(entry_type, zome, &dna_file, conductor_api).await?;
 
     // Check the visibility and return
     match entry_def {

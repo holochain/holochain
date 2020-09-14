@@ -84,16 +84,17 @@ impl Invocation for ValidateLinkAddInvocation {
     }
 }
 
-impl TryFrom<ValidateLinkAddInvocation> for HostInput {
-    type Error = SerializedBytesError;
-    fn try_from(
-        validate_link_add_invocation: ValidateLinkAddInvocation,
-    ) -> Result<Self, Self::Error> {
-        Ok(Self::new(
-            (&*validate_link_add_invocation.link_add).try_into()?,
-        ))
-    }
-}
+// TODO: I think this is wrong and unused?
+// impl TryFrom<ValidateLinkAddInvocation> for HostInput {
+//     type Error = SerializedBytesError;
+//     fn try_from(
+//         validate_link_add_invocation: ValidateLinkAddInvocation,
+//     ) -> Result<Self, Self::Error> {
+//         Ok(Self::new(
+//             (&*validate_link_add_invocation.link_add).try_into()?,
+//         ))
+//     }
+// }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub enum ValidateLinkAddResult {

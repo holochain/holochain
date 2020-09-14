@@ -12,11 +12,6 @@ use crate::dna::Zomes;
 use crate::header::NewEntryHeader;
 use crate::Timestamp;
 use ::fixt::prelude::*;
-use holo_hash::fixt::AgentPubKeyFixturator;
-use holo_hash::fixt::DnaHashFixturator;
-use holo_hash::fixt::EntryHashFixturator;
-use holo_hash::fixt::HeaderHashFixturator;
-use holo_hash::fixt::WasmHashFixturator;
 use holo_hash::AgentPubKey;
 use holochain_keystore::Signature;
 use holochain_serialized_bytes::SerializedBytes;
@@ -371,7 +366,7 @@ fixturator!(
 
 fixturator!(
     EntryDef;
-    constructor fn new(EntryDefId, EntryVisibility, CrdtType, RequiredValidations);
+    constructor fn new(EntryDefId, EntryVisibility, CrdtType, RequiredValidations, RequiredValidationPackage);
 );
 
 fixturator!(
