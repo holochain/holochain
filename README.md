@@ -17,7 +17,7 @@ This repository contains most of the core Holochain libraries and binaries.
 
 ## Application Developer
 
-[Read the wasm API docs](./crates/hkd/README.md)
+[Read the wasm API docs](./crates/hdk/README.md)
 
 ## Core Developer
 
