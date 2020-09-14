@@ -156,7 +156,7 @@ where
                 }
                 // Doesn't have header but not because it was deleted
                 GetElementResponse::GetHeader(None) => (),
-                r @ _ => {
+                r => {
                     error!(
                         msg = "Got an invalid response to fetch element via header",
                         ?r
@@ -210,7 +210,7 @@ where
                         ?r
                     );
                 }
-                r @ _ => unimplemented!("{:?} is unimplemented for fetching via entry", r),
+                r => unimplemented!("{:?} is unimplemented for fetching via entry", r),
             }
         }
         Ok(())
@@ -232,9 +232,9 @@ where
             let values = metadata
                 .headers
                 .into_iter()
-                .map(|h| SysMetaVal::NewEntry(h))
-                .chain(metadata.deletes.into_iter().map(|h| SysMetaVal::Delete(h)))
-                .chain(metadata.updates.into_iter().map(|h| SysMetaVal::Update(h)));
+                .map(SysMetaVal::NewEntry)
+                .chain(metadata.deletes.into_iter().map(SysMetaVal::Delete))
+                .chain(metadata.updates.into_iter().map(SysMetaVal::Update));
             match *basis.hash_type() {
                 hash_type::AnyDht::Entry => {
                     for v in values {
@@ -400,7 +400,7 @@ where
                     .meta_cache
                     .get_headers(&r, hash.clone())?
                     .collect::<Vec<_>>()?;
-                let headers = self.render_headers(headers, |h| Ok(h))?;
+                let headers = self.render_headers(headers, Ok)?;
                 let deletes = self
                     .meta_cache
                     .get_deletes_on_entry(&r, hash.clone())?
@@ -519,10 +519,11 @@ where
                         .meta_cache
                         .get_headers(&r, entry_hash)?
                         .filter_map(|header| {
-                            if let None = self
+                            if self
                                 .meta_cache
                                 .get_deletes_on_header(&r, header.header_hash.clone())?
                                 .next()?
+                                .is_none()
                             {
                                 Ok(Some(header))
                             } else {

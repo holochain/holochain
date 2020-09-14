@@ -78,7 +78,7 @@ pub(crate) fn get_original_address<'a>(
             })
             .transpose()?;
 
-        let entry_address = match maybe_original_element {
+        match maybe_original_element {
             Some(original_element_signed_header_hash) => {
                 match original_element_signed_header_hash.header().entry_data() {
                     Some((entry_hash, _)) => Ok(entry_hash.clone()),
@@ -86,8 +86,7 @@ pub(crate) fn get_original_address<'a>(
                 }
             }
             None => Err(RibosomeError::ElementDeps(address.into())),
-        };
-        entry_address
+        }
     })
 }
 

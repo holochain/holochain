@@ -129,7 +129,7 @@ pub mod wasm_test {
                 cell_id: bob_cell_id,
                 zome_name: TestWasm::WhoAmI.into(),
                 cap: ().into(),
-                fn_name: "set_access".to_string(),
+                fn_name: "set_access".into(),
                 payload: HostInput::new(().try_into().unwrap()),
                 provenance: bob_agent_id.clone(),
             })
@@ -143,7 +143,7 @@ pub mod wasm_test {
                 cell_id: alice_cell_id,
                 zome_name: TestWasm::WhoAmI.into(),
                 cap: ().into(),
-                fn_name: "whoarethey".to_string(),
+                fn_name: "whoarethey".into(),
                 payload: HostInput::new(bob_agent_id.clone().try_into().unwrap()),
                 provenance: alice_agent_id,
             })

@@ -7,6 +7,7 @@ use holochain_crypto::CryptoError;
 use holochain_serialized_bytes::prelude::SerializedBytesError;
 use holochain_types::dna::error::DnaError;
 use holochain_wasmer_host::prelude::WasmError;
+use holochain_zome_types::zome::FunctionName;
 use holochain_zome_types::zome::ZomeName;
 use thiserror::Error;
 use tokio::task::JoinError;
@@ -33,7 +34,7 @@ pub enum RibosomeError {
 
     /// A ZomeFn was called by name that doesn't exist
     #[error("Attempted to call a zome function that doesn't exist: Zome: {0} Fn {1}")]
-    ZomeFnNotExists(ZomeName, String),
+    ZomeFnNotExists(ZomeName, FunctionName),
 
     /// a problem with entry defs
     #[error("An error with entry defs: {0}")]

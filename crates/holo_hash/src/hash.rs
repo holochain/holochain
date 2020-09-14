@@ -110,7 +110,7 @@ fn bytes_to_loc(bytes: &[u8]) -> u32 {
         + ((bytes[3] as u32) << 24)
 }
 
-fn assert_length(hash: &Vec<u8>) {
+fn assert_length(hash: &[u8]) {
     if hash.len() != HASH_SERIALIZED_LEN {
         panic!(
             "invalid holo_hash byte count, expected: {}, found: {}. {:?}",
