@@ -295,8 +295,10 @@ impl SourceChain {
             .filter(|shh| Ok(query.check(shh.header())))
             .map(|shh| match self.0.get_element(shh.header_address()) {
                 Ok(Some(element)) => Ok(element),
-                Ok(None) => Err(SourceChainError::ElementMissing(shh.header_address().to_string())),
-                Err(e) => Err(e)
+                Ok(None) => Err(SourceChainError::ElementMissing(
+                    shh.header_address().to_string(),
+                )),
+                Err(e) => Err(e),
             })
             .collect()
     }
