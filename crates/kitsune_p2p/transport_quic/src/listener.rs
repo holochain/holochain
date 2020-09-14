@@ -5,23 +5,19 @@ use kitsune_p2p_types::{
     transport::transport_listener::*,
     transport::*,
 };
+use std::net::SocketAddr;
 
 ghost_actor::ghost_chan! {
     chan ListenerInner<TransportError> {
-        /// our incoming task has produced a connection instance
-        fn register_incoming(
-            sender: ghost_actor::GhostSender<TransportConnection>,
-            receiver: TransportConnectionEventReceiver,
-        ) -> ();
+        /// internal raw connect fn
+        fn raw_connect(addr: SocketAddr) -> quinn::Connecting;
     }
 }
 
 /// QUIC implementation of kitsune TransportListener actor.
 struct TransportListenerQuic {
-    #[allow(dead_code)]
     internal_sender: ghost_actor::GhostSender<ListenerInner>,
     quinn_endpoint: quinn::Endpoint,
-    incoming_sender: futures::channel::mpsc::Sender<TransportListenerEvent>,
 }
 
 impl ghost_actor::GhostControlHandler for TransportListenerQuic {}
@@ -29,17 +25,12 @@ impl ghost_actor::GhostControlHandler for TransportListenerQuic {}
 impl ghost_actor::GhostHandler<ListenerInner> for TransportListenerQuic {}
 
 impl ListenerInnerHandler for TransportListenerQuic {
-    fn handle_register_incoming(
+    fn handle_raw_connect(
         &mut self,
-        sender: ghost_actor::GhostSender<TransportConnection>,
-        receiver: TransportConnectionEventReceiver,
-    ) -> ListenerInnerHandlerResult<()> {
-        let send_clone = self.incoming_sender.clone();
-        Ok(
-            async move { send_clone.incoming_connection(sender, receiver).await }
-                .boxed()
-                .into(),
-        )
+        addr: SocketAddr,
+    ) -> ListenerInnerHandlerResult<quinn::Connecting> {
+        let out = self.quinn_endpoint.connect(&addr, "stub.stub").map_err(TransportError::other)?;
+        Ok(async move { Ok(out) }.boxed().into())
     }
 }
 
@@ -52,7 +43,7 @@ impl TransportListenerHandler for TransportListenerQuic {
             crate::SCHEME,
             self.quinn_endpoint
                 .local_addr()
-                .map_err(TransportError::custom)?,
+                .map_err(TransportError::other)?,
         );
         Ok(async move { Ok(out) }.boxed().into())
     }
@@ -64,21 +55,12 @@ impl TransportListenerHandler for TransportListenerQuic {
         ghost_actor::GhostSender<TransportConnection>,
         TransportConnectionEventReceiver,
     )> {
-        // TODO fix this block_on
-        let addr = tokio_safe_block_on::tokio_safe_block_on(
-            crate::url_to_addr(&input, crate::SCHEME),
-            std::time::Duration::from_secs(1),
-        )
-        .unwrap()?;
-        let maybe_con = self
-            .quinn_endpoint
-            .connect(&addr, "stub.stub")
-            .map_err(TransportError::custom)?;
-        Ok(
-            async move { crate::connection::spawn_transport_connection_quic(maybe_con).await }
-                .boxed()
-                .into(),
-        )
+        let i_s = self.internal_sender.clone();
+        Ok(async move {
+            let addr = crate::url_to_addr(&input, crate::SCHEME).await?;
+            let maybe_con = i_s.raw_connect(addr).await?;
+            crate::connection::spawn_transport_connection_quic(maybe_con).await
+        }.boxed().into())
     }
 }
 
@@ -90,13 +72,14 @@ pub async fn spawn_transport_listener_quic(
     TransportListenerEventReceiver,
 )> {
     let (server_config, _server_cert) = danger::configure_server()
+        .await
         .map_err(|e| TransportError::from(format!("cert error: {:?}", e)))?;
     let mut builder = quinn::Endpoint::builder();
     builder.listen(server_config);
     builder.default_client_config(danger::configure_client());
-    let (quinn_endpoint, mut incoming) = builder
+    let (quinn_endpoint, incoming) = builder
         .bind(&crate::url_to_addr(&bind_to, crate::SCHEME).await?)
-        .map_err(TransportError::custom)?;
+        .map_err(TransportError::other)?;
 
     let (incoming_sender, receiver) = futures::channel::mpsc::channel(10);
 
@@ -106,38 +89,23 @@ pub async fn spawn_transport_listener_quic(
 
     let sender = builder.channel_factory().create_channel().await?;
 
-    let internal_sender_clone = internal_sender.clone();
     tokio::task::spawn(async move {
-        while let Some(maybe_con) = incoming.next().await {
-            let internal_sender_clone = internal_sender_clone.clone();
+        incoming.for_each_concurrent(10, |maybe_con| async {
+            let res: TransportResult<()> = async {
+                let (con_send, con_recv) = crate::connection::spawn_transport_connection_quic(maybe_con).await?;
+                incoming_sender.incoming_connection(con_send, con_recv).await?;
 
-            // TODO - some buffer_unordered(10) magic
-            //        so we don't process infinite incoming connections
-            tokio::task::spawn(async move {
-                let r = match crate::connection::spawn_transport_connection_quic(maybe_con).await {
-                    Err(_) => {
-                        // TODO - log this?
-                        return;
-                    }
-                    Ok(r) => r,
-                };
-
-                if internal_sender_clone
-                    .register_incoming(r.0, r.1)
-                    .await
-                    .is_err()
-                {
-                    // TODO - log this?
-                    return;
-                }
-            });
-        }
+                Ok(())
+            }.await;
+            if let Err(err) = res {
+                ghost_actor::dependencies::tracing::error!(?err);
+            }
+        }).await;
     });
 
     let actor = TransportListenerQuic {
         internal_sender,
         quinn_endpoint,
-        incoming_sender,
     };
 
     tokio::task::spawn(builder.spawn(actor));
@@ -146,6 +114,7 @@ pub async fn spawn_transport_listener_quic(
 }
 
 mod danger {
+    use kitsune_p2p_types::transport::{TransportResult, TransportError};
     use quinn::{
         Certificate, CertificateChain, ClientConfig, ClientConfigBuilder, PrivateKey, ServerConfig,
         ServerConfigBuilder, TransportConfig,
@@ -153,22 +122,39 @@ mod danger {
     use std::sync::Arc;
 
     #[allow(dead_code)]
-    pub(crate) fn configure_server() -> Result<(ServerConfig, Vec<u8>), Box<dyn std::error::Error>>
+    pub(crate) async fn configure_server() -> TransportResult<(ServerConfig, Vec<u8>)>
     {
-        let cert = rcgen::generate_simple_self_signed(vec!["localhost".into()]).unwrap();
-        let cert_der = cert.serialize_der().unwrap();
-        let priv_key = cert.serialize_private_key_der();
-        let priv_key = PrivateKey::from_der(&priv_key)?;
+        //let options = lair_keystore_api::actor::TlsCertOptions::default();
+        //let cert = lair_keystore_api::internal::tls::tls_cert_self_signed_new_from_entropy(
+        //    lair_keystore_api::actor::TlsCertOptions::default(),
+        //).await.map_err(TransportError::other)?;
+        let sni = format!("a{}a.a{}a", nanoid::nanoid!(), nanoid::nanoid!());
+        let mut params = rcgen::CertificateParams::new(vec![sni.clone()]);
+        //params.alg = &rcgen::PKCS_ED25519;
+        //params.alg = &rcgen::PKCS_ECDSA_P256_SHA256;
+        params.alg = &rcgen::PKCS_ECDSA_P384_SHA384;
+        let cert = rcgen::Certificate::from_params(params)
+            .map_err(TransportError::other)?;
+        let priv_key_der = cert.serialize_private_key_der();
+        let cert_der = cert.serialize_der().map_err(TransportError::other)?;
+        let cert = lair_keystore_api::entry::EntryTlsCert {
+            sni: sni.into(),
+            priv_key_der: priv_key_der.into(),
+            cert_der: cert_der.into(),
+            cert_digest: vec![0; 32].into(),
+        };
+
+        let priv_key = PrivateKey::from_der(&cert.priv_key_der).map_err(TransportError::other)?;
 
         let mut transport_config = TransportConfig::default();
         transport_config.stream_window_uni(0);
         let mut server_config = ServerConfig::default();
         server_config.transport = Arc::new(transport_config);
         let mut cfg_builder = ServerConfigBuilder::new(server_config);
-        let cert = Certificate::from_der(&cert_der)?;
-        cfg_builder.certificate(CertificateChain::from_certs(vec![cert]), priv_key)?;
+        let tcert = Certificate::from_der(&cert.cert_der).map_err(TransportError::other)?;
+        cfg_builder.certificate(CertificateChain::from_certs(vec![tcert]), priv_key).map_err(TransportError::other)?;
 
-        Ok((cfg_builder.build(), cert_der))
+        Ok((cfg_builder.build(), cert.cert_der.to_vec()))
     }
 
     /// Dummy certificate verifier that treats any certificate as valid.
