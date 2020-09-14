@@ -1,11 +1,13 @@
 /// Get an element from the hash AND the details for the entry or header hash passed in.
 /// Returns None if the entry/header does not exist.
+/// The details returned are a contextual mix of elements and header hashes, see below.
 ///
 /// Note: The return details will be inferred by the hash type passed in, be careful to pass in the
 ///       correct hash type for the details you want.
 ///
-/// Note: The element returned is the same that would be returned by `get!`, i.e. the "oldest live"
-///       entry if an entry hash is passed in, or the specified element if a header hash is passed
+/// Note: If a header hash is passed in the element returned is the specified element.
+///       If an entry hash is passed in the element returned is the same that would be returned by
+///       `get!`, i.e. the "oldest live".
 ///       @see get! for more information about what "oldest live" means.
 ///
 /// The details returned include relevant creates, updates and deletes for the hash passed in.
@@ -16,8 +18,19 @@
 /// Updates must reference another create or update header+entry.
 /// Deletes must reference a create or update header+entry (nothing can reference a delete).
 ///
-/// Details for a header hash return all updates and deletes that reference that specific header.
-/// Details for an entry hash return all creates, updates and deletes that reference that entry.
+/// Full elements are returned for direct references to the passed hash.
+/// Header hashes are returned for references to references to the passed hash.
+///
+/// Details for a header hash return:
+/// - the element for this header hash if it exists
+/// - all update and delete _elements_ that reference that specified header
+/// - all update and delete _header hashes_ that reference the elements returned
+///
+/// Details for an entry hash return:
+/// - all creates, updates and delete _elements_ that reference that entry hash
+/// - all update and delete _elements_ that reference the elements that reference the entry hash
+/// - all update and delete _header hashes_ that reference the elements that reference the elements
+///   that reference the entry hash
 ///
 /// Note: Entries are just values, so can be referenced by many CRUD headers by many authors.
 ///       e.g. the number 1 or string "foo" can be referenced by anyone publishing CRUD headers at

@@ -1,3 +1,4 @@
+// @todo document this
 #[macro_export]
 macro_rules! query {
     ( $base:expr ) => {{
