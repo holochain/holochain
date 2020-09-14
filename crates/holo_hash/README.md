@@ -23,7 +23,7 @@ Each primitive HashType has a unique 3-byte prefix associated with it, to easily
 
 | hash type | HoloHash alias | prefix |
 |-----------|----------------|--------|
-| Agent     | AgentHash      | uhCAk  |
+| Agent     | AgentPubKey    | uhCAk  |
 | Entry     | EntryHash      | uhCEk  |
 | DhtOp     | DhtOpHash      | uhCQk  |
 | Dna       | DnaHash        | uhC0k  |
