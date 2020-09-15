@@ -8,6 +8,14 @@
 /// An update to an element does not change its liveness.
 /// @see get_details! for more information about how CRUD elements reference each other.
 ///
+/// Note: `get!` __always triggers and blocks on a network call__.
+///       @todo implement a 'get optimistic' that returns based on the current opinion of the world
+///       and performs network calls in the background so they are available 'next time'.
+///
+/// Note: Deletes are considered in the liveness but Updates are not currently followed
+///       automatically due to the need for the happ to disambiguate update logic.
+///       @todo implement 'redirect' logic so that updates are followed by `get!`.
+///
 /// Note: Updates typically point to a different entry hash than what they are updating but not
 ///       always, e.g. consider changing `foo` to `bar` back to `foo`. The entry hashes in a crud
 ///       tree can be circular but the header hashes are never circular.

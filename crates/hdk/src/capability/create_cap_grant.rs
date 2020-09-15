@@ -23,7 +23,7 @@
 /// - New entries are committed to the author's chain with the author's signature
 /// - Signals are emmitted to the author's system and GUI
 /// - The author must be online from the perspective of the caller
-/// - The author can inline `call_remote` back to the caller or any other agent
+/// - The author can chain `call_remote` back to the caller or any other agent
 ///
 /// The happ developer needs to plan carefully to ensure auditability and accountability is
 /// maintained for all writes and network calls if this is important to the integrity of the happ.

@@ -1,6 +1,4 @@
 /// Thin wrapper around update! for app entries.
-///
-/// Conceptually works as an app entry delete+create.
 /// The hash evalutes to the HeaderHash of the deleted element, the input is the new app entry.
 ///
 /// Updates can reference create and update elements (header+entry) but not deletes.
@@ -20,6 +18,9 @@
 /// let foo_zero_header_hash: HeaderHash = commit_entry!(Foo(0))?;
 /// let foo_ten_update_header_hash: HeaderHash = update_entry!(foo_zero_header_hash, Foo(10))?;
 /// ```
+///
+/// @todo in the future this will be true because we will have the concept of 'redirects':
+/// Works as an app entry delete+create.
 ///
 /// @see create_entry!
 /// @see update!

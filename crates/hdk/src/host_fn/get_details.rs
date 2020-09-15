@@ -6,8 +6,8 @@
 ///       correct hash type for the details you want.
 ///
 /// Note: If a header hash is passed in the element returned is the specified element.
-///       If an entry hash is passed in the element returned is the same that would be returned by
-///       `get!`, i.e. the "oldest live".
+///       If an entry hash is passed in all the headers (so implicitly all the elements) are
+///       returned for the entry that matches that hash.
 ///       @see get! for more information about what "oldest live" means.
 ///
 /// The details returned include relevant creates, updates and deletes for the hash passed in.
@@ -24,13 +24,10 @@
 /// Details for a header hash return:
 /// - the element for this header hash if it exists
 /// - all update and delete _elements_ that reference that specified header
-/// - all update and delete _header hashes_ that reference the elements returned
 ///
 /// Details for an entry hash return:
 /// - all creates, updates and delete _elements_ that reference that entry hash
 /// - all update and delete _elements_ that reference the elements that reference the entry hash
-/// - all update and delete _header hashes_ that reference the elements that reference the elements
-///   that reference the entry hash
 ///
 /// Note: Entries are just values, so can be referenced by many CRUD headers by many authors.
 ///       e.g. the number 1 or string "foo" can be referenced by anyone publishing CRUD headers at
