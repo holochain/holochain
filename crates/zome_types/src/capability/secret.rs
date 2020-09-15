@@ -51,13 +51,6 @@ impl<'de> serde::de::Deserialize<'de> for CapSecret {
     }
 }
 
-/// Interop with serde_bytes.
-impl From<serde_bytes::ByteBuf> for CapSecret {
-    fn from(byte_buf: serde_bytes::ByteBuf) -> Self {
-        byte_buf.as_ref().into()
-    }
-}
-
 /// Trivial new type derivation.
 impl From<[u8; CAP_SECRET_BYTES]> for CapSecret {
     fn from(b: [u8; CAP_SECRET_BYTES]) -> Self {
@@ -81,18 +74,6 @@ impl Eq for CapSecret {}
 impl std::fmt::Debug for CapSecret {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(&self.0.to_vec(), f)
-    }
-}
-
-/// Infallible conversion from a slice to CapSecret
-/// Warning: If you do this with too many or few bytes then expect Bad Things to happen.
-///          Missing bytes will simply result in 0 values in the CapSecret (less secure).
-///          Extra bytes will be truncated (undefined behaviour).
-impl From<&[u8]> for CapSecret {
-    fn from(bytes: &[u8]) -> Self {
-        let mut inner = [0; CAP_SECRET_BYTES];
-        inner.copy_from_slice(bytes);
-        inner.into()
     }
 }
 
