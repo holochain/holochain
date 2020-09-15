@@ -56,12 +56,7 @@ pub fn wasm_call_n(c: &mut Criterion) {
                         };
                         ribosome
                             .clone()
-                            .maybe_call(
-                                ha.clone().into(),
-                                &i,
-                                &i.zome_name.clone(),
-                                i.fn_name.clone(),
-                            )
+                            .maybe_call(ha.clone().into(), &i, &i.zome_name, &i.fn_name)
                             .unwrap();
                     });
                 });
