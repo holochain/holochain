@@ -23,7 +23,7 @@ pub enum Details {
 /// This is all the metadata available for an element.
 pub struct ElementDetails {
     /// The specific element.
-    /// Either an Create or an Update.
+    /// Either a Create or an Update.
     pub element: Element,
     /// Any Delete on this element.
     pub deletes: Vec<Delete>,

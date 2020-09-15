@@ -23,7 +23,7 @@
 ///  e.g. the following are equivalent
 ///
 /// ```ignore
-/// #[hdk_entry(id = "foo", visibility = "private")]
+/// #[hdk_entry(id = "foo", visibility = "private", required_validations = 6, )]
 /// pub struct Foo;
 /// ```
 ///

@@ -10,12 +10,12 @@
 /// - there is only one way to create a link, validation logic depends on only the base+target+tag
 /// - can represent circular references because only entry hashes are needed
 /// - support arbitrary bytes of data (i.e. "tag") that can be read or used to filter gets
-/// - link creates and deletes are 1:1 pairs, a delete always points to a _specific_ link
+/// - deletes always point to a _specific_ link creation event, not the link itself
 /// - model dynamic sets of or relationships between things
 /// - can reference any entry regardless of type (e.g. posts can link to comments)
 /// - cannot reference other links or crud headers (@todo maybe we can do this in the future)
 ///
-/// Note: There is a hard limit of 512 bytes of data for the tag as it is used as an lmdb key.
+/// Note: There is a hard limit of 400 bytes of data for the tag as it is used as an lmdb key.
 ///
 /// Crud:
 ///
