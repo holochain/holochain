@@ -17,22 +17,36 @@ use holochain_serialized_bytes::prelude::*;
 pub struct Element {
     /// The signed header for this element
     signed_header: SignedHeaderHashed,
-    /// If there is an entry associated with this header it will be here
-    maybe_entry: Option<Entry>,
+    /// If there is an entry associated with this header it will be here.
+    /// If not, there will be an enum variant explaining the reason.
+    entry: ElementEntry,
 }
 
 impl Element {
     /// Raw element constructor.  Used only when we know that the values are valid.
     pub fn new(signed_header: SignedHeaderHashed, maybe_entry: Option<Entry>) -> Self {
+        let maybe_visibilty = signed_header
+            .header()
+            .entry_data()
+            .map(|(_, entry_type)| entry_type.visibility());
+        let entry = match (maybe_entry, maybe_visibilty) {
+            (Some(entry), Some(_)) => ElementEntry::Present(entry),
+            (None, Some(EntryVisibility::Private)) => ElementEntry::Hidden,
+            (None, None) => ElementEntry::NotApplicable,
+            (Some(_), None) => {
+                unreachable!("Entry is present for a Header type which has no entry reference")
+            }
+            (None, Some(EntryVisibility::Public)) => ElementEntry::NotStored,
+        };
         Self {
             signed_header,
-            maybe_entry,
+            entry,
         }
     }
 
     /// Break this element into its components
-    pub fn into_inner(self) -> (SignedHeaderHashed, Option<Entry>) {
-        (self.signed_header, self.maybe_entry)
+    pub fn into_inner(self) -> (SignedHeaderHashed, ElementEntry) {
+        (self.signed_header, self.entry)
     }
 
     /// The inner signed header
@@ -62,29 +76,17 @@ impl Element {
 
     /// Access the Entry portion of this triple as a ElementEntry,
     /// which includes the context around the presence or absence of the entry.
-    pub fn entry(&self) -> ElementEntry {
-        let maybe_visibilty = self
-            .header()
-            .entry_data()
-            .map(|(_, entry_type)| entry_type.visibility());
-        match (self.maybe_entry.as_ref(), maybe_visibilty) {
-            (Some(entry), Some(_)) => ElementEntry::Present(entry),
-            (None, Some(EntryVisibility::Private)) => ElementEntry::Hidden,
-            (None, None) => ElementEntry::NotApplicable,
-            (Some(_), None) => {
-                unreachable!("Entry is present for a Header type which has no entry reference")
-            }
-            (None, Some(EntryVisibility::Public)) => ElementEntry::NotStored,
-        }
+    pub fn entry(&self) -> &ElementEntry {
+        &self.entry
     }
 }
 
 /// Represents the different ways the entry_address reference within a Header
 /// can be intepreted
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum ElementEntry<'a> {
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
+pub enum ElementEntry {
     /// The Header has an entry_address reference, and the Entry is accessible.
-    Present(&'a Entry),
+    Present(Entry),
     /// The Header has an entry_address reference, but we are in a public
     /// context and the entry is private.
     Hidden,
@@ -96,12 +98,23 @@ pub enum ElementEntry<'a> {
     NotStored,
 }
 
-impl<'a> ElementEntry<'a> {
-    /// Provides entry data if it exists.
+impl ElementEntry {
+    /// Provides entry data by reference if it exists
     ///
     /// Collapses the enum down to the two possibilities of
     /// extant or nonextant Entry data
-    pub fn as_option(&'a self) -> Option<&'a Entry> {
+    pub fn as_option(&self) -> Option<&Entry> {
+        if let ElementEntry::Present(ref entry) = self {
+            Some(entry)
+        } else {
+            None
+        }
+    }
+    /// Provides entry data as owned value if it exists.
+    ///
+    /// Collapses the enum down to the two possibilities of
+    /// extant or nonextant Entry data
+    pub fn to_option(self) -> Option<Entry> {
         if let ElementEntry::Present(entry) = self {
             Some(entry)
         } else {
@@ -115,7 +128,7 @@ impl<'a> ElementEntry<'a> {
     /// anything other than ElementEntry::Present returns None
     /// a present entry that fails to deserialize cleanly is an error
     /// a present entry that deserializes cleanly is returned as the provided type A
-    pub fn to_app_option<A: TryFrom<SerializedBytes>>(&'a self) -> Result<Option<A>, A::Error> {
+    pub fn to_app_option<A: TryFrom<SerializedBytes>>(&self) -> Result<Option<A>, A::Error> {
         match self.as_option() {
             Some(Entry::App(eb)) => Ok(Some(A::try_from(SerializedBytes::from(eb.to_owned()))?)),
             _ => Ok(None),
@@ -250,7 +263,7 @@ impl From<SignedHeaderHashed> for HoloHashed<SignedHeader> {
 
 impl From<Element> for Option<Entry> {
     fn from(e: Element) -> Self {
-        e.maybe_entry
+        e.entry.to_option()
     }
 }
 

@@ -1532,14 +1532,14 @@ mod slow_tests {
                 .await
                 .unwrap()
                 .unwrap();
-            assert_eq!(e.into_inner().1.unwrap(), target_entry);
+            assert_eq!(e.into_inner().1.to_option().unwrap(), target_entry);
 
             let e = cascade
                 .dht_get(base_entry_hash.into(), Default::default())
                 .await
                 .unwrap()
                 .unwrap();
-            assert_eq!(e.into_inner().1.unwrap(), base_entry);
+            assert_eq!(e.into_inner().1.to_option().unwrap(), base_entry);
         }
         conductor.shutdown().await;
         shutdown.await.unwrap();
