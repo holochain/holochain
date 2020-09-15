@@ -29,7 +29,10 @@ impl ListenerInnerHandler for TransportListenerQuic {
         &mut self,
         addr: SocketAddr,
     ) -> ListenerInnerHandlerResult<quinn::Connecting> {
-        let out = self.quinn_endpoint.connect(&addr, "stub.stub").map_err(TransportError::other)?;
+        let out = self
+            .quinn_endpoint
+            .connect(&addr, "stub.stub")
+            .map_err(TransportError::other)?;
         Ok(async move { Ok(out) }.boxed().into())
     }
 }
@@ -60,18 +63,24 @@ impl TransportListenerHandler for TransportListenerQuic {
             let addr = crate::url_to_addr(&input, crate::SCHEME).await?;
             let maybe_con = i_s.raw_connect(addr).await?;
             crate::connection::spawn_transport_connection_quic(maybe_con).await
-        }.boxed().into())
+        }
+        .boxed()
+        .into())
     }
 }
 
 /// Spawn a new QUIC TransportListenerSender.
 pub async fn spawn_transport_listener_quic(
     bind_to: Url2,
+    cert: Option<(
+        lair_keystore_api::actor::Cert,
+        lair_keystore_api::actor::CertPrivKey,
+    )>,
 ) -> TransportListenerResult<(
     ghost_actor::GhostSender<TransportListener>,
     TransportListenerEventReceiver,
 )> {
-    let (server_config, _server_cert) = danger::configure_server()
+    let server_config = danger::configure_server(cert)
         .await
         .map_err(|e| TransportError::from(format!("cert error: {:?}", e)))?;
     let mut builder = quinn::Endpoint::builder();
@@ -90,17 +99,23 @@ pub async fn spawn_transport_listener_quic(
     let sender = builder.channel_factory().create_channel().await?;
 
     tokio::task::spawn(async move {
-        incoming.for_each_concurrent(10, |maybe_con| async {
-            let res: TransportResult<()> = async {
-                let (con_send, con_recv) = crate::connection::spawn_transport_connection_quic(maybe_con).await?;
-                incoming_sender.incoming_connection(con_send, con_recv).await?;
+        incoming
+            .for_each_concurrent(10, |maybe_con| async {
+                let res: TransportResult<()> = async {
+                    let (con_send, con_recv) =
+                        crate::connection::spawn_transport_connection_quic(maybe_con).await?;
+                    incoming_sender
+                        .incoming_connection(con_send, con_recv)
+                        .await?;
 
-                Ok(())
-            }.await;
-            if let Err(err) = res {
-                ghost_actor::dependencies::tracing::error!(?err);
-            }
-        }).await;
+                    Ok(())
+                }
+                .await;
+                if let Err(err) = res {
+                    ghost_actor::dependencies::tracing::error!(?err);
+                }
+            })
+            .await;
     });
 
     let actor = TransportListenerQuic {
@@ -114,7 +129,7 @@ pub async fn spawn_transport_listener_quic(
 }
 
 mod danger {
-    use kitsune_p2p_types::transport::{TransportResult, TransportError};
+    use kitsune_p2p_types::transport::{TransportError, TransportResult};
     use quinn::{
         Certificate, CertificateChain, ClientConfig, ClientConfigBuilder, PrivateKey, ServerConfig,
         ServerConfigBuilder, TransportConfig,
@@ -122,25 +137,39 @@ mod danger {
     use std::sync::Arc;
 
     #[allow(dead_code)]
-    pub(crate) async fn configure_server() -> TransportResult<(ServerConfig, Vec<u8>)>
-    {
-        let mut options = lair_keystore_api::actor::TlsCertOptions::default();
-        options.alg = lair_keystore_api::actor::TlsCertAlg::PkcsEcdsaP256Sha256;
-        let cert = lair_keystore_api::internal::tls::tls_cert_self_signed_new_from_entropy(
-            options,
-        ).await.map_err(TransportError::other)?;
+    pub(crate) async fn configure_server(
+        cert: Option<(
+            lair_keystore_api::actor::Cert,
+            lair_keystore_api::actor::CertPrivKey,
+        )>,
+    ) -> TransportResult<ServerConfig> {
+        let (cert, cert_priv) = match cert {
+            Some(r) => r,
+            None => {
+                let mut options = lair_keystore_api::actor::TlsCertOptions::default();
+                options.alg = lair_keystore_api::actor::TlsCertAlg::PkcsEcdsaP256Sha256;
+                let cert = lair_keystore_api::internal::tls::tls_cert_self_signed_new_from_entropy(
+                    options,
+                )
+                .await
+                .map_err(TransportError::other)?;
+                (cert.cert_der, cert.priv_key_der)
+            }
+        };
 
-        let priv_key = PrivateKey::from_der(&cert.priv_key_der).map_err(TransportError::other)?;
+        let tcert = Certificate::from_der(&cert).map_err(TransportError::other)?;
+        let tcert_priv = PrivateKey::from_der(&cert_priv).map_err(TransportError::other)?;
 
         let mut transport_config = TransportConfig::default();
         transport_config.stream_window_uni(0);
         let mut server_config = ServerConfig::default();
         server_config.transport = Arc::new(transport_config);
         let mut cfg_builder = ServerConfigBuilder::new(server_config);
-        let tcert = Certificate::from_der(&cert.cert_der).map_err(TransportError::other)?;
-        cfg_builder.certificate(CertificateChain::from_certs(vec![tcert]), priv_key).map_err(TransportError::other)?;
+        cfg_builder
+            .certificate(CertificateChain::from_certs(vec![tcert]), tcert_priv)
+            .map_err(TransportError::other)?;
 
-        Ok((cfg_builder.build(), cert.cert_der.to_vec()))
+        Ok(cfg_builder.build())
     }
 
     /// Dummy certificate verifier that treats any certificate as valid.
