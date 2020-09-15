@@ -111,7 +111,7 @@ inside core, but some illustrative examples include:
 - `commit_entry`: save some data to the local source chain and broadcast it to
   the DHT to be redundantly validated and stored
 - `get_entry`: retrieve some data from local or the network given its hash
-- `link_entries`: create graph style relationships (links) between entries
+- `create_link`: create graph style relationships (links) between entries
 - `get_links`: retrive links between entries using the DHT as a graph database
 - `send`: send data directly to a known peer on the network
 
@@ -323,12 +323,12 @@ To implement an `init` callback we need a few things:
 
 - the `holochain_externs!()` macro as above
 - to define an `extern` called `init` as described above
-- to use the `ret!()` macro with the `GuestOutput` type to return an
+- to use the `ret!()` macro with the `ExternOutput` type to return an
   `InitCallbackResult` enum, serialized into a `GuestPtr`
 
 That last point is a little complex so I'll break it down.
 
-The `GuestOutput` struct wraps `SerializedBytes` from the
+The `ExternOutput` struct wraps `SerializedBytes` from the
 `holochain_serialized_bytes` crate. Anything that can be serialized can be
 sent back to the host through this struct and the `ret!` macro.
 
@@ -338,14 +338,14 @@ automatically and returns the location of it back to the host so the host can
 copy it out of wasm memory into its own memory and work with it from there.
 
 In the case of a known callback like `init` the host will attempt to deserialize
-the inner value of `GuestOutput` because it is expecting the guest to return a
+the inner value of `ExternOutput` because it is expecting the guest to return a
 meaningful value from the callback.
 
 All the callback return values have a simple naming convention
 `FooCallbackResult` so `init` must return an `InitCallbackResult` enum.
 
 In the case of a function called due to an external RPC request, the host will
-simply send back whatever is inside `GuestOutput` as raw binary bytes.
+simply send back whatever is inside `ExternOutput` as raw binary bytes.
 
 All the callback input and output values are defined in `holochain_zome_types`.
 
@@ -362,7 +362,7 @@ pub extern "C" fn init(_: GuestPtr) -> GuestPtr {
 
  // `ret!` will `return` anything `TryInto<SerializedBytes>` as a `GuestPtr`
  ret!(
-  GuestOutput::new(
+  ExternOutput::new(
    // the host will allow this wasm to be installed if it returns `Pass`
    InitCallbackResult::Pass.try_into().unwrap()
   )
@@ -393,7 +393,7 @@ The easiest way to make a struct do this is by deriving the traits:
 struct Foo;
 ```
 
-Note in the example the usage of `ret!()` and `GuestOutput` exactly as in the
+Note in the example the usage of `ret!()` and `ExternOutput` exactly as in the
 `init` example.
 
 In this case the custom `HelloWorld` struct will be ignored by the holochain
@@ -418,7 +418,7 @@ struct HelloWorld;
 #[no_mangle]
 pub extern "C" hello_world(_: GuestPtr) -> GuestPtr {
  ret!(
-  GuestOutput(
+  ExternOutput(
    // the derived serialization traits make this work
    HelloWorld.try_into().unwrap()
   )
@@ -479,7 +479,7 @@ It consists of a few components, some new and some already demonstrated above:
 - `holochain_externs!()` to enable the holochain host to run the wasm
 - A `Png` struct to hold binary PNG data as `u8` bytes
 - An `extern` function `save_image` that will be callable over websockets RPC
-- A `host_call!` to `__commit_entry` inside `save_image` to commit the image
+- A `host_call!` to `__create` inside `save_image` to commit the image
 - A `validate_entry` callback function implementation to validate the PNG
 - Some basic validation logic to ensure the PNG is under 10mb
 - Calling `host_args!()` in both externs to accept input
@@ -510,11 +510,11 @@ pub extern "C" fn save_image(remote_ptr: GuestPtr) -> GuestPtr {
  // a real application should handle it
  //
  // the important bit for this example is that we use host_call!() and that the
- // __commit_entry function on the host will enqueue a validation callback
- let _: CommitEntryOutput = host_call!(
+ // __create function on the host will enqueue a validation callback
+ let _: CreateOutput = host_call!(
   // note that all host functions from holochain start with prefix `__`
-  __commit_entry,
-  CommitEntryInput::new(
+  __create,
+  CreateInput::new(
    Entry::App(
     // this serializes the image into an Entry enum that the holochain host
     // knows what to do with
@@ -531,13 +531,13 @@ pub extern "C" fn save_image(remote_ptr: GuestPtr) -> GuestPtr {
 // this is optional, the same logic can be implemented with the base `validate`
 pub extern "C" fn validate_entry(remote_ptr: GuestPtr) -> GuestPtr {
 
- // HostInput is the mirror of GuestOutput
- let input: HostInput = host_args!(remote_ptr);
+ // ExternInput is the mirror of ExternOutput
+ let input: ExternInput = host_args!(remote_ptr);
 
  // we ret! a GuestInput containing SerializedBytes of ValidateCallbackResult
- ret!(GuestOutput::new(
+ ret!(ExternOutput::new(
   // attempt to deserialize an Entry from the inner
-  // SerializedBytes of the HostInput struct
+  // SerializedBytes of the ExternInput struct
   match Entry::try_from(input.into_inner()) {
    Ok(Entry::App(serialized_bytes)) => {
     // we only have one entry type in this wasm so we can deserialize it
@@ -635,10 +635,10 @@ pub extern "C" fn commit_message(remote_ptr: GuestPtr) -> GuestPtr {
  // it evalutes to v from Ok(v) or short circuits with Err(e)
  // because this is inside an extern function the short circuit logic also
  // handles memory and serialization logic for the holochain host
- let commit_entry_output: CommitEntryOutput = try_result!(
+ let commit_entry_output: CreateOutput = try_result!(
   host_call!(
-   __commit_entry,
-   CommitEntryInput::new(
+   __create,
+   CreateInput::new(
     Entry::App(
      try_result!(
       message.try_into(),
@@ -650,7 +650,7 @@ pub extern "C" fn commit_message(remote_ptr: GuestPtr) -> GuestPtr {
   "commit entry call failed"
  );
  ret!(
-  GuestOutput(
+  ExternOutput(
    try_result!(
     commit_entry_output.try_into(),
     "failed to deserialize commit entry output"
@@ -678,7 +678,7 @@ the sugar that it provides.
 The HDK macros simply expand to this extern boilerplate, saving you from typing
 out a few macros to input/output data for the host. They also offer some
 convenience wrappers around `host_call!()` that do exactly what you'd expect,
-e.g. `commit_entry!( ... )` vs. `host_call!(__commit_entry, ... )`.
+e.g. `create_entry!( ... )` vs. `host_call!(__create, ... )`.
 
 Think of the HDK as a tool and safety net but also don't feel you can't peek
 under the hood to see what is there.
@@ -716,10 +716,10 @@ struct Png([u8]);
 // the input args and return values are all native Rust types, not pointers
 // we can use `Result` and `?`
 // the only wasm-ey thing here is the `host_call!()` macro
-fn _save_image(png: Png) -> Result<CommitEntryOutput, String> {
+fn _save_image(png: Png) -> Result<CreateOutput, String> {
  Ok(host_call!(
-  __commit_entry,
-  CommitEntryInput::new(
+  __create,
+  CreateInput::new(
    Entry::App(
     png.try_into()?
    )
@@ -728,9 +728,9 @@ fn _save_image(png: Png) -> Result<CommitEntryOutput, String> {
 }
 
 // absolutely nothing wasm specific here at all
-// only need to know to return a GuestOutput with inner ValidateCallbackResult
-fn _validate_entry(input: HostInput) -> Result<GuestOutput, String> {
- Ok(GuestOutput(match Entry::try_from(input.into_inner())? {
+// only need to know to return a ExternOutput with inner ValidateCallbackResult
+fn _validate_entry(input: ExternInput) -> Result<ExternOutput, String> {
+ Ok(ExternOutput(match Entry::try_from(input.into_inner())? {
   Entry::App(serialized_bytes) => {
    let png: Png = serialized_bytes.try_into()?;
 

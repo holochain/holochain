@@ -7,8 +7,8 @@ use crate::conductor::{
 use crate::core::ribosome::ZomeCallInvocation;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::app::{AppId, InstalledApp};
-use holochain_zome_types::GuestOutput;
-use holochain_zome_types::ZomeCallInvocationResponse;
+use holochain_zome_types::ExternOutput;
+use holochain_zome_types::ZomeCallResponse;
 
 /// The interface that a Conductor exposes to the outside world.
 #[async_trait::async_trait]
@@ -59,12 +59,10 @@ impl AppInterfaceApi for RealAppInterfaceApi {
             )),
             AppRequest::ZomeCallInvocation(request) => {
                 match self.conductor_handle.call_zome(*request).await? {
-                    Ok(ZomeCallInvocationResponse::ZomeApiFn(output)) => {
+                    Ok(ZomeCallResponse::Ok(output)) => {
                         Ok(AppResponse::ZomeCallInvocation(Box::new(output)))
                     }
-                    Ok(ZomeCallInvocationResponse::Unauthorized) => {
-                        Ok(AppResponse::ZomeCallUnauthorized)
-                    }
+                    Ok(ZomeCallResponse::Unauthorized) => Ok(AppResponse::ZomeCallUnauthorized),
                     Err(e) => Ok(AppResponse::Error(e.into())),
                 }
             }
@@ -123,7 +121,7 @@ pub enum AppResponse {
     AppInfo(Option<InstalledApp>),
 
     /// The response to a zome call
-    ZomeCallInvocation(Box<GuestOutput>),
+    ZomeCallInvocation(Box<ExternOutput>),
 
     /// The zome call is unauthorized
     ZomeCallUnauthorized,
