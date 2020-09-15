@@ -2,6 +2,7 @@ FROM holochain/holonix:latest
 
 WORKDIR /holochain/build
 ENV NIX_ENV_PREFIX /holochain/build
+ENV NIXPKGS_ALLOW_UNFREE 1
 
 ARG DOCKER_BRANCH=develop
 
