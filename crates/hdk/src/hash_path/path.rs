@@ -253,7 +253,7 @@ impl TryFrom<&LinkTag> for Path {
 }
 
 impl Path {
-    /// What is the hash for the current Path.
+    /// What is the hash for the current Path?
     pub fn hash(&self) -> Result<holo_hash::EntryHash, HdkError> {
         Ok(hash_entry!(self)?)
     }
