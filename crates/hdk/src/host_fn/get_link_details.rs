@@ -11,7 +11,7 @@
 ///      - `[ 1 ]` returns `[ a, b, c]`
 ///      - `[ 1, 2 ]` returns `[ a, b ]`
 ///      - `[ 1, 2, 3 ]` returns `[ a ]`
-///      - `[ 5 ]` returns `[ ]` (does _not_ return c because the filter is prefix not contains)
+///      - `[ 5 ]` returns `[ ]` (does _not_ return c because the filter is by "prefix", not "contains")
 ///
 /// This is mostly identical to get_links but it returns all the creates and all the deletes.
 /// c.f. get_links that returns only the creates that have not been deleted.
