@@ -11,7 +11,7 @@ pub struct BytesKey(pub Vec<u8>);
 /// The value stored in the links meta db
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct LinkMetaVal {
-    /// Hash of the [LinkAdd] [Header] that created this link
+    /// Hash of the [CreateLink] [Header] that created this link
     pub link_add_hash: HeaderHash,
     /// The [Entry] being linked to
     pub target: EntryHash,
@@ -37,7 +37,7 @@ pub enum LinkMetaKey<'a> {
     BaseZome(&'a EntryHash, ZomeId),
     /// Search for all links on a base, for a zome and with a tag
     BaseZomeTag(&'a EntryHash, ZomeId, &'a LinkTag),
-    /// This will match only the link created with a certain [LinkAdd] hash
+    /// This will match only the link created with a certain [CreateLink] hash
     Full(&'a EntryHash, ZomeId, &'a LinkTag, &'a HeaderHash),
 }
 
@@ -47,16 +47,16 @@ pub(super) type SysMetaKey = AnyDhtHash;
 #[derive(Debug, Hash, PartialEq, Eq, Ord, PartialOrd, Clone, Serialize, Deserialize)]
 pub enum SysMetaVal {
     /// A header that results in a new entry
-    /// Either a [EntryCreate] or [EntryUpdate]
+    /// Either a [Create] or [Update]
     NewEntry(TimedHeaderHash),
-    /// An [EntryUpdate] [Header]
+    /// An [Update] [Header]
     Update(TimedHeaderHash),
-    /// An [Header::ElementDelete]
+    /// An [Header::Delete]
     Delete(TimedHeaderHash),
     /// Activity on an agent's public key
     Activity(TimedHeaderHash),
     /// Link remove on link add
-    LinkRemove(TimedHeaderHash),
+    DeleteLink(TimedHeaderHash),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize, SerializedBytes)]
@@ -198,7 +198,7 @@ impl From<SysMetaVal> for HeaderHash {
             SysMetaVal::NewEntry(h)
             | SysMetaVal::Update(h)
             | SysMetaVal::Delete(h)
-            | SysMetaVal::LinkRemove(h)
+            | SysMetaVal::DeleteLink(h)
             | SysMetaVal::Activity(h) => h.header_hash,
         }
     }
@@ -210,20 +210,20 @@ impl From<NewEntryHeader> for EntryHeader {
     }
 }
 
-impl From<header::EntryUpdate> for EntryHeader {
-    fn from(h: header::EntryUpdate) -> Self {
-        EntryHeader::Update(Header::EntryUpdate(h))
+impl From<header::Update> for EntryHeader {
+    fn from(h: header::Update) -> Self {
+        EntryHeader::Update(Header::Update(h))
     }
 }
 
-impl From<header::ElementDelete> for EntryHeader {
-    fn from(h: header::ElementDelete) -> Self {
-        EntryHeader::Delete(Header::ElementDelete(h))
+impl From<header::Delete> for EntryHeader {
+    fn from(h: header::Delete) -> Self {
+        EntryHeader::Delete(Header::Delete(h))
     }
 }
 
-impl<'a> From<(&'a LinkAdd, &'a HeaderHash)> for LinkMetaKey<'a> {
-    fn from((link_add, hash): (&'a LinkAdd, &'a HeaderHash)) -> Self {
+impl<'a> From<(&'a CreateLink, &'a HeaderHash)> for LinkMetaKey<'a> {
+    fn from((link_add, hash): (&'a CreateLink, &'a HeaderHash)) -> Self {
         Self::Full(
             &link_add.base_address,
             link_add.zome_id,

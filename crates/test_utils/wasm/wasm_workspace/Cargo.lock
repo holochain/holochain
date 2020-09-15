@@ -514,15 +514,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "test_wasm_commit_entry"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
- "test_wasm_common",
-]
-
-[[package]]
 name = "test_wasm_common"
 version = "0.0.1"
 dependencies = [
@@ -534,6 +525,15 @@ dependencies = [
 
 [[package]]
 name = "test_wasm_crd"
+version = "0.0.1"
+dependencies = [
+ "hdk3",
+ "serde",
+ "test_wasm_common",
+]
+
+[[package]]
+name = "test_wasm_create_entry"
 version = "0.0.1"
 dependencies = [
  "hdk3",
@@ -567,20 +567,20 @@ dependencies = [
 ]
 
 [[package]]
-name = "test_wasm_entry_hash"
-version = "0.0.1"
-dependencies = [
- "hdk3",
- "serde",
-]
-
-[[package]]
 name = "test_wasm_foo"
 version = "0.0.1"
 dependencies = [
  "hdk3",
  "serde",
  "test_wasm_common",
+]
+
+[[package]]
+name = "test_wasm_hash_entry"
+version = "0.0.1"
+dependencies = [
+ "hdk3",
+ "serde",
 ]
 
 [[package]]
