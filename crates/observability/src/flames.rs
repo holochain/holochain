@@ -103,19 +103,19 @@ fn save_flamegraph(path: PathBuf) -> Option<()> {
 fn parse_time(samples: &mut usize, value: &dyn std::fmt::Debug) {
     let v = format!("{:?}", value);
     if v.ends_with("ns") {
-        if let Some(v) = v.trim_end_matches("ns").parse::<f64>().ok() {
+        if let Ok(v) = v.trim_end_matches("ns").parse::<f64>() {
             *samples = v as usize;
         }
     } else if v.ends_with("µs") {
-        if let Some(v) = v.trim_end_matches("µs").parse::<f64>().ok() {
+        if let Ok(v) = v.trim_end_matches("µs").parse::<f64>() {
             *samples = (v * 1000.0) as usize;
         }
     } else if v.ends_with("ms") {
-        if let Some(v) = v.trim_end_matches("ms").parse::<f64>().ok() {
+        if let Ok(v) = v.trim_end_matches("ms").parse::<f64>() {
             *samples = (v * 1000000.0) as usize;
         }
     } else if v.ends_with('s') {
-        if let Some(v) = v.trim_end_matches('s').parse::<f64>().ok() {
+        if let Ok(v) = v.trim_end_matches('s').parse::<f64>() {
             *samples = (v * 1000000000.0) as usize;
         }
     }

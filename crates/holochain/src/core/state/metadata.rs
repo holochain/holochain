@@ -313,7 +313,11 @@ where
     fn update_entry_dht_status(&mut self, basis: EntryHash) -> DatabaseResult<()> {
         let status = fresh_reader!(self.env, |r| self.get_headers(&r, basis.clone())?.find_map(
             |header| {
-                if let None = self.get_deletes_on_header(&r, header.header_hash)?.next()? {
+                if self
+                    .get_deletes_on_header(&r, header.header_hash)?
+                    .next()?
+                    .is_none()
+                {
                     trace!("found live header");
                     Ok(Some(EntryDhtStatus::Live))
                 } else {

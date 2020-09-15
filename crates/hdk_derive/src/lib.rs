@@ -21,29 +21,29 @@ impl Parse for EntryDef {
 
         let vars = Punctuated::<syn::MetaNameValue, syn::Token![,]>::parse_terminated(input)?;
         for var in vars {
-            match var.path.segments.first() {
-                Some(segment) => {
-                    match segment.ident.to_string().as_str() {
-                        "id" => match var.lit {
-                            syn::Lit::Str(s) => {
-                                id = holochain_zome_types::entry_def::EntryDefId::App(
-                                    s.value().to_string(),
+            if let Some(segment) = var.path.segments.first() {
+                match segment.ident.to_string().as_str() {
+                    "id" => match var.lit {
+                        syn::Lit::Str(s) => {
+                            id = holochain_zome_types::entry_def::EntryDefId::App(
+                                s.value().to_string(),
+                            )
+                        }
+                        _ => unreachable!(),
+                    },
+                    "required_validations" => match var.lit {
+                        syn::Lit::Int(i) => {
+                            required_validations =
+                                holochain_zome_types::entry_def::RequiredValidations::from(
+                                    i.base10_parse::<u8>()?,
                                 )
-                            }
-                            _ => unreachable!(),
-                        },
-                        "required_validations" => match var.lit {
-                            syn::Lit::Int(i) => {
-                                required_validations =
-                                    holochain_zome_types::entry_def::RequiredValidations::from(
-                                        i.base10_parse::<u8>()?,
-                                    )
-                            }
-                            _ => unreachable!(),
-                        },
-                        "visibility" => {
-                            match var.lit {
-                                syn::Lit::Str(s) => visibility = match s.value().as_str() {
+                        }
+                        _ => unreachable!(),
+                    },
+                    "visibility" => {
+                        match var.lit {
+                            syn::Lit::Str(s) => {
+                                visibility = match s.value().as_str() {
                                     "public" => {
                                         holochain_zome_types::entry_def::EntryVisibility::Public
                                     }
@@ -51,17 +51,16 @@ impl Parse for EntryDef {
                                         holochain_zome_types::entry_def::EntryVisibility::Private
                                     }
                                     _ => unreachable!(),
-                                },
-                                _ => unreachable!(),
-                            };
-                        }
-                        "crdt_type" => {
-                            unimplemented!();
-                        }
-                        _ => {}
+                                }
+                            }
+                            _ => unreachable!(),
+                        };
                     }
+                    "crdt_type" => {
+                        unimplemented!();
+                    }
+                    _ => {}
                 }
-                None => {}
             }
         }
         Ok(EntryDef(holochain_zome_types::entry_def::EntryDef {

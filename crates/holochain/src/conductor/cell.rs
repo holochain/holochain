@@ -10,6 +10,7 @@ use crate::conductor::api::CellConductorApiT;
 use crate::conductor::handle::ConductorHandle;
 use crate::core::queue_consumer::{spawn_queue_consumer_tasks, InitialQueueTriggers};
 use crate::core::ribosome::ZomeCallInvocation;
+use holochain_zome_types::zome::FunctionName;
 
 use crate::{
     conductor::{api::CellConductorApi, cell::error::CellResult},
@@ -618,7 +619,7 @@ impl Cell {
         &self,
         from_agent: AgentPubKey,
         zome_name: ZomeName,
-        fn_name: String,
+        fn_name: FunctionName,
         cap: CapSecret,
         payload: SerializedBytes,
     ) -> CellResult<SerializedBytes> {

@@ -1,10 +1,7 @@
 //! defines the websocket listener struct
 
 use crate::*;
-use futures::{
-    stream::{BoxStream, StreamExt},
-    Future,
-};
+use futures::stream::{BoxStream, StreamExt};
 
 /// Websocket listening / server socket. This struct is an async Stream -
 /// calling `.next().await` will give you a Future that will in turn resolve
@@ -78,33 +75,31 @@ pub async fn websocket_bind(addr: Url2, config: Arc<WebsocketConfig>) -> Result<
 }
 
 /// Connects the new listener
-fn connect(
+async fn connect(
     config: Arc<WebsocketConfig>,
     socket_result: std::io::Result<tokio::net::TcpStream>,
-) -> impl Future<Output = Result<(WebsocketSender, WebsocketReceiver)>> {
-    async move {
-        match socket_result {
-            Ok(socket) => {
-                socket.set_keepalive(Some(std::time::Duration::from_secs(
-                    config.tcp_keepalive_s as u64,
-                )))?;
-                tracing::debug!(
-                    message = "accepted incoming raw socket",
-                    remote_addr = %socket.peer_addr()?,
-                );
-                let socket = tokio_tungstenite::accept_async_with_config(
-                    socket,
-                    Some(tungstenite::protocol::WebSocketConfig {
-                        max_send_queue: Some(config.max_send_queue),
-                        max_message_size: Some(config.max_message_size),
-                        max_frame_size: Some(config.max_frame_size),
-                    }),
-                )
-                .await
-                .map_err(|e| Error::new(ErrorKind::Other, e))?;
-                build_websocket_pair(config, socket)
-            }
-            Err(e) => Err(Error::new(ErrorKind::Other, e)),
+) -> Result<(WebsocketSender, WebsocketReceiver)> {
+    match socket_result {
+        Ok(socket) => {
+            socket.set_keepalive(Some(std::time::Duration::from_secs(
+                config.tcp_keepalive_s as u64,
+            )))?;
+            tracing::debug!(
+                message = "accepted incoming raw socket",
+                remote_addr = %socket.peer_addr()?,
+            );
+            let socket = tokio_tungstenite::accept_async_with_config(
+                socket,
+                Some(tungstenite::protocol::WebSocketConfig {
+                    max_send_queue: Some(config.max_send_queue),
+                    max_message_size: Some(config.max_message_size),
+                    max_frame_size: Some(config.max_frame_size),
+                }),
+            )
+            .await
+            .map_err(|e| Error::new(ErrorKind::Other, e))?;
+            build_websocket_pair(config, socket)
         }
+        Err(e) => Err(Error::new(ErrorKind::Other, e)),
     }
 }

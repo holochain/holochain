@@ -46,6 +46,10 @@ impl<'a> ElementGroup<'a> {
             .map(|shh| shh.header_address())
             .zip(self.headers.iter().map(|shh| shh.header()))
     }
+    /// true if len is zero
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
     /// Amount of headers
     pub fn len(&self) -> usize {
         self.headers.len()
@@ -189,7 +193,7 @@ impl RawGetEntryResponse {
                 let et = eu.entry_type.clone();
                 (WireNewEntryHeader::Update((eu, signature).into()), et)
             }
-            h @ _ => panic!(
+            h => panic!(
                 "Get entry responses cannot be created from headers
                     other then EntryCreate or EntryUpdate.
                     Tried to with: {:?}",
@@ -284,7 +288,7 @@ impl WireElement {
         let (signed_header, maybe_entry) = e.into_inner();
         Self {
             signed_header: signed_header.into_inner().0,
-            maybe_entry: maybe_entry,
+            maybe_entry,
             deleted,
         }
     }

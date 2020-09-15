@@ -1,4 +1,5 @@
 use super::CapSecret;
+use crate::zome::FunctionName;
 use crate::zome::ZomeName;
 use holo_hash::*;
 use holochain_serialized_bytes::SerializedBytes;
@@ -181,8 +182,6 @@ impl CapAccess {
     }
 }
 
-/// a single function name
-pub type FunctionName = String;
 /// a single zome/function pair
 pub type GrantedFunction = (ZomeName, FunctionName);
 /// A collection of zome/function pairs

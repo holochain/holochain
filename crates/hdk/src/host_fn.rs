@@ -1,7 +1,6 @@
 pub mod agent_info;
 pub mod call;
 pub mod call_remote;
-pub mod capability;
 pub mod commit_entry;
 pub mod debug;
 pub mod decrypt;

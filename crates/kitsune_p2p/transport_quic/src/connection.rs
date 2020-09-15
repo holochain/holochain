@@ -128,11 +128,11 @@ pub(crate) async fn spawn_transport_connection_quic(
                     Ok(data) => data,
                 };
 
-                if let Err(_) = bi_send.write_all(&res_data).await {
+                if bi_send.write_all(&res_data).await.is_err() {
                     // TODO - log?
                 }
 
-                if let Err(_) = bi_send.finish().await {
+                if bi_send.finish().await.is_err() {
                     // TODO - log?
                 }
             });
