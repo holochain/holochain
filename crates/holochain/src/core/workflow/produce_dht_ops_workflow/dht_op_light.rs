@@ -34,7 +34,7 @@ pub async fn light_to_op<P: PrefixType>(
             // TODO: Could use this signature? Is it the same?
             // Should we not be storing the signature in the DhtOpLight?
             let (header, sig) = header.into_header_and_signature();
-            let entry = entry.to_option().map(Box::new);
+            let entry = entry.into_option().map(Box::new);
             Ok(DhtOp::StoreElement(sig, header.into_content(), entry))
         }
         DhtOpLight::StoreEntry(h, _, _) => {
@@ -52,13 +52,13 @@ pub async fn light_to_op<P: PrefixType>(
             let entry = match header.visibility() {
                 // Entry must be here because it's a StoreEntry
                 EntryVisibility::Public => entry
-                    .to_option()
+                    .into_option()
                     .ok_or_else(|| DhtOpConvertError::MissingData(header.entry().clone().into()))?,
                 // If the entry is not here and you were meant to have access
                 // it's because you were using a database without access to private entries
                 // If not then you should handle this error
                 EntryVisibility::Private => entry
-                    .to_option()
+                    .into_option()
                     .ok_or(DhtOpConvertError::StoreEntryOnPrivate)?,
             };
             Ok(DhtOp::StoreEntry(sig, header, Box::new(entry)))

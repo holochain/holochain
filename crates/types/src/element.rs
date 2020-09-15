@@ -183,7 +183,7 @@ impl RawGetEntryResponse {
     fn from_element(element: Element) -> (WireNewEntryHeader, EntryType, Entry) {
         let (shh, entry) = element.into_inner();
         let entry = entry
-            .to_option()
+            .into_option()
             .expect("Get entry responses cannot be created without entries");
         let (header, signature) = shh.into_header_and_signature();
         let (new_entry_header, entry_type) = match header.into_content() {
@@ -292,7 +292,7 @@ impl WireElement {
             signed_header: signed_header.into_inner().0,
             // TODO: consider refactoring WireElement to use ElementEntry
             // instead of Option<Entry>
-            maybe_entry: maybe_entry.to_option(),
+            maybe_entry: maybe_entry.into_option(),
             deleted,
         }
     }

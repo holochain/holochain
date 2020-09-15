@@ -114,7 +114,7 @@ impl ElementEntry {
     ///
     /// Collapses the enum down to the two possibilities of
     /// extant or nonextant Entry data
-    pub fn to_option(self) -> Option<Entry> {
+    pub fn into_option(self) -> Option<Entry> {
         if let ElementEntry::Present(entry) = self {
             Some(entry)
         } else {
@@ -263,7 +263,7 @@ impl From<SignedHeaderHashed> for HoloHashed<SignedHeader> {
 
 impl From<Element> for Option<Entry> {
     fn from(e: Element) -> Self {
-        e.entry.to_option()
+        e.entry.into_option()
     }
 }
 

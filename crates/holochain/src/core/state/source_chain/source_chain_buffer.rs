@@ -218,7 +218,7 @@ impl SourceChainBuf {
                             signature,
                             header_address,
                             header,
-                            entry: entry.to_option(),
+                            entry: entry.into_option(),
                         }),
                     });
                 }
