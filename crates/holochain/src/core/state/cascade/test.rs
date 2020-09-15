@@ -56,7 +56,7 @@ fn setup_env(env: EnvironmentRead) -> DatabaseResult<Chains> {
     )
     .unwrap();
 
-    let jimbo_header = Header::EntryCreate(header::EntryCreate {
+    let jimbo_header = Header::Create(header::Create {
         author: jimbo_id.clone(),
         timestamp: Timestamp::now().into(),
         header_seq: 0,
@@ -65,7 +65,7 @@ fn setup_env(env: EnvironmentRead) -> DatabaseResult<Chains> {
         entry_hash: jimbo_entry.as_hash().clone(),
     });
 
-    let jessy_header = Header::EntryCreate(header::EntryCreate {
+    let jessy_header = Header::Create(header::Create {
         author: jessy_id.clone(),
         timestamp: Timestamp::now().into(),
         header_seq: 0,

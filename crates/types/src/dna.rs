@@ -35,7 +35,7 @@ pub struct DnaDef {
     pub name: String,
 
     /// A UUID for uniquifying this Dna.
-    // TODO: consider Vec<u8> instead (https://github.com/Holo-Host/holochain/pull/86#discussion_r412689085)
+    // TODO: consider Vec<u8> instead (https://github.com/holochain/holochain/pull/86#discussion_r412689085)
     pub uuid: String,
 
     /// Any arbitrary application properties can be included in this object.
