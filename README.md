@@ -7,7 +7,9 @@
 [![Twitter Follow](https://img.shields.io/twitter/follow/holochain.svg?style=social&label=Follow)](https://twitter.com/holochain)
 License: [![License: CAL 1.0](https://img.shields.io/badge/License-CAL%201.0-blue.svg)](https://github.com/holochain/cryptographic-autonomy-license)
 
-This repository contains most of the core Holochain libraries and binaries.
+This repository contains the core Holochain libraries and binaries.
+
+This is the most recent and well maintained version of Holochain with a refactored state model (you may see references to it as Holochain RSM).
 
 **Code Status:** This code is in alpha. It is not for production use. The code is guaranteed NOT secure. Also, We will likely be restructuring code APIs and data chains until Beta.
 
