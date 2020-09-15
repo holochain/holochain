@@ -4,7 +4,7 @@
 
 use crate::capability::CapSecret;
 use crate::capability::CAP_SECRET_BYTES;
-use crate::HostInput;
+use crate::ExternInput;
 use holo_hash::{hash_type, *};
 use holochain_serialized_bytes::prelude::*;
 
@@ -55,6 +55,6 @@ pub fn fake_cap_secret() -> CapSecret {
 }
 
 /// A fixture ZomeCallInvocationPayload for unit testing.
-pub fn fake_zome_invocation_payload() -> HostInput {
-    HostInput::try_from(SerializedBytes::try_from(()).unwrap()).unwrap()
+pub fn fake_zome_invocation_payload() -> ExternInput {
+    ExternInput::try_from(SerializedBytes::try_from(()).unwrap()).unwrap()
 }

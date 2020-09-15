@@ -10,8 +10,8 @@ use crate::core::ribosome::guest_callback::post_commit::PostCommitHostAccess;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateHostAccess;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
-use crate::core::ribosome::guest_callback::validate_link_add::ValidateLinkAddHostAccess;
-use crate::core::ribosome::guest_callback::validate_link_add::ValidateLinkAddInvocation;
+use crate::core::ribosome::guest_callback::validate_link_add::ValidateCreateLinkHostAccess;
+use crate::core::ribosome::guest_callback::validate_link_add::ValidateCreateLinkInvocation;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageHostAccess;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
 use crate::core::ribosome::wasm_ribosome::WasmRibosome;
@@ -40,14 +40,14 @@ use holochain_wasm_test_utils::strum::IntoEnumIterator;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::header::HeaderHashes;
 use holochain_zome_types::link::LinkTag;
-use holochain_zome_types::HostInput;
+use holochain_zome_types::ExternInput;
 use rand::seq::IteratorRandom;
 use rand::thread_rng;
 use rand::Rng;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-wasm_io_fixturator!(HostInput<SerializedBytes>);
+wasm_io_fixturator!(ExternInput<SerializedBytes>);
 
 newtype_fixturator!(FnComponents<Vec<String>>);
 
@@ -329,12 +329,12 @@ fixturator!(
 );
 
 fixturator!(
-    ValidateLinkAddInvocation;
-    constructor fn new(ZomeName, LinkAdd, Entry, Entry);
+    ValidateCreateLinkInvocation;
+    constructor fn new(ZomeName, CreateLink, Entry, Entry);
 );
 
 fixturator!(
-    ValidateLinkAddHostAccess;
+    ValidateCreateLinkHostAccess;
     constructor fn new();
 );
 

@@ -12,7 +12,7 @@ use holochain_types::dna::{
 use holochain_zome_types::migrate_agent::MigrateAgent;
 use holochain_zome_types::migrate_agent::MigrateAgentCallbackResult;
 use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::HostInput;
+use holochain_zome_types::ExternInput;
 
 #[derive(Clone)]
 pub struct MigrateAgentInvocation {
@@ -66,12 +66,12 @@ impl Invocation for MigrateAgentInvocation {
         ]
         .into()
     }
-    fn host_input(self) -> Result<HostInput, SerializedBytesError> {
-        Ok(HostInput::new((&self.migrate_agent).try_into()?))
+    fn host_input(self) -> Result<ExternInput, SerializedBytesError> {
+        Ok(ExternInput::new((&self.migrate_agent).try_into()?))
     }
 }
 
-impl TryFrom<MigrateAgentInvocation> for HostInput {
+impl TryFrom<MigrateAgentInvocation> for ExternInput {
     type Error = SerializedBytesError;
     fn try_from(migrate_agent_invocation: MigrateAgentInvocation) -> Result<Self, Self::Error> {
         Ok(Self::new(
@@ -122,7 +122,7 @@ mod test {
     use holochain_types::dna::zome::HostFnAccess;
     use holochain_zome_types::migrate_agent::MigrateAgent;
     use holochain_zome_types::migrate_agent::MigrateAgentCallbackResult;
-    use holochain_zome_types::HostInput;
+    use holochain_zome_types::ExternInput;
     use rand::prelude::*;
 
     #[test]
@@ -226,7 +226,7 @@ mod test {
 
         assert_eq!(
             host_input,
-            HostInput::new(
+            ExternInput::new(
                 SerializedBytes::try_from(MigrateAgentFixturator::new(fixt::Empty).next().unwrap())
                     .unwrap()
             ),

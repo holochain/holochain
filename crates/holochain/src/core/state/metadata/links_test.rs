@@ -1,7 +1,7 @@
 use super::*;
 use crate::fixt::{
-    EntryHashFixturator, KnownLinkAdd, KnownLinkRemove, LinkAddFixturator, LinkRemoveFixturator,
-    ZomeIdFixturator,
+    CreateLinkFixturator, DeleteLinkFixturator, EntryHashFixturator, KnownCreateLink,
+    KnownDeleteLink, ZomeIdFixturator,
 };
 use crate::here;
 use ::fixt::prelude::*;
@@ -12,8 +12,8 @@ use holochain_types::observability;
 
 #[derive(Clone)]
 struct TestData {
-    link_add: LinkAdd,
-    link_remove: LinkRemove,
+    link_add: CreateLink,
+    link_remove: DeleteLink,
     base_hash: EntryHash,
     zome_id: ZomeId,
     tag: LinkTag,
@@ -35,18 +35,18 @@ async fn fixtures(env: EnvironmentWrite, n: usize) -> Vec<TestData> {
         let tag = LinkTag::new(tag_fix.next().unwrap());
         let zome_id = zome_id.next().unwrap();
 
-        let link_add = KnownLinkAdd {
+        let link_add = KnownCreateLink {
             base_address: base_address.clone(),
             target_address: target_address.clone(),
             zome_id,
             tag: tag.clone(),
         };
 
-        let link_add = LinkAddFixturator::new(link_add).next().unwrap();
+        let link_add = CreateLinkFixturator::new(link_add).next().unwrap();
 
         // Create the expected link result
         let (_, link_add_hash): (_, HeaderHash) =
-            HeaderHashed::from_content_sync(Header::LinkAdd(link_add.clone())).into();
+            HeaderHashed::from_content_sync(Header::CreateLink(link_add.clone())).into();
 
         let expected_link = LinkMetaVal {
             link_add_hash: link_add_hash.clone(),
@@ -56,10 +56,10 @@ async fn fixtures(env: EnvironmentWrite, n: usize) -> Vec<TestData> {
             tag: tag.clone(),
         };
 
-        let link_remove = KnownLinkRemove {
+        let link_remove = KnownDeleteLink {
             link_add_address: link_add_hash,
         };
-        let link_remove = LinkRemoveFixturator::new(link_remove).next().unwrap();
+        let link_remove = DeleteLinkFixturator::new(link_remove).next().unwrap();
         let td = TestData {
             link_add,
             link_remove,
@@ -79,7 +79,7 @@ impl TestData {
     async fn with_same_keys(mut td: Self) -> Self {
         td.link_add.timestamp = Timestamp::now().into();
         let link_add_hash =
-            HeaderHashed::from_content_sync(Header::LinkAdd(td.link_add.clone())).into_hash();
+            HeaderHashed::from_content_sync(Header::CreateLink(td.link_add.clone())).into_hash();
         td.link_remove.link_add_address = link_add_hash.clone();
         td.expected_link.timestamp = td.link_add.timestamp.clone().into();
         td.expected_link.link_add_hash = link_add_hash;
@@ -241,8 +241,8 @@ impl TestData {
     async fn add_link(&self, meta_buf: &mut MetadataBuf) {
         meta_buf.add_link(self.link_add.clone()).unwrap();
     }
-    async fn remove_link(&self, meta_buf: &mut MetadataBuf) {
-        meta_buf.remove_link(self.link_remove.clone()).unwrap();
+    async fn delete_link(&self, meta_buf: &mut MetadataBuf) {
+        meta_buf.delete_link(self.link_remove.clone()).unwrap();
     }
 
     #[instrument(skip(td, meta_buf))]
@@ -361,7 +361,7 @@ impl TestData {
 }
 
 #[tokio::test(threaded_scheduler)]
-async fn can_add_and_remove_link() {
+async fn can_add_and_delete_link() {
     let test_env = test_cell_env();
     let arc = test_env.env();
     let env = arc.guard();
@@ -382,7 +382,7 @@ async fn can_add_and_remove_link() {
             .await;
 
         // Remove from scratch
-        td.remove_link(&mut meta_buf).await;
+        td.delete_link(&mut meta_buf).await;
 
         // Is empty
         td.empty(here!("empty after remove"), &meta_buf).await;
@@ -409,7 +409,7 @@ async fn can_add_and_remove_link() {
     // Remove the link
     {
         let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
-        td.remove_link(&mut meta_buf).await;
+        td.delete_link(&mut meta_buf).await;
         // Is empty
         td.empty(here!("empty after remove"), &meta_buf).await;
         env.with_commit(|writer| meta_buf.flush_to_txn(writer))
@@ -474,7 +474,7 @@ async fn multiple_links() {
         }
 
         // Remove from scratch
-        td[5].remove_link(&mut meta_buf).await;
+        td[5].delete_link(&mut meta_buf).await;
 
         td[5]
             .not_on_full_key(here!("removed in scratch"), &meta_buf)
@@ -510,7 +510,7 @@ async fn multiple_links() {
         for d in td.iter() {
             d.only_on_full_key(here!("all in db"), &meta_buf).await;
         }
-        td[0].remove_link(&mut meta_buf).await;
+        td[0].delete_link(&mut meta_buf).await;
 
         for d in &td[1..] {
             d.only_on_full_key(here!("all except 0 scratch"), &meta_buf)
@@ -621,7 +621,7 @@ async fn links_on_same_base() {
         d.link_add.base_address = base_hash.clone();
         // Create the new hash
         let (_, link_add_hash): (_, HeaderHash) =
-            HeaderHashed::from_content_sync(Header::LinkAdd(d.link_add.clone())).into();
+            HeaderHashed::from_content_sync(Header::CreateLink(d.link_add.clone())).into();
         d.expected_link.link_add_hash = link_add_hash.clone();
         d.link_remove.link_add_address = link_add_hash;
     }
@@ -658,7 +658,7 @@ async fn links_on_same_base() {
         let span = debug_span!("check_remove");
         let _g = span.enter();
         let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
-        td[0].remove_link(&mut meta_buf).await;
+        td[0].delete_link(&mut meta_buf).await;
         for d in &td[1..] {
             d.only_on_full_key(here!("same base"), &meta_buf).await;
             d.only_on_zome_id(here!("same base"), &meta_buf).await;
@@ -704,7 +704,7 @@ async fn links_on_same_zome_id() {
         d.link_add.zome_id = zome_id;
         // Create the new hash
         let (_, link_add_hash): (_, HeaderHash) =
-            HeaderHashed::from_content_sync(Header::LinkAdd(d.link_add.clone())).into();
+            HeaderHashed::from_content_sync(Header::CreateLink(d.link_add.clone())).into();
         d.expected_link.link_add_hash = link_add_hash.clone();
         d.expected_link.zome_id = zome_id;
         d.link_remove.link_add_address = link_add_hash;
@@ -744,7 +744,7 @@ async fn links_on_same_zome_id() {
         let span = debug_span!("check_remove");
         let _g = span.enter();
         let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
-        td[9].remove_link(&mut meta_buf).await;
+        td[9].delete_link(&mut meta_buf).await;
         for d in &td[..9] {
             d.only_on_full_key(here!("same base"), &meta_buf).await;
             // Half the tag
@@ -803,7 +803,7 @@ async fn links_on_same_tag() {
 
         // Create the new hash
         let (_, link_add_hash): (_, HeaderHash) =
-            HeaderHashed::from_content_sync(Header::LinkAdd(d.link_add.clone())).into();
+            HeaderHashed::from_content_sync(Header::CreateLink(d.link_add.clone())).into();
         d.expected_link.link_add_hash = link_add_hash.clone();
         d.expected_link.zome_id = zome_id;
         d.expected_link.tag = tag.clone();
@@ -851,8 +851,8 @@ async fn links_on_same_tag() {
         let span = debug_span!("check_remove");
         let _g = span.enter();
         let mut meta_buf = MetadataBuf::vault(arc.clone().into()).unwrap();
-        td[5].remove_link(&mut meta_buf).await;
-        td[6].remove_link(&mut meta_buf).await;
+        td[5].delete_link(&mut meta_buf).await;
+        td[6].delete_link(&mut meta_buf).await;
         let partial_td = &td[..5].iter().chain(&td[7..]).cloned().collect::<Vec<_>>();
         TestData::only_these_on_base(
             &partial_td[..],

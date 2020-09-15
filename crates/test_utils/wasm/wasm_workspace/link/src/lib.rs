@@ -17,13 +17,13 @@ fn target() -> ExternResult<EntryHash> {
 }
 
 #[hdk_extern]
-fn link_entries(_: ()) -> ExternResult<HeaderHash> {
-    Ok(link_entries!(base()?, target()?)?)
+fn create_link(_: ()) -> ExternResult<HeaderHash> {
+    Ok(create_link!(base()?, target()?)?)
 }
 
 #[hdk_extern]
-fn remove_link(input: RemoveLinkInput) -> ExternResult<HeaderHash> {
-    Ok(remove_link!(input.into_inner())?)
+fn delete_link(input: DeleteLinkInput) -> ExternResult<HeaderHash> {
+    Ok(delete_link!(input.into_inner())?)
 }
 
 #[hdk_extern]
