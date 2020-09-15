@@ -1,6 +1,6 @@
 use holochain_serialized_bytes::prelude::*;
 
-use crate::header::HeaderHashedVec;
+use crate::element::ElementVec;
 
 /// All wasm shared I/O types need to share the same basic behaviours to cross the host/guest
 /// boundary in a predictable way.
@@ -67,8 +67,8 @@ wasm_io_types!(
     pub struct PropertyOutput(());
     // Query the source chain for data.
     pub struct QueryInput(crate::query::ChainQueryFilter);
-    pub struct QueryOutput(HeaderHashedVec);
-    // Length of random bytes to generate.
+    pub struct QueryOutput(ElementVec);
+    // the length of random bytes to create
     pub struct RandomBytesInput(u32);
     pub struct RandomBytesOutput(crate::bytes::Bytes);
     // Header hash of the CreateLink element.
