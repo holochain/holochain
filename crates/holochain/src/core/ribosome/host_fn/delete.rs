@@ -7,20 +7,20 @@ use crate::core::{workflow::integrate_dht_ops_workflow::integrate_to_cache, Sour
 use holo_hash::{EntryHash, HeaderHash};
 use holochain_p2p::actor::GetOptions;
 use holochain_zome_types::header::builder;
-use holochain_zome_types::DeleteEntryInput;
-use holochain_zome_types::{element::SignedHeaderHashed, DeleteEntryOutput};
+use holochain_zome_types::DeleteInput;
+use holochain_zome_types::{element::SignedHeaderHashed, DeleteOutput};
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
-pub fn delete_entry<'a>(
+pub fn delete<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: DeleteEntryInput,
-) -> RibosomeResult<DeleteEntryOutput> {
-    let removes_address = input.into_inner();
+    input: DeleteInput,
+) -> RibosomeResult<DeleteOutput> {
+    let deletes_address = input.into_inner();
 
-    let removes_entry_address =
-        get_original_address(call_context.clone(), removes_address.clone())?;
+    let deletes_entry_address =
+        get_original_address(call_context.clone(), deletes_address.clone())?;
 
     let host_access = call_context.host_access();
 
@@ -29,9 +29,9 @@ pub fn delete_entry<'a>(
         let mut guard = host_access.workspace().write().await;
         let workspace: &mut CallZomeWorkspace = &mut guard;
         let source_chain = &mut workspace.source_chain;
-        let header_builder = builder::ElementDelete {
-            removes_address,
-            removes_entry_address,
+        let header_builder = builder::Delete {
+            deletes_address,
+            deletes_entry_address,
         };
         let header_hash = source_chain.put(header_builder, None).await?;
         let element = source_chain
@@ -46,7 +46,7 @@ pub fn delete_entry<'a>(
         .await
         .map_err(Box::new)
         .map_err(SourceChainError::from)?;
-        Ok(DeleteEntryOutput::new(header_hash))
+        Ok(DeleteOutput::new(header_hash))
     })
 }
 
@@ -78,7 +78,7 @@ pub(crate) fn get_original_address<'a>(
             })
             .transpose()?;
 
-        let entry_address = match maybe_original_element {
+        match maybe_original_element {
             Some(original_element_signed_header_hash) => {
                 match original_element_signed_header_hash.header().entry_data() {
                     Some((entry_hash, _)) => Ok(entry_hash.clone()),
@@ -86,8 +86,7 @@ pub(crate) fn get_original_address<'a>(
                 }
             }
             None => Err(RibosomeError::ElementDeps(address.into())),
-        };
-        entry_address
+        }
     })
 }
 

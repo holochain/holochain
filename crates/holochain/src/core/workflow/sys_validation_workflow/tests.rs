@@ -33,9 +33,9 @@ async fn sys_validation_workflow_test() {
             name: "sys_validation_workflow_test".to_string(),
             uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
             properties: SerializedBytes::try_from(()).unwrap(),
-            zomes: vec![TestWasm::CommitEntry.into()].into(),
+            zomes: vec![TestWasm::Create.into()].into(),
         },
-        vec![TestWasm::CommitEntry.into()],
+        vec![TestWasm::Create.into()],
     )
     .await
     .unwrap();
@@ -80,7 +80,7 @@ async fn run_test(
     bob_links_in_a_legit_way(&bob_cell_id, &handle, &dna_file).await;
 
     // Some time for ops to reach alice and run through validation
-    tokio::time::delay_for(Duration::from_millis(1000)).await;
+    tokio::time::delay_for(Duration::from_millis(1500)).await;
 
     {
         let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
@@ -154,7 +154,7 @@ async fn run_test(
 
     // Some time for ops to reach alice and run through validation
     // This takes a little longer due to the large entry and links
-    tokio::time::delay_for(Duration::from_millis(1000)).await;
+    tokio::time::delay_for(Duration::from_millis(1500)).await;
 
     {
         let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
@@ -216,7 +216,7 @@ async fn run_test(
     dodgy_bob(&bob_cell_id, &handle, &dna_file).await;
 
     // Some time for ops to reach alice and run through validation
-    tokio::time::delay_for(Duration::from_millis(500)).await;
+    tokio::time::delay_for(Duration::from_millis(1500)).await;
 
     {
         let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
@@ -291,7 +291,7 @@ async fn bob_links_in_a_legit_way(
 
     // 5
     // Link the entries
-    let link_add_address = link_entries(
+    let link_add_address = create_link(
         &bob_env,
         call_data.clone(),
         base_entry_hash.clone(),
@@ -344,7 +344,7 @@ async fn bob_makes_a_large_link(
 
     // 8
     // Commit a large header
-    let link_add_address = link_entries(
+    let link_add_address = create_link(
         &bob_env,
         call_data.clone(),
         base_entry_hash.clone(),
@@ -390,7 +390,7 @@ async fn dodgy_bob(bob_cell_id: &CellId, handle: &ConductorHandle, dna_file: &Dn
     // Whoops forgot to commit that proof
 
     // Link the entries
-    link_entries(
+    create_link(
         &bob_env,
         call_data.clone(),
         base_entry_hash.clone(),

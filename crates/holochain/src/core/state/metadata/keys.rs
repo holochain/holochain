@@ -11,7 +11,7 @@ pub struct BytesKey(pub Vec<u8>);
 /// The value stored in the links meta db
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct LinkMetaVal {
-    /// Hash of the [LinkAdd] [Header] that created this link
+    /// Hash of the [CreateLink] [Header] that created this link
     pub link_add_hash: HeaderHash,
     /// The [Entry] being linked to
     pub target: EntryHash,
@@ -37,7 +37,7 @@ pub enum LinkMetaKey<'a> {
     BaseZome(&'a EntryHash, ZomeId),
     /// Search for all links on a base, for a zome and with a tag
     BaseZomeTag(&'a EntryHash, ZomeId, &'a LinkTag),
-    /// This will match only the link created with a certain [LinkAdd] hash
+    /// This will match only the link created with a certain [CreateLink] hash
     Full(&'a EntryHash, ZomeId, &'a LinkTag, &'a HeaderHash),
 }
 
@@ -47,16 +47,16 @@ pub(super) type SysMetaKey = AnyDhtHash;
 #[derive(Debug, Hash, PartialEq, Eq, Ord, PartialOrd, Clone, Serialize, Deserialize)]
 pub enum SysMetaVal {
     /// A header that results in a new entry
-    /// Either a [EntryCreate] or [EntryUpdate]
+    /// Either a [Create] or [Update]
     NewEntry(TimedHeaderHash),
-    /// An [EntryUpdate] [Header]
+    /// An [Update] [Header]
     Update(TimedHeaderHash),
-    /// An [Header::ElementDelete]
+    /// An [Header::Delete]
     Delete(TimedHeaderHash),
     /// Activity on an agent's public key
     Activity(TimedHeaderHash),
     /// Link remove on link add
-    LinkRemove(TimedHeaderHash),
+    DeleteLink(TimedHeaderHash),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize, SerializedBytes)]
@@ -166,21 +166,29 @@ impl MiscMetaValue {
 }
 
 impl From<&LinkMetaKey<'_>> for BytesKey {
-    fn from(k: &LinkMetaKey<'_>) -> Self {
+    fn from(key: &LinkMetaKey<'_>) -> Self {
         use LinkMetaKey::*;
-        match k {
-            Base(b) => b.as_ref().to_vec(),
-            BaseZome(b, z) => [b.as_ref(), &[u8::from(*z)]].concat(),
-            BaseZomeTag(b, z, t) => [b.as_ref(), &[u8::from(*z)], t.as_ref()].concat(),
-            Full(b, z, t, l) => [b.as_ref(), &[u8::from(*z)], t.as_ref(), l.as_ref()].concat(),
+        match key {
+            Base(base) => base.as_ref().to_vec(),
+            BaseZome(base, zome) => [base.as_ref(), &[u8::from(*zome)]].concat(),
+            BaseZomeTag(base, zome, tag) => {
+                [base.as_ref(), &[u8::from(*zome)], tag.as_ref()].concat()
+            }
+            Full(base, zome, tag, link) => [
+                base.as_ref(),
+                &[u8::from(*zome)],
+                tag.as_ref(),
+                link.as_ref(),
+            ]
+            .concat(),
         }
         .into()
     }
 }
 
 impl From<LinkMetaKey<'_>> for BytesKey {
-    fn from(k: LinkMetaKey<'_>) -> Self {
-        (&k).into()
+    fn from(key: LinkMetaKey<'_>) -> Self {
+        (&key).into()
     }
 }
 
@@ -190,7 +198,7 @@ impl From<SysMetaVal> for HeaderHash {
             SysMetaVal::NewEntry(h)
             | SysMetaVal::Update(h)
             | SysMetaVal::Delete(h)
-            | SysMetaVal::LinkRemove(h)
+            | SysMetaVal::DeleteLink(h)
             | SysMetaVal::Activity(h) => h.header_hash,
         }
     }
@@ -202,20 +210,20 @@ impl From<NewEntryHeader> for EntryHeader {
     }
 }
 
-impl From<header::EntryUpdate> for EntryHeader {
-    fn from(h: header::EntryUpdate) -> Self {
-        EntryHeader::Update(Header::EntryUpdate(h))
+impl From<header::Update> for EntryHeader {
+    fn from(h: header::Update) -> Self {
+        EntryHeader::Update(Header::Update(h))
     }
 }
 
-impl From<header::ElementDelete> for EntryHeader {
-    fn from(h: header::ElementDelete) -> Self {
-        EntryHeader::Delete(Header::ElementDelete(h))
+impl From<header::Delete> for EntryHeader {
+    fn from(h: header::Delete) -> Self {
+        EntryHeader::Delete(Header::Delete(h))
     }
 }
 
-impl<'a> From<(&'a LinkAdd, &'a HeaderHash)> for LinkMetaKey<'a> {
-    fn from((link_add, hash): (&'a LinkAdd, &'a HeaderHash)) -> Self {
+impl<'a> From<(&'a CreateLink, &'a HeaderHash)> for LinkMetaKey<'a> {
+    fn from((link_add, hash): (&'a CreateLink, &'a HeaderHash)) -> Self {
         Self::Full(
             &link_add.base_address,
             link_add.zome_id,
@@ -226,23 +234,27 @@ impl<'a> From<(&'a LinkAdd, &'a HeaderHash)> for LinkMetaKey<'a> {
 }
 
 impl<'a> From<&'a WireLinkMetaKey> for LinkMetaKey<'a> {
-    fn from(w: &'a WireLinkMetaKey) -> Self {
-        match w {
-            WireLinkMetaKey::Base(b) => Self::Base(b),
-            WireLinkMetaKey::BaseZome(b, z) => Self::BaseZome(b, *z),
-            WireLinkMetaKey::BaseZomeTag(b, z, t) => Self::BaseZomeTag(b, *z, t),
-            WireLinkMetaKey::Full(b, z, t, l) => Self::Full(b, *z, t, l),
+    fn from(wire_link_meta_key: &'a WireLinkMetaKey) -> Self {
+        match wire_link_meta_key {
+            WireLinkMetaKey::Base(base) => Self::Base(base),
+            WireLinkMetaKey::BaseZome(base, zome) => Self::BaseZome(base, *zome),
+            WireLinkMetaKey::BaseZomeTag(base, zome, tag) => Self::BaseZomeTag(base, *zome, tag),
+            WireLinkMetaKey::Full(base, zome, tag, link) => Self::Full(base, *zome, tag, link),
         }
     }
 }
 
 impl From<&LinkMetaKey<'_>> for WireLinkMetaKey {
-    fn from(k: &LinkMetaKey) -> Self {
-        match k.clone() {
-            LinkMetaKey::Base(b) => Self::Base(b.clone()),
-            LinkMetaKey::BaseZome(b, z) => Self::BaseZome(b.clone(), z),
-            LinkMetaKey::BaseZomeTag(b, z, t) => Self::BaseZomeTag(b.clone(), z, t.clone()),
-            LinkMetaKey::Full(b, z, t, l) => Self::Full(b.clone(), z, t.clone(), l.clone()),
+    fn from(key: &LinkMetaKey) -> Self {
+        match key.clone() {
+            LinkMetaKey::Base(base) => Self::Base(base.clone()),
+            LinkMetaKey::BaseZome(base, zome) => Self::BaseZome(base.clone(), zome),
+            LinkMetaKey::BaseZomeTag(base, zome, tag) => {
+                Self::BaseZomeTag(base.clone(), zome, tag.clone())
+            }
+            LinkMetaKey::Full(base, zome, tag, link) => {
+                Self::Full(base.clone(), zome, tag.clone(), link.clone())
+            }
         }
     }
 }

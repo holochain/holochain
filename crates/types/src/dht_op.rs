@@ -64,20 +64,20 @@ pub enum DhtOp {
     // TODO: This entry is here for validation by the entry update header holder
     // link's don't do this. The entry is validated by store entry. Maybe we either
     // need to remove the Entry here or add it to link.
-    RegisterUpdatedBy(Signature, header::EntryUpdate),
+    RegisterUpdatedBy(Signature, header::Update),
 
     /// Op for registering a Header deletion with the Header authority
-    RegisterDeletedBy(Signature, header::ElementDelete),
+    RegisterDeletedBy(Signature, header::Delete),
 
     /// Op for registering a Header deletion with the Entry authority, so that
     /// the Entry can be marked Dead if all of its Headers have been deleted
-    RegisterDeletedEntryHeader(Signature, header::ElementDelete),
+    RegisterDeletedEntryHeader(Signature, header::Delete),
 
     /// Op for adding a link
-    RegisterAddLink(Signature, header::LinkAdd),
+    RegisterAddLink(Signature, header::CreateLink),
 
     /// Op for removing a link
-    RegisterRemoveLink(Signature, header::LinkRemove),
+    RegisterRemoveLink(Signature, header::DeleteLink),
 }
 
 /// Show that this type is used as the basis
@@ -116,14 +116,13 @@ impl DhtOp {
 
     /// Returns the basis hash which determines which agents will receive this DhtOp
     pub async fn dht_basis(&self) -> AnyDhtHash {
-        let basis = self.as_unique_form().basis().await;
-        basis
+        self.as_unique_form().basis().await
     }
 
     /// Convert a [DhtOp] to a [DhtOpLight] and basis
     pub async fn to_light(
-        // Hoping one day we can work out how to go from `&EntryCreate`
-        // to `&Header::EntryCreate(EntryCreate)` so punting on a reference
+        // Hoping one day we can work out how to go from `&Create`
+        // to `&Header::Create(Create)` so punting on a reference
         &self,
     ) -> DhtOpLight {
         let basis = self.dht_basis().await;
@@ -219,11 +218,11 @@ pub enum UniqueForm<'a> {
     StoreElement(&'a Header),
     StoreEntry(&'a NewEntryHeader),
     RegisterAgentActivity(&'a Header),
-    RegisterUpdatedBy(&'a header::EntryUpdate),
-    RegisterDeletedBy(&'a header::ElementDelete),
-    RegisterDeletedEntryHeader(&'a header::ElementDelete),
-    RegisterAddLink(&'a header::LinkAdd),
-    RegisterRemoveLink(&'a header::LinkRemove),
+    RegisterUpdatedBy(&'a header::Update),
+    RegisterDeletedBy(&'a header::Delete),
+    RegisterDeletedEntryHeader(&'a header::Delete),
+    RegisterAddLink(&'a header::CreateLink),
+    RegisterRemoveLink(&'a header::DeleteLink),
 }
 
 impl<'a> UniqueForm<'a> {
@@ -233,9 +232,9 @@ impl<'a> UniqueForm<'a> {
             UniqueForm::StoreEntry(header) => header.entry().clone().into(),
             UniqueForm::RegisterAgentActivity(header) => header.author().clone().into(),
             UniqueForm::RegisterUpdatedBy(header) => header.original_entry_address.clone().into(),
-            UniqueForm::RegisterDeletedBy(header) => header.removes_address.clone().into(),
+            UniqueForm::RegisterDeletedBy(header) => header.deletes_address.clone().into(),
             UniqueForm::RegisterDeletedEntryHeader(header) => {
-                header.removes_entry_address.clone().into()
+                header.deletes_entry_address.clone().into()
             }
             UniqueForm::RegisterAddLink(header) => header.base_address.clone().into(),
             UniqueForm::RegisterRemoveLink(header) => header.base_address.clone().into(),
@@ -359,26 +358,26 @@ async fn produce_op_lights_from_iter(
 
         match header {
             Header::Dna(_)
-            | Header::ChainOpen(_)
-            | Header::ChainClose(_)
+            | Header::OpenChain(_)
+            | Header::CloseChain(_)
             | Header::AgentValidationPkg(_)
             | Header::InitZomesComplete(_) => {}
-            Header::LinkAdd(link_add) => ops.push(DhtOpLight::RegisterAddLink(
+            Header::CreateLink(link_add) => ops.push(DhtOpLight::RegisterAddLink(
                 header_hash,
                 UniqueForm::RegisterAddLink(link_add).basis().await,
             )),
-            Header::LinkRemove(link_remove) => ops.push(DhtOpLight::RegisterRemoveLink(
+            Header::DeleteLink(link_remove) => ops.push(DhtOpLight::RegisterRemoveLink(
                 header_hash,
                 UniqueForm::RegisterRemoveLink(link_remove).basis().await,
             )),
-            Header::EntryCreate(entry_create) => ops.push(DhtOpLight::StoreEntry(
+            Header::Create(entry_create) => ops.push(DhtOpLight::StoreEntry(
                 header_hash,
                 maybe_entry_hash.ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.clone()))?,
                 UniqueForm::StoreEntry(&NewEntryHeader::Create(entry_create.clone()))
                     .basis()
                     .await,
             )),
-            Header::EntryUpdate(entry_update) => {
+            Header::Update(entry_update) => {
                 let entry_hash = maybe_entry_hash
                     .ok_or_else(|| DhtOpError::HeaderWithoutEntry(header.clone()))?;
                 ops.push(DhtOpLight::StoreEntry(
@@ -394,9 +393,9 @@ async fn produce_op_lights_from_iter(
                     UniqueForm::RegisterUpdatedBy(entry_update).basis().await,
                 ));
             }
-            Header::ElementDelete(entry_delete) => {
-                // TODO: VALIDATION: This only works if entry_delete.remove_address is either EntryCreate
-                // or EntryUpdate
+            Header::Delete(entry_delete) => {
+                // TODO: VALIDATION: This only works if entry_delete.remove_address is either Create
+                // or Update
                 ops.push(DhtOpLight::RegisterDeletedBy(
                     header_hash.clone(),
                     UniqueForm::RegisterDeletedBy(entry_delete).basis().await,

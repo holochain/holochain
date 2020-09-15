@@ -1,4 +1,4 @@
-use super::{commit_entry::extract_entry_def, delete_entry::get_original_address};
+use super::{create::extract_entry_def, delete::get_original_address};
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::{
@@ -7,21 +7,22 @@ use crate::core::{
     SourceChainError,
 };
 use holo_hash::HasHash;
-use holochain_zome_types::UpdateEntryInput;
+use holochain_zome_types::entry_def::EntryDefId;
+use holochain_zome_types::UpdateInput;
 use holochain_zome_types::{
     header::{builder, AppEntryType, EntryType},
-    UpdateEntryOutput,
+    UpdateOutput,
 };
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
-pub fn update_entry<'a>(
+pub fn update<'a>(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
-    input: UpdateEntryInput,
-) -> RibosomeResult<UpdateEntryOutput> {
+    input: UpdateInput,
+) -> RibosomeResult<UpdateOutput> {
     // destructure the args out into an app type def id and entry
-    let (entry_def_id, entry, original_header_hash) = input.into_inner();
+    let (entry_def_id, entry, original_header_address) = input.into_inner();
 
     // build the entry hash
     let async_entry = entry.clone();
@@ -32,19 +33,26 @@ pub fn update_entry<'a>(
     let header_zome_id = ribosome.zome_name_to_id(&call_context.zome_name)?;
 
     // extract the entry defs for a zome
-    let (header_entry_def_id, entry_visibility) =
-        extract_entry_def(ribosome, call_context.clone(), entry_def_id)?;
-
-    let app_entry_type = AppEntryType::new(header_entry_def_id, header_zome_id, entry_visibility);
+    let entry_type = match entry_def_id {
+        EntryDefId::App(entry_def_id) => {
+            let (header_entry_def_id, entry_visibility) =
+                extract_entry_def(ribosome, call_context.clone(), entry_def_id.into())?;
+            let app_entry_type =
+                AppEntryType::new(header_entry_def_id, header_zome_id, entry_visibility);
+            EntryType::App(app_entry_type)
+        }
+        EntryDefId::CapGrant => EntryType::CapGrant,
+        EntryDefId::CapClaim => EntryType::CapClaim,
+    };
 
     let original_entry_address =
-        get_original_address(call_context.clone(), original_header_hash.clone())?;
+        get_original_address(call_context.clone(), original_header_address.clone())?;
 
     // build a header for the entry being updated
-    let header_builder = builder::EntryUpdate {
-        entry_type: EntryType::App(app_entry_type),
-        entry_hash: entry_hash,
-        original_header_address: original_header_hash,
+    let header_builder = builder::Update {
+        entry_type,
+        entry_hash,
+        original_header_address,
         original_entry_address,
     };
 
@@ -72,7 +80,7 @@ pub fn update_entry<'a>(
         .await
         .map_err(Box::new)
         .map_err(SourceChainError::from)?;
-        Ok(UpdateEntryOutput::new(header_hash))
+        Ok(UpdateOutput::new(header_hash))
     })
 }
 

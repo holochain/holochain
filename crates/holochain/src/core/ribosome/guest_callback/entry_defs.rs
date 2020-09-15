@@ -7,13 +7,14 @@ use holochain_types::dna::zome::HostFnAccess;
 use holochain_zome_types::entry_def::EntryDefs;
 use holochain_zome_types::entry_def::EntryDefsCallbackResult;
 use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::HostInput;
+use holochain_zome_types::ExternInput;
 use std::collections::BTreeMap;
 
 #[derive(Debug, Clone)]
 pub struct EntryDefsInvocation;
 
 impl EntryDefsInvocation {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self
     }
@@ -47,12 +48,12 @@ impl Invocation for EntryDefsInvocation {
     fn fn_components(&self) -> FnComponents {
         vec!["entry_defs".into()].into()
     }
-    fn host_input(self) -> Result<HostInput, SerializedBytesError> {
-        Ok(HostInput::new(().try_into()?))
+    fn host_input(self) -> Result<ExternInput, SerializedBytesError> {
+        Ok(ExternInput::new(().try_into()?))
     }
 }
 
-impl TryFrom<EntryDefsInvocation> for HostInput {
+impl TryFrom<EntryDefsInvocation> for ExternInput {
     type Error = SerializedBytesError;
     fn try_from(_: EntryDefsInvocation) -> Result<Self, Self::Error> {
         Ok(Self::new(().try_into()?))
@@ -102,7 +103,7 @@ mod test {
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::dna::zome::HostFnAccess;
     use holochain_zome_types::entry_def::EntryDefsCallbackResult;
-    use holochain_zome_types::HostInput;
+    use holochain_zome_types::ExternInput;
     use std::collections::BTreeMap;
 
     #[test]
@@ -216,7 +217,7 @@ mod test {
 
         assert_eq!(
             host_input,
-            HostInput::new(SerializedBytes::try_from(()).unwrap()),
+            ExternInput::new(SerializedBytes::try_from(()).unwrap()),
         );
     }
 }

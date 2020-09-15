@@ -96,7 +96,7 @@ mod tests {
                 a1,
                 a2,
                 "".into(),
-                "".to_string(),
+                "".into(),
                 [0; holochain_zome_types::capability::CAP_SECRET_BYTES].into(),
                 UnsafeBytes::from(b"yippo".to_vec()).into(),
             )
@@ -273,8 +273,8 @@ mod tests {
         let (p2p, mut evt) = spawn_holochain_p2p().await.unwrap();
 
         let test_1 = GetLinksResponse {
-            link_adds: vec![(fixt!(LinkAdd), fixt!(Signature))],
-            link_removes: vec![(fixt!(LinkRemove), fixt!(Signature))],
+            link_adds: vec![(fixt!(CreateLink), fixt!(Signature))],
+            link_removes: vec![(fixt!(DeleteLink), fixt!(Signature))],
         };
 
         let test_1_clone = test_1.clone();

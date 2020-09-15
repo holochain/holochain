@@ -12,15 +12,14 @@
 
    # can be any github ref
    # branch, tag, commit, etc.
-   ref = "8cca456dd4cbd73334f357ef07922ce685a6ff6d";
-   # ^^ this is HEAD of holonix rsm branch as of 2020-07-07 (david.b)
+   ref = "v0.0.83";
 
    # the sha of what is downloaded from the above ref
    # note: even if you change the above ref it will not be redownloaded until
    #       the sha here changes (the sha is the cache key for downloads)
    # note: to get a new sha, get nix to try and download a bad sha
    #       it will complain and tell you the right sha
-   sha256 = "17smxvmyi8l6vl7wxn9nvdzdm6h3dd81mcplpymp8lla7ix7yajr";
+   sha256 = "1xb96i8mwb2yfnmpwy2sp4s2ybbh3zj6hrpxbqsccqwp0gwvj9z5";
 
    # the github owner of the holonix repo
    owner = "holochain";
@@ -93,7 +92,7 @@ See:
    owner = "holochain";
 
    # repository name on github that release are deployed to
-   repo = "holochain-2020";
+   repo = "holochain";
 
    # canonical local upstream name as per `git remote -v`
    upstream = "origin";

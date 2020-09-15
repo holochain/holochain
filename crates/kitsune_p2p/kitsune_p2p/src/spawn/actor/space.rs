@@ -321,10 +321,8 @@ impl KitsuneP2pHandler for Space {
         }
 
         // race timeout > timeout is nonesense
-        if input.as_race {
-            if input.race_timeout_ms.unwrap() > input.timeout_ms.unwrap() {
-                input.race_timeout_ms = Some(input.timeout_ms.unwrap());
-            }
+        if input.as_race && input.race_timeout_ms.unwrap() > input.timeout_ms.unwrap() {
+            input.race_timeout_ms = Some(input.timeout_ms.unwrap());
         }
 
         self.handle_rpc_multi_inner(input)
@@ -528,9 +526,10 @@ impl Space {
                             let from_agent2 = from_agent.clone();
                             tokio::task::spawn(
                                 async move {
-                                    if let Ok(_) = internal_sender
+                                    if internal_sender
                                         .immediate_request(space, to_agent, from_agent2, payload)
                                         .await
+                                        .is_ok()
                                     {
                                         send_success_count
                                             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);

@@ -51,5 +51,5 @@ The tests can access and call WASM-compiled zomes that are present in the `test_
 
 ## Examples
 
-- [Call zome functions from your test](https://github.com/Holo-Host/holochain/blob/develop/crates/holochain/src/core/ribosome/host_fn/commit_entry.rs#L234)
-- [Boot up the conductor and call zome functions](https://github.com/Holo-Host/holochain/blob/develop/crates/holochain/tests/ser_regression.rs)
+- [Call zome functions from your test](https://github.com/holochain/holochain/blob/develop/crates/holochain/src/core/ribosome/host_fn/commit_entry.rs#L234)
+- [Boot up the conductor and call zome functions](https://github.com/holochain/holochain/blob/develop/crates/holochain/tests/ser_regression.rs)

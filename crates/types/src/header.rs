@@ -29,31 +29,31 @@ pub mod error;
 /// A header of one of the two types that create a new entry.
 pub enum NewEntryHeader {
     /// A header which simply creates a new entry
-    Create(EntryCreate),
+    Create(Create),
     /// A header which creates a new entry that is semantically related to a
     /// previously created entry or header
-    Update(EntryUpdate),
+    Update(Update),
 }
 
 #[allow(missing_docs)]
 #[derive(Debug, From)]
 /// Same as NewEntryHeader but takes headers as reference
 pub enum NewEntryHeaderRef<'a> {
-    Create(&'a EntryCreate),
-    Update(&'a EntryUpdate),
+    Create(&'a Create),
+    Update(&'a Update),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Ord, PartialOrd)]
 /// A header of one of the two types that create a new entry.
 pub enum WireNewEntryHeader {
-    Create(WireEntryCreate),
-    Update(WireEntryUpdate),
+    Create(WireCreate),
+    Update(WireUpdate),
 }
 
-/// The minimum unique data for EntryCreate headers
+/// The minimum unique data for Create headers
 /// that share a common entry
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Ord, PartialOrd)]
-pub struct WireEntryCreate {
+pub struct WireCreate {
     /// Timestamp is first so that deriving Ord results in
     /// order by time
     pub timestamp: holochain_zome_types::timestamp::Timestamp,
@@ -63,10 +63,10 @@ pub struct WireEntryCreate {
     pub signature: Signature,
 }
 
-/// The minimum unique data for EntryUpdate headers
+/// The minimum unique data for Update headers
 /// that share a common entry
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Ord, PartialOrd)]
-pub struct WireEntryUpdate {
+pub struct WireUpdate {
     /// Timestamp is first so that deriving Ord results in
     /// order by time
     pub timestamp: holochain_zome_types::timestamp::Timestamp,
@@ -82,13 +82,13 @@ pub struct WireEntryUpdate {
 /// original entry authority to someone asking for
 /// metadata on that original entry.
 /// ## How updates work
-/// `EntryUpdate` headers create both a new entry and
+/// `Update` headers create both a new entry and
 /// a metadata relationship on the original entry.
 /// This wire data represents the metadata relationship
 /// which is stored on the original entry, i.e. this represents
 /// the "forward" reference from the original entry to the new entry.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
-pub struct WireEntryUpdateRelationship {
+pub struct WireUpdateRelationship {
     /// Timestamp is first so that deriving Ord results in
     /// order by time
     pub timestamp: holochain_zome_types::timestamp::Timestamp,
@@ -105,8 +105,8 @@ pub struct WireEntryUpdateRelationship {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
-pub struct WireElementDelete {
-    pub delete: ElementDelete,
+pub struct WireDelete {
+    pub delete: Delete,
     pub signature: Signature,
 }
 
@@ -114,24 +114,24 @@ impl NewEntryHeader {
     /// Get the entry on this header
     pub fn entry(&self) -> &EntryHash {
         match self {
-            NewEntryHeader::Create(EntryCreate { entry_hash, .. })
-            | NewEntryHeader::Update(EntryUpdate { entry_hash, .. }) => entry_hash,
+            NewEntryHeader::Create(Create { entry_hash, .. })
+            | NewEntryHeader::Update(Update { entry_hash, .. }) => entry_hash,
         }
     }
 
     /// Get the visibility of this header
     pub fn visibility(&self) -> &EntryVisibility {
         match self {
-            NewEntryHeader::Create(EntryCreate { entry_type, .. })
-            | NewEntryHeader::Update(EntryUpdate { entry_type, .. }) => entry_type.visibility(),
+            NewEntryHeader::Create(Create { entry_type, .. })
+            | NewEntryHeader::Update(Update { entry_type, .. }) => entry_type.visibility(),
         }
     }
 
     /// Get the timestamp of this header
     pub fn timestamp(&self) -> &holochain_zome_types::timestamp::Timestamp {
         match self {
-            NewEntryHeader::Create(EntryCreate { timestamp, .. })
-            | NewEntryHeader::Update(EntryUpdate { timestamp, .. }) => timestamp,
+            NewEntryHeader::Create(Create { timestamp, .. })
+            | NewEntryHeader::Update(Update { timestamp, .. }) => timestamp,
         }
     }
 }
@@ -139,14 +139,14 @@ impl NewEntryHeader {
 impl From<NewEntryHeader> for Header {
     fn from(h: NewEntryHeader) -> Self {
         match h {
-            NewEntryHeader::Create(h) => Header::EntryCreate(h),
-            NewEntryHeader::Update(h) => Header::EntryUpdate(h),
+            NewEntryHeader::Create(h) => Header::Create(h),
+            NewEntryHeader::Update(h) => Header::Update(h),
         }
     }
 }
 
-impl From<(EntryCreate, Signature)> for WireEntryCreate {
-    fn from((ec, signature): (EntryCreate, Signature)) -> Self {
+impl From<(Create, Signature)> for WireCreate {
+    fn from((ec, signature): (Create, Signature)) -> Self {
         Self {
             timestamp: ec.timestamp,
             author: ec.author,
@@ -157,8 +157,8 @@ impl From<(EntryCreate, Signature)> for WireEntryCreate {
     }
 }
 
-impl From<(EntryUpdate, Signature)> for WireEntryUpdate {
-    fn from((eu, signature): (EntryUpdate, Signature)) -> Self {
+impl From<(Update, Signature)> for WireUpdate {
+    fn from((eu, signature): (Update, Signature)) -> Self {
         Self {
             timestamp: eu.timestamp,
             author: eu.author,
@@ -171,7 +171,7 @@ impl From<(EntryUpdate, Signature)> for WireEntryUpdate {
     }
 }
 
-impl WireElementDelete {
+impl WireDelete {
     pub async fn into_element(self) -> Element {
         Element::new(
             SignedHeaderHashed::from_content_sync(SignedHeader(self.delete.into(), self.signature)),
@@ -180,11 +180,11 @@ impl WireElementDelete {
     }
 }
 
-impl WireEntryUpdateRelationship {
-    /// Recreate the EntryUpdate Element without an Entry.
+impl WireUpdateRelationship {
+    /// Recreate the Update Element without an Entry.
     /// Useful for creating dht ops
     pub async fn into_element(self, original_entry_address: EntryHash) -> Element {
-        let eu = EntryUpdate {
+        let eu = Update {
             author: self.author,
             timestamp: self.timestamp,
             header_seq: self.header_seq,
@@ -195,10 +195,7 @@ impl WireEntryUpdateRelationship {
             entry_hash: self.new_entry_address,
         };
         Element::new(
-            SignedHeaderHashed::from_content_sync(SignedHeader(
-                Header::EntryUpdate(eu),
-                self.signature,
-            )),
+            SignedHeaderHashed::from_content_sync(SignedHeader(Header::Update(eu), self.signature)),
             None,
         )
     }
@@ -207,19 +204,19 @@ impl WireEntryUpdateRelationship {
 impl NewEntryHeaderRef<'_> {
     pub fn entry_type(&self) -> &EntryType {
         match self {
-            NewEntryHeaderRef::Create(EntryCreate { entry_type, .. })
-            | NewEntryHeaderRef::Update(EntryUpdate { entry_type, .. }) => entry_type,
+            NewEntryHeaderRef::Create(Create { entry_type, .. })
+            | NewEntryHeaderRef::Update(Update { entry_type, .. }) => entry_type,
         }
     }
     pub fn entry_hash(&self) -> &EntryHash {
         match self {
-            NewEntryHeaderRef::Create(EntryCreate { entry_hash, .. })
-            | NewEntryHeaderRef::Update(EntryUpdate { entry_hash, .. }) => entry_hash,
+            NewEntryHeaderRef::Create(Create { entry_hash, .. })
+            | NewEntryHeaderRef::Update(Update { entry_hash, .. }) => entry_hash,
         }
     }
 }
 
-impl TryFrom<SignedHeaderHashed> for WireElementDelete {
+impl TryFrom<SignedHeaderHashed> for WireDelete {
     type Error = WrongHeaderError;
     fn try_from(shh: SignedHeaderHashed) -> Result<Self, Self::Error> {
         let (h, signature) = shh.into_header_and_signature();
@@ -230,11 +227,11 @@ impl TryFrom<SignedHeaderHashed> for WireElementDelete {
     }
 }
 
-impl TryFrom<SignedHeaderHashed> for WireEntryUpdate {
+impl TryFrom<SignedHeaderHashed> for WireUpdate {
     type Error = WrongHeaderError;
     fn try_from(shh: SignedHeaderHashed) -> Result<Self, Self::Error> {
         let (h, signature) = shh.into_header_and_signature();
-        let d: EntryUpdate = h.into_content().try_into()?;
+        let d: Update = h.into_content().try_into()?;
         Ok(Self {
             signature,
             timestamp: d.timestamp,
@@ -247,11 +244,11 @@ impl TryFrom<SignedHeaderHashed> for WireEntryUpdate {
     }
 }
 
-impl TryFrom<SignedHeaderHashed> for WireEntryUpdateRelationship {
+impl TryFrom<SignedHeaderHashed> for WireUpdateRelationship {
     type Error = WrongHeaderError;
     fn try_from(shh: SignedHeaderHashed) -> Result<Self, Self::Error> {
         let (h, signature) = shh.into_header_and_signature();
-        let d: EntryUpdate = h.into_content().try_into()?;
+        let d: Update = h.into_content().try_into()?;
         Ok(Self {
             signature,
             timestamp: d.timestamp,
@@ -279,7 +276,7 @@ impl WireNewEntryHeader {
         match self {
             WireNewEntryHeader::Create(ec) => {
                 let signature = ec.signature;
-                let ec = EntryCreate {
+                let ec = Create {
                     author: ec.author,
                     timestamp: ec.timestamp,
                     header_seq: ec.header_seq,
@@ -291,7 +288,7 @@ impl WireNewEntryHeader {
             }
             WireNewEntryHeader::Update(eu) => {
                 let signature = eu.signature;
-                let eu = EntryUpdate {
+                let eu = Update {
                     author: eu.author,
                     timestamp: eu.timestamp,
                     header_seq: eu.header_seq,
@@ -313,9 +310,9 @@ impl TryFrom<SignedHeaderHashed> for WireNewEntryHeader {
         let (sh, _) = shh.into_inner();
         let (header, s) = sh.into();
         match header {
-            Header::EntryCreate(ec) => Ok(Self::Create((ec, s).into())),
-            Header::EntryUpdate(eu) => Ok(Self::Update((eu, s).into())),
-            _ => return Err(HeaderError::NotNewEntry),
+            Header::Create(ec) => Ok(Self::Create((ec, s).into())),
+            Header::Update(eu) => Ok(Self::Update((eu, s).into())),
+            _ => Err(HeaderError::NotNewEntry),
         }
     }
 }
@@ -324,8 +321,8 @@ impl TryFrom<Header> for NewEntryHeader {
     type Error = WrongHeaderError;
     fn try_from(value: Header) -> Result<Self, Self::Error> {
         match value {
-            Header::EntryCreate(h) => Ok(NewEntryHeader::Create(h)),
-            Header::EntryUpdate(h) => Ok(NewEntryHeader::Update(h)),
+            Header::Create(h) => Ok(NewEntryHeader::Create(h)),
+            Header::Update(h) => Ok(NewEntryHeader::Update(h)),
             _ => Err(WrongHeaderError(format!("{:?}", value))),
         }
     }
@@ -335,8 +332,8 @@ impl<'a> TryFrom<&'a Header> for NewEntryHeaderRef<'a> {
     type Error = WrongHeaderError;
     fn try_from(value: &'a Header) -> Result<Self, Self::Error> {
         match value {
-            Header::EntryCreate(h) => Ok(NewEntryHeaderRef::Create(h)),
-            Header::EntryUpdate(h) => Ok(NewEntryHeaderRef::Update(h)),
+            Header::Create(h) => Ok(NewEntryHeaderRef::Create(h)),
+            Header::Update(h) => Ok(NewEntryHeaderRef::Update(h)),
             _ => Err(WrongHeaderError(format!("{:?}", value))),
         }
     }
@@ -375,8 +372,8 @@ mod tests {
     }
 
     #[test]
-    fn test_entrycreate_msgpack_roundtrip() {
-        let orig: Header = EntryCreate::from_builder(
+    fn test_create_entry_msgpack_roundtrip() {
+        let orig: Header = Create::from_builder(
             HeaderBuilderCommonFixturator::new(Unpredictable)
                 .next()
                 .unwrap(),
@@ -395,8 +392,8 @@ mod tests {
     }
 
     #[test]
-    fn test_entrycreate_serializedbytes_roundtrip() {
-        let orig: Header = EntryCreate::from_builder(
+    fn test_create_entry_serializedbytes_roundtrip() {
+        let orig: Header = Create::from_builder(
             HeaderBuilderCommonFixturator::new(Unpredictable)
                 .next()
                 .unwrap(),

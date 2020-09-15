@@ -10,6 +10,7 @@ use crate::conductor::api::CellConductorApiT;
 use crate::conductor::handle::ConductorHandle;
 use crate::core::queue_consumer::{spawn_queue_consumer_tasks, InitialQueueTriggers};
 use crate::core::ribosome::ZomeCallInvocation;
+use holochain_zome_types::zome::FunctionName;
 
 use crate::{
     conductor::{api::CellConductorApi, cell::error::CellResult},
@@ -49,9 +50,9 @@ use holochain_types::{
     Timestamp,
 };
 use holochain_zome_types::capability::CapSecret;
-use holochain_zome_types::header::{LinkAdd, LinkRemove};
+use holochain_zome_types::header::{CreateLink, DeleteLink};
 use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::HostInput;
+use holochain_zome_types::ExternInput;
 use std::{
     collections::{BTreeMap, BTreeSet},
     convert::TryInto,
@@ -515,8 +516,8 @@ impl Cell {
             .collect::<BTreeMap<_, _>>()?;
 
         // Get the headers from the element stores
-        let mut result_adds: Vec<(LinkAdd, Signature)> = Vec::with_capacity(links.len());
-        let mut result_removes: Vec<(LinkRemove, Signature)> = Vec::with_capacity(links.len());
+        let mut result_adds: Vec<(CreateLink, Signature)> = Vec::with_capacity(links.len());
+        let mut result_removes: Vec<(DeleteLink, Signature)> = Vec::with_capacity(links.len());
         for (link_add, link_removes) in links {
             if let Some(link_add) = element_vault.get_header(&link_add.header_hash)? {
                 for link_remove in link_removes {
@@ -618,7 +619,7 @@ impl Cell {
         &self,
         from_agent: AgentPubKey,
         zome_name: ZomeName,
-        fn_name: String,
+        fn_name: FunctionName,
         cap: CapSecret,
         payload: SerializedBytes,
     ) -> CellResult<SerializedBytes> {
@@ -626,7 +627,7 @@ impl Cell {
             cell_id: self.id.clone(),
             zome_name: zome_name.clone(),
             cap,
-            payload: HostInput::new(payload),
+            payload: ExternInput::new(payload),
             provenance: from_agent,
             fn_name,
         };

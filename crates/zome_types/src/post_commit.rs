@@ -1,5 +1,5 @@
 use crate::header::HeaderHashes;
-use crate::zome_io::GuestOutput;
+use crate::zome_io::ExternOutput;
 use crate::CallbackResult;
 use holochain_serialized_bytes::prelude::*;
 
@@ -9,8 +9,8 @@ pub enum PostCommitCallbackResult {
     Fail(HeaderHashes, String),
 }
 
-impl From<GuestOutput> for PostCommitCallbackResult {
-    fn from(guest_output: GuestOutput) -> Self {
+impl From<ExternOutput> for PostCommitCallbackResult {
+    fn from(guest_output: ExternOutput) -> Self {
         match guest_output.into_inner().try_into() {
             Ok(v) => v,
             Err(e) => Self::Fail(vec![].into(), format!("{:?}", e)),

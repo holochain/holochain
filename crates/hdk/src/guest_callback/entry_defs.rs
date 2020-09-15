@@ -1,3 +1,41 @@
+/// Implements a whole lot of sane defaults for a struct or enum that should behave as an entry.
+/// All the entry def fields are available as dedicated methods on the type and matching From impls
+/// are provided for each. This allows for both Foo::entry_def() and EntryDef::from(Foo::new())
+/// style logic which are both useful in different scenarios.
+///
+/// For example, the Foo::entry_def() style works best in the entry_defs callback as it doesn't
+/// require an instantiated Foo in order to get the definition.
+/// On the other hand, EntryDef::from(Foo::new()) works better when e.g. using create_entry!() as
+/// an instance of Foo already exists and we need the entry def id back for creates and updates.
+///
+/// If you don't want to use the macro you can simply implement similar fns youself.
+///
+/// This is not a trait at the moment, it could be in the future but for now these functions and
+/// impls are just a loose set of conventions.
+///
+/// It's actually entirely possible to interact with core directly without any of these.
+/// e.g. create_entry!() is just building a tuple of EntryDefId and Entry::App under the hood.
+///
+/// This requires that TryFrom and TryInto SerializedBytes is implemented for the entry type,
+/// which implies that serde::Serialize and serde::Deserialize is also implemented.
+/// These can all be derived and there is an attribute macro that both does the default defines.
+///
+///  e.g. the following are equivalent
+///
+/// ```ignore
+/// #[hdk_entry(id = "foo", visibility = "private", required_validations = 6, )]
+/// pub struct Foo;
+/// ```
+///
+/// ```ignore
+/// #[derive(SerializedBytes, serde::Serialize, serde::Deserialize)]
+/// pub struct Foo;
+/// entry_def!(Foo EntryDef {
+///   id: "foo".into(),
+///   visibility: EntryVisibility::Private,
+///   ..Default::default()
+/// });
+/// ```
 #[macro_export]
 macro_rules! entry_def {
     ( $t:ident $def:expr ) => {
@@ -33,7 +71,8 @@ macro_rules! entry_def {
                     _ => Err($crate::prelude::SerializedBytesError::FromBytes(format!(
                         "{:?} is not an Entry::App so has no serialized bytes",
                         entry
-                    )))?,
+                    ))
+                    .into()),
                 }
             }
         }
@@ -107,6 +146,20 @@ macro_rules! entry_def {
     };
 }
 
+/// Shorthand to implement the entry defs callback similar to the vec![ .. ] macro but for entries.
+///
+/// e.g. the following are the same
+///
+/// ```ignore
+/// entry_defs![ Foo::entry_def() ];
+/// ```
+///
+/// ```ignore
+/// #[hdk_extern]
+/// fn entry_defs(_: ()) -> ExternResult<EntryDefsCallbackResult> {
+///   Ok(vec![ Foo::entry_def() ].into())
+/// }
+/// ```
 #[macro_export]
 macro_rules! entry_defs {
     [ $( $def:expr ),* ] => {

@@ -9,7 +9,7 @@ use holo_hash::EntryHash;
 use holochain_state::{env::EnvironmentWrite, fresh_reader};
 use holochain_types::{
     element::{GetElementResponse, RawGetEntryResponse},
-    header::WireEntryUpdateRelationship,
+    header::WireUpdateRelationship,
     metadata::TimedHeaderHash,
 };
 use holochain_zome_types::{element::SignedHeaderHashed, header::conversions::WrongHeaderError};
@@ -83,7 +83,7 @@ pub async fn handle_get_entry(
                 .get_updates(&reader, hash.clone().into())?
                 .collect::<Vec<_>>()?;
             let updates_returns = updates_returns.into_iter().map(|update| {
-                let update: WireEntryUpdateRelationship = render_header(update)?
+                let update: WireUpdateRelationship = render_header(update)?
                     .try_into()
                     .map_err(AuthorityDataError::from)?;
                 CellResult::Ok(update)

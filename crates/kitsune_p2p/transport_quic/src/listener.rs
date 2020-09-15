@@ -122,7 +122,11 @@ pub async fn spawn_transport_listener_quic(
                     Ok(r) => r,
                 };
 
-                if let Err(_) = internal_sender_clone.register_incoming(r.0, r.1).await {
+                if internal_sender_clone
+                    .register_incoming(r.0, r.1)
+                    .await
+                    .is_err()
+                {
                     // TODO - log this?
                     return;
                 }

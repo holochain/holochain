@@ -63,6 +63,11 @@ impl SourceChainBuf {
         self.sequence.chain_head()
     }
 
+    /// true if len is 0
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     pub fn len(&self) -> usize {
         self.sequence.len()
     }
@@ -250,7 +255,7 @@ impl SourceChainBuf {
         let avh_addr = self.put_raw(agent_validation_header, None).await?;
 
         // create a agent chain element and add it directly to the store
-        let agent_header = Header::EntryCreate(header::EntryCreate {
+        let agent_header = Header::Create(header::Create {
             author: agent_pubkey.clone(),
             timestamp: Timestamp::now().into(),
             header_seq: 2,
@@ -303,7 +308,7 @@ impl<'a> FallibleIterator for SourceChainBackwardIterator<'a> {
                 let header: Option<SignedHeaderHashed> = self.store.get_header(&top)?;
                 self.current = match &header {
                     None => None,
-                    Some(header) => header.header().prev_header().map(|h| h.clone()),
+                    Some(header) => header.header().prev_header().cloned(),
                 };
                 Ok(header)
             }
@@ -347,7 +352,7 @@ pub mod tests {
                 });
                 let dna_header = HeaderHashed::from_content_sync(dna_header);
 
-                let agent_header = Header::EntryCreate(header::EntryCreate {
+                let agent_header = Header::Create(header::Create {
                     author: agent_pubkey.clone(),
                     timestamp: Timestamp(1, 0).into(),
                     header_seq: 1,
@@ -464,7 +469,7 @@ pub mod tests {
             let json = store.dump_as_json().await?;
             let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
 
-            assert_eq!(parsed[0]["element"]["header"]["type"], "EntryCreate");
+            assert_eq!(parsed[0]["element"]["header"]["type"], "Create");
             assert_eq!(parsed[0]["element"]["header"]["entry_type"], "AgentPubKey");
             assert_eq!(parsed[0]["element"]["entry"]["entry_type"], "Agent");
             assert_ne!(

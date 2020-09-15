@@ -5,7 +5,7 @@ extern crate strum_macros;
 use holochain_types::dna::zome::Zome;
 use holochain_zome_types::zome::ZomeName;
 
-const WASM_WORKSPACE_TARGET: &'static str = "wasm_workspace/target";
+const WASM_WORKSPACE_TARGET: &str = "wasm_workspace/target";
 
 #[derive(EnumIter, Clone, Copy)]
 pub enum TestWasm {
@@ -13,12 +13,12 @@ pub enum TestWasm {
     Anchor,
     Bench,
     Capability,
-    CommitEntry,
+    Create,
     Crd,
     Crud,
     Debug,
     EntryDefs,
-    EntryHash,
+    HashEntry,
     Foo,
     HashPath,
     Imports,
@@ -36,9 +36,9 @@ pub enum TestWasm {
     Validate,
     ValidateLink,
     ValidateInvalid,
-    ValidateLinkAddInvalid,
+    ValidateCreateLinkInvalid,
     ValidateValid,
-    ValidateLinkAddValid,
+    ValidateCreateLinkValid,
     ValidationPackageFail,
     ValidationPackageSuccess,
     WhoAmI,
@@ -52,12 +52,12 @@ impl From<TestWasm> for ZomeName {
             TestWasm::Anchor => "anchor",
             TestWasm::Bench => "bench",
             TestWasm::Capability => "capability",
-            TestWasm::CommitEntry => "commit_entry",
+            TestWasm::Create => "create_entry",
             TestWasm::Crd => "crd",
             TestWasm::Crud => "crud",
             TestWasm::Debug => "debug",
             TestWasm::EntryDefs => "entry_defs",
-            TestWasm::EntryHash => "entry_hash",
+            TestWasm::HashEntry => "hash_entry",
             TestWasm::Foo => "foo",
             TestWasm::HashPath => "hash_path",
             TestWasm::Imports => "imports",
@@ -75,9 +75,9 @@ impl From<TestWasm> for ZomeName {
             TestWasm::Validate => "validate",
             TestWasm::ValidateLink => "validate_link",
             TestWasm::ValidateInvalid => "validate_invalid",
-            TestWasm::ValidateLinkAddInvalid => "validate_link_add_invalid",
+            TestWasm::ValidateCreateLinkInvalid => "validate_link_add_invalid",
             TestWasm::ValidateValid => "validate_valid",
-            TestWasm::ValidateLinkAddValid => "validate_link_add_valid",
+            TestWasm::ValidateCreateLinkValid => "validate_link_add_valid",
             TestWasm::ValidationPackageFail => "validation_package_fail",
             TestWasm::ValidationPackageSuccess => "validation_package_success",
             TestWasm::WhoAmI => "whoami",
@@ -97,8 +97,8 @@ impl From<TestWasm> for DnaWasm {
             TestWasm::Capability => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_capability.wasm")
             }
-            TestWasm::CommitEntry => {
-                get_code("wasm32-unknown-unknown/release/test_wasm_commit_entry.wasm")
+            TestWasm::Create => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_create_entry.wasm")
             }
             TestWasm::Crd => get_code("wasm32-unknown-unknown/release/test_wasm_crd.wasm"),
             TestWasm::Crud => get_code("wasm32-unknown-unknown/release/test_wasm_crud.wasm"),
@@ -106,8 +106,8 @@ impl From<TestWasm> for DnaWasm {
             TestWasm::EntryDefs => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_entry_defs.wasm")
             }
-            TestWasm::EntryHash => {
-                get_code("wasm32-unknown-unknown/release/test_wasm_entry_hash.wasm")
+            TestWasm::HashEntry => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_hash_entry.wasm")
             }
             TestWasm::Foo => get_code("wasm32-unknown-unknown/release/test_wasm_foo.wasm"),
             TestWasm::HashPath => {
@@ -150,13 +150,13 @@ impl From<TestWasm> for DnaWasm {
             TestWasm::ValidateInvalid => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_validate_invalid.wasm")
             }
-            TestWasm::ValidateLinkAddInvalid => {
+            TestWasm::ValidateCreateLinkInvalid => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_validate_link_add_invalid.wasm")
             }
             TestWasm::ValidateValid => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_validate_valid.wasm")
             }
-            TestWasm::ValidateLinkAddValid => {
+            TestWasm::ValidateCreateLinkValid => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_validate_link_add_valid.wasm")
             }
             TestWasm::ValidationPackageFail => {

@@ -1,4 +1,4 @@
-//! An Entry is a unit of data in a Holochain Source Chain.	use holo_hash::AgentPubKey;
+//! An Entry is a unit of data in a Holochain Source Chain.
 //!
 //! This module contains all the necessary definitions for Entry, which broadly speaking
 //! refers to any data which will be written into the ContentAddressableStorage, or the EntityAttributeValueStorage.
@@ -20,7 +20,7 @@ pub use error::*;
 pub const ENTRY_SIZE_LIMIT: usize = 16 * 1000 * 1000; // 16MiB
 
 /// The data type written to the source chain when explicitly granting a capability.
-/// NB: this is not simply `CapGrant`, because the `CapGrant::Authorship`
+/// NB: this is not simply `CapGrant`, because the `CapGrant::ChainAuthor`
 /// grant is already implied by `Entry::Agent`, so that should not be committed
 /// to a chain. This is a type alias because if we add other capability types
 /// in the future, we may want to include them
@@ -54,8 +54,8 @@ impl Entry {
     /// If this entry represents a capability grant, return a `CapGrant`.
     pub fn as_cap_grant(&self) -> Option<CapGrant> {
         match self {
-            Entry::Agent(key) => Some(CapGrant::Authorship(key.clone())),
-            Entry::CapGrant(data) => Some(CapGrant::ZomeCall(data.clone())),
+            Entry::Agent(key) => Some(CapGrant::ChainAuthor(key.clone())),
+            Entry::CapGrant(data) => Some(CapGrant::RemoteAgent(data.clone())),
             _ => None,
         }
     }

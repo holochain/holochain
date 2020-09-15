@@ -21,29 +21,29 @@ impl Parse for EntryDef {
 
         let vars = Punctuated::<syn::MetaNameValue, syn::Token![,]>::parse_terminated(input)?;
         for var in vars {
-            match var.path.segments.first() {
-                Some(segment) => {
-                    match segment.ident.to_string().as_str() {
-                        "id" => match var.lit {
-                            syn::Lit::Str(s) => {
-                                id = holochain_zome_types::entry_def::EntryDefId::App(
-                                    s.value().to_string(),
+            if let Some(segment) = var.path.segments.first() {
+                match segment.ident.to_string().as_str() {
+                    "id" => match var.lit {
+                        syn::Lit::Str(s) => {
+                            id = holochain_zome_types::entry_def::EntryDefId::App(
+                                s.value().to_string(),
+                            )
+                        }
+                        _ => unreachable!(),
+                    },
+                    "required_validations" => match var.lit {
+                        syn::Lit::Int(i) => {
+                            required_validations =
+                                holochain_zome_types::entry_def::RequiredValidations::from(
+                                    i.base10_parse::<u8>()?,
                                 )
-                            }
-                            _ => unreachable!(),
-                        },
-                        "required_validations" => match var.lit {
-                            syn::Lit::Int(i) => {
-                                required_validations =
-                                    holochain_zome_types::entry_def::RequiredValidations::from(
-                                        i.base10_parse::<u8>()?,
-                                    )
-                            }
-                            _ => unreachable!(),
-                        },
-                        "visibility" => {
-                            match var.lit {
-                                syn::Lit::Str(s) => visibility = match s.value().as_str() {
+                        }
+                        _ => unreachable!(),
+                    },
+                    "visibility" => {
+                        match var.lit {
+                            syn::Lit::Str(s) => {
+                                visibility = match s.value().as_str() {
                                     "public" => {
                                         holochain_zome_types::entry_def::EntryVisibility::Public
                                     }
@@ -51,17 +51,16 @@ impl Parse for EntryDef {
                                         holochain_zome_types::entry_def::EntryVisibility::Private
                                     }
                                     _ => unreachable!(),
-                                },
-                                _ => unreachable!(),
-                            };
-                        }
-                        "crdt_type" => {
-                            unimplemented!();
-                        }
-                        _ => {}
+                                }
+                            }
+                            _ => unreachable!(),
+                        };
                     }
+                    "crdt_type" => {
+                        unimplemented!();
+                    }
+                    _ => {}
                 }
-                None => {}
             }
         }
         Ok(EntryDef(holochain_zome_types::entry_def::EntryDef {
@@ -167,6 +166,22 @@ pub fn hdk_extern(_attrs: TokenStream, item: TokenStream) -> TokenStream {
 
     // build a new internal fn ident that is compatible with map_extern!
     // this needs to be sufficiently unlikely to have namespace collisions with other fns
+    //
+    // @todo can we do this by wrapping the external facing extern in an inner module with the
+    // crazy name rather than the function itself getting a weird name??
+    // e.g. something like this:
+    // ```rust
+    // pub fn foo ( .. ) -> ExternResult< .. > {
+    //  // .. do stuff
+    // }
+    // pub mod foo_hdk_extern_mod {
+    // // does the no_mangle + extern hoist this out of the mod scope from the host's perspective?
+    //  #[no_mangle]
+    //  pub extern "C" foo (ptr: GuestPtr) -> GuestPtr {
+    //   // .. boilerplate
+    //  }
+    // }
+    // ```
     let internal_fn_ident = syn::Ident::new(
         &format!("{}_hdk_extern", external_fn_ident.to_string()),
         item_fn.sig.ident.span(),

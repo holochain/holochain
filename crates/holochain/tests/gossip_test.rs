@@ -16,7 +16,7 @@ use holochain_types::dna::DnaFile;
 use holochain_types::test_utils::fake_agent_pubkey_1;
 use holochain_types::{observability, test_utils::fake_agent_pubkey_2};
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::HostInput;
+use holochain_zome_types::ExternInput;
 use matches::assert_matches;
 use test_wasm_common::{AnchorInput, TestString};
 
@@ -157,8 +157,8 @@ where
         cell_id: cell_id.clone(),
         zome_name: TestWasm::Anchor.into(),
         cap: CapSecretFixturator::new(Unpredictable).next().unwrap(),
-        fn_name: func.to_string(),
-        payload: HostInput::new(payload.try_into()?),
+        fn_name: func.into(),
+        payload: ExternInput::new(payload.try_into()?),
         provenance: cell_id.agent_pubkey().clone(),
     })
 }

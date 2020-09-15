@@ -152,7 +152,13 @@ impl PendingDependencies {
 
     /// Are there any dependencies that we need to check?
     pub fn pending_dependencies(&self) -> bool {
-        self.pending.len() > 0
+        !self.pending.is_empty()
+    }
+}
+
+impl Default for PendingDependencies {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -240,11 +246,10 @@ impl PendingDependencies {
         let shh = match dep {
             Dependency::Claim(shh) | Dependency::Proof(shh) => shh,
             Dependency::PendingValidation(shh) => {
-                let header = shh
-                    .header()
-                    .clone()
-                    .try_into()
-                    .map_err(|_| ValidationOutcome::NotLinkAdd(shh.header_address().clone()))?;
+                let header =
+                    shh.header().clone().try_into().map_err(|_| {
+                        ValidationOutcome::NotCreateLink(shh.header_address().clone())
+                    })?;
                 let hash = DhtOpHash::with_data_sync(&UniqueForm::RegisterAddLink(&header));
                 self.pending.push(hash.into());
                 shh

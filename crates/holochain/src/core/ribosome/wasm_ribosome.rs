@@ -18,9 +18,9 @@ use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitResult;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
-use crate::core::ribosome::guest_callback::validate_link_add::ValidateLinkAddHostAccess;
-use crate::core::ribosome::guest_callback::validate_link_add::ValidateLinkAddInvocation;
-use crate::core::ribosome::guest_callback::validate_link_add::ValidateLinkAddResult;
+use crate::core::ribosome::guest_callback::validate_link_add::ValidateCreateLinkHostAccess;
+use crate::core::ribosome::guest_callback::validate_link_add::ValidateCreateLinkInvocation;
+use crate::core::ribosome::guest_callback::validate_link_add::ValidateCreateLinkResult;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 use crate::core::ribosome::guest_callback::CallIterator;
@@ -30,29 +30,29 @@ use crate::core::ribosome::host_fn::call_remote::call_remote;
 use crate::core::ribosome::host_fn::capability_claims::capability_claims;
 use crate::core::ribosome::host_fn::capability_grants::capability_grants;
 use crate::core::ribosome::host_fn::capability_info::capability_info;
-use crate::core::ribosome::host_fn::commit_entry::commit_entry;
+use crate::core::ribosome::host_fn::create::create;
+use crate::core::ribosome::host_fn::create_link::create_link;
 use crate::core::ribosome::host_fn::debug::debug;
 use crate::core::ribosome::host_fn::decrypt::decrypt;
-use crate::core::ribosome::host_fn::delete_entry::delete_entry;
+use crate::core::ribosome::host_fn::delete::delete;
+use crate::core::ribosome::host_fn::delete_link::delete_link;
 use crate::core::ribosome::host_fn::emit_signal::emit_signal;
 use crate::core::ribosome::host_fn::encrypt::encrypt;
-use crate::core::ribosome::host_fn::entry_hash::entry_hash;
 use crate::core::ribosome::host_fn::get::get;
 use crate::core::ribosome::host_fn::get_details::get_details;
 use crate::core::ribosome::host_fn::get_link_details::get_link_details;
 use crate::core::ribosome::host_fn::get_links::get_links;
+use crate::core::ribosome::host_fn::hash_entry::hash_entry;
 use crate::core::ribosome::host_fn::keystore::keystore;
-use crate::core::ribosome::host_fn::link_entries::link_entries;
 use crate::core::ribosome::host_fn::property::property;
 use crate::core::ribosome::host_fn::query::query;
 use crate::core::ribosome::host_fn::random_bytes::random_bytes;
-use crate::core::ribosome::host_fn::remove_link::remove_link;
 use crate::core::ribosome::host_fn::schedule::schedule;
 use crate::core::ribosome::host_fn::show_env::show_env;
 use crate::core::ribosome::host_fn::sign::sign;
 use crate::core::ribosome::host_fn::sys_time::sys_time;
 use crate::core::ribosome::host_fn::unreachable::unreachable;
-use crate::core::ribosome::host_fn::update_entry::update_entry;
+use crate::core::ribosome::host_fn::update::update;
 use crate::core::ribosome::host_fn::zome_info::zome_info;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::Invocation;
@@ -72,15 +72,16 @@ use holochain_zome_types::migrate_agent::MigrateAgentCallbackResult;
 use holochain_zome_types::post_commit::PostCommitCallbackResult;
 use holochain_zome_types::validate::ValidateCallbackResult;
 use holochain_zome_types::validate::ValidationPackageCallbackResult;
-use holochain_zome_types::validate_link_add::ValidateLinkAddCallbackResult;
+use holochain_zome_types::validate_link_add::ValidateCreateLinkCallbackResult;
+use holochain_zome_types::zome::FunctionName;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::CallbackResult;
-use holochain_zome_types::ZomeCallInvocationResponse;
-use holochain_zome_types::{header::ZomeId, GuestOutput};
+use holochain_zome_types::ZomeCallResponse;
+use holochain_zome_types::{header::ZomeId, ExternOutput};
 use std::sync::Arc;
 
 /// Path to the wasm cache path
-const WASM_CACHE_PATH_ENV: &'static str = "HC_WASM_CACHE_PATH";
+const WASM_CACHE_PATH_ENV: &str = "HC_WASM_CACHE_PATH";
 
 /// The only WasmRibosome is a Wasm ribosome.
 /// note that this is cloned on every invocation so keep clones cheap!
@@ -177,7 +178,7 @@ impl WasmRibosome {
 
         // imported host functions for core
         ns.insert("__debug", func!(invoke_host_function!(debug)));
-        ns.insert("__entry_hash", func!(invoke_host_function!(entry_hash)));
+        ns.insert("__hash_entry", func!(invoke_host_function!(hash_entry)));
         ns.insert("__unreachable", func!(invoke_host_function!(unreachable)));
 
         if let HostFnAccess {
@@ -296,21 +297,21 @@ impl WasmRibosome {
         } = host_fn_access
         {
             ns.insert("__call", func!(invoke_host_function!(call)));
-            ns.insert("__commit_entry", func!(invoke_host_function!(commit_entry)));
+            ns.insert("__create", func!(invoke_host_function!(create)));
             ns.insert("__emit_signal", func!(invoke_host_function!(emit_signal)));
-            ns.insert("__link_entries", func!(invoke_host_function!(link_entries)));
-            ns.insert("__remove_link", func!(invoke_host_function!(remove_link)));
-            ns.insert("__update_entry", func!(invoke_host_function!(update_entry)));
-            ns.insert("__delete_entry", func!(invoke_host_function!(delete_entry)));
+            ns.insert("__create_link", func!(invoke_host_function!(create_link)));
+            ns.insert("__delete_link", func!(invoke_host_function!(delete_link)));
+            ns.insert("__update", func!(invoke_host_function!(update)));
+            ns.insert("__delete", func!(invoke_host_function!(delete)));
             ns.insert("__schedule", func!(invoke_host_function!(schedule)));
         } else {
             ns.insert("__call", func!(invoke_host_function!(unreachable)));
-            ns.insert("__commit_entry", func!(invoke_host_function!(unreachable)));
+            ns.insert("__create", func!(invoke_host_function!(unreachable)));
             ns.insert("__emit_signal", func!(invoke_host_function!(unreachable)));
-            ns.insert("__link_entries", func!(invoke_host_function!(unreachable)));
-            ns.insert("__remove_link", func!(invoke_host_function!(unreachable)));
-            ns.insert("__update_entry", func!(invoke_host_function!(unreachable)));
-            ns.insert("__delete_entry", func!(invoke_host_function!(unreachable)));
+            ns.insert("__create_link", func!(invoke_host_function!(unreachable)));
+            ns.insert("__delete_link", func!(invoke_host_function!(unreachable)));
+            ns.insert("__update", func!(invoke_host_function!(unreachable)));
+            ns.insert("__delete", func!(invoke_host_function!(unreachable)));
             ns.insert("__schedule", func!(invoke_host_function!(unreachable)));
         }
         imports.register("env", ns);
@@ -358,17 +359,16 @@ impl RibosomeT for WasmRibosome {
     }
 
     fn zome_name_to_id(&self, zome_name: &ZomeName) -> RibosomeResult<ZomeId> {
-        let header_zome_id: holochain_zome_types::header::ZomeId = match self
+        match self
             .dna_file()
             .dna
             .zomes
             .iter()
             .position(|(name, _)| name == zome_name)
         {
-            Some(index) => holochain_zome_types::header::ZomeId::from(index as u8),
-            None => Err(RibosomeError::ZomeNotExists(zome_name.clone()))?,
-        };
-        Ok(header_zome_id)
+            Some(index) => Ok(holochain_zome_types::header::ZomeId::from(index as u8)),
+            None => Err(RibosomeError::ZomeNotExists(zome_name.to_owned())),
+        }
     }
 
     /// call a function in a zome for an invocation if it exists
@@ -378,23 +378,23 @@ impl RibosomeT for WasmRibosome {
         host_access: HostAccess,
         invocation: &I,
         zome_name: &ZomeName,
-        to_call: String,
-    ) -> Result<Option<GuestOutput>, RibosomeError> {
+        to_call: &FunctionName,
+    ) -> Result<Option<ExternOutput>, RibosomeError> {
         let call_context = CallContext {
             zome_name: zome_name.clone(),
             host_access,
         };
         let module = self.module(call_context.clone())?;
 
-        if module.info().exports.contains_key(&to_call) {
+        if module.info().exports.contains_key(to_call.as_ref()) {
             // there is a callback to_call and it is implemented in the wasm
             // it is important to fully instantiate this (e.g. don't try to use the module above)
             // because it builds guards against memory leaks and handles imports correctly
             let mut instance = self.instance(call_context)?;
 
-            let result: GuestOutput = holochain_wasmer_host::guest::call(
+            let result: ExternOutput = holochain_wasmer_host::guest::call(
                 &mut instance,
-                &to_call,
+                to_call.as_ref(),
                 // be aware of this clone!
                 // the whole invocation is cloned!
                 // @todo - is this a problem for large payloads like entries?
@@ -424,13 +424,13 @@ impl RibosomeT for WasmRibosome {
         &self,
         host_access: ZomeCallHostAccess,
         invocation: ZomeCallInvocation,
-    ) -> RibosomeResult<ZomeCallInvocationResponse> {
+    ) -> RibosomeResult<ZomeCallResponse> {
         Ok(if invocation.is_authorized(&host_access)? {
             // make a copy of these for the error handling below
             let zome_name = invocation.zome_name.clone();
             let fn_name = invocation.fn_name.clone();
 
-            let guest_output: GuestOutput = match self
+            let guest_output: ExternOutput = match self
                 .call_iterator(host_access.into(), self.clone(), invocation)
                 .next()?
             {
@@ -438,9 +438,9 @@ impl RibosomeT for WasmRibosome {
                 None => return Err(RibosomeError::ZomeFnNotExists(zome_name, fn_name)),
             };
 
-            ZomeCallInvocationResponse::ZomeApiFn(guest_output)
+            ZomeCallResponse::Ok(guest_output)
         } else {
-            ZomeCallInvocationResponse::Unauthorized
+            ZomeCallResponse::Unauthorized
         })
     }
 
@@ -454,10 +454,10 @@ impl RibosomeT for WasmRibosome {
 
     fn run_validate_link_add(
         &self,
-        access: ValidateLinkAddHostAccess,
-        invocation: ValidateLinkAddInvocation,
-    ) -> RibosomeResult<ValidateLinkAddResult> {
-        do_callback!(self, access, invocation, ValidateLinkAddCallbackResult)
+        access: ValidateCreateLinkHostAccess,
+        invocation: ValidateCreateLinkInvocation,
+    ) -> RibosomeResult<ValidateCreateLinkResult> {
+        do_callback!(self, access, invocation, ValidateCreateLinkCallbackResult)
     }
 
     fn run_init(

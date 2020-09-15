@@ -53,7 +53,7 @@ impl TryFrom<&Entry> for ThisWasmEntry {
             Entry::App(eb) => Ok(Self::try_from(SerializedBytes::from(eb.to_owned()))?),
             _ => Err(SerializedBytesError::FromBytes(
                 "failed to deserialize ThisWasmEntry".into(),
-            ))?,
+            ).into()),
         }
     }
 }
@@ -75,7 +75,7 @@ fn validate(entry: Entry) -> ExternResult<ValidateCallbackResult> {
 }
 
 fn _commit_validate(to_commit: ThisWasmEntry) -> ExternResult<HeaderHash> {
-    Ok(commit_entry!(&to_commit)?)
+    Ok(create_entry!(&to_commit)?)
 }
 
 #[hdk_extern]
