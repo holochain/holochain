@@ -44,8 +44,8 @@ pub async fn light_to_op<P: PrefixType>(
                 .into_inner();
             let (header, sig) = header.into_header_and_signature();
             let header = match header.into_content() {
-                Header::EntryCreate(c) => NewEntryHeader::Create(c),
-                Header::EntryUpdate(c) => NewEntryHeader::Update(c),
+                Header::Create(c) => NewEntryHeader::Create(c),
+                Header::Update(c) => NewEntryHeader::Update(c),
                 _ => return Err(DhtOpConvertError::HeaderEntryMismatch),
             };
 
@@ -73,7 +73,7 @@ pub async fn light_to_op<P: PrefixType>(
                 .ok_or_else(|| DhtOpConvertError::MissingData(h.into()))?
                 .into_header_and_signature();
             let header = match header.into_content() {
-                Header::EntryUpdate(u) => u,
+                Header::Update(u) => u,
                 h => {
                     return Err(DhtOpConvertError::HeaderMismatch(
                         format!("{:?}", h),
@@ -99,7 +99,7 @@ pub async fn light_to_op<P: PrefixType>(
                 .0
                 .into_header_and_signature();
             let header = match header.into_content() {
-                Header::LinkAdd(u) => u,
+                Header::CreateLink(u) => u,
                 h => {
                     return Err(DhtOpConvertError::HeaderMismatch(
                         format!("{:?}", h),
@@ -117,7 +117,7 @@ pub async fn light_to_op<P: PrefixType>(
                 .0
                 .into_header_and_signature();
             let header = match header.into_content() {
-                Header::LinkRemove(u) => u,
+                Header::DeleteLink(u) => u,
                 h => {
                     return Err(DhtOpConvertError::HeaderMismatch(
                         format!("{:?}", h),
@@ -134,13 +134,13 @@ fn get_element_delete<P: PrefixType>(
     header_hash: HeaderHash,
     op_name: String,
     cas: &ElementBuf<P>,
-) -> DhtOpConvertResult<(header::ElementDelete, Signature)> {
+) -> DhtOpConvertResult<(header::Delete, Signature)> {
     let (header, sig) = cas
         .get_header(&header_hash)?
         .ok_or_else(|| DhtOpConvertError::MissingData(header_hash.into()))?
         .into_header_and_signature();
     match header.into_content() {
-        Header::ElementDelete(u) => Ok((u, sig)),
+        Header::Delete(u) => Ok((u, sig)),
         h => Err(DhtOpConvertError::HeaderMismatch(
             format!("{:?}", h),
             op_name,

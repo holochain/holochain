@@ -108,32 +108,32 @@ macro_rules! builder_variant {
 
 builder_variant!(InitZomesComplete {});
 
-builder_variant!(LinkAdd {
+builder_variant!(CreateLink {
     base_address: EntryHash,
     target_address: EntryHash,
     zome_id: ZomeId,
     tag: LinkTag,
 });
 
-builder_variant!(LinkRemove {
+builder_variant!(DeleteLink {
     link_add_address: HeaderHash,
     base_address: EntryHash,
 });
 
-builder_variant!(ChainOpen {
+builder_variant!(OpenChain {
     prev_dna_hash: DnaHash,
 });
 
-builder_variant!(ChainClose {
+builder_variant!(CloseChain {
     new_dna_hash: DnaHash,
 });
 
-builder_variant!(EntryCreate {
+builder_variant!(Create {
     entry_type: EntryType,
     entry_hash: EntryHash,
 });
 
-builder_variant!(EntryUpdate {
+builder_variant!(Update {
     original_entry_address: EntryHash,
     original_header_address: HeaderHash,
 
@@ -141,9 +141,9 @@ builder_variant!(EntryUpdate {
     entry_hash: EntryHash,
 });
 
-builder_variant!(ElementDelete {
-    removes_address: HeaderHash,
-    removes_entry_address: EntryHash,
+builder_variant!(Delete {
+    deletes_address: HeaderHash,
+    deletes_entry_address: EntryHash,
 });
 
 builder_variant!(AgentValidationPkg {

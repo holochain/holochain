@@ -1,4 +1,4 @@
 ARG DOCKER_BRANCH=develop
-FROM holochain/holochain-2020:latest.${DOCKER_BRANCH}
+FROM holochain/holochain:latest.${DOCKER_BRANCH}
 
 RUN nix-shell --run hc-merge-test

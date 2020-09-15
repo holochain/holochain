@@ -2,13 +2,13 @@
 
 use super::error::ZomeApiResult;
 use crate::core::ribosome::ZomeCallInvocation;
-use holochain_zome_types::ZomeCallInvocationResponse;
+use holochain_zome_types::ZomeCallResponse;
 
 /// The ZomeApi defines the functions which are imported into the Wasm runtime,
 /// i.e. the core API which is made accessible to hApps for interacting with Holochain.
 pub trait ZomeApi {
     /// Invoke a zome function
-    fn call(&self, invocation: ZomeCallInvocation) -> ZomeApiResult<ZomeCallInvocationResponse>;
+    fn call(&self, invocation: ZomeCallInvocation) -> ZomeApiResult<ZomeCallResponse>;
 
     // fn commit_capability_claim();
     // fn commit_capability_grant();
@@ -28,11 +28,11 @@ pub trait ZomeApi {
     // fn get_links();
     // // et al...
 
-    // fn link_entries();
+    // fn create_link();
     // fn property(); // --> get_property ?
     // fn query();
     // fn query_result();
-    // fn remove_link();
+    // fn delete_link();
     // fn send();
     // fn sign();
     // fn sign_one_time();

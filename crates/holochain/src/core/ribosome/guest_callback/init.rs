@@ -12,7 +12,7 @@ use holochain_types::dna::zome::HostFnAccess;
 use holochain_types::dna::DnaDef;
 use holochain_zome_types::init::InitCallbackResult;
 use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::HostInput;
+use holochain_zome_types::ExternInput;
 
 #[derive(Debug, Clone)]
 pub struct InitInvocation {
@@ -51,12 +51,12 @@ impl Invocation for InitInvocation {
     fn fn_components(&self) -> FnComponents {
         vec!["init".into()].into()
     }
-    fn host_input(self) -> Result<HostInput, SerializedBytesError> {
-        Ok(HostInput::new(().try_into()?))
+    fn host_input(self) -> Result<ExternInput, SerializedBytesError> {
+        Ok(ExternInput::new(().try_into()?))
     }
 }
 
-impl TryFrom<InitInvocation> for HostInput {
+impl TryFrom<InitInvocation> for ExternInput {
     type Error = SerializedBytesError;
     fn try_from(_: InitInvocation) -> Result<Self, Self::Error> {
         Ok(Self::new(().try_into()?))
@@ -109,7 +109,7 @@ mod test {
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::dna::zome::HostFnAccess;
     use holochain_zome_types::init::InitCallbackResult;
-    use holochain_zome_types::HostInput;
+    use holochain_zome_types::ExternInput;
 
     #[test]
     fn init_callback_result_fold() {
@@ -213,7 +213,7 @@ mod test {
 
         assert_eq!(
             host_input,
-            HostInput::new(SerializedBytes::try_from(()).unwrap()),
+            ExternInput::new(SerializedBytes::try_from(()).unwrap()),
         );
     }
 }
