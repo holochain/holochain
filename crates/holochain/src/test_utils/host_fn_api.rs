@@ -25,8 +25,8 @@ use holochain_zome_types::{
     link::{Link, LinkTag},
     metadata::Details,
     zome::ZomeName,
-    CommitEntryInput, DeleteEntryInput, GetDetailsInput, GetInput, GetLinksInput, LinkEntriesInput,
-    RemoveLinkInput, UpdateEntryInput,
+    CreateInput, CreateLinkInput, DeleteInput, DeleteLinkInput, GetDetailsInput, GetInput,
+    GetLinksInput, UpdateInput,
 };
 use std::sync::Arc;
 use tracing::*;
@@ -99,14 +99,14 @@ pub async fn commit_entry<'env, E: Into<entry_def::EntryDefId>>(
     let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
     let workspace_lock = CallZomeWorkspaceLock::new(workspace);
 
-    let input = CommitEntryInput::new((entry_def_id.into(), entry));
+    let input = CreateInput::new((entry_def_id.into(), entry));
 
     let output = {
         let host_access = ZomeCallHostAccess::new(workspace_lock.clone(), keystore, network);
         let call_context = CallContext::new(zome_name, host_access.into());
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
-        host_fn::commit_entry::commit_entry(ribosome.clone(), call_context.clone(), input).unwrap()
+        host_fn::create::create(ribosome.clone(), call_context.clone(), input).unwrap()
     };
 
     // Write
@@ -134,14 +134,14 @@ pub async fn delete_entry<'env>(
     let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
     let workspace_lock = CallZomeWorkspaceLock::new(workspace);
 
-    let input = DeleteEntryInput::new(hash);
+    let input = DeleteInput::new(hash);
 
     let output = {
         let host_access = ZomeCallHostAccess::new(workspace_lock.clone(), keystore, network);
         let call_context = CallContext::new(zome_name, host_access.into());
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
-        let r = host_fn::delete_entry::delete_entry(ribosome.clone(), call_context.clone(), input);
+        let r = host_fn::delete::delete(ribosome.clone(), call_context.clone(), input);
         let r = r.map_err(|e| {
             debug!(%e);
             e
@@ -176,14 +176,14 @@ pub async fn update_entry<'env, E: Into<entry_def::EntryDefId>>(
     let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
     let workspace_lock = CallZomeWorkspaceLock::new(workspace);
 
-    let input = UpdateEntryInput::new((entry_def_id.into(), entry, original_header_hash));
+    let input = UpdateInput::new((entry_def_id.into(), entry, original_header_hash));
 
     let output = {
         let host_access = ZomeCallHostAccess::new(workspace_lock.clone(), keystore, network);
         let call_context = CallContext::new(zome_name, host_access.into());
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
-        host_fn::update_entry::update_entry(ribosome.clone(), call_context.clone(), input).unwrap()
+        host_fn::update::update(ribosome.clone(), call_context.clone(), input).unwrap()
     };
 
     // Write
@@ -257,7 +257,7 @@ pub async fn get_details<'env>(
     output.into_inner()
 }
 
-pub async fn link_entries<'env>(
+pub async fn create_link<'env>(
     env: &EnvironmentWrite,
     call_data: CallData,
     base: EntryHash,
@@ -274,14 +274,14 @@ pub async fn link_entries<'env>(
     let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
     let workspace_lock = CallZomeWorkspaceLock::new(workspace);
 
-    let input = LinkEntriesInput::new((base.clone(), target.clone(), link_tag));
+    let input = CreateLinkInput::new((base.clone(), target.clone(), link_tag));
 
     let output = {
         let host_access = ZomeCallHostAccess::new(workspace_lock.clone(), keystore, network);
         let call_context = CallContext::new(zome_name, host_access.into());
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
-        host_fn::link_entries::link_entries(ribosome.clone(), call_context.clone(), input).unwrap()
+        host_fn::create_link::create_link(ribosome.clone(), call_context.clone(), input).unwrap()
     };
 
     // Write
@@ -294,7 +294,7 @@ pub async fn link_entries<'env>(
     output.into_inner()
 }
 
-pub async fn remove_link<'env>(
+pub async fn delete_link<'env>(
     env: &EnvironmentWrite,
     call_data: CallData,
     link_add_hash: HeaderHash,
@@ -309,14 +309,14 @@ pub async fn remove_link<'env>(
     let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
     let workspace_lock = CallZomeWorkspaceLock::new(workspace);
 
-    let input = RemoveLinkInput::new(link_add_hash);
+    let input = DeleteLinkInput::new(link_add_hash);
 
     let output = {
         let host_access = ZomeCallHostAccess::new(workspace_lock.clone(), keystore, network);
         let call_context = CallContext::new(zome_name, host_access.into());
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
-        host_fn::remove_link::remove_link(ribosome.clone(), call_context.clone(), input).unwrap()
+        host_fn::delete_link::delete_link(ribosome.clone(), call_context.clone(), input).unwrap()
     };
 
     // Write
@@ -372,7 +372,7 @@ pub async fn get_link_details<'env>(
     base: EntryHash,
     tag: LinkTag,
     options: GetLinksOptions,
-) -> Vec<(LinkAdd, Vec<LinkRemove>)> {
+) -> Vec<(CreateLink, Vec<DeleteLink>)> {
     let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
 
     let mut cascade = workspace.cascade(call_data.network);

@@ -224,11 +224,11 @@ pub(super) async fn check_link_in_metadata<P: PrefixType>(
     link_add_hash: &HeaderHash,
     meta_vault: &impl MetadataBufT<P>,
 ) -> SysValidationResult<()> {
-    // Check the header is a LinkAdd
-    let link_add: LinkAdd = link_add
+    // Check the header is a CreateLink
+    let link_add: CreateLink = link_add
         .clone()
         .try_into()
-        .map_err(|_| ValidationOutcome::NotLinkAdd(link_add_hash.clone()))?;
+        .map_err(|_| ValidationOutcome::NotCreateLink(link_add_hash.clone()))?;
 
     // Full key always returns just one link
     let link_key = LinkMetaKey::from((&link_add, link_add_hash));
