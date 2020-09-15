@@ -18,6 +18,17 @@ This repository contains most of the core Holochain libraries and binaries.
 
 ## Development Environment
 
+Assuming you have [installed the nix shell](https://nixos.wiki/wiki/Nix_Installation_Guide):
+
+```
+git clone git@github.com:holochain/holochain.git
+cd holochain
+nix-shell
+hc-merge-test
+```
+
+This will compile holochain and run all the tests.
+
 We have an all-in-one development environment including (among other things):
 
 - The correct version and sane environment variables of cargo/rust
