@@ -233,7 +233,7 @@ mod slow_tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_init_unimplemented() {
-        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
+        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::Crud]))
             .next()
             .unwrap();
         let mut init_invocation = InitInvocationFixturator::new(fixt::Empty).next().unwrap();
