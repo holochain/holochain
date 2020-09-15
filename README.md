@@ -13,15 +13,24 @@ This repository contains most of the core Holochain libraries and binaries..
 
 ## Overview
 
+// TODO: remove or add the correct link?
 [Holochain Implementation Architectural Overview](./docs/TODO.md)
 
 ## Application Developer
 
 [Read the wasm API docs](./crates/hdk/README.md)
 
+Build the hdk docs:
+```bash
+cargo doc --manifest-path=crates/hdk/Cargo.toml --open
+```
+
 ## Core Developer
 
-[Core Developer Setup](./docs/TODO.md)
+Build the holochain docs:
+```bash
+cargo doc --manifest-path=crates/holochain/Cargo.toml --open
+```
 
 ## Contribute
 Holochain is an open source project.  We welcome all sorts of participation and are actively working on increasing surface area to accept it.  Please see our [contributing guidelines](/CONTRIBUTING.md) for our general practices and protocols on participating in the community, as well as specific expectations around things like code formatting, testing practices, continuous integration, etc.
