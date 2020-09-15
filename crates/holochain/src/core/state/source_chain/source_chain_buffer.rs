@@ -95,6 +95,10 @@ impl SourceChainBuf {
         self.elements.get_header(k)
     }
 
+    pub fn get_entry(&self, k: &EntryHash) -> DatabaseResult<Option<EntryHashed>> {
+        self.elements.get_entry(k)
+    }
+
     pub async fn get_incomplete_dht_ops(&self) -> SourceChainResult<Vec<(u32, Vec<DhtOp>)>> {
         let mut ops = Vec::new();
         let ops_headers = fresh_reader!(self.env(), |r| {
@@ -255,7 +259,7 @@ impl SourceChainBuf {
         let avh_addr = self.put_raw(agent_validation_header, None).await?;
 
         // create a agent chain element and add it directly to the store
-        let agent_header = Header::EntryCreate(header::EntryCreate {
+        let agent_header = Header::Create(header::Create {
             author: agent_pubkey.clone(),
             timestamp: Timestamp::now().into(),
             header_seq: 2,
@@ -352,7 +356,7 @@ pub mod tests {
                 });
                 let dna_header = HeaderHashed::from_content_sync(dna_header);
 
-                let agent_header = Header::EntryCreate(header::EntryCreate {
+                let agent_header = Header::Create(header::Create {
                     author: agent_pubkey.clone(),
                     timestamp: Timestamp(1, 0).into(),
                     header_seq: 1,
@@ -469,7 +473,7 @@ pub mod tests {
             let json = store.dump_as_json().await?;
             let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
 
-            assert_eq!(parsed[0]["element"]["header"]["type"], "EntryCreate");
+            assert_eq!(parsed[0]["element"]["header"]["type"], "Create");
             assert_eq!(parsed[0]["element"]["header"]["entry_type"], "AgentPubKey");
             assert_eq!(parsed[0]["element"]["entry"]["entry_type"], "Agent");
             assert_ne!(

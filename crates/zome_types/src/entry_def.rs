@@ -1,5 +1,5 @@
 use crate::crdt::CrdtType;
-use crate::zome_io::GuestOutput;
+use crate::zome_io::ExternOutput;
 use crate::CallbackResult;
 use holochain_serialized_bytes::prelude::*;
 
@@ -136,8 +136,8 @@ impl From<Vec<EntryDef>> for EntryDefsCallbackResult {
     }
 }
 
-impl From<GuestOutput> for EntryDefsCallbackResult {
-    fn from(callback_guest_output: GuestOutput) -> Self {
+impl From<ExternOutput> for EntryDefsCallbackResult {
+    fn from(callback_guest_output: ExternOutput) -> Self {
         match callback_guest_output.into_inner().try_into() {
             Ok(v) => v,
             Err(e) => Self::Err(format!("{:?}", e)),
@@ -161,7 +161,7 @@ mod tests {
     use super::EntryDefsCallbackResult;
     use super::EntryVisibility;
     use crate::crdt::CrdtType;
-    use crate::zome_io::GuestOutput;
+    use crate::zome_io::ExternOutput;
     use std::convert::TryInto;
 
     #[test]
@@ -175,7 +175,7 @@ mod tests {
             }]
             .into(),
         );
-        let guest_output = GuestOutput::new(defs_callback_result.clone().try_into().unwrap());
+        let guest_output = ExternOutput::new(defs_callback_result.clone().try_into().unwrap());
         assert_eq!(defs_callback_result, guest_output.into(),);
     }
 }

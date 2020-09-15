@@ -7,7 +7,7 @@ fn init(_: ()) -> ExternResult<InitCallbackResult> {
     let mut functions: GrantedFunctions = HashSet::new();
     functions.insert((zome_info!()?.zome_name, "foo".into()));
     // functions.insert((zome_info!()?.zome_name, "needs_cap_claim".into()));
-    commit_cap_grant!(
+    create_cap_grant!(
         CapGrantEntry {
             tag: "".into(),
             // empty access converts to unrestricted

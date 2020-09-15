@@ -257,7 +257,7 @@ pub mod test {
     };
     use holochain_wasm_test_utils::TestWasm;
     use holochain_websocket::WebsocketMessage;
-    use holochain_zome_types::HostInput;
+    use holochain_zome_types::ExternInput;
     use matches::assert_matches;
     use mockall::predicate;
     use std::{collections::HashMap, convert::TryInto};
@@ -458,7 +458,7 @@ pub mod test {
                     cell_id.clone(),
                     TestWasm::Foo.into(),
                     "foo".into(),
-                    HostInput::new(().try_into().unwrap()),
+                    ExternInput::new(().try_into().unwrap()),
                 ),
             )
             .next()

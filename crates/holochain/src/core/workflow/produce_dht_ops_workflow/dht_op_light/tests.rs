@@ -1,10 +1,9 @@
 use crate::{
     core::state::element_buf::ElementBuf,
     fixt::{
-        AgentValidationPkgFixturator, ChainCloseFixturator, ChainOpenFixturator, DnaFixturator,
-        EntryCreateFixturator, EntryFixturator, EntryHashFixturator, EntryTypeFixturator,
-        EntryUpdateFixturator, InitZomesCompleteFixturator, LinkAddFixturator,
-        LinkRemoveFixturator,
+        AgentValidationPkgFixturator, CloseChainFixturator, CreateFixturator, CreateLinkFixturator,
+        DeleteLinkFixturator, DnaFixturator, EntryFixturator, EntryHashFixturator,
+        EntryTypeFixturator, InitZomesCompleteFixturator, OpenChainFixturator, UpdateFixturator,
     },
 };
 use ::fixt::prelude::*;
@@ -20,8 +19,8 @@ use holochain_types::{
 };
 use holochain_zome_types::header::{
     builder::{self, HeaderBuilder},
-    AgentValidationPkg, ChainClose, ChainOpen, Dna, EntryCreate, EntryType, EntryUpdate, Header,
-    HeaderBuilderCommon, InitZomesComplete, LinkAdd, LinkRemove,
+    AgentValidationPkg, CloseChain, Create, CreateLink, DeleteLink, Dna, EntryType, Header,
+    HeaderBuilderCommon, InitZomesComplete, OpenChain, Update,
 };
 use pretty_assertions::assert_eq;
 use tracing::*;
@@ -34,11 +33,11 @@ struct ElementTest {
     header_hash: HeaderHash,
     sig: Signature,
     entry: Entry,
-    link_add: LinkAdd,
-    link_remove: LinkRemove,
+    link_add: CreateLink,
+    link_remove: DeleteLink,
     dna: Dna,
-    chain_close: ChainClose,
-    chain_open: ChainOpen,
+    chain_close: CloseChain,
+    chain_open: OpenChain,
     agent_validation_pkg: AgentValidationPkg,
     init_zomes_complete: InitZomesComplete,
 }
@@ -52,11 +51,11 @@ impl ElementTest {
         let header_hash = fixt!(HeaderHash);
         let sig = fixt!(Signature);
         let entry = fixt!(Entry);
-        let link_add = fixt!(LinkAdd);
-        let link_remove = fixt!(LinkRemove);
+        let link_add = fixt!(CreateLink);
+        let link_remove = fixt!(DeleteLink);
         let dna = fixt!(Dna);
-        let chain_open = fixt!(ChainOpen);
-        let chain_close = fixt!(ChainClose);
+        let chain_open = fixt!(OpenChain);
+        let chain_close = fixt!(CloseChain);
         let agent_validation_pkg = fixt!(AgentValidationPkg);
         let init_zomes_complete = fixt!(InitZomesComplete);
         Self {
@@ -77,8 +76,8 @@ impl ElementTest {
         }
     }
 
-    fn create_element(&mut self) -> (EntryCreate, Element) {
-        let entry_create = builder::EntryCreate {
+    fn create_element(&mut self) -> (Create, Element) {
+        let entry_create = builder::Create {
             entry_type: self.entry_type.clone(),
             entry_hash: self.entry_hash.clone(),
         }
@@ -87,8 +86,8 @@ impl ElementTest {
         (entry_create, element)
     }
 
-    fn update_element(&mut self) -> (EntryUpdate, Element) {
-        let entry_update = builder::EntryUpdate {
+    fn update_element(&mut self) -> (Update, Element) {
+        let entry_update = builder::Update {
             original_entry_address: self.original_entry_hash.clone(),
             entry_type: self.entry_type.clone(),
             entry_hash: self.entry_hash.clone(),
@@ -141,9 +140,9 @@ impl ElementTest {
     }
 
     fn entry_delete(mut self) -> (Element, Vec<DhtOp>) {
-        let entry_delete = builder::ElementDelete {
-            removes_address: self.header_hash.clone(),
-            removes_entry_address: self.entry_hash.clone(),
+        let entry_delete = builder::Delete {
+            deletes_address: self.header_hash.clone(),
+            deletes_entry_address: self.entry_hash.clone(),
         }
         .build(self.commons.next().unwrap());
         let element = self.to_element(entry_delete.clone().into(), None);
@@ -249,11 +248,11 @@ async fn test_dht_basis() {
     {
         // Create a header that points to an entry
         let new_entry = fixt!(Entry);
-        let original_header = fixt!(EntryCreate);
+        let original_header = fixt!(Create);
         let expected_entry_hash: AnyDhtHash = original_header.entry_hash.clone().into();
 
         let original_header_hash =
-            HeaderHashed::from_content_sync(Header::EntryCreate(original_header.clone()));
+            HeaderHashed::from_content_sync(Header::Create(original_header.clone()));
         let signed_header =
             SignedHeaderHashed::with_presigned(original_header_hash.clone(), fixt!(Signature));
         let original_header_hash = original_header_hash.into_inner().1;
@@ -267,7 +266,7 @@ async fn test_dht_basis() {
         cas.put(signed_header, Some(entry_hashed)).unwrap();
 
         // Create the update header with the same hash
-        let mut entry_update = fixt!(EntryUpdate);
+        let mut entry_update = fixt!(Update);
         entry_update.original_entry_address = original_header.entry_hash.clone();
         entry_update.original_header_address = original_header_hash;
 

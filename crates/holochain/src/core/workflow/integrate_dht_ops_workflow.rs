@@ -246,14 +246,14 @@ fn op_dependencies_held<P: PrefixType>(
             DhtOp::RegisterDeletedEntryHeader(_, element_delete) => {
                 // Check if we have the header with the entry that we are removing in the vault
                 // or defer the op.
-                if !header_with_entry_is_stored(&element_delete.removes_address, element_store)? {
+                if !header_with_entry_is_stored(&element_delete.deletes_address, element_store)? {
                     return Ok(false);
                 }
             }
             DhtOp::RegisterDeletedBy(_, element_delete) => {
                 // Check if we have the header with the entry that we are removing in the vault
                 // or defer the op.
-                if !header_with_entry_is_stored(&element_delete.removes_address, element_store)? {
+                if !header_with_entry_is_stored(&element_delete.deletes_address, element_store)? {
                     return Ok(false);
                 }
             }
@@ -325,7 +325,7 @@ where
         }
         DhtOpLight::RegisterRemoveLink(hash, _) => {
             let header = get_header(hash, element_store)?.try_into()?;
-            meta_store.remove_link(header)?;
+            meta_store.delete_link(header)?;
         }
     }
     Ok(())

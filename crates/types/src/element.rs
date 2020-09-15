@@ -1,7 +1,7 @@
 //! Defines a Element, the basic unit of Holochain data.
 
 use crate::{
-    header::{WireElementDelete, WireEntryUpdateRelationship, WireNewEntryHeader},
+    header::{WireDelete, WireNewEntryHeader, WireUpdateRelationship},
     prelude::*,
     EntryHashed, HeaderHashed,
 };
@@ -28,7 +28,7 @@ pub struct WireElement {
     maybe_entry: Option<Entry>,
     /// If this element is deleted then we require a single delete
     /// in the cache as proof of the tombstone
-    deleted: Option<WireElementDelete>,
+    deleted: Option<WireDelete>,
 }
 
 /// A group of elements with a common entry
@@ -130,11 +130,11 @@ pub struct RawGetEntryResponse {
     // header being deleted but we would need to only ever store
     // if there was a header delete in our MetadataBuf and
     // not the delete header hash as we do now.
-    pub deletes: Vec<WireElementDelete>,
+    pub deletes: Vec<WireDelete>,
     /// Any updates on this entry.
     /// Note you will need to ask for "all_live_headers_with_metadata"
     /// to get this back
-    pub updates: Vec<WireEntryUpdateRelationship>,
+    pub updates: Vec<WireUpdateRelationship>,
     /// The entry shared across all headers
     pub entry: Entry,
     /// The entry_type shared across all headers
@@ -148,12 +148,12 @@ impl RawGetEntryResponse {
     /// elements all have the same entry. This is not checked
     /// due to the performance cost.
     /// ### Panics
-    /// If the elements are not a header of EntryCreate or EntryDelete
+    /// If the elements are not a header of Create or EntryDelete
     /// or there is no entry or the entry hash is different
     pub fn from_elements<E>(
         elements: E,
-        deletes: Vec<WireElementDelete>,
-        updates: Vec<WireEntryUpdateRelationship>,
+        deletes: Vec<WireDelete>,
+        updates: Vec<WireUpdateRelationship>,
     ) -> Option<Self>
     where
         E: IntoIterator<Item = Element>,
@@ -187,17 +187,17 @@ impl RawGetEntryResponse {
             .expect("Get entry responses cannot be created without entries");
         let (header, signature) = shh.into_header_and_signature();
         let (new_entry_header, entry_type) = match header.into_content() {
-            Header::EntryCreate(ec) => {
+            Header::Create(ec) => {
                 let et = ec.entry_type.clone();
                 (WireNewEntryHeader::Create((ec, signature).into()), et)
             }
-            Header::EntryUpdate(eu) => {
+            Header::Update(eu) => {
                 let et = eu.entry_type.clone();
                 (WireNewEntryHeader::Update((eu, signature).into()), et)
             }
             h => panic!(
                 "Get entry responses cannot be created from headers
-                    other then EntryCreate or EntryUpdate.
+                    other then Create or Update.
                     Tried to with: {:?}",
                 h
             ),
@@ -286,7 +286,7 @@ impl WireElement {
         (header, deleted)
     }
     /// Convert from a [Element] when sending to the network
-    pub fn from_element(e: Element, deleted: Option<WireElementDelete>) -> Self {
+    pub fn from_element(e: Element, deleted: Option<WireDelete>) -> Self {
         let (signed_header, maybe_entry) = e.into_inner();
         Self {
             signed_header: signed_header.into_inner().0,
