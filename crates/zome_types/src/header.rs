@@ -40,13 +40,13 @@ pub enum Header {
     Dna(Dna),
     AgentValidationPkg(AgentValidationPkg),
     InitZomesComplete(InitZomesComplete),
-    LinkAdd(LinkAdd),
-    LinkRemove(LinkRemove),
-    ChainOpen(ChainOpen),
-    ChainClose(ChainClose),
-    EntryCreate(EntryCreate),
-    EntryUpdate(EntryUpdate),
-    ElementDelete(ElementDelete),
+    CreateLink(CreateLink),
+    DeleteLink(DeleteLink),
+    OpenChain(OpenChain),
+    CloseChain(CloseChain),
+    Create(Create),
+    Update(Update),
+    Delete(Delete),
 }
 
 pub type HeaderHashed = HoloHashed<Header>;
@@ -97,13 +97,13 @@ write_into_header! {
     Dna,
     AgentValidationPkg,
     InitZomesComplete,
-    LinkAdd,
-    LinkRemove,
-    ChainOpen,
-    ChainClose,
-    EntryCreate,
-    EntryUpdate,
-    ElementDelete,
+    CreateLink,
+    DeleteLink,
+    OpenChain,
+    CloseChain,
+    Create,
+    Update,
+    Delete,
 }
 
 /// a utility macro just to not have to type in the match statement everywhere.
@@ -113,13 +113,13 @@ macro_rules! match_header {
             Header::Dna($i) => { $($t)* }
             Header::AgentValidationPkg($i) => { $($t)* }
             Header::InitZomesComplete($i) => { $($t)* }
-            Header::LinkAdd($i) => { $($t)* }
-            Header::LinkRemove($i) => { $($t)* }
-            Header::ChainOpen($i) => { $($t)* }
-            Header::ChainClose($i) => { $($t)* }
-            Header::EntryCreate($i) => { $($t)* }
-            Header::EntryUpdate($i) => { $($t)* }
-            Header::ElementDelete($i) => { $($t)* }
+            Header::CreateLink($i) => { $($t)* }
+            Header::DeleteLink($i) => { $($t)* }
+            Header::OpenChain($i) => { $($t)* }
+            Header::CloseChain($i) => { $($t)* }
+            Header::Create($i) => { $($t)* }
+            Header::Update($i) => { $($t)* }
+            Header::Delete($i) => { $($t)* }
         }
     };
 }
@@ -127,15 +127,15 @@ macro_rules! match_header {
 impl Header {
     /// Returns the address and entry type of the Entry, if applicable.
     // TODO: DRY: possibly create an `EntryData` struct which is used by both
-    // EntryCreate and EntryUpdate
+    // Create and Update
     pub fn entry_data(&self) -> Option<(&EntryHash, &EntryType)> {
         match self {
-            Self::EntryCreate(EntryCreate {
+            Self::Create(Create {
                 entry_hash,
                 entry_type,
                 ..
             }) => Some((entry_hash, entry_type)),
-            Self::EntryUpdate(EntryUpdate {
+            Self::Update(Update {
                 entry_hash,
                 entry_type,
                 ..
@@ -173,13 +173,13 @@ impl Header {
             Self::Dna(Dna { .. }) => 0,
             Self::AgentValidationPkg(AgentValidationPkg { header_seq, .. })
             | Self::InitZomesComplete(InitZomesComplete { header_seq, .. })
-            | Self::LinkAdd(LinkAdd { header_seq, .. })
-            | Self::LinkRemove(LinkRemove { header_seq, .. })
-            | Self::ElementDelete(ElementDelete { header_seq, .. })
-            | Self::ChainClose(ChainClose { header_seq, .. })
-            | Self::ChainOpen(ChainOpen { header_seq, .. })
-            | Self::EntryCreate(EntryCreate { header_seq, .. })
-            | Self::EntryUpdate(EntryUpdate { header_seq, .. }) => *header_seq,
+            | Self::CreateLink(CreateLink { header_seq, .. })
+            | Self::DeleteLink(DeleteLink { header_seq, .. })
+            | Self::Delete(Delete { header_seq, .. })
+            | Self::CloseChain(CloseChain { header_seq, .. })
+            | Self::OpenChain(OpenChain { header_seq, .. })
+            | Self::Create(Create { header_seq, .. })
+            | Self::Update(Update { header_seq, .. }) => *header_seq,
         }
     }
 
@@ -189,13 +189,13 @@ impl Header {
             Self::Dna(Dna { .. }) => return None,
             Self::AgentValidationPkg(AgentValidationPkg { prev_header, .. }) => prev_header,
             Self::InitZomesComplete(InitZomesComplete { prev_header, .. }) => prev_header,
-            Self::LinkAdd(LinkAdd { prev_header, .. }) => prev_header,
-            Self::LinkRemove(LinkRemove { prev_header, .. }) => prev_header,
-            Self::ElementDelete(ElementDelete { prev_header, .. }) => prev_header,
-            Self::ChainClose(ChainClose { prev_header, .. }) => prev_header,
-            Self::ChainOpen(ChainOpen { prev_header, .. }) => prev_header,
-            Self::EntryCreate(EntryCreate { prev_header, .. }) => prev_header,
-            Self::EntryUpdate(EntryUpdate { prev_header, .. }) => prev_header,
+            Self::CreateLink(CreateLink { prev_header, .. }) => prev_header,
+            Self::DeleteLink(DeleteLink { prev_header, .. }) => prev_header,
+            Self::Delete(Delete { prev_header, .. }) => prev_header,
+            Self::CloseChain(CloseChain { prev_header, .. }) => prev_header,
+            Self::OpenChain(OpenChain { prev_header, .. }) => prev_header,
+            Self::Create(Create { prev_header, .. }) => prev_header,
+            Self::Update(Update { prev_header, .. }) => prev_header,
         })
     }
 }
@@ -236,7 +236,9 @@ pub struct ZomeId(u8);
 pub struct EntryDefIndex(u8);
 
 /// The Dna Header is always the first header in a source chain
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, SerializedBytes)]
+#[derive(
+    Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, SerializedBytes, Hash,
+)]
 pub struct Dna {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
@@ -246,7 +248,9 @@ pub struct Dna {
 
 /// Header for an agent validation package, used to determine whether an agent
 /// is allowed to participate in this DNA
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, SerializedBytes)]
+#[derive(
+    Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, SerializedBytes, Hash,
+)]
 pub struct AgentValidationPkg {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
@@ -258,7 +262,9 @@ pub struct AgentValidationPkg {
 
 /// A header which declares that all zome init functions have successfully
 /// completed, and the chain is ready for commits. Contains no explicit data.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, SerializedBytes)]
+#[derive(
+    Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, SerializedBytes, Hash,
+)]
 pub struct InitZomesComplete {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
@@ -267,8 +273,10 @@ pub struct InitZomesComplete {
 }
 
 /// Declares that a metadata Link should be made between two EntryHashes
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, SerializedBytes)]
-pub struct LinkAdd {
+#[derive(
+    Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, SerializedBytes, Hash,
+)]
+pub struct CreateLink {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub header_seq: u32,
@@ -281,25 +289,29 @@ pub struct LinkAdd {
 }
 
 /// Declares that a previously made Link should be nullified and considered removed.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, SerializedBytes)]
-pub struct LinkRemove {
+#[derive(
+    Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, SerializedBytes, Hash,
+)]
+pub struct DeleteLink {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub header_seq: u32,
     pub prev_header: HeaderHash,
 
-    /// this is redundant with the `LinkAdd` header but needs to be included to facilitate DHT ops
+    /// this is redundant with the `CreateLink` header but needs to be included to facilitate DHT ops
     /// this is NOT exposed to wasm developers and is validated by the subconscious to ensure that
-    /// it always matches the `base_address` of the `LinkAdd`
+    /// it always matches the `base_address` of the `CreateLink`
     pub base_address: EntryHash,
-    /// The address of the `LinkAdd` being reversed
+    /// The address of the `CreateLink` being reversed
     pub link_add_address: HeaderHash,
 }
 
 /// When migrating to a new version of a DNA, this header is committed to the
 /// new chain to declare the migration path taken. **Currently unused**
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, SerializedBytes)]
-pub struct ChainOpen {
+#[derive(
+    Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, SerializedBytes, Hash,
+)]
+pub struct OpenChain {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub header_seq: u32,
@@ -310,8 +322,10 @@ pub struct ChainOpen {
 
 /// When migrating to a new version of a DNA, this header is committed to the
 /// old chain to declare the migration path taken. **Currently unused**
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, SerializedBytes)]
-pub struct ChainClose {
+#[derive(
+    Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, SerializedBytes, Hash,
+)]
+pub struct CloseChain {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub header_seq: u32,
@@ -325,7 +339,7 @@ pub struct ChainClose {
 #[derive(
     Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, SerializedBytes, Hash,
 )]
-pub struct EntryCreate {
+pub struct Create {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub header_seq: u32,
@@ -350,7 +364,7 @@ pub struct EntryCreate {
 #[derive(
     Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, SerializedBytes, Hash,
 )]
-pub struct EntryUpdate {
+pub struct Update {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub header_seq: u32,
@@ -363,39 +377,53 @@ pub struct EntryUpdate {
     pub entry_hash: EntryHash,
 }
 
-/// Placeholder for future when we want to have updates on headers
-/// Not currently in use.
-#[derive(
-    Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, SerializedBytes, Hash,
-)]
-pub struct HeaderUpdate {
-    pub author: AgentPubKey,
-    pub timestamp: Timestamp,
-    pub header_seq: u32,
-    pub prev_header: HeaderHash,
-
-    pub original_header_address: HeaderHash,
-
-    pub entry_type: EntryType,
-    pub entry_hash: EntryHash,
-}
-
 /// Declare that a previously published Header should be nullified and
 /// considered deleted.
 ///
 /// Via the associated [DhtOp], this also has an effect on Entries: namely,
 /// that a previously published Entry will become inaccessible if all of its
 /// Headers are marked deleted.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, SerializedBytes)]
-pub struct ElementDelete {
+#[derive(
+    Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, SerializedBytes, Hash,
+)]
+pub struct Delete {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
     pub header_seq: u32,
     pub prev_header: HeaderHash,
 
     /// Address of the Element being deleted
-    pub removes_address: HeaderHash,
-    pub removes_entry_address: EntryHash,
+    pub deletes_address: HeaderHash,
+    pub deletes_entry_address: EntryHash,
+}
+
+/// Placeholder for future when we want to have updates on headers
+/// Not currently in use.
+#[derive(
+    Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, SerializedBytes, Hash,
+)]
+pub struct UpdateHeader {
+    pub author: AgentPubKey,
+    pub timestamp: Timestamp,
+    pub header_seq: u32,
+    pub prev_header: HeaderHash,
+
+    pub original_header_address: HeaderHash,
+}
+
+/// Placeholder for future when we want to have deletes on headers
+/// Not currently in use.
+#[derive(
+    Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, SerializedBytes, Hash,
+)]
+pub struct DeleteHeader {
+    pub author: AgentPubKey,
+    pub timestamp: Timestamp,
+    pub header_seq: u32,
+    pub prev_header: HeaderHash,
+
+    /// Address of the header being deleted
+    pub deletes_address: HeaderHash,
 }
 
 /// Allows Headers which reference Entries to know what type of Entry it is

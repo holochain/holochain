@@ -34,7 +34,7 @@ use holochain_types::test_utils::fake_agent_pubkey_1;
 use holochain_types::{observability, test_utils::fake_agent_pubkey_2};
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::WebsocketSender;
-use holochain_zome_types::HostInput;
+use holochain_zome_types::ExternInput;
 use matches::assert_matches;
 use test_case::test_case;
 use test_utils::*;
@@ -226,7 +226,7 @@ async fn speed_test(n: Option<usize>) -> TestEnvironment {
             zome_name: TestWasm::Anchor.into(),
             cap: CapSecretFixturator::new(Unpredictable).next().unwrap(),
             fn_name: func.into(),
-            payload: HostInput::new(payload.try_into()?),
+            payload: ExternInput::new(payload.try_into()?),
             provenance: cell_id.agent_pubkey().clone(),
         })
     }

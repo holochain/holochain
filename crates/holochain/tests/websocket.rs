@@ -212,7 +212,7 @@ pub async fn call_foo_fn(app_port: u16, original_dna_hash: DnaHash, holochain: &
             cell_id,
             TestWasm::Foo,
             "foo".into(),
-            HostInput::new(().try_into().unwrap()),
+            ExternInput::new(().try_into().unwrap()),
         ))
         .next()
         .unwrap(),
@@ -221,7 +221,7 @@ pub async fn call_foo_fn(app_port: u16, original_dna_hash: DnaHash, holochain: &
     let response = app_interface.request(request);
     let call_response = check_timeout(holochain, response, 3000).await;
     let foo = TestString::from(String::from("foo"));
-    let expected = Box::new(GuestOutput::new(foo.try_into().unwrap()));
+    let expected = Box::new(ExternOutput::new(foo.try_into().unwrap()));
     trace!(?call_response);
     assert_matches!(call_response, AppResponse::ZomeCallInvocation(response) if response == expected);
     app_interface

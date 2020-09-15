@@ -20,7 +20,7 @@ pub use error::*;
 pub const ENTRY_SIZE_LIMIT: usize = 16 * 1000 * 1000; // 16MiB
 
 /// The data type written to the source chain when explicitly granting a capability.
-/// NB: this is not simply `CapGrant`, because the `CapGrant::Authorship`
+/// NB: this is not simply `CapGrant`, because the `CapGrant::ChainAuthor`
 /// grant is already implied by `Entry::Agent`, so that should not be committed
 /// to a chain. This is a type alias because if we add other capability types
 /// in the future, we may want to include them
@@ -34,9 +34,7 @@ pub type CapClaimEntry = CapClaim;
 pub struct GetOptions;
 
 /// Structure holding the entry portion of a chain element.
-#[derive(
-    Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, SerializedBytes,
-)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, SerializedBytes)]
 #[serde(tag = "entry_type", content = "entry")]
 pub enum Entry {
     /// The `Agent` system entry, the third entry of every source chain,
@@ -56,8 +54,8 @@ impl Entry {
     /// If this entry represents a capability grant, return a `CapGrant`.
     pub fn as_cap_grant(&self) -> Option<CapGrant> {
         match self {
-            Entry::Agent(key) => Some(CapGrant::Authorship(key.clone())),
-            Entry::CapGrant(data) => Some(CapGrant::ZomeCall(data.clone())),
+            Entry::Agent(key) => Some(CapGrant::ChainAuthor(key.clone())),
+            Entry::CapGrant(data) => Some(CapGrant::RemoteAgent(data.clone())),
             _ => None,
         }
     }

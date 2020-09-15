@@ -1,4 +1,4 @@
-use crate::zome_io::GuestOutput;
+use crate::zome_io::ExternOutput;
 use crate::CallbackResult;
 use holochain_serialized_bytes::prelude::*;
 
@@ -14,8 +14,8 @@ pub enum MigrateAgentCallbackResult {
     Fail(String),
 }
 
-impl From<GuestOutput> for MigrateAgentCallbackResult {
-    fn from(guest_output: GuestOutput) -> Self {
+impl From<ExternOutput> for MigrateAgentCallbackResult {
+    fn from(guest_output: ExternOutput) -> Self {
         match guest_output.into_inner().try_into() {
             Ok(v) => v,
             Err(e) => Self::Fail(format!("{:?}", e)),

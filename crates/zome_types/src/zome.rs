@@ -1,6 +1,6 @@
 use holochain_serialized_bytes::prelude::*;
 
-/// ZomeName as a String
+/// ZomeName as a String.
 #[derive(Clone, Debug, Serialize, Hash, Deserialize, Ord, Eq, PartialEq, PartialOrd)]
 #[repr(transparent)]
 pub struct ZomeName(pub String);
@@ -29,7 +29,7 @@ impl From<String> for ZomeName {
     }
 }
 
-/// a single function name
+/// A single function name.
 #[repr(transparent)]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, PartialOrd, Ord, Eq, Hash)]
 pub struct FunctionName(pub String);
