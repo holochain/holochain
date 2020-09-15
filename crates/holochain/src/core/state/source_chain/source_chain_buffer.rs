@@ -94,6 +94,10 @@ impl SourceChainBuf {
     pub fn get_header(&self, k: &HeaderHash) -> DatabaseResult<Option<SignedHeaderHashed>> {
         self.elements.get_header(k)
     }
+    
+    pub fn get_entry(&self, k: &EntryHash) -> DatabaseResult<Option<EntryHashed>> {
+        self.elements.get_entry(k)
+    }
 
     pub async fn get_incomplete_dht_ops(&self) -> SourceChainResult<Vec<(u32, Vec<DhtOp>)>> {
         let mut ops = Vec::new();

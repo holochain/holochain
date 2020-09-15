@@ -291,14 +291,15 @@ impl SourceChain {
     /// This returns a Vec rather than an iterator because it is intended to be
     /// used by the `query` host function, which crosses the wasm boundary
     pub fn query(&self, query: &ChainQueryFilter) -> SourceChainResult<Vec<Element>> {
+        let include_entries = query.include_entries;
         self.iter_back()
             .filter(|shh| Ok(query.check(shh.header())))
-            .map(|shh| match self.0.get_element(shh.header_address()) {
-                Ok(Some(element)) => Ok(element),
-                Ok(None) => Err(SourceChainError::ElementMissing(
-                    shh.header_address().to_string(),
-                )),
-                Err(e) => Err(e),
+            .map(|shh| {
+                let entry = match shh.header().entry_hash() {
+                    Some(eh) if include_entries => self.0.get_entry(eh)?,
+                    _ => None,
+                };
+                Ok(Element::new(shh, entry.map(|e| e.into_content())))
             })
             .collect()
     }
