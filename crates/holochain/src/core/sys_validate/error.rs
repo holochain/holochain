@@ -63,7 +63,7 @@ pub enum ValidationOutcome {
     #[error("The link tag size {0} was bigger then the MAX_TAG_SIZE {1}")]
     TagTooLarge(usize, usize),
     #[error("The header {0:?} was expected to be a link add header")]
-    NotLinkAdd(HeaderHash),
+    NotCreateLink(HeaderHash),
     #[error("The header was expected to be a new entry header but was a {0:?}")]
     NotNewEntry(Header),
     #[error("The dependency {0:?} is not held")]
@@ -72,7 +72,7 @@ pub enum ValidationOutcome {
     PrevHeaderError(#[from] PrevHeaderError),
     #[error("StoreEntry should not be gossiped for private entries")]
     PrivateEntry,
-    #[error("EntryUpdate original EntryType: {0:?} doesn't match new EntryType {1:?}")]
+    #[error("Update original EntryType: {0:?} doesn't match new EntryType {1:?}")]
     UpdateTypeMismatch(EntryType, EntryType),
     #[error("Signature {0:?} failed to verify for Header {1:?}")]
     VerifySignature(Signature, Header),

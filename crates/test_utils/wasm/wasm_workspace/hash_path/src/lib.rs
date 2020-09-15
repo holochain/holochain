@@ -20,8 +20,8 @@ fn ensure(path_string: TestString) -> ExternResult<()> {
 }
 
 #[hdk_extern]
-fn remove_link(remove_link: RemoveLinkInput) -> ExternResult<HeaderHash> {
-    Ok(remove_link!(remove_link.into_inner())?)
+fn delete_link(delete_link: DeleteLinkInput) -> ExternResult<HeaderHash> {
+    Ok(delete_link!(delete_link.into_inner())?)
 }
 
 #[hdk_extern]

@@ -34,10 +34,10 @@ use holochain_types::{
     metadata::{EntryDhtStatus, MetadataSet, TimedHeaderHash},
     EntryHashed, HeaderHashed,
 };
-use holochain_zome_types::header::{LinkAdd, LinkRemove};
+use holochain_zome_types::header::{CreateLink, DeleteLink};
 use holochain_zome_types::{
     element::SignedHeader,
-    header::{ElementDelete, EntryUpdate},
+    header::{Delete, Update},
     link::Link,
     metadata::{Details, ElementDetails, EntryDetails},
     Header,
@@ -405,12 +405,12 @@ where
                     .meta_cache
                     .get_deletes_on_entry(&r, hash.clone())?
                     .collect::<Vec<_>>()?;
-                let deletes = self.render_headers(deletes, |h| Ok(ElementDelete::try_from(h)?))?;
+                let deletes = self.render_headers(deletes, |h| Ok(Delete::try_from(h)?))?;
                 let updates = self
                     .meta_cache
                     .get_updates(&r, hash.into())?
                     .collect::<Vec<_>>()?;
-                let updates = self.render_headers(updates, |h| Ok(EntryUpdate::try_from(h)?))?;
+                let updates = self.render_headers(updates, |h| Ok(Update::try_from(h)?))?;
                 Ok(Some(EntryDetails {
                     entry: entry.into_content(),
                     headers,
@@ -431,7 +431,7 @@ where
                     .meta_cache
                     .get_deletes_on_header(&r, hash)?
                     .collect::<Vec<_>>())?;
-                let deletes = self.render_headers(deletes, |h| Ok(ElementDelete::try_from(h)?))?;
+                let deletes = self.render_headers(deletes, |h| Ok(Delete::try_from(h)?))?;
                 Ok(Some(ElementDetails { element, deletes }))
             }
             None => Ok(None),
@@ -764,17 +764,17 @@ where
     }
 
     #[instrument(skip(self, key, options))]
-    /// Return all LinkAdd headers
-    /// and LinkRemove headers ordered by time.
+    /// Return all CreateLink headers
+    /// and DeleteLink headers ordered by time.
     pub async fn get_link_details<'link>(
         &mut self,
         key: &'link LinkMetaKey<'link>,
         options: GetLinksOptions,
-    ) -> CascadeResult<Vec<(LinkAdd, Vec<LinkRemove>)>> {
+    ) -> CascadeResult<Vec<(CreateLink, Vec<DeleteLink>)>> {
         // Update the cache from the network
         self.fetch_links(key.into(), options).await?;
 
-        // Get the links and collect the LinkAdd / LinkRemove hashes by time.
+        // Get the links and collect the CreateLink / DeleteLink hashes by time.
         let links = fresh_reader!(self.env, |r| {
             self.meta_cache
                 .get_links_all(&r, key)?
@@ -795,10 +795,10 @@ where
                 .collect::<BTreeMap<_, _>>()
         })?;
         // Get the headers from the element stores
-        let mut result: Vec<(LinkAdd, _)> = Vec::with_capacity(links.len());
+        let mut result: Vec<(CreateLink, _)> = Vec::with_capacity(links.len());
         for (link_add, link_removes) in links {
             if let Some(link_add) = self.get_element_local_raw(&link_add.header_hash)? {
-                let mut r: Vec<LinkRemove> = Vec::with_capacity(link_removes.len());
+                let mut r: Vec<DeleteLink> = Vec::with_capacity(link_removes.len());
                 for link_remove in link_removes {
                     if let Some(link_remove) =
                         self.get_element_local_raw(&link_remove.header_hash)?

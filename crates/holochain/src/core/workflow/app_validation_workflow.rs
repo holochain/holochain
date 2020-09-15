@@ -18,7 +18,7 @@ use crate::{
     core::present::retrieve_entry,
     core::present::DataSource,
     core::present::DbPair,
-    core::ribosome::guest_callback::validate_link_add::ValidateLinkAddHostAccess,
+    core::ribosome::guest_callback::validate_link_add::ValidateCreateLinkHostAccess,
     core::ribosome::guest_callback::validate_link_add::ValidateLinkAddInvocation,
     core::ribosome::guest_callback::validate_link_add::ValidateLinkAddResult,
     core::ribosome::wasm_ribosome::WasmRibosome,
@@ -550,8 +550,8 @@ pub fn run_link_validation_callback(
         base,
         target,
     };
-    let access = ValidateLinkAddHostAccess::new(workspace_lock, network);
-    let validate = ribosome.run_validate_link_add(access, invocation)?;
+    let access = ValidateCreateLinkHostAccess::new(workspace_lock, network);
+    let validate = ribosome.run_validate_create_link(access, invocation)?;
     match validate {
         ValidateLinkAddResult::Valid => Ok(Outcome::Accepted),
         ValidateLinkAddResult::Invalid(reason) => Ok(Outcome::Rejected(reason)),

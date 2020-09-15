@@ -35,81 +35,81 @@ impl std::fmt::Display for WrongHeaderError {
 
 impl std::error::Error for WrongHeaderError {}
 
-impl TryFrom<Header> for EntryUpdate {
+impl TryFrom<Header> for Update {
     type Error = WrongHeaderError;
     fn try_from(value: Header) -> Result<Self, Self::Error> {
         match value {
-            Header::EntryUpdate(h) => Ok(h),
+            Header::Update(h) => Ok(h),
             _ => Err(WrongHeaderError(format!("{:?}", value))),
         }
     }
 }
 
-impl<'a> TryFrom<&'a Header> for &'a EntryUpdate {
+impl<'a> TryFrom<&'a Header> for &'a Update {
     type Error = WrongHeaderError;
     fn try_from(value: &'a Header) -> Result<Self, Self::Error> {
         match value {
-            Header::EntryUpdate(h) => Ok(h),
+            Header::Update(h) => Ok(h),
             _ => Err(WrongHeaderError(format!("{:?}", value))),
         }
     }
 }
 
-impl TryFrom<Header> for ElementDelete {
+impl TryFrom<Header> for Delete {
     type Error = WrongHeaderError;
     fn try_from(value: Header) -> Result<Self, Self::Error> {
         match value {
-            Header::ElementDelete(h) => Ok(h),
+            Header::Delete(h) => Ok(h),
             _ => Err(WrongHeaderError(format!("{:?}", value))),
         }
     }
 }
 
-impl<'a> TryFrom<&'a Header> for &'a ElementDelete {
+impl<'a> TryFrom<&'a Header> for &'a Delete {
     type Error = WrongHeaderError;
     fn try_from(value: &'a Header) -> Result<Self, Self::Error> {
         match value {
-            Header::ElementDelete(h) => Ok(h),
+            Header::Delete(h) => Ok(h),
             _ => Err(WrongHeaderError(format!("{:?}", value))),
         }
     }
 }
 
-impl TryFrom<Header> for LinkAdd {
+impl TryFrom<Header> for CreateLink {
     type Error = WrongHeaderError;
     fn try_from(value: Header) -> Result<Self, Self::Error> {
         match value {
-            Header::LinkAdd(h) => Ok(h),
+            Header::CreateLink(h) => Ok(h),
             _ => Err(WrongHeaderError(format!("{:?}", value))),
         }
     }
 }
 
-impl<'a> TryFrom<&'a Header> for &'a LinkAdd {
+impl<'a> TryFrom<&'a Header> for &'a CreateLink {
     type Error = WrongHeaderError;
     fn try_from(value: &'a Header) -> Result<Self, Self::Error> {
         match value {
-            Header::LinkAdd(h) => Ok(h),
+            Header::CreateLink(h) => Ok(h),
             _ => Err(WrongHeaderError(format!("{:?}", value))),
         }
     }
 }
 
-impl TryFrom<Header> for LinkRemove {
+impl TryFrom<Header> for DeleteLink {
     type Error = WrongHeaderError;
     fn try_from(value: Header) -> Result<Self, Self::Error> {
         match value {
-            Header::LinkRemove(h) => Ok(h),
+            Header::DeleteLink(h) => Ok(h),
             _ => Err(WrongHeaderError(format!("{:?}", value))),
         }
     }
 }
 
-impl<'a> TryFrom<&'a Header> for &'a LinkRemove {
+impl<'a> TryFrom<&'a Header> for &'a DeleteLink {
     type Error = WrongHeaderError;
     fn try_from(value: &'a Header) -> Result<Self, Self::Error> {
         match value {
-            Header::LinkRemove(h) => Ok(h),
+            Header::DeleteLink(h) => Ok(h),
             _ => Err(WrongHeaderError(format!("{:?}", value))),
         }
     }

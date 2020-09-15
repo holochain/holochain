@@ -1,4 +1,4 @@
-use crate::zome_io::GuestOutput;
+use crate::zome_io::ExternOutput;
 use crate::CallbackResult;
 use holo_hash::EntryHash;
 use holochain_serialized_bytes::prelude::*;
@@ -10,8 +10,8 @@ pub enum InitCallbackResult {
     UnresolvedDependencies(Vec<EntryHash>),
 }
 
-impl From<GuestOutput> for InitCallbackResult {
-    fn from(callback_guest_output: GuestOutput) -> Self {
+impl From<ExternOutput> for InitCallbackResult {
+    fn from(callback_guest_output: ExternOutput) -> Self {
         match callback_guest_output.into_inner().try_into() {
             Ok(v) => v,
             Err(e) => Self::Fail(format!("{:?}", e)),

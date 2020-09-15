@@ -33,7 +33,7 @@ use holochain_types::{
     validate::ValidationStatus, Entry, Timestamp,
 };
 use holochain_zome_types::{
-    header::{ElementDelete, EntryType, EntryUpdate, LinkAdd, LinkRemove},
+    header::{CreateLink, Delete, DeleteLink, EntryType, Update},
     Header,
 };
 use std::{collections::BinaryHeap, convert::TryInto};
@@ -232,7 +232,7 @@ fn handle_failed(error: ValidationOutcome) -> Outcome {
         ValidationOutcome::EntryType => Rejected,
         ValidationOutcome::EntryVisibility(_) => Rejected,
         ValidationOutcome::TagTooLarge(_, _) => Rejected,
-        ValidationOutcome::NotLinkAdd(_) => Rejected,
+        ValidationOutcome::NotCreateLink(_) => Rejected,
         ValidationOutcome::NotNewEntry(_) => Rejected,
         ValidationOutcome::NotHoldingDep(dep) => AwaitingOpDep(dep),
         ValidationOutcome::PrevHeaderError(PrevHeaderError::MissingMeta(dep)) => {
@@ -333,7 +333,7 @@ async fn validate_op_inner(
             Ok(())
         }
         DhtOp::RegisterRemoveLink(signature, header) => {
-            register_remove_link(header, workspace, network, dependencies, check_level).await?;
+            register_delete_link(header, workspace, network, dependencies, check_level).await?;
 
             let header = header.clone().into();
             all_op_check(signature, &header).await?;
@@ -418,7 +418,7 @@ async fn store_entry(
     check_entry_hash(entry_hash, entry).await?;
     check_entry_size(entry)?;
 
-    // Additional checks if this is an EntryUpdate
+    // Additional checks if this is an Update
     if let NewEntryHeaderRef::Update(entry_update) = header {
         let dependency = check_header_exists(
             entry_update.original_header_address.clone(),
@@ -433,7 +433,7 @@ async fn store_entry(
 }
 
 async fn register_updated_by(
-    entry_update: &EntryUpdate,
+    entry_update: &Update,
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
     dependencies: &mut PendingDependencies,
@@ -459,14 +459,14 @@ async fn register_updated_by(
 }
 
 async fn register_deleted_by(
-    element_delete: &ElementDelete,
+    element_delete: &Delete,
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
     dependencies: &mut PendingDependencies,
     check_level: CheckLevel,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
-    let removed_header_address = &element_delete.removes_address;
+    let removed_header_address = &element_delete.deletes_address;
 
     // Checks
     let dependency =
@@ -479,14 +479,14 @@ async fn register_deleted_by(
 }
 
 async fn register_deleted_entry_header(
-    element_delete: &ElementDelete,
+    element_delete: &Delete,
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
     dependencies: &mut PendingDependencies,
     check_level: CheckLevel,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
-    let removed_header_address = &element_delete.removes_address;
+    let removed_header_address = &element_delete.deletes_address;
 
     // Checks
     let dependency =
@@ -497,7 +497,7 @@ async fn register_deleted_entry_header(
 }
 
 async fn register_add_link(
-    link_add: &LinkAdd,
+    link_add: &CreateLink,
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
     dependencies: &mut PendingDependencies,
@@ -522,8 +522,8 @@ async fn register_add_link(
     Ok(())
 }
 
-async fn register_remove_link(
-    link_remove: &LinkRemove,
+async fn register_delete_link(
+    link_remove: &DeleteLink,
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
     dependencies: &mut PendingDependencies,
@@ -541,7 +541,7 @@ async fn register_remove_link(
     Ok(())
 }
 
-fn update_check(entry_update: &EntryUpdate, original_header: &Header) -> SysValidationResult<()> {
+fn update_check(entry_update: &Update, original_header: &Header) -> SysValidationResult<()> {
     check_new_entry_header(original_header)?;
     let original_header: NewEntryHeaderRef = original_header
         .try_into()

@@ -8,7 +8,7 @@ macro_rules! guest_functions {
             #[no_mangle]
             pub extern "C" fn $guest_fn(host_allocation_ptr: GuestPtr) -> GuestPtr {
                 let input = {
-                    let v: HostInput = host_args!(host_allocation_ptr);
+                    let v: ExternInput = host_args!(host_allocation_ptr);
                     let deserialized = <$input_type>::try_from(v.into_inner());
                     try_result!(deserialized, "failed to deserialize host inputs")
                 };
@@ -23,7 +23,7 @@ macro_rules! guest_functions {
                     output.try_into(),
                     "failed to serialize output for extern response"
                 );
-                ret!(GuestOutput::new(output_sb));
+                ret!(ExternOutput::new(output_sb));
             }
         )*
     }
@@ -36,23 +36,23 @@ guest_functions!(
     [__capability_claims, capability_claims, CapabilityClaimsInput, CapabilityClaimsOutput],
     [__capability_grants, capability_grants, CapabilityGrantsInput, CapabilityGrantsOutput],
     [__capability_info, capability_info, CapabilityInfoInput, CapabilityInfoOutput],
-    [
-        __commit_entry,
-        commit_entry,
-        CommitEntryInput,
-        CommitEntryOutput
-    ],
+    // [
+    //     __create,
+    //     commit_entry,
+    //     CreateInput,
+    //     CreateOutput
+    // ],
     [__decrypt, decrypt, DecryptInput, DecryptOutput],
     [__encrypt, encrypt, EncryptInput, EncryptOutput],
     [__show_env, show_env, ShowEnvInput, ShowEnvOutput],
     [__property, property, PropertyInput, PropertyOutput],
     [__query, query, QueryInput, QueryOutput],
-    [
-        __remove_link,
-        remove_link,
-        RemoveLinkInput,
-        RemoveLinkOutput
-    ],
+    // [
+    //     __delete_link,
+    //     delete_link,
+    //     DeleteLinkInput,
+    //     DeleteLinkOutput
+    // ],
     [
         __random_bytes,
         random_bytes,
@@ -61,34 +61,34 @@ guest_functions!(
     ],
     [__sign, sign, SignInput, SignOutput],
     [__schedule, schedule, ScheduleInput, ScheduleOutput],
-    [
-        __update_entry,
-        update_entry,
-        UpdateEntryInput,
-        UpdateEntryOutput
-    ],
+    // [
+    //     __update,
+    //     update_entry,
+    //     UpdateInput,
+    //     UpdateOutput
+    // ],
     [
         __emit_signal,
         emit_signal,
         EmitSignalInput,
         EmitSignalOutput
     ],
-    [
-        __delete_entry,
-        delete_entry,
-        DeleteEntryInput,
-        DeleteEntryOutput
-    ],
-    [
-        __link_entries,
-        link_entries,
-        LinkEntriesInput,
-        LinkEntriesOutput
-    ],
+    // [
+    //     __delete,
+    //     delete_entry,
+    //     DeleteInput,
+    //     DeleteOutput
+    // ],
+    // [
+    //     __create_link,
+    //     create_link,
+    //     CreateLinkInput,
+    //     CreateLinkOutput
+    // ],
     [__keystore, keystore, KeystoreInput, KeystoreOutput],
     [__get_links, get_links, GetLinksInput, GetLinksOutput],
     [__get, get, GetInput, GetOutput],
-    [__entry_hash, entry_hash, EntryHashInput, EntryHashOutput],
+    // [__hash_entry, entry_hash, HashEntryInput, HashEntryOutput],
     [__sys_time, sys_time, SysTimeInput, SysTimeOutput],
     [__debug, debug, DebugInput, DebugOutput],
     [

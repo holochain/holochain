@@ -37,15 +37,15 @@ use holochain_zome_types::entry_def::EntryVisibility;
 use holochain_zome_types::entry_def::RequiredValidations;
 use holochain_zome_types::header::AgentValidationPkg;
 use holochain_zome_types::header::AppEntryType;
-use holochain_zome_types::header::ChainClose;
-use holochain_zome_types::header::ChainOpen;
+use holochain_zome_types::header::CloseChain;
+use holochain_zome_types::header::Create;
+use holochain_zome_types::header::Delete;
 use holochain_zome_types::header::Dna;
-use holochain_zome_types::header::ElementDelete;
-use holochain_zome_types::header::EntryCreate;
 use holochain_zome_types::header::EntryType;
-use holochain_zome_types::header::EntryUpdate;
 use holochain_zome_types::header::Header;
 use holochain_zome_types::header::InitZomesComplete;
+use holochain_zome_types::header::OpenChain;
+use holochain_zome_types::header::Update;
 use holochain_zome_types::header::ZomeId;
 use holochain_zome_types::migrate_agent::MigrateAgent;
 use holochain_zome_types::zome::FunctionName;
@@ -285,7 +285,7 @@ fixturator!(
 
 fixturator!(
     CapGrant;
-    variants [ Authorship(AgentPubKey) ZomeCall(ZomeCallCapGrant) ];
+    variants [ ChainAuthor(AgentPubKey) RemoteAgent(ZomeCallCapGrant) ];
 );
 
 fn element_with_no_entry(signature: Signature, header: Header) -> Element {
@@ -511,50 +511,50 @@ fixturator!(
 );
 
 fixturator!(
-    ChainOpen;
+    OpenChain;
     constructor fn from_builder(HeaderBuilderCommon, DnaHash);
 );
 
 fixturator!(
-    ChainClose;
+    CloseChain;
     constructor fn from_builder(HeaderBuilderCommon, DnaHash);
 );
 
 fixturator!(
-    EntryCreate;
+    Create;
     constructor fn from_builder(HeaderBuilderCommon, EntryType, EntryHash);
 
     curve PublicCurve {
-        let mut ec = fixt!(EntryCreate);
+        let mut ec = fixt!(Create);
         ec.entry_type = fixt!(EntryType, PublicCurve);
         ec
     };
     curve EntryType {
-        let mut ec = EntryCreateFixturator::new_indexed(Unpredictable, self.0.index).next().unwrap();
+        let mut ec = CreateFixturator::new_indexed(Unpredictable, self.0.index).next().unwrap();
         ec.entry_type = self.0.curve.clone();
         ec
     };
 );
 
 fixturator!(
-    EntryUpdate;
+    Update;
     constructor fn from_builder(HeaderBuilderCommon, EntryHash, HeaderHash, EntryType, EntryHash);
 
     curve PublicCurve {
-        let mut eu = fixt!(EntryUpdate);
+        let mut eu = fixt!(Update);
         eu.entry_type = fixt!(EntryType, PublicCurve);
         eu
     };
 
     curve EntryType {
-        let mut eu = EntryUpdateFixturator::new_indexed(Unpredictable, self.0.index).next().unwrap();
+        let mut eu = UpdateFixturator::new_indexed(Unpredictable, self.0.index).next().unwrap();
         eu.entry_type = self.0.curve.clone();
         eu
     };
 );
 
 fixturator!(
-    ElementDelete;
+    Delete;
     constructor fn from_builder(HeaderBuilderCommon, HeaderHash, EntryHash);
 );
 
@@ -564,19 +564,19 @@ fixturator!(
         Dna(Dna)
         AgentValidationPkg(AgentValidationPkg)
         InitZomesComplete(InitZomesComplete)
-        LinkAdd(LinkAdd)
-        LinkRemove(LinkRemove)
-        ChainOpen(ChainOpen)
-        ChainClose(ChainClose)
-        EntryCreate(EntryCreate)
-        EntryUpdate(EntryUpdate)
-        ElementDelete(ElementDelete)
+        CreateLink(CreateLink)
+        DeleteLink(DeleteLink)
+        OpenChain(OpenChain)
+        CloseChain(CloseChain)
+        Create(Create)
+        Update(Update)
+        Delete(Delete)
     ];
 
     curve PublicCurve {
         match fixt!(Header) {
-            Header::EntryCreate(_) => Header::EntryCreate(fixt!(EntryCreate, PublicCurve)),
-            Header::EntryUpdate(_) => Header::EntryUpdate(fixt!(EntryUpdate, PublicCurve)),
+            Header::Create(_) => Header::Create(fixt!(Create, PublicCurve)),
+            Header::Update(_) => Header::Update(fixt!(Update, PublicCurve)),
             other_type => other_type,
         }
     };
@@ -585,26 +585,26 @@ fixturator!(
 fixturator!(
     NewEntryHeader;
     variants [
-        Create(EntryCreate)
-        Update(EntryUpdate)
+        Create(Create)
+        Update(Update)
     ];
 
 
     curve PublicCurve {
         match fixt!(NewEntryHeader) {
-            NewEntryHeader::Create(_) => NewEntryHeader::Create(fixt!(EntryCreate, PublicCurve)),
-            NewEntryHeader::Update(_) => NewEntryHeader::Update(fixt!(EntryUpdate, PublicCurve)),
+            NewEntryHeader::Create(_) => NewEntryHeader::Create(fixt!(Create, PublicCurve)),
+            NewEntryHeader::Update(_) => NewEntryHeader::Update(fixt!(Update, PublicCurve)),
         }
     };
 
     curve EntryType {
         match fixt!(NewEntryHeader) {
             NewEntryHeader::Create(_) => {
-                let ec = EntryCreateFixturator::new_indexed(self.0.curve.clone(), self.0.index).next().unwrap();
+                let ec = CreateFixturator::new_indexed(self.0.curve.clone(), self.0.index).next().unwrap();
                 NewEntryHeader::Create(ec)
             },
             NewEntryHeader::Update(_) => {
-                let eu = EntryUpdateFixturator::new_indexed(self.0.curve.clone(), self.0.index).next().unwrap();
+                let eu = UpdateFixturator::new_indexed(self.0.curve.clone(), self.0.index).next().unwrap();
                 NewEntryHeader::Update(eu)
             },
         }

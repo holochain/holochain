@@ -83,7 +83,7 @@ fn validate(element: Element) -> ExternResult<ValidateCallbackResult> {
 }
 
 fn _commit_validate(to_commit: ThisWasmEntry) -> ExternResult<HeaderHash> {
-    Ok(commit_entry!(&to_commit)?)
+    Ok(create_entry!(&to_commit)?)
 }
 
 #[hdk_extern]

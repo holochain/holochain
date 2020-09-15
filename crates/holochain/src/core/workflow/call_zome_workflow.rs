@@ -24,7 +24,7 @@ use holochain_state::prelude::*;
 use holochain_types::element::Element;
 use holochain_zome_types::entry::GetOptions;
 use holochain_zome_types::header::Header;
-use holochain_zome_types::ZomeCallInvocationResponse;
+use holochain_zome_types::ZomeCallResponse;
 use std::sync::Arc;
 use tracing::instrument;
 
@@ -32,7 +32,7 @@ pub mod call_zome_workspace_lock;
 
 /// Placeholder for the return value of a zome invocation
 /// TODO: do we want this to be the same as ZomeCallInvocationRESPONSE?
-pub type ZomeCallInvocationResult = RibosomeResult<ZomeCallInvocationResponse>;
+pub type ZomeCallInvocationResult = RibosomeResult<ZomeCallResponse>;
 
 #[derive(Debug)]
 pub struct CallZomeWorkflowArgs<Ribosome: RibosomeT> {
@@ -146,7 +146,7 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT>(
 
     {
         for chain_element in to_app_validate {
-            if let Header::LinkAdd(link_add) = chain_element.header() {
+            if let Header::CreateLink(link_add) = chain_element.header() {
                 let (base, target) = {
                     let mut workspace = workspace_lock.write().await;
                     let mut cascade = workspace.cascade(network.clone());
@@ -185,7 +185,7 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT>(
                 match outcome {
                     app_validation_workflow::Outcome::Accepted => (),
                     app_validation_workflow::Outcome::Rejected(reason) => {
-                        return Err(SourceChainError::InvalidLinkAdd(reason).into());
+                        return Err(SourceChainError::InvalidCreateLink(reason).into());
                     }
                     app_validation_workflow::Outcome::AwaitingDeps(hashes) => {
                         return Err(SourceChainError::InvalidCommit(format!("{:?}", hashes)).into());
@@ -301,8 +301,8 @@ pub mod tests {
     use holochain_types::{observability, test_utils::fake_agent_pubkey_1};
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::entry::Entry;
-    use holochain_zome_types::GuestOutput;
-    use holochain_zome_types::HostInput;
+    use holochain_zome_types::ExternInput;
+    use holochain_zome_types::ExternOutput;
     use matches::assert_matches;
 
     #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
@@ -346,7 +346,7 @@ pub mod tests {
                     .unwrap(),
                 TestWasm::Foo.into(),
                 "fun_times".into(),
-                HostInput::new(Payload { a: 1 }.try_into().unwrap()),
+                ExternInput::new(Payload { a: 1 }.try_into().unwrap()),
             ),
         )
         .next()
@@ -410,7 +410,7 @@ pub mod tests {
             .expect_call_zome_function()
             .returning(move |_workspace, _invocation| {
                 let x = SerializedBytes::try_from(Payload { a: 3 }).unwrap();
-                Ok(ZomeCallInvocationResponse::ZomeApiFn(GuestOutput::new(x)))
+                Ok(ZomeCallResponse::Ok(ExternOutput::new(x)))
             });
 
         let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(
@@ -420,7 +420,7 @@ pub mod tests {
                     .unwrap(),
                 TestWasm::Foo.into(),
                 "fun_times".into(),
-                HostInput::new(Payload { a: 1 }.try_into().unwrap()),
+                ExternInput::new(Payload { a: 1 }.try_into().unwrap()),
             ),
         )
         .next()
@@ -457,7 +457,7 @@ pub mod tests {
                     .unwrap(),
                 TestWasm::Foo.into(),
                 "fun_times".into(),
-                HostInput::new(Payload { a: 1 }.try_into().unwrap()),
+                ExternInput::new(Payload { a: 1 }.try_into().unwrap()),
             ),
         )
         .next()
@@ -488,7 +488,7 @@ pub mod tests {
                     .unwrap(),
                 TestWasm::Foo.into(),
                 "fun_times".into(),
-                HostInput::new(Payload { a: 1 }.try_into().unwrap()),
+                ExternInput::new(Payload { a: 1 }.try_into().unwrap()),
             ),
         )
         .next()
