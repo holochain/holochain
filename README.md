@@ -11,11 +11,6 @@ This repository contains most of the core Holochain libraries and binaries.
 
 **Code Status:** This code is in alpha. It is not for production use. The code is guaranteed NOT secure. Also, We will likely be restructuring code APIs and data chains until Beta.
 
-## Overview
-
-// TODO: remove or add the correct link?
-[Holochain Implementation Architectural Overview](./docs/TODO.md)
-
 ## Development Environment
 
 Assuming you have [installed the nix shell](https://nixos.wiki/wiki/Nix_Installation_Guide):
