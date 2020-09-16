@@ -281,6 +281,7 @@ pub mod wasm_test {
     }
 
     #[tokio::test(threaded_scheduler)]
+    #[ignore] // david.b (this test is flakey)
     async fn multiple_create_entry_limit_test() {
         observability::test_run().unwrap();
         let dna_file = DnaFile::new(
