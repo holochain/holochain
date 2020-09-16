@@ -390,7 +390,7 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn can_write_private_entry_when_enabled() -> anyhow::Result<()> {
-        let keystore = spawn_test_keystore(Vec::new()).await?;
+        let keystore = spawn_test_keystore().await?;
         let test_env = test_cell_env();
         let arc = test_env.env();
         let env = arc.guard();
@@ -437,7 +437,7 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn cannot_write_private_entry_when_disabled() -> anyhow::Result<()> {
-        let keystore = spawn_test_keystore(Vec::new()).await?;
+        let keystore = spawn_test_keystore().await?;
         let test_env = test_cell_env();
         let arc = test_env.env();
         let env = arc.guard();

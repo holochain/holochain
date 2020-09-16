@@ -74,7 +74,7 @@ fn try_cap_claim(cap_for: CapFor) -> ExternResult<ZomeCallResponse> {
         cap_for.1,
         zome_info!()?.zome_name,
         "needs_cap_claim".to_string().into(),
-        cap_for.0,
+        Some(cap_for.0),
         ().try_into()?
     )?;
 
@@ -103,7 +103,7 @@ fn send_assigned_cap_claim(agent: AgentPubKey) -> ExternResult<()> {
         agent,
         this_zome,
         "accept_cap_claim".into(),
-        ().into(),
+        None,
         CapClaim::new(tag, agent_info!()?.agent_latest_pubkey, secret,).try_into()?
     )?;
     Ok(())

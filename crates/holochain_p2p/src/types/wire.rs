@@ -25,7 +25,7 @@ pub(crate) enum WireMessage {
     CallRemote {
         zome_name: ZomeName,
         fn_name: FunctionName,
-        cap: CapSecret,
+        cap: Option<CapSecret>,
         #[serde(with = "serde_bytes")]
         data: Vec<u8>,
     },
@@ -65,7 +65,7 @@ impl WireMessage {
     pub fn call_remote(
         zome_name: ZomeName,
         fn_name: FunctionName,
-        cap: CapSecret,
+        cap: Option<CapSecret>,
         request: SerializedBytes,
     ) -> WireMessage {
         Self::CallRemote {

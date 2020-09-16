@@ -17,30 +17,35 @@ pub mod dht_arc;
 pub mod transport {
     /// Error related to remote communication.
     #[derive(Debug, thiserror::Error)]
+    #[non_exhaustive]
     pub enum TransportError {
-        /// GhostError
+        /// GhostError.
         #[error(transparent)]
         GhostError(#[from] ghost_actor::GhostError),
 
-        /// Custom
-        #[error("Custom: {0}")]
-        Custom(Box<dyn std::error::Error + Send + Sync>),
-
-        /// Other
-        #[error("Other: {0}")]
-        Other(String),
+        /// Unspecified error.
+        #[error(transparent)]
+        Other(Box<dyn std::error::Error + Send + Sync>),
     }
 
     impl TransportError {
         /// promote a custom error type to a TransportError
-        pub fn custom(e: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> Self {
-            Self::Custom(e.into())
+        pub fn other(e: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> Self {
+            Self::Other(e.into())
         }
     }
 
     impl From<String> for TransportError {
         fn from(s: String) -> Self {
-            Self::Other(s)
+            #[derive(Debug, thiserror::Error)]
+            struct OtherError(String);
+            impl std::fmt::Display for OtherError {
+                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    write!(f, "{}", self.0)
+                }
+            }
+
+            TransportError::other(OtherError(s))
         }
     }
 
@@ -48,6 +53,10 @@ pub mod transport {
         fn from(s: &str) -> Self {
             s.to_string().into()
         }
+    }
+
+    impl From<TransportError> for () {
+        fn from(_: TransportError) {}
     }
 
     /// Result type for remote communication.
