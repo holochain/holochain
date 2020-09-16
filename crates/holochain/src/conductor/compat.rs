@@ -186,9 +186,7 @@ fn extract_app_interfaces(
 pub mod tests {
 
     use super::*;
-    use crate::conductor::{
-        handle::mock::MockConductorHandle, paths::EnvironmentRootPath, Conductor,
-    };
+    use crate::conductor::{handle::MockConductorHandleT, paths::EnvironmentRootPath, Conductor};
     use holochain_types::{app::MembraneProof, test_utils::fake_dna_zomes};
     use holochain_wasm_test_utils::TestWasm;
     use matches::assert_matches;
@@ -347,7 +345,7 @@ pub mod tests {
             .await
             .unwrap();
 
-        let mut handle = MockConductorHandle::new();
+        let mut handle = MockConductorHandleT::new();
         handle
             .expect_sync_install_dna()
             .with(predicate::eq(dna1.clone()))

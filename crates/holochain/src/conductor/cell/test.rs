@@ -29,7 +29,7 @@ async fn test_cell_handle_publish() {
 
     let holochain_p2p_cell = holochain_p2p.to_cell(dna.clone(), agent.clone());
 
-    let mut mock_handler = crate::conductor::handle::mock::MockConductorHandle::new();
+    let mut mock_handler = crate::conductor::handle::MockConductorHandleT::new();
     mock_handler
         .expect_sync_get_dna()
         .returning(|_| Some(fixt!(DnaFile)));
