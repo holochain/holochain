@@ -1,5 +1,7 @@
 use crate::{
     buffer::BufferedStore,
+    db_fixture::DbFixture,
+    db_fixture::LoadDbFixture,
     error::{DatabaseError, DatabaseResult},
     prelude::*,
 };
@@ -279,6 +281,48 @@ where
                 }
             }
         }
+
         Ok(())
+    }
+}
+
+impl<K, V> LoadDbFixture for KvvBufUsed<K, V>
+where
+    K: Clone + BufKey + Debug,
+    V: BufMultiVal + Ord + Debug,
+{
+    type FixtureItem = (K, V);
+
+    fn write_test_datum(&mut self, datum: Self::FixtureItem) {
+        let (k, v) = datum;
+        self.insert(k, v);
+    }
+
+    fn read_test_data<R: Readable>(&self, _: &R) -> DbFixture<Self::FixtureItem> {
+        unimplemented!("Must use read_test_data_mut for KvvBuf")
+    }
+
+    fn read_test_data_mut(&mut self, writer: &mut Writer) -> DbFixture<Self::FixtureItem> {
+        use rkv::Cursor;
+        use rkv::Readable;
+
+        // Flush
+        self.flush_to_txn_ref(writer)
+            .expect("Couldn't flush scratch");
+
+        // Get kv pairs from DB
+        let mut cursor = writer
+            .open_ro_cursor(self.db.db)
+            .expect("Couldn't open cursor");
+        cursor
+            .iter_start()
+            .map(|result| {
+                let (k, v) = result.expect("Error while iterating");
+                let key = K::from_key_bytes_or_friendly_panic(k);
+                let val = holochain_serialized_bytes::decode(v)
+                    .expect("Couldn't deserialize fixture data in KvvBuf");
+                (key, val)
+            })
+            .collect()
     }
 }

@@ -20,5 +20,5 @@ tokio = { version = "0.2", features = [ "full" ] }
 
 [patch.crates-io]
 
-rkv = { git = "https://github.com/holochain/rkv.git", branch = "master" }
+rkv = { git = "https://github.com/holochain/rkv.git", branch = "public-db" }
 lmdb-rkv = { git = "https://github.com/holochain/lmdb-rs.git" }

@@ -482,3 +482,9 @@ async fn check_entry_not_private_test() {
         ))
     );
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// fixture-based tests
+
+#[tokio::test(threaded_scheduler)]
+async fn check_entry_exists_test() {}
