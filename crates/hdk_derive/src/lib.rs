@@ -166,6 +166,22 @@ pub fn hdk_extern(_attrs: TokenStream, item: TokenStream) -> TokenStream {
 
     // build a new internal fn ident that is compatible with map_extern!
     // this needs to be sufficiently unlikely to have namespace collisions with other fns
+    //
+    // @todo can we do this by wrapping the external facing extern in an inner module with the
+    // crazy name rather than the function itself getting a weird name??
+    // e.g. something like this:
+    // ```rust
+    // pub fn foo ( .. ) -> ExternResult< .. > {
+    //  // .. do stuff
+    // }
+    // pub mod foo_hdk_extern_mod {
+    // // does the no_mangle + extern hoist this out of the mod scope from the host's perspective?
+    //  #[no_mangle]
+    //  pub extern "C" foo (ptr: GuestPtr) -> GuestPtr {
+    //   // .. boilerplate
+    //  }
+    // }
+    // ```
     let internal_fn_ident = syn::Ident::new(
         &format!("{}_hdk_extern", external_fn_ident.to_string()),
         item_fn.sig.ident.span(),

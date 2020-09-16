@@ -8,7 +8,7 @@ use holochain::core::ribosome::RibosomeT;
 use holochain::core::ribosome::ZomeCallInvocation;
 use holochain_types::fixt::CapSecretFixturator;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::HostInput;
+use holochain_zome_types::ExternInput;
 
 pub fn wasm_call_n(c: &mut Criterion) {
     let mut group = c.benchmark_group("wasm_call_n");
@@ -51,17 +51,12 @@ pub fn wasm_call_n(c: &mut Criterion) {
                             zome_name: TestWasm::Bench.into(),
                             cap: Some(cap.clone()),
                             fn_name: "echo_bytes".into(),
-                            payload: HostInput::new(sb.clone()),
+                            payload: ExternInput::new(sb.clone()),
                             provenance: agent_key.clone(),
                         };
                         ribosome
                             .clone()
-                            .maybe_call(
-                                ha.clone().into(),
-                                &i,
-                                &i.zome_name.clone(),
-                                i.fn_name.clone(),
-                            )
+                            .maybe_call(ha.clone().into(), &i, &i.zome_name, &i.fn_name)
                             .unwrap();
                     });
                 });

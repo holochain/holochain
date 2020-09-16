@@ -2,9 +2,9 @@ use super::error::{WorkflowError, WorkflowResult};
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 use crate::core::ribosome::guest_callback::validate::{ValidateHostAccess, ValidateResult};
-use crate::core::ribosome::guest_callback::validate_link_add::ValidateLinkAddHostAccess;
-use crate::core::ribosome::guest_callback::validate_link_add::ValidateLinkAddInvocation;
-use crate::core::ribosome::guest_callback::validate_link_add::ValidateLinkAddResult;
+use crate::core::ribosome::guest_callback::validate_link_add::ValidateCreateLinkHostAccess;
+use crate::core::ribosome::guest_callback::validate_link_add::ValidateCreateLinkInvocation;
+use crate::core::ribosome::guest_callback::validate_link_add::ValidateCreateLinkResult;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::ribosome::{error::RibosomeResult, RibosomeT, ZomeCallHostAccess};
 use crate::core::state::source_chain::SourceChainError;
@@ -26,7 +26,7 @@ use holochain_state::prelude::*;
 use holochain_types::element::Element;
 use holochain_zome_types::entry::GetOptions;
 use holochain_zome_types::header::Header;
-use holochain_zome_types::ZomeCallInvocationResponse;
+use holochain_zome_types::ZomeCallResponse;
 use std::sync::Arc;
 use tracing::instrument;
 
@@ -34,7 +34,7 @@ pub mod call_zome_workspace_lock;
 
 /// Placeholder for the return value of a zome invocation
 /// TODO: do we want this to be the same as ZomeCallInvocationRESPONSE?
-pub type ZomeCallInvocationResult = RibosomeResult<ZomeCallInvocationResponse>;
+pub type ZomeCallInvocationResult = RibosomeResult<ZomeCallResponse>;
 
 #[derive(Debug)]
 pub struct CallZomeWorkflowArgs<Ribosome: RibosomeT> {
@@ -151,10 +151,10 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT>(
         let mut cascade = workspace.cascade(network);
         for chain_element in to_app_validate {
             // @todo have app validate in its own workflow
-            if let Header::LinkAdd(link_add) = chain_element.header() {
-                let validate: ValidateLinkAddResult = ribosome.run_validate_link_add(
-                    ValidateLinkAddHostAccess,
-                    ValidateLinkAddInvocation {
+            if let Header::CreateLink(link_add) = chain_element.header() {
+                let validate: ValidateCreateLinkResult = ribosome.run_validate_link_add(
+                    ValidateCreateLinkHostAccess,
+                    ValidateCreateLinkInvocation {
                         zome_name: zome_name.clone(),
                         base: Arc::new({
                             let base_address: AnyDhtHash = link_add.base_address.clone().into();
@@ -186,9 +186,9 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT>(
                     },
                 )?;
                 match validate {
-                    ValidateLinkAddResult::Valid => {}
-                    ValidateLinkAddResult::Invalid(reason) => {
-                        return Err(SourceChainError::InvalidLinkAdd(reason).into());
+                    ValidateCreateLinkResult::Valid => {}
+                    ValidateCreateLinkResult::Invalid(reason) => {
+                        return Err(SourceChainError::InvalidCreateLink(reason).into());
                     }
                 }
             }
@@ -283,8 +283,8 @@ pub mod tests {
     use holochain_types::{observability, test_utils::fake_agent_pubkey_1};
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::entry::Entry;
-    use holochain_zome_types::GuestOutput;
-    use holochain_zome_types::HostInput;
+    use holochain_zome_types::ExternInput;
+    use holochain_zome_types::ExternOutput;
     use matches::assert_matches;
 
     #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
@@ -328,7 +328,7 @@ pub mod tests {
                     .unwrap(),
                 TestWasm::Foo.into(),
                 "fun_times".into(),
-                HostInput::new(Payload { a: 1 }.try_into().unwrap()),
+                ExternInput::new(Payload { a: 1 }.try_into().unwrap()),
             ),
         )
         .next()
@@ -392,7 +392,7 @@ pub mod tests {
             .expect_call_zome_function()
             .returning(move |_workspace, _invocation| {
                 let x = SerializedBytes::try_from(Payload { a: 3 }).unwrap();
-                Ok(ZomeCallInvocationResponse::ZomeApiFn(GuestOutput::new(x)))
+                Ok(ZomeCallResponse::Ok(ExternOutput::new(x)))
             });
 
         let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(
@@ -402,7 +402,7 @@ pub mod tests {
                     .unwrap(),
                 TestWasm::Foo.into(),
                 "fun_times".into(),
-                HostInput::new(Payload { a: 1 }.try_into().unwrap()),
+                ExternInput::new(Payload { a: 1 }.try_into().unwrap()),
             ),
         )
         .next()
@@ -439,7 +439,7 @@ pub mod tests {
                     .unwrap(),
                 TestWasm::Foo.into(),
                 "fun_times".into(),
-                HostInput::new(Payload { a: 1 }.try_into().unwrap()),
+                ExternInput::new(Payload { a: 1 }.try_into().unwrap()),
             ),
         )
         .next()
@@ -470,7 +470,7 @@ pub mod tests {
                     .unwrap(),
                 TestWasm::Foo.into(),
                 "fun_times".into(),
-                HostInput::new(Payload { a: 1 }.try_into().unwrap()),
+                ExternInput::new(Payload { a: 1 }.try_into().unwrap()),
             ),
         )
         .next()

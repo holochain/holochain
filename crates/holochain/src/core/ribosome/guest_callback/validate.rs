@@ -9,7 +9,7 @@ use holochain_types::dna::zome::HostFnAccess;
 use holochain_zome_types::entry::Entry;
 use holochain_zome_types::validate::ValidateCallbackResult;
 use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::HostInput;
+use holochain_zome_types::ExternInput;
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -66,12 +66,12 @@ impl Invocation for ValidateInvocation {
         ]
         .into()
     }
-    fn host_input(self) -> Result<HostInput, SerializedBytesError> {
-        Ok(HostInput::new((&*self.entry).try_into()?))
+    fn host_input(self) -> Result<ExternInput, SerializedBytesError> {
+        Ok(ExternInput::new((&*self.entry).try_into()?))
     }
 }
 
-impl TryFrom<ValidateInvocation> for HostInput {
+impl TryFrom<ValidateInvocation> for ExternInput {
     type Error = SerializedBytesError;
     fn try_from(validate_invocation: ValidateInvocation) -> Result<Self, Self::Error> {
         Ok(Self::new((&*validate_invocation.entry).try_into()?))
@@ -126,7 +126,7 @@ mod test {
     use holochain_types::{dna::zome::HostFnAccess, fixt::*};
     use holochain_zome_types::entry::Entry;
     use holochain_zome_types::validate::ValidateCallbackResult;
-    use holochain_zome_types::HostInput;
+    use holochain_zome_types::ExternInput;
     use rand::seq::SliceRandom;
     use std::sync::Arc;
 
@@ -254,7 +254,7 @@ mod test {
 
         assert_eq!(
             host_input,
-            HostInput::new(SerializedBytes::try_from(&*validate_invocation.entry).unwrap()),
+            ExternInput::new(SerializedBytes::try_from(&*validate_invocation.entry).unwrap()),
         );
     }
 }
@@ -275,7 +275,7 @@ mod slow_tests {
     use ::fixt::prelude::*;
     use holo_hash::fixt::AgentPubKeyFixturator;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::CommitEntryOutput;
+    use holochain_zome_types::CreateOutput;
     use holochain_zome_types::Entry;
     use std::sync::Arc;
 
@@ -367,7 +367,7 @@ mod slow_tests {
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock.clone();
 
-        let output: CommitEntryOutput =
+        let output: CreateOutput =
             crate::call_test_ribosome!(host_access, TestWasm::Validate, "always_validates", ());
 
         // the chain head should be the committed entry header
@@ -403,7 +403,7 @@ mod slow_tests {
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock.clone();
 
-        let output: CommitEntryOutput =
+        let output: CreateOutput =
             crate::call_test_ribosome!(host_access, TestWasm::Validate, "never_validates", ());
 
         // the chain head should be the committed entry header

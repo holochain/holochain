@@ -2,7 +2,7 @@
 
 use crate::{
     entry_def::EntryVisibility,
-    header::{conversions::WrongHeaderError, HeaderHashed, LinkAdd, LinkRemove},
+    header::{conversions::WrongHeaderError, CreateLink, DeleteLink, HeaderHashed},
     signature::Signature,
     Entry, Header,
 };
@@ -78,6 +78,10 @@ impl Element {
         }
     }
 }
+
+/// Small struct to allow the return type of `query!()` to be a vector of elements
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+pub struct ElementVec(pub Vec<Element>);
 
 /// Represents the different ways the entry_address reference within a Header
 /// can be intepreted
@@ -254,7 +258,7 @@ impl From<Element> for Option<Entry> {
     }
 }
 
-impl TryFrom<Element> for LinkAdd {
+impl TryFrom<Element> for CreateLink {
     type Error = WrongHeaderError;
     fn try_from(value: Element) -> Result<Self, Self::Error> {
         value
@@ -267,7 +271,7 @@ impl TryFrom<Element> for LinkAdd {
     }
 }
 
-impl TryFrom<Element> for LinkRemove {
+impl TryFrom<Element> for DeleteLink {
     type Error = WrongHeaderError;
     fn try_from(value: Element) -> Result<Self, Self::Error> {
         value
