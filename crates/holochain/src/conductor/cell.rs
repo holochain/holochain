@@ -620,7 +620,7 @@ impl Cell {
         from_agent: AgentPubKey,
         zome_name: ZomeName,
         fn_name: FunctionName,
-        cap: CapSecret,
+        cap: Option<CapSecret>,
         payload: SerializedBytes,
     ) -> CellResult<SerializedBytes> {
         let invocation = ZomeCallInvocation {
