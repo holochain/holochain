@@ -18,6 +18,7 @@ use holo_hash::{
     hash_type::{self, AnyDht},
     AnyDhtHash, EntryHash, HasHash, HeaderHash,
 };
+use holochain_p2p::HolochainP2pCellT;
 use holochain_p2p::{
     actor::{GetLinksOptions, GetMetaOptions, GetOptions},
     HolochainP2pCell,

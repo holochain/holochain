@@ -1250,7 +1250,7 @@ dependencies = [
  "lazy_static",
  "maplit",
  "matches",
- "mockall",
+ "mockall 0.7.2",
  "must_future",
  "nanoid",
  "num_cpus",
@@ -1324,6 +1324,7 @@ dependencies = [
 name = "holochain_p2p"
 version = "0.0.1"
 dependencies = [
+ "async-trait",
  "fixt",
  "futures",
  "ghost_actor",
@@ -1333,6 +1334,7 @@ dependencies = [
  "holochain_types",
  "holochain_zome_types",
  "kitsune_p2p",
+ "mockall 0.8.1",
  "serde",
  "serde_bytes",
  "thiserror",
@@ -1965,7 +1967,22 @@ dependencies = [
  "downcast",
  "fragile",
  "lazy_static",
- "mockall_derive",
+ "mockall_derive 0.7.2",
+ "predicates",
+ "predicates-tree",
+]
+
+[[package]]
+name = "mockall"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "68ecfc6340c5b98a9a270b56e5f43353d87ebb18d9458a9301344bc79317c563"
+dependencies = [
+ "cfg-if",
+ "downcast",
+ "fragile",
+ "lazy_static",
+ "mockall_derive 0.8.1",
  "predicates",
  "predicates-tree",
 ]
@@ -1975,6 +1992,18 @@ name = "mockall_derive"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a673cb441f78cd9af4f5919c28576a3cc325fb6b54e42f7047dacce3c718c17b"
+dependencies = [
+ "cfg-if",
+ "proc-macro2 1.0.21",
+ "quote 1.0.7",
+ "syn 1.0.41",
+]
+
+[[package]]
+name = "mockall_derive"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b873f753808fe0c3827ce76edb3ace27804966dfde3043adfac1c24d0a2559df"
 dependencies = [
  "cfg-if",
  "proc-macro2 1.0.21",
