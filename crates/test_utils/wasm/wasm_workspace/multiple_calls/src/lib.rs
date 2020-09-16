@@ -11,7 +11,7 @@ fn post() -> Post {
 
 #[hdk_extern]
 fn create_entry_multiple(_: ()) -> ExternResult<HeaderHash> {
-    for _ in 0..140 {
+    for _ in 0..14 {
         create_entry!(post())?;
     }
 
@@ -21,7 +21,7 @@ fn create_entry_multiple(_: ()) -> ExternResult<HeaderHash> {
 #[hdk_extern]
 fn get_entry_multiple(_: ()) -> ExternResult<GetOutput> {
     let address = hash_entry!(post())?;
-    for _ in 0..250 {
+    for _ in 0..25 {
         get!(address.clone())?;
     }
 
