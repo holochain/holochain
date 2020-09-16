@@ -55,11 +55,11 @@ workflows:
   # triggers:
    # - schedule:
    #    cron: "0 0 * * *"
-   filters:
-    branches:
-     only:
-      - develop
-      - master
+  filters:
+   branches:
+    only:
+     - develop
+     - master
   jobs:
    - docker-build-latest
    - docker-build-circle-build:
