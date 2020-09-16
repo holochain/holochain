@@ -27,6 +27,7 @@ with holonix.pkgs;
   shellHook = holonix.pkgs.lib.concatStrings [
    holonix.shell.shellHook
    ''
+    touch .env
     source .env
     export HC_TARGET_PREFIX=$NIX_ENV_PREFIX
     export CARGO_TARGET_DIR="$HC_TARGET_PREFIX/target"
@@ -107,7 +108,7 @@ with holonix.pkgs;
      rm -f $dir/$tarball
 
      ### fetch code to bench
-     curl -L --cacert $SSL_CERT_FILE -H "Authorization: token $token" "https://github.com/Holo-Host/holochain/archive/$ref.tar.gz" > $tarball
+     curl -L --cacert $SSL_CERT_FILE -H "Authorization: token $token" "https://github.com/holochain/holochain/archive/$ref.tar.gz" > $tarball
      tar -zxvf $tarball -C $dir
 
      ### bench code
@@ -130,7 +131,7 @@ with holonix.pkgs;
       -H "Authorization: token $token" \
       -X POST \
       -H "Accept: application/vnd.github.v3+json" \
-      https://api.github.com/repos/Holo-Host/holochain/commits/$2/comments \
+      https://api.github.com/repos/holochain/holochain/commits/$2/comments \
       -d@-
     }
 

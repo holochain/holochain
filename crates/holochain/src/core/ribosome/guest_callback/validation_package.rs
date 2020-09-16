@@ -11,7 +11,7 @@ use holochain_zome_types::header::AppEntryType;
 use holochain_zome_types::validate::ValidationPackage;
 use holochain_zome_types::validate::ValidationPackageCallbackResult;
 use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::HostInput;
+use holochain_zome_types::ExternInput;
 
 #[derive(Clone)]
 pub struct ValidationPackageInvocation {
@@ -61,12 +61,12 @@ impl Invocation for ValidationPackageInvocation {
         ]
         .into()
     }
-    fn host_input(self) -> Result<HostInput, SerializedBytesError> {
-        Ok(HostInput::new((&self.app_entry_type).try_into()?))
+    fn host_input(self) -> Result<ExternInput, SerializedBytesError> {
+        Ok(ExternInput::new((&self.app_entry_type).try_into()?))
     }
 }
 
-impl TryFrom<ValidationPackageInvocation> for HostInput {
+impl TryFrom<ValidationPackageInvocation> for ExternInput {
     type Error = SerializedBytesError;
     fn try_from(
         validation_package_invocation: ValidationPackageInvocation,
@@ -132,7 +132,7 @@ mod test {
     use holochain_types::dna::zome::HostFnAccess;
     use holochain_zome_types::validate::ValidationPackage;
     use holochain_zome_types::validate::ValidationPackageCallbackResult;
-    use holochain_zome_types::HostInput;
+    use holochain_zome_types::ExternInput;
     use rand::prelude::*;
 
     #[tokio::test(threaded_scheduler)]
@@ -239,7 +239,7 @@ mod test {
 
         assert_eq!(
             host_input,
-            HostInput::new(
+            ExternInput::new(
                 SerializedBytes::try_from(&validation_package_invocation.app_entry_type).unwrap()
             ),
         );

@@ -17,12 +17,17 @@ pub struct ChainQueryFilter {
     pub entry_type: Option<EntryType>,
     /// Filter by HeaderType
     pub header_type: Option<HeaderType>,
+    /// Include the entries in the elements
+    pub include_entries: bool,
 }
 
 impl ChainQueryFilter {
     /// Create a no-op ChainQueryFilter which returns everything
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            include_entries: false,
+            ..Self::default()
+        }
     }
 
     /// Filter on sequence range
@@ -40,6 +45,12 @@ impl ChainQueryFilter {
     /// Filter on header type
     pub fn header_type(mut self, header_type: HeaderType) -> Self {
         self.header_type = Some(header_type);
+        self
+    }
+
+    /// Include the entries in the ElementsVec that is returned
+    pub fn include_entries(mut self, include_entries: bool) -> Self {
+        self.include_entries = include_entries;
         self
     }
 
@@ -85,26 +96,26 @@ mod tests {
         let entry_type_1 = EntryType::App(fixt!(AppEntryType));
         let entry_type_2 = EntryType::AgentPubKey;
 
-        let mut h1 = fixt!(EntryCreate);
+        let mut h1 = fixt!(Create);
         h1.entry_type = entry_type_1.clone();
         h1.header_seq = 0;
 
-        let mut h2 = fixt!(EntryUpdate);
+        let mut h2 = fixt!(Update);
         h2.entry_type = entry_type_2.clone();
         h2.header_seq = 1;
 
-        let mut h3 = fixt!(LinkAdd);
+        let mut h3 = fixt!(CreateLink);
         h3.header_seq = 2;
 
-        let mut h4 = fixt!(EntryCreate);
+        let mut h4 = fixt!(Create);
         h4.entry_type = entry_type_2.clone();
         h4.header_seq = 3;
 
-        let mut h5 = fixt!(EntryUpdate);
+        let mut h5 = fixt!(Update);
         h5.entry_type = entry_type_1.clone();
         h5.header_seq = 4;
 
-        let mut h6 = fixt!(LinkAdd);
+        let mut h6 = fixt!(CreateLink);
         h6.header_seq = 5;
 
         let headers = [

@@ -20,7 +20,7 @@ commands:
 jobs:
   merge-test:
     docker:
-     - image: holochain/holochain-2020:circle.build.develop
+     - image: holochain/holochain:circle.build.develop
        auth:
         username: $DOCKER_USER
         password: $DOCKER_PASS
@@ -52,14 +52,14 @@ workflows:
   jobs:
    - merge-test
  docker-builds:
-  triggers:
-   - schedule:
-      cron: "0 0 * * *"
-      filters:
-       branches:
-        only:
-         - develop
-         - master
+  # triggers:
+   # - schedule:
+   #    cron: "0 0 * * *"
+  # filters:
+  #  branches:
+  #   only:
+  #    - develop
+  #    - master
   jobs:
    - docker-build-latest
    - docker-build-circle-build:

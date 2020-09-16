@@ -45,8 +45,8 @@ pub enum SourceChainError {
     #[error("InvalidCommit error: {0}")]
     InvalidCommit(String),
 
-    #[error("InvalidLinkAdd error: {0}")]
-    InvalidLinkAdd(String),
+    #[error("InvalidCreateLink error: {0}")]
+    InvalidCreateLink(String),
 
     #[error("KeystoreError: {0}")]
     KeystoreError(#[from] holochain_keystore::KeystoreError),
@@ -62,6 +62,10 @@ pub enum SourceChainError {
 
     #[error("Required the scratch space to be empty but contained values")]
     ScratchNotFresh,
+
+    /// Element signature doesn't validate against the header
+    #[error("Element associated with header {0} was not found on the source chain")]
+    ElementMissing(String),
 }
 
 // serde_json::Error does not implement PartialEq - why is that a requirement??
