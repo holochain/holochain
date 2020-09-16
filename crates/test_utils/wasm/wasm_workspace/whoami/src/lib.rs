@@ -31,7 +31,7 @@ fn whoarethey(agent_pubkey: AgentPubKey) -> ExternResult<AgentInfo> {
         agent_pubkey,
         zome_info!()?.zome_name,
         "whoami".to_string().into(),
-        ().into(),
+        None,
         ().try_into()?
     )?;
 

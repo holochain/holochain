@@ -49,7 +49,7 @@ pub fn wasm_call_n(c: &mut Criterion) {
                         let i = ZomeCallInvocation {
                             cell_id: cell_id.clone(),
                             zome_name: TestWasm::Bench.into(),
-                            cap: cap.clone(),
+                            cap: Some(cap.clone()),
                             fn_name: "echo_bytes".into(),
                             payload: ExternInput::new(sb.clone()),
                             provenance: agent_key.clone(),

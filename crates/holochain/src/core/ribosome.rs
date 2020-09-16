@@ -237,7 +237,7 @@ impl ZomeCallInvocation {
                 .read()
                 .await
                 .source_chain
-                .valid_cap_grant(&check_function, &check_agent, &check_secret)?;
+                .valid_cap_grant(&check_function, &check_agent, check_secret.as_ref())?;
 
             Ok(maybe_grant.is_some())
         })
@@ -266,7 +266,7 @@ pub struct ZomeCallInvocation {
     /// The name of the Zome containing the function that would be invoked
     pub zome_name: ZomeName,
     /// The capability request authorization required
-    pub cap: CapSecret,
+    pub cap: Option<CapSecret>,
     /// The name of the Zome function to call
     pub fn_name: FunctionName,
     /// The serialized data to pass an an argument to the Zome call
@@ -280,7 +280,7 @@ fixturator!(
     curve Empty ZomeCallInvocation {
         cell_id: CellIdFixturator::new(Empty).next().unwrap(),
         zome_name: ZomeNameFixturator::new(Empty).next().unwrap(),
-        cap: CapSecretFixturator::new(Empty).next().unwrap(),
+        cap: Some(CapSecretFixturator::new(Empty).next().unwrap()),
         fn_name: FunctionNameFixturator::new(Empty).next().unwrap(),
         payload: ExternInputFixturator::new(Empty).next().unwrap(),
         provenance: AgentPubKeyFixturator::new(Empty).next().unwrap(),
@@ -288,7 +288,7 @@ fixturator!(
     curve Unpredictable ZomeCallInvocation {
         cell_id: CellIdFixturator::new(Unpredictable).next().unwrap(),
         zome_name: ZomeNameFixturator::new(Unpredictable).next().unwrap(),
-        cap: CapSecretFixturator::new(Unpredictable).next().unwrap(),
+        cap: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
         fn_name: FunctionNameFixturator::new(Unpredictable).next().unwrap(),
         payload: ExternInputFixturator::new(Unpredictable).next().unwrap(),
         provenance: AgentPubKeyFixturator::new(Unpredictable).next().unwrap(),
@@ -300,9 +300,9 @@ fixturator!(
         zome_name: ZomeNameFixturator::new_indexed(Predictable, self.0.index)
             .next()
             .unwrap(),
-        cap: CapSecretFixturator::new_indexed(Predictable, self.0.index)
+        cap: Some(CapSecretFixturator::new_indexed(Predictable, self.0.index)
             .next()
-            .unwrap(),
+            .unwrap()),
         fn_name: FunctionNameFixturator::new_indexed(Predictable, self.0.index)
             .next()
             .unwrap(),
@@ -332,7 +332,7 @@ impl Iterator for ZomeCallInvocationFixturator<NamedInvocation> {
 
         // simulate a local transaction by setting the cap to empty and matching the provenance of
         // the call to the cell id
-        ret.cap = ().into();
+        ret.cap = None;
         ret.provenance = ret.cell_id.agent_pubkey().clone();
 
         Some(ret)
