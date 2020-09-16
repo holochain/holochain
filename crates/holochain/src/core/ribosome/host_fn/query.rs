@@ -1,8 +1,7 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_types::HeaderHashed;
-use holochain_zome_types::header::HeaderHashedVec;
+use holochain_zome_types::element::{Element, ElementVec};
 use holochain_zome_types::QueryInput;
 use holochain_zome_types::QueryOutput;
 use std::sync::Arc;
@@ -13,14 +12,14 @@ pub fn query(
     input: QueryInput,
 ) -> RibosomeResult<QueryOutput> {
     tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-        let hashes: Vec<HeaderHashed> = call_context
+        let elements: Vec<Element> = call_context
             .host_access
             .workspace()
             .write()
             .await
             .source_chain
             .query(input.inner_ref())?;
-        Ok(QueryOutput::new(HeaderHashedVec(hashes)))
+        Ok(QueryOutput::new(ElementVec(elements)))
     })
 }
 
@@ -73,7 +72,7 @@ pub mod slow_tests {
             TestString::from("b".to_string())
         );
 
-        let elements: HeaderHashedVec = crate::call_test_ribosome!(
+        let elements: ElementVec = crate::call_test_ribosome!(
             host_access,
             TestWasm::Query,
             "query",
