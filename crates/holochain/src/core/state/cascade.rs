@@ -58,19 +58,20 @@ mod test;
 
 pub mod error;
 
-pub struct Cascade<'a, M = MetadataBuf, C = MetadataBuf>
+pub struct Cascade<'a, Network = HolochainP2pCell, MetaVault = MetadataBuf, MetaCache = MetadataBuf>
 where
-    M: MetadataBufT,
-    C: MetadataBufT,
+    Network: HolochainP2pCellT,
+    MetaVault: MetadataBufT,
+    MetaCache: MetadataBufT,
 {
     element_vault: &'a ElementBuf,
-    meta_vault: &'a M,
+    meta_vault: &'a MetaVault,
 
     element_cache: &'a mut ElementBuf,
-    meta_cache: &'a mut C,
+    meta_cache: &'a mut MetaCache,
 
     env: EnvironmentRead,
-    network: HolochainP2pCell,
+    network: Network,
 }
 
 #[derive(Debug)]
@@ -90,19 +91,20 @@ enum Search {
 
 /// Should these functions be sync or async?
 /// Depends on how much computation, and if writes are involved
-impl<'a, M, C> Cascade<'a, M, C>
+impl<'a, Network, MetaVault, MetaCache> Cascade<'a, Network, MetaVault, MetaCache>
 where
-    C: MetadataBufT,
-    M: MetadataBufT,
+    MetaCache: MetadataBufT,
+    MetaVault: MetadataBufT,
+    Network: HolochainP2pCellT,
 {
     /// Constructs a [Cascade], taking references to all necessary databases
     pub fn new(
         env: EnvironmentRead,
         element_vault: &'a ElementBuf,
-        meta_vault: &'a M,
+        meta_vault: &'a MetaVault,
         element_cache: &'a mut ElementBuf,
-        meta_cache: &'a mut C,
-        network: HolochainP2pCell,
+        meta_cache: &'a mut MetaCache,
+        network: Network,
     ) -> Self {
         Cascade {
             env,

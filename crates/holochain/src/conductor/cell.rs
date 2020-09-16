@@ -95,14 +95,15 @@ impl PartialEq for Cell {
 /// The [Conductor] manages a collection of Cells, and will call functions
 /// on the Cell when a Conductor API method is called (either a
 /// [CellConductorApi] or an [AppInterfaceApi])
-pub struct Cell<CA = CellConductorApi>
+pub struct Cell<Api = CellConductorApi, P2pCell = holochain_p2p::HolochainP2pCell>
 where
-    CA: CellConductorApiT,
+    Api: CellConductorApiT,
+    P2pCell: holochain_p2p::HolochainP2pCellT,
 {
     id: CellId,
-    conductor_api: CA,
+    conductor_api: Api,
     env: EnvironmentWrite,
-    holochain_p2p_cell: holochain_p2p::HolochainP2pCell,
+    holochain_p2p_cell: P2pCell,
     queue_triggers: InitialQueueTriggers,
 }
 
