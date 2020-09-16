@@ -222,7 +222,7 @@ impl SourceChainBuf {
                             signature,
                             header_address,
                             header,
-                            entry,
+                            entry: entry.into_option(),
                         }),
                     });
                 }

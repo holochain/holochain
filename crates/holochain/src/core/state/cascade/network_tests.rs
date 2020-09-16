@@ -254,7 +254,7 @@ async fn get_from_another_agent() {
     assert_eq!(*signed_header.header().author(), bob_agent_id);
 
     // Check entry is the same
-    let ret_entry: Post = ret_entry.unwrap().try_into().unwrap();
+    let ret_entry: Post = ret_entry.into_option().unwrap().try_into().unwrap();
     assert_eq!(entry, ret_entry);
 
     let new_entry = Post("Bananas are bendy".into());
