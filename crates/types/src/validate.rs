@@ -5,7 +5,7 @@
 /// much of this happens in the subconscious
 /// an entry missing validation dependencies may cycle through Pending many times before finally
 /// reaching a final validation state or being abandoned
-#[derive(Clone, serde::Serialize, serde::Deserialize, Debug, Eq, PartialEq)]
+#[derive(Clone, serde::Serialize, serde::Deserialize, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum ValidationStatus {
     /// all implemented validation callbacks found all dependencies and passed validation
     Valid,

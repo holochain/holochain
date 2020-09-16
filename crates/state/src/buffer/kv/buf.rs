@@ -443,6 +443,22 @@ where
     }
 }
 
+impl<K, V> LoadDbFixture for KvBufFresh<K, V>
+where
+    K: BufKey,
+    V: BufVal + Ord,
+{
+    type FixtureItem = (K, V);
+
+    fn write_test_datum(&mut self, datum: Self::FixtureItem) {
+        self.inner.write_test_datum(datum)
+    }
+
+    fn read_test_data<R: Readable>(&self, reader: &R) -> DbFixture<Self::FixtureItem> {
+        self.inner.read_test_data(reader)
+    }
+}
+
 impl<V> LoadDbFixture for KvIntBufUsed<V>
 where
     V: BufVal + Ord,

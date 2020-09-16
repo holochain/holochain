@@ -14,6 +14,8 @@ use holochain_state::{
         CACHE_LINKS_META, CACHE_STATUS_META, CACHE_SYSTEM_META, META_VAULT_LINKS, META_VAULT_MISC,
         META_VAULT_SYS,
     },
+    db_fixture::DbFixture,
+    db_fixture::LoadDbFixture,
     error::{DatabaseError, DatabaseResult},
     fresh_reader,
     prelude::*,
@@ -682,5 +684,48 @@ impl<P: PrefixType> BufferedStore for MetadataBuf<P> {
         self.links_meta.flush_to_txn_ref(writer)?;
         self.misc_meta.flush_to_txn_ref(writer)?;
         Ok(())
+    }
+}
+
+// TODO: macroize for these predictable impls
+#[allow(missing_docs)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum MetadataBufFixtureItem<P: PrefixType> {
+    SystemMeta(<KvvBufUsed<PrefixBytesKey<P>, SysMetaVal> as LoadDbFixture>::FixtureItem),
+    LinksMeta(<KvBufUsed<PrefixBytesKey<P>, LinkMetaVal> as LoadDbFixture>::FixtureItem),
+    MiscMeta(<KvBufUsed<PrefixBytesKey<P>, MiscMetaValue> as LoadDbFixture>::FixtureItem),
+}
+
+impl<P: PrefixType> LoadDbFixture for MetadataBuf<P> {
+    type FixtureItem = MetadataBufFixtureItem<P>;
+
+    fn write_test_datum(&mut self, datum: Self::FixtureItem) {
+        match datum {
+            Self::FixtureItem::SystemMeta(d) => self.system_meta.write_test_datum(d),
+            Self::FixtureItem::LinksMeta(d) => self.links_meta.write_test_datum(d),
+            Self::FixtureItem::MiscMeta(d) => self.misc_meta.write_test_datum(d),
+        }
+    }
+
+    fn read_test_data<R: Readable>(&self, reader: &R) -> DbFixture<Self::FixtureItem> {
+        let sys = self
+            .system_meta
+            .read_test_data(reader)
+            .into_iter()
+            .map(|i| Self::FixtureItem::SystemMeta(i));
+        let links = self
+            .links_meta
+            .read_test_data(reader)
+            .into_iter()
+            .map(|i| Self::FixtureItem::LinksMeta(i));
+        let misc = self
+            .misc_meta
+            .read_test_data(reader)
+            .into_iter()
+            .map(|i| Self::FixtureItem::MiscMeta(i));
+
+        sys.chain(links)
+            .chain(misc)
+            .collect::<DbFixture<Self::FixtureItem>>()
     }
 }

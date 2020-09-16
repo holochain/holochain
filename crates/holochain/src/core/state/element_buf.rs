@@ -323,14 +323,14 @@ impl<P: PrefixType> BufferedStore for ElementBuf<P> {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub enum ElementBufFixture<P: PrefixType> {
+pub enum ElementBufFixtureItem<P: PrefixType> {
     PublicEntries(<EntryCas<P> as LoadDbFixture>::FixtureItem),
     PrivateEntries(<EntryCas<P> as LoadDbFixture>::FixtureItem),
     Headers(<HeaderCas<P> as LoadDbFixture>::FixtureItem),
 }
 
 impl<P: PrefixType> LoadDbFixture for ElementBuf<P> {
-    type FixtureItem = ElementBufFixture<P>;
+    type FixtureItem = ElementBufFixtureItem<P>;
 
     fn write_test_datum(&mut self, datum: Self::FixtureItem) {
         match datum {

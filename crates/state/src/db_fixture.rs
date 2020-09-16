@@ -38,3 +38,14 @@ pub trait LoadDbFixture {
 
 /// Type of data which can be written as a DB fixture
 pub type DbFixture<T> = BTreeSet<T>;
+
+// macro_rules! composite_fixture_item {
+//     ($name:ty { $($variant:ident, $db:ty),*, }) => {
+//         #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+//         pub enum $name {
+//             $(
+//                 $variant(<$db as LoadDbFixture>::FixtureItem),
+//             )*
+//         }
+//     };
+// }

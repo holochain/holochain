@@ -50,7 +50,7 @@ pub struct EntryDetails {
 }
 
 /// The status of an [Entry] in the Dht
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum EntryDhtStatus {
     /// This [Entry] has active headers
     Live,

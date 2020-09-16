@@ -6,7 +6,10 @@ use holochain_serialized_bytes::prelude::*;
 use holochain_state::{
     buffer::KvBufFresh,
     db::VALIDATION_LIMBO,
+    db_fixture::DbFixture,
+    db_fixture::LoadDbFixture,
     error::DatabaseResult,
+    prelude::Readable,
     prelude::{EnvironmentRead, GetDb},
 };
 use holochain_types::{dht_op::DhtOpLight, Timestamp};
@@ -21,7 +24,7 @@ pub struct ValidationLimboStore(pub KvBufFresh<ValidationLimboKey, ValidationLim
 pub type ValidationLimboKey = DhtOpHash;
 
 /// A type for storing in databases that only need the hashes.
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, PartialOrd, Ord)]
 pub struct ValidationLimboValue {
     /// Status of this op in the limbo
     pub status: ValidationLimboStatus,
@@ -43,7 +46,7 @@ pub struct ValidationLimboValue {
 }
 
 /// The status of a [DhtOp] in limbo
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, PartialOrd, Ord)]
 pub enum ValidationLimboStatus {
     /// Is awaiting to be system validated
     Pending,
@@ -63,5 +66,17 @@ impl ValidationLimboStore {
     pub fn new(env: EnvironmentRead) -> DatabaseResult<Self> {
         let db = env.get_db(&*VALIDATION_LIMBO)?;
         Ok(Self(KvBufFresh::new(env, db)))
+    }
+}
+
+impl LoadDbFixture for ValidationLimboStore {
+    type FixtureItem = (ValidationLimboKey, ValidationLimboValue);
+
+    fn write_test_datum(&mut self, datum: Self::FixtureItem) {
+        self.0.write_test_datum(datum)
+    }
+
+    fn read_test_data<R: Readable>(&self, reader: &R) -> DbFixture<Self::FixtureItem> {
+        self.0.read_test_data(reader)
     }
 }

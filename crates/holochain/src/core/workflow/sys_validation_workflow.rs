@@ -24,6 +24,7 @@ use holochain_p2p::HolochainP2pCell;
 use holochain_state::{
     buffer::{BufferedStore, KvBufFresh},
     db::INTEGRATION_LIMBO,
+    db_fixture::LoadDbFixture,
     fresh_reader,
     prelude::*,
 };
@@ -662,4 +663,17 @@ impl Workspace for SysValidationWorkspace {
         self.meta_judged.flush_to_txn_ref(writer)?;
         Ok(())
     }
+}
+
+pub enum SysValidationWorkspaceFixtureItem {
+    IntegrationLimbo(<IntegrationLimboStore as LoadDbFixture>::FixtureItem),
+    ValidationLimbo(<ValidationLimboStore as LoadDbFixture>::FixtureItem),
+    ElementVault(<ElementBuf as LoadDbFixture>::FixtureItem),
+    MetaVault(<MetadataBuf as LoadDbFixture>::FixtureItem),
+    ElementPending(<ElementBuf as LoadDbFixture>::FixtureItem),
+    MetaPending(<MetadataBuf as LoadDbFixture>::FixtureItem),
+    ElementJudged(<ElementBuf as LoadDbFixture>::FixtureItem),
+    MetaJudged(<MetadataBuf as LoadDbFixture>::FixtureItem),
+    ElementCache(<ElementBuf as LoadDbFixture>::FixtureItem),
+    MetaCache(<MetadataBuf as LoadDbFixture>::FixtureItem),
 }

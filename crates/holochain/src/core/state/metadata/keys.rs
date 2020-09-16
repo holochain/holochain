@@ -9,7 +9,7 @@ use super::*;
 pub struct BytesKey(pub Vec<u8>);
 
 /// The value stored in the links meta db
-#[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
 pub struct LinkMetaVal {
     /// Hash of the [CreateLink] [Header] that created this link
     pub link_add_hash: HeaderHash,
@@ -70,10 +70,10 @@ pub(super) enum MiscMetaKey {
     StoreElement(HeaderHash),
 }
 
-#[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
 /// Values for the misc kv
 /// Matches the key
-pub(super) enum MiscMetaValue {
+pub enum MiscMetaValue {
     /// Collapsed status of an entry
     EntryStatus(EntryDhtStatus),
     /// We have integrated a StoreElement for this key

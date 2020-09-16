@@ -80,7 +80,7 @@ impl BufferedStore for IntegratedDhtOpsBuf {
 pub type IntegrationLimboKey = DhtOpHash;
 
 /// A type for storing in databases that only need the hashes.
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd)]
 pub struct IntegratedDhtOpsValue {
     /// The op's validation status
     pub validation_status: ValidationStatus,
@@ -91,7 +91,7 @@ pub struct IntegratedDhtOpsValue {
 }
 
 /// A type for storing in databases that only need the hashes.
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd)]
 pub struct IntegrationLimboValue {
     /// The op's validation status
     pub validation_status: ValidationStatus,

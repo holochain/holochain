@@ -86,7 +86,7 @@ type DhtBasis = AnyDhtHash;
 /// A type for storing in databases that don't need the actual
 /// data. Everything is a hash of the type except the signatures.
 #[allow(missing_docs)]
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd)]
 pub enum DhtOpLight {
     StoreElement(HeaderHash, Option<EntryHash>, DhtBasis),
     StoreEntry(HeaderHash, EntryHash, DhtBasis),

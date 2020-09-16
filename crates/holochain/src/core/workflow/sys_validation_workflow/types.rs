@@ -68,7 +68,7 @@ pub enum Dependency<T> {
 /// PendingDependencies can either be fixed to a specific element or
 /// any element with the same entry. This changes how we handle
 /// dependencies that turn out to be invalid.
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, PartialOrd, Ord)]
 pub enum DepType {
     /// The dependency is a specific element
     FixedElement(DhtOpHash),
@@ -135,7 +135,7 @@ impl<T> Dependency<T> {
 /// ## Failed validation
 /// If in the above scenario Op B fails to validate then
 /// Op A will also fail validation.
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, PartialOrd, Ord)]
 pub struct PendingDependencies {
     /// PendingDependencies that hadn't finished validation at the
     /// time we used them to validate this op.
