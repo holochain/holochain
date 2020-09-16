@@ -41,7 +41,7 @@ impl HolochainP2pActor {
         from_agent: AgentPubKey,
         zome_name: ZomeName,
         fn_name: FunctionName,
-        cap: CapSecret,
+        cap: Option<CapSecret>,
         data: Vec<u8>,
     ) -> kitsune_p2p::actor::KitsuneP2pHandlerResult<Vec<u8>> {
         let data: SerializedBytes = UnsafeBytes::from(data).into();
@@ -404,7 +404,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         to_agent: AgentPubKey,
         zome_name: ZomeName,
         fn_name: FunctionName,
-        cap: CapSecret,
+        cap: Option<CapSecret>,
         request: SerializedBytes,
     ) -> HolochainP2pHandlerResult<SerializedBytes> {
         let space = dna_hash.into_kitsune();

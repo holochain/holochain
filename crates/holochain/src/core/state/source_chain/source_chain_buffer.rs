@@ -95,6 +95,10 @@ impl SourceChainBuf {
         self.elements.get_header(k)
     }
 
+    pub fn get_entry(&self, k: &EntryHash) -> DatabaseResult<Option<EntryHashed>> {
+        self.elements.get_entry(k)
+    }
+
     pub async fn get_incomplete_dht_ops(&self) -> SourceChainResult<Vec<(u32, Vec<DhtOp>)>> {
         let mut ops = Vec::new();
         let ops_headers = fresh_reader!(self.env(), |r| {
@@ -218,7 +222,7 @@ impl SourceChainBuf {
                             signature,
                             header_address,
                             header,
-                            entry,
+                            entry: entry.into_option(),
                         }),
                     });
                 }

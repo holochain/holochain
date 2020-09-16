@@ -17,12 +17,17 @@ pub struct ChainQueryFilter {
     pub entry_type: Option<EntryType>,
     /// Filter by HeaderType
     pub header_type: Option<HeaderType>,
+    /// Include the entries in the elements
+    pub include_entries: bool,
 }
 
 impl ChainQueryFilter {
     /// Create a no-op ChainQueryFilter which returns everything
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            include_entries: false,
+            ..Self::default()
+        }
     }
 
     /// Filter on sequence range
@@ -40,6 +45,12 @@ impl ChainQueryFilter {
     /// Filter on header type
     pub fn header_type(mut self, header_type: HeaderType) -> Self {
         self.header_type = Some(header_type);
+        self
+    }
+
+    /// Include the entries in the ElementsVec that is returned
+    pub fn include_entries(mut self, include_entries: bool) -> Self {
+        self.include_entries = include_entries;
         self
     }
 

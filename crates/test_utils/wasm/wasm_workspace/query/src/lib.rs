@@ -12,7 +12,7 @@ fn path(s: &str) -> ExternResult<EntryHash> {
 }
 
 #[hdk_extern]
-fn query(args: QueryFilter) -> ExternResult<HeaderHashedVec> {
+fn query(args: QueryFilter) -> ExternResult<ElementVec> {
     Ok(query!(args)?)
 }
 
