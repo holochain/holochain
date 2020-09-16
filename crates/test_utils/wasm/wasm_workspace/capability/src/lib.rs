@@ -9,7 +9,7 @@ fn init(_: ()) -> ExternResult<InitCallbackResult> {
     let mut functions: GrantedFunctions = HashSet::new();
     functions.insert((zome_info!()?.zome_name, "accept_cap_claim".into()));
     // functions.insert((zome_info!()?.zome_name, "needs_cap_claim".into()));
-    commit_cap_grant!(
+    create_cap_grant!(
         CapGrantEntry {
             tag: "".into(),
             // empty access converts to unrestricted
@@ -33,13 +33,13 @@ fn cap_grant_entry(secret: CapSecret) -> ExternResult<CapGrantEntry> {
     Ok(CapGrantEntry {
         tag: "".into(),
         access: secret.into(),
-        functions
+        functions,
     })
 }
 
 #[hdk_extern]
 pub fn transferable_cap_grant(secret: CapSecret) -> ExternResult<HeaderHash> {
-    Ok(commit_cap_grant!(
+    Ok(create_cap_grant!(
         cap_grant_entry(secret)?
     )?)
 }
@@ -47,10 +47,7 @@ pub fn transferable_cap_grant(secret: CapSecret) -> ExternResult<HeaderHash> {
 #[hdk_extern]
 pub fn roll_cap_grant(header_hash: HeaderHash) -> ExternResult<HeaderHash> {
     let secret = generate_cap_secret!()?;
-    Ok(update_cap_grant!(
-        header_hash,
-        cap_grant_entry(secret)?
-    )?)
+    Ok(update_cap_grant!(header_hash, cap_grant_entry(secret)?)?)
 }
 
 #[hdk_extern]
@@ -67,7 +64,7 @@ fn get_entry(header_hash: HeaderHash) -> ExternResult<GetOutput> {
 /// intended to
 #[hdk_extern]
 fn accept_cap_claim(claim: CapClaim) -> ExternResult<HeaderHash> {
-    Ok(commit_cap_claim!(claim)?)
+    Ok(create_cap_claim!(claim)?)
 }
 
 #[hdk_extern]
@@ -76,18 +73,17 @@ fn needs_cap_claim(_: ()) -> ExternResult<()> {
 }
 
 #[hdk_extern]
-fn try_cap_claim(cap_for: CapFor) -> ExternResult<ZomeCallInvocationResponse> {
-    let result: ZomeCallInvocationResponse = call_remote!(
+fn try_cap_claim(cap_for: CapFor) -> ExternResult<ZomeCallResponse> {
+    let result: ZomeCallResponse = call_remote!(
         cap_for.1,
         zome_info!()?.zome_name,
         "needs_cap_claim".to_string().into(),
-        cap_for.0,
+        Some(cap_for.0),
         ().try_into()?
     )?;
 
     Ok(result)
 }
-
 
 #[hdk_extern]
 fn send_assigned_cap_claim(agent: AgentPubKey) -> ExternResult<()> {
@@ -100,7 +96,7 @@ fn send_assigned_cap_claim(agent: AgentPubKey) -> ExternResult<()> {
     let mut functions: GrantedFunctions = HashSet::new();
     let this_zome = zome_info!()?.zome_name;
     functions.insert((this_zome.clone(), "needs_cap_claim".into()));
-    commit_cap_grant!(CapGrantEntry {
+    create_cap_grant!(CapGrantEntry {
         access: (secret, agent.clone()).into(),
         functions,
         tag: tag.clone(),
@@ -111,12 +107,8 @@ fn send_assigned_cap_claim(agent: AgentPubKey) -> ExternResult<()> {
         agent,
         this_zome,
         "accept_cap_claim".into(),
-        ().into(),
-        CapClaim::new(
-            tag,
-            agent_info!()?.agent_latest_pubkey,
-            secret,
-        ).try_into()?
+        None,
+        CapClaim::new(tag, agent_info!()?.agent_latest_pubkey, secret,).try_into()?
     )?;
     Ok(())
 }

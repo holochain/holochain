@@ -7,11 +7,10 @@ pub use error::*;
 use fallible_iterator::FallibleIterator;
 use holo_hash::*;
 use holochain_state::{buffer::BufferedStore, error::DatabaseResult, fresh_reader, prelude::*};
-use holochain_types::{prelude::*, EntryHashed, HeaderHashed};
-use holochain_zome_types::capability::CapAccess;
-use holochain_zome_types::capability::GrantedFunction;
+use holochain_types::{prelude::*, EntryHashed};
 use holochain_zome_types::{
-    capability::{CapGrant, CapSecret},
+    capability::{CapAccess, CapGrant, CapSecret, GrantedFunction},
+    element::Element,
     entry::{CapClaimEntry, Entry},
     header::{builder, EntryType, Header, HeaderBuilder, HeaderBuilderCommon, HeaderInner},
     query::ChainQueryFilter,
@@ -77,7 +76,7 @@ impl SourceChain {
     ) -> SourceChainResult<HeaderHash> {
         let (entry, entry_hash) =
             EntryHashed::from_content_sync(Entry::CapClaim(claim_entry)).into_inner();
-        let header_builder = builder::EntryCreate {
+        let header_builder = builder::Create {
             entry_type: EntryType::CapClaim,
             entry_hash,
         };
@@ -100,7 +99,7 @@ impl SourceChain {
         &self,
         check_function: &GrantedFunction,
         check_agent: &AgentPubKey,
-        check_secret: &CapSecret,
+        check_secret: Option<&CapSecret>,
     ) -> SourceChainResult<Option<CapGrant>> {
         // most calls for most apps are going to be the local agent calling itself locally
         // for this case we want to short circuit without iterating the whole source chain
@@ -122,17 +121,17 @@ impl SourceChain {
                 .iter_fail(&r)?
                 .filter(|header| {
                     Ok(match header.as_content().header() {
-                        Header::EntryCreate(create) => match create.entry_type {
+                        Header::Create(create) => match create.entry_type {
                             EntryType::CapGrant => true,
                             // filter out authorship and everything else
                             _ => false,
                         },
-                        Header::EntryUpdate(update) => match update.entry_type {
+                        Header::Update(update) => match update.entry_type {
                             EntryType::CapGrant => true,
                             // filter out authorship and everything else
                             _ => false,
                         },
-                        Header::ElementDelete(_) => true,
+                        Header::Delete(_) => true,
                         // no other headers are relevant
                         _ => false,
                     })
@@ -144,11 +143,11 @@ impl SourceChain {
                     (HashSet::new(), vec![]),
                     |(mut references, mut headers), header| {
                         match header.as_content().header() {
-                            Header::EntryUpdate(update) => {
+                            Header::Update(update) => {
                                 references.insert(update.original_header_address.clone());
                             }
-                            Header::ElementDelete(delete) => {
-                                references.insert(delete.removes_address.clone());
+                            Header::Delete(delete) => {
+                                references.insert(delete.deletes_address.clone());
                             }
                             _ => {}
                         }
@@ -170,8 +169,8 @@ impl SourceChain {
                 .iter()
                 .filter(|header| !references.contains(header.as_hash()))
                 .filter_map(|header| match header.as_content().header() {
-                    Header::EntryCreate(create) => Some(create.entry_hash.clone()),
-                    Header::EntryUpdate(update) => Some(update.entry_hash.clone()),
+                    Header::Create(create) => Some(create.entry_hash.clone()),
+                    Header::Update(update) => Some(update.entry_hash.clone()),
                     _ => None,
                 })
                 .collect();
@@ -197,10 +196,10 @@ impl SourceChain {
             // authorship > assigned > transferable > unrestricted
             .fold(None, |mut acc, grant| {
                 acc = match &grant {
-                    CapGrant::ZomeCall(zome_call_cap_grant) => {
+                    CapGrant::RemoteAgent(zome_call_cap_grant) => {
                         match &zome_call_cap_grant.access {
                             CapAccess::Assigned { .. } => match &acc {
-                                Some(CapGrant::ZomeCall(acc_zome_call_cap_grant)) => {
+                                Some(CapGrant::RemoteAgent(acc_zome_call_cap_grant)) => {
                                     match acc_zome_call_cap_grant.access {
                                         // an assigned acc takes precedence
                                         CapAccess::Assigned { .. } => acc,
@@ -213,7 +212,7 @@ impl SourceChain {
                                 _ => unreachable!(),
                             },
                             CapAccess::Transferable { .. } => match &acc {
-                                Some(CapGrant::ZomeCall(acc_zome_call_cap_grant)) => {
+                                Some(CapGrant::RemoteAgent(acc_zome_call_cap_grant)) => {
                                     match acc_zome_call_cap_grant.access {
                                         // an assigned acc takes precedence
                                         CapAccess::Assigned { .. } => acc,
@@ -233,7 +232,7 @@ impl SourceChain {
                             }
                         }
                     },
-                    // Authorship should have short circuited and be filtered out already
+                    // ChainAuthor should have short circuited and be filtered out already
                     _ => unreachable!(),
                 };
                 Ok(acc)
@@ -291,10 +290,17 @@ impl SourceChain {
     /// Query Headers in the source chain.
     /// This returns a Vec rather than an iterator because it is intended to be
     /// used by the `query` host function, which crosses the wasm boundary
-    pub fn query(&self, query: &ChainQueryFilter) -> SourceChainResult<Vec<HeaderHashed>> {
+    pub fn query(&self, query: &ChainQueryFilter) -> SourceChainResult<Vec<Element>> {
+        let include_entries = query.include_entries;
         self.iter_back()
             .filter(|shh| Ok(query.check(shh.header())))
-            .map(|shh| Ok(shh.header_hashed().clone()))
+            .map(|shh| {
+                let entry = match shh.header().entry_hash() {
+                    Some(eh) if include_entries => self.0.get_entry(eh)?,
+                    _ => None,
+                };
+                Ok(Element::new(shh, entry.map(|e| e.into_content())))
+            })
             .collect()
     }
 }
@@ -330,8 +336,8 @@ pub mod tests {
     async fn test_get_cap_grant() -> SourceChainResult<()> {
         let test_env = test_cell_env();
         let env = test_env.env();
-        let access = CapAccess::from(CapSecretFixturator::new(Unpredictable).next().unwrap());
-        let secret = access.secret().unwrap();
+        let secret = Some(CapSecretFixturator::new(Unpredictable).next().unwrap());
+        let access = CapAccess::from(secret.unwrap());
 
         // @todo curry
         let _curry = CurryPayloadsFixturator::new(Empty).next().unwrap();
@@ -352,19 +358,22 @@ pub mod tests {
         {
             let chain = SourceChain::new(env.clone().into())?;
             assert_eq!(
-                chain.valid_cap_grant(&function, &alice, secret)?,
-                Some(CapGrant::Authorship(alice.clone())),
+                chain.valid_cap_grant(&function, &alice, secret.as_ref())?,
+                Some(CapGrant::ChainAuthor(alice.clone())),
             );
 
             // bob should not match anything as the secret hasn't been committed yet
-            assert_eq!(chain.valid_cap_grant(&function, &bob, &secret)?, None);
+            assert_eq!(
+                chain.valid_cap_grant(&function, &bob, secret.as_ref())?,
+                None
+            );
         }
 
         let (original_header_address, original_entry_address) = {
             let mut chain = SourceChain::new(env.clone().into())?;
             let (entry, entry_hash) =
                 EntryHashed::from_content_sync(Entry::CapGrant(grant.clone())).into_inner();
-            let header_builder = builder::EntryCreate {
+            let header_builder = builder::Create {
                 entry_type: EntryType::CapGrant,
                 entry_hash: entry_hash.clone(),
             };
@@ -381,14 +390,14 @@ pub mod tests {
             // alice should find her own authorship with higher priority than the committed grant
             // even if she passes in the secret
             assert_eq!(
-                chain.valid_cap_grant(&function, &alice, &secret)?,
-                Some(CapGrant::Authorship(alice.clone())),
+                chain.valid_cap_grant(&function, &alice, secret.as_ref())?,
+                Some(CapGrant::ChainAuthor(alice.clone())),
             );
 
             // bob should be granted with the committed grant as it matches the secret he passes to
             // alice at runtime
             assert_eq!(
-                chain.valid_cap_grant(&function, &bob, &secret)?,
+                chain.valid_cap_grant(&function, &bob, secret.as_ref())?,
                 Some(grant.clone().into())
             );
         }
@@ -396,15 +405,15 @@ pub mod tests {
         // let's roll the secret and assign the grant to bob specifically
         let mut assignees = HashSet::new();
         assignees.insert(bob.clone());
-        let updated_secret = CapSecretFixturator::new(Unpredictable).next().unwrap();
-        let updated_access = CapAccess::from((updated_secret.clone(), assignees));
+        let updated_secret = Some(CapSecretFixturator::new(Unpredictable).next().unwrap());
+        let updated_access = CapAccess::from((updated_secret.clone().unwrap(), assignees));
         let updated_grant = ZomeCallCapGrant::new("tag".into(), updated_access.clone(), functions);
 
         let (updated_header_hash, updated_entry_hash) = {
             let mut chain = SourceChain::new(env.clone().into())?;
             let (entry, entry_hash) =
                 EntryHashed::from_content_sync(Entry::CapGrant(updated_grant.clone())).into_inner();
-            let header_builder = builder::EntryUpdate {
+            let header_builder = builder::Update {
                 entry_type: EntryType::CapGrant,
                 entry_hash: entry_hash.clone(),
                 original_header_address,
@@ -423,27 +432,30 @@ pub mod tests {
             // alice should find her own authorship with higher priority than the committed grant
             // even if she passes in the secret
             assert_eq!(
-                chain.valid_cap_grant(&function, &alice, &secret)?,
-                Some(CapGrant::Authorship(alice.clone())),
+                chain.valid_cap_grant(&function, &alice, secret.as_ref())?,
+                Some(CapGrant::ChainAuthor(alice.clone())),
             );
             assert_eq!(
-                chain.valid_cap_grant(&function, &alice, &updated_secret)?,
-                Some(CapGrant::Authorship(alice.clone())),
+                chain.valid_cap_grant(&function, &alice, updated_secret.as_ref())?,
+                Some(CapGrant::ChainAuthor(alice.clone())),
             );
 
             // bob MUST provide the updated secret as the old one is invalidated by the new one
-            assert_eq!(chain.valid_cap_grant(&function, &bob, &secret)?, None);
             assert_eq!(
-                chain.valid_cap_grant(&function, &bob, &updated_secret)?,
+                chain.valid_cap_grant(&function, &bob, secret.as_ref())?,
+                None
+            );
+            assert_eq!(
+                chain.valid_cap_grant(&function, &bob, updated_secret.as_ref())?,
                 Some(updated_grant.into())
             );
         }
 
         {
             let mut chain = SourceChain::new(env.clone().into())?;
-            let header_builder = builder::ElementDelete {
-                removes_address: updated_header_hash,
-                removes_entry_address: updated_entry_hash,
+            let header_builder = builder::Delete {
+                deletes_address: updated_header_hash,
+                deletes_entry_address: updated_entry_hash,
             };
             chain.put(header_builder, None).await?;
 
@@ -455,18 +467,21 @@ pub mod tests {
             let chain = SourceChain::new(env.clone().into())?;
             // alice should find her own authorship
             assert_eq!(
-                chain.valid_cap_grant(&function, &alice, &secret)?,
-                Some(CapGrant::Authorship(alice.clone())),
+                chain.valid_cap_grant(&function, &alice, secret.as_ref())?,
+                Some(CapGrant::ChainAuthor(alice.clone())),
             );
             assert_eq!(
-                chain.valid_cap_grant(&function, &alice, &updated_secret)?,
-                Some(CapGrant::Authorship(alice)),
+                chain.valid_cap_grant(&function, &alice, updated_secret.as_ref())?,
+                Some(CapGrant::ChainAuthor(alice)),
             );
 
             // bob has no access
-            assert_eq!(chain.valid_cap_grant(&function, &bob, &secret)?, None);
             assert_eq!(
-                chain.valid_cap_grant(&function, &bob, &updated_secret)?,
+                chain.valid_cap_grant(&function, &bob, secret.as_ref())?,
+                None
+            );
+            assert_eq!(
+                chain.valid_cap_grant(&function, &bob, updated_secret.as_ref())?,
                 None
             );
         }

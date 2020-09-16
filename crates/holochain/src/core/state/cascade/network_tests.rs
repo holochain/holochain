@@ -172,9 +172,9 @@ async fn get_from_another_agent() {
             name: "dht_get_test".to_string(),
             uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
             properties: SerializedBytes::try_from(()).unwrap(),
-            zomes: vec![TestWasm::CommitEntry.into()].into(),
+            zomes: vec![TestWasm::Create.into()].into(),
         },
-        vec![TestWasm::CommitEntry.into()],
+        vec![TestWasm::Create.into()],
     )
     .await
     .unwrap();
@@ -254,7 +254,7 @@ async fn get_from_another_agent() {
     assert_eq!(*signed_header.header().author(), bob_agent_id);
 
     // Check entry is the same
-    let ret_entry: Post = ret_entry.unwrap().try_into().unwrap();
+    let ret_entry: Post = ret_entry.into_option().unwrap().try_into().unwrap();
     assert_eq!(entry, ret_entry);
 
     let new_entry = Post("Bananas are bendy".into());
@@ -311,13 +311,13 @@ async fn get_from_another_agent() {
         header_hash
     );
     assert_eq!(
-        HeaderHash::with_data_sync(&Header::ElementDelete(
+        HeaderHash::with_data_sync(&Header::Delete(
             entry_details.deletes.get(0).unwrap().clone()
         )),
         remove_hash
     );
     assert_eq!(
-        HeaderHash::with_data_sync(&Header::EntryUpdate(
+        HeaderHash::with_data_sync(&Header::Update(
             entry_details.updates.get(0).unwrap().clone()
         )),
         update_hash
@@ -326,7 +326,7 @@ async fn get_from_another_agent() {
     assert_eq!(header_details.deletes.len(), 1);
     assert_eq!(*header_details.element.header_address(), header_hash);
     assert_eq!(
-        HeaderHash::with_data_sync(&Header::ElementDelete(
+        HeaderHash::with_data_sync(&Header::Delete(
             header_details.deletes.get(0).unwrap().clone()
         )),
         remove_hash
@@ -347,9 +347,9 @@ async fn get_links_from_another_agent() {
             name: "dht_get_test".to_string(),
             uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
             properties: SerializedBytes::try_from(()).unwrap(),
-            zomes: vec![TestWasm::CommitEntry.into()].into(),
+            zomes: vec![TestWasm::Create.into()].into(),
         },
-        vec![TestWasm::CommitEntry.into()],
+        vec![TestWasm::Create.into()],
     )
     .await
     .unwrap();
@@ -416,7 +416,7 @@ async fn get_links_from_another_agent() {
         fake_authority(&bob_env, base_header_hash.clone().into(), call_data.clone()).await;
 
         // Link the entries
-        let link_add_hash = link_entries(
+        let link_add_hash = create_link(
             &bob_env,
             call_data.clone(),
             base_entry_hash.clone(),
@@ -459,7 +459,7 @@ async fn get_links_from_another_agent() {
 
         // Link the entries
         let link_remove_hash =
-            remove_link(&bob_env, call_data.clone(), link_add_hash.clone()).await;
+            delete_link(&bob_env, call_data.clone(), link_add_hash.clone()).await;
 
         fake_authority(&bob_env, link_remove_hash.clone().into(), call_data.clone()).await;
     }
@@ -486,7 +486,7 @@ async fn get_links_from_another_agent() {
     assert_eq!(link_add.base_address, base_entry_hash);
     assert_eq!(
         link_remove.link_add_address,
-        HeaderHash::with_data_sync(&Header::LinkAdd(link_add))
+        HeaderHash::with_data_sync(&Header::CreateLink(link_add))
     );
 
     let shutdown = handle.take_shutdown_handle().await.unwrap();
@@ -607,14 +607,14 @@ async fn generate_fixt_store() -> (
     let mut meta_store = BTreeMap::new();
     let entry = EntryFixturator::new(AppEntry).next().unwrap();
     let entry_hash = EntryHashed::from_content_sync(entry.clone()).into_hash();
-    let mut element_create = fixt!(EntryCreate);
+    let mut element_create = fixt!(Create);
     let entry_type = AppEntryTypeFixturator::new(EntryVisibility::Public)
         .map(EntryType::App)
         .next()
         .unwrap();
     element_create.entry_type = entry_type;
     element_create.entry_hash = entry_hash.clone();
-    let header = HeaderHashed::from_content_sync(Header::EntryCreate(element_create));
+    let header = HeaderHashed::from_content_sync(Header::Create(element_create));
     let hash = header.as_hash().clone();
     let signed_header = SignedHeaderHashed::with_presigned(header, fixt!(Signature));
     meta_store.insert(

@@ -62,7 +62,7 @@ impl HolochainP2pCell {
         to_agent: AgentPubKey,
         zome_name: ZomeName,
         fn_name: FunctionName,
-        cap: CapSecret,
+        cap: Option<CapSecret>,
         request: SerializedBytes,
     ) -> actor::HolochainP2pResult<SerializedBytes> {
         self.sender

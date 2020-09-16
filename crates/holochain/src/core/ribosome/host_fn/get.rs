@@ -30,5 +30,5 @@ pub fn get<'a>(
     })
 }
 
-// we are relying on the commit entry tests to show the commit/get round trip
+// we are relying on the create tests to show the commit/get round trip
 // @see commit_entry.rs

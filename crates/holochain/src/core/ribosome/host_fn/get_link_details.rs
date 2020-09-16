@@ -54,7 +54,7 @@ pub mod slow_tests {
     use ::fixt::prelude::*;
     use holo_hash::HasHash;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::header::LinkAdd;
+    use holochain_zome_types::header::CreateLink;
     use test_wasm_common::*;
 
     #[tokio::test(threaded_scheduler)]
@@ -128,7 +128,7 @@ pub mod slow_tests {
 
         let link_details = children_details_output.into_inner();
 
-        let to_remove: LinkAdd = (link_details[0]).0.clone();
+        let to_remove: CreateLink = (link_details[0]).0.clone();
 
         let to_remove_hash =
             holochain_types::header::HeaderHashed::from_content_sync(to_remove.into()).into_hash();
@@ -136,7 +136,7 @@ pub mod slow_tests {
         let _remove_hash: holo_hash::HeaderHash = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
-            "remove_link",
+            "delete_link",
             to_remove_hash
         );
 
