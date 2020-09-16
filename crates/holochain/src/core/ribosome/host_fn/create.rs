@@ -349,7 +349,7 @@ pub mod wasm_test {
 
         // ALICE DOING A CALL
 
-        let n = 20;
+        let n = 50;
 
         // alice create a bunch of entries
         let output = handle
