@@ -148,8 +148,9 @@ pub mod wasm_test {
     use holochain_zome_types::Entry;
     use holochain_zome_types::GetOutput;
     use holochain_zome_types::{entry::EntryError, ExternInput};
-    use matches::assert_matches;
     use std::sync::Arc;
+    use test_wasm_common::TestBytes;
+    use test_wasm_common::TestInt;
 
     #[tokio::test(threaded_scheduler)]
     /// we cannot commit before genesis
@@ -331,6 +332,7 @@ pub mod wasm_test {
         dna_store.expect_get().return_const(Some(dna_file.clone()));
         dna_store.expect_add_dnas::<Vec<_>>().return_const(());
         dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
+        dna_store.expect_get_entry_def().return_const(None);
 
         let (_tmpdir, _app_api, handle) = setup_app(
             vec![(
@@ -347,78 +349,61 @@ pub mod wasm_test {
 
         // ALICE DOING A CALL
 
+        let n = 20;
+
+        // alice create a bunch of entries
+        let output = handle
+            .call_zome(ZomeCallInvocation {
+                cell_id: alice_cell_id.clone(),
+                zome_name: TestWasm::MultipleCalls.into(),
+                cap: None,
+                fn_name: "create_entry_multiple".into(),
+                payload: ExternInput::new(TestInt(n).try_into().unwrap()),
+                provenance: alice_agent_id.clone(),
+            })
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            output,
+            ZomeCallResponse::Ok(
+                ExternOutput::new(().try_into().unwrap())
+                    .try_into()
+                    .unwrap()
+            )
+        );
+
+        // bob get the entries
         let output = handle
             .call_zome(ZomeCallInvocation {
                 cell_id: alice_cell_id,
                 zome_name: TestWasm::MultipleCalls.into(),
                 cap: None,
-                fn_name: "create_entry_multiple".into(),
-                payload: ExternInput::new(().try_into().unwrap()),
+                fn_name: "get_entry_multiple".into(),
+                payload: ExternInput::new(TestInt(n).try_into().unwrap()),
                 provenance: alice_agent_id,
             })
             .await
             .unwrap()
             .unwrap();
-        assert_matches!(output, ZomeCallResponse::Ok(_));
+
+        // check the vals
+        let mut expected = vec![];
+        for i in 0..n {
+            expected.append(&mut i.to_le_bytes().to_vec());
+        }
+        assert_eq!(
+            output,
+            ZomeCallResponse::Ok(
+                ExternOutput::new(TestBytes(expected).try_into().unwrap())
+                    .try_into()
+                    .unwrap()
+            )
+        );
 
         let shutdown = handle.take_shutdown_handle().await.unwrap();
         handle.shutdown().await;
         shutdown.await.unwrap();
-    }
-
-    #[tokio::test(threaded_scheduler)]
-    #[ignore]
-    async fn ribosome_multiple_create_entry_test<'a>() {
-        holochain_types::observability::test_run().ok();
-        // test workspace boilerplate
-        let test_env = holochain_state::test_utils::test_cell_env();
-        let env = test_env.env();
-        let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
-
-        // commits fail validation if we don't do genesis
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
-            .await
-            .unwrap();
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
-        let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace_lock.clone();
-
-        // get the result of a commit entry
-        let output: CreateOutput = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::MultipleCalls,
-            "create_entry_multiple",
-            ()
-        );
-
-        // the chain head should be the committed entry header
-        let chain_head = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-            SourceChainResult::Ok(
-                workspace_lock
-                    .read()
-                    .await
-                    .source_chain
-                    .chain_head()?
-                    .to_owned(),
-            )
-        })
-        .unwrap();
-
-        assert_eq!(&chain_head, output.inner_ref());
-
-        let round: GetOutput = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::MultipleCalls,
-            "get_entry_multiple",
-            ()
-        );
-
-        let sb: SerializedBytes = match round.into_inner().and_then(|el| el.into()) {
-            Some(holochain_zome_types::entry::Entry::App(entry_bytes)) => entry_bytes.into(),
-            other => panic!(format!("unexpected output: {:?}", other)),
-        };
-        // this should be the content "foo" of the committed post
-        assert_eq!(&vec![163, 102, 111, 111], sb.bytes(),)
     }
 
     #[tokio::test(threaded_scheduler)]
