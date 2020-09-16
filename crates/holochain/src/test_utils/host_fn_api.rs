@@ -28,7 +28,7 @@ use holochain_zome_types::{
     metadata::Details,
     zome::ZomeName,
     CreateInput, CreateLinkInput, DeleteInput, DeleteLinkInput, GetDetailsInput, GetInput,
-    GetLinksInput, UpdateInput,
+    GetLinksInput, UpdateInput, ZomeCallResponse,
 };
 use std::sync::Arc;
 use tracing::*;
@@ -428,7 +428,7 @@ pub async fn call_zome_direct(
     env.guard()
         .with_commit(|writer| workspace.flush_to_txn_ref(writer))
         .unwrap();
-    let output = unwrap_to!(output => ZomeCallInvocationResponse::ZomeApiFn).clone();
+    let output = unwrap_to!(output => ZomeCallResponse::Ok).clone();
 
     output.into_inner()
 }

@@ -19,8 +19,8 @@ use crate::{
     core::present::DataSource,
     core::present::DbPair,
     core::ribosome::guest_callback::validate_link_add::ValidateCreateLinkHostAccess,
-    core::ribosome::guest_callback::validate_link_add::ValidateLinkAddInvocation,
-    core::ribosome::guest_callback::validate_link_add::ValidateLinkAddResult,
+    core::ribosome::guest_callback::validate_link_add::ValidateCreateLinkInvocation,
+    core::ribosome::guest_callback::validate_link_add::ValidateCreateLinkResult,
     core::ribosome::wasm_ribosome::WasmRibosome,
     core::state::cascade::Cascade,
     core::{
@@ -59,8 +59,8 @@ use holochain_types::{
     validate::ValidationStatus, Entry, HeaderHashed, Timestamp,
 };
 use holochain_zome_types::{
-    element::Element, element::SignedHeaderHashed, header::AppEntryType, header::EntryType,
-    header::LinkAdd, zome::ZomeName, Header,
+    element::Element, element::SignedHeaderHashed, header::AppEntryType, header::CreateLink,
+    header::EntryType, zome::ZomeName, Header,
 };
 use tracing::*;
 pub use types::Outcome;
@@ -285,7 +285,7 @@ async fn validate_op(
     let outcome = match element.header() {
         // TODO: Validate link probably doesn't need to be separate
         // as the correct validate_add_link can still be called.
-        Header::LinkAdd(link_add) => {
+        Header::CreateLink(link_add) => {
             // Get the base and target for this link
             let base = retrieve_entry(&link_add.base_address, &mut data_source)
                 .await?
@@ -375,13 +375,11 @@ fn get_element(op: DhtOp) -> AppValidationOutcome<Element> {
     match op {
         DhtOp::RegisterDeletedBy(_, _) | DhtOp::RegisterAgentActivity(_, _) => Outcome::accepted(),
         DhtOp::StoreElement(s, h, e) => match h {
-            Header::ElementDelete(_) | Header::LinkAdd(_) | Header::LinkRemove(_) => {
-                Ok(Element::new(
-                    SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(h), s),
-                    None,
-                ))
-            }
-            Header::EntryUpdate(_) | Header::EntryCreate(_) => match e {
+            Header::Delete(_) | Header::CreateLink(_) | Header::DeleteLink(_) => Ok(Element::new(
+                SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(h), s),
+                None,
+            )),
+            Header::Update(_) | Header::Create(_) => match e {
                 Some(e) => Ok(Element::new(
                     SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(h), s),
                     Some(*e),
@@ -442,32 +440,32 @@ async fn get_app_entry_type_from_dep(
     dependencies: &mut PendingDependencies,
 ) -> AppValidationOutcome<Option<AppEntryType>> {
     match element.header() {
-        Header::LinkAdd(la) => {
+        Header::CreateLink(la) => {
             let el = retrieve_entry(&la.base_address, data_source)
                 .await?
                 .and_then(|dep| dependencies.store_entry_any(dep))
                 .ok_or_else(|| Outcome::awaiting(&la.base_address))?;
             Ok(extract_app_type(&el))
         }
-        Header::LinkRemove(lr) => {
+        Header::DeleteLink(lr) => {
             let el = retrieve_entry(&lr.base_address, data_source)
                 .await?
                 .and_then(|dep| dependencies.store_entry_any(dep))
                 .ok_or_else(|| Outcome::awaiting(&lr.base_address))?;
             Ok(extract_app_type(&el))
         }
-        Header::EntryUpdate(eu) => {
+        Header::Update(eu) => {
             let el = retrieve_element(&eu.original_header_address, data_source)
                 .await?
                 .and_then(|dep| dependencies.store_entry_fixed(dep))
                 .ok_or_else(|| Outcome::awaiting(&eu.original_header_address))?;
             Ok(extract_app_type(&el))
         }
-        Header::ElementDelete(ed) => {
-            let el = retrieve_element(&ed.removes_address, data_source)
+        Header::Delete(ed) => {
+            let el = retrieve_element(&ed.deletes_address, data_source)
                 .await?
                 .and_then(|dep| dependencies.store_entry_fixed(dep))
-                .ok_or_else(|| Outcome::awaiting(&ed.removes_address))?;
+                .ok_or_else(|| Outcome::awaiting(&ed.deletes_address))?;
             Ok(extract_app_type(&el))
         }
         _ => todo!(),
@@ -537,14 +535,14 @@ pub fn run_validation_callback(
 
 pub fn run_link_validation_callback(
     zome_name: ZomeName,
-    link_add: Arc<LinkAdd>,
+    link_add: Arc<CreateLink>,
     base: Arc<Entry>,
     target: Arc<Entry>,
     ribosome: &impl RibosomeT,
     workspace_lock: CallZomeWorkspaceLock,
     network: HolochainP2pCell,
 ) -> AppValidationResult<Outcome> {
-    let invocation = ValidateLinkAddInvocation {
+    let invocation = ValidateCreateLinkInvocation {
         zome_name,
         link_add,
         base,
@@ -553,8 +551,8 @@ pub fn run_link_validation_callback(
     let access = ValidateCreateLinkHostAccess::new(workspace_lock, network);
     let validate = ribosome.run_validate_create_link(access, invocation)?;
     match validate {
-        ValidateLinkAddResult::Valid => Ok(Outcome::Accepted),
-        ValidateLinkAddResult::Invalid(reason) => Ok(Outcome::Rejected(reason)),
+        ValidateCreateLinkResult::Valid => Ok(Outcome::Accepted),
+        ValidateCreateLinkResult::Invalid(reason) => Ok(Outcome::Rejected(reason)),
     }
 }
 

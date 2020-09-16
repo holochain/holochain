@@ -32,7 +32,7 @@ fn add_valid_link(_: ()) -> ExternResult<HeaderHash> {
 
 fn add_valid_link_inner() -> ExternResult<HeaderHash> {
     let always_linkable_entry_hash = hash_entry!(MaybeLinkable::AlwaysLinkable)?;
-    commit_entry!(MaybeLinkable::AlwaysLinkable)?;
+    create_entry!(MaybeLinkable::AlwaysLinkable)?;
 
     Ok(create_link!(
         always_linkable_entry_hash.clone(),
@@ -43,7 +43,7 @@ fn add_valid_link_inner() -> ExternResult<HeaderHash> {
 #[hdk_extern]
 fn remove_valid_link(_: ()) -> ExternResult<HeaderHash> {
     let valid_link = add_valid_link_inner()?;
-    Ok(remove_link!(valid_link)?)
+    Ok(delete_link!(valid_link)?)
 }
 
 #[hdk_extern]
@@ -52,8 +52,8 @@ fn add_invalid_link(_: ()) -> ExternResult<HeaderHash> {
 }
 
 fn add_invalid_link_inner() -> ExternResult<HeaderHash> {
-    let always_linkable_entry_hash = entry_hash!(MaybeLinkable::AlwaysLinkable)?;
-    let never_linkable_entry_hash = entry_hash!(MaybeLinkable::NeverLinkable)?;
+    let always_linkable_entry_hash = hash_entry!(MaybeLinkable::AlwaysLinkable)?;
+    let never_linkable_entry_hash = hash_entry!(MaybeLinkable::NeverLinkable)?;
 
     create_entry!(MaybeLinkable::AlwaysLinkable)?;
     create_entry!(MaybeLinkable::NeverLinkable)?;
@@ -67,7 +67,7 @@ fn add_invalid_link_inner() -> ExternResult<HeaderHash> {
 #[hdk_extern]
 fn remove_invalid_link(_: ()) -> ExternResult<HeaderHash> {
     let valid_link = add_invalid_link_inner()?;
-    Ok(remove_link!(valid_link)?)
+    Ok(delete_link!(valid_link)?)
 }
 
 #[hdk_extern]
@@ -78,7 +78,7 @@ fn validate(_element: Element) -> ExternResult<ValidateCallbackResult> {
 #[hdk_extern]
 fn validate_remove_link(element: Element) -> ExternResult<ValidateCallbackResult> {
     match (element.into_inner().0.into_inner().0).0 {
-        Header::LinkRemove(link_remove) => {
+        Header::DeleteLink(link_remove) => {
             let base: Option<MaybeLinkable> = match get!(link_remove.base_address.clone())? {
                 Some(b) => b.entry().to_app_option()?,
                 None => {
@@ -101,7 +101,7 @@ fn validate_remove_link(element: Element) -> ExternResult<ValidateCallbackResult
             })
         }
         _ => Ok(ValidateCallbackResult::Invalid(
-            "Not a LinkRemove header".to_string(),
+            "Not a DeleteLink header".to_string(),
         )),
     }
 }

@@ -196,18 +196,18 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT>(
             match chain_element.header() {
                 Header::Dna(_)
                 | Header::AgentValidationPkg(_)
-                | Header::ChainOpen(_)
-                | Header::ChainClose(_)
+                | Header::OpenChain(_)
+                | Header::CloseChain(_)
                 | Header::InitZomesComplete(_) => {
                     // These headers don't get validated
                 }
-                Header::LinkAdd(_) => {
+                Header::CreateLink(_) => {
                     // These get validate via validate link
                 }
-                Header::EntryCreate(_)
-                | Header::EntryUpdate(_)
-                | Header::ElementDelete(_)
-                | Header::LinkRemove(_) => {
+                Header::Create(_)
+                | Header::Update(_)
+                | Header::Delete(_)
+                | Header::DeleteLink(_) => {
                     let element = Arc::new(chain_element);
                     let outcome = app_validation_workflow::run_validation_callback(
                         zome_name.clone(),

@@ -21,7 +21,7 @@ use holochain_types::{
     Entry,
 };
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::{element::Element, zome::ZomeName, Header, HostInput};
+use holochain_zome_types::{element::Element, zome::ZomeName, ExternInput, Header};
 use std::{
     convert::{TryFrom, TryInto},
     time::Duration,
@@ -224,7 +224,7 @@ async fn run_test(
             DhtOpLight::RegisterAddLink(hh, _) if hh == invalid_link_hash => {
                 assert_eq!(i.validation_status, ValidationStatus::Rejected, "{}", s)
             }
-            // The store element for this LinkAdd header is also rejected
+            // The store element for this CreateLink header is also rejected
             DhtOpLight::StoreElement(hh, _, _) if hh == invalid_link_hash => {
                 assert_eq!(i.validation_status, ValidationStatus::Rejected, "{}", s)
             }
@@ -318,7 +318,7 @@ async fn run_test(
         let invalid_link_entry_hash = EntryHash::with_data_sync(&Entry::app(sb).unwrap());
 
         // Link adds with these base / target are invalid
-        if let Header::LinkAdd(la) = el.header() {
+        if let Header::CreateLink(la) = el.header() {
             if invalid_link_entry_hash == la.base_address
                 || invalid_link_entry_hash == la.target_address
             {
@@ -327,7 +327,7 @@ async fn run_test(
             }
         }
         match &i.op {
-            // The store element for the LinkRemove is invalid
+            // The store element for the DeleteLink is invalid
             DhtOpLight::StoreElement(hh, _, _) if hh == invalid_remove_hash => {
                 assert_eq!(i.validation_status, ValidationStatus::Rejected, "{}", s)
             }
@@ -393,7 +393,7 @@ where
         zome_name: zome_name.into(),
         cap: CapSecretFixturator::new(Unpredictable).next().unwrap(),
         fn_name: func.into(),
-        payload: HostInput::new(payload.try_into()?),
+        payload: ExternInput::new(payload.try_into()?),
         provenance: cell_id.agent_pubkey().clone(),
     })
 }

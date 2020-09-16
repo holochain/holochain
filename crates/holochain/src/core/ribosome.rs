@@ -124,7 +124,7 @@ impl HostAccess {
             Self::ValidationPackage(ValidationPackageHostAccess{workspace, .. }) |
             Self::PostCommit(PostCommitHostAccess{workspace, .. }) |
             Self::Validate(ValidateHostAccess { workspace, .. }) |
-            Self::ValidateLinkAdd(ValidateCreateLinkHostAccess { workspace, .. }) => {
+            Self::ValidateCreateLink(ValidateCreateLinkHostAccess { workspace, .. }) => {
                 workspace
             }
             _ => panic!("Gave access to a host function that uses the workspace without providing a workspace"),
@@ -150,7 +150,7 @@ impl HostAccess {
             | Self::Init(InitHostAccess { network, .. })
             | Self::PostCommit(PostCommitHostAccess { network, .. })
             | Self::Validate(ValidateHostAccess { network, .. })
-            | Self::ValidateLinkAdd(ValidateCreateLinkHostAccess { network, .. }) => network,
+            | Self::ValidateCreateLink(ValidateCreateLinkHostAccess { network, .. }) => network,
             _ => panic!(
                 "Gave access to a host function that uses the network without providing a network"
             ),

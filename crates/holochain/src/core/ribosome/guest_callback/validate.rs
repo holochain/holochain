@@ -68,16 +68,16 @@ impl Invocation for ValidateInvocation {
             Some(Entry::CapClaim(_)) => fns.push("cap_claim".into()),
             Some(Entry::CapGrant(_)) => fns.push("cap_grant".into()),
             None => match self.element.header() {
-                Header::ElementDelete(_) => fns.push("delete".into()),
-                Header::EntryUpdate(_) => fns.push("update".into()),
-                Header::LinkRemove(_) => fns.push("remove_link".into()),
+                Header::Delete(_) => fns.push("delete".into()),
+                Header::Update(_) => fns.push("update".into()),
+                Header::DeleteLink(_) => fns.push("remove_link".into()),
                 _ => (),
             },
         }
         fns.into()
     }
     fn host_input(self) -> Result<ExternInput, SerializedBytesError> {
-        Ok(ExternInput::new((&*self.entry).try_into()?))
+        Ok(ExternInput::new((&*self.element).try_into()?))
     }
 }
 

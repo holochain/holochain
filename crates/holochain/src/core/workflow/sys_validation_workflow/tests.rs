@@ -115,17 +115,17 @@ async fn run_test(
                 debug!(?hash, ?i, op_in_val = ?el);
             }
         }
-        assert_eq!(
-            fresh_reader_test!(alice_env, |r| {
-                workspace
-                    .validation_limbo
-                    .iter(&r)
-                    .unwrap()
-                    .count()
-                    .unwrap()
-            }),
-            0
-        );
+        assert_eq!(res.len(), 0, "{:?}", res);
+        let int_limbo: Vec<_> = fresh_reader_test!(alice_env, |r| {
+            workspace
+                .integration_limbo
+                .iter(&r)
+                .unwrap()
+                .map(|(k, i)| Ok((k.to_vec(), i)))
+                .collect()
+                .unwrap()
+        });
+        assert_eq!(int_limbo.len(), 0, "{:?}", int_limbo);
         let res: Vec<_> = fresh_reader_test!(alice_env, |r| {
             workspace
                 .integrated_dht_ops
@@ -153,7 +153,7 @@ async fn run_test(
             }
         }
 
-        assert_eq!(res.len(), expected_count);
+        assert_eq!(res.len(), expected_count, "{:?}", res);
     }
 
     let (bad_update_header, bad_update_entry_hash, link_add_hash) =
