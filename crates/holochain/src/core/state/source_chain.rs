@@ -7,11 +7,10 @@ pub use error::*;
 use fallible_iterator::FallibleIterator;
 use holo_hash::*;
 use holochain_state::{buffer::BufferedStore, error::DatabaseResult, fresh_reader, prelude::*};
-use holochain_types::{prelude::*, EntryHashed, HeaderHashed};
-use holochain_zome_types::capability::CapAccess;
-use holochain_zome_types::capability::GrantedFunction;
+use holochain_types::{prelude::*, EntryHashed};
 use holochain_zome_types::{
-    capability::{CapGrant, CapSecret},
+    capability::{CapAccess, CapGrant, CapSecret, GrantedFunction},
+    element::Element,
     entry::{CapClaimEntry, Entry},
     header::{builder, EntryType, Header, HeaderBuilder, HeaderBuilderCommon, HeaderInner},
     query::ChainQueryFilter,
@@ -291,10 +290,17 @@ impl SourceChain {
     /// Query Headers in the source chain.
     /// This returns a Vec rather than an iterator because it is intended to be
     /// used by the `query` host function, which crosses the wasm boundary
-    pub fn query(&self, query: &ChainQueryFilter) -> SourceChainResult<Vec<HeaderHashed>> {
+    pub fn query(&self, query: &ChainQueryFilter) -> SourceChainResult<Vec<Element>> {
+        let include_entries = query.include_entries;
         self.iter_back()
             .filter(|shh| Ok(query.check(shh.header())))
-            .map(|shh| Ok(shh.header_hashed().clone()))
+            .map(|shh| {
+                let entry = match shh.header().entry_hash() {
+                    Some(eh) if include_entries => self.0.get_entry(eh)?,
+                    _ => None,
+                };
+                Ok(Element::new(shh, entry.map(|e| e.into_content())))
+            })
             .collect()
     }
 }
