@@ -121,10 +121,10 @@ pub fn extract_entry_def(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    use super::commit_entry;
-    use crate::conductor::dna_store::MockDnaStore;
     use super::create;
+    use crate::conductor::dna_store::MockDnaStore;
     use crate::core::ribosome::error::RibosomeError;
+    use crate::core::ribosome::ZomeCallInvocation;
     use crate::core::state::source_chain::ChainInvalidReason;
     use crate::core::state::source_chain::SourceChainError;
     use crate::core::state::source_chain::SourceChainResult;
@@ -133,28 +133,21 @@ pub mod wasm_test {
     use crate::fixt::EntryFixturator;
     use crate::fixt::WasmRibosomeFixturator;
     use crate::fixt::ZomeCallHostAccessFixturator;
+    use crate::test_utils::setup_app;
     use ::fixt::prelude::*;
     use hdk3::prelude::*;
     use holo_hash::{AnyDhtHash, EntryHash};
-    use holochain_serialized_bytes::prelude::*;
     use holochain_types::{
-        app::InstalledCell,
-        cell::CellId,
-        dna::DnaDef,
-        dna::DnaFile,
-        fixt::{AppEntry, CapSecretFixturator},
-        observability,
-        test_utils::fake_agent_pubkey_1,
-        test_utils::fake_agent_pubkey_2,
+        app::InstalledCell, cell::CellId, dna::DnaDef, dna::DnaFile, fixt::AppEntry, observability,
+        test_utils::fake_agent_pubkey_1, test_utils::fake_agent_pubkey_2,
     };
-    use holochain_types::fixt::AppEntry;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::entry_def::EntryDefId;
     use holochain_zome_types::CreateInput;
     use holochain_zome_types::CreateOutput;
     use holochain_zome_types::Entry;
     use holochain_zome_types::GetOutput;
-    use holochain_zome_types::{entry::EntryError, HostInput};
+    use holochain_zome_types::{entry::EntryError, ExternInput};
     use matches::assert_matches;
     use std::sync::Arc;
 
@@ -291,7 +284,7 @@ pub mod wasm_test {
         observability::test_run().unwrap();
         let dna_file = DnaFile::new(
             DnaDef {
-                name: "commit_multi_test".to_string(),
+                name: "create_multi_test".to_string(),
                 uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
                 properties: SerializedBytes::try_from(()).unwrap(),
                 zomes: vec![TestWasm::MultipleCalls.into()].into(),
@@ -340,7 +333,10 @@ pub mod wasm_test {
         dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
 
         let (_tmpdir, _app_api, handle) = setup_app(
-            vec![(alice_installed_cell, None), (bob_installed_cell, None)],
+            vec![(
+                "APPropriated",
+                vec![(alice_installed_cell, None), (bob_installed_cell, None)],
+            )],
             dna_store,
         )
         .await;
@@ -355,20 +351,21 @@ pub mod wasm_test {
             .call_zome(ZomeCallInvocation {
                 cell_id: alice_cell_id,
                 zome_name: TestWasm::MultipleCalls.into(),
-                cap: CapSecretFixturator::new(Empty).next().unwrap(),
-                fn_name: "commit_entry_multiple".to_string(),
-                payload: HostInput::new(().try_into().unwrap()),
+                cap: None,
+                fn_name: "create_entry_multiple".into(),
+                payload: ExternInput::new(().try_into().unwrap()),
                 provenance: alice_agent_id,
             })
             .await
             .unwrap()
             .unwrap();
-        assert_matches!(output, ZomeCallInvocationResponse::ZomeApiFn(_));
+        assert_matches!(output, ZomeCallResponse::Ok(_));
 
         let shutdown = handle.take_shutdown_handle().await.unwrap();
         handle.shutdown().await;
         shutdown.await.unwrap();
     }
+
     #[tokio::test(threaded_scheduler)]
     #[ignore]
     async fn ribosome_multiple_create_entry_test<'a>() {
@@ -387,10 +384,10 @@ pub mod wasm_test {
         host_access.workspace = workspace_lock.clone();
 
         // get the result of a commit entry
-        let output: CommitEntryOutput = crate::call_test_ribosome!(
+        let output: CreateOutput = crate::call_test_ribosome!(
             host_access,
             TestWasm::MultipleCalls,
-            "commit_entry_multiple",
+            "create_entry_multiple",
             ()
         );
 

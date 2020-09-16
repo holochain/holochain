@@ -10,17 +10,17 @@ fn post() -> Post {
 }
 
 #[hdk_extern]
-fn commit_entry_multiple(_: ()) -> ExternResult<HeaderHash> {
+fn create_entry_multiple(_: ()) -> ExternResult<HeaderHash> {
     for _ in 0..140 {
-        commit_entry!(post())?;
+        create_entry!(post())?;
     }
 
-    Ok(commit_entry!(post())?)
+    Ok(create_entry!(post())?)
 }
 
 #[hdk_extern]
 fn get_entry_multiple(_: ()) -> ExternResult<GetOutput> {
-    let address = entry_hash!(post())?;
+    let address = hash_entry!(post())?;
     for _ in 0..250 {
         get!(address.clone())?;
     }
