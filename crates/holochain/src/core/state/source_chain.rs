@@ -336,8 +336,8 @@ pub mod tests {
     async fn test_get_cap_grant() -> SourceChainResult<()> {
         let test_env = test_cell_env();
         let env = test_env.env();
-        let secret = CapSecretFixturator::new(Unpredictable).next().unwrap();
-        let access = CapAccess::from(secret);
+        let secret = Some(CapSecretFixturator::new(Unpredictable).next().unwrap());
+        let access = CapAccess::from(secret.unwrap());
 
         // @todo curry
         let _curry = CurryPayloadsFixturator::new(Empty).next().unwrap();
@@ -358,12 +358,15 @@ pub mod tests {
         {
             let chain = SourceChain::new(env.clone().into())?;
             assert_eq!(
-                chain.valid_cap_grant(&function, &alice, &secret)?,
+                chain.valid_cap_grant(&function, &alice, secret.as_ref())?,
                 Some(CapGrant::ChainAuthor(alice.clone())),
             );
 
             // bob should not match anything as the secret hasn't been committed yet
-            assert_eq!(chain.valid_cap_grant(&function, &bob, secret)?, None);
+            assert_eq!(
+                chain.valid_cap_grant(&function, &bob, secret.as_ref())?,
+                None
+            );
         }
 
         let (original_header_address, original_entry_address) = {
@@ -387,14 +390,14 @@ pub mod tests {
             // alice should find her own authorship with higher priority than the committed grant
             // even if she passes in the secret
             assert_eq!(
-                chain.valid_cap_grant(&function, &alice, &secret)?,
+                chain.valid_cap_grant(&function, &alice, secret.as_ref())?,
                 Some(CapGrant::ChainAuthor(alice.clone())),
             );
 
             // bob should be granted with the committed grant as it matches the secret he passes to
             // alice at runtime
             assert_eq!(
-                chain.valid_cap_grant(&function, &bob, secret)?,
+                chain.valid_cap_grant(&function, &bob, secret.as_ref())?,
                 Some(grant.clone().into())
             );
         }
@@ -402,8 +405,8 @@ pub mod tests {
         // let's roll the secret and assign the grant to bob specifically
         let mut assignees = HashSet::new();
         assignees.insert(bob.clone());
-        let updated_secret = CapSecretFixturator::new(Unpredictable).next().unwrap();
-        let updated_access = CapAccess::from((updated_secret.clone(), assignees));
+        let updated_secret = Some(CapSecretFixturator::new(Unpredictable).next().unwrap());
+        let updated_access = CapAccess::from((updated_secret.clone().unwrap(), assignees));
         let updated_grant = ZomeCallCapGrant::new("tag".into(), updated_access.clone(), functions);
 
         let (updated_header_hash, updated_entry_hash) = {
@@ -429,18 +432,21 @@ pub mod tests {
             // alice should find her own authorship with higher priority than the committed grant
             // even if she passes in the secret
             assert_eq!(
-                chain.valid_cap_grant(&function, &alice, &secret)?,
+                chain.valid_cap_grant(&function, &alice, secret.as_ref())?,
                 Some(CapGrant::ChainAuthor(alice.clone())),
             );
             assert_eq!(
-                chain.valid_cap_grant(&function, &alice, &updated_secret)?,
+                chain.valid_cap_grant(&function, &alice, updated_secret.as_ref())?,
                 Some(CapGrant::ChainAuthor(alice.clone())),
             );
 
             // bob MUST provide the updated secret as the old one is invalidated by the new one
-            assert_eq!(chain.valid_cap_grant(&function, &bob, secret)?, None);
             assert_eq!(
-                chain.valid_cap_grant(&function, &bob, Some(&updated_secret))?,
+                chain.valid_cap_grant(&function, &bob, secret.as_ref())?,
+                None
+            );
+            assert_eq!(
+                chain.valid_cap_grant(&function, &bob, updated_secret.as_ref())?,
                 Some(updated_grant.into())
             );
         }
@@ -461,18 +467,21 @@ pub mod tests {
             let chain = SourceChain::new(env.clone().into())?;
             // alice should find her own authorship
             assert_eq!(
-                chain.valid_cap_grant(&function, &alice, &secret)?,
+                chain.valid_cap_grant(&function, &alice, secret.as_ref())?,
                 Some(CapGrant::ChainAuthor(alice.clone())),
             );
             assert_eq!(
-                chain.valid_cap_grant(&function, &alice, &updated_secret)?,
+                chain.valid_cap_grant(&function, &alice, updated_secret.as_ref())?,
                 Some(CapGrant::ChainAuthor(alice)),
             );
 
             // bob has no access
-            assert_eq!(chain.valid_cap_grant(&function, &bob, secret)?, None);
             assert_eq!(
-                chain.valid_cap_grant(&function, &bob, Some(&updated_secret))?,
+                chain.valid_cap_grant(&function, &bob, secret.as_ref())?,
+                None
+            );
+            assert_eq!(
+                chain.valid_cap_grant(&function, &bob, updated_secret.as_ref())?,
                 None
             );
         }
