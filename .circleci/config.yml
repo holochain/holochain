@@ -52,14 +52,14 @@ workflows:
   jobs:
    - merge-test
  docker-builds:
-  triggers:
-   - schedule:
-      cron: "0 0 * * *"
-      filters:
-       branches:
-        only:
-         - develop
-         - master
+  # triggers:
+   # - schedule:
+   #    cron: "0 0 * * *"
+   filters:
+    branches:
+     only:
+      - develop
+      - master
   jobs:
    - docker-build-latest
    - docker-build-circle-build:
