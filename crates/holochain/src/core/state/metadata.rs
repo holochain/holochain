@@ -687,7 +687,7 @@ impl<P: PrefixType> BufferedStore for MetadataBuf<P> {
     }
 }
 
-// TODO: macroize for these predictable impls
+// TODO: could DRY these predictable impls with proc macros
 #[allow(missing_docs)]
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum MetadataBufFixtureItem<P: PrefixType> {

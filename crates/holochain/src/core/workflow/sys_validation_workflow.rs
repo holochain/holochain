@@ -24,6 +24,7 @@ use holochain_p2p::HolochainP2pCell;
 use holochain_state::{
     buffer::{BufferedStore, KvBufFresh},
     db::INTEGRATION_LIMBO,
+    db_fixture::DbFixture,
     db_fixture::LoadDbFixture,
     fresh_reader,
     prelude::*,
@@ -665,15 +666,111 @@ impl Workspace for SysValidationWorkspace {
     }
 }
 
+// TODO: could DRY these predictable impls with proc macros
+#[allow(missing_docs)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SysValidationWorkspaceFixtureItem {
     IntegrationLimbo(<IntegrationLimboStore as LoadDbFixture>::FixtureItem),
     ValidationLimbo(<ValidationLimboStore as LoadDbFixture>::FixtureItem),
     ElementVault(<ElementBuf as LoadDbFixture>::FixtureItem),
     MetaVault(<MetadataBuf as LoadDbFixture>::FixtureItem),
-    ElementPending(<ElementBuf as LoadDbFixture>::FixtureItem),
-    MetaPending(<MetadataBuf as LoadDbFixture>::FixtureItem),
-    ElementJudged(<ElementBuf as LoadDbFixture>::FixtureItem),
-    MetaJudged(<MetadataBuf as LoadDbFixture>::FixtureItem),
+    ElementPending(<ElementBuf<PendingPrefix> as LoadDbFixture>::FixtureItem),
+    MetaPending(<MetadataBuf<PendingPrefix> as LoadDbFixture>::FixtureItem),
+    ElementJudged(<ElementBuf<JudgedPrefix> as LoadDbFixture>::FixtureItem),
+    MetaJudged(<MetadataBuf<JudgedPrefix> as LoadDbFixture>::FixtureItem),
     ElementCache(<ElementBuf as LoadDbFixture>::FixtureItem),
     MetaCache(<MetadataBuf as LoadDbFixture>::FixtureItem),
+}
+
+impl LoadDbFixture for SysValidationWorkspace {
+    type FixtureItem = SysValidationWorkspaceFixtureItem;
+
+    fn write_test_datum(&mut self, datum: Self::FixtureItem) {
+        match datum {
+            Self::FixtureItem::IntegrationLimbo(d) => self.integration_limbo.write_test_datum(d),
+            Self::FixtureItem::ValidationLimbo(d) => self.validation_limbo.write_test_datum(d),
+            Self::FixtureItem::ElementVault(d) => self.element_vault.write_test_datum(d),
+            Self::FixtureItem::MetaVault(d) => self.meta_vault.write_test_datum(d),
+            Self::FixtureItem::ElementPending(d) => self.element_pending.write_test_datum(d),
+            Self::FixtureItem::MetaPending(d) => self.meta_pending.write_test_datum(d),
+            Self::FixtureItem::ElementJudged(d) => self.element_judged.write_test_datum(d),
+            Self::FixtureItem::MetaJudged(d) => self.meta_judged.write_test_datum(d),
+            Self::FixtureItem::ElementCache(d) => self.element_cache.write_test_datum(d),
+            Self::FixtureItem::MetaCache(d) => self.meta_cache.write_test_datum(d),
+        }
+    }
+
+    fn read_test_data<R: Readable>(&self, reader: &R) -> DbFixture<Self::FixtureItem> {
+        let integration_limbo = self
+            .integration_limbo
+            .read_test_data(reader)
+            .into_iter()
+            .map(|i| Self::FixtureItem::IntegrationLimbo(i));
+
+        let validation_limbo = self
+            .validation_limbo
+            .read_test_data(reader)
+            .into_iter()
+            .map(|i| Self::FixtureItem::ValidationLimbo(i));
+
+        let element_vault = self
+            .element_vault
+            .read_test_data(reader)
+            .into_iter()
+            .map(|i| Self::FixtureItem::ElementVault(i));
+
+        let meta_vault = self
+            .meta_vault
+            .read_test_data(reader)
+            .into_iter()
+            .map(|i| Self::FixtureItem::MetaVault(i));
+
+        let element_pending = self
+            .element_pending
+            .read_test_data(reader)
+            .into_iter()
+            .map(|i| Self::FixtureItem::ElementPending(i));
+
+        let meta_pending = self
+            .meta_pending
+            .read_test_data(reader)
+            .into_iter()
+            .map(|i| Self::FixtureItem::MetaPending(i));
+
+        let element_judged = self
+            .element_judged
+            .read_test_data(reader)
+            .into_iter()
+            .map(|i| Self::FixtureItem::ElementJudged(i));
+
+        let meta_judged = self
+            .meta_judged
+            .read_test_data(reader)
+            .into_iter()
+            .map(|i| Self::FixtureItem::MetaJudged(i));
+
+        let element_cache = self
+            .element_cache
+            .read_test_data(reader)
+            .into_iter()
+            .map(|i| Self::FixtureItem::ElementCache(i));
+
+        let meta_cache = self
+            .meta_cache
+            .read_test_data(reader)
+            .into_iter()
+            .map(|i| Self::FixtureItem::MetaCache(i));
+
+        integration_limbo
+            .chain(validation_limbo)
+            .chain(element_vault)
+            .chain(meta_vault)
+            .chain(element_pending)
+            .chain(meta_pending)
+            .chain(element_judged)
+            .chain(meta_judged)
+            .chain(element_cache)
+            .chain(meta_cache)
+            .collect::<DbFixture<Self::FixtureItem>>()
+    }
 }
