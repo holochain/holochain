@@ -135,14 +135,9 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::GenerateAgentPubKey(agent_pub_key))
             }
-            ListAgentPubKeys => {
-                let pub_key_list = self
-                    .conductor_handle
-                    .keystore()
-                    .clone()
-                    .list_sign_keys()
-                    .await?;
-                Ok(AdminResponse::ListAgentPubKeys(pub_key_list))
+            ListCellIds => {
+                let cell_ids = self.conductor_handle.list_cell_ids().await?;
+                Ok(AdminResponse::ListCellIds(cell_ids))
             }
             ActivateApp { app_id } => {
                 // Activate app
@@ -243,8 +238,8 @@ pub enum AdminRequest {
     ListDnas,
     /// Generate a new AgentPubKey
     GenerateAgentPubKey,
-    /// List all AgentPubKeys in Keystore
-    ListAgentPubKeys,
+    /// List all the cell ids in the conductor
+    ListCellIds,
     /// Activate an app
     ActivateApp {
         /// The AppId to activate
@@ -283,8 +278,8 @@ pub enum AdminResponse {
     ListDnas(Vec<DnaHash>),
     /// Keystore generated a new AgentPubKey
     GenerateAgentPubKey(AgentPubKey),
-    /// Listing all the AgentPubKeys in the Keystore
-    ListAgentPubKeys(Vec<AgentPubKey>),
+    /// Listing all the cell ids in the conductor
+    ListCellIds(Vec<CellId>),
     /// [AppInterfaceApi] successfully attached
     AppInterfaceAttached {
         /// Port of the new [AppInterfaceApi]
@@ -339,13 +334,14 @@ mod test {
         let cell_id = CellId::new(dna.dna_hash().clone(), agent_key.clone());
         let expected_cell_ids = InstalledApp {
             app_id: "test".to_string(),
-            cell_data: vec![InstalledCell::new(cell_id, "".to_string())],
+            cell_data: vec![InstalledCell::new(cell_id.clone(), "".to_string())],
         };
         let payload = InstallAppPayload {
             dnas: vec![dna_payload],
             app_id: "test".to_string(),
             agent_key,
         };
+
         let install_response = admin_api
             .handle_admin_request(AdminRequest::InstallApp(Box::new(payload)))
             .await;
@@ -356,54 +352,25 @@ mod test {
         let dna_list = admin_api.handle_admin_request(AdminRequest::ListDnas).await;
         let expects = vec![dna_hash];
         assert_matches!(dna_list, AdminResponse::ListDnas(a) if a == expects);
+
+        let res = admin_api
+            .handle_admin_request(AdminRequest::ActivateApp {
+                app_id: "test".to_string(),
+            })
+            .await;
+
+        assert_matches!(res, AdminResponse::AppActivated);
+
+        let res = admin_api
+            .handle_admin_request(AdminRequest::ListCellIds)
+            .await;
+
+        assert_matches!(res, AdminResponse::ListCellIds(v) if v == vec![cell_id]);
+
         handle.shutdown().await;
         tokio::time::timeout(std::time::Duration::from_secs(1), shutdown)
             .await
             .ok();
-        Ok(())
-    }
-
-    #[tokio::test(threaded_scheduler)]
-    async fn generate_and_list_pub_keys() -> Result<()> {
-        let test_env = test_conductor_env();
-        let TestEnvironment {
-            env: wasm_env,
-            tmpdir: _tmpdir,
-        } = test_wasm_env();
-        let _tmpdir = test_env.tmpdir.clone();
-        let handle = Conductor::builder().test(test_env, wasm_env).await.unwrap();
-        let admin_api = RealAdminInterfaceApi::new(handle);
-
-        let agent_pub_key = admin_api
-            .handle_admin_request(AdminRequest::GenerateAgentPubKey)
-            .await;
-
-        let agent_pub_key = match agent_pub_key {
-            AdminResponse::GenerateAgentPubKey(key) => key,
-            _ => panic!("bad type: {:?}", agent_pub_key),
-        };
-
-        let pub_key_list = admin_api
-            .handle_admin_request(AdminRequest::ListAgentPubKeys)
-            .await;
-
-        let mut pub_key_list = match pub_key_list {
-            AdminResponse::ListAgentPubKeys(list) => list,
-            _ => panic!("bad type: {:?}", pub_key_list),
-        };
-
-        // includes our two pre-generated test keys
-        let mut expects = vec![
-            AgentPubKey::try_from("uhCAkw-zrttiYpdfAYX4fR6W8DPUdheZJ-1QsRA4cTImmzTYUcOr4").unwrap(),
-            AgentPubKey::try_from("uhCAkomHzekU0-x7p62WmrusdxD2w9wcjdajC88688JGSTEo6cbEK").unwrap(),
-            agent_pub_key,
-        ];
-
-        pub_key_list.sort();
-        expects.sort();
-
-        assert_eq!(expects, pub_key_list);
-
         Ok(())
     }
 
