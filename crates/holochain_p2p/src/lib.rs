@@ -50,6 +50,7 @@ pub trait HolochainP2pCellT {
     ) -> actor::HolochainP2pResult<SerializedBytes>;
 
     /// Publish data to the correct neighborhood.
+    #[allow(clippy::ptr_arg)]
     async fn publish(
         &mut self,
         request_validation_receipt: bool,

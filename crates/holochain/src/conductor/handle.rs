@@ -93,6 +93,7 @@ pub trait ConductorHandleT: Send + Sync {
     /// around having a circular reference in the types.
     ///
     /// Never use a ConductorHandle for different Conductor here!
+    #[allow(clippy::ptr_arg)]
     async fn add_admin_interfaces(
         self: Arc<Self>,
         configs: Vec<AdminInterfaceConfig>,
@@ -153,6 +154,7 @@ pub trait ConductorHandleT: Send + Sync {
 
     /// Install Cells into ConductorState based on installation info, and run
     /// genesis on all new source chains
+    #[allow(clippy::ptr_arg)]
     async fn install_app(
         self: Arc<Self>,
         app_id: AppId,
@@ -164,15 +166,18 @@ pub trait ConductorHandleT: Send + Sync {
     async fn setup_cells(self: Arc<Self>) -> ConductorResult<Vec<CreateAppError>>;
 
     /// Activate an app
+    #[allow(clippy::ptr_arg)]
     async fn activate_app(&self, app_id: AppId) -> ConductorResult<()>;
 
     /// Deactivate an app
+    #[allow(clippy::ptr_arg)]
     async fn deactivate_app(&self, app_id: AppId) -> ConductorResult<()>;
 
     /// List Cell Ids
     async fn list_cell_ids(&self) -> ConductorResult<Vec<CellId>>;
 
     /// Dump the cells state
+    #[allow(clippy::ptr_arg)]
     async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String>;
 
     /// Get info about an installed App, whether active or inactive
