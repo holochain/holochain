@@ -29,6 +29,10 @@ with holonix.pkgs;
    ''
     touch .env
     source .env
+
+    # https://nixos.wiki/wiki/Development_environment_with_nix-shell#troubleshooting
+    export NIX_ENFORCE_PURITY=0
+
     export HC_TARGET_PREFIX=$NIX_ENV_PREFIX
     export CARGO_TARGET_DIR="$HC_TARGET_PREFIX/target"
     export HC_TEST_WASM_DIR="$HC_TARGET_PREFIX/.wasm_target"
@@ -43,7 +47,13 @@ with holonix.pkgs;
     # ensure the holochain binary is fresh and installed on the path
     # ideally we want to do this offline but if that fails we can fall back to
     # doing it online and update the crates registry
-    cargo install --path crates/holochain --offline || cargo install --path crates/holochain
+    rm $CARGO_INSTALL_ROOT/bin/holochain
+    cargo install --path crates/holochain --offline
+    if (( $? != 0 ))
+     then
+      cargo install --path crates/holochain
+    fi
+
     if [[ $( command -v holochain ) == $CARGO_INSTALL_ROOT* ]]
      then
       echo 'updated holochain binary'
