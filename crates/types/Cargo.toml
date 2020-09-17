@@ -13,7 +13,7 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0.26"
-async-trait = "0.1.24"
+async-trait = "0.1"
 backtrace = "0.3.27"
 base64 = "0.10.1"
 chrono = "0.4.6"
