@@ -35,6 +35,9 @@ jobs:
   merge-test-mac:
    macos:
     xcode: "12.0.0"
+   resource_class: xlarge
+   environment:
+    NIXPKGS_ALLOW_UNFREE: 1
    steps:
     - checkout
     - run:
