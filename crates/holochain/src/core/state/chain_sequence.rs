@@ -37,13 +37,6 @@ pub struct ChainSequenceBuf {
     tx_seq: u32,
     current_head: Option<HeaderHash>,
     persisted_head: Option<HeaderHash>,
-    /// If this transaction hasn't moved the chain
-    /// we don't need to check for as at on write.
-    /// This helps avoid failed writes when nothing
-    /// is actually being written by a workflow
-    /// or when produce_dht_ops updates the
-    /// dht_transforms_complete.
-    chain_moved_in_this_transaction: bool,
 }
 
 impl ChainSequenceBuf {
@@ -60,7 +53,6 @@ impl ChainSequenceBuf {
             tx_seq,
             current_head,
             persisted_head,
-            chain_moved_in_this_transaction: false,
         })
     }
 
@@ -122,7 +114,6 @@ impl ChainSequenceBuf {
         trace!(self.next_index);
         self.next_index += 1;
         self.current_head = Some(header_address);
-        self.chain_moved_in_this_transaction = true;
         Ok(())
     }
 
@@ -156,6 +147,16 @@ impl ChainSequenceBuf {
         }
         Ok(())
     }
+
+    /// If this transaction hasn't moved the chain
+    /// we don't need to check for as at on write.
+    /// This helps avoid failed writes when nothing
+    /// is actually being written by a workflow
+    /// or when produce_dht_ops updates the
+    /// dht_transforms_complete.
+    pub fn chain_moved_in_this_transaction(&self) -> bool {
+        self.current_head != self.persisted_head
+    }
 }
 
 impl BufferedStore for ChainSequenceBuf {
@@ -173,20 +174,15 @@ impl BufferedStore for ChainSequenceBuf {
             return Ok(());
         }
 
-        // Need to write but not a chain move
-        if !self.chain_moved_in_this_transaction {
-            return Ok(self.buf.flush_to_txn_ref(writer)?);
-        }
-
         // Writing a chain move
         let env = self.buf.env().clone();
         let db = env.get_db(&*CHAIN_SEQUENCE)?;
         let (_, _, persisted_head) = ChainSequenceBuf::head_info(&KvIntStore::new(db), writer)?;
-        let (old, new) = (self.persisted_head.as_ref(), persisted_head.as_ref());
-        if old != new {
+        let persisted_head_moved = self.persisted_head != persisted_head;
+        if persisted_head_moved && self.chain_moved_in_this_transaction() {
             Err(SourceChainError::HeadMoved(
-                old.map(|x| x.to_owned()),
-                new.map(|x| x.to_owned()),
+                self.persisted_head.to_owned(),
+                persisted_head,
             ))
         } else {
             Ok(self.buf.flush_to_txn_ref(writer)?)
@@ -497,21 +493,22 @@ pub mod tests {
 
         // Add a few things to start with
         let mut buf = ChainSequenceBuf::new(arc1.clone().into())?;
-            buf.put_header(
-                HeaderHash::from_raw_bytes(vec![
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                ])
-                .into(),
-            )?;
-            buf.put_header(
-                HeaderHash::from_raw_bytes(vec![
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
-                ])
-                .into(),
-            )?;
-            arc1.guard().with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
+        buf.put_header(
+            HeaderHash::from_raw_bytes(vec![
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0,
+            ])
+            .into(),
+        )?;
+        buf.put_header(
+            HeaderHash::from_raw_bytes(vec![
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 1,
+            ])
+            .into(),
+        )?;
+        arc1.guard()
+            .with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
 
         // Modify the chain without adding a header -- this succeeds
         let task1 = tokio::spawn(async move {
