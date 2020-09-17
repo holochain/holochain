@@ -51,11 +51,19 @@ with holonix.pkgs;
     # ideally we want to do this offline but if that fails we can fall back to
     # doing it online and update the crates registry
     rm $CARGO_INSTALL_ROOT/bin/holochain
-    cargo install --path crates/holochain --offline
-    if (( $? != 0 ))
+
+    # CI very much does not like offline
+    if [[ -z "$CI" ]]
      then
+      cargo install --path crates/holochain --offline
+      if (( $? != 0 ))
+       then
+        cargo install --path crates/holochain
+      fi
+     else
       cargo install --path crates/holochain
     fi
+
 
     if [[ $( command -v holochain ) == $CARGO_INSTALL_ROOT* ]]
      then
