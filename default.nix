@@ -33,6 +33,9 @@ with holonix.pkgs;
     # https://nixos.wiki/wiki/Development_environment_with_nix-shell#troubleshooting
     export NIX_ENFORCE_PURITY=0
 
+    export RUST_SODIUM_DISABLE_PIE=1
+    export RUST_SODIUM_USE_PKG_CONFIG=1
+
     export HC_TARGET_PREFIX=$NIX_ENV_PREFIX
     export CARGO_TARGET_DIR="$HC_TARGET_PREFIX/target"
     export HC_TEST_WASM_DIR="$HC_TARGET_PREFIX/.wasm_target"
@@ -65,6 +68,7 @@ with holonix.pkgs;
   ];
 
   buildInputs = [
+   holonix.pkgs.libsodium
    holonix.pkgs.gnuplot
    holonix.pkgs.flamegraph
    holonix.pkgs.fd
