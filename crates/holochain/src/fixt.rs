@@ -241,20 +241,20 @@ fixturator!(
     KeystoreSender;
     curve Empty {
         tokio_safe_block_on::tokio_safe_block_forever_on(async {
-            let _ = holochain_crypto::crypto_init_sodium();
+            // let _ = holochain_crypto::crypto_init_sodium();
             delete_me_create_test_keystore().await
         })
     };
     curve Unpredictable {
         // TODO: Make this unpredictable
         tokio_safe_block_on::tokio_safe_block_forever_on(async {
-            let _ = holochain_crypto::crypto_init_sodium();
+            // let _ = holochain_crypto::crypto_init_sodium();
             delete_me_create_test_keystore().await
         })
     };
     curve Predictable {
         tokio_safe_block_on::tokio_safe_block_forever_on(async {
-            let _ = holochain_crypto::crypto_init_sodium();
+            // let _ = holochain_crypto::crypto_init_sodium();
             delete_me_create_test_keystore().await
         })
     };

@@ -89,6 +89,7 @@ impl KeystoreApiHandler for TestKeystore {
     fn handle_generate_sign_keypair_from_pure_entropy(
         &mut self,
     ) -> KeystoreApiHandlerResult<holo_hash::AgentPubKey> {
+        let _ = crypto_init_sodium();
         if !self.fixture_keypairs.is_empty() {
             let MockKeypair { pub_key, sec_key } = self.fixture_keypairs.remove(0);
             // we're loading this out of insecure memory - but this is just a mock
