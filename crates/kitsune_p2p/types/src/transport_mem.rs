@@ -176,14 +176,20 @@ impl TransportConnectionHandler for InnerCon {
         Ok(async move { Ok(url) }.boxed().into())
     }
 
-    fn handle_request(&mut self, data: Vec<u8>) -> TransportConnectionHandlerResult<Vec<u8>> {
+    fn handle_create_channel(&mut self) -> TransportConnectionHandlerResult<(
+        TransportChannelWrite,
+        TransportChannelRead,
+    )> {
         let this_url = self.this_url.clone();
         let evt_send = self.evt_send.clone();
-        Ok(
-            async move { evt_send.incoming_request(this_url, data).await }
-                .boxed()
-                .into(),
-        )
+        Ok(async move {
+            let (recv1, send1) = tokio::io::split(std::io::Cursor::new(Vec::new()));
+            let (recv2, send2) = tokio::io::split(std::io::Cursor::new(Vec::new()));
+            evt_send.incoming_channel(this_url, Box::new(send1), Box::new(recv2)).await?;
+            let send2: TransportChannelWrite = Box::new(send2);
+            let recv1: TransportChannelRead = Box::new(recv1);
+            Ok((send2, recv1))
+        }.boxed().into())
     }
 }
 
@@ -196,12 +202,19 @@ mod tests {
         tokio::task::spawn(async move {
             while let Some(msg) = recv.next().await {
                 match msg {
-                    TransportConnectionEvent::IncomingRequest {
-                        respond, url, data, ..
+                    TransportConnectionEvent::IncomingChannel {
+                        respond, url, mut send, mut recv, ..
                     } => {
-                        let data = format!("echo({}): {}", url, String::from_utf8_lossy(&data),)
-                            .into_bytes();
-                        respond.respond(Ok(async move { Ok(data) }.boxed().into()));
+                        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+                        respond.respond(Ok(async move {
+                            let mut data = Vec::new();
+                            recv.read_to_end(&mut data).await.map_err(TransportError::other)?;
+                            let data = format!("echo({}): {}", url, String::from_utf8_lossy(&data),)
+                                .into_bytes();
+                            send.write_all(&data).await.map_err(TransportError::other)?;
+                            send.shutdown().await.map_err(TransportError::other)?;
+                            Ok(())
+                        }.boxed().into()));
                     }
                 }
             }
