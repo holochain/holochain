@@ -13,7 +13,7 @@ impl From<String> for TestString {
 
 #[derive(Serialize, Deserialize, SerializedBytes)]
 #[repr(transparent)]
-pub struct TestBytes(#[serde(with = "serde_bytes")] Vec<u8>);
+pub struct TestBytes(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
 impl From<Vec<u8>> for TestBytes {
     fn from(b: Vec<u8>) -> Self {
@@ -31,6 +31,9 @@ impl From<bool> for TestBool {
         Self(b)
     }
 }
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
+pub struct TestInt(pub u32);
 
 #[derive(Clone, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct AnchorInput(pub String, pub String);

@@ -6,16 +6,17 @@
 //! entry_types, and special entries, like deletion_entry and cap_entry.
 
 use holo_hash::*;
+use holochain_zome_types::element::ElementEntry;
 pub use holochain_zome_types::entry::Entry;
 
 /// An Entry paired with its EntryHash
 pub type EntryHashed = HoloHashed<Entry>;
 
-/// Convenience function for when you have an Option Entry but need
+/// Convenience function for when you have an ElementEntry but need
 /// a Option EntryHashed
-pub async fn option_entry_hashed(entry: Option<Entry>) -> Option<EntryHashed> {
+pub async fn option_entry_hashed(entry: ElementEntry) -> Option<EntryHashed> {
     match entry {
-        Some(e) => Some(EntryHashed::from_content_sync(e)),
-        None => None,
+        ElementEntry::Present(e) => Some(EntryHashed::from_content_sync(e)),
+        _ => None,
     }
 }

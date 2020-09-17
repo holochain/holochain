@@ -269,12 +269,12 @@ pub async fn produce_ops_from_element(element: &Element) -> DhtOpResult<Vec<DhtO
         let header = header.clone();
         let op = match op_light {
             DhtOpLight::StoreElement(_, _, _) => {
-                let maybe_entry_box = maybe_entry.clone().map(Box::new);
+                let maybe_entry_box = maybe_entry.clone().into_option().map(Box::new);
                 DhtOp::StoreElement(signature, header, maybe_entry_box)
             }
             DhtOpLight::StoreEntry(_, _, _) => {
                 let new_entry_header = header.clone().try_into()?;
-                let box_entry = match maybe_entry.clone() {
+                let box_entry = match maybe_entry.clone().into_option() {
                     Some(entry) => Box::new(entry),
                     None => {
                         // Entry is private so continue

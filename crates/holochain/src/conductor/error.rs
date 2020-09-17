@@ -84,6 +84,9 @@ pub enum ConductorError {
 
     #[error(transparent)]
     EntryDefStoreError(#[from] EntryDefStoreError),
+
+    #[error(transparent)]
+    KeystoreError(#[from] holochain_keystore::KeystoreError),
 }
 
 #[derive(Error, Debug)]

@@ -148,6 +148,13 @@ impl Cell {
         }
     }
 
+    /// Initialize all the workflows once.
+    /// This will run only once even if called
+    /// multiple times.
+    pub fn initialize_workflows(&mut self) {
+        self.queue_triggers.initialize_workflows();
+    }
+
     /// Performs the Genesis workflow the Cell, ensuring that its initial
     /// elements are committed. This is a prerequisite for any other interaction
     /// with the SourceChain
@@ -620,7 +627,7 @@ impl Cell {
         from_agent: AgentPubKey,
         zome_name: ZomeName,
         fn_name: FunctionName,
-        cap: CapSecret,
+        cap: Option<CapSecret>,
         payload: SerializedBytes,
     ) -> CellResult<SerializedBytes> {
         let invocation = ZomeCallInvocation {

@@ -7,7 +7,7 @@ mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn test_message() {
         let (listener1, _events1) =
-            spawn_transport_listener_quic(url2!("kitsune-quic://127.0.0.1:0"))
+            spawn_transport_listener_quic(url2!("kitsune-quic://127.0.0.1:0"), None)
                 .await
                 .unwrap();
 
@@ -15,7 +15,7 @@ mod tests {
         println!("listener1 bound to: {}", bound1);
 
         let (listener2, mut events2) =
-            spawn_transport_listener_quic(url2!("kitsune-quic://127.0.0.1:0"))
+            spawn_transport_listener_quic(url2!("kitsune-quic://127.0.0.1:0"), None)
                 .await
                 .unwrap();
 

@@ -27,6 +27,7 @@ with holonix.pkgs;
   shellHook = holonix.pkgs.lib.concatStrings [
    holonix.shell.shellHook
    ''
+    touch .env
     source .env
     export HC_TARGET_PREFIX=$NIX_ENV_PREFIX
     export CARGO_TARGET_DIR="$HC_TARGET_PREFIX/target"
