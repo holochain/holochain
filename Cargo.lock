@@ -1235,6 +1235,7 @@ dependencies = [
  "ghost_actor",
  "hdk3",
  "holo_hash",
+ "holochain_crypto",
  "holochain_keystore",
  "holochain_legacy",
  "holochain_p2p",

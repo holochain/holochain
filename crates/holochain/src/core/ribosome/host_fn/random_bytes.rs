@@ -16,14 +16,6 @@ pub fn random_bytes(
     let system_random = ring::rand::SystemRandom::new();
     let mut bytes = vec![0; input.into_inner() as _];
     system_random.fill(&mut bytes)?;
-    // let _ = crypto_init_sodium();
-    // let mut buf: DynCryptoBytes = crypto_secure_buffer(input.into_inner() as _)?;
-    //
-    // tokio_safe_block_on::tokio_safe_block_forever_on(async {
-    //     crypto_randombytes_buf(&mut buf).await
-    // })?;
-    //
-    // let random_bytes = buf.read();
 
     Ok(RandomBytesOutput::new(Bytes::from(bytes)))
 }
@@ -84,7 +76,7 @@ pub mod wasm_test {
             "random_bytes",
             RandomBytesInput::new(5 as _)
         );
-        dbg!(&output);
+
         assert_ne!(&[0; LEN], output.into_inner().as_ref(),);
     }
 }
