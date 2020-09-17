@@ -37,6 +37,13 @@ pub struct ChainSequenceBuf {
     tx_seq: u32,
     current_head: Option<HeaderHash>,
     persisted_head: Option<HeaderHash>,
+    /// If this transaction hasn't moved the chain
+    /// we don't need to check for as at on write.
+    /// This helps avoid failed writes when nothing
+    /// is actually being written by a workflow
+    /// or when produce_dht_ops updates the
+    /// dht_transforms_complete.
+    chain_moved_in_this_transaction: bool,
 }
 
 impl ChainSequenceBuf {
@@ -53,6 +60,7 @@ impl ChainSequenceBuf {
             tx_seq,
             current_head,
             persisted_head,
+            chain_moved_in_this_transaction: false,
         })
     }
 
@@ -114,6 +122,7 @@ impl ChainSequenceBuf {
         trace!(self.next_index);
         self.next_index += 1;
         self.current_head = Some(header_address);
+        self.chain_moved_in_this_transaction = true;
         Ok(())
     }
 
@@ -159,9 +168,17 @@ impl BufferedStore for ChainSequenceBuf {
     /// Commit to the source chain, performing an as-at check and returning a
     /// SourceChainError::HeadMoved error if the as-at check fails
     fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> SourceChainResult<()> {
+        // Nothing to write
         if self.is_clean() {
             return Ok(());
         }
+
+        // Need to write but not a chain move
+        if !self.chain_moved_in_this_transaction {
+            return Ok(self.buf.flush_to_txn_ref(writer)?);
+        }
+
+        // Writing a chain move
         let env = self.buf.env().clone();
         let db = env.get_db(&*CHAIN_SEQUENCE)?;
         let (_, _, persisted_head) = ChainSequenceBuf::head_info(&KvIntStore::new(db), writer)?;
