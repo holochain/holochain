@@ -9,7 +9,7 @@ use crate::conductor::{
     ConductorHandle,
 };
 use holo_hash::*;
-use holochain_keystore::KeystoreApiSender;
+use holochain_keystore::KeystoreSenderExt;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::{
     app::{AppId, InstallAppDnaPayload, InstallAppPayload, InstalledApp, InstalledCell},

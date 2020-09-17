@@ -29,7 +29,10 @@ macro_rules! map_extern {
                 input.into_inner().try_into(),
                 "failed to deserialize args"
             ));
-            let result_value = $crate::prelude::try_result!(result, "inner function failed");
+            let result_value = $crate::prelude::try_result!(
+                result,
+                concat!("inner function '", stringify!($f), "' failed")
+            );
             let result_sb = $crate::prelude::try_result!(
                 $crate::prelude::SerializedBytes::try_from(result_value),
                 "inner function result serialization error"

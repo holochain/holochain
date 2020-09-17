@@ -34,7 +34,6 @@ pub mod paths;
 pub mod state;
 
 pub use cell::{error::CellError, Cell};
-pub(crate) use conductor::delete_me_create_test_keystore;
 pub use conductor::{Conductor, ConductorBuilder, ConductorStateDb};
 pub use handle::ConductorHandle;
 
