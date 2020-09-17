@@ -45,8 +45,10 @@ mod sys_meta;
 #[cfg(test)]
 mod mock;
 
-/// Trait for the [MetadataBuf]
-/// Needed for mocking
+/// Trait for the [MetadataBuf], needed for mocking
+///
+/// Unfortunately this cannot be automocked because of the lifetimes required
+/// for returning iterators from these trait methods, which automock doesn't support.
 #[async_trait::async_trait]
 pub trait MetadataBufT<P = IntegratedPrefix>
 where

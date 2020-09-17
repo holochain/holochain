@@ -20,7 +20,7 @@ use error::WorkflowResult;
 use fallible_iterator::FallibleIterator;
 use holo_hash::DhtOpHash;
 use holochain_keystore::Signature;
-use holochain_p2p::HolochainP2pCell;
+use holochain_p2p::{HolochainP2pCell, HolochainP2pCellT};
 use holochain_state::{
     buffer::{BufferedStore, KvBufFresh},
     db::INTEGRATION_LIMBO,
@@ -563,7 +563,10 @@ pub struct SysValidationWorkspace {
 }
 
 impl<'a> SysValidationWorkspace {
-    pub fn cascade(&'a mut self, network: HolochainP2pCell) -> Cascade<'a> {
+    pub fn cascade<Network: HolochainP2pCellT>(
+        &'a mut self,
+        network: Network,
+    ) -> Cascade<'a, Network> {
         Cascade::new(
             self.validation_limbo.env().clone(),
             &self.element_vault,
