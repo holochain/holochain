@@ -1,5 +1,4 @@
 use super::*;
-use holo_hash::AnyDhtHash;
 use std::marker::PhantomData;
 /// Prefix for integrated database
 const INTEGRATED_PREFIX: u8 = 0x0;

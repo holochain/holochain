@@ -489,39 +489,31 @@ async fn check_entry_not_private_test() {
 #[cfg(test)]
 mod fixture_tests {
     use super::*;
-    use crate::core::{
-        state::element_buf::ElementBufFixtureItem as EF,
-        state::metadata::MetadataBufFixtureItem as MF,
-        state::metadata::SysMetaKey,
-        state::metadata::SysMetaVal,
-        workflow::sys_validation_workflow::{
-            types::Dependency, SysValidationWorkspaceFixtureItem as SF,
-        },
+    use crate::core::workflow::sys_validation_workflow::{
+        types::Dependency, SysValidationWorkspaceFixtureItem as SF,
     };
     use holo_hash::HasHash;
-    use holochain_state::db_fixture::{DbFixture, LoadDbFixture};
-    use holochain_types::{Entry, EntryHashed};
+    use holochain_state::db_fixture::LoadDbFixture;
+    use holochain_types::EntryHashed;
     use holochain_zome_types::element::SignedHeader;
-    use maplit::btreeset;
-
-    fn fixture(entry: EntryHashed) -> DbFixture<SysValidationWorkspace> {
-        let entry_hash = entry.as_hash().clone();
-        let mut header = fixt!(Create);
-        header.entry_hash = entry_hash.clone();
-        let header = HeaderHashed::from_content_sync(Header::from(header));
-        let shh = SignedHeaderHashed::from_content_sync(SignedHeader(header.as_content().clone(), fixt!(Signature)));
-        btreeset! {
-            SF::ElementVault(EF::PublicEntries(entry)),
-            SF::ElementVault(EF::Headers(shh.into())),
-            SF::MetaCache(MF::SystemMeta((SysMetaKey::from(entry_hash).into(), SysMetaVal::NewEntry(header.into()))))
-        }
-    }
 
     #[tokio::test(threaded_scheduler)]
     async fn check_entry_exists_test() {
         let test_env = test_cell_env();
+
+        // Construct the Element to test
         let entry = EntryHashed::from_content_sync(fixt!(Entry));
         let any_hash: AnyDhtHash = entry.as_hash().clone().into();
+        let mut header = fixt!(Create);
+        header.entry_hash = entry.as_hash().clone();
+        let header = HeaderHashed::from_content_sync(Header::from(header));
+        let shh = SignedHeaderHashed::from_content_sync(SignedHeader(
+            header.as_content().clone(),
+            fixt!(Signature),
+        ));
+        let el = Element::new(shh, Some(entry.as_content().clone()));
+
+        // Set up an empty workspace and a mock network
         let mut workspace = SysValidationWorkspace::new(test_env.env().into()).unwrap();
         let mut network = holochain_p2p::MockHolochainP2pCellT::new();
         network
@@ -529,6 +521,7 @@ mod fixture_tests {
             .times(1)
             .returning(|_, _| Ok(Vec::new()));
 
+        // Assert that the dep is missing at first
         assert_matches!(
             check_entry_exists(entry.as_hash().clone(), &mut workspace, network).await,
             Err(SysValidationError::ValidationOutcome(
@@ -536,7 +529,7 @@ mod fixture_tests {
             )) if hash == any_hash
         );
 
-        workspace.write_test_data(fixture(entry.clone()));
+        workspace.write_test_data(SF::registered_entry(el));
 
         let network = holochain_p2p::MockHolochainP2pCellT::new();
 

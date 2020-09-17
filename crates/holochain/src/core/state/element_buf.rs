@@ -15,8 +15,6 @@ use holochain_state::{
         GetDb, ELEMENT_CACHE_ENTRIES, ELEMENT_CACHE_HEADERS, ELEMENT_VAULT_HEADERS,
         ELEMENT_VAULT_PRIVATE_ENTRIES, ELEMENT_VAULT_PUBLIC_ENTRIES,
     },
-    db_fixture::DbFixture,
-    db_fixture::LoadDbFixture,
     error::{DatabaseError, DatabaseResult},
     exports::SingleStore,
     prelude::*,
@@ -28,6 +26,11 @@ use holochain_types::{
 use holochain_zome_types::entry_def::EntryVisibility;
 use holochain_zome_types::{Entry, Header};
 use tracing::*;
+
+#[cfg(test)]
+mod db_fixture;
+#[cfg(test)]
+pub use db_fixture::*;
 
 /// A CasBufFresh with Entries for values
 pub type EntryCas<P> = CasBufFreshSync<Entry, P>;
@@ -319,61 +322,6 @@ impl<P: PrefixType> BufferedStore for ElementBuf<P> {
         };
         self.headers.flush_to_txn_ref(writer)?;
         Ok(())
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub enum ElementBufFixtureItem<P: PrefixType> {
-    PublicEntries(<EntryCas<P> as LoadDbFixture>::FixtureItem),
-    PrivateEntries(<EntryCas<P> as LoadDbFixture>::FixtureItem),
-    Headers(<HeaderCas<P> as LoadDbFixture>::FixtureItem),
-}
-
-impl<P: PrefixType> LoadDbFixture for ElementBuf<P> {
-    type FixtureItem = ElementBufFixtureItem<P>;
-
-    fn write_test_datum(&mut self, datum: Self::FixtureItem) {
-        match datum {
-            Self::FixtureItem::Headers(d) => self.headers.write_test_datum(d),
-            Self::FixtureItem::PublicEntries(d) => self.public_entries.write_test_datum(d),
-            Self::FixtureItem::PrivateEntries(d) => self
-                .private_entries
-                .as_mut()
-                .expect("Using private entry fixture data when private entry access is disabled")
-                .write_test_datum(d),
-        }
-    }
-
-    fn read_test_data<R: Readable>(&self, reader: &R) -> DbFixture<Self> {
-        let headers = self
-            .headers
-            .iter_fail(reader)
-            .expect("Couldn't iterate when gathering fixture data")
-            .map(|i| Ok(Self::FixtureItem::Headers(i)));
-
-        let public_entries = self
-            .public_entries
-            .iter_fail(reader)
-            .expect("Couldn't iterate when gathering fixture data")
-            .map(|i| Ok(Self::FixtureItem::PublicEntries(i)));
-
-        if let Some(buf) = &self.private_entries {
-            let private_entries = buf
-                .iter_fail(reader)
-                .expect("Couldn't iterate when gathering fixture data")
-                .map(|i| Ok(Self::FixtureItem::PrivateEntries(i)));
-
-            headers
-                .chain(public_entries)
-                .chain(private_entries)
-                .collect()
-                .expect("Couldn't collect fixture data")
-        } else {
-            headers
-                .chain(public_entries)
-                .collect()
-                .expect("Couldn't collect fixture data")
-        }
     }
 }
 
