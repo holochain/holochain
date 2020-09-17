@@ -205,7 +205,7 @@ where
         self.put(datum)
     }
 
-    fn read_test_data<R: Readable>(&self, reader: &R) -> DbFixture<Self::FixtureItem> {
+    fn read_test_data<R: Readable>(&self, reader: &R) -> DbFixture<Self> {
         self.iter_fail(reader)
             .expect("Couldn't iterate when gathering fixture data")
             .collect()
@@ -225,7 +225,7 @@ where
     fn write_test_datum(&mut self, datum: Self::FixtureItem) {
         self.inner.write_test_datum(datum)
     }
-    fn read_test_data<R: Readable>(&self, reader: &R) -> DbFixture<Self::FixtureItem> {
+    fn read_test_data<R: Readable>(&self, reader: &R) -> DbFixture<Self> {
         self.inner.read_test_data(reader)
     }
 }

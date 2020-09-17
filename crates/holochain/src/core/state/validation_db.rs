@@ -76,7 +76,7 @@ impl LoadDbFixture for ValidationLimboStore {
         self.0.write_test_datum(datum)
     }
 
-    fn read_test_data<R: Readable>(&self, reader: &R) -> DbFixture<Self::FixtureItem> {
+    fn read_test_data<R: Readable>(&self, reader: &R) -> DbFixture<Self> {
         self.0.read_test_data(reader)
     }
 }

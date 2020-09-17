@@ -41,7 +41,9 @@ pub enum LinkMetaKey<'a> {
     Full(&'a EntryHash, ZomeId, &'a LinkTag, &'a HeaderHash),
 }
 
-pub(super) type SysMetaKey = AnyDhtHash;
+/// The typed representation of a SysMeta key.
+/// However, this must be converted to a PrefixBytesKey before inserting into a DB.
+pub type SysMetaKey = AnyDhtHash;
 
 /// Values of [Header]s stored by the sys meta db
 #[derive(Debug, Hash, PartialEq, Eq, Ord, PartialOrd, Clone, Serialize, Deserialize)]
@@ -322,20 +324,20 @@ impl IntoIterator for MiscMetaKey {
     }
 }
 
-impl<T: PrefixType> From<MiscMetaKey> for PrefixBytesKey<T> {
-    fn from(k: MiscMetaKey) -> Self {
-        PrefixBytesKey::new(k)
-    }
-}
+// impl<T: PrefixType> From<MiscMetaKey> for PrefixBytesKey<T> {
+//     fn from(k: MiscMetaKey) -> Self {
+//         PrefixBytesKey::new(k)
+//     }
+// }
 
-impl<T: PrefixType> From<&LinkMetaKey<'_>> for PrefixBytesKey<T> {
-    fn from(k: &LinkMetaKey) -> Self {
-        PrefixBytesKey::new(k)
-    }
-}
+// impl<T: PrefixType> From<&LinkMetaKey<'_>> for PrefixBytesKey<T> {
+//     fn from(k: &LinkMetaKey) -> Self {
+//         PrefixBytesKey::new(k)
+//     }
+// }
 
-impl<T: PrefixType> From<LinkMetaKey<'_>> for PrefixBytesKey<T> {
-    fn from(k: LinkMetaKey) -> Self {
-        (&k).into()
-    }
-}
+// impl<T: PrefixType> From<LinkMetaKey<'_>> for PrefixBytesKey<T> {
+//     fn from(k: LinkMetaKey) -> Self {
+//         (&k).into()
+//     }
+// }

@@ -298,11 +298,11 @@ where
         self.insert(k, v);
     }
 
-    fn read_test_data<R: Readable>(&self, _: &R) -> DbFixture<Self::FixtureItem> {
+    fn read_test_data<R: Readable>(&self, _: &R) -> DbFixture<Self> {
         unimplemented!("Must use read_test_data_mut for KvvBuf")
     }
 
-    fn read_test_data_mut(&mut self, writer: &mut Writer) -> DbFixture<Self::FixtureItem> {
+    fn read_test_data_mut(&mut self, writer: &mut Writer) -> DbFixture<Self> {
         use rkv::Cursor;
         use rkv::Readable;
 

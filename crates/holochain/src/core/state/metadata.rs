@@ -709,7 +709,7 @@ impl<P: PrefixType> LoadDbFixture for MetadataBuf<P> {
         }
     }
 
-    fn read_test_data<R: Readable>(&self, reader: &R) -> DbFixture<Self::FixtureItem> {
+    fn read_test_data<R: Readable>(&self, reader: &R) -> DbFixture<Self> {
         let sys = self
             .system_meta
             .read_test_data(reader)
@@ -726,8 +726,6 @@ impl<P: PrefixType> LoadDbFixture for MetadataBuf<P> {
             .into_iter()
             .map(|i| Self::FixtureItem::MiscMeta(i));
 
-        sys.chain(links)
-            .chain(misc)
-            .collect::<DbFixture<Self::FixtureItem>>()
+        sys.chain(links).chain(misc).collect::<DbFixture<Self>>()
     }
 }

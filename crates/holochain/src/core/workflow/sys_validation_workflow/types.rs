@@ -56,6 +56,7 @@ pub struct OrderedOp<V> {
 /// It is useful too know where a dependency is from because
 /// we might need to wait for it to be validated or we might
 /// need a stronger form of dependency.
+#[derive(Debug)]
 pub enum Dependency<T> {
     /// This agent is holding this dependency and it has passed validation
     Proof(T),

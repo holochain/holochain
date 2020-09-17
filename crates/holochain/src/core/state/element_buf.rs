@@ -344,7 +344,7 @@ impl<P: PrefixType> LoadDbFixture for ElementBuf<P> {
         }
     }
 
-    fn read_test_data<R: Readable>(&self, reader: &R) -> DbFixture<Self::FixtureItem> {
+    fn read_test_data<R: Readable>(&self, reader: &R) -> DbFixture<Self> {
         let headers = self
             .headers
             .iter_fail(reader)

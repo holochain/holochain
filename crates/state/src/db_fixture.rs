@@ -15,14 +15,14 @@ pub trait LoadDbFixture {
 
     /// Coerce the database to a state given by the fixture data.
     /// Should be used for tests only!
-    fn write_test_data(&mut self, data: DbFixture<Self::FixtureItem>) {
+    fn write_test_data(&mut self, data: DbFixture<Self>) {
         for datum in data {
             self.write_test_datum(datum)
         }
     }
 
     /// Retrieve data from DB as fixture data.
-    fn read_test_data<R: Readable>(&self, reader: &R) -> DbFixture<Self::FixtureItem>;
+    fn read_test_data<R: Readable>(&self, reader: &R) -> DbFixture<Self>;
 
     /// Retrieve data from DB as fixture data, using a write transaction.
     /// This is used for database types where we don't have a way of iterating over
@@ -31,10 +31,10 @@ pub trait LoadDbFixture {
     ///
     /// NB: this does *not* need to modify anything, as we can simply drop the
     /// Writer without committing it.
-    fn read_test_data_mut(&mut self, writer: &mut Writer) -> DbFixture<Self::FixtureItem> {
+    fn read_test_data_mut(&mut self, writer: &mut Writer) -> DbFixture<Self> {
         self.read_test_data(writer)
     }
 }
 
 /// Type of data which can be written as a DB fixture
-pub type DbFixture<T> = BTreeSet<T>;
+pub type DbFixture<T> = BTreeSet<<T as LoadDbFixture>::FixtureItem>;

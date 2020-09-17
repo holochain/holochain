@@ -434,7 +434,7 @@ where
         self.put(k, v).expect("Couldn't put fixture datum into DB")
     }
 
-    fn read_test_data<R: Readable>(&self, reader: &R) -> DbFixture<Self::FixtureItem> {
+    fn read_test_data<R: Readable>(&self, reader: &R) -> DbFixture<Self> {
         self.iter(reader)
             .expect("Couldn't iterate when gathering fixture data")
             .map(|(b, v)| Ok((K::from_key_bytes_or_friendly_panic(b), v)))
@@ -454,7 +454,7 @@ where
         self.inner.write_test_datum(datum)
     }
 
-    fn read_test_data<R: Readable>(&self, reader: &R) -> DbFixture<Self::FixtureItem> {
+    fn read_test_data<R: Readable>(&self, reader: &R) -> DbFixture<Self> {
         self.inner.read_test_data(reader)
     }
 }
@@ -470,7 +470,7 @@ where
         self.put(k, v).expect("Couldn't put fixture datum into DB")
     }
 
-    fn read_test_data<R: Readable>(&self, reader: &R) -> DbFixture<Self::FixtureItem> {
+    fn read_test_data<R: Readable>(&self, reader: &R) -> DbFixture<Self> {
         self.iter(reader)
             .expect("Couldn't iterate when gathering fixture data")
             .map(|(b, v)| Ok((IntKey::from_key_bytes_or_friendly_panic(b), v)))

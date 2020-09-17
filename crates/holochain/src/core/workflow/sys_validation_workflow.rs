@@ -703,7 +703,7 @@ impl LoadDbFixture for SysValidationWorkspace {
         }
     }
 
-    fn read_test_data<R: Readable>(&self, reader: &R) -> DbFixture<Self::FixtureItem> {
+    fn read_test_data<R: Readable>(&self, reader: &R) -> DbFixture<Self> {
         let integration_limbo = self
             .integration_limbo
             .read_test_data(reader)
@@ -774,6 +774,6 @@ impl LoadDbFixture for SysValidationWorkspace {
             .chain(meta_judged)
             .chain(element_cache)
             .chain(meta_cache)
-            .collect::<DbFixture<Self::FixtureItem>>()
+            .collect::<DbFixture<Self>>()
     }
 }

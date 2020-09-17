@@ -182,8 +182,9 @@ impl<P: PrefixType> PrefixBytesKey<P> {
     }
 }
 
-impl<T: PrefixType> From<AnyDhtHash> for PrefixBytesKey<T> {
-    fn from(h: AnyDhtHash) -> Self {
-        Self::new(h.into_iter())
+// Anything that can go into bytes can be the basis of a PrefixBytesKey
+impl<I: IntoIterator<Item = u8>, P: PrefixType> From<I> for PrefixBytesKey<P> {
+    fn from(bytes: I) -> Self {
+        Self::new(bytes)
     }
 }
