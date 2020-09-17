@@ -39,6 +39,18 @@ with holonix.pkgs;
     mkdir -p $HC_WASM_CACHE_PATH
 
     export PEWPEWPEW_PORT=4343
+
+    # ensure the holochain binary is fresh and installed on the path
+    # ideally we want to do this offline but if that fails we can fall back to
+    # doing it online and update the crates registry
+    cargo install --path crates/holochain --offline || cargo install --path crates/holochain
+    if [[ $( command -v holochain ) == $CARGO_INSTALL_ROOT* ]]
+     then
+      echo 'updated holochain binary'
+     else
+      echo 'failed to update holochain binary'
+      exit
+    fi
    ''
   ];
 
