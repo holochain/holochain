@@ -358,12 +358,16 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 Err(e) => Some(e),
             }
         });
-        Ok(futures::future::join_all(add_cells_tasks)
+        let r = futures::future::join_all(add_cells_tasks)
             .await
             .into_iter()
             // Remove successful and collect the errors
             .filter_map(|r| r)
-            .collect())
+            .collect();
+        {
+            self.conductor.write().await.initialize_cell_workflows();
+        }
+        Ok(r)
     }
 
     async fn activate_app(&self, app_id: AppId) -> ConductorResult<()> {
