@@ -32,6 +32,19 @@ jobs:
       - run:
           command: nix-shell --run hc-merge-test
 
+  merge-test-mac:
+   macos:
+    xcode: "12.0.0"
+   steps:
+    - checkout
+    - run:
+       name: Test on mac
+       no_output_timeout: 30m
+       command: |
+        curl -L https://nixos.org/nix/install | sh
+        . /Users/distiller/.nix-profile/etc/profile.d/nix.sh
+        nix-shell --run hc-merge-test
+
   docker-build-latest:
    resource_class: large
    machine: true
@@ -51,6 +64,7 @@ workflows:
  tests:
   jobs:
    - merge-test
+   - merge-test-mac
  docker-builds:
   triggers:
    - schedule:
