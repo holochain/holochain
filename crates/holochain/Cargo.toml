@@ -10,7 +10,7 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0.26"
-async-trait = "0.1.24"
+async-trait = "0.1"
 base64 = "0.10.1"
 cfg-if = "0.1"
 chrono = "0.4.6"
@@ -36,7 +36,7 @@ holochain_zome_types = { version = "0.0.1", path = "../zome_types" }
 human-panic = "1.0.3"
 lazy_static = "1.4.0"
 legacy = { path = "../legacy", package = "holochain_legacy" }
-mockall = "0.7.0"
+mockall = "0.8"
 must_future = "0.1.1"
 nanoid = "0.3"
 num_cpus = "1.8"

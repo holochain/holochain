@@ -1,6 +1,7 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
+use holochain_p2p::HolochainP2pCellT;
 use holochain_zome_types::CallRemoteInput;
 use holochain_zome_types::CallRemoteOutput;
 use holochain_zome_types::ZomeCallResponse;

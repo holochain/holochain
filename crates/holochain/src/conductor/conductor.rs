@@ -65,7 +65,7 @@ use futures::future::{self, TryFutureExt};
 use holo_hash::DnaHash;
 
 #[cfg(test)]
-use super::handle::mock::MockConductorHandle;
+use super::handle::MockConductorHandleT;
 use fallible_iterator::FallibleIterator;
 use holochain_zome_types::entry_def::EntryDef;
 
@@ -740,7 +740,7 @@ mod builder {
         #[cfg(test)]
         state: Option<ConductorState>,
         #[cfg(test)]
-        mock_handle: Option<MockConductorHandle>,
+        mock_handle: Option<MockConductorHandleT>,
     }
 
     impl ConductorBuilder {
@@ -892,7 +892,7 @@ mod builder {
         /// Pass a mock handle in, which will be returned regardless of whatever
         /// else happens to this builder
         #[cfg(test)]
-        pub fn with_mock_handle(mut self, handle: MockConductorHandle) -> Self {
+        pub fn with_mock_handle(mut self, handle: MockConductorHandleT) -> Self {
             self.mock_handle = Some(handle);
             self
         }
