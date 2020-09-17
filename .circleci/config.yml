@@ -41,7 +41,7 @@ jobs:
        name: Test on mac
        no_output_timeout: 30m
        command: |
-        curl -L https://nixos.org/nix/install | sh
+        sh <(curl -L https://nixos.org/nix/install) --darwin-use-unencrypted-nix-store-volume
         . /Users/distiller/.nix-profile/etc/profile.d/nix.sh
         nix-shell --run hc-merge-test
 
