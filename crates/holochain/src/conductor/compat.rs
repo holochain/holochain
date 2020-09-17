@@ -347,22 +347,22 @@ pub mod tests {
 
         let mut handle = MockConductorHandleT::new();
         handle
-            .expect_sync_install_dna()
+            .expect_install_dna()
             .with(predicate::eq(dna1.clone()))
             .times(1)
             .returning(|_| Ok(()));
         handle
-            .expect_sync_install_dna()
+            .expect_install_dna()
             .with(predicate::eq(dna1a.clone()))
             .times(1)
             .returning(|_| Ok(()));
         handle
-            .expect_sync_install_dna()
+            .expect_install_dna()
             .with(predicate::eq(dna2.clone()))
             .times(1)
             .returning(|_| Ok(()));
         handle
-            .expect_sync_install_app()
+            .expect_install_app()
             .with(
                 predicate::eq("LEGACY".to_string()),
                 predicate::function(move |data: &Vec<(InstalledCell, Option<MembraneProof>)>| {
@@ -375,16 +375,16 @@ pub mod tests {
             .times(1)
             .returning(|_, _| Ok(()));
         handle
-            .expect_sync_activate_app()
+            .expect_activate_app()
             .with(predicate::eq("LEGACY".to_string()))
             .times(1)
             .returning(|_| Ok(()));
         handle
-            .expect_sync_setup_cells()
+            .expect_setup_cells()
             .times(1)
             .returning(|| Ok(vec![]));
         handle
-            .expect_sync_add_app_interface()
+            .expect_add_app_interface()
             .with(predicate::eq(1111))
             .times(1)
             .returning(|port| Ok(port));
