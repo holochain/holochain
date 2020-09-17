@@ -290,12 +290,12 @@ async fn validate_op(
             let base = retrieve_entry(&link_add.base_address, &mut data_source)
                 .await?
                 .and_then(|dep| dependencies.store_entry_any(dep))
-                .and_then(|e| e.into_inner().1)
+                .and_then(|e| e.into_inner().1.into_option())
                 .ok_or_else(|| Outcome::awaiting(&link_add.base_address))?;
             let target = retrieve_entry(&link_add.target_address, &mut data_source)
                 .await?
                 .and_then(|dep| dependencies.store_entry_any(dep))
-                .and_then(|e| e.into_inner().1)
+                .and_then(|e| e.into_inner().1.into_option())
                 .ok_or_else(|| Outcome::awaiting(&link_add.target_address))?;
 
             let link_add = Arc::new(link_add.clone());

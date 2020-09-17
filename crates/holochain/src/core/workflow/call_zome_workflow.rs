@@ -158,6 +158,7 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT>(
                         .ok_or_else(|| RibosomeError::ElementDeps(base_address.clone()))?
                         .into_inner()
                         .1
+                        .into_option()
                         .ok_or_else(|| RibosomeError::ElementDeps(base_address.clone()))?;
                     let base = Arc::new(base);
                     let target_address: AnyDhtHash = link_add.target_address.clone().into();
@@ -168,6 +169,7 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT>(
                         .ok_or_else(|| RibosomeError::ElementDeps(target_address.clone()))?
                         .into_inner()
                         .1
+                        .into_option()
                         .ok_or_else(|| RibosomeError::ElementDeps(target_address.clone()))?;
                     let target = Arc::new(target);
                     (base, target)

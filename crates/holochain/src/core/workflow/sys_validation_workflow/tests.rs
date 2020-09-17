@@ -30,7 +30,6 @@ use tracing::*;
 const NUM_ATTEMPTS: usize = 100;
 
 #[tokio::test(threaded_scheduler)]
-#[ignore]
 async fn sys_validation_workflow_test() {
     observability::test_run().ok();
 

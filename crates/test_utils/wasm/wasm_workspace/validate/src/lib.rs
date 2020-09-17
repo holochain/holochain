@@ -1,3 +1,4 @@
+use element::ElementEntry;
 use hdk3::prelude::*;
 
 /// an example inner value that can be serialized into the contents of Entry::App()
@@ -51,9 +52,10 @@ impl TryFrom<&Entry> for ThisWasmEntry {
     fn try_from(entry: &Entry) -> Result<Self, Self::Error> {
         match entry {
             Entry::App(eb) => Ok(Self::try_from(SerializedBytes::from(eb.to_owned()))?),
-            _ => Err(SerializedBytesError::FromBytes(
-                "failed to deserialize ThisWasmEntry".into(),
-            ).into()),
+            _ => Err(
+                SerializedBytesError::FromBytes("failed to deserialize ThisWasmEntry".into())
+                    .into(),
+            ),
         }
     }
 }
@@ -65,10 +67,10 @@ entry_defs![
 
 #[hdk_extern]
 fn validate(element: Element) -> ExternResult<ValidateCallbackResult> {
-    let (_, entry) = element.into_inner();
+    let entry = element.into_inner().1;
     let entry = match entry {
-        Some(e) => e,
-        None => return Ok(ValidateCallbackResult::Valid),
+        ElementEntry::Present(e) => e,
+        _ => return Ok(ValidateCallbackResult::Valid),
     };
     if let Entry::Agent(_) = entry {
         return Ok(ValidateCallbackResult::Valid);
