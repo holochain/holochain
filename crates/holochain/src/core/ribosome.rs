@@ -486,6 +486,7 @@ pub mod wasm_test {
             let mut host_access = $host_access.clone();
             let input = $input.clone();
             tokio::task::spawn(async move {
+                use holochain_p2p::HolochainP2pCellT;
                 // ensure type of test wasm
                 use std::convert::TryInto;
                 use $crate::core::ribosome::RibosomeT;
