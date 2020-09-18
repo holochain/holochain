@@ -293,11 +293,15 @@ where
         Ok(())
     }
 
+    fn get_element_data_local_raw(&self, hash: &HeaderHash) -> CascadeResult<Option<Element>> {
+        match self.element_vault.get_element(hash)? {
+            None => Ok(self.element_cache.get_element(hash)?),
+            r => Ok(r),
+        }
+    }
+
     fn get_element_local_raw(&self, hash: &HeaderHash) -> CascadeResult<Option<Element>> {
-        let r = match self.element_vault.get_element(hash)? {
-            None => self.element_cache.get_element(hash)?,
-            r => r,
-        };
+        let r = self.get_element_data_local_raw(hash)?;
         // Check we have a valid reason to return this element
         match r {
             Some(el)
@@ -339,11 +343,16 @@ where
         Ok(None)
     }
 
-    fn get_entry_local_raw(&self, hash: &EntryHash) -> CascadeResult<Option<EntryHashed>> {
+    fn get_entry_data_local_raw(&self, hash: &EntryHash) -> CascadeResult<Option<EntryHashed>> {
         let r = match self.element_vault.get_entry(hash)? {
             None => self.element_cache.get_entry(hash)?,
             r => r,
         };
+        Ok(r)
+    }
+
+    fn get_entry_local_raw(&self, hash: &EntryHash) -> CascadeResult<Option<EntryHashed>> {
+        let r = self.get_entry_data_local_raw(hash)?;
         // Check we have a valid reason to return this element
         match r {
             Some(e) if self.valid_entry(e.as_hash())? => Ok(Some(e)),
@@ -357,7 +366,7 @@ where
             .map(|h| h.into_header_and_signature().0))
     }
 
-    fn get_header_local_raw_with_sig(
+    fn get_header_data_local_raw_with_sig(
         &self,
         hash: &HeaderHash,
     ) -> CascadeResult<Option<SignedHeaderHashed>> {
@@ -365,6 +374,14 @@ where
             None => self.element_cache.get_header(hash)?,
             r => r,
         };
+        Ok(r)
+    }
+
+    fn get_header_local_raw_with_sig(
+        &self,
+        hash: &HeaderHash,
+    ) -> CascadeResult<Option<SignedHeaderHashed>> {
+        let r = self.get_header_data_local_raw_with_sig(hash)?;
         // Check we have a valid reason to return this element
         match r {
             Some(h)
@@ -484,6 +501,159 @@ where
             }
         }
         Ok(false)
+    }
+
+    /// This is call completely ignores all validation and CRUD.
+    /// It just gets the data that wherever it can be found.
+    /// Use with caution.
+    // TODO: This still fetches the full element and metadata.
+    // Need to add a fetch_retrieve_entry that only gets data.
+    pub async fn retrieve_data(
+        &mut self,
+        hash: AnyDhtHash,
+        options: GetOptions,
+    ) -> CascadeResult<Option<Element>> {
+        match *hash.hash_type() {
+            // This is the same as retieve for an entry hash
+            // because you can't find an element via entry hash
+            // without the metadata
+            AnyDht::Entry => {
+                let hash = hash.into();
+                match self.get_element_local_raw_via_entry(&hash)? {
+                    Some(e) => Ok(Some(e)),
+                    None => {
+                        self.fetch_element_via_entry(hash.clone(), options).await?;
+                        self.get_element_local_raw_via_entry(&hash)
+                    }
+                }
+            }
+            AnyDht::Header => {
+                let hash = hash.into();
+                match self.get_element_data_local_raw(&hash)? {
+                    Some(e) => Ok(Some(e)),
+                    None => {
+                        self.fetch_element_via_header(hash.clone(), options).await?;
+                        self.get_element_data_local_raw(&hash)
+                    }
+                }
+            }
+        }
+    }
+
+    /// This is call completely ignores all validation and CRUD.
+    /// It just gets the data that wherever it can be found.
+    /// Use with caution.
+    // TODO: This still fetches the full element and metadata.
+    // Need to add a fetch_retrieve_entry that only gets data.
+    pub async fn retrieve_entry_data(
+        &mut self,
+        hash: &EntryHash,
+        options: GetOptions,
+    ) -> CascadeResult<Option<EntryHashed>> {
+        match self.get_entry_data_local_raw(hash)? {
+            Some(e) => Ok(Some(e)),
+            None => {
+                self.fetch_element_via_entry(hash.clone(), options).await?;
+                self.get_entry_data_local_raw(hash)
+            }
+        }
+    }
+
+    /// This is call completely ignores all validation and CRUD.
+    /// It just gets the data that wherever it can be found.
+    /// Use with caution.
+    // TODO: This still fetches the full element and metadata.
+    // Need to add a fetch_retrieve_entry that only gets data.
+    pub async fn retrieve_header_data(
+        &mut self,
+        hash: HeaderHash,
+        options: GetOptions,
+    ) -> CascadeResult<Option<SignedHeaderHashed>> {
+        match self.get_header_data_local_raw_with_sig(&hash)? {
+            Some(h) => Ok(Some(h)),
+            None => {
+                self.fetch_element_via_header(hash.clone(), options).await?;
+                self.get_header_data_local_raw_with_sig(&hash)
+            }
+        }
+    }
+
+    /// Get the entry from the dht regardless of metadata.
+    /// This call has the opportunity to hit the local cache
+    /// and avoid a network call.
+    // TODO: This still fetches the full element and metadata.
+    // Need to add a fetch_retrieve_entry that only gets data.
+    // TODO: This call is the same as retrieve with an entry hash
+    // and maybe can be removed.
+    pub async fn retrieve_entry(
+        &mut self,
+        hash: &EntryHash,
+        options: GetOptions,
+    ) -> CascadeResult<Option<Element>> {
+        match self.get_element_local_raw_via_entry(hash)? {
+            Some(e) => Ok(Some(e)),
+            None => {
+                self.fetch_element_via_entry(hash.clone(), options).await?;
+                self.get_element_local_raw_via_entry(hash)
+            }
+        }
+    }
+
+    /// Get only the header from the dht regardless of metadata.
+    /// Useful for avoiding getting the Entry if you don't need it.
+    /// This call has the opportunity to hit the local cache
+    /// and avoid a network call.
+    // TODO: This still fetches the full element and metadata.
+    // Need to add a fetch_retrieve_header that only gets data.
+    pub async fn retrieve_header(
+        &mut self,
+        hash: HeaderHash,
+        options: GetOptions,
+    ) -> CascadeResult<Option<SignedHeaderHashed>> {
+        match self.get_header_local_raw_with_sig(&hash)? {
+            Some(h) => Ok(Some(h)),
+            None => {
+                self.fetch_element_via_header(hash.clone(), options).await?;
+                self.get_header_local_raw_with_sig(&hash)
+            }
+        }
+    }
+
+    /// Get an element from the dht regardless of metadata.
+    /// Useful for checking if data is held.
+    /// This call has the opportunity to hit the local cache
+    /// and avoid a network call.
+    /// Note we still need to return the element as proof they are really
+    /// holding it unless we create a byte challenge function.
+    // TODO: This still fetches the full element and metadata.
+    // Need to add a fetch_retrieve that only gets data.
+    pub async fn retrieve(
+        &mut self,
+        hash: AnyDhtHash,
+        options: GetOptions,
+    ) -> CascadeResult<Option<Element>> {
+        match *hash.hash_type() {
+            AnyDht::Entry => {
+                let hash = hash.into();
+                match self.get_element_local_raw_via_entry(&hash)? {
+                    Some(e) => Ok(Some(e)),
+                    None => {
+                        self.fetch_element_via_entry(hash.clone(), options).await?;
+                        self.get_element_local_raw_via_entry(&hash)
+                    }
+                }
+            }
+            AnyDht::Header => {
+                let hash = hash.into();
+                match self.get_element_local_raw(&hash)? {
+                    Some(e) => Ok(Some(e)),
+                    None => {
+                        self.fetch_element_via_header(hash.clone(), options).await?;
+                        self.get_element_local_raw(&hash)
+                    }
+                }
+            }
+        }
     }
 
     #[instrument(skip(self, options))]
@@ -630,82 +800,6 @@ where
                 Ok(None)
             }
         })
-    }
-
-    /// Get the entry from the dht regardless of metadata.
-    /// This call has the opportunity to hit the local cache
-    /// and avoid a network call.
-    // TODO: This still fetches the full element and metadata.
-    // Need to add a fetch_retrieve_entry that only gets data.
-    pub async fn retrieve_entry(
-        &mut self,
-        hash: &EntryHash,
-        options: GetOptions,
-    ) -> CascadeResult<Option<Element>> {
-        match self.get_element_local_raw_via_entry(hash)? {
-            Some(e) => Ok(Some(e)),
-            None => {
-                self.fetch_element_via_entry(hash.clone(), options).await?;
-                self.get_element_local_raw_via_entry(hash)
-            }
-        }
-    }
-
-    /// Get only the header from the dht regardless of metadata.
-    /// Useful for avoiding getting the Entry if you don't need it.
-    /// This call has the opportunity to hit the local cache
-    /// and avoid a network call.
-    // TODO: This still fetches the full element and metadata.
-    // Need to add a fetch_retrieve_header that only gets data.
-    pub async fn retrieve_header(
-        &mut self,
-        hash: HeaderHash,
-        options: GetOptions,
-    ) -> CascadeResult<Option<SignedHeaderHashed>> {
-        match self.get_header_local_raw_with_sig(&hash)? {
-            Some(h) => Ok(Some(h)),
-            None => {
-                self.fetch_element_via_header(hash.clone(), options).await?;
-                self.get_header_local_raw_with_sig(&hash)
-            }
-        }
-    }
-
-    /// Get an element from the dht regardless of metadata.
-    /// Useful for checking if data is held.
-    /// This call has the opportunity to hit the local cache
-    /// and avoid a network call.
-    /// Note we still need to return the element as proof they are really
-    /// holding it unless we create a byte challenge function.
-    // TODO: This still fetches the full element and metadata.
-    // Need to add a fetch_retrieve that only gets data.
-    pub async fn retrieve(
-        &mut self,
-        hash: AnyDhtHash,
-        options: GetOptions,
-    ) -> CascadeResult<Option<Element>> {
-        match *hash.hash_type() {
-            AnyDht::Entry => {
-                let hash = hash.into();
-                match self.get_element_local_raw_via_entry(&hash)? {
-                    Some(e) => Ok(Some(e)),
-                    None => {
-                        self.fetch_element_via_entry(hash.clone(), options).await?;
-                        self.get_element_local_raw_via_entry(&hash)
-                    }
-                }
-            }
-            AnyDht::Header => {
-                let hash = hash.into();
-                match self.get_element_local_raw(&hash)? {
-                    Some(e) => Ok(Some(e)),
-                    None => {
-                        self.fetch_element_via_header(hash.clone(), options).await?;
-                        self.get_element_local_raw(&hash)
-                    }
-                }
-            }
-        }
     }
 
     #[instrument(skip(self))]

@@ -18,9 +18,9 @@ use holo_hash::fixt::EntryHashFixturator;
 use holo_hash::fixt::HeaderHashFixturator;
 use holo_hash::fixt::WasmHashFixturator;
 use holo_hash::AgentPubKey;
+use holo_hash::EntryHash;
 use holochain_keystore::Signature;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_zome_types::capability::CapClaim;
 use holochain_zome_types::capability::CapGrant;
 use holochain_zome_types::capability::CapSecret;
 use holochain_zome_types::capability::CurryPayloads;
@@ -54,6 +54,7 @@ use holochain_zome_types::Entry;
 use holochain_zome_types::{
     capability::CapAccess, element::Element, element::SignedHeaderHashed, header::HeaderHashed,
 };
+use holochain_zome_types::{capability::CapClaim, header::HeaderType};
 use rand::seq::IteratorRandom;
 use rand::thread_rng;
 use rand::Rng;
@@ -294,6 +295,8 @@ fn element_with_no_entry(signature: Signature, header: Header) -> Element {
     Element::new(shh, None)
 }
 
+type NewEntryElement = (Entry, HeaderType);
+
 fixturator!(
     Element;
     vanilla fn element_with_no_entry(Signature, Header);
@@ -312,7 +315,40 @@ fixturator!(
         let (shh, _) = ElementFixturator::new_indexed(new, self.0.index).next().unwrap().into_inner();
         Element::new(shh, Some(self.0.curve.clone()))
     };
+    curve NewEntryElement {
+        new_entry_element(self.0.curve.0.clone(), self.0.curve.1.clone(), self.0.index)
+    };
 );
+
+fn new_entry_element(entry: Entry, header_type: HeaderType, index: usize) -> Element {
+    let et = match entry {
+        Entry::App(_) => EntryType::App(
+            AppEntryTypeFixturator::new_indexed(Unpredictable, index)
+                .next()
+                .unwrap(),
+        ),
+        Entry::Agent(_) => EntryType::AgentPubKey,
+        Entry::CapClaim(_) => EntryType::CapClaim,
+        Entry::CapGrant(_) => EntryType::CapGrant,
+    };
+    match header_type {
+        HeaderType::Create => {
+            let c = CreateFixturator::new_indexed(et, index).next().unwrap();
+            let c = NewEntryHeader::Create(c);
+            let element: Element = ElementFixturator::new_indexed(c, index).next().unwrap();
+            let (shh, _) = element.into_inner();
+            Element::new(shh, Some(entry.clone()))
+        }
+        HeaderType::Update => {
+            let u = UpdateFixturator::new_indexed(et, index).next().unwrap();
+            let u = NewEntryHeader::Update(u);
+            let element: Element = ElementFixturator::new_indexed(u, index).next().unwrap();
+            let (shh, _) = element.into_inner();
+            Element::new(shh, Some(entry.clone()))
+        }
+        _ => panic!("You choose {:?} for an Element with en Entry", header_type),
+    }
+}
 
 fixturator!(
     Entry;
@@ -534,7 +570,18 @@ fixturator!(
         ec.entry_type = self.0.curve.clone();
         ec
     };
+    curve Entry {
+        let et = match self.0.curve {
+            Entry::App(_) => EntryType::App(AppEntryTypeFixturator::new_indexed(Unpredictable, self.0.index).next().unwrap()),
+            Entry::Agent(_) => EntryType::AgentPubKey,
+            Entry::CapClaim(_) => EntryType::CapClaim,
+            Entry::CapGrant(_) => EntryType::CapGrant,
+        };
+        CreateFixturator::new_indexed(et, self.0.index).next().unwrap()
+    };
 );
+
+type EntryTypeEntryHash = (EntryType, EntryHash);
 
 fixturator!(
     Update;
@@ -550,6 +597,24 @@ fixturator!(
         let mut eu = UpdateFixturator::new_indexed(Unpredictable, self.0.index).next().unwrap();
         eu.entry_type = self.0.curve.clone();
         eu
+    };
+
+    curve EntryTypeEntryHash {
+        let mut u = UpdateFixturator::new_indexed(Unpredictable, self.0.index).next().unwrap();
+        u.entry_type = self.0.curve.0.clone();
+        u.entry_hash = self.0.curve.1.clone();
+        u
+    };
+
+    curve Entry {
+        let et = match self.0.curve {
+            Entry::App(_) => EntryType::App(AppEntryTypeFixturator::new_indexed(Unpredictable, self.0.index).next().unwrap()),
+            Entry::Agent(_) => EntryType::AgentPubKey,
+            Entry::CapClaim(_) => EntryType::CapClaim,
+            Entry::CapGrant(_) => EntryType::CapGrant,
+        };
+        let eh = EntryHash::with_data_sync(&self.0.curve);
+        UpdateFixturator::new_indexed((et, eh), self.0.index).next().unwrap()
     };
 );
 

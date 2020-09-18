@@ -6,13 +6,34 @@ use derive_more::Constructor;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::dna::zome::{HostFnAccess, Permission};
-use holochain_zome_types::entry::Entry;
 use holochain_zome_types::header::CreateLink;
-use holochain_zome_types::validate_link_add::ValidateCreateLinkCallbackResult;
-use holochain_zome_types::validate_link_add::ValidateCreateLinkData;
+use holochain_zome_types::header::DeleteLink;
+use holochain_zome_types::validate_link::ValidateCreateLinkData;
+use holochain_zome_types::validate_link::ValidateLinkCallbackResult;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::ExternInput;
+use holochain_zome_types::{entry::Entry, validate_link::ValidateDeleteLinkData};
 use std::sync::Arc;
+
+#[derive(Clone)]
+pub struct ValidateLinkInvocation<I>
+where
+    I: Invocation,
+{
+    invocation: I,
+}
+
+impl ValidateLinkInvocation<ValidateCreateLinkInvocation> {
+    pub fn new(invocation: ValidateCreateLinkInvocation) -> Self {
+        Self { invocation }
+    }
+}
+
+impl ValidateLinkInvocation<ValidateDeleteLinkInvocation> {
+    pub fn new(invocation: ValidateDeleteLinkInvocation) -> Self {
+        Self { invocation }
+    }
+}
 
 #[derive(Clone)]
 pub struct ValidateCreateLinkInvocation {
@@ -21,6 +42,12 @@ pub struct ValidateCreateLinkInvocation {
     pub link_add: Arc<CreateLink>,
     pub base: Arc<Entry>,
     pub target: Arc<Entry>,
+}
+
+#[derive(Clone, derive_more::Constructor)]
+pub struct ValidateDeleteLinkInvocation {
+    pub zome_name: ZomeName,
+    pub delete_link: DeleteLink,
 }
 
 impl ValidateCreateLinkInvocation {
@@ -44,23 +71,45 @@ impl From<ValidateCreateLinkInvocation> for ValidateCreateLinkData {
     }
 }
 
+impl From<ValidateDeleteLinkInvocation> for ValidateDeleteLinkData {
+    fn from(validate_delete_link_invocation: ValidateDeleteLinkInvocation) -> Self {
+        Self {
+            delete_link: validate_delete_link_invocation.delete_link.clone(),
+        }
+    }
+}
 #[derive(Clone, Constructor)]
-pub struct ValidateCreateLinkHostAccess {
+pub struct ValidateLinkHostAccess {
     pub workspace: CallZomeWorkspaceLock,
     pub network: HolochainP2pCell,
 }
 
-impl From<ValidateCreateLinkHostAccess> for HostAccess {
-    fn from(validate_link_add_host_access: ValidateCreateLinkHostAccess) -> Self {
+impl From<ValidateLinkHostAccess> for HostAccess {
+    fn from(validate_link_add_host_access: ValidateLinkHostAccess) -> Self {
         Self::ValidateCreateLink(validate_link_add_host_access)
     }
 }
 
-impl From<&ValidateCreateLinkHostAccess> for HostFnAccess {
-    fn from(_: &ValidateCreateLinkHostAccess) -> Self {
+impl From<&ValidateLinkHostAccess> for HostFnAccess {
+    fn from(_: &ValidateLinkHostAccess) -> Self {
         let mut access = Self::none();
         access.read_workspace = Permission::Allow;
         access
+    }
+}
+
+impl<I> Invocation for ValidateLinkInvocation<I>
+where
+    I: Invocation,
+{
+    fn zomes(&self) -> ZomesToInvoke {
+        self.invocation.zomes()
+    }
+    fn fn_components(&self) -> FnComponents {
+        self.invocation.fn_components()
+    }
+    fn host_input(self) -> Result<ExternInput, SerializedBytesError> {
+        self.invocation.host_input()
     }
 }
 
@@ -72,12 +121,7 @@ impl Invocation for ValidateCreateLinkInvocation {
         ZomesToInvoke::One(self.zome_name.clone())
     }
     fn fn_components(&self) -> FnComponents {
-        vec![
-            "validate_link".into(),
-            // "add" is optional, validate_link is fine too
-            "add".into(),
-        ]
-        .into()
+        vec!["validate_create_link".into()].into()
     }
     fn host_input(self) -> Result<ExternInput, SerializedBytesError> {
         Ok(ExternInput::new(
@@ -86,37 +130,43 @@ impl Invocation for ValidateCreateLinkInvocation {
     }
 }
 
-impl TryFrom<ValidateCreateLinkInvocation> for ExternInput {
-    type Error = SerializedBytesError;
-    fn try_from(
-        validate_create_link_invocation: ValidateCreateLinkInvocation,
-    ) -> Result<Self, Self::Error> {
-        Ok(Self::new(
-            (&*validate_create_link_invocation.link_add).try_into()?,
+impl Invocation for ValidateDeleteLinkInvocation {
+    fn zomes(&self) -> ZomesToInvoke {
+        // links are specific to zomes so only validate in the zome the link is defined in
+        // note that here it is possible there is a zome/link mismatch
+        // we rely on the invocation to be built correctly
+        ZomesToInvoke::One(self.zome_name.clone())
+    }
+    fn fn_components(&self) -> FnComponents {
+        vec!["validate_delete_link".into()].into()
+    }
+    fn host_input(self) -> Result<ExternInput, SerializedBytesError> {
+        Ok(ExternInput::new(
+            ValidateDeleteLinkData::from(self).try_into()?,
         ))
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, SerializedBytes)]
-pub enum ValidateCreateLinkResult {
+pub enum ValidateLinkResult {
     Valid,
     Invalid(String),
 }
 
-impl From<Vec<(ZomeName, ValidateCreateLinkCallbackResult)>> for ValidateCreateLinkResult {
-    fn from(a: Vec<(ZomeName, ValidateCreateLinkCallbackResult)>) -> Self {
+impl From<Vec<(ZomeName, ValidateLinkCallbackResult)>> for ValidateLinkResult {
+    fn from(a: Vec<(ZomeName, ValidateLinkCallbackResult)>) -> Self {
         a.into_iter().map(|(_, v)| v).collect::<Vec<_>>().into()
     }
 }
 
-impl From<Vec<ValidateCreateLinkCallbackResult>> for ValidateCreateLinkResult {
-    fn from(callback_results: Vec<ValidateCreateLinkCallbackResult>) -> Self {
+impl From<Vec<ValidateLinkCallbackResult>> for ValidateLinkResult {
+    fn from(callback_results: Vec<ValidateLinkCallbackResult>) -> Self {
         callback_results.into_iter().fold(Self::Valid, |acc, x| {
             match x {
                 // validation is invalid if any x is invalid
-                ValidateCreateLinkCallbackResult::Invalid(i) => Self::Invalid(i),
+                ValidateLinkCallbackResult::Invalid(i) => Self::Invalid(i),
                 // valid x allows validation to continue
-                ValidateCreateLinkCallbackResult::Valid => acc,
+                ValidateLinkCallbackResult::Valid => acc,
             }
         })
     }
@@ -125,15 +175,15 @@ impl From<Vec<ValidateCreateLinkCallbackResult>> for ValidateCreateLinkResult {
 #[cfg(test)]
 mod test {
 
-    use super::ValidateCreateLinkResult;
+    use super::ValidateLinkResult;
     use crate::core::ribosome::Invocation;
     use crate::core::ribosome::ZomesToInvoke;
     use crate::fixt::*;
     use ::fixt::prelude::*;
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::dna::zome::{HostFnAccess, Permission};
-    use holochain_zome_types::validate_link_add::ValidateCreateLinkCallbackResult;
-    use holochain_zome_types::validate_link_add::ValidateCreateLinkData;
+    use holochain_zome_types::validate_link::ValidateCreateLinkData;
+    use holochain_zome_types::validate_link::ValidateLinkCallbackResult;
     use holochain_zome_types::ExternInput;
     use rand::seq::SliceRandom;
 
@@ -141,11 +191,11 @@ mod test {
     async fn validate_link_add_callback_result_fold() {
         let mut rng = thread_rng();
 
-        let result_valid = || ValidateCreateLinkResult::Valid;
-        let result_invalid = || ValidateCreateLinkResult::Invalid("".into());
+        let result_valid = || ValidateLinkResult::Valid;
+        let result_invalid = || ValidateLinkResult::Invalid("".into());
 
-        let cb_valid = || ValidateCreateLinkCallbackResult::Valid;
-        let cb_invalid = || ValidateCreateLinkCallbackResult::Invalid("".into());
+        let cb_valid = || ValidateLinkCallbackResult::Valid;
+        let cb_invalid = || ValidateLinkCallbackResult::Invalid("".into());
 
         for (mut results, expected) in vec![
             (vec![], result_valid()),
@@ -173,7 +223,7 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     async fn validate_link_add_invocation_allow_side_effects() {
         let validate_link_add_host_access =
-            ValidateCreateLinkHostAccessFixturator::new(fixt::Unpredictable)
+            ValidateLinkHostAccessFixturator::new(fixt::Unpredictable)
                 .next()
                 .unwrap();
         let mut access = HostFnAccess::none();
@@ -201,7 +251,7 @@ mod test {
                 .next()
                 .unwrap();
 
-        let mut expected = vec!["validate_link", "validate_link_add"];
+        let mut expected = vec!["validate_create_link"];
         for fn_component in validate_create_link_invocation.fn_components() {
             assert_eq!(fn_component, expected.pop().unwrap(),);
         }
@@ -235,7 +285,7 @@ mod test {
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
 
-    use super::ValidateCreateLinkResult;
+    use super::ValidateLinkResult;
     use crate::core::ribosome::RibosomeT;
     use crate::core::state::source_chain::SourceChainResult;
     use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
@@ -244,21 +294,22 @@ mod slow_tests {
     use ::fixt::prelude::*;
     use holo_hash::HeaderHash;
     use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::zome::ZomeName;
 
     #[tokio::test(threaded_scheduler)]
     async fn test_validate_link_add_unimplemented() {
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
             .next()
             .unwrap();
-        let mut validate_invocation = ValidateCreateLinkInvocationFixturator::new(fixt::Empty)
-            .next()
-            .unwrap();
-        validate_invocation.zome_name = TestWasm::Foo.into();
+        let validate_invocation =
+            ValidateLinkInvocationCreateFixturator::new(ZomeName::from(TestWasm::Foo))
+                .next()
+                .unwrap();
 
         let result = ribosome
-            .run_validate_create_link(fixt!(ValidateCreateLinkHostAccess), validate_invocation)
+            .run_validate_link(fixt!(ValidateLinkHostAccess), validate_invocation)
             .unwrap();
-        assert_eq!(result, ValidateCreateLinkResult::Valid,);
+        assert_eq!(result, ValidateLinkResult::Valid,);
     }
 
     #[tokio::test(threaded_scheduler)]
@@ -266,15 +317,16 @@ mod slow_tests {
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateCreateLinkValid]))
             .next()
             .unwrap();
-        let mut validate_invocation = ValidateCreateLinkInvocationFixturator::new(fixt::Empty)
-            .next()
-            .unwrap();
-        validate_invocation.zome_name = TestWasm::ValidateCreateLinkValid.into();
+        let validate_invocation = ValidateLinkInvocationCreateFixturator::new(ZomeName::from(
+            TestWasm::ValidateCreateLinkValid,
+        ))
+        .next()
+        .unwrap();
 
         let result = ribosome
-            .run_validate_create_link(fixt!(ValidateCreateLinkHostAccess), validate_invocation)
+            .run_validate_link(fixt!(ValidateLinkHostAccess), validate_invocation)
             .unwrap();
-        assert_eq!(result, ValidateCreateLinkResult::Valid,);
+        assert_eq!(result, ValidateLinkResult::Valid,);
     }
 
     #[tokio::test(threaded_scheduler)]
@@ -283,21 +335,21 @@ mod slow_tests {
             WasmRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateCreateLinkInvalid]))
                 .next()
                 .unwrap();
-        let mut validate_create_link_invocation =
-            ValidateCreateLinkInvocationFixturator::new(fixt::Empty)
-                .next()
-                .unwrap();
-        validate_create_link_invocation.zome_name = TestWasm::ValidateCreateLinkInvalid.into();
+        let validate_create_link_invocation = ValidateLinkInvocationCreateFixturator::new(
+            ZomeName::from(TestWasm::ValidateCreateLinkInvalid),
+        )
+        .next()
+        .unwrap();
 
         let result = ribosome
-            .run_validate_create_link(
-                fixt!(ValidateCreateLinkHostAccess),
+            .run_validate_link(
+                fixt!(ValidateLinkHostAccess),
                 validate_create_link_invocation,
             )
             .unwrap();
         assert_eq!(
             result,
-            ValidateCreateLinkResult::Invalid("esoteric edge case (link version)".into()),
+            ValidateLinkResult::Invalid("esoteric edge case (link version)".into()),
         );
     }
 

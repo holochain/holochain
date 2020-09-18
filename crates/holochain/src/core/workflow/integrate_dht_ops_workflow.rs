@@ -233,7 +233,7 @@ fn op_dependencies_held<P: PrefixType>(
             DhtOp::StoreElement(_, _, _)
             | DhtOp::StoreEntry(_, _, _)
             | DhtOp::RegisterAgentActivity(_, _) => (),
-            DhtOp::RegisterUpdatedBy(_, entry_update) => {
+            DhtOp::RegisterUpdatedBy(_, entry_update, _) => {
                 // Check if we have the header with entry that we are updating in the vault
                 // or defer the op.
                 if !header_with_entry_is_stored(
@@ -352,7 +352,7 @@ pub fn integrate_single_data<P: PrefixType>(
             DhtOp::RegisterAgentActivity(signature, header) => {
                 put_data(signature, header, None, element_store)?;
             }
-            DhtOp::RegisterUpdatedBy(signature, entry_update) => {
+            DhtOp::RegisterUpdatedBy(signature, entry_update, _) => {
                 put_data(signature, entry_update.into(), None, element_store)?;
             }
             DhtOp::RegisterDeletedEntryHeader(signature, element_delete) => {

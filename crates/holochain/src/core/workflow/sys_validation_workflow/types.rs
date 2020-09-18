@@ -55,7 +55,7 @@ impl From<&DhtOp> for DhtOpOrder {
             DhtOp::StoreElement(_, h, _) => StoreElement(h.timestamp()),
             DhtOp::StoreEntry(_, h, _) => StoreEntry(*h.timestamp()),
             DhtOp::RegisterAgentActivity(_, h) => RegisterAgentActivity(h.timestamp()),
-            DhtOp::RegisterUpdatedBy(_, h) => RegisterUpdatedBy(h.timestamp),
+            DhtOp::RegisterUpdatedBy(_, h, _) => RegisterUpdatedBy(h.timestamp),
             DhtOp::RegisterDeletedBy(_, h) => RegisterDeletedBy(h.timestamp),
             DhtOp::RegisterDeletedEntryHeader(_, h) => RegisterDeletedEntryHeader(h.timestamp),
             DhtOp::RegisterAddLink(_, h) => RegisterAddLink(h.timestamp),

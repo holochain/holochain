@@ -577,7 +577,7 @@ fn add_op_to_judged(mut ps: Vec<Db>, op: &DhtOp) -> Vec<Db> {
         DhtOp::RegisterAgentActivity(s, h) => {
             ps.push(Db::JudgedHeader(h.clone(), Some(s.clone())));
         }
-        DhtOp::RegisterUpdatedBy(s, h) => {
+        DhtOp::RegisterUpdatedBy(s, h, _) => {
             let h: Header = h.clone().try_into().unwrap();
             ps.push(Db::JudgedHeader(h.clone(), Some(s.clone())));
         }
@@ -660,7 +660,11 @@ fn register_agent_activity(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
 
 #[allow(dead_code)]
 fn register_replaced_by_for_header(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-    let op = DhtOp::RegisterUpdatedBy(a.signature.clone(), a.entry_update_header.clone());
+    let op = DhtOp::RegisterUpdatedBy(
+        a.signature.clone(),
+        a.entry_update_header.clone(),
+        Some(a.new_entry.clone().into()),
+    );
     let pre_state = vec![
         Db::IntQueue(op.clone()),
         Db::CasHeader(a.original_header.clone().into(), Some(a.signature.clone())),
@@ -677,7 +681,11 @@ fn register_replaced_by_for_header(a: TestData) -> (Vec<Db>, Vec<Db>, &'static s
 }
 
 fn register_replaced_by_for_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-    let op = DhtOp::RegisterUpdatedBy(a.signature.clone(), a.entry_update_entry.clone());
+    let op = DhtOp::RegisterUpdatedBy(
+        a.signature.clone(),
+        a.entry_update_entry.clone(),
+        Some(a.new_entry.clone().into()),
+    );
     let pre_state = vec![
         Db::IntQueue(op.clone()),
         Db::CasEntry(

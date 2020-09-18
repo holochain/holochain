@@ -71,10 +71,11 @@ pub async fn light_to_op<P: PrefixType>(
             Ok(DhtOp::RegisterAgentActivity(sig, header.into_content()))
         }
         DhtOpLight::RegisterUpdatedBy(h, _, _) => {
-            let (header, sig) = cas
-                .get_header(&h)?
+            let (header, entry) = cas
+                .get_element(&h)?
                 .ok_or_else(|| DhtOpConvertError::MissingData(h.into()))?
-                .into_header_and_signature();
+                .into_inner();
+            let (header, sig) = header.into_header_and_signature();
             let header = match header.into_content() {
                 Header::Update(u) => u,
                 h => {
@@ -84,7 +85,8 @@ pub async fn light_to_op<P: PrefixType>(
                     ));
                 }
             };
-            Ok(DhtOp::RegisterUpdatedBy(sig, header))
+            let entry = entry.into_option().map(Box::new);
+            Ok(DhtOp::RegisterUpdatedBy(sig, header, entry))
         }
         DhtOpLight::RegisterDeletedBy(header_hash, _) => {
             let (header, sig) = get_element_delete(header_hash, op_name, &cas)?;

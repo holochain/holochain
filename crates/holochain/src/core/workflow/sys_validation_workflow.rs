@@ -303,8 +303,26 @@ async fn validate_op_inner(
             all_op_check(signature, header).await?;
             Ok(())
         }
-        DhtOp::RegisterUpdatedBy(signature, header) => {
-            register_updated_by(header, workspace, network, dependencies, check_level).await?;
+        DhtOp::RegisterUpdatedBy(signature, header, entry) => {
+            register_updated_by(
+                header,
+                workspace,
+                network.clone(),
+                dependencies,
+                check_level,
+            )
+            .await?;
+            if let Some(entry) = entry {
+                store_entry(
+                    NewEntryHeaderRef::Update(header),
+                    entry.as_ref(),
+                    conductor_api,
+                    workspace,
+                    network,
+                    dependencies,
+                )
+                .await?;
+            }
 
             let header = header.clone().into();
             all_op_check(signature, &header).await?;

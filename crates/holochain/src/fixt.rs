@@ -1,6 +1,5 @@
 pub mod curve;
 
-use crate::core::ribosome::guest_callback::entry_defs::EntryDefsHostAccess;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
 use crate::core::ribosome::guest_callback::init::InitHostAccess;
 use crate::core::ribosome::guest_callback::init::InitInvocation;
@@ -10,15 +9,20 @@ use crate::core::ribosome::guest_callback::post_commit::PostCommitHostAccess;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateHostAccess;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
-use crate::core::ribosome::guest_callback::validate_link_add::ValidateCreateLinkHostAccess;
-use crate::core::ribosome::guest_callback::validate_link_add::ValidateCreateLinkInvocation;
+use crate::core::ribosome::guest_callback::validate_link::ValidateCreateLinkInvocation;
+use crate::core::ribosome::guest_callback::validate_link::ValidateDeleteLinkInvocation;
+use crate::core::ribosome::guest_callback::validate_link::ValidateLinkHostAccess;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageHostAccess;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
+use crate::core::ribosome::guest_callback::{
+    entry_defs::EntryDefsHostAccess, validate_link::ValidateLinkInvocation,
+};
 use crate::core::ribosome::wasm_ribosome::WasmRibosome;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostAccess;
 use crate::core::ribosome::ZomeCallHostAccess;
+use crate::core::ribosome::ZomesToInvoke;
 use crate::core::state::metadata::LinkMetaVal;
 use crate::core::workflow::CallZomeWorkspace;
 use crate::core::workflow::CallZomeWorkspaceLock;
@@ -40,6 +44,7 @@ use holochain_wasm_test_utils::strum::IntoEnumIterator;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::header::HeaderHashes;
 use holochain_zome_types::link::LinkTag;
+use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::ExternInput;
 use rand::seq::IteratorRandom;
 use rand::thread_rng;
@@ -324,8 +329,13 @@ fixturator!(
 );
 
 fixturator!(
+    ZomesToInvoke;
+    constructor fn one(ZomeName);
+);
+
+fixturator!(
     ValidateInvocation;
-    constructor fn new(ZomeName, Element);
+    constructor fn new(ZomesToInvoke, Element);
 );
 
 fixturator!(
@@ -334,7 +344,35 @@ fixturator!(
 );
 
 fixturator!(
-    ValidateCreateLinkHostAccess;
+    ValidateDeleteLinkInvocation;
+    constructor fn new(ZomeName, DeleteLink);
+);
+
+/// Macros don't get along with generics.
+type ValidateLinkInvocationCreate = ValidateLinkInvocation<ValidateCreateLinkInvocation>;
+
+fixturator!(
+    ValidateLinkInvocationCreate;
+    constructor fn new(ValidateCreateLinkInvocation);
+    curve ZomeName {
+        let mut c = ValidateCreateLinkInvocationFixturator::new(Empty)
+            .next()
+            .unwrap();
+        c.zome_name = self.0.curve.clone();
+        ValidateLinkInvocationCreate::new(c)
+    };
+);
+
+/// Macros don't get along with generics.
+type ValidateLinkInvocationDelete = ValidateLinkInvocation<ValidateDeleteLinkInvocation>;
+
+fixturator!(
+    ValidateLinkInvocationDelete;
+    constructor fn new(ValidateDeleteLinkInvocation);
+);
+
+fixturator!(
+    ValidateLinkHostAccess;
     constructor fn new(CallZomeWorkspaceLock, HolochainP2pCell);
 );
 

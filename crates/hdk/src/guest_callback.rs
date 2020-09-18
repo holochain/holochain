@@ -3,5 +3,5 @@ pub mod init;
 pub mod migrate_agent;
 pub mod post_commit;
 pub mod validate;
-pub mod validate_link_add;
+pub mod validate_link;
 pub mod validation_package;
