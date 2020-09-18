@@ -28,6 +28,18 @@ pub enum CapGrant {
     /// layer and the caller must provide a secret that we check for in a private entry in the
     /// local chain.
     RemoteAgent(ZomeCallCapGrant),
+
+    /// Special capability grant which when exercised, makes Holochain treat
+    /// the caller as if they were the Author, granting them the ChainAuthor
+    /// capability.
+    ///
+    /// Holochain has a special mechanism for checking this capability
+    /// such that the same grant can be used to generate tokens for multiple
+    /// callers, each of which can be individually revoked.
+    ///
+    /// This is used primarily to allow access to external callers such as a
+    /// GUI or CLI, without requiring signatures.
+    AuthorDelegation(AuthorDelegation),
 }
 
 impl From<holo_hash::AgentPubKey> for CapGrant {
@@ -116,6 +128,7 @@ impl CapGrant {
                     CapAccess::Assigned { secret, .. } => check_secret.map(|given| secret == given).unwrap_or(false),
                 }
             }
+            CapGrant::AuthorDelegation(_) => todo!(),
         }
     }
 }
@@ -174,3 +187,18 @@ impl From<(CapSecret, AgentPubKey)> for CapAccess {
 pub type GrantedFunction = (ZomeName, FunctionName);
 /// A collection of zome/function pairs
 pub type GrantedFunctions = HashSet<GrantedFunction>;
+
+/// The "seed" for which Author delegation tokens are produced. There is a special
+/// mechanism for this implemented at the level of the Interfaces. TODO: document
+pub type AuthorDelegationSeed = [u8; 32]; // 256 byte hash
+
+/// The data for the AuthorDelegation cap grant
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct AuthorDelegation(AuthorDelegationSeed);
+
+impl AuthorDelegation {
+    /// Constructor
+    pub fn new(seed: AuthorDelegationSeed) -> Self {
+        Self(seed)
+    }
+}

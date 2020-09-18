@@ -20,6 +20,7 @@ use holo_hash::fixt::WasmHashFixturator;
 use holo_hash::AgentPubKey;
 use holochain_keystore::Signature;
 use holochain_serialized_bytes::SerializedBytes;
+use holochain_zome_types::capability::AuthorDelegation;
 use holochain_zome_types::capability::CapAccess;
 use holochain_zome_types::capability::CapClaim;
 use holochain_zome_types::capability::CapGrant;
@@ -31,6 +32,7 @@ use holochain_zome_types::capability::ZomeCallCapGrant;
 use holochain_zome_types::capability::CAP_SECRET_BYTES;
 use holochain_zome_types::crdt::CrdtType;
 use holochain_zome_types::entry::AppEntryBytes;
+use holochain_zome_types::entry::CapGrantEntry;
 use holochain_zome_types::entry_def::EntryDef;
 use holochain_zome_types::entry_def::EntryDefId;
 use holochain_zome_types::entry_def::EntryDefs;
@@ -282,8 +284,22 @@ fixturator!(
 );
 
 fixturator!(
+    AuthorDelegation;
+    curve Empty AuthorDelegation::new([0; 32]);
+
+    curve Predictable AuthorDelegation::new([0; 32]);
+
+    curve Unpredictable AuthorDelegation::new([0; 32]);
+);
+
+fixturator!(
     CapGrant;
-    variants [ ChainAuthor(AgentPubKey) RemoteAgent(ZomeCallCapGrant) ];
+    variants [ ChainAuthor(AgentPubKey) RemoteAgent(ZomeCallCapGrant) AuthorDelegation(AuthorDelegation) ];
+);
+
+fixturator!(
+    CapGrantEntry;
+    variants [ RemoteAgent(ZomeCallCapGrant) AuthorDelegation(AuthorDelegation) ];
 );
 
 fixturator!(
@@ -292,7 +308,7 @@ fixturator!(
         Agent(AgentPubKey)
         App(AppEntryBytes)
         CapClaim(CapClaim)
-        CapGrant(ZomeCallCapGrant)
+        CapGrant(CapGrantEntry)
     ];
 
     curve AppEntry {

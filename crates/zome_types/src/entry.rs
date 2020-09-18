@@ -5,9 +5,9 @@
 //! It defines serialization behaviour for entries. Here you can find the complete list of
 //! entry_types, and special entries, like deletion_entry and cap_entry.
 
-use crate::capability::CapClaim;
 use crate::capability::CapGrant;
 use crate::capability::ZomeCallCapGrant;
+use crate::capability::{AuthorDelegation, CapClaim};
 use holo_hash::{hash_type, AgentPubKey, HashableContent, HashableContentBytes};
 use holochain_serialized_bytes::prelude::*;
 
@@ -20,11 +20,25 @@ pub use error::*;
 pub const ENTRY_SIZE_LIMIT: usize = 16 * 1000 * 1000; // 16MiB
 
 /// The data type written to the source chain when explicitly granting a capability.
-/// NB: this is not simply `CapGrant`, because the `CapGrant::ChainAuthor`
-/// grant is already implied by `Entry::Agent`, so that should not be committed
-/// to a chain. This is a type alias because if we add other capability types
-/// in the future, we may want to include them
-pub type CapGrantEntry = ZomeCallCapGrant;
+/// This is not simply `CapGrant`, because the `CapGrant::ChainAuthor`
+/// grant is already implied by `Entry::Agent`. This enum contains everything
+/// in CapGrant except for ChainAuthor.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]
+pub enum CapGrantEntry {
+    /// Maps to CapGrant::RemoteAgent
+    RemoteAgent(ZomeCallCapGrant),
+    /// Maps to CapGrant::AuthorDelegation
+    AuthorDelegation(AuthorDelegation),
+}
+
+impl From<CapGrantEntry> for CapGrant {
+    fn from(e: CapGrantEntry) -> CapGrant {
+        match e {
+            CapGrantEntry::RemoteAgent(g) => CapGrant::RemoteAgent(g),
+            CapGrantEntry::AuthorDelegation(g) => CapGrant::AuthorDelegation(g),
+        }
+    }
+}
 
 /// The data type written to the source chain to denote a capability claim
 pub type CapClaimEntry = CapClaim;
@@ -55,7 +69,7 @@ impl Entry {
     pub fn as_cap_grant(&self) -> Option<CapGrant> {
         match self {
             Entry::Agent(key) => Some(CapGrant::ChainAuthor(key.clone())),
-            Entry::CapGrant(data) => Some(CapGrant::RemoteAgent(data.clone())),
+            Entry::CapGrant(entry) => Some(entry.clone().into()),
             _ => None,
         }
     }
