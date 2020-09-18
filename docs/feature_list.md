@@ -1,30 +1,28 @@
-# Feature List
-
-These are the features that are currently implemented or planned and their status.
 
 ## HDK features
 | Feature                  | Status      | Example     | Comment |
 |--------------------------|-------------|-------------|---------|
-| `entry_hash!()`          | Done        | [Example](https://github.com/Holo-Host/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/entry_hash/src/lib.rs) |         |
-| `get!()`                 | Done        | [Example](https://github.com/Holo-Host/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/anchor/src/lib.rs) |         |
+| `hash_entry!()`          | Done        | [Example](https://github.com/Holo-Host/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/hash_entry/src/lib.rs) |         |
+| `get!()`                 | Done        | [Example](https://github.com/Holo-Host/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/create_entry/src/lib.rs) |         |
 | `get_details!()`         | Done        | [Example](https://github.com/Holo-Host/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/crud/src/countree.rs) |         |
 | `get_links!()`           | Done        | [Example](https://github.com/Holo-Host/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/link/src/lib.rs) |         |
 | `get_link_details!()`    | Done        |  |         |
 | `query!()`               | Done        | [Example](https://github.com/Holo-Host/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/query/src/lib.rs) |         |
-| `commit_entry!()`        | Done        | [Example](https://github.com/Holo-Host/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/commit_entry/src/lib.rs) |         |
+| `create_entry!()`        | Done        | [Example](https://github.com/Holo-Host/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/create_entry/src/lib.rs) |         |
 | `update_entry!()`        | Done        | [Example](https://github.com/Holo-Host/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/crud/src/countree.rs) |         |
 | `delete_entry!()`        | Done        | [Example](https://github.com/Holo-Host/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/crud/src/countree.rs) |         |
-| `link_entries!()`        | Done        | [Example](https://github.com/Holo-Host/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/link/src/lib.rs) | LinkTag may get splitted in Tag and Type in the future |
+| `create_link!()`        | Done        | [Example](https://github.com/Holo-Host/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/link/src/lib.rs) | LinkTag may get splitted in Tag and Type in the future |
+| `delete_link!()`        | Done        | [Example](https://github.com/Holo-Host/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/link/src/lib.rs) | LinkTag may get splitted in Tag and Type in the future |
 | `zome_info!()`           | Done        | [Example](https://github.com/Holo-Host/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/zome_info/src/lib.rs) |         |
 | `agent_info!()`          | Done        | [Example](https://github.com/Holo-Host/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/agent_info/src/lib.rs) |         |
 | `call_remote!()`         | Done        | [Example](https://github.com/Holo-Host/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/capability/src/lib.rs) |         |
 | `sys_time!()`            | Done        | [Example](https://github.com/Holo-Host/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/sys_time/src/lib.rs) |         |
 | `Path` & `Anchors`       | Done        | [Paths](https://github.com/Holo-Host/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/hash_path/src/lib.rs) & [Anchors](https://github.com/Holo-Host/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/anchor/src/lib.rs) |         |
 | `generate_cap_secret!()` | Done        | [Example](https://github.com/Holo-Host/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/capability/src/lib.rs) |         |
-| `commit_cap_grant!()`    | Done        | [Example](https://github.com/Holo-Host/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/capability/src/lib.rs) |         |
+| `create_cap_grant!()`    | Done        | [Example](https://github.com/Holo-Host/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/capability/src/lib.rs) |         |
 | `update_cap_grant!()`    | Done        | [Example](https://github.com/Holo-Host/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/capability/src/lib.rs) |         |
 | `delete_cap_grant!()`    | Done        | [Example](https://github.com/Holo-Host/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/capability/src/lib.rs) |         |
-| `commit_cap_claim!()`    | Done        | [Example](https://github.com/Holo-Host/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/capability/src/lib.rs) |         |
+| `create_cap_claim!()`    | Done        | [Example](https://github.com/Holo-Host/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/capability/src/lib.rs) |         |
 | `init`                   | In progress | Callback exists, it is not called yet |
 | `post_commit`            | In progress | Callback exists, it is not called yet |
 | `keystore!() `           | In progress    |         |         |
@@ -53,4 +51,5 @@ These are the features that are currently implemented or planned and their statu
 |-------------------------------------|-------------|---------|
 | JS side client                      | Done        | [@holochain/conductor-api](https://github.com/Holo-Host/holochain-conductor-api) |
 | hApp integration testing            | Provisional | [@holochain/tryorama](https://github.com/Holo-Host/tryorama-rsm) has been adapted, will probably change in the future |
+| holochain-run-dna |  Provisional | [@holochain-open-dev/holochain-run-dna](https://www.npmjs.com/package/@holochain-open-dev/holochain-run-dna) |
 | Cross-platform executable binary    | Not done    | The executable would add a system tray icon from which you can interact with holochain (Note: holoscape is not going to be upgraded to RSM and will be discontinued) |
