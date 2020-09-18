@@ -341,8 +341,6 @@ pub mod tests {
         HeaderHashed,
         Option<Entry>,
     ) {
-        let _ = holochain_crypto::crypto_init_sodium();
-
         let dna = fake_dna_file("a");
         let agent_pubkey = fake_agent_pubkey_1();
 
