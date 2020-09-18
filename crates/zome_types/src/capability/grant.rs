@@ -42,8 +42,8 @@ pub enum CapGrant {
     AuthorDelegation(AuthorDelegation),
 }
 
-impl From<holo_hash::AgentPubKey> for CapGrant {
-    fn from(agent_hash: holo_hash::AgentPubKey) -> Self {
+impl From<AgentPubKey> for CapGrant {
+    fn from(agent_hash: AgentPubKey) -> Self {
         CapGrant::ChainAuthor(agent_hash)
     }
 }
@@ -88,8 +88,8 @@ impl ZomeCallCapGrant {
 
 impl From<ZomeCallCapGrant> for CapGrant {
     /// Create a new ZomeCall capability grant
-    fn from(zccg: ZomeCallCapGrant) -> Self {
-        CapGrant::RemoteAgent(zccg)
+    fn from(grant: ZomeCallCapGrant) -> Self {
+        CapGrant::RemoteAgent(grant)
     }
 }
 

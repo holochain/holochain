@@ -4,14 +4,13 @@ use hdk3::prelude::*;
 fn set_access(_: ()) -> ExternResult<()> {
     let mut functions: GrantedFunctions = HashSet::new();
     functions.insert((zome_info!()?.zome_name, "whoami".into()));
-    create_cap_grant!(
-        CapGrantEntry {
-            tag: "".into(),
-            // empty access converts to unrestricted
-            access: ().into(),
-            functions,
-        }
-    )?;
+    create_cap_grant!(ZomeCallCapGrant {
+        tag: "".into(),
+        // empty access converts to unrestricted
+        access: ().into(),
+        functions,
+    }
+    .into())?;
 
     Ok(())
 }

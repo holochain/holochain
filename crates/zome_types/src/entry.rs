@@ -40,6 +40,13 @@ impl From<CapGrantEntry> for CapGrant {
     }
 }
 
+impl From<ZomeCallCapGrant> for CapGrantEntry {
+    /// Create a new ZomeCall capability grant
+    fn from(grant: ZomeCallCapGrant) -> Self {
+        CapGrantEntry::RemoteAgent(grant)
+    }
+}
+
 /// The data type written to the source chain to denote a capability claim
 pub type CapClaimEntry = CapClaim;
 

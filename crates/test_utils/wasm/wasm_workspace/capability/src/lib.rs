@@ -9,14 +9,13 @@ fn init(_: ()) -> ExternResult<InitCallbackResult> {
     let mut functions: GrantedFunctions = HashSet::new();
     functions.insert((zome_info!()?.zome_name, "accept_cap_claim".into()));
     // functions.insert((zome_info!()?.zome_name, "needs_cap_claim".into()));
-    create_cap_grant!(
-        CapGrantEntry {
-            tag: "".into(),
-            // empty access converts to unrestricted
-            access: ().into(),
-            functions,
-        }
-    )?;
+    create_cap_grant!(ZomeCallCapGrant {
+        tag: "".into(),
+        // empty access converts to unrestricted
+        access: ().into(),
+        functions,
+    }
+    .into())?;
 
     Ok(InitCallbackResult::Pass)
 }
@@ -30,18 +29,17 @@ fn cap_grant_entry(secret: CapSecret) -> ExternResult<CapGrantEntry> {
     let mut functions: GrantedFunctions = HashSet::new();
     let this_zome = zome_info!()?.zome_name;
     functions.insert((this_zome, "needs_cap_claim".into()));
-    Ok(CapGrantEntry {
+    Ok(ZomeCallCapGrant {
         tag: "".into(),
         access: secret.into(),
         functions,
-    })
+    }
+    .into())
 }
 
 #[hdk_extern]
 pub fn transferable_cap_grant(secret: CapSecret) -> ExternResult<HeaderHash> {
-    Ok(create_cap_grant!(
-        cap_grant_entry(secret)?
-    )?)
+    Ok(create_cap_grant!(cap_grant_entry(secret)?)?)
 }
 
 #[hdk_extern]
@@ -96,11 +94,12 @@ fn send_assigned_cap_claim(agent: AgentPubKey) -> ExternResult<()> {
     let mut functions: GrantedFunctions = HashSet::new();
     let this_zome = zome_info!()?.zome_name;
     functions.insert((this_zome.clone(), "needs_cap_claim".into()));
-    create_cap_grant!(CapGrantEntry {
+    create_cap_grant!(ZomeCallCapGrant {
         access: (secret, agent.clone()).into(),
         functions,
         tag: tag.clone(),
-    })?;
+    }
+    .into())?;
 
     // send the assigned cap token
     call_remote!(
