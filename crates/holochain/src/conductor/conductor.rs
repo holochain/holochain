@@ -535,6 +535,12 @@ where
         }
     }
 
+    pub(super) fn initialize_cell_workflows(&mut self) {
+        for cell in self.cells.values_mut() {
+            cell.cell.initialize_workflows();
+        }
+    }
+
     pub(super) async fn load_wasms_into_dna_files(
         &self,
     ) -> ConductorResult<(
