@@ -147,6 +147,16 @@ impl ChainSequenceBuf {
         }
         Ok(())
     }
+
+    /// If this transaction hasn't moved the chain
+    /// we don't need to check for as at on write.
+    /// This helps avoid failed writes when nothing
+    /// is actually being written by a workflow
+    /// or when produce_dht_ops updates the
+    /// dht_transforms_complete.
+    pub fn chain_moved_in_this_transaction(&self) -> bool {
+        self.current_head != self.persisted_head
+    }
 }
 
 impl BufferedStore for ChainSequenceBuf {
@@ -159,17 +169,20 @@ impl BufferedStore for ChainSequenceBuf {
     /// Commit to the source chain, performing an as-at check and returning a
     /// SourceChainError::HeadMoved error if the as-at check fails
     fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> SourceChainResult<()> {
+        // Nothing to write
         if self.is_clean() {
             return Ok(());
         }
+
+        // Writing a chain move
         let env = self.buf.env().clone();
         let db = env.get_db(&*CHAIN_SEQUENCE)?;
         let (_, _, persisted_head) = ChainSequenceBuf::head_info(&KvIntStore::new(db), writer)?;
-        let (old, new) = (self.persisted_head.as_ref(), persisted_head.as_ref());
-        if old != new {
+        let persisted_head_moved = self.persisted_head != persisted_head;
+        if persisted_head_moved && self.chain_moved_in_this_transaction() {
             Err(SourceChainError::HeadMoved(
-                old.map(|x| x.to_owned()),
-                new.map(|x| x.to_owned()),
+                self.persisted_head.to_owned(),
+                persisted_head,
             ))
         } else {
             Ok(self.buf.flush_to_txn_ref(writer)?)
@@ -370,14 +383,17 @@ pub mod tests {
         Ok(())
     }
 
+    /// If we attempt to move the chain head, but it has already moved from
+    /// under us, error
     #[tokio::test(threaded_scheduler)]
-    async fn chain_sequence_head_moved() -> anyhow::Result<()> {
+    async fn chain_sequence_head_moved_triggers_error() -> anyhow::Result<()> {
         let test_env = test_cell_env();
         let arc1 = test_env.env();
         let arc2 = test_env.env();
         let (tx1, rx1) = tokio::sync::oneshot::channel();
         let (tx2, rx2) = tokio::sync::oneshot::channel();
 
+        // Attempt to move the chain concurrently-- this one fails
         let task1 = tokio::spawn(async move {
             let mut buf = ChainSequenceBuf::new(arc1.clone().into())?;
             buf.put_header(
@@ -411,6 +427,7 @@ pub mod tests {
             env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
         });
 
+        // Attempt to move the chain concurrently -- this one succeeds
         let task2 = tokio::spawn(async move {
             rx1.await.unwrap();
             let mut buf = ChainSequenceBuf::new(arc2.clone().into())?;
@@ -459,6 +476,75 @@ pub mod tests {
             ))
             if hash == expected_hash
         );
+        assert!(result2.unwrap().is_ok());
+
+        Ok(())
+    }
+
+    /// If the chain head has moved from under us, but we are not moving the
+    /// chain head ourselves, proceed as usual
+    #[tokio::test(threaded_scheduler)]
+    async fn chain_sequence_head_moved_triggers_no_error_if_clean() -> anyhow::Result<()> {
+        let test_env = test_cell_env();
+        let arc1 = test_env.env();
+        let arc2 = test_env.env();
+        let (tx1, rx1) = tokio::sync::oneshot::channel();
+        let (tx2, rx2) = tokio::sync::oneshot::channel();
+
+        // Add a few things to start with
+        let mut buf = ChainSequenceBuf::new(arc1.clone().into())?;
+        buf.put_header(
+            HeaderHash::from_raw_bytes(vec![
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0,
+            ])
+            .into(),
+        )?;
+        buf.put_header(
+            HeaderHash::from_raw_bytes(vec![
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 1,
+            ])
+            .into(),
+        )?;
+        arc1.guard()
+            .with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
+
+        // Modify the chain without adding a header -- this succeeds
+        let task1 = tokio::spawn(async move {
+            let mut buf = ChainSequenceBuf::new(arc1.clone().into())?;
+            buf.complete_dht_op(0)?;
+
+            // let the other task run and make a commit to the chain head,
+            // to demonstrate the chain moving underneath us
+            tx1.send(()).unwrap();
+            rx2.await.unwrap();
+
+            let env = arc1.guard();
+            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))
+        });
+
+        // Add a header to the chain -- there is no collision, so this succeeds
+        let task2 = tokio::spawn(async move {
+            rx1.await.unwrap();
+            let mut buf = ChainSequenceBuf::new(arc2.clone().into())?;
+            buf.put_header(
+                HeaderHash::from_raw_bytes(vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                ])
+                .into(),
+            )?;
+
+            let env = arc2.guard();
+            env.with_commit(|mut writer| buf.flush_to_txn(&mut writer))?;
+            tx2.send(()).unwrap();
+            Result::<_, SourceChainError>::Ok(())
+        });
+
+        let (result1, result2) = tokio::join!(task1, task2);
+
+        assert!(result1.unwrap().is_ok());
         assert!(result2.unwrap().is_ok());
 
         Ok(())

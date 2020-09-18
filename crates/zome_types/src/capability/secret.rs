@@ -76,21 +76,3 @@ impl std::fmt::Debug for CapSecret {
         std::fmt::Debug::fmt(&self.0.to_vec(), f)
     }
 }
-
-/// It's fairly common (e.g. when calling unrestricted functions) to need to generate a cap secret
-/// that is not secret at all but it doesn't matter because it will be ignored by the recipient.
-/// To try and make it as clear as possible that this is 'empty' and 'insecure' the pattern is to
-/// coerce ().into() rather than CapSecret::default() or CapSecret::new().
-///
-/// This is relatively harmless on the claim side, sending an empty secret as a claim will pass for
-/// Unrestricted zome calls and simply be Unauthorized on anything else.
-///
-/// This is DANGEROUS on the grant side.
-/// Do NOT commit a cap grant with an empty/predictable secret.
-///
-/// @todo sys validation to prevent empty secret assigned/transferable cap grants
-impl From<()> for CapSecret {
-    fn from(_: ()) -> Self {
-        Self::from([0; CAP_SECRET_BYTES])
-    }
-}

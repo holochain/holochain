@@ -5,7 +5,7 @@ use super::{
     ConductorBuilder, ConductorHandle,
 };
 use holo_hash::*;
-use holochain_keystore::keystore_actor::KeystoreApiSender;
+use holochain_keystore::keystore_actor::KeystoreSenderExt;
 use holochain_keystore::{test_keystore::spawn_test_keystore, KeystoreError};
 use holochain_types::{
     app::InstalledCell,
@@ -40,7 +40,7 @@ pub async fn load_conductor_from_legacy_config(
     builder: ConductorBuilder,
 ) -> Result<ConductorHandle, CompatConfigError> {
     let config = config_from_legacy(&legacy);
-    let keystore = spawn_test_keystore(Vec::new()).await?;
+    let keystore = spawn_test_keystore().await?;
 
     let conductor: ConductorHandle = builder
         .config(config)
@@ -186,9 +186,7 @@ fn extract_app_interfaces(
 pub mod tests {
 
     use super::*;
-    use crate::conductor::{
-        handle::mock::MockConductorHandle, paths::EnvironmentRootPath, Conductor,
-    };
+    use crate::conductor::{handle::MockConductorHandleT, paths::EnvironmentRootPath, Conductor};
     use holochain_types::{app::MembraneProof, test_utils::fake_dna_zomes};
     use holochain_wasm_test_utils::TestWasm;
     use matches::assert_matches;
@@ -347,24 +345,24 @@ pub mod tests {
             .await
             .unwrap();
 
-        let mut handle = MockConductorHandle::new();
+        let mut handle = MockConductorHandleT::new();
         handle
-            .expect_sync_install_dna()
+            .expect_install_dna()
             .with(predicate::eq(dna1.clone()))
             .times(1)
             .returning(|_| Ok(()));
         handle
-            .expect_sync_install_dna()
+            .expect_install_dna()
             .with(predicate::eq(dna1a.clone()))
             .times(1)
             .returning(|_| Ok(()));
         handle
-            .expect_sync_install_dna()
+            .expect_install_dna()
             .with(predicate::eq(dna2.clone()))
             .times(1)
             .returning(|_| Ok(()));
         handle
-            .expect_sync_install_app()
+            .expect_install_app()
             .with(
                 predicate::eq("LEGACY".to_string()),
                 predicate::function(move |data: &Vec<(InstalledCell, Option<MembraneProof>)>| {
@@ -377,16 +375,16 @@ pub mod tests {
             .times(1)
             .returning(|_, _| Ok(()));
         handle
-            .expect_sync_activate_app()
+            .expect_activate_app()
             .with(predicate::eq("LEGACY".to_string()))
             .times(1)
             .returning(|_| Ok(()));
         handle
-            .expect_sync_setup_cells()
+            .expect_setup_cells()
             .times(1)
             .returning(|| Ok(vec![]));
         handle
-            .expect_sync_add_app_interface()
+            .expect_add_app_interface()
             .with(predicate::eq(1111))
             .times(1)
             .returning(|port| Ok(port));
