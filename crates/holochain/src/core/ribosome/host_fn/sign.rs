@@ -4,11 +4,14 @@ use crate::core::ribosome::RibosomeT;
 use holochain_zome_types::SignInput;
 use holochain_zome_types::SignOutput;
 use std::sync::Arc;
+use holochain_keystore::keystore_actor::KeystoreSenderExt;
 
 pub fn sign(
     _ribosome: Arc<impl RibosomeT>,
-    _call_context: Arc<CallContext>,
-    _input: SignInput,
+    call_context: Arc<CallContext>,
+    input: SignInput,
 ) -> RibosomeResult<SignOutput> {
-    unimplemented!();
+    Ok(SignOutput::new(tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+        call_context.host_access.keystore().sign(input.into_inner()).await
+    })?))
 }

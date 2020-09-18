@@ -80,9 +80,10 @@ wasm_io_types!(
     // @todo
     pub struct SendInput(());
     pub struct SendOutput(());
-    // @todo
-    pub struct SignInput(());
-    pub struct SignOutput(());
+    // Attempt to have the keystore sign some data
+    // The pubkey in the input needs to be found in the keystore for this to work
+    pub struct SignInput(crate::signature::SignInput);
+    pub struct SignOutput(crate::signature::Signature);
     // @todo
     pub struct ScheduleInput(core::time::Duration);
     pub struct ScheduleOutput(());

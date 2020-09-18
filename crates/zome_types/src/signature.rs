@@ -2,7 +2,7 @@
 use holochain_serialized_bytes::prelude::*;
 
 /// Input structure for creating a signature.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, SerializedBytes, Clone)]
 pub struct SignInput {
     /// The public key associated with the private key that should be used to
     /// generate the signature.

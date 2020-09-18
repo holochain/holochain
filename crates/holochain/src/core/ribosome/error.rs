@@ -53,6 +53,10 @@ pub enum RibosomeError {
 
     /// ident
     #[error(transparent)]
+    KeystoreError(#[from] holochain_keystore::KeystoreError),
+
+    /// ident
+    #[error(transparent)]
     DatabaseError(#[from] holochain_state::error::DatabaseError),
 
     /// ident
