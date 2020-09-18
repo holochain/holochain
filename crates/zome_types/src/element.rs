@@ -1,6 +1,7 @@
 //! Defines a Element, the basic unit of Holochain data.
 
 use crate::{
+    entry::CapGrantEntry,
     entry_def::EntryVisibility,
     header::{conversions::WrongHeaderError, CreateLink, DeleteLink, HeaderHashed},
     signature::Signature,
@@ -143,9 +144,12 @@ impl ElementEntry {
     ///
     /// same as as_option but handles cap grants
     /// anything other than ElementEntry::Present for a Entry::CapGrant returns None
-    pub fn to_grant_option(&self) -> Option<crate::entry::CapGrantEntry> {
+    pub fn to_grant_option(&self) -> Option<crate::capability::ZomeCallCapGrant> {
         match self.as_option() {
-            Some(Entry::CapGrant(cap_grant_entry)) => Some(cap_grant_entry.to_owned()),
+            Some(Entry::CapGrant(cap_grant_entry)) => match cap_grant_entry {
+                CapGrantEntry::RemoteAgent(grant) => Some(grant.to_owned()),
+                CapGrantEntry::AuthorDelegation(_) => None,
+            },
             _ => None,
         }
     }

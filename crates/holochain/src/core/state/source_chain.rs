@@ -372,7 +372,7 @@ pub mod tests {
         let (original_header_address, original_entry_address) = {
             let mut chain = SourceChain::new(env.clone().into())?;
             let (entry, entry_hash) =
-                EntryHashed::from_content_sync(Entry::CapGrant(grant.clone())).into_inner();
+                EntryHashed::from_content_sync(Entry::CapGrant(grant.clone().into())).into_inner();
             let header_builder = builder::Create {
                 entry_type: EntryType::CapGrant,
                 entry_hash: entry_hash.clone(),
@@ -412,7 +412,8 @@ pub mod tests {
         let (updated_header_hash, updated_entry_hash) = {
             let mut chain = SourceChain::new(env.clone().into())?;
             let (entry, entry_hash) =
-                EntryHashed::from_content_sync(Entry::CapGrant(updated_grant.clone())).into_inner();
+                EntryHashed::from_content_sync(Entry::CapGrant(updated_grant.clone().into()))
+                    .into_inner();
             let header_builder = builder::Update {
                 entry_type: EntryType::CapGrant,
                 entry_hash: entry_hash.clone(),

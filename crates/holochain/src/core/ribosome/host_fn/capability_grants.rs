@@ -82,7 +82,7 @@ pub mod wasm_test {
 
         let entry_secret: CapSecret = match entry.into_inner() {
             Some(element) => {
-                let cap_grant_entry: CapGrantEntry = element.entry().to_grant_option().unwrap();
+                let cap_grant_entry: ZomeCallCapGrant = element.entry().to_grant_option().unwrap();
                 match cap_grant_entry.access {
                     CapAccess::Transferable { secret, .. } => secret,
                     _ => unreachable!(),
