@@ -38,9 +38,6 @@ use holochain_serialized_bytes::prelude::*;
 mod error;
 pub use error::*;
 
-mod types;
-pub use types::*;
-
 pub mod keystore_actor;
 use keystore_actor::*;
 pub use keystore_actor::{KeystoreSender, KeystoreSenderExt};

@@ -1,7 +1,7 @@
 use crate::core::state::element_buf::ElementBuf;
 use error::{DhtOpConvertError, DhtOpConvertResult};
 use holo_hash::{EntryHash, HeaderHash};
-use holochain_keystore::Signature;
+use holochain_zome_types::signature::Signature;
 use holochain_types::{
     dht_op::{DhtOp, DhtOpLight},
     header::NewEntryHeader,

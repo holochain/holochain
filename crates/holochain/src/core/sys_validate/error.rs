@@ -4,7 +4,8 @@ use crate::{
     core::state::cascade::error::CascadeError,
 };
 use holo_hash::{AnyDhtHash, HeaderHash};
-use holochain_keystore::{KeystoreError, Signature};
+use holochain_keystore::{KeystoreError};
+use holochain_zome_types::signature::Signature;
 use holochain_state::error::DatabaseError;
 use holochain_types::cell::CellId;
 use holochain_zome_types::{

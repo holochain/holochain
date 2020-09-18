@@ -16,7 +16,7 @@ use crate::core::{
 use error::WorkflowResult;
 use fallible_iterator::FallibleIterator;
 use holo_hash::{DhtOpHash, HeaderHash};
-use holochain_keystore::Signature;
+use holochain_zome_types::signature::Signature;
 use holochain_state::{
     buffer::BufferedStore,
     buffer::KvBufFresh,

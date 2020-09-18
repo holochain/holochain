@@ -1,4 +1,6 @@
 use crate::*;
+use holochain_zome_types::signature::Signature;
+use holochain_zome_types::signature::SignInput;
 
 /// Extend holo_hash::AgentPubKey with additional signature functionality
 /// from Keystore.

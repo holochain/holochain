@@ -17,7 +17,7 @@ use crate::{
 };
 use ::fixt::prelude::*;
 use holo_hash::*;
-use holochain_keystore::Signature;
+use holochain_zome_types::signature::Signature;
 use holochain_state::{
     env::{EnvironmentWrite, ReadManager, WriteManager},
     error::DatabaseError,

@@ -2,6 +2,8 @@
 //! We will re-export the main KeystoreSender usable by clients at the lib.
 
 use crate::*;
+use holochain_zome_types::signature::Signature;
+use holochain_zome_types::signature::SignInput;
 use ghost_actor::dependencies::futures::future::FutureExt;
 
 /// GhostSender type for the KeystoreApi

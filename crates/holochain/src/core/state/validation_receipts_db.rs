@@ -2,7 +2,8 @@
 
 use fallible_iterator::FallibleIterator;
 use holo_hash::{AgentPubKey, DhtOpHash};
-use holochain_keystore::{AgentPubKeyExt, KeystoreSender, Signature};
+use holochain_keystore::{AgentPubKeyExt, KeystoreSender};
+use holochain_zome_types::signature::Signature;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::{
     buffer::{BufferedStore, KvvBufUsed},

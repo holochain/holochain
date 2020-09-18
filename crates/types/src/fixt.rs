@@ -18,7 +18,7 @@ use holo_hash::fixt::EntryHashFixturator;
 use holo_hash::fixt::HeaderHashFixturator;
 use holo_hash::fixt::WasmHashFixturator;
 use holo_hash::AgentPubKey;
-use holochain_keystore::Signature;
+use holochain_zome_types::signature::Signature;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_zome_types::capability::CapAccess;
 use holochain_zome_types::capability::CapClaim;

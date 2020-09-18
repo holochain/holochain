@@ -19,7 +19,7 @@ use crate::{
 use error::WorkflowResult;
 use fallible_iterator::FallibleIterator;
 use holo_hash::DhtOpHash;
-use holochain_keystore::Signature;
+use holochain_zome_types::signature::Signature;
 use holochain_p2p::{HolochainP2pCell, HolochainP2pCellT};
 use holochain_state::{
     buffer::{BufferedStore, KvBufFresh},

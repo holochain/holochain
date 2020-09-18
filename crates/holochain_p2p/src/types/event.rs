@@ -2,6 +2,7 @@
 //! Module containing incoming events from the HolochainP2p actor.
 
 use crate::*;
+use holochain_zome_types::signature::Signature;
 
 /// Get options help control how the get is processed at various levels.
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
