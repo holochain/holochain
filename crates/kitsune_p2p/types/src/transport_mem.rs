@@ -176,20 +176,32 @@ impl TransportConnectionHandler for InnerCon {
         Ok(async move { Ok(url) }.boxed().into())
     }
 
-    fn handle_create_channel(&mut self) -> TransportConnectionHandlerResult<(
-        TransportChannelWrite,
-        TransportChannelRead,
-    )> {
+    fn handle_create_channel(
+        &mut self,
+    ) -> TransportConnectionHandlerResult<(TransportChannelWrite, TransportChannelRead)> {
         let this_url = self.this_url.clone();
         let evt_send = self.evt_send.clone();
         Ok(async move {
-            let (recv1, send1) = tokio::io::split(std::io::Cursor::new(Vec::new()));
-            let (recv2, send2) = tokio::io::split(std::io::Cursor::new(Vec::new()));
-            evt_send.incoming_channel(this_url, Box::new(send1), Box::new(recv2)).await?;
+            use futures::sink::SinkExt;
+            let (send1, recv1) = futures::channel::mpsc::channel(10);
+            let send1 = send1.sink_map_err(TransportError::other);
+            let (send2, recv2) = futures::channel::mpsc::channel(10);
+            let send2 = send2.sink_map_err(TransportError::other);
+            // if we don't spawn here there can be a deadlock on
+            // incoming_channel trying to process all channel data
+            // before we've returned our halves here.
+            tokio::task::spawn(async move {
+                // it's ok if this errors... the channels will close.
+                let _ = evt_send
+                    .incoming_channel(this_url, Box::new(send1), Box::new(recv2))
+                    .await;
+            });
             let send2: TransportChannelWrite = Box::new(send2);
             let recv1: TransportChannelRead = Box::new(recv1);
             Ok((send2, recv1))
-        }.boxed().into())
+        }
+        .boxed()
+        .into())
     }
 }
 
@@ -203,18 +215,22 @@ mod tests {
             while let Some(msg) = recv.next().await {
                 match msg {
                     TransportConnectionEvent::IncomingChannel {
-                        respond, url, mut send, mut recv, ..
+                        respond,
+                        url,
+                        mut send,
+                        recv,
+                        ..
                     } => {
-                        use tokio::io::{AsyncReadExt, AsyncWriteExt};
                         respond.respond(Ok(async move {
-                            let mut data = Vec::new();
-                            recv.read_to_end(&mut data).await.map_err(TransportError::other)?;
-                            let data = format!("echo({}): {}", url, String::from_utf8_lossy(&data),)
-                                .into_bytes();
-                            send.write_all(&data).await.map_err(TransportError::other)?;
-                            send.shutdown().await.map_err(TransportError::other)?;
+                            let data = recv.read_to_end().await;
+                            let data =
+                                format!("echo({}): {}", url, String::from_utf8_lossy(&data),)
+                                    .into_bytes();
+                            send.write_and_close(data).await?;
                             Ok(())
-                        }.boxed().into()));
+                        }
+                        .boxed()
+                        .into()));
                     }
                 }
             }

@@ -49,11 +49,70 @@ pub type TransportResult<T> = Result<T, TransportError>;
 
 /// Defines an established connection to a remote peer.
 pub mod transport_connection {
+    use futures::{future::FutureExt, sink::SinkExt, stream::StreamExt};
+
     /// Receiver side of the channel
-    pub type TransportChannelRead = Box<dyn tokio::io::AsyncRead + Send + Unpin + 'static>;
+    pub type TransportChannelRead =
+        Box<dyn futures::stream::Stream<Item = Vec<u8>> + Send + Unpin + 'static>;
+
+    /// Extension trait for channel readers
+    pub trait TransportChannelReadExt {
+        /// Read the stream to close into a single byte vec.
+        fn read_to_end(
+            self,
+        ) -> ghost_actor::dependencies::must_future::MustBoxFuture<'static, Vec<u8>>;
+    }
+
+    impl<T: futures::stream::Stream<Item = Vec<u8>> + Send + Unpin + 'static>
+        TransportChannelReadExt for T
+    {
+        fn read_to_end(
+            self,
+        ) -> ghost_actor::dependencies::must_future::MustBoxFuture<'static, Vec<u8>> {
+            async move {
+                self.fold(Vec::new(), |mut acc, x| async move {
+                    acc.extend_from_slice(&x);
+                    acc
+                })
+                .await
+            }
+            .boxed()
+            .into()
+        }
+    }
 
     /// Sender side of the channel
-    pub type TransportChannelWrite = Box<dyn tokio::io::AsyncWrite + Send + Unpin + 'static>;
+    pub type TransportChannelWrite = Box<
+        dyn futures::sink::Sink<Vec<u8>, Error = super::TransportError> + Send + Unpin + 'static,
+    >;
+
+    /// Extension trait for channel writers
+    pub trait TransportChannelWriteExt {
+        /// Write all data and close channel
+        fn write_and_close<'a>(
+            &'a mut self,
+            data: Vec<u8>,
+        ) -> ghost_actor::dependencies::must_future::MustBoxFuture<'a, super::TransportResult<()>>;
+    }
+
+    impl<
+            T: futures::sink::Sink<Vec<u8>, Error = super::TransportError> + Send + Unpin + 'static,
+        > TransportChannelWriteExt for T
+    {
+        fn write_and_close<'a>(
+            &'a mut self,
+            data: Vec<u8>,
+        ) -> ghost_actor::dependencies::must_future::MustBoxFuture<'a, super::TransportResult<()>>
+        {
+            async move {
+                self.send(data).await?;
+                self.close().await?;
+                Ok(())
+            }
+            .boxed()
+            .into()
+        }
+    }
 
     ghost_actor::ghost_chan! {
         /// Event stream for handling incoming requests from a remote.
@@ -88,24 +147,35 @@ pub mod transport_connection {
     /// Extension trait for additional methods on TransportConnections
     pub trait TransportConnectionSenderExt {
         /// Make a request using a single channel open/close
-        fn request(&self, data: Vec<u8>) -> ghost_actor::dependencies::must_future::MustBoxFuture<'static, super::TransportResult<Vec<u8>>>;
+        fn request(
+            &self,
+            data: Vec<u8>,
+        ) -> ghost_actor::dependencies::must_future::MustBoxFuture<
+            'static,
+            super::TransportResult<Vec<u8>>,
+        >;
     }
 
     impl<T: TransportConnectionSender> TransportConnectionSenderExt for T {
-        fn request(&self, data: Vec<u8>) -> ghost_actor::dependencies::must_future::MustBoxFuture<'static, super::TransportResult<Vec<u8>>> {
+        fn request(
+            &self,
+            data: Vec<u8>,
+        ) -> ghost_actor::dependencies::must_future::MustBoxFuture<
+            'static,
+            super::TransportResult<Vec<u8>>,
+        > {
             use super::TransportError;
-            use tokio::io::{AsyncReadExt, AsyncWriteExt};
-            use futures::future::FutureExt;
 
             let fut = self.create_channel();
             async move {
-                let (mut send, mut recv) = fut.await.map_err(TransportError::other)?;
-                send.write_all(&data).await.map_err(TransportError::other)?;
-                send.shutdown().await.map_err(TransportError::other)?;
-                let mut out = Vec::new();
-                recv.read_to_end(&mut out).await.map_err(TransportError::other)?;
+                let (mut send, recv) = fut.await.map_err(TransportError::other)?;
+                send.write_and_close(data).await?;
+                let out = recv.read_to_end().await;
+
                 Ok(out)
-            }.boxed().into()
+            }
+            .boxed()
+            .into()
         }
     }
 }
