@@ -337,9 +337,9 @@ async fn validate_op(
             // Run the link validation
             run_create_link_validation_callback(
                 zome_name,
-                link_add.clone(),
-                base.clone(),
-                target.clone(),
+                link_add,
+                base,
+                target,
                 &ribosome,
                 workspace_lock.clone(),
                 network.clone(),
@@ -353,7 +353,7 @@ async fn validate_op(
             // Call the element validation
             run_validation_callback(
                 zomes_to_invoke,
-                element.clone(),
+                element,
                 &ribosome,
                 workspace_lock.clone(),
                 network.clone(),

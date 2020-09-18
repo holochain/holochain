@@ -74,7 +74,7 @@ impl From<ValidateCreateLinkInvocation> for ValidateCreateLinkData {
 impl From<ValidateDeleteLinkInvocation> for ValidateDeleteLinkData {
     fn from(validate_delete_link_invocation: ValidateDeleteLinkInvocation) -> Self {
         Self {
-            delete_link: validate_delete_link_invocation.delete_link.clone(),
+            delete_link: validate_delete_link_invocation.delete_link,
         }
     }
 }

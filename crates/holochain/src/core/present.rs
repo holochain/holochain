@@ -123,7 +123,7 @@ pub async fn retrieve_header(
     found!(retrieve_header_from(hash, data_source.pending())?.map(PendingValidation));
     let mut cascade = data_source.cascade();
     let shh = cascade
-        .retrieve_header(hash.clone().into(), Default::default())
+        .retrieve_header(hash.clone(), Default::default())
         .await?;
     Ok(shh.map(Claim))
 }
