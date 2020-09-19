@@ -13,10 +13,10 @@ use crate::conductor::{
     entry_def_store::{get_entry_defs, EntryDefBufferKey},
 };
 use fallible_iterator::FallibleIterator;
-use holochain_keystore::{AgentPubKeyExt};
-use holochain_zome_types::signature::Signature;
+use holochain_keystore::AgentPubKeyExt;
 use holochain_state::{fresh_reader, prelude::PrefixType};
 use holochain_types::{header::NewEntryHeaderRef, Entry};
+use holochain_zome_types::signature::Signature;
 use holochain_zome_types::{
     element::SignedHeaderHashed,
     entry_def::{EntryDef, EntryVisibility},

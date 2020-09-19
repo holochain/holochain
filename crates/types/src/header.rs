@@ -13,9 +13,9 @@ use crate::{
 use conversions::WrongHeaderError;
 use derive_more::From;
 use holo_hash::EntryHash;
-use holochain_zome_types::signature::Signature;
 use holochain_zome_types::entry_def::EntryVisibility;
 pub use holochain_zome_types::header::HeaderHashed;
+use holochain_zome_types::signature::Signature;
 use holochain_zome_types::{
     element::{Element, SignedHeader},
     header::*,

@@ -24,7 +24,7 @@ futures = "0.3"
 holo_hash = { version = "0.0.1", path = "../holo_hash" }
 holochain_crypto = { version = "0.0.1", path = "../crypto" }
 holochain_keystore = { version = "0.0.1", path = "../keystore" }
-holochain_serialized_bytes = "=0.0.43"
+holochain_serialized_bytes = "=0.0.45"
 holochain_zome_types = { path = "../zome_types", features = ["fixturators"] }
 lazy_static = "1.4.0"
 must_future = "0.1.1"

@@ -8,7 +8,6 @@ use crate::{
 };
 use ::fixt::prelude::*;
 use holo_hash::{fixt::HeaderHashFixturator, *};
-use holochain_zome_types::signature::Signature;
 use holochain_state::test_utils::test_cell_env;
 use holochain_types::{
     dht_op::{produce_ops_from_element, DhtOp},
@@ -22,6 +21,7 @@ use holochain_zome_types::header::{
     AgentValidationPkg, CloseChain, Create, CreateLink, DeleteLink, Dna, EntryType, Header,
     HeaderBuilderCommon, InitZomesComplete, OpenChain, Update,
 };
+use holochain_zome_types::signature::Signature;
 use pretty_assertions::assert_eq;
 use tracing::*;
 

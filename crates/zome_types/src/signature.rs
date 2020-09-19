@@ -1,4 +1,5 @@
 //! Signature for authenticity of data
+use holo_hash::AgentPubKey;
 use holochain_serialized_bytes::prelude::*;
 
 /// Input structure for creating a signature.
@@ -26,14 +27,30 @@ impl SignInput {
     pub fn new_raw(key: holo_hash::AgentPubKey, data: Vec<u8>) -> Self {
         Self {
             key,
-            data: holochain_serialized_bytes::UnsafeBytes::from(data).into(),
+            data: UnsafeBytes::from(data).into(),
         }
+    }
+
+    /// key getter
+    pub fn key(&self) -> &AgentPubKey {
+        &self.key
+    }
+
+    /// data getter
+    pub fn data(&self) -> &SerializedBytes {
+        &self.data
     }
 }
 
 /// The raw bytes of a signature.
 #[derive(Clone, Serialize, Deserialize, SerializedBytes, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Signature(#[serde(with = "serde_bytes")] pub Vec<u8>);
+
+impl AsRef<[u8]> for Signature {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
 
 impl std::fmt::Debug for Signature {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
