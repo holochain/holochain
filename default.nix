@@ -44,7 +44,6 @@ with holonix.pkgs;
   ];
 
   buildInputs = [
-   holonix.pkgs.libsodium
    holonix.pkgs.gnuplot
    holonix.pkgs.flamegraph
    holonix.pkgs.fd
