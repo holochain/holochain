@@ -84,6 +84,8 @@ wasm_io_types!(
     // The pubkey in the input needs to be found in the keystore for this to work
     pub struct SignInput(crate::signature::SignInput);
     pub struct SignOutput(crate::signature::Signature);
+    pub struct VerifySignatureInput(crate::signature::VerifySignatureInput);
+    pub struct VerifySignatureOutput(bool);
     // @todo
     pub struct ScheduleInput(core::time::Duration);
     pub struct ScheduleOutput(());
@@ -112,9 +114,6 @@ wasm_io_types!(
         ),
     );
     pub struct CreateLinkOutput(holo_hash::HeaderHash);
-    // @todo
-    pub struct KeystoreInput(());
-    pub struct KeystoreOutput(());
     // Get links by entry hash from the cascade.
     pub struct GetLinksInput((holo_hash::EntryHash, Option<crate::link::LinkTag>));
     pub struct GetLinksOutput(crate::link::Links);

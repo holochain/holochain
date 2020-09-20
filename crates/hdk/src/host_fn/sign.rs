@@ -3,17 +3,16 @@
 /// Assuming the private key for the provided
 #[macro_export]
 macro_rules! sign {
-    ( $key:expr, $data:expr ) => {{
+    ( $sign_input:expr ) => {{
         $crate::prelude::host_externs!(__sign);
-        $crate::host_fn!(
-            __sign,
-            $crate::prelude::holochain_zome_types::zome_io::SignInput::new(
-                $crate::prelude::holochain_zome_types::signature::SignInput {
-                    key: $key.into(),
-                    data: $data.into(),
-                }
-            ),
-            $crate::prelude::SignOutput
+        $crate::host_fn!(__sign, $sign_input, $crate::prelude::SignOutput)
+    }};
+    ( $key:expr, $data:expr ) => {{
+        $crate::sign!(
+            $crate::prelude::holochain_zome_types::signature::SignInput {
+                key: $key.into(),
+                data: $data.into(),
+            }
         )
     }};
 }

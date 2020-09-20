@@ -15,7 +15,6 @@ pub mod get_details;
 pub mod get_link_details;
 pub mod get_links;
 pub mod hash_entry;
-pub mod keystore;
 pub mod property;
 pub mod query;
 pub mod random_bytes;
@@ -25,6 +24,7 @@ pub mod sign;
 pub mod sys_time;
 pub mod unreachable;
 pub mod update;
+pub mod verify_signature;
 pub mod zome_info;
 
 /// Simple wrapper around the holochain_wasmer_guest host_call! macro.
