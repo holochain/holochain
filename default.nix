@@ -46,32 +46,6 @@ with holonix.pkgs;
     mkdir -p $HC_WASM_CACHE_PATH
 
     export PEWPEWPEW_PORT=4343
-
-    # ensure the holochain binary is fresh and installed on the path
-    # ideally we want to do this offline but if that fails we can fall back to
-    # doing it online and update the crates registry
-    rm $CARGO_INSTALL_ROOT/bin/holochain
-
-    # CI very much does not like offline
-    if [[ -z "$CI" ]]
-     then
-      cargo install --path crates/holochain --offline
-      if (( $? != 0 ))
-       then
-        cargo install --path crates/holochain
-      fi
-     else
-      cargo install --path crates/holochain
-    fi
-
-
-    if [[ $( command -v holochain ) == $CARGO_INSTALL_ROOT* ]]
-     then
-      echo 'updated holochain binary'
-     else
-      echo 'failed to update holochain binary'
-      exit
-    fi
    ''
   ];
 
@@ -95,6 +69,44 @@ with holonix.pkgs;
    ++ (holonix.pkgs.callPackage ./test {
     pkgs = holonix.pkgs;
    }).buildInputs
+
+   ++ ([(
+    holonix.pkgs.writeShellScriptBin "hc-install" ''
+     cargo install --path crates/holochain
+     echo 'holochain installed!'
+     echo
+
+     hc-doctor
+    ''
+   )])
+
+   ++ ([(
+    holonix.pkgs.writeShellScriptBin "hc-uninstall" ''
+     rm $CARGO_INSTALL_ROOT/bin/holochain
+     echo 'holochain uninstalled!'
+     echo
+
+     hc-doctor
+    ''
+   )])
+
+   ++ ([(
+    holonix.pkgs.writeShellScriptBin "hc-doctor" ''
+     echo "### holochain doctor ###"
+     echo
+
+     echo "if you have installed holochain directly using hc-install it should be in the cargo root"
+     echo "it may be worth running hc-uninstall and hc-install to 'refresh' it as HEAD moves quickly"
+     echo
+
+     echo "cargo install root:"
+     echo $CARGO_INSTALL_ROOT
+     echo
+
+     echo "holochain binary installation:"
+     command -v holochain
+    ''
+   )])
 
    # convenience command for executing dna-util
    # until such time as we have release artifacts
