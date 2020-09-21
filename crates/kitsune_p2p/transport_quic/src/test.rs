@@ -35,20 +35,28 @@ mod tests {
                         );
                         while let Some(evt) = evt.next().await {
                             match evt {
-                                TransportConnectionEvent::IncomingRequest {
+                                TransportConnectionEvent::IncomingChannel {
                                     respond,
                                     url,
-                                    data,
+                                    mut send,
+                                    recv,
                                     ..
                                 } => {
-                                    println!(
-                                        "message from {} : {}",
-                                        url,
-                                        String::from_utf8_lossy(&data),
-                                    );
-                                    let out = format!("echo: {}", String::from_utf8_lossy(&data),)
-                                        .into_bytes();
-                                    respond.respond(Ok(async move { Ok(out) }.boxed().into()));
+                                    respond.respond(Ok(async move {
+                                        let data = recv.read_to_end().await;
+                                        println!(
+                                            "message from {} : {}",
+                                            url,
+                                            String::from_utf8_lossy(&data),
+                                        );
+                                        let data =
+                                            format!("echo: {}", String::from_utf8_lossy(&data))
+                                                .into_bytes();
+                                        send.write_and_close(data).await?;
+                                        Ok(())
+                                    }
+                                    .boxed()
+                                    .into()));
                                 }
                             }
                         }
