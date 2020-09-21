@@ -1635,6 +1635,8 @@ dependencies = [
  "derive_more",
  "futures",
  "ghost_actor",
+ "nanoid",
+ "once_cell",
  "thiserror",
  "tokio",
  "url2",
