@@ -70,6 +70,7 @@ jobs:
     - run:
        command: |
         $ENV:PATH="$ENV:PATH;%USERPROFILE%\.cargo\bin"
+        $CARGO_NET_GIT_FETCH_WITH_CLI = true
         cargo test
 
   docker-build-latest:
