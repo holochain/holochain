@@ -32,6 +32,26 @@ jobs:
       - run:
           command: nix-shell --run hc-merge-test
 
+  merge-test-mac:
+   macos:
+    xcode: "12.0.0"
+   resource_class: xlarge
+   environment:
+    NIXPKGS_ALLOW_UNFREE: 1
+   steps:
+    - checkout
+    - run:
+       name: Test on mac
+       no_output_timeout: 30m
+       command: |
+        # fix for "too many open files" that breaks tokio and lmdb
+        ulimit -n 10240
+        # catalina nixos install
+        sh <(curl -L https://nixos.org/nix/install) --darwin-use-unencrypted-nix-store-volume
+        . /Users/distiller/.nix-profile/etc/profile.d/nix.sh
+        # do tests
+        nix-shell --run hc-merge-test
+
   docker-build-latest:
    resource_class: large
    machine: true
@@ -51,6 +71,7 @@ workflows:
  tests:
   jobs:
    - merge-test
+   - merge-test-mac
  docker-builds:
   triggers:
    - schedule:

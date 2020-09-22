@@ -14,8 +14,6 @@
 //! #[tokio::main(threaded_scheduler)]
 //! async fn main() {
 //!     tokio::task::spawn(async move {
-//!         let _ = holochain_crypto::crypto_init_sodium();
-//!
 //!         let keystore = test_keystore::spawn_test_keystore().await.unwrap();
 //!         let agent_pubkey = AgentPubKey::new_from_pure_entropy(&keystore).await.unwrap();
 //!
