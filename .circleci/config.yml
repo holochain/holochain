@@ -68,7 +68,7 @@ jobs:
         ./rustup-init.exe -y
         $ENV:PATH="$ENV:PATH;%USERPROFILE%\.cargo\bin"
         New-Item ./.cargo -ItemType "directory"
-        New-Item ./.cargo/cargo.toml -ItemType 'file' -Value @'
+        New-Item ./.cargo/config.toml -ItemType 'file' -Value @'
         [net]
         git-fetch-with-cli = true
         '@
