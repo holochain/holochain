@@ -1,3 +1,5 @@
+net.git-fetch-with-cli = true
+
 [workspace]
 members = [
   "crates/dna_util",
