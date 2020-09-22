@@ -91,7 +91,7 @@ with holonix.pkgs;
 
    ++ ([(
     holonix.pkgs.writeShellScriptBin "hc-uninstall-holochain" ''
-     rm $CARGO_INSTALL_ROOT/bin/holochain
+     cargo uninstall holochain
      echo 'holochain uninstalled!'
      echo
     ''
@@ -107,7 +107,7 @@ with holonix.pkgs;
 
    ++ ([(
     holonix.pkgs.writeShellScriptBin "hc-uninstall-dna-util" ''
-     rm $CARGO_INSTALL_ROOT/bin/dna-util
+     cargo uninstall dna_util
      echo 'dna util uninstalled!'
      echo
     ''
