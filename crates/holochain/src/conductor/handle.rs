@@ -47,11 +47,13 @@
 
 use super::{
     api::error::ConductorApiResult,
+    api::SignalSubscription,
     config::AdminInterfaceConfig,
     dna_store::DnaStore,
     entry_def_store::EntryDefBufferKey,
     error::{ConductorResult, CreateAppError},
     manager::TaskManagerRunHandle,
+    state::AppInterfaceId,
     Cell, Conductor,
 };
 use crate::core::ribosome::ZomeCallInvocation;
@@ -179,6 +181,13 @@ pub trait ConductorHandleT: Send + Sync {
     /// Dump the cells state
     #[allow(clippy::ptr_arg)]
     async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String>;
+
+    /// Update Signal subscription for an interface
+    async fn update_signal_subscription(
+        &self,
+        app_interface_id: &AppInterfaceId,
+        subscription: SignalSubscription,
+    ) -> ConductorResult<()>;
 
     /// Get info about an installed App, whether active or inactive
     #[allow(clippy::ptr_arg)]
@@ -404,6 +413,14 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
     async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
         self.conductor.read().await.dump_cell_state(cell_id).await
+    }
+
+    async fn update_signal_subscription(
+        &self,
+        _app_interface_id: &AppInterfaceId,
+        _subscription: SignalSubscription,
+    ) -> ConductorResult<()> {
+        todo!()
     }
 
     async fn get_app_info(&self, app_id: &AppId) -> ConductorResult<Option<InstalledApp>> {

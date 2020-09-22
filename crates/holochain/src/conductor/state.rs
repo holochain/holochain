@@ -3,12 +3,11 @@
 
 use crate::conductor::interface::InterfaceDriver;
 
-use holochain_types::{
-    app::{AppId, InstalledApp, InstalledCell},
-    cell::CellId,
-};
+use holochain_types::app::{AppId, InstalledApp, InstalledCell};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+
+use super::api::SignalSubscription;
 
 /// Mutable conductor state, stored in a DB and writeable only via Admin interface.
 ///
@@ -26,12 +25,11 @@ pub struct ConductorState {
     pub active_apps: HashMap<AppId, Vec<InstalledCell>>,
     /// List of interfaces any UI can use to access zome functions.
     #[serde(default)]
-    pub app_interfaces: HashMap<AppInterfaceNick, AppInterfaceConfig>,
+    pub app_interfaces: HashMap<AppInterfaceId, AppInterfaceConfig>,
 }
 
-/// A friendly name used to refer to an App Interface.
-// TODO: is this needed?
-pub type AppInterfaceNick = String;
+/// A unique identifier used to refer to an App Interface internally.
+pub type AppInterfaceId = String;
 
 impl ConductorState {
     /// Retrieve info about an installed App by its AppId
@@ -56,7 +54,6 @@ impl ConductorState {
 /// GUIs, browser based web UIs, local native UIs, other local applications and scripts.
 /// We currently have:
 /// * websockets
-/// * HTTP
 ///
 /// We will also soon develop
 /// * Unix domain sockets
@@ -65,10 +62,9 @@ impl ConductorState {
 #[derive(Clone, Deserialize, Serialize, Debug)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct AppInterfaceConfig {
-    /// The list of CellIds which this app interface applies to
-    // FIXME: [ B-01607 ] currently not hooked up, doesn't make sense until
-    // Signals are implemented
-    pub cells: Vec<CellId>,
+    /// The signal subscription settings for each App
+    pub signal_subscriptions: HashMap<AppId, SignalSubscription>,
+
     /// The driver for the interface, e.g. Websocket
     pub driver: InterfaceDriver,
 }

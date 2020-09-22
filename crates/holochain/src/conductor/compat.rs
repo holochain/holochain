@@ -119,7 +119,7 @@ pub async fn load_conductor_from_legacy_config(
     for i in app_interfaces {
         let AppInterfaceConfig {
             driver: InterfaceDriver::Websocket { port },
-            cells: _,
+            signal_subscriptions: _,
         } = i;
         conductor
             .clone()
@@ -175,8 +175,7 @@ fn extract_app_interfaces(
         .filter_map(|c: legacy::InterfaceConfig| {
             convert_interface_driver(c.driver).map(|driver| AppInterfaceConfig {
                 driver,
-                // FIXME: cells not hooked up for now since we don't use signals yet
-                cells: Vec::new(),
+                signal_subscriptions: HashMap::new(),
             })
         })
         .collect()

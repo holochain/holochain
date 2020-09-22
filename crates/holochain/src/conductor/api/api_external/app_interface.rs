@@ -1,5 +1,8 @@
 use super::{InterfaceApi, SignalSubscription};
-use crate::conductor::api::error::{ConductorApiResult, ExternalApiWireError, SerializationError};
+use crate::conductor::{
+    api::error::{ConductorApiResult, ExternalApiWireError, SerializationError},
+    state::AppInterfaceId,
+};
 use crate::conductor::{
     interface::error::{InterfaceError, InterfaceResult},
     ConductorHandle,
@@ -37,12 +40,16 @@ pub trait AppInterfaceApi: 'static + Send + Sync + Clone {
 #[derive(Clone)]
 pub struct RealAppInterfaceApi {
     conductor_handle: ConductorHandle,
+    interface_id: AppInterfaceId,
 }
 
 impl RealAppInterfaceApi {
     /// Create a new instance from a shared Conductor reference
-    pub fn new(conductor_handle: ConductorHandle) -> Self {
-        Self { conductor_handle }
+    pub fn new(conductor_handle: ConductorHandle, interface_id: AppInterfaceId) -> Self {
+        Self {
+            conductor_handle,
+            interface_id,
+        }
     }
 }
 
@@ -57,6 +64,12 @@ impl AppInterfaceApi for RealAppInterfaceApi {
             AppRequest::AppInfo { app_id } => Ok(AppResponse::AppInfo(
                 self.conductor_handle.get_app_info(&app_id).await?,
             )),
+            AppRequest::SignalSubscription(subscription) => {
+                self.conductor_handle
+                    .update_signal_subscription(&self.interface_id, subscription)
+                    .await?;
+                Ok(AppResponse::SignalSubscriptionUpdated)
+            }
             AppRequest::ZomeCallInvocation(request) => {
                 match self.conductor_handle.call_zome(*request).await? {
                     Ok(ZomeCallResponse::Ok(output)) => {
@@ -108,8 +121,9 @@ pub enum AppRequest {
 
     /// Call a zome function
     ZomeCallInvocation(Box<ZomeCallInvocation>),
-    // /// Update signal subscriptions
-    // SignalSubscription(SignalSubscription),
+
+    /// Update signal subscriptions
+    SignalSubscription(SignalSubscription),
 }
 
 /// Responses to requests received on an App interface
@@ -125,7 +139,11 @@ pub enum AppResponse {
     /// The response to a zome call
     ZomeCallInvocation(Box<ExternOutput>),
 
+    /// The response to a SignalSubscription message
+    SignalSubscriptionUpdated,
+
     /// The zome call is unauthorized
+    // TODO: I think this should be folded into ExternalApiWireError -MD
     ZomeCallUnauthorized,
 }
 

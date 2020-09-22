@@ -358,7 +358,11 @@ pub mod test {
 
         let handle = conductor_handle.clone();
 
-        (tmpdir, RealAppInterfaceApi::new(conductor_handle), handle)
+        (
+            tmpdir,
+            RealAppInterfaceApi::new(conductor_handle, "test-interface".into()),
+            handle,
+        )
     }
 
     #[tokio::test(threaded_scheduler)]

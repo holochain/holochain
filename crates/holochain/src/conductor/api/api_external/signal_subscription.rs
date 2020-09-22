@@ -5,6 +5,7 @@ use std::collections::HashMap;
 /// Declares updated Signal subscription settings for an App.
 /// This message is part of the AppInterfaceApi
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[cfg_attr(test, derive(PartialEq))]
 pub struct SignalSubscription {
     /// The app for which to manage subscription
     app_id: AppId,
@@ -19,6 +20,7 @@ pub struct SignalSubscription {
 /// An empty Exclude filter means "allow all signals" (subscribe to all).
 /// An empty Include filter means "block all signals" (unsubscribe from all).
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[cfg_attr(test, derive(PartialEq))]
 pub enum SignalFilterSet {
     /// Only allow signals from the specified Cells with the specified filters,
     /// block everything else
@@ -49,6 +51,7 @@ impl SignalFilterSet {
 
 /// Specifies fine-grained filter controls for the signals
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[cfg_attr(test, derive(PartialEq))]
 pub struct SignalFilter;
 
 impl Default for SignalFilter {

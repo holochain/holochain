@@ -287,7 +287,8 @@ where
         port: u16,
         handle: ConductorHandle,
     ) -> ConductorResult<u16> {
-        let app_api = RealAppInterfaceApi::new(handle);
+        let interface_id = format!("interface-{}", port);
+        let app_api = RealAppInterfaceApi::new(handle, interface_id);
         let (signal_broadcaster, _r) = tokio::sync::broadcast::channel(SIGNAL_BUFFER_SIZE);
         let stop_rx = self.managed_task_stop_broadcaster.subscribe();
         let (port, task) = spawn_app_interface_task(port, app_api, signal_broadcaster, stop_rx)
