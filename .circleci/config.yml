@@ -68,7 +68,7 @@ jobs:
     - run:
        command: ./rustup-init.exe -y
     - run:
-       shell: bash.exe
+       # shell: bash.exe
        command: |
         $ENV:PATH="$ENV:PATH;%USERPROFILE%\.cargo\bin"
         $CARGO_NET_GIT_FETCH_WITH_CLI = true
