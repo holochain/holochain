@@ -53,7 +53,7 @@ jobs:
         sh <(curl -L https://nixos.org/nix/install) --darwin-use-unencrypted-nix-store-volume
         . /Users/distiller/.nix-profile/etc/profile.d/nix.sh
         # do tests
-        nix-shell --run hc-merge-test
+        nix-shell --run hc-test
 
   merge-test-win:
    executor:
@@ -80,7 +80,7 @@ jobs:
     - run:
        command: |
         $env:path += ";C:\Program Files\cmake\bin"
-        
+
         cargo test warm_wasm_tests --manifest-path=crates/holochain/Cargo.toml --features "slow_tests build_wasms"
         cargo test -- --nocapture
         cargo test --manifest-path=crates/holochain/Cargo.toml --features slow_tests -- --nocapture
@@ -104,8 +104,8 @@ workflows:
  tests:
   jobs:
    - merge-test
-   - merge-test-mac
-   - merge-test-win
+   - hc-test-mac
+   - hc-test-win
  docker-builds:
   triggers:
    - schedule:
