@@ -63,6 +63,8 @@ jobs:
     - checkout
     - run:
        command: |
+        choco install cmake -y
+        $env:Path+=";$Env:ProgramFiles\CMake\bin"; ./makeall.bat
         $ProgressPreference = "SilentlyContinue"
         Invoke-WebRequest -Uri https://static.rust-lang.org/rustup/dist/i686-pc-windows-gnu/rustup-init.exe -Outfile rustup-init.exe
         ./rustup-init.exe -y
