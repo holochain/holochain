@@ -68,7 +68,6 @@ jobs:
         Invoke-WebRequest -URI https://github.com/Kitware/CMake/releases/download/v3.16.4/cmake-3.16.4-win64-x64.zip -OutFile $Env:HOMEPATH\cmake-3.16.4-win64-x64.zip
         Expand-Archive $Env:HOMEPATH\cmake-3.16.4-win64-x64.zip -DestinationPath "$Env:ProgramFiles"
         Rename-Item "$Env:ProgramFiles\cmake-3.16.4-win64-x64" -NewName CMake
-        $env:path += ";C:\Program Files\cmake\bin"
 
         Invoke-WebRequest -Uri https://static.rust-lang.org/rustup/dist/i686-pc-windows-gnu/rustup-init.exe -Outfile rustup-init.exe
         ./rustup-init.exe -y
@@ -78,7 +77,11 @@ jobs:
         [net]
         git-fetch-with-cli = true
         '@
-    - run: cargo test
+    - run:
+       command: |
+        $env:path += ";C:\Program Files\cmake\bin"
+        cmake
+        cargo test
 
   docker-build-latest:
    resource_class: large
