@@ -67,6 +67,11 @@ jobs:
         Invoke-WebRequest -Uri https://static.rust-lang.org/rustup/dist/i686-pc-windows-gnu/rustup-init.exe -Outfile rustup-init.exe
     - run:
        command: ./rustup-init.exe -y
+    - run:
+       command: |
+        $ENV:PATH="$ENV:PATH;%USERPROFILE%\.cargo\bin"
+        cd project
+        cargo test
 
   docker-build-latest:
    resource_class: large
