@@ -70,7 +70,6 @@ jobs:
     - run:
        command: |
         $ENV:PATH="$ENV:PATH;%USERPROFILE%\.cargo\bin"
-        cd project
         cargo test
 
   docker-build-latest:
