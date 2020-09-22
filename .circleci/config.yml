@@ -72,7 +72,7 @@ jobs:
         [net]
         git-fetch-with-cli = true
         '@
-     - run: cargo test
+    - run: cargo test
 
   docker-build-latest:
    resource_class: large
