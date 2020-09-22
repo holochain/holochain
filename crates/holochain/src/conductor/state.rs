@@ -29,7 +29,14 @@ pub struct ConductorState {
 }
 
 /// A unique identifier used to refer to an App Interface internally.
-pub type AppInterfaceId = String;
+#[derive(Clone, Deserialize, Serialize, Default, Debug, Hash, PartialEq, Eq, derive_more::From)]
+pub struct AppInterfaceId(String);
+
+impl From<&str> for AppInterfaceId {
+    fn from(s: &str) -> Self {
+        Self(s.into())
+    }
+}
 
 impl ConductorState {
     /// Retrieve info about an installed App by its AppId
@@ -45,7 +52,7 @@ impl ConductorState {
     }
 
     /// Returns the interface configuration with the given ID if present
-    pub fn interface_by_id(&self, id: &str) -> Option<AppInterfaceConfig> {
+    pub fn interface_by_id(&self, id: &AppInterfaceId) -> Option<AppInterfaceConfig> {
         self.app_interfaces.get(id).cloned()
     }
 }
