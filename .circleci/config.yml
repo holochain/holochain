@@ -61,8 +61,8 @@ jobs:
     size: "medium"
    steps:
     - checkout
-    - Invoke-WebRequest -Uri "https://static.rust-lang.org/rustup/dist/i686-pc-windows-gnu/rustup-init.exe" -Outfile "rustup-init.exe"
-    - rustup-init.exe
+    - run: Invoke-WebRequest -Uri "https://static.rust-lang.org/rustup/dist/i686-pc-windows-gnu/rustup-init.exe" -Outfile "rustup-init.exe"
+    - run: rustup-init.exe
 
   docker-build-latest:
    resource_class: large
