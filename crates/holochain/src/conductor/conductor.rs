@@ -782,8 +782,6 @@ mod builder {
                 }
             }
 
-            let _ = holochain_crypto::crypto_init_sodium();
-
             let keystore = if let Some(keystore) = self.keystore {
                 keystore
             } else if self.config.use_dangerous_test_keystore {
