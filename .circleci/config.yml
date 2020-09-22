@@ -1,5 +1,8 @@
 version: 2.1
 
+orbs:
+ win: circleci/windows@2.2.0
+
 commands:
  build-docker:
   description: "Build and deploy a docker box"
@@ -52,6 +55,15 @@ jobs:
         # do tests
         nix-shell --run hc-merge-test
 
+  merge-test-win:
+   executor:
+    name: win/default
+    size: "medium"
+   steps:
+    - checkout
+    - Invoke-WebRequest -Uri "https://static.rust-lang.org/rustup/dist/i686-pc-windows-gnu/rustup-init.exe" -Outfile "rustup-init.exe"
+    - rustup-init.exe
+
   docker-build-latest:
    resource_class: large
    machine: true
@@ -72,6 +84,7 @@ workflows:
   jobs:
    - merge-test
    - merge-test-mac
+   - merge-test-win
  docker-builds:
   triggers:
    - schedule:
