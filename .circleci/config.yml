@@ -35,7 +35,7 @@ jobs:
       - run:
           command: nix-shell --run hc-merge-test
 
-  merge-test-mac:
+  hc-test-mac:
    macos:
     xcode: "12.0.0"
    resource_class: xlarge
@@ -55,7 +55,7 @@ jobs:
         # do tests
         nix-shell --run hc-test
 
-  merge-test-win:
+  hc-test-win:
    executor:
     name: win/default
     size: "medium"
