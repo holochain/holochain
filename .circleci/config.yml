@@ -70,7 +70,7 @@ jobs:
         Rename-Item "$Env:ProgramFiles\cmake-3.16.4-win64-x64" -NewName CMake
 
         Invoke-WebRequest -Uri https://static.rust-lang.org/rustup/dist/i686-pc-windows-gnu/rustup-init.exe -Outfile rustup-init.exe
-        ./rustup-init.exe -y --default-toolchain 1.45.1
+        ./rustup-init.exe -y --default-toolchain 1.45.1 --target wasm32-unknown-unknown
         $ENV:PATH="$ENV:PATH;%USERPROFILE%\.cargo\bin"
         New-Item ./.cargo -ItemType "directory"
         New-Item ./.cargo/config.toml -ItemType 'file' -Value @'
