@@ -80,8 +80,10 @@ jobs:
     - run:
        command: |
         $env:path += ";C:\Program Files\cmake\bin"
-        cmake
-        cargo test
+        
+        cargo test warm_wasm_tests --manifest-path=crates/holochain/Cargo.toml --features "slow_tests build_wasms"
+        cargo test -- --nocapture
+        cargo test --manifest-path=crates/holochain/Cargo.toml --features slow_tests -- --nocapture
 
   docker-build-latest:
    resource_class: large
