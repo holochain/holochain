@@ -71,6 +71,8 @@ jobs:
 
         Invoke-WebRequest -Uri https://static.rust-lang.org/rustup/dist/i686-pc-windows-gnu/rustup-init.exe -Outfile rustup-init.exe
         ./rustup-init.exe -y
+        rustup install toolchain 1.45.1
+        rustup default 1.45.1
         $ENV:PATH="$ENV:PATH;%USERPROFILE%\.cargo\bin"
         New-Item ./.cargo -ItemType "directory"
         New-Item ./.cargo/config.toml -ItemType 'file' -Value @'
