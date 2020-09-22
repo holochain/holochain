@@ -1,4 +1,4 @@
-use super::InterfaceApi;
+use super::{InterfaceApi, SignalSubscription};
 use crate::conductor::api::error::{ConductorApiResult, ExternalApiWireError, SerializationError};
 use crate::conductor::{
     interface::error::{InterfaceError, InterfaceResult},
@@ -108,6 +108,8 @@ pub enum AppRequest {
 
     /// Call a zome function
     ZomeCallInvocation(Box<ZomeCallInvocation>),
+    // /// Update signal subscriptions
+    // SignalSubscription(SignalSubscription),
 }
 
 /// Responses to requests received on an App interface

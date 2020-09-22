@@ -78,7 +78,7 @@ pub fn spawn_admin_interface_task<A: InterfaceApi>(
         // TODO: TK-01261: Make send_socket close tell the recv socket to close locally in the websocket code
         for mut send_socket in send_sockets {
             // TODO: TK-01261: change from u16 code to enum
-            send_socket.close(1000, "Shutting down".into()).await?;
+            WebsocketSender::close(&mut send_socket, 1000, "Shutting down".into()).await?;
         }
 
         // These SHOULD end soon after we get here, or by the time we get here.
