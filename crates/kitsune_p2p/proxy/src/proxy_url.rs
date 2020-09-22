@@ -155,13 +155,15 @@ macro_rules! q_from {
 }
 
 q_from! {
-     ProxyUrl => (url2::Url2, url2::Url2), |url| { url.into_inner() },
-    &ProxyUrl => (url2::Url2, url2::Url2), |url| { url.clone().into_inner() },
-     ProxyUrl => url2::Url2, |url| { url.into_full() },
-    &ProxyUrl => url2::Url2, |url| { url.as_full().clone() },
-     String => ProxyUrl, |url| { ProxyUrl::from_full(&url).unwrap() },
-    &String => ProxyUrl, |url| { ProxyUrl::from_full(url).unwrap() },
-       &str => ProxyUrl, |url| { ProxyUrl::from_full(url).unwrap() },
+       ProxyUrl => (url2::Url2, url2::Url2), |url| { url.into_inner() },
+      &ProxyUrl => (url2::Url2, url2::Url2), |url| { url.clone().into_inner() },
+       ProxyUrl => url2::Url2, |url| { url.into_full() },
+      &ProxyUrl => url2::Url2, |url| { url.as_full().clone() },
+         String => ProxyUrl, |url| { ProxyUrl::from_full(&url).unwrap() },
+        &String => ProxyUrl, |url| { ProxyUrl::from_full(url).unwrap() },
+           &str => ProxyUrl, |url| { ProxyUrl::from_full(url).unwrap() },
+     url2::Url2 => ProxyUrl, |url| { ProxyUrl::from_full(url.as_str()).unwrap() },
+    &url2::Url2 => ProxyUrl, |url| { ProxyUrl::from_full(url.as_str()).unwrap() },
 }
 
 impl AsRef<str> for ProxyUrl {
