@@ -22,15 +22,15 @@ fallible-iterator = "0.2.0"
 fixt = { version = "0.0.1", path = "../fixt" }
 futures = "0.3.1"
 ghost_actor = "0.2.1"
+ring = "0.16"
 holo_hash = { version = "0.0.1", path = "../holo_hash", features = ["full"] }
-holochain_crypto = { version = "0.0.1", path = "../crypto" }
 holochain_keystore = { version = "0.0.1", path = "../keystore" }
 holochain_p2p = { version = "0.0.1", path = "../holochain_p2p" }
-holochain_serialized_bytes = "=0.0.43"
+holochain_serialized_bytes = "=0.0.45"
 holochain_state = { version = "0.0.1", path = "../state" }
 holochain_types = { version = "0.0.1", path = "../types" }
 holochain_wasm_test_utils = { version = "0.0.1", path = "../test_utils/wasm" }
-holochain_wasmer_host = "=0.0.45"
+holochain_wasmer_host = "=0.0.46"
 holochain_websocket = { version = "0.0.1", path = "../websocket" }
 holochain_zome_types = { version = "0.0.1", path = "../zome_types" }
 human-panic = "1.0.3"

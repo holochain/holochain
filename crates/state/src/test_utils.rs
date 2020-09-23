@@ -28,7 +28,6 @@ pub fn test_wasm_env() -> TestEnvironment {
 /// Generate a test keystore pre-populated with a couple test keypairs.
 pub fn test_keystore() -> holochain_keystore::KeystoreSender {
     use holochain_keystore::KeystoreSenderExt;
-    let _ = holochain_crypto::crypto_init_sodium();
 
     tokio_safe_block_on::tokio_safe_block_on(
         async move {

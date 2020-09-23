@@ -29,6 +29,7 @@ with holonix.pkgs;
    ''
     touch .env
     source .env
+
     export HC_TARGET_PREFIX=$NIX_ENV_PREFIX
     export CARGO_TARGET_DIR="$HC_TARGET_PREFIX/target"
     export HC_TEST_WASM_DIR="$HC_TARGET_PREFIX/.wasm_target"
@@ -61,6 +62,81 @@ with holonix.pkgs;
    ++ (holonix.pkgs.callPackage ./test {
     pkgs = holonix.pkgs;
    }).buildInputs
+
+   ++ ([(
+    holonix.pkgs.writeShellScriptBin "hc-install" ''
+     hc-install-holochain
+     hc-install-dna-util
+
+     hc-doctor
+    ''
+   )])
+
+   ++ ([(
+    holonix.pkgs.writeShellScriptBin "hc-uninstall" ''
+     hc-uninstall-holochain
+     hc-uninstall-dna-util
+
+     hc-doctor
+    ''
+   )])
+
+   ++ ([(
+    holonix.pkgs.writeShellScriptBin "hc-install-holochain" ''
+     cargo install --path crates/holochain
+     echo 'holochain installed!'
+     echo
+    ''
+   )])
+
+   ++ ([(
+    holonix.pkgs.writeShellScriptBin "hc-uninstall-holochain" ''
+     cargo uninstall holochain
+     echo 'holochain uninstalled!'
+     echo
+    ''
+   )])
+
+   ++ ([(
+    holonix.pkgs.writeShellScriptBin "hc-install-dna-util" ''
+     cargo install --path crates/dna_util
+     echo 'dna util installed!'
+     echo
+    ''
+   )])
+
+   ++ ([(
+    holonix.pkgs.writeShellScriptBin "hc-uninstall-dna-util" ''
+     cargo uninstall dna_util
+     echo 'dna util uninstalled!'
+     echo
+    ''
+   )])
+
+   ++ ([(
+    holonix.pkgs.writeShellScriptBin "hc-doctor" ''
+     echo "### holochain doctor ###"
+     echo
+
+     echo "if you have installed holochain directly using hc-install it should be in the cargo root"
+     echo "if that is what you want it may be worth running hc-install to 'refresh' it as HEAD moves quickly"
+     echo
+     echo "if you are using the more stable binaries provided by holonix it should be in /nix/store/../bin"
+     echo
+
+     echo "cargo install root:"
+     echo $CARGO_INSTALL_ROOT
+     echo
+
+     echo "holochain binary installation:"
+     command -v holochain
+     echo
+
+     echo "dna-util binary installation"
+     command -v dna-util
+     echo
+    ''
+   )])
 
    # convenience command for executing dna-util
    # until such time as we have release artifacts

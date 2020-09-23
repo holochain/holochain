@@ -3,7 +3,6 @@
 
 use crate::core::state::{cascade::error::CascadeError, source_chain::SourceChainError};
 use holo_hash::AnyDhtHash;
-use holochain_crypto::CryptoError;
 use holochain_serialized_bytes::prelude::SerializedBytesError;
 use holochain_types::dna::error::DnaError;
 use holochain_wasmer_host::prelude::WasmError;
@@ -48,8 +47,12 @@ pub enum RibosomeError {
     ElementDeps(AnyDhtHash),
 
     /// ident
+    #[error("Unspecified ring error")]
+    RingUnspecified,
+
+    /// ident
     #[error(transparent)]
-    CryptoError(#[from] CryptoError),
+    KeystoreError(#[from] holochain_keystore::KeystoreError),
 
     /// ident
     #[error(transparent)]
@@ -74,6 +77,12 @@ pub enum RibosomeError {
     /// ident
     #[error(transparent)]
     P2pError(#[from] holochain_p2p::HolochainP2pError),
+}
+
+impl From<ring::error::Unspecified> for RibosomeError {
+    fn from(_: ring::error::Unspecified) -> Self {
+        Self::RingUnspecified
+    }
 }
 
 /// Type alias
