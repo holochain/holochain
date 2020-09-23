@@ -3,6 +3,22 @@
 use crate::*;
 
 /// Utility for deailing with proxy urls.
+/// Proxy URLs are like super-urls... they need to be able to
+/// compose a sub or base-transport url, while adding a new scheme and
+/// a tls certificate digest, without shadowing any info.
+///
+/// We could do this by percent encoding the base-url into a
+/// query string or path segment, but that is not very user-friendly looking.
+///
+/// Instead, we extract some info from the base-url into path
+/// segments, and include everything else after a special path segment marker
+/// `--`.
+///
+/// Optional extracted items (order matters):
+///  - `h` - host: `/h/[host-name-here]`
+///  - `p` - port: `/p/[port-here]`
+///  - `u` - username: `/u/[user-name-here]`
+///  - `w` - password: `/w/[password-here]`
 #[derive(Debug, Display, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Deref, AsRef)]
 #[display(fmt = "{}", full)]
 pub struct ProxyUrl {
@@ -32,36 +48,32 @@ impl ProxyUrl {
         {
             let mut path = full.path_segments().ok_or_else(|| err!())?;
             path.next();
-            let mut mode = 0;
+            let mut found_base_path_marker = false;
             loop {
                 let key = match path.next() {
                     None => break,
                     Some(key) => key,
                 };
                 if key == "--" {
-                    mode = 1;
+                    found_base_path_marker = true;
                     continue;
                 }
-                match mode {
-                    0 => {
-                        let val = match path.next() {
-                            None => break,
-                            Some(val) => val,
-                        };
-                        match key {
-                            "h" => base.set_host(Some(val)).map_err(|_| err!())?,
-                            "p" => base
-                                .set_port(Some(val.parse().map_err(|_| err!())?))
-                                .map_err(|_| err!())?,
-                            "u" => base.set_username(val).map_err(|_| err!())?,
-                            "w" => base.set_password(Some(val)).map_err(|_| err!())?,
-                            _ => return Err(format!("Invalid Proxy Url: {}", full).into()),
-                        }
+                if found_base_path_marker {
+                    base.path_segments_mut().map_err(|_| err!())?.push(key);
+                } else {
+                    let val = match path.next() {
+                        None => break,
+                        Some(val) => val,
+                    };
+                    match key {
+                        "h" => base.set_host(Some(val)).map_err(|_| err!())?,
+                        "p" => base
+                            .set_port(Some(val.parse().map_err(|_| err!())?))
+                            .map_err(|_| err!())?,
+                        "u" => base.set_username(val).map_err(|_| err!())?,
+                        "w" => base.set_password(Some(val)).map_err(|_| err!())?,
+                        _ => return Err(err!()),
                     }
-                    1 => {
-                        base.path_segments_mut().map_err(|_| err!())?.push(key);
-                    }
-                    _ => unreachable!(),
                 }
             }
         }
