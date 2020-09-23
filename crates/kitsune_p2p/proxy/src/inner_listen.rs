@@ -53,6 +53,30 @@ pub async fn spawn_kitsune_proxy_listener(
     Ok((sender, evt_recv))
 }
 
+pub(crate) fn gen_tls_configs(
+    tls: &TlsConfig,
+) -> TransportResult<(Arc<rustls::ServerConfig>, Arc<rustls::ClientConfig>)> {
+    let cert = rustls::Certificate(tls.cert.0.to_vec());
+    let cert_priv_key = rustls::PrivateKey(tls.cert_priv_key.0.to_vec());
+
+    let mut tls_server_config =
+        rustls::ServerConfig::with_ciphersuites(rustls::NoClientAuth::new(), CIPHER_SUITES);
+    tls_server_config
+        .set_single_cert(vec![cert], cert_priv_key)
+        .map_err(TransportError::other)?;
+    tls_server_config.set_protocols(&[ALPN_KITSUNE_PROXY_0.to_vec()]);
+    let tls_server_config = Arc::new(tls_server_config);
+
+    let mut tls_client_config = rustls::ClientConfig::with_ciphersuites(CIPHER_SUITES);
+    tls_client_config
+        .dangerous()
+        .set_certificate_verifier(TlsServerVerifier::new());
+    tls_client_config.set_protocols(&[ALPN_KITSUNE_PROXY_0.to_vec()]);
+    let tls_client_config = Arc::new(tls_client_config);
+
+    Ok((tls_server_config, tls_client_config))
+}
+
 struct InnerListen {
     accept_proxy_cb: AcceptProxyCallback,
     sub_sender: ghost_actor::GhostSender<TransportListener>,
@@ -70,23 +94,7 @@ impl InnerListen {
         evt_send: futures::channel::mpsc::Sender<TransportListenerEvent>,
         proxy_url: Option<ProxyUrl>,
     ) -> TransportResult<Self> {
-        let cert = rustls::Certificate(tls.cert.0.to_vec());
-        let cert_priv_key = rustls::PrivateKey(tls.cert_priv_key.0.to_vec());
-
-        let mut tls_server_config =
-            rustls::ServerConfig::with_ciphersuites(rustls::NoClientAuth::new(), CIPHER_SUITES);
-        tls_server_config
-            .set_single_cert(vec![cert], cert_priv_key)
-            .map_err(TransportError::other)?;
-        tls_server_config.set_protocols(&[ALPN_KITSUNE_PROXY_0.to_vec()]);
-        let tls_server_config = Arc::new(tls_server_config);
-
-        let mut tls_client_config = rustls::ClientConfig::with_ciphersuites(CIPHER_SUITES);
-        tls_client_config
-            .dangerous()
-            .set_certificate_verifier(TlsServerVerifier::new());
-        tls_client_config.set_protocols(&[ALPN_KITSUNE_PROXY_0.to_vec()]);
-        let tls_client_config = Arc::new(tls_client_config);
+        let (tls_server_config, tls_client_config) = gen_tls_configs(&tls)?;
 
         let mut out = Self {
             accept_proxy_cb,
