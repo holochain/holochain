@@ -43,7 +43,6 @@ use crate::core::ribosome::host_fn::get_details::get_details;
 use crate::core::ribosome::host_fn::get_link_details::get_link_details;
 use crate::core::ribosome::host_fn::get_links::get_links;
 use crate::core::ribosome::host_fn::hash_entry::hash_entry;
-use crate::core::ribosome::host_fn::keystore::keystore;
 use crate::core::ribosome::host_fn::property::property;
 use crate::core::ribosome::host_fn::query::query;
 use crate::core::ribosome::host_fn::random_bytes::random_bytes;
@@ -53,6 +52,7 @@ use crate::core::ribosome::host_fn::sign::sign;
 use crate::core::ribosome::host_fn::sys_time::sys_time;
 use crate::core::ribosome::host_fn::unreachable::unreachable;
 use crate::core::ribosome::host_fn::update::update;
+use crate::core::ribosome::host_fn::verify_signature::verify_signature;
 use crate::core::ribosome::host_fn::zome_info::zome_info;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::Invocation;
@@ -186,12 +186,18 @@ impl WasmRibosome {
             ..
         } = host_fn_access
         {
-            ns.insert("__keystore", func!(invoke_host_function!(keystore)));
+            ns.insert(
+                "__verify_signature",
+                func!(invoke_host_function!(verify_signature)),
+            );
             ns.insert("__sign", func!(invoke_host_function!(sign)));
             ns.insert("__decrypt", func!(invoke_host_function!(decrypt)));
             ns.insert("__encrypt", func!(invoke_host_function!(encrypt)));
         } else {
-            ns.insert("__keystore", func!(invoke_host_function!(unreachable)));
+            ns.insert(
+                "__verify_signature",
+                func!(invoke_host_function!(unreachable)),
+            );
             ns.insert("__sign", func!(invoke_host_function!(unreachable)));
             ns.insert("__decrypt", func!(invoke_host_function!(unreachable)));
             ns.insert("__encrypt", func!(invoke_host_function!(unreachable)));

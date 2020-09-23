@@ -2,7 +2,6 @@
 //! holochain specific wrapper around more generic p2p module
 
 use holo_hash::*;
-use holochain_keystore::*;
 use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::zome::FunctionName;
 use holochain_zome_types::{capability::CapSecret, zome::ZomeName};

@@ -33,6 +33,7 @@ pub enum TestWasm {
     Query,
     RandomBytes,
     SerRegression,
+    Sign,
     SysTime,
     Validate,
     ValidateLink,
@@ -73,6 +74,7 @@ impl From<TestWasm> for ZomeName {
             TestWasm::Query => "query",
             TestWasm::RandomBytes => "random_bytes",
             TestWasm::SerRegression => "ser_regression",
+            TestWasm::Sign => "sign",
             TestWasm::SysTime => "sys_time",
             TestWasm::Validate => "validate",
             TestWasm::ValidateLink => "validate_link",
@@ -145,6 +147,7 @@ impl From<TestWasm> for DnaWasm {
             TestWasm::SerRegression => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_ser_regression.wasm")
             }
+            TestWasm::Sign => get_code("wasm32-unknown-unknown/release/test_wasm_sign.wasm"),
             TestWasm::SysTime => get_code("wasm32-unknown-unknown/release/test_wasm_sys_time.wasm"),
             TestWasm::Validate => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_validate.wasm")
