@@ -85,7 +85,6 @@ guest_functions!(
     //     CreateLinkInput,
     //     CreateLinkOutput
     // ],
-    [__keystore, keystore, KeystoreInput, KeystoreOutput],
     [__get_links, get_links, GetLinksInput, GetLinksOutput],
     [__get, get, GetInput, GetOutput],
     // [__hash_entry, entry_hash, HashEntryInput, HashEntryOutput],

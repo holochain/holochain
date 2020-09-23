@@ -24,6 +24,7 @@ members = [
     "query",
     "random_bytes",
     "ser_regression",
+    "sign",
     "sys_time",
     "validate",
     "validate_invalid",

@@ -2,7 +2,7 @@
 
 use fallible_iterator::FallibleIterator;
 use holo_hash::{AgentPubKey, DhtOpHash};
-use holochain_keystore::{AgentPubKeyExt, KeystoreSender, Signature};
+use holochain_keystore::{AgentPubKeyExt, KeystoreSender};
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::{
     buffer::{BufferedStore, KvvBufUsed},
@@ -10,6 +10,7 @@ use holochain_state::{
     error::{DatabaseError, DatabaseResult},
     prelude::{Readable, Writer},
 };
+use holochain_zome_types::signature::Signature;
 
 /// The result of a DhtOp Validation.
 #[derive(

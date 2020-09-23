@@ -9,6 +9,51 @@ use holochain::core::ribosome::ZomeCallInvocation;
 use holochain_types::fixt::CapSecretFixturator;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::ExternInput;
+use once_cell::sync::Lazy;
+use std::sync::Mutex;
+
+static TOKIO_RUNTIME: Lazy<Mutex<tokio::runtime::Runtime>> = Lazy::new(|| {
+    Mutex::new(
+        tokio::runtime::Builder::new()
+            .threaded_scheduler()
+            .enable_all()
+            .build()
+            .unwrap(),
+    )
+});
+
+static WASM_RIBOSOME: Lazy<Mutex<holochain::core::ribosome::wasm_ribosome::WasmRibosome>> =
+    Lazy::new(|| {
+        Mutex::new(
+            holochain::fixt::WasmRibosomeFixturator::new(holochain::fixt::curve::Zomes(vec![
+                TestWasm::Bench.into(),
+            ]))
+            .next()
+            .unwrap(),
+        )
+    });
+
+static CELL_ID: Lazy<Mutex<holochain_types::cell::CellId>> = Lazy::new(|| {
+    Mutex::new(
+        holochain_types::fixt::CellIdFixturator::new(Unpredictable)
+            .next()
+            .unwrap(),
+    )
+});
+
+static CAP: Lazy<Mutex<holochain_zome_types::capability::CapSecret>> =
+    Lazy::new(|| Mutex::new(CapSecretFixturator::new(Unpredictable).next().unwrap()));
+
+static AGENT_KEY: Lazy<Mutex<AgentPubKey>> =
+    Lazy::new(|| Mutex::new(AgentPubKeyFixturator::new(Unpredictable).next().unwrap()));
+
+static HOST_ACCESS_FIXTURATOR: Lazy<
+    Mutex<holochain::fixt::ZomeCallHostAccessFixturator<Unpredictable>>,
+> = Lazy::new(|| {
+    Mutex::new(holochain::fixt::ZomeCallHostAccessFixturator::new(
+        Unpredictable,
+    ))
+});
 
 pub fn wasm_call_n(c: &mut Criterion) {
     let mut group = c.benchmark_group("wasm_call_n");
@@ -26,40 +71,26 @@ pub fn wasm_call_n(c: &mut Criterion) {
             let bytes = test_wasm_common::TestBytes::from(vec![0; n]);
             let sb: SerializedBytes = bytes.try_into().unwrap();
 
-            let mut host_access_fixturator =
-                holochain::fixt::ZomeCallHostAccessFixturator::new(Unpredictable);
+            TOKIO_RUNTIME.lock().unwrap().enter(move || {
+                let ha = HOST_ACCESS_FIXTURATOR.lock().unwrap().next().unwrap();
 
-            tokio::runtime::Builder::new()
-                .threaded_scheduler()
-                .build()
-                .unwrap()
-                .enter(move || {
-                    let ribosome = holochain::fixt::WasmRibosomeFixturator::new(
-                        holochain::fixt::curve::Zomes(vec![TestWasm::Bench.into()]),
-                    )
-                    .next()
-                    .unwrap();
-                    let cell_id = holochain_types::fixt::CellIdFixturator::new(Unpredictable)
-                        .next()
+                b.iter(|| {
+                    let i = ZomeCallInvocation {
+                        cell_id: CELL_ID.lock().unwrap().clone(),
+                        zome_name: TestWasm::Bench.into(),
+                        cap: Some(CAP.lock().unwrap().clone()),
+                        fn_name: "echo_bytes".into(),
+                        payload: ExternInput::new(sb.clone()),
+                        provenance: AGENT_KEY.lock().unwrap().clone(),
+                    };
+                    WASM_RIBOSOME
+                        .lock()
+                        .unwrap()
+                        .clone()
+                        .maybe_call(ha.clone().into(), &i, &i.zome_name, &i.fn_name)
                         .unwrap();
-                    let cap = CapSecretFixturator::new(Unpredictable).next().unwrap();
-                    let ha = host_access_fixturator.next().unwrap();
-                    let agent_key = AgentPubKeyFixturator::new(Unpredictable).next().unwrap();
-                    b.iter(|| {
-                        let i = ZomeCallInvocation {
-                            cell_id: cell_id.clone(),
-                            zome_name: TestWasm::Bench.into(),
-                            cap: Some(cap.clone()),
-                            fn_name: "echo_bytes".into(),
-                            payload: ExternInput::new(sb.clone()),
-                            provenance: agent_key.clone(),
-                        };
-                        ribosome
-                            .clone()
-                            .maybe_call(ha.clone().into(), &i, &i.zome_name, &i.fn_name)
-                            .unwrap();
-                    });
                 });
+            });
         });
     }
 
