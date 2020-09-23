@@ -1,7 +1,6 @@
 //! KitsuneP2p Proxy Wire Protocol Items.
 
 use crate::*;
-use derive_more::*;
 
 /// Type used to correlate proxy message requests / responses.
 #[derive(
@@ -69,12 +68,12 @@ pub struct WireUrl(String);
 
 impl WireUrl {
     /// Convert to url2.
-    pub fn to_url2(&self) -> url2::Url2 {
+    pub fn to_url(&self) -> ProxyUrl {
         self.into()
     }
 
     /// Convert to url2.
-    pub fn into_url2(self) -> url2::Url2 {
+    pub fn into_url(self) -> ProxyUrl {
         self.into()
     }
 }
@@ -90,13 +89,13 @@ macro_rules! q_from {
 }
 
 q_from! {
-         String => WireUrl,      |s| { Self(s) },
-        &String => WireUrl,      |s| { Self(s.to_string()) },
-           &str => WireUrl,      |s| { Self(s.to_string()) },
-     url2::Url2 => WireUrl,    |url| { Self(url.to_string()) },
-    &url2::Url2 => WireUrl,    |url| { Self(url.to_string()) },
-        WireUrl => url2::Url2, |url| { url2::url2!("{}", &url.0) },
-       &WireUrl => url2::Url2, |url| { url2::url2!("{}", &url.0) },
+       String => WireUrl,      |s| { Self(s) },
+      &String => WireUrl,      |s| { Self(s.to_string()) },
+         &str => WireUrl,      |s| { Self(s.to_string()) },
+     ProxyUrl => WireUrl,    |url| { Self(url.to_string()) },
+    &ProxyUrl => WireUrl,    |url| { Self(url.to_string()) },
+      WireUrl => ProxyUrl,   |url| { url.0.into() },
+     &WireUrl => ProxyUrl,   |url| { (&url.0).into() },
 }
 
 #[cfg(test)]
@@ -234,7 +233,7 @@ macro_rules! write_proxy_wire {
 
             test_val! {
                 String { "test".to_string() },
-                WireUrl { url2::url2!("test://test").into() },
+                WireUrl { "test://test".into() },
                 MsgId { 42.into() },
                 ChannelId { 42.into() },
                 ChannelData { vec![0xdb; 32].into() },
