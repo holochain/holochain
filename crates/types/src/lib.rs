@@ -17,7 +17,6 @@ pub mod header;
 pub mod link;
 pub mod metadata;
 pub mod prelude;
-pub mod signal;
 pub mod timestamp;
 pub mod universal_map;
 pub mod validate;

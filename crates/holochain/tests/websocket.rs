@@ -22,7 +22,6 @@ use matches::assert_matches;
 use std::sync::Arc;
 use std::{path::PathBuf, process::Stdio, time::Duration};
 use tempdir::TempDir;
-use test_wasm_common::TestString;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::{Child, Command};
 use tokio::stream::StreamExt;
