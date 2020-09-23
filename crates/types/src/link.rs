@@ -1,8 +1,8 @@
 //! Links interrelate entries in a source chain.
 
 use holo_hash::{AnyDhtHash, EntryHash, HeaderHash};
-use holochain_keystore::Signature;
 use holochain_serialized_bytes::prelude::*;
+use holochain_zome_types::signature::Signature;
 use holochain_zome_types::{
     header::{CreateLink, DeleteLink, ZomeId},
     link::LinkTag,

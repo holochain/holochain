@@ -1,13 +1,13 @@
 use crate::core::state::element_buf::ElementBuf;
 use error::{DhtOpConvertError, DhtOpConvertResult};
 use holo_hash::{EntryHash, HeaderHash};
-use holochain_keystore::Signature;
 use holochain_types::{
     dht_op::{DhtOp, DhtOpLight},
     header::NewEntryHeader,
 };
 use holochain_zome_types::entry_def::EntryVisibility;
 use holochain_zome_types::header::{self, Header};
+use holochain_zome_types::signature::Signature;
 
 pub mod error;
 

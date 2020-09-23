@@ -35,7 +35,6 @@ use fallible_iterator::FallibleIterator;
 use futures::future::FutureExt;
 use hash_type::AnyDht;
 use holo_hash::*;
-use holochain_keystore::Signature;
 use holochain_p2p::HolochainP2pCellT;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::{
@@ -52,6 +51,7 @@ use holochain_types::{
 };
 use holochain_zome_types::capability::CapSecret;
 use holochain_zome_types::header::{CreateLink, DeleteLink};
+use holochain_zome_types::signature::Signature;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::ExternInput;
 use std::{
@@ -609,7 +609,7 @@ impl Cell {
     }
 
     /// the network module would like this cell/agent to sign some data
-    async fn handle_sign_network_data(&self) -> CellResult<holochain_keystore::Signature> {
+    async fn handle_sign_network_data(&self) -> CellResult<Signature> {
         unimplemented!()
     }
 
