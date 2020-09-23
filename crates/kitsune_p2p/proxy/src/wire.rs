@@ -116,6 +116,33 @@ macro_rules! test_val {
     };
 }
 
+/// This macro DRYs out implementing the wire protocol variants
+/// as there is a lot of shared code between them.
+///
+/// DSL:
+///
+/// $s_name - snake-case name
+/// $c_name - camel-case name
+/// $b      - protocol variant identifier byte (u8) literal
+/// $t_name - type name (snake-case)
+/// $t_idx  - type index in the message array
+/// $t_ty   - type rust type
+///
+/// Docs allowed on variant and types.
+///
+/// E.g.:
+///
+/// write_proxy_wire! {
+///    /// Forward data through the proxy channel.
+///    /// Send zero length data for keep-alive.
+///    chan_send::ChanSend(0x30) {
+///        /// The channel id to send data through.
+///        (channel_id::0): ChannelId,
+///
+///        /// The data content to be sent.
+///        (channel_data::1): ChannelData,
+///    },
+/// }
 macro_rules! write_proxy_wire {
     ($(
         $(#[doc = $doc:expr])* $s_name:ident :: $c_name:ident($b:literal) {$(
