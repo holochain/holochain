@@ -25,6 +25,7 @@ use crate::core::{
 use fallible_iterator::FallibleIterator;
 use holo_hash::*;
 use holochain_p2p::HolochainP2pCell;
+use holochain_p2p::HolochainP2pCellT;
 use holochain_state::{
     buffer::{BufferedStore, KvBufFresh},
     db::AUTHORED_DHT_OPS,
@@ -181,7 +182,7 @@ mod tests {
             },
             SourceChainError,
         },
-        fixt::{EntryFixturator, LinkAddFixturator},
+        fixt::{CreateLinkFixturator, EntryFixturator},
     };
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
@@ -189,7 +190,7 @@ mod tests {
     use holo_hash::fixt::*;
     use holochain_p2p::{
         actor::{HolochainP2p, HolochainP2pRefToCell, HolochainP2pSender},
-        spawn_holochain_p2p,
+        spawn_holochain_p2p, HolochainP2pRef,
     };
     use holochain_state::{
         buffer::BufferedStore,
@@ -205,7 +206,7 @@ mod tests {
     use holochain_zome_types::entry_def::EntryVisibility;
     use holochain_zome_types::{
         element::SignedHeaderHashed,
-        header::{builder, EntryType, EntryUpdate},
+        header::{builder, EntryType, Update},
     };
     use matches::assert_matches;
     use std::{
@@ -238,7 +239,7 @@ mod tests {
         let env_ref = env.guard();
         // Create data fixts for op
         let mut sig_fixt = SignatureFixturator::new(Unpredictable);
-        let mut link_add_fixt = LinkAddFixturator::new(Unpredictable);
+        let mut link_add_fixt = CreateLinkFixturator::new(Unpredictable);
 
         let mut data = Vec::new();
         for _ in 0..num_hash {
@@ -323,7 +324,9 @@ mod tests {
 
         // Join some agents onto the network
         for agent in agents {
-            network.join(dna.clone(), agent).await.unwrap();
+            HolochainP2pRef::join(&network, dna.clone(), agent)
+                .await
+                .unwrap();
         }
 
         (network, cell_network, recv_task, rx_complete)
@@ -539,7 +542,7 @@ mod tests {
                     let mut source_chain = SourceChain::new(env.clone().into()).unwrap();
                     let original_header_address = source_chain
                         .put(
-                            builder::EntryCreate {
+                            builder::Create {
                                 entry_type: ec_entry_type,
                                 entry_hash: original_entry_hash.clone(),
                             },
@@ -556,7 +559,7 @@ mod tests {
 
                     let entry_update_hash = source_chain
                         .put(
-                            builder::EntryUpdate {
+                            builder::Update {
                                 entry_type: eu_entry_type,
                                 entry_hash: new_entry_hash,
                                 original_header_address: original_header_address.clone(),
@@ -616,7 +619,7 @@ mod tests {
                     // Op is expected to not contain the Entry
                     let (entry_update_header, sig) =
                         entry_update_header.into_header_and_signature();
-                    let entry_update_header: EntryUpdate =
+                    let entry_update_header: Update =
                         entry_update_header.into_content().try_into().unwrap();
                     let expected_op =
                         DhtOp::StoreElement(sig.clone(), entry_update_header.clone().into(), None);
@@ -625,7 +628,7 @@ mod tests {
                     map.insert(op_hash, (expected_op, store_element_count.clone()));
 
                     let expected_op =
-                        DhtOp::RegisterUpdatedBy(sig.clone(), entry_update_header.clone());
+                        DhtOp::RegisterUpdatedBy(sig.clone(), entry_update_header.clone(), None);
                     let op_hash = DhtOpHashed::from_content_sync(expected_op.clone()).into_hash();
 
                     map.insert(op_hash, (expected_op, register_replaced_by_count.clone()));
@@ -709,7 +712,9 @@ mod tests {
 
                 // Join some agents onto the network
                 for agent in agents {
-                    network.join(dna.clone(), agent).await.unwrap();
+                    HolochainP2pRef::join(&network, dna.clone(), agent)
+                        .await
+                        .unwrap()
                 }
 
                 call_workflow(env.clone().into(), cell_network).await;

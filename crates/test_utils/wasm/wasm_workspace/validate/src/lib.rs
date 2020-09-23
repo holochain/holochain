@@ -1,3 +1,4 @@
+use element::ElementEntry;
 use hdk3::prelude::*;
 
 /// an example inner value that can be serialized into the contents of Entry::App()
@@ -68,10 +69,10 @@ entry_defs![
 #[hdk_extern]
 fn validate(data: ValidateData) -> ExternResult<ValidateCallbackResult> {
     let element = data.element;
-    let (_, entry) = element.into_inner();
+    let entry = element.into_inner().1;
     let entry = match entry {
-        Some(e) => e,
-        None => return Ok(ValidateCallbackResult::Valid),
+        ElementEntry::Present(e) => e,
+        _ => return Ok(ValidateCallbackResult::Valid),
     };
     if let Entry::Agent(_) = entry {
         return Ok(ValidateCallbackResult::Valid);
@@ -86,7 +87,7 @@ fn validate(data: ValidateData) -> ExternResult<ValidateCallbackResult> {
 }
 
 fn _commit_validate(to_commit: ThisWasmEntry) -> ExternResult<HeaderHash> {
-    Ok(commit_entry!(&to_commit)?)
+    Ok(create_entry!(&to_commit)?)
 }
 
 #[hdk_extern]

@@ -1,232 +1,110 @@
 //! DANGER! This is a mock keystore for testing, DO NOT USE THIS IN PRODUCTION!
 
 use crate::*;
-use ghost_actor::dependencies::futures::future::FutureExt;
-use holochain_crypto::*;
-use std::collections::HashMap;
 
-/// DANGER! These Mock Keypairs should NEVER be used in production
-/// The private keys have not been handled securely!
-pub struct MockKeypair {
-    /// The agent public key.
-    pub pub_key: holo_hash::AgentPubKey,
+const PUB1: &[u8] = &[
+    154, 185, 40, 0, 115, 213, 127, 247, 174, 124, 110, 222, 11, 151, 230, 233, 2, 171, 91, 154,
+    79, 50, 137, 45, 188, 110, 75, 56, 45, 18, 156, 158,
+];
+const SEC1: &[u8] = &[
+    207, 84, 35, 155, 191, 10, 211, 240, 254, 92, 222, 153, 125, 241, 80, 102, 189, 217, 201, 140,
+    112, 159, 21, 148, 138, 41, 85, 90, 169, 56, 174, 72,
+];
+const PUB2: &[u8] = &[
+    123, 88, 252, 103, 102, 190, 254, 104, 167, 210, 29, 41, 26, 225, 12, 113, 137, 104, 253, 93,
+    101, 214, 107, 125, 58, 208, 110, 203, 2, 166, 30, 88,
+];
+const SEC2: &[u8] = &[
+    59, 31, 135, 117, 115, 107, 84, 52, 95, 216, 51, 180, 79, 81, 14, 169, 163, 149, 166, 174, 167,
+    143, 3, 211, 123, 224, 24, 25, 201, 40, 81, 188,
+];
 
-    /// The private secret key DANGER - this is not handled securely!!
-    pub sec_key: Vec<u8>,
-}
+const CERT_SNI: &str = "ar1J-HVz0EO4CzS9CN8EFta.ad471maBa70w5vn6nNilfUa";
+const CERT_SEC: &[u8] = &[
+    48, 83, 2, 1, 1, 48, 5, 6, 3, 43, 101, 112, 4, 34, 4, 32, 135, 101, 23, 181, 167, 183, 114, 94,
+    169, 84, 144, 224, 192, 41, 112, 118, 149, 226, 42, 187, 247, 210, 54, 43, 83, 125, 13, 209,
+    93, 207, 33, 153, 161, 35, 3, 33, 0, 83, 74, 255, 70, 132, 118, 51, 92, 85, 250, 176, 123, 49,
+    206, 237, 79, 161, 136, 99, 44, 52, 128, 94, 174, 55, 174, 198, 113, 79, 135, 111, 26,
+];
+const CERT: &[u8] = &[
+    48, 130, 1, 48, 48, 129, 227, 160, 3, 2, 1, 2, 2, 1, 42, 48, 5, 6, 3, 43, 101, 112, 48, 33, 49,
+    31, 48, 29, 6, 3, 85, 4, 3, 12, 22, 114, 99, 103, 101, 110, 32, 115, 101, 108, 102, 32, 115,
+    105, 103, 110, 101, 100, 32, 99, 101, 114, 116, 48, 32, 23, 13, 55, 53, 48, 49, 48, 49, 48, 48,
+    48, 48, 48, 48, 90, 24, 15, 52, 48, 57, 54, 48, 49, 48, 49, 48, 48, 48, 48, 48, 48, 90, 48, 33,
+    49, 31, 48, 29, 6, 3, 85, 4, 3, 12, 22, 114, 99, 103, 101, 110, 32, 115, 101, 108, 102, 32,
+    115, 105, 103, 110, 101, 100, 32, 99, 101, 114, 116, 48, 42, 48, 5, 6, 3, 43, 101, 112, 3, 33,
+    0, 83, 74, 255, 70, 132, 118, 51, 92, 85, 250, 176, 123, 49, 206, 237, 79, 161, 136, 99, 44,
+    52, 128, 94, 174, 55, 174, 198, 113, 79, 135, 111, 26, 163, 62, 48, 60, 48, 58, 6, 3, 85, 29,
+    17, 4, 51, 48, 49, 130, 47, 97, 114, 49, 74, 45, 72, 86, 122, 48, 69, 79, 52, 67, 122, 83, 57,
+    67, 78, 56, 69, 70, 116, 97, 46, 97, 100, 52, 55, 49, 109, 97, 66, 97, 55, 48, 119, 53, 118,
+    110, 54, 110, 78, 105, 108, 102, 85, 97, 48, 5, 6, 3, 43, 101, 112, 3, 65, 0, 211, 114, 220,
+    25, 145, 60, 41, 144, 219, 0, 170, 31, 206, 39, 134, 136, 147, 103, 63, 215, 239, 108, 28, 136,
+    102, 40, 213, 247, 233, 32, 190, 66, 155, 175, 6, 206, 193, 223, 93, 244, 11, 54, 81, 66, 31,
+    79, 20, 161, 138, 83, 58, 13, 4, 214, 204, 189, 12, 66, 180, 147, 202, 208, 242, 3,
+];
+const CERT_DIGEST: &[u8] = &[
+    112, 155, 175, 48, 124, 184, 87, 220, 71, 56, 229, 88, 125, 146, 177, 13, 218, 216, 23, 59,
+    225, 6, 23, 207, 126, 223, 169, 142, 92, 242, 240, 239,
+];
 
 /// Construct a new TestKeystore.
 /// DANGER! This is a mock keystore for testing, DO NOT USE THIS IN PRODUCTION!
-pub async fn spawn_test_keystore(
-    fixture_keypairs: Vec<MockKeypair>,
-) -> KeystoreApiResult<KeystoreSender> {
-    let builder = ghost_actor::actor_builder::GhostActorBuilder::new();
-    let internal_sender = builder
-        .channel_factory()
-        .create_channel::<TestKeystoreInternal>()
-        .await?;
-    let sender = builder
-        .channel_factory()
-        .create_channel::<KeystoreApi>()
-        .await?;
-    tokio::task::spawn(builder.spawn(TestKeystore::new(internal_sender, fixture_keypairs)));
-    Ok(sender)
-}
-
-/// Internal Private Key newtype.
-#[derive(Debug)]
-struct PrivateKey(pub holochain_crypto::DynCryptoBytes);
-
-ghost_actor::ghost_chan! {
-    /// Internal Channel
-    chan TestKeystoreInternal<KeystoreError> {
-        /// we have generated a keypair, now track it
-        fn finalize_new_keypair(
-            pub_key: holo_hash::AgentPubKey,
-            priv_key: PrivateKey,
-        ) -> ();
-    }
-}
-
-/// Internal mock keystore struct.
-struct TestKeystore {
-    internal_sender: ghost_actor::GhostSender<TestKeystoreInternal>,
-    fixture_keypairs: Vec<MockKeypair>,
-    active_keypairs: HashMap<holo_hash::AgentPubKey, PrivateKey>,
-}
-
-impl TestKeystore {
-    fn new(
-        internal_sender: ghost_actor::GhostSender<TestKeystoreInternal>,
-        fixture_keypairs: Vec<MockKeypair>,
-    ) -> Self {
-        Self {
-            internal_sender,
-            fixture_keypairs,
-            active_keypairs: HashMap::<holo_hash::AgentPubKey, _>::new(),
-        }
-    }
-}
-
-impl ghost_actor::GhostControlHandler for TestKeystore {}
-
-impl ghost_actor::GhostHandler<TestKeystoreInternal> for TestKeystore {}
-
-impl TestKeystoreInternalHandler for TestKeystore {
-    fn handle_finalize_new_keypair(
-        &mut self,
-        pub_key: holo_hash::AgentPubKey,
-        priv_key: PrivateKey,
-    ) -> TestKeystoreInternalHandlerResult<()> {
-        self.active_keypairs.insert(pub_key, priv_key);
-        Ok(async move { Ok(()) }.boxed().into())
-    }
-}
-
-impl ghost_actor::GhostHandler<KeystoreApi> for TestKeystore {}
-
-impl KeystoreApiHandler for TestKeystore {
-    fn handle_generate_sign_keypair_from_pure_entropy(
-        &mut self,
-    ) -> KeystoreApiHandlerResult<holo_hash::AgentPubKey> {
-        if !self.fixture_keypairs.is_empty() {
-            let MockKeypair { pub_key, sec_key } = self.fixture_keypairs.remove(0);
-            // we're loading this out of insecure memory - but this is just a mock
-            let sec_key = PrivateKey(danger_crypto_secure_buffer_from_bytes(&sec_key)?);
-            self.active_keypairs.insert(pub_key.clone(), sec_key);
-            return Ok(async move { Ok(pub_key) }.boxed().into());
-        }
-        let i_s = self.internal_sender.clone();
-        Ok(async move {
-            let (pub_key, sec_key) = crypto_sign_keypair(None).await?;
-            let pub_key = pub_key.read().to_vec();
-            let agent_pubkey = holo_hash::AgentPubKey::with_pre_hashed(pub_key);
-            let sec_key = PrivateKey(sec_key);
-            i_s.finalize_new_keypair(agent_pubkey.clone(), sec_key)
-                .await?;
-            Ok(agent_pubkey)
-        }
-        .boxed()
-        .into())
-    }
-
-    fn handle_list_sign_keys(&mut self) -> KeystoreApiHandlerResult<Vec<holo_hash::AgentPubKey>> {
-        let keys = self.active_keypairs.keys().cloned().collect();
-        Ok(async move { Ok(keys) }.boxed().into())
-    }
-
-    fn handle_sign(&mut self, input: SignInput) -> KeystoreApiHandlerResult<Signature> {
-        let SignInput { key, data } = input;
-        let mut data = crypto_insecure_buffer_from_bytes(data.bytes())?;
-        let mut sec_key = match self.active_keypairs.get(&key) {
-            Some(sec_key) => sec_key.0.clone(),
-            None => return Err(format!("Signature Failure, Unknown Agent: {}", key).into()),
-        };
-        Ok(async move {
-            let signature = crypto_sign(&mut data, &mut sec_key).await?;
-            let signature = signature.read().to_vec();
-            Ok(Signature(signature))
-        }
-        .boxed()
-        .into())
-    }
+pub async fn spawn_test_keystore() -> KeystoreApiResult<KeystoreSender> {
+    use lair_keystore_api::test::*;
+    let (api, _evt) = spawn_test_keystore(
+        vec![
+            FixtureSignEd25519Keypair {
+                pub_key: PUB1.to_vec(),
+                priv_key: SEC1.to_vec(),
+            },
+            FixtureSignEd25519Keypair {
+                pub_key: PUB2.to_vec(),
+                priv_key: SEC2.to_vec(),
+            },
+        ],
+        vec![FixtureTlsCert {
+            priv_key_der: CERT_SEC.to_vec(),
+            sni: CERT_SNI.to_string(),
+            cert_der: CERT.to_vec(),
+            cert_digest: CERT_DIGEST.to_vec(),
+        }],
+    )
+    .await?;
+    Ok(api)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn fixture_keypairs() -> Vec<MockKeypair> {
-        vec![
-            MockKeypair {
-                pub_key: holo_hash::AgentPubKey::try_from(
-                    "uhCAkw-zrttiYpdfAYX4fR6W8DPUdheZJ-1QsRA4cTImmzTYUcOr4",
-                )
-                .unwrap(),
-                sec_key: vec![
-                    220, 218, 15, 212, 178, 51, 204, 96, 121, 97, 6, 205, 179, 84, 80, 159, 84,
-                    163, 193, 46, 127, 15, 47, 91, 134, 106, 72, 72, 51, 76, 26, 16, 195, 236, 235,
-                    182, 216, 152, 165, 215, 192, 97, 126, 31, 71, 165, 188, 12, 245, 29, 133, 230,
-                    73, 251, 84, 44, 68, 14, 28, 76, 137, 166, 205, 54,
-                ],
-            },
-            MockKeypair {
-                pub_key: holo_hash::AgentPubKey::try_from(
-                    "uhCAkomHzekU0-x7p62WmrusdxD2w9wcjdajC88688JGSTEo6cbEK",
-                )
-                .unwrap(),
-                sec_key: vec![
-                    170, 205, 134, 46, 233, 225, 100, 162, 101, 124, 207, 157, 12, 131, 239, 244,
-                    216, 190, 244, 161, 209, 56, 159, 135, 240, 134, 88, 28, 48, 75, 227, 244, 162,
-                    97, 243, 122, 69, 52, 251, 30, 233, 235, 101, 166, 174, 235, 29, 196, 61, 176,
-                    247, 7, 35, 117, 168, 194, 243, 206, 188, 240, 145, 146, 76, 74,
-                ],
-            },
-        ]
-    }
-
     #[tokio::test(threaded_scheduler)]
-    async fn test_test_keystore_can_supply_fixture_keys() {
-        let _ = crypto_init_sodium();
-        use holo_hash::AgentPubKey;
+    async fn test_test_keystore() {
         tokio::task::spawn(async move {
-            let keystore = spawn_test_keystore(fixture_keypairs()).await.unwrap();
-
-            let agent1 = AgentPubKey::new_from_pure_entropy(&keystore).await.unwrap();
-            let agent2 = AgentPubKey::new_from_pure_entropy(&keystore).await.unwrap();
-            let agent3 = AgentPubKey::new_from_pure_entropy(&keystore).await.unwrap();
-
-            assert_eq!(
-                "uhCAkw-zrttiYpdfAYX4fR6W8DPUdheZJ-1QsRA4cTImmzTYUcOr4",
-                &agent1.to_string(),
-            );
-            assert_eq!(
-                "uhCAkomHzekU0-x7p62WmrusdxD2w9wcjdajC88688JGSTEo6cbEK",
-                &agent2.to_string(),
-            );
-            assert_ne!(&agent1.to_string(), &agent3.to_string(),);
-
-            let mut sign_keys = keystore
-                .list_sign_keys()
+            let keystore = spawn_test_keystore().await.unwrap();
+            let agent_pubkey1 = holo_hash::AgentPubKey::new_from_pure_entropy(&keystore)
                 .await
-                .unwrap()
-                .iter()
-                .map(|agent| agent.to_string())
-                .collect::<Vec<_>>();
-            sign_keys.sort();
-
-            let mut expected = vec![agent1.to_string(), agent2.to_string(), agent3.to_string()];
-            expected.sort();
-
-            assert_eq!(&format!("{:?}", expected), &format!("{:?}", sign_keys),);
-        })
-        .await
-        .unwrap();
-    }
-
-    #[tokio::test(threaded_scheduler)]
-    async fn test_test_keystore_can_sign_and_validate_data() {
-        let _ = crypto_init_sodium();
-        use holo_hash::AgentPubKey;
-        tokio::task::spawn(async move {
-            let keystore = spawn_test_keystore(fixture_keypairs()).await.unwrap();
-
-            let agent_pubkey = AgentPubKey::new_from_pure_entropy(&keystore).await.unwrap();
+                .unwrap();
+            assert_eq!(
+                "uhCAkmrkoAHPVf_eufG7eC5fm6QKrW5pPMoktvG5LOC0SnJ4vV1Uv",
+                &agent_pubkey1.to_string()
+            );
+            let agent_pubkey2 = holo_hash::AgentPubKey::new_from_pure_entropy(&keystore)
+                .await
+                .unwrap();
+            assert_eq!(
+                "uhCAke1j8Z2a-_min0h0pGuEMcYlo_V1l1mt9OtBuywKmHlg4L_R-",
+                &agent_pubkey2.to_string()
+            );
 
             #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
             struct MyData(Vec<u8>);
 
             let my_data_1 = MyData(b"signature test data 1".to_vec());
-            let my_data_2 = MyData(b"signature test data 2".to_vec());
 
-            let signature = agent_pubkey.sign(&keystore, &my_data_1).await.unwrap();
+            let signature = agent_pubkey1.sign(&keystore, &my_data_1).await.unwrap();
 
-            assert!(agent_pubkey
+            assert!(agent_pubkey1
                 .verify_signature(&signature, &my_data_1)
-                .await
-                .unwrap());
-            assert!(!agent_pubkey
-                .verify_signature(&signature, &my_data_2)
                 .await
                 .unwrap());
         })

@@ -1,44 +1,57 @@
-use futures::{future::FutureExt, stream::StreamExt};
+use futures::{future::FutureExt, sink::SinkExt, stream::StreamExt};
 use kitsune_p2p_types::{
     dependencies::{ghost_actor, url2::*},
     transport::transport_connection::*,
     transport::*,
 };
 
-ghost_actor::ghost_chan! {
-    chan ConnectionInner<TransportError> {
-        /// we received an incoming request - publish it
-        fn publish_incoming(url: Url2, data: Vec<u8>) -> Vec<u8>;
-    }
-}
-
 /// QUIC implementation of kitsune TransportConnection actor.
 struct TransportConnectionQuic {
-    #[allow(dead_code)]
-    internal_sender: ghost_actor::GhostSender<ConnectionInner>,
     quinn_connection: quinn::Connection,
-    #[allow(dead_code)]
-    incoming_sender: futures::channel::mpsc::Sender<TransportConnectionEvent>,
 }
 
 impl ghost_actor::GhostControlHandler for TransportConnectionQuic {}
 
-impl ghost_actor::GhostHandler<ConnectionInner> for TransportConnectionQuic {}
-
-impl ConnectionInnerHandler for TransportConnectionQuic {
-    fn handle_publish_incoming(
-        &mut self,
-        url: Url2,
-        data: Vec<u8>,
-    ) -> ConnectionInnerHandlerResult<Vec<u8>> {
-        let send_clone = self.incoming_sender.clone();
-        Ok(async move { send_clone.incoming_request(url, data).await }
-            .boxed()
-            .into())
-    }
-}
-
 impl ghost_actor::GhostHandler<TransportConnection> for TransportConnectionQuic {}
+
+fn tx_bi_chan(
+    mut bi_send: quinn::SendStream,
+    mut bi_recv: quinn::RecvStream,
+) -> (TransportChannelWrite, TransportChannelRead) {
+    let (write_send, mut write_recv) = futures::channel::mpsc::channel::<Vec<u8>>(10);
+    let write_send = write_send.sink_map_err(TransportError::other);
+    tokio::task::spawn(async move {
+        while let Some(data) = write_recv.next().await {
+            bi_send
+                .write_all(&data)
+                .await
+                .map_err(TransportError::other)?;
+        }
+        bi_send.finish().await.map_err(TransportError::other)?;
+        TransportResult::Ok(())
+    });
+    let (mut read_send, read_recv) = futures::channel::mpsc::channel::<Vec<u8>>(10);
+    tokio::task::spawn(async move {
+        let mut buf = [0_u8; 4096];
+        while let Some(read) = bi_recv
+            .read(&mut buf)
+            .await
+            .map_err(TransportError::other)?
+        {
+            if read == 0 {
+                continue;
+            }
+            read_send
+                .send(buf[0..read].to_vec())
+                .await
+                .map_err(TransportError::other)?;
+        }
+        TransportResult::Ok(())
+    });
+    let write_send: TransportChannelWrite = Box::new(write_send);
+    let read_recv: TransportChannelRead = Box::new(read_recv);
+    (write_send, read_recv)
+}
 
 impl TransportConnectionHandler for TransportConnectionQuic {
     fn handle_remote_url(&mut self) -> TransportConnectionHandlerResult<Url2> {
@@ -50,20 +63,14 @@ impl TransportConnectionHandler for TransportConnectionQuic {
         Ok(async move { Ok(out) }.boxed().into())
     }
 
-    fn handle_request(&mut self, input: Vec<u8>) -> TransportConnectionHandlerResult<Vec<u8>> {
+    fn handle_create_channel(
+        &mut self,
+    ) -> TransportConnectionHandlerResult<(TransportChannelWrite, TransportChannelRead)> {
         let maybe_bi = self.quinn_connection.open_bi();
         Ok(async move {
-            let (mut bi_send, bi_recv) = maybe_bi.await.map_err(TransportError::custom)?;
-            bi_send
-                .write_all(&input)
-                .await
-                .map_err(TransportError::custom)?;
-            bi_send.finish().await.map_err(TransportError::custom)?;
-            let res = bi_recv
-                .read_to_end(std::usize::MAX)
-                .await
-                .map_err(TransportError::custom)?;
-            Ok(res)
+            let (bi_send, bi_recv) = maybe_bi.await.map_err(TransportError::other)?;
+            let (write, read) = tx_bi_chan(bi_send, bi_recv);
+            Ok((write, read))
         }
         .boxed()
         .into())
@@ -77,72 +84,45 @@ pub(crate) async fn spawn_transport_connection_quic(
     ghost_actor::GhostSender<TransportConnection>,
     TransportConnectionEventReceiver,
 )> {
-    let con = maybe_con.await.map_err(TransportError::custom)?;
+    let con = maybe_con.await.map_err(TransportError::other)?;
+
     let quinn::NewConnection {
         connection,
         mut bi_streams,
         ..
     } = con;
+
     let (incoming_sender, receiver) = futures::channel::mpsc::channel(10);
 
     let builder = ghost_actor::actor_builder::GhostActorBuilder::new();
-
-    let internal_sender = builder
-        .channel_factory()
-        .create_channel::<ConnectionInner>()
-        .await?;
 
     let sender = builder
         .channel_factory()
         .create_channel::<TransportConnection>()
         .await?;
 
-    let internal_sender_clone = internal_sender.clone();
     let sender_clone = sender.clone();
     tokio::task::spawn(async move {
-        while let Some(Ok((mut bi_send, bi_recv))) = bi_streams.next().await {
-            let internal_sender_clone = internal_sender_clone.clone();
+        while let Some(Ok((bi_send, bi_recv))) = bi_streams.next().await {
             let sender_clone = sender_clone.clone();
+            let incoming_sender = incoming_sender.clone();
             tokio::task::spawn(async move {
-                let req_data = match bi_recv.read_to_end(std::usize::MAX).await {
-                    Err(_) => {
-                        // TODO - log?
-                        return;
-                    }
-                    Ok(data) => data,
-                };
+                let url = sender_clone
+                    .remote_url()
+                    .await
+                    .map_err(TransportError::other)?;
 
-                let url = match sender_clone.remote_url().await {
-                    Err(_) => {
-                        // TODO - log?
-                        return;
-                    }
-                    Ok(url) => url,
-                };
+                let (write, read) = tx_bi_chan(bi_send, bi_recv);
 
-                let res_data = match internal_sender_clone.publish_incoming(url, req_data).await {
-                    Err(_) => {
-                        // TODO - log?
-                        return;
-                    }
-                    Ok(data) => data,
-                };
+                let _ = incoming_sender.incoming_channel(url, write, read).await;
 
-                if bi_send.write_all(&res_data).await.is_err() {
-                    // TODO - log?
-                }
-
-                if bi_send.finish().await.is_err() {
-                    // TODO - log?
-                }
+                TransportResult::Ok(())
             });
         }
     });
 
     let actor = TransportConnectionQuic {
-        internal_sender,
         quinn_connection: connection,
-        incoming_sender,
     };
     tokio::task::spawn(builder.spawn(actor));
 

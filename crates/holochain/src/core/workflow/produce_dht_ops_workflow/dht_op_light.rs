@@ -34,7 +34,7 @@ pub async fn light_to_op<P: PrefixType>(
             // TODO: Could use this signature? Is it the same?
             // Should we not be storing the signature in the DhtOpLight?
             let (header, sig) = header.into_header_and_signature();
-            let entry = entry.map(Box::new);
+            let entry = entry.into_option().map(Box::new);
             Ok(DhtOp::StoreElement(sig, header.into_content(), entry))
         }
         DhtOpLight::StoreEntry(h, _, _) => {
@@ -44,19 +44,22 @@ pub async fn light_to_op<P: PrefixType>(
                 .into_inner();
             let (header, sig) = header.into_header_and_signature();
             let header = match header.into_content() {
-                Header::EntryCreate(c) => NewEntryHeader::Create(c),
-                Header::EntryUpdate(c) => NewEntryHeader::Update(c),
+                Header::Create(c) => NewEntryHeader::Create(c),
+                Header::Update(c) => NewEntryHeader::Update(c),
                 _ => return Err(DhtOpConvertError::HeaderEntryMismatch),
             };
 
             let entry = match header.visibility() {
                 // Entry must be here because it's a StoreEntry
                 EntryVisibility::Public => entry
+                    .into_option()
                     .ok_or_else(|| DhtOpConvertError::MissingData(header.entry().clone().into()))?,
                 // If the entry is not here and you were meant to have access
                 // it's because you were using a database without access to private entries
                 // If not then you should handle this error
-                EntryVisibility::Private => entry.ok_or(DhtOpConvertError::StoreEntryOnPrivate)?,
+                EntryVisibility::Private => entry
+                    .into_option()
+                    .ok_or(DhtOpConvertError::StoreEntryOnPrivate)?,
             };
             Ok(DhtOp::StoreEntry(sig, header, Box::new(entry)))
         }
@@ -68,12 +71,13 @@ pub async fn light_to_op<P: PrefixType>(
             Ok(DhtOp::RegisterAgentActivity(sig, header.into_content()))
         }
         DhtOpLight::RegisterUpdatedBy(h, _, _) => {
-            let (header, sig) = cas
-                .get_header(&h)?
+            let (header, entry) = cas
+                .get_element(&h)?
                 .ok_or_else(|| DhtOpConvertError::MissingData(h.into()))?
-                .into_header_and_signature();
+                .into_inner();
+            let (header, sig) = header.into_header_and_signature();
             let header = match header.into_content() {
-                Header::EntryUpdate(u) => u,
+                Header::Update(u) => u,
                 h => {
                     return Err(DhtOpConvertError::HeaderMismatch(
                         format!("{:?}", h),
@@ -81,7 +85,8 @@ pub async fn light_to_op<P: PrefixType>(
                     ));
                 }
             };
-            Ok(DhtOp::RegisterUpdatedBy(sig, header))
+            let entry = entry.into_option().map(Box::new);
+            Ok(DhtOp::RegisterUpdatedBy(sig, header, entry))
         }
         DhtOpLight::RegisterDeletedBy(header_hash, _) => {
             let (header, sig) = get_element_delete(header_hash, op_name, &cas)?;
@@ -99,7 +104,7 @@ pub async fn light_to_op<P: PrefixType>(
                 .0
                 .into_header_and_signature();
             let header = match header.into_content() {
-                Header::LinkAdd(u) => u,
+                Header::CreateLink(u) => u,
                 h => {
                     return Err(DhtOpConvertError::HeaderMismatch(
                         format!("{:?}", h),
@@ -117,7 +122,7 @@ pub async fn light_to_op<P: PrefixType>(
                 .0
                 .into_header_and_signature();
             let header = match header.into_content() {
-                Header::LinkRemove(u) => u,
+                Header::DeleteLink(u) => u,
                 h => {
                     return Err(DhtOpConvertError::HeaderMismatch(
                         format!("{:?}", h),
@@ -134,13 +139,13 @@ fn get_element_delete<P: PrefixType>(
     header_hash: HeaderHash,
     op_name: String,
     cas: &ElementBuf<P>,
-) -> DhtOpConvertResult<(header::ElementDelete, Signature)> {
+) -> DhtOpConvertResult<(header::Delete, Signature)> {
     let (header, sig) = cas
         .get_header(&header_hash)?
         .ok_or_else(|| DhtOpConvertError::MissingData(header_hash.into()))?
         .into_header_and_signature();
     match header.into_content() {
-        Header::ElementDelete(u) => Ok((u, sig)),
+        Header::Delete(u) => Ok((u, sig)),
         h => Err(DhtOpConvertError::HeaderMismatch(
             format!("{:?}", h),
             op_name,

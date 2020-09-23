@@ -35,10 +35,10 @@ use holochain_types::{
 use holochain_zome_types::{
     entry::GetOptions,
     entry_def::EntryDefs,
-    header::{builder, ElementDelete, EntryUpdate, LinkAdd, LinkRemove, ZomeId},
+    header::{builder, CreateLink, Delete, DeleteLink, Update, ZomeId},
     link::{LinkTag, Links},
     zome::ZomeName,
-    CommitEntryInput, GetInput, GetLinksInput, Header, LinkEntriesInput,
+    CreateInput, CreateLinkInput, GetInput, GetLinksInput, Header,
 };
 use produce_dht_ops_workflow::{produce_dht_ops_workflow, ProduceDhtOpsWorkspace};
 use std::{
@@ -53,15 +53,15 @@ struct TestData {
     original_entry: Entry,
     new_entry: Entry,
     any_header: Header,
-    entry_update_header: EntryUpdate,
-    entry_update_entry: EntryUpdate,
+    entry_update_header: Update,
+    entry_update_entry: Update,
     original_header_hash: HeaderHash,
     original_entry_hash: EntryHash,
     new_entry_hash: EntryHash,
     original_header: NewEntryHeader,
-    entry_delete: ElementDelete,
-    link_add: LinkAdd,
-    link_remove: LinkRemove,
+    entry_delete: Delete,
+    link_add: CreateLink,
+    link_remove: DeleteLink,
 }
 
 impl TestData {
@@ -104,22 +104,22 @@ impl TestData {
         }
 
         // Entry update for header
-        let mut entry_update_header = fixt!(EntryUpdate, PublicCurve);
+        let mut entry_update_header = fixt!(Update, PublicCurve);
         entry_update_header.entry_hash = new_entry_hash.clone();
         entry_update_header.original_header_address = original_header_hash.clone();
 
         // Entry update for entry
-        let mut entry_update_entry = fixt!(EntryUpdate, PublicCurve);
+        let mut entry_update_entry = fixt!(Update, PublicCurve);
         entry_update_entry.entry_hash = new_entry_hash.clone();
         entry_update_entry.original_entry_address = original_entry_hash.clone();
         entry_update_entry.original_header_address = original_header_hash.clone();
 
         // Entry delete
-        let mut entry_delete = fixt!(ElementDelete);
-        entry_delete.removes_address = original_header_hash.clone();
+        let mut entry_delete = fixt!(Delete);
+        entry_delete.deletes_address = original_header_hash.clone();
 
         // Link add
-        let mut link_add = fixt!(LinkAdd);
+        let mut link_add = fixt!(CreateLink);
         link_add.base_address = original_entry_hash.clone();
         link_add.target_address = new_entry_hash.clone();
         link_add.zome_id = fixt!(ZomeId);
@@ -128,16 +128,16 @@ impl TestData {
         let link_add_hash = HeaderHashed::from_content_sync(link_add.clone().into()).into_hash();
 
         // Link remove
-        let mut link_remove = fixt!(LinkRemove);
+        let mut link_remove = fixt!(DeleteLink);
         link_remove.base_address = original_entry_hash.clone();
         link_remove.link_add_address = link_add_hash.clone();
 
         let mut any_header = fixt!(Header, PublicCurve);
         match &mut any_header {
-            Header::EntryCreate(ec) => {
+            Header::Create(ec) => {
                 ec.entry_hash = original_entry_hash.clone();
             }
-            Header::EntryUpdate(eu) => {
+            Header::Update(eu) => {
                 eu.entry_hash = original_entry_hash.clone();
             }
             _ => (),
@@ -183,8 +183,8 @@ enum Db {
     MetaActivity(Header),
     MetaUpdate(AnyDhtHash, Header),
     MetaDelete(HeaderHash, Header),
-    MetaLink(LinkAdd, EntryHash),
-    MetaLinkEmpty(LinkAdd),
+    MetaLink(CreateLink, EntryHash),
+    MetaLinkEmpty(CreateLink),
 }
 
 impl Db {
@@ -334,9 +334,7 @@ impl Db {
                         .meta
                         .get_deletes_on_entry(
                             &reader,
-                            ElementDelete::try_from(header)
-                                .unwrap()
-                                .removes_entry_address,
+                            Delete::try_from(header).unwrap().deletes_entry_address,
                         )
                         .unwrap()
                         .collect::<Vec<_>>()
@@ -579,7 +577,7 @@ fn add_op_to_judged(mut ps: Vec<Db>, op: &DhtOp) -> Vec<Db> {
         DhtOp::RegisterAgentActivity(s, h) => {
             ps.push(Db::JudgedHeader(h.clone(), Some(s.clone())));
         }
-        DhtOp::RegisterUpdatedBy(s, h) => {
+        DhtOp::RegisterUpdatedBy(s, h, _) => {
             let h: Header = h.clone().try_into().unwrap();
             ps.push(Db::JudgedHeader(h.clone(), Some(s.clone())));
         }
@@ -610,7 +608,7 @@ fn add_op_to_judged(mut ps: Vec<Db>, op: &DhtOp) -> Vec<Db> {
 
 fn store_element(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let entry = match &a.any_header {
-        Header::EntryCreate(_) | Header::EntryUpdate(_) => Some(a.original_entry.clone().into()),
+        Header::Create(_) | Header::Update(_) => Some(a.original_entry.clone().into()),
         _ => None,
     };
     let op = DhtOp::StoreElement(
@@ -662,7 +660,11 @@ fn register_agent_activity(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
 
 #[allow(dead_code)]
 fn register_replaced_by_for_header(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-    let op = DhtOp::RegisterUpdatedBy(a.signature.clone(), a.entry_update_header.clone());
+    let op = DhtOp::RegisterUpdatedBy(
+        a.signature.clone(),
+        a.entry_update_header.clone(),
+        Some(a.new_entry.clone().into()),
+    );
     let pre_state = vec![
         Db::IntQueue(op.clone()),
         Db::CasHeader(a.original_header.clone().into(), Some(a.signature.clone())),
@@ -679,7 +681,11 @@ fn register_replaced_by_for_header(a: TestData) -> (Vec<Db>, Vec<Db>, &'static s
 }
 
 fn register_replaced_by_for_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-    let op = DhtOp::RegisterUpdatedBy(a.signature.clone(), a.entry_update_entry.clone());
+    let op = DhtOp::RegisterUpdatedBy(
+        a.signature.clone(),
+        a.entry_update_entry.clone(),
+        Some(a.new_entry.clone().into()),
+    );
     let pre_state = vec![
         Db::IntQueue(op.clone()),
         Db::CasEntry(
@@ -760,7 +766,7 @@ fn register_add_link(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     (pre_state, expect, "register link add")
 }
 
-fn register_remove_link(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+fn register_delete_link(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let op = DhtOp::RegisterRemoveLink(a.signature.clone(), a.link_remove.clone());
     let pre_state = vec![
         Db::IntQueue(op.clone()),
@@ -781,7 +787,7 @@ fn register_remove_link(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
 }
 
 // Link remove when not an author
-fn register_remove_link_missing_base(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+fn register_delete_link_missing_base(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let op = DhtOp::RegisterRemoveLink(a.signature.clone(), a.link_remove.clone());
     let pre_state = vec![Db::IntQueue(op.clone())];
     let pre_state = add_op_to_judged(pre_state, &op);
@@ -808,8 +814,8 @@ async fn test_ops_state() {
         register_deleted_by,
         register_deleted_header_by,
         register_add_link,
-        register_remove_link,
-        register_remove_link_missing_base,
+        register_delete_link,
+        register_delete_link_missing_base,
     ];
 
     for t in tests.iter() {
@@ -899,7 +905,7 @@ async fn commit_entry<'env>(
         .next()
         .unwrap();
 
-    let input = CommitEntryInput::new((entry_def_id.clone(), entry.clone()));
+    let input = CreateInput::new((entry_def_id.clone(), entry.clone()));
 
     let output = {
         let mut host_access = fixt!(ZomeCallHostAccess);
@@ -907,7 +913,7 @@ async fn commit_entry<'env>(
         call_context.host_access = host_access.into();
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
-        host_fn::commit_entry::commit_entry(ribosome.clone(), call_context.clone(), input).unwrap()
+        host_fn::create::create(ribosome.clone(), call_context.clone(), input).unwrap()
     };
 
     // Write
@@ -946,7 +952,7 @@ async fn get_entry(env: EnvironmentWrite, entry_hash: EntryHash) -> Option<Entry
     output.into_inner().and_then(|el| el.into())
 }
 
-async fn link_entries(
+async fn create_link(
     env: EnvironmentWrite,
     base_address: EntryHash,
     target_address: EntryHash,
@@ -975,8 +981,8 @@ async fn link_entries(
     let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
     call_context.zome_name = zome_name.clone();
 
-    // Call link_entries
-    let input = LinkEntriesInput::new((base_address.into(), target_address.into(), link_tag));
+    // Call create_link
+    let input = CreateLinkInput::new((base_address.into(), target_address.into(), link_tag));
 
     let output = {
         let mut host_access = fixt!(ZomeCallHostAccess);
@@ -984,8 +990,8 @@ async fn link_entries(
         call_context.host_access = host_access.into();
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
-        // Call the real link_entries host fn
-        host_fn::link_entries::link_entries(ribosome.clone(), call_context.clone(), input).unwrap()
+        // Call the real create_link host fn
+        host_fn::create_link::create_link(ribosome.clone(), call_context.clone(), input).unwrap()
     };
 
     // Write the changes
@@ -996,7 +1002,7 @@ async fn link_entries(
             .unwrap();
     }
 
-    // Get the LinkAdd HeaderHash back
+    // Get the CreateLink HeaderHash back
     output.into_inner()
 }
 
@@ -1079,7 +1085,7 @@ async fn test_metadata_from_wasm_api() {
         .0;
 
     // Link the base to the target
-    let _link_add_address = link_entries(
+    let _link_add_address = create_link(
         env.clone(),
         base_address.clone(),
         target_entry_hash.clone(),
@@ -1146,7 +1152,7 @@ async fn test_wasm_api_without_integration_links() {
         .0;
 
     // Link the base to the target
-    let _link_add_address = link_entries(
+    let _link_add_address = create_link(
         env.clone(),
         base_address.clone(),
         target_entry_hash.clone(),
@@ -1214,9 +1220,9 @@ async fn test_wasm_api_without_integration_delete() {
             .next()
             .unwrap()
             .unwrap();
-        let delete = builder::ElementDelete {
-            removes_address: entry_header.header_hash,
-            removes_entry_address: base_address.clone(),
+        let delete = builder::Delete {
+            deletes_address: entry_header.header_hash,
+            deletes_entry_address: base_address.clone(),
         };
         workspace.source_chain.put(delete, None).await.unwrap();
         env_ref
@@ -1242,7 +1248,7 @@ async fn test_wasm_api_without_integration_delete() {
 #[ignore]
 async fn test_integrate_single_register_replaced_by_for_header() {
     // For RegisterUpdatedBy with intended_for Header
-    // metadata has EntryUpdate on HeaderHash but not EntryHash
+    // metadata has Update on HeaderHash but not EntryHash
     todo!()
 }
 
@@ -1250,7 +1256,7 @@ async fn test_integrate_single_register_replaced_by_for_header() {
 #[ignore]
 async fn test_integrate_single_register_replaced_by_for_entry() {
     // For RegisterUpdatedBy with intended_for Entry
-    // metadata has EntryUpdate on EntryHash but not HeaderHash
+    // metadata has Update on EntryHash but not HeaderHash
     todo!()
 }
 
@@ -1258,7 +1264,7 @@ async fn test_integrate_single_register_replaced_by_for_entry() {
 #[ignore]
 async fn test_integrate_single_register_delete_on_headerd_by() {
     // For RegisterDeletedBy
-    // metadata has ElementDelete on HeaderHash
+    // metadata has Delete on HeaderHash
     todo!()
 }
 
@@ -1272,7 +1278,7 @@ async fn test_integrate_single_register_add_link() {
 
 #[tokio::test(threaded_scheduler)]
 #[ignore]
-async fn test_integrate_single_register_remove_link() {
+async fn test_integrate_single_register_delete_link() {
     // For RegisterAddLink
     // metadata has link on EntryHash
     todo!()
@@ -1305,7 +1311,7 @@ mod slow_tests {
     };
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::header::{builder, AppEntryType, EntryType};
-    use holochain_zome_types::HostInput;
+    use holochain_zome_types::ExternInput;
     use matches::assert_matches;
     use unwrap_to::unwrap_to;
     use uuid::Uuid;
@@ -1373,7 +1379,7 @@ mod slow_tests {
 
             let mut workspace = CallZomeWorkspace::new(cell_env.clone().into()).unwrap();
 
-            let header_builder = builder::EntryCreate {
+            let header_builder = builder::Create {
                 entry_type: EntryType::App(AppEntryType::new(
                     0.into(),
                     0.into(),
@@ -1388,7 +1394,7 @@ mod slow_tests {
                 .unwrap();
 
             // Commit the target
-            let header_builder = builder::EntryCreate {
+            let header_builder = builder::Create {
                 entry_type: EntryType::App(AppEntryType::new(
                     1.into(),
                     0.into(),
@@ -1413,7 +1419,7 @@ mod slow_tests {
             .unwrap();
 
             // Commit the base
-            let header_builder = builder::EntryCreate {
+            let header_builder = builder::Create {
                 entry_type: EntryType::App(AppEntryType::new(
                     2.into(),
                     0.into(),
@@ -1437,7 +1443,7 @@ mod slow_tests {
             .await
             .unwrap();
 
-            let header_builder = builder::LinkAdd {
+            let header_builder = builder::CreateLink {
                 base_address: base_entry_hash.clone(),
                 target_address: target_entry_hash.clone(),
                 zome_id: 0.into(),
@@ -1473,7 +1479,7 @@ mod slow_tests {
                 cell_id.clone(),
                 TestWasm::Foo,
                 "foo".into(),
-                HostInput::new(fixt!(SerializedBytes)),
+                ExternInput::new(fixt!(SerializedBytes)),
             ))
             .next()
             .unwrap(),
@@ -1532,14 +1538,14 @@ mod slow_tests {
                 .await
                 .unwrap()
                 .unwrap();
-            assert_eq!(e.into_inner().1.unwrap(), target_entry);
+            assert_eq!(e.into_inner().1.into_option().unwrap(), target_entry);
 
             let e = cascade
                 .dht_get(base_entry_hash.into(), Default::default())
                 .await
                 .unwrap()
                 .unwrap();
-            assert_eq!(e.into_inner().1.unwrap(), base_entry);
+            assert_eq!(e.into_inner().1.into_option().unwrap(), base_entry);
         }
         conductor.shutdown().await;
         shutdown.await.unwrap();

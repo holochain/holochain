@@ -2,7 +2,7 @@
 //! either being held locally or existing on the DHT
 use super::*;
 use crate::core::validation::{CheckLevel, Dependency};
-use holochain_p2p::HolochainP2pCell;
+use holochain_p2p::HolochainP2pCellT;
 
 macro_rules! check_holding {
     ($f:ident, $($hash:expr),+ => $dep:ident, $($ws:expr),+ ) => {{
@@ -42,7 +42,7 @@ macro_rules! check_holding_meta {
 pub async fn check_holding_entry_all(
     hash: &EntryHash,
     workspace: &mut SysValidationWorkspace,
-    network: HolochainP2pCell,
+    network: impl HolochainP2pCellT,
     check_level: CheckLevel,
 ) -> SysValidationResult<Dependency<Element>> {
     match check_level {
@@ -63,7 +63,7 @@ async fn check_holding_entry_inner(
 pub async fn check_holding_header_all(
     hash: &HeaderHash,
     workspace: &mut SysValidationWorkspace,
-    network: HolochainP2pCell,
+    network: impl HolochainP2pCellT,
     check_level: CheckLevel,
 ) -> SysValidationResult<Dependency<SignedHeaderHashed>> {
     match check_level {
@@ -83,7 +83,7 @@ async fn check_holding_header_inner(
 pub async fn check_holding_element_all(
     hash: &HeaderHash,
     workspace: &mut SysValidationWorkspace,
-    network: HolochainP2pCell,
+    network: impl HolochainP2pCellT,
     check_level: CheckLevel,
 ) -> SysValidationResult<Dependency<Element>> {
     match check_level {
@@ -106,7 +106,7 @@ pub async fn check_holding_prev_header_all(
     author: &AgentPubKey,
     prev_header_hash: &HeaderHash,
     workspace: &mut SysValidationWorkspace,
-    network: HolochainP2pCell,
+    network: impl HolochainP2pCellT,
     check_level: CheckLevel,
 ) -> SysValidationResult<Dependency<SignedHeaderHashed>> {
     match check_level {
@@ -137,7 +137,7 @@ pub async fn check_holding_store_entry_all(
     entry_hash: &EntryHash,
     header_hash: &HeaderHash,
     workspace: &mut SysValidationWorkspace,
-    network: HolochainP2pCell,
+    network: impl HolochainP2pCellT,
     check_level: CheckLevel,
 ) -> SysValidationResult<Dependency<Element>> {
     match check_level {
@@ -165,7 +165,7 @@ async fn check_holding_store_entry_inner(
 pub async fn check_holding_link_add_all(
     header_hash: &HeaderHash,
     workspace: &mut SysValidationWorkspace,
-    network: HolochainP2pCell,
+    network: impl HolochainP2pCellT,
     check_level: CheckLevel,
 ) -> SysValidationResult<Dependency<SignedHeaderHashed>> {
     match check_level {
@@ -224,11 +224,11 @@ pub(super) async fn check_link_in_metadata<P: PrefixType>(
     link_add_hash: &HeaderHash,
     meta_vault: &impl MetadataBufT<P>,
 ) -> SysValidationResult<()> {
-    // Check the header is a LinkAdd
-    let link_add: LinkAdd = link_add
+    // Check the header is a CreateLink
+    let link_add: CreateLink = link_add
         .clone()
         .try_into()
-        .map_err(|_| ValidationOutcome::NotLinkAdd(link_add_hash.clone()))?;
+        .map_err(|_| ValidationOutcome::NotCreateLink(link_add_hash.clone()))?;
 
     // Full key always returns just one link
     let link_key = LinkMetaKey::from((&link_add, link_add_hash));
@@ -328,7 +328,7 @@ async fn check_holding_element<P: PrefixType>(
 pub async fn check_entry_exists(
     entry_hash: EntryHash,
     workspace: &mut SysValidationWorkspace,
-    network: HolochainP2pCell,
+    network: impl HolochainP2pCellT,
 ) -> SysValidationResult<Dependency<Element>> {
     check_holding_entry!(workspace, check_holding_entry, &entry_hash);
     let mut cascade = workspace.cascade(network);
@@ -343,7 +343,7 @@ pub async fn check_entry_exists(
 pub async fn check_header_exists(
     hash: HeaderHash,
     workspace: &mut SysValidationWorkspace,
-    network: HolochainP2pCell,
+    network: impl HolochainP2pCellT,
 ) -> SysValidationResult<Dependency<SignedHeaderHashed>> {
     check_holding_el!(workspace, check_holding_header, &hash);
     let mut cascade = workspace.cascade(network);
@@ -358,7 +358,7 @@ pub async fn check_header_exists(
 pub async fn check_element_exists(
     hash: HeaderHash,
     workspace: &mut SysValidationWorkspace,
-    network: HolochainP2pCell,
+    network: impl HolochainP2pCellT,
 ) -> SysValidationResult<Dependency<Element>> {
     check_holding_el!(workspace, check_holding_element, &hash);
     let mut cascade = workspace.cascade(network);

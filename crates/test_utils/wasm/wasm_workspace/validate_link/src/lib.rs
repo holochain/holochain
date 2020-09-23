@@ -10,18 +10,18 @@ enum MaybeLinkable {
 entry_defs![MaybeLinkable::entry_def()];
 
 #[hdk_extern]
-fn validate_link(
-    validate_link_add_data: ValidateLinkAddData,
-) -> ExternResult<ValidateLinkAddCallbackResult> {
-    let base: MaybeLinkable = validate_link_add_data.base.try_into()?;
-    let target: MaybeLinkable = validate_link_add_data.target.try_into()?;
+fn validate_create_link(
+    validate_create_link_data: ValidateCreateLinkData,
+) -> ExternResult<ValidateLinkCallbackResult> {
+    let base: MaybeLinkable = validate_create_link_data.base.try_into()?;
+    let target: MaybeLinkable = validate_create_link_data.target.try_into()?;
 
     Ok(match base {
         MaybeLinkable::AlwaysLinkable => match target {
-            MaybeLinkable::AlwaysLinkable => ValidateLinkAddCallbackResult::Valid,
-            _ => ValidateLinkAddCallbackResult::Invalid("target never validates".to_string()),
+            MaybeLinkable::AlwaysLinkable => ValidateLinkCallbackResult::Valid,
+            _ => ValidateLinkCallbackResult::Invalid("target never validates".to_string()),
         },
-        _ => ValidateLinkAddCallbackResult::Invalid("base never validates".to_string()),
+        _ => ValidateLinkCallbackResult::Invalid("base never validates".to_string()),
     })
 }
 
@@ -31,10 +31,10 @@ fn add_valid_link(_: ()) -> ExternResult<HeaderHash> {
 }
 
 fn add_valid_link_inner() -> ExternResult<HeaderHash> {
-    let always_linkable_entry_hash = entry_hash!(MaybeLinkable::AlwaysLinkable)?;
-    commit_entry!(MaybeLinkable::AlwaysLinkable)?;
+    let always_linkable_entry_hash = hash_entry!(MaybeLinkable::AlwaysLinkable)?;
+    create_entry!(MaybeLinkable::AlwaysLinkable)?;
 
-    Ok(link_entries!(
+    Ok(create_link!(
         always_linkable_entry_hash.clone(),
         always_linkable_entry_hash
     )?)
@@ -43,7 +43,7 @@ fn add_valid_link_inner() -> ExternResult<HeaderHash> {
 #[hdk_extern]
 fn remove_valid_link(_: ()) -> ExternResult<HeaderHash> {
     let valid_link = add_valid_link_inner()?;
-    Ok(remove_link!(valid_link)?)
+    Ok(delete_link!(valid_link)?)
 }
 
 #[hdk_extern]
@@ -52,13 +52,13 @@ fn add_invalid_link(_: ()) -> ExternResult<HeaderHash> {
 }
 
 fn add_invalid_link_inner() -> ExternResult<HeaderHash> {
-    let always_linkable_entry_hash = entry_hash!(MaybeLinkable::AlwaysLinkable)?;
-    let never_linkable_entry_hash = entry_hash!(MaybeLinkable::NeverLinkable)?;
+    let always_linkable_entry_hash = hash_entry!(MaybeLinkable::AlwaysLinkable)?;
+    let never_linkable_entry_hash = hash_entry!(MaybeLinkable::NeverLinkable)?;
 
-    commit_entry!(MaybeLinkable::AlwaysLinkable)?;
-    commit_entry!(MaybeLinkable::NeverLinkable)?;
+    create_entry!(MaybeLinkable::AlwaysLinkable)?;
+    create_entry!(MaybeLinkable::NeverLinkable)?;
 
-    Ok(link_entries!(
+    Ok(create_link!(
         never_linkable_entry_hash,
         always_linkable_entry_hash
     )?)
@@ -67,7 +67,7 @@ fn add_invalid_link_inner() -> ExternResult<HeaderHash> {
 #[hdk_extern]
 fn remove_invalid_link(_: ()) -> ExternResult<HeaderHash> {
     let valid_link = add_invalid_link_inner()?;
-    Ok(remove_link!(valid_link)?)
+    Ok(delete_link!(valid_link)?)
 }
 
 #[hdk_extern]
@@ -76,32 +76,28 @@ fn validate(_element: ValidateData) -> ExternResult<ValidateCallbackResult> {
 }
 
 #[hdk_extern]
-fn validate_remove_link(element: Element) -> ExternResult<ValidateCallbackResult> {
-    match (element.into_inner().0.into_inner().0).0 {
-        Header::LinkRemove(link_remove) => {
-            let base: Option<MaybeLinkable> = match get!(link_remove.base_address.clone())? {
-                Some(b) => b.entry().to_app_option()?,
-                None => {
-                    return Ok(ValidateCallbackResult::UnresolvedDependencies(vec![
-                        link_remove.base_address,
-                    ]))
-                }
-            };
-            let base = match base {
-                Some(b) => b,
-                None => {
-                    return Ok(ValidateCallbackResult::Invalid(
-                        "Base of this entry is not MaybeLinkable".to_string(),
-                    ))
-                }
-            };
-            Ok(match base {
-                MaybeLinkable::AlwaysLinkable => ValidateCallbackResult::Valid,
-                _ => ValidateCallbackResult::Invalid("base never validates".to_string()),
-            })
+fn validate_delete_link(
+    validate_delete_link: ValidateDeleteLinkData,
+) -> ExternResult<ValidateCallbackResult> {
+    let delete_link = validate_delete_link.delete_link;
+    let base: Option<MaybeLinkable> = match get!(delete_link.base_address.clone())? {
+        Some(b) => b.entry().to_app_option()?,
+        None => {
+            return Ok(ValidateCallbackResult::UnresolvedDependencies(vec![
+                delete_link.base_address,
+            ]))
         }
-        _ => Ok(ValidateCallbackResult::Invalid(
-            "Not a LinkRemove header".to_string(),
-        )),
-    }
+    };
+    let base = match base {
+        Some(b) => b,
+        None => {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Base of this entry is not MaybeLinkable".to_string(),
+            ))
+        }
+    };
+    Ok(match base {
+        MaybeLinkable::AlwaysLinkable => ValidateCallbackResult::Valid,
+        _ => ValidateCallbackResult::Invalid("base never validates".to_string()),
+    })
 }

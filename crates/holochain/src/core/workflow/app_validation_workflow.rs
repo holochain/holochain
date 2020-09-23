@@ -17,12 +17,17 @@ use crate::{
     conductor::entry_def_store::get_entry_def,
     core::present::retrieve_element,
     core::present::retrieve_entry,
+    core::present::retrieve_header,
     core::present::DataSource,
     core::present::DbPair,
-    core::ribosome::guest_callback::validate_link_add::ValidateLinkAddHostAccess,
-    core::ribosome::guest_callback::validate_link_add::ValidateLinkAddInvocation,
-    core::ribosome::guest_callback::validate_link_add::ValidateLinkAddResult,
+    core::ribosome::guest_callback::validate_link::ValidateCreateLinkInvocation,
+    core::ribosome::guest_callback::validate_link::ValidateDeleteLinkInvocation,
+    core::ribosome::guest_callback::validate_link::ValidateLinkHostAccess,
+    core::ribosome::guest_callback::validate_link::ValidateLinkInvocation,
+    core::ribosome::guest_callback::validate_link::ValidateLinkResult,
     core::ribosome::wasm_ribosome::WasmRibosome,
+    core::ribosome::Invocation,
+    core::ribosome::ZomesToInvoke,
     core::state::cascade::Cascade,
     core::{
         queue_consumer::{OneshotWriter, TriggerSender, WorkComplete},
@@ -60,9 +65,15 @@ use holochain_types::{
     validate::ValidationStatus, Entry, HeaderHashed, Timestamp,
 };
 use holochain_zome_types::{
-    element::Element, element::SignedHeaderHashed, entry_def::EntryDef, header::AppEntryType,
-    header::EntryType, header::LinkAdd, validate::RequiredValidationPackage,
-    validate::ValidationPackage, zome::ZomeName, Header,
+    element::Element,
+    element::SignedHeaderHashed,
+    header::AppEntryType,
+    header::EntryType,
+    header::{CreateLink, DeleteLink, ZomeId},
+    validate::RequiredValidationPackage,
+    validate::ValidationPackage,
+    zome::ZomeName,
+    Header,
 };
 use tracing::*;
 pub use types::Outcome;
@@ -259,6 +270,13 @@ fn check_dep_status(
     Ok(None)
 }
 
+fn to_zome_name(zomes_to_invoke: ZomesToInvoke) -> AppValidationResult<ZomeName> {
+    match zomes_to_invoke {
+        ZomesToInvoke::All => Err(AppValidationError::LinkMultipleZomes),
+        ZomesToInvoke::One(zn) => Ok(zn),
+    }
+}
+
 async fn validate_op(
     op: DhtOp,
     conductor_api: &impl CellConductorApiT,
@@ -272,6 +290,9 @@ async fn validate_op(
     // Create the element
     let element = get_element(op)?;
 
+    // Check for caps
+    check_for_caps(&element)?;
+
     // Get the dna file
     let dna_file = { conductor_api.get_this_dna().await };
     let dna_file =
@@ -284,87 +305,69 @@ async fn validate_op(
     // Get the validation package
     let validation_package = get_val_pack(&app_entry_type, &dna_file, conductor_api).await?;
 
-    // Get the zome names
-    let zome_names = get_zome_names(&dna_file, &app_entry_type).await?;
+    let zomes_to_invoke =
+        get_zomes_to_invoke(&element, &dna_file, &mut data_source, dependencies).await?;
 
     // Create the ribosome
     let ribosome = WasmRibosome::new(dna_file);
 
     let outcome = match element.header() {
-        // TODO: Validate link probably doesn't need to be separate
-        // as the correct validate_add_link can still be called.
-        Header::LinkAdd(link_add) => {
+        Header::DeleteLink(delete_link) => {
+            let zome_name = to_zome_name(zomes_to_invoke)?;
+            // Run the link validation
+            run_delete_link_validation_callback(
+                zome_name,
+                delete_link.clone(),
+                &ribosome,
+                workspace_lock.clone(),
+                network.clone(),
+            )?
+        }
+        Header::CreateLink(link_add) => {
             // Get the base and target for this link
             let base = retrieve_entry(&link_add.base_address, &mut data_source)
                 .await?
                 .and_then(|dep| dependencies.store_entry_any(dep))
-                .and_then(|e| e.into_inner().1)
+                .and_then(|e| e.into_inner().1.into_option())
                 .ok_or_else(|| Outcome::awaiting(&link_add.base_address))?;
             let target = retrieve_entry(&link_add.target_address, &mut data_source)
                 .await?
                 .and_then(|dep| dependencies.store_entry_any(dep))
-                .and_then(|e| e.into_inner().1)
+                .and_then(|e| e.into_inner().1.into_option())
                 .ok_or_else(|| Outcome::awaiting(&link_add.target_address))?;
 
             let link_add = Arc::new(link_add.clone());
             let base = Arc::new(base);
             let target = Arc::new(target);
 
-            // If the link is on an AgentPubKey
-            // then we need to call multiple zomes
-            zome_names
-                .into_iter()
-                .map(|zome_name| {
-                    // Run the link validation
-                    run_link_validation_callback(
-                        zome_name,
-                        link_add.clone(),
-                        base.clone(),
-                        target.clone(),
-                        &ribosome,
-                        workspace_lock.clone(),
-                        network.clone(),
-                    )
-                })
-                .collect::<Result<Vec<_>, _>>()?
-                .into_iter()
-                // Find any rejected or awaiting
-                .find(|o| match o {
-                    Outcome::AwaitingDeps(_) | Outcome::Rejected(_) => true,
-                    Outcome::Accepted => false,
-                })
-                .unwrap_or(Outcome::Accepted)
+            let zome_name = to_zome_name(zomes_to_invoke)?;
+
+            // Run the link validation
+            run_create_link_validation_callback(
+                zome_name,
+                link_add,
+                base,
+                target,
+                &ribosome,
+                workspace_lock.clone(),
+                network.clone(),
+            )?
         }
         _ => {
             // Element
 
             // Call the callback
-            // TODO: Not sure if this is correct? Calling every zome
-            // for an agent key etc. If so we should change run_validation
-            // to a Vec<ZomeName>
             let element = Arc::new(element);
             let validation_package = validation_package.map(|vp| Arc::new(vp));
-            zome_names
-                .into_iter()
-                .map(|zome_name| {
-                    // Call the element validation
-                    run_validation_callback(
-                        zome_name,
-                        element.clone(),
-                        validation_package.clone(),
-                        &ribosome,
-                        workspace_lock.clone(),
-                        network.clone(),
-                    )
-                })
-                .collect::<Result<Vec<_>, _>>()?
-                .into_iter()
-                // Find any rejected or awaiting
-                .find(|o| match o {
-                    Outcome::AwaitingDeps(_) | Outcome::Rejected(_) => true,
-                    Outcome::Accepted => false,
-                })
-                .unwrap_or(Outcome::Accepted)
+            // Call the element validation
+            run_validation_callback(
+                zomes_to_invoke,
+                element,
+                validation_package.clone(),
+                &ribosome,
+                workspace_lock.clone(),
+                network.clone(),
+            )?
         }
     };
     if let Outcome::AwaitingDeps(_) | Outcome::Rejected(_) = &outcome {
@@ -383,37 +386,31 @@ async fn validate_op(
 /// validate this op.
 fn get_element(op: DhtOp) -> AppValidationOutcome<Element> {
     match op {
-        DhtOp::RegisterDeletedBy(_, _) | DhtOp::RegisterAgentActivity(_, _) => Outcome::accepted(),
+        DhtOp::RegisterAgentActivity(_, _) => Outcome::accepted(),
         DhtOp::StoreElement(s, h, e) => match h {
-            Header::ElementDelete(_) | Header::LinkAdd(_) | Header::LinkRemove(_) => {
-                Ok(Element::new(
-                    SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(h), s),
-                    None,
-                ))
-            }
-            Header::EntryUpdate(_) | Header::EntryCreate(_) => match e {
-                Some(e) => Ok(Element::new(
-                    SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(h), s),
-                    Some(*e),
-                )),
-                // TODO: Not sure if this is correct.
-                // This is basically private entries. We can't get them
-                // so we can run app validation but maybe we should pass in
-                // element without the entry for a validate_private_entry_header
-                // style call?
-                None => Outcome::accepted(),
-            },
+            Header::Delete(_) | Header::CreateLink(_) | Header::DeleteLink(_) => Ok(Element::new(
+                SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(h), s),
+                None,
+            )),
+            Header::Update(_) | Header::Create(_) => Ok(Element::new(
+                SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(h), s),
+                e.map(|e| *e),
+            )),
             _ => Outcome::accepted(),
         },
         DhtOp::StoreEntry(s, h, e) => Ok(Element::new(
             SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(h.into()), s),
             Some(*e),
         )),
-        DhtOp::RegisterUpdatedBy(s, h) => Ok(Element::new(
+        DhtOp::RegisterUpdatedBy(s, h, e) => Ok(Element::new(
+            SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(h.into()), s),
+            e.map(|e| *e),
+        )),
+        DhtOp::RegisterDeletedEntryHeader(s, h) => Ok(Element::new(
             SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(h.into()), s),
             None,
         )),
-        DhtOp::RegisterDeletedEntryHeader(s, h) => Ok(Element::new(
+        DhtOp::RegisterDeletedBy(s, h) => Ok(Element::new(
             SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(h.into()), s),
             None,
         )),
@@ -426,6 +423,49 @@ fn get_element(op: DhtOp) -> AppValidationOutcome<Element> {
             None,
         )),
     }
+}
+
+/// Check for capability headers
+/// and exit as we don't want to validate them
+fn check_for_caps(element: &Element) -> AppValidationOutcome<()> {
+    match element.header().entry_type() {
+        Some(EntryType::CapClaim) | Some(EntryType::CapGrant) => Outcome::accepted(),
+        _ => Ok(()),
+    }
+}
+
+/// Get the zome name from the app entry type
+/// or get all zome names.
+async fn get_zomes_to_invoke(
+    element: &Element,
+    dna_file: &DnaFile,
+    data_source: &mut AppValDataSource<'_>,
+    dependencies: &mut PendingDependencies,
+) -> AppValidationOutcome<ZomesToInvoke> {
+    match get_app_entry_type(element, data_source, dependencies).await? {
+        Some(aet) => Ok(ZomesToInvoke::One(get_zome_name(&aet, &dna_file)?)),
+        None => match element.header() {
+            Header::CreateLink(_) | Header::DeleteLink(_) => {
+                get_link_zome(element, dna_file, data_source, dependencies).await
+            }
+            _ => Ok(ZomesToInvoke::All),
+        },
+    }
+}
+
+fn get_zome_name(entry_type: &AppEntryType, dna_file: &DnaFile) -> AppValidationResult<ZomeName> {
+    zome_id_to_zome_name(entry_type.zome_id(), dna_file)
+}
+
+fn zome_id_to_zome_name(zome_id: ZomeId, dna_file: &DnaFile) -> AppValidationResult<ZomeName> {
+    let zome_index = u8::from(zome_id) as usize;
+    Ok(dna_file
+        .dna()
+        .zomes
+        .get(zome_index)
+        .ok_or_else(|| AppValidationError::ZomeId(zome_id))?
+        .0
+        .clone())
 }
 
 /// Either get the app entry type
@@ -444,6 +484,36 @@ async fn get_app_entry_type(
     }
 }
 
+async fn get_link_zome(
+    element: &Element,
+    dna_file: &DnaFile,
+    data_source: &mut AppValDataSource<'_>,
+    dependencies: &mut PendingDependencies,
+) -> AppValidationOutcome<ZomesToInvoke> {
+    match element.header() {
+        Header::CreateLink(cl) => {
+            let zome_name = zome_id_to_zome_name(cl.zome_id, dna_file)?;
+            Ok(ZomesToInvoke::One(zome_name))
+        }
+        Header::DeleteLink(dl) => {
+            let shh = retrieve_header(&dl.link_add_address, data_source)
+                .await?
+                .map(|dep| dependencies.store_element(dep))
+                .ok_or_else(|| Outcome::awaiting(&dl.link_add_address))?;
+            match shh.header() {
+                Header::CreateLink(cl) => {
+                    let zome_name = zome_id_to_zome_name(cl.zome_id, dna_file)?;
+                    Ok(ZomesToInvoke::One(zome_name))
+                }
+                // The header that was found was the wrong type
+                // so lets try again.
+                _ => Err(Outcome::awaiting(&dl.link_add_address)),
+            }
+        }
+        _ => unreachable!(),
+    }
+}
+
 /// Retrieve the dependency and extract
 /// the app entry type so we know which zome to call
 async fn get_app_entry_type_from_dep(
@@ -452,35 +522,14 @@ async fn get_app_entry_type_from_dep(
     dependencies: &mut PendingDependencies,
 ) -> AppValidationOutcome<Option<AppEntryType>> {
     match element.header() {
-        Header::LinkAdd(la) => {
-            let el = retrieve_entry(&la.base_address, data_source)
-                .await?
-                .and_then(|dep| dependencies.store_entry_any(dep))
-                .ok_or_else(|| Outcome::awaiting(&la.base_address))?;
-            Ok(extract_app_type(&el))
-        }
-        Header::LinkRemove(lr) => {
-            let el = retrieve_entry(&lr.base_address, data_source)
-                .await?
-                .and_then(|dep| dependencies.store_entry_any(dep))
-                .ok_or_else(|| Outcome::awaiting(&lr.base_address))?;
-            Ok(extract_app_type(&el))
-        }
-        Header::EntryUpdate(eu) => {
-            let el = retrieve_element(&eu.original_header_address, data_source)
+        Header::Delete(ed) => {
+            let el = retrieve_element(&ed.deletes_address, data_source)
                 .await?
                 .and_then(|dep| dependencies.store_entry_fixed(dep))
-                .ok_or_else(|| Outcome::awaiting(&eu.original_header_address))?;
+                .ok_or_else(|| Outcome::awaiting(&ed.deletes_address))?;
             Ok(extract_app_type(&el))
         }
-        Header::ElementDelete(ed) => {
-            let el = retrieve_element(&ed.removes_address, data_source)
-                .await?
-                .and_then(|dep| dependencies.store_entry_fixed(dep))
-                .ok_or_else(|| Outcome::awaiting(&ed.removes_address))?;
-            Ok(extract_app_type(&el))
-        }
-        _ => todo!(),
+        _ => Ok(None),
     }
 }
 
@@ -521,27 +570,6 @@ async fn get_val_pack(
     }
 }
 
-/// Get the zome name from the app entry type
-/// or get all zome names.
-async fn get_zome_names(
-    dna_file: &DnaFile,
-    app_entry_type: &Option<AppEntryType>,
-) -> AppValidationOutcome<Vec<ZomeName>> {
-    match app_entry_type {
-        Some(aet) => Ok(vec![get_zome_name(aet, &dna_file)?]),
-        None => Ok(dna_file
-            .dna()
-            .zomes
-            .iter()
-            .map(|(z, _)| z.clone())
-            .collect()),
-    }
-}
-
-fn get_zome_name(entry_type: &AppEntryType, dna_file: &DnaFile) -> AppValidationResult<ZomeName> {
-    Ok(get_zome_info(entry_type, dna_file)?.0.clone())
-}
-
 fn get_zome_info<'a>(
     entry_type: &AppEntryType,
     dna_file: &'a DnaFile,
@@ -551,11 +579,11 @@ fn get_zome_info<'a>(
         .dna()
         .zomes
         .get(zome_index)
-        .ok_or_else(|| AppValidationError::ZomeId(entry_type.clone()))?)
+        .ok_or_else(|| AppValidationError::ZomeId(entry_type.zome_id().clone()))?)
 }
 
 pub fn run_validation_callback(
-    zome_name: ZomeName,
+    zomes_to_invoke: ZomesToInvoke,
     element: Arc<Element>,
     validation_package: Option<Arc<ValidationPackage>>,
     ribosome: &impl RibosomeT,
@@ -565,7 +593,7 @@ pub fn run_validation_callback(
     let validate: ValidateResult = ribosome.run_validate(
         ValidateHostAccess::new(workspace_lock, network),
         ValidateInvocation {
-            zome_name,
+            zomes_to_invoke,
             element,
             validation_package,
         },
@@ -580,26 +608,51 @@ pub fn run_validation_callback(
     }
 }
 
-pub fn run_link_validation_callback(
+pub fn run_create_link_validation_callback(
     zome_name: ZomeName,
-    link_add: Arc<LinkAdd>,
+    link_add: Arc<CreateLink>,
     base: Arc<Entry>,
     target: Arc<Entry>,
     ribosome: &impl RibosomeT,
     workspace_lock: CallZomeWorkspaceLock,
     network: HolochainP2pCell,
 ) -> AppValidationResult<Outcome> {
-    let invocation = ValidateLinkAddInvocation {
+    let invocation = ValidateCreateLinkInvocation {
         zome_name,
         link_add,
         base,
         target,
     };
-    let access = ValidateLinkAddHostAccess::new(workspace_lock, network);
-    let validate = ribosome.run_validate_link_add(access, invocation)?;
+    let invocation = ValidateLinkInvocation::<ValidateCreateLinkInvocation>::new(invocation);
+    run_link_validation_callback(invocation, ribosome, workspace_lock, network)
+}
+
+pub fn run_delete_link_validation_callback(
+    zome_name: ZomeName,
+    delete_link: DeleteLink,
+    ribosome: &impl RibosomeT,
+    workspace_lock: CallZomeWorkspaceLock,
+    network: HolochainP2pCell,
+) -> AppValidationResult<Outcome> {
+    let invocation = ValidateDeleteLinkInvocation {
+        zome_name,
+        delete_link,
+    };
+    let invocation = ValidateLinkInvocation::<ValidateDeleteLinkInvocation>::new(invocation);
+    run_link_validation_callback(invocation, ribosome, workspace_lock, network)
+}
+
+pub fn run_link_validation_callback<I: Invocation + 'static>(
+    invocation: ValidateLinkInvocation<I>,
+    ribosome: &impl RibosomeT,
+    workspace_lock: CallZomeWorkspaceLock,
+    network: HolochainP2pCell,
+) -> AppValidationResult<Outcome> {
+    let access = ValidateLinkHostAccess::new(workspace_lock, network);
+    let validate = ribosome.run_validate_link(access, invocation)?;
     match validate {
-        ValidateLinkAddResult::Valid => Ok(Outcome::Accepted),
-        ValidateLinkAddResult::Invalid(reason) => Ok(Outcome::Rejected(reason)),
+        ValidateLinkResult::Valid => Ok(Outcome::Accepted),
+        ValidateLinkResult::Invalid(reason) => Ok(Outcome::Rejected(reason)),
     }
 }
 

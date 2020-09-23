@@ -38,9 +38,9 @@ async fn sys_validation_workflow_test() {
             name: "sys_validation_workflow_test".to_string(),
             uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
             properties: SerializedBytes::try_from(()).unwrap(),
-            zomes: vec![TestWasm::CommitEntry.into()].into(),
+            zomes: vec![TestWasm::Create.into()].into(),
         },
-        vec![TestWasm::CommitEntry.into()],
+        vec![TestWasm::Create.into()],
     )
     .await
     .unwrap();
@@ -115,17 +115,17 @@ async fn run_test(
                 debug!(?hash, ?i, op_in_val = ?el);
             }
         }
-        assert_eq!(
-            fresh_reader_test!(alice_env, |r| {
-                workspace
-                    .validation_limbo
-                    .iter(&r)
-                    .unwrap()
-                    .count()
-                    .unwrap()
-            }),
-            0
-        );
+        assert_eq!(res.len(), 0, "{:?}", res);
+        let int_limbo: Vec<_> = fresh_reader_test!(alice_env, |r| {
+            workspace
+                .integration_limbo
+                .iter(&r)
+                .unwrap()
+                .map(|(k, i)| Ok((k.to_vec(), i)))
+                .collect()
+                .unwrap()
+        });
+        assert_eq!(int_limbo.len(), 0, "{:?}", int_limbo);
         let res: Vec<_> = fresh_reader_test!(alice_env, |r| {
             workspace
                 .integrated_dht_ops
@@ -153,7 +153,7 @@ async fn run_test(
             }
         }
 
-        assert_eq!(res.len(), expected_count);
+        assert_eq!(res.len(), expected_count, "{:?}", res);
     }
 
     let (bad_update_header, bad_update_entry_hash, link_add_hash) =
@@ -297,7 +297,7 @@ async fn bob_links_in_a_legit_way(
 
     // 5
     // Link the entries
-    let link_add_address = link_entries(
+    let link_add_address = create_link(
         &bob_env,
         call_data.clone(),
         base_entry_hash.clone(),
@@ -350,7 +350,7 @@ async fn bob_makes_a_large_link(
 
     // 8
     // Commit a large header
-    let link_add_address = link_entries(
+    let link_add_address = create_link(
         &bob_env,
         call_data.clone(),
         base_entry_hash.clone(),
@@ -396,7 +396,7 @@ async fn dodgy_bob(bob_cell_id: &CellId, handle: &ConductorHandle, dna_file: &Dn
     // Whoops forgot to commit that proof
 
     // Link the entries
-    link_entries(
+    create_link(
         &bob_env,
         call_data.clone(),
         base_entry_hash.clone(),

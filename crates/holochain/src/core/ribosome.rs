@@ -23,15 +23,15 @@ use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitResult;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
-use crate::core::ribosome::guest_callback::validate_link_add::ValidateLinkAddHostAccess;
-use crate::core::ribosome::guest_callback::validate_link_add::ValidateLinkAddInvocation;
-use crate::core::ribosome::guest_callback::validate_link_add::ValidateLinkAddResult;
+use crate::core::ribosome::guest_callback::validate_link::ValidateLinkHostAccess;
+use crate::core::ribosome::guest_callback::validate_link::ValidateLinkInvocation;
+use crate::core::ribosome::guest_callback::validate_link::ValidateLinkResult;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 use crate::core::ribosome::guest_callback::CallIterator;
 use crate::core::workflow::CallZomeWorkspaceLock;
+use crate::fixt::ExternInputFixturator;
 use crate::fixt::FunctionNameFixturator;
-use crate::fixt::HostInputFixturator;
 use crate::fixt::ZomeNameFixturator;
 use ::fixt::prelude::*;
 use derive_more::Constructor;
@@ -55,9 +55,9 @@ use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::capability::CapGrant;
 use holochain_zome_types::zome::FunctionName;
 use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::GuestOutput;
-use holochain_zome_types::ZomeCallInvocationResponse;
-use holochain_zome_types::{capability::CapSecret, header::ZomeId, HostInput};
+use holochain_zome_types::ExternOutput;
+use holochain_zome_types::ZomeCallResponse;
+use holochain_zome_types::{capability::CapSecret, header::ZomeId, ExternInput};
 use mockall::automock;
 use std::iter::Iterator;
 
@@ -87,7 +87,7 @@ impl CallContext {
 pub enum HostAccess {
     ZomeCall(ZomeCallHostAccess),
     Validate(ValidateHostAccess),
-    ValidateLinkAdd(ValidateLinkAddHostAccess),
+    ValidateCreateLink(ValidateLinkHostAccess),
     Init(InitHostAccess),
     EntryDefs(EntryDefsHostAccess),
     MigrateAgent(MigrateAgentHostAccess),
@@ -100,7 +100,7 @@ impl From<&HostAccess> for HostFnAccess {
         match host_access {
             HostAccess::ZomeCall(zome_call_host_access) => zome_call_host_access.into(),
             HostAccess::Validate(validate_host_access) => validate_host_access.into(),
-            HostAccess::ValidateLinkAdd(validate_link_add_host_access) => {
+            HostAccess::ValidateCreateLink(validate_link_add_host_access) => {
                 validate_link_add_host_access.into()
             }
             HostAccess::Init(init_host_access) => init_host_access.into(),
@@ -124,7 +124,7 @@ impl HostAccess {
             Self::ValidationPackage(ValidationPackageHostAccess{workspace, .. }) |
             Self::PostCommit(PostCommitHostAccess{workspace, .. }) |
             Self::Validate(ValidateHostAccess { workspace, .. }) |
-            Self::ValidateLinkAdd(ValidateLinkAddHostAccess { workspace, .. }) => {
+            Self::ValidateCreateLink(ValidateLinkHostAccess { workspace, .. }) => {
                 workspace
             }
             _ => panic!("Gave access to a host function that uses the workspace without providing a workspace"),
@@ -150,7 +150,7 @@ impl HostAccess {
             | Self::Init(InitHostAccess { network, .. })
             | Self::PostCommit(PostCommitHostAccess { network, .. })
             | Self::Validate(ValidateHostAccess { network, .. })
-            | Self::ValidateLinkAdd(ValidateLinkAddHostAccess { network, .. }) => network,
+            | Self::ValidateCreateLink(ValidateLinkHostAccess { network, .. }) => network,
             _ => panic!(
                 "Gave access to a host function that uses the network without providing a network"
             ),
@@ -195,6 +195,12 @@ pub enum ZomesToInvoke {
     One(ZomeName),
 }
 
+impl ZomesToInvoke {
+    pub fn one(zome_name: ZomeName) -> Self {
+        Self::One(zome_name)
+    }
+}
+
 pub trait Invocation: Clone {
     /// Some invocations call into a single zome and some call into many or all zomes.
     /// An example of an invocation that calls across all zomes is init. Init must pass for every
@@ -219,9 +225,9 @@ pub trait Invocation: Clone {
     /// results).
     fn fn_components(&self) -> FnComponents;
     /// the serialized input from the host for the wasm call
-    /// this is intentionally NOT a reference to self because HostInput may be huge we want to be
+    /// this is intentionally NOT a reference to self because ExternInput may be huge we want to be
     /// careful about cloning invocations
-    fn host_input(self) -> Result<HostInput, SerializedBytesError>;
+    fn host_input(self) -> Result<ExternInput, SerializedBytesError>;
 }
 
 impl ZomeCallInvocation {
@@ -241,7 +247,7 @@ impl ZomeCallInvocation {
                 .read()
                 .await
                 .source_chain
-                .valid_cap_grant(&check_function, &check_agent, &check_secret)?;
+                .valid_cap_grant(&check_function, &check_agent, check_secret.as_ref())?;
 
             Ok(maybe_grant.is_some())
         })
@@ -253,7 +259,7 @@ mockall::mock! {
     trait Invocation {
         fn zomes(&self) -> ZomesToInvoke;
         fn fn_components(&self) -> FnComponents;
-        fn host_input(self) -> Result<HostInput, SerializedBytesError>;
+        fn host_input(self) -> Result<ExternInput, SerializedBytesError>;
     }
     trait Clone {
         fn clone(&self) -> Self;
@@ -270,11 +276,11 @@ pub struct ZomeCallInvocation {
     /// The name of the Zome containing the function that would be invoked
     pub zome_name: ZomeName,
     /// The capability request authorization required
-    pub cap: CapSecret,
+    pub cap: Option<CapSecret>,
     /// The name of the Zome function to call
     pub fn_name: FunctionName,
     /// The serialized data to pass an an argument to the Zome call
-    pub payload: HostInput,
+    pub payload: ExternInput,
     /// the provenance of the call
     pub provenance: AgentPubKey,
 }
@@ -284,17 +290,17 @@ fixturator!(
     curve Empty ZomeCallInvocation {
         cell_id: CellIdFixturator::new(Empty).next().unwrap(),
         zome_name: ZomeNameFixturator::new(Empty).next().unwrap(),
-        cap: CapSecretFixturator::new(Empty).next().unwrap(),
+        cap: Some(CapSecretFixturator::new(Empty).next().unwrap()),
         fn_name: FunctionNameFixturator::new(Empty).next().unwrap(),
-        payload: HostInputFixturator::new(Empty).next().unwrap(),
+        payload: ExternInputFixturator::new(Empty).next().unwrap(),
         provenance: AgentPubKeyFixturator::new(Empty).next().unwrap(),
     };
     curve Unpredictable ZomeCallInvocation {
         cell_id: CellIdFixturator::new(Unpredictable).next().unwrap(),
         zome_name: ZomeNameFixturator::new(Unpredictable).next().unwrap(),
-        cap: CapSecretFixturator::new(Unpredictable).next().unwrap(),
+        cap: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
         fn_name: FunctionNameFixturator::new(Unpredictable).next().unwrap(),
-        payload: HostInputFixturator::new(Unpredictable).next().unwrap(),
+        payload: ExternInputFixturator::new(Unpredictable).next().unwrap(),
         provenance: AgentPubKeyFixturator::new(Unpredictable).next().unwrap(),
     };
     curve Predictable ZomeCallInvocation {
@@ -304,13 +310,13 @@ fixturator!(
         zome_name: ZomeNameFixturator::new_indexed(Predictable, self.0.index)
             .next()
             .unwrap(),
-        cap: CapSecretFixturator::new_indexed(Predictable, self.0.index)
+        cap: Some(CapSecretFixturator::new_indexed(Predictable, self.0.index)
             .next()
-            .unwrap(),
+            .unwrap()),
         fn_name: FunctionNameFixturator::new_indexed(Predictable, self.0.index)
             .next()
             .unwrap(),
-        payload: HostInputFixturator::new_indexed(Predictable, self.0.index)
+        payload: ExternInputFixturator::new_indexed(Predictable, self.0.index)
             .next()
             .unwrap(),
         provenance: AgentPubKeyFixturator::new_indexed(Predictable, self.0.index)
@@ -321,7 +327,7 @@ fixturator!(
 
 /// Fixturator curve for a named zome invocation
 /// cell id, test wasm for zome to call, function name, host input payload
-pub struct NamedInvocation(pub CellId, pub TestWasm, pub String, pub HostInput);
+pub struct NamedInvocation(pub CellId, pub TestWasm, pub String, pub ExternInput);
 
 impl Iterator for ZomeCallInvocationFixturator<NamedInvocation> {
     type Item = ZomeCallInvocation;
@@ -336,7 +342,7 @@ impl Iterator for ZomeCallInvocationFixturator<NamedInvocation> {
 
         // simulate a local transaction by setting the cap to empty and matching the provenance of
         // the call to the cell id
-        ret.cap = ().into();
+        ret.cap = None;
         ret.provenance = ret.cell_id.agent_pubkey().clone();
 
         Some(ret)
@@ -350,7 +356,7 @@ impl Invocation for ZomeCallInvocation {
     fn fn_components(&self) -> FnComponents {
         vec![self.fn_name.to_owned().into()].into()
     }
-    fn host_input(self) -> Result<HostInput, SerializedBytesError> {
+    fn host_input(self) -> Result<ExternInput, SerializedBytesError> {
         Ok(self.payload)
     }
 }
@@ -390,7 +396,7 @@ pub trait RibosomeT: Sized + std::fmt::Debug {
         invocation: &I,
         zome_name: &ZomeName,
         to_call: &FunctionName,
-    ) -> Result<Option<GuestOutput>, RibosomeError>;
+    ) -> Result<Option<ExternOutput>, RibosomeError>;
 
     /// @todo list out all the available callbacks and maybe cache them somewhere
     fn list_callbacks(&self) {
@@ -445,11 +451,11 @@ pub trait RibosomeT: Sized + std::fmt::Debug {
         invocation: ValidateInvocation,
     ) -> RibosomeResult<ValidateResult>;
 
-    fn run_validate_link_add(
+    fn run_validate_link<I: Invocation + 'static>(
         &self,
-        access: ValidateLinkAddHostAccess,
-        invocation: ValidateLinkAddInvocation,
-    ) -> RibosomeResult<ValidateLinkAddResult>;
+        access: ValidateLinkHostAccess,
+        invocation: ValidateLinkInvocation<I>,
+    ) -> RibosomeResult<ValidateLinkResult>;
 
     fn call_iterator<R: 'static + RibosomeT, I: 'static + Invocation>(
         &self,
@@ -464,7 +470,7 @@ pub trait RibosomeT: Sized + std::fmt::Debug {
         &self,
         access: ZomeCallHostAccess,
         invocation: ZomeCallInvocation,
-    ) -> RibosomeResult<ZomeCallInvocationResponse>;
+    ) -> RibosomeResult<ZomeCallResponse>;
 }
 
 impl std::fmt::Debug for MockRibosomeT {
@@ -490,6 +496,7 @@ pub mod wasm_test {
             let mut host_access = $host_access.clone();
             let input = $input.clone();
             tokio::task::spawn(async move {
+                use holochain_p2p::HolochainP2pCellT;
                 // ensure type of test wasm
                 use std::convert::TryInto;
                 use $crate::core::ribosome::RibosomeT;
@@ -522,7 +529,7 @@ pub mod wasm_test {
                         cell_id,
                         $test_wasm.into(),
                         $fn_name.into(),
-                        holochain_zome_types::HostInput::new(input.try_into().unwrap()),
+                        holochain_zome_types::ExternInput::new(input.try_into().unwrap()),
                     ),
                 )
                 .next()
@@ -537,12 +544,10 @@ pub mod wasm_test {
                     };
 
                 let output = match zome_invocation_response {
-                    crate::core::ribosome::ZomeCallInvocationResponse::ZomeApiFn(guest_output) => {
+                    crate::core::ribosome::ZomeCallResponse::Ok(guest_output) => {
                         guest_output.into_inner().try_into().unwrap()
                     }
-                    crate::core::ribosome::ZomeCallInvocationResponse::Unauthorized => {
-                        unreachable!()
-                    }
+                    crate::core::ribosome::ZomeCallResponse::Unauthorized => unreachable!(),
                 };
                 output
             })

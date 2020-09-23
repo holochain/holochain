@@ -4,7 +4,7 @@ use holo_hash::{AnyDhtHash, EntryHash, HeaderHash};
 use holochain_keystore::Signature;
 use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::{
-    header::{LinkAdd, LinkRemove, ZomeId},
+    header::{CreateLink, DeleteLink, ZomeId},
     link::LinkTag,
 };
 use regex::Regex;
@@ -26,7 +26,7 @@ pub enum WireLinkMetaKey {
     BaseZome(EntryHash, ZomeId),
     /// Search for all links on a base, for a zome and with a tag
     BaseZomeTag(EntryHash, ZomeId, LinkTag),
-    /// This will match only the link created with a certain [LinkAdd] hash
+    /// This will match only the link created with a certain [CreateLink] hash
     Full(EntryHash, ZomeId, LinkTag, HeaderHash),
 }
 
@@ -37,9 +37,9 @@ pub enum WireLinkMetaKey {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub struct GetLinksResponse {
     /// All the link adds on the key you searched for
-    pub link_adds: Vec<(LinkAdd, Signature)>,
+    pub link_adds: Vec<(CreateLink, Signature)>,
     /// All the link removes on the key you searched for
-    pub link_removes: Vec<(LinkRemove, Signature)>,
+    pub link_removes: Vec<(DeleteLink, Signature)>,
 }
 
 impl WireLinkMetaKey {

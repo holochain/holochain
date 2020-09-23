@@ -8,11 +8,7 @@ use super::{
     },
     workflow::sys_validation_workflow::SysValidationWorkspace,
 };
-use crate::conductor::{
-    api::CellConductorApiT,
-    entry_def_store::get_entry_def,
-    entry_def_store::{get_entry_defs, EntryDefBufferKey},
-};
+use crate::conductor::{api::CellConductorApiT, entry_def_store::get_entry_def};
 use fallible_iterator::FallibleIterator;
 use holochain_keystore::{AgentPubKeyExt, Signature};
 use holochain_state::{fresh_reader, prelude::PrefixType};
@@ -20,7 +16,7 @@ use holochain_types::{header::NewEntryHeaderRef, Entry};
 use holochain_zome_types::{
     element::SignedHeaderHashed,
     entry_def::{EntryDef, EntryVisibility},
-    header::{AppEntryType, EntryType, EntryUpdate, LinkAdd},
+    header::{AppEntryType, CreateLink, EntryType, Update},
     link::LinkTag,
     Header,
 };
@@ -330,10 +326,10 @@ pub async fn check_entry_hash(hash: &EntryHash, entry: &Entry) -> SysValidationR
 }
 
 /// Check the header should have an entry.
-/// Is either a EntryCreate or EntryUpdate
+/// Is either a Create or Update
 pub fn check_new_entry_header(header: &Header) -> SysValidationResult<()> {
     match header {
-        Header::EntryCreate(_) | Header::EntryUpdate(_) => Ok(()),
+        Header::Create(_) | Header::Update(_) => Ok(()),
         _ => Err(ValidationOutcome::NotNewEntry(header.clone()).into()),
     }
 }
@@ -364,10 +360,10 @@ pub fn check_tag_size(tag: &LinkTag) -> SysValidationResult<()> {
     }
 }
 
-/// Check a EntryUpdate's entry type is the same for
+/// Check a Update's entry type is the same for
 /// original and new entry.
 pub fn check_update_reference(
-    eu: &EntryUpdate,
+    eu: &Update,
     original_entry_header: &NewEntryHeaderRef<'_>,
 ) -> SysValidationResult<()> {
     if eu.entry_type == *original_entry_header.entry_type() {

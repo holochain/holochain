@@ -3,8 +3,8 @@ name = "holochain_state"
 version = "0.0.1"
 description = "Abstractions for persistence of Holochain state"
 license = "CAL-1.0"
-homepage = "https://github.com/Holo-host/holochain"
-documentation = "https://github.com/Holo-host/holochain"
+homepage = "https://github.com/holochain/holochain"
+documentation = "https://github.com/holochain/holochain"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 edition = "2018"
 
@@ -19,7 +19,6 @@ failure = "0.1.6"
 fixt = { version = "0.0.1", path = "../fixt" }
 futures = "0.3.1"
 holo_hash = { path = "../holo_hash" }
-holochain_crypto = { version = "0.0.1", path = "../crypto" }
 holochain_keystore = { version = "0.0.1", path = "../keystore" }
 holochain_serialized_bytes = "=0.0.43"
 holochain_types = { path = "../types" }

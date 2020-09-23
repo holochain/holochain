@@ -114,37 +114,37 @@ fixturator!(
 );
 
 fixturator!(
-    ChainOpen;
+    OpenChain;
     constructor fn from_builder(HeaderBuilderCommon, DnaHash);
 );
 
 fixturator!(
-    ChainClose;
+    CloseChain;
     constructor fn from_builder(HeaderBuilderCommon, DnaHash);
 );
 
 fixturator!(
-    EntryCreate;
+    Create;
     constructor fn from_builder(HeaderBuilderCommon, EntryType, EntryHash);
 );
 
 fixturator!(
-    EntryUpdate;
+    Update;
     constructor fn from_builder(HeaderBuilderCommon, EntryHash, HeaderHash, EntryType, EntryHash);
 );
 
 fixturator!(
-    ElementDelete;
+    Delete;
     constructor fn from_builder(HeaderBuilderCommon, HeaderHash, EntryHash);
 );
 
 fixturator!(
-    LinkRemove;
+    DeleteLink;
     constructor fn from_builder(HeaderBuilderCommon, HeaderHash, EntryHash);
 );
 
 fixturator!(
-    LinkAdd;
+    CreateLink;
     constructor fn from_builder(HeaderBuilderCommon, EntryHash, EntryHash, u8, LinkTag);
 );
 
@@ -152,21 +152,21 @@ fixturator!(
     LinkTag; from Bytes;
 );
 
-pub struct KnownLinkAdd {
+pub struct KnownCreateLink {
     pub base_address: EntryHash,
     pub target_address: EntryHash,
     pub tag: LinkTag,
     pub zome_id: ZomeId,
 }
 
-pub struct KnownLinkRemove {
+pub struct KnownDeleteLink {
     pub link_add_address: holo_hash::HeaderHash,
 }
 
-impl Iterator for LinkAddFixturator<KnownLinkAdd> {
-    type Item = LinkAdd;
+impl Iterator for CreateLinkFixturator<KnownCreateLink> {
+    type Item = CreateLink;
     fn next(&mut self) -> Option<Self::Item> {
-        let mut f = fixt!(LinkAdd);
+        let mut f = fixt!(CreateLink);
         f.base_address = self.0.curve.base_address.clone();
         f.target_address = self.0.curve.target_address.clone();
         f.tag = self.0.curve.tag.clone();
@@ -175,10 +175,10 @@ impl Iterator for LinkAddFixturator<KnownLinkAdd> {
     }
 }
 
-impl Iterator for LinkRemoveFixturator<KnownLinkRemove> {
-    type Item = LinkRemove;
+impl Iterator for DeleteLinkFixturator<KnownDeleteLink> {
+    type Item = DeleteLink;
     fn next(&mut self) -> Option<Self::Item> {
-        let mut f = fixt!(LinkRemove);
+        let mut f = fixt!(DeleteLink);
         f.link_add_address = self.0.curve.link_add_address.clone();
         Some(f)
     }

@@ -6,32 +6,45 @@ use holochain_serialized_bytes::SerializedBytes;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashSet};
 
-/// System entry to hold a capabilities granted by the callee
+/// Represents a _potentially_ valid access grant to a zome call.
+/// Zome call response will be Unauthorized without a valid grant.
+///
+/// The CapGrant is not always a dedicated entry in the chain.
+/// Notably AgentPubKey entries in the current chain act like root access to local zome calls.
+///
+/// A `CapGrant` is valid if it matches the function, agent and secret for a given zome call.
+///
+/// @see `.is_valid()`
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[allow(clippy::large_enum_variant)]
 pub enum CapGrant {
-    /// Grants the capability of writing to the source chain for this agent key.
-    /// This grant is provided by the `Entry::Agent` entry on the source chain.
-    Authorship(AgentPubKey),
+    /// Grants the capability of calling every extern to the calling agent, provided the calling
+    /// agent is the local chain author.
+    /// This grant is compared to the current `Entry::Agent` entry on the source chain.
+    ChainAuthor(AgentPubKey),
 
-    /// General capability for giving fine grained access to zome functions
-    /// and/or private data
-    ZomeCall(ZomeCallCapGrant),
+    /// Any agent other than the chain author is attempting to call an extern.
+    /// The pubkey of the calling agent is secured by the cryptographic handshake at the network
+    /// layer and the caller must provide a secret that we check for in a private entry in the
+    /// local chain.
+    RemoteAgent(ZomeCallCapGrant),
 }
 
 impl From<holo_hash::AgentPubKey> for CapGrant {
     fn from(agent_hash: holo_hash::AgentPubKey) -> Self {
-        CapGrant::Authorship(agent_hash)
+        CapGrant::ChainAuthor(agent_hash)
     }
 }
 
 #[derive(Default, PartialEq, Eq, Debug, Clone, serde::Serialize, serde::Deserialize)]
-/// @todo the ability to forcibly curry payloads into functions that are called with a claim
+/// @todo Ability to forcibly curry payloads into functions that are called with a claim.
 pub struct CurryPayloads(pub BTreeMap<GrantedFunction, SerializedBytes>);
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-/// The payload for the ZomeCall capability grant.
-/// This data is committed to the source chain as a private entry.
+/// The entry for the ZomeCall capability grant.
+/// This data is committed to the callee's source chain as a private entry.
+/// The remote calling agent must provide a secret and we source their pubkey from the active
+/// network connection. This must match the strictness of the CapAccess.
 pub struct ZomeCallCapGrant {
     /// A string by which to later query for saved grants.
     /// This does not need to be unique within a source chain.
@@ -40,7 +53,7 @@ pub struct ZomeCallCapGrant {
     pub access: CapAccess,
     /// Set of functions to which this capability grants ZomeCall access
     pub functions: GrantedFunctions,
-    // the payloads to curry to the functions
+    // @todo the payloads to curry to the functions
     // pub curry_payloads: CurryPayloads,
 }
 
@@ -50,13 +63,13 @@ impl ZomeCallCapGrant {
         tag: String,
         access: CapAccess,
         functions: GrantedFunctions,
-        // curry_payloads: CurryPayloads,
+        // @todo curry_payloads: CurryPayloads,
     ) -> Self {
         Self {
             tag,
             access,
             functions,
-            // curry_payloads,
+            // @todo curry_payloads,
         }
     }
 }
@@ -64,121 +77,96 @@ impl ZomeCallCapGrant {
 impl From<ZomeCallCapGrant> for CapGrant {
     /// Create a new ZomeCall capability grant
     fn from(zccg: ZomeCallCapGrant) -> Self {
-        CapGrant::ZomeCall(zccg)
+        CapGrant::RemoteAgent(zccg)
     }
 }
 
 impl CapGrant {
-    /// Check if a tag matches this grant.
-    /// An Authorship grant has no tag, thus will never match any tag
-    pub fn tag_matches(&self, query: &str) -> bool {
-        match self {
-            CapGrant::Authorship(_) => false,
-            CapGrant::ZomeCall(ZomeCallCapGrant { tag, .. }) => tag == query,
-        }
-    }
-
-    /// given a grant, is it valid in isolation?
-    /// in a world of CRUD, some new entry might update or delete an existing one, but we can check
-    /// if a grant is valid in a standalone way
+    /// Given a grant, is it valid in isolation?
+    /// In a world of CRUD, some new entry might update or delete an existing one, but we can check
+    /// if a grant is valid in a standalone way.
     pub fn is_valid(
         &self,
         check_function: &GrantedFunction,
         check_agent: &AgentPubKey,
-        check_secret: &CapSecret,
+        check_secret: Option<&CapSecret>,
     ) -> bool {
         match self {
-            // the grant is valid always if the author matches the check agent
-            CapGrant::Authorship(author) => author == check_agent,
-            // otherwise we need to do more work
-            CapGrant::ZomeCall(ZomeCallCapGrant {
+            // Grant is always valid if the author matches the check agent.
+            CapGrant::ChainAuthor(author) => author == check_agent,
+            // Otherwise we need to do more work…
+            CapGrant::RemoteAgent(ZomeCallCapGrant {
                 access, functions, ..
             }) => {
-                // the checked function needs to be in the grant
+                // The checked function needs to be in the grant…
                 functions.contains(check_function)
-                // the agent needs to be in the grant
+                // The agent needs to be valid…
                 && match access {
-                    // the grant is assigned so the agent needs to match
+                    // The grant is assigned so the agent needs to match…
                     CapAccess::Assigned { assignees, .. } => assignees.contains(check_agent),
-                    // the grant has no assignees so is always valid
+                    // The grant has no assignees so is always valid…
                     _ => true,
                 }
-                // the secret needs to match
+                // The secret needs to match…
                 && match access {
-                    // or it doesn't...
+                    // Unless the extern is unrestricted.
                     CapAccess::Unrestricted => true,
                     // note the PartialEq implementation is constant time for secrets
-                    CapAccess::Transferable { secret, .. } => secret == check_secret,
-                    CapAccess::Assigned { secret, .. } => secret == check_secret,
+                    CapAccess::Transferable { secret, .. } => check_secret.map(|given| secret == given).unwrap_or(false),
+                    CapAccess::Assigned { secret, .. } => check_secret.map(|given| secret == given).unwrap_or(false),
                 }
             }
         }
     }
 }
 
-/// Represents access requirements for capability grants
+/// Represents access requirements for capability grants.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub enum CapAccess {
-    /// No restriction: accessible by anyone
+    /// No restriction: callable by anyone.
     Unrestricted,
-    /// Accessible by anyone who can provide the secret
+    /// Callable by anyone who can provide the secret.
     Transferable {
-        /// The secret
+        /// The secret.
         secret: CapSecret,
     },
-    /// Accessible by anyone in the list of assignees who possesses the secret
+    /// Callable by anyone in the list of assignees who possesses the secret.
     Assigned {
-        /// The secret
+        /// The secret.
         secret: CapSecret,
-        /// The set of agents who may exercise this grant
+        /// Agents who can use this grant.
         assignees: HashSet<AgentPubKey>,
     },
 }
 
+/// Implements ().into() shorthand for CapAccess::Unrestricted
 impl From<()> for CapAccess {
     fn from(_: ()) -> Self {
         Self::Unrestricted
     }
 }
 
+/// Implements secret.into() shorthand for CapAccess::Transferable(secret)
 impl From<CapSecret> for CapAccess {
     fn from(secret: CapSecret) -> Self {
         Self::Transferable { secret }
     }
 }
 
+/// Implements (secret, assignees).into() shorthand for CapAccess::Assigned { secret, assignees }
 impl From<(CapSecret, HashSet<AgentPubKey>)> for CapAccess {
     fn from((secret, assignees): (CapSecret, HashSet<AgentPubKey>)) -> Self {
         Self::Assigned { secret, assignees }
     }
 }
 
+/// Implements (secret, agent_pub_key).into() shorthand for
+/// CapAccess::Assigned { secret, assignees: hashset!{ agent } }
 impl From<(CapSecret, AgentPubKey)> for CapAccess {
     fn from((secret, assignee): (CapSecret, AgentPubKey)) -> Self {
         let mut assignees = HashSet::new();
         assignees.insert(assignee);
         Self::from((secret, assignees))
-    }
-}
-
-impl CapAccess {
-    /// Check if access is granted given the inputs
-    pub fn is_authorized(&self, agent_key: &AgentPubKey, maybe_secret: Option<&CapSecret>) -> bool {
-        match self {
-            CapAccess::Unrestricted => true,
-            CapAccess::Transferable { secret } => Some(secret) == maybe_secret,
-            CapAccess::Assigned { secret, assignees } => {
-                Some(secret) == maybe_secret && assignees.contains(agent_key)
-            }
-        }
-    }
-
-    /// If this CapAccess has a secret, get it
-    pub fn secret(&self) -> Option<&CapSecret> {
-        match self {
-            CapAccess::Transferable { secret } | CapAccess::Assigned { secret, .. } => Some(secret),
-            CapAccess::Unrestricted => None,
-        }
     }
 }
 

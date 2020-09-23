@@ -1,9 +1,10 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
+use holochain_p2p::HolochainP2pCellT;
 use holochain_zome_types::CallRemoteInput;
 use holochain_zome_types::CallRemoteOutput;
-use holochain_zome_types::ZomeCallInvocationResponse;
+use holochain_zome_types::ZomeCallResponse;
 use std::convert::TryInto;
 use std::sync::Arc;
 
@@ -13,21 +14,20 @@ pub fn call_remote(
     input: CallRemoteInput,
 ) -> RibosomeResult<CallRemoteOutput> {
     // it is the network's responsibility to handle timeouts and return an Err result in that case
-    let result: ZomeCallInvocationResponse =
-        tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-            let mut network = call_context.host_access().network().clone();
-            let call_remote = input.into_inner();
-            network
-                .call_remote(
-                    call_remote.to_agent(),
-                    call_remote.zome_name(),
-                    call_remote.fn_name(),
-                    call_remote.cap(),
-                    call_remote.request(),
-                )
-                .await
-        })?
-        .try_into()?;
+    let result: ZomeCallResponse = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+        let mut network = call_context.host_access().network().clone();
+        let call_remote = input.into_inner();
+        network
+            .call_remote(
+                call_remote.to_agent(),
+                call_remote.zome_name(),
+                call_remote.fn_name(),
+                call_remote.cap(),
+                call_remote.request(),
+            )
+            .await
+    })?
+    .try_into()?;
 
     Ok(CallRemoteOutput::new(result))
 }
@@ -39,7 +39,7 @@ pub mod wasm_test {
     use crate::conductor::dna_store::MockDnaStore;
     use crate::conductor::interface::websocket::test::setup_app;
     use crate::core::ribosome::ZomeCallInvocation;
-    use crate::core::ribosome::ZomeCallInvocationResponse;
+    use crate::core::ribosome::ZomeCallResponse;
     use hdk3::prelude::*;
     use holochain_types::app::InstalledCell;
     use holochain_types::cell::CellId;
@@ -49,7 +49,7 @@ pub mod wasm_test {
     use holochain_types::test_utils::fake_agent_pubkey_2;
     use holochain_wasm_test_utils::TestWasm;
     pub use holochain_zome_types::capability::CapSecret;
-    use holochain_zome_types::HostInput;
+    use holochain_zome_types::ExternInput;
 
     #[tokio::test(threaded_scheduler)]
     /// we can call a fn on a remote
@@ -128,9 +128,9 @@ pub mod wasm_test {
             .call_zome(ZomeCallInvocation {
                 cell_id: bob_cell_id,
                 zome_name: TestWasm::WhoAmI.into(),
-                cap: ().into(),
+                cap: None,
                 fn_name: "set_access".into(),
-                payload: HostInput::new(().try_into().unwrap()),
+                payload: ExternInput::new(().try_into().unwrap()),
                 provenance: bob_agent_id.clone(),
             })
             .await
@@ -142,9 +142,9 @@ pub mod wasm_test {
             .call_zome(ZomeCallInvocation {
                 cell_id: alice_cell_id,
                 zome_name: TestWasm::WhoAmI.into(),
-                cap: ().into(),
+                cap: None,
                 fn_name: "whoarethey".into(),
-                payload: HostInput::new(bob_agent_id.clone().try_into().unwrap()),
+                payload: ExternInput::new(bob_agent_id.clone().try_into().unwrap()),
                 provenance: alice_agent_id,
             })
             .await
@@ -152,7 +152,7 @@ pub mod wasm_test {
             .unwrap();
 
         match output {
-            ZomeCallInvocationResponse::ZomeApiFn(guest_output) => {
+            ZomeCallResponse::Ok(guest_output) => {
                 let response: SerializedBytes = guest_output.into_inner();
                 let agent_info: AgentInfo = response.try_into().unwrap();
                 assert_eq!(

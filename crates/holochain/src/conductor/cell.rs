@@ -36,6 +36,7 @@ use futures::future::FutureExt;
 use hash_type::AnyDht;
 use holo_hash::*;
 use holochain_keystore::Signature;
+use holochain_p2p::HolochainP2pCellT;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::{
     db::GetDb,
@@ -50,9 +51,9 @@ use holochain_types::{
     Timestamp,
 };
 use holochain_zome_types::capability::CapSecret;
-use holochain_zome_types::header::{LinkAdd, LinkRemove};
+use holochain_zome_types::header::{CreateLink, DeleteLink};
 use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::HostInput;
+use holochain_zome_types::ExternInput;
 use std::{
     collections::{BTreeMap, BTreeSet},
     convert::TryInto,
@@ -94,14 +95,15 @@ impl PartialEq for Cell {
 /// The [Conductor] manages a collection of Cells, and will call functions
 /// on the Cell when a Conductor API method is called (either a
 /// [CellConductorApi] or an [AppInterfaceApi])
-pub struct Cell<CA = CellConductorApi>
+pub struct Cell<Api = CellConductorApi, P2pCell = holochain_p2p::HolochainP2pCell>
 where
-    CA: CellConductorApiT,
+    Api: CellConductorApiT,
+    P2pCell: holochain_p2p::HolochainP2pCellT,
 {
     id: CellId,
-    conductor_api: CA,
+    conductor_api: Api,
     env: EnvironmentWrite,
-    holochain_p2p_cell: holochain_p2p::HolochainP2pCell,
+    holochain_p2p_cell: P2pCell,
     queue_triggers: InitialQueueTriggers,
 }
 
@@ -146,6 +148,13 @@ impl Cell {
         } else {
             Err(CellError::CellWithoutGenesis(id))
         }
+    }
+
+    /// Initialize all the workflows once.
+    /// This will run only once even if called
+    /// multiple times.
+    pub fn initialize_workflows(&mut self) {
+        self.queue_triggers.initialize_workflows();
     }
 
     /// Performs the Genesis workflow the Cell, ensuring that its initial
@@ -516,8 +525,8 @@ impl Cell {
             .collect::<BTreeMap<_, _>>()?;
 
         // Get the headers from the element stores
-        let mut result_adds: Vec<(LinkAdd, Signature)> = Vec::with_capacity(links.len());
-        let mut result_removes: Vec<(LinkRemove, Signature)> = Vec::with_capacity(links.len());
+        let mut result_adds: Vec<(CreateLink, Signature)> = Vec::with_capacity(links.len());
+        let mut result_removes: Vec<(DeleteLink, Signature)> = Vec::with_capacity(links.len());
         for (link_add, link_removes) in links {
             if let Some(link_add) = element_vault.get_header(&link_add.header_hash)? {
                 for link_remove in link_removes {
@@ -620,14 +629,14 @@ impl Cell {
         from_agent: AgentPubKey,
         zome_name: ZomeName,
         fn_name: FunctionName,
-        cap: CapSecret,
+        cap: Option<CapSecret>,
         payload: SerializedBytes,
     ) -> CellResult<SerializedBytes> {
         let invocation = ZomeCallInvocation {
             cell_id: self.id.clone(),
             zome_name: zome_name.clone(),
             cap,
-            payload: HostInput::new(payload),
+            payload: ExternInput::new(payload),
             provenance: from_agent,
             fn_name,
         };

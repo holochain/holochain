@@ -7,7 +7,7 @@ mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn test_message() {
         let (listener1, _events1) =
-            spawn_transport_listener_quic(url2!("kitsune-quic://127.0.0.1:0"))
+            spawn_transport_listener_quic(url2!("kitsune-quic://127.0.0.1:0"), None)
                 .await
                 .unwrap();
 
@@ -15,7 +15,7 @@ mod tests {
         println!("listener1 bound to: {}", bound1);
 
         let (listener2, mut events2) =
-            spawn_transport_listener_quic(url2!("kitsune-quic://127.0.0.1:0"))
+            spawn_transport_listener_quic(url2!("kitsune-quic://127.0.0.1:0"), None)
                 .await
                 .unwrap();
 
@@ -35,20 +35,28 @@ mod tests {
                         );
                         while let Some(evt) = evt.next().await {
                             match evt {
-                                TransportConnectionEvent::IncomingRequest {
+                                TransportConnectionEvent::IncomingChannel {
                                     respond,
                                     url,
-                                    data,
+                                    mut send,
+                                    recv,
                                     ..
                                 } => {
-                                    println!(
-                                        "message from {} : {}",
-                                        url,
-                                        String::from_utf8_lossy(&data),
-                                    );
-                                    let out = format!("echo: {}", String::from_utf8_lossy(&data),)
-                                        .into_bytes();
-                                    respond.respond(Ok(async move { Ok(out) }.boxed().into()));
+                                    respond.respond(Ok(async move {
+                                        let data = recv.read_to_end().await;
+                                        println!(
+                                            "message from {} : {}",
+                                            url,
+                                            String::from_utf8_lossy(&data),
+                                        );
+                                        let data =
+                                            format!("echo: {}", String::from_utf8_lossy(&data))
+                                                .into_bytes();
+                                        send.write_and_close(data).await?;
+                                        Ok(())
+                                    }
+                                    .boxed()
+                                    .into()));
                                 }
                             }
                         }

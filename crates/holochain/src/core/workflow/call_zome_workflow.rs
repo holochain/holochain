@@ -2,8 +2,8 @@ use super::{
     app_validation_workflow,
     error::{WorkflowError, WorkflowResult},
 };
-use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::ZomeCallInvocation;
+use crate::core::ribosome::{error::RibosomeError, ZomesToInvoke};
 use crate::core::ribosome::{error::RibosomeResult, RibosomeT, ZomeCallHostAccess};
 use crate::core::state::source_chain::SourceChainError;
 use crate::core::state::workspace::Workspace;
@@ -16,6 +16,7 @@ use crate::core::{
     sys_validate_element,
 };
 pub use call_zome_workspace_lock::CallZomeWorkspaceLock;
+use either::Either;
 use fallible_iterator::FallibleIterator;
 use holo_hash::AnyDhtHash;
 use holochain_keystore::KeystoreSender;
@@ -24,7 +25,7 @@ use holochain_state::prelude::*;
 use holochain_types::element::Element;
 use holochain_zome_types::entry::GetOptions;
 use holochain_zome_types::header::Header;
-use holochain_zome_types::ZomeCallInvocationResponse;
+use holochain_zome_types::ZomeCallResponse;
 use std::sync::Arc;
 use tracing::instrument;
 
@@ -32,7 +33,7 @@ pub mod call_zome_workspace_lock;
 
 /// Placeholder for the return value of a zome invocation
 /// TODO: do we want this to be the same as ZomeCallInvocationRESPONSE?
-pub type ZomeCallInvocationResult = RibosomeResult<ZomeCallInvocationResponse>;
+pub type ZomeCallInvocationResult = RibosomeResult<ZomeCallResponse>;
 
 #[derive(Debug)]
 pub struct CallZomeWorkflowArgs<Ribosome: RibosomeT> {
@@ -146,96 +147,103 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT>(
 
     {
         for chain_element in to_app_validate {
-            if let Header::LinkAdd(link_add) = chain_element.header() {
-                let (base, target) = {
-                    let mut workspace = workspace_lock.write().await;
-                    let mut cascade = workspace.cascade(network.clone());
-                    let base_address: AnyDhtHash = link_add.base_address.clone().into();
-                    let base = cascade
-                        .retrieve(base_address.clone(), GetOptions.into())
-                        .await
-                        .map_err(RibosomeError::from)?
-                        .ok_or_else(|| RibosomeError::ElementDeps(base_address.clone()))?
-                        .into_inner()
-                        .1
-                        .ok_or_else(|| RibosomeError::ElementDeps(base_address.clone()))?;
-                    let base = Arc::new(base);
-                    let target_address: AnyDhtHash = link_add.target_address.clone().into();
-                    let target = cascade
-                        .retrieve(target_address.clone(), GetOptions.into())
-                        .await
-                        .map_err(RibosomeError::from)?
-                        .ok_or_else(|| RibosomeError::ElementDeps(target_address.clone()))?
-                        .into_inner()
-                        .1
-                        .ok_or_else(|| RibosomeError::ElementDeps(target_address.clone()))?;
-                    let target = Arc::new(target);
-                    (base, target)
-                };
-                let link_add = Arc::new(link_add.clone());
-                let outcome = app_validation_workflow::run_link_validation_callback(
-                    zome_name.clone(),
-                    link_add,
-                    base,
-                    target,
-                    &ribosome,
-                    workspace_lock.clone(),
-                    network.clone(),
-                )?;
-                match outcome {
-                    app_validation_workflow::Outcome::Accepted => (),
-                    app_validation_workflow::Outcome::Rejected(reason) => {
-                        return Err(SourceChainError::InvalidLinkAdd(reason).into());
-                    }
-                    app_validation_workflow::Outcome::AwaitingDeps(hashes) => {
-                        return Err(SourceChainError::InvalidCommit(format!("{:?}", hashes)).into());
-                    }
-                }
-            }
-
-            match chain_element.header() {
+            let outcome = match chain_element.header() {
                 Header::Dna(_)
                 | Header::AgentValidationPkg(_)
-                | Header::ChainOpen(_)
-                | Header::ChainClose(_)
+                | Header::OpenChain(_)
+                | Header::CloseChain(_)
                 | Header::InitZomesComplete(_) => {
                     // These headers don't get validated
+                    continue;
                 }
-                Header::LinkAdd(_) => {
-                    // These get validate via validate link
+                Header::CreateLink(link_add) => {
+                    let (base, target) = {
+                        let mut workspace = workspace_lock.write().await;
+                        let mut cascade = workspace.cascade(network.clone());
+                        let base_address: AnyDhtHash = link_add.base_address.clone().into();
+                        let base = cascade
+                            .retrieve(base_address.clone(), GetOptions.into())
+                            .await
+                            .map_err(RibosomeError::from)?
+                            .ok_or_else(|| RibosomeError::ElementDeps(base_address.clone()))?
+                            .into_inner()
+                            .1
+                            .into_option()
+                            .ok_or_else(|| RibosomeError::ElementDeps(base_address.clone()))?;
+                        let base = Arc::new(base);
+                        let target_address: AnyDhtHash = link_add.target_address.clone().into();
+                        let target = cascade
+                            .retrieve(target_address.clone(), GetOptions.into())
+                            .await
+                            .map_err(RibosomeError::from)?
+                            .ok_or_else(|| RibosomeError::ElementDeps(target_address.clone()))?
+                            .into_inner()
+                            .1
+                            .into_option()
+                            .ok_or_else(|| RibosomeError::ElementDeps(target_address.clone()))?;
+                        let target = Arc::new(target);
+                        (base, target)
+                    };
+                    let link_add = Arc::new(link_add.clone());
+                    Either::Left(
+                        app_validation_workflow::run_create_link_validation_callback(
+                            zome_name.clone(),
+                            link_add,
+                            base,
+                            target,
+                            &ribosome,
+                            workspace_lock.clone(),
+                            network.clone(),
+                        )?,
+                    )
                 }
-                Header::EntryCreate(_)
-                | Header::EntryUpdate(_)
-                | Header::ElementDelete(_)
-                | Header::LinkRemove(_) => {
-                    let element = Arc::new(chain_element);
-                    let outcome = app_validation_workflow::run_validation_callback(
+                Header::DeleteLink(delete_link) => Either::Left(
+                    app_validation_workflow::run_delete_link_validation_callback(
                         zome_name.clone(),
+                        delete_link.clone(),
+                        &ribosome,
+                        workspace_lock.clone(),
+                        network.clone(),
+                    )?,
+                ),
+                Header::Create(_) | Header::Update(_) | Header::Delete(_) => {
+                    let element = Arc::new(chain_element);
+                    Either::Right(app_validation_workflow::run_validation_callback(
+                        ZomesToInvoke::One(zome_name.clone()),
                         element,
                         todo!("Get the app validation package"),
                         &ribosome,
                         workspace_lock.clone(),
                         network.clone(),
-                    )?;
-                    match outcome {
-                        app_validation_workflow::Outcome::Accepted => (),
-                        app_validation_workflow::Outcome::Rejected(reason) => {
-                            return Err(SourceChainError::InvalidCommit(reason).into());
-                        }
-                        // when the wasm is being called directly in a zome invocation any
-                        // state other than valid is not allowed for new entries
-                        // e.g. we require that all dependencies are met when committing an
-                        // entry to a local source chain
-                        // this is different to the case where we are validating data coming in
-                        // from the network where unmet dependencies would need to be
-                        // rescheduled to attempt later due to partitions etc.
-                        app_validation_workflow::Outcome::AwaitingDeps(hashes) => {
-                            return Err(
-                                SourceChainError::InvalidCommit(format!("{:?}", hashes)).into()
-                            );
-                        }
-                    }
+                    )?)
                 }
+            };
+            match outcome {
+                Either::Left(outcome) => match outcome {
+                    app_validation_workflow::Outcome::Accepted => (),
+                    app_validation_workflow::Outcome::Rejected(reason) => {
+                        return Err(SourceChainError::InvalidLink(reason).into());
+                    }
+                    app_validation_workflow::Outcome::AwaitingDeps(hashes) => {
+                        return Err(SourceChainError::InvalidCommit(format!("{:?}", hashes)).into());
+                    }
+                },
+                Either::Right(outcome) => match outcome {
+                    app_validation_workflow::Outcome::Accepted => (),
+                    app_validation_workflow::Outcome::Rejected(reason) => {
+                        return Err(SourceChainError::InvalidCommit(reason).into());
+                    }
+                    // when the wasm is being called directly in a zome invocation any
+                    // state other than valid is not allowed for new entries
+                    // e.g. we require that all dependencies are met when committing an
+                    // entry to a local source chain
+                    // this is different to the case where we are validating data coming in
+                    // from the network where unmet dependencies would need to be
+                    // rescheduled to attempt later due to partitions etc.
+                    app_validation_workflow::Outcome::AwaitingDeps(hashes) => {
+                        return Err(SourceChainError::InvalidCommit(format!("{:?}", hashes)).into());
+                    }
+                },
             }
         }
     }
@@ -302,8 +310,8 @@ pub mod tests {
     use holochain_types::{observability, test_utils::fake_agent_pubkey_1};
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::entry::Entry;
-    use holochain_zome_types::GuestOutput;
-    use holochain_zome_types::HostInput;
+    use holochain_zome_types::ExternInput;
+    use holochain_zome_types::ExternOutput;
     use matches::assert_matches;
 
     #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
@@ -347,7 +355,7 @@ pub mod tests {
                     .unwrap(),
                 TestWasm::Foo.into(),
                 "fun_times".into(),
-                HostInput::new(Payload { a: 1 }.try_into().unwrap()),
+                ExternInput::new(Payload { a: 1 }.try_into().unwrap()),
             ),
         )
         .next()
@@ -411,7 +419,7 @@ pub mod tests {
             .expect_call_zome_function()
             .returning(move |_workspace, _invocation| {
                 let x = SerializedBytes::try_from(Payload { a: 3 }).unwrap();
-                Ok(ZomeCallInvocationResponse::ZomeApiFn(GuestOutput::new(x)))
+                Ok(ZomeCallResponse::Ok(ExternOutput::new(x)))
             });
 
         let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(
@@ -421,7 +429,7 @@ pub mod tests {
                     .unwrap(),
                 TestWasm::Foo.into(),
                 "fun_times".into(),
-                HostInput::new(Payload { a: 1 }.try_into().unwrap()),
+                ExternInput::new(Payload { a: 1 }.try_into().unwrap()),
             ),
         )
         .next()
@@ -458,7 +466,7 @@ pub mod tests {
                     .unwrap(),
                 TestWasm::Foo.into(),
                 "fun_times".into(),
-                HostInput::new(Payload { a: 1 }.try_into().unwrap()),
+                ExternInput::new(Payload { a: 1 }.try_into().unwrap()),
             ),
         )
         .next()
@@ -489,7 +497,7 @@ pub mod tests {
                     .unwrap(),
                 TestWasm::Foo.into(),
                 "fun_times".into(),
-                HostInput::new(Payload { a: 1 }.try_into().unwrap()),
+                ExternInput::new(Payload { a: 1 }.try_into().unwrap()),
             ),
         )
         .next()

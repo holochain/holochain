@@ -4,12 +4,12 @@ members = [
     "anchor",
     "bench",
     "capability",
-    "commit_entry",
+    "create_entry",
     "crd",
     "crud",
     "debug",
     "entry_defs",
-    "entry_hash",
+    "hash_entry",
     "foo",
     "hash_path",
     "imports",
@@ -18,6 +18,7 @@ members = [
     "link",
     "migrate_agent_fail",
     "migrate_agent_pass",
+    "multiple_calls",
     "post_commit_fail",
     "post_commit_success",
     "query",
@@ -41,4 +42,3 @@ opt-level = "z"
 
 
 [patch.crates-io]
-

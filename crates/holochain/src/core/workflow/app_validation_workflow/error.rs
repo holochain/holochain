@@ -1,5 +1,5 @@
 use holochain_types::cell::CellId;
-use holochain_zome_types::header::AppEntryType;
+use holochain_zome_types::header::ZomeId;
 use thiserror::Error;
 
 use crate::{
@@ -15,6 +15,8 @@ use super::types::Outcome;
 pub enum AppValidationError {
     #[error("Dna is missing for this cell {0:?}. Cannot validate without dna.")]
     DnaMissing(CellId),
+    #[error("Links cannot be called on multiple zomes for validation")]
+    LinkMultipleZomes,
     #[error(transparent)]
     EntryDefStoreError(#[from] EntryDefStoreError),
     #[error(transparent)]
@@ -22,7 +24,7 @@ pub enum AppValidationError {
     #[error(transparent)]
     RibosomeError(#[from] RibosomeError),
     #[error("The app entry type {0:?} zome id was out of range")]
-    ZomeId(AppEntryType),
+    ZomeId(ZomeId),
 }
 
 pub type AppValidationResult<T> = Result<T, AppValidationError>;

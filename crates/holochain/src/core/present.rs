@@ -14,7 +14,7 @@ use holochain_state::{
     prelude::JudgedPrefix,
     prelude::{PendingPrefix, PrefixType},
 };
-use holochain_zome_types::element::Element;
+use holochain_zome_types::element::{Element, SignedHeaderHashed};
 
 use crate::core::state::cascade::Cascade;
 
@@ -106,6 +106,28 @@ pub async fn retrieve_element(
     Ok(el.map(Claim))
 }
 
+/// Retrieve an SignedHeaderHashed from the judged, pending or cascade.
+/// This call will stop at the first found so _can_ avoid network calls.
+/// The element will only be returned if at least the StoreEntry or
+/// StoreElement validation has run or will run.
+/// A `Dependency::PendingValidation` will be returned in cases where
+/// validation has not run (the op hasn't been judged).
+/// _Note: This does not mean the entry is "Valid" only that it will be
+/// judged.
+pub async fn retrieve_header(
+    hash: &HeaderHash,
+    data_source: &mut impl DataSource,
+) -> PresentResult<Option<Dependency<SignedHeaderHashed>>> {
+    use Dependency::*;
+    found!(retrieve_header_from(hash, data_source.judged())?.map(Proof));
+    found!(retrieve_header_from(hash, data_source.pending())?.map(PendingValidation));
+    let mut cascade = data_source.cascade();
+    let shh = cascade
+        .retrieve_header(hash.clone(), Default::default())
+        .await?;
+    Ok(shh.map(Claim))
+}
+
 fn retrieve_entry_from<P, M>(hash: &EntryHash, dbs: DbPair<P, M>) -> PresentResult<Option<Element>>
 where
     P: PrefixType,
@@ -141,6 +163,30 @@ where
             }
             if has_op {
                 Ok(Some(el))
+            } else {
+                Ok(None)
+            }
+        }
+        None => Ok(None),
+    }
+}
+
+fn retrieve_header_from<P, M>(
+    hash: &HeaderHash,
+    dbs: DbPair<P, M>,
+) -> PresentResult<Option<SignedHeaderHashed>>
+where
+    P: PrefixType,
+    M: MetadataBufT<P>,
+{
+    match dbs.element.get_header(&hash)? {
+        Some(shh) => {
+            let mut has_op = dbs.meta.has_registered_store_element(hash)?;
+            if let Some(eh) = shh.header().entry_hash() {
+                has_op = has_op || dbs.meta.has_registered_store_entry(eh, hash)?;
+            }
+            if has_op {
+                Ok(Some(shh))
             } else {
                 Ok(None)
             }

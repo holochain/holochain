@@ -3,14 +3,15 @@ name = "holochain_p2p"
 version = "0.0.1"
 description = "holochain specific wrapper around more generic p2p module"
 license = "CAL-1.0"
-homepage = "https://github.com/Holo-host/holochain"
-documentation = "https://github.com/Holo-host/holochain"
+homepage = "https://github.com/holochain/holochain"
+documentation = "https://github.com/holochain/holochain"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 keywords = [ "holochain", "holo", "p2p", "dht", "networking" ]
 categories = [ "network-programming" ]
 edition = "2018"
 
 [dependencies]
+async-trait = "0.1"
 fixt = { path = "../fixt" }
 futures = "0.3"
 ghost_actor = "0.2.1"
@@ -20,6 +21,7 @@ holochain_serialized_bytes = "=0.0.43"
 holochain_types = { version = "0.0.1", path = "../types" }
 holochain_zome_types = { version = "0.0.1", path = "../zome_types" }
 kitsune_p2p = { version = "0.0.1", path = "../kitsune_p2p/kitsune_p2p" }
+mockall = "0.8.1"
 serde = { version = "1.0.104", features = [ "derive" ] }
 serde_bytes = "0.11"
 thiserror = "1.0.18"

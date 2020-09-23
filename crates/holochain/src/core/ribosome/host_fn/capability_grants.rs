@@ -176,9 +176,9 @@ pub mod wasm_test {
             .call_zome(ZomeCallInvocation {
                 cell_id: alice_cell_id.clone(),
                 zome_name: TestWasm::Capability.into(),
-                cap: ().into(),
+                cap: None,
                 fn_name: "try_cap_claim".into(),
-                payload: HostInput::new(
+                payload: ExternInput::new(
                     CapFor(original_secret, bob_agent_id.clone().try_into().unwrap())
                         .try_into()
                         .unwrap(),
@@ -192,11 +192,11 @@ pub mod wasm_test {
         // the _outer_ invocation response is to try_cap_claim for alice
         // the _inner_ invocation response is needs_cap_claim and should be unauthorized
         match output {
-            ZomeCallInvocationResponse::ZomeApiFn(guest_output) => {
+            ZomeCallResponse::Ok(guest_output) => {
                 let response: SerializedBytes = guest_output.into_inner();
-                let inner_response: ZomeCallInvocationResponse = response.try_into().unwrap();
+                let inner_response: ZomeCallResponse = response.try_into().unwrap();
                 // the inner response should be unauthorized
-                assert_eq!(inner_response, ZomeCallInvocationResponse::Unauthorized,);
+                assert_eq!(inner_response, ZomeCallResponse::Unauthorized,);
             }
             _ => unreachable!(),
         }
@@ -207,9 +207,9 @@ pub mod wasm_test {
             .call_zome(ZomeCallInvocation {
                 cell_id: bob_cell_id.clone(),
                 zome_name: TestWasm::Capability.into(),
-                cap: ().into(),
+                cap: None,
                 fn_name: "transferable_cap_grant".into(),
-                payload: HostInput::new(original_secret.try_into().unwrap()),
+                payload: ExternInput::new(original_secret.try_into().unwrap()),
                 provenance: bob_agent_id.clone(),
             })
             .await
@@ -217,9 +217,7 @@ pub mod wasm_test {
             .unwrap();
 
         let original_grant_hash: HeaderHash = match output.clone() {
-            ZomeCallInvocationResponse::ZomeApiFn(guest_output) => {
-                guest_output.into_inner().try_into().unwrap()
-            }
+            ZomeCallResponse::Ok(guest_output) => guest_output.into_inner().try_into().unwrap(),
             _ => unreachable!(),
         };
 
@@ -229,9 +227,9 @@ pub mod wasm_test {
             .call_zome(ZomeCallInvocation {
                 cell_id: alice_cell_id.clone(),
                 zome_name: TestWasm::Capability.into(),
-                cap: ().into(),
+                cap: None,
                 fn_name: "try_cap_claim".into(),
-                payload: HostInput::new(
+                payload: ExternInput::new(
                     CapFor(original_secret, bob_agent_id.clone().try_into().unwrap())
                         .try_into()
                         .unwrap(),
@@ -245,13 +243,13 @@ pub mod wasm_test {
         // the _outer_ invocation response is to try_cap_claim for alice
         // the _inner_ invocation response is needs_cap_claim and should be unauthorized
         match output.clone() {
-            ZomeCallInvocationResponse::ZomeApiFn(guest_output) => {
+            ZomeCallResponse::Ok(guest_output) => {
                 let response: SerializedBytes = guest_output.into_inner();
-                let inner_response: ZomeCallInvocationResponse = response.try_into().unwrap();
+                let inner_response: ZomeCallResponse = response.try_into().unwrap();
                 // the inner response should be serialized nil (authorized)
                 assert_eq!(
                     inner_response,
-                    ZomeCallInvocationResponse::ZomeApiFn(GuestOutput::new(().try_into().unwrap())),
+                    ZomeCallResponse::Ok(ExternOutput::new(().try_into().unwrap())),
                 );
             }
             _ => unreachable!(),
@@ -263,9 +261,9 @@ pub mod wasm_test {
             .call_zome(ZomeCallInvocation {
                 cell_id: bob_cell_id.clone(),
                 zome_name: TestWasm::Capability.into(),
-                cap: ().into(),
+                cap: None,
                 fn_name: "roll_cap_grant".into(),
-                payload: HostInput::new(original_grant_hash.try_into().unwrap()),
+                payload: ExternInput::new(original_grant_hash.try_into().unwrap()),
                 provenance: bob_agent_id.clone(),
             })
             .await
@@ -273,9 +271,7 @@ pub mod wasm_test {
             .unwrap();
 
         let new_grant_header_hash: HeaderHash = match output.clone() {
-            ZomeCallInvocationResponse::ZomeApiFn(guest_output) => {
-                guest_output.into_inner().try_into().unwrap()
-            }
+            ZomeCallResponse::Ok(guest_output) => guest_output.into_inner().try_into().unwrap(),
             _ => unreachable!(),
         };
 
@@ -283,9 +279,9 @@ pub mod wasm_test {
             .call_zome(ZomeCallInvocation {
                 cell_id: bob_cell_id.clone(),
                 zome_name: TestWasm::Capability.into(),
-                cap: ().into(),
+                cap: None,
                 fn_name: "get_entry".into(),
-                payload: HostInput::new(new_grant_header_hash.clone().try_into().unwrap()),
+                payload: ExternInput::new(new_grant_header_hash.clone().try_into().unwrap()),
                 provenance: bob_agent_id.clone(),
             })
             .await
@@ -293,7 +289,7 @@ pub mod wasm_test {
             .unwrap();
 
         let new_secret: CapSecret = match output.clone() {
-            ZomeCallInvocationResponse::ZomeApiFn(guest_output) => {
+            ZomeCallResponse::Ok(guest_output) => {
                 let get_output: GetOutput = guest_output.into_inner().try_into().unwrap();
                 match get_output.into_inner() {
                     Some(element) => match element.entry().to_grant_option() {
@@ -313,9 +309,9 @@ pub mod wasm_test {
             .call_zome(ZomeCallInvocation {
                 cell_id: alice_cell_id.clone(),
                 zome_name: TestWasm::Capability.into(),
-                cap: ().into(),
+                cap: None,
                 fn_name: "try_cap_claim".into(),
-                payload: HostInput::new(
+                payload: ExternInput::new(
                     CapFor(original_secret, bob_agent_id.clone().try_into().unwrap())
                         .try_into()
                         .unwrap(),
@@ -329,11 +325,11 @@ pub mod wasm_test {
         // the _outer_ invocation response is to try_cap_claim for alice
         // the _inner_ invocation response is needs_cap_claim and should be unauthorized
         match output {
-            ZomeCallInvocationResponse::ZomeApiFn(guest_output) => {
+            ZomeCallResponse::Ok(guest_output) => {
                 let response: SerializedBytes = guest_output.into_inner();
-                let inner_response: ZomeCallInvocationResponse = response.try_into().unwrap();
+                let inner_response: ZomeCallResponse = response.try_into().unwrap();
                 // the inner response should be unauthorized
-                assert_eq!(inner_response, ZomeCallInvocationResponse::Unauthorized,);
+                assert_eq!(inner_response, ZomeCallResponse::Unauthorized,);
             }
             _ => unreachable!(),
         }
@@ -342,9 +338,9 @@ pub mod wasm_test {
             .call_zome(ZomeCallInvocation {
                 cell_id: alice_cell_id.clone(),
                 zome_name: TestWasm::Capability.into(),
-                cap: ().into(),
+                cap: None,
                 fn_name: "try_cap_claim".into(),
-                payload: HostInput::new(
+                payload: ExternInput::new(
                     CapFor(new_secret, bob_agent_id.clone().try_into().unwrap())
                         .try_into()
                         .unwrap(),
@@ -358,13 +354,13 @@ pub mod wasm_test {
         // the _outer_ invocation response is to try_cap_claim for alice
         // the _inner_ invocation response is needs_cap_claim and should be unauthorized
         match output.clone() {
-            ZomeCallInvocationResponse::ZomeApiFn(guest_output) => {
+            ZomeCallResponse::Ok(guest_output) => {
                 let response: SerializedBytes = guest_output.into_inner();
-                let inner_response: ZomeCallInvocationResponse = response.try_into().unwrap();
+                let inner_response: ZomeCallResponse = response.try_into().unwrap();
                 // the inner response should be serialized nil (authorized)
                 assert_eq!(
                     inner_response,
-                    ZomeCallInvocationResponse::ZomeApiFn(GuestOutput::new(().try_into().unwrap())),
+                    ZomeCallResponse::Ok(ExternOutput::new(().try_into().unwrap())),
                 );
             }
             _ => unreachable!(),
@@ -376,9 +372,9 @@ pub mod wasm_test {
             .call_zome(ZomeCallInvocation {
                 cell_id: bob_cell_id,
                 zome_name: TestWasm::Capability.into(),
-                cap: ().into(),
+                cap: None,
                 fn_name: "delete_cap_grant".into(),
-                payload: HostInput::new(new_grant_header_hash.try_into().unwrap()),
+                payload: ExternInput::new(new_grant_header_hash.try_into().unwrap()),
                 provenance: bob_agent_id.clone(),
             })
             .await
@@ -389,9 +385,9 @@ pub mod wasm_test {
             .call_zome(ZomeCallInvocation {
                 cell_id: alice_cell_id.clone(),
                 zome_name: TestWasm::Capability.into(),
-                cap: ().into(),
+                cap: None,
                 fn_name: "try_cap_claim".into(),
-                payload: HostInput::new(
+                payload: ExternInput::new(
                     CapFor(original_secret, bob_agent_id.clone().try_into().unwrap())
                         .try_into()
                         .unwrap(),
@@ -405,11 +401,11 @@ pub mod wasm_test {
         // the _outer_ invocation response is to try_cap_claim for alice
         // the _inner_ invocation response is needs_cap_claim and should be unauthorized
         match output {
-            ZomeCallInvocationResponse::ZomeApiFn(guest_output) => {
+            ZomeCallResponse::Ok(guest_output) => {
                 let response: SerializedBytes = guest_output.into_inner();
-                let inner_response: ZomeCallInvocationResponse = response.try_into().unwrap();
+                let inner_response: ZomeCallResponse = response.try_into().unwrap();
                 // the inner response should be unauthorized
-                assert_eq!(inner_response, ZomeCallInvocationResponse::Unauthorized,);
+                assert_eq!(inner_response, ZomeCallResponse::Unauthorized,);
             }
             _ => unreachable!(),
         }
@@ -418,9 +414,9 @@ pub mod wasm_test {
             .call_zome(ZomeCallInvocation {
                 cell_id: alice_cell_id.clone(),
                 zome_name: TestWasm::Capability.into(),
-                cap: ().into(),
+                cap: None,
                 fn_name: "try_cap_claim".into(),
-                payload: HostInput::new(
+                payload: ExternInput::new(
                     CapFor(new_secret, bob_agent_id.clone().try_into().unwrap())
                         .try_into()
                         .unwrap(),
@@ -434,11 +430,11 @@ pub mod wasm_test {
         // the _outer_ invocation response is to try_cap_claim for alice
         // the _inner_ invocation response is needs_cap_claim and should be unauthorized
         match output {
-            ZomeCallInvocationResponse::ZomeApiFn(guest_output) => {
+            ZomeCallResponse::Ok(guest_output) => {
                 let response: SerializedBytes = guest_output.into_inner();
-                let inner_response: ZomeCallInvocationResponse = response.try_into().unwrap();
+                let inner_response: ZomeCallResponse = response.try_into().unwrap();
                 // the inner response should be unauthorized
-                assert_eq!(inner_response, ZomeCallInvocationResponse::Unauthorized,);
+                assert_eq!(inner_response, ZomeCallResponse::Unauthorized,);
             }
             _ => unreachable!(),
         }

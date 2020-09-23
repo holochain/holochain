@@ -3,8 +3,8 @@ name = "holochain_types"
 version = "0.0.1"
 description = "Holochain common types"
 license = "CAL-1.0"
-homepage = "https://github.com/Holo-host/holochain"
-documentation = "https://github.com/Holo-host/holochain"
+homepage = "https://github.com/holochain/holochain"
+documentation = "https://github.com/holochain/holochain"
 readme = "README.md"
 authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
 edition = "2018"
@@ -13,7 +13,7 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0.26"
-async-trait = "0.1.24"
+async-trait = "0.1"
 backtrace = "0.3.27"
 base64 = "0.10.1"
 chrono = "0.4.6"
@@ -22,7 +22,6 @@ fixt = { path = "../fixt" }
 flate2 = "1.0.14"
 futures = "0.3"
 holo_hash = { version = "0.0.1", path = "../holo_hash" }
-holochain_crypto = { version = "0.0.1", path = "../crypto" }
 holochain_keystore = { version = "0.0.1", path = "../keystore" }
 holochain_serialized_bytes = "=0.0.43"
 holochain_zome_types = { path = "../zome_types", features = ["fixturators"] }

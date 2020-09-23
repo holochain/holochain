@@ -9,7 +9,7 @@ pub struct CallRemote {
     to_agent: AgentPubKey,
     zome_name: ZomeName,
     fn_name: FunctionName,
-    cap: CapSecret,
+    cap: Option<CapSecret>,
     request: SerializedBytes,
 }
 
@@ -18,7 +18,7 @@ impl CallRemote {
         to_agent: AgentPubKey,
         zome_name: ZomeName,
         fn_name: FunctionName,
-        cap: CapSecret,
+        cap: Option<CapSecret>,
         request: SerializedBytes,
     ) -> Self {
         Self {
@@ -42,7 +42,7 @@ impl CallRemote {
         self.fn_name.clone()
     }
 
-    pub fn cap(&self) -> CapSecret {
+    pub fn cap(&self) -> Option<CapSecret> {
         self.cap
     }
 
