@@ -1187,6 +1187,7 @@ dependencies = [
  "nanoid",
  "num_cpus",
  "observability",
+ "once_cell",
  "parking_lot",
  "predicates",
  "pretty_assertions",

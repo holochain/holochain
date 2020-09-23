@@ -73,6 +73,7 @@ serial_test = "0.4.0"
 test-case = "1.0.0"
 test_wasm_common = { version = "0.0.1", path = "../test_utils/wasm_common" }
 unwrap_to = "0.1.0"
+once_cell = "1.4.1"
 
 [[bench]]
 name = "bench"
