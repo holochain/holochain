@@ -10,5 +10,5 @@ pub fn emit_signal(
     _call_context: Arc<CallContext>,
     _input: EmitSignalInput,
 ) -> RibosomeResult<EmitSignalOutput> {
-    unimplemented!();
+    unimplemented!("Must implement signals!");
 }

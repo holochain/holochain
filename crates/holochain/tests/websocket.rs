@@ -7,8 +7,7 @@ use holochain::conductor::{
     error::ConductorError,
     Conductor,
 };
-use holochain::core::ribosome::NamedInvocation;
-use holochain::core::ribosome::ZomeCallInvocationFixturator;
+use holochain::core::ribosome::{NamedInvocation, ZomeCallInvocationFixturator};
 use holochain_types::{
     app::{InstallAppDnaPayload, InstallAppPayload},
     cell::CellId,
@@ -205,30 +204,43 @@ pub async fn start_holochain(config_path: PathBuf) -> Child {
 
 pub async fn call_foo_fn(app_port: u16, original_dna_hash: DnaHash, holochain: &mut Child) {
     // Connect to App Interface
-    let (mut app_interface, _) = websocket_client_by_port(app_port).await.unwrap();
-
+    let (mut app_tx, _) = websocket_client_by_port(app_port).await.unwrap();
     let cell_id = CellId::from((original_dna_hash, fake_agent_pubkey_1()));
+    call_zome_fn(
+        holochain,
+        &mut app_tx,
+        cell_id,
+        TestWasm::Foo,
+        "foo".into(),
+        (),
+    )
+    .await;
+    app_tx.close(1000, "Shutting down".into()).await.unwrap();
+}
+
+pub async fn call_zome_fn<SB: TryInto<SerializedBytes, Error = SerializedBytesError>>(
+    holochain: &mut Child,
+    app_tx: &mut WebsocketSender,
+    cell_id: CellId,
+    wasm: TestWasm,
+    fn_name: String,
+    input: SB,
+) {
     let request = Box::new(
         ZomeCallInvocationFixturator::new(NamedInvocation(
             cell_id,
-            TestWasm::Foo,
-            "foo".into(),
-            ExternInput::new(().try_into().unwrap()),
+            wasm,
+            fn_name,
+            ExternInput::new(input.try_into().unwrap()),
         ))
         .next()
         .unwrap(),
     );
     let request = AppRequest::ZomeCallInvocation(request);
-    let response = app_interface.request(request);
+    let response = app_tx.request(request);
     let call_response = check_timeout(holochain, response, 3000).await;
-    let foo = TestString::from(String::from("foo"));
-    let expected = Box::new(ExternOutput::new(foo.try_into().unwrap()));
     trace!(?call_response);
-    assert_matches!(call_response, AppResponse::ZomeCallInvocation(response) if response == expected);
-    app_interface
-        .close(1000, "Shutting down".into())
-        .await
-        .unwrap();
+    assert_matches!(call_response, AppResponse::ZomeCallInvocation(_));
 }
 
 pub async fn attach_app_interface(client: &mut WebsocketSender, holochain: &mut Child) -> u16 {
@@ -342,6 +354,88 @@ async fn call_zome() {
     // Call Zome again
     call_foo_fn(app_port, original_dna_hash, &mut holochain).await;
 
+    // Shutdown holochain
+    holochain.kill().expect("Failed to kill holochain");
+}
+
+#[tokio::test(threaded_scheduler)]
+#[cfg(feature = "slow_tests")]
+async fn emit_signals() {
+    observability::test_run().ok();
+    // NOTE: This is a full integration test that
+    // actually runs the holochain binary
+
+    // TODO: B-01453: can we make this port 0 and find out the dynamic port later?
+    let port = 9911;
+
+    let tmp_dir = TempDir::new("conductor_cfg_3").unwrap();
+    let path = tmp_dir.path().to_path_buf();
+    let environment_path = path.clone();
+    let config = create_config(port, environment_path);
+    let config_path = write_config(path, &config);
+
+    let mut holochain = start_holochain(config_path.clone()).await;
+
+    let (mut admin_tx, _) = websocket_client_by_port(port).await.unwrap();
+
+    let uuid = uuid::Uuid::new_v4();
+    let dna = fake_dna_zomes(
+        &uuid.to_string(),
+        vec![(TestWasm::EmitSignal.into(), TestWasm::EmitSignal.into())],
+    );
+    let original_dna_hash = dna.dna_hash().clone();
+
+    // Install Dna
+    let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
+    let dna_payload = InstallAppDnaPayload::path_only(fake_dna_path, "".to_string());
+    let agent_key = fake_agent_pubkey_1();
+    let payload = InstallAppPayload {
+        dnas: vec![dna_payload],
+        app_id: "test".to_string(),
+        agent_key: agent_key.clone(),
+    };
+    let request = AdminRequest::InstallApp(Box::new(payload));
+    let response = admin_tx.request(request);
+    let response = check_timeout(&mut holochain, response, 3000).await;
+    assert_matches!(response, AdminResponse::AppInstalled(_));
+
+    // Activate cells
+    let request = AdminRequest::ActivateApp {
+        app_id: "test".to_string(),
+    };
+    let response = admin_tx.request(request);
+    let response = check_timeout(&mut holochain, response, 1000).await;
+    assert_matches!(response, AdminResponse::AppActivated);
+
+    // Attach App Interface
+    let app_port = attach_app_interface(&mut admin_tx, &mut holochain).await;
+
+    ///////////////////////////////////////////////////////
+    // Emit signals (the real test!)
+
+    let (mut app_tx, app_rx) = websocket_client_by_port(app_port).await.unwrap();
+
+    call_zome_fn(
+        &mut holochain,
+        &mut app_tx,
+        CellId::new(original_dna_hash.clone(), agent_key),
+        TestWasm::EmitSignal,
+        "emit".into(),
+        (),
+    )
+    .await;
+
+    let msg = app_rx
+        .timeout(Duration::from_secs(1))
+        .next()
+        .await
+        .unwrap()
+        .unwrap();
+    let _sig = unwrap_to::unwrap_to!(msg => WebsocketMessage::Signal);
+
+    ///////////////////////////////////////////////////////
+
+    admin_tx.close(1000, "Shutting down".into()).await.unwrap();
     // Shutdown holochain
     holochain.kill().expect("Failed to kill holochain");
 }

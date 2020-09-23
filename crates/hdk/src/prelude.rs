@@ -10,6 +10,7 @@ pub use crate::delete;
 pub use crate::delete_cap_grant;
 pub use crate::delete_entry;
 pub use crate::delete_link;
+pub use crate::emit_signal;
 pub use crate::entry_def;
 pub use crate::entry_defs;
 pub use crate::error::HdkError;
