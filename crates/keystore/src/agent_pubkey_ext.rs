@@ -1,6 +1,7 @@
 use crate::*;
 use holochain_zome_types::signature::SignInput;
 use holochain_zome_types::signature::Signature;
+use std::sync::Arc;
 
 /// Extend holo_hash::AgentPubKey with additional signature functionality
 /// from Keystore.
@@ -67,25 +68,15 @@ impl AgentPubKeyExt for holo_hash::AgentPubKey {
     {
         use ghost_actor::dependencies::futures::future::FutureExt;
 
-        let result: KeystoreApiResult<(
-            holochain_crypto::DynCryptoBytes,
-            holochain_crypto::DynCryptoBytes,
-            holochain_crypto::DynCryptoBytes,
-        )> = (|| {
-            let pub_key =
-                holochain_crypto::crypto_insecure_buffer_from_bytes(self.get_core_bytes())?;
-            let signature = holochain_crypto::crypto_insecure_buffer_from_bytes(&signature.0)?;
-            let data: SerializedBytes = data.try_into()?;
-            let data = holochain_crypto::crypto_insecure_buffer_from_bytes(data.bytes())?;
-            Ok((signature, data, pub_key))
-        })();
+        let pub_key: lair_keystore_api::actor::SignEd25519PubKey =
+            self.get_core_bytes().to_vec().into();
+        let sig: lair_keystore_api::actor::SignEd25519Signature = signature.0.to_vec().into();
+
+        let data: Result<SerializedBytes, SerializedBytesError> = data.try_into();
 
         async move {
-            let (mut signature, mut data, mut pub_key) = result?;
-            Ok(
-                holochain_crypto::crypto_sign_verify(&mut signature, &mut data, &mut pub_key)
-                    .await?,
-            )
+            let data = Arc::new(data?.bytes().to_vec());
+            Ok(pub_key.verify(data, sig).await?)
         }
         .boxed()
         .into()
@@ -94,26 +85,13 @@ impl AgentPubKeyExt for holo_hash::AgentPubKey {
     fn verify_signature_raw(&self, signature: &Signature, data: &[u8]) -> KeystoreApiFuture<bool> {
         use ghost_actor::dependencies::futures::future::FutureExt;
 
-        let result: KeystoreApiResult<(
-            holochain_crypto::DynCryptoBytes,
-            holochain_crypto::DynCryptoBytes,
-            holochain_crypto::DynCryptoBytes,
-        )> = (|| {
-            let pub_key =
-                holochain_crypto::crypto_insecure_buffer_from_bytes(self.get_core_bytes())?;
-            let signature = holochain_crypto::crypto_insecure_buffer_from_bytes(&signature.0)?;
-            let data = holochain_crypto::crypto_insecure_buffer_from_bytes(data)?;
-            Ok((signature, data, pub_key))
-        })();
+        let data = Arc::new(data.to_vec());
+        let pub_key: lair_keystore_api::actor::SignEd25519PubKey =
+            self.get_core_bytes().to_vec().into();
+        let sig: lair_keystore_api::actor::SignEd25519Signature = signature.0.to_vec().into();
 
-        async move {
-            let (mut signature, mut data, mut pub_key) = result?;
-            Ok(
-                holochain_crypto::crypto_sign_verify(&mut signature, &mut data, &mut pub_key)
-                    .await?,
-            )
-        }
-        .boxed()
-        .into()
+        async move { Ok(pub_key.verify(data, sig).await?) }
+            .boxed()
+            .into()
     }
 }
