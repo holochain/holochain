@@ -1,4 +1,7 @@
 use crate::*;
+use futures::{sink::SinkExt, stream::StreamExt};
+use rustls::Session;
+use std::io::{Read, Write};
 
 ghost_actor::ghost_chan! {
     pub(crate) chan TlsConnection<TransportError> {
@@ -71,6 +74,51 @@ impl InnerTls {
             evt_send,
         })
     }
+
+    fn request(&self, data: ProxyWire) -> TlsConnectionHandlerResult<ProxyWire> {
+        let nr = webpki::DNSNameRef::try_from_ascii_str("stub.stub").unwrap();
+        let mut cli = rustls::ClientSession::new(&self.tls_client_config, nr);
+        let fut = self.sub_sender.create_channel();
+        Ok(async move {
+            let (mut write, mut read) = fut.await?;
+
+            let data = data.encode()?;
+            cli.write_all(&data).map_err(TransportError::other)?;
+
+            let mut buf = [0_u8; 4096];
+            let mut in_pre = std::io::Cursor::new(Vec::new());
+            let mut in_post = Vec::new();
+            loop {
+                if cli.wants_write() {
+                    let mut data = Vec::new();
+                    cli.write_tls(&mut data).map_err(TransportError::other)?;
+                    write.send(data).await?;
+                }
+
+                if !cli.wants_read() {
+                    tokio::time::delay_for(std::time::Duration::from_millis(10)).await;
+                    continue;
+                }
+
+                match read.next().await {
+                    None => return Err("failed to get response".into()),
+                    Some(data) => {
+                        in_pre.get_mut().extend_from_slice(&data);
+                        cli.read_tls(&mut in_pre).map_err(TransportError::other)?;
+                        cli.process_new_packets().map_err(TransportError::other)?;
+                        let size = cli.read(&mut buf).map_err(TransportError::other)?;
+                        in_post.extend_from_slice(&buf[..size]);
+
+                        if let Ok(proxy_wire) = ProxyWire::decode(&in_post) {
+                            return Ok(proxy_wire);
+                        }
+                    }
+                }
+            }
+        }
+        .boxed()
+        .into())
+    }
 }
 
 impl ghost_actor::GhostControlHandler for InnerTls {
@@ -87,14 +135,36 @@ impl ghost_actor::GhostHandler<TlsConnection> for InnerTls {}
 
 impl TlsConnectionHandler for InnerTls {
     fn handle_req_proxy(&mut self) -> TlsConnectionHandlerResult<Arc<ProxyUrl>> {
-        unimplemented!()
+        let data = ProxyWire::req_proxy(MsgId::next());
+        let fut = self.request(data)?;
+        Ok(async move {
+            let data = fut.await?;
+            match data {
+                ProxyWire::ReqProxyOk(ok) => Ok(Arc::new(ok.1.into())),
+                ProxyWire::ReqProxyErr(err) => Err(err.1.into()),
+                _ => Err("bad response".into()),
+            }
+        }
+        .boxed()
+        .into())
     }
 
     fn handle_chan_new(
         &mut self,
-        _proxy_url: Arc<ProxyUrl>,
+        proxy_url: Arc<ProxyUrl>,
     ) -> TlsConnectionHandlerResult<ChannelId> {
-        unimplemented!()
+        let data = ProxyWire::chan_new(MsgId::next(), (&*proxy_url).into());
+        let fut = self.request(data)?;
+        Ok(async move {
+            let data = fut.await?;
+            match data {
+                ProxyWire::ChanNewOk(ok) => Ok(ok.1),
+                ProxyWire::ChanNewErr(err) => Err(err.1.into()),
+                _ => Err("bad response".into()),
+            }
+        }
+        .boxed()
+        .into())
     }
 
     fn handle_chan_send(
@@ -119,6 +189,7 @@ impl TransportConnectionEventHandler for InnerTls {
         _send: TransportChannelWrite,
         _recv: TransportChannelRead,
     ) -> TransportConnectionEventHandlerResult<()> {
+        let mut _srv = rustls::ServerSession::new(&self.tls_server_config);
         unimplemented!()
     }
 }
