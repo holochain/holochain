@@ -15,6 +15,7 @@ pub mod entry;
 pub mod fixt;
 pub mod header;
 pub mod link;
+mod macros;
 pub mod metadata;
 pub mod prelude;
 pub mod timestamp;

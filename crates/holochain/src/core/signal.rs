@@ -4,7 +4,7 @@
 //! - System-defined signals are produced in various places in the system
 
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::cell::CellId;
+use holochain_types::{cell::CellId, impl_from};
 
 /// A Signal is some information emitted from within Holochain out through
 /// an Interface
@@ -18,8 +18,18 @@ pub enum Signal {
 
 /// A Signal which originates from within the Holochain system, as opposed to
 /// from within a Cell
+///
+/// TODO, decide what these will be. For instance, maybe there is a
+/// DataAvailable signal for doing async network requests
 #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes)]
 pub enum SystemSignal {
-    // e.g.:
-// DataAvailable(AnyDhtHash),
+    /// Since we have no real system signals, we use a test signal for testing
+    /// TODO: replace instances of this with something real
+    Test(String),
+}
+
+impl_from! {
+    String => SystemSignal, |s| { Self::Test(s) },
+    SystemSignal => Signal, |s| { Self::System(s) },
+    String => Signal,       |s| { Self::System(s.into()) },
 }
