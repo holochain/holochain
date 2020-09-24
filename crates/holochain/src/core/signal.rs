@@ -28,8 +28,10 @@ pub enum SystemSignal {
     Test(String),
 }
 
+pub fn test_signal(s: &str) -> Signal {
+    SystemSignal::Test(s.to_string()).into()
+}
+
 impl_from! {
-    String => SystemSignal, |s| { Self::Test(s) },
     SystemSignal => Signal, |s| { Self::System(s) },
-    String => Signal,       |s| { Self::System(s.into()) },
 }

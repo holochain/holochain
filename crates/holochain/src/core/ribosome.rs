@@ -356,6 +356,7 @@ pub struct ZomeCallHostAccess {
     pub workspace: CallZomeWorkspaceLock,
     pub keystore: KeystoreSender,
     pub network: HolochainP2pCell,
+    // pub signal_tx: ConductorSideSignalSender,
 }
 
 impl From<ZomeCallHostAccess> for HostAccess {

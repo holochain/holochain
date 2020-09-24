@@ -1,4 +1,4 @@
-use crate::conductor::api::*;
+use crate::{conductor::api::*, core::signal::Signal};
 use error::InterfaceResult;
 use futures::{
     channel::mpsc::{channel, Receiver, Sender},
@@ -14,33 +14,21 @@ pub mod error;
 pub mod websocket;
 
 /// Allows the conductor or cell to forward signals to connected clients
-pub struct ConductorSideSignalSender<Sig>
-where
-    Sig: 'static + Send + TryInto<SerializedBytes, Error = SerializedBytesError>,
-{
-    sender: Sender<SerializedBytes>,
-    phantom: std::marker::PhantomData<Sig>,
-}
+#[derive(Clone)]
+pub struct ConductorSideSignalSender(Sender<Signal>);
 
-impl<Sig> ConductorSideSignalSender<Sig>
-where
-    Sig: 'static + Send + TryInto<SerializedBytes, Error = SerializedBytesError>,
-{
+impl ConductorSideSignalSender {
     /// send the signal to the connected client
-    pub async fn send(&mut self, data: Sig) -> InterfaceResult<()> {
-        let data: SerializedBytes = data.try_into()?;
-        self.sender.send(data).await?;
+    pub async fn send(&mut self, sig: Signal) -> InterfaceResult<()> {
+        self.0.send(sig).await?;
         Ok(())
     }
 
     // -- private -- //
 
     /// internal constructor
-    fn priv_new(sender: Sender<SerializedBytes>) -> Self {
-        Self {
-            sender,
-            phantom: std::marker::PhantomData,
-        }
+    fn priv_new(sender: Sender<Signal>) -> Self {
+        Self(sender)
     }
 }
 
@@ -60,7 +48,7 @@ pub type ExternalSideResponder =
 /// supply this function with:
 /// - a signal sender(sink)
 /// - a request(and response callback) stream
-pub fn create_interface_channel<Sig, Req, Res, ExternSig, ExternReq>(
+pub fn create_interface_channel<Req, Res, ExternSig, ExternReq>(
     // the "external signal sink" - A sender that accepts already serialized
     // SerializedBytes.
     extern_sig: ExternSig,
@@ -69,17 +57,16 @@ pub fn create_interface_channel<Sig, Req, Res, ExternSig, ExternReq>(
     extern_req: ExternReq,
 ) -> (
     // creates a conductor side sender that accepts concrete signal types.
-    ConductorSideSignalSender<Sig>,
+    ConductorSideSignalSender,
     // creates a conductor side receiver that produces concrete request types.
     ConductorSideRequestReceiver<Req, Res>,
 )
 where
-    Sig: 'static + Send + TryInto<SerializedBytes, Error = SerializedBytesError>,
     Req: 'static + Send + TryFrom<SerializedBytes, Error = SerializedBytesError>,
     <Req as TryFrom<SerializedBytes>>::Error: std::fmt::Debug + Send,
     Res: 'static + Send + TryInto<SerializedBytes, Error = SerializedBytesError>,
-    ExternSig: 'static + Send + Sink<SerializedBytes>,
-    <ExternSig as Sink<SerializedBytes>>::Error: std::fmt::Debug + Send,
+    ExternSig: 'static + Send + Sink<Signal>,
+    <ExternSig as Sink<Signal>>::Error: std::fmt::Debug + Send,
     ExternReq: 'static + Send + Stream<Item = (SerializedBytes, ExternalSideResponder)>,
 {
     // pretty straight forward to forward the signal sender : )
@@ -158,6 +145,9 @@ pub enum InterfaceDriver {
 
 #[cfg(test)]
 mod tests {
+
+    use crate::core::signal::test_signal;
+
     use super::*;
 
     #[tokio::test]
@@ -176,16 +166,13 @@ mod tests {
         let (mut send_req, recv_req) = channel(1);
 
         let (mut chan_sig_send, mut chan_req_recv): (
-            ConductorSideSignalSender<TestMsg>,
+            ConductorSideSignalSender,
             ConductorSideRequestReceiver<TestMsg, TestMsg>,
         ) = create_interface_channel(send_sig, recv_req);
 
-        chan_sig_send.send("test_sig_1".into()).await.unwrap();
-
-        assert_eq!(
-            "test_sig_1",
-            &TestMsg::try_from(recv_sig.next().await.unwrap()).unwrap().0,
-        );
+        chan_sig_send.send(test_signal("test_sig_1")).await.unwrap();
+        let signal_bytes = SerializedBytes::try_from(recv_sig.next().await.unwrap()).unwrap();
+        assert_eq!("test_sig_1", &TestMsg::try_from(signal_bytes).unwrap().0,);
 
         let (res_send, res_recv) = tokio::sync::oneshot::channel();
         let respond: ExternalSideResponder = Box::new(move |res| {
