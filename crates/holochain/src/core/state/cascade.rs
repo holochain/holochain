@@ -55,21 +55,29 @@ mod test;
 
 pub mod error;
 
+/////////////////
+// Helper macros
+/////////////////
+
+/// Get an item from an option
+/// or return early from the function
 macro_rules! get_or_return {
-    ($db:expr) => {
-        match $db {
-            Some(db) => db,
+    ($n:expr) => {
+        match $n {
+            Some(n) => n,
             None => return Ok(()),
         }
     };
-    ($db:expr, $ret:expr) => {
-        match $db {
-            Some(db) => db,
+    ($n:expr, $ret:expr) => {
+        match $n {
+            Some(n) => n,
             None => return Ok($ret),
         }
     };
 }
 
+/// Return from a function if
+/// an item is found otherwise continue
 macro_rules! return_if_found {
     ($i:expr) => {
         if let Some(i) = $i {
@@ -78,6 +86,7 @@ macro_rules! return_if_found {
     };
 }
 
+/// Search every level that the cascade has been constructed with
 macro_rules! search_all {
     ($cascade:expr, $fn:ident, $hash:expr) => {{
         if let Some(db) = $cascade.pending_data.as_ref() {
@@ -163,26 +172,27 @@ enum Search {
     NotInCascade,
 }
 
-/// Should these functions be sync or async?
-/// Depends on how much computation, and if writes are involved
 impl<'a, Network, MetaVault, MetaCache> Cascade<'a, Network, MetaVault, MetaCache>
 where
     MetaCache: MetadataBufT,
     MetaVault: MetadataBufT,
     Network: HolochainP2pCellT,
 {
-    /// Constructs a [Cascade], taking references to all necessary databases
+    /// Constructs a [Cascade], for the default use case of
+    /// vault + cache + network
+    // TODO: Probably should rename this function but want to
+    // avoid refactoring
     pub fn new(
         env: EnvironmentRead,
-        element_vault: &'a ElementBuf,
-        meta_vault: &'a MetaVault,
+        element_integrated: &'a ElementBuf,
+        meta_integrated: &'a MetaVault,
         element_cache: &'a mut ElementBuf,
         meta_cache: &'a mut MetaCache,
         network: Network,
     ) -> Self {
         let integrated_data = Some(DbPair {
-            element: element_vault,
-            meta: meta_vault,
+            element: element_integrated,
+            meta: meta_integrated,
         });
         let cache_data = Some(DbPairMut {
             element: element_cache,
@@ -198,7 +208,10 @@ where
             cache_data,
         }
     }
+}
 
+impl<'a> Cascade<'a> {
+    /// Construct a completely empty cascade
     pub fn empty() -> Self {
         Self {
             integrated_data: None,
@@ -222,6 +235,7 @@ where
     MetaRejected: MetadataBufT<RejectedPrefix>,
     Network: HolochainP2pCellT,
 {
+    /// Add the integrated [ElementBuf] and [MetadataBuf] to the cascade
     pub fn with_integrated(
         mut self,
         integrated_data: DbPair<'a, MetaVault, IntegratedPrefix>,
@@ -231,18 +245,21 @@ where
         self
     }
 
+    /// Add the integrated [ElementBuf] and [MetadataBuf] to the cascade
     pub fn with_pending(mut self, pending_data: DbPair<'a, MetaPending, PendingPrefix>) -> Self {
         self.env = Some(pending_data.meta.env().clone());
         self.pending_data = Some(pending_data);
         self
     }
 
+    /// Add the judged [ElementBuf] and [MetadataBuf] to the cascade
     pub fn with_judged(mut self, judged_data: DbPair<'a, MetaJudged, JudgedPrefix>) -> Self {
         self.env = Some(judged_data.meta.env().clone());
         self.judged_data = Some(judged_data);
         self
     }
 
+    /// Add the rejected [ElementBuf] and [MetadataBuf] to the cascade
     pub fn with_rejected(
         mut self,
         rejected_data: DbPair<'a, MetaRejected, RejectedPrefix>,
@@ -252,12 +269,14 @@ where
         self
     }
 
+    /// Add the cache [ElementBuf] and [MetadataBuf] to the cascade
     pub fn with_cache(mut self, cache_data: DbPairMut<'a, MetaCache>) -> Self {
         self.env = Some(cache_data.meta.env().clone());
         self.cache_data = Some(cache_data);
         self
     }
 
+    /// Add the integrated [ElementBuf] and [MetadataBuf] to the cascade
     pub fn with_network(mut self, network: Network) -> Self {
         self.network = Some(network);
         self
@@ -419,7 +438,10 @@ where
         Ok(())
     }
 
+    /// Get the element from any databases that the Cascade has been constructed with
     fn get_element_local_raw(&self, hash: &HeaderHash) -> CascadeResult<Option<Element>> {
+        // It's a little tricky to call a function on every db.
+        // Closures don't work so an inline generic function is needed.
         fn get_element<P: PrefixType, M: MetadataBufT<P>>(
             db: &DbPair<M, P>,
             hash: &HeaderHash,
@@ -444,33 +466,9 @@ where
             })
         }
         search_all!(self, get_entry, hash)
-        // let cache_data = get_or_return!(self.cache_data.as_ref(), None);
-        // let integrated_data = get_or_return!(self.integrated_data.as_ref(), None);
-        // // Get all the headers we know about.
-        // let mut headers: BTreeSet<TimedHeaderHash> =
-        //     fresh_reader!(cache_data.meta.env(), |r| cache_data
-        //         .meta
-        //         .get_headers(&r, hash.clone())?
-        //         .collect())?;
-        // headers.extend(fresh_reader!(cache_data.meta.env(), |r| integrated_data
-        //     .meta
-        //     .get_headers(&r, hash.clone())?
-        //     .collect::<Vec<_>>())?);
-
-        // // We might not actually be holding some of these
-        // // so we need to search until we find one.
-        // // We are most likely holding the newest header
-        // // so iterate in reverse
-        // for header in headers.into_iter().rev() {
-        //     // Return the first element we are actually holding
-        //     if let Some(el) = self.get_element_local_raw(&header.header_hash)? {
-        //         return Ok(Some(el));
-        //     }
-        // }
-        // // Not holding any
-        // Ok(None)
     }
 
+    /// Get the entry from any databases that the Cascade has been constructed with
     fn get_entry_local_raw(&self, hash: &EntryHash) -> CascadeResult<Option<EntryHashed>> {
         fn get_entry<P: PrefixType, M: MetadataBufT<P>>(
             db: &DbPair<M, P>,
@@ -481,6 +479,7 @@ where
         search_all!(self, get_entry, hash)
     }
 
+    /// Get the header from any databases that the Cascade has been constructed with
     fn get_header_local_raw(&self, hash: &HeaderHash) -> CascadeResult<Option<HeaderHashed>> {
         Ok(self
             .get_header_local_raw_with_sig(hash)?
@@ -566,6 +565,18 @@ where
         }
     }
 
+    /// Check if this hash has been validated.
+    /// Elements can end up in the cache or integrated table because
+    /// they were gossiped to you or you authored them.
+    /// If you care about the hash you are using being valid in the same
+    /// way as if you got it from the StoreElement authority you can use
+    /// this function to verify that constraint.
+    ///
+    /// An example of how this could go wrong is you do a get for a HeaderHash
+    /// where you are the authority for the RegisterAgentActivity for this header.
+    /// That hash is in your integrated db so you find it but the element has failed
+    /// app validation. The header appears valid even though it isn't because as a
+    /// RegisterAgentActivity authority you haven't run app validation.
     pub fn valid_header(&self, hash: &HeaderHash) -> CascadeResult<bool> {
         let cache_data = get_or_return!(self.cache_data.as_ref(), false);
         let integrated_data = get_or_return!(self.integrated_data.as_ref(), false);
@@ -573,6 +584,8 @@ where
             || cache_data.meta.has_registered_store_element(&hash)?)
     }
 
+    /// Same as valid_header but checks for StoreEntry validation
+    /// See valid_header for details
     pub fn valid_entry(&self, hash: &EntryHash) -> CascadeResult<bool> {
         let cache_data = get_or_return!(self.cache_data.as_ref(), false);
         let integrated_data = get_or_return!(self.integrated_data.as_ref(), false);
@@ -588,6 +601,7 @@ where
     }
 
     /// Check if we have a valid reason to return an element from the cascade
+    /// See valid_header for details
     pub fn valid_element(
         &self,
         header_hash: &HeaderHash,
@@ -772,7 +786,7 @@ where
         })
     }
 
-    /// Get the entry from the dht regardless of metadata.
+    /// Get the entry from the dht regardless of metadata or validation status.
     /// This call has the opportunity to hit the local cache
     /// and avoid a network call.
     // TODO: This still fetches the full element and metadata.
@@ -791,7 +805,7 @@ where
         }
     }
 
-    /// Get only the header from the dht regardless of metadata.
+    /// Get only the header from the dht regardless of metadata or validation status.
     /// Useful for avoiding getting the Entry if you don't need it.
     /// This call has the opportunity to hit the local cache
     /// and avoid a network call.
@@ -811,7 +825,7 @@ where
         }
     }
 
-    /// Get an element from the dht regardless of metadata.
+    /// Get an element from the dht regardless of metadata or validation status.
     /// Useful for checking if data is held.
     /// This call has the opportunity to hit the local cache
     /// and avoid a network call.
