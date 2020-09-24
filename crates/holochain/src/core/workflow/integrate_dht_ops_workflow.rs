@@ -4,6 +4,9 @@ use super::*;
 use crate::core::{
     queue_consumer::{OneshotWriter, TriggerSender, WorkComplete},
     state::{
+        cascade::error::CascadeResult,
+        cascade::Cascade,
+        cascade::DbPair,
         dht_op_integration::{
             IntegratedDhtOpsStore, IntegratedDhtOpsValue, IntegrationLimboStore,
             IntegrationLimboValue,
@@ -15,7 +18,7 @@ use crate::core::{
 };
 use error::WorkflowResult;
 use fallible_iterator::FallibleIterator;
-use holo_hash::{DhtOpHash, HeaderHash};
+use holo_hash::{DhtOpHash, EntryHash, HeaderHash};
 use holochain_state::{
     buffer::BufferedStore,
     buffer::KvBufFresh,
@@ -25,12 +28,12 @@ use holochain_state::{
     prelude::*,
 };
 use holochain_types::{
-    dht_op::{produce_op_lights_from_elements, DhtOp, DhtOpLight},
+    dht_op::{produce_op_lights_from_elements, DhtOp, DhtOpLight, UniqueForm},
     element::{Element, SignedHeaderHashed, SignedHeaderHashedExt},
     validate::ValidationStatus,
     Entry, EntryHashed, Timestamp,
 };
-use holochain_zome_types::signature::Signature;
+use holochain_zome_types::{element::ElementEntry, signature::Signature};
 use holochain_zome_types::{element::SignedHeader, Header};
 use produce_dht_ops_workflow::dht_op_light::{
     error::{DhtOpConvertError, DhtOpConvertResult},
@@ -94,26 +97,7 @@ pub async fn integrate_dht_ops_workflow(
                 order,
             } = so.0;
             // Check validation status and put in correct dbs
-            let outcome = match value.validation_status {
-                ValidationStatus::Valid => integrate_single_dht_op(
-                    value.clone(),
-                    op,
-                    &mut workspace.elements,
-                    &mut workspace.meta,
-                )?,
-                ValidationStatus::Rejected => integrate_single_dht_op(
-                    value.clone(),
-                    op,
-                    &mut workspace.element_rejected,
-                    &mut workspace.meta_rejected,
-                )?,
-                ValidationStatus::Abandoned => {
-                    // Throwing away abandoned ops
-                    // TODO: keep abandoned ops but remove the entries
-                    // and put them in a AbandonedPrefix db
-                    continue;
-                }
-            };
+            let outcome = integrate_single_dht_op(value.clone(), op, &mut workspace).await?;
             match outcome {
                 Outcome::Integrated(integrated) => {
                     // TODO We could create a prefix for the integrated ops db
@@ -176,113 +160,182 @@ pub async fn integrate_dht_ops_workflow(
 ///
 /// We can skip integrating element data when integrating data as an Author
 /// rather than as an Authority, hence the last parameter.
-#[instrument(skip(iv, element_store, meta_store))]
-fn integrate_single_dht_op<P: PrefixType>(
+#[instrument(skip(iv, workspace))]
+async fn integrate_single_dht_op(
     iv: IntegrationLimboValue,
     op: DhtOp,
-    element_store: &mut ElementBuf<P>,
-    meta_store: &mut MetadataBuf<P>,
-) -> DhtOpConvertResult<Outcome> {
-    if op_dependencies_held(&op, element_store)? {
-        integrate_single_data(op, element_store)?;
-        integrate_single_metadata(iv.op.clone(), element_store, meta_store)?;
-        let integrated = IntegratedDhtOpsValue {
-            validation_status: iv.validation_status,
-            op: iv.op,
-            when_integrated: Timestamp::now(),
-        };
-        debug!("integrating");
-        Ok(Outcome::Integrated(integrated))
+    workspace: &mut IntegrateDhtOpsWorkspace,
+) -> WorkflowResult<Outcome> {
+    if op_dependencies_held(&op, workspace).await? {
+        match iv.validation_status {
+            ValidationStatus::Valid => Ok(integrate_data_and_meta(
+                iv,
+                op,
+                &mut workspace.elements,
+                &mut workspace.meta,
+            )?),
+            ValidationStatus::Rejected => Ok(integrate_data_and_meta(
+                iv,
+                op,
+                &mut workspace.element_rejected,
+                &mut workspace.meta_rejected,
+            )?),
+            ValidationStatus::Abandoned => {
+                // Throwing away abandoned ops
+                // TODO: keep abandoned ops but remove the entries
+                // and put them in a AbandonedPrefix db
+                let integrated = IntegratedDhtOpsValue {
+                    validation_status: iv.validation_status,
+                    op: iv.op,
+                    when_integrated: Timestamp::now(),
+                };
+                Ok(Outcome::Integrated(integrated))
+            }
+        }
     } else {
         debug!("deferring");
         Ok(Outcome::Deferred(op))
     }
 }
 
+fn integrate_data_and_meta<P: PrefixType>(
+    iv: IntegrationLimboValue,
+    op: DhtOp,
+    element_store: &mut ElementBuf<P>,
+    meta_store: &mut MetadataBuf<P>,
+) -> DhtOpConvertResult<Outcome> {
+    integrate_single_data(op, element_store)?;
+    integrate_single_metadata(iv.op.clone(), element_store, meta_store)?;
+    let integrated = IntegratedDhtOpsValue {
+        validation_status: iv.validation_status,
+        op: iv.op,
+        when_integrated: Timestamp::now(),
+    };
+    debug!("integrating");
+    Ok(Outcome::Integrated(integrated))
+}
+
 /// Check if we have the required dependencies held before integrating.
-// TODO: This doesn't really check why we are holding the values.
-// We could have them for other reasons.
-fn op_dependencies_held<P: PrefixType>(
+async fn op_dependencies_held(
     op: &DhtOp,
-    element_store: &ElementBuf<P>,
-) -> DhtOpConvertResult<bool> {
+    workspace: &mut IntegrateDhtOpsWorkspace,
+) -> CascadeResult<bool> {
     {
-        fn header_with_entry_is_stored<P: PrefixType>(
-            hash: &HeaderHash,
-            element_store: &ElementBuf<P>,
-        ) -> DhtOpConvertResult<bool> {
-            match element_store.get_header(hash)?.map(|e| {
-                e.header()
-                    .entry_data()
-                    .map(|(h, _)| h.clone())
-                    .ok_or_else(|| {
-                        // This is not a NewEntryHeader: cannot continue
-                        DhtOpConvertError::MissingEntryDataForHeader(hash.clone())
-                    })
-            }) {
-                Some(r) => Ok(element_store.contains_entry(&r?)?),
-                None => Ok(false),
-            }
-        }
-
-        // let entry_is_stored = |hash| element_store.contains_entry(hash);
-
-        let header_is_stored = |hash| element_store.contains_header(hash);
-
         match op {
-            DhtOp::StoreElement(_, _, _)
-            | DhtOp::StoreEntry(_, _, _)
-            | DhtOp::RegisterAgentActivity(_, _) => (),
+            DhtOp::StoreElement(_, _, _) | DhtOp::StoreEntry(_, _, _) => (),
+            DhtOp::RegisterAgentActivity(_, header) => {
+                // RegisterAgentActivity is the exception where we need to make
+                // sure that we have integrated the previous RegisterAgentActivity DhtOp
+                // from the same chain.
+                // This is because to say if the chain is valid as a whole we can't
+                // have parts missing.
+                let mut cascade = workspace.cascade();
+                let prev_header_hash = header.prev_header();
+                if let Some(prev_header_hash) = prev_header_hash.cloned() {
+                    match cascade
+                        .retrieve_header(prev_header_hash, Default::default())
+                        .await?
+                    {
+                        Some(prev_header) => {
+                            let op_hash = DhtOpHash::with_data_sync(
+                                &UniqueForm::RegisterAgentActivity(prev_header.header()),
+                            );
+                            if workspace.integration_limbo.contains(&op_hash)? {
+                                return Ok(true);
+                            }
+                        }
+                        None => return Ok(false),
+                    }
+                }
+            }
             DhtOp::RegisterUpdatedBy(_, entry_update) => {
-                // Check if we have the header with entry that we are updating in the vault
+                // Check if we have the header with entry that we are updating
                 // or defer the op.
                 if !header_with_entry_is_stored(
                     &entry_update.original_header_address,
-                    element_store,
-                )? {
+                    workspace.cascade(),
+                )
+                .await?
+                {
                     return Ok(false);
                 }
             }
-            DhtOp::RegisterDeletedEntryHeader(_, element_delete) => {
-                // Check if we have the header with the entry that we are removing in the vault
+            DhtOp::RegisterDeletedBy(_, element_delete)
+            | DhtOp::RegisterDeletedEntryHeader(_, element_delete) => {
+                // Check if we have the header with the entry that we are removing
                 // or defer the op.
-                if !header_with_entry_is_stored(&element_delete.deletes_address, element_store)? {
+                if !header_with_entry_is_stored(
+                    &element_delete.deletes_address,
+                    workspace.cascade(),
+                )
+                .await?
+                {
                     return Ok(false);
                 }
             }
-            DhtOp::RegisterDeletedBy(_, element_delete) => {
-                // Check if we have the header with the entry that we are removing in the vault
-                // or defer the op.
-                if !header_with_entry_is_stored(&element_delete.deletes_address, element_store)? {
+            DhtOp::RegisterAddLink(_, create_link) => {
+                // Check whether we have the base address.
+                // If not then this should put the op back on the queue.
+                if !entry_is_stored(&create_link.base_address, workspace.cascade()).await? {
                     return Ok(false);
                 }
             }
-            DhtOp::RegisterAddLink(_signature, _link_add) => {
-                // TODO: Not sure what to do here as the base might be rejected
-                // // Check whether we have the base address in the Vault.
-                // // If not then this should put the op back on the queue.
-                // if !entry_is_stored(&link_add.base_address)? {
-                //     let op = DhtOp::RegisterAddLink(signature, link_add);
-                //     return Outcome::deferred(op);
-                // }
-            }
-            DhtOp::RegisterRemoveLink(_signature, link_remove) => {
-                // TODO: Not sure what to do here as the base might be rejected
-                // // Check whether we have the base address and link add address
-                // // are in the Vault.
-                // // If not then this should put the op back on the queue.
-                // if !entry_is_stored(&link_remove.base_address)?
-                //     || !header_is_stored(&link_remove.link_add_address)?
-                // {
-                //      return false;
-                // }
-                if !header_is_stored(&link_remove.link_add_address)? {
+            DhtOp::RegisterRemoveLink(_, delete_link) => {
+                // Check whether we have the link add address.
+                // If not then this should put the op back on the queue.
+                if !header_is_stored(&delete_link.link_add_address, workspace.cascade()).await? {
                     return Ok(false);
                 }
             }
         }
 
         Ok(true)
+    }
+}
+
+/// Get an element that contains an entry from the cascade
+async fn header_with_entry_is_stored(
+    hash: &HeaderHash,
+    mut cascade: Cascade<'_>,
+) -> CascadeResult<bool> {
+    // TODO: PERF: Add contains() to cascade so we don't deserialize
+    // the entry
+    match cascade
+        .retrieve(hash.clone().into(), Default::default())
+        .await?
+    {
+        Some(el) => match el.entry() {
+            ElementEntry::Present(_) | ElementEntry::Hidden => Ok(true),
+            ElementEntry::NotApplicable => Err(DhtOpConvertError::HeaderEntryMismatch.into()),
+            ElementEntry::NotStored => {
+                Err(DhtOpConvertError::MissingEntryDataForHeader(hash.clone()).into())
+            }
+        },
+        None => Ok(false),
+    }
+}
+
+/// Get an entry that contains an entry from the cascade
+async fn entry_is_stored(hash: &EntryHash, mut cascade: Cascade<'_>) -> CascadeResult<bool> {
+    // TODO: PERF: Add contains() to cascade so we don't deserialize
+    // the entry
+    match cascade
+        .retrieve_entry(hash.clone(), Default::default())
+        .await?
+    {
+        Some(_) => Ok(true),
+        None => Ok(false),
+    }
+}
+
+/// Get an header that contains an entry from the cascade
+async fn header_is_stored(hash: &HeaderHash, mut cascade: Cascade<'_>) -> CascadeResult<bool> {
+    match cascade
+        .retrieve_header(hash.clone(), Default::default())
+        .await?
+    {
+        Some(_) => Ok(true),
+        None => Ok(false),
     }
 }
 
@@ -500,6 +553,23 @@ impl IntegrateDhtOpsWorkspace {
 
     pub fn op_exists(&self, hash: &DhtOpHash) -> DatabaseResult<bool> {
         Ok(self.integrated_dht_ops.contains(&hash)? || self.integration_limbo.contains(&hash)?)
+    }
+
+    /// Create a cascade through the integrated and rejected stores
+    // TODO: Might need to add abandoned here but will need some
+    // thought as abandoned entries are not stored.
+    pub fn cascade(&self) -> Cascade<'_> {
+        let integrated_data = DbPair {
+            element: &self.elements,
+            meta: &self.meta,
+        };
+        let rejected_data = DbPair {
+            element: &self.element_rejected,
+            meta: &self.meta_rejected,
+        };
+        Cascade::empty()
+            .with_integrated(integrated_data)
+            .with_rejected(rejected_data)
     }
 
     #[tracing::instrument(skip(self, writer))]
