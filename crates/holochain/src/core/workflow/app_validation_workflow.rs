@@ -303,7 +303,7 @@ async fn validate_op(
     let app_entry_type = get_app_entry_type(&element, &mut data_source, dependencies).await?;
 
     // Get the validation package
-    let validation_package = get_val_pack(&app_entry_type, &dna_file, conductor_api).await?;
+    let validation_package = get_validation_package(&app_entry_type, &dna_file, conductor_api).await?;
 
     let zomes_to_invoke =
         get_zomes_to_invoke(&element, &dna_file, &mut data_source, dependencies).await?;
@@ -545,7 +545,7 @@ fn extract_app_type(element: &Element) -> Option<AppEntryType> {
 
 /// Get the validation package based on
 /// the requirements set by the AppEntryType
-async fn get_val_pack(
+async fn get_validation_package(
     app_entry_type: &Option<AppEntryType>,
     dna_file: &DnaFile,
     conductor_api: &impl CellConductorApiT,
