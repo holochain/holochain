@@ -187,15 +187,19 @@ macro_rules! write_proxy_wire {
             }
 
             /// Decode a wire message.
-            pub fn decode(data: &[u8]) -> TransportResult<Self> {
+            pub fn decode(data: &[u8]) -> TransportResult<(usize, Self)> {
+                use serde::Deserialize;
                 if data.is_empty() {
                     return Err("cannot decode empty byte array".into());
                 }
                 Ok(match data[0] {
                     $(
-                        type_bytes::$c_name => Self::$c_name(
-                            rmp_serde::from_read_ref(&data[1..]).map_err(TransportError::other)?,
-                        ),
+                        type_bytes::$c_name => {
+                            let mut de = rmp_serde::decode::Deserializer::new(std::io::Cursor::new(&data[1..]));
+                            let val = Self::$c_name($c_name::deserialize(&mut de)
+                                .map_err(TransportError::other)?);
+                            ((de.position() + 1) as usize, val)
+                        },
                     )*
                     _ => return Err("corrupt wire message".into()),
                 })
@@ -252,7 +256,8 @@ macro_rules! write_proxy_wire {
                         $t_name,
                     )*);
                     let enc = msg.encode().unwrap();
-                    let dec = ProxyWire::decode(&enc).unwrap();
+                    let (size, dec) = ProxyWire::decode(&enc).unwrap();
+                    assert_eq!(enc.len(), size);
                     assert_eq!(msg, dec);
                 }
             )*

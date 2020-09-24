@@ -108,7 +108,7 @@ impl InnerTls {
                         let size = cli.read(&mut buf).map_err(TransportError::other)?;
                         in_post.extend_from_slice(&buf[..size]);
 
-                        if let Ok(proxy_wire) = ProxyWire::decode(&in_post) {
+                        if let Ok((_read_size, proxy_wire)) = ProxyWire::decode(&in_post) {
                             write.close().await?;
                             return Ok(proxy_wire);
                         }
@@ -214,7 +214,7 @@ impl TransportConnectionEventHandler for InnerTls {
                         srv.process_new_packets().map_err(TransportError::other)?;
                         let size = srv.read(&mut buf).map_err(TransportError::other)?;
                         in_post.extend_from_slice(&buf[..size]);
-                        if let Ok(proxy_wire) = ProxyWire::decode(&in_post) {
+                        if let Ok((_read_size, proxy_wire)) = ProxyWire::decode(&in_post) {
                             let res = match proxy_wire {
                                 ProxyWire::ReqProxy(_) => {
                                     evt_send.req_proxy().await.map(|proxy_url| {

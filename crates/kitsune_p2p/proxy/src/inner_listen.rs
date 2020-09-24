@@ -33,21 +33,28 @@ pub async fn spawn_kitsune_proxy_listener(
 
     let builder = ghost_actor::actor_builder::GhostActorBuilder::new();
 
-    let sender = builder
-        .channel_factory()
+    let channel_factory = builder.channel_factory().clone();
+
+    let sender = channel_factory
         .create_channel::<TransportListener>()
         .await?;
 
-    builder
-        .channel_factory()
-        .attach_receiver(sub_receiver)
-        .await?;
+    channel_factory.attach_receiver(sub_receiver).await?;
 
     let (evt_send, evt_recv) = futures::channel::mpsc::channel(10);
 
     tokio::task::spawn(
-        builder
-            .spawn(InnerListen::new(tls, accept_proxy_cb, sub_sender, evt_send, proxy_url).await?),
+        builder.spawn(
+            InnerListen::new(
+                channel_factory,
+                tls,
+                accept_proxy_cb,
+                sub_sender,
+                evt_send,
+                proxy_url,
+            )
+            .await?,
+        ),
     );
 
     Ok((sender, evt_recv))
@@ -77,7 +84,9 @@ pub(crate) fn gen_tls_configs(
     Ok((tls_server_config, tls_client_config))
 }
 
+#[allow(dead_code)]
 struct InnerListen {
+    channel_factory: ghost_actor::actor_builder::GhostActorChannelFactory<Self>,
     accept_proxy_cb: AcceptProxyCallback,
     sub_sender: ghost_actor::GhostSender<TransportListener>,
     evt_send: futures::channel::mpsc::Sender<TransportListenerEvent>,
@@ -88,15 +97,17 @@ struct InnerListen {
 
 impl InnerListen {
     pub async fn new(
+        channel_factory: ghost_actor::actor_builder::GhostActorChannelFactory<Self>,
         tls: TlsConfig,
         accept_proxy_cb: AcceptProxyCallback,
         sub_sender: ghost_actor::GhostSender<TransportListener>,
         evt_send: futures::channel::mpsc::Sender<TransportListenerEvent>,
-        proxy_url: Option<ProxyUrl>,
+        _proxy_url: Option<ProxyUrl>,
     ) -> TransportResult<Self> {
         let (tls_server_config, tls_client_config) = gen_tls_configs(&tls)?;
 
-        let mut out = Self {
+        let out = Self {
+            channel_factory,
             accept_proxy_cb,
             sub_sender,
             evt_send,
@@ -105,14 +116,17 @@ impl InnerListen {
             tls_client_config,
         };
 
+        /*
         if let Some(proxy_url) = proxy_url {
             let (_proxy_url, _proxy_send, _proxy_recv) =
                 out.negotiate_proxy_service(proxy_url).await?;
         }
+        */
 
         Ok(out)
     }
 
+    /*
     /// low-level transport connect
     fn low_level_connect(
         &self,
@@ -153,6 +167,7 @@ impl InnerListen {
         let (sender, receiver) = spawn_kitsune_proxy_connection(sender, receiver).await?;
         Ok(((*proxy_url).clone(), sender, receiver))
     }
+    */
 }
 
 impl ghost_actor::GhostControlHandler for InnerListen {
@@ -176,11 +191,12 @@ impl TransportListenerHandler for InnerListen {
 
     fn handle_connect(
         &mut self,
-        url: url2::Url2,
+        _url: url2::Url2,
     ) -> TransportListenerHandlerResult<(
         ghost_actor::GhostSender<TransportConnection>,
         TransportConnectionEventReceiver,
     )> {
+        /*
         let proxy_url: ProxyUrl = url.into();
         let fut = self.low_level_connect(&proxy_url)?;
         Ok(async move {
@@ -190,6 +206,21 @@ impl TransportListenerHandler for InnerListen {
         }
         .boxed()
         .into())
+        */
+        unimplemented!()
+    }
+}
+
+impl ghost_actor::GhostHandler<TransportConnectionEvent> for InnerListen {}
+
+impl TransportConnectionEventHandler for InnerListen {
+    fn handle_incoming_channel(
+        &mut self,
+        _url: url2::Url2,
+        _send: TransportChannelWrite,
+        _recv: TransportChannelRead,
+    ) -> TransportConnectionEventHandlerResult<()> {
+        unimplemented!()
     }
 }
 
@@ -198,9 +229,18 @@ impl ghost_actor::GhostHandler<TransportListenerEvent> for InnerListen {}
 impl TransportListenerEventHandler for InnerListen {
     fn handle_incoming_connection(
         &mut self,
-        sender: ghost_actor::GhostSender<TransportConnection>,
+        _sender: ghost_actor::GhostSender<TransportConnection>,
         receiver: TransportConnectionEventReceiver,
     ) -> TransportListenerEventHandlerResult<()> {
+        let fut = self.channel_factory.attach_receiver(receiver);
+
+        Ok(async move {
+            let _ = fut.await;
+            Ok(())
+        }
+        .boxed()
+        .into())
+        /*
         let accept_proxy_cb = self.accept_proxy_cb.clone();
         let evt_send = self.evt_send.clone();
         let tls = self.tls.clone();
@@ -222,6 +262,8 @@ impl TransportListenerEventHandler for InnerListen {
         }
         .boxed()
         .into())
+        */
+        //unimplemented!()
     }
 }
 
