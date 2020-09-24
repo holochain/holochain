@@ -188,6 +188,9 @@ macro_rules! write_proxy_wire {
 
             /// Decode a wire message.
             pub fn decode(data: &[u8]) -> TransportResult<Self> {
+                if data.is_empty() {
+                    return Err("cannot decode empty byte array".into());
+                }
                 Ok(match data[0] {
                     $(
                         type_bytes::$c_name => Self::$c_name(

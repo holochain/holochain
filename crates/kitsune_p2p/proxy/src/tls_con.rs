@@ -251,7 +251,13 @@ mod tests {
     use super::*;
 
     #[tokio::test(threaded_scheduler)]
-    async fn test_tls_connection() -> TransportResult<()> {
+    async fn test_tls_connection() {
+        if let Err(e) = test_tls_connection_inner().await {
+            panic!("{:?}", e);
+        }
+    }
+
+    async fn test_tls_connection_inner() -> TransportResult<()> {
         let tls = TlsConfig::new_ephemeral().await?;
         let (tls_server_config, tls_client_config) = inner_listen::gen_tls_configs(&tls)?;
 
@@ -265,7 +271,17 @@ mod tests {
 
         let track_con = move |mut recv: TlsConnectionReceiver| {
             tokio::task::spawn(async move {
-                while let Some(_msg) = recv.next().await {
+                while let Some(msg) = recv.next().await {
+                    match msg {
+                        TlsConnection::ReqProxy { respond, .. } => {
+                            respond.respond(Ok(async move {
+                                Ok(Arc::new("p://s/t/h/c.d/p/12/--".into()))
+                            }
+                            .boxed()
+                            .into()));
+                        }
+                        _ => panic!("unexpected: {:?}", msg),
+                    }
                 }
             });
         };
@@ -281,7 +297,10 @@ mod tests {
                 while let Some(msg) = recv.next().await {
                     match msg {
                         TransportListenerEvent::IncomingConnection {
-                            respond, sender, receiver, ..
+                            respond,
+                            sender,
+                            receiver,
+                            ..
                         } => {
                             let (_sender, receiver) = spawn_tls_connection(
                                 sender,
@@ -289,7 +308,8 @@ mod tests {
                                 t_tls.clone(),
                                 t_srv.clone(),
                                 t_cli.clone(),
-                            ).await?;
+                            )
+                            .await?;
                             track_con(receiver);
                             respond.respond(Ok(async move { Ok(()) }.boxed().into()));
                         }
@@ -303,14 +323,18 @@ mod tests {
         track_listen(evt2);
 
         let (con1, con_evt1) = bind1.connect(addr2.clone()).await?;
-        let (_con1, con_evt1) = spawn_tls_connection(
+        let (con1, con_evt1) = spawn_tls_connection(
             con1,
             con_evt1,
             tls.clone(),
             tls_server_config.clone(),
             tls_client_config.clone(),
-        ).await?;
+        )
+        .await?;
         track_con(con_evt1);
+
+        let res = con1.req_proxy().await?;
+        assert_eq!("p://s/t/h/c.d/p/12/--", &res.to_string());
 
         Ok(())
     }

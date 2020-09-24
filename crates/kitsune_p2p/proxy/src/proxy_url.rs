@@ -32,21 +32,21 @@ impl ProxyUrl {
     /// Create a new proxy url from a full url str.
     pub fn from_full(full: &str) -> TransportResult<Self> {
         macro_rules! err {
-            () => {
-                TransportError::from(format!("Invalid Proxy Url: {}", full))
+            ($h:literal) => {
+                TransportError::from(format!("Invalid Proxy Url({}): {}", $h, full))
             };
         }
-        let full = url2::try_url2!("{}", full).map_err(|_| err!())?;
+        let full = url2::try_url2!("{}", full).map_err(|_| err!("parse"))?;
         let base_scheme = match full.path_segments() {
-            None => return Err(err!()),
+            None => return Err(err!("read scheme")),
             Some(mut s) => match s.next() {
-                None => return Err(err!()),
+                None => return Err(err!("read scheme")),
                 Some(s) => s,
             },
         };
         let mut base = url2::url2!("{}://", base_scheme);
         {
-            let mut path = full.path_segments().ok_or_else(|| err!())?;
+            let mut path = full.path_segments().ok_or_else(|| err!("read base"))?;
             path.next();
             let mut found_base_path_marker = false;
             loop {
@@ -59,20 +59,24 @@ impl ProxyUrl {
                     continue;
                 }
                 if found_base_path_marker {
-                    base.path_segments_mut().map_err(|_| err!())?.push(key);
+                    base.path_segments_mut()
+                        .map_err(|_| err!("read marker"))?
+                        .push(key);
                 } else {
                     let val = match path.next() {
                         None => break,
                         Some(val) => val,
                     };
                     match key {
-                        "h" => base.set_host(Some(val)).map_err(|_| err!())?,
+                        "h" => base.set_host(Some(val)).map_err(|_| err!("read host"))?,
                         "p" => base
-                            .set_port(Some(val.parse().map_err(|_| err!())?))
-                            .map_err(|_| err!())?,
-                        "u" => base.set_username(val).map_err(|_| err!())?,
-                        "w" => base.set_password(Some(val)).map_err(|_| err!())?,
-                        _ => return Err(err!()),
+                            .set_port(Some(val.parse().map_err(|_| err!("read port"))?))
+                            .map_err(|_| err!("read port"))?,
+                        "u" => base.set_username(val).map_err(|_| err!("read username"))?,
+                        "w" => base
+                            .set_password(Some(val))
+                            .map_err(|_| err!("read password"))?,
+                        _ => return Err(err!("read base")),
                     }
                 }
             }
