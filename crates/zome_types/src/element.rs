@@ -132,7 +132,7 @@ impl ElementEntry {
     /// anything other than ElementEntry::Present returns None
     /// a present entry that fails to deserialize cleanly is an error
     /// a present entry that deserializes cleanly is returned as the provided type A
-    pub fn to_app_option<A: TryFrom<SerializedBytes>>(&self) -> Result<Option<A>, A::Error> {
+    pub fn to_app_option<A: TryFrom<SerializedBytes, Error = SerializedBytesError>>(&self) -> Result<Option<A>, SerializedBytesError> {
         match self.as_option() {
             Some(Entry::App(eb)) => Ok(Some(A::try_from(SerializedBytes::from(eb.to_owned()))?)),
             _ => Ok(None),
