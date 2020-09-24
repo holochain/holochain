@@ -12,7 +12,6 @@ pub mod guest_callback;
 pub mod host_fn;
 pub mod wasm_ribosome;
 
-use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
 use crate::core::ribosome::guest_callback::init::InitInvocation;
@@ -33,6 +32,7 @@ use crate::core::workflow::CallZomeWorkspaceLock;
 use crate::fixt::ExternInputFixturator;
 use crate::fixt::FunctionNameFixturator;
 use crate::fixt::ZomeNameFixturator;
+use crate::{conductor::interface::SignalMulticaster, core::ribosome::error::RibosomeError};
 use ::fixt::prelude::*;
 use derive_more::Constructor;
 use error::RibosomeResult;
@@ -356,7 +356,7 @@ pub struct ZomeCallHostAccess {
     pub workspace: CallZomeWorkspaceLock,
     pub keystore: KeystoreSender,
     pub network: HolochainP2pCell,
-    // pub signal_tx: ConductorSideSignalSender,
+    pub signal_tx: SignalMulticaster,
 }
 
 impl From<ZomeCallHostAccess> for HostAccess {

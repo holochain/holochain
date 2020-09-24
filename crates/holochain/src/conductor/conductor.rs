@@ -27,6 +27,7 @@ use super::{
         TaskManagerRunHandle,
     },
     paths::EnvironmentRootPath,
+    state::AppInterfaceId,
     state::ConductorState,
     CellError,
 };
@@ -35,6 +36,7 @@ use crate::{
         api::error::ConductorApiResult, cell::Cell, config::ConductorConfig,
         dna_store::MockDnaStore, error::ConductorResult, handle::ConductorHandle,
     },
+    core::signal::Signal,
     core::state::{source_chain::SourceChainBuf, wasm::WasmBuf},
 };
 use holochain_keystore::{
@@ -116,6 +118,10 @@ where
     /// This exists so that we can run tests and bind to port 0, and find out
     /// the dynamically allocated port later.
     admin_websocket_ports: Vec<u16>,
+
+    /// Collection of signal broadcasters per app interface, keyed by id
+    app_interface_signal_broadcasters:
+        HashMap<AppInterfaceId, tokio::sync::broadcast::Sender<Signal>>,
 
     /// Channel on which to send info about tasks we want to manage
     managed_task_add_sender: mpsc::Sender<ManagedTaskAdd>,
@@ -287,15 +293,18 @@ where
         port: u16,
         handle: ConductorHandle,
     ) -> ConductorResult<u16> {
-        let interface_id = format!("interface-{}", port).into();
-        let app_api = RealAppInterfaceApi::new(handle, interface_id);
+        let interface_id: AppInterfaceId = format!("interface-{}", port).into();
+        let app_api = RealAppInterfaceApi::new(handle, interface_id.clone());
         let (signal_broadcaster, _r) = tokio::sync::broadcast::channel(SIGNAL_BUFFER_SIZE);
         let stop_rx = self.managed_task_stop_broadcaster.subscribe();
-        let (port, task) = spawn_app_interface_task(port, app_api, signal_broadcaster, stop_rx)
-            .await
-            .map_err(Box::new)?;
+        let (port, task) =
+            spawn_app_interface_task(port, app_api, signal_broadcaster.clone(), stop_rx)
+                .await
+                .map_err(Box::new)?;
         // TODO: RELIABILITY: Handle this task by restating it if it fails and log the error
         self.manage_task(ManagedTaskAdd::dont_handle(task)).await?;
+        self.app_interface_signal_broadcasters
+            .insert(interface_id, signal_broadcaster);
         Ok(port)
     }
 
@@ -678,6 +687,7 @@ where
             state_db: KvStore::new(db),
             cells: HashMap::new(),
             shutting_down: false,
+            app_interface_signal_broadcasters: HashMap::new(),
             managed_task_add_sender: task_tx,
             managed_task_stop_broadcaster: stop_tx,
             task_manager_run_handle,

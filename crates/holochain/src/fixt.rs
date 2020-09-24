@@ -1,5 +1,6 @@
 pub mod curve;
 
+use crate::conductor::interface::SignalMulticaster;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsHostAccess;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
 use crate::core::ribosome::guest_callback::init::InitHostAccess;
@@ -256,6 +257,19 @@ fixturator!(
 );
 
 fixturator!(
+    SignalMulticaster;
+    curve Empty {
+        SignalMulticaster::new(Vec::new())
+    };
+    curve Unpredictable {
+        SignalMulticaster::new(Vec::new())
+    };
+    curve Predictable {
+        SignalMulticaster::new(Vec::new())
+    };
+);
+
+fixturator!(
     CallZomeWorkspaceLock;
     curve Empty {
         // XXX: This may not be great to just grab an environment for this purpose.
@@ -279,7 +293,7 @@ fixturator!(
 
 fixturator!(
     ZomeCallHostAccess;
-    constructor fn new(CallZomeWorkspaceLock, KeystoreSender, HolochainP2pCell);
+    constructor fn new(CallZomeWorkspaceLock, KeystoreSender, HolochainP2pCell, SignalMulticaster);
 );
 
 fixturator!(

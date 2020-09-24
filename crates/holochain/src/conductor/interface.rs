@@ -1,5 +1,5 @@
 use crate::{conductor::api::*, core::signal::Signal};
-use error::InterfaceResult;
+use error::{InterfaceError, InterfaceResult};
 use futures::{
     channel::mpsc::{channel, Receiver, Sender},
     future::{BoxFuture, FutureExt},
@@ -9,15 +9,42 @@ use futures::{
 use holochain_serialized_bytes::{SerializedBytes, SerializedBytesError};
 use serde::{Deserialize, Serialize};
 use std::convert::{TryFrom, TryInto};
+use tokio::sync::broadcast;
 
 pub mod error;
 pub mod websocket;
 
+#[derive(Clone, Debug)]
+pub struct SignalMulticaster(Vec<broadcast::Sender<Signal>>);
+
+impl SignalMulticaster {
+    /// send the signal to the connected client
+    pub async fn send(&mut self, sig: Signal) -> InterfaceResult<()> {
+        self.0
+            .iter_mut()
+            .map(|tx| tx.send(sig.clone()))
+            .collect::<Result<Vec<_>, broadcast::SendError<Signal>>>()
+            .map_err(InterfaceError::SignalSend)?;
+        Ok(())
+    }
+
+    /// internal constructor
+    pub fn new(senders: Vec<broadcast::Sender<Signal>>) -> Self {
+        Self(senders)
+    }
+
+    #[cfg(test)]
+    /// A sender with nothing to send to. A placeholder for tests
+    pub fn noop() -> Self {
+        Self(Vec::new())
+    }
+}
+
 /// Allows the conductor or cell to forward signals to connected clients
 #[derive(Clone)]
-pub struct ConductorSideSignalSender(Sender<Signal>);
+pub struct ConductorSideSignalSenderXx(Sender<Signal>);
 
-impl ConductorSideSignalSender {
+impl ConductorSideSignalSenderXx {
     /// send the signal to the connected client
     pub async fn send(&mut self, sig: Signal) -> InterfaceResult<()> {
         self.0.send(sig).await?;
@@ -48,6 +75,7 @@ pub type ExternalSideResponder =
 /// supply this function with:
 /// - a signal sender(sink)
 /// - a request(and response callback) stream
+// FIXME: this is only used in a test. If it doesn't wind up getting used, remove.
 pub fn create_interface_channel<Req, Res, ExternSig, ExternReq>(
     // the "external signal sink" - A sender that accepts already serialized
     // SerializedBytes.
@@ -57,7 +85,7 @@ pub fn create_interface_channel<Req, Res, ExternSig, ExternReq>(
     extern_req: ExternReq,
 ) -> (
     // creates a conductor side sender that accepts concrete signal types.
-    ConductorSideSignalSender,
+    ConductorSideSignalSenderXx,
     // creates a conductor side receiver that produces concrete request types.
     ConductorSideRequestReceiver<Req, Res>,
 )
@@ -105,7 +133,7 @@ where
     );
 
     // return the sender and the request/response stream
-    (ConductorSideSignalSender::priv_new(sig_send), req_recv)
+    (ConductorSideSignalSenderXx::priv_new(sig_send), req_recv)
 }
 
 /// bind a conductor-side request receiver to a particular conductor api
@@ -166,7 +194,7 @@ mod tests {
         let (mut send_req, recv_req) = channel(1);
 
         let (mut chan_sig_send, mut chan_req_recv): (
-            ConductorSideSignalSender,
+            ConductorSideSignalSenderXx,
             ConductorSideRequestReceiver<TestMsg, TestMsg>,
         ) = create_interface_channel(send_sig, recv_req);
 
