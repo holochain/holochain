@@ -293,7 +293,7 @@ async fn op_dependencies_held(
     }
 }
 
-/// Get an element that contains an entry from the cascade
+/// Check the cascade to see if this Header is also stored with an Entry
 async fn header_with_entry_is_stored(
     hash: &HeaderHash,
     mut cascade: Cascade<'_>,
@@ -315,7 +315,7 @@ async fn header_with_entry_is_stored(
     }
 }
 
-/// Get an entry that contains an entry from the cascade
+/// Check if an Entry is stored in the cascade
 async fn entry_is_stored(hash: &EntryHash, mut cascade: Cascade<'_>) -> CascadeResult<bool> {
     // TODO: PERF: Add contains() to cascade so we don't deserialize
     // the entry
@@ -328,7 +328,7 @@ async fn entry_is_stored(hash: &EntryHash, mut cascade: Cascade<'_>) -> CascadeR
     }
 }
 
-/// Get an header that contains an entry from the cascade
+/// Check if a header is stored in the cascade
 async fn header_is_stored(hash: &HeaderHash, mut cascade: Cascade<'_>) -> CascadeResult<bool> {
     match cascade
         .retrieve_header(hash.clone(), Default::default())
