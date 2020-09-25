@@ -256,7 +256,7 @@ async fn validate_op_inner(
     check_level: CheckLevel,
 ) -> SysValidationResult<()> {
     match op {
-        DhtOp::StoreElement(signature, header, entry) => {
+        DhtOp::StoreElement(_, header, entry) => {
             store_element(header, workspace, network.clone(), dependencies).await?;
             if let Some(entry) = entry {
                 store_entry(
@@ -271,11 +271,9 @@ async fn validate_op_inner(
                 )
                 .await?;
             }
-
-            all_op_check(signature, header).await?;
             Ok(())
         }
-        DhtOp::StoreEntry(signature, header, entry) => {
+        DhtOp::StoreEntry(_, header, entry) => {
             store_entry(
                 (header).into(),
                 entry.as_ref(),
@@ -288,10 +286,9 @@ async fn validate_op_inner(
 
             let header = header.clone().into();
             store_element(&header, workspace, network, dependencies).await?;
-            all_op_check(signature, &header).await?;
             Ok(())
         }
-        DhtOp::RegisterAgentActivity(signature, header) => {
+        DhtOp::RegisterAgentActivity(_, header) => {
             register_agent_activity(
                 header,
                 workspace,
@@ -301,52 +298,40 @@ async fn validate_op_inner(
             )
             .await?;
             store_element(header, workspace, network, dependencies).await?;
-            all_op_check(signature, header).await?;
             Ok(())
         }
-        DhtOp::RegisterUpdatedBy(signature, header) => {
+        DhtOp::RegisterUpdatedBy(_, header) => {
             register_updated_by(header, workspace, network, dependencies, check_level).await?;
-
-            let header = header.clone().into();
-            all_op_check(signature, &header).await?;
             Ok(())
         }
-        DhtOp::RegisterDeletedBy(signature, header) => {
+        DhtOp::RegisterDeletedBy(_, header) => {
             register_deleted_by(header, workspace, network, dependencies, check_level).await?;
-
-            let header = header.clone().into();
-            all_op_check(signature, &header).await?;
             Ok(())
         }
-        DhtOp::RegisterDeletedEntryHeader(signature, header) => {
+        DhtOp::RegisterDeletedEntryHeader(_, header) => {
             register_deleted_entry_header(header, workspace, network, dependencies, check_level)
                 .await?;
-
-            let header = header.clone().into();
-            all_op_check(signature, &header).await?;
             Ok(())
         }
-        DhtOp::RegisterAddLink(signature, header) => {
+        DhtOp::RegisterAddLink(_, header) => {
             register_add_link(header, workspace, network, dependencies, check_level).await?;
-
-            let header = header.clone().into();
-            all_op_check(signature, &header).await?;
             Ok(())
         }
-        DhtOp::RegisterRemoveLink(signature, header) => {
+        DhtOp::RegisterRemoveLink(_, header) => {
             register_delete_link(header, workspace, network, dependencies, check_level).await?;
-
-            let header = header.clone().into();
-            all_op_check(signature, &header).await?;
             Ok(())
         }
     }
 }
 
-async fn all_op_check(signature: &Signature, header: &Header) -> SysValidationResult<()> {
-    verify_header_signature(&signature, &header).await?;
-    author_key_is_valid(header.author()).await?;
-    Ok(())
+/// Check if the op has valid signature and author.
+/// Ops that fail this check should be dropped.
+pub async fn counterfeit_check(
+    signature: &Signature,
+    header: &Header,
+) -> SysValidationResult<bool> {
+    Ok(verify_header_signature(&signature, &header).await?
+        && author_key_is_valid(header.author()).await?)
 }
 
 async fn register_agent_activity(

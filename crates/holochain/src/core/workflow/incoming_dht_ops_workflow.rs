@@ -4,6 +4,7 @@ use super::{
     error::WorkflowResult,
     integrate_dht_ops_workflow::{integrate_single_data, integrate_single_metadata},
     produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertResult,
+    sys_validation_workflow::counterfeit_check,
     sys_validation_workflow::types::PendingDependencies,
 };
 use crate::core::{
@@ -44,7 +45,14 @@ pub async fn incoming_dht_ops_workflow(
     for (hash, op) in ops {
         if !workspace.op_exists(&hash)? {
             tracing::debug!(?op);
-            workspace.add_to_pending(hash, op).await?;
+            if should_keep(&op).await? {
+                workspace.add_to_pending(hash, op).await?;
+            } else {
+                tracing::warn!(
+                    msg = "Dropping op because it failed counterfeit checks",
+                    ?op
+                );
+            }
         }
     }
 
@@ -57,6 +65,13 @@ pub async fn incoming_dht_ops_workflow(
     sys_validation_trigger.trigger();
 
     Ok(())
+}
+
+/// If this op fails the counterfeit check it should be dropped
+async fn should_keep(op: &DhtOp) -> WorkflowResult<bool> {
+    let header = op.header();
+    let signature = op.signature();
+    Ok(counterfeit_check(signature, &header).await?)
 }
 
 #[allow(missing_docs)]

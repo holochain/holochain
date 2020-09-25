@@ -178,6 +178,22 @@ impl DhtOp {
             | DhtOp::RegisterRemoveLink(s, _) => s,
         }
     }
+
+    /// Get the header from this op
+    /// This requires cloning and converting the header
+    /// as some ops don't hold the Header type
+    pub fn header(&self) -> Header {
+        match self {
+            DhtOp::StoreElement(_, h, _) => h.clone(),
+            DhtOp::StoreEntry(_, h, _) => h.clone().into(),
+            DhtOp::RegisterAgentActivity(_, h) => h.clone(),
+            DhtOp::RegisterUpdatedBy(_, h) => h.clone().into(),
+            DhtOp::RegisterDeletedBy(_, h) => h.clone().into(),
+            DhtOp::RegisterDeletedEntryHeader(_, h) => h.clone().into(),
+            DhtOp::RegisterAddLink(_, h) => h.clone().into(),
+            DhtOp::RegisterRemoveLink(_, h) => h.clone().into(),
+        }
+    }
 }
 
 impl DhtOpLight {

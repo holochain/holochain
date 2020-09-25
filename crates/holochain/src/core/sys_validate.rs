@@ -170,19 +170,22 @@ pub fn sys_validate_header(
 //////////////////////////////
 
 /// Verify the signature for this header
-pub async fn verify_header_signature(sig: &Signature, header: &Header) -> SysValidationResult<()> {
+pub async fn verify_header_signature(
+    sig: &Signature,
+    header: &Header,
+) -> SysValidationResult<bool> {
     if header.author().verify_signature(sig, header).await? {
-        Ok(())
+        Ok(true)
     } else {
-        Err(ValidationOutcome::VerifySignature(sig.clone(), header.clone()).into())
+        Ok(false)
     }
 }
 
 /// Verify the author key was valid at the time
 /// of signing with dpki
 /// TODO: This is just a stub until we have dpki.
-pub async fn author_key_is_valid(_author: &AgentPubKey) -> SysValidationResult<()> {
-    Ok(())
+pub async fn author_key_is_valid(_author: &AgentPubKey) -> SysValidationResult<bool> {
+    Ok(true)
 }
 
 /// Check that previous header makes sense

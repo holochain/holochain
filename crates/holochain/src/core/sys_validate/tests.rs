@@ -134,7 +134,7 @@ async fn verify_header_signature_test() {
 
     assert_matches!(
         verify_header_signature(&real_signature, &header).await,
-        Ok(())
+        Ok(true)
     );
 }
 
