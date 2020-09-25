@@ -153,13 +153,10 @@ pub async fn integrate_dht_ops_workflow(
     Ok(result)
 }
 
-/// Integrate a single DhtOp to the specified stores.
+/// Integrate a single DhtOp to the stores based on the
+/// validation status.
 ///
-/// The two stores are intended to be either the pair of Vaults,
-/// or the pair of Caches, but never a mixture of the two.
-///
-/// We can skip integrating element data when integrating data as an Author
-/// rather than as an Authority, hence the last parameter.
+/// Check for dependencies in any of our other stores.
 #[instrument(skip(iv, workspace))]
 async fn integrate_single_dht_op(
     iv: IntegrationLimboValue,

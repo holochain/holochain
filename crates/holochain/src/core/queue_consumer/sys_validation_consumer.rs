@@ -37,6 +37,7 @@ pub fn spawn_sys_validation_consumer(
                 workspace,
                 env.clone().into(),
                 &mut trigger_app_validation,
+                trigger_self.clone(),
                 network.clone(),
                 conductor_api.clone(),
             )

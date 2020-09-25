@@ -277,9 +277,19 @@ where
     }
 
     /// Add the integrated [ElementBuf] and [MetadataBuf] to the cascade
-    pub fn with_network(mut self, network: Network) -> Self {
-        self.network = Some(network);
-        self
+    pub fn with_network<N: HolochainP2pCellT>(
+        self,
+        network: N,
+    ) -> Cascade<'a, N, MetaVault, MetaCache, MetaPending, MetaJudged, MetaRejected> {
+        Cascade {
+            integrated_data: self.integrated_data,
+            pending_data: self.pending_data,
+            judged_data: self.judged_data,
+            rejected_data: self.rejected_data,
+            cache_data: self.cache_data,
+            env: self.env,
+            network: Some(network),
+        }
     }
 
     async fn update_stores(&mut self, element: Element) -> CascadeResult<()> {

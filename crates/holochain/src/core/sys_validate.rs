@@ -2,10 +2,13 @@
 //! This module contains all the checks we run for sys validation
 
 use super::{
+    queue_consumer::TriggerSender,
     state::{
         element_buf::ElementBuf,
         metadata::{LinkMetaKey, MetadataBufT},
     },
+    workflow::incoming_dht_ops_workflow::incoming_dht_ops_workflow,
+    workflow::sys_validation_workflow::types::CheckLevel,
     workflow::sys_validation_workflow::SysValidationWorkspace,
 };
 use crate::conductor::{
@@ -14,9 +17,10 @@ use crate::conductor::{
 };
 use fallible_iterator::FallibleIterator;
 use holochain_keystore::AgentPubKeyExt;
-use holochain_state::{fresh_reader, prelude::PrefixType};
-use holochain_types::{header::NewEntryHeaderRef, Entry};
-use holochain_zome_types::signature::Signature;
+use holochain_p2p::HolochainP2pCell;
+use holochain_state::{env::EnvironmentWrite, fresh_reader, prelude::PrefixType};
+use holochain_types::{dht_op::DhtOp, header::NewEntryHeaderRef, Entry};
+use holochain_zome_types::{element::ElementEntry, signature::Signature};
 use holochain_zome_types::{
     element::SignedHeaderHashed,
     entry_def::{EntryDef, EntryVisibility},
@@ -393,4 +397,318 @@ pub fn check_update_reference(
         )
         .into())
     }
+}
+
+/// If we are not holding this header then
+/// retrieve it and send it as a RegisterAddLink DhtOp
+/// to our incoming_dht_ops_workflow.
+///
+/// Apply a checks callback to the Element.
+///
+/// Additionally sys validation will be triggered to
+/// run again if we weren't holding it.
+pub async fn check_and_hold_register_add_link<F>(
+    hash: &HeaderHash,
+    workspace: &mut SysValidationWorkspace,
+    network: HolochainP2pCell,
+    incoming_dht_ops_sender: IncomingDhtOpSender,
+    f: F,
+) -> SysValidationResult<()>
+where
+    F: FnOnce(&Element) -> SysValidationResult<()>,
+{
+    let source = check_and_hold(hash, workspace, network).await?;
+    f(source.as_ref())?;
+    incoming_dht_ops_sender
+        .send_register_add_link(source)
+        .await?;
+    Ok(())
+}
+
+/// If we are not holding this header then
+/// retrieve it and send it as a RegisterAgentActivity DhtOp
+/// to our incoming_dht_ops_workflow.
+///
+/// Apply a checks callback to the Element.
+///
+/// Additionally sys validation will be triggered to
+/// run again if we weren't holding it.
+pub async fn check_and_hold_register_agent_activity<F>(
+    hash: &HeaderHash,
+    workspace: &mut SysValidationWorkspace,
+    network: HolochainP2pCell,
+    incoming_dht_ops_sender: IncomingDhtOpSender,
+    f: F,
+) -> SysValidationResult<()>
+where
+    F: FnOnce(&Element) -> SysValidationResult<()>,
+{
+    let source = check_and_hold(hash, workspace, network).await?;
+    f(source.as_ref())?;
+    incoming_dht_ops_sender
+        .send_register_agent_activity(source)
+        .await?;
+    Ok(())
+}
+
+/// If we are not holding this header then
+/// retrieve it and send it as a StoreEntry DhtOp
+/// to our incoming_dht_ops_workflow.
+///
+/// Apply a checks callback to the Element.
+///
+/// Additionally sys validation will be triggered to
+/// run again if we weren't holding it.
+pub async fn check_and_hold_store_entry<F>(
+    hash: &HeaderHash,
+    workspace: &mut SysValidationWorkspace,
+    network: HolochainP2pCell,
+    incoming_dht_ops_sender: IncomingDhtOpSender,
+    f: F,
+) -> SysValidationResult<()>
+where
+    F: FnOnce(&Element) -> SysValidationResult<()>,
+{
+    let source = check_and_hold(hash, workspace, network).await?;
+    f(source.as_ref())?;
+    incoming_dht_ops_sender.send_store_entry(source).await?;
+    Ok(())
+}
+
+/// If we are not holding this entry then
+/// retrieve any element at this EntryHash
+/// and send it as a StoreEntry DhtOp
+/// to our incoming_dht_ops_workflow.
+///
+/// Note this is different to check_and_hold_store_entry
+/// because it gets the Element via an EntryHash which
+/// means it will be any Element.
+///
+/// Apply a checks callback to the Element.
+///
+/// Additionally sys validation will be triggered to
+/// run again if we weren't holding it.
+pub async fn check_and_hold_any_store_entry<F>(
+    hash: &EntryHash,
+    workspace: &mut SysValidationWorkspace,
+    network: HolochainP2pCell,
+    incoming_dht_ops_sender: IncomingDhtOpSender,
+    f: F,
+) -> SysValidationResult<()>
+where
+    F: FnOnce(&Element) -> SysValidationResult<()>,
+{
+    let source = check_and_hold(hash, workspace, network).await?;
+    f(source.as_ref())?;
+    incoming_dht_ops_sender.send_store_entry(source).await?;
+    Ok(())
+}
+
+/// If we are not holding this header then
+/// retrieve it and send it as a StoreElement DhtOp
+/// to our incoming_dht_ops_workflow.
+///
+/// Apply a checks callback to the Element.
+///
+/// Additionally sys validation will be triggered to
+/// run again if we weren't holding it.
+pub async fn check_and_hold_store_element<F>(
+    hash: &HeaderHash,
+    workspace: &mut SysValidationWorkspace,
+    network: HolochainP2pCell,
+    incoming_dht_ops_sender: IncomingDhtOpSender,
+    f: F,
+) -> SysValidationResult<()>
+where
+    F: FnOnce(&Element) -> SysValidationResult<()>,
+{
+    let source = check_and_hold(hash, workspace, network).await?;
+    f(source.as_ref())?;
+    incoming_dht_ops_sender.send_store_element(source).await?;
+    Ok(())
+}
+
+/// Allows you to send an op to the
+/// incoming_dht_ops_workflow if you
+/// found it on the network and were supposed
+/// to be holding it.
+#[derive(derive_more::Constructor)]
+pub struct IncomingDhtOpSender {
+    env: EnvironmentWrite,
+    sys_validation_trigger: TriggerSender,
+    check_level: CheckLevel,
+}
+
+impl IncomingDhtOpSender {
+    /// Sends the op to the workflow if it was found on the network
+    async fn send_op(
+        self,
+        source: Source,
+        make_op: fn(Element) -> Option<(DhtOpHash, DhtOp)>,
+    ) -> SysValidationResult<()> {
+        if let Source::Network(el) = source {
+            if let CheckLevel::Hold = self.check_level {
+                if let Some(op) = make_op(el) {
+                    let ops = vec![op];
+                    incoming_dht_ops_workflow(&self.env, self.sys_validation_trigger, ops)
+                        .await
+                        .map_err(Box::new)?;
+                }
+            }
+        }
+        Ok(())
+    }
+    async fn send_store_element(self, source: Source) -> SysValidationResult<()> {
+        self.send_op(source, make_store_element).await
+    }
+    async fn send_store_entry(self, source: Source) -> SysValidationResult<()> {
+        self.send_op(source, make_store_entry).await
+    }
+    async fn send_register_add_link(self, source: Source) -> SysValidationResult<()> {
+        self.send_op(source, make_register_add_link).await
+    }
+    async fn send_register_agent_activity(self, source: Source) -> SysValidationResult<()> {
+        self.send_op(source, make_register_agent_activity).await
+    }
+}
+
+/// Where the element was found.
+enum Source {
+    /// Locally because we are holding it or
+    /// because we will be soon
+    Local(Element),
+    /// On the network.
+    /// This means we aren't holding it so
+    /// we should add it to our incoming ops
+    Network(Element),
+}
+
+impl AsRef<Element> for Source {
+    fn as_ref(&self) -> &Element {
+        match self {
+            Source::Local(el) | Source::Network(el) => el,
+        }
+    }
+}
+
+/// Check if we are holding a dependency and
+/// run a check callback on the it.
+/// This function also returns where the dependency
+/// was found so you can decide whether or not to add
+/// it to the incoming ops.
+async fn check_and_hold<I: Into<AnyDhtHash> + Clone>(
+    hash: &I,
+    workspace: &mut SysValidationWorkspace,
+    network: HolochainP2pCell,
+) -> SysValidationResult<Source> {
+    let hash: AnyDhtHash = hash.clone().into();
+    // Create a workspace with just the local stores
+    let mut local_cascade = workspace.local_cascade();
+    if let Some(el) = local_cascade
+        .retrieve(hash.clone(), Default::default())
+        .await?
+    {
+        return Ok(Source::Local(el));
+    }
+    // Create a workspace with just the network
+    let mut network_only_cascade = workspace.network_only_cascade(network);
+    match network_only_cascade
+        .retrieve(hash.clone(), Default::default())
+        .await?
+    {
+        Some(el) => Ok(Source::Network(el)),
+        None => Err(ValidationOutcome::NotHoldingDep(hash).into()),
+    }
+}
+
+/// Make a StoreElement DhtOp from an Element.
+/// Note that this can fail if the op is missing an
+/// Entry when it was supposed to have one.
+///
+/// Because adding ops to incoming limbo while we are checking them
+/// is only faster then waiting for them through gossip we don't care enough
+/// to return an error.
+fn make_store_element(element: Element) -> Option<(DhtOpHash, DhtOp)> {
+    // Extract the data
+    let (shh, element_entry) = element.into_inner();
+    let (header, signature) = shh.into_header_and_signature();
+    let header = header.into_content();
+
+    // Check the entry
+    let maybe_entry_box = match element_entry {
+        ElementEntry::Present(e) => Some(e.into()),
+        // This is ok because we weren't expecting an entry
+        ElementEntry::NotApplicable | ElementEntry::Hidden => None,
+        // The element is expected to have an entry but it wasn't
+        // stored so we can't add this to incoming ops
+        ElementEntry::NotStored => return None,
+    };
+
+    // Create the hash and op
+    let op = DhtOp::StoreElement(signature, header, maybe_entry_box);
+    let hash = DhtOpHash::with_data_sync(&op);
+    Some((hash, op))
+}
+
+/// Make a StoreEntry DhtOp from an Element.
+/// Note that this can fail if the op is missing an Entry or
+/// the header is the wrong type.
+///
+/// Because adding ops to incoming limbo while we are checking them
+/// is only faster then waiting for them through gossip we don't care enough
+/// to return an error.
+fn make_store_entry(element: Element) -> Option<(DhtOpHash, DhtOp)> {
+    // Extract the data
+    let (shh, element_entry) = element.into_inner();
+    let (header, signature) = shh.into_header_and_signature();
+
+    // Check the entry and exit early if it's not there
+    let entry_box = element_entry.into_option()?.into();
+    // If the header is the wrong type exit early
+    let header = header.into_content().try_into().ok()?;
+
+    // Create the hash and op
+    let op = DhtOp::StoreEntry(signature, header, entry_box);
+    let hash = DhtOpHash::with_data_sync(&op);
+    Some((hash, op))
+}
+
+/// Make a RegisterAddLink DhtOp from an Element.
+/// Note that this can fail if the header is the wrong type
+///
+/// Because adding ops to incoming limbo while we are checking them
+/// is only faster then waiting for them through gossip we don't care enough
+/// to return an error.
+fn make_register_add_link(element: Element) -> Option<(DhtOpHash, DhtOp)> {
+    // Extract the data
+    let (shh, _) = element.into_inner();
+    let (header, signature) = shh.into_header_and_signature();
+
+    // If the header is the wrong type exit early
+    let header = header.into_content().try_into().ok()?;
+
+    // Create the hash and op
+    let op = DhtOp::RegisterAddLink(signature, header);
+    let hash = DhtOpHash::with_data_sync(&op);
+    Some((hash, op))
+}
+
+/// Make a RegisterAgentActivity DhtOp from an Element.
+/// Note that this can fail if the header is the wrong type
+///
+/// Because adding ops to incoming limbo while we are checking them
+/// is only faster then waiting for them through gossip we don't care enough
+/// to return an error.
+fn make_register_agent_activity(element: Element) -> Option<(DhtOpHash, DhtOp)> {
+    // Extract the data
+    let (shh, _) = element.into_inner();
+    let (header, signature) = shh.into_header_and_signature();
+
+    // If the header is the wrong type exit early
+    let header = header.into_content();
+
+    // Create the hash and op
+    let op = DhtOp::RegisterAgentActivity(signature, header);
+    let hash = DhtOpHash::with_data_sync(&op);
+    Some((hash, op))
 }
