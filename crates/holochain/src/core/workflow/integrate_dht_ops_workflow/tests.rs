@@ -1241,7 +1241,7 @@ async fn test_wasm_api_without_integration_delete() {
 async fn test_integrate_single_register_replaced_by_for_header() {
     // For RegisterUpdatedBy with intended_for Header
     // metadata has Update on HeaderHash but not EntryHash
-    todo!()
+    todo!("write this test")
 }
 
 #[tokio::test(threaded_scheduler)]
@@ -1249,7 +1249,7 @@ async fn test_integrate_single_register_replaced_by_for_header() {
 async fn test_integrate_single_register_replaced_by_for_entry() {
     // For RegisterUpdatedBy with intended_for Entry
     // metadata has Update on EntryHash but not HeaderHash
-    todo!()
+    todo!("write this test")
 }
 
 #[tokio::test(threaded_scheduler)]
@@ -1257,7 +1257,7 @@ async fn test_integrate_single_register_replaced_by_for_entry() {
 async fn test_integrate_single_register_delete_on_headerd_by() {
     // For RegisterDeletedBy
     // metadata has Delete on HeaderHash
-    todo!()
+    todo!("write this test")
 }
 
 #[tokio::test(threaded_scheduler)]
@@ -1265,7 +1265,7 @@ async fn test_integrate_single_register_delete_on_headerd_by() {
 async fn test_integrate_single_register_add_link() {
     // For RegisterAddLink
     // metadata has link on EntryHash
-    todo!()
+    todo!("write this test")
 }
 
 #[tokio::test(threaded_scheduler)]
@@ -1273,7 +1273,7 @@ async fn test_integrate_single_register_add_link() {
 async fn test_integrate_single_register_delete_link() {
     // For RegisterAddLink
     // metadata has link on EntryHash
-    todo!()
+    todo!("write this test")
 }
 
 #[cfg(feature = "slow_tests")]

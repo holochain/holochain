@@ -32,7 +32,7 @@ use crate::core::workflow::CallZomeWorkspaceLock;
 use crate::fixt::ExternInputFixturator;
 use crate::fixt::FunctionNameFixturator;
 use crate::fixt::ZomeNameFixturator;
-use crate::{conductor::interface::SignalMulticaster, core::ribosome::error::RibosomeError};
+use crate::{conductor::interface::SignalBroadcaster, core::ribosome::error::RibosomeError};
 use ::fixt::prelude::*;
 use derive_more::Constructor;
 use error::RibosomeResult;
@@ -147,6 +147,16 @@ impl HostAccess {
             Self::ZomeCall(ZomeCallHostAccess { network, .. })
             | Self::Init(InitHostAccess { network, .. })
             | Self::PostCommit(PostCommitHostAccess { network, .. }) => network,
+            _ => panic!(
+                "Gave access to a host function that uses the network without providing a network"
+            ),
+        }
+    }
+
+    /// Get the signal broadcaster, panics if none was provided
+    pub fn signal_tx(&self) -> &SignalBroadcaster {
+        match self {
+            Self::ZomeCall(ZomeCallHostAccess { signal_tx, .. }) => signal_tx,
             _ => panic!(
                 "Gave access to a host function that uses the network without providing a network"
             ),
@@ -356,7 +366,7 @@ pub struct ZomeCallHostAccess {
     pub workspace: CallZomeWorkspaceLock,
     pub keystore: KeystoreSender,
     pub network: HolochainP2pCell,
-    pub signal_tx: SignalMulticaster,
+    pub signal_tx: SignalBroadcaster,
 }
 
 impl From<ZomeCallHostAccess> for HostAccess {

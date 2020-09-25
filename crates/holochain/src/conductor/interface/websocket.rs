@@ -190,6 +190,8 @@ async fn recv_incoming_msgs_and_outgoing_signals<A: InterfaceApi>(
         tokio::select! {
             // If we receive a Signal broadcasted from a Cell, push it out
             // across the interface
+            // NOTE: we could just use futures::StreamExt::forward to hook this
+            // tx and rx together in a new spawned task
             signal = rx_from_cell.next() => {
                 if let Some(signal) = signal {
                     let bytes = SerializedBytes::try_from(

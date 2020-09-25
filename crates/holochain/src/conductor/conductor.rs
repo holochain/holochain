@@ -21,6 +21,7 @@ use super::{
             spawn_admin_interface_task, spawn_app_interface_task, spawn_websocket_listener,
             SIGNAL_BUFFER_SIZE,
         },
+        SignalBroadcaster,
     },
     manager::{
         keep_alive_task, spawn_task_manager, ManagedTaskAdd, ManagedTaskHandle,
@@ -295,17 +296,28 @@ where
     ) -> ConductorResult<u16> {
         let interface_id: AppInterfaceId = format!("interface-{}", port).into();
         let app_api = RealAppInterfaceApi::new(handle, interface_id.clone());
+        // This receiver is thrown away because we can produce infinite new
+        // receivers from the Sender
         let (signal_broadcaster, _r) = tokio::sync::broadcast::channel(SIGNAL_BUFFER_SIZE);
         let stop_rx = self.managed_task_stop_broadcaster.subscribe();
         let (port, task) =
             spawn_app_interface_task(port, app_api, signal_broadcaster.clone(), stop_rx)
                 .await
                 .map_err(Box::new)?;
-        // TODO: RELIABILITY: Handle this task by restating it if it fails and log the error
+        // TODO: RELIABILITY: Handle this task by restarting it if it fails and log the error
         self.manage_task(ManagedTaskAdd::dont_handle(task)).await?;
         self.app_interface_signal_broadcasters
             .insert(interface_id, signal_broadcaster);
         Ok(port)
+    }
+
+    pub(super) fn signal_broadcaster(&self) -> SignalBroadcaster {
+        SignalBroadcaster::new(
+            self.app_interface_signal_broadcasters
+                .values()
+                .cloned()
+                .collect(),
+        )
     }
 
     /// Perform Genesis on the source chains for each of the specified CellIds.
@@ -344,7 +356,7 @@ where
         // unwrap safe because of the partition
         let success = success.into_iter().map(Result::unwrap);
 
-        // If there was errors, cleanup and return the errors
+        // If there were errors, cleanup and return the errors
         if !errors.is_empty() {
             for cell_id in success {
                 let env = EnvironmentWrite::new(

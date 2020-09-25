@@ -4,7 +4,7 @@
 //! Elements can be added. A constructed Cell is guaranteed to have a valid
 //! SourceChain which has already undergone Genesis.
 
-use super::{interface::SignalMulticaster, manager::ManagedTaskAdd};
+use super::{interface::SignalBroadcaster, manager::ManagedTaskAdd};
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::api::CellConductorApiT;
 use crate::conductor::handle::ConductorHandle;
@@ -208,8 +208,8 @@ impl Cell {
         &self.holochain_p2p_cell
     }
 
-    fn signal_multicaster(&self) -> SignalMulticaster {
-        todo!()
+    async fn signal_broadcaster(&self) -> SignalBroadcaster {
+        self.conductor_api.signal_broadcaster().await
     }
 
     #[instrument(skip(self, evt))]
@@ -671,7 +671,7 @@ impl Cell {
             workspace,
             self.holochain_p2p_cell.clone(),
             keystore,
-            self.signal_multicaster(),
+            self.signal_broadcaster().await,
             arc.clone().into(),
             args,
             self.queue_triggers.produce_dht_ops.clone(),

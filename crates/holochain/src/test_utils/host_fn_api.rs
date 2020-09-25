@@ -1,5 +1,5 @@
 use crate::{
-    conductor::interface::SignalMulticaster,
+    conductor::interface::SignalBroadcaster,
     conductor::ConductorHandle,
     core::{
         ribosome::{host_fn, wasm_ribosome::WasmRibosome, CallContext, ZomeCallHostAccess},
@@ -58,7 +58,7 @@ pub struct CallData {
     pub zome_name: ZomeName,
     pub network: HolochainP2pCell,
     pub keystore: KeystoreSender,
-    pub signal_tx: SignalMulticaster,
+    pub signal_tx: SignalBroadcaster,
 }
 
 impl CallData {
@@ -75,7 +75,7 @@ impl CallData {
 
         let zome_name = dna_file.dna().zomes.get(0).unwrap().0.clone();
         let ribosome = WasmRibosome::new(dna_file.clone());
-        let signal_tx = todo!();
+        let signal_tx = todo!("get the signal broadcaster");
         let call_data = CallData {
             ribosome,
             zome_name,

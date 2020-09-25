@@ -52,6 +52,7 @@ use super::{
     dna_store::DnaStore,
     entry_def_store::EntryDefBufferKey,
     error::{ConductorResult, CreateAppError},
+    interface::SignalBroadcaster,
     manager::TaskManagerRunHandle,
     state::AppInterfaceId,
     Cell, Conductor,
@@ -182,12 +183,9 @@ pub trait ConductorHandleT: Send + Sync {
     #[allow(clippy::ptr_arg)]
     async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String>;
 
-    /// Update Signal subscription for an interface
-    async fn update_signal_subscription(
-        &self,
-        app_interface_id: &AppInterfaceId,
-        subscription: SignalSubscription,
-    ) -> ConductorResult<()>;
+    /// Access the broadcast Sender which will send a Signal across every
+    /// attached app interface
+    async fn signal_broadcaster(&self) -> SignalBroadcaster;
 
     /// Get info about an installed App, whether active or inactive
     #[allow(clippy::ptr_arg)]
@@ -415,12 +413,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         self.conductor.read().await.dump_cell_state(cell_id).await
     }
 
-    async fn update_signal_subscription(
-        &self,
-        _app_interface_id: &AppInterfaceId,
-        _subscription: SignalSubscription,
-    ) -> ConductorResult<()> {
-        todo!()
+    async fn signal_broadcaster(&self) -> SignalBroadcaster {
+        self.conductor.read().await.signal_broadcaster()
     }
 
     async fn get_app_info(&self, app_id: &AppId) -> ConductorResult<Option<InstalledApp>> {

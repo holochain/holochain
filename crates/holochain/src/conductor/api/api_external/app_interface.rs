@@ -65,10 +65,7 @@ impl AppInterfaceApi for RealAppInterfaceApi {
                 self.conductor_handle.get_app_info(&app_id).await?,
             )),
             AppRequest::SignalSubscription(subscription) => {
-                self.conductor_handle
-                    .update_signal_subscription(&self.interface_id, subscription)
-                    .await?;
-                Ok(AppResponse::SignalSubscriptionUpdated)
+                todo!("Signal pubsub not yet implemented")
             }
             AppRequest::ZomeCallInvocation(request) => {
                 match self.conductor_handle.call_zome(*request).await? {

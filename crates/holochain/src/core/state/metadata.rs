@@ -621,11 +621,11 @@ where
     }
 
     fn get_canonical_entry_hash(&self, _entry_hash: EntryHash) -> DatabaseResult<EntryHash> {
-        todo!()
+        todo!("Cannot implement until redirects are implemented")
     }
 
     fn get_canonical_header_hash(&self, _header_hash: HeaderHash) -> DatabaseResult<HeaderHash> {
-        todo!()
+        todo!("Cannot implement until redirects are implemented")
     }
 
     fn get_link_removes_on_link_add<'r, R: Readable>(

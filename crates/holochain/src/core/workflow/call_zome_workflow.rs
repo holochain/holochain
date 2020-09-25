@@ -16,7 +16,7 @@ use crate::core::{
     },
     sys_validate_element,
 };
-use crate::{conductor::interface::SignalMulticaster, core::ribosome::error::RibosomeError};
+use crate::{conductor::interface::SignalBroadcaster, core::ribosome::error::RibosomeError};
 pub use call_zome_workspace_lock::CallZomeWorkspaceLock;
 use fallible_iterator::FallibleIterator;
 use holo_hash::AnyDhtHash;
@@ -47,7 +47,7 @@ pub async fn call_zome_workflow<'env, Ribosome: RibosomeT>(
     workspace: CallZomeWorkspace,
     network: HolochainP2pCell,
     keystore: KeystoreSender,
-    signal_tx: SignalMulticaster,
+    signal_tx: SignalBroadcaster,
     writer: OneshotWriter,
     args: CallZomeWorkflowArgs<Ribosome>,
     mut trigger_produce_dht_ops: TriggerSender,
@@ -75,7 +75,7 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT>(
     workspace_lock: CallZomeWorkspaceLock,
     network: HolochainP2pCell,
     keystore: KeystoreSender,
-    signal_tx: SignalMulticaster,
+    signal_tx: SignalBroadcaster,
     args: CallZomeWorkflowArgs<Ribosome>,
 ) -> WorkflowResult<ZomeCallInvocationResult> {
     let CallZomeWorkflowArgs {
@@ -311,7 +311,7 @@ pub mod tests {
             workspace.into(),
             network,
             keystore,
-            SignalMulticaster::noop(),
+            SignalBroadcaster::noop(),
             args,
         )
         .await

@@ -15,9 +15,9 @@ pub mod error;
 pub mod websocket;
 
 #[derive(Clone, Debug)]
-pub struct SignalMulticaster(Vec<broadcast::Sender<Signal>>);
+pub struct SignalBroadcaster(Vec<broadcast::Sender<Signal>>);
 
-impl SignalMulticaster {
+impl SignalBroadcaster {
     /// send the signal to the connected client
     pub async fn send(&mut self, sig: Signal) -> InterfaceResult<()> {
         self.0
@@ -42,9 +42,9 @@ impl SignalMulticaster {
 
 /// Allows the conductor or cell to forward signals to connected clients
 #[derive(Clone)]
-pub struct ConductorSideSignalSenderXx(Sender<Signal>);
+pub struct ConductorSideSignalSender(Sender<Signal>);
 
-impl ConductorSideSignalSenderXx {
+impl ConductorSideSignalSender {
     /// send the signal to the connected client
     pub async fn send(&mut self, sig: Signal) -> InterfaceResult<()> {
         self.0.send(sig).await?;
@@ -85,7 +85,7 @@ pub fn create_interface_channel<Req, Res, ExternSig, ExternReq>(
     extern_req: ExternReq,
 ) -> (
     // creates a conductor side sender that accepts concrete signal types.
-    ConductorSideSignalSenderXx,
+    ConductorSideSignalSender,
     // creates a conductor side receiver that produces concrete request types.
     ConductorSideRequestReceiver<Req, Res>,
 )
@@ -133,7 +133,7 @@ where
     );
 
     // return the sender and the request/response stream
-    (ConductorSideSignalSenderXx::priv_new(sig_send), req_recv)
+    (ConductorSideSignalSender::priv_new(sig_send), req_recv)
 }
 
 /// bind a conductor-side request receiver to a particular conductor api
@@ -194,7 +194,7 @@ mod tests {
         let (mut send_req, recv_req) = channel(1);
 
         let (mut chan_sig_send, mut chan_req_recv): (
-            ConductorSideSignalSenderXx,
+            ConductorSideSignalSender,
             ConductorSideRequestReceiver<TestMsg, TestMsg>,
         ) = create_interface_channel(send_sig, recv_req);
 
