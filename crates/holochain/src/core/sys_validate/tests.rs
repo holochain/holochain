@@ -129,7 +129,7 @@ async fn verify_header_signature_test() {
 
     assert_matches!(
         verify_header_signature(&wrong_signature, &header).await,
-        Err(SysValidationError::ValidationOutcome(ValidationOutcome::VerifySignature(_, _)))
+        Ok(false)
     );
 
     assert_matches!(

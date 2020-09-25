@@ -1,13 +1,23 @@
 use super::*;
 use ::fixt::prelude::*;
+use holochain_keystore::AgentPubKeyExt;
 use holochain_state::test_utils::TestEnvironment;
 use holochain_types::{dht_op::DhtOp, fixt::*};
+use holochain_zome_types::{test_utils::fake_agent_pubkey_1, Header};
 
 #[tokio::test(threaded_scheduler)]
 async fn incoming_ops_to_limbo() {
     let TestEnvironment { env, tmpdir: _t } = holochain_state::test_utils::test_cell_env();
+    let keystore = holochain_state::test_utils::test_keystore();
     let (sys_validation_trigger, mut rx) = TriggerSender::new();
-    let op = DhtOp::RegisterAgentActivity(fixt!(Signature), fixt!(Header));
+
+    let author = fake_agent_pubkey_1();
+    let mut header = fixt!(CreateLink);
+    header.author = author.clone();
+    let header = Header::CreateLink(header);
+    let signature = author.sign(&keystore, &header).await.unwrap();
+
+    let op = DhtOp::RegisterAgentActivity(signature, header);
     let op_light = op.to_light().await;
     let hash = DhtOpHash::with_data_sync(&op);
     let ops = vec![(hash.clone(), op.clone())];
