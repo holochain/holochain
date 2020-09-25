@@ -283,6 +283,7 @@ async fn call_zome() {
     let mut holochain = start_holochain(config_path.clone()).await;
 
     let (mut client, _) = websocket_client_by_port(port).await.unwrap();
+    let (_, receiver2) = websocket_client_by_port(port).await.unwrap();
 
     let uuid = uuid::Uuid::new_v4();
     let dna = fake_dna_zomes(
@@ -326,6 +327,18 @@ async fn call_zome() {
 
     // Call Zome
     call_foo_fn(app_port, original_dna_hash.clone(), &mut holochain).await;
+
+    // Ensure that the other client does not receive any messages, i.e. that
+    // responses are not broadcast to all connected clients, only the one
+    // that made the request.
+    assert!(
+        receiver2
+            .timeout(Duration::from_millis(500))
+            .next()
+            .await
+            .unwrap()
+            .is_err() // Err means the timeout elapsed
+    );
 
     client.close(1000, "Shutting down".into()).await.unwrap();
     // Shutdown holochain
