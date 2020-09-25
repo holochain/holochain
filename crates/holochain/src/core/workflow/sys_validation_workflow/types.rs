@@ -79,10 +79,10 @@ pub enum DepType {
 /// Sets the level required for validation dependencies
 #[derive(Clone, Debug, Copy)]
 pub enum CheckLevel {
-    /// Selected dependencies must be validated by this agent
-    Proof,
-    /// Selected dependencies must be validated by another authority
-    Claim,
+    /// Selected dependencies must be held by this agent
+    Hold,
+    /// Selected dependencies must be witnessed by this agent
+    Witness,
 }
 
 impl<T> Dependency<T> {
