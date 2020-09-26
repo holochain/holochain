@@ -19,6 +19,8 @@ pub(crate) use wire::*;
 
 #[allow(dead_code)]
 mod wire_read;
+#[allow(dead_code)]
+mod wire_write;
 
 mod config;
 pub use config::*;

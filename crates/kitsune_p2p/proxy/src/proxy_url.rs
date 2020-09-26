@@ -124,6 +124,12 @@ impl ProxyUrl {
         Ok(Self { full, base })
     }
 
+    /// Get a short-hash / first six characters of tls digest for logging
+    pub fn short(&self) -> &str {
+        let h = self.full.host_str().unwrap();
+        &h[..std::cmp::min(h.chars().count(), 6)]
+    }
+
     /// Get the base url this proxy is addressable at.
     pub fn as_base(&self) -> &url2::Url2 {
         &self.base

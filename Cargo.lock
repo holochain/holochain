@@ -1629,6 +1629,7 @@ dependencies = [
  "serde",
  "serde_bytes",
  "tokio",
+ "tracing-subscriber",
  "webpki",
 ]
 

@@ -3,7 +3,7 @@ use futures::{sink::SinkExt, stream::StreamExt};
 
 pub(crate) fn wrap_wire_read(
     mut read: TransportChannelRead,
-) -> impl futures::stream::Stream<Item = ProxyWire> {
+) -> futures::channel::mpsc::Receiver<ProxyWire> {
     let (mut send, recv) = futures::channel::mpsc::channel(10);
 
     tokio::task::spawn(async move {
