@@ -61,7 +61,7 @@ pub mod error;
 
 /// Get an item from an option
 /// or return early from the function
-macro_rules! get_or_return {
+macro_rules! ok_or_return {
     ($n:expr) => {
         match $n {
             Some(n) => n,
@@ -78,7 +78,7 @@ macro_rules! get_or_return {
 
 /// Return from a function if
 /// an item is found otherwise continue
-macro_rules! return_if_found {
+macro_rules! return_if_ok {
     ($i:expr) => {
         if let Some(i) = $i {
             return Ok(Some(i));
@@ -90,20 +90,20 @@ macro_rules! return_if_found {
 macro_rules! search_all {
     ($cascade:expr, $fn:ident, $hash:expr) => {{
         if let Some(db) = $cascade.pending_data.as_ref() {
-            return_if_found!($fn(db, $hash)?)
+            return_if_ok!($fn(db, $hash)?)
         }
         if let Some(db) = $cascade.judged_data.as_ref() {
-            return_if_found!($fn(db, $hash)?)
+            return_if_ok!($fn(db, $hash)?)
         }
         if let Some(db) = $cascade.integrated_data.as_ref() {
-            return_if_found!($fn(db, $hash)?)
+            return_if_ok!($fn(db, $hash)?)
         }
         if let Some(db) = $cascade.rejected_data.as_ref() {
-            return_if_found!($fn(db, $hash)?)
+            return_if_ok!($fn(db, $hash)?)
         }
         if let Some(db) = $cascade.cache_data.as_ref() {
             let db = DbPair::from(db);
-            return_if_found!($fn(&db, $hash)?)
+            return_if_ok!($fn(&db, $hash)?)
         }
         Ok(None)
     }};
@@ -293,7 +293,7 @@ where
     }
 
     async fn update_stores(&mut self, element: Element) -> CascadeResult<()> {
-        let cache_data = get_or_return!(self.cache_data.as_mut());
+        let cache_data = ok_or_return!(self.cache_data.as_mut());
         let op_lights = produce_op_lights_from_elements(vec![&element]).await?;
         let (shh, e) = element.into_inner();
         cache_data.element.put(shh, option_entry_hashed(e).await)?;
@@ -308,7 +308,7 @@ where
         &mut self,
         elements: ElementGroup<'_>,
     ) -> CascadeResult<()> {
-        let cache_data = get_or_return!(self.cache_data.as_mut());
+        let cache_data = ok_or_return!(self.cache_data.as_mut());
         let op_lights = produce_op_lights_from_element_group(&elements).await?;
         cache_data.element.put_element_group(elements)?;
         for op in op_lights {
@@ -322,7 +322,7 @@ where
         hash: HeaderHash,
         options: GetOptions,
     ) -> CascadeResult<()> {
-        let network = get_or_return!(self.network.as_mut());
+        let network = ok_or_return!(self.network.as_mut());
         let results = network.get(hash.into(), options).await?;
         // Search through the returns for the first delete
         for response in results.into_iter() {
@@ -355,7 +355,7 @@ where
         hash: EntryHash,
         options: GetOptions,
     ) -> CascadeResult<()> {
-        let network = get_or_return!(self.network.as_mut());
+        let network = ok_or_return!(self.network.as_mut());
         let results = network
             .get(hash.clone().into(), options.clone())
             .instrument(debug_span!("fetch_element_via_entry::network_get"))
@@ -405,7 +405,7 @@ where
         basis: AnyDhtHash,
         options: GetMetaOptions,
     ) -> CascadeResult<Vec<MetadataSet>> {
-        let network = get_or_return!(self.network.as_mut(), vec![]);
+        let network = ok_or_return!(self.network.as_mut(), vec![]);
         Ok(network.get_meta(basis.clone(), options).await?)
     }
 
@@ -416,7 +416,7 @@ where
         options: GetLinksOptions,
     ) -> CascadeResult<()> {
         debug!("in get links");
-        let network = get_or_return!(self.network.as_mut());
+        let network = ok_or_return!(self.network.as_mut());
         let results = network.get_links(link_key, options).await?;
 
         for links in results {
@@ -470,7 +470,7 @@ where
             fresh_reader!(db.meta.env(), |r| {
                 let mut iter = db.meta.get_headers(&r, hash.clone())?;
                 while let Some(h) = iter.next()? {
-                    return_if_found!(db.element.get_element(&h.header_hash)?)
+                    return_if_ok!(db.element.get_element(&h.header_hash)?)
                 }
                 Ok(None)
             })
@@ -526,8 +526,8 @@ where
     }
 
     async fn create_entry_details(&self, hash: EntryHash) -> CascadeResult<Option<EntryDetails>> {
-        let cache_data = get_or_return!(self.cache_data.as_ref(), None);
-        let env = get_or_return!(self.env.as_ref(), None);
+        let cache_data = ok_or_return!(self.cache_data.as_ref(), None);
+        let env = ok_or_return!(self.env.as_ref(), None);
         match self.get_entry_local_raw(&hash)? {
             Some(entry) => fresh_reader!(env, |r| {
                 let entry_dht_status = cache_data.meta.get_dht_status(&r, &hash)?;
@@ -559,8 +559,8 @@ where
     }
 
     fn create_element_details(&self, hash: HeaderHash) -> CascadeResult<Option<ElementDetails>> {
-        let cache_data = get_or_return!(self.cache_data.as_ref(), None);
-        let env = get_or_return!(self.env.as_ref(), None);
+        let cache_data = ok_or_return!(self.cache_data.as_ref(), None);
+        let env = ok_or_return!(self.env.as_ref(), None);
         match self.get_element_local_raw(&hash)? {
             Some(element) => {
                 let hash = element.header_address().clone();
@@ -588,8 +588,8 @@ where
     /// app validation. The header appears valid even though it isn't because as a
     /// RegisterAgentActivity authority you haven't run app validation.
     pub fn valid_header(&self, hash: &HeaderHash) -> CascadeResult<bool> {
-        let cache_data = get_or_return!(self.cache_data.as_ref(), false);
-        let integrated_data = get_or_return!(self.integrated_data.as_ref(), false);
+        let cache_data = ok_or_return!(self.cache_data.as_ref(), false);
+        let integrated_data = ok_or_return!(self.integrated_data.as_ref(), false);
         Ok(integrated_data.meta.has_registered_store_element(&hash)?
             || cache_data.meta.has_registered_store_element(&hash)?)
     }
@@ -597,8 +597,8 @@ where
     /// Same as valid_header but checks for StoreEntry validation
     /// See valid_header for details
     pub fn valid_entry(&self, hash: &EntryHash) -> CascadeResult<bool> {
-        let cache_data = get_or_return!(self.cache_data.as_ref(), false);
-        let integrated_data = get_or_return!(self.integrated_data.as_ref(), false);
+        let cache_data = ok_or_return!(self.cache_data.as_ref(), false);
+        let integrated_data = ok_or_return!(self.integrated_data.as_ref(), false);
         if cache_data.meta.has_any_registered_store_entry(hash)? {
             // Found a entry header in the cache
             return Ok(true);
@@ -617,8 +617,8 @@ where
         header_hash: &HeaderHash,
         entry_hash: Option<&EntryHash>,
     ) -> CascadeResult<bool> {
-        let cache_data = get_or_return!(self.cache_data.as_ref(), false);
-        let integrated_data = get_or_return!(self.integrated_data.as_ref(), false);
+        let cache_data = ok_or_return!(self.cache_data.as_ref(), false);
+        let integrated_data = ok_or_return!(self.integrated_data.as_ref(), false);
         if self.valid_header(&header_hash)? {
             return Ok(true);
         }
@@ -669,8 +669,8 @@ where
         self.fetch_element_via_entry(entry_hash.clone(), options.clone())
             .await?;
 
-        let cache_data = get_or_return!(self.cache_data.as_ref(), None);
-        let env = get_or_return!(self.env.as_ref(), None);
+        let cache_data = ok_or_return!(self.cache_data.as_ref(), None);
+        let env = ok_or_return!(self.env.as_ref(), None);
         // Meta Cache
         let oldest_live_element = fresh_reader!(env, |r| {
             match cache_data.meta.get_dht_status(&r, &entry_hash)? {
@@ -746,9 +746,9 @@ where
         header_hash: HeaderHash,
         options: GetOptions,
     ) -> CascadeResult<Option<Element>> {
-        let cache_data = get_or_return!(self.cache_data.as_ref(), None);
-        let integrated_data = get_or_return!(self.integrated_data.as_ref(), None);
-        let env = get_or_return!(self.env.as_ref(), None);
+        let cache_data = ok_or_return!(self.cache_data.as_ref(), None);
+        let integrated_data = ok_or_return!(self.integrated_data.as_ref(), None);
+        let env = ok_or_return!(self.env.as_ref(), None);
         debug!("in get header");
         let found_local_delete = fresh_reader!(env, |r| {
             let in_cache = || {
@@ -778,8 +778,8 @@ where
         self.fetch_element_via_header(header_hash.clone(), options)
             .await?;
 
-        let cache_data = get_or_return!(self.cache_data.as_ref(), None);
-        let env = get_or_return!(self.env.as_ref(), None);
+        let cache_data = ok_or_return!(self.cache_data.as_ref(), None);
+        let env = ok_or_return!(self.env.as_ref(), None);
         fresh_reader!(env, |r| {
             // Check if header is alive after fetch
             let is_live = cache_data
@@ -919,8 +919,8 @@ where
         // Update the cache from the network
         self.fetch_links(key.into(), options).await?;
 
-        let cache_data = get_or_return!(self.cache_data.as_ref(), vec![]);
-        let env = get_or_return!(self.env.as_ref(), vec![]);
+        let cache_data = ok_or_return!(self.cache_data.as_ref(), vec![]);
+        let env = ok_or_return!(self.env.as_ref(), vec![]);
         fresh_reader!(env, |r| {
             // Meta Cache
             // Return any links from the meta cache that don't have removes.
@@ -943,8 +943,8 @@ where
         // Update the cache from the network
         self.fetch_links(key.into(), options).await?;
 
-        let cache_data = get_or_return!(self.cache_data.as_ref(), vec![]);
-        let env = get_or_return!(self.env.as_ref(), vec![]);
+        let cache_data = ok_or_return!(self.cache_data.as_ref(), vec![]);
+        let env = ok_or_return!(self.env.as_ref(), vec![]);
         // Get the links and collect the CreateLink / DeleteLink hashes by time.
         let links = fresh_reader!(env, |r| {
             cache_data
