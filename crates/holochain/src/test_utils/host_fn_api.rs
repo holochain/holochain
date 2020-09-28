@@ -52,6 +52,7 @@ pub struct Post(pub String);
 #[serde(transparent)]
 pub struct Msg(pub String);
 
+/// A CellId plus ZomeName: the full "path" to a zome in the conductor
 #[derive(Clone, Debug, derive_more::From, derive_more::Into)]
 pub struct ZomePath(CellId, ZomeName);
 

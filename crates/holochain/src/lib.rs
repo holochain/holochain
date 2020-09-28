@@ -7,7 +7,7 @@ pub mod conductor;
 pub mod core;
 #[allow(missing_docs)]
 pub mod fixt;
-#[allow(missing_docs)]
+#[deny(missing_docs)]
 pub mod test_utils;
 
 // this is here so that wasm ribosome macros can reference it
