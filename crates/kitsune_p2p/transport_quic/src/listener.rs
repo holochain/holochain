@@ -1,23 +1,75 @@
-use futures::{future::FutureExt, stream::StreamExt};
+use futures::{future::FutureExt, sink::SinkExt, stream::StreamExt};
 use kitsune_p2p_types::{
     dependencies::{ghost_actor, url2::*},
-    transport::transport_connection::*,
-    transport::transport_listener::*,
     transport::*,
 };
-use std::net::SocketAddr;
+use std::{collections::HashMap, net::SocketAddr};
+
+fn tx_bi_chan(
+    mut bi_send: quinn::SendStream,
+    mut bi_recv: quinn::RecvStream,
+) -> (TransportChannelWrite, TransportChannelRead) {
+    let (write_send, mut write_recv) = futures::channel::mpsc::channel::<Vec<u8>>(10);
+    let write_send = write_send.sink_map_err(TransportError::other);
+    tokio::task::spawn(async move {
+        while let Some(data) = write_recv.next().await {
+            bi_send
+                .write_all(&data)
+                .await
+                .map_err(TransportError::other)?;
+        }
+        bi_send.finish().await.map_err(TransportError::other)?;
+        TransportResult::Ok(())
+    });
+    let (mut read_send, read_recv) = futures::channel::mpsc::channel::<Vec<u8>>(10);
+    tokio::task::spawn(async move {
+        let mut buf = [0_u8; 4096];
+        while let Some(read) = bi_recv
+            .read(&mut buf)
+            .await
+            .map_err(TransportError::other)?
+        {
+            if read == 0 {
+                continue;
+            }
+            read_send
+                .send(buf[0..read].to_vec())
+                .await
+                .map_err(TransportError::other)?;
+        }
+        TransportResult::Ok(())
+    });
+    let write_send: TransportChannelWrite = Box::new(write_send);
+    let read_recv: TransportChannelRead = Box::new(read_recv);
+    (write_send, read_recv)
+}
 
 ghost_actor::ghost_chan! {
     chan ListenerInner<TransportError> {
-        /// internal raw connect fn
         fn raw_connect(addr: SocketAddr) -> quinn::Connecting;
+
+        fn take_connecting(
+            maybe_con: quinn::Connecting,
+            with_channel: bool,
+        ) -> Option<(
+            Url2,
+            TransportChannelWrite,
+            TransportChannelRead,
+        )>;
+
+        fn raw_set_connection(
+            url: Url2,
+            con: quinn::Connection,
+        ) -> ();
     }
 }
 
 /// QUIC implementation of kitsune TransportListener actor.
 struct TransportListenerQuic {
     internal_sender: ghost_actor::GhostSender<ListenerInner>,
+    incoming_channel_sender: TransportIncomingChannelSender,
     quinn_endpoint: quinn::Endpoint,
+    connections: HashMap<Url2, quinn::Connection>,
 }
 
 impl ghost_actor::GhostControlHandler for TransportListenerQuic {}
@@ -35,6 +87,55 @@ impl ListenerInnerHandler for TransportListenerQuic {
             .map_err(TransportError::other)?;
         Ok(async move { Ok(out) }.boxed().into())
     }
+
+    fn handle_take_connecting(
+        &mut self,
+        maybe_con: quinn::Connecting,
+        with_channel: bool,
+    ) -> ListenerInnerHandlerResult<Option<(Url2, TransportChannelWrite, TransportChannelRead)>>
+    {
+        let i_s = self.internal_sender.clone();
+        let mut incoming_channel_sender = self.incoming_channel_sender.clone();
+        Ok(async move {
+            let quinn::NewConnection {
+                connection: con,
+                mut bi_streams,
+                ..
+            } = maybe_con.await.map_err(TransportError::other)?;
+            let out = if with_channel {
+                let (bi_send, bi_recv) = con.open_bi().await.map_err(TransportError::other)?;
+                Some(tx_bi_chan(bi_send, bi_recv))
+            } else {
+                None
+            };
+            let url = url2!("{}://{}", crate::SCHEME, con.remote_address(),);
+            i_s.raw_set_connection(url.clone(), con).await?;
+            let url_clone = url.clone();
+            tokio::task::spawn(async move {
+                while let Some(Ok((bi_send, bi_recv))) = bi_streams.next().await {
+                    let (write, read) = tx_bi_chan(bi_send, bi_recv);
+                    if let Err(_) = incoming_channel_sender
+                        .send((url_clone.clone(), write, read))
+                        .await
+                    {
+                        break;
+                    }
+                }
+            });
+            Ok(out.map(move |(write, read)| (url, write, read)))
+        }
+        .boxed()
+        .into())
+    }
+
+    fn handle_raw_set_connection(
+        &mut self,
+        url: Url2,
+        con: quinn::Connection,
+    ) -> ListenerInnerHandlerResult<()> {
+        self.connections.insert(url, con);
+        Ok(async move { Ok(()) }.boxed().into())
+    }
 }
 
 impl ghost_actor::GhostHandler<TransportListener> for TransportListenerQuic {}
@@ -51,18 +152,32 @@ impl TransportListenerHandler for TransportListenerQuic {
         Ok(async move { Ok(out) }.boxed().into())
     }
 
-    fn handle_connect(
+    fn handle_create_channel(
         &mut self,
-        input: Url2,
-    ) -> TransportListenerHandlerResult<(
-        ghost_actor::GhostSender<TransportConnection>,
-        TransportConnectionEventReceiver,
-    )> {
+        url: Url2,
+    ) -> TransportListenerHandlerResult<(Url2, TransportChannelWrite, TransportChannelRead)> {
+        if let Some(con) = self.connections.get(&url) {
+            let maybe_bi = con.open_bi();
+            return Ok(async move {
+                // TODO -
+                //   if open_bi errors - we should
+                //   drop our cached connection and
+                //   create a new one
+                let (bi_send, bi_recv) = maybe_bi.await.map_err(TransportError::other)?;
+                let (write, read) = tx_bi_chan(bi_send, bi_recv);
+                Ok((url, write, read))
+            }
+            .boxed()
+            .into());
+        }
+
         let i_s = self.internal_sender.clone();
         Ok(async move {
-            let addr = crate::url_to_addr(&input, crate::SCHEME).await?;
+            let addr = crate::url_to_addr(&url, crate::SCHEME).await?;
             let maybe_con = i_s.raw_connect(addr).await?;
-            crate::connection::spawn_transport_connection_quic(maybe_con).await
+            let (url, write, read) = i_s.take_connecting(maybe_con, true).await?.unwrap();
+
+            Ok((url, write, read))
         }
         .boxed()
         .into())
@@ -78,7 +193,7 @@ pub async fn spawn_transport_listener_quic(
     )>,
 ) -> TransportListenerResult<(
     ghost_actor::GhostSender<TransportListener>,
-    TransportListenerEventReceiver,
+    TransportIncomingChannelReceiver,
 )> {
     let server_config = danger::configure_server(cert)
         .await
@@ -90,7 +205,7 @@ pub async fn spawn_transport_listener_quic(
         .bind(&crate::url_to_addr(&bind_to, crate::SCHEME).await?)
         .map_err(TransportError::other)?;
 
-    let (incoming_sender, receiver) = futures::channel::mpsc::channel(10);
+    let (incoming_channel_sender, receiver) = futures::channel::mpsc::channel(10);
 
     let builder = ghost_actor::actor_builder::GhostActorBuilder::new();
 
@@ -98,16 +213,12 @@ pub async fn spawn_transport_listener_quic(
 
     let sender = builder.channel_factory().create_channel().await?;
 
+    let i_s = internal_sender.clone();
     tokio::task::spawn(async move {
         incoming
             .for_each_concurrent(10, |maybe_con| async {
                 let res: TransportResult<()> = async {
-                    let (con_send, con_recv) =
-                        crate::connection::spawn_transport_connection_quic(maybe_con).await?;
-                    incoming_sender
-                        .incoming_connection(con_send, con_recv)
-                        .await?;
-
+                    i_s.take_connecting(maybe_con, false).await?;
                     Ok(())
                 }
                 .await;
@@ -120,7 +231,9 @@ pub async fn spawn_transport_listener_quic(
 
     let actor = TransportListenerQuic {
         internal_sender,
+        incoming_channel_sender,
         quinn_endpoint,
+        connections: HashMap::new(),
     };
 
     tokio::task::spawn(builder.spawn(actor));

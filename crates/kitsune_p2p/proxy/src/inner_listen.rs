@@ -108,7 +108,7 @@ struct InnerListen {
     tls: TlsConfig,
     tls_server_config: Arc<rustls::ServerConfig>,
     tls_client_config: Arc<rustls::ClientConfig>,
-    connections: HashMap<url2::Url2, ghost_actor::GhostSender<TransportConnection>>,
+    low_level_connections: HashMap<url2::Url2, ghost_actor::GhostSender<TransportConnection>>,
 }
 
 impl InnerListen {
@@ -139,55 +139,8 @@ impl InnerListen {
             tls,
             tls_server_config,
             tls_client_config,
-            connections: HashMap::new(),
+            low_level_connections: HashMap::new(),
         })
-    }
-
-    pub fn assert_connection(
-        &mut self,
-        base_url: url2::Url2,
-    ) -> InternalHandlerResult<ghost_actor::GhostSender<TransportConnection>> {
-        if let Some(con) = self.connections.get(&base_url) {
-            let con = con.clone();
-            return Ok(async move { Ok(con) }.boxed().into());
-        }
-        let short = self.this_url.short().to_string();
-        tracing::debug!("{}: connecting to {}", short, base_url);
-        let fut = self.sub_sender.connect(base_url);
-        let i_s = self.i_s.clone();
-        Ok(async move {
-            let (send, recv) = fut.await?;
-            let base_url = send.remote_url().await?;
-            let con = i_s
-                .register_connection(base_url.clone(), send, recv)
-                .await?;
-            tracing::debug!("{}: CONNECTED to {}", short, base_url);
-            Ok(con)
-        }
-        .boxed()
-        .into())
-    }
-
-    pub fn create_channel(
-        &mut self,
-        base_url: url2::Url2,
-    ) -> InternalHandlerResult<(
-        futures::channel::mpsc::Sender<ProxyWire>,
-        futures::channel::mpsc::Receiver<ProxyWire>,
-    )> {
-        let short = self.this_url.short().to_string();
-        let con = self.assert_connection(base_url.clone())?;
-        Ok(async move {
-            let con = con.await?;
-            tracing::trace!("{}: low-level channel to {}", short, base_url);
-            let (write, read) = con.create_channel().await?;
-            let write = wire_write::wrap_wire_write(write);
-            let read = wire_read::wrap_wire_read(read);
-            tracing::trace!("{}: CHANNEL to {}", short, base_url);
-            Ok((write, read))
-        }
-        .boxed()
-        .into())
     }
 }
 
@@ -203,7 +156,18 @@ impl ghost_actor::GhostControlHandler for InnerListen {
 
 ghost_actor::ghost_chan! {
     chan Internal<TransportError> {
-        fn register_connection(
+        fn assert_low_level_connection(
+            base_url: url2::Url2,
+        ) -> ghost_actor::GhostSender<TransportConnection>;
+
+        fn create_low_level_channel(
+            base_url: url2::Url2,
+        ) -> (
+            futures::channel::mpsc::Sender<ProxyWire>,
+            futures::channel::mpsc::Receiver<ProxyWire>,
+        );
+
+        fn register_low_level_connection(
             base_url: url2::Url2,
             sender: ghost_actor::GhostSender<TransportConnection>,
             receiver: futures::channel::mpsc::Receiver<TransportConnectionEvent>,
@@ -217,17 +181,64 @@ ghost_actor::ghost_chan! {
 impl ghost_actor::GhostHandler<Internal> for InnerListen {}
 
 impl InternalHandler for InnerListen {
-    fn handle_register_connection(
+    fn handle_assert_low_level_connection(
+        &mut self,
+        base_url: url2::Url2,
+    ) -> InternalHandlerResult<ghost_actor::GhostSender<TransportConnection>> {
+        if let Some(con) = self.low_level_connections.get(&base_url) {
+            let con = con.clone();
+            return Ok(async move { Ok(con) }.boxed().into());
+        }
+        let short = self.this_url.short().to_string();
+        tracing::debug!("{}: connecting to {}", short, base_url);
+        let fut = self.sub_sender.connect(base_url);
+        let i_s = self.i_s.clone();
+        Ok(async move {
+            let (send, recv) = fut.await?;
+            let base_url = send.remote_url().await?;
+            let con = i_s
+                .register_low_level_connection(base_url.clone(), send, recv)
+                .await?;
+            tracing::debug!("{}: CONNECTED to {}", short, base_url);
+            Ok(con)
+        }
+        .boxed()
+        .into())
+    }
+
+    fn handle_create_low_level_channel(
+        &mut self,
+        base_url: url2::Url2,
+    ) -> InternalHandlerResult<(
+        futures::channel::mpsc::Sender<ProxyWire>,
+        futures::channel::mpsc::Receiver<ProxyWire>,
+    )> {
+        let short = self.this_url.short().to_string();
+        let con = self.i_s.assert_low_level_connection(base_url.clone());
+        Ok(async move {
+            let con = con.await?;
+            tracing::trace!("{}: low-level channel to {}", short, base_url);
+            let (write, read) = con.create_channel().await?;
+            let write = wire_write::wrap_wire_write(write);
+            let read = wire_read::wrap_wire_read(read);
+            tracing::trace!("{}: CHANNEL to {}", short, base_url);
+            Ok((write, read))
+        }
+        .boxed()
+        .into())
+    }
+
+    fn handle_register_low_level_connection(
         &mut self,
         base_url: url2::Url2,
         sender: ghost_actor::GhostSender<TransportConnection>,
         receiver: futures::channel::mpsc::Receiver<TransportConnectionEvent>,
     ) -> InternalHandlerResult<ghost_actor::GhostSender<TransportConnection>> {
-        if let Some(con) = self.connections.get(&base_url) {
+        if let Some(con) = self.low_level_connections.get(&base_url) {
             let con = con.clone();
             return Ok(async move { Ok(con) }.boxed().into());
         }
-        self.connections.insert(base_url, sender.clone());
+        self.low_level_connections.insert(base_url, sender.clone());
         let fut = self.channel_factory.attach_receiver(receiver);
         tokio::task::spawn(fut);
         Ok(async move { Ok(sender) }.boxed().into())
@@ -240,7 +251,7 @@ impl InternalHandler for InnerListen {
             proxy_url.short(),
             proxy_url
         );
-        let fut = self.create_channel(proxy_url.into_base())?;
+        let fut = self.i_s.create_low_level_channel(proxy_url.into_base());
         let i_s = self.i_s.clone();
         Ok(async move {
             let (mut write, mut read) = fut.await?;
@@ -283,15 +294,22 @@ impl TransportListenerHandler for InnerListen {
 
     fn handle_connect(
         &mut self,
-        _url: url2::Url2,
+        url: url2::Url2,
     ) -> TransportListenerHandlerResult<(
         ghost_actor::GhostSender<TransportConnection>,
         TransportConnectionEventReceiver,
     )> {
-        // TODO - _url is proxy url
-        //        connect with base_url
-        //        create/return a pseudo channel
-        unimplemented!()
+        let proxy_url = ProxyUrl::from(url);
+        let fut = self
+            .i_s
+            .assert_low_level_connection(proxy_url.as_base().clone());
+
+        Ok(async move {
+            let _con = fut.await?;
+            unimplemented!()
+        }
+        .boxed()
+        .into())
     }
 }
 
@@ -322,6 +340,14 @@ impl TransportConnectionEventHandler for InnerListen {
                             .map_err(TransportError::other)?;
                         write.close().await.map_err(TransportError::other)?;
                     }
+                    /*
+                    ProxyWire::ChanNew(ChanNew(msg_id, proxy_url)) => {
+                        if proxy_url == this_url {
+                            panic!("cannot handle not passthru yet")
+                        }
+
+                    }
+                    */
                     _ => panic!("unexpected: {:?}", wire),
                 }
             }
@@ -345,7 +371,7 @@ impl TransportListenerEventHandler for InnerListen {
         Ok(async move {
             let base_url = sender.remote_url().await?;
             tracing::debug!("{}: INCOMING CONNECTION from {}", short, base_url);
-            i_s.register_connection(base_url.clone(), sender, receiver)
+            i_s.register_low_level_connection(base_url.clone(), sender, receiver)
                 .await?;
             tracing::debug!("{}: INCOMING CONNECTION done {}", short, base_url);
 
@@ -397,32 +423,42 @@ mod tests {
         }
     }
 
+    async fn connect(
+        proxy_config: Arc<ProxyConfig>,
+    ) -> TransportResult<ghost_actor::GhostSender<TransportListener>> {
+        let (bind, evt) = kitsune_p2p_types::transport_mem::spawn_bind_transport_mem().await?;
+        let addr = bind.bound_url().await?;
+        tracing::warn!("got bind: {}", addr);
+
+        let (bind, _evt) = spawn_kitsune_proxy_listener(proxy_config, bind, evt).await?;
+        let addr = bind.bound_url().await?;
+        tracing::warn!("got proxy: {}", addr);
+
+        Ok(bind)
+    }
+
     async fn test_inner_listen_inner() -> TransportResult<()> {
         init_tracing();
-
-        let (bind1, evt1) = kitsune_p2p_types::transport_mem::spawn_bind_transport_mem().await?;
-        let addr1 = bind1.bound_url().await?;
-        tracing::warn!("got bind1 = {}", addr1);
 
         let proxy_config1 = ProxyConfig::local_proxy_server(
             TlsConfig::new_ephemeral().await?,
             AcceptProxyCallback::accept_all(),
         );
-
-        let (bind1, _evt1) = spawn_kitsune_proxy_listener(proxy_config1, bind1, evt1).await?;
+        let bind1 = connect(proxy_config1).await?;
         let addr1 = bind1.bound_url().await?;
-        tracing::warn!("got proxy1 = {}", addr1);
 
-        let (bind2, evt2) = kitsune_p2p_types::transport_mem::spawn_bind_transport_mem().await?;
-        let addr2 = bind2.bound_url().await?;
-        tracing::warn!("got bind2 = {}", addr2);
+        let proxy_config2 = ProxyConfig::local_proxy_server(
+            TlsConfig::new_ephemeral().await?,
+            AcceptProxyCallback::accept_all(),
+        );
+        let bind2 = connect(proxy_config2).await?;
 
-        let proxy_config2 =
+        let proxy_config3 =
             ProxyConfig::remote_proxy_client(TlsConfig::new_ephemeral().await?, addr1.into());
+        let bind3 = connect(proxy_config3).await?;
+        let addr3 = bind3.bound_url().await?;
 
-        let (bind2, _evt2) = spawn_kitsune_proxy_listener(proxy_config2, bind2, evt2).await?;
-        let addr2 = bind2.bound_url().await?;
-        tracing::warn!("got proxy2 = {}", addr2);
+        let (_send, _recv) = bind2.connect(addr3).await?;
 
         Ok(())
     }
