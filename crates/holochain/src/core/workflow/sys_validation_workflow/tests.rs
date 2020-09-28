@@ -4,7 +4,7 @@ use crate::{
         state::{element_buf::ElementBuf, validation_db::ValidationLimboStatus},
         workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace,
     },
-    test_utils::{host_fn_api::*, setup_app},
+    test_utils::{host_fn_api::*, setup_app, wait_for_integration},
 };
 use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
@@ -25,7 +25,6 @@ use std::{
 use tracing::*;
 
 #[tokio::test(threaded_scheduler)]
-#[ignore]
 async fn sys_validation_workflow_test() {
     observability::test_run().ok();
 
@@ -78,13 +77,28 @@ async fn run_test(
     handle: ConductorHandle,
     dna_file: DnaFile,
 ) {
+    // Check if the correct number of ops are integrated
+    // every 100 ms for a maximum of 10 seconds but early exit
+    // if they are there.
+    let num_attempts = 100;
+    let delay_per_attempt = Duration::from_millis(100);
+
     bob_links_in_a_legit_way(&bob_cell_id, &handle, &dna_file).await;
 
-    // Some time for ops to reach alice and run through validation
-    tokio::time::delay_for(Duration::from_millis(1500)).await;
+    // Integration should have 9 ops in it.
+    // Plus another 14 for genesis.
+    // Init is not run because we aren't calling the zome.
+    let expected_count = 9 + 14;
 
     {
         let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
+        wait_for_integration(
+            &alice_env,
+            expected_count,
+            num_attempts,
+            delay_per_attempt.clone(),
+        )
+        .await;
 
         let workspace = IncomingDhtOpsWorkspace::new(alice_env.clone().into()).unwrap();
         // Validation should be empty
@@ -147,18 +161,24 @@ async fn run_test(
             }
         }
 
-        assert_eq!(res.len(), 9 + 14);
+        assert_eq!(res.len(), expected_count);
     }
 
     let (bad_update_header, bad_update_entry_hash, link_add_hash) =
         bob_makes_a_large_link(&bob_cell_id, &handle, &dna_file).await;
 
-    // Some time for ops to reach alice and run through validation
-    // This takes a little longer due to the large entry and links
-    tokio::time::delay_for(Duration::from_millis(1500)).await;
+    // Integration should have 12 ops in it
+    let expected_count = 12 + expected_count;
 
     {
         let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
+        wait_for_integration(
+            &alice_env,
+            expected_count,
+            num_attempts,
+            delay_per_attempt.clone(),
+        )
+        .await;
 
         let workspace = IncomingDhtOpsWorkspace::new(alice_env.clone().into()).unwrap();
         // Validation should be empty
@@ -210,17 +230,24 @@ async fn run_test(
                 })
                 .count()
                 .unwrap()),
-            12 + 23
+            expected_count
         );
     }
 
     dodgy_bob(&bob_cell_id, &handle, &dna_file).await;
 
-    // Some time for ops to reach alice and run through validation
-    tokio::time::delay_for(Duration::from_millis(1500)).await;
+    // Integration should have new 4 ops in it
+    let expected_count = 5 + expected_count;
 
     {
         let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
+        wait_for_integration(
+            &alice_env,
+            expected_count,
+            num_attempts,
+            delay_per_attempt.clone(),
+        )
+        .await;
         let env_ref = alice_env.guard();
 
         let workspace = IncomingDhtOpsWorkspace::new(alice_env.clone().into()).unwrap();
@@ -256,7 +283,7 @@ async fn run_test(
                     .count()
                     .unwrap()
             },
-            5 + 35
+            expected_count
         );
     }
 }
