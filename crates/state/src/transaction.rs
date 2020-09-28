@@ -45,12 +45,12 @@ impl Drop for ReaderSpanInfo {
 #[derive(Shrinkwrap)]
 pub struct Reader<'env>(#[shrinkwrap(main_field)] rkv::Reader<'env>, ReaderSpanInfo);
 
-/// If MDB_NOTLS env flag is set, then read-only transactions are threadsafe
+/// If LMDB_NOTLS env flag is set, then read-only transactions are threadsafe
 /// and we can mark them as such
 #[cfg(feature = "lmdb_no_tls")]
 unsafe impl<'env> Send for Reader<'env> {}
 
-/// If MDB_NOTLS env flag is set, then read-only transactions are threadsafe
+/// If LMDB_NOTLS env flag is set, then read-only transactions are threadsafe
 /// and we can mark them as such
 #[cfg(feature = "lmdb_no_tls")]
 unsafe impl<'env> Sync for Reader<'env> {}
