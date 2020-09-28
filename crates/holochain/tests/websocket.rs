@@ -1,13 +1,16 @@
 use anyhow::Result;
 use assert_cmd::prelude::*;
 use futures::Future;
-use holochain::conductor::{
-    api::{AdminRequest, AdminResponse, AppRequest, AppResponse},
-    config::*,
-    error::ConductorError,
-    Conductor,
-};
 use holochain::core::ribosome::{NamedInvocation, ZomeCallInvocationFixturator};
+use holochain::{
+    conductor::{
+        api::{AdminRequest, AdminResponse, AppRequest, AppResponse},
+        config::*,
+        error::ConductorError,
+        Conductor,
+    },
+    core::signal::Signal,
+};
 use holochain_types::{
     app::{InstallAppDnaPayload, InstallAppPayload},
     cell::CellId,
@@ -382,12 +385,13 @@ async fn emit_signals() {
         &uuid.to_string(),
         vec![(TestWasm::EmitSignal.into(), TestWasm::EmitSignal.into())],
     );
-    let original_dna_hash = dna.dna_hash().clone();
+    let dna_hash = dna.dna_hash().clone();
 
     // Install Dna
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
     let dna_payload = InstallAppDnaPayload::path_only(fake_dna_path, "".to_string());
     let agent_key = fake_agent_pubkey_1();
+    let cell_id = CellId::new(dna_hash.clone(), agent_key.clone());
     let payload = InstallAppPayload {
         dnas: vec![dna_payload],
         app_id: "test".to_string(),
@@ -412,25 +416,40 @@ async fn emit_signals() {
     ///////////////////////////////////////////////////////
     // Emit signals (the real test!)
 
-    let (mut app_tx, app_rx) = websocket_client_by_port(app_port).await.unwrap();
+    let (mut app_tx_1, app_rx_1) = websocket_client_by_port(app_port).await.unwrap();
+    let (_, app_rx_2) = websocket_client_by_port(app_port).await.unwrap();
 
     call_zome_fn(
         &mut holochain,
-        &mut app_tx,
-        CellId::new(original_dna_hash.clone(), agent_key),
+        &mut app_tx_1,
+        cell_id.clone(),
         TestWasm::EmitSignal,
         "emit".into(),
         (),
     )
     .await;
 
-    let msg = app_rx
+    let msg1 = app_rx_1
         .timeout(Duration::from_secs(1))
         .next()
         .await
         .unwrap()
         .unwrap();
-    let _sig = unwrap_to::unwrap_to!(msg => WebsocketMessage::Signal);
+    let sig1: SerializedBytes = unwrap_to::unwrap_to!(msg1 => WebsocketMessage::Signal).clone();
+
+    let msg2 = app_rx_2
+        .timeout(Duration::from_secs(1))
+        .next()
+        .await
+        .unwrap()
+        .unwrap();
+    let sig2: SerializedBytes = unwrap_to::unwrap_to!(msg2 => WebsocketMessage::Signal).clone();
+
+    assert_eq!(
+        Signal::App(cell_id, ().try_into().unwrap()),
+        Signal::try_from(sig1.clone()).unwrap(),
+    );
+    assert_eq!(sig1, sig2);
 
     ///////////////////////////////////////////////////////
 
