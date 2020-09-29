@@ -305,9 +305,8 @@ async fn header_with_entry_is_stored(
         Some(el) => match el.entry() {
             ElementEntry::Present(_) | ElementEntry::Hidden => Ok(true),
             ElementEntry::NotApplicable => Err(DhtOpConvertError::HeaderEntryMismatch.into()),
-            ElementEntry::NotStored => {
-                Err(DhtOpConvertError::MissingEntryDataForHeader(hash.clone()).into())
-            }
+            // This means we have just the header (probably through register agent activity)
+            ElementEntry::NotStored => Ok(false),
         },
         None => Ok(false),
     }
