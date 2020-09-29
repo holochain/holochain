@@ -119,12 +119,22 @@ pub type TransportIncomingChannelReceiver =
     futures::channel::mpsc::Receiver<TransportIncomingChannel>;
 
 ghost_actor::ghost_chan! {
-    /// Represents a socket binding for establishing connections.
+    /// Represents a transport binding for establishing connections.
+    /// This api was designed mainly around supporting the QUIC transport.
+    /// It should be applicable to other transports, but with some assumptions:
+    /// - Keep alive logic should be handled internally.
+    /// - Transport encryption is handled internally.
+    /// - See light-weight comments below on `create_channel` api.
     pub chan TransportListener<TransportError> {
         /// Retrieve the current url (address) this listener is bound to.
         fn bound_url() -> url2::Url2;
 
         /// Attempt to establish an outgoing channel to a remote.
+        /// Channels are expected to be very light-weight.
+        /// This API was designed around QUIC bi-streams.
+        /// If your low-level channels are not light-weight, consider
+        /// implementing pooling/multiplex virtual channels to
+        /// make this api light weight.
         fn create_channel(url: url2::Url2) -> (
             url2::Url2,
             TransportChannelWrite,
@@ -135,7 +145,7 @@ ghost_actor::ghost_chan! {
 
 /// Extension trait for additional methods on TransportListenerSenders
 pub trait TransportListenerSenderExt {
-    /// Make a request using a single channel open/close
+    /// Make a request using a single channel open/close.
     fn request(
         &self,
         url: url2::Url2,

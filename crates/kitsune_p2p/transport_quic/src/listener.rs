@@ -1,10 +1,11 @@
 use futures::{future::FutureExt, sink::SinkExt, stream::StreamExt};
 use kitsune_p2p_types::{
-    dependencies::{ghost_actor, url2::*},
+    dependencies::{ghost_actor, ghost_actor::GhostControlSender, url2::*},
     transport::*,
 };
 use std::{collections::HashMap, net::SocketAddr};
 
+/// Convert quinn async read/write streams into Vec<u8> senders / receivers.
 fn tx_bi_chan(
     mut bi_send: quinn::SendStream,
     mut bi_recv: quinn::RecvStream,
@@ -45,9 +46,14 @@ fn tx_bi_chan(
 }
 
 ghost_actor::ghost_chan! {
+    /// Internal Sender
     chan ListenerInner<TransportError> {
+        /// Use our binding to establish a new outgoing connection.
         fn raw_connect(addr: SocketAddr) -> quinn::Connecting;
 
+        /// Take a quinn connecting instance pulling it into our logic.
+        /// Shared code for both incoming and outgoing connections.
+        /// For outgoing create_channel we may also wish to create a channel.
         fn take_connecting(
             maybe_con: quinn::Connecting,
             with_channel: bool,
@@ -57,22 +63,52 @@ ghost_actor::ghost_chan! {
             TransportChannelRead,
         )>;
 
-        fn raw_set_connection(
+        /// Finalization step for taking control of a connection.
+        /// Places it in our hash map for use establishing outgoing channels.
+        fn set_connection(
             url: Url2,
             con: quinn::Connection,
         ) -> ();
+
+        /// If we get an error making outgoing channels,
+        /// or if the incoming channel receiver stops,
+        /// we want to remove this connection from our pool. It is done.
+        fn drop_connection(url: Url2) -> ();
     }
 }
 
 /// QUIC implementation of kitsune TransportListener actor.
 struct TransportListenerQuic {
+    /// internal api logic
     internal_sender: ghost_actor::GhostSender<ListenerInner>,
+    /// incoming channel send to our owner
     incoming_channel_sender: TransportIncomingChannelSender,
+    /// the quinn binding (akin to a socket listener)
     quinn_endpoint: quinn::Endpoint,
+    /// pool of active connections
     connections: HashMap<Url2, quinn::Connection>,
 }
 
-impl ghost_actor::GhostControlHandler for TransportListenerQuic {}
+impl ghost_actor::GhostControlHandler for TransportListenerQuic {
+    fn handle_ghost_actor_shutdown(
+        mut self,
+    ) -> ghost_actor::dependencies::must_future::MustBoxFuture<'static, ()> {
+        async move {
+            // Note: it's easiest to just blanket shut everything down.
+            // If we wanted to be more graceful, we'd need to plumb
+            // in some signals to start rejecting incoming connections,
+            // then we could use `quinn_endpoint.wait_idle().await`.
+            let _ = self.incoming_channel_sender.close_channel();
+            for (_, con) in self.connections.into_iter() {
+                con.close(0_u8.into(), b"");
+                drop(con);
+            }
+            self.quinn_endpoint.close(0_u8.into(), b"");
+        }
+        .boxed()
+        .into()
+    }
+}
 
 impl ghost_actor::GhostHandler<ListenerInner> for TransportListenerQuic {}
 
@@ -108,8 +144,8 @@ impl ListenerInnerHandler for TransportListenerQuic {
             } else {
                 None
             };
-            let url = url2!("{}://{}", crate::SCHEME, con.remote_address(),);
-            i_s.raw_set_connection(url.clone(), con).await?;
+            let url = url2!("{}://{}", crate::SCHEME, con.remote_address());
+            i_s.set_connection(url.clone(), con).await?;
             let url_clone = url.clone();
             tokio::task::spawn(async move {
                 while let Some(Ok((bi_send, bi_recv))) = bi_streams.next().await {
@@ -128,12 +164,17 @@ impl ListenerInnerHandler for TransportListenerQuic {
         .into())
     }
 
-    fn handle_raw_set_connection(
+    fn handle_set_connection(
         &mut self,
         url: Url2,
         con: quinn::Connection,
     ) -> ListenerInnerHandlerResult<()> {
         self.connections.insert(url, con);
+        Ok(async move { Ok(()) }.boxed().into())
+    }
+
+    fn handle_drop_connection(&mut self, url: Url2) -> ListenerInnerHandlerResult<()> {
+        self.connections.remove(&url);
         Ok(async move { Ok(()) }.boxed().into())
     }
 }
@@ -156,23 +197,21 @@ impl TransportListenerHandler for TransportListenerQuic {
         &mut self,
         url: Url2,
     ) -> TransportListenerHandlerResult<(Url2, TransportChannelWrite, TransportChannelRead)> {
-        if let Some(con) = self.connections.get(&url) {
-            let maybe_bi = con.open_bi();
-            return Ok(async move {
-                // TODO -
-                //   if open_bi errors - we should
-                //   drop our cached connection and
-                //   create a new one
-                let (bi_send, bi_recv) = maybe_bi.await.map_err(TransportError::other)?;
-                let (write, read) = tx_bi_chan(bi_send, bi_recv);
-                Ok((url, write, read))
-            }
-            .boxed()
-            .into());
-        }
+        let maybe_bi = self.connections.get(&url).map(|con| con.open_bi());
 
         let i_s = self.internal_sender.clone();
         Ok(async move {
+            if let Some(maybe_bi) = maybe_bi {
+                match maybe_bi.await {
+                    Ok((bi_send, bi_recv)) => {
+                        let (write, read) = tx_bi_chan(bi_send, bi_recv);
+                        return Ok((url, write, read));
+                    }
+                    Err(_) => {
+                        i_s.drop_connection(url.clone()).await?;
+                    }
+                }
+            }
             let addr = crate::url_to_addr(&url, crate::SCHEME).await?;
             let maybe_con = i_s.raw_connect(addr).await?;
             let (url, write, read) = i_s.take_connecting(maybe_con, true).await?.unwrap();
@@ -227,6 +266,13 @@ pub async fn spawn_transport_listener_quic(
                 }
             })
             .await;
+
+        // Our incoming connections ended,
+        // this also indicates we cannot establish outgoing connections.
+        // I.e., we need to shut down.
+        i_s.ghost_actor_shutdown().await?;
+
+        TransportResult::Ok(())
     });
 
     let actor = TransportListenerQuic {
