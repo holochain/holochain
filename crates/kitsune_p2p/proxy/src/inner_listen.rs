@@ -296,7 +296,7 @@ impl InternalHandler for InnerListen {
             .i_s
             .create_low_level_channel(dest_proxy_url.as_base().clone());
         Ok(async move {
-            let (fwd_write, fwd_read) = match fut.await {
+            let (mut fwd_write, fwd_read) = match fut.await {
                 Err(e) => {
                     write
                         .send(ProxyWire::failure(format!("{:?}", e)))
@@ -306,6 +306,10 @@ impl InternalHandler for InnerListen {
                 }
                 Ok(t) => t,
             };
+            fwd_write
+                .send(ProxyWire::chan_new(dest_proxy_url.clone().into()))
+                .await
+                .map_err(TransportError::other)?;
             cross_join_channel_forward(fwd_write, read);
             cross_join_channel_forward(write, fwd_read);
             Ok(())
@@ -437,7 +441,6 @@ impl rustls::ServerCertVerifier for TlsServerVerifier {
     }
 }
 
-/*
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -492,9 +495,8 @@ mod tests {
         let bind3 = connect(proxy_config3).await?;
         let addr3 = bind3.bound_url().await?;
 
-        let (_send, _recv) = bind2.connect(addr3).await?;
+        let (_url, _write, _read) = bind2.create_channel(addr3).await?;
 
         Ok(())
     }
 }
-*/
