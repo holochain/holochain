@@ -70,17 +70,27 @@ macro_rules! meta_mock {
         });
         metadata
     }};
-    ($fun:ident, $data:expr, $with_fn:expr) => {{
+    ($fun:ident, $data:expr, $match_fn:expr) => {{
         let mut metadata = $crate::core::state::metadata::MockMetadataBuf::new();
-        metadata.$fun().withf($with_fn).returning({
-            move |_| {
-                Ok(Box::new(fallible_iterator::convert(
-                    $data
-                        .clone()
-                        .into_iter()
-                        .map(holochain_types::metadata::TimedHeaderHash::from)
-                        .map(Ok),
-                )))
+        metadata.$fun().returning({
+            move |a| {
+                if $match_fn(a) {
+                    Ok(Box::new(fallible_iterator::convert(
+                        $data
+                            .clone()
+                            .into_iter()
+                            .map(holochain_types::metadata::TimedHeaderHash::from)
+                            .map(Ok),
+                    )))
+                } else {
+                    let mut data = $data.clone();
+                    data.clear();
+                    Ok(Box::new(fallible_iterator::convert(
+                        data.into_iter()
+                            .map(holochain_types::metadata::TimedHeaderHash::from)
+                            .map(Ok),
+                    )))
+                }
             }
         });
         metadata
@@ -196,6 +206,7 @@ pub fn warm_wasm_tests() {
 }
 /// Exit early if the expected number of ops
 /// have been integrated or wait for num_attempts * delay
+#[tracing::instrument(skip(env))]
 pub async fn wait_for_integration(
     env: &EnvironmentWrite,
     expected_count: usize,
@@ -204,6 +215,29 @@ pub async fn wait_for_integration(
 ) {
     for _ in 0..num_attempts {
         let workspace = IncomingDhtOpsWorkspace::new(env.clone().into()).unwrap();
+
+        let val_limbo: Vec<_> = fresh_reader_test!(env, |r| {
+            workspace
+                .validation_limbo
+                .iter(&r)
+                .unwrap()
+                .map(|(_, v)| Ok(v))
+                .collect()
+                .unwrap()
+        });
+        tracing::debug!(?val_limbo);
+
+        let int_limbo: Vec<_> = fresh_reader_test!(env, |r| {
+            workspace
+                .integration_limbo
+                .iter(&r)
+                .unwrap()
+                .map(|(_, v)| Ok(v))
+                .collect()
+                .unwrap()
+        });
+        tracing::debug!(?int_limbo);
+
         let count = fresh_reader_test!(env, |r| {
             workspace
                 .integrated_dht_ops
@@ -214,6 +248,8 @@ pub async fn wait_for_integration(
         });
         if count == expected_count {
             return;
+        } else {
+            tracing::debug!(?count);
         }
         tokio::time::delay_for(delay).await;
     }

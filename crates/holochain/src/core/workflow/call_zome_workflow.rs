@@ -18,7 +18,6 @@ use crate::core::{
 pub use call_zome_workspace_lock::CallZomeWorkspaceLock;
 use either::Either;
 use fallible_iterator::FallibleIterator;
-use holo_hash::AnyDhtHash;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
 use holochain_state::prelude::*;
@@ -160,27 +159,24 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT>(
                     let (base, target) = {
                         let mut workspace = workspace_lock.write().await;
                         let mut cascade = workspace.cascade(network.clone());
-                        let base_address: AnyDhtHash = link_add.base_address.clone().into();
+                        let base_address = &link_add.base_address;
                         let base = cascade
-                            .retrieve(base_address.clone(), GetOptions.into())
+                            .retrieve_entry(base_address.clone(), GetOptions.into())
                             .await
                             .map_err(RibosomeError::from)?
-                            .ok_or_else(|| RibosomeError::ElementDeps(base_address.clone()))?
-                            .into_inner()
-                            .1
-                            .into_option()
-                            .ok_or_else(|| RibosomeError::ElementDeps(base_address.clone()))?;
+                            .ok_or_else(|| RibosomeError::ElementDeps(base_address.clone().into()))?
+                            .into_content();
                         let base = Arc::new(base);
-                        let target_address: AnyDhtHash = link_add.target_address.clone().into();
+
+                        let target_address = &link_add.target_address;
                         let target = cascade
-                            .retrieve(target_address.clone(), GetOptions.into())
+                            .retrieve_entry(target_address.clone(), GetOptions.into())
                             .await
                             .map_err(RibosomeError::from)?
-                            .ok_or_else(|| RibosomeError::ElementDeps(target_address.clone()))?
-                            .into_inner()
-                            .1
-                            .into_option()
-                            .ok_or_else(|| RibosomeError::ElementDeps(target_address.clone()))?;
+                            .ok_or_else(|| {
+                                RibosomeError::ElementDeps(target_address.clone().into())
+                            })?
+                            .into_content();
                         let target = Arc::new(target);
                         (base, target)
                     };

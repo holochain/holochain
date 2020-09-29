@@ -34,6 +34,8 @@ pub use mock::MockMetadataBuf;
 #[cfg(test)]
 use mockall::mock;
 
+#[cfg(test)]
+mod chain_test;
 mod keys;
 #[cfg(test)]
 pub mod links_test;
@@ -110,10 +112,10 @@ where
     fn deregister_element_header(&mut self, header: HeaderHash) -> DatabaseResult<()>;
 
     /// Registers a published [Header] on the authoring agent's public key
-    fn register_activity(&mut self, header: Header) -> DatabaseResult<()>;
+    fn register_activity(&mut self, header: &Header) -> DatabaseResult<()>;
 
     /// Deregister a published [Header] on the authoring agent's public key
-    fn deregister_activity(&mut self, header: Header) -> DatabaseResult<()>;
+    fn deregister_activity(&mut self, header: &Header) -> DatabaseResult<()>;
 
     /// Registers a [Header::Update] on the referenced [Header] or [Entry]
     fn register_update(&mut self, update: header::Update) -> DatabaseResult<()>;
@@ -134,11 +136,19 @@ where
         entry_hash: EntryHash,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>;
 
-    /// Returns all headers registered on an agent's public key
+    /// Get chain items on an agents source chain.
+    /// This is how we query for RegisterAgentActivity items.
+    ///
+    /// The relationship is a key (that can be partially matched)
+    /// as [AgentPubKey] then "header sequence index" then HeaderHash.
+    ///
+    /// There can be multiple headers at a sequence number.
+    /// This means there's a fork in the chain.
+    /// We store the data as proof.
     fn get_activity<'r, R: Readable>(
         &'r self,
         reader: &'r R,
-        agent_pubkey: AgentPubKey,
+        key: ChainItemKey,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>;
 
     /// Returns all the hashes of [Update] headers registered on an [Entry]
@@ -236,15 +246,6 @@ impl MetadataBuf<PendingPrefix> {
     }
 }
 
-impl MetadataBuf<JudgedPrefix> {
-    /// Create a [MetadataBuf] with the vault databases using the JudgedPrefix.
-    /// The data in the type will be separate from the other prefixes even though the
-    /// database is shared.
-    pub fn judged(env: EnvironmentRead) -> DatabaseResult<Self> {
-        Self::new_vault(env)
-    }
-}
-
 impl MetadataBuf<RejectedPrefix> {
     /// Create a [MetadataBuf] with the vault databases using the RejectedPrefix.
     /// The data in the type will be separate from the other prefixes even though the
@@ -288,7 +289,6 @@ where
             h @ EntryHeader::NewEntry(_) => SysMetaVal::NewEntry(h.into_hash()?),
             h @ EntryHeader::Update(_) => SysMetaVal::Update(h.into_hash()?),
             h @ EntryHeader::Delete(_) => SysMetaVal::Delete(h.into_hash()?),
-            h @ EntryHeader::Activity(_) => SysMetaVal::Activity(h.into_hash()?),
         };
         let key: SysMetaKey = key.into();
         self.system_meta.insert(PrefixBytesKey::new(key), sys_val);
@@ -304,7 +304,6 @@ where
             h @ EntryHeader::NewEntry(_) => SysMetaVal::NewEntry(h.into_hash()?),
             h @ EntryHeader::Update(_) => SysMetaVal::Update(h.into_hash()?),
             h @ EntryHeader::Delete(_) => SysMetaVal::Delete(h.into_hash()?),
-            h @ EntryHeader::Activity(_) => SysMetaVal::Activity(h.into_hash()?),
         };
         let key: SysMetaKey = key.into();
         self.system_meta.delete(PrefixBytesKey::new(key), sys_val);
@@ -331,7 +330,7 @@ where
         // No evidence of life found so entry is marked dead
         .unwrap_or(EntryDhtStatus::Dead);
         self.misc_meta.put(
-            MiscMetaKey::EntryStatus(basis).into(),
+            MiscMetaKey::entry_status(&basis).into(),
             MiscMetaValue::EntryStatus(status),
         )
     }
@@ -460,14 +459,14 @@ where
 
     fn register_element_header(&mut self, header: &Header) -> DatabaseResult<()> {
         self.misc_meta.put(
-            MiscMetaKey::StoreElement(HeaderHash::with_data_sync(header)).into(),
+            MiscMetaKey::store_element(&HeaderHash::with_data_sync(header)).into(),
             MiscMetaValue::new_store_element(),
         )
     }
 
     fn deregister_element_header(&mut self, hash: HeaderHash) -> DatabaseResult<()> {
         self.misc_meta
-            .delete(MiscMetaKey::StoreElement(hash).into())
+            .delete(MiscMetaKey::store_element(&hash).into())
     }
 
     fn register_update(&mut self, update: header::Update) -> DatabaseResult<()> {
@@ -500,14 +499,16 @@ where
         self.update_entry_dht_status(entry_hash)
     }
 
-    fn register_activity(&mut self, header: Header) -> DatabaseResult<()> {
-        let author = header.author().clone();
-        self.register_header_on_basis(author, EntryHeader::Activity(header))
+    fn register_activity(&mut self, header: &Header) -> DatabaseResult<()> {
+        let key = ChainItemKey::from(header);
+        let key = MiscMetaKey::chain_item(&key).into();
+        let value = MiscMetaValue::ChainItem(header.timestamp().clone().into());
+        self.misc_meta.put(key, value)
     }
 
-    fn deregister_activity(&mut self, header: Header) -> DatabaseResult<()> {
-        let author = header.author().clone();
-        self.deregister_header_on_basis(author, EntryHeader::Activity(header))
+    fn deregister_activity(&mut self, header: &Header) -> DatabaseResult<()> {
+        let key = ChainItemKey::from(header);
+        self.misc_meta.delete(MiscMetaKey::chain_item(&key).into())
     }
 
     fn get_headers<'r, R: Readable>(
@@ -589,21 +590,23 @@ where
     fn get_activity<'r, R: Readable>(
         &'r self,
         r: &'r R,
-        agent_pubkey: AgentPubKey,
+        key: ChainItemKey,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
-        Ok(Box::new(
-            fallible_iterator::convert(
-                self.system_meta
-                    .get(r, &SysMetaKey::from(agent_pubkey).into())?,
-            )
-            .filter_map(|h| {
-                Ok(match h {
-                    SysMetaVal::Activity(h) => Some(h),
-                    _ => None,
-                })
-            }),
-        ))
+        let k = MiscMetaKey::chain_item(&key).into();
+        Ok(Box::new(self.misc_meta.iter_all_key_matches(r, k)?.map(
+            |(k, v)| {
+                let k: MiscMetaKey<ChainItemPrefix> =
+                    PrefixBytesKey::<P>::from_key_bytes_or_friendly_panic(k).into();
+                let header_hash = ChainItemKey::from(k).into();
+                let timestamp = MiscMetaValue::chain_item(v);
+                let r = TimedHeaderHash {
+                    timestamp,
+                    header_hash,
+                };
+                Ok(r)
+            },
+        )))
     }
 
     // TODO: For now this is only checking for deletes
@@ -615,7 +618,7 @@ where
     ) -> DatabaseResult<EntryDhtStatus> {
         Ok(self
             .misc_meta
-            .get(r, &MiscMetaKey::EntryStatus(entry_hash.clone()).into())?
+            .get(r, &MiscMetaKey::entry_status(entry_hash).into())?
             .map(MiscMetaValue::entry_status)
             .unwrap_or(EntryDhtStatus::Dead))
     }
@@ -651,7 +654,7 @@ where
     fn has_registered_store_element(&self, hash: &HeaderHash) -> DatabaseResult<bool> {
         fresh_reader!(self.env, |r| self
             .misc_meta
-            .contains(&r, &MiscMetaKey::StoreElement(hash.clone()).into()))
+            .contains(&r, &MiscMetaKey::store_element(hash).into()))
     }
 
     fn has_registered_store_entry(

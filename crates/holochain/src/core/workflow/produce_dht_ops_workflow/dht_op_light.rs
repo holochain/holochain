@@ -20,7 +20,7 @@ mod tests;
 /// Convert a DhtOpLight into a DhtOp (render all the hashes to values)
 /// This only checks the ElementVault so can only be used with ops that you are
 /// an authority or author of.
-pub async fn light_to_op<P: PrefixType>(
+pub fn light_to_op<P: PrefixType>(
     op: DhtOpLight,
     cas: &ElementBuf<P>,
 ) -> DhtOpConvertResult<DhtOp> {

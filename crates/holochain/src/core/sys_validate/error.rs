@@ -1,7 +1,7 @@
 use super::SourceChainError;
 use crate::{
     conductor::entry_def_store::error::EntryDefStoreError,
-    core::state::cascade::error::CascadeError,
+    core::state::cascade::error::CascadeError, core::workflow::error::WorkflowError,
 };
 use holo_hash::{AnyDhtHash, HeaderHash};
 use holochain_keystore::KeystoreError;
@@ -38,6 +38,8 @@ pub enum SysValidationError {
     DnaMissing(CellId),
     #[error(transparent)]
     ValidationOutcome(#[from] ValidationOutcome),
+    #[error(transparent)]
+    WorkflowError(#[from] Box<WorkflowError>),
 }
 
 pub type SysValidationResult<T> = Result<T, SysValidationError>;
