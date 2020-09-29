@@ -29,8 +29,8 @@ use holochain_state::{
     prelude::*,
 };
 use holochain_types::{
-    dht_op::DhtOp, dht_op::DhtOpLight, header::NewEntryHeaderRef, test_utils::which_agent,
-    validate::ValidationStatus, Entry, Timestamp,
+    dht_op::DhtOp, header::NewEntryHeaderRef, test_utils::which_agent, validate::ValidationStatus,
+    Entry, Timestamp,
 };
 use holochain_zome_types::signature::Signature;
 use holochain_zome_types::{
@@ -40,10 +40,6 @@ use holochain_zome_types::{
 use std::{collections::BinaryHeap, convert::TryInto};
 use tracing::*;
 
-use integrate_dht_ops_workflow::{
-    disintegrate_single_data, disintegrate_single_metadata, integrate_single_data,
-    integrate_single_metadata, reintegrate_single_data,
-};
 use produce_dht_ops_workflow::dht_op_light::light_to_op;
 use types::{CheckLevel, DhtOpOrder, OrderedOp, Outcome};
 
@@ -115,10 +111,14 @@ async fn sys_validation_workflow_inner(
                         | ValidationLimboStatus::AwaitingAppDeps(_) => Ok(false),
                     }
                 })?
-                .map_err(|e| WorkflowError::from(e))
+                .map_err(WorkflowError::from)
                 .map(|vlv| {
                     // Sort the ops into a min-heap
-                    let op = light_to_op(vlv.op.clone(), element_pending)?;
+                    let op = light_to_op(vlv.op.clone(), element_pending);
+                    if let Err(e) = &op {
+                        error!(?e)
+                    }
+                    let op = op?;
 
                     let hash = DhtOpHash::with_data_sync(&op);
                     let order = DhtOpOrder::from(&op);
@@ -174,7 +174,7 @@ async fn sys_validation_workflow_inner(
                     op: vlv.op,
                     validation_status: ValidationStatus::Valid,
                 };
-                workspace.put_int_limbo(op_hash, iv, op)?;
+                workspace.put_int_limbo(op_hash, iv)?;
             }
             Outcome::AwaitingOpDep(missing_dep) => {
                 // TODO: Try and get this dependency to add to limbo
@@ -198,7 +198,7 @@ async fn sys_validation_workflow_inner(
                     op: vlv.op,
                     validation_status: ValidationStatus::Rejected,
                 };
-                workspace.put_int_limbo(op_hash, iv, op)?;
+                workspace.put_int_limbo(op_hash, iv)?;
             }
         }
     }
@@ -572,17 +572,12 @@ pub struct SysValidationWorkspace {
     // Data pending validation
     pub element_pending: ElementBuf<PendingPrefix>,
     pub meta_pending: MetadataBuf<PendingPrefix>,
-    // Data that has progressed past validation and is pending Integration
-    pub element_judged: ElementBuf<JudgedPrefix>,
-    pub meta_judged: MetadataBuf<JudgedPrefix>,
     // Read only rejected store for finding dependency data
     pub element_rejected: ElementBuf<RejectedPrefix>,
     pub meta_rejected: MetadataBuf<RejectedPrefix>,
     // Cached data
     pub element_cache: ElementBuf,
     pub meta_cache: MetadataBuf,
-    // Ops to disintegrate
-    pub to_disintegrate_pending: Vec<DhtOpLight>,
     pub env: EnvironmentRead,
 }
 
@@ -617,9 +612,6 @@ impl SysValidationWorkspace {
         let element_pending = ElementBuf::pending(env.clone())?;
         let meta_pending = MetadataBuf::pending(env.clone())?;
 
-        let element_judged = ElementBuf::judged(env.clone())?;
-        let meta_judged = MetadataBuf::judged(env.clone())?;
-
         // READ ONLY
         let element_rejected = ElementBuf::rejected(env.clone())?;
         let meta_rejected = MetadataBuf::rejected(env.clone())?;
@@ -631,13 +623,10 @@ impl SysValidationWorkspace {
             meta_vault,
             element_pending,
             meta_pending,
-            element_judged,
-            meta_judged,
             element_rejected,
             meta_rejected,
             element_cache,
             meta_cache,
-            to_disintegrate_pending: Vec::new(),
             env,
         })
     }
@@ -653,32 +642,9 @@ impl SysValidationWorkspace {
         Ok(())
     }
 
-    #[tracing::instrument(skip(self, hash, op))]
-    fn put_int_limbo(
-        &mut self,
-        hash: DhtOpHash,
-        iv: IntegrationLimboValue,
-        op: DhtOp,
-    ) -> WorkflowResult<()> {
-        disintegrate_single_metadata(iv.op.clone(), &self.element_pending, &mut self.meta_pending)?;
-        self.to_disintegrate_pending.push(iv.op.clone());
-        integrate_single_data(op, &mut self.element_judged)?;
-        integrate_single_metadata(iv.op.clone(), &self.element_judged, &mut self.meta_judged)?;
+    #[tracing::instrument(skip(self, hash))]
+    fn put_int_limbo(&mut self, hash: DhtOpHash, iv: IntegrationLimboValue) -> WorkflowResult<()> {
         self.integration_limbo.put(hash, iv)?;
-        Ok(())
-    }
-
-    #[tracing::instrument(skip(self, writer))]
-    /// We need to cancel any deletes for the pending data
-    /// where the ops still in validation limbo reference that data
-    fn update_element_stores(&mut self, writer: &mut Writer) -> WorkspaceResult<()> {
-        for op in self.to_disintegrate_pending.drain(..) {
-            disintegrate_single_data(op, &mut self.element_pending);
-        }
-        let mut val_iter = self.validation_limbo.iter(writer)?;
-        while let Some((_, vlv)) = val_iter.next()? {
-            reintegrate_single_data(vlv.op, &mut self.element_pending);
-        }
         Ok(())
     }
 
@@ -705,10 +671,6 @@ impl SysValidationWorkspace {
             element: &self.element_pending,
             meta: &self.meta_pending,
         };
-        let judged_data = DbPair {
-            element: &self.element_judged,
-            meta: &self.meta_judged,
-        };
         let rejected_data = DbPair {
             element: &self.element_rejected,
             meta: &self.meta_rejected,
@@ -720,7 +682,6 @@ impl SysValidationWorkspace {
         Cascade::empty()
             .with_integrated(integrated_data)
             .with_pending(pending_data)
-            .with_judged(judged_data)
             .with_cache(cache_data)
             .with_rejected(rejected_data)
     }
@@ -736,7 +697,6 @@ impl SysValidationWorkspace {
 
 impl Workspace for SysValidationWorkspace {
     fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> WorkspaceResult<()> {
-        self.update_element_stores(writer)?;
         self.validation_limbo.0.flush_to_txn_ref(writer)?;
         self.integration_limbo.flush_to_txn_ref(writer)?;
         // Flush for cascade
@@ -745,8 +705,6 @@ impl Workspace for SysValidationWorkspace {
 
         self.element_pending.flush_to_txn_ref(writer)?;
         self.meta_pending.flush_to_txn_ref(writer)?;
-        self.element_judged.flush_to_txn_ref(writer)?;
-        self.meta_judged.flush_to_txn_ref(writer)?;
         Ok(())
     }
 }

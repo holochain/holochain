@@ -246,15 +246,6 @@ impl MetadataBuf<PendingPrefix> {
     }
 }
 
-impl MetadataBuf<JudgedPrefix> {
-    /// Create a [MetadataBuf] with the vault databases using the JudgedPrefix.
-    /// The data in the type will be separate from the other prefixes even though the
-    /// database is shared.
-    pub fn judged(env: EnvironmentRead) -> DatabaseResult<Self> {
-        Self::new_vault(env)
-    }
-}
-
 impl MetadataBuf<RejectedPrefix> {
     /// Create a [MetadataBuf] with the vault databases using the RejectedPrefix.
     /// The data in the type will be separate from the other prefixes even though the

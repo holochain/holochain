@@ -92,9 +92,6 @@ macro_rules! search_all {
         if let Some(db) = $cascade.pending_data.as_ref() {
             return_if_ok!($fn(db, $hash)?)
         }
-        if let Some(db) = $cascade.judged_data.as_ref() {
-            return_if_ok!($fn(db, $hash)?)
-        }
         if let Some(db) = $cascade.integrated_data.as_ref() {
             return_if_ok!($fn(db, $hash)?)
         }
@@ -138,19 +135,16 @@ pub struct Cascade<
     MetaVault = MetadataBuf,
     MetaCache = MetadataBuf,
     MetaPending = MetadataBuf<PendingPrefix>,
-    MetaJudged = MetadataBuf<JudgedPrefix>,
     MetaRejected = MetadataBuf<RejectedPrefix>,
 > where
     Network: HolochainP2pCellT,
     MetaVault: MetadataBufT,
     MetaPending: MetadataBufT<PendingPrefix>,
-    MetaJudged: MetadataBufT<JudgedPrefix>,
     MetaRejected: MetadataBufT<RejectedPrefix>,
     MetaCache: MetadataBufT,
 {
     integrated_data: Option<DbPair<'a, MetaVault, IntegratedPrefix>>,
     pending_data: Option<DbPair<'a, MetaPending, PendingPrefix>>,
-    judged_data: Option<DbPair<'a, MetaJudged, JudgedPrefix>>,
     rejected_data: Option<DbPair<'a, MetaRejected, RejectedPrefix>>,
     cache_data: Option<DbPairMut<'a, MetaCache>>,
     env: Option<EnvironmentRead>,
@@ -202,7 +196,6 @@ where
             env: Some(env),
             network: Some(network),
             pending_data: None,
-            judged_data: None,
             rejected_data: None,
             integrated_data,
             cache_data,
@@ -216,7 +209,6 @@ impl<'a> Cascade<'a> {
         Self {
             integrated_data: None,
             pending_data: None,
-            judged_data: None,
             rejected_data: None,
             cache_data: None,
             env: None,
@@ -225,13 +217,12 @@ impl<'a> Cascade<'a> {
     }
 }
 
-impl<'a, Network, MetaVault, MetaCache, MetaPending, MetaJudged, MetaRejected>
-    Cascade<'a, Network, MetaVault, MetaCache, MetaPending, MetaJudged, MetaRejected>
+impl<'a, Network, MetaVault, MetaCache, MetaPending, MetaRejected>
+    Cascade<'a, Network, MetaVault, MetaCache, MetaPending, MetaRejected>
 where
     MetaCache: MetadataBufT,
     MetaVault: MetadataBufT,
     MetaPending: MetadataBufT<PendingPrefix>,
-    MetaJudged: MetadataBufT<JudgedPrefix>,
     MetaRejected: MetadataBufT<RejectedPrefix>,
     Network: HolochainP2pCellT,
 {
@@ -249,13 +240,6 @@ where
     pub fn with_pending(mut self, pending_data: DbPair<'a, MetaPending, PendingPrefix>) -> Self {
         self.env = Some(pending_data.meta.env().clone());
         self.pending_data = Some(pending_data);
-        self
-    }
-
-    /// Add the judged [ElementBuf] and [MetadataBuf] to the cascade
-    pub fn with_judged(mut self, judged_data: DbPair<'a, MetaJudged, JudgedPrefix>) -> Self {
-        self.env = Some(judged_data.meta.env().clone());
-        self.judged_data = Some(judged_data);
         self
     }
 
@@ -280,11 +264,10 @@ where
     pub fn with_network<N: HolochainP2pCellT>(
         self,
         network: N,
-    ) -> Cascade<'a, N, MetaVault, MetaCache, MetaPending, MetaJudged, MetaRejected> {
+    ) -> Cascade<'a, N, MetaVault, MetaCache, MetaPending, MetaRejected> {
         Cascade {
             integrated_data: self.integrated_data,
             pending_data: self.pending_data,
-            judged_data: self.judged_data,
             rejected_data: self.rejected_data,
             cache_data: self.cache_data,
             env: self.env,

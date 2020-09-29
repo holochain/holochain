@@ -241,17 +241,12 @@ pub async fn check_chain_rollback(
             .get_activity(&r, k.clone())?
             .filter(|thh| Ok(thh.header_hash != header_hash))
             .count()?;
-        let judged_count = workspace
-            .meta_judged
-            .get_activity(&r, k.clone())?
-            .filter(|thh| Ok(thh.header_hash != header_hash))
-            .count()?;
         let pending_count = workspace
             .meta_pending
             .get_activity(&r, k.clone())?
             .filter(|thh| Ok(thh.header_hash != header_hash))
             .count()?;
-        DatabaseResult::Ok(vault_count + judged_count + pending_count)
+        DatabaseResult::Ok(vault_count + pending_count)
     })?;
 
     // Ok or log warning

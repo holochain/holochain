@@ -13,6 +13,7 @@ use crate::core::{
         },
         element_buf::ElementBuf,
         metadata::{MetadataBuf, MetadataBufT},
+        validation_db::ValidationLimboStore,
         workspace::{Workspace, WorkspaceResult},
     },
 };
@@ -67,7 +68,7 @@ pub async fn integrate_dht_ops_workflow(
     // Sort the ops
     let mut sorted_ops = BinaryHeap::new();
     for iv in ops {
-        let op = light_to_op(iv.op.clone(), &workspace.element_judged)?;
+        let op = light_to_op(iv.op.clone(), &workspace.element_pending)?;
         let hash = DhtOpHash::with_data_sync(&op);
         let order = DhtOpOrder::from(&op);
         let v = OrderedOp {
@@ -473,21 +474,25 @@ enum Outcome {
 }
 
 pub struct IntegrateDhtOpsWorkspace {
-    // integration queue
+    /// integration queue
     pub integration_limbo: IntegrationLimboStore,
-    // integrated ops
+    /// integrated ops
     pub integrated_dht_ops: IntegratedDhtOpsStore,
-    // Cas for storing
+    /// Cas for storing
     pub elements: ElementBuf,
-    // metadata store
+    /// metadata store
     pub meta: MetadataBuf,
-    // Data that has progressed past validation and is pending Integration
-    pub element_judged: ElementBuf<JudgedPrefix>,
-    pub meta_judged: MetadataBuf<JudgedPrefix>,
+    /// Data that has progressed past validation and is pending Integration
+    pub element_pending: ElementBuf<PendingPrefix>,
+    pub meta_pending: MetadataBuf<PendingPrefix>,
     pub element_rejected: ElementBuf<RejectedPrefix>,
     pub meta_rejected: MetadataBuf<RejectedPrefix>,
-    // Ops to disintegrate
-    pub to_disintegrate_judged: Vec<DhtOpLight>,
+    /// Ops to disintegrate
+    pub to_disintegrate_pending: Vec<DhtOpLight>,
+    /// READ ONLY
+    /// Need the validation limbo to make sure we don't
+    /// remove data that is in this limbo
+    pub validation_limbo: ValidationLimboStore,
 }
 
 impl Workspace for IntegrateDhtOpsWorkspace {
@@ -501,8 +506,8 @@ impl Workspace for IntegrateDhtOpsWorkspace {
         self.integrated_dht_ops.flush_to_txn_ref(writer)?;
         // flush integration queue
         self.integration_limbo.flush_to_txn_ref(writer)?;
-        self.element_judged.flush_to_txn_ref(writer)?;
-        self.meta_judged.flush_to_txn_ref(writer)?;
+        self.element_pending.flush_to_txn_ref(writer)?;
+        self.meta_pending.flush_to_txn_ref(writer)?;
         self.element_rejected.flush_to_txn_ref(writer)?;
         self.meta_rejected.flush_to_txn_ref(writer)?;
         Ok(())
@@ -518,11 +523,13 @@ impl IntegrateDhtOpsWorkspace {
         let db = env.get_db(&*INTEGRATION_LIMBO)?;
         let integration_limbo = KvBufFresh::new(env.clone(), db);
 
+        let validation_limbo = ValidationLimboStore::new(env.clone())?;
+
         let elements = ElementBuf::vault(env.clone(), true)?;
         let meta = MetadataBuf::vault(env.clone())?;
 
-        let element_judged = ElementBuf::judged(env.clone())?;
-        let meta_judged = MetadataBuf::judged(env.clone())?;
+        let element_pending = ElementBuf::pending(env.clone())?;
+        let meta_pending = MetadataBuf::pending(env.clone())?;
 
         let element_rejected = ElementBuf::rejected(env.clone())?;
         let meta_rejected = MetadataBuf::rejected(env)?;
@@ -532,18 +539,19 @@ impl IntegrateDhtOpsWorkspace {
             integrated_dht_ops,
             elements,
             meta,
-            element_judged,
-            meta_judged,
+            element_pending,
+            meta_pending,
             element_rejected,
             meta_rejected,
-            to_disintegrate_judged: Vec::new(),
+            validation_limbo,
+            to_disintegrate_pending: Vec::new(),
         })
     }
 
     #[tracing::instrument(skip(self, hash))]
     fn integrate(&mut self, hash: DhtOpHash, v: IntegratedDhtOpsValue) -> DhtOpConvertResult<()> {
-        disintegrate_single_metadata(v.op.clone(), &self.element_judged, &mut self.meta_judged)?;
-        self.to_disintegrate_judged.push(v.op.clone());
+        disintegrate_single_metadata(v.op.clone(), &self.element_pending, &mut self.meta_pending)?;
+        self.to_disintegrate_pending.push(v.op.clone());
         self.integrated_dht_ops.put(hash, v)?;
         Ok(())
     }
@@ -573,12 +581,16 @@ impl IntegrateDhtOpsWorkspace {
     /// We need to cancel any deletes for the judged data
     /// where the ops still in integration limbo reference that data
     fn update_element_stores(&mut self, writer: &mut Writer) -> WorkspaceResult<()> {
-        for op in self.to_disintegrate_judged.drain(..) {
-            disintegrate_single_data(op, &mut self.element_judged);
+        for op in self.to_disintegrate_pending.drain(..) {
+            disintegrate_single_data(op, &mut self.element_pending);
         }
-        let mut val_iter = self.integration_limbo.iter(writer)?;
+        let mut int_iter = self.integration_limbo.iter(writer)?;
+        while let Some((_, vlv)) = int_iter.next()? {
+            reintegrate_single_data(vlv.op, &mut self.element_pending);
+        }
+        let mut val_iter = self.validation_limbo.iter(writer)?;
         while let Some((_, vlv)) = val_iter.next()? {
-            reintegrate_single_data(vlv.op, &mut self.element_judged);
+            reintegrate_single_data(vlv.op, &mut self.element_pending);
         }
         Ok(())
     }
