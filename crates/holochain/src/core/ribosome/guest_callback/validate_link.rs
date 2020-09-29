@@ -3,6 +3,7 @@ use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
 use crate::core::{ribosome::FnComponents, workflow::CallZomeWorkspaceLock};
 use derive_more::Constructor;
+use holo_hash::AnyDhtHash;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::dna::zome::{HostFnAccess, Permission};
@@ -151,6 +152,7 @@ impl Invocation for ValidateDeleteLinkInvocation {
 pub enum ValidateLinkResult {
     Valid,
     Invalid(String),
+    UnresolvedDependencies(Vec<AnyDhtHash>),
 }
 
 impl From<Vec<(ZomeName, ValidateLinkCallbackResult)>> for ValidateLinkResult {
@@ -165,6 +167,11 @@ impl From<Vec<ValidateLinkCallbackResult>> for ValidateLinkResult {
             match x {
                 // validation is invalid if any x is invalid
                 ValidateLinkCallbackResult::Invalid(i) => Self::Invalid(i),
+                // return unresolved dependencies if it's otherwise valid
+                ValidateLinkCallbackResult::UnresolvedDependencies(ud) => match acc {
+                    Self::Invalid(_) => acc,
+                    _ => Self::UnresolvedDependencies(ud),
+                },
                 // valid x allows validation to continue
                 ValidateLinkCallbackResult::Valid => acc,
             }

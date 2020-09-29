@@ -3,7 +3,7 @@ use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
 use crate::core::{ribosome::FnComponents, workflow::CallZomeWorkspaceLock};
 use derive_more::Constructor;
-use holo_hash::EntryHash;
+use holo_hash::AnyDhtHash;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::dna::zome::{HostFnAccess, Permission};
@@ -96,7 +96,7 @@ pub enum ValidateResult {
     Invalid(String),
     /// subconscious needs to map this to either pending or abandoned based on context that the
     /// wasm can't possibly have
-    UnresolvedDependencies(Vec<EntryHash>),
+    UnresolvedDependencies(Vec<AnyDhtHash>),
 }
 
 impl From<Vec<(ZomeName, ValidateCallbackResult)>> for ValidateResult {

@@ -2,6 +2,7 @@ use crate::header::CreateLink;
 use crate::zome_io::ExternOutput;
 use crate::CallbackResult;
 use crate::{entry::Entry, header::DeleteLink};
+use holo_hash::AnyDhtHash;
 use holochain_serialized_bytes::prelude::*;
 
 #[derive(Serialize, Deserialize, SerializedBytes)]
@@ -20,6 +21,7 @@ pub struct ValidateDeleteLinkData {
 pub enum ValidateLinkCallbackResult {
     Valid,
     Invalid(String),
+    UnresolvedDependencies(Vec<AnyDhtHash>),
 }
 
 impl CallbackResult for ValidateLinkCallbackResult {

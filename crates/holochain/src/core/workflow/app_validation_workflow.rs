@@ -39,7 +39,7 @@ use crate::{
 use error::AppValidationResult;
 pub use error::*;
 use fallible_iterator::FallibleIterator;
-use holo_hash::{AnyDhtHash, DhtOpHash};
+use holo_hash::DhtOpHash;
 use holochain_p2p::{HolochainP2pCell, HolochainP2pCellT};
 use holochain_state::{
     buffer::{BufferedStore, KvBufFresh},
@@ -437,10 +437,7 @@ pub fn run_validation_callback(
     match validate {
         ValidateResult::Valid => Ok(Outcome::Accepted),
         ValidateResult::Invalid(reason) => Ok(Outcome::Rejected(reason)),
-        ValidateResult::UnresolvedDependencies(hashes) => {
-            let deps = hashes.into_iter().map(AnyDhtHash::from).collect();
-            Ok(Outcome::AwaitingDeps(deps))
-        }
+        ValidateResult::UnresolvedDependencies(hashes) => Ok(Outcome::AwaitingDeps(hashes)),
     }
 }
 
@@ -489,6 +486,7 @@ pub fn run_link_validation_callback<I: Invocation + 'static>(
     match validate {
         ValidateLinkResult::Valid => Ok(Outcome::Accepted),
         ValidateLinkResult::Invalid(reason) => Ok(Outcome::Rejected(reason)),
+        ValidateLinkResult::UnresolvedDependencies(hashes) => Ok(Outcome::AwaitingDeps(hashes)),
     }
 }
 
