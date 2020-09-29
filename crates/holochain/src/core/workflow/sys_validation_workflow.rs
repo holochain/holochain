@@ -18,7 +18,7 @@ use crate::{
         sys_validate::*,
     },
 };
-use error::WorkflowResult;
+use error::{WorkflowError, WorkflowResult};
 use fallible_iterator::FallibleIterator;
 use holo_hash::DhtOpHash;
 use holochain_p2p::{HolochainP2pCell, HolochainP2pCellT};
@@ -45,7 +45,7 @@ use integrate_dht_ops_workflow::{
     integrate_single_metadata, reintegrate_single_data,
 };
 use produce_dht_ops_workflow::dht_op_light::light_to_op;
-use types::{CheckLevel, DhtOpOrder, OrderedOp, Outcome, PendingDependencies};
+use types::{CheckLevel, DhtOpOrder, OrderedOp, Outcome};
 
 pub mod types;
 
@@ -97,41 +97,45 @@ async fn sys_validation_workflow_inner(
 ) -> WorkflowResult<WorkComplete> {
     let env = workspace.validation_limbo.env().clone();
     // Drain all the ops
-    let ops: Vec<ValidationLimboValue> = fresh_reader!(env, |r| workspace
-        .validation_limbo
-        .drain_iter_filter(&r, |(_, vlv)| {
-            match vlv.status {
-                // We only want pending or awaiting sys dependency ops
-                ValidationLimboStatus::Pending | ValidationLimboStatus::AwaitingSysDeps(_) => {
-                    Ok(true)
-                }
-                ValidationLimboStatus::SysValidated
-                | ValidationLimboStatus::AwaitingAppDeps(_)
-                | ValidationLimboStatus::PendingValidation => Ok(false),
-            }
-        })?
-        .collect())?;
+    let sorted_ops: BinaryHeap<std::cmp::Reverse<OrderedOp<ValidationLimboValue>>> =
+        fresh_reader!(env, |r| {
+            let validation_limbo = &mut workspace.validation_limbo;
+            let element_pending = &workspace.element_pending;
 
-    // Sort the ops
-    let mut sorted_ops = BinaryHeap::new();
-    for vlv in ops {
-        let op = light_to_op(vlv.op.clone(), &workspace.element_pending).await?;
+            let sorted_ops: Result<
+                BinaryHeap<std::cmp::Reverse<OrderedOp<ValidationLimboValue>>>,
+                WorkflowError,
+            > = validation_limbo
+                .drain_iter_filter(&r, |(_, vlv)| {
+                    match vlv.status {
+                        // We only want pending or awaiting sys dependency ops
+                        ValidationLimboStatus::Pending
+                        | ValidationLimboStatus::AwaitingSysDeps(_) => Ok(true),
+                        ValidationLimboStatus::SysValidated
+                        | ValidationLimboStatus::AwaitingAppDeps(_) => Ok(false),
+                    }
+                })?
+                .map_err(|e| WorkflowError::from(e))
+                .map(|vlv| {
+                    // Sort the ops into a min-heap
+                    let op = light_to_op(vlv.op.clone(), element_pending)?;
 
-        let hash = DhtOpHash::with_data_sync(&op);
-        let order = DhtOpOrder::from(&op);
-        let v = OrderedOp {
-            order,
-            hash,
-            op,
-            value: vlv,
-        };
-        // We want a min-heap
-        sorted_ops.push(std::cmp::Reverse(v));
-
-        // Since we are processing DhtOps in a loop, make sure we yield
-        // between each one, since hashing could take a while
-        tokio::task::yield_now().await;
-    }
+                    let hash = DhtOpHash::with_data_sync(&op);
+                    let order = DhtOpOrder::from(&op);
+                    let v = OrderedOp {
+                        order,
+                        hash,
+                        op,
+                        value: vlv,
+                    };
+                    // We want a min-heap
+                    // sorted_ops.push(std::cmp::Reverse(v));
+                    Ok(std::cmp::Reverse(v))
+                })
+                .iterator()
+                .collect();
+            sorted_ops
+        })?;
 
     // Process each op
     for so in sorted_ops {
@@ -156,7 +160,6 @@ async fn sys_validation_workflow_inner(
             workspace,
             network.clone(),
             &conductor_api,
-            &mut vlv.pending_dependencies,
             incoming_dht_ops_sender,
         )
         .await?;
@@ -167,16 +170,11 @@ async fn sys_validation_workflow_inner(
                 workspace.put_val_limbo(op_hash, vlv)?;
             }
             Outcome::SkipAppValidation => {
-                if vlv.pending_dependencies.pending_dependencies() {
-                    vlv.status = ValidationLimboStatus::PendingValidation;
-                    workspace.put_val_limbo(op_hash, vlv)?;
-                } else {
-                    let iv = IntegrationLimboValue {
-                        op: vlv.op,
-                        validation_status: ValidationStatus::Valid,
-                    };
-                    workspace.put_int_limbo(op_hash, iv, op)?;
-                }
+                let iv = IntegrationLimboValue {
+                    op: vlv.op,
+                    validation_status: ValidationStatus::Valid,
+                };
+                workspace.put_int_limbo(op_hash, iv, op)?;
             }
             Outcome::AwaitingOpDep(missing_dep) => {
                 // TODO: Try and get this dependency to add to limbo
@@ -212,7 +210,6 @@ async fn validate_op(
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
     conductor_api: &impl CellConductorApiT,
-    dependencies: &mut PendingDependencies,
     incoming_dht_ops_sender: IncomingDhtOpSender,
 ) -> WorkflowResult<Outcome> {
     match validate_op_inner(
@@ -220,7 +217,6 @@ async fn validate_op(
         workspace,
         network,
         conductor_api,
-        dependencies,
         incoming_dht_ops_sender,
     )
     .await
@@ -280,12 +276,11 @@ async fn validate_op_inner(
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
     conductor_api: &impl CellConductorApiT,
-    dependencies: &mut PendingDependencies,
     incoming_dht_ops_sender: IncomingDhtOpSender,
 ) -> SysValidationResult<()> {
     match op {
         DhtOp::StoreElement(_, header, entry) => {
-            store_element(header, workspace, network.clone(), dependencies).await?;
+            store_element(header, workspace, network.clone()).await?;
             if let Some(entry) = entry {
                 store_entry(
                     (header)
@@ -295,7 +290,6 @@ async fn validate_op_inner(
                     conductor_api,
                     workspace,
                     network,
-                    dependencies,
                 )
                 .await?;
             }
@@ -308,18 +302,17 @@ async fn validate_op_inner(
                 conductor_api,
                 workspace,
                 network.clone(),
-                dependencies,
             )
             .await?;
 
             let header = header.clone().into();
-            store_element(&header, workspace, network, dependencies).await?;
+            store_element(&header, workspace, network).await?;
             Ok(())
         }
         DhtOp::RegisterAgentActivity(_, header) => {
             register_agent_activity(header, workspace, network.clone(), incoming_dht_ops_sender)
                 .await?;
-            store_element(header, workspace, network, dependencies).await?;
+            store_element(header, workspace, network).await?;
             Ok(())
         }
         DhtOp::RegisterUpdatedBy(_, header) => {
@@ -336,14 +329,7 @@ async fn validate_op_inner(
             Ok(())
         }
         DhtOp::RegisterAddLink(_, header) => {
-            register_add_link(
-                header,
-                workspace,
-                network,
-                dependencies,
-                incoming_dht_ops_sender,
-            )
-            .await?;
+            register_add_link(header, workspace, network, incoming_dht_ops_sender).await?;
             Ok(())
         }
         DhtOp::RegisterRemoveLink(_, header) => {
@@ -393,7 +379,6 @@ async fn store_element(
     header: &Header,
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
-    dependencies: &mut PendingDependencies,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
     let prev_header_hash = header.prev_header();
@@ -401,8 +386,11 @@ async fn store_element(
     // Checks
     check_prev_header(header)?;
     if let Some(prev_header_hash) = prev_header_hash {
-        let dependency = check_header_exists(prev_header_hash.clone(), workspace, network).await?;
-        let prev_header = dependencies.store_element(dependency).await?;
+        let mut cascade = workspace.full_cascade(network);
+        let prev_header = cascade
+            .retrieve_header(prev_header_hash.clone(), Default::default())
+            .await?
+            .ok_or_else(|| ValidationOutcome::DepMissingFromDht(prev_header_hash.clone().into()))?;
         check_prev_timestamp(&header, prev_header.header())?;
         check_prev_seq(&header, prev_header.header())?;
     }
@@ -415,7 +403,6 @@ async fn store_entry(
     conductor_api: &impl CellConductorApiT,
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
-    dependencies: &mut PendingDependencies,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
     let entry_type = header.entry_type();
@@ -432,13 +419,14 @@ async fn store_entry(
 
     // Additional checks if this is an Update
     if let NewEntryHeaderRef::Update(entry_update) = header {
-        let dependency = check_header_exists(
-            entry_update.original_header_address.clone(),
-            workspace,
-            network,
-        )
-        .await?;
-        let original_header = dependencies.store_element(dependency).await?;
+        let original_header_address = &entry_update.original_header_address;
+        let mut cascade = workspace.full_cascade(network);
+        let original_header = cascade
+            .retrieve_header(original_header_address.clone(), Default::default())
+            .await?
+            .ok_or_else(|| {
+                ValidationOutcome::DepMissingFromDht(original_header_address.clone().into())
+            })?;
         update_check(entry_update, original_header.header())?;
     }
     Ok(())
@@ -519,7 +507,6 @@ async fn register_add_link(
     link_add: &CreateLink,
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
-    dependencies: &mut PendingDependencies,
     incoming_dht_ops_sender: IncomingDhtOpSender,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
@@ -536,8 +523,11 @@ async fn register_add_link(
     )
     .await?;
 
-    let dependency = check_entry_exists(target_entry_address.clone(), workspace, network).await?;
-    dependencies.store_entry_any(dependency).await?;
+    let mut cascade = workspace.full_cascade(network);
+    cascade
+        .retrieve_entry(target_entry_address.clone(), Default::default())
+        .await?
+        .ok_or_else(|| ValidationOutcome::DepMissingFromDht(target_entry_address.clone().into()))?;
 
     check_tag_size(&link_add.tag)?;
     Ok(())
@@ -733,6 +723,14 @@ impl SysValidationWorkspace {
             .with_judged(judged_data)
             .with_cache(cache_data)
             .with_rejected(rejected_data)
+    }
+
+    /// Get a cascade over all local databases and the network
+    pub fn full_cascade<Network: HolochainP2pCellT>(
+        &mut self,
+        network: Network,
+    ) -> Cascade<'_, Network> {
+        self.local_cascade().with_network(network)
     }
 }
 

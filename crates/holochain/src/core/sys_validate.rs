@@ -3,10 +3,7 @@
 
 use super::{
     queue_consumer::TriggerSender,
-    state::{
-        element_buf::ElementBuf,
-        metadata::{ChainItemKey, LinkMetaKey, MetadataBufT},
-    },
+    state::metadata::{ChainItemKey, MetadataBufT},
     workflow::incoming_dht_ops_workflow::incoming_dht_ops_workflow,
     workflow::sys_validation_workflow::types::CheckLevel,
     workflow::sys_validation_workflow::SysValidationWorkspace,
@@ -18,15 +15,12 @@ use crate::conductor::{
 use fallible_iterator::FallibleIterator;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_p2p::HolochainP2pCell;
-use holochain_state::{
-    env::EnvironmentWrite, error::DatabaseResult, fresh_reader, prelude::PrefixType,
-};
+use holochain_state::{env::EnvironmentWrite, error::DatabaseResult, fresh_reader};
 use holochain_types::{dht_op::DhtOp, header::NewEntryHeaderRef, Entry};
 use holochain_zome_types::{element::ElementEntry, signature::Signature};
 use holochain_zome_types::{
-    element::SignedHeaderHashed,
     entry_def::{EntryDef, EntryVisibility},
-    header::{AppEntryType, CreateLink, EntryType, Update},
+    header::{AppEntryType, EntryType, Update},
     link::LinkTag,
     Header,
 };
@@ -41,11 +35,8 @@ pub use holochain_types::{
     HeaderHashed, Timestamp,
 };
 
-pub use present::*;
-
 #[allow(missing_docs)]
 mod error;
-mod present;
 #[cfg(test)]
 mod tests;
 

@@ -67,7 +67,7 @@ pub async fn integrate_dht_ops_workflow(
     // Sort the ops
     let mut sorted_ops = BinaryHeap::new();
     for iv in ops {
-        let op = light_to_op(iv.op.clone(), &workspace.element_judged).await?;
+        let op = light_to_op(iv.op.clone(), &workspace.element_judged)?;
         let hash = DhtOpHash::with_data_sync(&op);
         let order = DhtOpOrder::from(&op);
         let v = OrderedOp {

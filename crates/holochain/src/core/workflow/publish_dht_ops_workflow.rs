@@ -125,7 +125,7 @@ pub async fn publish_dht_ops_workflow_inner(
         let op = value.op.clone();
         workspace.authored().put(op_hash.clone(), value)?;
 
-        let op = match light_to_op(op, workspace.elements()).await {
+        let op = match light_to_op(op, workspace.elements()) {
             // Ignore StoreEntry ops on private
             Err(DhtOpConvertError::StoreEntryOnPrivate) => continue,
             r => r?,
