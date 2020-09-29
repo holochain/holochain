@@ -1,3 +1,5 @@
+#![allow(clippy::large_enum_variant)]
+
 use crate::*;
 use futures::{sink::SinkExt, stream::StreamExt};
 use ghost_actor::dependencies::tracing;
@@ -177,6 +179,7 @@ ghost_actor::ghost_chan! {
 
         fn incoming_req_proxy(
             base_url: url2::Url2,
+            _cert_digest: ChannelData,
             write: futures::channel::mpsc::Sender<ProxyWire>,
             read: futures::channel::mpsc::Receiver<ProxyWire>,
         ) -> ();
@@ -223,19 +226,25 @@ impl InternalHandler for InnerListen {
         write: TransportChannelWrite,
         read: TransportChannelRead,
     ) -> InternalHandlerResult<()> {
-        let write = wire_write::wrap_wire_write(write);
+        let mut write = wire_write::wrap_wire_write(write);
         let mut read = wire_read::wrap_wire_read(read);
         let i_s = self.i_s.clone();
         Ok(async move {
             match read.next().await {
-                Some(ProxyWire::ReqProxy(ReqProxy())) => {
-                    i_s.incoming_req_proxy(base_url, write, read).await?;
+                Some(ProxyWire::ReqProxy(ReqProxy(cert_digest))) => {
+                    i_s.incoming_req_proxy(base_url, cert_digest, write, read)
+                        .await?;
                 }
                 Some(ProxyWire::ChanNew(ChanNew(proxy_url))) => {
                     i_s.incoming_chan_new(base_url, proxy_url.into(), write, read)
                         .await?;
                 }
-                _ => (),
+                e => {
+                    write
+                        .send(ProxyWire::failure(format!("invalid message {:?}", e)))
+                        .await
+                        .map_err(TransportError::other)?;
+                }
             }
             Ok(())
         }
@@ -246,10 +255,21 @@ impl InternalHandler for InnerListen {
     fn handle_incoming_req_proxy(
         &mut self,
         _base_url: url2::Url2,
-        _write: futures::channel::mpsc::Sender<ProxyWire>,
+        cert_digest: ChannelData,
+        mut write: futures::channel::mpsc::Sender<ProxyWire>,
         _read: futures::channel::mpsc::Receiver<ProxyWire>,
     ) -> InternalHandlerResult<()> {
-        unimplemented!()
+        let proxy_url = ProxyUrl::new(self.this_url.as_base().as_str(), cert_digest.0.into())?;
+        // just accepting all proxy requests for now
+        Ok(async move {
+            write
+                .send(ProxyWire::req_proxy_ok(proxy_url.into()))
+                .await
+                .map_err(TransportError::other)?;
+            Ok(())
+        }
+        .boxed()
+        .into())
     }
 
     fn handle_incoming_chan_new(
@@ -319,13 +339,14 @@ impl InternalHandler for InnerListen {
             proxy_url.short(),
             proxy_url
         );
+        let cert_digest = self.tls.cert_digest.clone();
         let fut = self.i_s.create_low_level_channel(proxy_url.into_base());
         let i_s = self.i_s.clone();
         Ok(async move {
             let (mut write, mut read) = fut.await?;
 
             write
-                .send(ProxyWire::req_proxy())
+                .send(ProxyWire::req_proxy(cert_digest.to_vec().into()))
                 .await
                 .map_err(TransportError::other)?;
             let res = match read.next().await {
@@ -362,10 +383,35 @@ impl TransportListenerHandler for InnerListen {
 
     fn handle_create_channel(
         &mut self,
-        _url: url2::Url2,
+        url: url2::Url2,
     ) -> TransportListenerHandlerResult<(url2::Url2, TransportChannelWrite, TransportChannelRead)>
     {
-        unimplemented!()
+        let proxy_url = ProxyUrl::from(url);
+        let tls_client_config = self.tls_client_config.clone();
+        let i_s = self.i_s.clone();
+        Ok(async move {
+            let (mut write, read) = i_s
+                .create_low_level_channel(proxy_url.as_base().clone())
+                .await?;
+            write
+                .send(ProxyWire::chan_new(proxy_url.clone().into()))
+                .await
+                .map_err(TransportError::other)?;
+            let ((send1, recv1), (send2, recv2)) = create_transport_channel_pair();
+            tls_cli::spawn_tls_client(
+                proxy_url.clone(),
+                tls_client_config,
+                send1,
+                recv1,
+                write,
+                read,
+            )
+            .await
+            .map_err(TransportError::other)??;
+            Ok((proxy_url.into(), send2, recv2))
+        }
+        .boxed()
+        .into())
     }
 }
 

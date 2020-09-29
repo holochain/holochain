@@ -33,6 +33,8 @@ mod wire_read;
 mod wire_write;
 
 #[allow(dead_code)]
+mod tls_cli;
+#[allow(dead_code)]
 mod tls_srv;
 
 mod config;

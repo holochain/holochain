@@ -150,9 +150,10 @@ impl ListenerInnerHandler for TransportListenerQuic {
             tokio::task::spawn(async move {
                 while let Some(Ok((bi_send, bi_recv))) = bi_streams.next().await {
                     let (write, read) = tx_bi_chan(bi_send, bi_recv);
-                    if let Err(_) = incoming_channel_sender
+                    if incoming_channel_sender
                         .send((url_clone.clone(), write, read))
                         .await
+                        .is_err()
                     {
                         break;
                     }

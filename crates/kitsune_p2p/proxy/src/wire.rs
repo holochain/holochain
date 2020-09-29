@@ -216,6 +216,8 @@ write_proxy_wire! {
 
     /// Request that the remote end proxy for us.
     req_proxy::ReqProxy(0x10) {
+        /// The cert digest others should expect when tunnelling TLS
+        (cert_digest::0): ChannelData,
     },
 
     /// The remote end agrees to proxy for us.
