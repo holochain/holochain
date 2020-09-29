@@ -1,7 +1,6 @@
 use crate::*;
 use futures::{sink::SinkExt, stream::StreamExt};
 use ghost_actor::dependencies::tracing;
-use std::collections::HashMap;
 
 /// Tls ALPN identifier for kitsune proxy handshaking
 const ALPN_KITSUNE_PROXY_0: &[u8] = b"kitsune-proxy/0";
@@ -16,10 +15,10 @@ static CIPHER_SUITES: &[&rustls::SupportedCipherSuite] = &[
 pub async fn spawn_kitsune_proxy_listener(
     proxy_config: Arc<ProxyConfig>,
     sub_sender: ghost_actor::GhostSender<TransportListener>,
-    sub_receiver: TransportListenerEventReceiver,
+    mut sub_receiver: TransportIncomingChannelReceiver,
 ) -> TransportResult<(
     ghost_actor::GhostSender<TransportListener>,
-    TransportListenerEventReceiver,
+    TransportIncomingChannelReceiver,
 )> {
     let (tls, accept_proxy_cb, proxy_url): (TlsConfig, AcceptProxyCallback, Option<ProxyUrl>) =
         match proxy_config.as_ref() {
@@ -47,8 +46,6 @@ pub async fn spawn_kitsune_proxy_listener(
 
     let i_s = channel_factory.create_channel::<Internal>().await?;
 
-    channel_factory.attach_receiver(sub_receiver).await?;
-
     let (evt_send, evt_recv) = futures::channel::mpsc::channel(10);
 
     tokio::task::spawn(
@@ -69,6 +66,23 @@ pub async fn spawn_kitsune_proxy_listener(
     if let Some(proxy_url) = proxy_url {
         i_s.req_proxy(proxy_url).await?;
     }
+
+    tokio::task::spawn(async move {
+        while let Some((url, write, read)) = sub_receiver.next().await {
+            // spawn so we can process incoming requests in parallel
+            let i_s = i_s.clone();
+            tokio::task::spawn(async move {
+                let _ = i_s.incoming_channel(url, write, read).await;
+            });
+        }
+
+        // Our incoming channels ended,
+        // this also indicates we cannot establish outgoing connections.
+        // I.e., we need to shut down.
+        i_s.ghost_actor_shutdown().await?;
+
+        TransportResult::Ok(())
+    });
 
     Ok((sender, evt_recv))
 }
@@ -104,11 +118,10 @@ struct InnerListen {
     this_url: ProxyUrl,
     accept_proxy_cb: AcceptProxyCallback,
     sub_sender: ghost_actor::GhostSender<TransportListener>,
-    evt_send: futures::channel::mpsc::Sender<TransportListenerEvent>,
+    evt_send: TransportIncomingChannelSender,
     tls: TlsConfig,
     tls_server_config: Arc<rustls::ServerConfig>,
     tls_client_config: Arc<rustls::ClientConfig>,
-    low_level_connections: HashMap<url2::Url2, ghost_actor::GhostSender<TransportConnection>>,
 }
 
 impl InnerListen {
@@ -119,7 +132,7 @@ impl InnerListen {
         tls: TlsConfig,
         accept_proxy_cb: AcceptProxyCallback,
         sub_sender: ghost_actor::GhostSender<TransportListener>,
-        evt_send: futures::channel::mpsc::Sender<TransportListenerEvent>,
+        evt_send: TransportIncomingChannelSender,
     ) -> TransportResult<Self> {
         tracing::info!(
             "{}: starting up with this_url: {}",
@@ -139,15 +152,15 @@ impl InnerListen {
             tls,
             tls_server_config,
             tls_client_config,
-            low_level_connections: HashMap::new(),
         })
     }
 }
 
 impl ghost_actor::GhostControlHandler for InnerListen {
-    fn handle_ghost_actor_shutdown(self) -> MustBoxFuture<'static, ()> {
+    fn handle_ghost_actor_shutdown(mut self) -> MustBoxFuture<'static, ()> {
         async move {
             let _ = self.sub_sender.ghost_actor_shutdown().await;
+            self.evt_send.close_channel();
         }
         .boxed()
         .into()
@@ -156,9 +169,24 @@ impl ghost_actor::GhostControlHandler for InnerListen {
 
 ghost_actor::ghost_chan! {
     chan Internal<TransportError> {
-        fn assert_low_level_connection(
+        fn incoming_channel(
             base_url: url2::Url2,
-        ) -> ghost_actor::GhostSender<TransportConnection>;
+            write: TransportChannelWrite,
+            read: TransportChannelRead,
+        ) -> ();
+
+        fn incoming_req_proxy(
+            base_url: url2::Url2,
+            write: futures::channel::mpsc::Sender<ProxyWire>,
+            read: futures::channel::mpsc::Receiver<ProxyWire>,
+        ) -> ();
+
+        fn incoming_chan_new(
+            base_url: url2::Url2,
+            dest_proxy_url: ProxyUrl,
+            write: futures::channel::mpsc::Sender<ProxyWire>,
+            read: futures::channel::mpsc::Receiver<ProxyWire>,
+        ) -> ();
 
         fn create_low_level_channel(
             base_url: url2::Url2,
@@ -167,12 +195,6 @@ ghost_actor::ghost_chan! {
             futures::channel::mpsc::Receiver<ProxyWire>,
         );
 
-        fn register_low_level_connection(
-            base_url: url2::Url2,
-            sender: ghost_actor::GhostSender<TransportConnection>,
-            receiver: futures::channel::mpsc::Receiver<TransportConnectionEvent>,
-        ) -> ghost_actor::GhostSender<TransportConnection>;
-
         fn req_proxy(proxy_url: ProxyUrl) -> ();
         fn set_proxy_url(proxy_url: ProxyUrl) -> ();
     }
@@ -180,27 +202,93 @@ ghost_actor::ghost_chan! {
 
 impl ghost_actor::GhostHandler<Internal> for InnerListen {}
 
+fn cross_join_channel_forward(
+    mut write: futures::channel::mpsc::Sender<ProxyWire>,
+    mut read: futures::channel::mpsc::Receiver<ProxyWire>,
+) {
+    tokio::task::spawn(async move {
+        while let Some(msg) = read.next().await {
+            // do we need to inspect these??
+            // for now just forwarding everything
+            write.send(msg).await.map_err(TransportError::other)?;
+        }
+        TransportResult::Ok(())
+    });
+}
+
 impl InternalHandler for InnerListen {
-    fn handle_assert_low_level_connection(
+    fn handle_incoming_channel(
         &mut self,
         base_url: url2::Url2,
-    ) -> InternalHandlerResult<ghost_actor::GhostSender<TransportConnection>> {
-        if let Some(con) = self.low_level_connections.get(&base_url) {
-            let con = con.clone();
-            return Ok(async move { Ok(con) }.boxed().into());
-        }
-        let short = self.this_url.short().to_string();
-        tracing::debug!("{}: connecting to {}", short, base_url);
-        let fut = self.sub_sender.connect(base_url);
+        write: TransportChannelWrite,
+        read: TransportChannelRead,
+    ) -> InternalHandlerResult<()> {
+        let write = wire_write::wrap_wire_write(write);
+        let mut read = wire_read::wrap_wire_read(read);
         let i_s = self.i_s.clone();
         Ok(async move {
-            let (send, recv) = fut.await?;
-            let base_url = send.remote_url().await?;
-            let con = i_s
-                .register_low_level_connection(base_url.clone(), send, recv)
-                .await?;
-            tracing::debug!("{}: CONNECTED to {}", short, base_url);
-            Ok(con)
+            match read.next().await {
+                Some(ProxyWire::ReqProxy(ReqProxy())) => {
+                    i_s.incoming_req_proxy(base_url, write, read).await?;
+                }
+                Some(ProxyWire::ChanNew(ChanNew(proxy_url))) => {
+                    i_s.incoming_chan_new(base_url, proxy_url.into(), write, read)
+                        .await?;
+                }
+                _ => (),
+            }
+            Ok(())
+        }
+        .boxed()
+        .into())
+    }
+
+    fn handle_incoming_req_proxy(
+        &mut self,
+        _base_url: url2::Url2,
+        _write: futures::channel::mpsc::Sender<ProxyWire>,
+        _read: futures::channel::mpsc::Receiver<ProxyWire>,
+    ) -> InternalHandlerResult<()> {
+        unimplemented!()
+    }
+
+    fn handle_incoming_chan_new(
+        &mut self,
+        base_url: url2::Url2,
+        dest_proxy_url: ProxyUrl,
+        mut write: futures::channel::mpsc::Sender<ProxyWire>,
+        read: futures::channel::mpsc::Receiver<ProxyWire>,
+    ) -> InternalHandlerResult<()> {
+        if dest_proxy_url == self.this_url {
+            // Hey! They're trying to talk to us!
+            // Let's connect them to our owner.
+            tls_srv::spawn_tls_server(
+                base_url,
+                self.tls_server_config.clone(),
+                self.evt_send.clone(),
+                write,
+                read,
+            );
+            return Ok(async move { Ok(()) }.boxed().into());
+        }
+        // if we are proxying - forward to another channel
+        let fut = self
+            .i_s
+            .create_low_level_channel(dest_proxy_url.as_base().clone());
+        Ok(async move {
+            let (fwd_write, fwd_read) = match fut.await {
+                Err(e) => {
+                    write
+                        .send(ProxyWire::failure(format!("{:?}", e)))
+                        .await
+                        .map_err(TransportError::other)?;
+                    return Ok(());
+                }
+                Ok(t) => t,
+            };
+            cross_join_channel_forward(fwd_write, read);
+            cross_join_channel_forward(write, fwd_read);
+            Ok(())
         }
         .boxed()
         .into())
@@ -213,35 +301,15 @@ impl InternalHandler for InnerListen {
         futures::channel::mpsc::Sender<ProxyWire>,
         futures::channel::mpsc::Receiver<ProxyWire>,
     )> {
-        let short = self.this_url.short().to_string();
-        let con = self.i_s.assert_low_level_connection(base_url.clone());
+        let fut = self.sub_sender.create_channel(base_url);
         Ok(async move {
-            let con = con.await?;
-            tracing::trace!("{}: low-level channel to {}", short, base_url);
-            let (write, read) = con.create_channel().await?;
+            let (_url, write, read) = fut.await?;
             let write = wire_write::wrap_wire_write(write);
             let read = wire_read::wrap_wire_read(read);
-            tracing::trace!("{}: CHANNEL to {}", short, base_url);
             Ok((write, read))
         }
         .boxed()
         .into())
-    }
-
-    fn handle_register_low_level_connection(
-        &mut self,
-        base_url: url2::Url2,
-        sender: ghost_actor::GhostSender<TransportConnection>,
-        receiver: futures::channel::mpsc::Receiver<TransportConnectionEvent>,
-    ) -> InternalHandlerResult<ghost_actor::GhostSender<TransportConnection>> {
-        if let Some(con) = self.low_level_connections.get(&base_url) {
-            let con = con.clone();
-            return Ok(async move { Ok(con) }.boxed().into());
-        }
-        self.low_level_connections.insert(base_url, sender.clone());
-        let fut = self.channel_factory.attach_receiver(receiver);
-        tokio::task::spawn(fut);
-        Ok(async move { Ok(sender) }.boxed().into())
     }
 
     fn handle_req_proxy(&mut self, proxy_url: ProxyUrl) -> InternalHandlerResult<()> {
@@ -257,7 +325,7 @@ impl InternalHandler for InnerListen {
             let (mut write, mut read) = fut.await?;
 
             write
-                .send(ProxyWire::req_proxy(MsgId::next()))
+                .send(ProxyWire::req_proxy())
                 .await
                 .map_err(TransportError::other)?;
             let res = match read.next().await {
@@ -265,8 +333,8 @@ impl InternalHandler for InnerListen {
                 Some(r) => r,
             };
             let proxy_url = match res {
-                ProxyWire::ReqProxyOk(ReqProxyOk(_msg_id, proxy_url)) => proxy_url,
-                ProxyWire::ReqProxyErr(ReqProxyErr(_msg_id, reason)) => {
+                ProxyWire::ReqProxyOk(ReqProxyOk(proxy_url)) => proxy_url,
+                ProxyWire::Failure(Failure(reason)) => {
                     return Err(format!("err response to proxy request: {:?}", reason).into());
                 }
                 _ => return Err(format!("unexpected: {:?}", res).into()),
@@ -292,93 +360,12 @@ impl TransportListenerHandler for InnerListen {
         Ok(async move { Ok(this_url) }.boxed().into())
     }
 
-    fn handle_connect(
-        &mut self,
-        url: url2::Url2,
-    ) -> TransportListenerHandlerResult<(
-        ghost_actor::GhostSender<TransportConnection>,
-        TransportConnectionEventReceiver,
-    )> {
-        let proxy_url = ProxyUrl::from(url);
-        let fut = self
-            .i_s
-            .assert_low_level_connection(proxy_url.as_base().clone());
-
-        Ok(async move {
-            let _con = fut.await?;
-            unimplemented!()
-        }
-        .boxed()
-        .into())
-    }
-}
-
-impl ghost_actor::GhostHandler<TransportConnectionEvent> for InnerListen {}
-
-impl TransportConnectionEventHandler for InnerListen {
-    fn handle_incoming_channel(
+    fn handle_create_channel(
         &mut self,
         _url: url2::Url2,
-        write: TransportChannelWrite,
-        read: TransportChannelRead,
-    ) -> TransportConnectionEventHandlerResult<()> {
-        //let i_s = self.i_s.clone();
-        let this_url = self.this_url.clone();
-        let mut write = wire_write::wrap_wire_write(write);
-        let mut read = wire_read::wrap_wire_read(read);
-
-        tokio::task::spawn(async move {
-            while let Some(wire) = read.next().await {
-                match wire {
-                    ProxyWire::ReqProxy(ReqProxy(msg_id)) => {
-                        // TODO set cert to match remote
-                        let proxy_url = this_url.clone();
-                        // TODO always agreeing for now
-                        write
-                            .send(ProxyWire::req_proxy_ok(msg_id, proxy_url.into()))
-                            .await
-                            .map_err(TransportError::other)?;
-                        write.close().await.map_err(TransportError::other)?;
-                    }
-                    /*
-                    ProxyWire::ChanNew(ChanNew(msg_id, proxy_url)) => {
-                        if proxy_url == this_url {
-                            panic!("cannot handle not passthru yet")
-                        }
-
-                    }
-                    */
-                    _ => panic!("unexpected: {:?}", wire),
-                }
-            }
-            TransportResult::Ok(())
-        });
-
-        Ok(async move { Ok(()) }.boxed().into())
-    }
-}
-
-impl ghost_actor::GhostHandler<TransportListenerEvent> for InnerListen {}
-
-impl TransportListenerEventHandler for InnerListen {
-    fn handle_incoming_connection(
-        &mut self,
-        sender: ghost_actor::GhostSender<TransportConnection>,
-        receiver: TransportConnectionEventReceiver,
-    ) -> TransportListenerEventHandlerResult<()> {
-        let short = self.this_url.short().to_string();
-        let i_s = self.i_s.clone();
-        Ok(async move {
-            let base_url = sender.remote_url().await?;
-            tracing::debug!("{}: INCOMING CONNECTION from {}", short, base_url);
-            i_s.register_low_level_connection(base_url.clone(), sender, receiver)
-                .await?;
-            tracing::debug!("{}: INCOMING CONNECTION done {}", short, base_url);
-
-            Ok(())
-        }
-        .boxed()
-        .into())
+    ) -> TransportListenerHandlerResult<(url2::Url2, TransportChannelWrite, TransportChannelRead)>
+    {
+        unimplemented!()
     }
 }
 
@@ -404,6 +391,7 @@ impl rustls::ServerCertVerifier for TlsServerVerifier {
     }
 }
 
+/*
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -463,3 +451,4 @@ mod tests {
         Ok(())
     }
 }
+*/

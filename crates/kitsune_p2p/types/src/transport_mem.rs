@@ -98,23 +98,16 @@ impl TransportListenerHandler for InnerListen {
         Ok(async move {
             let mut evt_send = get_core(url.clone()).await?;
 
-            let (send1, recv1) = futures::channel::mpsc::channel(10);
-            let send1 = send1.sink_map_err(TransportError::other);
-            let (send2, recv2) = futures::channel::mpsc::channel(10);
-            let send2 = send2.sink_map_err(TransportError::other);
+            let ((send1, recv1), (send2, recv2)) = create_transport_channel_pair();
 
             // if we don't spawn here there can be a deadlock on
             // incoming_channel trying to process all channel data
             // before we've returned our halves here.
             tokio::task::spawn(async move {
                 // it's ok if this errors... the channels will close.
-                let _ = evt_send
-                    .send((this_url, Box::new(send1), Box::new(recv2)))
-                    .await;
+                let _ = evt_send.send((this_url, send1, recv1)).await;
             });
-            let send2: TransportChannelWrite = Box::new(send2);
-            let recv1: TransportChannelRead = Box::new(recv1);
-            Ok((url, send2, recv1))
+            Ok((url, send2, recv2))
         }
         .boxed()
         .into())

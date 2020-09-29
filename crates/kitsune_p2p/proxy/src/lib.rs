@@ -6,10 +6,20 @@ use futures::future::FutureExt;
 use ghost_actor::{dependencies::must_future::MustBoxFuture, GhostControlSender};
 use kitsune_p2p_types::{
     dependencies::{ghost_actor, url2},
-    transport::{transport_connection::*, transport_listener::*, *},
+    transport::*,
 };
 use lair_keystore_api::actor::*;
 use std::sync::Arc;
+
+pub(crate) fn blake2b_32(data: &[u8]) -> Vec<u8> {
+    blake2b_simd::Params::new()
+        .hash_length(32)
+        .to_state()
+        .update(data)
+        .finalize()
+        .as_bytes()
+        .to_vec()
+}
 
 mod proxy_url;
 pub use proxy_url::*;
@@ -22,16 +32,11 @@ mod wire_read;
 #[allow(dead_code)]
 mod wire_write;
 
+#[allow(dead_code)]
+mod tls_srv;
+
 mod config;
 pub use config::*;
 
 mod inner_listen;
 pub use inner_listen::*;
-
-#[allow(dead_code)]
-mod tls_con;
-pub(crate) use tls_con::*;
-
-#[allow(dead_code)]
-mod inner_con;
-//pub(crate) use inner_con::*;

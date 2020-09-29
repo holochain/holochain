@@ -108,6 +108,25 @@ impl<T: futures::sink::Sink<Vec<u8>, Error = TransportError> + Send + Unpin + 's
     }
 }
 
+/// Sometimes we may need to set up virtual channels,
+/// e.g. for translating data before crossing the api boundary.
+pub fn create_transport_channel_pair() -> (
+    (TransportChannelWrite, TransportChannelRead),
+    (TransportChannelWrite, TransportChannelRead),
+) {
+    let (send1, recv1) = futures::channel::mpsc::channel(10);
+    let send1 = send1.sink_map_err(TransportError::other);
+    let (send2, recv2) = futures::channel::mpsc::channel(10);
+    let send2 = send2.sink_map_err(TransportError::other);
+
+    let send1 = Box::new(send1);
+    let recv1 = Box::new(recv1);
+    let send2 = Box::new(send2);
+    let recv2 = Box::new(recv2);
+
+    ((send1, recv2), (send2, recv1))
+}
+
 /// Tuple sent through TransportIncomingChannel Sender/Receiver.
 pub type TransportIncomingChannel = (url2::Url2, TransportChannelWrite, TransportChannelRead);
 
