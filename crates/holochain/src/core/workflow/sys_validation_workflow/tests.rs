@@ -167,7 +167,7 @@ async fn run_test(
         bob_makes_a_large_link(&bob_cell_id, &handle, &dna_file).await;
 
     // Integration should have 13 ops in it
-    let expected_count = 12 + expected_count;
+    let expected_count = 13 + expected_count;
 
     {
         let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
@@ -208,8 +208,6 @@ async fn run_test(
             .collect()
             .unwrap());
 
-        // Integration should have 12 ops in it
-        // Plus the original 23
         assert_eq!(
             fresh_reader_test!(alice_env, |r| workspace
                 .integrated_dht_ops
