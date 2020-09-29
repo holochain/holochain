@@ -318,7 +318,7 @@ impl Db {
                     let header_hash = TimedHeaderHash::from(header_hash);
                     let res = workspace
                         .meta
-                        .get_activity(&reader, header.author().clone())
+                        .get_activity(&reader, (&header).into())
                         .unwrap()
                         .collect::<Vec<_>>()
                         .unwrap();

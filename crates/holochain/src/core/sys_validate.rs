@@ -5,7 +5,7 @@ use super::{
     queue_consumer::TriggerSender,
     state::{
         element_buf::ElementBuf,
-        metadata::{LinkMetaKey, MetadataBufT},
+        metadata::{ChainItemKey, LinkMetaKey, MetadataBufT},
     },
     workflow::incoming_dht_ops_workflow::incoming_dht_ops_workflow,
     workflow::sys_validation_workflow::types::CheckLevel,
@@ -18,7 +18,9 @@ use crate::conductor::{
 use fallible_iterator::FallibleIterator;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_p2p::HolochainP2pCell;
-use holochain_state::{env::EnvironmentWrite, fresh_reader, prelude::PrefixType};
+use holochain_state::{
+    env::EnvironmentWrite, error::DatabaseResult, fresh_reader, prelude::PrefixType,
+};
 use holochain_types::{dht_op::DhtOp, header::NewEntryHeaderRef, Entry};
 use holochain_zome_types::{element::ElementEntry, signature::Signature};
 use holochain_zome_types::{
@@ -221,7 +223,7 @@ pub async fn check_valid_if_dna(
     fresh_reader!(meta_vault.env(), |r| {
         match header {
             Header::Dna(_) => meta_vault
-                .get_activity(&r, header.author().clone())?
+                .get_activity(&r, ChainItemKey::Agent(header.author().clone()))?
                 .next()?
                 .map_or(Ok(()), |_| {
                     Err(PrevHeaderError::InvalidRoot).map_err(|e| ValidationOutcome::from(e).into())
@@ -234,13 +236,48 @@ pub async fn check_valid_if_dna(
 /// Check if there are other headers at this
 /// sequence number
 pub async fn check_chain_rollback(
-    _header: &Header,
-    _meta_vault: &impl MetadataBufT,
-    _element_vault: &ElementBuf,
+    header: &Header,
+    workspace: &SysValidationWorkspace,
 ) -> SysValidationResult<()> {
-    // Will need to pull out all headers to check this.
-    // TODO: Do we need some way of storing headers by
-    // sequence number in the metadata store?
+    let header_hash = HeaderHash::with_data_sync(header);
+    let k = ChainItemKey::AgentSequence(header.author().clone(), header.header_seq());
+    let env = workspace.meta_vault.env();
+    // Check there are no conflicting chain items
+    // at any valid or potentially valid stores.
+    let count = fresh_reader!(env, |r| {
+        let vault_count = workspace
+            .meta_vault
+            .get_activity(&r, k.clone())?
+            .filter(|thh| Ok(thh.header_hash != header_hash))
+            .count()?;
+        let judged_count = workspace
+            .meta_judged
+            .get_activity(&r, k.clone())?
+            .filter(|thh| Ok(thh.header_hash != header_hash))
+            .count()?;
+        let pending_count = workspace
+            .meta_pending
+            .get_activity(&r, k.clone())?
+            .filter(|thh| Ok(thh.header_hash != header_hash))
+            .count()?;
+        DatabaseResult::Ok(vault_count + judged_count + pending_count)
+    })?;
+
+    // Ok or log warning
+    if count == 0 {
+        return Ok(());
+    } else {
+        let s = tracing::warn_span!("agent_activity");
+        let _g = s.enter();
+        tracing::warn!(
+            "Chain rollback detected at position {} for agent {:?} from header {:?}
+            There were {} headers at this position",
+            header.header_seq(),
+            header.author(),
+            header,
+            count,
+        );
+    }
     Ok(())
 }
 

@@ -44,7 +44,7 @@ pub async fn incoming_dht_ops_workflow(
     // add incoming ops to the validation limbo
     for (hash, op) in ops {
         if !workspace.op_exists(&hash)? {
-            tracing::debug!(?op);
+            tracing::debug!(?hash, ?op);
             if should_keep(&op).await? {
                 workspace.add_to_pending(hash, op).await?;
             } else {
@@ -117,6 +117,7 @@ impl IncomingDhtOpsWorkspace {
     async fn add_to_pending(&mut self, hash: DhtOpHash, op: DhtOp) -> DhtOpConvertResult<()> {
         let basis = op.dht_basis().await;
         let op_light = op.to_light().await;
+        tracing::debug!(?op_light);
 
         integrate_single_data(op, &mut self.element_pending)?;
         integrate_single_metadata(
