@@ -53,6 +53,7 @@ struct TestData {
     original_entry: Entry,
     new_entry: Entry,
     any_header: Header,
+    dna_header: Header,
     entry_update_header: Update,
     entry_update_entry: Update,
     original_header_hash: HeaderHash,
@@ -132,6 +133,7 @@ impl TestData {
         link_remove.base_address = original_entry_hash.clone();
         link_remove.link_add_address = link_add_hash.clone();
 
+        // Any Header
         let mut any_header = fixt!(Header, PublicCurve);
         match &mut any_header {
             Header::Create(ec) => {
@@ -143,11 +145,15 @@ impl TestData {
             _ => (),
         };
 
+        // Dna Header
+        let dna_header = Header::Dna(fixt!(Dna));
+
         Self {
             signature: fixt!(Signature),
             original_entry,
             new_entry,
             any_header,
+            dna_header,
             entry_update_header,
             entry_update_entry,
             original_header,
@@ -203,7 +209,11 @@ impl Db {
                         op: op.to_light().await,
                         when_integrated: Timestamp::now().into(),
                     };
-                    let mut r = workspace.integrated_dht_ops.get(&op_hash).unwrap().unwrap();
+                    let mut r = workspace
+                        .integrated_dht_ops
+                        .get(&op_hash)
+                        .unwrap()
+                        .expect(&format!("Should contain {:?}", op));
                     r.when_integrated = value.when_integrated;
                     assert_eq!(r, value, "{}", here);
                 }
@@ -648,12 +658,12 @@ fn store_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
 }
 
 fn register_agent_activity(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-    let op = DhtOp::RegisterAgentActivity(a.signature.clone(), a.any_header.clone());
+    let op = DhtOp::RegisterAgentActivity(a.signature.clone(), a.dna_header.clone());
     let pre_state = vec![Db::IntQueue(op.clone())];
     let pre_state = add_op_to_judged(pre_state, &op);
     let expect = vec![
         Db::Integrated(op.clone()),
-        Db::MetaActivity(a.any_header.clone()),
+        Db::MetaActivity(a.dna_header.clone()),
     ];
     (pre_state, expect, "register agent activity")
 }
