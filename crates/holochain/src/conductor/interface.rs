@@ -22,7 +22,7 @@ pub struct SignalBroadcaster(Vec<broadcast::Sender<Signal>>);
 
 impl SignalBroadcaster {
     /// send the signal to the connected client
-    pub async fn send(&mut self, sig: Signal) -> InterfaceResult<()> {
+    pub fn send(&mut self, sig: Signal) -> InterfaceResult<()> {
         self.0
             .iter_mut()
             .map(|tx| tx.send(sig.clone()))

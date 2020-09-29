@@ -10,11 +10,9 @@ pub fn emit_signal(
     call_context: Arc<CallContext>,
     input: EmitSignalInput,
 ) -> RibosomeResult<EmitSignalOutput> {
-    tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-        let cell_id = call_context.host_access().cell_id().clone();
-        let bytes = input.into_inner();
-        let signal = Signal::App(cell_id, bytes);
-        call_context.host_access().signal_tx().send(signal).await
-    })?;
+    let cell_id = call_context.host_access().cell_id().clone();
+    let bytes = input.into_inner();
+    let signal = Signal::App(cell_id, bytes);
+    call_context.host_access().signal_tx().send(signal)?;
     Ok(EmitSignalOutput::new(()))
 }
