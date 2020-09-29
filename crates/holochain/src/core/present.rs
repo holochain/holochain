@@ -80,7 +80,9 @@ pub async fn retrieve_entry(
     found!(retrieve_entry_from(hash, data_source.judged())?.map(Proof));
     found!(retrieve_entry_from(hash, data_source.pending())?.map(PendingValidation));
     let mut cascade = data_source.cascade();
-    let el = cascade.retrieve_entry(hash, Default::default()).await?;
+    let el = cascade
+        .retrieve(hash.clone().into(), Default::default())
+        .await?;
     Ok(el.map(Claim))
 }
 

@@ -4,14 +4,14 @@ use crate::{
         state::{element_buf::ElementBuf, validation_db::ValidationLimboStatus},
         workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace,
     },
-    test_utils::{host_fn_api::*, setup_app},
+    test_utils::{host_fn_api::*, setup_app, wait_for_integration},
 };
 use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
 use hdk3::prelude::LinkTag;
 use holo_hash::{AnyDhtHash, DhtOpHash, EntryHash, HeaderHash};
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_state::{env::EnvironmentWrite, fresh_reader_test, prelude::ReadManager};
+use holochain_state::{fresh_reader_test, prelude::ReadManager};
 use holochain_types::{
     app::InstalledCell, cell::CellId, dht_op::DhtOpLight, dna::DnaDef, dna::DnaFile, fixt::*,
     test_utils::fake_agent_pubkey_1, test_utils::fake_agent_pubkey_2, validate::ValidationStatus,
@@ -24,10 +24,6 @@ use std::{
     time::Duration,
 };
 use tracing::*;
-
-/// Wait for a maximum of 10 seconds
-/// for validation to run. (100 * 100ms)
-const NUM_ATTEMPTS: usize = 100;
 
 #[tokio::test(threaded_scheduler)]
 async fn sys_validation_workflow_test() {
@@ -82,17 +78,28 @@ async fn run_test(
     handle: ConductorHandle,
     dna_file: DnaFile,
 ) {
+    // Check if the correct number of ops are integrated
+    // every 100 ms for a maximum of 10 seconds but early exit
+    // if they are there.
+    let num_attempts = 100;
+    let delay_per_attempt = Duration::from_millis(100);
+
     bob_links_in_a_legit_way(&bob_cell_id, &handle, &dna_file).await;
 
     // Integration should have 9 ops in it.
     // Plus another 14 for genesis.
     // Init is not run because we aren't calling the zome.
     let expected_count = 9 + 14;
-    let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
-    wait_for_validation(&alice_env, expected_count).await;
 
     {
         let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
+        wait_for_integration(
+            &alice_env,
+            expected_count,
+            num_attempts,
+            delay_per_attempt.clone(),
+        )
+        .await;
 
         let workspace = IncomingDhtOpsWorkspace::new(alice_env.clone().into()).unwrap();
         // Validation should be empty
@@ -159,13 +166,18 @@ async fn run_test(
     let (bad_update_header, bad_update_entry_hash, link_add_hash) =
         bob_makes_a_large_link(&bob_cell_id, &handle, &dna_file).await;
 
-    // Integration should have 12 ops in it
+    // Integration should have 13 ops in it
     let expected_count = 12 + expected_count;
-    let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
-    wait_for_validation(&alice_env, expected_count).await;
 
     {
         let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
+        wait_for_integration(
+            &alice_env,
+            expected_count,
+            num_attempts,
+            delay_per_attempt.clone(),
+        )
+        .await;
 
         let workspace = IncomingDhtOpsWorkspace::new(alice_env.clone().into()).unwrap();
         // Validation should be empty
@@ -185,7 +197,19 @@ async fn run_test(
                 .unwrap()),
             0
         );
+
         let bad_update_entry_hash: AnyDhtHash = bad_update_entry_hash.into();
+
+        let int_limbo: Vec<_> = fresh_reader_test!(alice_env, |r| workspace
+            .integration_limbo
+            .iter(&r)
+            .unwrap()
+            .map(|(_, v)| Ok(v.clone()))
+            .collect()
+            .unwrap());
+
+        // Integration should have 12 ops in it
+        // Plus the original 23
         assert_eq!(
             fresh_reader_test!(alice_env, |r| workspace
                 .integrated_dht_ops
@@ -209,13 +233,18 @@ async fn run_test(
                         DhtOpLight::RegisterAddLink(hh, _) if hh == &link_add_hash => {
                             assert_eq!(i.validation_status, ValidationStatus::Rejected)
                         }
+                        DhtOpLight::RegisterUpdatedBy(hh, _, _) if hh == &bad_update_header => {
+                            assert_eq!(i.validation_status, ValidationStatus::Rejected)
+                        }
                         _ => assert_eq!(i.validation_status, ValidationStatus::Valid),
                     }
                     Ok(())
                 })
                 .count()
                 .unwrap()),
-            expected_count
+            expected_count,
+            "{:?}",
+            int_limbo,
         );
     }
 
@@ -223,11 +252,16 @@ async fn run_test(
 
     // Integration should have new 4 ops in it
     let expected_count = 4 + expected_count;
-    let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
-    wait_for_validation(&alice_env, expected_count).await;
 
     {
         let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
+        wait_for_integration(
+            &alice_env,
+            expected_count,
+            num_attempts,
+            delay_per_attempt.clone(),
+        )
+        .await;
         let env_ref = alice_env.guard();
 
         let workspace = IncomingDhtOpsWorkspace::new(alice_env.clone().into()).unwrap();
@@ -408,23 +442,4 @@ async fn dodgy_bob(bob_cell_id: &CellId, handle: &ConductorHandle, dna_file: &Dn
     // Produce and publish these commits
     let mut triggers = handle.get_cell_triggers(&bob_cell_id).await.unwrap();
     triggers.produce_dht_ops.trigger();
-}
-
-/// Exit early if validation has run or wait for the maximum number of attempts
-async fn wait_for_validation(alice_env: &EnvironmentWrite, expected_count: usize) {
-    for _ in 0..NUM_ATTEMPTS {
-        let workspace = IncomingDhtOpsWorkspace::new(alice_env.clone().into()).unwrap();
-        let count = fresh_reader_test!(alice_env, |r| {
-            workspace
-                .integrated_dht_ops
-                .iter(&r)
-                .unwrap()
-                .count()
-                .unwrap()
-        });
-        if count == expected_count {
-            return ();
-        }
-        tokio::time::delay_for(Duration::from_millis(100)).await;
-    }
 }

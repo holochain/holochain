@@ -20,7 +20,6 @@ use crate::{
 use error::WorkflowResult;
 use fallible_iterator::FallibleIterator;
 use holo_hash::DhtOpHash;
-use holochain_keystore::Signature;
 use holochain_p2p::{HolochainP2pCell, HolochainP2pCellT};
 use holochain_state::{
     buffer::{BufferedStore, KvBufFresh},
@@ -32,6 +31,7 @@ use holochain_types::{
     dht_op::DhtOp, dht_op::DhtOpLight, header::NewEntryHeaderRef, test_utils::which_agent,
     validate::ValidationStatus, Entry, Timestamp,
 };
+use holochain_zome_types::signature::Signature;
 use holochain_zome_types::{
     header::{CreateLink, Delete, DeleteLink, EntryType, Update},
     Header,

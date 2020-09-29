@@ -33,6 +33,7 @@ use holo_hash::HeaderHash;
 use holo_hash::WasmHash;
 use holochain_keystore::keystore_actor::KeystoreSender;
 use holochain_p2p::HolochainP2pCellFixturator;
+use holochain_state::test_utils::test_keystore;
 use holochain_types::dna::wasm::DnaWasm;
 use holochain_types::dna::zome::Zome;
 use holochain_types::dna::DnaFile;
@@ -245,6 +246,7 @@ fixturator!(
     KeystoreSender;
     curve Empty {
         tokio_safe_block_on::tokio_safe_block_forever_on(async {
+            // an empty keystore
             holochain_keystore::test_keystore::spawn_test_keystore().await.unwrap()
         })
     };
@@ -254,11 +256,8 @@ fixturator!(
             holochain_keystore::test_keystore::spawn_test_keystore().await.unwrap()
         })
     };
-    curve Predictable {
-        tokio_safe_block_on::tokio_safe_block_forever_on(async {
-            holochain_keystore::test_keystore::spawn_test_keystore().await.unwrap()
-        })
-    };
+    // a prepopulate keystore with hardcoded agents in it
+    curve Predictable test_keystore();
 );
 
 fixturator!(
