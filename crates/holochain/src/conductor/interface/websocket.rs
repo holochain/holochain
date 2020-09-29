@@ -1,3 +1,6 @@
+//! Module for establishing Websocket-based Interfaces,
+//! i.e. those configured with `InterfaceDriver::Websocket`
+
 use super::error::{InterfaceError, InterfaceResult};
 use crate::conductor::{
     conductor::StopReceiver,
@@ -22,10 +25,9 @@ use url2::url2;
 // TODO: This is arbitrary, choose reasonable size.
 /// Number of signals in buffer before applying
 /// back pressure.
-pub(crate) const SIGNAL_BUFFER_SIZE: usize = 5;
+pub(crate) const SIGNAL_BUFFER_SIZE: usize = 50;
 
-/// Create an Admin Interface, which only receives AdminRequest messages
-/// from the external client
+/// Create a WebsocketListener to be used in interfaces
 pub async fn spawn_websocket_listener(port: u16) -> InterfaceResult<WebsocketListener> {
     trace!("Initializing Admin interface");
     let listener = websocket_bind(
@@ -37,6 +39,8 @@ pub async fn spawn_websocket_listener(port: u16) -> InterfaceResult<WebsocketLis
     Ok(listener)
 }
 
+/// Create an Admin Interface, which only receives AdminRequest messages
+/// from the external client
 pub fn spawn_admin_interface_task<A: InterfaceApi>(
     mut listener: WebsocketListener,
     api: A,
