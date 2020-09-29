@@ -167,8 +167,8 @@ async fn run_test(
     let (bad_update_header, bad_update_entry_hash, link_add_hash) =
         bob_makes_a_large_link(&bob_cell_id, &handle, &dna_file).await;
 
-    // Integration should have 12 ops in it
-    let expected_count = 12 + expected_count;
+    // Integration should have 13 ops in it
+    let expected_count = 13 + expected_count;
 
     {
         let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
@@ -198,7 +198,17 @@ async fn run_test(
                 .unwrap()),
             0
         );
+
         let bad_update_entry_hash: AnyDhtHash = bad_update_entry_hash.into();
+
+        let int_limbo: Vec<_> = fresh_reader_test!(alice_env, |r| workspace
+            .integration_limbo
+            .iter(&r)
+            .unwrap()
+            .map(|(_, v)| Ok(v.clone()))
+            .collect()
+            .unwrap());
+
         // Integration should have 12 ops in it
         // Plus the original 23
         assert_eq!(
@@ -224,13 +234,18 @@ async fn run_test(
                         DhtOpLight::RegisterAddLink(hh, _) if hh == &link_add_hash => {
                             assert_eq!(i.validation_status, ValidationStatus::Rejected)
                         }
+                        DhtOpLight::RegisterUpdatedBy(hh, _, _) if hh == &bad_update_header => {
+                            assert_eq!(i.validation_status, ValidationStatus::Rejected)
+                        }
                         _ => assert_eq!(i.validation_status, ValidationStatus::Valid),
                     }
                     Ok(())
                 })
                 .count()
                 .unwrap()),
-            expected_count
+            expected_count,
+            "{:?}",
+            int_limbo,
         );
     }
 
