@@ -160,7 +160,7 @@ async fn call_admin() {
     let payload = InstallAppPayload {
         dnas: vec![dna_payload],
         app_id: "test".to_string(),
-        agent_key,
+        agent_key: Some(agent_key),
     };
     let request = AdminRequest::InstallApp(Box::new(payload));
     let response = client.request(request);
@@ -298,7 +298,7 @@ async fn call_zome() {
     let payload = InstallAppPayload {
         dnas: vec![dna_payload],
         app_id: "test".to_string(),
-        agent_key,
+        agent_key: Some(agent_key),
     };
     let request = AdminRequest::InstallApp(Box::new(payload));
     let response = client.request(request);
@@ -365,7 +365,7 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
     let payload = InstallAppPayload {
         dnas: vec![dna_payload],
         app_id: "test".to_string(),
-        agent_key,
+        agent_key: Some(agent_key),
     };
     let request = AdminRequest::InstallApp(Box::new(payload));
     let response = client.request(request).await;
@@ -422,7 +422,7 @@ async fn conductor_admin_interface_ends_with_shutdown() -> Result<()> {
     let payload = InstallAppPayload {
         dnas: vec![dna_payload],
         app_id: "test".to_string(),
-        agent_key,
+        agent_key: Some(agent_key),
     };
     let request = AdminRequest::InstallApp(Box::new(payload));
 

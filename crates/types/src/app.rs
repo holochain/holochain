@@ -17,7 +17,7 @@ pub struct InstallAppPayload {
     /// Placeholder to find the app
     pub app_id: AppId,
     /// The agent that installed this app
-    pub agent_key: AgentPubKey,
+    pub agent_key: Option<AgentPubKey>,
     /// The Dna paths in this app
     pub dnas: Vec<InstallAppDnaPayload>,
 }

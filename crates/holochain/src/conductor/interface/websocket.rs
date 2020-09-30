@@ -392,7 +392,7 @@ pub mod test {
         let payload = InstallAppPayload {
             dnas: vec![dna_payload],
             app_id: "test app".to_string(),
-            agent_key,
+            agent_key: Some(agent_key),
         };
         let msg = AdminRequest::InstallApp(Box::new(payload));
         let msg = msg.try_into().unwrap();

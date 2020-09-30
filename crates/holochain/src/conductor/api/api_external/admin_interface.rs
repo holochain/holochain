@@ -15,6 +15,7 @@ use holochain_types::{
     app::{AppId, InstallAppDnaPayload, InstallAppPayload, InstalledApp, InstalledCell},
     cell::CellId,
     dna::{DnaFile, JsonProperties},
+    test_utils::fake_agent_pubkey_1,
 };
 use std::path::PathBuf;
 use tracing::*;
@@ -83,9 +84,16 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 trace!(?payload.dnas);
                 let InstallAppPayload {
                     app_id,
-                    agent_key,
+                    agent_key: maybe_agent_key,
                     dnas,
                 } = *payload;
+
+                let agent_key = if let Some(agent_key) = maybe_agent_key {
+                    agent_key
+                } else {
+                    //TODO: generate in lair
+                    fake_agent_pubkey_1()
+                };
 
                 // Install Dnas
                 let tasks = dnas.into_iter().map(|dna_payload| async {
@@ -119,8 +127,13 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     .into_iter()
                     .map(|(cell_data, _)| cell_data)
                     .collect();
-                let app = InstalledApp { app_id, cell_data };
-                Ok(AdminResponse::AppInstalled(app))
+
+                let installed_app = InstalledApp { app_id, cell_data };
+                let response = InstallAppResponse {
+                    agent_key,
+                    installed_app,
+                };
+                Ok(AdminResponse::AppInstalled(response))
             }
             ListDnas => {
                 let dna_list = self.conductor_handle.list_dnas().await?;
@@ -263,6 +276,15 @@ pub enum AdminRequest {
     },
 }
 
+/// Response to installing an app, which can include the agent pub key created for it
+#[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[cfg_attr(test, derive(Clone))]
+#[serde(rename = "snake-case")]
+pub struct InstallAppResponse {
+    agent_key: AgentPubKey,
+    installed_app: InstalledApp,
+}
+
 /// Responses to messages received on an Admin interface
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[cfg_attr(test, derive(Clone))]
@@ -271,7 +293,7 @@ pub enum AdminResponse {
     /// This response is unimplemented
     Unimplemented(AdminRequest),
     /// hApp [Dna]s have successfully been installed
-    AppInstalled(InstalledApp),
+    AppInstalled(InstallAppResponse),
     /// AdminInterfaces have successfully been added
     AdminInterfacesAdded(()),
     /// A list of all installed [Dna]s
@@ -330,25 +352,105 @@ mod test {
         let (dna_path, _tempdir) = write_fake_dna_file(dna.clone()).await.unwrap();
         let dna_payload = InstallAppDnaPayload::path_only(dna_path, "".to_string());
         let dna_hash = dna.dna_hash().clone();
+
         let agent_key = fake_agent_pubkey_1();
-        let cell_id = CellId::new(dna.dna_hash().clone(), agent_key.clone());
-        let expected_cell_ids = InstalledApp {
-            app_id: "test".to_string(),
-            cell_data: vec![InstalledCell::new(cell_id.clone(), "".to_string())],
-        };
+
         let payload = InstallAppPayload {
             dnas: vec![dna_payload],
             app_id: "test".to_string(),
-            agent_key,
+            agent_key: Some(agent_key.clone()),
         };
 
         let install_response = admin_api
             .handle_admin_request(AdminRequest::InstallApp(Box::new(payload)))
             .await;
+
+        let cell_id = CellId::new(dna.dna_hash().clone(), agent_key);
+        let expected_cell_ids = InstalledApp {
+            app_id: "test".to_string(),
+            cell_data: vec![InstalledCell::new(cell_id.clone(), "".to_string())],
+        };
+
         assert_matches!(
             install_response,
-            AdminResponse::AppInstalled(cell_ids) if cell_ids == expected_cell_ids
+            AdminResponse::AppInstalled(InstallAppResponse{agent_key: _, installed_app: cell_ids}) if cell_ids == expected_cell_ids
         );
+
+        let dna_list = admin_api.handle_admin_request(AdminRequest::ListDnas).await;
+        let expects = vec![dna_hash];
+        assert_matches!(dna_list, AdminResponse::ListDnas(a) if a == expects);
+
+        let res = admin_api
+            .handle_admin_request(AdminRequest::ActivateApp {
+                app_id: "test".to_string(),
+            })
+            .await;
+
+        assert_matches!(res, AdminResponse::AppActivated);
+
+        let res = admin_api
+            .handle_admin_request(AdminRequest::ListCellIds)
+            .await;
+
+        assert_matches!(res, AdminResponse::ListCellIds(v) if v == vec![cell_id]);
+
+        handle.shutdown().await;
+        tokio::time::timeout(std::time::Duration::from_secs(1), shutdown)
+            .await
+            .ok();
+        Ok(())
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn install_list_dna_with_none() -> Result<()> {
+        observability::test_run().ok();
+        let test_env = test_conductor_env();
+        let TestEnvironment {
+            env: wasm_env,
+            tmpdir: _tmpdir,
+        } = test_wasm_env();
+        let _tmpdir = test_env.tmpdir.clone();
+        let handle = Conductor::builder().test(test_env, wasm_env).await?;
+        let shutdown = handle.take_shutdown_handle().await.unwrap();
+        let admin_api = RealAdminInterfaceApi::new(handle.clone());
+        let uuid = Uuid::new_v4();
+        let dna = fake_dna_zomes(
+            &uuid.to_string(),
+            vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
+        );
+        let (dna_path, _tempdir) = write_fake_dna_file(dna.clone()).await.unwrap();
+        let dna_payload = InstallAppDnaPayload::path_only(dna_path, "".to_string());
+        let dna_hash = dna.dna_hash().clone();
+
+        let payload = InstallAppPayload {
+            dnas: vec![dna_payload],
+            app_id: "test".to_string(),
+            agent_key: None,
+        };
+
+        let install_response = admin_api
+            .handle_admin_request(AdminRequest::InstallApp(Box::new(payload)))
+            .await;
+
+        let agent_key = if let AdminResponse::AppInstalled(resp) = install_response.clone() {
+            resp.agent_key
+        } else {
+            panic!("expecting AppInstalled")
+        };
+
+        let cell_id = CellId::new(dna.dna_hash().clone(), agent_key);
+        match install_response {
+            AdminResponse::AppInstalled(resp) => {
+                let expected_cell_ids = InstalledApp {
+                    app_id: "test".to_string(),
+                    cell_data: vec![InstalledCell::new(cell_id.clone(), "".to_string())],
+                };
+                assert_eq!(resp.installed_app, expected_cell_ids);
+                assert_eq!(resp.agent_key, fake_agent_pubkey_1());
+            },
+            _ => assert!(false, "expecting AppInstalled")
+        }
+
         let dna_list = admin_api.handle_admin_request(AdminRequest::ListDnas).await;
         let expects = vec![dna_hash];
         assert_matches!(dna_list, AdminResponse::ListDnas(a) if a == expects);
