@@ -6,6 +6,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 - Added App Validation workflow that runs app validation as authority [#330](https://github.com/holochain/holochain/pull/330)
+- Added validation package to entry defs see for usage [#344](https://github.com/holochain/holochain/pull/344)
 
 ### Changed
 
