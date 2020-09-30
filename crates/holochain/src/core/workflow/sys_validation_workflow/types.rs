@@ -83,7 +83,7 @@ pub enum CheckLevel {
     Hold,
     /// Selected dependencies must be witnessed by this agent,
     /// meaning that we were able to fetch the element from another agent,
-    /// but have not verified the element's validity ourselves 
+    /// but have not verified the element's validity ourselves
     Witness,
 }
 
