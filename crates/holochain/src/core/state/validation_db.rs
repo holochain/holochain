@@ -46,7 +46,7 @@ pub enum ValidationLimboStatus {
     /// Is awaiting to be app validated
     SysValidated,
     /// Is waiting for dependencies so the op can proceed to app validation
-    AwaitingAppDeps(AnyDhtHash),
+    AwaitingAppDeps(Vec<AnyDhtHash>),
 }
 
 impl ValidationLimboStore {

@@ -83,6 +83,15 @@ pub enum ValidationOutcome {
     ZomeId(AppEntryType),
 }
 
+impl ValidationOutcome {
+    pub fn not_holding<I: Into<AnyDhtHash> + Clone>(h: &I) -> Self {
+        Self::NotHoldingDep(h.clone().into())
+    }
+    pub fn not_found<I: Into<AnyDhtHash> + Clone>(h: &I) -> Self {
+        Self::DepMissingFromDht(h.clone().into())
+    }
+}
+
 #[derive(Error, Debug)]
 pub enum PrevHeaderError {
     #[error("Root of source chain must be Dna")]

@@ -16,6 +16,8 @@ use crate::core::{
         validation_db::ValidationLimboStore,
         workspace::{Workspace, WorkspaceResult},
     },
+    validation::DhtOpOrder,
+    validation::OrderedOp,
 };
 use error::WorkflowResult;
 use fallible_iterator::FallibleIterator;
@@ -41,7 +43,6 @@ use produce_dht_ops_workflow::dht_op_light::{
     light_to_op,
 };
 use std::{collections::BinaryHeap, convert::TryInto};
-use sys_validation_workflow::types::{DhtOpOrder, OrderedOp};
 use tracing::*;
 
 pub use disintegrate::*;
@@ -246,7 +247,7 @@ async fn op_dependencies_held(
                     }
                 }
             }
-            DhtOp::RegisterUpdatedBy(_, entry_update) => {
+            DhtOp::RegisterUpdatedBy(_, entry_update, _) => {
                 // Check if we have the header with entry that we are updating
                 // or defer the op.
                 if !header_with_entry_is_stored(
@@ -402,7 +403,7 @@ pub fn integrate_single_data<P: PrefixType>(
             DhtOp::RegisterAgentActivity(signature, header) => {
                 put_data(signature, header, None, element_store)?;
             }
-            DhtOp::RegisterUpdatedBy(signature, entry_update) => {
+            DhtOp::RegisterUpdatedBy(signature, entry_update, _) => {
                 put_data(signature, entry_update.into(), None, element_store)?;
             }
             DhtOp::RegisterDeletedEntryHeader(signature, element_delete) => {

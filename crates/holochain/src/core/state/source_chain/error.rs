@@ -45,8 +45,8 @@ pub enum SourceChainError {
     #[error("InvalidCommit error: {0}")]
     InvalidCommit(String),
 
-    #[error("InvalidCreateLink error: {0}")]
-    InvalidCreateLink(String),
+    #[error("InvalidLink error: {0}")]
+    InvalidLink(String),
 
     #[error("KeystoreError: {0}")]
     KeystoreError(#[from] holochain_keystore::KeystoreError),

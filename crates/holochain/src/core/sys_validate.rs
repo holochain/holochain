@@ -4,8 +4,8 @@
 use super::{
     queue_consumer::TriggerSender,
     state::metadata::{ChainItemKey, MetadataBufT},
+    validation::CheckLevel,
     workflow::incoming_dht_ops_workflow::incoming_dht_ops_workflow,
-    workflow::sys_validation_workflow::types::CheckLevel,
     workflow::sys_validation_workflow::SysValidationWorkspace,
 };
 use crate::conductor::{

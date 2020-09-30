@@ -16,6 +16,7 @@ use crate::{
             workspace::{Workspace, WorkspaceResult},
         },
         sys_validate::*,
+        validation::*,
     },
 };
 use error::{WorkflowError, WorkflowResult};
@@ -41,7 +42,7 @@ use std::{collections::BinaryHeap, convert::TryInto};
 use tracing::*;
 
 use produce_dht_ops_workflow::dht_op_light::light_to_op;
-use types::{CheckLevel, DhtOpOrder, OrderedOp, Outcome};
+use types::Outcome;
 
 pub mod types;
 
@@ -114,11 +115,7 @@ async fn sys_validation_workflow_inner(
                 .map_err(WorkflowError::from)
                 .map(|vlv| {
                     // Sort the ops into a min-heap
-                    let op = light_to_op(vlv.op.clone(), element_pending);
-                    if let Err(e) = &op {
-                        error!(?e)
-                    }
-                    let op = op?;
+                    let op = light_to_op(vlv.op.clone(), element_pending)?;
 
                     let hash = DhtOpHash::with_data_sync(&op);
                     let order = DhtOpOrder::from(&op);
@@ -129,7 +126,6 @@ async fn sys_validation_workflow_inner(
                         value: vlv,
                     };
                     // We want a min-heap
-                    // sorted_ops.push(std::cmp::Reverse(v));
                     Ok(std::cmp::Reverse(v))
                 })
                 .iterator()
@@ -222,11 +218,10 @@ async fn validate_op(
     .await
     {
         Ok(_) => match op {
-            DhtOp::RegisterAgentActivity(_, _) |
             // TODO: Check strict mode where store element
             // is also run through app validation
-            DhtOp::StoreElement(_, _, _) => Ok(Outcome::SkipAppValidation),
-            _ => Ok(Outcome::Accepted)
+            DhtOp::RegisterAgentActivity(_, _) => Ok(Outcome::SkipAppValidation),
+            _ => Ok(Outcome::Accepted),
         },
         // Handle the errors that result in pending or awaiting deps
         Err(SysValidationError::ValidationOutcome(e)) => {
@@ -315,8 +310,20 @@ async fn validate_op_inner(
             store_element(header, workspace, network).await?;
             Ok(())
         }
-        DhtOp::RegisterUpdatedBy(_, header) => {
-            register_updated_by(header, workspace, network, incoming_dht_ops_sender).await?;
+        DhtOp::RegisterUpdatedBy(_, header, entry) => {
+            register_updated_by(header, workspace, network.clone(), incoming_dht_ops_sender)
+                .await?;
+            if let Some(entry) = entry {
+                store_entry(
+                    NewEntryHeaderRef::Update(header),
+                    entry.as_ref(),
+                    conductor_api,
+                    workspace,
+                    network.clone(),
+                )
+                .await?;
+            }
+
             Ok(())
         }
         DhtOp::RegisterDeletedBy(_, header) => {

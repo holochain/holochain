@@ -1,5 +1,7 @@
 use crate::{
     conductor::ConductorHandle,
+    core::ribosome::RibosomeT,
+    core::ribosome::ZomeCallInvocation,
     core::{
         ribosome::{host_fn, wasm_ribosome::WasmRibosome, CallContext, ZomeCallHostAccess},
         state::{metadata::LinkMetaKey, workspace::Workspace},
@@ -26,7 +28,7 @@ use holochain_zome_types::{
     metadata::Details,
     zome::ZomeName,
     CreateInput, CreateLinkInput, DeleteInput, DeleteLinkInput, GetDetailsInput, GetInput,
-    GetLinksInput, UpdateInput,
+    GetLinksInput, UpdateInput, ZomeCallResponse,
 };
 use std::sync::Arc;
 use tracing::*;
@@ -37,6 +39,8 @@ use unwrap_to::unwrap_to;
 // that will match entry defs
 pub const POST_ID: &str = "post";
 pub const MSG_ID: &str = "msg";
+pub const VALID_ID: &str = "always_validates";
+pub const INVALID_ID: &str = "never_validates";
 
 #[derive(
     Default, Debug, PartialEq, Clone, SerializedBytes, serde::Serialize, serde::Deserialize,
@@ -50,6 +54,21 @@ pub struct Post(pub String);
 #[repr(transparent)]
 #[serde(transparent)]
 pub struct Msg(pub String);
+
+/// Type from the validate wasm
+// TODO: Maybe we can dry this up by putting the wasm types
+// somewhere outside the wasm?
+#[derive(Deserialize, Serialize, SerializedBytes, Debug, Clone)]
+pub enum ThisWasmEntry {
+    AlwaysValidates,
+    NeverValidates,
+}
+
+#[derive(Deserialize, Serialize, SerializedBytes, Debug, Clone)]
+pub enum MaybeLinkable {
+    AlwaysLinkable,
+    NeverLinkable,
+}
 
 #[derive(Clone)]
 pub struct CallData {
@@ -380,32 +399,60 @@ pub async fn get_link_details<'env>(
     cascade.get_link_details(&key, options).await.unwrap()
 }
 
-impl TryFrom<Post> for Entry {
-    type Error = EntryError;
-    fn try_from(post: Post) -> Result<Self, Self::Error> {
-        Ok(Entry::App(SerializedBytes::try_from(post)?.try_into()?))
-    }
+pub async fn call_zome_direct(
+    env: &EnvironmentWrite,
+    call_data: CallData,
+    invocation: ZomeCallInvocation,
+) -> SerializedBytes {
+    let CallData {
+        network,
+        keystore,
+        ribosome,
+        ..
+    } = call_data;
+
+    let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
+    let workspace_lock = CallZomeWorkspaceLock::new(workspace);
+
+    let output = {
+        let host_access = ZomeCallHostAccess::new(workspace_lock.clone(), keystore, network);
+        let ribosome = Arc::new(ribosome);
+        ribosome
+            .call_zome_function(host_access, invocation)
+            .unwrap()
+    };
+
+    // Write
+    let mut guard = workspace_lock.write().await;
+    let workspace = &mut guard;
+    env.guard()
+        .with_commit(|writer| workspace.flush_to_txn_ref(writer))
+        .unwrap();
+    let output = unwrap_to!(output => ZomeCallResponse::Ok).clone();
+
+    output.into_inner()
 }
 
-impl TryFrom<Entry> for Post {
-    type Error = SerializedBytesError;
-    fn try_from(entry: Entry) -> Result<Self, Self::Error> {
-        let entry = unwrap_to!(entry => Entry::App).clone();
-        Ok(Post::try_from(entry.into_sb())?)
-    }
+macro_rules! test_entry_impl {
+    ($type:ident) => {
+        impl TryFrom<$type> for Entry {
+            type Error = EntryError;
+            fn try_from(n: $type) -> Result<Self, Self::Error> {
+                Ok(Entry::App(SerializedBytes::try_from(n)?.try_into()?))
+            }
+        }
+
+        impl TryFrom<Entry> for $type {
+            type Error = SerializedBytesError;
+            fn try_from(entry: Entry) -> Result<Self, Self::Error> {
+                let entry = unwrap_to!(entry => Entry::App).clone();
+                Ok($type::try_from(entry.into_sb())?)
+            }
+        }
+    };
 }
 
-impl TryFrom<Msg> for Entry {
-    type Error = EntryError;
-    fn try_from(msg: Msg) -> Result<Self, Self::Error> {
-        Ok(Entry::App(SerializedBytes::try_from(msg)?.try_into()?))
-    }
-}
-
-impl TryFrom<Entry> for Msg {
-    type Error = SerializedBytesError;
-    fn try_from(entry: Entry) -> Result<Self, Self::Error> {
-        let entry = unwrap_to!(entry => Entry::App).clone();
-        Ok(Msg::try_from(entry.into_sb())?)
-    }
-}
+test_entry_impl!(ThisWasmEntry);
+test_entry_impl!(Post);
+test_entry_impl!(Msg);
+test_entry_impl!(MaybeLinkable);
