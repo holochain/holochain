@@ -269,7 +269,8 @@ pub async fn check_chain_rollback(
     } else {
         let s = tracing::warn_span!("agent_activity");
         let _g = s.enter();
-        tracing::warn!(
+        // TODO: implement real rollback detection once we know what that looks like
+        tracing::error!(
             "Chain rollback detected at position {} for agent {:?} from header {:?}
             There were {} headers at this position",
             header.header_seq(),
