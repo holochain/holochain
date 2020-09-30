@@ -197,22 +197,24 @@ async fn check_prev_header_in_metadata_test() {
     let prev_header_hash = header_fixt.next().unwrap();
     let author = fixt!(AgentPubKey);
     let activity_return = vec![prev_header_hash.clone()];
-    let mut metadata = meta_mock!(expect_get_activity, activity_return, {
-        let author = author.clone();
-        move |a| *a == author
-    });
+    let mut metadata = {
+        let k = ChainItemKey::Full(author.clone(), 1, prev_header_hash.clone());
+        meta_mock!(expect_get_activity, activity_return, {
+            |a: ChainItemKey| a == k
+        })
+    };
 
     metadata.expect_env().return_const(env);
 
     // Previous header on this hash
     assert_matches!(
-        check_prev_header_in_metadata(&author, &prev_header_hash, &metadata).await,
+        check_prev_header_in_metadata(&author, 1, &prev_header_hash, &metadata).await,
         Ok(())
     );
 
     // No previous header on this hash
     assert_matches!(
-        check_prev_header_in_metadata(&author, &header_fixt.next().unwrap(), &metadata).await,
+        check_prev_header_in_metadata(&author, 1, &header_fixt.next().unwrap(), &metadata).await,
         Err(SysValidationError::ValidationOutcome(ValidationOutcome::NotHoldingDep(_)))
     );
 }

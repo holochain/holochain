@@ -50,6 +50,8 @@ use types::{CheckLevel, DhtOpOrder, OrderedOp, Outcome, PendingDependencies};
 pub mod types;
 
 #[cfg(test)]
+mod chain_test;
+#[cfg(test)]
 mod tests;
 
 #[instrument(skip(
@@ -383,7 +385,7 @@ async fn register_agent_activity(
         )
         .await?;
     }
-    check_chain_rollback(&header, &workspace.meta_vault, &workspace.element_vault).await?;
+    check_chain_rollback(&header, &workspace).await?;
     Ok(())
 }
 

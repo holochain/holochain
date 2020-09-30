@@ -104,6 +104,7 @@ async fn check_holding_element_inner(
 /// and return the header
 pub async fn check_holding_prev_header_all(
     author: &AgentPubKey,
+    header_seq: u32,
     prev_header_hash: &HeaderHash,
     workspace: &mut SysValidationWorkspace,
     network: impl HolochainP2pCellT,
@@ -111,7 +112,7 @@ pub async fn check_holding_prev_header_all(
 ) -> SysValidationResult<Dependency<SignedHeaderHashed>> {
     match check_level {
         CheckLevel::Hold => {
-            check_holding_prev_header_inner(author, prev_header_hash, workspace).await
+            check_holding_prev_header_inner(author, header_seq, prev_header_hash, workspace).await
         }
         CheckLevel::Witness => {
             check_header_exists(prev_header_hash.clone(), workspace, network).await
@@ -121,12 +122,14 @@ pub async fn check_holding_prev_header_all(
 
 async fn check_holding_prev_header_inner(
     author: &AgentPubKey,
+    header_seq: u32,
     prev_header_hash: &HeaderHash,
     workspace: &SysValidationWorkspace,
 ) -> SysValidationResult<Dependency<SignedHeaderHashed>> {
     // Need to check these are both the same dependency type.
     // If either is PendingValidation then the return type must also be etc.
-    let dep = check_prev_header_in_metadata_all(author, prev_header_hash, workspace).await?;
+    let dep =
+        check_prev_header_in_metadata_all(author, header_seq, prev_header_hash, workspace).await?;
     Ok(check_holding_header_inner(&prev_header_hash, &workspace)
         .await?
         .min(&dep))
@@ -189,13 +192,17 @@ async fn check_holding_link_add_inner(
 /// Check the prev header is in the metadata
 pub(super) async fn check_prev_header_in_metadata<P: PrefixType>(
     author: &AgentPubKey,
+    header_seq: u32,
     prev_header_hash: &HeaderHash,
     meta_vault: &impl MetadataBufT<P>,
 ) -> SysValidationResult<()> {
     fresh_reader!(meta_vault.env(), |r| {
         meta_vault
-            .get_activity(&r, author.clone())?
-            .find(|activity| Ok(prev_header_hash == &activity.header_hash))?
+            .get_activity(
+                &r,
+                ChainItemKey::Full(author.clone(), header_seq, prev_header_hash.clone()),
+            )?
+            .next()?
             .ok_or_else(|| ValidationOutcome::NotHoldingDep(prev_header_hash.clone().into()))?;
         Ok(())
     })
@@ -250,6 +257,7 @@ pub(super) async fn check_link_in_metadata<P: PrefixType>(
 /// Check the prev header is in the metadata
 async fn check_prev_header_in_metadata_all(
     author: &AgentPubKey,
+    header_seq: u32,
     prev_header_hash: &HeaderHash,
     workspace: &SysValidationWorkspace,
 ) -> SysValidationResult<Dependency<()>> {
@@ -257,6 +265,7 @@ async fn check_prev_header_in_metadata_all(
         workspace,
         check_prev_header_in_metadata,
         author,
+        header_seq,
         prev_header_hash
     );
     Err(ValidationOutcome::NotHoldingDep(prev_header_hash.clone().into()).into())
