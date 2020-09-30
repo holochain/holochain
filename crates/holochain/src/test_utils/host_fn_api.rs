@@ -79,10 +79,21 @@ pub struct CallData {
 }
 
 impl CallData {
+    /// Create CallData for the first zome.
     pub async fn create(
         cell_id: &CellId,
         handle: &ConductorHandle,
         dna_file: &DnaFile,
+    ) -> (EnvironmentWrite, CallData) {
+        Self::create_for_zome(cell_id, handle, dna_file, 0).await
+    }
+
+    /// Create CallData for a specific zome if there are multiple.
+    pub async fn create_for_zome(
+        cell_id: &CellId,
+        handle: &ConductorHandle,
+        dna_file: &DnaFile,
+        zome_index: usize,
     ) -> (EnvironmentWrite, CallData) {
         let env = handle.get_cell_env(cell_id).await.unwrap();
         let keystore = env.keystore().clone();
@@ -90,7 +101,7 @@ impl CallData {
             .holochain_p2p()
             .to_cell(cell_id.dna_hash().clone(), cell_id.agent_pubkey().clone());
 
-        let zome_name = dna_file.dna().zomes.get(0).unwrap().0.clone();
+        let zome_name = dna_file.dna().zomes.get(zome_index).unwrap().0.clone();
         let ribosome = WasmRibosome::new(dna_file.clone());
         let call_data = CallData {
             ribosome,

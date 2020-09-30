@@ -3,24 +3,22 @@ use holochain_zome_types::header::ZomeId;
 use thiserror::Error;
 
 use crate::{
-    conductor::entry_def_store::error::EntryDefStoreError,
-    core::validation::OutcomeOrError,
-    core::{present::PresentError, ribosome::error::RibosomeError},
-    from_sub_error,
+    conductor::entry_def_store::error::EntryDefStoreError, core::ribosome::error::RibosomeError,
+    core::state::cascade::error::CascadeError, core::validation::OutcomeOrError, from_sub_error,
 };
 
 use super::types::Outcome;
 
 #[derive(Error, Debug)]
 pub enum AppValidationError {
+    #[error(transparent)]
+    CascadeError(#[from] CascadeError),
     #[error("Dna is missing for this cell {0:?}. Cannot validate without dna.")]
     DnaMissing(CellId),
-    #[error("Links cannot be called on multiple zomes for validation")]
-    LinkMultipleZomes,
     #[error(transparent)]
     EntryDefStoreError(#[from] EntryDefStoreError),
-    #[error(transparent)]
-    PresentError(#[from] PresentError),
+    #[error("Links cannot be called on multiple zomes for validation")]
+    LinkMultipleZomes,
     #[error(transparent)]
     RibosomeError(#[from] RibosomeError),
     #[error("The app entry type {0:?} zome id was out of range")]
@@ -39,5 +37,6 @@ impl<T> From<AppValidationError> for OutcomeOrError<T, AppValidationError> {
 }
 
 // These need to match the #[from] in AppValidationError
-from_sub_error!(AppValidationError, PresentError);
 from_sub_error!(AppValidationError, RibosomeError);
+from_sub_error!(AppValidationError, CascadeError);
+from_sub_error!(AppValidationError, EntryDefStoreError);

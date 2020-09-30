@@ -78,26 +78,26 @@ fn validate(_element: ValidateData) -> ExternResult<ValidateCallbackResult> {
 #[hdk_extern]
 fn validate_delete_link(
     validate_delete_link: ValidateDeleteLinkData,
-) -> ExternResult<ValidateCallbackResult> {
+) -> ExternResult<ValidateLinkCallbackResult> {
     let delete_link = validate_delete_link.delete_link;
     let base: Option<MaybeLinkable> = match get!(delete_link.base_address.clone())? {
         Some(b) => b.entry().to_app_option()?,
         None => {
-            return Ok(ValidateCallbackResult::UnresolvedDependencies(vec![
-                delete_link.base_address,
+            return Ok(ValidateLinkCallbackResult::UnresolvedDependencies(vec![
+                delete_link.base_address.into(),
             ]))
         }
     };
     let base = match base {
         Some(b) => b,
         None => {
-            return Ok(ValidateCallbackResult::Invalid(
+            return Ok(ValidateLinkCallbackResult::Invalid(
                 "Base of this entry is not MaybeLinkable".to_string(),
             ))
         }
     };
     Ok(match base {
-        MaybeLinkable::AlwaysLinkable => ValidateCallbackResult::Valid,
-        _ => ValidateCallbackResult::Invalid("base never validates".to_string()),
+        MaybeLinkable::AlwaysLinkable => ValidateLinkCallbackResult::Valid,
+        _ => ValidateLinkCallbackResult::Invalid("base never validates".to_string()),
     })
 }

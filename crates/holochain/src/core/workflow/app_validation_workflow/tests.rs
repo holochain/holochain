@@ -9,6 +9,7 @@ use crate::{
     },
     test_utils::host_fn_api::*,
     test_utils::setup_app,
+    test_utils::wait_for_integration,
 };
 use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
@@ -28,10 +29,6 @@ use std::{
 };
 use tracing::*;
 
-/// Wait for a maximum of 10 seconds
-/// for validation to run. (100 * 100ms)
-const NUM_ATTEMPTS: usize = 100;
-
 #[tokio::test(threaded_scheduler)]
 async fn app_validation_workflow_test() {
     observability::test_run().ok();
@@ -41,9 +38,18 @@ async fn app_validation_workflow_test() {
             name: "app_validation_workflow_test".to_string(),
             uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
             properties: SerializedBytes::try_from(()).unwrap(),
-            zomes: vec![TestWasm::Validate.into(), TestWasm::ValidateLink.into()].into(),
+            zomes: vec![
+                TestWasm::Validate.into(),
+                TestWasm::ValidateLink.into(),
+                TestWasm::Create.into(),
+            ]
+            .into(),
         },
-        vec![TestWasm::Validate.into(), TestWasm::ValidateLink.into()],
+        vec![
+            TestWasm::Validate.into(),
+            TestWasm::ValidateLink.into(),
+            TestWasm::Create.into(),
+        ],
     )
     .await
     .unwrap();
@@ -72,11 +78,122 @@ async fn app_validation_workflow_test() {
     )
     .await;
 
-    run_test(alice_cell_id, bob_cell_id, handle.clone(), &dna_file).await;
+    let expected_count = run_test(
+        alice_cell_id.clone(),
+        bob_cell_id.clone(),
+        handle.clone(),
+        &dna_file,
+    )
+    .await;
+    run_test_entry_def_id(
+        alice_cell_id,
+        bob_cell_id,
+        handle.clone(),
+        &dna_file,
+        expected_count,
+    )
+    .await;
 
     let shutdown = handle.take_shutdown_handle().await.unwrap();
     handle.shutdown().await;
     shutdown.await.unwrap();
+}
+
+// These are the expected invalid ops
+fn expected_invalid_entry(
+    (hash, i, el): &(DhtOpHash, IntegratedDhtOpsValue, Element),
+    line: u32,
+    invalid_header_hash: &HeaderHash,
+    invalid_entry_hash: &AnyDhtHash,
+) -> bool {
+    let s = format!("\nline:{}\n{:?}\n{:?}\n{:?}", line, hash, i, el);
+    match &i.op {
+        // A Store entry that matches these hashes
+        DhtOpLight::StoreEntry(hh, _, eh)
+            if eh == invalid_entry_hash && hh == invalid_header_hash =>
+        {
+            assert_eq!(i.validation_status, ValidationStatus::Rejected, "{}", s)
+        }
+        // And the store element
+        DhtOpLight::StoreElement(hh, _, _) if hh == invalid_header_hash => {
+            assert_eq!(i.validation_status, ValidationStatus::Rejected, "{}", s);
+        }
+        _ => return false,
+    }
+    true
+}
+
+// All others must be valid
+fn others((hash, i, el): &(DhtOpHash, IntegratedDhtOpsValue, Element), line: u32) {
+    let s = format!("\nline:{}\n{:?}\n{:?}\n{:?}", line, hash, i, el);
+    match &i.op {
+        // Register agent activity will be invalid if the previous header is invalid
+        // This is very hard to track in these tests and this op also doesn't
+        // go through app validation so it's more productive to skip it
+        DhtOpLight::RegisterAgentActivity(_, _) => (),
+        _ => assert_eq!(i.validation_status, ValidationStatus::Valid, "{}", s),
+    }
+}
+
+// Now we expect an invalid link
+fn expected_invalid_link(
+    (hash, i, el): &(DhtOpHash, IntegratedDhtOpsValue, Element),
+    line: u32,
+    invalid_link_hash: &HeaderHash,
+) -> bool {
+    let s = format!("\nline:{}\n{:?}\n{:?}\n{:?}", line, hash, i, el);
+    match &i.op {
+        // Invalid link
+        DhtOpLight::RegisterAddLink(hh, _) if hh == invalid_link_hash => {
+            assert_eq!(i.validation_status, ValidationStatus::Rejected, "{}", s)
+        }
+        // The store element for this CreateLink header is also rejected
+        DhtOpLight::StoreElement(hh, _, _) if hh == invalid_link_hash => {
+            assert_eq!(i.validation_status, ValidationStatus::Rejected, "{}", s)
+        }
+        _ => return false,
+    }
+    true
+}
+
+// Now we're trying to remove an invalid link
+fn expected_invalid_remove_link(
+    (hash, i, el): &(DhtOpHash, IntegratedDhtOpsValue, Element),
+    line: u32,
+    invalid_remove_hash: &HeaderHash,
+) -> bool {
+    let s = format!("\nline:{}\n{:?}\n{:?}\n{:?}", line, hash, i, el);
+
+    // To make it simple we want to skip this op
+    if let DhtOpLight::RegisterAgentActivity(_, _) = &i.op {
+        return false;
+    }
+
+    // Get the hash of the entry that makes the link invalid
+    let sb = SerializedBytes::try_from(&MaybeLinkable::NeverLinkable).unwrap();
+    let invalid_link_entry_hash = EntryHash::with_data_sync(&Entry::app(sb).unwrap());
+
+    // Link adds with these base / target are invalid
+    if let Header::CreateLink(la) = el.header() {
+        if invalid_link_entry_hash == la.base_address
+            || invalid_link_entry_hash == la.target_address
+        {
+            assert_eq!(i.validation_status, ValidationStatus::Rejected, "{}", s);
+            return true;
+        }
+    }
+    match &i.op {
+        // The store element for the DeleteLink is invalid
+        DhtOpLight::StoreElement(hh, _, _) if hh == invalid_remove_hash => {
+            assert_eq!(i.validation_status, ValidationStatus::Rejected, "{}", s)
+        }
+        // The remove link op is also invalid
+        DhtOpLight::RegisterRemoveLink(hh, _) if hh == invalid_remove_hash => {
+            assert_eq!(i.validation_status, ValidationStatus::Rejected, "{}", s)
+        }
+        _ => return false,
+    }
+    true
 }
 
 async fn run_test(
@@ -84,7 +201,13 @@ async fn run_test(
     bob_cell_id: CellId,
     handle: ConductorHandle,
     dna_file: &DnaFile,
-) {
+) -> usize {
+    // Check if the correct number of ops are integrated
+    // every 100 ms for a maximum of 10 seconds but early exit
+    // if they are there.
+    let num_attempts = 100;
+    let delay_per_attempt = Duration::from_millis(100);
+
     let invocation =
         new_invocation(&bob_cell_id, "always_validates", (), TestWasm::Validate).unwrap();
     handle.call_zome(invocation).await.unwrap().unwrap();
@@ -93,7 +216,7 @@ async fn run_test(
     // Plus another 16 for genesis + init
     let expected_count = 3 + 16;
     let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
-    wait_for_validation(&alice_env, expected_count).await;
+    wait_for_integration(&alice_env, expected_count, num_attempts, delay_per_attempt).await;
 
     {
         let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
@@ -120,43 +243,7 @@ async fn run_test(
     // So they will be valid.
     let expected_count = 3 + expected_count;
     let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
-    wait_for_validation(&alice_env, expected_count).await;
-
-    // These are the expected invalid ops
-    fn expected_invalid_entry(
-        (hash, i, el): &(DhtOpHash, IntegratedDhtOpsValue, Element),
-        line: u32,
-        invalid_header_hash: &HeaderHash,
-        invalid_entry_hash: &AnyDhtHash,
-    ) -> bool {
-        let s = format!("\nline:{}\n{:?}\n{:?}\n{:?}", line, hash, i, el);
-        match &i.op {
-            // A Store entry that matches these hashes
-            DhtOpLight::StoreEntry(hh, _, eh)
-                if eh == invalid_entry_hash && hh == invalid_header_hash =>
-            {
-                assert_eq!(i.validation_status, ValidationStatus::Rejected, "{}", s)
-            }
-            // And the store element
-            DhtOpLight::StoreElement(hh, _, _) if hh == invalid_header_hash => {
-                assert_eq!(i.validation_status, ValidationStatus::Rejected, "{}", s);
-            }
-            _ => return false,
-        }
-        true
-    }
-
-    // All others must be valid
-    fn others((hash, i, el): &(DhtOpHash, IntegratedDhtOpsValue, Element), line: u32) {
-        let s = format!("\nline:{}\n{:?}\n{:?}\n{:?}", line, hash, i, el);
-        match &i.op {
-            // Register agent activity will be invalid if the previous header is invalid
-            // This is very hard to track in these tests and this op also doesn't
-            // go through app validation so it's more productive to skip it
-            DhtOpLight::RegisterAgentActivity(_, _) => (),
-            _ => assert_eq!(i.validation_status, ValidationStatus::Valid, "{}", s),
-        }
-    };
+    wait_for_integration(&alice_env, expected_count, num_attempts, delay_per_attempt).await;
 
     {
         let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
@@ -182,7 +269,7 @@ async fn run_test(
     // Integration should have 6 ops in it
     let expected_count = 6 + expected_count;
     let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
-    wait_for_validation(&alice_env, expected_count).await;
+    wait_for_integration(&alice_env, expected_count, num_attempts, delay_per_attempt).await;
 
     {
         let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
@@ -210,28 +297,8 @@ async fn run_test(
     // Integration should have 9 ops in it
     let expected_count = 9 + expected_count;
     let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
-    wait_for_validation(&alice_env, expected_count).await;
+    wait_for_integration(&alice_env, expected_count, num_attempts, delay_per_attempt).await;
 
-    // Now we expect an invalid link
-    fn expected_invalid_link(
-        (hash, i, el): &(DhtOpHash, IntegratedDhtOpsValue, Element),
-        line: u32,
-        invalid_link_hash: &HeaderHash,
-    ) -> bool {
-        let s = format!("\nline:{}\n{:?}\n{:?}\n{:?}", line, hash, i, el);
-        match &i.op {
-            // Invalid link
-            DhtOpLight::RegisterAddLink(hh, _) if hh == invalid_link_hash => {
-                assert_eq!(i.validation_status, ValidationStatus::Rejected, "{}", s)
-            }
-            // The store element for this CreateLink header is also rejected
-            DhtOpLight::StoreElement(hh, _, _) if hh == invalid_link_hash => {
-                assert_eq!(i.validation_status, ValidationStatus::Rejected, "{}", s)
-            }
-            _ => return false,
-        }
-        true
-    };
     {
         let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
 
@@ -262,7 +329,7 @@ async fn run_test(
     // Integration should have 9 ops in it
     let expected_count = 9 + expected_count;
     let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
-    wait_for_validation(&alice_env, expected_count).await;
+    wait_for_integration(&alice_env, expected_count, num_attempts, delay_per_attempt).await;
 
     {
         let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
@@ -298,47 +365,7 @@ async fn run_test(
     // Integration should have 12 ops in it
     let expected_count = 12 + expected_count;
     let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
-    wait_for_validation(&alice_env, expected_count).await;
-
-    // Now we're trying to remove an invalid link
-    fn expected_invalid_remove_link(
-        (hash, i, el): &(DhtOpHash, IntegratedDhtOpsValue, Element),
-        line: u32,
-        invalid_remove_hash: &HeaderHash,
-    ) -> bool {
-        let s = format!("\nline:{}\n{:?}\n{:?}\n{:?}", line, hash, i, el);
-
-        // To make it simple we want to skip this op
-        if let DhtOpLight::RegisterAgentActivity(_, _) = &i.op {
-            return false;
-        }
-
-        // Get the hash of the entry that makes the link invalid
-        let sb = SerializedBytes::try_from(&MaybeLinkable::NeverLinkable).unwrap();
-        let invalid_link_entry_hash = EntryHash::with_data_sync(&Entry::app(sb).unwrap());
-
-        // Link adds with these base / target are invalid
-        if let Header::CreateLink(la) = el.header() {
-            if invalid_link_entry_hash == la.base_address
-                || invalid_link_entry_hash == la.target_address
-            {
-                assert_eq!(i.validation_status, ValidationStatus::Rejected, "{}", s);
-                return true;
-            }
-        }
-        match &i.op {
-            // The store element for the DeleteLink is invalid
-            DhtOpLight::StoreElement(hh, _, _) if hh == invalid_remove_hash => {
-                assert_eq!(i.validation_status, ValidationStatus::Rejected, "{}", s)
-            }
-            // The remove link op is also invalid
-            DhtOpLight::RegisterRemoveLink(hh, _) if hh == invalid_remove_hash => {
-                assert_eq!(i.validation_status, ValidationStatus::Rejected, "{}", s)
-            }
-            _ => return false,
-        }
-        true
-    };
+    wait_for_integration(&alice_env, expected_count, num_attempts, delay_per_attempt).await;
 
     {
         let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
@@ -358,24 +385,61 @@ async fn run_test(
         }
         assert_eq!(int.len(), expected_count);
     }
+    expected_count
 }
 
-/// Exit early if validation has run or wait for the maximum number of attempts
-async fn wait_for_validation(alice_env: &EnvironmentWrite, expected_count: usize) {
-    for _ in 0..NUM_ATTEMPTS {
+/// 1 Commits an entry with validate_create_entry_<EntryDefId> callback
+/// 2. The callback rejects the entry proving that it actually ran.
+/// 3. Reject only Post with "Banana" as the String to show it doesn't
+///    affect other entries.
+async fn run_test_entry_def_id(
+    alice_cell_id: CellId,
+    bob_cell_id: CellId,
+    handle: ConductorHandle,
+    dna_file: &DnaFile,
+    expected_count: usize,
+) {
+    // Check if the correct number of ops are integrated
+    // every 100 ms for a maximum of 10 seconds but early exit
+    // if they are there.
+    let num_attempts = 100;
+    let delay_per_attempt = Duration::from_millis(100);
+
+    let (invalid_header_hash, invalid_entry_hash) =
+        commit_invalid_post(&bob_cell_id, &handle, dna_file).await;
+    let invalid_entry_hash: AnyDhtHash = invalid_entry_hash.into();
+
+    // Integration should have 3 ops in it
+    // StoreEntry and StoreElement should be invalid.
+    let expected_count = 3 + expected_count;
+    let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
+    wait_for_integration(&alice_env, expected_count, num_attempts, delay_per_attempt).await;
+
+    {
+        let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
+
         let workspace = IncomingDhtOpsWorkspace::new(alice_env.clone().into()).unwrap();
-        let count = fresh_reader_test!(alice_env, |r| {
-            workspace
-                .integrated_dht_ops
-                .iter(&r)
-                .unwrap()
-                .count()
-                .unwrap()
-        });
-        if count == expected_count {
-            return ();
+        // Validation should be empty
+        let val = inspect_val_limbo(&alice_env, &workspace);
+        assert_eq!(val.len(), 0);
+        let int = inspect_integrated(&alice_env, &workspace);
+        for v in &int {
+            match &v.1.op {
+                // A Store entry that matches these hashes
+                DhtOpLight::StoreEntry(hh, _, eh)
+                    if *eh == invalid_entry_hash && *hh == invalid_header_hash =>
+                {
+                    assert_eq!(v.1.validation_status, ValidationStatus::Rejected, "{:?}", v)
+                }
+                // And the store element
+                DhtOpLight::StoreElement(hh, _, _) if *hh == invalid_header_hash => {
+                    assert_eq!(v.1.validation_status, ValidationStatus::Rejected, "{:?}", v);
+                }
+                _ => (),
+            }
         }
-        tokio::time::delay_for(Duration::from_millis(100)).await;
+
+        assert_eq!(int.len(), expected_count);
     }
 }
 
@@ -414,6 +478,33 @@ async fn commit_invalid(
         call_data.clone(),
         entry.clone().try_into().unwrap(),
         INVALID_ID,
+    )
+    .await;
+
+    // Produce and publish these commits
+    let mut triggers = handle.get_cell_triggers(&bob_cell_id).await.unwrap();
+    triggers.produce_dht_ops.trigger();
+    (invalid_header_hash, entry_hash)
+}
+
+// Need to "hack holochain" because otherwise the invalid
+// commit is caught by the call zome workflow
+async fn commit_invalid_post(
+    bob_cell_id: &CellId,
+    handle: &ConductorHandle,
+    dna_file: &DnaFile,
+) -> (HeaderHash, EntryHash) {
+    // Bananas are not allowed
+    let entry = Post("Banana".into());
+    let entry_hash = EntryHash::with_data_sync(&Entry::try_from(entry.clone()).unwrap());
+    // Create call data for the 3rd zome Create
+    let (bob_env, call_data) = CallData::create_for_zome(bob_cell_id, handle, dna_file, 2).await;
+    // 9
+    let invalid_header_hash = commit_entry(
+        &bob_env,
+        call_data.clone(),
+        entry.clone().try_into().unwrap(),
+        POST_ID,
     )
     .await;
 

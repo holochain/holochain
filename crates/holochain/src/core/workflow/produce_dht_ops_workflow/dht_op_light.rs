@@ -1,13 +1,13 @@
 use crate::core::state::element_buf::ElementBuf;
 use error::{DhtOpConvertError, DhtOpConvertResult};
 use holo_hash::{EntryHash, HeaderHash};
-use holochain_keystore::Signature;
 use holochain_types::{
     dht_op::{DhtOp, DhtOpLight},
     header::NewEntryHeader,
 };
 use holochain_zome_types::entry_def::EntryVisibility;
 use holochain_zome_types::header::{self, Header};
+use holochain_zome_types::signature::Signature;
 
 pub mod error;
 
@@ -20,7 +20,7 @@ mod tests;
 /// Convert a DhtOpLight into a DhtOp (render all the hashes to values)
 /// This only checks the ElementVault so can only be used with ops that you are
 /// an authority or author of.
-pub async fn light_to_op<P: PrefixType>(
+pub fn light_to_op<P: PrefixType>(
     op: DhtOpLight,
     cas: &ElementBuf<P>,
 ) -> DhtOpConvertResult<DhtOp> {

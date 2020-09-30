@@ -1,4 +1,6 @@
 use crate::*;
+use holochain_zome_types::signature::SignInput;
+use holochain_zome_types::signature::Signature;
 use std::sync::Arc;
 
 /// Extend holo_hash::AgentPubKey with additional signature functionality

@@ -35,7 +35,6 @@ use fallible_iterator::FallibleIterator;
 use futures::future::FutureExt;
 use hash_type::AnyDht;
 use holo_hash::*;
-use holochain_keystore::Signature;
 use holochain_p2p::HolochainP2pCellT;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::{
@@ -52,6 +51,7 @@ use holochain_types::{
 };
 use holochain_zome_types::capability::CapSecret;
 use holochain_zome_types::header::{CreateLink, DeleteLink};
+use holochain_zome_types::signature::Signature;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::ExternInput;
 use std::{
@@ -599,8 +599,7 @@ impl Cell {
                 let full_op =
                     crate::core::workflow::produce_dht_ops_workflow::dht_op_light::light_to_op(
                         val.op, &cas,
-                    )
-                    .await?;
+                    )?;
                 let basis = full_op.dht_basis().await;
                 out.push((basis, op_hash, full_op));
             }
@@ -609,7 +608,7 @@ impl Cell {
     }
 
     /// the network module would like this cell/agent to sign some data
-    async fn handle_sign_network_data(&self) -> CellResult<holochain_keystore::Signature> {
+    async fn handle_sign_network_data(&self) -> CellResult<Signature> {
         unimplemented!()
     }
 
@@ -658,6 +657,7 @@ impl Cell {
         let arc = self.env();
         let keystore = arc.keystore().clone();
         let workspace = CallZomeWorkspace::new(arc.clone().into())?;
+        let conductor_api = self.conductor_api.clone();
 
         let args = CallZomeWorkflowArgs {
             ribosome: self.get_ribosome().await?,
@@ -668,6 +668,7 @@ impl Cell {
             self.holochain_p2p_cell.clone(),
             keystore,
             arc.clone().into(),
+            conductor_api,
             args,
             self.queue_triggers.produce_dht_ops.clone(),
         )

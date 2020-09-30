@@ -1,7 +1,7 @@
 use crate::element::Element;
 use crate::zome_io::ExternOutput;
 use crate::CallbackResult;
-use holo_hash::EntryHash;
+use holo_hash::AnyDhtHash;
 use holochain_serialized_bytes::prelude::*;
 
 #[derive(Serialize, Deserialize, SerializedBytes)]
@@ -16,7 +16,7 @@ pub enum ValidateCallbackResult {
     Invalid(String),
     /// Subconscious needs to map this to either pending or abandoned based on context that the
     /// wasm can't possibly have.
-    UnresolvedDependencies(Vec<EntryHash>),
+    UnresolvedDependencies(Vec<AnyDhtHash>),
 }
 
 impl CallbackResult for ValidateCallbackResult {
@@ -57,7 +57,7 @@ pub enum RequiredValidationPackage {
 pub enum ValidationPackageCallbackResult {
     Success(ValidationPackage),
     Fail(String),
-    UnresolvedDependencies(Vec<EntryHash>),
+    UnresolvedDependencies(Vec<AnyDhtHash>),
 }
 
 impl From<ExternOutput> for ValidationPackageCallbackResult {

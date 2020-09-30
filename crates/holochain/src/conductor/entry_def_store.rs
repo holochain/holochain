@@ -6,6 +6,7 @@ use crate::core::ribosome::{
     RibosomeT,
 };
 
+use super::api::CellConductorApiT;
 use error::{EntryDefStoreError, EntryDefStoreResult};
 use fallible_iterator::FallibleIterator;
 use holochain_serialized_bytes::prelude::*;
@@ -20,8 +21,6 @@ use holochain_zome_types::entry_def::EntryDef;
 use holochain_zome_types::header::AppEntryType;
 use holochain_zome_types::header::EntryDefIndex;
 use std::{collections::HashMap, convert::TryInto};
-
-use super::api::CellConductorApiT;
 
 pub mod error;
 

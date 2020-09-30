@@ -10,7 +10,9 @@ use crate::{
     core::{
         queue_consumer::QueueTriggerClosedError,
         ribosome::error::RibosomeError,
-        state::{source_chain::SourceChainError, workspace::WorkspaceError},
+        state::{
+            cascade::error::CascadeError, source_chain::SourceChainError, workspace::WorkspaceError,
+        },
         SysValidationError,
     },
 };
@@ -29,6 +31,9 @@ pub enum WorkflowError {
 
     #[error("Conductor API error: {0}")]
     ConductorApi(#[from] Box<ConductorApiError>),
+
+    #[error(transparent)]
+    CascadeError(#[from] CascadeError),
 
     #[error("Workspace error: {0}")]
     WorkspaceError(#[from] WorkspaceError),

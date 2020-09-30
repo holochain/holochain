@@ -1,0 +1,25 @@
+[package]
+name = "kitsune_p2p_proxy"
+version = "0.0.1"
+description = "Proxy transport module for kitsune-p2p"
+license = "Apache-2.0"
+homepage = "https://github.com/holochain/holochain"
+documentation = "https://github.com/holochain/holochain"
+authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
+keywords = [ "holochain", "holo", "p2p", "dht", "networking" ]
+categories = [ "network-programming" ]
+edition = "2018"
+
+[dependencies]
+base64 = "0.12"
+derive_more = "0.99.7"
+futures = "0.3"
+kitsune_p2p_types = { version = "0.0.1", path = "../types" }
+lair_keystore_api = "0.0.1-alpha.4"
+nanoid = "0.3"
+rmp-serde = "0.14"
+rustls = { version = "0.18", features = [ "dangerous_configuration" ] }
+serde = { version = "1", features = [ "derive" ] }
+serde_bytes = "0.11"
+tokio = { version = "0.2", features = [ "full" ] }
+webpki = "0.21.2"

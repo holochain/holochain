@@ -3,15 +3,17 @@ use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
 use crate::core::{ribosome::FnComponents, workflow::CallZomeWorkspaceLock};
 use derive_more::Constructor;
-use holo_hash::EntryHash;
+use holo_hash::AnyDhtHash;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::dna::zome::{HostFnAccess, Permission};
+use holochain_zome_types::entry::Entry;
+use holochain_zome_types::entry_def::EntryDefId;
 use holochain_zome_types::validate::ValidateCallbackResult;
+use holochain_zome_types::validate::ValidateData;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::ExternInput;
 use holochain_zome_types::{element::Element, validate::ValidationPackage, Header};
-use holochain_zome_types::{entry::Entry, validate::ValidateData};
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -25,6 +27,9 @@ pub struct ValidateInvocation {
     /// Only elements with an app entry
     /// will have a validation package
     pub validation_package: Option<Arc<ValidationPackage>>,
+    /// The [EntryDefId] for the entry associated with
+    /// this element if there is one.
+    pub entry_def_id: Option<EntryDefId>,
 }
 
 #[derive(Clone, Constructor)]
@@ -65,9 +70,12 @@ impl Invocation for ValidateInvocation {
         }
         match self.element.entry().as_option() {
             Some(Entry::Agent(_)) => fns.push("agent".into()),
-            Some(Entry::App(_)) => fns.push("entry".into()),
-            Some(Entry::CapClaim(_)) => fns.push("cap_claim".into()),
-            Some(Entry::CapGrant(_)) => fns.push("cap_grant".into()),
+            Some(Entry::App(_)) => {
+                fns.push("entry".into());
+                if let Some(EntryDefId::App(entry_def_id)) = self.entry_def_id.clone() {
+                    fns.push(entry_def_id);
+                }
+            }
             _ => (),
         }
         fns.into()
@@ -83,7 +91,7 @@ pub enum ValidateResult {
     Invalid(String),
     /// subconscious needs to map this to either pending or abandoned based on context that the
     /// wasm can't possibly have
-    UnresolvedDependencies(Vec<EntryHash>),
+    UnresolvedDependencies(Vec<AnyDhtHash>),
 }
 
 impl From<Vec<(ZomeName, ValidateCallbackResult)>> for ValidateResult {

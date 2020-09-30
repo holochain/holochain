@@ -33,6 +33,7 @@ use holo_hash::HeaderHash;
 use holo_hash::WasmHash;
 use holochain_keystore::keystore_actor::KeystoreSender;
 use holochain_p2p::HolochainP2pCellFixturator;
+use holochain_state::test_utils::test_keystore;
 use holochain_types::dna::wasm::DnaWasm;
 use holochain_types::dna::zome::Zome;
 use holochain_types::dna::DnaFile;
@@ -42,9 +43,11 @@ pub use holochain_types::fixt::*;
 use holochain_types::test_utils::fake_dna_zomes;
 use holochain_wasm_test_utils::strum::IntoEnumIterator;
 use holochain_wasm_test_utils::TestWasm;
+use holochain_zome_types::element::Element;
+use holochain_zome_types::header::HeaderHashes;
 use holochain_zome_types::link::LinkTag;
+use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::ExternInput;
-use holochain_zome_types::{element::Element, header::HeaderHashes, zome::ZomeName};
 use rand::seq::IteratorRandom;
 use rand::thread_rng;
 use rand::Rng;
@@ -244,6 +247,7 @@ fixturator!(
     KeystoreSender;
     curve Empty {
         tokio_safe_block_on::tokio_safe_block_forever_on(async {
+            // an empty keystore
             holochain_keystore::test_keystore::spawn_test_keystore().await.unwrap()
         })
     };
@@ -253,11 +257,8 @@ fixturator!(
             holochain_keystore::test_keystore::spawn_test_keystore().await.unwrap()
         })
     };
-    curve Predictable {
-        tokio_safe_block_on::tokio_safe_block_forever_on(async {
-            holochain_keystore::test_keystore::spawn_test_keystore().await.unwrap()
-        })
-    };
+    // a prepopulate keystore with hardcoded agents in it
+    curve Predictable test_keystore();
 );
 
 fixturator!(
@@ -332,11 +333,15 @@ fixturator!(
     constructor fn one(ZomeName);
 );
 
-fn make_validate_invocation(zti: ZomesToInvoke, el: Element) -> ValidateInvocation {
+fn make_validate_invocation(
+    zomes_to_invoke: ZomesToInvoke,
+    element: Element,
+) -> ValidateInvocation {
     ValidateInvocation {
-        zomes_to_invoke: zti,
-        element: Arc::new(el),
+        zomes_to_invoke,
+        element: Arc::new(element),
         validation_package: None,
+        entry_def_id: None,
     }
 }
 
