@@ -47,7 +47,7 @@ impl Parse for EntryDef {
                         match var.lit {
                             syn::Lit::Str(s) => {
                                 required_validation_package = match s.value().as_str() {
-                                    "entry" => {
+                                    "element" => {
                                         holochain_zome_types::validate::RequiredValidationPackage::Element
                                     }
                                     "sub_chain" => {
