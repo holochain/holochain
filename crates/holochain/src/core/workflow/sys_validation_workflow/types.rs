@@ -53,7 +53,9 @@ pub struct OrderedOp<V> {
 pub enum CheckLevel {
     /// Selected dependencies must be held by this agent
     Hold,
-    /// Selected dependencies must be witnessed by this agent
+    /// Selected dependencies must be witnessed by this agent,
+    /// meaning that we were able to fetch the element from another agent,
+    /// but have not verified the element's validity ourselves
     Witness,
 }
 
