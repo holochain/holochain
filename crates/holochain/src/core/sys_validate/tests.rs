@@ -190,36 +190,6 @@ async fn check_valid_if_dna_test() {
 }
 
 #[tokio::test(threaded_scheduler)]
-async fn check_prev_header_in_metadata_test() {
-    let env: EnvironmentRead = test_cell_env().env.into();
-    // Test data
-    let mut header_fixt = HeaderHashFixturator::new(Predictable);
-    let prev_header_hash = header_fixt.next().unwrap();
-    let author = fixt!(AgentPubKey);
-    let activity_return = vec![prev_header_hash.clone()];
-    let mut metadata = {
-        let k = ChainItemKey::Full(author.clone(), 1, prev_header_hash.clone());
-        meta_mock!(expect_get_activity, activity_return, {
-            |a: ChainItemKey| a == k
-        })
-    };
-
-    metadata.expect_env().return_const(env);
-
-    // Previous header on this hash
-    assert_matches!(
-        check_prev_header_in_metadata(&author, 1, &prev_header_hash, &metadata).await,
-        Ok(())
-    );
-
-    // No previous header on this hash
-    assert_matches!(
-        check_prev_header_in_metadata(&author, 1, &header_fixt.next().unwrap(), &metadata).await,
-        Err(SysValidationError::ValidationOutcome(ValidationOutcome::NotHoldingDep(_)))
-    );
-}
-
-#[tokio::test(threaded_scheduler)]
 async fn check_previous_timestamp() {
     let mut header = fixt!(CreateLink);
     let mut prev_header = fixt!(CreateLink);

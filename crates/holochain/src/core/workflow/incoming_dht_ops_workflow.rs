@@ -5,7 +5,6 @@ use super::{
     integrate_dht_ops_workflow::{integrate_single_data, integrate_single_metadata},
     produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertResult,
     sys_validation_workflow::counterfeit_check,
-    sys_validation_workflow::types::PendingDependencies,
 };
 use crate::core::{
     queue_consumer::TriggerSender,
@@ -132,7 +131,6 @@ impl IncomingDhtOpsWorkspace {
             time_added: Timestamp::now(),
             last_try: None,
             num_tries: 0,
-            pending_dependencies: PendingDependencies::new(),
         };
         self.validation_limbo.put(hash, vlv)?;
         Ok(())
