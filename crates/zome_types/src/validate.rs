@@ -46,9 +46,8 @@ pub struct ValidationPackage;
 pub enum RequiredValidationPackage {
     /// Just the element (default)
     Element,
-    /// N number of chain elements counting back from
-    /// this entry
-    Chain(usize),
+    /// All chain items of the same entry type
+    SubChain,
     /// The entire chain
     Full,
 }

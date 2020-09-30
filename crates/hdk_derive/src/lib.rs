@@ -50,11 +50,14 @@ impl Parse for EntryDef {
                                     "entry" => {
                                         holochain_zome_types::validate::RequiredValidationPackage::Element
                                     }
+                                    "sub_chain" => {
+                                        holochain_zome_types::validate::RequiredValidationPackage::SubChain
+                                    }
                                     "full" => {
                                         holochain_zome_types::validate::RequiredValidationPackage::Full
                                     }
-                                    // TODO: Add Chain(n)
-                                    _ => unreachable!(),
+                                    _ => unreachable!("Invalid required_validation_package
+                                    Options are: entry, sub_chain and full"),
                                 }
                             }
                             _ => unreachable!(),
@@ -143,7 +146,7 @@ impl quote::ToTokens for RequiredValidationPackage {
         let variant = syn::Ident::new(
             match self.0 {
                 holochain_zome_types::validate::RequiredValidationPackage::Element => "Element",
-                holochain_zome_types::validate::RequiredValidationPackage::Chain(_) => "Chain",
+                holochain_zome_types::validate::RequiredValidationPackage::SubChain => "SubChain",
                 holochain_zome_types::validate::RequiredValidationPackage::Full => "Full",
             },
             proc_macro2::Span::call_site(),

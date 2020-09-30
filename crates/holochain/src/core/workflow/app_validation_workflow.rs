@@ -516,7 +516,7 @@ async fn get_validation_package(
             Ok(match entry_def.required_validation_package {
                 // Only needs the element
                 RequiredValidationPackage::Element => None,
-                RequiredValidationPackage::Chain(_) => {
+                RequiredValidationPackage::SubChain => {
                     todo!("Implement getting the sub chain validation package")
                 }
                 RequiredValidationPackage::Full => todo!("Implement getting the full chain"),

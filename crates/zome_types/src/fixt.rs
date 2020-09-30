@@ -30,21 +30,10 @@ fixturator!(
     unit variants [ Public Private ] empty Public;
 );
 
-fixturator! {
+fixturator!(
     RequiredValidationPackage;
-    enum [ Element Chain Full ];
-    curve Empty RequiredValidationPackage::Element;
-    curve Unpredictable match RequiredValidationPackageVariant::random() {
-        RequiredValidationPackageVariant::Element => RequiredValidationPackage::Element,
-        RequiredValidationPackageVariant::Full => RequiredValidationPackage::Full,
-        RequiredValidationPackageVariant::Chain => RequiredValidationPackage::Chain(fixt!(U64) as usize),
-    };
-    curve Predictable match RequiredValidationPackageVariant::nth(self.0.index) {
-        RequiredValidationPackageVariant::Element => RequiredValidationPackage::Element,
-        RequiredValidationPackageVariant::Full => RequiredValidationPackage::Full,
-        RequiredValidationPackageVariant::Chain => RequiredValidationPackage::Chain(U64Fixturator::new_indexed(Predictable, self.0.index).next().unwrap() as usize),
-    };
-}
+    unit variants [ Element SubChain Full ] empty Element;
+);
 
 fixturator!(
     AppEntryType;
