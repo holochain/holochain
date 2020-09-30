@@ -132,6 +132,7 @@ impl From<ValidateInvocation> for ValidateData {
 #[cfg(test)]
 mod test {
 
+    use super::ValidateData;
     use super::ValidateResult;
     use crate::core::ribosome::Invocation;
     use crate::fixt::ValidateHostAccessFixturator;
@@ -245,7 +246,7 @@ mod test {
         );
         let el = fixt!(Element, (agent_entry, HeaderType::Update));
         validate_invocation.element = Arc::new(el);
-        let mut expected = vec!["validate", "validate_update", "validate_update_cap_claim"];
+        let mut expected = vec!["validate", "validate_update"];
         for fn_component in validate_invocation.fn_components() {
             assert_eq!(fn_component, expected.pop().unwrap(),);
         }
@@ -258,7 +259,7 @@ mod test {
         );
         let el = fixt!(Element, (agent_entry, HeaderType::Create));
         validate_invocation.element = Arc::new(el);
-        let mut expected = vec!["validate", "validate_create", "validate_create_cap_grant"];
+        let mut expected = vec!["validate", "validate_create"];
         for fn_component in validate_invocation.fn_components() {
             assert_eq!(fn_component, expected.pop().unwrap(),);
         }
@@ -274,7 +275,9 @@ mod test {
 
         assert_eq!(
             host_input,
-            ExternInput::new(SerializedBytes::try_from(&*validate_invocation.element).unwrap()),
+            ExternInput::new(
+                SerializedBytes::try_from(&ValidateData::from(validate_invocation)).unwrap()
+            ),
         );
     }
 }
