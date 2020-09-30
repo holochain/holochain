@@ -8,6 +8,7 @@ use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::dna::zome::{HostFnAccess, Permission};
 use holochain_zome_types::entry::Entry;
+use holochain_zome_types::entry_def::EntryDefId;
 use holochain_zome_types::validate::ValidateCallbackResult;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::ExternInput;
@@ -22,15 +23,9 @@ pub struct ValidateInvocation {
     // we can SerializedBytes off an Element reference
     // lifetimes on invocations are a pain
     pub element: Arc<Element>,
-}
-
-impl ValidateInvocation {
-    pub fn new(zomes_to_invoke: ZomesToInvoke, element: Element) -> Self {
-        Self {
-            zomes_to_invoke,
-            element: Arc::new(element),
-        }
-    }
+    /// The [EntryDefId] for the entry associated with
+    /// this element if there is one.
+    pub entry_def_id: Option<EntryDefId>,
 }
 
 #[derive(Clone, Constructor)]
@@ -71,7 +66,12 @@ impl Invocation for ValidateInvocation {
         }
         match self.element.entry().as_option() {
             Some(Entry::Agent(_)) => fns.push("agent".into()),
-            Some(Entry::App(_)) => fns.push("entry".into()),
+            Some(Entry::App(_)) => {
+                fns.push("entry".into());
+                if let Some(EntryDefId::App(entry_def_id)) = self.entry_def_id.clone() {
+                    fns.push(entry_def_id);
+                }
+            }
             Some(Entry::CapClaim(_)) => fns.push("cap_claim".into()),
             Some(Entry::CapGrant(_)) => fns.push("cap_grant".into()),
             _ => (),
