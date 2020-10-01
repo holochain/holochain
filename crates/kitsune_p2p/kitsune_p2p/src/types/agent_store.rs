@@ -61,7 +61,7 @@ pub struct AgentInfo {
     // The space this agent info is relevant to.
     space: KitsuneSpace,
     // The pub key of the agent id this info is relevant to.
-    id: KitsuneAgent,
+    agent: KitsuneAgent,
     // List of urls the agent can be reached at, in the agent's own preference order.
     urls: Urls,
     // The unix ms timestamp that the agent info was signed at, according to the agent's own clock.
