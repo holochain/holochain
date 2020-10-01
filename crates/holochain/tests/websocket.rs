@@ -395,7 +395,7 @@ async fn emit_signals() {
     let payload = InstallAppPayload {
         dnas: vec![dna_payload],
         app_id: "test".to_string(),
-        agent_key: agent_key.clone(),
+        agent_key: Some(agent_key.clone()),
     };
     let request = AdminRequest::InstallApp(Box::new(payload));
     let response = admin_tx.request(request);
