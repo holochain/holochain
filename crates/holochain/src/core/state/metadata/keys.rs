@@ -1,9 +1,22 @@
 use super::*;
+use holo_hash::HOLO_HASH_SERIALIZED_LEN;
+pub(super) use misc::*;
+
+mod misc;
+
 /// Some keys do not store an array of bytes
 /// so can not impl AsRef<[u8]>.
 /// This is the key type for those keys to impl into
 #[derive(
-    Ord, PartialOrd, Eq, PartialEq, derive_more::Into, derive_more::From, derive_more::AsRef,
+    Ord,
+    PartialOrd,
+    Eq,
+    PartialEq,
+    derive_more::Into,
+    derive_more::From,
+    derive_more::AsRef,
+    Clone,
+    Debug,
 )]
 #[as_ref(forward)]
 pub struct BytesKey(pub Vec<u8>);
@@ -59,33 +72,26 @@ pub enum SysMetaVal {
     DeleteLink(TimedHeaderHash),
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize, SerializedBytes)]
-/// Key for the misc metadata kv
-/// This holds miscellaneous data relevant
-/// to the metadata store
-pub(super) enum MiscMetaKey {
-    /// Collapsed status of an entry
-    EntryStatus(EntryHash),
-    /// We have integrated a StoreElement for this key
-    StoreElement(HeaderHash),
-}
-
-#[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
-/// Values for the misc kv
-/// Matches the key
-pub(super) enum MiscMetaValue {
-    /// Collapsed status of an entry
-    EntryStatus(EntryDhtStatus),
-    /// We have integrated a StoreElement for this key
-    StoreElement(()),
-}
-
+// #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 /// Subset of headers for the sys meta db
 pub(super) enum EntryHeader {
-    Activity(Header),
     NewEntry(Header),
     Update(Header),
     Delete(Header),
+}
+
+/// To allow partial matching of all chain items on
+/// an agents key, a chain sequence position and
+/// a specific header we use this enum in a similar way to
+/// the [LinkMetaKey]
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum ChainItemKey {
+    /// Match all headers on this agents key
+    Agent(AgentPubKey),
+    /// Match all headers on this agents key at this sequence number
+    AgentSequence(AgentPubKey, u32),
+    /// Match a specific header at this key / sequence number
+    Full(AgentPubKey, u32, HeaderHash),
 }
 
 impl LinkMetaVal {
@@ -128,10 +134,7 @@ impl BufKey for BytesKey {
 impl EntryHeader {
     pub(super) fn into_hash(self) -> Result<TimedHeaderHash, SerializedBytesError> {
         let header = match self {
-            EntryHeader::NewEntry(h)
-            | EntryHeader::Update(h)
-            | EntryHeader::Delete(h)
-            | EntryHeader::Activity(h) => h,
+            EntryHeader::NewEntry(h) | EntryHeader::Update(h) | EntryHeader::Delete(h) => h,
         };
         let (header, header_hash): (Header, HeaderHash) =
             HeaderHashed::from_content_sync(header).into();
@@ -149,19 +152,6 @@ impl<'a> LinkMetaKey<'a> {
         match self {
             Base(b) | BaseZome(b, _) | BaseZomeTag(b, _, _) | Full(b, _, _, _) => b,
         }
-    }
-}
-
-impl MiscMetaValue {
-    pub(super) fn entry_status(self) -> EntryDhtStatus {
-        match self {
-            MiscMetaValue::EntryStatus(e) => e,
-            _ => unreachable!("Tried to go from {:?} to {:?}", self, "entry_status"),
-        }
-    }
-
-    pub(super) fn new_store_element() -> Self {
-        Self::StoreElement(())
     }
 }
 
@@ -259,29 +249,6 @@ impl From<&LinkMetaKey<'_>> for WireLinkMetaKey {
     }
 }
 
-impl From<MiscMetaKey> for BytesKey {
-    fn from(k: MiscMetaKey) -> Self {
-        BytesKey::from(&k)
-    }
-}
-
-impl From<&MiscMetaKey> for BytesKey {
-    fn from(k: &MiscMetaKey) -> Self {
-        let r: Vec<u8> =
-            UnsafeBytes::from(SerializedBytes::try_from(k).expect("Type can't fail to serialize"))
-                .into();
-        r.into()
-    }
-}
-
-impl From<BytesKey> for MiscMetaKey {
-    fn from(k: BytesKey) -> Self {
-        SerializedBytes::from(UnsafeBytes::from(<Vec<u8>>::from(k)))
-            .try_into()
-            .expect("Database MiscMetaKey failed to serialize")
-    }
-}
-
 impl From<&[u8]> for BytesKey {
     fn from(b: &[u8]) -> Self {
         Self(b.to_owned())
@@ -289,15 +256,6 @@ impl From<&[u8]> for BytesKey {
 }
 
 impl IntoIterator for &LinkMetaKey<'_> {
-    type Item = u8;
-    type IntoIter = std::vec::IntoIter<Self::Item>;
-    fn into_iter(self) -> Self::IntoIter {
-        let b: BytesKey = self.into();
-        b.0.into_iter()
-    }
-}
-
-impl IntoIterator for &MiscMetaKey {
     type Item = u8;
     type IntoIter = std::vec::IntoIter<Self::Item>;
     fn into_iter(self) -> Self::IntoIter {
@@ -314,20 +272,6 @@ impl IntoIterator for LinkMetaKey<'_> {
     }
 }
 
-impl IntoIterator for MiscMetaKey {
-    type Item = u8;
-    type IntoIter = std::vec::IntoIter<Self::Item>;
-    fn into_iter(self) -> Self::IntoIter {
-        (&self).into_iter()
-    }
-}
-
-impl<T: PrefixType> From<MiscMetaKey> for PrefixBytesKey<T> {
-    fn from(k: MiscMetaKey) -> Self {
-        PrefixBytesKey::new(k)
-    }
-}
-
 impl<T: PrefixType> From<&LinkMetaKey<'_>> for PrefixBytesKey<T> {
     fn from(k: &LinkMetaKey) -> Self {
         PrefixBytesKey::new(k)
@@ -337,5 +281,81 @@ impl<T: PrefixType> From<&LinkMetaKey<'_>> for PrefixBytesKey<T> {
 impl<T: PrefixType> From<LinkMetaKey<'_>> for PrefixBytesKey<T> {
     fn from(k: LinkMetaKey) -> Self {
         (&k).into()
+    }
+}
+
+impl From<&Header> for ChainItemKey {
+    fn from(h: &Header) -> Self {
+        ChainItemKey::Full(
+            h.author().clone(),
+            h.header_seq(),
+            HeaderHash::with_data_sync(h),
+        )
+    }
+}
+
+impl From<ChainItemKey> for HeaderHash {
+    fn from(c: ChainItemKey) -> Self {
+        match c {
+            ChainItemKey::Full(_, _, h) => h,
+            _ => unreachable!("Tried to get header hash from a partial key: {:?}", c),
+        }
+    }
+}
+
+impl From<&ChainItemKey> for BytesKey {
+    fn from(key: &ChainItemKey) -> Self {
+        use byteorder::{NativeEndian, WriteBytesExt};
+        match key {
+            ChainItemKey::Agent(a) => a.as_ref().into(),
+            ChainItemKey::AgentSequence(a, s) => {
+                // Get the agent key
+                let mut buf = a.clone().into_inner();
+                let mut num = Vec::with_capacity(4);
+
+                // Get the header seq
+                num.write_u32::<NativeEndian>(*s).unwrap();
+                buf.extend(num);
+                buf.into()
+            }
+            ChainItemKey::Full(a, s, h) => {
+                // Get the agent key
+                let mut buf = a.clone().into_inner();
+                let mut num = Vec::with_capacity(4);
+
+                // Get the header seq
+                num.write_u32::<NativeEndian>(*s).unwrap();
+                buf.extend(num);
+
+                // Get the header hash
+                buf.extend(h.clone().into_inner());
+                buf.into()
+            }
+        }
+    }
+}
+
+// TODO: This is way to fragile there must be a better way
+// get from the k bytes to the chain item key
+impl From<BytesKey> for ChainItemKey {
+    fn from(b: BytesKey) -> Self {
+        use byteorder::{ByteOrder, NativeEndian};
+        let bytes = b.0;
+        const SEQ_SIZE: usize = std::mem::size_of::<u32>();
+        debug_assert_eq!(bytes.len(), HOLO_HASH_SERIALIZED_LEN * 2 + SEQ_SIZE);
+
+        // Tak 36 for the AgentPubKey
+        let a = AgentPubKey::from_raw_bytes(bytes[..HOLO_HASH_SERIALIZED_LEN].to_owned());
+
+        // Take another 4 for the u32
+        let seq_bytes: Vec<_> =
+            bytes[HOLO_HASH_SERIALIZED_LEN..(HOLO_HASH_SERIALIZED_LEN + SEQ_SIZE)].to_owned();
+        let s = NativeEndian::read_u32(&seq_bytes);
+
+        // Take the rest for the header hash
+        let h =
+            HeaderHash::from_raw_bytes(bytes[(HOLO_HASH_SERIALIZED_LEN + SEQ_SIZE)..].to_owned());
+
+        ChainItemKey::Full(a, s, h)
     }
 }

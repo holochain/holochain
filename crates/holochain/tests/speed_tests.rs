@@ -360,5 +360,9 @@ pub async fn setup_app(
 
     let handle = conductor_handle.clone();
 
-    (test_env, RealAppInterfaceApi::new(conductor_handle), handle)
+    (
+        test_env,
+        RealAppInterfaceApi::new(conductor_handle, "test-interface".into()),
+        handle,
+    )
 }

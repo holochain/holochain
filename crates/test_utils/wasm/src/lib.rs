@@ -18,6 +18,7 @@ pub enum TestWasm {
     Crud,
     Debug,
     EntryDefs,
+    EmitSignal,
     HashEntry,
     Foo,
     HashPath,
@@ -59,6 +60,7 @@ impl From<TestWasm> for ZomeName {
             TestWasm::Crud => "crud",
             TestWasm::Debug => "debug",
             TestWasm::EntryDefs => "entry_defs",
+            TestWasm::EmitSignal => "emit_signal",
             TestWasm::HashEntry => "hash_entry",
             TestWasm::Foo => "foo",
             TestWasm::HashPath => "hash_path",
@@ -109,6 +111,9 @@ impl From<TestWasm> for DnaWasm {
             TestWasm::Debug => get_code("wasm32-unknown-unknown/release/test_wasm_debug.wasm"),
             TestWasm::EntryDefs => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_entry_defs.wasm")
+            }
+            TestWasm::EmitSignal => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_emit_signal.wasm")
             }
             TestWasm::HashEntry => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_hash_entry.wasm")
