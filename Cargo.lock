@@ -1179,6 +1179,7 @@ dependencies = [
  "holochain_websocket",
  "holochain_zome_types",
  "human-panic",
+ "kitsune_p2p",
  "lazy_static",
  "maplit",
  "matches",
@@ -1210,7 +1211,7 @@ dependencies = [
  "tracing-futures",
  "unwrap_to",
  "url 1.7.2",
- "url2",
+ "url2 0.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "url_serde",
  "uuid 0.7.4",
 ]
@@ -1426,7 +1427,7 @@ dependencies = [
  "tracing",
  "tracing-futures",
  "tungstenite",
- "url2",
+ "url2 0.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -1609,9 +1610,12 @@ dependencies = [
  "futures",
  "ghost_actor",
  "kitsune_p2p_types",
+ "serde",
+ "serde_bytes",
  "shrinkwraprs",
  "thiserror",
  "tokio",
+ "url2 0.0.5",
 ]
 
 [[package]]
@@ -1658,7 +1662,7 @@ dependencies = [
  "once_cell",
  "thiserror",
  "tokio",
- "url2",
+ "url2 0.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -3718,6 +3722,13 @@ dependencies = [
  "idna 0.2.0",
  "matches",
  "percent-encoding 2.1.0",
+]
+
+[[package]]
+name = "url2"
+version = "0.0.5"
+dependencies = [
+ "url 2.1.1",
 ]
 
 [[package]]

@@ -9,20 +9,25 @@ use shrinkwraprs::Shrinkwrap;
 use std::sync::Arc;
 use tempdir::TempDir;
 
-/// Create an [TestEnvironment] of [EnvironmentKind::Cell], backed by a temp directory
+/// Create a [TestEnvironment] of [EnvironmentKind::Cell], backed by a temp directory.
 pub fn test_cell_env() -> TestEnvironment {
     let cell_id = fake_cell_id(1);
     test_env(EnvironmentKind::Cell(cell_id))
 }
 
-/// Create an [TestEnvironment] of [EnvironmentKind::Conductor], backed by a temp directory
+/// Create a [TestEnvironment] of [EnvironmentKind::Conductor], backed by a temp directory.
 pub fn test_conductor_env() -> TestEnvironment {
     test_env(EnvironmentKind::Conductor)
 }
 
-/// Create an [TestEnvironment] of [EnvironmentKind::Wasm], backed by a temp directory
+/// Create a [TestEnvironment] of [EnvironmentKind::Wasm], backed by a temp directory.
 pub fn test_wasm_env() -> TestEnvironment {
     test_env(EnvironmentKind::Wasm)
+}
+
+/// Create a [TestEnvironment] of [EnvironmentKind::P2P], backed by a temp directory.
+pub fn test_p2p_env() -> TestEnvironment {
+    test_env(EnvironmentKind::P2P)
 }
 
 /// Generate a test keystore pre-populated with a couple test keypairs.

@@ -30,6 +30,7 @@ pub mod interactive;
 #[allow(missing_docs)]
 pub mod interface;
 pub mod manager;
+pub mod p2p_store;
 pub mod paths;
 pub mod state;
 
