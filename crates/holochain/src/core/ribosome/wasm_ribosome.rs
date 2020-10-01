@@ -18,9 +18,9 @@ use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitResult;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
-use crate::core::ribosome::guest_callback::validate_link_add::ValidateCreateLinkHostAccess;
-use crate::core::ribosome::guest_callback::validate_link_add::ValidateCreateLinkInvocation;
-use crate::core::ribosome::guest_callback::validate_link_add::ValidateCreateLinkResult;
+use crate::core::ribosome::guest_callback::validate_link::ValidateLinkHostAccess;
+use crate::core::ribosome::guest_callback::validate_link::ValidateLinkInvocation;
+use crate::core::ribosome::guest_callback::validate_link::ValidateLinkResult;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 use crate::core::ribosome::guest_callback::CallIterator;
@@ -72,7 +72,7 @@ use holochain_zome_types::migrate_agent::MigrateAgentCallbackResult;
 use holochain_zome_types::post_commit::PostCommitCallbackResult;
 use holochain_zome_types::validate::ValidateCallbackResult;
 use holochain_zome_types::validate::ValidationPackageCallbackResult;
-use holochain_zome_types::validate_link_add::ValidateCreateLinkCallbackResult;
+use holochain_zome_types::validate_link::ValidateLinkCallbackResult;
 use holochain_zome_types::zome::FunctionName;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::CallbackResult;
@@ -458,12 +458,12 @@ impl RibosomeT for WasmRibosome {
         do_callback!(self, access, invocation, ValidateCallbackResult)
     }
 
-    fn run_validate_link_add(
+    fn run_validate_link<I: Invocation + 'static>(
         &self,
-        access: ValidateCreateLinkHostAccess,
-        invocation: ValidateCreateLinkInvocation,
-    ) -> RibosomeResult<ValidateCreateLinkResult> {
-        do_callback!(self, access, invocation, ValidateCreateLinkCallbackResult)
+        access: ValidateLinkHostAccess,
+        invocation: ValidateLinkInvocation<I>,
+    ) -> RibosomeResult<ValidateLinkResult> {
+        do_callback!(self, access, invocation, ValidateLinkCallbackResult)
     }
 
     fn run_init(

@@ -1,10 +1,10 @@
-use super::error::{WorkflowError, WorkflowResult};
-use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
-use crate::core::ribosome::guest_callback::validate::{ValidateHostAccess, ValidateResult};
-use crate::core::ribosome::guest_callback::validate_link_add::ValidateCreateLinkHostAccess;
-use crate::core::ribosome::guest_callback::validate_link_add::ValidateCreateLinkInvocation;
-use crate::core::ribosome::guest_callback::validate_link_add::ValidateCreateLinkResult;
+use super::{
+    app_validation_workflow,
+    error::{WorkflowError, WorkflowResult},
+};
+use crate::conductor::interface::SignalBroadcaster;
 use crate::core::ribosome::ZomeCallInvocation;
+use crate::core::ribosome::{error::RibosomeError, ZomesToInvoke};
 use crate::core::ribosome::{error::RibosomeResult, RibosomeT, ZomeCallHostAccess};
 use crate::core::state::source_chain::SourceChainError;
 use crate::core::state::workspace::Workspace;
@@ -16,10 +16,9 @@ use crate::core::{
     },
     sys_validate_element,
 };
-use crate::{conductor::interface::SignalBroadcaster, core::ribosome::error::RibosomeError};
 pub use call_zome_workspace_lock::CallZomeWorkspaceLock;
+use either::Either;
 use fallible_iterator::FallibleIterator;
-use holo_hash::AnyDhtHash;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
 use holochain_state::prelude::*;
@@ -156,62 +155,89 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT>(
     };
 
     {
-        let mut workspace = workspace_lock.write().await;
-        let mut cascade = workspace.cascade(network);
         for chain_element in to_app_validate {
-            // @todo have app validate in its own workflow
-            if let Header::CreateLink(link_add) = chain_element.header() {
-                let validate: ValidateCreateLinkResult = ribosome.run_validate_link_add(
-                    ValidateCreateLinkHostAccess,
-                    ValidateCreateLinkInvocation {
-                        zome_name: zome_name.clone(),
-                        base: Arc::new({
-                            let base_address: AnyDhtHash = link_add.base_address.clone().into();
-                            #[allow(clippy::eval_order_dependence)]
-                            cascade
-                                .dht_get(base_address.clone(), GetOptions.into())
-                                .await
-                                .map_err(RibosomeError::from)?
-                                .ok_or_else(|| RibosomeError::ElementDeps(base_address.clone()))?
-                                .entry()
-                                .as_option()
-                                .ok_or_else(|| RibosomeError::ElementDeps(base_address.clone()))?
-                                .to_owned()
-                        }),
-                        target: Arc::new({
-                            let target_address: AnyDhtHash = link_add.target_address.clone().into();
-                            #[allow(clippy::eval_order_dependence)]
-                            cascade
-                                .dht_get(target_address.clone(), GetOptions.into())
-                                .await
-                                .map_err(RibosomeError::from)?
-                                .ok_or_else(|| RibosomeError::ElementDeps(target_address.clone()))?
-                                .entry()
-                                .as_option()
-                                .ok_or_else(|| RibosomeError::ElementDeps(target_address.clone()))?
-                                .to_owned()
-                        }),
-                        link_add: Arc::new(link_add.to_owned()),
-                    },
-                )?;
-                match validate {
-                    ValidateCreateLinkResult::Valid => {}
-                    ValidateCreateLinkResult::Invalid(reason) => {
-                        return Err(SourceChainError::InvalidCreateLink(reason).into());
-                    }
+            let outcome = match chain_element.header() {
+                Header::Dna(_)
+                | Header::AgentValidationPkg(_)
+                | Header::OpenChain(_)
+                | Header::CloseChain(_)
+                | Header::InitZomesComplete(_) => {
+                    // These headers don't get validated
+                    continue;
                 }
-            }
+                Header::CreateLink(link_add) => {
+                    let (base, target) = {
+                        let mut workspace = workspace_lock.write().await;
+                        let mut cascade = workspace.cascade(network.clone());
+                        let base_address = &link_add.base_address;
+                        let base = cascade
+                            .retrieve_entry(base_address.clone(), GetOptions.into())
+                            .await
+                            .map_err(RibosomeError::from)?
+                            .ok_or_else(|| RibosomeError::ElementDeps(base_address.clone().into()))?
+                            .into_content();
+                        let base = Arc::new(base);
 
-            if let holochain_types::element::ElementEntry::Present(entry) = chain_element.entry() {
-                let validate: ValidateResult = ribosome.run_validate(
-                    ValidateHostAccess,
-                    ValidateInvocation {
-                        zome_name: zome_name.clone(),
-                        entry: Arc::new(entry.clone()),
-                    },
-                )?;
-                match validate {
-                    ValidateResult::Valid => {}
+                        let target_address = &link_add.target_address;
+                        let target = cascade
+                            .retrieve_entry(target_address.clone(), GetOptions.into())
+                            .await
+                            .map_err(RibosomeError::from)?
+                            .ok_or_else(|| {
+                                RibosomeError::ElementDeps(target_address.clone().into())
+                            })?
+                            .into_content();
+                        let target = Arc::new(target);
+                        (base, target)
+                    };
+                    let link_add = Arc::new(link_add.clone());
+                    Either::Left(
+                        app_validation_workflow::run_create_link_validation_callback(
+                            zome_name.clone(),
+                            link_add,
+                            base,
+                            target,
+                            &ribosome,
+                            workspace_lock.clone(),
+                            network.clone(),
+                        )?,
+                    )
+                }
+                Header::DeleteLink(delete_link) => Either::Left(
+                    app_validation_workflow::run_delete_link_validation_callback(
+                        zome_name.clone(),
+                        delete_link.clone(),
+                        &ribosome,
+                        workspace_lock.clone(),
+                        network.clone(),
+                    )?,
+                ),
+                Header::Create(_) | Header::Update(_) | Header::Delete(_) => {
+                    let element = Arc::new(chain_element);
+                    Either::Right(app_validation_workflow::run_validation_callback(
+                        ZomesToInvoke::One(zome_name.clone()),
+                        element,
+                        &ribosome,
+                        workspace_lock.clone(),
+                        network.clone(),
+                    )?)
+                }
+            };
+            match outcome {
+                Either::Left(outcome) => match outcome {
+                    app_validation_workflow::Outcome::Accepted => (),
+                    app_validation_workflow::Outcome::Rejected(reason) => {
+                        return Err(SourceChainError::InvalidLink(reason).into());
+                    }
+                    app_validation_workflow::Outcome::AwaitingDeps(hashes) => {
+                        return Err(SourceChainError::InvalidCommit(format!("{:?}", hashes)).into());
+                    }
+                },
+                Either::Right(outcome) => match outcome {
+                    app_validation_workflow::Outcome::Accepted => (),
+                    app_validation_workflow::Outcome::Rejected(reason) => {
+                        return Err(SourceChainError::InvalidCommit(reason).into());
+                    }
                     // when the wasm is being called directly in a zome invocation any
                     // state other than valid is not allowed for new entries
                     // e.g. we require that all dependencies are met when committing an
@@ -219,13 +245,10 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT>(
                     // this is different to the case where we are validating data coming in
                     // from the network where unmet dependencies would need to be
                     // rescheduled to attempt later due to partitions etc.
-                    ValidateResult::Invalid(reason) => {
-                        return Err(SourceChainError::InvalidCommit(reason).into());
-                    }
-                    ValidateResult::UnresolvedDependencies(hashes) => {
+                    app_validation_workflow::Outcome::AwaitingDeps(hashes) => {
                         return Err(SourceChainError::InvalidCommit(format!("{:?}", hashes)).into());
                     }
-                }
+                },
             }
         }
     }

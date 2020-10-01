@@ -22,9 +22,9 @@ use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitResult;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
-use crate::core::ribosome::guest_callback::validate_link_add::ValidateCreateLinkHostAccess;
-use crate::core::ribosome::guest_callback::validate_link_add::ValidateCreateLinkInvocation;
-use crate::core::ribosome::guest_callback::validate_link_add::ValidateCreateLinkResult;
+use crate::core::ribosome::guest_callback::validate_link::ValidateLinkHostAccess;
+use crate::core::ribosome::guest_callback::validate_link::ValidateLinkInvocation;
+use crate::core::ribosome::guest_callback::validate_link::ValidateLinkResult;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 use crate::core::ribosome::guest_callback::CallIterator;
@@ -87,7 +87,7 @@ impl CallContext {
 pub enum HostAccess {
     ZomeCall(ZomeCallHostAccess),
     Validate(ValidateHostAccess),
-    ValidateCreateLink(ValidateCreateLinkHostAccess),
+    ValidateCreateLink(ValidateLinkHostAccess),
     Init(InitHostAccess),
     EntryDefs(EntryDefsHostAccess),
     MigrateAgent(MigrateAgentHostAccess),
@@ -122,7 +122,9 @@ impl HostAccess {
             Self::Init(InitHostAccess{workspace, .. }) |
             Self::MigrateAgent(MigrateAgentHostAccess{workspace, .. }) |
             Self::ValidationPackage(ValidationPackageHostAccess{workspace, .. }) |
-            Self::PostCommit(PostCommitHostAccess{workspace, .. }) => {
+            Self::PostCommit(PostCommitHostAccess{workspace, .. }) |
+            Self::Validate(ValidateHostAccess { workspace, .. }) |
+            Self::ValidateCreateLink(ValidateLinkHostAccess { workspace, .. }) => {
                 workspace
             }
             _ => panic!("Gave access to a host function that uses the workspace without providing a workspace"),
@@ -146,7 +148,9 @@ impl HostAccess {
         match self {
             Self::ZomeCall(ZomeCallHostAccess { network, .. })
             | Self::Init(InitHostAccess { network, .. })
-            | Self::PostCommit(PostCommitHostAccess { network, .. }) => network,
+            | Self::PostCommit(PostCommitHostAccess { network, .. })
+            | Self::Validate(ValidateHostAccess { network, .. })
+            | Self::ValidateCreateLink(ValidateLinkHostAccess { network, .. }) => network,
             _ => panic!(
                 "Gave access to a host function that uses the network without providing a network"
             ),
@@ -207,6 +211,12 @@ impl From<Vec<String>> for FnComponents {
 pub enum ZomesToInvoke {
     All,
     One(ZomeName),
+}
+
+impl ZomesToInvoke {
+    pub fn one(zome_name: ZomeName) -> Self {
+        Self::One(zome_name)
+    }
 }
 
 pub trait Invocation: Clone {
@@ -464,11 +474,11 @@ pub trait RibosomeT: Sized + std::fmt::Debug {
         invocation: ValidateInvocation,
     ) -> RibosomeResult<ValidateResult>;
 
-    fn run_validate_link_add(
+    fn run_validate_link<I: Invocation + 'static>(
         &self,
-        access: ValidateCreateLinkHostAccess,
-        invocation: ValidateCreateLinkInvocation,
-    ) -> RibosomeResult<ValidateCreateLinkResult>;
+        access: ValidateLinkHostAccess,
+        invocation: ValidateLinkInvocation<I>,
+    ) -> RibosomeResult<ValidateLinkResult>;
 
     fn call_iterator<R: 'static + RibosomeT, I: 'static + Invocation>(
         &self,
