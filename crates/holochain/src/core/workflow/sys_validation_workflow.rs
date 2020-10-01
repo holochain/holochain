@@ -594,14 +594,30 @@ async fn register_add_link(
     let target_entry_address = &link_add.target_address;
 
     // Checks
-    check_and_hold_any_store_entry(
-        base_entry_address,
-        workspace,
-        network.clone(),
-        incoming_dht_ops_sender,
-        |_| Ok(()),
-    )
-    .await?;
+    // HACK: Because we write metadata to the cache and data to the vault
+    // for direct calls we can't find elements via EntryHash.
+    // This will be solved via adding an authored data store.
+    match &incoming_dht_ops_sender {
+        Some(_) => {
+            check_and_hold_any_store_entry(
+                base_entry_address,
+                workspace,
+                network.clone(),
+                incoming_dht_ops_sender,
+                |_| Ok(()),
+            )
+            .await?;
+        }
+        None => {
+            let mut cascade = workspace.full_cascade(network.clone());
+            cascade
+                .retrieve_entry(base_entry_address.clone(), Default::default())
+                .await?
+                .ok_or_else(|| {
+                    ValidationOutcome::DepMissingFromDht(base_entry_address.clone().into())
+                })?;
+        }
+    }
 
     let mut cascade = workspace.full_cascade(network);
     cascade
