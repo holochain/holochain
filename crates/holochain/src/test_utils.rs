@@ -1,10 +1,16 @@
-use crate::conductor::{
-    api::RealAppInterfaceApi,
-    config::{AdminInterfaceConfig, ConductorConfig, InterfaceDriver},
-    dna_store::MockDnaStore,
-    ConductorBuilder, ConductorHandle,
+//! Utils for Holochain tests
+
+use crate::{
+    conductor::{
+        api::RealAppInterfaceApi,
+        config::{AdminInterfaceConfig, ConductorConfig, InterfaceDriver},
+        dna_store::MockDnaStore,
+        ConductorBuilder, ConductorHandle,
+    },
+    core::workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace,
 };
 use ::fixt::prelude::*;
+use fallible_iterator::FallibleIterator;
 use holo_hash::fixt::*;
 use holo_hash::*;
 use holochain_keystore::KeystoreSender;
@@ -13,7 +19,11 @@ use holochain_p2p::{
     HolochainP2pCell, HolochainP2pRef, HolochainP2pSender,
 };
 use holochain_serialized_bytes::{SerializedBytes, UnsafeBytes};
-use holochain_state::test_utils::{test_conductor_env, test_wasm_env, TestEnvironment};
+use holochain_state::{
+    env::EnvironmentWrite,
+    fresh_reader_test,
+    test_utils::{test_conductor_env, test_wasm_env, TestEnvironment},
+};
 use holochain_types::{
     app::InstalledCell,
     element::{SignedHeaderHashed, SignedHeaderHashedExt},
@@ -23,7 +33,7 @@ use holochain_types::{
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::entry_def::EntryVisibility;
 use holochain_zome_types::header::{Create, EntryType, Header};
-use std::{convert::TryInto, sync::Arc};
+use std::{convert::TryInto, sync::Arc, time::Duration};
 use tempdir::TempDir;
 
 #[cfg(test)]
@@ -62,17 +72,27 @@ macro_rules! meta_mock {
         });
         metadata
     }};
-    ($fun:ident, $data:expr, $with_fn:expr) => {{
+    ($fun:ident, $data:expr, $match_fn:expr) => {{
         let mut metadata = $crate::core::state::metadata::MockMetadataBuf::new();
-        metadata.$fun().withf($with_fn).returning({
-            move |_| {
-                Ok(Box::new(fallible_iterator::convert(
-                    $data
-                        .clone()
-                        .into_iter()
-                        .map(holochain_types::metadata::TimedHeaderHash::from)
-                        .map(Ok),
-                )))
+        metadata.$fun().returning({
+            move |a| {
+                if $match_fn(a) {
+                    Ok(Box::new(fallible_iterator::convert(
+                        $data
+                            .clone()
+                            .into_iter()
+                            .map(holochain_types::metadata::TimedHeaderHash::from)
+                            .map(Ok),
+                    )))
+                } else {
+                    let mut data = $data.clone();
+                    data.clear();
+                    Ok(Box::new(fallible_iterator::convert(
+                        data.into_iter()
+                            .map(holochain_types::metadata::TimedHeaderHash::from)
+                            .map(Ok),
+                    )))
+                }
             }
         });
         metadata
@@ -121,6 +141,7 @@ pub async fn test_network(
     (network, recv, cell_network)
 }
 
+/// Do what's necessary to install an app
 pub async fn install_app(
     name: &str,
     cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
@@ -142,6 +163,7 @@ pub async fn install_app(
     assert!(errors.is_empty());
 }
 
+/// Payload for installing cells
 pub type InstalledCellsWithProofs = Vec<(InstalledCell, Option<SerializedBytes>)>;
 
 /// Setup an app for testing
@@ -174,15 +196,69 @@ pub async fn setup_app(
 
     let handle = conductor_handle.clone();
 
-    (tmpdir, RealAppInterfaceApi::new(conductor_handle), handle)
+    (
+        tmpdir,
+        RealAppInterfaceApi::new(conductor_handle, "test-interface".into()),
+        handle,
+    )
 }
 
+/// If HC_WASM_CACHE_PATH is set warm the cache
 pub fn warm_wasm_tests() {
-    // If HC_WASM_CACHE_PATH is set warm the cache
     if let Some(_path) = std::env::var_os("HC_WASM_CACHE_PATH") {
         let wasms: Vec<_> = TestWasm::iter().collect();
         crate::fixt::WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(wasms))
             .next()
             .unwrap();
+    }
+}
+/// Exit early if the expected number of ops
+/// have been integrated or wait for num_attempts * delay
+#[tracing::instrument(skip(env))]
+pub async fn wait_for_integration(
+    env: &EnvironmentWrite,
+    expected_count: usize,
+    num_attempts: usize,
+    delay: Duration,
+) {
+    for _ in 0..num_attempts {
+        let workspace = IncomingDhtOpsWorkspace::new(env.clone().into()).unwrap();
+
+        let val_limbo: Vec<_> = fresh_reader_test!(env, |r| {
+            workspace
+                .validation_limbo
+                .iter(&r)
+                .unwrap()
+                .map(|(_, v)| Ok(v))
+                .collect()
+                .unwrap()
+        });
+        tracing::debug!(?val_limbo);
+
+        let int_limbo: Vec<_> = fresh_reader_test!(env, |r| {
+            workspace
+                .integration_limbo
+                .iter(&r)
+                .unwrap()
+                .map(|(_, v)| Ok(v))
+                .collect()
+                .unwrap()
+        });
+        tracing::debug!(?int_limbo);
+
+        let count = fresh_reader_test!(env, |r| {
+            workspace
+                .integrated_dht_ops
+                .iter(&r)
+                .unwrap()
+                .count()
+                .unwrap()
+        });
+        if count == expected_count {
+            return;
+        } else {
+            tracing::debug!(?count);
+        }
+        tokio::time::delay_for(delay).await;
     }
 }

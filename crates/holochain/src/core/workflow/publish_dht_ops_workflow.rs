@@ -125,7 +125,7 @@ pub async fn publish_dht_ops_workflow_inner(
         let op = value.op.clone();
         workspace.authored().put(op_hash.clone(), value)?;
 
-        let op = match light_to_op(op, workspace.elements()).await {
+        let op = match light_to_op(op, workspace.elements()) {
             // Ignore StoreEntry ops on private
             Err(DhtOpConvertError::StoreEntryOnPrivate) => continue,
             r => r?,
@@ -190,7 +190,7 @@ mod tests {
     use holo_hash::fixt::*;
     use holochain_p2p::{
         actor::{HolochainP2p, HolochainP2pRefToCell, HolochainP2pSender},
-        spawn_holochain_p2p,
+        spawn_holochain_p2p, HolochainP2pRef,
     };
     use holochain_state::{
         buffer::BufferedStore,
@@ -324,7 +324,9 @@ mod tests {
 
         // Join some agents onto the network
         for agent in agents {
-            network.join(dna.clone(), agent).await.unwrap();
+            HolochainP2pRef::join(&network, dna.clone(), agent)
+                .await
+                .unwrap();
         }
 
         (network, cell_network, recv_task, rx_complete)
@@ -626,7 +628,7 @@ mod tests {
                     map.insert(op_hash, (expected_op, store_element_count.clone()));
 
                     let expected_op =
-                        DhtOp::RegisterUpdatedBy(sig.clone(), entry_update_header.clone());
+                        DhtOp::RegisterUpdatedBy(sig.clone(), entry_update_header.clone(), None);
                     let op_hash = DhtOpHashed::from_content_sync(expected_op.clone()).into_hash();
 
                     map.insert(op_hash, (expected_op, register_replaced_by_count.clone()));
@@ -710,7 +712,9 @@ mod tests {
 
                 // Join some agents onto the network
                 for agent in agents {
-                    network.join(dna.clone(), agent).await.unwrap();
+                    HolochainP2pRef::join(&network, dna.clone(), agent)
+                        .await
+                        .unwrap()
                 }
 
                 call_workflow(env.clone().into(), cell_network).await;

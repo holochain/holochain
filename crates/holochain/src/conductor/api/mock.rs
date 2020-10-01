@@ -2,7 +2,10 @@
 #![allow(clippy::ptr_arg)]
 
 use super::CellConductorApiT;
-use crate::conductor::{api::error::ConductorApiResult, entry_def_store::EntryDefBufferKey};
+use crate::conductor::{
+    api::error::ConductorApiResult, entry_def_store::EntryDefBufferKey,
+    interface::SignalBroadcaster,
+};
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::workflow::ZomeCallInvocationResult;
 use async_trait::async_trait;
@@ -17,6 +20,7 @@ use mockall::mock;
 // The mock! expansion here creates mocks on a non-async version of the API, and then the actual trait is implemented
 // by delegating each async trait method to its sync counterpart
 // See https://github.com/asomers/mockall/issues/75
+// TODO: try automock again
 mock! {
 
     pub CellConductorApi {
@@ -32,6 +36,7 @@ mock! {
         fn sync_dpki_request(&self, method: String, args: String) -> ConductorApiResult<String>;
 
         fn mock_keystore(&self) -> &KeystoreSender;
+        fn mock_signal_broadcaster(&self) -> SignalBroadcaster;
         fn sync_get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile>;
         fn sync_get_this_dna(&self) -> Option<DnaFile>;
         fn sync_get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef>;
@@ -67,6 +72,11 @@ impl CellConductorApiT for MockCellConductorApi {
     fn keystore(&self) -> &KeystoreSender {
         self.mock_keystore()
     }
+
+    async fn signal_broadcaster(&self) -> SignalBroadcaster {
+        self.mock_signal_broadcaster()
+    }
+
     async fn get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile> {
         self.sync_get_dna(dna_hash)
     }

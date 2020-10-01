@@ -8,6 +8,7 @@ members = [
     "crd",
     "crud",
     "debug",
+    "emit_signal",
     "entry_defs",
     "hash_entry",
     "foo",
