@@ -22,8 +22,8 @@ use holochain_state::{
 };
 use holochain_types::{cell::CellId, dna::DnaFile, element::Element, Entry};
 use holochain_zome_types::{
+    element::SignedHeaderHashed,
     entry_def,
-    header::*,
     link::{Link, LinkTag},
     metadata::Details,
     zome::ZomeName,
@@ -391,7 +391,7 @@ pub async fn get_link_details<'env>(
     base: EntryHash,
     tag: LinkTag,
     options: GetLinksOptions,
-) -> Vec<(CreateLink, Vec<DeleteLink>)> {
+) -> Vec<(SignedHeaderHashed, Vec<SignedHeaderHashed>)> {
     let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
 
     let mut cascade = workspace.cascade(call_data.network);

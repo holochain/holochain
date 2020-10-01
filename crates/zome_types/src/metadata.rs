@@ -1,9 +1,5 @@
 //! Metadata types for use in wasm
-use crate::{
-    element::Element,
-    header::{Delete, Update},
-    Entry, Header,
-};
+use crate::{element::Element, element::SignedHeaderHashed, Entry};
 use holochain_serialized_bytes::prelude::*;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, SerializedBytes)]
@@ -26,7 +22,7 @@ pub struct ElementDetails {
     /// Either a Create or an Update.
     pub element: Element,
     /// Any Delete on this element.
-    pub deletes: Vec<Delete>,
+    pub deletes: Vec<SignedHeaderHashed>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, SerializedBytes)]
@@ -36,14 +32,14 @@ pub struct EntryDetails {
     pub entry: Entry,
     /// Create relationships.
     /// These can only be Create or Update headers
-    pub headers: Vec<Header>,
+    pub headers: Vec<SignedHeaderHashed>,
     /// Delete relationships
-    pub deletes: Vec<Delete>,
+    pub deletes: Vec<SignedHeaderHashed>,
     /// Update relationships.
     /// ## Warning
     /// This is just the relationship and you will need call get
     /// if you want to get the new Entry.
-    pub updates: Vec<Update>,
+    pub updates: Vec<SignedHeaderHashed>,
     /// The status of this entry currently
     /// according to your view of the metadata
     pub entry_dht_status: EntryDhtStatus,
