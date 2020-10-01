@@ -1157,6 +1157,7 @@ dependencies = [
  "assert_cmd",
  "async-trait",
  "base64 0.10.1",
+ "byteorder",
  "cfg-if",
  "chrono",
  "criterion",

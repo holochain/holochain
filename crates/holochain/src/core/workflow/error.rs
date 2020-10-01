@@ -1,7 +1,10 @@
 // Error types are self-explanatory
 #![allow(missing_docs)]
 
-use super::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
+use super::{
+    app_validation_workflow::AppValidationError,
+    produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError,
+};
 use crate::{
     conductor::{api::error::ConductorApiError, CellError},
     core::{
@@ -20,6 +23,9 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum WorkflowError {
+    #[error(transparent)]
+    AppValidationError(#[from] AppValidationError),
+
     #[error("Agent is invalid: {0:?}")]
     AgentInvalid(AgentPubKey),
 
