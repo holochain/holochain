@@ -89,18 +89,18 @@ mod tests {
         })
         .unwrap();
 
-        let ret = &store_buf.as_store_ref().get(
-            &env.reader().unwrap(),
-            &agent_info_signed
-                .as_agent_info_ref()
-                .as_id_ref()
-                .to_owned()
-                .into()
-        ).unwrap();
+        let ret = &store_buf
+            .as_store_ref()
+            .get(
+                &env.reader().unwrap(),
+                &agent_info_signed
+                    .as_agent_info_ref()
+                    .as_id_ref()
+                    .to_owned()
+                    .into(),
+            )
+            .unwrap();
 
-        assert_eq!(
-            ret,
-            &Some(agent_info_signed),
-        );
+        assert_eq!(ret, &Some(agent_info_signed),);
     }
 }
