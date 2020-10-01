@@ -1,7 +1,12 @@
 use super::{
     app_validation_workflow, error::WorkflowResult, sys_validation_workflow::sys_validate_element,
 };
+use crate::conductor::api::CellConductorApiT;
+use crate::conductor::interface::SignalBroadcaster;
+use crate::core::ribosome::ZomeCallInvocation;
+use crate::core::ribosome::{error::RibosomeError, ZomesToInvoke};
 use crate::core::ribosome::{error::RibosomeResult, RibosomeT, ZomeCallHostAccess};
+use crate::core::state::metadata::MetadataBufT;
 use crate::core::state::source_chain::SourceChainError;
 use crate::core::state::workspace::Workspace;
 use crate::core::{
@@ -11,11 +16,6 @@ use crate::core::{
         source_chain::SourceChain, workspace::WorkspaceResult,
     },
 };
-use crate::core::{
-    ribosome::{error::RibosomeError, ZomesToInvoke},
-    state::metadata::MetadataBufT,
-};
-use crate::{conductor::api::CellConductorApiT, core::ribosome::ZomeCallInvocation};
 pub use call_zome_workspace_lock::CallZomeWorkspaceLock;
 use either::Either;
 use holochain_keystore::KeystoreSender;
@@ -38,38 +38,24 @@ mod validation_test;
 pub type ZomeCallInvocationResult = RibosomeResult<ZomeCallResponse>;
 
 #[derive(Debug)]
-pub struct CallZomeWorkflowArgs<Ribosome: RibosomeT> {
+pub struct CallZomeWorkflowArgs<Ribosome: RibosomeT, C: CellConductorApiT> {
     pub ribosome: Ribosome,
     pub invocation: ZomeCallInvocation,
+    pub signal_tx: SignalBroadcaster,
+    pub conductor_api: C,
 }
 
-#[instrument(skip(
-    workspace,
-    network,
-    keystore,
-    writer,
-    args,
-    conductor_api,
-    trigger_produce_dht_ops
-))]
-pub async fn call_zome_workflow<'env, Ribosome: RibosomeT>(
+#[instrument(skip(workspace, network, keystore, writer, args, trigger_produce_dht_ops))]
+pub async fn call_zome_workflow<'env, Ribosome: RibosomeT, C: CellConductorApiT>(
     workspace: CallZomeWorkspace,
     network: HolochainP2pCell,
     keystore: KeystoreSender,
     writer: OneshotWriter,
-    conductor_api: impl CellConductorApiT,
-    args: CallZomeWorkflowArgs<Ribosome>,
+    args: CallZomeWorkflowArgs<Ribosome, C>,
     mut trigger_produce_dht_ops: TriggerSender,
 ) -> WorkflowResult<ZomeCallInvocationResult> {
     let workspace_lock = CallZomeWorkspaceLock::new(workspace);
-    let result = call_zome_workflow_inner(
-        workspace_lock.clone(),
-        network,
-        keystore,
-        conductor_api,
-        args,
-    )
-    .await?;
+    let result = call_zome_workflow_inner(workspace_lock.clone(), network, keystore, args).await?;
 
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
@@ -85,16 +71,17 @@ pub async fn call_zome_workflow<'env, Ribosome: RibosomeT>(
     Ok(result)
 }
 
-async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT>(
+async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT, C: CellConductorApiT>(
     workspace_lock: CallZomeWorkspaceLock,
     network: HolochainP2pCell,
     keystore: KeystoreSender,
-    conductor_api: impl CellConductorApiT,
-    args: CallZomeWorkflowArgs<Ribosome>,
+    args: CallZomeWorkflowArgs<Ribosome, C>,
 ) -> WorkflowResult<ZomeCallInvocationResult> {
     let CallZomeWorkflowArgs {
         ribosome,
         invocation,
+        signal_tx,
+        conductor_api,
     } = args;
 
     let zome_name = invocation.zome_name.clone();
@@ -105,8 +92,13 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT>(
     tracing::trace!(line = line!());
     // Create the unsafe sourcechain for use with wasm closure
     let result = {
-        let host_access =
-            ZomeCallHostAccess::new(workspace_lock.clone(), keystore, network.clone());
+        let host_access = ZomeCallHostAccess::new(
+            workspace_lock.clone(),
+            keystore,
+            network.clone(),
+            signal_tx,
+            invocation.cell_id.clone(),
+        );
         ribosome.call_zome_function(host_access, invocation)
     };
     tracing::trace!(line = line!());
@@ -329,8 +321,10 @@ pub mod tests {
         let args = CallZomeWorkflowArgs {
             invocation,
             ribosome,
+            signal_tx: SignalBroadcaster::noop(),
+            conductor_api,
         };
-        call_zome_workflow_inner(workspace.into(), network, keystore, conductor_api, args).await
+        call_zome_workflow_inner(workspace.into(), network, keystore, args).await
     }
 
     // 1.  Check if there is a Capability token secret in the parameters.

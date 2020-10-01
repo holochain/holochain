@@ -4,7 +4,7 @@
 //! Elements can be added. A constructed Cell is guaranteed to have a valid
 //! SourceChain which has already undergone Genesis.
 
-use super::manager::ManagedTaskAdd;
+use super::{interface::SignalBroadcaster, manager::ManagedTaskAdd};
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::api::CellConductorApiT;
 use crate::conductor::handle::ConductorHandle;
@@ -206,6 +206,10 @@ impl Cell {
     /// Access a network sender that is partially applied to this cell's DnaHash/AgentPubKey
     pub fn holochain_p2p_cell(&self) -> &holochain_p2p::HolochainP2pCell {
         &self.holochain_p2p_cell
+    }
+
+    async fn signal_broadcaster(&self) -> SignalBroadcaster {
+        self.conductor_api.signal_broadcaster().await
     }
 
     #[instrument(skip(self, evt))]
@@ -658,17 +662,20 @@ impl Cell {
         let keystore = arc.keystore().clone();
         let workspace = CallZomeWorkspace::new(arc.clone().into())?;
         let conductor_api = self.conductor_api.clone();
+        let signal_tx = self.signal_broadcaster().await;
+        let ribosome = self.get_ribosome().await?;
 
         let args = CallZomeWorkflowArgs {
-            ribosome: self.get_ribosome().await?,
+            ribosome,
             invocation,
+            conductor_api,
+            signal_tx,
         };
         Ok(call_zome_workflow(
             workspace,
             self.holochain_p2p_cell.clone(),
             keystore,
             arc.clone().into(),
-            conductor_api,
             args,
             self.queue_triggers.produce_dht_ops.clone(),
         )

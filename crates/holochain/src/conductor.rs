@@ -27,7 +27,6 @@ pub mod entry_def_store;
 pub mod error;
 pub mod handle;
 pub mod interactive;
-#[allow(missing_docs)]
 pub mod interface;
 pub mod manager;
 pub mod paths;
