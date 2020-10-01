@@ -26,6 +26,7 @@ members = [
     "ser_regression",
     "sign",
     "sys_time",
+    "update_entry",
     "validate",
     "validate_invalid",
     "validate_link",

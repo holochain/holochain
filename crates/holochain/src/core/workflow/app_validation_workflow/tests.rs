@@ -8,21 +8,21 @@ use crate::{
         workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace,
     },
     test_utils::host_fn_api::*,
+    test_utils::new_invocation,
     test_utils::setup_app,
     test_utils::wait_for_integration,
 };
-use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
 use holo_hash::{AnyDhtHash, DhtOpHash, EntryHash, HeaderHash};
-use holochain_serialized_bytes::{SerializedBytes, SerializedBytesError};
+use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::{env::EnvironmentWrite, fresh_reader_test};
 use holochain_types::{
-    app::InstalledCell, cell::CellId, dht_op::DhtOpLight, dna::DnaDef, dna::DnaFile, fixt::*,
+    app::InstalledCell, cell::CellId, dht_op::DhtOpLight, dna::DnaDef, dna::DnaFile,
     test_utils::fake_agent_pubkey_1, test_utils::fake_agent_pubkey_2, validate::ValidationStatus,
     Entry,
 };
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::{element::Element, zome::ZomeName, ExternInput, Header};
+use holochain_zome_types::{element::Element, Header};
 use std::{
     convert::{TryFrom, TryInto},
     time::Duration,
@@ -362,25 +362,6 @@ async fn run_test(
         }
         assert_eq!(int.len(), expected_count);
     }
-}
-
-fn new_invocation<P, Z: Into<ZomeName>>(
-    cell_id: &CellId,
-    func: &str,
-    payload: P,
-    zome_name: Z,
-) -> Result<ZomeCallInvocation, SerializedBytesError>
-where
-    P: TryInto<SerializedBytes, Error = SerializedBytesError>,
-{
-    Ok(ZomeCallInvocation {
-        cell_id: cell_id.clone(),
-        zome_name: zome_name.into(),
-        cap: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
-        fn_name: func.into(),
-        payload: ExternInput::new(payload.try_into()?),
-        provenance: cell_id.agent_pubkey().clone(),
-    })
 }
 
 // Need to "hack holochain" because otherwise the invalid

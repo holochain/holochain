@@ -5,6 +5,7 @@ use crate::{
         dna_store::MockDnaStore,
         ConductorBuilder, ConductorHandle,
     },
+    core::ribosome::ZomeCallInvocation,
     core::workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace,
 };
 use ::fixt::prelude::*;
@@ -16,7 +17,7 @@ use holochain_p2p::{
     actor::HolochainP2pRefToCell, event::HolochainP2pEventReceiver, spawn_holochain_p2p,
     HolochainP2pCell, HolochainP2pRef, HolochainP2pSender,
 };
-use holochain_serialized_bytes::{SerializedBytes, UnsafeBytes};
+use holochain_serialized_bytes::{SerializedBytes, SerializedBytesError, UnsafeBytes};
 use holochain_state::{
     env::EnvironmentWrite,
     fresh_reader_test,
@@ -24,13 +25,18 @@ use holochain_state::{
 };
 use holochain_types::{
     app::InstalledCell,
+    cell::CellId,
     element::{SignedHeaderHashed, SignedHeaderHashedExt},
+    fixt::CapSecretFixturator,
     test_utils::fake_header_hash,
     Entry, EntryHashed, HeaderHashed, Timestamp,
 };
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::entry_def::EntryVisibility;
-use holochain_zome_types::header::{Create, EntryType, Header};
+use holochain_zome_types::{entry_def::EntryVisibility, zome::ZomeName};
+use holochain_zome_types::{
+    header::{Create, EntryType, Header},
+    ExternInput,
+};
 use std::{convert::TryInto, sync::Arc, time::Duration};
 use tempdir::TempDir;
 
@@ -253,4 +259,24 @@ pub async fn wait_for_integration(
         }
         tokio::time::delay_for(delay).await;
     }
+}
+
+/// Helper to create a zome invocation for tests
+pub fn new_invocation<P, Z: Into<ZomeName>>(
+    cell_id: &CellId,
+    func: &str,
+    payload: P,
+    zome_name: Z,
+) -> Result<ZomeCallInvocation, SerializedBytesError>
+where
+    P: TryInto<SerializedBytes, Error = SerializedBytesError>,
+{
+    Ok(ZomeCallInvocation {
+        cell_id: cell_id.clone(),
+        zome_name: zome_name.into(),
+        cap: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
+        fn_name: func.into(),
+        payload: ExternInput::new(payload.try_into()?),
+        provenance: cell_id.agent_pubkey().clone(),
+    })
 }

@@ -710,6 +710,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_wasm_update_entry"
+version = "0.0.1"
+dependencies = [
+ "hdk3",
+ "serde",
+ "test_wasm_common",
+]
+
+[[package]]
 name = "test_wasm_validate"
 version = "0.0.1"
 dependencies = [
