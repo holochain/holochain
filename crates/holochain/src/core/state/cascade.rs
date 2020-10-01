@@ -517,7 +517,9 @@ where
                     .meta
                     .get_headers(&r, hash.clone())?
                     .collect::<Vec<_>>()?;
-                let headers = self.render_headers(headers, |_| true)?;
+                let headers = self.render_headers(headers, |h| {
+                    h == HeaderType::Update || h == HeaderType::Create
+                })?;
                 let deletes = cache_data
                     .meta
                     .get_deletes_on_entry(&r, hash.clone())?

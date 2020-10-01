@@ -30,15 +30,28 @@ pub struct ElementDetails {
 pub struct EntryDetails {
     /// The data
     pub entry: Entry,
-    /// Create relationships.
-    /// These can only be Create or Update headers
+    /// ## Create relationships.
+    /// These are the headers that created this entry.
+    /// They can be either a [Create] or an [Update] header
+    /// where the `entry_hash` field is the hash of
+    /// the above entry.
+    ///
+    /// You can make an [Element] from any of these
+    /// and the entry.
     pub headers: Vec<SignedHeaderHashed>,
-    /// Delete relationships
+    /// ## Delete relationships
+    /// These are the deletes that have the
+    /// `deletes_entry_address` set to the above Entry.
     pub deletes: Vec<SignedHeaderHashed>,
-    /// Update relationships.
-    /// ## Warning
+    /// ## Update relationships.
+    /// These are the updates that have the
+    /// `original_entry_address` set to the above Entry.
+    /// ### Notes
     /// This is just the relationship and you will need call get
-    /// if you want to get the new Entry.
+    /// if you want to get the new Entry (the entry on the `entry_hash` field).
+    ///
+    /// You **cannot** make an [Element] from these headers
+    /// and the above entry.
     pub updates: Vec<SignedHeaderHashed>,
     /// The status of this entry currently
     /// according to your view of the metadata
