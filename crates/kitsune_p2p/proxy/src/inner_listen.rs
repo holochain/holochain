@@ -226,20 +226,25 @@ impl InternalHandler for InnerListen {
         write: TransportChannelWrite,
         read: TransportChannelRead,
     ) -> InternalHandlerResult<()> {
+        let short = self.this_url.short().to_string();
+        tracing::debug!("{}: proxy, incoming channel: {}", short, base_url);
         let mut write = wire_write::wrap_wire_write(write);
         let mut read = wire_read::wrap_wire_read(read);
         let i_s = self.i_s.clone();
         Ok(async move {
             match read.next().await {
                 Some(ProxyWire::ReqProxy(ReqProxy(cert_digest))) => {
+                    tracing::debug!("{}: req proxy: {:?}", short, cert_digest);
                     i_s.incoming_req_proxy(base_url, cert_digest, write, read)
                         .await?;
                 }
                 Some(ProxyWire::ChanNew(ChanNew(proxy_url))) => {
+                    tracing::debug!("{}: chan new: {:?}", short, proxy_url);
                     i_s.incoming_chan_new(base_url, proxy_url.into(), write, read)
                         .await?;
                 }
                 e => {
+                    tracing::error!("{}: invalid message {:?}", short, e);
                     write
                         .send(ProxyWire::failure(format!("invalid message {:?}", e)))
                         .await
@@ -279,7 +284,7 @@ impl InternalHandler for InnerListen {
         mut write: futures::channel::mpsc::Sender<ProxyWire>,
         read: futures::channel::mpsc::Receiver<ProxyWire>,
     ) -> InternalHandlerResult<()> {
-        if dest_proxy_url == self.this_url {
+        if dest_proxy_url.as_base() == self.this_url.as_base() {
             // Hey! They're trying to talk to us!
             // Let's connect them to our owner.
             tls_srv::spawn_tls_server(
@@ -467,9 +472,15 @@ mod tests {
         let addr = bind.bound_url().await?;
         tracing::warn!("got bind: {}", addr);
 
-        let (bind, _evt) = spawn_kitsune_proxy_listener(proxy_config, bind, evt).await?;
+        let (bind, mut evt) = spawn_kitsune_proxy_listener(proxy_config, bind, evt).await?;
         let addr = bind.bound_url().await?;
         tracing::warn!("got proxy: {}", addr);
+
+        tokio::task::spawn(async move {
+            while let Some((url, _write, _read)) = evt.next().await {
+                tracing::warn!("Incoming PROXY: {}", url);
+            }
+        });
 
         Ok(bind)
     }
