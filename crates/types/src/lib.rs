@@ -15,16 +15,12 @@ pub mod entry;
 pub mod fixt;
 pub mod header;
 pub mod link;
+mod macros;
 pub mod metadata;
 pub mod prelude;
 pub mod timestamp;
-pub mod validate;
-
-/// Placeholders to allow other things to compile
-#[allow(missing_docs)]
-pub mod shims;
-
 pub mod universal_map;
+pub mod validate;
 
 // #[cfg(test)]
 pub mod test_utils;

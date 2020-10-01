@@ -1,4 +1,4 @@
-use super::{InterfaceApi, RealAppInterfaceApi};
+use super::InterfaceApi;
 use crate::conductor::api::error::{
     ConductorApiError, ConductorApiResult, ExternalApiWireError, SerializationError,
 };
@@ -50,19 +50,11 @@ pub trait AdminInterfaceApi: 'static + Send + Sync + Clone {
 pub struct RealAdminInterfaceApi {
     /// Mutable access to the Conductor
     conductor_handle: ConductorHandle,
-
-    /// Needed to spawn an App interface
-    // TODO: is this needed? it's not currently being used.
-    app_api: RealAppInterfaceApi,
 }
 
 impl RealAdminInterfaceApi {
     pub(crate) fn new(conductor_handle: ConductorHandle) -> Self {
-        let app_api = RealAppInterfaceApi::new(conductor_handle.clone());
-        RealAdminInterfaceApi {
-            conductor_handle,
-            app_api,
-        }
+        RealAdminInterfaceApi { conductor_handle }
     }
 }
 
