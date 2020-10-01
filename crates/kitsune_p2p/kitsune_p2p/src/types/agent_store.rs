@@ -114,7 +114,7 @@ impl AgentInfo {
         self.as_ref()
     }
 
-    /// Thin AsRef wrapper for signed_at_ms.
+    /// Accessor for signed_at_ms.
     pub fn signed_at_ms(&self) -> u64 {
         self.signed_at_ms
     }
