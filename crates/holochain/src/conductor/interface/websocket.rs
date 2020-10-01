@@ -1,3 +1,6 @@
+//! Module for establishing Websocket-based Interfaces,
+//! i.e. those configured with `InterfaceDriver::Websocket`
+
 use super::error::{InterfaceError, InterfaceResult};
 use crate::conductor::{
     conductor::StopReceiver,
@@ -22,10 +25,9 @@ use url2::url2;
 // TODO: This is arbitrary, choose reasonable size.
 /// Number of signals in buffer before applying
 /// back pressure.
-pub(crate) const SIGNAL_BUFFER_SIZE: usize = 5;
+pub(crate) const SIGNAL_BUFFER_SIZE: usize = 50;
 
-/// Create an Admin Interface, which only receives AdminRequest messages
-/// from the external client
+/// Create a WebsocketListener to be used in interfaces
 pub async fn spawn_websocket_listener(port: u16) -> InterfaceResult<WebsocketListener> {
     trace!("Initializing Admin interface");
     let listener = websocket_bind(
@@ -37,6 +39,8 @@ pub async fn spawn_websocket_listener(port: u16) -> InterfaceResult<WebsocketLis
     Ok(listener)
 }
 
+/// Create an Admin Interface, which only receives AdminRequest messages
+/// from the external client
 pub fn spawn_admin_interface_task<A: InterfaceApi>(
     mut listener: WebsocketListener,
     api: A,
@@ -53,11 +57,11 @@ pub fn spawn_admin_interface_task<A: InterfaceApi>(
                 // establish a new connection to a client
                 maybe_con = listener.next() => if let Some(connection) = maybe_con {
                     match connection {
-                        Ok((send_socket, recv_socket)) => {
-                            send_sockets.push(send_socket);
+                        Ok((tx_to_iface, rx_from_iface)) => {
+                            send_sockets.push(tx_to_iface);
                             listener_handles.push(tokio::task::spawn(recv_incoming_admin_msgs(
                                 api.clone(),
-                                recv_socket,
+                                rx_from_iface,
                             )));
                         }
                         Err(err) => {
@@ -75,10 +79,10 @@ pub fn spawn_admin_interface_task<A: InterfaceApi>(
         // TODO: TK-01261: drop listener, make sure all these tasks finish!
         drop(listener);
 
-        // TODO: TK-01261: Make send_socket close tell the recv socket to close locally in the websocket code
-        for mut send_socket in send_sockets {
+        // TODO: TK-01261: Make tx_to_iface close tell the recv socket to close locally in the websocket code
+        for mut tx_to_iface in send_sockets {
             // TODO: TK-01261: change from u16 code to enum
-            send_socket.close(1000, "Shutting down".into()).await?;
+            WebsocketSender::close(&mut tx_to_iface, 1000, "Shutting down".into()).await?;
         }
 
         // These SHOULD end soon after we get here, or by the time we get here.
@@ -116,13 +120,13 @@ pub async fn spawn_app_interface_task<A: InterfaceApi>(
         let mut listener_handles = Vec::new();
 
         let mut handle_connection =
-            |send_socket: WebsocketSender, recv_socket: WebsocketReceiver| {
-                let signal_rx = signal_broadcaster.subscribe();
+            |tx_to_iface: WebsocketSender, rx_from_iface: WebsocketReceiver| {
+                let rx_from_cell = signal_broadcaster.subscribe();
                 listener_handles.push(tokio::task::spawn(recv_incoming_msgs_and_outgoing_signals(
                     api.clone(),
-                    recv_socket,
-                    signal_rx,
-                    send_socket,
+                    rx_from_iface,
+                    rx_from_cell,
+                    tx_to_iface,
                 )));
             };
 
@@ -134,8 +138,8 @@ pub async fn spawn_app_interface_task<A: InterfaceApi>(
                 // establish a new connection to a client
                 maybe_con = listener.next() => if let Some(connection) = maybe_con {
                     match connection {
-                        Ok((send_socket, recv_socket)) => {
-                            handle_connection(send_socket, recv_socket);
+                        Ok((tx_to_iface, rx_from_iface)) => {
+                            handle_connection(tx_to_iface, rx_from_iface);
                         }
                         Err(err) => {
                             warn!("Admin socket connection failed: {}", err);
@@ -165,8 +169,8 @@ async fn handle_shutdown(listener_handles: Vec<JoinHandle<InterfaceResult<()>>>)
 
 /// Polls for messages coming in from the external client.
 /// Used by Admin interface.
-async fn recv_incoming_admin_msgs<A: InterfaceApi>(api: A, mut recv_socket: WebsocketReceiver) {
-    while let Some(msg) = recv_socket.next().await {
+async fn recv_incoming_admin_msgs<A: InterfaceApi>(api: A, mut rx_from_iface: WebsocketReceiver) {
+    while let Some(msg) = rx_from_iface.next().await {
         match handle_incoming_message(msg, api.clone()).await {
             Err(InterfaceError::Closed) => break,
             Err(e) => error!(error = &e as &dyn std::error::Error),
@@ -180,22 +184,24 @@ async fn recv_incoming_admin_msgs<A: InterfaceApi>(api: A, mut recv_socket: Webs
 /// App interface.
 async fn recv_incoming_msgs_and_outgoing_signals<A: InterfaceApi>(
     api: A,
-    mut recv_socket: WebsocketReceiver,
-    mut signal_rx: broadcast::Receiver<Signal>,
-    mut signal_tx: WebsocketSender,
+    mut rx_from_iface: WebsocketReceiver,
+    mut rx_from_cell: broadcast::Receiver<Signal>,
+    mut tx_to_iface: WebsocketSender,
 ) -> InterfaceResult<()> {
-    trace!("CONNECTION: {}", recv_socket.remote_addr());
+    trace!("CONNECTION: {}", rx_from_iface.remote_addr());
 
     loop {
         tokio::select! {
             // If we receive a Signal broadcasted from a Cell, push it out
             // across the interface
-            signal = signal_rx.next() => {
+            // NOTE: we could just use futures::StreamExt::forward to hook this
+            // tx and rx together in a new spawned task
+            signal = rx_from_cell.next() => {
                 if let Some(signal) = signal {
                     let bytes = SerializedBytes::try_from(
                         signal.map_err(InterfaceError::SignalReceive)?,
                     )?;
-                    signal_tx.signal(bytes).await?;
+                    tx_to_iface.signal(bytes).await?;
                 } else {
                     debug!("Closing interface: signal stream empty");
                     break;
@@ -203,7 +209,7 @@ async fn recv_incoming_msgs_and_outgoing_signals<A: InterfaceApi>(
             },
 
             // If we receive a message from outside, handle it
-            msg = recv_socket.next() => {
+            msg = rx_from_iface.next() => {
                 if let Some(msg) = msg {
                     handle_incoming_message(msg, api.clone()).await?
                 } else {
@@ -358,7 +364,11 @@ pub mod test {
 
         let handle = conductor_handle.clone();
 
-        (tmpdir, RealAppInterfaceApi::new(conductor_handle), handle)
+        (
+            tmpdir,
+            RealAppInterfaceApi::new(conductor_handle, "test-interface".into()),
+            handle,
+        )
     }
 
     #[tokio::test(threaded_scheduler)]

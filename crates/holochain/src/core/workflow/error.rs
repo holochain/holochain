@@ -1,13 +1,18 @@
 // Error types are self-explanatory
 #![allow(missing_docs)]
 
-use super::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
+use super::{
+    app_validation_workflow::AppValidationError,
+    produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError,
+};
 use crate::{
     conductor::{api::error::ConductorApiError, CellError},
     core::{
         queue_consumer::QueueTriggerClosedError,
         ribosome::error::RibosomeError,
-        state::{source_chain::SourceChainError, workspace::WorkspaceError},
+        state::{
+            cascade::error::CascadeError, source_chain::SourceChainError, workspace::WorkspaceError,
+        },
         SysValidationError,
     },
 };
@@ -18,11 +23,17 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum WorkflowError {
+    #[error(transparent)]
+    AppValidationError(#[from] AppValidationError),
+
     #[error("Agent is invalid: {0:?}")]
     AgentInvalid(AgentPubKey),
 
     #[error("Conductor API error: {0}")]
     ConductorApi(#[from] Box<ConductorApiError>),
+
+    #[error(transparent)]
+    CascadeError(#[from] CascadeError),
 
     #[error("Workspace error: {0}")]
     WorkspaceError(#[from] WorkspaceError),
