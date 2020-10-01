@@ -142,7 +142,7 @@ impl GetDb for EnvironmentRead {
 /// The canonical representation of a (singleton) LMDB environment.
 /// The wrapper contains methods for managing transactions
 /// and database connections,
-#[derive(Clone, Shrinkwrap, Into)]
+#[derive(Clone, Shrinkwrap, Into, derive_more::From)]
 pub struct EnvironmentWrite(EnvironmentRead);
 
 impl EnvironmentWrite {

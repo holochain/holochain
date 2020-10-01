@@ -40,7 +40,7 @@ pub mod timestamp;
 #[allow(missing_docs)]
 pub mod validate;
 #[allow(missing_docs)]
-pub mod validate_link_add;
+pub mod validate_link;
 #[allow(missing_docs)]
 pub mod zome;
 #[allow(missing_docs)]

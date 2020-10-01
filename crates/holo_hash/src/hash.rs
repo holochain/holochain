@@ -3,7 +3,8 @@ use crate::{has_hash::HasHash, HashType, PrimitiveHashType};
 pub(crate) const HASH_CORE_LEN: usize = 32;
 pub(crate) const HASH_LOC_LEN: usize = 4;
 
-pub(crate) const HASH_SERIALIZED_LEN: usize = HASH_CORE_LEN + HASH_LOC_LEN;
+/// Length of the a full HoloHash bytes
+pub const HOLO_HASH_SERIALIZED_LEN: usize = HASH_CORE_LEN + HASH_LOC_LEN;
 
 /// A HoloHash contains a vector of 36 bytes representing a 32-byte blake2b hash
 /// plus 4 bytes representing a DHT location. It also contains a zero-sized
@@ -111,10 +112,10 @@ fn bytes_to_loc(bytes: &[u8]) -> u32 {
 }
 
 fn assert_length(hash: &[u8]) {
-    if hash.len() != HASH_SERIALIZED_LEN {
+    if hash.len() != HOLO_HASH_SERIALIZED_LEN {
         panic!(
             "invalid holo_hash byte count, expected: {}, found: {}. {:?}",
-            HASH_SERIALIZED_LEN,
+            HOLO_HASH_SERIALIZED_LEN,
             hash.len(),
             hash
         );

@@ -99,8 +99,8 @@ wasm_io_types!(
     );
     // Header hash of the newly committed element.
     pub struct UpdateOutput(holo_hash::HeaderHash);
-    // @todo
-    pub struct EmitSignalInput(());
+    // Emit a Signal::App to subscribers on the interface
+    pub struct EmitSignalInput(SerializedBytes);
     pub struct EmitSignalOutput(());
     // @todo
     pub struct DeleteInput(holo_hash::HeaderHash);

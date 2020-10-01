@@ -10,6 +10,9 @@ impl CallZomeWorkspaceLock {
     pub fn new(workspace: CallZomeWorkspace) -> Self {
         Self(Arc::new(RwLock::new(workspace)))
     }
+    pub fn into_inner(self) -> Arc<RwLock<CallZomeWorkspace>> {
+        self.0
+    }
 }
 
 impl From<CallZomeWorkspace> for CallZomeWorkspaceLock {
