@@ -1211,7 +1211,7 @@ dependencies = [
  "tracing-futures",
  "unwrap_to",
  "url 1.7.2",
- "url2 0.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "url2",
  "url_serde",
  "uuid 0.7.4",
 ]
@@ -1427,7 +1427,7 @@ dependencies = [
  "tracing",
  "tracing-futures",
  "tungstenite",
- "url2 0.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "url2",
 ]
 
 [[package]]
@@ -1607,6 +1607,7 @@ version = "0.0.1"
 dependencies = [
  "assert_matches",
  "derive_more",
+ "fixt",
  "futures",
  "ghost_actor",
  "kitsune_p2p_types",
@@ -1615,7 +1616,7 @@ dependencies = [
  "shrinkwraprs",
  "thiserror",
  "tokio",
- "url2 0.0.5",
+ "url2",
 ]
 
 [[package]]
@@ -1662,7 +1663,7 @@ dependencies = [
  "once_cell",
  "thiserror",
  "tokio",
- "url2 0.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "url2",
 ]
 
 [[package]]
@@ -3722,21 +3723,16 @@ dependencies = [
  "idna 0.2.0",
  "matches",
  "percent-encoding 2.1.0",
+ "serde",
 ]
 
 [[package]]
 name = "url2"
-version = "0.0.5"
-dependencies = [
- "url 2.1.1",
-]
-
-[[package]]
-name = "url2"
-version = "0.0.5"
+version = "0.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "545437eb5b6116743ab42171d7b471878177360f7f8227f5f0ddfb651431c6d7"
+checksum = "c89cd13f1de9862d363308f5ffdadcd2b64b2a4a812fb296a80b7d3e80011b1e"
 dependencies = [
+ "serde",
  "url 2.1.1",
 ]
 
