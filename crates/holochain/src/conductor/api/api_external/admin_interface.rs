@@ -9,13 +9,13 @@ use crate::conductor::{
     ConductorHandle,
 };
 use holo_hash::*;
+use holochain_keystore::AgentPubKeyExt;
 use holochain_keystore::KeystoreSenderExt;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::{
     app::{AppId, InstallAppDnaPayload, InstallAppPayload, InstalledApp, InstalledCell},
     cell::CellId,
     dna::{DnaFile, JsonProperties},
-    test_utils::fake_agent_pubkey_1,
 };
 use std::path::PathBuf;
 use tracing::*;
@@ -91,8 +91,8 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 let agent_key = if let Some(agent_key) = maybe_agent_key {
                     agent_key
                 } else {
-                    //TODO: generate in lair
-                    fake_agent_pubkey_1()
+                    let keystore = self.conductor_handle.keystore();
+                    AgentPubKey::new_from_pure_entropy(&keystore).await.unwrap()
                 };
 
                 // Install Dnas
@@ -446,9 +446,8 @@ mod test {
                     cell_data: vec![InstalledCell::new(cell_id.clone(), "".to_string())],
                 };
                 assert_eq!(resp.installed_app, expected_cell_ids);
-                assert_eq!(resp.agent_key, fake_agent_pubkey_1());
-            },
-            _ => assert!(false, "expecting AppInstalled")
+            }
+            _ => assert!(false, "expecting AppInstalled"),
         }
 
         let dna_list = admin_api.handle_admin_request(AdminRequest::ListDnas).await;
