@@ -32,7 +32,7 @@ use holochain_types::{
     metadata::{EntryDhtStatus, MetadataSet, TimedHeaderHash},
     EntryHashed, HeaderHashed,
 };
-use holochain_zome_types::header::{CreateLink, DeleteLink};
+use holochain_zome_types::header::{CreateLink, DeleteLink, HeaderType};
 use holochain_zome_types::{
     element::SignedHeader,
     header::{Delete, Update},
@@ -40,7 +40,7 @@ use holochain_zome_types::{
     metadata::{Details, ElementDetails, EntryDetails},
     Header,
 };
-use std::convert::TryFrom;
+use std::{collections::HashSet, convert::TryFrom};
 use std::{
     collections::{BTreeMap, BTreeSet},
     convert::TryInto,
@@ -524,24 +524,55 @@ where
         search_all!(self, get_header, hash)
     }
 
-    fn render_headers<T, F>(&self, headers: Vec<TimedHeaderHash>, f: F) -> CascadeResult<Vec<T>>
+    fn render_headers<F>(
+        &self,
+        headers: impl IntoIterator<Item = TimedHeaderHash>,
+        f: F,
+    ) -> CascadeResult<Vec<SignedHeaderHashed>>
     where
-        F: Fn(Header) -> DhtOpConvertResult<T>,
+        F: Fn(HeaderType) -> bool,
     {
-        let mut result = Vec::with_capacity(headers.len());
-        for h in headers {
-            let hash = h.header_hash;
-            let h = self.get_header_local_raw(&hash)?;
-            match h {
-                Some(h) => result.push(f(HeaderHashed::into_content(h))?),
-                None => continue,
-            }
-        }
-        Ok(result)
+        headers
+            .into_iter()
+            .filter_map(|h| {
+                let hash = h.header_hash;
+                let h = match self.get_header_local_raw(&hash) {
+                    Ok(r) => r,
+                    Err(e) => return Some(Err(e)),
+                };
+                match h {
+                    Some(h) => {
+                        // Check the header type is correct
+                        if f(h.header().header_type()) {
+                            Some(Ok(h.into_content()))
+                        } else {
+                            None
+                        }
+                    }
+                    None => None,
+                }
+            })
+            .collect()
     }
+    // fn render_headers<T, F>(&self, headers: impl IntoIterator<Item = TimedHeaderHash>, f: F) -> CascadeResult<Vec<T>>
+    // where
+    //     F: Fn(Header) -> DhtOpConvertResult<T>,
+    // {
+    //     let mut result = Vec::with_capacity(headers.len());
+    //     for h in headers {
+    //         let hash = h.header_hash;
+    //         let h = self.get_header_local_raw(&hash)?;
+    //         match h {
+    //             Some(h) => result.push(f(HeaderHashed::into_content(h))?),
+    //             None => continue,
+    //         }
+    //     }
+    //     Ok(result)
+    // }
 
     async fn create_entry_details(&self, hash: EntryHash) -> CascadeResult<Option<EntryDetails>> {
         let cache_data = ok_or_return!(self.cache_data.as_ref(), None);
+        let authored_data = ok_or_return!(self.authored_data.as_ref(), None);
         let env = ok_or_return!(self.env.as_ref(), None);
         match self.get_entry_local_raw(&hash)? {
             Some(entry) => fresh_reader!(env, |r| {
@@ -549,18 +580,21 @@ where
                 let headers = cache_data
                     .meta
                     .get_headers(&r, hash.clone())?
+                    .chain(authored_data.meta.get_headers(&r, hash.clone())?)
                     .collect::<Vec<_>>()?;
-                let headers = self.render_headers(headers, Ok)?;
+                let headers = self.render_headers(headers, |h| {
+                    h == HeaderType::Update || h == HeaderType::Create
+                })?;
                 let deletes = cache_data
                     .meta
                     .get_deletes_on_entry(&r, hash.clone())?
                     .collect::<Vec<_>>()?;
-                let deletes = self.render_headers(deletes, |h| Ok(Delete::try_from(h)?))?;
+                    let deletes = self.render_headers(deletes, |h| h == HeaderType::Delete)?;
                 let updates = cache_data
                     .meta
                     .get_updates(&r, hash.into())?
                     .collect::<Vec<_>>()?;
-                let updates = self.render_headers(updates, |h| Ok(Update::try_from(h)?))?;
+                let updates = self.render_headers(updates, |h| h == HeaderType::Update)?;
                 Ok(Some(EntryDetails {
                     entry: entry.into_content(),
                     headers,
@@ -988,7 +1022,6 @@ where
         fresh_reader!(env, |r| {
             // Meta Cache
             // Return any links from the meta cache that don't have removes.
-            // TODO: Check for duplicates with a HashSet
             Ok(cache_data
                 .meta
                 .get_live_links(&r, key)?
@@ -999,7 +1032,11 @@ where
                         .get_live_links(&r, key)?
                         .map(|l| Ok(l.into_link())),
                 )
-                .collect()?)
+                // Need to collect into a Set first to remove
+                // duplicates from authored and cache
+                .collect::<HashSet<_>>()?
+                .into_iter()
+                .collect())
         })
     }
 
@@ -1018,7 +1055,7 @@ where
         let authored_data = ok_or_return!(self.authored_data.as_ref(), vec![]);
         let env = ok_or_return!(self.env.as_ref(), vec![]);
         // Get the links and collect the CreateLink / DeleteLink hashes by time.
-        // TODO: Search authored and combine with cache_data
+        // Search authored and combine with cache_data
         let links = fresh_reader!(env, |r| {
             cache_data
                 .meta
@@ -1029,13 +1066,8 @@ where
                         .meta
                         .get_link_removes_on_link_add(&r, link_add.link_add_hash.clone())?
                         .collect::<BTreeSet<_>>()?;
-                    // Create timed header hash
-                    let link_add = TimedHeaderHash {
-                        timestamp: link_add.timestamp,
-                        header_hash: link_add.link_add_hash,
-                    };
                     // Return all link removes with this link add
-                    Ok((link_add, link_removes))
+                    Ok((link_add.link_add_hash, link_removes))
                 })
                 .chain(authored_data.meta.get_links_all(&r, key)?.map(|link_add| {
                     // Collect the link removes on this link add
@@ -1043,20 +1075,15 @@ where
                         .meta
                         .get_link_removes_on_link_add(&r, link_add.link_add_hash.clone())?
                         .collect::<BTreeSet<_>>()?;
-                    // Create timed header hash
-                    let link_add = TimedHeaderHash {
-                        timestamp: link_add.timestamp,
-                        header_hash: link_add.link_add_hash,
-                    };
                     // Return all link removes with this link add
-                    Ok((link_add, link_removes))
+                    Ok((link_add.link_add_hash, link_removes))
                 }))
                 .collect::<BTreeMap<_, _>>()
         })?;
         // Get the headers from the element stores
         let mut result: Vec<(CreateLink, _)> = Vec::with_capacity(links.len());
         for (link_add, link_removes) in links {
-            if let Some(link_add) = self.get_element_local_raw(&link_add.header_hash)? {
+            if let Some(link_add) = self.get_element_local_raw(&link_add)? {
                 let mut r: Vec<DeleteLink> = Vec::with_capacity(link_removes.len());
                 for link_remove in link_removes {
                     if let Some(link_remove) =
