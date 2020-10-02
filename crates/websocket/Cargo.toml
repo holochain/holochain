@@ -20,7 +20,7 @@ tokio-tungstenite = { version = "0.10.1", features = [ "tls" ] }
 tracing = "0.1"
 tracing-futures = "0.2"
 tungstenite = "0.10"
-url2 = "0.0.5"
+url2 = "0.0.6"
 
 [dev-dependencies]
 holochain_types = { version = "=0.0.1", path = "../types" }
