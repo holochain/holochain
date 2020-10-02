@@ -61,11 +61,12 @@ async fn tls_client(
                     if expected_proxy_url == remote_proxy_url {
                         let _ = setup_send.send(Ok(()));
                     } else {
-                        let _ = setup_send.send(Err(format!(
+                        let msg = format!(
                             "expected remote {} != received {}",
                             expected_proxy_url, remote_proxy_url,
-                        )
-                        .into()));
+                        );
+                        let _ = setup_send.send(Err(msg.clone().into()));
+                        return Err(msg.into());
                     }
                 }
             }
@@ -104,12 +105,12 @@ async fn tls_client(
                             cli.process_new_packets().map_err(TransportError::other)?;
                             while let Ok(size) = cli.read(&mut buf) {
                                 if size == 0 {
-                                    // End of stream
-                                    return Err("reached end of stream".into());
+                                    break;
                                 }
                                 send.send(buf[..size].to_vec()).await?;
                             }
                         }
+                        None => return Ok(()),
                         _ => return Err(format!("invalid wire: {:?}", wire).into()),
                     }
                     outgoing_data_fut = fut;

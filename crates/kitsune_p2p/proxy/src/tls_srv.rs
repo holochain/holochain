@@ -2,8 +2,10 @@ use crate::*;
 use futures::{sink::SinkExt, stream::StreamExt};
 use rustls::Session;
 use std::io::{Read, Write};
+use ghost_actor::dependencies::tracing;
 
 pub(crate) fn spawn_tls_server(
+    short: String,
     incoming_base_url: url2::Url2,
     tls_server_config: Arc<rustls::ServerConfig>,
     evt_send: TransportIncomingChannelSender,
@@ -11,6 +13,7 @@ pub(crate) fn spawn_tls_server(
     read: futures::channel::mpsc::Receiver<ProxyWire>,
 ) {
     tokio::task::spawn(tls_server(
+        short,
         incoming_base_url,
         tls_server_config,
         evt_send,
@@ -20,6 +23,7 @@ pub(crate) fn spawn_tls_server(
 }
 
 async fn tls_server(
+    short: String,
     incoming_base_url: url2::Url2,
     tls_server_config: Arc<rustls::ServerConfig>,
     mut evt_send: TransportIncomingChannelSender,
@@ -41,6 +45,8 @@ async fn tls_server(
             if !did_post_handshake_work && !srv.is_handshaking() {
                 did_post_handshake_work = true;
 
+                println!("INCOMING_CERTS!! - {:?}", srv.get_peer_certificates());
+
                 let cert_digest = blake2b_32(
                     srv.get_peer_certificates()
                         .unwrap()
@@ -51,6 +57,7 @@ async fn tls_server(
 
                 let remote_proxy_url =
                     ProxyUrl::new(incoming_base_url.as_str(), cert_digest.into())?;
+                tracing::info!("{}: SRV: INCOMING TLS: {}", short, remote_proxy_url);
 
                 evt_send
                     .send((
@@ -63,6 +70,7 @@ async fn tls_server(
             }
 
             if srv.wants_write() {
+                tracing::trace!("{}: SRV tls wants write", short);
                 let mut data = Vec::new();
                 srv.write_tls(&mut data).map_err(TransportError::other)?;
                 write
@@ -76,14 +84,17 @@ async fn tls_server(
                 continue;
             }
 
+            tracing::trace!("{}: SRV tls wants read", short);
+
             use futures::future::Either;
             match futures::future::select(outgoing_data_fut, incoming_wire_fut).await {
                 Either::Left((data, fut)) => {
                     match data {
                         Some(data) => {
+                            tracing::trace!("{}: SRV outgoing {} bytes", short, data.len());
                             srv.write_all(&data).map_err(TransportError::other)?;
                         }
-                        None => return Err("write side shutdown".into()),
+                        None => return Ok(()),
                     }
                     outgoing_data_fut = recv1.next();
                     incoming_wire_fut = fut;
@@ -91,17 +102,19 @@ async fn tls_server(
                 Either::Right((wire, fut)) => {
                     match wire {
                         Some(ProxyWire::ChanSend(ChanSend(data))) => {
+                            tracing::trace!("{}: SRV incoming encrypted {} bytes", short, data.len());
                             in_pre.get_mut().extend_from_slice(&data);
                             srv.read_tls(&mut in_pre).map_err(TransportError::other)?;
                             srv.process_new_packets().map_err(TransportError::other)?;
                             while let Ok(size) = srv.read(&mut buf) {
+                                tracing::trace!("{}: SRV incoming decrypted {} bytes", short, size);
                                 if size == 0 {
-                                    // End of stream
-                                    return Err("reached end of stream".into());
+                                    break;
                                 }
                                 send1.send(buf[..size].to_vec()).await?;
                             }
                         }
+                        None => return Ok(()),
                         _ => return Err(format!("invalid wire: {:?}", wire).into()),
                     }
                     outgoing_data_fut = fut;

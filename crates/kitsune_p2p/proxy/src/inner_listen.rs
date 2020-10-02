@@ -3,6 +3,7 @@
 use crate::*;
 use futures::{sink::SinkExt, stream::StreamExt};
 use ghost_actor::dependencies::tracing;
+use std::collections::HashMap;
 
 /// Tls ALPN identifier for kitsune proxy handshaking
 const ALPN_KITSUNE_PROXY_0: &[u8] = b"kitsune-proxy/0";
@@ -97,13 +98,17 @@ pub(crate) fn gen_tls_configs(
 
     let mut tls_server_config =
         rustls::ServerConfig::with_ciphersuites(rustls::NoClientAuth::new(), CIPHER_SUITES);
+        //rustls::ServerConfig::with_ciphersuites(TlsClientVerifier::new(), CIPHER_SUITES);
     tls_server_config
-        .set_single_cert(vec![cert], cert_priv_key)
+        .set_single_cert(vec![cert.clone()], cert_priv_key.clone())
         .map_err(TransportError::other)?;
     tls_server_config.set_protocols(&[ALPN_KITSUNE_PROXY_0.to_vec()]);
     let tls_server_config = Arc::new(tls_server_config);
 
     let mut tls_client_config = rustls::ClientConfig::with_ciphersuites(CIPHER_SUITES);
+    tls_client_config
+        .set_single_client_cert(vec![cert], cert_priv_key)
+        .map_err(TransportError::other)?;
     tls_client_config
         .dangerous()
         .set_certificate_verifier(TlsServerVerifier::new());
@@ -111,6 +116,13 @@ pub(crate) fn gen_tls_configs(
     let tls_client_config = Arc::new(tls_client_config);
 
     Ok((tls_server_config, tls_client_config))
+}
+
+#[allow(dead_code)]
+struct ProxyTo {
+    base_connection_url: url2::Url2,
+    proxy_url: ProxyUrl,
+    expires_at: std::time::Instant,
 }
 
 #[allow(dead_code)]
@@ -124,6 +136,7 @@ struct InnerListen {
     tls: TlsConfig,
     tls_server_config: Arc<rustls::ServerConfig>,
     tls_client_config: Arc<rustls::ClientConfig>,
+    proxy_list: HashMap<ProxyUrl, ProxyTo>,
 }
 
 impl InnerListen {
@@ -154,6 +167,7 @@ impl InnerListen {
             tls,
             tls_server_config,
             tls_client_config,
+            proxy_list: HashMap::new(),
         })
     }
 }
@@ -197,6 +211,8 @@ ghost_actor::ghost_chan! {
             futures::channel::mpsc::Sender<ProxyWire>,
             futures::channel::mpsc::Receiver<ProxyWire>,
         );
+
+        fn register_proxy_to(proxy_url: ProxyUrl, base_url: url2::Url2) -> ();
 
         fn req_proxy(proxy_url: ProxyUrl) -> ();
         fn set_proxy_url(proxy_url: ProxyUrl) -> ();
@@ -259,14 +275,19 @@ impl InternalHandler for InnerListen {
 
     fn handle_incoming_req_proxy(
         &mut self,
-        _base_url: url2::Url2,
+        base_url: url2::Url2,
         cert_digest: ChannelData,
         mut write: futures::channel::mpsc::Sender<ProxyWire>,
         _read: futures::channel::mpsc::Receiver<ProxyWire>,
     ) -> InternalHandlerResult<()> {
+        tracing::info!("{}: {} would like us to proxy them", self.this_url.short(), base_url);
         let proxy_url = ProxyUrl::new(self.this_url.as_base().as_str(), cert_digest.0.into())?;
-        // just accepting all proxy requests for now
+        let i_s = self.i_s.clone();
         Ok(async move {
+            // just accepting all proxy requests for now
+
+            i_s.register_proxy_to(proxy_url.clone(), base_url).await?;
+
             write
                 .send(ProxyWire::req_proxy_ok(proxy_url.into()))
                 .await
@@ -284,22 +305,44 @@ impl InternalHandler for InnerListen {
         mut write: futures::channel::mpsc::Sender<ProxyWire>,
         read: futures::channel::mpsc::Receiver<ProxyWire>,
     ) -> InternalHandlerResult<()> {
-        if dest_proxy_url.as_base() == self.this_url.as_base() {
+        let short = self.this_url.short().to_string();
+
+        let proxy_to = if let Some(proxy_to) = self.proxy_list.get(&dest_proxy_url) {
+            Some(proxy_to.base_connection_url.clone())
+        } else {
+            None
+        };
+
+        if proxy_to.is_none() && dest_proxy_url.as_base() == self.this_url.as_base() {
+            tracing::debug!("{}: chan new to self, hooking connection", short);
+
             // Hey! They're trying to talk to us!
             // Let's connect them to our owner.
             tls_srv::spawn_tls_server(
+                short.clone(),
                 base_url,
                 self.tls_server_config.clone(),
                 self.evt_send.clone(),
                 write,
                 read,
             );
+
             return Ok(async move { Ok(()) }.boxed().into());
         }
+
         // if we are proxying - forward to another channel
-        let fut = self
-            .i_s
-            .create_low_level_channel(dest_proxy_url.as_base().clone());
+        let fut = match proxy_to {
+            None => {
+                self
+                    .i_s
+                    .create_low_level_channel(dest_proxy_url.as_base().clone())
+            }
+            Some(proxy_to) => {
+                self
+                    .i_s
+                    .create_low_level_channel(proxy_to)
+            }
+        };
         Ok(async move {
             let (mut fwd_write, fwd_read) = match fut.await {
                 Err(e) => {
@@ -339,6 +382,25 @@ impl InternalHandler for InnerListen {
         }
         .boxed()
         .into())
+    }
+
+    fn handle_register_proxy_to(
+        &mut self,
+        proxy_url: ProxyUrl,
+        base_url: url2::Url2,
+    ) -> InternalHandlerResult<()> {
+        let expires_at = std::time::Instant::now()
+            .checked_add(std::time::Duration::from_millis(60000))
+            .unwrap();
+        self.proxy_list.insert(
+            proxy_url.clone(),
+            ProxyTo {
+                base_connection_url: base_url,
+                proxy_url,
+                expires_at,
+            }
+        );
+        Ok(async move { Ok(()) }.boxed().into())
     }
 
     fn handle_req_proxy(&mut self, proxy_url: ProxyUrl) -> InternalHandlerResult<()> {
@@ -446,6 +508,33 @@ impl rustls::ServerCertVerifier for TlsServerVerifier {
     }
 }
 
+/*
+struct TlsClientVerifier;
+
+impl TlsClientVerifier {
+    fn new() -> Arc<Self> {
+        Arc::new(Self)
+    }
+}
+
+impl rustls::ClientCertVerifier for TlsClientVerifier {
+    fn client_auth_root_subjects(
+        &self,
+        _sni: Option<&webpki::DNSName>,
+    ) -> Option<rustls::DistinguishedNames> {
+        None
+    }
+
+    fn verify_client_cert(
+        &self,
+        _presented_certs: &[rustls::Certificate],
+        _sni: Option<&webpki::DNSName>,
+    ) -> Result<rustls::ClientCertVerified, rustls::TLSError> {
+        Ok(rustls::ClientCertVerified::assertion())
+    }
+}
+*/
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -507,6 +596,8 @@ mod tests {
         let addr3 = bind3.bound_url().await?;
 
         let (_url, _write, _read) = bind2.create_channel(addr3).await?;
+
+        tokio::time::delay_for(std::time::Duration::from_millis(200)).await;
 
         Ok(())
     }

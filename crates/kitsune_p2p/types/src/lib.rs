@@ -11,6 +11,8 @@ pub mod dependencies {
 }
 
 pub mod async_lazy;
+mod call_hist;
+pub use call_hist::*;
 pub mod dht_arc;
 pub mod transport;
 pub mod transport_mem;
