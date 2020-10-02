@@ -32,6 +32,13 @@ hc-merge-test
 
 This will compile holochain and run all the tests.
 
+If you get an error while running `nix-shell` about ngrok having an unfree license, you can fix that by running,
+
+```
+mkdir -p ~/.config/nixpkgs/
+echo "{ allowUnfree = true; }" >> ~/.config/nixpkgs/config.nix
+```
+
 We have an all-in-one development environment including (among other things):
 
 - The correct version and sane environment variables of cargo/rust
