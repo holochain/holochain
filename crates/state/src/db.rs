@@ -63,6 +63,8 @@ pub enum DbName {
     ValidationLimbo,
     /// KVV store to accumulate validation receipts for a published EntryHash
     ValidationReceipts,
+    /// Single store for all known agents on the network
+    Agent,
 }
 
 impl DbName {
@@ -92,6 +94,7 @@ impl DbName {
             IntegrationLimbo => Single,
             ValidationLimbo => Single,
             ValidationReceipts => Multi,
+            Agent => Single,
         }
     }
 }
@@ -162,6 +165,8 @@ lazy_static! {
     pub static ref VALIDATION_LIMBO: DbKey<SingleStore> = DbKey::new(DbName::ValidationLimbo);
     /// The key to access the ValidationReceipts database
     pub static ref VALIDATION_RECEIPTS: DbKey<MultiStore> = DbKey::new(DbName::ValidationReceipts);
+    /// The key to access the Agent database
+    pub static ref AGENT: DbKey<SingleStore> = DbKey::new(DbName::Agent);
 }
 
 lazy_static! {
@@ -228,6 +233,9 @@ fn register_databases(env: &Rkv, kind: &EnvironmentKind, um: &mut DbMap) -> Data
             register_db(env, um, &*WASM)?;
             register_db(env, um, &*DNA_DEF)?;
             register_db(env, um, &*ENTRY_DEF)?;
+        }
+        EnvironmentKind::P2P => {
+            register_db(env, um, &*AGENT)?;
         }
     }
     Ok(())
