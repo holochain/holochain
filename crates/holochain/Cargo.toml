@@ -61,7 +61,6 @@ url = "1.7.2"
 url2 = "0.0.6"
 url_serde = "0.2.0"
 uuid = { version = "0.7", features = [ "serde", "v4" ] }
-kitsune_p2p = { version = "0.0.1", path = "../kitsune_p2p/kitsune_p2p" }
 
 [dev-dependencies]
 anyhow = "1.0.26"

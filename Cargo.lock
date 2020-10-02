@@ -1182,7 +1182,6 @@ dependencies = [
  "holochain_websocket",
  "holochain_zome_types",
  "human-panic",
- "kitsune_p2p",
  "lazy_static",
  "maplit",
  "matches",

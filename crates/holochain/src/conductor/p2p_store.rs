@@ -1,12 +1,12 @@
 //! A simple KvBuf for AgentInfoSigned.
 
+use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
+use holochain_p2p::kitsune_p2p::KitsuneAgent;
 use holochain_state::buffer::KvStore;
 use holochain_state::db::GetDb;
 use holochain_state::env::EnvironmentRead;
 use holochain_state::error::DatabaseResult;
 use holochain_state::key::BufKey;
-use kitsune_p2p::agent_store::AgentInfoSigned;
-use kitsune_p2p::KitsuneAgent;
 
 /// Required new type for KvBuf key.
 #[derive(Ord, PartialOrd, Eq, PartialEq)]
@@ -58,11 +58,11 @@ impl AgentKv {
 mod tests {
 
     use fixt::prelude::*;
+    use holochain_p2p::kitsune_p2p::fixt::AgentInfoSignedFixturator;
     use holochain_state::buffer::KvStoreT;
     use holochain_state::env::ReadManager;
     use holochain_state::env::WriteManager;
     use holochain_state::test_utils::test_p2p_env;
-    use kitsune_p2p::fixt::AgentInfoSignedFixturator;
 
     #[tokio::test(threaded_scheduler)]
     async fn test_store_agent_info_signed() {
