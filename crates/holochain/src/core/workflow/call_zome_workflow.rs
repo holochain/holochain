@@ -258,23 +258,29 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT>(
 
 pub struct CallZomeWorkspace {
     pub source_chain: SourceChain,
-    pub meta: MetadataBuf,
-    pub cache_cas: ElementBuf,
-    pub cache_meta: MetadataBuf,
+    pub meta_authored: MetadataBuf<AuthoredPrefix>,
+    pub element_integrated: ElementBuf<IntegratedPrefix>,
+    pub meta_integrated: MetadataBuf<IntegratedPrefix>,
+    pub element_cache: ElementBuf,
+    pub meta_cache: MetadataBuf,
 }
 
 impl<'a> CallZomeWorkspace {
     pub fn new(env: EnvironmentRead) -> WorkspaceResult<Self> {
         let source_chain = SourceChain::new(env.clone())?;
-        let cache_cas = ElementBuf::cache(env.clone())?;
-        let meta = MetadataBuf::vault(env.clone())?;
-        let cache_meta = MetadataBuf::cache(env)?;
+        let meta_authored = MetadataBuf::authored(env.clone())?;
+        let element_integrated = ElementBuf::vault(env.clone(), true)?;
+        let meta_integrated = MetadataBuf::vault(env.clone())?;
+        let element_cache = ElementBuf::cache(env.clone())?;
+        let meta_cache = MetadataBuf::cache(env)?;
 
         Ok(CallZomeWorkspace {
             source_chain,
-            meta,
-            cache_cas,
-            cache_meta,
+            meta_authored,
+            element_integrated,
+            meta_integrated,
+            element_cache,
+            meta_cache,
         })
     }
 
@@ -282,9 +288,11 @@ impl<'a> CallZomeWorkspace {
         Cascade::new(
             self.source_chain.env().clone(),
             &self.source_chain.elements(),
-            &self.meta,
-            &mut self.cache_cas,
-            &mut self.cache_meta,
+            &self.meta_authored,
+            &self.element_integrated,
+            &self.meta_integrated,
+            &mut self.element_cache,
+            &mut self.meta_cache,
             network,
         )
     }
@@ -293,9 +301,9 @@ impl<'a> CallZomeWorkspace {
 impl Workspace for CallZomeWorkspace {
     fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> WorkspaceResult<()> {
         self.source_chain.flush_to_txn_ref(writer)?;
-        self.meta.flush_to_txn_ref(writer)?;
-        self.cache_cas.flush_to_txn_ref(writer)?;
-        self.cache_meta.flush_to_txn_ref(writer)?;
+        self.meta_authored.flush_to_txn_ref(writer)?;
+        self.element_cache.flush_to_txn_ref(writer)?;
+        self.meta_cache.flush_to_txn_ref(writer)?;
         Ok(())
     }
 }
