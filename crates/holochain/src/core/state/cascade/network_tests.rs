@@ -310,28 +310,22 @@ async fn get_from_another_agent() {
     assert_eq!(entry_details.updates.len(), 1);
     assert_eq!(entry_details.entry_dht_status, EntryDhtStatus::Dead);
     assert_eq!(
-        HeaderHash::with_data_sync(entry_details.headers.get(0).unwrap()),
+        *entry_details.headers.get(0).unwrap().header_address(),
         header_hash
     );
     assert_eq!(
-        HeaderHash::with_data_sync(&Header::Delete(
-            entry_details.deletes.get(0).unwrap().clone()
-        )),
+        *entry_details.deletes.get(0).unwrap().header_address(),
         remove_hash
     );
     assert_eq!(
-        HeaderHash::with_data_sync(&Header::Update(
-            entry_details.updates.get(0).unwrap().clone()
-        )),
+        *entry_details.updates.get(0).unwrap().header_address(),
         update_hash
     );
 
     assert_eq!(header_details.deletes.len(), 1);
     assert_eq!(*header_details.element.header_address(), header_hash);
     assert_eq!(
-        HeaderHash::with_data_sync(&Header::Delete(
-            header_details.deletes.get(0).unwrap().clone()
-        )),
+        *entry_details.deletes.get(0).unwrap().header_address(),
         remove_hash
     );
 
@@ -484,6 +478,8 @@ async fn get_links_from_another_agent() {
     let (link_add, link_removes) = links.get(0).unwrap().clone();
     assert_eq!(link_removes.len(), 1);
     let link_remove = link_removes.get(0).unwrap().clone();
+    let link_remove = unwrap_to::unwrap_to!(link_remove.header() => Header::DeleteLink).clone();
+    let link_add = unwrap_to::unwrap_to!(link_add.header() => Header::CreateLink).clone();
     assert_eq!(link_add.tag, link_tag);
     assert_eq!(link_add.target_address, target_entry_hash);
     assert_eq!(link_add.base_address, base_entry_hash);

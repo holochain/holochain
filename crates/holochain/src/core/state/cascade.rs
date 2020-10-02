@@ -8,10 +8,7 @@ use super::{
     element_buf::ElementBuf,
     metadata::{LinkMetaKey, MetadataBuf, MetadataBufT},
 };
-use crate::core::workflow::{
-    integrate_dht_ops_workflow::integrate_single_metadata,
-    produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertResult,
-};
+use crate::core::workflow::integrate_dht_ops_workflow::integrate_single_metadata;
 use error::CascadeResult;
 use fallible_iterator::FallibleIterator;
 use holo_hash::{hash_type::AnyDht, AnyDhtHash, EntryHash, HeaderHash};
@@ -30,21 +27,16 @@ use holochain_types::{
     entry::option_entry_hashed,
     link::{GetLinksResponse, WireLinkMetaKey},
     metadata::{EntryDhtStatus, MetadataSet, TimedHeaderHash},
-    EntryHashed, HeaderHashed,
+    EntryHashed,
 };
-use holochain_zome_types::header::{CreateLink, DeleteLink, HeaderType};
 use holochain_zome_types::{
     element::SignedHeader,
-    header::{Delete, Update},
+    header::HeaderType,
     link::Link,
     metadata::{Details, ElementDetails, EntryDetails},
-    Header,
 };
-use std::{collections::HashSet, convert::TryFrom};
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    convert::TryInto,
-};
+use std::collections::HashSet;
+use std::collections::{BTreeMap, BTreeSet};
 use tracing::*;
 use tracing_futures::Instrument;
 
@@ -504,13 +496,6 @@ where
         search_all!(self, get_entry, hash)
     }
 
-    /// Get the header from any databases that the Cascade has been constructed with
-    fn get_header_local_raw(&self, hash: &HeaderHash) -> CascadeResult<Option<HeaderHashed>> {
-        Ok(self
-            .get_header_local_raw_with_sig(hash)?
-            .map(|h| h.into_header_and_signature().0))
-    }
-
     fn get_header_local_raw_with_sig(
         &self,
         hash: &HeaderHash,
@@ -536,7 +521,7 @@ where
             .into_iter()
             .filter_map(|h| {
                 let hash = h.header_hash;
-                let h = match self.get_header_local_raw(&hash) {
+                let h = match self.get_header_local_raw_with_sig(&hash) {
                     Ok(r) => r,
                     Err(e) => return Some(Err(e)),
                 };
@@ -544,7 +529,7 @@ where
                     Some(h) => {
                         // Check the header type is correct
                         if f(h.header().header_type()) {
-                            Some(Ok(h.into_content()))
+                            Some(Ok(h))
                         } else {
                             None
                         }
@@ -554,21 +539,6 @@ where
             })
             .collect()
     }
-    // fn render_headers<T, F>(&self, headers: impl IntoIterator<Item = TimedHeaderHash>, f: F) -> CascadeResult<Vec<T>>
-    // where
-    //     F: Fn(Header) -> DhtOpConvertResult<T>,
-    // {
-    //     let mut result = Vec::with_capacity(headers.len());
-    //     for h in headers {
-    //         let hash = h.header_hash;
-    //         let h = self.get_header_local_raw(&hash)?;
-    //         match h {
-    //             Some(h) => result.push(f(HeaderHashed::into_content(h))?),
-    //             None => continue,
-    //         }
-    //     }
-    //     Ok(result)
-    // }
 
     async fn create_entry_details(&self, hash: EntryHash) -> CascadeResult<Option<EntryDetails>> {
         let cache_data = ok_or_return!(self.cache_data.as_ref(), None);
@@ -581,19 +551,21 @@ where
                     .meta
                     .get_headers(&r, hash.clone())?
                     .chain(authored_data.meta.get_headers(&r, hash.clone())?)
-                    .collect::<Vec<_>>()?;
+                    .collect::<HashSet<_>>()?;
                 let headers = self.render_headers(headers, |h| {
                     h == HeaderType::Update || h == HeaderType::Create
                 })?;
                 let deletes = cache_data
                     .meta
                     .get_deletes_on_entry(&r, hash.clone())?
-                    .collect::<Vec<_>>()?;
-                    let deletes = self.render_headers(deletes, |h| h == HeaderType::Delete)?;
+                    .chain(authored_data.meta.get_deletes_on_entry(&r, hash.clone())?)
+                    .collect::<HashSet<_>>()?;
+                let deletes = self.render_headers(deletes, |h| h == HeaderType::Delete)?;
                 let updates = cache_data
                     .meta
-                    .get_updates(&r, hash.into())?
-                    .collect::<Vec<_>>()?;
+                    .get_updates(&r, hash.clone().into())?
+                    .chain(authored_data.meta.get_updates(&r, hash.into())?)
+                    .collect::<HashSet<_>>()?;
                 let updates = self.render_headers(updates, |h| h == HeaderType::Update)?;
                 Ok(Some(EntryDetails {
                     entry: entry.into_content(),
@@ -609,15 +581,17 @@ where
 
     fn create_element_details(&self, hash: HeaderHash) -> CascadeResult<Option<ElementDetails>> {
         let cache_data = ok_or_return!(self.cache_data.as_ref(), None);
+        let authored_data = ok_or_return!(self.authored_data.as_ref(), None);
         let env = ok_or_return!(self.env.as_ref(), None);
         match self.get_element_local_raw(&hash)? {
             Some(element) => {
                 let hash = element.header_address().clone();
                 let deletes = fresh_reader!(env, |r| cache_data
                     .meta
-                    .get_deletes_on_header(&r, hash)?
-                    .collect::<Vec<_>>())?;
-                let deletes = self.render_headers(deletes, |h| Ok(Delete::try_from(h)?))?;
+                    .get_deletes_on_header(&r, hash.clone())?
+                    .chain(authored_data.meta.get_deletes_on_header(&r, hash)?)
+                    .collect::<HashSet<_>>())?;
+                let deletes = self.render_headers(deletes, |h| h == HeaderType::Delete)?;
                 Ok(Some(ElementDetails { element, deletes }))
             }
             None => Ok(None),
@@ -1047,7 +1021,7 @@ where
         &mut self,
         key: &'link LinkMetaKey<'link>,
         options: GetLinksOptions,
-    ) -> CascadeResult<Vec<(CreateLink, Vec<DeleteLink>)>> {
+    ) -> CascadeResult<Vec<(SignedHeaderHashed, Vec<SignedHeaderHashed>)>> {
         // Update the cache from the network
         self.fetch_links(key.into(), options).await?;
 
@@ -1081,21 +1055,25 @@ where
                 .collect::<BTreeMap<_, _>>()
         })?;
         // Get the headers from the element stores
-        let mut result: Vec<(CreateLink, _)> = Vec::with_capacity(links.len());
-        for (link_add, link_removes) in links {
-            if let Some(link_add) = self.get_element_local_raw(&link_add)? {
-                let mut r: Vec<DeleteLink> = Vec::with_capacity(link_removes.len());
-                for link_remove in link_removes {
-                    if let Some(link_remove) =
-                        self.get_element_local_raw(&link_remove.header_hash)?
+        fallible_iterator::convert(links.into_iter().map(Ok))
+            .filter_map(|(create_link, delete_links)| {
+                // Get the create link data
+                match self.get_header_local_raw_with_sig(&create_link)? {
+                    Some(create_link)
+                        if create_link.header().header_type() == HeaderType::CreateLink =>
                     {
-                        r.push(link_remove.try_into()?);
+                        // Render the delete links making sure they are DeleteLink headers
+                        let delete_links =
+                            self.render_headers(delete_links, |h| h == HeaderType::DeleteLink)?;
+                        Ok(Some((create_link, delete_links)))
                     }
+                    // Not a create link
+                    Some(_) => Ok(None),
+                    // No header found
+                    None => Ok(None),
                 }
-                result.push((link_add.try_into()?, r));
-            }
-        }
-        Ok(result)
+            })
+            .collect()
     }
 }
 
