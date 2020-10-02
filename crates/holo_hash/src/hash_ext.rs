@@ -1,6 +1,6 @@
 use crate::{
     encode, hash_type, HashType, HashableContent, HashableContentBytes, HoloHash, HoloHashOf,
-    HoloHashed, PrimitiveHashType, HASH_CORE_LEN, HASH_SERIALIZED_LEN,
+    HoloHashed, PrimitiveHashType, HASH_CORE_LEN, HOLO_HASH_SERIALIZED_LEN,
 };
 use hash_type::{HashTypeAsync, HashTypeSync};
 
@@ -23,7 +23,7 @@ impl<T: HashType> HoloHash<T> {
         }
 
         assert_eq!(
-            HASH_SERIALIZED_LEN,
+            HOLO_HASH_SERIALIZED_LEN,
             hash.len(),
             "only 36 byte hashes supported"
         );
@@ -48,7 +48,7 @@ impl<P: PrimitiveHashType> HoloHash<P> {
         }
 
         assert_eq!(
-            HASH_SERIALIZED_LEN,
+            HOLO_HASH_SERIALIZED_LEN,
             hash.len(),
             "only 36 byte hashes supported"
         );

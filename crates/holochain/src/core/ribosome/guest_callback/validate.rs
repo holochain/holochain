@@ -1,38 +1,43 @@
-use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostAccess;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
+use crate::core::{ribosome::FnComponents, workflow::CallZomeWorkspaceLock};
 use derive_more::Constructor;
-use holo_hash::EntryHash;
+use holo_hash::AnyDhtHash;
+use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::dna::zome::HostFnAccess;
+use holochain_types::dna::zome::{HostFnAccess, Permission};
 use holochain_zome_types::entry::Entry;
 use holochain_zome_types::validate::ValidateCallbackResult;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::ExternInput;
+use holochain_zome_types::{element::Element, Header};
 use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct ValidateInvocation {
-    pub zome_name: ZomeName,
+    pub zomes_to_invoke: ZomesToInvoke,
     // Arc here as entry may be very large
-    // don't want to clone the Entry just to validate it
-    // we can SerializedBytes off an Entry reference
+    // don't want to clone the Element just to validate it
+    // we can SerializedBytes off an Element reference
     // lifetimes on invocations are a pain
-    pub entry: Arc<Entry>,
+    pub element: Arc<Element>,
 }
 
 impl ValidateInvocation {
-    pub fn new(zome_name: ZomeName, entry: Entry) -> Self {
+    pub fn new(zomes_to_invoke: ZomesToInvoke, element: Element) -> Self {
         Self {
-            zome_name,
-            entry: Arc::new(entry),
+            zomes_to_invoke,
+            element: Arc::new(element),
         }
     }
 }
 
 #[derive(Clone, Constructor)]
-pub struct ValidateHostAccess;
+pub struct ValidateHostAccess {
+    pub workspace: CallZomeWorkspaceLock,
+    pub network: HolochainP2pCell,
+}
 
 impl From<ValidateHostAccess> for HostAccess {
     fn from(validate_host_access: ValidateHostAccess) -> Self {
@@ -42,39 +47,46 @@ impl From<ValidateHostAccess> for HostAccess {
 
 impl From<&ValidateHostAccess> for HostFnAccess {
     fn from(_: &ValidateHostAccess) -> Self {
-        Self::none()
+        let mut access = Self::none();
+        access.read_workspace = Permission::Allow;
+        access
     }
 }
 
 impl Invocation for ValidateInvocation {
     fn zomes(&self) -> ZomesToInvoke {
-        // entries are specific to zomes so only validate in the zome the entry is defined in
+        // Entries are specific to zomes so only validate in the zome the entry is defined in
         // note that here it is possible there is a zome/entry mismatch
-        // we rely on the invocation to be built correctly
-        ZomesToInvoke::One(self.zome_name.clone())
+        // we rely on the invocation to be built correctly.
+        // However agent entries need to run on all zomes.
+        self.zomes_to_invoke.clone()
     }
     fn fn_components(&self) -> FnComponents {
-        vec![
-            "validate".into(),
-            match *self.entry {
-                Entry::Agent(_) => "agent",
-                Entry::App(_) => "entry",
-                Entry::CapClaim(_) => "cap_claim",
-                Entry::CapGrant(_) => "cap_grant",
-            }
-            .into(),
-        ]
-        .into()
+        let mut fns = vec!["validate".into()];
+        match self.element.header() {
+            Header::Create(_) => fns.push("create".into()),
+            Header::Update(_) => fns.push("update".into()),
+            Header::Delete(_) => fns.push("delete".into()),
+            _ => (),
+        }
+        match self.element.entry().as_option() {
+            Some(Entry::Agent(_)) => fns.push("agent".into()),
+            Some(Entry::App(_)) => fns.push("entry".into()),
+            Some(Entry::CapClaim(_)) => fns.push("cap_claim".into()),
+            Some(Entry::CapGrant(_)) => fns.push("cap_grant".into()),
+            _ => (),
+        }
+        fns.into()
     }
     fn host_input(self) -> Result<ExternInput, SerializedBytesError> {
-        Ok(ExternInput::new((&*self.entry).try_into()?))
+        Ok(ExternInput::new((&*self.element).try_into()?))
     }
 }
 
 impl TryFrom<ValidateInvocation> for ExternInput {
     type Error = SerializedBytesError;
     fn try_from(validate_invocation: ValidateInvocation) -> Result<Self, Self::Error> {
-        Ok(Self::new((&*validate_invocation.entry).try_into()?))
+        Ok(Self::new((&*validate_invocation.element).try_into()?))
     }
 }
 
@@ -84,7 +96,7 @@ pub enum ValidateResult {
     Invalid(String),
     /// subconscious needs to map this to either pending or abandoned based on context that the
     /// wasm can't possibly have
-    UnresolvedDependencies(Vec<EntryHash>),
+    UnresolvedDependencies(Vec<AnyDhtHash>),
 }
 
 impl From<Vec<(ZomeName, ValidateCallbackResult)>> for ValidateResult {
@@ -116,17 +128,16 @@ mod test {
 
     use super::ValidateResult;
     use crate::core::ribosome::Invocation;
-    use crate::core::ribosome::ZomesToInvoke;
     use crate::fixt::ValidateHostAccessFixturator;
     use crate::fixt::ValidateInvocationFixturator;
     use crate::fixt::ZomeCallCapGrantFixturator;
     use ::fixt::prelude::*;
     use holo_hash::fixt::AgentPubKeyFixturator;
     use holochain_serialized_bytes::prelude::*;
-    use holochain_types::{dna::zome::HostFnAccess, fixt::*};
-    use holochain_zome_types::entry::Entry;
+    use holochain_types::{dna::zome::HostFnAccess, dna::zome::Permission, fixt::*};
     use holochain_zome_types::validate::ValidateCallbackResult;
     use holochain_zome_types::ExternInput;
+    use holochain_zome_types::{entry::Entry, header::HeaderType};
     use rand::seq::SliceRandom;
     use std::sync::Arc;
 
@@ -174,10 +185,9 @@ mod test {
         let validate_host_access = ValidateHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
-        assert_eq!(
-            HostFnAccess::from(&validate_host_access),
-            HostFnAccess::none(),
-        );
+        let mut access = HostFnAccess::none();
+        access.read_workspace = Permission::Allow;
+        assert_eq!(HostFnAccess::from(&validate_host_access), access);
     }
 
     #[tokio::test(threaded_scheduler)]
@@ -185,8 +195,8 @@ mod test {
         let validate_invocation = ValidateInvocationFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
-        let zome_name = validate_invocation.zome_name.clone();
-        assert_eq!(ZomesToInvoke::One(zome_name), validate_invocation.zomes(),);
+        let zomes_to_invoke = validate_invocation.zomes_to_invoke.clone();
+        assert_eq!(zomes_to_invoke, validate_invocation.zomes(),);
     }
 
     #[tokio::test(threaded_scheduler)]
@@ -201,8 +211,9 @@ mod test {
                 .unwrap()
                 .into(),
         );
-        validate_invocation.entry = Arc::new(agent_entry);
-        let mut expected = vec!["validate", "validate_agent"];
+        let el = fixt!(Element, (agent_entry, HeaderType::Create));
+        validate_invocation.element = Arc::new(el);
+        let mut expected = vec!["validate", "validate_create", "validate_create_agent"];
         for fn_component in validate_invocation.fn_components() {
             assert_eq!(fn_component, expected.pop().unwrap(),);
         }
@@ -213,8 +224,9 @@ mod test {
                 .unwrap()
                 .into(),
         );
-        validate_invocation.entry = Arc::new(agent_entry);
-        let mut expected = vec!["validate", "validate_entry"];
+        let el = fixt!(Element, (agent_entry, HeaderType::Create));
+        validate_invocation.element = Arc::new(el);
+        let mut expected = vec!["validate", "validate_create", "validate_create_entry"];
         for fn_component in validate_invocation.fn_components() {
             assert_eq!(fn_component, expected.pop().unwrap(),);
         }
@@ -225,8 +237,9 @@ mod test {
                 .unwrap()
                 .into(),
         );
-        validate_invocation.entry = Arc::new(agent_entry);
-        let mut expected = vec!["validate", "validate_cap_claim"];
+        let el = fixt!(Element, (agent_entry, HeaderType::Update));
+        validate_invocation.element = Arc::new(el);
+        let mut expected = vec!["validate", "validate_update", "validate_update_cap_claim"];
         for fn_component in validate_invocation.fn_components() {
             assert_eq!(fn_component, expected.pop().unwrap(),);
         }
@@ -237,8 +250,9 @@ mod test {
                 .unwrap()
                 .into(),
         );
-        validate_invocation.entry = Arc::new(agent_entry);
-        let mut expected = vec!["validate", "validate_cap_grant"];
+        let el = fixt!(Element, (agent_entry, HeaderType::Create));
+        validate_invocation.element = Arc::new(el);
+        let mut expected = vec!["validate", "validate_create", "validate_create_cap_grant"];
         for fn_component in validate_invocation.fn_components() {
             assert_eq!(fn_component, expected.pop().unwrap(),);
         }
@@ -254,7 +268,7 @@ mod test {
 
         assert_eq!(
             host_input,
-            ExternInput::new(SerializedBytes::try_from(&*validate_invocation.entry).unwrap()),
+            ExternInput::new(SerializedBytes::try_from(&*validate_invocation.element).unwrap()),
         );
     }
 }
@@ -263,17 +277,15 @@ mod test {
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
 
-    use super::ValidateHostAccess;
     use super::ValidateResult;
-    use crate::core::ribosome::RibosomeT;
+    use crate::core::ribosome::{RibosomeT, ZomesToInvoke};
     use crate::core::state::source_chain::SourceChainResult;
     use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
     use crate::fixt::curve::Zomes;
-    use crate::fixt::ValidateInvocationFixturator;
-    use crate::fixt::WasmRibosomeFixturator;
-    use crate::fixt::ZomeCallHostAccessFixturator;
+    use crate::fixt::*;
     use ::fixt::prelude::*;
     use holo_hash::fixt::AgentPubKeyFixturator;
+    use holochain_types::fixt::*;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::CreateOutput;
     use holochain_zome_types::Entry;
@@ -287,10 +299,10 @@ mod slow_tests {
         let mut validate_invocation = ValidateInvocationFixturator::new(fixt::Empty)
             .next()
             .unwrap();
-        validate_invocation.zome_name = TestWasm::Foo.into();
+        validate_invocation.zomes_to_invoke = ZomesToInvoke::One(TestWasm::Foo.into());
 
         let result = ribosome
-            .run_validate(ValidateHostAccess, validate_invocation)
+            .run_validate(fixt!(ValidateHostAccess), validate_invocation)
             .unwrap();
         assert_eq!(result, ValidateResult::Valid,);
     }
@@ -303,10 +315,10 @@ mod slow_tests {
         let mut validate_invocation = ValidateInvocationFixturator::new(fixt::Empty)
             .next()
             .unwrap();
-        validate_invocation.zome_name = TestWasm::ValidateValid.into();
+        validate_invocation.zomes_to_invoke = ZomesToInvoke::One(TestWasm::ValidateValid.into());
 
         let result = ribosome
-            .run_validate(ValidateHostAccess, validate_invocation)
+            .run_validate(fixt!(ValidateHostAccess), validate_invocation)
             .unwrap();
         assert_eq!(result, ValidateResult::Valid,);
     }
@@ -319,10 +331,10 @@ mod slow_tests {
         let mut validate_invocation = ValidateInvocationFixturator::new(fixt::Empty)
             .next()
             .unwrap();
-        validate_invocation.zome_name = TestWasm::ValidateInvalid.into();
+        validate_invocation.zomes_to_invoke = ZomesToInvoke::One(TestWasm::ValidateInvalid.into());
 
         let result = ribosome
-            .run_validate(ValidateHostAccess, validate_invocation)
+            .run_validate(fixt!(ValidateHostAccess), validate_invocation)
             .unwrap();
         assert_eq!(result, ValidateResult::Invalid("esoteric edge case".into()),);
     }
@@ -342,11 +354,13 @@ mod slow_tests {
                 .into(),
         );
 
-        validate_invocation.zome_name = TestWasm::ValidateInvalid.into();
-        validate_invocation.entry = Arc::new(entry);
+        validate_invocation.zomes_to_invoke = ZomesToInvoke::One(TestWasm::ValidateInvalid.into());
+
+        let el = fixt!(Element, entry);
+        validate_invocation.element = Arc::new(el);
 
         let result = ribosome
-            .run_validate(ValidateHostAccess, validate_invocation)
+            .run_validate(fixt!(ValidateHostAccess), validate_invocation)
             .unwrap();
         assert_eq!(result, ValidateResult::Invalid("esoteric edge case".into()));
     }

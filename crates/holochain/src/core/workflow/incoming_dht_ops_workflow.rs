@@ -4,7 +4,7 @@ use super::{
     error::WorkflowResult,
     integrate_dht_ops_workflow::{integrate_single_data, integrate_single_metadata},
     produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertResult,
-    sys_validation_workflow::types::PendingDependencies,
+    sys_validation_workflow::counterfeit_check,
 };
 use crate::core::{
     queue_consumer::TriggerSender,
@@ -43,8 +43,15 @@ pub async fn incoming_dht_ops_workflow(
     // add incoming ops to the validation limbo
     for (hash, op) in ops {
         if !workspace.op_exists(&hash)? {
-            tracing::debug!(?op);
-            workspace.add_to_pending(hash, op).await?;
+            tracing::debug!(?hash, ?op);
+            if should_keep(&op).await? {
+                workspace.add_to_pending(hash, op).await?;
+            } else {
+                tracing::warn!(
+                    msg = "Dropping op because it failed counterfeit checks",
+                    ?op
+                );
+            }
         }
     }
 
@@ -57,6 +64,13 @@ pub async fn incoming_dht_ops_workflow(
     sys_validation_trigger.trigger();
 
     Ok(())
+}
+
+/// If this op fails the counterfeit check it should be dropped
+async fn should_keep(op: &DhtOp) -> WorkflowResult<bool> {
+    let header = op.header();
+    let signature = op.signature();
+    Ok(counterfeit_check(signature, &header).await?)
 }
 
 #[allow(missing_docs)]
@@ -102,6 +116,7 @@ impl IncomingDhtOpsWorkspace {
     async fn add_to_pending(&mut self, hash: DhtOpHash, op: DhtOp) -> DhtOpConvertResult<()> {
         let basis = op.dht_basis().await;
         let op_light = op.to_light().await;
+        tracing::debug!(?op_light);
 
         integrate_single_data(op, &mut self.element_pending)?;
         integrate_single_metadata(
@@ -116,7 +131,6 @@ impl IncomingDhtOpsWorkspace {
             time_added: Timestamp::now(),
             last_try: None,
             num_tries: 0,
-            pending_dependencies: PendingDependencies::new(),
         };
         self.validation_limbo.put(hash, vlv)?;
         Ok(())
