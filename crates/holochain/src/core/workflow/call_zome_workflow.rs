@@ -3,7 +3,6 @@ use super::{
     error::{WorkflowError, WorkflowResult},
 };
 use crate::conductor::interface::SignalBroadcaster;
-use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::ribosome::{error::RibosomeError, ZomesToInvoke};
 use crate::core::ribosome::{error::RibosomeResult, RibosomeT, ZomeCallHostAccess};
 use crate::core::state::source_chain::SourceChainError;
@@ -51,6 +50,7 @@ pub struct CallZomeWorkflowArgs<Ribosome: RibosomeT> {
     conductor_api,
     trigger_produce_dht_ops
 ))]
+#[allow(clippy::complexity)]
 pub async fn call_zome_workflow<'env, Ribosome: RibosomeT>(
     workspace: CallZomeWorkspace,
     network: HolochainP2pCell,
@@ -62,9 +62,15 @@ pub async fn call_zome_workflow<'env, Ribosome: RibosomeT>(
     mut trigger_produce_dht_ops: TriggerSender,
 ) -> WorkflowResult<ZomeCallInvocationResult> {
     let workspace_lock = CallZomeWorkspaceLock::new(workspace);
-    let result =
-        call_zome_workflow_inner(workspace_lock.clone(), network, keystore, signal_tx, args)
-            .await?;
+    let result = call_zome_workflow_inner(
+        workspace_lock.clone(),
+        network,
+        keystore,
+        conductor_api,
+        signal_tx,
+        args,
+    )
+    .await?;
 
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
@@ -84,6 +90,7 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT>(
     workspace_lock: CallZomeWorkspaceLock,
     network: HolochainP2pCell,
     keystore: KeystoreSender,
+    conductor_api: impl CellConductorApiT,
     signal_tx: SignalBroadcaster,
     args: CallZomeWorkflowArgs<Ribosome>,
 ) -> WorkflowResult<ZomeCallInvocationResult> {
@@ -375,6 +382,7 @@ pub mod tests {
             workspace.into(),
             network,
             keystore,
+            conductor_api,
             SignalBroadcaster::noop(),
             args,
         )
