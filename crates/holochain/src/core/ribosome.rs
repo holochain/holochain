@@ -92,7 +92,7 @@ pub enum HostAccess {
     EntryDefs(EntryDefsHostAccess),
     MigrateAgent(MigrateAgentHostAccess),
     ValidationPackage(ValidationPackageHostAccess),
-    PostCommit(PostCommitHostAccess),
+    PostCommit(PostCommitHostAccess), // TODO: add emit_signal access here?
 }
 
 impl From<&HostAccess> for HostFnAccess {

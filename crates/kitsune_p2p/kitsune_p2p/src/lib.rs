@@ -8,3 +8,5 @@ mod spawn;
 pub use spawn::*;
 
 mod test;
+
+pub mod fixt;
