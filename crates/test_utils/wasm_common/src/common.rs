@@ -11,6 +11,12 @@ impl From<String> for TestString {
     }
 }
 
+impl From<&str> for TestString {
+    fn from(s: &str) -> Self {
+        Self(s.to_owned())
+    }
+}
+
 #[derive(Serialize, Deserialize, SerializedBytes)]
 #[repr(transparent)]
 pub struct TestBytes(#[serde(with = "serde_bytes")] pub Vec<u8>);
