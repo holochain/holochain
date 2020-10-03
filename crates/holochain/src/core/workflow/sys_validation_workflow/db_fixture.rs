@@ -18,8 +18,6 @@ pub enum SysValidationWorkspaceFixtureItem {
     MetaVault(<MetadataBuf as LoadDbFixture>::FixtureItem),
     ElementPending(<ElementBuf<PendingPrefix> as LoadDbFixture>::FixtureItem),
     MetaPending(<MetadataBuf<PendingPrefix> as LoadDbFixture>::FixtureItem),
-    ElementJudged(<ElementBuf<JudgedPrefix> as LoadDbFixture>::FixtureItem),
-    MetaJudged(<MetadataBuf<JudgedPrefix> as LoadDbFixture>::FixtureItem),
     ElementCache(<ElementBuf as LoadDbFixture>::FixtureItem),
     MetaCache(<MetadataBuf as LoadDbFixture>::FixtureItem),
 }
@@ -49,8 +47,6 @@ impl LoadDbFixture for SysValidationWorkspace {
             Self::FixtureItem::MetaVault(d) => self.meta_vault.write_test_datum(d),
             Self::FixtureItem::ElementPending(d) => self.element_pending.write_test_datum(d),
             Self::FixtureItem::MetaPending(d) => self.meta_pending.write_test_datum(d),
-            Self::FixtureItem::ElementJudged(d) => self.element_judged.write_test_datum(d),
-            Self::FixtureItem::MetaJudged(d) => self.meta_judged.write_test_datum(d),
             Self::FixtureItem::ElementCache(d) => self.element_cache.write_test_datum(d),
             Self::FixtureItem::MetaCache(d) => self.meta_cache.write_test_datum(d),
         }
@@ -93,18 +89,6 @@ impl LoadDbFixture for SysValidationWorkspace {
             .into_iter()
             .map(|i| Self::FixtureItem::MetaPending(i));
 
-        let element_judged = self
-            .element_judged
-            .read_test_data(reader)
-            .into_iter()
-            .map(|i| Self::FixtureItem::ElementJudged(i));
-
-        let meta_judged = self
-            .meta_judged
-            .read_test_data(reader)
-            .into_iter()
-            .map(|i| Self::FixtureItem::MetaJudged(i));
-
         let element_cache = self
             .element_cache
             .read_test_data(reader)
@@ -123,8 +107,6 @@ impl LoadDbFixture for SysValidationWorkspace {
             .chain(meta_vault)
             .chain(element_pending)
             .chain(meta_pending)
-            .chain(element_judged)
-            .chain(meta_judged)
             .chain(element_cache)
             .chain(meta_cache)
             .collect::<DbFixture<Self>>()

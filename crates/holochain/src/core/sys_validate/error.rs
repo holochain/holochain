@@ -1,12 +1,13 @@
 use super::SourceChainError;
 use crate::{
     conductor::entry_def_store::error::EntryDefStoreError,
-    core::state::cascade::error::CascadeError,
+    core::state::cascade::error::CascadeError, core::workflow::error::WorkflowError,
 };
 use holo_hash::{AnyDhtHash, HeaderHash};
-use holochain_keystore::{KeystoreError, Signature};
+use holochain_keystore::KeystoreError;
 use holochain_state::error::DatabaseError;
 use holochain_types::cell::CellId;
+use holochain_zome_types::signature::Signature;
 use holochain_zome_types::{
     header::{AppEntryType, EntryType},
     Header,
@@ -37,6 +38,8 @@ pub enum SysValidationError {
     DnaMissing(CellId),
     #[error(transparent)]
     ValidationOutcome(#[from] ValidationOutcome),
+    #[error(transparent)]
+    WorkflowError(#[from] Box<WorkflowError>),
 }
 
 pub type SysValidationResult<T> = Result<T, SysValidationError>;
@@ -78,6 +81,15 @@ pub enum ValidationOutcome {
     VerifySignature(Signature, Header),
     #[error("The app entry type {0:?} zome id was out of range")]
     ZomeId(AppEntryType),
+}
+
+impl ValidationOutcome {
+    pub fn not_holding<I: Into<AnyDhtHash> + Clone>(h: &I) -> Self {
+        Self::NotHoldingDep(h.clone().into())
+    }
+    pub fn not_found<I: Into<AnyDhtHash> + Clone>(h: &I) -> Self {
+        Self::DepMissingFromDht(h.clone().into())
+    }
 }
 
 #[derive(Error, Debug)]

@@ -55,9 +55,9 @@ checksum = "245097e9a4535ee1e3e3931fcfcd55a796a44c643e8596ff6566d68f09b87bbc"
 
 [[package]]
 name = "derive_more"
-version = "0.99.9"
+version = "0.99.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "298998b1cf6b5b2c8a7b023dfd45821825ce3ba8a8af55c921a0e734e4653f76"
+checksum = "1dcfabdab475c16a93d669dddfc393027803e347d09663f524447f642fbb84ba"
 dependencies = [
  "proc-macro2 1.0.19",
  "quote 1.0.7",
@@ -144,9 +144,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_serialized_bytes"
-version = "0.0.43"
+version = "0.0.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d61a43f9efb00384b2e35c8690774423be81f4675c3849d757ad45e74bf853f1"
+checksum = "adca869d80860a04757af4fc011d49505594365391a6e3a04105e8f88b9c32e1"
 dependencies = [
  "holochain_serialized_bytes_derive",
  "rmp-serde",
@@ -159,9 +159,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_serialized_bytes_derive"
-version = "0.0.43"
+version = "0.0.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ec23054c743a2a9f7e76603abf52c06c530735bd36f35a92df2d6498f79f60d6"
+checksum = "2dbbf84d56f0a0cb00e5532fd4d40b1d42ffb403a1a964d8eeedc4d40131e208"
 dependencies = [
  "quote 0.6.13",
  "syn 0.15.44",
@@ -169,9 +169,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_common"
-version = "0.0.45"
+version = "0.0.46"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0367dabf82b157d98dc6080edc94034bce8d6cc6fc276bfbee06005d58380397"
+checksum = "6ee46b8c29e3823cd71f62d6be4f524943f3ee4e8df25f2e758b5feb576636d2"
 dependencies = [
  "holochain_serialized_bytes",
  "serde",
@@ -180,9 +180,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_guest"
-version = "0.0.45"
+version = "0.0.46"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c1cb68124704cee9c6755775216352bb4287e6fdc0c5223e62284dc11447dcd4"
+checksum = "d25baad68477da31c444f4c036f8c9da5c129024aa23041e6d3c2fa42c3cdff4"
 dependencies = [
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
@@ -559,6 +559,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_wasm_emit_signal"
+version = "0.0.1"
+dependencies = [
+ "hdk3",
+ "serde",
+ "test_wasm_common",
+]
+
+[[package]]
 name = "test_wasm_entry_defs"
 version = "0.0.1"
 dependencies = [
@@ -689,6 +698,14 @@ name = "test_wasm_ser_regression"
 version = "0.0.1"
 dependencies = [
  "derive_more",
+ "hdk3",
+ "serde",
+]
+
+[[package]]
+name = "test_wasm_sign"
+version = "0.0.1"
+dependencies = [
  "hdk3",
  "serde",
 ]

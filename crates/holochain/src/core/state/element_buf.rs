@@ -74,16 +74,6 @@ impl ElementBuf<PendingPrefix> {
     }
 }
 
-impl ElementBuf<JudgedPrefix> {
-    /// Create a element buf for all elements that have progressed past validation.
-    /// Note this doesn't mean they are Valid only that validation has run and
-    /// come up with a [ValidationStatus].
-    /// This reuses the database but is the data is completely separate.
-    pub fn judged(env: EnvironmentRead) -> DatabaseResult<Self> {
-        ElementBuf::new_vault(env, true)
-    }
-}
-
 impl ElementBuf<RejectedPrefix> {
     /// Create a element buf for all elements that have been rejected.
     /// This reuses the database but is the data is completely separate.

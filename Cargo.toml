@@ -1,6 +1,5 @@
 [workspace]
 members = [
-  "crates/crypto",
   "crates/dna_util",
   "crates/fixt",
   "crates/fixt/test",
@@ -12,6 +11,7 @@ members = [
   "crates/kitsune_p2p/kitsune_p2p",
   "crates/kitsune_p2p/transport_quic",
   "crates/kitsune_p2p/types",
+  "crates/kitsune_p2p/proxy",
   "crates/legacy",
   "crates/state",
   "crates/test_utils/wasm",

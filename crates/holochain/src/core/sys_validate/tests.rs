@@ -129,12 +129,12 @@ async fn verify_header_signature_test() {
 
     assert_matches!(
         verify_header_signature(&wrong_signature, &header).await,
-        Err(SysValidationError::ValidationOutcome(ValidationOutcome::VerifySignature(_, _)))
+        Ok(false)
     );
 
     assert_matches!(
         verify_header_signature(&real_signature, &header).await,
-        Ok(())
+        Ok(true)
     );
 }
 
@@ -186,34 +186,6 @@ async fn check_valid_if_dna_test() {
         Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::PrevHeaderError(PrevHeaderError::InvalidRoot)
         ))
-    );
-}
-
-#[tokio::test(threaded_scheduler)]
-async fn check_prev_header_in_metadata_test() {
-    let env: EnvironmentRead = test_cell_env().env.into();
-    // Test data
-    let mut header_fixt = HeaderHashFixturator::new(Predictable);
-    let prev_header_hash = header_fixt.next().unwrap();
-    let author = fixt!(AgentPubKey);
-    let activity_return = vec![prev_header_hash.clone()];
-    let mut metadata = meta_mock!(expect_get_activity, activity_return, {
-        let author = author.clone();
-        move |a| *a == author
-    });
-
-    metadata.expect_env().return_const(env);
-
-    // Previous header on this hash
-    assert_matches!(
-        check_prev_header_in_metadata(&author, &prev_header_hash, &metadata).await,
-        Ok(())
-    );
-
-    // No previous header on this hash
-    assert_matches!(
-        check_prev_header_in_metadata(&author, &header_fixt.next().unwrap(), &metadata).await,
-        Err(SysValidationError::ValidationOutcome(ValidationOutcome::NotHoldingDep(_)))
     );
 }
 
@@ -489,9 +461,7 @@ async fn check_entry_not_private_test() {
 #[cfg(test)]
 mod fixture_tests {
     use super::*;
-    use crate::core::workflow::sys_validation_workflow::{
-        types::Dependency, SysValidationWorkspaceFixtureItem as SF,
-    };
+    use crate::core::workflow::sys_validation_workflow::SysValidationWorkspaceFixtureItem as SF;
     use holo_hash::HasHash;
     use holochain_state::db_fixture::LoadDbFixture;
     use holochain_types::EntryHashed;
@@ -521,21 +491,22 @@ mod fixture_tests {
             .times(1)
             .returning(|_, _| Ok(Vec::new()));
 
-        // Assert that the dep is missing at first
-        assert_matches!(
-            check_entry_exists(entry.as_hash().clone(), &mut workspace, network).await,
-            Err(SysValidationError::ValidationOutcome(
-                ValidationOutcome::DepMissingFromDht(hash)
-            )) if hash == any_hash
-        );
+        todo!("rewrite test without Dependency type");
+        // // Assert that the dep is missing at first
+        // assert_matches!(
+        //     check_entry_exists(entry.as_hash().clone(), &mut workspace, network).await,
+        //     Err(SysValidationError::ValidationOutcome(
+        //         ValidationOutcome::DepMissingFromDht(hash)
+        //     )) if hash == any_hash
+        // );
 
-        workspace.write_test_data(SF::registered_entry(el));
+        // workspace.write_test_data(SF::registered_entry(el));
 
-        let network = holochain_p2p::MockHolochainP2pCellT::new();
+        // let network = holochain_p2p::MockHolochainP2pCellT::new();
 
-        assert_matches!(
-            check_entry_exists(entry.as_hash().clone(), &mut workspace, network).await,
-            Ok(Dependency::Claim(_))
-        );
+        // assert_matches!(
+        //     check_entry_exists(entry.as_hash().clone(), &mut workspace, network).await,
+        //     Ok(Dependency::Claim(_))
+        // );
     }
 }

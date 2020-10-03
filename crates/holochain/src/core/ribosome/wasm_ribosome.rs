@@ -18,9 +18,9 @@ use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitResult;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
-use crate::core::ribosome::guest_callback::validate_link_add::ValidateCreateLinkHostAccess;
-use crate::core::ribosome::guest_callback::validate_link_add::ValidateCreateLinkInvocation;
-use crate::core::ribosome::guest_callback::validate_link_add::ValidateCreateLinkResult;
+use crate::core::ribosome::guest_callback::validate_link::ValidateLinkHostAccess;
+use crate::core::ribosome::guest_callback::validate_link::ValidateLinkInvocation;
+use crate::core::ribosome::guest_callback::validate_link::ValidateLinkResult;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 use crate::core::ribosome::guest_callback::CallIterator;
@@ -43,7 +43,6 @@ use crate::core::ribosome::host_fn::get_details::get_details;
 use crate::core::ribosome::host_fn::get_link_details::get_link_details;
 use crate::core::ribosome::host_fn::get_links::get_links;
 use crate::core::ribosome::host_fn::hash_entry::hash_entry;
-use crate::core::ribosome::host_fn::keystore::keystore;
 use crate::core::ribosome::host_fn::property::property;
 use crate::core::ribosome::host_fn::query::query;
 use crate::core::ribosome::host_fn::random_bytes::random_bytes;
@@ -53,6 +52,7 @@ use crate::core::ribosome::host_fn::sign::sign;
 use crate::core::ribosome::host_fn::sys_time::sys_time;
 use crate::core::ribosome::host_fn::unreachable::unreachable;
 use crate::core::ribosome::host_fn::update::update;
+use crate::core::ribosome::host_fn::verify_signature::verify_signature;
 use crate::core::ribosome::host_fn::zome_info::zome_info;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::Invocation;
@@ -72,7 +72,7 @@ use holochain_zome_types::migrate_agent::MigrateAgentCallbackResult;
 use holochain_zome_types::post_commit::PostCommitCallbackResult;
 use holochain_zome_types::validate::ValidateCallbackResult;
 use holochain_zome_types::validate::ValidationPackageCallbackResult;
-use holochain_zome_types::validate_link_add::ValidateCreateLinkCallbackResult;
+use holochain_zome_types::validate_link::ValidateLinkCallbackResult;
 use holochain_zome_types::zome::FunctionName;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::CallbackResult;
@@ -186,12 +186,18 @@ impl WasmRibosome {
             ..
         } = host_fn_access
         {
-            ns.insert("__keystore", func!(invoke_host_function!(keystore)));
+            ns.insert(
+                "__verify_signature",
+                func!(invoke_host_function!(verify_signature)),
+            );
             ns.insert("__sign", func!(invoke_host_function!(sign)));
             ns.insert("__decrypt", func!(invoke_host_function!(decrypt)));
             ns.insert("__encrypt", func!(invoke_host_function!(encrypt)));
         } else {
-            ns.insert("__keystore", func!(invoke_host_function!(unreachable)));
+            ns.insert(
+                "__verify_signature",
+                func!(invoke_host_function!(unreachable)),
+            );
             ns.insert("__sign", func!(invoke_host_function!(unreachable)));
             ns.insert("__decrypt", func!(invoke_host_function!(unreachable)));
             ns.insert("__encrypt", func!(invoke_host_function!(unreachable)));
@@ -452,12 +458,12 @@ impl RibosomeT for WasmRibosome {
         do_callback!(self, access, invocation, ValidateCallbackResult)
     }
 
-    fn run_validate_link_add(
+    fn run_validate_link<I: Invocation + 'static>(
         &self,
-        access: ValidateCreateLinkHostAccess,
-        invocation: ValidateCreateLinkInvocation,
-    ) -> RibosomeResult<ValidateCreateLinkResult> {
-        do_callback!(self, access, invocation, ValidateCreateLinkCallbackResult)
+        access: ValidateLinkHostAccess,
+        invocation: ValidateLinkInvocation<I>,
+    ) -> RibosomeResult<ValidateLinkResult> {
+        do_callback!(self, access, invocation, ValidateLinkCallbackResult)
     }
 
     fn run_init(

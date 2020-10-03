@@ -51,6 +51,7 @@ use super::{
     dna_store::DnaStore,
     entry_def_store::EntryDefBufferKey,
     error::{ConductorResult, CreateAppError},
+    interface::SignalBroadcaster,
     manager::TaskManagerRunHandle,
     Cell, Conductor,
 };
@@ -179,6 +180,10 @@ pub trait ConductorHandleT: Send + Sync {
     /// Dump the cells state
     #[allow(clippy::ptr_arg)]
     async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String>;
+
+    /// Access the broadcast Sender which will send a Signal across every
+    /// attached app interface
+    async fn signal_broadcaster(&self) -> SignalBroadcaster;
 
     /// Get info about an installed App, whether active or inactive
     #[allow(clippy::ptr_arg)]
@@ -364,12 +369,16 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 Err(e) => Some(e),
             }
         });
-        Ok(futures::future::join_all(add_cells_tasks)
+        let r = futures::future::join_all(add_cells_tasks)
             .await
             .into_iter()
             // Remove successful and collect the errors
             .filter_map(|r| r)
-            .collect())
+            .collect();
+        {
+            self.conductor.write().await.initialize_cell_workflows();
+        }
+        Ok(r)
     }
 
     async fn activate_app(&self, app_id: AppId) -> ConductorResult<()> {
@@ -400,6 +409,10 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
     async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
         self.conductor.read().await.dump_cell_state(cell_id).await
+    }
+
+    async fn signal_broadcaster(&self) -> SignalBroadcaster {
+        self.conductor.read().await.signal_broadcaster()
     }
 
     async fn get_app_info(&self, app_id: &AppId) -> ConductorResult<Option<InstalledApp>> {

@@ -1,7 +1,9 @@
 //! The CellConductorApi allows Cells to talk to their Conductor
 
 use super::error::{ConductorApiError, ConductorApiResult};
-use crate::conductor::{entry_def_store::EntryDefBufferKey, ConductorHandle};
+use crate::conductor::{
+    entry_def_store::EntryDefBufferKey, interface::SignalBroadcaster, ConductorHandle,
+};
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::workflow::ZomeCallInvocationResult;
 use async_trait::async_trait;
@@ -69,6 +71,10 @@ impl CellConductorApiT for CellConductorApi {
         self.conductor_handle.keystore()
     }
 
+    async fn signal_broadcaster(&self) -> SignalBroadcaster {
+        self.conductor_handle.signal_broadcaster().await
+    }
+
     async fn get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile> {
         self.conductor_handle.get_dna(dna_hash).await
     }
@@ -106,6 +112,10 @@ pub trait CellConductorApiT: Clone + Send + Sync + Sized {
 
     /// Request access to this conductor's keystore
     fn keystore(&self) -> &KeystoreSender;
+
+    /// Access the broadcast Sender which will send a Signal across every
+    /// attached app interface
+    async fn signal_broadcaster(&self) -> SignalBroadcaster;
 
     /// Get a [Dna] from the [DnaStore]
     async fn get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile>;

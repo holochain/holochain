@@ -11,7 +11,13 @@ This repository contains the core Holochain libraries and binaries.
 
 This is the most recent and well maintained version of Holochain with a refactored state model (you may see references to it as Holochain RSM).
 
-**Code Status:** This code is in alpha. It is not for production use. The code is guaranteed NOT secure. Also, We will likely be restructuring code APIs and data chains until Beta.
+## Code Status 
+
+This code is in alpha. It is not for production use. The code is guaranteed NOT secure. 
+
+We will be frequently and heavily restructuring code APIs and data chains until Beta.
+
+**We are currently only supporting Linux at this time**. You may or may not be able to successfully build and run Holochain on macOS. You definitely won't be able to on Windows (unless you are using WSL, but even that is untested). We will definitely be rolling out support for these OSes in the future, but in the meantime please use Linux for development!
 
 ## Development Environment
 
@@ -26,6 +32,13 @@ hc-merge-test
 
 This will compile holochain and run all the tests.
 
+If you get an error while running `nix-shell` about ngrok having an unfree license, you can fix that by running,
+
+```
+mkdir -p ~/.config/nixpkgs/
+echo "{ allowUnfree = true; }" >> ~/.config/nixpkgs/config.nix
+```
+
 We have an all-in-one development environment including (among other things):
 
 - The correct version and sane environment variables of cargo/rust
@@ -37,6 +50,7 @@ We have an all-in-one development environment including (among other things):
 It is called [Holonix](https://github.com/holochain/holonix) and you should use it.
 
 It has plenty of documentation and functionality and can be used across Windows, Mac, and Linux.
+(Although Holochain itself currently only supports Linux.)
 It is based on the development tools provided by [NixOS](http://nixos.org/).
 
 It is suitable for use in hackathons and 'serious' development for a long-term,

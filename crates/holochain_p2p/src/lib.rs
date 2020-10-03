@@ -2,7 +2,6 @@
 //! holochain specific wrapper around more generic p2p module
 
 use holo_hash::*;
-use holochain_keystore::*;
 use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::zome::FunctionName;
 use holochain_zome_types::{capability::CapSecret, zome::ZomeName};
@@ -21,6 +20,8 @@ use holochain_types::{
 };
 pub use spawn::*;
 pub use test::HolochainP2pCellFixturator;
+
+pub use kitsune_p2p;
 
 #[mockall::automock]
 #[async_trait::async_trait]

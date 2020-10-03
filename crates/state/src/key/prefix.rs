@@ -4,10 +4,8 @@ use std::marker::PhantomData;
 const INTEGRATED_PREFIX: u8 = 0x0;
 /// Prefix for the database awaiting validation ( judgement :) )
 const PENDING_PREFIX: u8 = 0x1;
-/// Prefix for the database awaiting integration (has been judged)
-const JUDGED_PREFIX: u8 = 0x2;
 /// Prefix for the database of rejected data (has been judged and found invalid)
-const REJECTED_PREFIX: u8 = 0x3;
+const REJECTED_PREFIX: u8 = 0x2;
 
 /// Prefix length 1 + hash length 36
 // TODO: B-02112 change to 39 bytes
@@ -51,10 +49,6 @@ pub struct IntegratedPrefix;
 pub struct PendingPrefix;
 
 #[derive(PartialOrd, Clone, Ord, PartialEq, Eq, Debug)]
-/// Prefix key for data that is post validated and pending integration
-pub struct JudgedPrefix;
-
-#[derive(PartialOrd, Clone, Ord, PartialEq, Eq, Debug)]
 /// Prefix key for data that has been rejected
 pub struct RejectedPrefix;
 
@@ -64,10 +58,6 @@ impl PrefixType for IntegratedPrefix {
 
 impl PrefixType for PendingPrefix {
     const PREFIX: u8 = PENDING_PREFIX;
-}
-
-impl PrefixType for JudgedPrefix {
-    const PREFIX: u8 = JUDGED_PREFIX;
 }
 
 impl PrefixType for RejectedPrefix {

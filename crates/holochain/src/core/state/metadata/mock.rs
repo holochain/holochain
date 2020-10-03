@@ -17,7 +17,7 @@ mock! {
         fn sync_register_element_header(&mut self, header: &Header) -> DatabaseResult<()>;
         fn sync_register_activity(
             &mut self,
-            header: Header,
+            header: &Header,
         ) -> DatabaseResult<()>;
         fn sync_register_update(&mut self, update: header::Update) -> DatabaseResult<()>;
         fn sync_register_delete(&mut self, delete: header::Delete) -> DatabaseResult<()>;
@@ -25,7 +25,7 @@ mock! {
         fn sync_deregister_element_header(&mut self, header: HeaderHash) -> DatabaseResult<()>;
         fn sync_deregister_activity(
             &mut self,
-            header: Header,
+            header: &Header,
         ) -> DatabaseResult<()>;
         fn sync_deregister_update(&mut self, update: header::Update) -> DatabaseResult<()>;
         fn sync_deregister_delete(&mut self, delete: header::Delete) -> DatabaseResult<()>;
@@ -42,7 +42,7 @@ mock! {
         ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError>>>;
         fn get_activity(
             &self,
-            header_hash: AgentPubKey,
+            key: ChainItemKey,
         ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError>>>;
         fn get_updates(
             &self,
@@ -115,10 +115,10 @@ impl MetadataBufT for MockMetadataBuf {
     fn get_activity<'r, R: Readable>(
         &'r self,
         _reader: &'r R,
-        agent_pubkey: AgentPubKey,
+        key: ChainItemKey,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
-        self.get_activity(agent_pubkey)
+        self.get_activity(key)
     }
 
     fn get_updates<'r, R: Readable>(
@@ -172,7 +172,7 @@ impl MetadataBufT for MockMetadataBuf {
         self.sync_register_element_header(header)
     }
 
-    fn register_activity(&mut self, header: Header) -> DatabaseResult<()> {
+    fn register_activity(&mut self, header: &Header) -> DatabaseResult<()> {
         self.sync_register_activity(header)
     }
 
@@ -191,7 +191,7 @@ impl MetadataBufT for MockMetadataBuf {
         self.sync_deregister_element_header(header)
     }
 
-    fn deregister_activity(&mut self, header: Header) -> DatabaseResult<()> {
+    fn deregister_activity(&mut self, header: &Header) -> DatabaseResult<()> {
         self.sync_deregister_activity(header)
     }
 

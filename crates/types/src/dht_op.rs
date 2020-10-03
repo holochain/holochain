@@ -64,7 +64,7 @@ pub enum DhtOp {
     // TODO: This entry is here for validation by the entry update header holder
     // link's don't do this. The entry is validated by store entry. Maybe we either
     // need to remove the Entry here or add it to link.
-    RegisterUpdatedBy(Signature, header::Update),
+    RegisterUpdatedBy(Signature, header::Update, Option<Box<Entry>>),
 
     /// Op for registering a Header deletion with the Header authority
     RegisterDeletedBy(Signature, header::Delete),
@@ -104,7 +104,7 @@ impl DhtOp {
             Self::StoreElement(_, header, _) => UniqueForm::StoreElement(header),
             Self::StoreEntry(_, header, _) => UniqueForm::StoreEntry(header),
             Self::RegisterAgentActivity(_, header) => UniqueForm::RegisterAgentActivity(header),
-            Self::RegisterUpdatedBy(_, header) => UniqueForm::RegisterUpdatedBy(header),
+            Self::RegisterUpdatedBy(_, header, _) => UniqueForm::RegisterUpdatedBy(header),
             Self::RegisterDeletedBy(_, header) => UniqueForm::RegisterDeletedBy(header),
             Self::RegisterDeletedEntryHeader(_, header) => {
                 UniqueForm::RegisterDeletedEntryHeader(header)
@@ -141,7 +141,7 @@ impl DhtOp {
                 let h = HeaderHash::with_data_sync(h);
                 DhtOpLight::RegisterAgentActivity(h, basis)
             }
-            DhtOp::RegisterUpdatedBy(_, h) => {
+            DhtOp::RegisterUpdatedBy(_, h, _) => {
                 let e = h.entry_hash.clone();
                 let h = HeaderHash::with_data_sync(&Header::from(h.clone()));
                 DhtOpLight::RegisterUpdatedBy(h, e, basis)
@@ -171,11 +171,41 @@ impl DhtOp {
             DhtOp::StoreElement(s, _, _)
             | DhtOp::StoreEntry(s, _, _)
             | DhtOp::RegisterAgentActivity(s, _)
-            | DhtOp::RegisterUpdatedBy(s, _)
+            | DhtOp::RegisterUpdatedBy(s, _, _)
             | DhtOp::RegisterDeletedBy(s, _)
             | DhtOp::RegisterDeletedEntryHeader(s, _)
             | DhtOp::RegisterAddLink(s, _)
             | DhtOp::RegisterRemoveLink(s, _) => s,
+        }
+    }
+
+    /// Extract inner Signature, Header and Option<Entry> from an op
+    pub fn into_inner(self) -> (Signature, Header, Option<Entry>) {
+        match self {
+            DhtOp::StoreElement(s, h, e) => (s, h, e.map(|e| *e)),
+            DhtOp::StoreEntry(s, h, e) => (s, h.into(), Some(*e)),
+            DhtOp::RegisterAgentActivity(s, h) => (s, h, None),
+            DhtOp::RegisterUpdatedBy(s, h, e) => (s, h.into(), e.map(|e| *e)),
+            DhtOp::RegisterDeletedBy(s, h) => (s, h.into(), None),
+            DhtOp::RegisterDeletedEntryHeader(s, h) => (s, h.into(), None),
+            DhtOp::RegisterAddLink(s, h) => (s, h.into(), None),
+            DhtOp::RegisterRemoveLink(s, h) => (s, h.into(), None),
+        }
+    }
+
+    /// Get the header from this op
+    /// This requires cloning and converting the header
+    /// as some ops don't hold the Header type
+    pub fn header(&self) -> Header {
+        match self {
+            DhtOp::StoreElement(_, h, _) => h.clone(),
+            DhtOp::StoreEntry(_, h, _) => h.clone().into(),
+            DhtOp::RegisterAgentActivity(_, h) => h.clone(),
+            DhtOp::RegisterUpdatedBy(_, h, _) => h.clone().into(),
+            DhtOp::RegisterDeletedBy(_, h) => h.clone().into(),
+            DhtOp::RegisterDeletedEntryHeader(_, h) => h.clone().into(),
+            DhtOp::RegisterAddLink(_, h) => h.clone().into(),
+            DhtOp::RegisterRemoveLink(_, h) => h.clone().into(),
         }
     }
 }
@@ -274,7 +304,8 @@ pub async fn produce_ops_from_element(element: &Element) -> DhtOpResult<Vec<DhtO
             }
             DhtOpLight::RegisterUpdatedBy(_, _, _) => {
                 let entry_update = header.try_into()?;
-                DhtOp::RegisterUpdatedBy(signature, entry_update)
+                let maybe_entry_box = maybe_entry.clone().into_option().map(Box::new);
+                DhtOp::RegisterUpdatedBy(signature, entry_update, maybe_entry_box)
             }
             DhtOpLight::RegisterDeletedEntryHeader(_, _) => {
                 let element_delete = header.try_into()?;

@@ -142,7 +142,7 @@ impl GetDb for EnvironmentRead {
 /// The canonical representation of a (singleton) LMDB environment.
 /// The wrapper contains methods for managing transactions
 /// and database connections,
-#[derive(Clone, Shrinkwrap, Into)]
+#[derive(Clone, Shrinkwrap, Into, derive_more::From)]
 pub struct EnvironmentWrite(EnvironmentRead);
 
 impl EnvironmentWrite {
@@ -212,6 +212,8 @@ pub enum EnvironmentKind {
     Conductor,
     /// Specifies the environment used to save wasm
     Wasm,
+    /// State of the p2p network
+    P2P,
 }
 
 impl EnvironmentKind {
@@ -221,6 +223,7 @@ impl EnvironmentKind {
             EnvironmentKind::Cell(cell_id) => PathBuf::from(cell_id.to_string()),
             EnvironmentKind::Conductor => PathBuf::from("conductor"),
             EnvironmentKind::Wasm => PathBuf::from("wasm"),
+            EnvironmentKind::P2P => PathBuf::from("p2p"),
         }
     }
 }

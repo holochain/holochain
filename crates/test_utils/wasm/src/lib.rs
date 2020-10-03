@@ -18,6 +18,7 @@ pub enum TestWasm {
     Crud,
     Debug,
     EntryDefs,
+    EmitSignal,
     HashEntry,
     Foo,
     HashPath,
@@ -33,6 +34,7 @@ pub enum TestWasm {
     Query,
     RandomBytes,
     SerRegression,
+    Sign,
     SysTime,
     Validate,
     ValidateLink,
@@ -58,6 +60,7 @@ impl From<TestWasm> for ZomeName {
             TestWasm::Crud => "crud",
             TestWasm::Debug => "debug",
             TestWasm::EntryDefs => "entry_defs",
+            TestWasm::EmitSignal => "emit_signal",
             TestWasm::HashEntry => "hash_entry",
             TestWasm::Foo => "foo",
             TestWasm::HashPath => "hash_path",
@@ -73,6 +76,7 @@ impl From<TestWasm> for ZomeName {
             TestWasm::Query => "query",
             TestWasm::RandomBytes => "random_bytes",
             TestWasm::SerRegression => "ser_regression",
+            TestWasm::Sign => "sign",
             TestWasm::SysTime => "sys_time",
             TestWasm::Validate => "validate",
             TestWasm::ValidateLink => "validate_link",
@@ -107,6 +111,9 @@ impl From<TestWasm> for DnaWasm {
             TestWasm::Debug => get_code("wasm32-unknown-unknown/release/test_wasm_debug.wasm"),
             TestWasm::EntryDefs => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_entry_defs.wasm")
+            }
+            TestWasm::EmitSignal => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_emit_signal.wasm")
             }
             TestWasm::HashEntry => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_hash_entry.wasm")
@@ -145,6 +152,7 @@ impl From<TestWasm> for DnaWasm {
             TestWasm::SerRegression => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_ser_regression.wasm")
             }
+            TestWasm::Sign => get_code("wasm32-unknown-unknown/release/test_wasm_sign.wasm"),
             TestWasm::SysTime => get_code("wasm32-unknown-unknown/release/test_wasm_sys_time.wasm"),
             TestWasm::Validate => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_validate.wasm")

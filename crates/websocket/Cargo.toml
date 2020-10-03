@@ -10,7 +10,7 @@ edition = "2018"
 
 [dependencies]
 futures = "0.3"
-holochain_serialized_bytes = "=0.0.43"
+holochain_serialized_bytes = "=0.0.45"
 nanoid = "0.3"
 net2 = "0.2"
 serde = { version = "1", features = [ "derive" ] }
@@ -20,7 +20,7 @@ tokio-tungstenite = { version = "0.10.1", features = [ "tls" ] }
 tracing = "0.1"
 tracing-futures = "0.2"
 tungstenite = "0.10"
-url2 = "0.0.5"
+url2 = "0.0.6"
 
 [dev-dependencies]
 holochain_types = { version = "=0.0.1", path = "../types" }

@@ -1,13 +1,10 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_crypto::crypto_init_sodium;
-use holochain_crypto::crypto_randombytes_buf;
-use holochain_crypto::crypto_secure_buffer;
-use holochain_crypto::DynCryptoBytes;
 use holochain_zome_types::bytes::Bytes;
 use holochain_zome_types::RandomBytesInput;
 use holochain_zome_types::RandomBytesOutput;
+use ring::rand::SecureRandom;
 use std::sync::Arc;
 
 /// return n crypto secure random bytes from the standard holochain crypto lib
@@ -16,16 +13,11 @@ pub fn random_bytes(
     _call_context: Arc<CallContext>,
     input: RandomBytesInput,
 ) -> RibosomeResult<RandomBytesOutput> {
-    let _ = crypto_init_sodium();
-    let mut buf: DynCryptoBytes = crypto_secure_buffer(input.into_inner() as _)?;
+    let system_random = ring::rand::SystemRandom::new();
+    let mut bytes = vec![0; input.into_inner() as _];
+    system_random.fill(&mut bytes)?;
 
-    tokio_safe_block_on::tokio_safe_block_forever_on(async {
-        crypto_randombytes_buf(&mut buf).await
-    })?;
-
-    let random_bytes = buf.read();
-
-    Ok(RandomBytesOutput::new(Bytes::from(random_bytes.to_vec())))
+    Ok(RandomBytesOutput::new(Bytes::from(bytes)))
 }
 
 #[cfg(test)]
@@ -84,6 +76,7 @@ pub mod wasm_test {
             "random_bytes",
             RandomBytesInput::new(5 as _)
         );
+
         assert_ne!(&[0; LEN], output.into_inner().as_ref(),);
     }
 }

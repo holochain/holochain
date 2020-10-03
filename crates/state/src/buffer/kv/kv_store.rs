@@ -93,7 +93,7 @@ where
     K: BufKey,
     V: BufVal,
 {
-    /// Create a new KvIntBufFresh
+    /// Create a new KvStore
     pub fn new(db: SingleStore) -> Self {
         Self {
             db,

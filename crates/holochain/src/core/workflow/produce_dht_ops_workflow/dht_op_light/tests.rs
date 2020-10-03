@@ -8,7 +8,6 @@ use crate::{
 };
 use ::fixt::prelude::*;
 use holo_hash::{fixt::HeaderHashFixturator, *};
-use holochain_keystore::Signature;
 use holochain_state::test_utils::test_cell_env;
 use holochain_types::{
     dht_op::{produce_ops_from_element, DhtOp},
@@ -22,6 +21,7 @@ use holochain_zome_types::header::{
     AgentValidationPkg, CloseChain, Create, CreateLink, DeleteLink, Dna, EntryType, Header,
     HeaderBuilderCommon, InitZomesComplete, OpenChain, Update,
 };
+use holochain_zome_types::signature::Signature;
 use pretty_assertions::assert_eq;
 use tracing::*;
 
@@ -134,7 +134,11 @@ impl ElementTest {
                 NewEntryHeader::Update(entry_update.clone()),
                 self.entry.clone().into(),
             ),
-            DhtOp::RegisterUpdatedBy(self.sig.clone(), entry_update),
+            DhtOp::RegisterUpdatedBy(
+                self.sig.clone(),
+                entry_update,
+                Some(self.entry.clone().into()),
+            ),
         ];
         (element, ops)
     }
@@ -266,12 +270,17 @@ async fn test_dht_basis() {
         cas.put(signed_header, Some(entry_hashed)).unwrap();
 
         // Create the update header with the same hash
-        let mut entry_update = fixt!(Update);
+        let update_new_entry = fixt!(Entry);
+        let mut entry_update = fixt!(Update, update_new_entry.clone());
         entry_update.original_entry_address = original_header.entry_hash.clone();
         entry_update.original_header_address = original_header_hash;
 
         // Create the op
-        let op = DhtOp::RegisterUpdatedBy(fixt!(Signature), entry_update);
+        let op = DhtOp::RegisterUpdatedBy(
+            fixt!(Signature),
+            entry_update,
+            Some(update_new_entry.into()),
+        );
 
         // Get the basis
         let result = op.dht_basis().await;

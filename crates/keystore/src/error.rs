@@ -1,4 +1,5 @@
 use crate::*;
+use holochain_zome_types::signature::Signature;
 
 /// Keystore Error Type.
 #[derive(Debug, thiserror::Error)]
@@ -14,10 +15,6 @@ pub enum KeystoreError {
     /// Error serializing data.
     #[error("SerializedBytesError: {0}")]
     SerializedBytesError(#[from] SerializedBytesError),
-
-    /// Holochain Crypto Erro.
-    #[error("CryptoError: {0}")]
-    CryptoError(#[from] holochain_crypto::CryptoError),
 
     /// Used by dependents to specify an invalid signature of some data
     #[error("Invalid signature {0:?}, for {1}")]
