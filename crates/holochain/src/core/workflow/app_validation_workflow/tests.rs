@@ -388,7 +388,7 @@ async fn run_test(
     expected_count
 }
 
-/// 1 Commits an entry with validate_create_entry_<EntryDefId> callback
+/// 1. Commits an entry with validate_create_entry_<EntryDefId> callback
 /// 2. The callback rejects the entry proving that it actually ran.
 /// 3. Reject only Post with "Banana" as the String to show it doesn't
 ///    affect other entries.
