@@ -540,32 +540,73 @@ where
             .collect()
     }
 
+    /// Compute the [EntryDhtStatus] for these headers
+    /// from the combined perspective of the cache and
+    /// the authored store
+    fn compute_entry_dht_status(
+        headers: &BTreeSet<TimedHeaderHash>,
+        cache_data: &DbPairMut<'a, MetaCache>,
+        authored_data: &DbPair<'a, MetaAuthored, AuthoredPrefix>,
+        env: &EnvironmentRead,
+    ) -> CascadeResult<EntryDhtStatus> {
+        fresh_reader!(env, |r| {
+            for thh in headers {
+                // If we can find any header that has no
+                // deletes in either store then the entry is live
+                if cache_data
+                    .meta
+                    .get_deletes_on_header(&r, thh.header_hash.clone())?
+                    .next()?
+                    .is_none()
+                    && authored_data
+                        .meta
+                        .get_deletes_on_header(&r, thh.header_hash.clone())?
+                        .next()?
+                        .is_none()
+                {
+                    return Ok(EntryDhtStatus::Live);
+                }
+            }
+
+            Ok(EntryDhtStatus::Dead)
+        })
+    }
+
     async fn create_entry_details(&self, hash: EntryHash) -> CascadeResult<Option<EntryDetails>> {
         let cache_data = ok_or_return!(self.cache_data.as_ref(), None);
         let authored_data = ok_or_return!(self.authored_data.as_ref(), None);
         let env = ok_or_return!(self.env.as_ref(), None);
         match self.get_entry_local_raw(&hash)? {
             Some(entry) => fresh_reader!(env, |r| {
-                let entry_dht_status = cache_data.meta.get_dht_status(&r, &hash)?;
+                // Get the "headers that created this entry" hashes
                 let headers = cache_data
                     .meta
                     .get_headers(&r, hash.clone())?
                     .chain(authored_data.meta.get_headers(&r, hash.clone())?)
-                    .collect::<HashSet<_>>()?;
-                let headers = self.render_headers(headers, |h| {
-                    h == HeaderType::Update || h == HeaderType::Create
-                })?;
+                    .collect::<BTreeSet<_>>()?;
+
+                // Get the delete hashes
                 let deletes = cache_data
                     .meta
                     .get_deletes_on_entry(&r, hash.clone())?
                     .chain(authored_data.meta.get_deletes_on_entry(&r, hash.clone())?)
-                    .collect::<HashSet<_>>()?;
-                let deletes = self.render_headers(deletes, |h| h == HeaderType::Delete)?;
+                    .collect::<BTreeSet<_>>()?;
+
+                // Get the update hashes
                 let updates = cache_data
                     .meta
                     .get_updates(&r, hash.clone().into())?
                     .chain(authored_data.meta.get_updates(&r, hash.into())?)
-                    .collect::<HashSet<_>>()?;
+                    .collect::<BTreeSet<_>>()?;
+
+                let entry_dht_status =
+                    Self::compute_entry_dht_status(&headers, &cache_data, &authored_data, &env)?;
+
+                // Render headers
+                let headers = self.render_headers(headers, |h| {
+                    h == HeaderType::Update || h == HeaderType::Create
+                })?;
+                let deletes = self.render_headers(deletes, |h| h == HeaderType::Delete)?;
                 let updates = self.render_headers(updates, |h| h == HeaderType::Update)?;
                 Ok(Some(EntryDetails {
                     entry: entry.into_content(),
@@ -590,7 +631,7 @@ where
                     .meta
                     .get_deletes_on_header(&r, hash.clone())?
                     .chain(authored_data.meta.get_deletes_on_header(&r, hash)?)
-                    .collect::<HashSet<_>>())?;
+                    .collect::<BTreeSet<_>>())?;
                 let deletes = self.render_headers(deletes, |h| h == HeaderType::Delete)?;
                 Ok(Some(ElementDetails { element, deletes }))
             }
@@ -694,7 +735,7 @@ where
         self.create_entry_details(entry_hash).await
     }
 
-    fn get_old_live_element<P: PrefixType, M: MetadataBufT<P>>(
+    fn get_oldest_live_element<P: PrefixType, M: MetadataBufT<P>>(
         &self,
         entry_hash: &EntryHash,
         db: &DbPair<M, P>,
@@ -757,7 +798,7 @@ where
         let authored_data = ok_or_return!(self.authored_data.as_ref(), None);
         // Meta Cache
         let oldest_live_element =
-            match self.get_old_live_element(&entry_hash, &DbPair::from(cache_data))? {
+            match self.get_oldest_live_element(&entry_hash, &DbPair::from(cache_data))? {
                 // Look for the element data in authored
                 Some(Search::Continue(oldest_live_header)) => {
                     match authored_data.element.get_element(&oldest_live_header)? {
@@ -768,7 +809,7 @@ where
                 Some(s) => s,
                 // Search the authored store
                 None => self
-                    .get_old_live_element(&entry_hash, authored_data)?
+                    .get_oldest_live_element(&entry_hash, authored_data)?
                     .unwrap_or(Search::NotInCascade),
             };
 

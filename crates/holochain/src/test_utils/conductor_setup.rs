@@ -21,6 +21,7 @@ use tempdir::TempDir;
 
 use super::host_fn_api::CallData;
 
+/// Everything you need to run a test that uses the conductor
 pub struct ConductorTestData {
     pub __tmpdir: Arc<TempDir>,
     pub app_api: RealAppInterfaceApi,
@@ -28,6 +29,8 @@ pub struct ConductorTestData {
     pub alice_call_data: ConductorCallData,
     pub bob_call_data: Option<ConductorCallData>,
 }
+
+/// Everything you need to make a call with the host fn api
 pub struct ConductorCallData {
     pub cell_id: CellId,
     pub env: EnvironmentWrite,
@@ -58,6 +61,7 @@ impl ConductorCallData {
         call_data
     }
 
+    /// Create a CallData for a specific zome and call
     pub fn call_data<I: Into<ZomeName>>(&self, zome_name: I) -> CallData {
         let zome_name: ZomeName = zome_name.into();
         let zome_path = (self.cell_id.clone(), zome_name).into();
@@ -135,6 +139,7 @@ impl ConductorTestData {
             bob_call_data,
         }
     }
+    /// Shutdown the conductor
     pub async fn shutdown_conductor(handle: ConductorHandle) {
         let shutdown = handle.take_shutdown_handle().await.unwrap();
         handle.shutdown().await;
