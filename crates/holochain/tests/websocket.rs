@@ -77,6 +77,7 @@ fn create_config(port: u16, environment_path: PathBuf) -> ConductorConfig {
         passphrase_service: Some(PassphraseServiceConfig::FromConfig {
             passphrase: "password".into(),
         }),
+        keystore_path: None,
         use_dangerous_test_keystore: true,
     }
 }

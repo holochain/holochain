@@ -21,7 +21,7 @@ pub use dpki_config::DpkiConfig;
 pub use network_config::NetworkConfig;
 pub use passphrase_service_config::PassphraseServiceConfig;
 //pub use signal_config::SignalConfig;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 // TODO change types from "stringly typed" to Url2
 /// All the config information for the conductor
@@ -62,6 +62,10 @@ pub struct ConductorConfig {
     /// Optional DPKI configuration if conductor is using a DPKI app to initalize and manage
     /// keys for new instances
     pub dpki: Option<DpkiConfig>,
+
+    /// Optional path for keystore directory.  If not specified will use the default provided
+    /// by the [ConfigBuilder]()https://docs.rs/lair_keystore_api/0.0.1-alpha.4/lair_keystore_api/struct.ConfigBuilder.html)
+    pub keystore_path: Option<PathBuf>,
 
     /// Configure how the conductor should prompt the user for the passphrase to lock/unlock keystores.
     /// The conductor is independent of the specialized implementation of the trait
@@ -147,6 +151,7 @@ pub mod tests {
                 decryption_service_uri: None,
                 dpki: None,
                 passphrase_service: Some(PassphraseServiceConfig::Cmd),
+                keystore_path: None,
                 admin_interfaces: None,
                 use_dangerous_test_keystore: false,
             }
@@ -195,6 +200,7 @@ pub mod tests {
                     init_params: "some_params".into()
                 }),
                 passphrase_service: Some(PassphraseServiceConfig::Cmd),
+                keystore_path: None,
                 admin_interfaces: Some(vec![AdminInterfaceConfig {
                     driver: InterfaceDriver::Websocket { port: 1234 }
                 }]),
@@ -204,10 +210,12 @@ pub mod tests {
     }
 
     #[test]
-    fn test_config_passphrase_in_config() {
+    fn test_config_keystore() {
         let toml = r#"
     environment_path = "/path/to/env"
     use_dangerous_test_keystore = true
+
+    keystore_path = "/path/to/keystore"
 
     [passphrase_service]
     type = "fromconfig"
@@ -227,6 +235,7 @@ pub mod tests {
                 passphrase_service: Some(PassphraseServiceConfig::FromConfig {
                     passphrase: "foobar".into()
                 }),
+                keystore_path: Some(PathBuf::from("/path/to/keystore").into()),
                 admin_interfaces: None,
                 use_dangerous_test_keystore: true,
             }
