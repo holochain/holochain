@@ -104,7 +104,7 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT, C: CellConductorApi
     tracing::trace!(line = line!());
 
     let to_app_validate = {
-        let workspace = workspace_lock.read().await;
+        let mut workspace = workspace_lock.write().await;
         // Get the new head
         let chain_head_end_len = workspace.source_chain.len();
         let new_elements_len = chain_head_end_len - chain_head_start_len;
@@ -117,9 +117,7 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT, C: CellConductorApi
             // Loop forwards through all the new elements
             let mut i = chain_head_start_len;
             while let Some(element) = workspace.source_chain.get_at_index(i as u32)? {
-                // TODO: Figure out how to write the cache from
-                // this validation call as there's likely some gets
-                sys_validate_element(&element, &workspace, network.clone(), &conductor_api)
+                sys_validate_element(&element, &mut workspace, network.clone(), &conductor_api)
                     .await
                     // If the was en error exit
                     // If the validation failed, exit with an InvalidCommit
