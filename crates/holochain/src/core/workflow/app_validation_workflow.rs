@@ -503,6 +503,9 @@ pub struct AppValidationWorkspace {
     // Read only rejected store for finding dependency data
     pub element_rejected: ElementBuf<RejectedPrefix>,
     pub meta_rejected: MetadataBuf<RejectedPrefix>,
+    // Read only authored store for finding dependency data
+    pub element_authored: ElementBuf<AuthoredPrefix>,
+    pub meta_authored: MetadataBuf<AuthoredPrefix>,
     // Cached data
     pub element_cache: ElementBuf,
     pub meta_cache: MetadataBuf,
@@ -534,6 +537,8 @@ impl AppValidationWorkspace {
         let call_zome_workspace_lock = Some(CallZomeWorkspaceLock::new(call_zome_workspace));
 
         // READ ONLY
+        let element_authored = ElementBuf::authored(env.clone(), false)?;
+        let meta_authored = MetadataBuf::authored(env.clone())?;
         let element_rejected = ElementBuf::rejected(env.clone())?;
         let meta_rejected = MetadataBuf::rejected(env)?;
 
@@ -543,6 +548,8 @@ impl AppValidationWorkspace {
             validation_limbo,
             element_vault,
             meta_vault,
+            element_authored,
+            meta_authored,
             element_pending,
             meta_pending,
             element_rejected,
@@ -590,6 +597,10 @@ impl AppValidationWorkspace {
             element: &self.element_vault,
             meta: &self.meta_vault,
         };
+        let authored_data = DbPair {
+            element: &self.element_authored,
+            meta: &self.meta_authored,
+        };
         let pending_data = DbPair {
             element: &self.element_pending,
             meta: &self.meta_pending,
@@ -604,6 +615,7 @@ impl AppValidationWorkspace {
         };
         Cascade::empty()
             .with_integrated(integrated_data)
+            .with_authored(authored_data)
             .with_pending(pending_data)
             .with_cache(cache_data)
             .with_rejected(rejected_data)
@@ -617,6 +629,10 @@ impl Workspace for AppValidationWorkspace {
         self.integration_limbo.flush_to_txn_ref(writer)?;
         self.element_pending.flush_to_txn_ref(writer)?;
         self.meta_pending.flush_to_txn_ref(writer)?;
+
+        // Flush for cascade
+        self.element_cache.flush_to_txn_ref(writer)?;
+        self.meta_cache.flush_to_txn_ref(writer)?;
 
         // Need to flush the call zome workspace because of the cache.
         // TODO: If cache becomes a separate env then remove this
