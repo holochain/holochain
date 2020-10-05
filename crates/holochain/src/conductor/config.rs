@@ -66,7 +66,7 @@ pub struct ConductorConfig {
     /// Configure how the conductor should prompt the user for the passphrase to lock/unlock keystores.
     /// The conductor is independent of the specialized implementation of the trait
     /// PassphraseService. It just needs something to provide a passphrase when needed.
-    /// This config setting selects one of the available services (i.e. CLI prompt, IPC, mock)
+    /// This config setting selects one of the available services (i.e. CLI prompt, IPC, FromConfig)
     pub passphrase_service: Option<PassphraseServiceConfig>,
 
     /// Setup admin interfaces to control this conductor through a websocket connection
@@ -198,6 +198,36 @@ pub mod tests {
                 admin_interfaces: Some(vec![AdminInterfaceConfig {
                     driver: InterfaceDriver::Websocket { port: 1234 }
                 }]),
+                use_dangerous_test_keystore: true,
+            }
+        );
+    }
+
+    #[test]
+    fn test_config_passphrase_in_config() {
+        let toml = r#"
+    environment_path = "/path/to/env"
+    use_dangerous_test_keystore = true
+
+    [passphrase_service]
+    type = "fromconfig"
+    passphrase = "foobar"
+
+    "#;
+        let result: ConductorResult<ConductorConfig> = config_from_toml(toml);
+        assert_eq!(
+            result.unwrap(),
+            ConductorConfig {
+                environment_path: PathBuf::from("/path/to/env").into(),
+                network: None,
+                signing_service_uri: None,
+                encryption_service_uri: None,
+                decryption_service_uri: None,
+                dpki: None,
+                passphrase_service: Some(PassphraseServiceConfig::FromConfig {
+                    passphrase: "foobar".into()
+                }),
+                admin_interfaces: None,
                 use_dangerous_test_keystore: true,
             }
         );
