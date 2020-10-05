@@ -52,9 +52,9 @@ pub mod slow_tests {
 
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
-    use holo_hash::HasHash;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::header::CreateLink;
+    use holochain_zome_types::element::SignedHeaderHashed;
+    use holochain_zome_types::Header;
     use test_wasm_common::*;
 
     #[tokio::test(threaded_scheduler)]
@@ -128,10 +128,9 @@ pub mod slow_tests {
 
         let link_details = children_details_output.into_inner();
 
-        let to_remove: CreateLink = (link_details[0]).0.clone();
+        let to_remove: SignedHeaderHashed = (link_details[0]).0.clone();
 
-        let to_remove_hash =
-            holochain_types::header::HeaderHashed::from_content_sync(to_remove.into()).into_hash();
+        let to_remove_hash = to_remove.as_hash().clone();
 
         let _remove_hash: holo_hash::HeaderHash = crate::call_test_ribosome!(
             host_access,
@@ -155,7 +154,11 @@ pub mod slow_tests {
             if removes.len() > 0 {
                 remove_happened = true;
 
-                assert_eq!(&removes[0].link_add_address, &to_remove_hash,);
+                let link_add_address = unwrap_to
+                    ::unwrap_to!(removes[0].header() => Header::DeleteLink)
+                .link_add_address
+                .clone();
+                assert_eq!(link_add_address, to_remove_hash,);
             }
         }
         assert!(remove_happened);

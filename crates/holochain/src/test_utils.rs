@@ -1,3 +1,5 @@
+//! Utils for Holochain tests
+
 use crate::{
     conductor::{
         api::RealAppInterfaceApi,
@@ -139,6 +141,7 @@ pub async fn test_network(
     (network, recv, cell_network)
 }
 
+/// Do what's necessary to install an app
 pub async fn install_app(
     name: &str,
     cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
@@ -160,6 +163,7 @@ pub async fn install_app(
     assert!(errors.is_empty());
 }
 
+/// Payload for installing cells
 pub type InstalledCellsWithProofs = Vec<(InstalledCell, Option<SerializedBytes>)>;
 
 /// Setup an app for testing
@@ -192,11 +196,15 @@ pub async fn setup_app(
 
     let handle = conductor_handle.clone();
 
-    (tmpdir, RealAppInterfaceApi::new(conductor_handle), handle)
+    (
+        tmpdir,
+        RealAppInterfaceApi::new(conductor_handle, "test-interface".into()),
+        handle,
+    )
 }
 
+/// If HC_WASM_CACHE_PATH is set warm the cache
 pub fn warm_wasm_tests() {
-    // If HC_WASM_CACHE_PATH is set warm the cache
     if let Some(_path) = std::env::var_os("HC_WASM_CACHE_PATH") {
         let wasms: Vec<_> = TestWasm::iter().collect();
         crate::fixt::WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(wasms))

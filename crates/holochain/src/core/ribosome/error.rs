@@ -1,7 +1,10 @@
 #![deny(missing_docs)]
 //! Errors occurring during a [Ribosome] call
 
-use crate::core::state::{cascade::error::CascadeError, source_chain::SourceChainError};
+use crate::{
+    conductor::interface::error::InterfaceError,
+    core::state::{cascade::error::CascadeError, source_chain::SourceChainError},
+};
 use holo_hash::AnyDhtHash;
 use holochain_serialized_bytes::prelude::SerializedBytesError;
 use holochain_types::dna::error::DnaError;
@@ -65,6 +68,10 @@ pub enum RibosomeError {
     /// ident
     #[error(transparent)]
     SourceChainError(#[from] SourceChainError),
+
+    /// ident
+    #[error(transparent)]
+    InterfaceError(#[from] InterfaceError),
 
     /// ident
     #[error(transparent)]
