@@ -8,7 +8,7 @@ use crate::entry_def::EntryVisibility;
 use crate::header::*;
 use crate::link::LinkTag;
 use crate::timestamp::Timestamp;
-use crate::validate::RequiredValidationPackage;
+use crate::validate::RequiredValidationType;
 
 pub use holo_hash::fixt::*;
 
@@ -31,7 +31,7 @@ fixturator!(
 );
 
 fixturator!(
-    RequiredValidationPackage;
+    RequiredValidationType;
     unit variants [ Element SubChain Full ] empty Element;
 );
 

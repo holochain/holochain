@@ -43,7 +43,7 @@ impl From<&ThisWasmEntry> for EntryDef {
             crdt_type: entry.into(),
             required_validations: entry.into(),
             visibility: entry.into(),
-            required_validation_package: Default::default(),
+            required_validation_type: Default::default(),
         }
     }
 }

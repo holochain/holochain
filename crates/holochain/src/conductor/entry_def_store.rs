@@ -248,14 +248,14 @@ mod tests {
             visibility: EntryVisibility::Public,
             crdt_type: CrdtType,
             required_validations: 5.into(),
-            required_validation_package: Default::default(),
+            required_validation_type: Default::default(),
         };
         let comment_def = EntryDef {
             id: "comment".into(),
             visibility: EntryVisibility::Private,
             crdt_type: CrdtType,
             required_validations: 5.into(),
-            required_validation_package: Default::default(),
+            required_validation_type: Default::default(),
         };
         let dna_wasm = DnaWasmHashed::from_content(TestWasm::EntryDefs.into())
             .await

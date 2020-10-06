@@ -10,7 +10,7 @@ struct EntryDefId(holochain_zome_types::entry_def::EntryDefId);
 struct EntryVisibility(holochain_zome_types::entry_def::EntryVisibility);
 struct CrdtType(holochain_zome_types::crdt::CrdtType);
 struct RequiredValidations(holochain_zome_types::entry_def::RequiredValidations);
-struct RequiredValidationPackage(holochain_zome_types::validate::RequiredValidationPackage);
+struct RequiredValidationType(holochain_zome_types::validate::RequiredValidationType);
 
 impl Parse for EntryDef {
     fn parse(input: ParseStream) -> Result<Self> {
@@ -19,8 +19,8 @@ impl Parse for EntryDef {
             holochain_zome_types::entry_def::RequiredValidations::default();
         let mut visibility = holochain_zome_types::entry_def::EntryVisibility::default();
         let crdt_type = holochain_zome_types::crdt::CrdtType::default();
-        let mut required_validation_package =
-            holochain_zome_types::validate::RequiredValidationPackage::default();
+        let mut required_validation_type =
+            holochain_zome_types::validate::RequiredValidationType::default();
 
         let vars = Punctuated::<syn::MetaNameValue, syn::Token![,]>::parse_terminated(input)?;
         for var in vars {
@@ -43,23 +43,24 @@ impl Parse for EntryDef {
                         }
                         _ => unreachable!(),
                     },
-                    "required_validation_package" => {
+                    "required_validation_type" => {
                         match var.lit {
-                            syn::Lit::Str(s) => {
-                                required_validation_package = match s.value().as_str() {
-                                    "element" => {
-                                        holochain_zome_types::validate::RequiredValidationPackage::Element
-                                    }
-                                    "sub_chain" => {
-                                        holochain_zome_types::validate::RequiredValidationPackage::SubChain
-                                    }
-                                    "full" => {
-                                        holochain_zome_types::validate::RequiredValidationPackage::Full
-                                    }
-                                    _ => unreachable!("Invalid required_validation_package
-                                    Options are: entry, sub_chain and full"),
+                            syn::Lit::Str(s) => required_validation_type = match s.value().as_str()
+                            {
+                                "element" => {
+                                    holochain_zome_types::validate::RequiredValidationType::Element
                                 }
-                            }
+                                "sub_chain" => {
+                                    holochain_zome_types::validate::RequiredValidationType::SubChain
+                                }
+                                "full" => {
+                                    holochain_zome_types::validate::RequiredValidationType::Full
+                                }
+                                _ => unreachable!(
+                                    "Invalid required_validation_type
+                                    Options are: entry, sub_chain and full"
+                                ),
+                            },
                             _ => unreachable!(),
                         };
                     }
@@ -91,7 +92,7 @@ impl Parse for EntryDef {
             required_validations,
             visibility,
             crdt_type,
-            required_validation_package,
+            required_validation_type,
         }))
     }
 }
@@ -141,18 +142,18 @@ impl quote::ToTokens for EntryVisibility {
     }
 }
 
-impl quote::ToTokens for RequiredValidationPackage {
+impl quote::ToTokens for RequiredValidationType {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let variant = syn::Ident::new(
             match self.0 {
-                holochain_zome_types::validate::RequiredValidationPackage::Element => "Element",
-                holochain_zome_types::validate::RequiredValidationPackage::SubChain => "SubChain",
-                holochain_zome_types::validate::RequiredValidationPackage::Full => "Full",
+                holochain_zome_types::validate::RequiredValidationType::Element => "Element",
+                holochain_zome_types::validate::RequiredValidationType::SubChain => "SubChain",
+                holochain_zome_types::validate::RequiredValidationType::Full => "Full",
             },
             proc_macro2::Span::call_site(),
         );
         tokens.append_all(quote::quote! {
-            hdk3::prelude::RequiredValidationPackage::#variant
+            hdk3::prelude::RequiredValidationType::#variant
         });
     }
 }
@@ -163,8 +164,7 @@ impl quote::ToTokens for EntryDef {
         let visibility = EntryVisibility(self.0.visibility);
         let crdt_type = CrdtType(self.0.crdt_type);
         let required_validations = RequiredValidations(self.0.required_validations);
-        let required_validation_package =
-            RequiredValidationPackage(self.0.required_validation_package);
+        let required_validation_type = RequiredValidationType(self.0.required_validation_type);
 
         tokens.append_all(quote::quote! {
             hdk3::prelude::EntryDef {
@@ -172,7 +172,7 @@ impl quote::ToTokens for EntryDef {
                 visibility: #visibility,
                 crdt_type: #crdt_type,
                 required_validations: #required_validations,
-                required_validation_package: #required_validation_package,
+                required_validation_type: #required_validation_type,
             }
         });
     }

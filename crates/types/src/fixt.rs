@@ -402,7 +402,7 @@ fixturator!(
 
 fixturator!(
     EntryDef;
-    constructor fn new(EntryDefId, EntryVisibility, CrdtType, RequiredValidations, RequiredValidationPackage);
+    constructor fn new(EntryDefId, EntryVisibility, CrdtType, RequiredValidations, RequiredValidationType);
 );
 
 fixturator!(
