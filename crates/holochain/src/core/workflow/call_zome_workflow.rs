@@ -1,10 +1,12 @@
 use super::{
-    app_validation_workflow,
-    error::{WorkflowError, WorkflowResult},
+    app_validation_workflow, error::WorkflowResult, sys_validation_workflow::sys_validate_element,
 };
+use crate::conductor::api::CellConductorApiT;
 use crate::conductor::interface::SignalBroadcaster;
 use crate::core::ribosome::error::RibosomeError;
+use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::ribosome::{error::RibosomeResult, RibosomeT, ZomeCallHostAccess};
+use crate::core::state::metadata::MetadataBufT;
 use crate::core::state::source_chain::SourceChainError;
 use crate::core::state::workspace::Workspace;
 use crate::core::{
@@ -13,12 +15,9 @@ use crate::core::{
         cascade::Cascade, element_buf::ElementBuf, metadata::MetadataBuf,
         source_chain::SourceChain, workspace::WorkspaceResult,
     },
-    sys_validate_element,
 };
-use crate::{conductor::api::CellConductorApiT, core::ribosome::ZomeCallInvocation};
 pub use call_zome_workspace_lock::CallZomeWorkspaceLock;
 use either::Either;
-use fallible_iterator::FallibleIterator;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
 use holochain_state::prelude::*;
@@ -31,46 +30,32 @@ use tracing::instrument;
 
 pub mod call_zome_workspace_lock;
 
+#[cfg(test)]
+mod validation_test;
+
 /// Placeholder for the return value of a zome invocation
 /// TODO: do we want this to be the same as ZomeCallInvocationRESPONSE?
 pub type ZomeCallInvocationResult = RibosomeResult<ZomeCallResponse>;
 
 #[derive(Debug)]
-pub struct CallZomeWorkflowArgs<Ribosome: RibosomeT> {
+pub struct CallZomeWorkflowArgs<Ribosome: RibosomeT, C: CellConductorApiT> {
     pub ribosome: Ribosome,
     pub invocation: ZomeCallInvocation,
+    pub signal_tx: SignalBroadcaster,
+    pub conductor_api: C,
 }
 
-#[instrument(skip(
-    workspace,
-    network,
-    keystore,
-    writer,
-    args,
-    conductor_api,
-    trigger_produce_dht_ops
-))]
-#[allow(clippy::complexity)]
-pub async fn call_zome_workflow<'env, Ribosome: RibosomeT>(
+#[instrument(skip(workspace, network, keystore, writer, args, trigger_produce_dht_ops))]
+pub async fn call_zome_workflow<'env, Ribosome: RibosomeT, C: CellConductorApiT>(
     workspace: CallZomeWorkspace,
     network: HolochainP2pCell,
     keystore: KeystoreSender,
-    signal_tx: SignalBroadcaster,
     writer: OneshotWriter,
-    conductor_api: impl CellConductorApiT,
-    args: CallZomeWorkflowArgs<Ribosome>,
+    args: CallZomeWorkflowArgs<Ribosome, C>,
     mut trigger_produce_dht_ops: TriggerSender,
 ) -> WorkflowResult<ZomeCallInvocationResult> {
     let workspace_lock = CallZomeWorkspaceLock::new(workspace);
-    let result = call_zome_workflow_inner(
-        workspace_lock.clone(),
-        network,
-        keystore,
-        conductor_api,
-        signal_tx,
-        args,
-    )
-    .await?;
+    let result = call_zome_workflow_inner(workspace_lock.clone(), network, keystore, args).await?;
 
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
@@ -86,30 +71,23 @@ pub async fn call_zome_workflow<'env, Ribosome: RibosomeT>(
     Ok(result)
 }
 
-async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT>(
+async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT, C: CellConductorApiT>(
     workspace_lock: CallZomeWorkspaceLock,
     network: HolochainP2pCell,
     keystore: KeystoreSender,
-    conductor_api: impl CellConductorApiT,
-    signal_tx: SignalBroadcaster,
-    args: CallZomeWorkflowArgs<Ribosome>,
+    args: CallZomeWorkflowArgs<Ribosome, C>,
 ) -> WorkflowResult<ZomeCallInvocationResult> {
     let CallZomeWorkflowArgs {
         ribosome,
         invocation,
+        signal_tx,
+        conductor_api,
     } = args;
 
     let zome_name = invocation.zome_name.clone();
 
     // Get the current head
-    let chain_head_start = workspace_lock
-        .read()
-        .await
-        .source_chain
-        .chain_head()?
-        .clone();
-
-    let agent_key = invocation.provenance.clone();
+    let chain_head_start_len = workspace_lock.read().await.source_chain.len();
 
     tracing::trace!(line = line!());
     // Create the unsafe sourcechain for use with wasm closure
@@ -128,44 +106,27 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT>(
     let to_app_validate = {
         let workspace = workspace_lock.read().await;
         // Get the new head
-        let chain_head_end = workspace.source_chain.chain_head()?;
+        let chain_head_end_len = workspace.source_chain.len();
+        let new_elements_len = chain_head_end_len - chain_head_start_len;
 
         // collect all the elements we need to validate in wasm
-        let mut to_app_validate: Vec<Element> = vec![];
+        let mut to_app_validate: Vec<Element> = Vec::with_capacity(new_elements_len);
 
         // Has there been changes?
-        if chain_head_start != *chain_head_end {
-            // get the changes
-            let mut new_headers = workspace
-                .source_chain
-                .iter_back()
-                .scan(None, |current_header, element| {
-                    let my_header = current_header.clone();
-                    *current_header = element.header().prev_header().cloned();
-                    let r = match my_header {
-                        Some(current_header) if current_header == chain_head_start => None,
-                        _ => Some(element),
-                    };
-                    Ok(r)
-                })
-                .map_err(WorkflowError::from);
-
-            while let Some(header) = new_headers.next()? {
-                let chain_element = workspace
-                    .source_chain
-                    .get_element(header.header_address())?;
-                let prev_chain_element = match chain_element {
-                    Some(ref c) => match c.header().prev_header() {
-                        Some(h) => workspace.source_chain.get_element(&h)?,
-                        None => None,
-                    },
-                    None => None,
-                };
-                if let Some(ref chain_element) = chain_element {
-                    sys_validate_element(&agent_key, chain_element, prev_chain_element.as_ref())
-                        .await?;
-                    to_app_validate.push(chain_element.to_owned());
-                }
+        if new_elements_len > 0 {
+            // Loop forwards through all the new elements
+            let mut i = chain_head_start_len;
+            while let Some(element) = workspace.source_chain.get_at_index(i as u32)? {
+                // TODO: Figure out how to write the cache from
+                // this validation call as there's likely some gets
+                sys_validate_element(&element, &workspace, network.clone(), &conductor_api)
+                    .await
+                    // If the was en error exit
+                    // If the validation failed, exit with an InvalidCommit
+                    // If it was ok continue
+                    .or_else(|outcome_or_err| outcome_or_err.invalid_call_zome_commit())?;
+                to_app_validate.push(element);
+                i += 1;
             }
         }
         to_app_validate
@@ -306,6 +267,10 @@ impl<'a> CallZomeWorkspace {
             network,
         )
     }
+
+    pub fn env(&self) -> &EnvironmentRead {
+        self.meta.env()
+    }
 }
 
 impl Workspace for CallZomeWorkspace {
@@ -357,16 +322,10 @@ pub mod tests {
         let args = CallZomeWorkflowArgs {
             invocation,
             ribosome,
-        };
-        call_zome_workflow_inner(
-            workspace.into(),
-            network,
-            keystore,
+            signal_tx: SignalBroadcaster::noop(),
             conductor_api,
-            SignalBroadcaster::noop(),
-            args,
-        )
-        .await
+        };
+        call_zome_workflow_inner(workspace.into(), network, keystore, args).await
     }
 
     // 1.  Check if there is a Capability token secret in the parameters.
