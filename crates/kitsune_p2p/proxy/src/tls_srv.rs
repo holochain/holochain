@@ -1,8 +1,8 @@
 use crate::*;
 use futures::{sink::SinkExt, stream::StreamExt};
+use ghost_actor::dependencies::tracing;
 use rustls::Session;
 use std::io::{Read, Write};
-use ghost_actor::dependencies::tracing;
 
 pub(crate) fn spawn_tls_server(
     short: String,
@@ -28,24 +28,24 @@ async fn tls_server(
     tls_server_config: Arc<rustls::ServerConfig>,
     mut evt_send: TransportIncomingChannelSender,
     mut write: futures::channel::mpsc::Sender<ProxyWire>,
-    mut read: futures::channel::mpsc::Receiver<ProxyWire>,
+    read: futures::channel::mpsc::Receiver<ProxyWire>,
 ) {
     let res: TransportResult<()> = async {
         let mut srv = rustls::ServerSession::new(&tls_server_config);
         let mut buf = [0_u8; 4096];
         let mut in_pre = std::io::Cursor::new(Vec::new());
 
-        let ((mut send1, mut recv1), (send2, recv2)) = create_transport_channel_pair();
+        let ((mut send1, recv1), (send2, recv2)) = create_transport_channel_pair();
         let mut send2 = Some(send2);
         let mut recv2 = Some(recv2);
-        let mut outgoing_data_fut = recv1.next();
-        let mut incoming_wire_fut = read.next();
+
+        let mut merge = kitsune_p2p_types::auto_stream_select(recv1, read);
+        use kitsune_p2p_types::AutoStreamSelect::*;
+
         let mut did_post_handshake_work = false;
         loop {
             if !did_post_handshake_work && !srv.is_handshaking() {
                 did_post_handshake_work = true;
-
-                println!("INCOMING_CERTS!! - {:?}", srv.get_peer_certificates());
 
                 let cert_digest = blake2b_32(
                     srv.get_peer_certificates()
@@ -86,40 +86,34 @@ async fn tls_server(
 
             tracing::trace!("{}: SRV tls wants read", short);
 
-            use futures::future::Either;
-            match futures::future::select(outgoing_data_fut, incoming_wire_fut).await {
-                Either::Left((data, fut)) => {
-                    match data {
-                        Some(data) => {
-                            tracing::trace!("{}: SRV outgoing {} bytes", short, data.len());
-                            srv.write_all(&data).map_err(TransportError::other)?;
-                        }
-                        None => return Ok(()),
-                    }
-                    outgoing_data_fut = recv1.next();
-                    incoming_wire_fut = fut;
+            match merge.next().await {
+                Some(Left(Some(data))) => {
+                    tracing::trace!("{}: SRV outgoing {} bytes", short, data.len());
+                    srv.write_all(&data).map_err(TransportError::other)?;
                 }
-                Either::Right((wire, fut)) => {
-                    match wire {
-                        Some(ProxyWire::ChanSend(ChanSend(data))) => {
-                            tracing::trace!("{}: SRV incoming encrypted {} bytes", short, data.len());
-                            in_pre.get_mut().extend_from_slice(&data);
-                            srv.read_tls(&mut in_pre).map_err(TransportError::other)?;
-                            srv.process_new_packets().map_err(TransportError::other)?;
-                            while let Ok(size) = srv.read(&mut buf) {
-                                tracing::trace!("{}: SRV incoming decrypted {} bytes", short, size);
-                                if size == 0 {
-                                    break;
-                                }
-                                send1.send(buf[..size].to_vec()).await?;
+                Some(Left(None)) => {
+                    write.close().await.map_err(TransportError::other)?;
+                }
+                Some(Right(Some(wire))) => match wire {
+                    ProxyWire::ChanSend(ChanSend(data)) => {
+                        tracing::trace!("{}: SRV incoming encrypted {} bytes", short, data.len());
+                        in_pre.get_mut().extend_from_slice(&data);
+                        srv.read_tls(&mut in_pre).map_err(TransportError::other)?;
+                        srv.process_new_packets().map_err(TransportError::other)?;
+                        while let Ok(size) = srv.read(&mut buf) {
+                            tracing::trace!("{}: SRV incoming decrypted {} bytes", short, size);
+                            if size == 0 {
+                                break;
                             }
+                            send1.send(buf[..size].to_vec()).await?;
                         }
-                        None => return Ok(()),
-                        _ => return Err(format!("invalid wire: {:?}", wire).into()),
                     }
-                    outgoing_data_fut = fut;
-                    incoming_wire_fut = read.next();
+                    _ => return Err(format!("invalid wire: {:?}", wire).into()),
+                },
+                Some(Right(None)) => {
+                    send1.close().await?;
                 }
+                None => return Ok(()),
             }
         }
     }

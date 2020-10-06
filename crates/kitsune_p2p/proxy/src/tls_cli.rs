@@ -1,9 +1,11 @@
 use crate::*;
 use futures::{sink::SinkExt, stream::StreamExt};
+use ghost_actor::dependencies::tracing;
 use rustls::Session;
 use std::io::{Read, Write};
 
 pub(crate) fn spawn_tls_client(
+    short: String,
     expected_proxy_url: ProxyUrl,
     tls_client_config: Arc<rustls::ClientConfig>,
     send: TransportChannelWrite,
@@ -13,6 +15,7 @@ pub(crate) fn spawn_tls_client(
 ) -> tokio::sync::oneshot::Receiver<TransportResult<()>> {
     let (setup_send, setup_recv) = tokio::sync::oneshot::channel();
     tokio::task::spawn(tls_client(
+        short,
         setup_send,
         expected_proxy_url,
         tls_client_config,
@@ -24,14 +27,16 @@ pub(crate) fn spawn_tls_client(
     setup_recv
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn tls_client(
+    short: String,
     setup_send: tokio::sync::oneshot::Sender<TransportResult<()>>,
     expected_proxy_url: ProxyUrl,
     tls_client_config: Arc<rustls::ClientConfig>,
     mut send: TransportChannelWrite,
-    mut recv: TransportChannelRead,
+    recv: TransportChannelRead,
     mut write: futures::channel::mpsc::Sender<ProxyWire>,
-    mut read: futures::channel::mpsc::Receiver<ProxyWire>,
+    read: futures::channel::mpsc::Receiver<ProxyWire>,
 ) {
     let mut setup_send = Some(setup_send);
     let res: TransportResult<()> = async {
@@ -40,8 +45,9 @@ async fn tls_client(
         let mut buf = [0_u8; 4096];
         let mut in_pre = std::io::Cursor::new(Vec::new());
 
-        let mut outgoing_data_fut = recv.next();
-        let mut incoming_wire_fut = read.next();
+        let mut merge = kitsune_p2p_types::auto_stream_select(recv, read);
+        use kitsune_p2p_types::AutoStreamSelect::*;
+
         let mut did_post_handshake_work = false;
         loop {
             if !did_post_handshake_work && !cli.is_handshaking() {
@@ -59,6 +65,7 @@ async fn tls_client(
                     ProxyUrl::new(expected_proxy_url.as_base().as_str(), cert_digest.into())?;
                 if let Some(setup_send) = setup_send.take() {
                     if expected_proxy_url == remote_proxy_url {
+                        tracing::info!("{}: CLI: CONNECTED TLS: {}", short, remote_proxy_url);
                         let _ = setup_send.send(Ok(()));
                     } else {
                         let msg = format!(
@@ -72,6 +79,7 @@ async fn tls_client(
             }
 
             if cli.wants_write() {
+                tracing::trace!("{}: CLI tls wants write", short);
                 let mut data = Vec::new();
                 cli.write_tls(&mut data).map_err(TransportError::other)?;
                 write
@@ -85,37 +93,36 @@ async fn tls_client(
                 continue;
             }
 
-            use futures::future::Either;
-            match futures::future::select(outgoing_data_fut, incoming_wire_fut).await {
-                Either::Left((data, fut)) => {
-                    match data {
-                        Some(data) => {
-                            cli.write_all(&data).map_err(TransportError::other)?;
-                        }
-                        None => return Err("write side shutdown".into()),
-                    }
-                    outgoing_data_fut = recv.next();
-                    incoming_wire_fut = fut;
+            tracing::trace!("{}: CLI tls wants read", short);
+
+            match merge.next().await {
+                Some(Left(Some(data))) => {
+                    tracing::trace!("{}: CLI outgoing {} bytes", short, data.len());
+                    cli.write_all(&data).map_err(TransportError::other)?;
                 }
-                Either::Right((wire, fut)) => {
-                    match wire {
-                        Some(ProxyWire::ChanSend(ChanSend(data))) => {
-                            in_pre.get_mut().extend_from_slice(&data);
-                            cli.read_tls(&mut in_pre).map_err(TransportError::other)?;
-                            cli.process_new_packets().map_err(TransportError::other)?;
-                            while let Ok(size) = cli.read(&mut buf) {
-                                if size == 0 {
-                                    break;
-                                }
-                                send.send(buf[..size].to_vec()).await?;
+                Some(Left(None)) => {
+                    write.close().await.map_err(TransportError::other)?;
+                }
+                Some(Right(Some(wire))) => match wire {
+                    ProxyWire::ChanSend(ChanSend(data)) => {
+                        tracing::trace!("{}: CLI incoming encrypted {} bytes", short, data.len());
+                        in_pre.get_mut().extend_from_slice(&data);
+                        cli.read_tls(&mut in_pre).map_err(TransportError::other)?;
+                        cli.process_new_packets().map_err(TransportError::other)?;
+                        while let Ok(size) = cli.read(&mut buf) {
+                            tracing::trace!("{}: CLI incoming decrypted {} bytes", short, size);
+                            if size == 0 {
+                                break;
                             }
+                            send.send(buf[..size].to_vec()).await?;
                         }
-                        None => return Ok(()),
-                        _ => return Err(format!("invalid wire: {:?}", wire).into()),
                     }
-                    outgoing_data_fut = fut;
-                    incoming_wire_fut = read.next();
+                    _ => return Err(format!("invalid wire: {:?}", wire).into()),
+                },
+                Some(Right(None)) => {
+                    send.close().await?;
                 }
+                None => return Ok(()),
             }
         }
     }

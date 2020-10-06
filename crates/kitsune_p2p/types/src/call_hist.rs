@@ -13,8 +13,14 @@ mod tests {
         let expect1 = "apple:crates/kitsune_p2p/types/src/call_hist.rs:11";
         let expect2 = "banana:crates/kitsune_p2p/types/src/call_hist.rs:12";
         assert_eq!(&format!("[{}][{}]", expect2, expect1), &h.to_string());
-        assert_eq!(&format!("[\"{}\", \"{}\"]", expect2, expect1), &format!("{:?}", h));
-        assert_eq!(&format!("[\n    \"{}\",\n    \"{}\",\n]", expect2, expect1), &format!("{:#?}", h));
+        assert_eq!(
+            &format!("[\"{}\", \"{}\"]", expect2, expect1),
+            &format!("{:?}", h)
+        );
+        assert_eq!(
+            &format!("[\n    \"{}\",\n    \"{}\",\n]", expect2, expect1),
+            &format!("{:#?}", h)
+        );
     }
 }
 
@@ -25,9 +31,7 @@ mod if_debug {
 
     /// Item tracking call history potentially across async / through channels.
     #[derive(Clone, Copy)]
-    pub struct CallHist(
-        [&'static str; STACK_LEN],
-    );
+    pub struct CallHist([&'static str; STACK_LEN]);
 
     impl CallHist {
         /// Create a new CallHist instance.
