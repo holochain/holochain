@@ -343,7 +343,7 @@ async fn validate_op_inner(
     }
 }
 
-#[instrument(skip(element, workspace, network, conductor_api))]
+#[instrument(skip(element, call_zome_workspace, network, conductor_api))]
 /// Direct system validation call that takes
 /// an Element instead of an op.
 /// Does not require holding dependencies.
@@ -351,24 +351,32 @@ async fn validate_op_inner(
 /// that outcome immediately.
 pub async fn sys_validate_element(
     element: &Element,
-    workspace: &CallZomeWorkspace,
+    call_zome_workspace: &mut CallZomeWorkspace,
     network: HolochainP2pCell,
     conductor_api: &impl CellConductorApiT,
 ) -> SysValidationOutcome<()> {
     trace!(?element);
     // Create a SysValidationWorkspace with the scratches from the CallZomeWorkspace
-    let mut workspace = SysValidationWorkspace::try_from(workspace).map(Box::new)?;
-    match sys_validate_element_inner(element, &mut workspace, network, conductor_api).await {
-        // Validation succeeded
-        Ok(_) => Ok(()),
-        // Validation failed so exit with that outcome
-        Err(SysValidationError::ValidationOutcome(validation_outcome)) => {
-            error!(msg = "Direct validation failed", ?element);
-            validation_outcome.into_outcome()
-        }
-        // An error occurred so return it
-        Err(e) => Err(OutcomeOrError::Err(e)),
-    }
+    let mut workspace = SysValidationWorkspace::try_from(&*call_zome_workspace)?;
+    let result =
+        match sys_validate_element_inner(element, &mut workspace, network, conductor_api).await {
+            // Validation succeeded
+            Ok(_) => Ok(()),
+            // Validation failed so exit with that outcome
+            Err(SysValidationError::ValidationOutcome(validation_outcome)) => {
+                error!(msg = "Direct validation failed", ?element);
+                validation_outcome.into_outcome()
+            }
+            // An error occurred so return it
+            Err(e) => Err(OutcomeOrError::Err(e)),
+        };
+
+    // Set the call zome workspace to the updated
+    // cache from the sys validation workspace
+    call_zome_workspace.meta_cache = workspace.meta_cache;
+    call_zome_workspace.element_cache = workspace.element_cache;
+
+    result
 }
 
 async fn sys_validate_element_inner(
@@ -591,30 +599,14 @@ async fn register_add_link(
     let target_entry_address = &link_add.target_address;
 
     // Checks
-    // HACK: Because we write metadata to the cache and data to the vault
-    // for direct calls we can't find elements via EntryHash.
-    // This will be solved via adding an authored data store.
-    match &incoming_dht_ops_sender {
-        Some(_) => {
-            check_and_hold_any_store_entry(
-                base_entry_address,
-                workspace,
-                network.clone(),
-                incoming_dht_ops_sender,
-                |_| Ok(()),
-            )
-            .await?;
-        }
-        None => {
-            let mut cascade = workspace.full_cascade(network.clone());
-            cascade
-                .retrieve_entry(base_entry_address.clone(), Default::default())
-                .await?
-                .ok_or_else(|| {
-                    ValidationOutcome::DepMissingFromDht(base_entry_address.clone().into())
-                })?;
-        }
-    }
+    check_and_hold_any_store_entry(
+        base_entry_address,
+        workspace,
+        network.clone(),
+        incoming_dht_ops_sender,
+        |_| Ok(()),
+    )
+    .await?;
 
     let mut cascade = workspace.full_cascade(network);
     cascade
@@ -671,7 +663,7 @@ pub struct SysValidationWorkspace {
     // Read only authored store for finding dependency data
     pub element_authored: ElementBuf<AuthoredPrefix>,
     pub meta_authored: MetadataBuf<AuthoredPrefix>,
-    // Cached data
+    /// Cached data
     pub element_cache: ElementBuf,
     pub meta_cache: MetadataBuf,
     pub env: EnvironmentRead,
