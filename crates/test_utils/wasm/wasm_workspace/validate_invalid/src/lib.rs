@@ -6,6 +6,6 @@ fn validate_agent(_: Element) -> ExternResult<ValidateCallbackResult> {
 }
 
 #[hdk_extern]
-fn validate(_: Element) -> ExternResult<ValidateCallbackResult> {
+fn validate(_: ValidateData) -> ExternResult<ValidateCallbackResult> {
     Ok(ValidateCallbackResult::Invalid("esoteric edge case".into()))
 }

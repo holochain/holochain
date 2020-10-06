@@ -103,9 +103,11 @@ macro_rules! make_kitsune_bin_type {
                 shrinkwraprs::Shrinkwrap,
                 derive_more::From,
                 derive_more::Into,
+                serde::Serialize,
+                serde::Deserialize,
             )]
             #[shrinkwrap(mutable)]
-            pub struct $name(pub Vec<u8>);
+            pub struct $name(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
             impl KitsuneBinType for $name {
                 fn get_bytes(&self) -> &[u8] {
@@ -157,9 +159,11 @@ These metadata "Operations" each also have unique OpHashes."#,
     shrinkwraprs::Shrinkwrap,
     derive_more::From,
     derive_more::Into,
+    serde::Deserialize,
+    serde::Serialize,
 )]
 #[shrinkwrap(mutable)]
-pub struct KitsuneSignature(pub Vec<u8>);
+pub struct KitsuneSignature(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
 impl std::fmt::Debug for KitsuneSignature {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -173,6 +177,7 @@ impl std::fmt::Debug for KitsuneSignature {
 }
 
 pub mod actor;
+pub mod agent_store;
 pub mod event;
 pub(crate) mod wire;
 

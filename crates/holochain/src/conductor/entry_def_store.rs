@@ -6,6 +6,7 @@ use crate::core::ribosome::{
     RibosomeT,
 };
 
+use super::api::CellConductorApiT;
 use error::{EntryDefStoreError, EntryDefStoreResult};
 use fallible_iterator::FallibleIterator;
 use holochain_serialized_bytes::prelude::*;
@@ -17,6 +18,7 @@ use holochain_state::{
 };
 use holochain_types::dna::{zome::Zome, DnaFile};
 use holochain_zome_types::entry_def::EntryDef;
+use holochain_zome_types::header::AppEntryType;
 use holochain_zome_types::header::EntryDefIndex;
 use std::{collections::HashMap, convert::TryInto};
 
@@ -122,6 +124,29 @@ impl BufferedStore for EntryDefBuf {
     }
 }
 
+/// Get an [EntryDef] from the entry def store
+/// or fallback to running the zome
+pub(crate) async fn get_entry_def(
+    entry_type: &AppEntryType,
+    zome: Zome,
+    dna_file: &DnaFile,
+    conductor_api: &impl CellConductorApiT,
+) -> EntryDefStoreResult<Option<EntryDef>> {
+    let entry_def_index = u8::from(entry_type.id()) as usize;
+
+    // Try to get the entry def from the entry def store
+    let key = EntryDefBufferKey::new(zome, entry_type.id());
+    let entry_def = { conductor_api.get_entry_def(&key).await };
+
+    // If it's not found run the ribosome and get the entry defs
+    match &entry_def {
+        Some(_) => Ok(entry_def),
+        None => Ok(get_entry_defs(dna_file.clone())?
+            .get(entry_def_index)
+            .map(|(_, v)| v.clone())),
+    }
+}
+
 #[tracing::instrument(skip(dna))]
 /// Get all the [EntryDef] for this dna
 pub(crate) fn get_entry_defs(
@@ -223,12 +248,14 @@ mod tests {
             visibility: EntryVisibility::Public,
             crdt_type: CrdtType,
             required_validations: 5.into(),
+            required_validation_type: Default::default(),
         };
         let comment_def = EntryDef {
             id: "comment".into(),
             visibility: EntryVisibility::Private,
             crdt_type: CrdtType,
             required_validations: 5.into(),
+            required_validation_type: Default::default(),
         };
         let dna_wasm = DnaWasmHashed::from_content(TestWasm::EntryDefs.into())
             .await

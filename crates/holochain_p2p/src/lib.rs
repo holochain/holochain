@@ -21,6 +21,8 @@ use holochain_types::{
 pub use spawn::*;
 pub use test::HolochainP2pCellFixturator;
 
+pub use kitsune_p2p;
+
 #[mockall::automock]
 #[async_trait::async_trait]
 /// A wrapper around HolochainP2pSender that partially applies the dna_hash / agent_pub_key.
