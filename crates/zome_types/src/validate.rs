@@ -1,7 +1,14 @@
+use crate::element::Element;
 use crate::zome_io::ExternOutput;
 use crate::CallbackResult;
 use holo_hash::AnyDhtHash;
 use holochain_serialized_bytes::prelude::*;
+
+#[derive(Serialize, Deserialize, SerializedBytes)]
+pub struct ValidateData {
+    pub element: Element,
+    pub validation_package: Option<ValidationPackage>,
+}
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub enum ValidateCallbackResult {
@@ -33,6 +40,18 @@ impl From<ExternOutput> for ValidateCallbackResult {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub struct ValidationPackage;
 
+/// The level of validation package required by
+/// an entry.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub enum RequiredValidationType {
+    /// Just the element (default)
+    Element,
+    /// All chain items of the same entry type
+    SubChain,
+    /// The entire chain
+    Full,
+}
+
 #[derive(Clone, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub enum ValidationPackageCallbackResult {
     Success(ValidationPackage),
@@ -55,5 +74,11 @@ impl CallbackResult for ValidationPackageCallbackResult {
             ValidationPackageCallbackResult::Fail(_) => true,
             _ => false,
         }
+    }
+}
+
+impl Default for RequiredValidationType {
+    fn default() -> Self {
+        Self::Element
     }
 }

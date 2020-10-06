@@ -3,8 +3,7 @@ use super::{
     error::{WorkflowError, WorkflowResult},
 };
 use crate::conductor::interface::SignalBroadcaster;
-use crate::core::ribosome::ZomeCallInvocation;
-use crate::core::ribosome::{error::RibosomeError, ZomesToInvoke};
+use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::{error::RibosomeResult, RibosomeT, ZomeCallHostAccess};
 use crate::core::state::source_chain::SourceChainError;
 use crate::core::state::workspace::Workspace;
@@ -16,6 +15,7 @@ use crate::core::{
     },
     sys_validate_element,
 };
+use crate::{conductor::api::CellConductorApiT, core::ribosome::ZomeCallInvocation};
 pub use call_zome_workspace_lock::CallZomeWorkspaceLock;
 use either::Either;
 use fallible_iterator::FallibleIterator;
@@ -41,20 +41,36 @@ pub struct CallZomeWorkflowArgs<Ribosome: RibosomeT> {
     pub invocation: ZomeCallInvocation,
 }
 
-#[instrument(skip(workspace, network, keystore, writer, args, trigger_produce_dht_ops))]
+#[instrument(skip(
+    workspace,
+    network,
+    keystore,
+    writer,
+    args,
+    conductor_api,
+    trigger_produce_dht_ops
+))]
+#[allow(clippy::complexity)]
 pub async fn call_zome_workflow<'env, Ribosome: RibosomeT>(
     workspace: CallZomeWorkspace,
     network: HolochainP2pCell,
     keystore: KeystoreSender,
     signal_tx: SignalBroadcaster,
     writer: OneshotWriter,
+    conductor_api: impl CellConductorApiT,
     args: CallZomeWorkflowArgs<Ribosome>,
     mut trigger_produce_dht_ops: TriggerSender,
 ) -> WorkflowResult<ZomeCallInvocationResult> {
     let workspace_lock = CallZomeWorkspaceLock::new(workspace);
-    let result =
-        call_zome_workflow_inner(workspace_lock.clone(), network, keystore, signal_tx, args)
-            .await?;
+    let result = call_zome_workflow_inner(
+        workspace_lock.clone(),
+        network,
+        keystore,
+        conductor_api,
+        signal_tx,
+        args,
+    )
+    .await?;
 
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
@@ -74,6 +90,7 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT>(
     workspace_lock: CallZomeWorkspaceLock,
     network: HolochainP2pCell,
     keystore: KeystoreSender,
+    conductor_api: impl CellConductorApiT,
     signal_tx: SignalBroadcaster,
     args: CallZomeWorkflowArgs<Ribosome>,
 ) -> WorkflowResult<ZomeCallInvocationResult> {
@@ -212,16 +229,17 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT>(
                         network.clone(),
                     )?,
                 ),
-                Header::Create(_) | Header::Update(_) | Header::Delete(_) => {
-                    let element = Arc::new(chain_element);
-                    Either::Right(app_validation_workflow::run_validation_callback(
-                        ZomesToInvoke::One(zome_name.clone()),
-                        element,
+                Header::Create(_) | Header::Update(_) | Header::Delete(_) => Either::Right(
+                    app_validation_workflow::run_validation_callback_direct(
+                        zome_name.clone(),
+                        chain_element,
                         &ribosome,
                         workspace_lock.clone(),
                         network.clone(),
-                    )?)
-                }
+                        &conductor_api,
+                    )
+                    .await?,
+                ),
             };
             match outcome {
                 Either::Left(outcome) => match outcome {
@@ -303,16 +321,18 @@ impl Workspace for CallZomeWorkspace {
 #[cfg(test)]
 pub mod tests {
     use super::*;
+    use crate::conductor::{api::CellConductorApi, handle::MockConductorHandleT};
     use crate::core::{
         ribosome::MockRibosomeT,
         workflow::{error::WorkflowError, genesis_workflow::tests::fake_genesis},
     };
     use crate::fixt::KeystoreSenderFixturator;
     use ::fixt::prelude::*;
+    use holo_hash::fixt::*;
     use holochain_p2p::HolochainP2pCellFixturator;
     use holochain_serialized_bytes::prelude::*;
     use holochain_state::{env::ReadManager, test_utils::test_cell_env};
-    use holochain_types::{observability, test_utils::fake_agent_pubkey_1};
+    use holochain_types::{cell::CellId, observability, test_utils::fake_agent_pubkey_1};
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::entry::Entry;
     use holochain_zome_types::ExternInput;
@@ -331,6 +351,9 @@ pub mod tests {
     ) -> WorkflowResult<ZomeCallInvocationResult> {
         let keystore = fixt!(KeystoreSender);
         let network = fixt!(HolochainP2pCell);
+        let cell_id = CellId::new(ribosome.dna_file().dna_hash().clone(), fixt!(AgentPubKey));
+        let conductor_api = Arc::new(MockConductorHandleT::new());
+        let conductor_api = CellConductorApi::new(conductor_api, cell_id);
         let args = CallZomeWorkflowArgs {
             invocation,
             ribosome,
@@ -339,6 +362,7 @@ pub mod tests {
             workspace.into(),
             network,
             keystore,
+            conductor_api,
             SignalBroadcaster::noop(),
             args,
         )
