@@ -44,6 +44,7 @@ pub use holochain_types::fixt::*;
 use holochain_types::test_utils::fake_dna_zomes;
 use holochain_wasm_test_utils::strum::IntoEnumIterator;
 use holochain_wasm_test_utils::TestWasm;
+use holochain_zome_types::element::Element;
 use holochain_zome_types::header::HeaderHashes;
 use holochain_zome_types::link::LinkTag;
 use holochain_zome_types::zome::ZomeName;
@@ -346,9 +347,20 @@ fixturator!(
     constructor fn one(ZomeName);
 );
 
+fn make_validate_invocation(
+    zomes_to_invoke: ZomesToInvoke,
+    element: Element,
+) -> ValidateInvocation {
+    ValidateInvocation {
+        zomes_to_invoke,
+        element: Arc::new(element),
+        entry_def_id: None,
+    }
+}
+
 fixturator!(
     ValidateInvocation;
-    constructor fn new(ZomesToInvoke, Element);
+    vanilla fn make_validate_invocation(ZomesToInvoke, Element);
 );
 
 fixturator!(

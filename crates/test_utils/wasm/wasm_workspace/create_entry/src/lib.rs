@@ -21,3 +21,14 @@ fn create_entry(_: ()) -> ExternResult<HeaderHash> {
 fn get_entry(_: ()) -> ExternResult<GetOutput> {
     Ok(GetOutput::new(get!(hash_entry!(post())?)?))
 }
+
+#[hdk_extern]
+fn validate_create_entry_post(element: Element) -> ExternResult<ValidateCallbackResult> {
+    let r = match element.entry().to_app_option::<Post>() {
+        Ok(Some(post)) if &post.0 == "Banana" => {
+            ValidateCallbackResult::Invalid("No Bananas!".to_string())
+        }
+        _ => ValidateCallbackResult::Valid,
+    };
+    Ok(r)
+}
