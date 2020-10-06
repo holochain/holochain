@@ -3,7 +3,7 @@ use super::{
     error::{WorkflowError, WorkflowResult},
 };
 use crate::conductor::interface::SignalBroadcaster;
-use crate::core::ribosome::{error::RibosomeError, ZomesToInvoke};
+use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::{error::RibosomeResult, RibosomeT, ZomeCallHostAccess};
 use crate::core::state::source_chain::SourceChainError;
 use crate::core::state::workspace::Workspace;
@@ -26,7 +26,7 @@ use holochain_types::element::Element;
 use holochain_zome_types::entry::GetOptions;
 use holochain_zome_types::header::Header;
 use holochain_zome_types::ZomeCallResponse;
-use std::{convert::TryInto, sync::Arc};
+use std::sync::Arc;
 use tracing::instrument;
 
 pub mod call_zome_workspace_lock;
@@ -229,37 +229,17 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT>(
                         network.clone(),
                     )?,
                 ),
-                Header::Create(_) | Header::Update(_) | Header::Delete(_) => {
-                    // Get the entry def id for this element
-                    let entry_def_id = {
-                        let mut workspace = workspace_lock.write().await;
-                        let cascade = workspace.cascade(network.clone());
-                        app_validation_workflow::get_associated_entry_def_id(
-                            &chain_element,
-                            ribosome.dna_file(),
-                            &conductor_api,
-                            cascade,
-                        )
-                        .await
-                    };
-
-                    // Getting the entry def id can result in awaiting deps outcome
-                    // so this needs to be handled here
-                    match entry_def_id {
-                        Ok(entry_def_id) => {
-                            let element = Arc::new(chain_element);
-                            Either::Right(app_validation_workflow::run_validation_callback(
-                                ZomesToInvoke::One(zome_name.clone()),
-                                element,
-                                entry_def_id,
-                                &ribosome,
-                                workspace_lock.clone(),
-                                network.clone(),
-                            )?)
-                        }
-                        Err(outcome) => Either::Right(outcome.try_into()?),
-                    }
-                }
+                Header::Create(_) | Header::Update(_) | Header::Delete(_) => Either::Right(
+                    app_validation_workflow::run_validation_callback_direct(
+                        zome_name.clone(),
+                        chain_element,
+                        &ribosome,
+                        workspace_lock.clone(),
+                        network.clone(),
+                        &conductor_api,
+                    )
+                    .await?,
+                ),
             };
             match outcome {
                 Either::Left(outcome) => match outcome {
