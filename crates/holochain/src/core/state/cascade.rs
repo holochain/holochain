@@ -735,48 +735,48 @@ where
         self.create_entry_details(entry_hash).await
     }
 
-    fn get_oldest_live_element<P: PrefixType, M: MetadataBufT<P>>(
+    /// Find the oldest live element in either the authored or cache stores
+    fn get_oldest_live_element<MA: MetadataBufT<AuthoredPrefix>, MC: MetadataBufT>(
         &self,
         entry_hash: &EntryHash,
-        db: &DbPair<M, P>,
-    ) -> CascadeResult<Option<Search>> {
-        let env = ok_or_return!(self.env.as_ref(), None);
+        authored_data: &DbPair<MA, AuthoredPrefix>,
+        cache_data: &DbPair<MC>,
+        env: &EnvironmentRead,
+    ) -> CascadeResult<Search> {
         fresh_reader!(env, |r| {
-            match db.meta.get_dht_status(&r, entry_hash)? {
-                EntryDhtStatus::Live => {
-                    let oldest_live_header = db
+            let oldest_live_header = authored_data
+                .meta
+                .get_headers(&r, entry_hash.clone())?
+                .chain(cache_data.meta.get_headers(&r, entry_hash.clone())?)
+                .filter_map(|header| {
+                    if authored_data
                         .meta
-                        .get_headers(&r, entry_hash.clone())?
-                        .filter_map(|header| {
-                            if db
-                                .meta
-                                .get_deletes_on_header(&r, header.header_hash.clone())?
-                                .next()?
-                                .is_none()
-                            {
-                                Ok(Some(header))
-                            } else {
-                                Ok(None)
-                            }
-                        })
-                        .min()?
-                        .expect("Status is live but no headers?");
+                        .get_deletes_on_header(&r, header.header_hash.clone())?
+                        .next()?
+                        .is_none()
+                        && cache_data
+                            .meta
+                            .get_deletes_on_header(&r, header.header_hash.clone())?
+                            .next()?
+                            .is_none()
+                    {
+                        Ok(Some(header))
+                    } else {
+                        Ok(None)
+                    }
+                })
+                .min()?;
 
+            match oldest_live_header {
+                Some(oldest_live_header) => {
                     // We have an oldest live header now get the element
-                    CascadeResult::Ok(Some(
-                        self.get_element_local_raw(&oldest_live_header.header_hash)?
-                            .map(Search::Found)
-                            // It's not local so check the network
-                            .unwrap_or(Search::Continue(oldest_live_header.header_hash)),
-                    ))
+                    Ok(self
+                        .get_element_local_raw(&oldest_live_header.header_hash)?
+                        .map(Search::Found)
+                        // It's not local so check the network
+                        .unwrap_or(Search::Continue(oldest_live_header.header_hash)))
                 }
-                EntryDhtStatus::Dead
-                | EntryDhtStatus::Pending
-                | EntryDhtStatus::Rejected
-                | EntryDhtStatus::Abandoned
-                | EntryDhtStatus::Conflict
-                | EntryDhtStatus::Withdrawn
-                | EntryDhtStatus::Purged => CascadeResult::Ok(None),
+                None => Ok(Search::NotInCascade),
             }
         })
     }
@@ -796,22 +796,15 @@ where
 
         let cache_data = ok_or_return!(self.cache_data.as_ref(), None);
         let authored_data = ok_or_return!(self.authored_data.as_ref(), None);
-        // Meta Cache
-        let oldest_live_element =
-            match self.get_oldest_live_element(&entry_hash, &DbPair::from(cache_data))? {
-                // Look for the element data in authored
-                Some(Search::Continue(oldest_live_header)) => {
-                    match authored_data.element.get_element(&oldest_live_header)? {
-                        Some(element) => Search::Found(element),
-                        None => Search::Continue(oldest_live_header),
-                    }
-                }
-                Some(s) => s,
-                // Search the authored store
-                None => self
-                    .get_oldest_live_element(&entry_hash, authored_data)?
-                    .unwrap_or(Search::NotInCascade),
-            };
+        let env = ok_or_return!(self.env.as_ref(), None);
+
+        // Meta Cache and Meta Authored
+        let oldest_live_element = self.get_oldest_live_element(
+            &entry_hash,
+            authored_data,
+            &DbPair::from(cache_data),
+            &env,
+        )?;
 
         // Network
         match oldest_live_element {
