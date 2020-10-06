@@ -10,23 +10,26 @@ use holochain_state::key::BufKey;
 
 /// Required new type for KvBuf key.
 #[derive(Ord, PartialOrd, Eq, PartialEq)]
-pub struct AgentKvKey(KitsuneAgent);
+pub struct AgentKvKey([0; 64])
 
-impl From<KitsuneAgent> for AgentKvKey {
-    fn from(kitsune_agent: KitsuneAgent) -> Self {
-        Self(kitsune_agent)
+impl From<AgentInfoSignedKey> for AgentKvKey {
+    fn from(agent_info_signed_key: AgentInfoSignedKey) -> Self {
+        let mut bytes = [0; 64];
+        bytes[..32].copy_from_slice(agent_info_signed_key.space_bytes())
+        bytes[32..].copy_from_slice(agent_info_signed_key.agent_bytes())
+        Self(bytes)
+    }
+}
+
+impl AsRef<[u8]> for AgentInfoSignedKey {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
     }
 }
 
 impl BufKey for AgentKvKey {
     fn from_key_bytes_or_friendly_panic(bytes: &[u8]) -> Self {
-        Self(KitsuneAgent::from(bytes.to_vec()))
-    }
-}
-
-impl AsRef<[u8]> for AgentKvKey {
-    fn as_ref(&self) -> &[u8] {
-        self.0.as_ref()
+        Self(AgentInfoSignedKey::from(bytes.to_vec()))
     }
 }
 

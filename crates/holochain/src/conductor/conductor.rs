@@ -108,6 +108,9 @@ where
     /// An LMDB environment for storing wasm
     wasm_env: EnvironmentWrite,
 
+    /// The LMDB environment for storing AgentInfoSigned
+    p2p_env: EnvironmentWrite,
+
     /// The database for persisting [ConductorState]
     state_db: ConductorStateDb,
 
@@ -614,6 +617,15 @@ where
         }
     }
 
+    pub(super) async fn put_agent_info_signed(
+        &self,
+        space: KitsuneSpace,
+        agent_info_signed: AgentInfoSigned,
+    ) -> ConductorResult<()> {
+        let environ = self.p2p_env.clone();
+        let key = space.append(&agent_info_signed.as_agent_ref());
+    }
+
     pub(super) async fn put_wasm(
         &self,
         dna: DnaFile,
@@ -684,6 +696,7 @@ where
     async fn new(
         env: EnvironmentWrite,
         wasm_env: EnvironmentWrite,
+        p2p_env: EnvironmentWrite,
         dna_store: DS,
         keystore: KeystoreSender,
         root_env_dir: EnvironmentRootPath,
@@ -696,6 +709,7 @@ where
         Ok(Self {
             env,
             wasm_env,
+            p2p_env,
             state_db: KvStore::new(db),
             cells: HashMap::new(),
             shutting_down: false,
@@ -833,6 +847,9 @@ mod builder {
             let wasm_environment =
                 EnvironmentWrite::new(env_path.as_ref(), EnvironmentKind::Wasm, keystore.clone())?;
 
+            let p2p_environment =
+                EnvironmentWrite::new(env_path.as_ref(), EnvironmentKind::P2P, keystore.clone())?;
+
             #[cfg(test)]
             let state = self.state;
 
@@ -845,6 +862,7 @@ mod builder {
             let conductor = Conductor::new(
                 environment,
                 wasm_environment,
+                p2p_environment,
                 dna_store,
                 keystore,
                 env_path,

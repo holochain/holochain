@@ -2,6 +2,7 @@
 
 use crate::{actor, actor::*, event::*, types::*};
 use futures::future::FutureExt;
+use crate::types::agent_store::AgentInfoSignedKey;
 use kitsune_p2p_types::async_lazy::AsyncLazy;
 use std::{
     collections::{hash_map::Entry, HashMap},
@@ -66,6 +67,20 @@ impl InternalHandler for KitsuneP2pActor {
 impl ghost_actor::GhostHandler<KitsuneP2pEvent> for KitsuneP2pActor {}
 
 impl KitsuneP2pEventHandler for KitsuneP2pActor {
+    fn handle_put_agent_info_signed(
+        &mut self,
+        agent_info_signed: crate::types::agent_store::AgentInfoSigned,
+    ) -> KitsuneP2pEventHandlerResult<()> {
+        Ok(self.evt_sender.put_agent_info_signed(agent_info_signed))
+    }
+
+    fn handle_get_agent_info_signed(
+        &mut self,
+        agent_info_signed_key: AgentInfoSignedKey,
+    ) -> KitsuneP2pEventHandlerResult<Option<crate::types::agent_store::AgentInfoSigned>> {
+        Ok(self.evt_sender.get_agent_info_signed(agent_info_signed_key))
+    }
+
     fn handle_call(
         &mut self,
         space: Arc<KitsuneSpace>,

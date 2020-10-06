@@ -8,6 +8,8 @@ use ghost_actor::dependencies::{tracing, tracing_futures::Instrument};
 use holochain_types::{element::GetElementResponse, Timestamp};
 use holochain_zome_types::zome::FunctionName;
 use kitsune_p2p::actor::KitsuneP2pSender;
+use kitsune_p2p::agent_store::AgentInfoSigned;
+use kitsune_p2p::agent_store::AgentInfoSignedKey;
 
 pub(crate) struct HolochainP2pActor {
     evt_sender: futures::channel::mpsc::Sender<HolochainP2pEvent>,
@@ -176,6 +178,27 @@ impl HolochainP2pActor {
 impl ghost_actor::GhostHandler<kitsune_p2p::event::KitsuneP2pEvent> for HolochainP2pActor {}
 
 impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
+    /// We need to store signed agent info.
+    fn handle_put_agent_info_signed(&mut self, agent_info_signed: AgentInfoSigned) -> kitsune_p2p::actor::KitsuneP2pHandlerResult<()> {
+        Ok(async move {
+            let evt_sender = self.evt_sender.clone();
+            let res = evt_sender.put_agent_info_signed(agent_info_signed).await;
+            res.map_err(kitsune_p2p::KitsuneP2pError::from).map(|res| UnsafeBytes::from(res).into())
+        }).boxed().into()
+    }
+
+    /// We need to get previously stored agent info.
+    fn handle_get_agent_info_signed(
+        &mut self,
+        agent_info_signed_key: AgentInfoSignedKey,
+    ) -> kitsune_p2p::actor::KitsuneP2pHandlerResult<Option<AgentInfoSigned>> {
+        Ok(async move {
+            let evt_sender = self.evt_sender.clone();
+            let res = evt_sender.get_agent_info_signed(agent_info_signed_key).await;
+            res.map_err(kitsune_p2p::KitsuneP2pError::from).map(|res| UnsafeBytes::from(res).into())
+        }).boxed().into()
+    }
+
     #[tracing::instrument(skip(self, space, to_agent, from_agent, payload))]
     fn handle_call(
         &mut self,

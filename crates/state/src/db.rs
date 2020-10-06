@@ -236,6 +236,8 @@ fn register_databases(env: &Rkv, kind: &EnvironmentKind, um: &mut DbMap) -> Data
         }
         EnvironmentKind::P2P => {
             register_db(env, um, &*AGENT)?;
+            // @todo health metrics for the space
+            // register_db(env, um, &*HEALTH)?;
         }
     }
     Ok(())

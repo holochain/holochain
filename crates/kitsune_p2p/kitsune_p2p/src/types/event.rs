@@ -43,6 +43,12 @@ ghost_actor::ghost_chan! {
     /// The KitsuneP2pEvent stream allows handling events generated from the
     /// KitsuneP2p actor.
     pub chan KitsuneP2pEvent<super::KitsuneP2pError> {
+        /// We need to store signed agent info.
+        fn put_agent_info_signed(agent_info_signed: crate::types::agent_store::AgentInfoSigned) -> ();
+
+        /// We need to get previously stored agent info.
+        fn get_agent_info_signed(agent_info_signed_key: crate::types::agent_store::AgentInfoSignedKey) -> Option<crate::types::agent_store::AgentInfoSigned>;
+
         /// We are receiving a request from a remote node.
         fn call(space: Arc<super::KitsuneSpace>, to_agent: Arc<super::KitsuneAgent>, from_agent: Arc<super::KitsuneAgent>, payload: Vec<u8>) -> Vec<u8>;
 

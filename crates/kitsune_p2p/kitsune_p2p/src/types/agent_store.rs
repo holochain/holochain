@@ -5,9 +5,37 @@ use crate::types::KitsuneP2pError;
 use crate::types::KitsuneSignature;
 use crate::types::KitsuneSpace;
 use url2::Url2;
+use crate::types::KitsuneBinType;
 
 /// A list of Urls.
 pub type Urls = Vec<Url2>;
+
+/// A space/agent pair that defines the key for AgentInfo across all spaces.
+pub struct AgentInfoSignedKey {
+    space: KitsuneSpace,
+    agent: KitsuneAgent,
+}
+
+impl AgentInfoSignedKey {
+    /// Wraps get_bytes for the space.
+    pub fn space_bytes(&self) -> &[u8] {
+        &self.space.get_bytes()
+    }
+
+    /// Wrapgs get_bytes for the agent.
+    pub fn agent_bytes(&self) -> &[u8] {
+        &self.agent.get_bytes()
+    }
+}
+
+impl From<(KitsuneSpace, KitsuneAgent)> for AgentInfoSignedKey {
+    fn from((space, agent): (KitsuneSpace, KitsuneAgent)) -> Self {
+        Self {
+            space,
+            agent,
+        }
+    }
+}
 
 /// Value in the peer database that tracks an Agent's representation as signed by that agent.
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, derive_more::AsRef)]
