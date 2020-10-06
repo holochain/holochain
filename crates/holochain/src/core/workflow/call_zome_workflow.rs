@@ -275,7 +275,7 @@ impl<'a> CallZomeWorkspace {
     }
 
     pub fn env(&self) -> &EnvironmentRead {
-        self.meta_integrated.env()
+        self.meta_authored.env()
     }
 }
 

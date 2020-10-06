@@ -816,16 +816,16 @@ impl TryFrom<&CallZomeWorkspace> for SysValidationWorkspace {
         let CallZomeWorkspace {
             source_chain,
             meta_authored,
-            element_integrated: element_vault,
-            meta_integrated: meta_vault,
+            element_integrated,
+            meta_integrated,
             element_cache,
             meta_cache,
         } = call_zome;
         let mut sys_val = Self::new(call_zome.env().clone())?;
         sys_val.element_authored = source_chain.elements().into();
         sys_val.meta_authored = meta_authored.into();
-        sys_val.element_vault = element_vault.into();
-        sys_val.meta_vault = meta_vault.into();
+        sys_val.element_vault = element_integrated.into();
+        sys_val.meta_vault = meta_integrated.into();
         sys_val.element_cache = element_cache.into();
         sys_val.meta_cache = meta_cache.into();
         Ok(sys_val)
