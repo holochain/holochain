@@ -38,7 +38,7 @@ impl From<ExternOutput> for ValidateCallbackResult {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
-pub struct ValidationPackage;
+pub struct ValidationPackage(pub Vec<Element>);
 
 /// The level of validation package required by
 /// an entry.
@@ -80,5 +80,11 @@ impl CallbackResult for ValidationPackageCallbackResult {
 impl Default for RequiredValidationPackage {
     fn default() -> Self {
         Self::Element
+    }
+}
+
+impl ValidationPackage {
+    pub fn new(elements: Vec<Element>) -> Self {
+        Self(elements)
     }
 }

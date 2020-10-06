@@ -73,7 +73,7 @@ impl ChainQueryFilter {
                 header
                     .entry_type()
                     .map(|header_entry_type| *header_entry_type == *entry_type)
-                    .unwrap_or(true)
+                    .unwrap_or(false)
             })
             .unwrap_or(true);
         check_range && check_header_type && check_entry_type

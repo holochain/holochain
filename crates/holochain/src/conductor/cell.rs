@@ -5,12 +5,16 @@
 //! SourceChain which has already undergone Genesis.
 
 use super::{interface::SignalBroadcaster, manager::ManagedTaskAdd};
-use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::api::CellConductorApiT;
 use crate::conductor::handle::ConductorHandle;
+use crate::conductor::{api::error::ConductorApiError, entry_def_store::get_entry_def_from_ids};
 use crate::core::queue_consumer::{spawn_queue_consumer_tasks, InitialQueueTriggers};
 use crate::core::ribosome::ZomeCallInvocation;
+use holochain_zome_types::header::EntryType;
+use holochain_zome_types::query::ChainQueryFilter;
+use holochain_zome_types::validate::ValidationPackage;
 use holochain_zome_types::zome::FunctionName;
+use validation_package::ValidationPackageDb;
 
 use crate::{
     conductor::{api::CellConductorApi, cell::error::CellResult},
@@ -20,7 +24,7 @@ use crate::{
             dht_op_integration::IntegratedDhtOpsBuf,
             element_buf::ElementBuf,
             metadata::{LinkMetaKey, MetadataBuf, MetadataBufT},
-            source_chain::SourceChainBuf,
+            source_chain::{SourceChain, SourceChainBuf},
         },
         workflow::{
             call_zome_workflow, error::WorkflowError, genesis_workflow::genesis_workflow,
@@ -39,7 +43,7 @@ use holochain_p2p::HolochainP2pCellT;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::{
     db::GetDb,
-    env::{EnvironmentWrite, ReadManager},
+    env::{EnvironmentRead, EnvironmentWrite, ReadManager},
 };
 use holochain_types::{
     autonomic::AutonomicProcess,
@@ -47,11 +51,13 @@ use holochain_types::{
     element::{GetElementResponse, WireElement},
     link::{GetLinksResponse, WireLinkMetaKey},
     metadata::{MetadataSet, TimedHeaderHash},
+    validate::ValidationPackageResponse,
     Timestamp,
 };
 use holochain_zome_types::capability::CapSecret;
 use holochain_zome_types::header::{CreateLink, DeleteLink};
 use holochain_zome_types::signature::Signature;
+use holochain_zome_types::validate::RequiredValidationPackage;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::ExternInput;
 use std::{
@@ -64,6 +70,7 @@ use tracing::*;
 use tracing_futures::Instrument;
 
 mod authority;
+mod validation_package;
 
 #[allow(missing_docs)]
 pub mod error;
@@ -262,11 +269,12 @@ impl Cell {
             GetValidationPackage {
                 span: _span,
                 respond,
+                header_hash,
                 ..
             } => {
                 async {
                     let res = self
-                        .handle_get_validation_package()
+                        .handle_get_validation_package(header_hash)
                         .await
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
@@ -409,9 +417,32 @@ impl Cell {
         Ok(())
     }
 
-    /// a remote node is attempting to retreive a validation package
-    async fn handle_get_validation_package(&self) -> CellResult<()> {
-        unimplemented!()
+    /// a remote node is attempting to retrieve a validation package
+    async fn handle_get_validation_package(
+        &self,
+        header_hash: HeaderHash,
+    ) -> CellResult<ValidationPackageResponse> {
+        let env: EnvironmentRead = self.env.clone().into();
+
+        // Get the header
+        let mut databases = ValidationPackageDb::create(env.clone())?;
+        let mut cascade = databases.cascade();
+        let header = match cascade
+            .retrieve_header(header_hash, Default::default())
+            .await?
+        {
+            Some(shh) => shh.into_header_and_signature().0.into_content(),
+            None => return Ok(None.into()),
+        };
+
+        // This agent is the author so get the validation package from the source chain
+        if header.author() == self.id.agent_pubkey() {
+            let ribosome = self.get_ribosome().await?;
+            validation_package::get_as_author(header, env, &ribosome.dna_file, &self.conductor_api)
+                .await
+        } else {
+            todo!("Implement authority returning validation package")
+        }
     }
 
     #[instrument(skip(self, options))]

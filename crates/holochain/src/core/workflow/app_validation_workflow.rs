@@ -71,6 +71,8 @@ use tracing::*;
 pub use types::Outcome;
 
 #[cfg(test)]
+mod network_call_tests;
+#[cfg(test)]
 mod tests;
 
 mod error;
@@ -319,7 +321,7 @@ async fn get_associated_entry_def(
     match get_app_entry_type(element, cascade).await? {
         Some(aet) => {
             let zome = get_zome_info(&aet, dna_file)?.1.clone();
-            Ok(get_entry_def(&aet, zome, dna_file, conductor_api).await?)
+            Ok(get_entry_def(aet.id(), zome, dna_file, conductor_api).await?)
         }
         None => Ok(None),
     }
