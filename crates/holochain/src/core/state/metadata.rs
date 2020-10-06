@@ -698,3 +698,18 @@ impl<P: PrefixType> BufferedStore for MetadataBuf<P> {
         Ok(())
     }
 }
+/// Create an Metadata with a clone of the scratch
+/// from another MetadataBuf
+impl<P> From<&MetadataBuf<P>> for MetadataBuf<P>
+where
+    P: PrefixType,
+{
+    fn from(other: &MetadataBuf<P>) -> Self {
+        Self {
+            system_meta: (&other.system_meta).into(),
+            links_meta: (&other.links_meta).into(),
+            misc_meta: (&other.misc_meta).into(),
+            env: other.env.clone(),
+        }
+    }
+}

@@ -12,6 +12,10 @@ fn post() -> Post {
     Post("foo".into())
 }
 
+fn msg() -> Msg {
+    Msg("hi".into())
+}
+
 #[hdk_extern]
 fn create_entry(_: ()) -> ExternResult<HeaderHash> {
     Ok(create_entry!(post())?)
@@ -23,15 +27,14 @@ fn get_entry(_: ()) -> ExternResult<GetOutput> {
 }
 
 #[hdk_extern]
-fn validate_create_entry_post(
-    validation_data: ValidateData,
-) -> ExternResult<ValidateCallbackResult> {
-    let element = validation_data.element;
-    let r = match element.entry().to_app_option::<Post>() {
-        Ok(Some(post)) if &post.0 == "Banana" => {
-            ValidateCallbackResult::Invalid("No Bananas!".to_string())
-        }
-        _ => ValidateCallbackResult::Valid,
-    };
-    Ok(r)
+fn update_entry(_: ()) -> ExternResult<HeaderHash> {
+    let header_hash = create_entry!(post())?;
+    Ok(update_entry!(header_hash, post())?)
+}
+
+#[hdk_extern]
+/// Updates to a different entry, this will fail
+fn invalid_update_entry(_: ()) -> ExternResult<HeaderHash> {
+    let header_hash = create_entry!(post())?;
+    Ok(update_entry!(header_hash, msg())?)
 }
