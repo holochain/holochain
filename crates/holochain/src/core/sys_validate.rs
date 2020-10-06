@@ -4,7 +4,6 @@
 use super::{
     queue_consumer::TriggerSender,
     state::metadata::{ChainItemKey, MetadataBufT},
-    validation::CheckLevel,
     workflow::incoming_dht_ops_workflow::incoming_dht_ops_workflow,
     workflow::sys_validation_workflow::SysValidationWorkspace,
 };
@@ -24,8 +23,8 @@ use holochain_zome_types::{
 use std::convert::TryInto;
 
 pub use crate::core::state::source_chain::{SourceChainError, SourceChainResult};
-pub(super) use error::ValidationOutcome;
-pub(super) use error::{PrevHeaderError, SysValidationError, SysValidationResult};
+pub(super) use error::*;
+
 pub use holo_hash::*;
 pub use holochain_types::{
     element::{Element, ElementExt},
@@ -45,123 +44,6 @@ pub const MAX_ENTRY_SIZE: usize = 16_000_000;
 /// Tags are used as keys to the database to allow
 /// fast lookup so they need to be small.
 pub const MAX_TAG_SIZE: usize = 400;
-
-/////////////
-// TODO: These checks are old and should probably be removed when
-// we implement the direct sys validation call
-/////////////
-
-/// Ensure that a given pre-fetched element is actually valid on this chain.
-///
-/// Namely:
-/// - The header signature is valid.
-/// - The header is valid (see validate_header).
-/// - The signature was authored by the agent that owns this chain.
-/// - @TODO - The entry content hashes properly & matches the hash in the header.
-/// - @TODO - The entry content is shaped properly according to the header type.
-/// - @TODO - The serialized entry content is < 100MB.
-pub async fn sys_validate_element(
-    author: &AgentPubKey,
-    element: &Element,
-    prev_element: Option<&Element>,
-) -> SourceChainResult<()> {
-    // The header signature is valid.
-    element.validate().await?;
-
-    // The header is valid.
-    sys_validate_header(
-        element.header_hashed(),
-        prev_element.map(|e| e.header_hashed()),
-    )?;
-
-    // The header was authored by the agent that owns this chain.
-    if element.header().author() != author {
-        tracing::error!(
-            "Author mismatch! {} != {}, element: {:?}",
-            element.header().author(),
-            author,
-            element
-        );
-        return Err(SourceChainError::InvalidSignature);
-    }
-
-    // - @TODO - The entry content hashes properly & matches the hash in the header.
-
-    // - @TODO - The entry content is shaped properly according to the header type.
-
-    // - @TODO - The serialized entry content is < 100MB.
-
-    Ok(())
-}
-
-/// Ensure that a given pre-fetched header is actually valid on this chain.
-///
-/// Namely:
-/// - If the header type contains a previous header reference
-///   (true for everything except the Dna header).
-///   Then, ensure the previous header timestamp sequence /
-///   ordering is correct, and the previous header is strictly the previous
-///   header by sequence.
-/// - @TODO - The agent was valid in DPKI at time of signing.
-pub fn sys_validate_header(
-    header: &HeaderHashed,
-    prev_header: Option<&HeaderHashed>,
-) -> SourceChainResult<()> {
-    // - If the header type contains a previous header reference
-    //   (true for everything except the Dna header).
-    //   Then, ensure the previous header timestamp sequence /
-    //   ordering is correct, and the previous header is strictly the previous
-    //   header by sequence.
-
-    // the only way this can be None is for Dna,
-    // in the case of Dna, we don't need to check the previous header.
-    if let Some(asserted_prev_header) = header.prev_header() {
-        // verify we have the correct previous header
-        let prev_header = match prev_header {
-            None => {
-                return Err(SourceChainError::InvalidPreviousHeader(
-                    "expected previous header, received None".to_string(),
-                ));
-            }
-            Some(prev_header) => prev_header,
-        };
-
-        // ensure the hashes match
-        if asserted_prev_header != prev_header.as_hash() {
-            return Err(SourceChainError::InvalidPreviousHeader(format!(
-                "expected header hash: {}, received: {}",
-                asserted_prev_header,
-                prev_header.as_hash(),
-            )));
-        }
-
-        // make sure the timestamps are in order
-        if header.timestamp() < prev_header.timestamp() {
-            return Err(SourceChainError::InvalidPreviousHeader(format!(
-                "expected timestamp < {}, received: {}",
-                Timestamp::from(header.timestamp()).to_string(),
-                Timestamp::from(prev_header.timestamp()).to_string(),
-            )));
-        }
-
-        // make sure the header_seq is strictly ordered
-        if header.header_seq() - 1 != prev_header.header_seq() {
-            return Err(SourceChainError::InvalidPreviousHeader(format!(
-                "expected header_seq: {}, received: {}",
-                header.header_seq() - 1,
-                prev_header.header_seq(),
-            )));
-        }
-    }
-
-    // - @TODO - The agent was valid in DPKI at time of signing.
-
-    Ok(())
-}
-
-///////////////////////////////
-// Sys validation starts here
-//////////////////////////////
 
 /// Verify the signature for this header
 pub async fn verify_header_signature(
@@ -421,7 +303,7 @@ pub async fn check_and_hold_register_add_link<F>(
     hash: &HeaderHash,
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
-    incoming_dht_ops_sender: IncomingDhtOpSender,
+    incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
 where
@@ -429,9 +311,13 @@ where
 {
     let source = check_and_hold(hash, workspace, network).await?;
     f(source.as_ref())?;
-    incoming_dht_ops_sender
-        .send_register_add_link(source)
-        .await?;
+    if let (Some(incoming_dht_ops_sender), Source::Network(element)) =
+        (incoming_dht_ops_sender, source)
+    {
+        incoming_dht_ops_sender
+            .send_register_add_link(element)
+            .await?;
+    }
     Ok(())
 }
 
@@ -447,7 +333,7 @@ pub async fn check_and_hold_register_agent_activity<F>(
     hash: &HeaderHash,
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
-    incoming_dht_ops_sender: IncomingDhtOpSender,
+    incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
 where
@@ -455,9 +341,13 @@ where
 {
     let source = check_and_hold(hash, workspace, network).await?;
     f(source.as_ref())?;
-    incoming_dht_ops_sender
-        .send_register_agent_activity(source)
-        .await?;
+    if let (Some(incoming_dht_ops_sender), Source::Network(element)) =
+        (incoming_dht_ops_sender, source)
+    {
+        incoming_dht_ops_sender
+            .send_register_agent_activity(element)
+            .await?;
+    }
     Ok(())
 }
 
@@ -473,7 +363,7 @@ pub async fn check_and_hold_store_entry<F>(
     hash: &HeaderHash,
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
-    incoming_dht_ops_sender: IncomingDhtOpSender,
+    incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
 where
@@ -481,7 +371,11 @@ where
 {
     let source = check_and_hold(hash, workspace, network).await?;
     f(source.as_ref())?;
-    incoming_dht_ops_sender.send_store_entry(source).await?;
+    if let (Some(incoming_dht_ops_sender), Source::Network(element)) =
+        (incoming_dht_ops_sender, source)
+    {
+        incoming_dht_ops_sender.send_store_entry(element).await?;
+    }
     Ok(())
 }
 
@@ -502,7 +396,7 @@ pub async fn check_and_hold_any_store_entry<F>(
     hash: &EntryHash,
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
-    incoming_dht_ops_sender: IncomingDhtOpSender,
+    incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
 where
@@ -510,7 +404,11 @@ where
 {
     let source = check_and_hold(hash, workspace, network).await?;
     f(source.as_ref())?;
-    incoming_dht_ops_sender.send_store_entry(source).await?;
+    if let (Some(incoming_dht_ops_sender), Source::Network(element)) =
+        (incoming_dht_ops_sender, source)
+    {
+        incoming_dht_ops_sender.send_store_entry(element).await?;
+    }
     Ok(())
 }
 
@@ -526,7 +424,7 @@ pub async fn check_and_hold_store_element<F>(
     hash: &HeaderHash,
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
-    incoming_dht_ops_sender: IncomingDhtOpSender,
+    incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
     f: F,
 ) -> SysValidationResult<()>
 where
@@ -534,7 +432,11 @@ where
 {
     let source = check_and_hold(hash, workspace, network).await?;
     f(source.as_ref())?;
-    incoming_dht_ops_sender.send_store_element(source).await?;
+    if let (Some(incoming_dht_ops_sender), Source::Network(element)) =
+        (incoming_dht_ops_sender, source)
+    {
+        incoming_dht_ops_sender.send_store_element(element).await?;
+    }
     Ok(())
 }
 
@@ -546,39 +448,34 @@ where
 pub struct IncomingDhtOpSender {
     env: EnvironmentWrite,
     sys_validation_trigger: TriggerSender,
-    check_level: CheckLevel,
 }
 
 impl IncomingDhtOpSender {
-    /// Sends the op to the workflow if it was found on the network
+    /// Sends the op to the incoming workflow
     async fn send_op(
         self,
-        source: Source,
+        element: Element,
         make_op: fn(Element) -> Option<(DhtOpHash, DhtOp)>,
     ) -> SysValidationResult<()> {
-        if let Source::Network(el) = source {
-            if let CheckLevel::Hold = self.check_level {
-                if let Some(op) = make_op(el) {
-                    let ops = vec![op];
-                    incoming_dht_ops_workflow(&self.env, self.sys_validation_trigger, ops)
-                        .await
-                        .map_err(Box::new)?;
-                }
-            }
+        if let Some(op) = make_op(element) {
+            let ops = vec![op];
+            incoming_dht_ops_workflow(&self.env, self.sys_validation_trigger, ops)
+                .await
+                .map_err(Box::new)?;
         }
         Ok(())
     }
-    async fn send_store_element(self, source: Source) -> SysValidationResult<()> {
-        self.send_op(source, make_store_element).await
+    async fn send_store_element(self, element: Element) -> SysValidationResult<()> {
+        self.send_op(element, make_store_element).await
     }
-    async fn send_store_entry(self, source: Source) -> SysValidationResult<()> {
-        self.send_op(source, make_store_entry).await
+    async fn send_store_entry(self, element: Element) -> SysValidationResult<()> {
+        self.send_op(element, make_store_entry).await
     }
-    async fn send_register_add_link(self, source: Source) -> SysValidationResult<()> {
-        self.send_op(source, make_register_add_link).await
+    async fn send_register_add_link(self, element: Element) -> SysValidationResult<()> {
+        self.send_op(element, make_register_add_link).await
     }
-    async fn send_register_agent_activity(self, source: Source) -> SysValidationResult<()> {
-        self.send_op(source, make_register_agent_activity).await
+    async fn send_register_agent_activity(self, element: Element) -> SysValidationResult<()> {
+        self.send_op(element, make_register_agent_activity).await
     }
 }
 

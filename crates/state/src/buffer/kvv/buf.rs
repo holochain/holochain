@@ -20,6 +20,7 @@ pub(super) enum KvvOp {
     Delete,
 }
 
+#[derive(Clone)]
 pub(super) struct ValuesDelta<V> {
     delete_all: bool,
     deltas: BTreeMap<V, KvvOp>,
@@ -280,5 +281,21 @@ where
             }
         }
         Ok(())
+    }
+}
+
+/// Create an KvvBufUsed with a clone of the scratch
+/// from another KvvBufUsed
+impl<K, V> From<&KvvBufUsed<K, V>> for KvvBufUsed<K, V>
+where
+    K: BufKey + Debug + Clone,
+    V: BufMultiVal + Debug,
+{
+    fn from(other: &KvvBufUsed<K, V>) -> Self {
+        Self {
+            db: other.db,
+            scratch: other.scratch.clone(),
+            no_dup_data: other.no_dup_data,
+        }
     }
 }
