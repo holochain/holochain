@@ -1,6 +1,5 @@
 //! # System Validation Checks
 //! This module contains all the checks we run for sys validation
-#![allow(deprecated)]
 
 use super::{
     queue_consumer::TriggerSender,
