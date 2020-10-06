@@ -820,13 +820,7 @@ mod builder {
                     .unwrap();
                 keystore
             } else {
-                spawn_lair_keystore(
-                    self.config
-                        .keystore_path
-                        .as_ref()
-                        .map(|path| path.as_path()),
-                )
-                .await?
+                spawn_lair_keystore(self.config.keystore_path.as_deref()).await?
             };
             let env_path = self.config.environment_path.clone();
 
