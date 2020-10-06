@@ -104,7 +104,7 @@ pub struct Config {
 pub enum PassphraseServiceConfig {
     Cmd,
     UnixSocket { path: String },
-    Mock { passphrase: String },
+    FromConfig { passphrase: String },
 }
 
 impl Default for PassphraseServiceConfig {

@@ -3,8 +3,8 @@ use super::{
 };
 use crate::conductor::api::CellConductorApiT;
 use crate::conductor::interface::SignalBroadcaster;
+use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::ZomeCallInvocation;
-use crate::core::ribosome::{error::RibosomeError, ZomesToInvoke};
 use crate::core::ribosome::{error::RibosomeResult, RibosomeT, ZomeCallHostAccess};
 use crate::core::state::metadata::MetadataBufT;
 use crate::core::state::source_chain::SourceChainError;
@@ -188,16 +188,17 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT, C: CellConductorApi
                         network.clone(),
                     )?,
                 ),
-                Header::Create(_) | Header::Update(_) | Header::Delete(_) => {
-                    let element = Arc::new(chain_element);
-                    Either::Right(app_validation_workflow::run_validation_callback(
-                        ZomesToInvoke::One(zome_name.clone()),
-                        element,
+                Header::Create(_) | Header::Update(_) | Header::Delete(_) => Either::Right(
+                    app_validation_workflow::run_validation_callback_direct(
+                        zome_name.clone(),
+                        chain_element,
                         &ribosome,
                         workspace_lock.clone(),
                         network.clone(),
-                    )?)
-                }
+                        &conductor_api,
+                    )
+                    .await?,
+                ),
             };
             match outcome {
                 Either::Left(outcome) => match outcome {

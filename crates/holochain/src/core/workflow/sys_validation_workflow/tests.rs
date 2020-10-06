@@ -441,3 +441,20 @@ async fn dodgy_bob(bob_cell_id: &CellId, handle: &ConductorHandle, dna_file: &Dn
     let mut triggers = handle.get_cell_triggers(&bob_cell_id).await.unwrap();
     triggers.produce_dht_ops.trigger();
 }
+
+//////////////////////
+//// Test Ideas
+//////////////////////
+// These are tests that I think might break
+// validation but are too hard to write currently
+
+// 1. Delete points to a header that isn't a NewEntryType.
+// ## Comments
+// I think this will fail RegisterDeleteBy but pass as StoreElement
+// which is wrong.
+// ## Scenario
+// 1. Commit a Delete Header that points to a valid EntryHash and
+// a HeaderHash that exists but is not a NewEntryHeader (use CreateLink).
+// 2. The Create link is integrated and valid.
+// ## Expected
+// The Delete header should be invalid for all authorities.

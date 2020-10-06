@@ -95,15 +95,12 @@ async fn sys_validation_workflow_inner(
 ) -> WorkflowResult<WorkComplete> {
     let env = workspace.validation_limbo.env().clone();
     // Drain all the ops
-    let sorted_ops: BinaryHeap<std::cmp::Reverse<OrderedOp<ValidationLimboValue>>> =
-        fresh_reader!(env, |r| {
-            let validation_limbo = &mut workspace.validation_limbo;
-            let element_pending = &workspace.element_pending;
+    let sorted_ops: BinaryHeap<OrderedOp<ValidationLimboValue>> = fresh_reader!(env, |r| {
+        let validation_limbo = &mut workspace.validation_limbo;
+        let element_pending = &workspace.element_pending;
 
-            let sorted_ops: Result<
-                BinaryHeap<std::cmp::Reverse<OrderedOp<ValidationLimboValue>>>,
-                WorkflowError,
-            > = validation_limbo
+        let sorted_ops: Result<BinaryHeap<OrderedOp<ValidationLimboValue>>, WorkflowError> =
+            validation_limbo
                 .drain_iter_filter(&r, |(_, vlv)| {
                     match vlv.status {
                         // We only want pending or awaiting sys dependency ops
@@ -126,22 +123,21 @@ async fn sys_validation_workflow_inner(
                         op,
                         value: vlv,
                     };
-                    // We want a min-heap
-                    Ok(std::cmp::Reverse(v))
+                    Ok(v)
                 })
                 .iterator()
                 .collect();
-            sorted_ops
-        })?;
+        sorted_ops
+    })?;
 
     // Process each op
-    for so in sorted_ops {
+    for so in sorted_ops.into_sorted_vec() {
         let OrderedOp {
             hash: op_hash,
             op,
             value: mut vlv,
             ..
-        } = so.0;
+        } = so;
 
         // Create an incoming ops sender for any dependencies we find
         // that we are meant to be holding but aren't.
@@ -382,6 +378,7 @@ pub async fn sys_validate_element(
 
     result
 }
+
 async fn sys_validate_element_inner(
     element: &Element,
     workspace: &mut SysValidationWorkspace,

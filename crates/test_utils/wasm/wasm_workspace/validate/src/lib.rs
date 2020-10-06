@@ -43,6 +43,7 @@ impl From<&ThisWasmEntry> for EntryDef {
             crdt_type: entry.into(),
             required_validations: entry.into(),
             visibility: entry.into(),
+            required_validation_type: Default::default(),
         }
     }
 }
@@ -66,7 +67,8 @@ entry_defs![
 ];
 
 #[hdk_extern]
-fn validate(element: Element) -> ExternResult<ValidateCallbackResult> {
+fn validate(data: ValidateData) -> ExternResult<ValidateCallbackResult> {
+    let element = data.element;
     let entry = element.into_inner().1;
     let entry = match entry {
         ElementEntry::Present(e) => e,

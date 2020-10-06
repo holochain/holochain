@@ -38,9 +38,18 @@ async fn app_validation_workflow_test() {
             name: "app_validation_workflow_test".to_string(),
             uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
             properties: SerializedBytes::try_from(()).unwrap(),
-            zomes: vec![TestWasm::Validate.into(), TestWasm::ValidateLink.into()].into(),
+            zomes: vec![
+                TestWasm::Validate.into(),
+                TestWasm::ValidateLink.into(),
+                TestWasm::Create.into(),
+            ]
+            .into(),
         },
-        vec![TestWasm::Validate.into(), TestWasm::ValidateLink.into()],
+        vec![
+            TestWasm::Validate.into(),
+            TestWasm::ValidateLink.into(),
+            TestWasm::Create.into(),
+        ],
     )
     .await
     .unwrap();
@@ -69,7 +78,21 @@ async fn app_validation_workflow_test() {
     )
     .await;
 
-    run_test(alice_cell_id, bob_cell_id, handle.clone(), &dna_file).await;
+    let expected_count = run_test(
+        alice_cell_id.clone(),
+        bob_cell_id.clone(),
+        handle.clone(),
+        &dna_file,
+    )
+    .await;
+    run_test_entry_def_id(
+        alice_cell_id,
+        bob_cell_id,
+        handle.clone(),
+        &dna_file,
+        expected_count,
+    )
+    .await;
 
     let shutdown = handle.take_shutdown_handle().await.unwrap();
     handle.shutdown().await;
@@ -178,7 +201,7 @@ async fn run_test(
     bob_cell_id: CellId,
     handle: ConductorHandle,
     dna_file: &DnaFile,
-) {
+) -> usize {
     // Check if the correct number of ops are integrated
     // every 100 ms for a maximum of 10 seconds but early exit
     // if they are there.
@@ -362,6 +385,62 @@ async fn run_test(
         }
         assert_eq!(int.len(), expected_count);
     }
+    expected_count
+}
+
+/// 1. Commits an entry with validate_create_entry_<EntryDefId> callback
+/// 2. The callback rejects the entry proving that it actually ran.
+/// 3. Reject only Post with "Banana" as the String to show it doesn't
+///    affect other entries.
+async fn run_test_entry_def_id(
+    alice_cell_id: CellId,
+    bob_cell_id: CellId,
+    handle: ConductorHandle,
+    dna_file: &DnaFile,
+    expected_count: usize,
+) {
+    // Check if the correct number of ops are integrated
+    // every 100 ms for a maximum of 10 seconds but early exit
+    // if they are there.
+    let num_attempts = 100;
+    let delay_per_attempt = Duration::from_millis(100);
+
+    let (invalid_header_hash, invalid_entry_hash) =
+        commit_invalid_post(&bob_cell_id, &handle, dna_file).await;
+    let invalid_entry_hash: AnyDhtHash = invalid_entry_hash.into();
+
+    // Integration should have 3 ops in it
+    // StoreEntry and StoreElement should be invalid.
+    let expected_count = 3 + expected_count;
+    let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
+    wait_for_integration(&alice_env, expected_count, num_attempts, delay_per_attempt).await;
+
+    {
+        let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
+
+        let workspace = IncomingDhtOpsWorkspace::new(alice_env.clone().into()).unwrap();
+        // Validation should be empty
+        let val = inspect_val_limbo(&alice_env, &workspace);
+        assert_eq!(val.len(), 0);
+        let int = inspect_integrated(&alice_env, &workspace);
+        for v in &int {
+            match &v.1.op {
+                // A Store entry that matches these hashes
+                DhtOpLight::StoreEntry(hh, _, eh)
+                    if *eh == invalid_entry_hash && *hh == invalid_header_hash =>
+                {
+                    assert_eq!(v.1.validation_status, ValidationStatus::Rejected, "{:?}", v)
+                }
+                // And the store element
+                DhtOpLight::StoreElement(hh, _, _) if *hh == invalid_header_hash => {
+                    assert_eq!(v.1.validation_status, ValidationStatus::Rejected, "{:?}", v);
+                }
+                _ => (),
+            }
+        }
+
+        assert_eq!(int.len(), expected_count);
+    }
 }
 
 // Need to "hack holochain" because otherwise the invalid
@@ -380,6 +459,33 @@ async fn commit_invalid(
         call_data.clone(),
         entry.clone().try_into().unwrap(),
         INVALID_ID,
+    )
+    .await;
+
+    // Produce and publish these commits
+    let mut triggers = handle.get_cell_triggers(&bob_cell_id).await.unwrap();
+    triggers.produce_dht_ops.trigger();
+    (invalid_header_hash, entry_hash)
+}
+
+// Need to "hack holochain" because otherwise the invalid
+// commit is caught by the call zome workflow
+async fn commit_invalid_post(
+    bob_cell_id: &CellId,
+    handle: &ConductorHandle,
+    dna_file: &DnaFile,
+) -> (HeaderHash, EntryHash) {
+    // Bananas are not allowed
+    let entry = Post("Banana".into());
+    let entry_hash = EntryHash::with_data_sync(&Entry::try_from(entry.clone()).unwrap());
+    // Create call data for the 3rd zome Create
+    let (bob_env, call_data) = CallData::create_for_zome(bob_cell_id, handle, dna_file, 2).await;
+    // 9
+    let invalid_header_hash = commit_entry(
+        &bob_env,
+        call_data.clone(),
+        entry.clone().try_into().unwrap(),
+        POST_ID,
     )
     .await;
 
