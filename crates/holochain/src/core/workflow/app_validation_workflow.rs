@@ -57,10 +57,13 @@ use holochain_types::{
 use holochain_zome_types::{
     element::Element,
     element::SignedHeaderHashed,
+    entry_def::EntryDef,
     entry_def::EntryDefId,
     header::AppEntryType,
     header::EntryType,
     header::{CreateLink, DeleteLink, ZomeId},
+    validate::RequiredValidationType,
+    validate::ValidationPackage,
     zome::ZomeName,
     Header,
 };
@@ -208,10 +211,16 @@ async fn validate_op(
         dna_file.ok_or_else(|| AppValidationError::DnaMissing(conductor_api.cell_id().clone()))?;
 
     // Get the EntryDefId associated with this Element if there is one
-    let entry_def_id = {
+    let entry_def = {
         let cascade = workspace.full_cascade(network.clone());
-        get_associated_entry_def_id(&element, &dna_file, conductor_api, cascade).await?
+        get_associated_entry_def(&element, &dna_file, conductor_api, cascade).await?
     };
+
+    // Get the validation package
+    let validation_package = get_validation_package(&entry_def).await?;
+
+    // Get the EntryDefId associated with this Element if there is one
+    let entry_def_id = entry_def.map(|ed| ed.id);
 
     // Get the zome names
     let zomes_to_invoke = get_zomes_to_invoke(&element, &dna_file, workspace, network).await?;
@@ -267,10 +276,12 @@ async fn validate_op(
 
             // Call the callback
             let element = Arc::new(element);
+            let validation_package = validation_package.map(Arc::new);
             // Call the element validation
-            run_validation_callback(
+            run_validation_callback_inner(
                 zomes_to_invoke,
                 element,
+                validation_package,
                 entry_def_id,
                 &ribosome,
                 workspace_lock.clone(),
@@ -289,28 +300,26 @@ async fn validate_op(
     Ok(outcome)
 }
 
-/// Get the [EntryDefId] associated with this
+/// Get the [EntryDef] associated with this
 /// element if there is one.
 ///
-/// Create and Update will get the id from
+/// Create and Update will get the def from
 /// the AppEntryType on their header.
 ///
-/// Delete will get the id from the
+/// Delete will get the def from the
 /// header on the `deletes_address` field.
 ///
 /// Other header types will None.
-pub async fn get_associated_entry_def_id(
+async fn get_associated_entry_def(
     element: &Element,
     dna_file: &DnaFile,
     conductor_api: &impl CellConductorApiT,
     cascade: Cascade<'_>,
-) -> AppValidationOutcome<Option<EntryDefId>> {
+) -> AppValidationOutcome<Option<EntryDef>> {
     match get_app_entry_type(element, cascade).await? {
         Some(aet) => {
             let zome = get_zome_info(&aet, dna_file)?.1.clone();
-            Ok(get_entry_def(&aet, zome, dna_file, conductor_api)
-                .await?
-                .map(|ed| ed.id))
+            Ok(get_entry_def(&aet, zome, dna_file, conductor_api).await?)
         }
         None => Ok(None),
     }
@@ -494,9 +503,70 @@ fn extract_app_type(element: &Element) -> Option<AppEntryType> {
         })
 }
 
-pub fn run_validation_callback(
+/// Get the validation package based on
+/// the requirements set by the AppEntryType
+async fn get_validation_package(
+    entry_def: &Option<EntryDef>,
+) -> AppValidationResult<Option<ValidationPackage>> {
+    match entry_def {
+        Some(entry_def) => {
+            Ok(match entry_def.required_validation_type {
+                // Only needs the element
+                RequiredValidationType::Element => None,
+                RequiredValidationType::SubChain => {
+                    todo!("Implement getting the sub chain validation package")
+                }
+                RequiredValidationType::Full => todo!("Implement getting the full chain"),
+            })
+        }
+        None => {
+            // Not an entry header type so no package
+            Ok(None)
+        }
+    }
+}
+
+pub async fn run_validation_callback_direct(
+    zome_name: ZomeName,
+    element: Element,
+    ribosome: &impl RibosomeT,
+    workspace_lock: CallZomeWorkspaceLock,
+    network: HolochainP2pCell,
+    conductor_api: &impl CellConductorApiT,
+) -> AppValidationResult<Outcome> {
+    let outcome = {
+        let mut workspace = workspace_lock.write().await;
+        let cascade = workspace.cascade(network.clone());
+        get_associated_entry_def(&element, ribosome.dna_file(), conductor_api, cascade).await
+    };
+
+    // The outcome could be awaiting a dependency to get the entry def
+    // so we need to check that here and exit early if that is the case
+    let entry_def = match outcome {
+        Ok(ed) => ed,
+        Err(outcome) => return outcome.try_into(),
+    };
+
+    let validation_package = get_validation_package(&entry_def).await?.map(Arc::new);
+    let entry_def_id = entry_def.map(|ed| ed.id);
+
+    let element = Arc::new(element);
+
+    run_validation_callback_inner(
+        ZomesToInvoke::One(zome_name),
+        element,
+        validation_package,
+        entry_def_id,
+        ribosome,
+        workspace_lock,
+        network,
+    )
+}
+
+fn run_validation_callback_inner(
     zomes_to_invoke: ZomesToInvoke,
     element: Arc<Element>,
+    validation_package: Option<Arc<ValidationPackage>>,
     entry_def_id: Option<EntryDefId>,
     ribosome: &impl RibosomeT,
     workspace_lock: CallZomeWorkspaceLock,
@@ -507,6 +577,7 @@ pub fn run_validation_callback(
         ValidateInvocation {
             zomes_to_invoke,
             element,
+            validation_package,
             entry_def_id,
         },
     )?;

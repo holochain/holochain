@@ -354,6 +354,7 @@ fn make_validate_invocation(
     ValidateInvocation {
         zomes_to_invoke,
         element: Arc::new(element),
+        validation_package: None,
         entry_def_id: None,
     }
 }

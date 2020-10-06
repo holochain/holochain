@@ -10,9 +10,10 @@ use holochain_types::dna::zome::{HostFnAccess, Permission};
 use holochain_zome_types::entry::Entry;
 use holochain_zome_types::entry_def::EntryDefId;
 use holochain_zome_types::validate::ValidateCallbackResult;
+use holochain_zome_types::validate::ValidateData;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::ExternInput;
-use holochain_zome_types::{element::Element, Header};
+use holochain_zome_types::{element::Element, validate::ValidationPackage, Header};
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -23,6 +24,9 @@ pub struct ValidateInvocation {
     // we can SerializedBytes off an Element reference
     // lifetimes on invocations are a pain
     pub element: Arc<Element>,
+    /// Only elements with an app entry
+    /// will have a validation package
+    pub validation_package: Option<Arc<ValidationPackage>>,
     /// The [EntryDefId] for the entry associated with
     /// this element if there is one.
     pub entry_def_id: Option<EntryDefId>,
@@ -72,21 +76,12 @@ impl Invocation for ValidateInvocation {
                     fns.push(entry_def_id);
                 }
             }
-            Some(Entry::CapClaim(_)) => fns.push("cap_claim".into()),
-            Some(Entry::CapGrant(_)) => fns.push("cap_grant".into()),
             _ => (),
         }
         fns.into()
     }
     fn host_input(self) -> Result<ExternInput, SerializedBytesError> {
-        Ok(ExternInput::new((&*self.element).try_into()?))
-    }
-}
-
-impl TryFrom<ValidateInvocation> for ExternInput {
-    type Error = SerializedBytesError;
-    fn try_from(validate_invocation: ValidateInvocation) -> Result<Self, Self::Error> {
-        Ok(Self::new((&*validate_invocation.element).try_into()?))
+        Ok(ExternInput::new(ValidateData::from(self).try_into()?))
     }
 }
 
@@ -123,9 +118,21 @@ impl From<Vec<ValidateCallbackResult>> for ValidateResult {
     }
 }
 
+impl From<ValidateInvocation> for ValidateData {
+    fn from(vi: ValidateInvocation) -> Self {
+        Self {
+            element: Element::clone(&vi.element),
+            validation_package: vi
+                .validation_package
+                .map(|vp| ValidationPackage::clone(&vp)),
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
 
+    use super::ValidateData;
     use super::ValidateResult;
     use crate::core::ribosome::Invocation;
     use crate::fixt::ValidateHostAccessFixturator;
@@ -239,7 +246,7 @@ mod test {
         );
         let el = fixt!(Element, (agent_entry, HeaderType::Update));
         validate_invocation.element = Arc::new(el);
-        let mut expected = vec!["validate", "validate_update", "validate_update_cap_claim"];
+        let mut expected = vec!["validate", "validate_update"];
         for fn_component in validate_invocation.fn_components() {
             assert_eq!(fn_component, expected.pop().unwrap(),);
         }
@@ -252,7 +259,7 @@ mod test {
         );
         let el = fixt!(Element, (agent_entry, HeaderType::Create));
         validate_invocation.element = Arc::new(el);
-        let mut expected = vec!["validate", "validate_create", "validate_create_cap_grant"];
+        let mut expected = vec!["validate", "validate_create"];
         for fn_component in validate_invocation.fn_components() {
             assert_eq!(fn_component, expected.pop().unwrap(),);
         }
@@ -268,7 +275,9 @@ mod test {
 
         assert_eq!(
             host_input,
-            ExternInput::new(SerializedBytes::try_from(&*validate_invocation.element).unwrap()),
+            ExternInput::new(
+                SerializedBytes::try_from(&ValidateData::from(validate_invocation)).unwrap()
+            ),
         );
     }
 }
