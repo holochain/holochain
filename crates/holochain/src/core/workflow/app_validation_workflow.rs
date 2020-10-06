@@ -62,7 +62,7 @@ use holochain_zome_types::{
     header::AppEntryType,
     header::EntryType,
     header::{CreateLink, DeleteLink, ZomeId},
-    validate::RequiredValidationPackage,
+    validate::RequiredValidationType,
     validate::ValidationPackage,
     zome::ZomeName,
     Header,
@@ -514,10 +514,10 @@ async fn get_validation_package(
 ) -> AppValidationResult<Option<ValidationPackage>> {
     match entry_def {
         Some(entry_def) => {
-            Ok(match entry_def.required_validation_package {
+            Ok(match entry_def.required_validation_type {
                 // Only needs the element
-                RequiredValidationPackage::Element => None,
-                RequiredValidationPackage::SubChain | RequiredValidationPackage::Full => {
+                RequiredValidationType::Element => None,
+                RequiredValidationType::SubChain | RequiredValidationType::Full => {
                     // TODO: What if this is the same author that is validating?
                     // We probably don't want to do a network call although
                     // it will just short circuit

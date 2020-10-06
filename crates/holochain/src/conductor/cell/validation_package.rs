@@ -71,18 +71,18 @@ pub(super) async fn get_as_author(
     .await?;
 
     // Get the required validation package
-    let required_validation_package = match entry_def {
-        Some(ed) => ed.required_validation_package,
+    let required_validation_type = match entry_def {
+        Some(ed) => ed.required_validation_type,
         None => return Ok(None.into()),
     };
 
     // Gather the package
-    match required_validation_package {
-        RequiredValidationPackage::Element => {
+    match required_validation_type {
+        RequiredValidationType::Element => {
             // TODO: I'm not sure if we should handle this case, it seems like they should already have the element
             Ok(None.into())
         }
-        RequiredValidationPackage::SubChain => {
+        RequiredValidationType::SubChain => {
             // Collect and return the sub chain
             let elements = source_chain.query(
                 &ChainQueryFilter::default()
@@ -93,7 +93,7 @@ pub(super) async fn get_as_author(
             )?;
             Ok(Some(ValidationPackage::new(elements)).into())
         }
-        RequiredValidationPackage::Full => {
+        RequiredValidationType::Full => {
             let elements = source_chain.query(
                 &ChainQueryFilter::default()
                     .include_entries(true)

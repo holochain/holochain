@@ -1,6 +1,6 @@
 use crate::zome_io::ExternOutput;
 use crate::CallbackResult;
-use crate::{crdt::CrdtType, validate::RequiredValidationPackage};
+use crate::{crdt::CrdtType, validate::RequiredValidationType};
 use holochain_serialized_bytes::prelude::*;
 
 const DEFAULT_REQUIRED_VALIDATIONS: u8 = 5;
@@ -75,7 +75,7 @@ pub struct EntryDef {
     /// how many validations to receive before considered "network saturated" (MAX value of 50?)
     pub required_validations: RequiredValidations,
     /// The required validation package for this entry
-    pub required_validation_package: RequiredValidationPackage,
+    pub required_validation_type: RequiredValidationType,
 }
 
 impl EntryDef {
@@ -84,14 +84,14 @@ impl EntryDef {
         visibility: EntryVisibility,
         crdt_type: CrdtType,
         required_validations: RequiredValidations,
-        required_validation_package: RequiredValidationPackage,
+        required_validation_type: RequiredValidationType,
     ) -> Self {
         Self {
             id,
             visibility,
             crdt_type,
             required_validations,
-            required_validation_package,
+            required_validation_type,
         }
     }
 }
@@ -165,7 +165,7 @@ mod tests {
     use super::EntryDefsCallbackResult;
     use super::EntryVisibility;
     use crate::zome_io::ExternOutput;
-    use crate::{crdt::CrdtType, validate::RequiredValidationPackage};
+    use crate::{crdt::CrdtType, validate::RequiredValidationType};
     use std::convert::TryInto;
 
     #[test]
@@ -176,7 +176,7 @@ mod tests {
                 visibility: EntryVisibility::Public,
                 crdt_type: CrdtType,
                 required_validations: 5.into(),
-                required_validation_package: RequiredValidationPackage::default(),
+                required_validation_type: RequiredValidationType::default(),
             }]
             .into(),
         );

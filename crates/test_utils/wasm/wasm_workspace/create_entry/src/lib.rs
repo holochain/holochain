@@ -3,21 +3,21 @@ use hdk3::prelude::*;
 #[hdk_entry(
     id = "post",
     required_validations = 5,
-    required_validation_package = "full"
+    required_validation_type = "full"
 )]
 struct Post(String);
 
 #[hdk_entry(
     id = "msg",
     required_validations = 5,
-    required_validation_package = "sub_chain"
+    required_validation_type = "sub_chain"
 )]
 struct Msg(String);
 
 #[hdk_entry(
     id = "priv_msg",
     required_validations = 5,
-    required_validation_package = "full",
+    required_validation_type = "full",
     visibility = "private"
 )]
 struct PrivMsg(String);

@@ -43,7 +43,7 @@ pub struct ValidationPackage(pub Vec<Element>);
 /// The level of validation package required by
 /// an entry.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
-pub enum RequiredValidationPackage {
+pub enum RequiredValidationType {
     /// Just the element (default)
     Element,
     /// All chain items of the same entry type
@@ -77,7 +77,7 @@ impl CallbackResult for ValidationPackageCallbackResult {
     }
 }
 
-impl Default for RequiredValidationPackage {
+impl Default for RequiredValidationType {
     fn default() -> Self {
         Self::Element
     }

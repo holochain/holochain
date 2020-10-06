@@ -57,7 +57,7 @@ use holochain_types::{
 use holochain_zome_types::capability::CapSecret;
 use holochain_zome_types::header::{CreateLink, DeleteLink};
 use holochain_zome_types::signature::Signature;
-use holochain_zome_types::validate::RequiredValidationPackage;
+use holochain_zome_types::validate::RequiredValidationType;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::ExternInput;
 use std::{
