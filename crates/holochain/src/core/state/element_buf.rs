@@ -409,3 +409,18 @@ mod tests {
         Ok(())
     }
 }
+
+/// Create an ElementBuf with a clone of the scratch
+/// from another ElementBuf
+impl<P> From<&ElementBuf<P>> for ElementBuf<P>
+where
+    P: PrefixType,
+{
+    fn from(other: &ElementBuf<P>) -> Self {
+        Self {
+            public_entries: (&other.public_entries).into(),
+            private_entries: other.private_entries.as_ref().map(|pe| pe.into()),
+            headers: (&other.headers).into(),
+        }
+    }
+}
