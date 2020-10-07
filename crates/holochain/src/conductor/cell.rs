@@ -10,10 +10,10 @@ use crate::conductor::handle::ConductorHandle;
 use crate::conductor::{api::error::ConductorApiError, entry_def_store::get_entry_def_from_ids};
 use crate::core::queue_consumer::{spawn_queue_consumer_tasks, InitialQueueTriggers};
 use crate::core::ribosome::ZomeCallInvocation;
-use holochain_zome_types::header::EntryType;
 use holochain_zome_types::query::ChainQueryFilter;
 use holochain_zome_types::validate::ValidationPackage;
 use holochain_zome_types::zome::FunctionName;
+use holochain_zome_types::{header::EntryType, query::AgentActivity};
 use validation_package::ValidationPackageDb;
 
 use crate::{
@@ -332,6 +332,23 @@ impl Cell {
                 .instrument(debug_span!("cell_handle_get_links"))
                 .await;
             }
+            GetAgentActivity {
+                span: _span,
+                respond,
+                agent,
+                query,
+                options,
+                ..
+            } => {
+                async {
+                    let res = self
+                        .handle_get_agent_activity(agent, query, options)
+                        .map_err(holochain_p2p::HolochainP2pError::other);
+                    respond.respond(Ok(async move { res }.boxed().into()));
+                }
+                .instrument(debug_span!("cell_handle_get_agent_activity"))
+                .await;
+            }
             ValidationReceiptReceived {
                 span: _span,
                 respond,
@@ -588,6 +605,17 @@ impl Cell {
             link_adds: result_adds,
             link_removes: result_removes,
         })
+    }
+
+    #[instrument(skip(self, options))]
+    fn handle_get_agent_activity(
+        &self,
+        agent: AgentPubKey,
+        query: ChainQueryFilter,
+        options: holochain_p2p::event::GetActivityOptions,
+    ) -> CellResult<AgentActivity> {
+        let env = self.env.clone();
+        authority::handle_get_agent_activity(env.into(), agent, query, options)
     }
 
     /// a remote agent is sending us a validation receipt.

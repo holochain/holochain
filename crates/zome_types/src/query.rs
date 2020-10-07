@@ -1,6 +1,9 @@
 //! Types for source chain queries
 
-use crate::header::{EntryType, Header, HeaderType};
+use crate::{
+    element::SignedHeaderHashed,
+    header::{EntryType, Header, HeaderType},
+};
 pub use holochain_serialized_bytes::prelude::*;
 
 /// Query arguments
@@ -20,6 +23,10 @@ pub struct ChainQueryFilter {
     /// Include the entries in the elements
     pub include_entries: bool,
 }
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
+/// An agents chain elements returned from a agent_activity_query
+pub struct AgentActivity(pub Vec<SignedHeaderHashed>);
 
 impl ChainQueryFilter {
     /// Create a no-op ChainQueryFilter which returns everything
@@ -77,6 +84,13 @@ impl ChainQueryFilter {
             })
             .unwrap_or(true);
         check_range && check_header_type && check_entry_type
+    }
+}
+
+impl AgentActivity {
+    /// Create a new set of headers from an agents chain activity
+    pub fn new(headers: Vec<SignedHeaderHashed>) -> Self {
+        Self(headers)
     }
 }
 

@@ -1,18 +1,21 @@
 use super::error::{AuthorityDataError, CellResult};
 use crate::core::state::{
     element_buf::ElementBuf,
-    metadata::{MetadataBuf, MetadataBufT},
+    metadata::{ChainItemKey, MetadataBuf, MetadataBufT},
 };
 use fallible_iterator::FallibleIterator;
 
-use holo_hash::EntryHash;
-use holochain_state::{env::EnvironmentWrite, fresh_reader};
+use holo_hash::{AgentPubKey, EntryHash};
+use holochain_state::{env::EnvironmentRead, env::EnvironmentWrite, fresh_reader};
 use holochain_types::{
     element::{GetElementResponse, RawGetEntryResponse},
     header::WireUpdateRelationship,
     metadata::TimedHeaderHash,
 };
-use holochain_zome_types::{element::SignedHeaderHashed, header::conversions::WrongHeaderError};
+use holochain_zome_types::{
+    element::SignedHeaderHashed, header::conversions::WrongHeaderError, query::AgentActivity,
+    query::ChainQueryFilter,
+};
 use std::{collections::BTreeSet, convert::TryInto};
 use tracing::*;
 
@@ -156,5 +159,26 @@ pub async fn handle_get_entry(
         };
         debug!(handle_get_details_return = ?r);
         Ok(GetElementResponse::GetEntryFull(r))
+    })
+}
+
+#[instrument(skip(env))]
+pub fn handle_get_agent_activity(
+    env: EnvironmentRead,
+    agent: AgentPubKey,
+    query: ChainQueryFilter,
+    options: holochain_p2p::event::GetActivityOptions,
+) -> CellResult<AgentActivity> {
+    let element_integrated = ElementBuf::vault(env.clone(), false)?;
+    let meta_integrated = MetadataBuf::vault(env.clone())?;
+
+    fresh_reader!(env, |r| {
+        Ok(AgentActivity::new(
+            meta_integrated
+                .get_activity(&r, ChainItemKey::Agent(agent))?
+                .filter_map(|h| element_integrated.get_header(&h.header_hash))
+                .filter(|shh| Ok(query.check(shh.header())))
+                .collect()?,
+        ))
     })
 }
