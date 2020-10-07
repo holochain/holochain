@@ -418,3 +418,19 @@ where
         self.inner.flush_to_txn_ref(writer)
     }
 }
+
+/// Create an Used with a clone of the scratch
+/// from another Used
+impl<'env, K, V> From<&Used<K, V, KvStore<K, V>>> for Used<K, V, KvStore<K, V>>
+where
+    K: BufKey,
+    V: BufVal,
+{
+    fn from(other: &Used<K, V, KvStore<K, V>>) -> Self {
+        Self {
+            store: KvStore::new(other.store.db()),
+            scratch: other.scratch.clone(),
+            __phantom: std::marker::PhantomData,
+        }
+    }
+}
