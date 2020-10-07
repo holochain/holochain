@@ -48,6 +48,7 @@ async fn tls_client(
         let mut merge = kitsune_p2p_types::auto_stream_select(recv, read);
         use kitsune_p2p_types::AutoStreamSelect::*;
 
+        let mut wants_write_close = false;
         let mut did_post_handshake_work = false;
         loop {
             if !did_post_handshake_work && !cli.is_handshaking() {
@@ -86,6 +87,8 @@ async fn tls_client(
                     .send(ProxyWire::chan_send(data.into()))
                     .await
                     .map_err(TransportError::other)?;
+            } else if wants_write_close && !cli.is_handshaking() {
+                write.close().await.map_err(TransportError::other)?;
             }
 
             if !cli.wants_read() {
@@ -101,7 +104,7 @@ async fn tls_client(
                     cli.write_all(&data).map_err(TransportError::other)?;
                 }
                 Some(Left(None)) => {
-                    write.close().await.map_err(TransportError::other)?;
+                    wants_write_close = true;
                 }
                 Some(Right(Some(wire))) => match wire {
                     ProxyWire::ChanSend(ChanSend(data)) => {
@@ -129,6 +132,7 @@ async fn tls_client(
     .await;
 
     if let Err(e) = res {
+        tracing::error!("{} CLI: ERROR: {:?}", short, e);
         let fail = ProxyWire::failure(format!("{:?}", e));
         if let Some(setup_send) = setup_send.take() {
             let _ = setup_send.send(Err(e));

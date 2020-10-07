@@ -87,3 +87,70 @@ impl ProxyConfig {
         })
     }
 }
+
+/// Tls ALPN identifier for kitsune proxy handshaking
+const ALPN_KITSUNE_PROXY_0: &[u8] = b"kitsune-proxy/0";
+
+/// Allow only these cipher suites for kitsune proxy Tls.
+static CIPHER_SUITES: &[&rustls::SupportedCipherSuite] = &[
+    &rustls::ciphersuite::TLS13_CHACHA20_POLY1305_SHA256,
+    &rustls::ciphersuite::TLS13_AES_256_GCM_SHA384,
+];
+
+/// Helper to generate rustls configs given a TlsConfig reference.
+#[allow(dead_code)]
+pub(crate) fn gen_tls_configs(
+    tls: &TlsConfig,
+) -> TransportResult<(Arc<rustls::ServerConfig>, Arc<rustls::ClientConfig>)> {
+    let cert = rustls::Certificate(tls.cert.0.to_vec());
+    let cert_priv_key = rustls::PrivateKey(tls.cert_priv_key.0.to_vec());
+
+    let root_cert = rustls::Certificate(lair_keystore_api::internal::tls::WK_CA_CERT_DER.to_vec());
+    let mut root_store = rustls::RootCertStore::empty();
+    root_store.add(&root_cert).unwrap();
+
+    let mut tls_server_config = rustls::ServerConfig::with_ciphersuites(
+        rustls::AllowAnyAuthenticatedClient::new(root_store),
+        CIPHER_SUITES,
+    );
+
+    tls_server_config
+        .set_single_cert(vec![cert.clone()], cert_priv_key.clone())
+        .map_err(TransportError::other)?;
+    tls_server_config.set_protocols(&[ALPN_KITSUNE_PROXY_0.to_vec()]);
+    let tls_server_config = Arc::new(tls_server_config);
+
+    let mut tls_client_config = rustls::ClientConfig::with_ciphersuites(CIPHER_SUITES);
+    tls_client_config
+        .set_single_client_cert(vec![cert], cert_priv_key)
+        .map_err(TransportError::other)?;
+    tls_client_config
+        .dangerous()
+        .set_certificate_verifier(TlsServerVerifier::new());
+    tls_client_config.set_protocols(&[ALPN_KITSUNE_PROXY_0.to_vec()]);
+    let tls_client_config = Arc::new(tls_client_config);
+
+    Ok((tls_server_config, tls_client_config))
+}
+
+struct TlsServerVerifier;
+
+impl TlsServerVerifier {
+    fn new() -> Arc<Self> {
+        Arc::new(Self)
+    }
+}
+
+impl rustls::ServerCertVerifier for TlsServerVerifier {
+    fn verify_server_cert(
+        &self,
+        _roots: &rustls::RootCertStore,
+        _presented_certs: &[rustls::Certificate],
+        _dns_name: webpki::DNSNameRef,
+        _ocsp_response: &[u8],
+    ) -> Result<rustls::ServerCertVerified, rustls::TLSError> {
+        // TODO - check acceptable cert digest
+
+        Ok(rustls::ServerCertVerified::assertion())
+    }
+}

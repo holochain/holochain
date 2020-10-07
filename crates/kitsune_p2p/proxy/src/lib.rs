@@ -37,8 +37,11 @@ mod tls_cli;
 #[allow(dead_code)]
 mod tls_srv;
 
-mod config;
-pub use config::*;
+#[cfg(test)]
+mod tls_tests;
 
 mod inner_listen;
 pub use inner_listen::*;
+
+mod config;
+pub use config::*;
