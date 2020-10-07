@@ -5,7 +5,9 @@ use crate::{
             element_buf::ElementBuf,
             metadata::{MetadataBuf, MetadataBufT},
         },
-        workflow::{integrate_dht_ops_workflow::integrate_to_cache, CallZomeWorkspace},
+        workflow::integrate_dht_ops_workflow::integrate_single_metadata,
+        workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertResult,
+        workflow::CallZomeWorkspace,
     },
     test_utils::test_network,
 };
@@ -25,12 +27,13 @@ use holochain_p2p::{
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::{
     env::{EnvironmentWrite, ReadManager},
-    prelude::{BufferedStore, WriteManager},
+    prelude::{BufferedStore, IntegratedPrefix, WriteManager},
     test_utils::test_cell_env,
 };
 use holochain_types::{
     app::InstalledCell,
     cell::CellId,
+    dht_op::produce_op_lights_from_elements,
     dna::{DnaDef, DnaFile},
     element::{Element, GetElementResponse, WireElement},
     entry::option_entry_hashed,
@@ -88,7 +91,7 @@ async fn get_updates_cache() {
 
     // Check the cache has been updated
     let result = workspace
-        .cache_cas
+        .element_cache
         .get_element(&expected.0)
         .unwrap()
         .unwrap();
@@ -145,7 +148,7 @@ async fn get_meta_updates_meta_cache() {
 
         // Check the cache has been updated
         workspace
-            .cache_meta
+            .meta_cache
             .get_headers(
                 &reader,
                 match expected.0.hash_type().clone() {
@@ -644,7 +647,8 @@ async fn fake_authority<'env>(env: &EnvironmentWrite, hash: AnyDhtHash, call_dat
         .put(shh, option_entry_hashed(e).await)
         .unwrap();
 
-    integrate_to_cache(&element, &element_vault, &mut meta_vault)
+    // TODO: figure this out
+    integrate_to_integrated(&element, &element_vault, &mut meta_vault)
         .await
         .unwrap();
 
@@ -654,4 +658,17 @@ async fn fake_authority<'env>(env: &EnvironmentWrite, hash: AnyDhtHash, call_dat
             meta_vault.flush_to_txn(writer)
         })
         .unwrap();
+}
+
+async fn integrate_to_integrated<C: MetadataBufT<IntegratedPrefix>>(
+    element: &Element,
+    element_store: &ElementBuf<IntegratedPrefix>,
+    meta_store: &mut C,
+) -> DhtOpConvertResult<()> {
+    // Produce the light directly
+    for op in produce_op_lights_from_elements(vec![element]).await? {
+        // we don't integrate element data, because it is already in our vault.
+        integrate_single_metadata(op, element_store, meta_store)?
+    }
+    Ok(())
 }

@@ -45,6 +45,9 @@ use tempdir::TempDir;
 #[cfg(test)]
 pub mod host_fn_api;
 
+#[cfg(test)]
+pub mod conductor_setup;
+
 #[macro_export]
 macro_rules! here {
     ($test: expr) => {
