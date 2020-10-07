@@ -2,7 +2,7 @@ use holochain_state::{env::EnvironmentRead, error::DatabaseResult, prelude::*};
 use holochain_types::dna::DnaFile;
 use holochain_zome_types::Header;
 
-use crate::core::state::cascade::{Cascade, DbPair, DbPairMut};
+use crate::core::state::cascade::{Cascade, DbPair};
 
 use super::*;
 
@@ -12,9 +12,8 @@ pub(super) struct ValidationPackageDb {
     meta_integrated: MetadataBuf<IntegratedPrefix>,
     element_rejected: ElementBuf<RejectedPrefix>,
     meta_rejected: MetadataBuf<RejectedPrefix>,
-    // TODO Change to authored when #394 is merged in
-    element_cache: ElementBuf,
-    meta_cache: MetadataBuf,
+    element_authored: ElementBuf<AuthoredPrefix>,
+    meta_authored: MetadataBuf<AuthoredPrefix>,
 }
 
 impl ValidationPackageDb {
@@ -22,23 +21,18 @@ impl ValidationPackageDb {
         Ok(Self {
             element_integrated: ElementBuf::vault(env.clone(), false)?,
             element_rejected: ElementBuf::rejected(env.clone())?,
-            element_cache: ElementBuf::cache(env.clone())?,
+            element_authored: ElementBuf::authored(env.clone(), false)?,
             meta_integrated: MetadataBuf::vault(env.clone())?,
             meta_rejected: MetadataBuf::rejected(env.clone())?,
-            meta_cache: MetadataBuf::cache(env)?,
+            meta_authored: MetadataBuf::authored(env)?,
         })
     }
 
-    // TODO: remove mut when #394 lands
-    pub(super) fn cascade(&mut self) -> Cascade {
+    pub(super) fn cascade(&self) -> Cascade {
         Cascade::empty()
             .with_integrated(DbPair::new(&self.element_integrated, &self.meta_integrated))
             .with_rejected(DbPair::new(&self.element_rejected, &self.meta_rejected))
-            // TODO Change to authored when #394 is merged in
-            .with_cache(DbPairMut::new(
-                &mut self.element_cache,
-                &mut self.meta_cache,
-            ))
+            .with_authored(DbPair::new(&self.element_authored, &self.meta_authored))
     }
 }
 

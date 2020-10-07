@@ -425,7 +425,7 @@ impl Cell {
         let env: EnvironmentRead = self.env.clone().into();
 
         // Get the header
-        let mut databases = ValidationPackageDb::create(env.clone())?;
+        let databases = ValidationPackageDb::create(env.clone())?;
         let mut cascade = databases.cascade();
         let header = match cascade
             .retrieve_header(header_hash, Default::default())
