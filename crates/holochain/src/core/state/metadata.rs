@@ -255,6 +255,15 @@ impl MetadataBuf<RejectedPrefix> {
     }
 }
 
+impl MetadataBuf<AuthoredPrefix> {
+    /// Create a [MetadataBuf] with the vault databases using the AuthoredPrefix.
+    /// The data in the type will be separate from the other prefixes even though the
+    /// database is shared.
+    pub fn authored(env: EnvironmentRead) -> DatabaseResult<Self> {
+        Self::new_vault(env)
+    }
+}
+
 impl<P> MetadataBuf<P>
 where
     P: PrefixType,
