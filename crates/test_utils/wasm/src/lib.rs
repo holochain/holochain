@@ -13,6 +13,8 @@ pub enum TestWasm {
     Anchor,
     Bench,
     Capability,
+    CallRemoteCallee,
+    CallRemoteCaller,
     Create,
     Crd,
     Crud,
@@ -56,6 +58,8 @@ impl From<TestWasm> for ZomeName {
             TestWasm::Anchor => "anchor",
             TestWasm::Bench => "bench",
             TestWasm::Capability => "capability",
+            TestWasm::CallRemoteCallee => "call_remote_callee",
+            TestWasm::CallRemoteCaller => "call_remote_caller",
             TestWasm::Create => "create_entry",
             TestWasm::Crd => "crd",
             TestWasm::Crud => "crud",
@@ -107,6 +111,12 @@ impl From<TestWasm> for DnaWasm {
             }
             TestWasm::Create => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_create_entry.wasm")
+            }
+            TestWasm::CallRemoteCallee => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_call_remote_callee.wasm")
+            }
+            TestWasm::CallRemoteCaller => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_call_remote_caller.wasm")
             }
             TestWasm::Crd => get_code("wasm32-unknown-unknown/release/test_wasm_crd.wasm"),
             TestWasm::Crud => get_code("wasm32-unknown-unknown/release/test_wasm_crud.wasm"),

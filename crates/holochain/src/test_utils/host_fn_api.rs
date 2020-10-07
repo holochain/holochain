@@ -4,7 +4,10 @@ use crate::{
     core::ribosome::RibosomeT,
     core::ribosome::ZomeCallInvocation,
     core::{
-        ribosome::{host_fn, wasm_ribosome::WasmRibosome, CallContext, ZomeCallHostAccess},
+        ribosome::{
+            error::RibosomeResult, host_fn, wasm_ribosome::WasmRibosome, CallContext,
+            ZomeCallHostAccess,
+        },
         state::{metadata::LinkMetaKey, workspace::Workspace},
         workflow::{CallZomeWorkspace, CallZomeWorkspaceLock},
     },
@@ -502,7 +505,7 @@ pub async fn call_zome_direct(
     env: &EnvironmentWrite,
     call_data: CallData,
     invocation: ZomeCallInvocation,
-) -> SerializedBytes {
+) -> RibosomeResult<SerializedBytes> {
     let CallData {
         network,
         keystore,
@@ -524,9 +527,7 @@ pub async fn call_zome_direct(
             cell_id,
         );
         let ribosome = Arc::new(ribosome);
-        ribosome
-            .call_zome_function(host_access, invocation)
-            .unwrap()
+        ribosome.call_zome_function(host_access, invocation)?
     };
 
     // Write
@@ -537,7 +538,7 @@ pub async fn call_zome_direct(
         .unwrap();
     let output = unwrap_to!(output => ZomeCallResponse::Ok).clone();
 
-    output.into_inner()
+    Ok(output.into_inner())
 }
 
 macro_rules! test_entry_impl {

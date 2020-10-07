@@ -506,6 +506,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_wasm_call_remote_callee"
+version = "0.0.1"
+dependencies = [
+ "hdk3",
+ "serde",
+ "test_wasm_common",
+]
+
+[[package]]
+name = "test_wasm_call_remote_caller"
+version = "0.0.1"
+dependencies = [
+ "hdk3",
+ "serde",
+ "test_wasm_common",
+]
+
+[[package]]
 name = "test_wasm_capability"
 version = "0.0.1"
 dependencies = [

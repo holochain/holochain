@@ -36,10 +36,14 @@ pub fn call_remote(
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
 
-    use crate::conductor::dna_store::MockDnaStore;
-    use crate::conductor::interface::websocket::test::setup_app;
+    use std::time::Duration;
+
+    use crate::conductor::{interface::websocket::test::setup_app, ConductorHandle};
     use crate::core::ribosome::ZomeCallInvocation;
     use crate::core::ribosome::ZomeCallResponse;
+    use crate::test_utils::conductor_setup::*;
+    use crate::test_utils::new_invocation;
+    use crate::{conductor::dna_store::MockDnaStore, test_utils::wait_for_integration};
     use hdk3::prelude::*;
     use holochain_types::app::InstalledCell;
     use holochain_types::cell::CellId;
@@ -169,5 +173,119 @@ pub mod wasm_test {
         let shutdown = handle.take_shutdown_handle().await.unwrap();
         handle.shutdown().await;
         shutdown.await.unwrap();
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn call_remote_regression_test() {
+        observability::test_run().ok();
+        // Check if the correct number of ops are integrated
+        // every 100 ms for a maximum of 10 seconds but early exit
+        // if they are there.
+        let num_attempts = 100;
+        let delay_per_attempt = Duration::from_millis(100);
+
+        let zomes = vec![TestWasm::CallRemoteCaller, TestWasm::CallRemoteCallee];
+        let conductor_test = ConductorTestData::new(zomes, true).await;
+        let ConductorTestData {
+            __tmpdir,
+            handle,
+            alice_call_data,
+            bob_call_data,
+            ..
+        } = conductor_test;
+        let bob_call_data = bob_call_data.unwrap();
+
+        // Alice commits base and target
+        let invocation = new_invocation(
+            &alice_call_data.cell_id,
+            "create_and_link_foo",
+            (),
+            TestWasm::CallRemoteCallee,
+        )
+        .unwrap();
+        handle.call_zome(invocation).await.unwrap().unwrap();
+
+        // Alice gets back the links from the same zome
+        let invocation = new_invocation(
+            &alice_call_data.cell_id,
+            "get_links_on_foo",
+            (),
+            TestWasm::CallRemoteCallee,
+        )
+        .unwrap();
+
+        let links: Links = call(&handle, invocation).await;
+        assert_eq!(links.into_inner().len(), 1);
+
+        // Integration should have 9 ops in it.
+        // Plus another 14 for genesis.
+        // Plus 2 cap
+        // Plus 2 init
+        // Init is not run because we aren't calling the zome.
+        let expected_count = 9 + 14 + 2 + 2;
+
+        wait_for_integration(
+            &bob_call_data.env,
+            expected_count,
+            num_attempts,
+            delay_per_attempt.clone(),
+        )
+        .await;
+
+        // Bob getting links from the same zome (but different cell)
+        let invocation = new_invocation(
+            &bob_call_data.cell_id,
+            "get_links_on_foo",
+            (),
+            TestWasm::CallRemoteCallee,
+        )
+        .unwrap();
+
+        let links: Links = call(&handle, invocation).await;
+
+        assert_eq!(links.into_inner().len(), 1);
+
+        // Alice gets the links from a different zome with remote call (same cell)
+        let invocation = new_invocation(
+            &alice_call_data.cell_id,
+            "get_links_from_other_zome",
+            (),
+            TestWasm::CallRemoteCaller,
+        )
+        .unwrap();
+
+        let links: Links = call(&handle, invocation).await;
+
+        assert_eq!(links.into_inner().len(), 1);
+
+        // Bob gets the links from a different zome with remote call (different cell)
+        let invocation = new_invocation(
+            &bob_call_data.cell_id,
+            "get_links_from_other_zome",
+            (),
+            TestWasm::CallRemoteCaller,
+        )
+        .unwrap();
+
+        let links: Links = call(&handle, invocation).await;
+
+        assert_eq!(links.into_inner().len(), 1);
+
+        ConductorTestData::shutdown_conductor(handle).await;
+    }
+
+    async fn call<T: TryFrom<SerializedBytes>>(
+        handle: &ConductorHandle,
+        invocation: ZomeCallInvocation,
+    ) -> T
+    where
+        T: TryFrom<SerializedBytes, Error = SerializedBytesError>,
+    {
+        let out = handle.call_zome(invocation).await.unwrap().unwrap();
+        unwrap_to::unwrap_to!(out => ZomeCallResponse::Ok)
+            .clone()
+            .into_inner()
+            .try_into()
+            .unwrap()
     }
 }

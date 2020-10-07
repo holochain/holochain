@@ -4,6 +4,8 @@ members = [
     "anchor",
     "bench",
     "capability",
+    "call_remote_callee",
+    "call_remote_caller",
     "create_entry",
     "crd",
     "crud",
