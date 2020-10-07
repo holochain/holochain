@@ -77,6 +77,14 @@ impl ElementBuf<RejectedPrefix> {
     }
 }
 
+impl ElementBuf<AuthoredPrefix> {
+    /// Create a element buf for all authored elements.
+    /// This reuses the database but is the data is completely separate.
+    pub fn authored(env: EnvironmentRead, allow_private: bool) -> DatabaseResult<Self> {
+        ElementBuf::new_vault(env, allow_private)
+    }
+}
+
 impl<P> ElementBuf<P>
 where
     P: PrefixType,

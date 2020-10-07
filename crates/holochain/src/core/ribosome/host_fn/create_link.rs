@@ -1,5 +1,5 @@
 use crate::core::ribosome::error::RibosomeResult;
-use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_cache;
+use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
 use crate::core::{
     ribosome::{CallContext, RibosomeT},
     workflow::CallZomeWorkspace,
@@ -34,10 +34,10 @@ pub fn create_link<'a>(
                 .source_chain
                 .get_element(&header_hash)?
                 .expect("Element we just put in SourceChain must be gettable");
-            integrate_to_cache(
+            integrate_to_authored(
                 &element,
                 workspace.source_chain.elements(),
-                &mut workspace.cache_meta,
+                &mut workspace.meta_authored,
             )
             .await
             .map_err(Box::new)?;

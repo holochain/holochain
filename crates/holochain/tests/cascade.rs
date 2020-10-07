@@ -72,10 +72,12 @@ async fn get_links() -> SourceChainResult<()> {
     let env = test_env.env();
 
     let mut source_chain = SourceChainBuf::new(env.clone().into())?;
+    let element_vault = ElementBuf::vault(env.clone().into(), true)?;
     let mut element_cache = ElementBuf::cache(env.clone().into())?;
 
     // create a cache and a cas for store and meta
     let meta_vault = MetadataBuf::vault(env.clone().into())?;
+    let meta_authored = MetadataBuf::authored(env.clone().into())?;
     let mut meta_cache = MetadataBuf::cache(env.clone().into())?;
 
     let (_jimbo_id, jimbo_header, jimbo_entry, _jessy_id, jessy_header, jessy_entry) = fixtures();
@@ -94,6 +96,8 @@ async fn get_links() -> SourceChainResult<()> {
     let mut cascade = Cascade::new(
         env.clone().into(),
         &source_chain.elements(),
+        &meta_authored,
+        &element_vault,
         &meta_vault,
         &mut element_cache,
         &mut meta_cache,

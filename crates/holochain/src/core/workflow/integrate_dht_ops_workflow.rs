@@ -450,12 +450,12 @@ fn get_header<P: PrefixType>(
 }
 
 /// After writing an Element to our chain, we want to integrate the meta ops
-/// inline, so that they are immediately available in the meta cache.
+/// inline, so that they are immediately available in the authored metadata.
 /// NB: We skip integrating the element data, since it is already available in
-/// our vault.
-pub async fn integrate_to_cache<C: MetadataBufT>(
+/// our source chain.
+pub async fn integrate_to_authored<C: MetadataBufT<AuthoredPrefix>>(
     element: &Element,
-    element_store: &ElementBuf,
+    element_store: &ElementBuf<AuthoredPrefix>,
     meta_store: &mut C,
 ) -> DhtOpConvertResult<()> {
     // Produce the light directly

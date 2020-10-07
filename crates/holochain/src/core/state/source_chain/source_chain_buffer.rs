@@ -17,7 +17,7 @@ use holochain_zome_types::{header, Entry, Header};
 use tracing::*;
 
 pub struct SourceChainBuf {
-    elements: ElementBuf,
+    elements: ElementBuf<AuthoredPrefix>,
     sequence: ChainSequenceBuf,
     keystore: KeystoreSender,
 
@@ -27,7 +27,7 @@ pub struct SourceChainBuf {
 impl SourceChainBuf {
     pub fn new(env: EnvironmentRead) -> DatabaseResult<Self> {
         Ok(Self {
-            elements: ElementBuf::vault(env.clone(), true)?,
+            elements: ElementBuf::authored(env.clone(), true)?,
             sequence: ChainSequenceBuf::new(env.clone())?,
             keystore: env.keystore().clone(),
             env,
@@ -36,7 +36,7 @@ impl SourceChainBuf {
 
     pub fn public_only(env: EnvironmentRead) -> DatabaseResult<Self> {
         Ok(Self {
-            elements: ElementBuf::vault(env.clone(), false)?,
+            elements: ElementBuf::authored(env.clone(), false)?,
             sequence: ChainSequenceBuf::new(env.clone())?,
             keystore: env.keystore().clone(),
             env,
@@ -45,18 +45,6 @@ impl SourceChainBuf {
 
     pub fn env(&self) -> &EnvironmentRead {
         &self.env
-    }
-
-    // add a cache test only method that allows this to
-    // be used with the cache database for testing
-    // FIXME This should only be cfg(test) but that doesn't work with integration tests
-    pub fn cache(env: EnvironmentRead) -> DatabaseResult<Self> {
-        Ok(Self {
-            elements: ElementBuf::cache(env.clone())?,
-            sequence: ChainSequenceBuf::new(env.clone())?,
-            keystore: env.keystore().clone(),
-            env,
-        })
     }
 
     pub fn chain_head(&self) -> Option<&HeaderHash> {
@@ -124,7 +112,7 @@ impl SourceChainBuf {
         self.sequence.complete_dht_op(i)
     }
 
-    pub fn elements(&self) -> &ElementBuf {
+    pub fn elements(&self) -> &ElementBuf<AuthoredPrefix> {
         &self.elements
     }
 
@@ -158,7 +146,7 @@ impl SourceChainBuf {
         Ok(header_address)
     }
 
-    pub fn headers(&self) -> &HeaderCas<IntegratedPrefix> {
+    pub fn headers(&self) -> &HeaderCas<AuthoredPrefix> {
         &self.elements.headers()
     }
 

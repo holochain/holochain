@@ -54,7 +54,7 @@ pub struct PublishDhtOpsWorkspace {
     /// Database of authored DhtOps, with data about prior publishing
     authored_dht_ops: AuthoredDhtOpsStore,
     /// Element store for looking up data to construct ops
-    elements: ElementBuf,
+    elements: ElementBuf<AuthoredPrefix>,
 }
 
 #[instrument(skip(workspace, writer, network))]
@@ -153,7 +153,7 @@ impl PublishDhtOpsWorkspace {
         let db = env.get_db(&*AUTHORED_DHT_OPS)?;
         let authored_dht_ops = KvBufFresh::new(env.clone(), db);
         // Note that this must always be false as we don't want private entries being published
-        let elements = ElementBuf::vault(env, false)?;
+        let elements = ElementBuf::authored(env, false)?;
         Ok(Self {
             authored_dht_ops,
             elements,
@@ -164,7 +164,7 @@ impl PublishDhtOpsWorkspace {
         &mut self.authored_dht_ops
     }
 
-    fn elements(&self) -> &ElementBuf {
+    fn elements(&self) -> &ElementBuf<AuthoredPrefix> {
         &self.elements
     }
 }
