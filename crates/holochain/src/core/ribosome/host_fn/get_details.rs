@@ -68,24 +68,26 @@ pub mod wasm_test {
             _ => panic!("no element"),
         };
 
-        let check_entry =
-            |details: GetDetailsOutput, count, update, delete| match details.clone().into_inner() {
-                Some(Details::Entry(entry_details)) => {
-                    match entry_details.entry {
-                        Entry::App(eb) => {
-                            let countree = CounTree::try_from(eb.into_sb()).unwrap();
-                            assert_eq!(countree, CounTree(count));
-                        }
-                        _ => panic!(
-                            "failed to deserialize {:?}, {}, {}, {}",
-                            details, count, update, delete
-                        ),
+        let check_entry = |details: GetDetailsOutput, count, update, delete, line| match details
+            .clone()
+            .into_inner()
+        {
+            Some(Details::Entry(entry_details)) => {
+                match entry_details.entry {
+                    Entry::App(eb) => {
+                        let countree = CounTree::try_from(eb.into_sb()).unwrap();
+                        assert_eq!(countree, CounTree(count));
                     }
-                    assert_eq!(entry_details.updates.len(), update);
-                    assert_eq!(entry_details.deletes.len(), delete);
+                    _ => panic!(
+                        "failed to deserialize {:?}, {}, {}, {}",
+                        details, count, update, delete
+                    ),
                 }
-                _ => panic!("no entry"),
-            };
+                assert_eq!(entry_details.updates.len(), update, "{}", line);
+                assert_eq!(entry_details.deletes.len(), delete, "{}", line);
+            }
+            _ => panic!("no entry"),
+        };
 
         let zero_hash: EntryHash =
             crate::call_test_ribosome!(host_access, TestWasm::Crud, "entry_hash", CounTree(0));
@@ -105,6 +107,7 @@ pub mod wasm_test {
             0,
             0,
             0,
+            line!(),
         );
 
         let one_a: HeaderHash =
@@ -124,12 +127,14 @@ pub mod wasm_test {
             0,
             1,
             0,
+            line!(),
         );
         check_entry(
             crate::call_test_ribosome!(host_access, TestWasm::Crud, "entry_details", one_hash),
             1,
             0,
             0,
+            line!(),
         );
 
         let one_b: HeaderHash =
@@ -149,12 +154,14 @@ pub mod wasm_test {
             0,
             2,
             0,
+            line!(),
         );
         check_entry(
             crate::call_test_ribosome!(host_access, TestWasm::Crud, "entry_details", one_hash),
             1,
             0,
             0,
+            line!(),
         );
 
         let two: HeaderHash = crate::call_test_ribosome!(host_access, TestWasm::Crud, "inc", one_b);
@@ -173,18 +180,21 @@ pub mod wasm_test {
             0,
             2,
             0,
+            line!(),
         );
         check_entry(
             crate::call_test_ribosome!(host_access, TestWasm::Crud, "entry_details", one_hash),
             1,
             1,
             0,
+            line!(),
         );
         check_entry(
             crate::call_test_ribosome!(host_access, TestWasm::Crud, "entry_details", two_hash),
             2,
             0,
             0,
+            line!(),
         );
 
         let zero_b: HeaderHash =
@@ -204,18 +214,21 @@ pub mod wasm_test {
             0,
             2,
             0,
+            line!(),
         );
         check_entry(
             crate::call_test_ribosome!(host_access, TestWasm::Crud, "entry_details", one_hash),
             1,
             1,
             1,
+            line!(),
         );
         check_entry(
             crate::call_test_ribosome!(host_access, TestWasm::Crud, "entry_details", two_hash),
             2,
             0,
             0,
+            line!(),
         );
 
         let zero_b_details: GetDetailsOutput =
