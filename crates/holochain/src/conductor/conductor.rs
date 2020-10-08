@@ -66,6 +66,8 @@ use tracing::*;
 pub use builder::*;
 use futures::future::{self, TryFutureExt};
 use holo_hash::DnaHash;
+use crate::conductor::p2p_store::AgentKv;
+use kitsune_p2p::agent_store::AgentInfoSigned;
 
 #[cfg(test)]
 use super::handle::MockConductorHandleT;
@@ -617,13 +619,34 @@ where
         }
     }
 
-    pub(super) async fn put_agent_info_signed(
+    pub(super) fn put_agent_info_signed(
         &self,
-        space: KitsuneSpace,
-        agent_info_signed: AgentInfoSigned,
+        agent_info_signed: kitsune_p2p::agent_store::AgentInfoSigned,
     ) -> ConductorResult<()> {
         let environ = self.p2p_env.clone();
-        let key = space.append(&agent_info_signed.as_agent_ref());
+        // let p2p = environ.get_db(&*holochain_state::db::AGENT)?;
+        let p2p_kv = AgentKv::new(environ.clone().into())?;
+        let env = environ.guard();
+        Ok(env.with_commit(|writer| {
+            p2p_kv.as_store_ref().put(
+                writer,
+                &(&agent_info_signed).into(),
+                &agent_info_signed,
+            )
+        })?)
+    }
+
+    pub(super) fn get_agent_info_signed(
+        &self,
+        agent_info_signed_key: kitsune_p2p::agent_store::AgentInfoSignedKey
+    ) -> ConductorResult<Option<AgentInfoSigned>> {
+        let environ = self.p2p_env.clone();
+
+        let p2p_kv = AgentKv::new(environ.clone().into())?;
+        let env = environ.guard();
+        let reader = env.reader()?;
+
+        Ok(p2p_kv.as_store_ref().get(&reader, &agent_info_signed_key.into())?)
     }
 
     pub(super) async fn put_wasm(
@@ -952,6 +975,7 @@ mod builder {
             self,
             test_env: TestEnvironment,
             test_wasm_env: EnvironmentWrite,
+            test_p2p_env: EnvironmentWrite,
         ) -> ConductorResult<ConductorHandle> {
             let TestEnvironment {
                 env: environment,
@@ -962,6 +986,7 @@ mod builder {
             let conductor = Conductor::new(
                 environment,
                 test_wasm_env,
+                test_p2p_env,
                 self.dna_store,
                 keystore,
                 tmpdir.path().to_path_buf().into(),
@@ -999,7 +1024,7 @@ pub mod tests {
     use super::*;
     use super::{Conductor, ConductorState};
     use crate::conductor::dna_store::MockDnaStore;
-    use holochain_state::test_utils::{test_conductor_env, test_wasm_env, TestEnvironment};
+    use holochain_state::test_utils::{test_conductor_env, test_wasm_env, test_p2p_env, TestEnvironment};
     use holochain_types::test_utils::fake_cell_id;
 
     #[tokio::test(threaded_scheduler)]
@@ -1012,12 +1037,17 @@ pub mod tests {
             env: wasm_env,
             tmpdir: _tmpdir,
         } = test_wasm_env();
+        let TestEnvironment {
+            env: p2p_env,
+            tmpdir: _p2p_tmpdir,
+        } = test_p2p_env();
         let dna_store = MockDnaStore::new();
         let keystore = environment.keystore().clone();
         let (holochain_p2p, _p2p_evt) = holochain_p2p::spawn_holochain_p2p().await.unwrap();
         let conductor = Conductor::new(
             environment,
             wasm_env,
+            p2p_env,
             dna_store,
             keystore,
             tmpdir.path().to_path_buf().into(),
@@ -1059,10 +1089,14 @@ pub mod tests {
             env: wasm_env,
             tmpdir: _tmpdir,
         } = test_wasm_env();
+        let TestEnvironment {
+            env: p2p_env,
+            tmpdir: _p2p_env,
+        } = test_p2p_env();
         let state = ConductorState::default();
         let conductor = ConductorBuilder::new()
             .fake_state(state.clone())
-            .test(test_env, wasm_env)
+            .test(test_env, wasm_env, p2p_env)
             .await
             .unwrap();
         assert_eq!(state, conductor.get_state_from_handle().await.unwrap());

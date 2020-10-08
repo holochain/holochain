@@ -40,6 +40,7 @@ use test_case::test_case;
 use test_utils::*;
 use test_wasm_common::{AnchorInput, TestString};
 use tracing::instrument;
+use holochain_state::test_utils::test_p2p_env;
 
 mod test_utils;
 
@@ -332,6 +333,11 @@ pub async fn setup_app(
         tmpdir: _tmpdir,
     } = test_wasm_env();
 
+    let TestEnvironment {
+        env: p2p_env,
+        tmpdir: _p2p_tmpdir,
+    } = test_p2p_env();
+
     let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
         .config(ConductorConfig {
             admin_interfaces: Some(vec![AdminInterfaceConfig {
@@ -339,7 +345,7 @@ pub async fn setup_app(
             }]),
             ..Default::default()
         })
-        .test(test_env.clone(), wasm_env)
+        .test(test_env.clone(), wasm_env, p2p_env)
         .await
         .unwrap();
 

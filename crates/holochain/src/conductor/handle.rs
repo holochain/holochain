@@ -69,6 +69,10 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::*;
 
+use holochain_p2p::event::HolochainP2pEvent::PutAgentInfoSigned;
+use holochain_p2p::event::HolochainP2pEvent::GetAgentInfoSigned;
+use futures::future::FutureExt;
+
 #[cfg(test)]
 use super::state::ConductorState;
 #[cfg(test)]
@@ -270,15 +274,28 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     #[instrument(skip(self))]
+    /// Warning: returning an error from this function kills the network for the conductor.
     async fn dispatch_holochain_p2p_event(
         &self,
         cell_id: &CellId,
         event: holochain_p2p::event::HolochainP2pEvent,
     ) -> ConductorResult<()> {
         let lock = self.conductor.read().await;
-        let cell: &Cell = lock.cell_by_id(cell_id)?;
-        trace!(agent = ?cell_id.agent_pubkey(), event = ?event);
-        cell.handle_holochain_p2p_event(event).await?;
+        match event {
+            PutAgentInfoSigned { agent_info_signed, respond, .. } => {
+                let res = lock.put_agent_info_signed(agent_info_signed).map_err(holochain_p2p::HolochainP2pError::other);
+                respond.respond(Ok(async move { res }.boxed().into()));
+            }
+            GetAgentInfoSigned { agent_info_signed_key, respond, .. } => {
+                let res = lock.get_agent_info_signed(agent_info_signed_key).map_err(holochain_p2p::HolochainP2pError::other);
+                respond.respond(Ok(async move { res }.boxed().into()));
+            }
+            _ => {
+                let cell: &Cell = lock.cell_by_id(cell_id)?;
+                trace!(agent = ?cell_id.agent_pubkey(), event = ?event);
+                cell.handle_holochain_p2p_event(event).await?;
+            }
+        }
         Ok(())
     }
 

@@ -1,6 +1,8 @@
 //! Definitions for events emited from the KitsuneP2p actor.
 
 use std::sync::Arc;
+use crate::types::agent_store::AgentInfoSigned;
+use crate::types::agent_store::AgentInfoSignedKey;
 
 /// Gather a list of op-hashes from our implementor that meet criteria.
 #[derive(Debug)]
@@ -39,15 +41,37 @@ pub struct SignNetworkDataEvt {
     pub data: Arc<Vec<u8>>,
 }
 
+#[derive(Debug)]
+/// Store the AgentInfo as signed by the agent themselves.
+pub struct PutAgentInfoSignedEvt {
+    /// The "space" context.
+    pub space: Arc<super::KitsuneSpace>,
+    /// The "agent" context.
+    pub agent: Arc<super::KitsuneAgent>,
+    /// The signed agent info.
+    pub agent_info_signed: AgentInfoSigned,
+}
+
+#[derive(Debug)]
+/// Get agent info as previously signed and put.
+pub struct GetAgentInfoSignedEvt {
+    /// The "space" context.
+    pub space: Arc<super::KitsuneSpace>,
+    /// The "agent" context.
+    pub agent: Arc<super::KitsuneAgent>,
+    /// The signed agent info key.
+    pub agent_info_signed_key: AgentInfoSignedKey,
+}
+
 ghost_actor::ghost_chan! {
     /// The KitsuneP2pEvent stream allows handling events generated from the
     /// KitsuneP2p actor.
     pub chan KitsuneP2pEvent<super::KitsuneP2pError> {
         /// We need to store signed agent info.
-        fn put_agent_info_signed(agent_info_signed: crate::types::agent_store::AgentInfoSigned) -> ();
+        fn put_agent_info_signed(input: PutAgentInfoSignedEvt) -> ();
 
         /// We need to get previously stored agent info.
-        fn get_agent_info_signed(agent_info_signed_key: crate::types::agent_store::AgentInfoSignedKey) -> Option<crate::types::agent_store::AgentInfoSigned>;
+        fn get_agent_info_signed(input: GetAgentInfoSignedEvt) -> Option<crate::types::agent_store::AgentInfoSigned>;
 
         /// We are receiving a request from a remote node.
         fn call(space: Arc<super::KitsuneSpace>, to_agent: Arc<super::KitsuneAgent>, from_agent: Arc<super::KitsuneAgent>, payload: Vec<u8>) -> Vec<u8>;

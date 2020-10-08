@@ -11,6 +11,7 @@ use crate::types::KitsuneBinType;
 pub type Urls = Vec<Url2>;
 
 /// A space/agent pair that defines the key for AgentInfo across all spaces.
+#[derive(Debug)]
 pub struct AgentInfoSignedKey {
     space: KitsuneSpace,
     agent: KitsuneAgent,
@@ -44,6 +45,15 @@ pub struct AgentInfoSigned {
     signature: KitsuneSignature,
     // The agent info.
     agent_info: AgentInfo,
+}
+
+impl From<&AgentInfoSigned> for AgentInfoSignedKey {
+    fn from(agent_info_signed: &AgentInfoSigned) -> Self {
+        Self {
+            space: agent_info_signed.as_agent_info_ref().as_space_ref().to_owned(),
+            agent: agent_info_signed.as_agent_info_ref().as_agent_ref().to_owned(),
+        }
+    }
 }
 
 impl AgentInfoSigned {
@@ -108,8 +118,8 @@ impl AgentInfo {
         self.as_ref()
     }
 
-    /// Thin AsRef wrapper for id.
-    pub fn as_id_ref(&self) -> &KitsuneAgent {
+    /// Thin AsRef wrapper for agent.
+    pub fn as_agent_ref(&self) -> &KitsuneAgent {
         self.as_ref()
     }
 

@@ -51,10 +51,10 @@ ghost_actor::ghost_chan! {
     /// the HolochainP2p actor.
     pub chan HolochainP2pEvent<super::HolochainP2pError> {
         /// We need to store signed agent info.
-        fn put_agent_info_signed(agent_info_signed: AgentInfoSigned) -> ();
+        fn put_agent_info_signed(dna_hash: DnaHash, to_agent: AgentPubKey, agent_info_signed: AgentInfoSigned) -> ();
 
         /// We need to get previously stored agent info.
-        fn get_agent_info_signed(agent_info_signed_key: AgentInfoSignedKey) -> Option<AgentInfoSigned>;
+        fn get_agent_info_signed(dna_hash: DnaHash, to_agent: AgentPubKey, agent_info_signed_key: AgentInfoSignedKey) -> Option<AgentInfoSigned>;
 
         /// A remote node is attempting to make a remote call on us.
         fn call_remote(

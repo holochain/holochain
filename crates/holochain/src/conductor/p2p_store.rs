@@ -1,27 +1,57 @@
 //! A simple KvBuf for AgentInfoSigned.
 
 use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
-use holochain_p2p::kitsune_p2p::KitsuneAgent;
+use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSignedKey;
 use holochain_state::buffer::KvStore;
 use holochain_state::db::GetDb;
 use holochain_state::env::EnvironmentRead;
 use holochain_state::error::DatabaseResult;
 use holochain_state::key::BufKey;
 
+const AGENT_KEY_LEN: usize = 64;
+const AGENT_KEY_COMPONENT_LEN: usize = 32;
+
 /// Required new type for KvBuf key.
-#[derive(Ord, PartialOrd, Eq, PartialEq)]
-pub struct AgentKvKey([0; 64])
+pub struct AgentKvKey([u8; AGENT_KEY_LEN]);
+
+impl PartialEq for AgentKvKey {
+    fn eq(&self, other: &Self) -> bool {
+        self == other
+    }
+}
+
+impl Eq for AgentKvKey { }
+
+impl PartialOrd for AgentKvKey {
+    fn partial_cmp(&self, other: &AgentKvKey) -> Option<std::cmp::Ordering> {
+        PartialOrd::partial_cmp(&&self.0[..], &&other.0[..])
+    }
+}
+
+impl Ord for AgentKvKey {
+    fn cmp(&self, other: &AgentKvKey) -> std::cmp::Ordering {
+        Ord::cmp(&&self.0[..], &&other.0[..])
+    }
+}
+
+impl From<&AgentInfoSigned> for AgentKvKey {
+    fn from(agent_info_signed: &AgentInfoSigned) -> Self {
+        AgentInfoSignedKey::from(agent_info_signed).into()
+    }
+}
 
 impl From<AgentInfoSignedKey> for AgentKvKey {
     fn from(agent_info_signed_key: AgentInfoSignedKey) -> Self {
-        let mut bytes = [0; 64];
-        bytes[..32].copy_from_slice(agent_info_signed_key.space_bytes())
-        bytes[32..].copy_from_slice(agent_info_signed_key.agent_bytes())
+        let mut bytes = [0; AGENT_KEY_LEN];
+        dbg!(agent_info_signed_key.space_bytes());
+        dbg!(agent_info_signed_key.agent_bytes());
+        bytes[..AGENT_KEY_COMPONENT_LEN].copy_from_slice(agent_info_signed_key.space_bytes());
+        bytes[AGENT_KEY_COMPONENT_LEN..].copy_from_slice(agent_info_signed_key.agent_bytes());
         Self(bytes)
     }
 }
 
-impl AsRef<[u8]> for AgentInfoSignedKey {
+impl AsRef<[u8]> for AgentKvKey {
     fn as_ref(&self) -> &[u8] {
         &self.0
     }
@@ -29,7 +59,10 @@ impl AsRef<[u8]> for AgentInfoSignedKey {
 
 impl BufKey for AgentKvKey {
     fn from_key_bytes_or_friendly_panic(bytes: &[u8]) -> Self {
-        Self(AgentInfoSignedKey::from(bytes.to_vec()))
+        assert_eq!(bytes.len(), AGENT_KEY_LEN, "AgentKvKey needs to be {} bytes long, found {} bytes", AGENT_KEY_LEN, bytes.len());
+        let mut inner = [0; AGENT_KEY_LEN];
+        inner.copy_from_slice(bytes);
+        Self(inner)
     }
 }
 
@@ -82,11 +115,7 @@ mod tests {
         env.with_commit(|writer| {
             store_buf.as_store_ref().put(
                 writer,
-                &agent_info_signed
-                    .as_agent_info_ref()
-                    .as_id_ref()
-                    .to_owned()
-                    .into(),
+                &(&agent_info_signed).into(),
                 &agent_info_signed,
             )
         })
@@ -96,14 +125,12 @@ mod tests {
             .as_store_ref()
             .get(
                 &env.reader().unwrap(),
-                &agent_info_signed
-                    .as_agent_info_ref()
-                    .as_id_ref()
-                    .to_owned()
-                    .into(),
+                &(&agent_info_signed).into(),
             )
             .unwrap();
 
+        dbg!(&ret);
+        dbg!(&agent_info_signed);
         assert_eq!(ret, &Some(agent_info_signed),);
     }
 }

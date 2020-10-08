@@ -21,6 +21,7 @@ use holochain_zome_types::ExternInput;
 use holochain_zome_types::ZomeCallResponse;
 use std::sync::Arc;
 use tempdir::TempDir;
+use holochain_state::test_utils::test_p2p_env;
 
 #[derive(Serialize, Deserialize, SerializedBytes)]
 struct CreateMessageInput {
@@ -207,8 +208,13 @@ pub async fn setup_app(
     } = test_wasm_env();
     let tmpdir = test_env.tmpdir.clone();
 
+    let TestEnvironment {
+        env: p2p_env,
+        tmpdir: _p2p_tmpdir,
+    } = test_p2p_env();
+
     let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
-        .test(test_env, wasm_env)
+        .test(test_env, wasm_env, p2p_env)
         .await
         .unwrap();
 
