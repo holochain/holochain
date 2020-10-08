@@ -151,6 +151,15 @@ where
         key: ChainItemKey,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>;
 
+    /// Same as get activity but includes the sequence number in the iterator value
+    fn get_activity_sequence<'r, R: Readable>(
+        &'r self,
+        r: &'r R,
+        key: ChainItemKey,
+    ) -> DatabaseResult<
+        Box<dyn FallibleIterator<Item = (u32, HeaderHash), Error = DatabaseError> + '_>,
+    >;
+
     /// Returns all the hashes of [Update] headers registered on an [Entry]
     fn get_updates<'r, R: Readable>(
         &'r self,
@@ -614,6 +623,26 @@ where
                     header_hash,
                 };
                 Ok(r)
+            },
+        )))
+    }
+
+    fn get_activity_sequence<'r, R: Readable>(
+        &'r self,
+        r: &'r R,
+        key: ChainItemKey,
+    ) -> DatabaseResult<
+        Box<dyn FallibleIterator<Item = (u32, HeaderHash), Error = DatabaseError> + '_>,
+    > {
+        let k = MiscMetaKey::chain_item(&key).into();
+        Ok(Box::new(self.misc_meta.iter_all_key_matches(r, k)?.map(
+            |(k, _)| {
+                let k: MiscMetaKey<ChainItemPrefix> =
+                    PrefixBytesKey::<P>::from_key_bytes_or_friendly_panic(k).into();
+                let key = ChainItemKey::from(k);
+                let sequence = (&key).into();
+                let header_hash = key.into();
+                Ok((sequence, header_hash))
             },
         )))
     }

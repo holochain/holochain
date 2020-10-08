@@ -44,6 +44,12 @@ mock! {
             &self,
             key: ChainItemKey,
         ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError>>>;
+        fn get_activity_sequence(
+            &self,
+            key: ChainItemKey,
+        ) -> DatabaseResult<
+            Box<dyn FallibleIterator<Item = (u32, HeaderHash), Error = DatabaseError>>,
+        >;
         fn get_updates(
             &self,
             hash: AnyDhtHash,
@@ -119,6 +125,15 @@ impl MetadataBufT for MockMetadataBuf {
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
     {
         self.get_activity(key)
+    }
+    fn get_activity_sequence<'r, R: Readable>(
+        &'r self,
+        _r: &'r R,
+        key: ChainItemKey,
+    ) -> DatabaseResult<
+        Box<dyn FallibleIterator<Item = (u32, HeaderHash), Error = DatabaseError> + '_>,
+    > {
+        self.get_activity_sequence(key)
     }
 
     fn get_updates<'r, R: Readable>(

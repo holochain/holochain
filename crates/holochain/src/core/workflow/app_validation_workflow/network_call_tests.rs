@@ -1,14 +1,20 @@
 use std::convert::TryInto;
 
 use fallible_iterator::FallibleIterator;
-use hdk3::prelude::ValidationPackage;
+use hdk3::prelude::{Element, ValidationPackage};
 use holo_hash::HeaderHash;
 use holochain_p2p::HolochainP2pCellT;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::query::{AgentActivity, ChainQueryFilter};
 
-use crate::test_utils::{
-    conductor_setup::ConductorCallData, host_fn_api::*, new_invocation, wait_for_integration,
+use crate::{
+    core::state::cascade::Cascade,
+    core::state::cascade::DbPairMut,
+    core::state::element_buf::ElementBuf,
+    core::state::metadata::MetadataBuf,
+    test_utils::{
+        conductor_setup::ConductorCallData, host_fn_api::*, new_invocation, wait_for_integration,
+    },
 };
 use crate::{
     core::state::source_chain::SourceChain, test_utils::conductor_setup::ConductorTestData,
@@ -182,6 +188,46 @@ async fn get_agent_activity_test() {
         .rev()
         .collect();
     let expected_activity = AgentActivity::new(expected_activity);
+    assert_eq!(agent_activity, expected_activity);
+
+    let mut element_cache = ElementBuf::cache(alice_call_data.env.clone().into()).unwrap();
+    let mut meta_cache = MetadataBuf::cache(alice_call_data.env.clone().into()).unwrap();
+    let cache_data = DbPairMut::new(&mut element_cache, &mut meta_cache);
+    let mut cascade = Cascade::empty()
+        .with_cache(cache_data)
+        .with_network(alice_call_data.network.clone());
+
+    // Cascade without entries
+    let agent_activity = cascade
+        .get_agent_activity(
+            alice_agent_id.clone(),
+            ChainQueryFilter::new(),
+            Default::default(),
+        )
+        .await
+        .expect("Failed to get any activity from alice");
+
+    let expected_activity: Vec<_> = expected_activity
+        .0
+        .into_iter()
+        .map(|shh| Element::new(shh, None))
+        .collect();
+    assert_eq!(agent_activity, expected_activity);
+
+    // Cascade with entries
+    let agent_activity = cascade
+        .get_agent_activity(
+            alice_agent_id.clone(),
+            ChainQueryFilter::new().include_entries(true),
+            Default::default(),
+        )
+        .await
+        .expect("Failed to get any activity from alice");
+
+    let expected_activity: Vec<_> = expected_activity
+        .into_iter()
+        .filter_map(|el| alice_source_chain.get_element(el.header_address()).unwrap())
+        .collect();
     assert_eq!(agent_activity, expected_activity);
 
     // Commit private messages

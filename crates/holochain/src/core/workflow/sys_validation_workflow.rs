@@ -670,7 +670,7 @@ pub struct SysValidationWorkspace {
 }
 
 impl<'a> SysValidationWorkspace {
-    pub fn cascade<Network: HolochainP2pCellT>(
+    pub fn cascade<Network: HolochainP2pCellT + Clone>(
         &'a mut self,
         network: Network,
     ) -> Cascade<'a, Network> {
@@ -742,7 +742,7 @@ impl SysValidationWorkspace {
         Ok(())
     }
 
-    pub fn network_only_cascade<Network: HolochainP2pCellT>(
+    pub fn network_only_cascade<Network: HolochainP2pCellT + Clone + Send + 'static>(
         &mut self,
         network: Network,
     ) -> Cascade<'_, Network> {
@@ -786,7 +786,7 @@ impl SysValidationWorkspace {
     }
 
     /// Get a cascade over all local databases and the network
-    pub fn full_cascade<Network: HolochainP2pCellT>(
+    pub fn full_cascade<Network: HolochainP2pCellT + Clone>(
         &mut self,
         network: Network,
     ) -> Cascade<'_, Network> {

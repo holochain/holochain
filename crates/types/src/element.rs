@@ -78,7 +78,7 @@ impl<'a> ElementGroup<'a> {
     }
 
     /// Create an element group from wire headers and an entry
-    pub async fn from_wire_elements<I: IntoIterator<Item = WireNewEntryHeader>>(
+    pub fn from_wire_elements<I: IntoIterator<Item = WireNewEntryHeader>>(
         headers_iter: I,
         entry_type: EntryType,
         entry: Entry,
@@ -90,9 +90,7 @@ impl<'a> ElementGroup<'a> {
         let entry = Cow::Owned(entry);
         for header in iter {
             headers.push(Cow::Owned(
-                header
-                    .into_header(entry_type.clone(), entry_hash.clone())
-                    .await,
+                header.into_header(entry_type.clone(), entry_hash.clone()),
             ))
         }
 
