@@ -1,13 +1,14 @@
 //! The workflow and queue consumer for sys validation
 
-use std::{convert::TryInto, sync::Arc};
+use std::{collections::BinaryHeap, convert::TryInto, sync::Arc};
 
 use super::{
-    error::WorkflowResult, produce_dht_ops_workflow::dht_op_light::light_to_op, CallZomeWorkspace,
-    CallZomeWorkspaceLock,
+    error::WorkflowError, error::WorkflowResult,
+    produce_dht_ops_workflow::dht_op_light::light_to_op, CallZomeWorkspace, CallZomeWorkspaceLock,
 };
 use crate::{
     conductor::api::CellConductorApiT,
+    conductor::entry_def_store::get_entry_def,
     core::ribosome::guest_callback::validate_link::ValidateCreateLinkInvocation,
     core::ribosome::guest_callback::validate_link::ValidateDeleteLinkInvocation,
     core::ribosome::guest_callback::validate_link::ValidateLinkHostAccess,
@@ -34,6 +35,8 @@ use crate::{
             validation_db::{ValidationLimboStatus, ValidationLimboStore, ValidationLimboValue},
             workspace::{Workspace, WorkspaceResult},
         },
+        validation::DhtOpOrder,
+        validation::OrderedOp,
     },
 };
 use error::AppValidationResult;
@@ -48,21 +51,27 @@ use holochain_state::{
     prelude::*,
 };
 use holochain_types::{
-    dht_op::DhtOp, dna::DnaFile, test_utils::which_agent, validate::ValidationStatus, Entry,
-    HeaderHashed, Timestamp,
+    dht_op::DhtOp, dna::zome::Zome, dna::DnaFile, test_utils::which_agent,
+    validate::ValidationStatus, Entry, HeaderHashed, Timestamp,
 };
 use holochain_zome_types::{
     element::Element,
     element::SignedHeaderHashed,
+    entry_def::EntryDef,
+    entry_def::EntryDefId,
     header::AppEntryType,
     header::EntryType,
     header::{CreateLink, DeleteLink, ZomeId},
+    validate::RequiredValidationType,
+    validate::ValidationPackage,
     zome::ZomeName,
     Header,
 };
 use tracing::*;
 pub use types::Outcome;
 
+#[cfg(test)]
+mod network_call_tests;
 #[cfg(test)]
 mod tests;
 
@@ -95,28 +104,54 @@ async fn app_validation_workflow_inner(
 ) -> WorkflowResult<WorkComplete> {
     let env = workspace.validation_limbo.env().clone();
 
-    let ops: Vec<ValidationLimboValue> = fresh_reader!(env, |r| workspace
-        .validation_limbo
-        .drain_iter_filter(&r, |(_, vlv)| {
-            match vlv.status {
-                // We only want sys validated or awaiting app dependency ops
-                ValidationLimboStatus::SysValidated | ValidationLimboStatus::AwaitingAppDeps(_) => {
-                    Ok(true)
-                }
-                ValidationLimboStatus::Pending | ValidationLimboStatus::AwaitingSysDeps(_) => {
-                    Ok(false)
-                }
-            }
-        })?
-        // TODO: Sort into min heap like sys val
-        .collect())?;
+    // Drain the ops into a sorted binary heap
+    let sorted_ops: BinaryHeap<OrderedOp<ValidationLimboValue>> = fresh_reader!(env, |r| {
+        let validation_limbo = &mut workspace.validation_limbo;
+        let element_pending = &workspace.element_pending;
+
+        let sorted_ops: Result<BinaryHeap<OrderedOp<ValidationLimboValue>>, WorkflowError> =
+            validation_limbo
+                .drain_iter_filter(&r, |(_, vlv)| {
+                    match vlv.status {
+                        // We only want sys validated or awaiting app dependency ops
+                        ValidationLimboStatus::SysValidated
+                        | ValidationLimboStatus::AwaitingAppDeps(_) => Ok(true),
+                        ValidationLimboStatus::Pending
+                        | ValidationLimboStatus::AwaitingSysDeps(_) => Ok(false),
+                    }
+                })?
+                .map_err(WorkflowError::from)
+                .map(|vlv| {
+                    // Sort the ops into a min-heap
+                    let op = light_to_op(vlv.op.clone(), element_pending)?;
+
+                    let hash = DhtOpHash::with_data_sync(&op);
+                    let order = DhtOpOrder::from(&op);
+                    let v = OrderedOp {
+                        order,
+                        hash,
+                        op,
+                        value: vlv,
+                    };
+                    // We want a min-heap
+                    Ok(v)
+                })
+                .iterator()
+                .collect();
+        sorted_ops
+    })?;
 
     // Validate all the ops
-    for mut vlv in ops {
+    for so in sorted_ops.into_sorted_vec() {
+        let OrderedOp {
+            hash,
+            op,
+            value: mut vlv,
+            ..
+        } = so;
+
         match &vlv.status {
             ValidationLimboStatus::AwaitingAppDeps(_) | ValidationLimboStatus::SysValidated => {
-                let op = light_to_op(vlv.op.clone(), &workspace.element_pending)?;
-
                 // Validate this op
                 let outcome = validate_op(op.clone(), &conductor_api, workspace, &network)
                     .await
@@ -125,7 +160,6 @@ async fn app_validation_workflow_inner(
 
                 match outcome {
                     Outcome::Accepted => {
-                        let hash = DhtOpHash::with_data_sync(&op);
                         let iv = IntegrationLimboValue {
                             validation_status: ValidationStatus::Valid,
                             op: vlv.op,
@@ -133,12 +167,10 @@ async fn app_validation_workflow_inner(
                         workspace.put_int_limbo(hash, iv, op)?;
                     }
                     Outcome::AwaitingDeps(deps) => {
-                        let hash = DhtOpHash::with_data_sync(&op);
                         vlv.status = ValidationLimboStatus::AwaitingAppDeps(deps);
                         workspace.put_val_limbo(hash, vlv)?;
                     }
                     Outcome::Rejected(_) => {
-                        let hash = DhtOpHash::with_data_sync(&op);
                         let iv = IntegrationLimboValue {
                             op: vlv.op,
                             validation_status: ValidationStatus::Rejected,
@@ -179,6 +211,18 @@ async fn validate_op(
     let dna_file = { conductor_api.get_this_dna().await };
     let dna_file =
         dna_file.ok_or_else(|| AppValidationError::DnaMissing(conductor_api.cell_id().clone()))?;
+
+    // Get the EntryDefId associated with this Element if there is one
+    let entry_def = {
+        let cascade = workspace.full_cascade(network.clone());
+        get_associated_entry_def(&element, &dna_file, conductor_api, cascade).await?
+    };
+
+    // Get the validation package
+    let validation_package = get_validation_package(&element, &entry_def, network.clone()).await?;
+
+    // Get the EntryDefId associated with this Element if there is one
+    let entry_def_id = entry_def.map(|ed| ed.id);
 
     // Get the zome names
     let zomes_to_invoke = get_zomes_to_invoke(&element, &dna_file, workspace, network).await?;
@@ -234,10 +278,13 @@ async fn validate_op(
 
             // Call the callback
             let element = Arc::new(element);
+            let validation_package = validation_package.map(Arc::new);
             // Call the element validation
-            run_validation_callback(
+            run_validation_callback_inner(
                 zomes_to_invoke,
                 element,
+                validation_package,
+                entry_def_id,
                 &ribosome,
                 workspace_lock.clone(),
                 network.clone(),
@@ -253,6 +300,31 @@ async fn validate_op(
     }
 
     Ok(outcome)
+}
+
+/// Get the [EntryDef] associated with this
+/// element if there is one.
+///
+/// Create and Update will get the def from
+/// the AppEntryType on their header.
+///
+/// Delete will get the def from the
+/// header on the `deletes_address` field.
+///
+/// Other header types will None.
+async fn get_associated_entry_def(
+    element: &Element,
+    dna_file: &DnaFile,
+    conductor_api: &impl CellConductorApiT,
+    cascade: Cascade<'_>,
+) -> AppValidationOutcome<Option<EntryDef>> {
+    match get_app_entry_type(element, cascade).await? {
+        Some(aet) => {
+            let zome = get_zome_info(&aet, dna_file)?.1.clone();
+            Ok(get_entry_def(aet.id(), zome, dna_file, conductor_api).await?)
+        }
+        None => Ok(None),
+    }
 }
 
 /// Get the element from the op or
@@ -316,7 +388,11 @@ async fn get_zomes_to_invoke(
     workspace: &mut AppValidationWorkspace,
     network: &HolochainP2pCell,
 ) -> AppValidationOutcome<ZomesToInvoke> {
-    match get_app_entry_type(element, workspace, network).await? {
+    let aet = {
+        let cascade = workspace.full_cascade(network.clone());
+        get_app_entry_type(element, cascade).await?
+    };
+    match aet {
         Some(aet) => Ok(ZomesToInvoke::One(get_zome_name(&aet, &dna_file)?)),
         None => match element.header() {
             Header::CreateLink(_) | Header::DeleteLink(_) => {
@@ -325,6 +401,18 @@ async fn get_zomes_to_invoke(
             _ => Ok(ZomesToInvoke::All),
         },
     }
+}
+
+fn get_zome_info<'a>(
+    entry_type: &AppEntryType,
+    dna_file: &'a DnaFile,
+) -> AppValidationResult<&'a (ZomeName, Zome)> {
+    let zome_index = u8::from(entry_type.zome_id()) as usize;
+    Ok(dna_file
+        .dna()
+        .zomes
+        .get(zome_index)
+        .ok_or_else(|| AppValidationError::ZomeId(entry_type.zome_id()))?)
 }
 
 fn get_zome_name(entry_type: &AppEntryType, dna_file: &DnaFile) -> AppValidationResult<ZomeName> {
@@ -346,15 +434,14 @@ fn zome_id_to_zome_name(zome_id: ZomeId, dna_file: &DnaFile) -> AppValidationRes
 /// from this entry or from the dependency.
 async fn get_app_entry_type(
     element: &Element,
-    workspace: &mut AppValidationWorkspace,
-    network: &HolochainP2pCell,
+    cascade: Cascade<'_>,
 ) -> AppValidationOutcome<Option<AppEntryType>> {
     match element.header().entry_data() {
         Some((_, et)) => match et.clone() {
             EntryType::App(aet) => Ok(Some(aet)),
             EntryType::AgentPubKey | EntryType::CapClaim | EntryType::CapGrant => Ok(None),
         },
-        None => get_app_entry_type_from_dep(element, workspace, network).await,
+        None => get_app_entry_type_from_dep(element, cascade).await,
     }
 }
 
@@ -394,12 +481,10 @@ async fn get_link_zome(
 /// the app entry type so we know which zome to call
 async fn get_app_entry_type_from_dep(
     element: &Element,
-    workspace: &mut AppValidationWorkspace,
-    network: &HolochainP2pCell,
+    mut cascade: Cascade<'_>,
 ) -> AppValidationOutcome<Option<AppEntryType>> {
     match element.header() {
         Header::Delete(ed) => {
-            let mut cascade = workspace.full_cascade(network.clone());
             let el = cascade
                 .retrieve(ed.deletes_address.clone().into(), Default::default())
                 .await?
@@ -420,9 +505,86 @@ fn extract_app_type(element: &Element) -> Option<AppEntryType> {
         })
 }
 
-pub fn run_validation_callback(
+/// Get the validation package based on
+/// the requirements set by the AppEntryType
+async fn get_validation_package(
+    element: &Element,
+    entry_def: &Option<EntryDef>,
+    mut network: HolochainP2pCell,
+) -> AppValidationResult<Option<ValidationPackage>> {
+    match entry_def {
+        Some(entry_def) => {
+            Ok(match entry_def.required_validation_type {
+                // Only needs the element
+                RequiredValidationType::Element => None,
+                RequiredValidationType::SubChain | RequiredValidationType::Full => {
+                    // TODO: What if this is the same author that is validating?
+                    // We probably don't want to do a network call although
+                    // it will just short circuit
+
+                    // Get from author
+                    let agent_id = element.header().author().clone();
+                    let header_hash = element.header_address().clone();
+                    network
+                        .get_validation_package(agent_id, header_hash)
+                        .await?
+                        .into()
+                    // TODO: Fallback to gossiper if author is unavailable
+                    // TODO: Fallback to RegisterAgentActivity if gossiper is unavailable
+                }
+            })
+        }
+        None => {
+            // Not an entry header type so no package
+            Ok(None)
+        }
+    }
+}
+
+pub async fn run_validation_callback_direct(
+    zome_name: ZomeName,
+    element: Element,
+    ribosome: &impl RibosomeT,
+    workspace_lock: CallZomeWorkspaceLock,
+    network: HolochainP2pCell,
+    conductor_api: &impl CellConductorApiT,
+) -> AppValidationResult<Outcome> {
+    let outcome = {
+        let mut workspace = workspace_lock.write().await;
+        let cascade = workspace.cascade(network.clone());
+        get_associated_entry_def(&element, ribosome.dna_file(), conductor_api, cascade).await
+    };
+
+    // The outcome could be awaiting a dependency to get the entry def
+    // so we need to check that here and exit early if that is the case
+    let entry_def = match outcome {
+        Ok(ed) => ed,
+        Err(outcome) => return outcome.try_into(),
+    };
+
+    let validation_package = get_validation_package(&element, &entry_def, network.clone())
+        .await?
+        .map(Arc::new);
+    let entry_def_id = entry_def.map(|ed| ed.id);
+
+    let element = Arc::new(element);
+
+    run_validation_callback_inner(
+        ZomesToInvoke::One(zome_name),
+        element,
+        validation_package,
+        entry_def_id,
+        ribosome,
+        workspace_lock,
+        network,
+    )
+}
+
+fn run_validation_callback_inner(
     zomes_to_invoke: ZomesToInvoke,
     element: Arc<Element>,
+    validation_package: Option<Arc<ValidationPackage>>,
+    entry_def_id: Option<EntryDefId>,
     ribosome: &impl RibosomeT,
     workspace_lock: CallZomeWorkspaceLock,
     network: HolochainP2pCell,
@@ -432,6 +594,8 @@ pub fn run_validation_callback(
         ValidateInvocation {
             zomes_to_invoke,
             element,
+            validation_package,
+            entry_def_id,
         },
     )?;
     match validate {
@@ -503,6 +667,9 @@ pub struct AppValidationWorkspace {
     // Read only rejected store for finding dependency data
     pub element_rejected: ElementBuf<RejectedPrefix>,
     pub meta_rejected: MetadataBuf<RejectedPrefix>,
+    // Read only authored store for finding dependency data
+    pub element_authored: ElementBuf<AuthoredPrefix>,
+    pub meta_authored: MetadataBuf<AuthoredPrefix>,
     // Cached data
     pub element_cache: ElementBuf,
     pub meta_cache: MetadataBuf,
@@ -534,6 +701,8 @@ impl AppValidationWorkspace {
         let call_zome_workspace_lock = Some(CallZomeWorkspaceLock::new(call_zome_workspace));
 
         // READ ONLY
+        let element_authored = ElementBuf::authored(env.clone(), false)?;
+        let meta_authored = MetadataBuf::authored(env.clone())?;
         let element_rejected = ElementBuf::rejected(env.clone())?;
         let meta_rejected = MetadataBuf::rejected(env)?;
 
@@ -543,6 +712,8 @@ impl AppValidationWorkspace {
             validation_limbo,
             element_vault,
             meta_vault,
+            element_authored,
+            meta_authored,
             element_pending,
             meta_pending,
             element_rejected,
@@ -590,6 +761,10 @@ impl AppValidationWorkspace {
             element: &self.element_vault,
             meta: &self.meta_vault,
         };
+        let authored_data = DbPair {
+            element: &self.element_authored,
+            meta: &self.meta_authored,
+        };
         let pending_data = DbPair {
             element: &self.element_pending,
             meta: &self.meta_pending,
@@ -604,6 +779,7 @@ impl AppValidationWorkspace {
         };
         Cascade::empty()
             .with_integrated(integrated_data)
+            .with_authored(authored_data)
             .with_pending(pending_data)
             .with_cache(cache_data)
             .with_rejected(rejected_data)
@@ -617,6 +793,10 @@ impl Workspace for AppValidationWorkspace {
         self.integration_limbo.flush_to_txn_ref(writer)?;
         self.element_pending.flush_to_txn_ref(writer)?;
         self.meta_pending.flush_to_txn_ref(writer)?;
+
+        // Flush for cascade
+        self.element_cache.flush_to_txn_ref(writer)?;
+        self.meta_cache.flush_to_txn_ref(writer)?;
 
         // Need to flush the call zome workspace because of the cache.
         // TODO: If cache becomes a separate env then remove this

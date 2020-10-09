@@ -1185,7 +1185,7 @@ async fn test_wasm_api_without_integration_links() {
     assert_eq!(links[0], target_entry_hash);
 }
 
-// This doesn't work without inline integration
+// TODO: Evaluate if this test adds any value or remove
 #[ignore]
 #[tokio::test(threaded_scheduler)]
 async fn test_wasm_api_without_integration_delete() {
@@ -1224,7 +1224,7 @@ async fn test_wasm_api_without_integration_delete() {
         let reader = env_ref.reader().unwrap();
         let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
         let entry_header = workspace
-            .meta
+            .meta_authored
             .get_headers(&reader, base_address.clone())
             .unwrap()
             .next()

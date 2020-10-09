@@ -18,9 +18,9 @@ pub enum PassphraseServiceConfig {
         /// Path of the socket
         path: PathBuf,
     },
-    /// Passphrase is requested from a mock service for testing purposes
-    Mock {
-        /// The actual pasphrase in the mock case so we can test fail cases
+    /// Passphrase is pulled directly from the config file
+    FromConfig {
+        /// The actual pasphrase
         passphrase: String,
     },
 }

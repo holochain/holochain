@@ -255,6 +255,15 @@ impl MetadataBuf<RejectedPrefix> {
     }
 }
 
+impl MetadataBuf<AuthoredPrefix> {
+    /// Create a [MetadataBuf] with the vault databases using the AuthoredPrefix.
+    /// The data in the type will be separate from the other prefixes even though the
+    /// database is shared.
+    pub fn authored(env: EnvironmentRead) -> DatabaseResult<Self> {
+        Self::new_vault(env)
+    }
+}
+
 impl<P> MetadataBuf<P>
 where
     P: PrefixType,
@@ -687,5 +696,20 @@ impl<P: PrefixType> BufferedStore for MetadataBuf<P> {
         self.links_meta.flush_to_txn_ref(writer)?;
         self.misc_meta.flush_to_txn_ref(writer)?;
         Ok(())
+    }
+}
+/// Create an Metadata with a clone of the scratch
+/// from another MetadataBuf
+impl<P> From<&MetadataBuf<P>> for MetadataBuf<P>
+where
+    P: PrefixType,
+{
+    fn from(other: &MetadataBuf<P>) -> Self {
+        Self {
+            system_meta: (&other.system_meta).into(),
+            links_meta: (&other.links_meta).into(),
+            misc_meta: (&other.misc_meta).into(),
+            env: other.env.clone(),
+        }
     }
 }

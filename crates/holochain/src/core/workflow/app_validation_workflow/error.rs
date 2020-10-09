@@ -1,10 +1,11 @@
+use holochain_p2p::HolochainP2pError;
 use holochain_types::cell::CellId;
 use holochain_zome_types::header::ZomeId;
 use thiserror::Error;
 
 use crate::{
-    core::ribosome::error::RibosomeError, core::state::cascade::error::CascadeError,
-    core::validation::OutcomeOrError, from_sub_error,
+    conductor::entry_def_store::error::EntryDefStoreError, core::ribosome::error::RibosomeError,
+    core::state::cascade::error::CascadeError, core::validation::OutcomeOrError, from_sub_error,
 };
 
 use super::types::Outcome;
@@ -15,6 +16,10 @@ pub enum AppValidationError {
     CascadeError(#[from] CascadeError),
     #[error("Dna is missing for this cell {0:?}. Cannot validate without dna.")]
     DnaMissing(CellId),
+    #[error(transparent)]
+    EntryDefStoreError(#[from] EntryDefStoreError),
+    #[error(transparent)]
+    HolochainP2pError(#[from] HolochainP2pError),
     #[error("Links cannot be called on multiple zomes for validation")]
     LinkMultipleZomes,
     #[error(transparent)]
@@ -37,3 +42,4 @@ impl<T> From<AppValidationError> for OutcomeOrError<T, AppValidationError> {
 // These need to match the #[from] in AppValidationError
 from_sub_error!(AppValidationError, RibosomeError);
 from_sub_error!(AppValidationError, CascadeError);
+from_sub_error!(AppValidationError, EntryDefStoreError);

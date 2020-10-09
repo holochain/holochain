@@ -1,18 +1,13 @@
 //! Types needed for all validation
+use std::convert::TryFrom;
+
 use derivative::Derivative;
 use holo_hash::DhtOpHash;
 use holochain_types::dht_op::DhtOp;
 
-/// Sets the level required for validation dependencies
-#[derive(Clone, Debug, Copy)]
-pub enum CheckLevel {
-    /// Selected dependencies must be held by this agent
-    Hold,
-    /// Selected dependencies must be witnessed by this agent,
-    /// meaning that we were able to fetch the element from another agent,
-    /// but have not verified the element's validity ourselves
-    Witness,
-}
+use super::{
+    workflow::error::WorkflowResult, SourceChainError, SysValidationError, ValidationOutcome,
+};
 
 /// Exit early with either an outcome or an error
 pub enum OutcomeOrError<T, E> {
@@ -75,5 +70,13 @@ impl From<&DhtOp> for DhtOpOrder {
             DhtOp::RegisterAddLink(_, h) => RegisterAddLink(h.timestamp),
             DhtOp::RegisterRemoveLink(_, h) => RegisterRemoveLink(h.timestamp),
         }
+    }
+}
+
+impl OutcomeOrError<ValidationOutcome, SysValidationError> {
+    /// Convert an OutcomeOrError<ValidationOutcome, SysValidationError> into
+    /// a InvalidCommit and exit the call zome workflow early
+    pub fn invalid_call_zome_commit<T>(self) -> WorkflowResult<T> {
+        Err(SourceChainError::InvalidCommit(ValidationOutcome::try_from(self)?.to_string()).into())
     }
 }

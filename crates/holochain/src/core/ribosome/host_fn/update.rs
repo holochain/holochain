@@ -3,7 +3,7 @@ use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::{
     ribosome::RibosomeT,
-    workflow::{integrate_dht_ops_workflow::integrate_to_cache, CallZomeWorkspace},
+    workflow::{integrate_dht_ops_workflow::integrate_to_authored, CallZomeWorkspace},
     SourceChainError,
 };
 use holo_hash::HasHash;
@@ -72,10 +72,10 @@ pub fn update<'a>(
         let element = source_chain
             .get_element(&header_hash)?
             .expect("Element we just put in SourceChain must be gettable");
-        integrate_to_cache(
+        integrate_to_authored(
             &element,
             workspace.source_chain.elements(),
-            &mut workspace.cache_meta,
+            &mut workspace.meta_authored,
         )
         .await
         .map_err(Box::new)

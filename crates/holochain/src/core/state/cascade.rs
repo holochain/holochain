@@ -35,12 +35,16 @@ use holochain_zome_types::{
     link::Link,
     metadata::{Details, ElementDetails, EntryDetails},
 };
+use std::collections::HashSet;
 use std::collections::{BTreeMap, BTreeSet};
 use tracing::*;
 use tracing_futures::Instrument;
 
 #[cfg(test)]
+mod authored_test;
+#[cfg(test)]
 mod network_tests;
+
 #[cfg(all(test, outdated_tests))]
 mod test;
 
@@ -80,6 +84,9 @@ macro_rules! return_if_ok {
 /// Search every level that the cascade has been constructed with
 macro_rules! search_all {
     ($cascade:expr, $fn:ident, $hash:expr) => {{
+        if let Some(db) = $cascade.authored_data.as_ref() {
+            return_if_ok!($fn(db, $hash)?)
+        }
         if let Some(db) = $cascade.pending_data.as_ref() {
             return_if_ok!($fn(db, $hash)?)
         }
@@ -102,6 +109,7 @@ macro_rules! search_all {
 /// The default IntegratedPrefix is for databases that don't
 /// actually use prefixes (like the cache). In this case we just
 /// choose the first one (IntegratedPrefix)
+#[derive(derive_more::Constructor)]
 pub struct DbPair<'a, M, P = IntegratedPrefix>
 where
     P: PrefixType,
@@ -111,6 +119,7 @@ where
     pub meta: &'a M,
 }
 
+#[derive(derive_more::Constructor)]
 pub struct DbPairMut<'a, M, P = IntegratedPrefix>
 where
     P: PrefixType,
@@ -124,17 +133,20 @@ pub struct Cascade<
     'a,
     Network = HolochainP2pCell,
     MetaVault = MetadataBuf,
+    MetaAuthored = MetadataBuf<AuthoredPrefix>,
     MetaCache = MetadataBuf,
     MetaPending = MetadataBuf<PendingPrefix>,
     MetaRejected = MetadataBuf<RejectedPrefix>,
 > where
     Network: HolochainP2pCellT,
     MetaVault: MetadataBufT,
+    MetaAuthored: MetadataBufT<AuthoredPrefix>,
     MetaPending: MetadataBufT<PendingPrefix>,
     MetaRejected: MetadataBufT<RejectedPrefix>,
     MetaCache: MetadataBufT,
 {
     integrated_data: Option<DbPair<'a, MetaVault, IntegratedPrefix>>,
+    authored_data: Option<DbPair<'a, MetaAuthored, AuthoredPrefix>>,
     pending_data: Option<DbPair<'a, MetaPending, PendingPrefix>>,
     rejected_data: Option<DbPair<'a, MetaRejected, RejectedPrefix>>,
     cache_data: Option<DbPairMut<'a, MetaCache>>,
@@ -157,24 +169,33 @@ enum Search {
     NotInCascade,
 }
 
-impl<'a, Network, MetaVault, MetaCache> Cascade<'a, Network, MetaVault, MetaCache>
+impl<'a, Network, MetaVault, MetaAuthored, MetaCache>
+    Cascade<'a, Network, MetaVault, MetaAuthored, MetaCache>
 where
     MetaCache: MetadataBufT,
     MetaVault: MetadataBufT,
+    MetaAuthored: MetadataBufT<AuthoredPrefix>,
     Network: HolochainP2pCellT,
 {
     /// Constructs a [Cascade], for the default use case of
     /// vault + cache + network
     // TODO: Probably should rename this function but want to
     // avoid refactoring
+    #[allow(clippy::complexity)]
     pub fn new(
         env: EnvironmentRead,
+        element_authored: &'a ElementBuf<AuthoredPrefix>,
+        meta_authored: &'a MetaAuthored,
         element_integrated: &'a ElementBuf,
         meta_integrated: &'a MetaVault,
         element_cache: &'a mut ElementBuf,
         meta_cache: &'a mut MetaCache,
         network: Network,
     ) -> Self {
+        let authored_data = Some(DbPair {
+            element: element_authored,
+            meta: meta_authored,
+        });
         let integrated_data = Some(DbPair {
             element: element_integrated,
             meta: meta_integrated,
@@ -189,6 +210,7 @@ where
             pending_data: None,
             rejected_data: None,
             integrated_data,
+            authored_data,
             cache_data,
         }
     }
@@ -199,6 +221,7 @@ impl<'a> Cascade<'a> {
     pub fn empty() -> Self {
         Self {
             integrated_data: None,
+            authored_data: None,
             pending_data: None,
             rejected_data: None,
             cache_data: None,
@@ -208,11 +231,12 @@ impl<'a> Cascade<'a> {
     }
 }
 
-impl<'a, Network, MetaVault, MetaCache, MetaPending, MetaRejected>
-    Cascade<'a, Network, MetaVault, MetaCache, MetaPending, MetaRejected>
+impl<'a, Network, MetaVault, MetaAuthored, MetaCache, MetaPending, MetaRejected>
+    Cascade<'a, Network, MetaVault, MetaAuthored, MetaCache, MetaPending, MetaRejected>
 where
     MetaCache: MetadataBufT,
     MetaVault: MetadataBufT,
+    MetaAuthored: MetadataBufT<AuthoredPrefix>,
     MetaPending: MetadataBufT<PendingPrefix>,
     MetaRejected: MetadataBufT<RejectedPrefix>,
     Network: HolochainP2pCellT,
@@ -231,6 +255,16 @@ where
     pub fn with_pending(mut self, pending_data: DbPair<'a, MetaPending, PendingPrefix>) -> Self {
         self.env = Some(pending_data.meta.env().clone());
         self.pending_data = Some(pending_data);
+        self
+    }
+
+    /// Add the authored [ElementBuf] and [MetadataBuf] to the cascade
+    pub fn with_authored(
+        mut self,
+        authored_data: DbPair<'a, MetaAuthored, AuthoredPrefix>,
+    ) -> Self {
+        self.env = Some(authored_data.meta.env().clone());
+        self.authored_data = Some(authored_data);
         self
     }
 
@@ -255,9 +289,10 @@ where
     pub fn with_network<N: HolochainP2pCellT>(
         self,
         network: N,
-    ) -> Cascade<'a, N, MetaVault, MetaCache, MetaPending, MetaRejected> {
+    ) -> Cascade<'a, N, MetaVault, MetaAuthored, MetaCache, MetaPending, MetaRejected> {
         Cascade {
             integrated_data: self.integrated_data,
+            authored_data: self.authored_data,
             pending_data: self.pending_data,
             rejected_data: self.rejected_data,
             cache_data: self.cache_data,
@@ -507,28 +542,73 @@ where
             .collect()
     }
 
+    /// Compute the [EntryDhtStatus] for these headers
+    /// from the combined perspective of the cache and
+    /// the authored store
+    fn compute_entry_dht_status(
+        headers: &BTreeSet<TimedHeaderHash>,
+        cache_data: &DbPairMut<'a, MetaCache>,
+        authored_data: &DbPair<'a, MetaAuthored, AuthoredPrefix>,
+        env: &EnvironmentRead,
+    ) -> CascadeResult<EntryDhtStatus> {
+        fresh_reader!(env, |r| {
+            for thh in headers {
+                // If we can find any header that has no
+                // deletes in either store then the entry is live
+                if cache_data
+                    .meta
+                    .get_deletes_on_header(&r, thh.header_hash.clone())?
+                    .next()?
+                    .is_none()
+                    && authored_data
+                        .meta
+                        .get_deletes_on_header(&r, thh.header_hash.clone())?
+                        .next()?
+                        .is_none()
+                {
+                    return Ok(EntryDhtStatus::Live);
+                }
+            }
+
+            Ok(EntryDhtStatus::Dead)
+        })
+    }
+
     async fn create_entry_details(&self, hash: EntryHash) -> CascadeResult<Option<EntryDetails>> {
         let cache_data = ok_or_return!(self.cache_data.as_ref(), None);
+        let authored_data = ok_or_return!(self.authored_data.as_ref(), None);
         let env = ok_or_return!(self.env.as_ref(), None);
         match self.get_entry_local_raw(&hash)? {
             Some(entry) => fresh_reader!(env, |r| {
-                let entry_dht_status = cache_data.meta.get_dht_status(&r, &hash)?;
+                // Get the "headers that created this entry" hashes
                 let headers = cache_data
                     .meta
                     .get_headers(&r, hash.clone())?
-                    .collect::<Vec<_>>()?;
-                let headers = self.render_headers(headers, |h| {
-                    h == HeaderType::Update || h == HeaderType::Create
-                })?;
+                    .chain(authored_data.meta.get_headers(&r, hash.clone())?)
+                    .collect::<BTreeSet<_>>()?;
+
+                // Get the delete hashes
                 let deletes = cache_data
                     .meta
                     .get_deletes_on_entry(&r, hash.clone())?
-                    .collect::<Vec<_>>()?;
-                let deletes = self.render_headers(deletes, |h| h == HeaderType::Delete)?;
+                    .chain(authored_data.meta.get_deletes_on_entry(&r, hash.clone())?)
+                    .collect::<BTreeSet<_>>()?;
+
+                // Get the update hashes
                 let updates = cache_data
                     .meta
-                    .get_updates(&r, hash.into())?
-                    .collect::<Vec<_>>()?;
+                    .get_updates(&r, hash.clone().into())?
+                    .chain(authored_data.meta.get_updates(&r, hash.into())?)
+                    .collect::<BTreeSet<_>>()?;
+
+                let entry_dht_status =
+                    Self::compute_entry_dht_status(&headers, &cache_data, &authored_data, &env)?;
+
+                // Render headers
+                let headers = self.render_headers(headers, |h| {
+                    h == HeaderType::Update || h == HeaderType::Create
+                })?;
+                let deletes = self.render_headers(deletes, |h| h == HeaderType::Delete)?;
                 let updates = self.render_headers(updates, |h| h == HeaderType::Update)?;
                 Ok(Some(EntryDetails {
                     entry: entry.into_content(),
@@ -544,14 +624,16 @@ where
 
     fn create_element_details(&self, hash: HeaderHash) -> CascadeResult<Option<ElementDetails>> {
         let cache_data = ok_or_return!(self.cache_data.as_ref(), None);
+        let authored_data = ok_or_return!(self.authored_data.as_ref(), None);
         let env = ok_or_return!(self.env.as_ref(), None);
         match self.get_element_local_raw(&hash)? {
             Some(element) => {
                 let hash = element.header_address().clone();
                 let deletes = fresh_reader!(env, |r| cache_data
                     .meta
-                    .get_deletes_on_header(&r, hash)?
-                    .collect::<Vec<_>>())?;
+                    .get_deletes_on_header(&r, hash.clone())?
+                    .chain(authored_data.meta.get_deletes_on_header(&r, hash)?)
+                    .collect::<BTreeSet<_>>())?;
                 let deletes = self.render_headers(deletes, |h| h == HeaderType::Delete)?;
                 Ok(Some(ElementDetails { element, deletes }))
             }
@@ -574,8 +656,10 @@ where
     pub fn valid_header(&self, hash: &HeaderHash) -> CascadeResult<bool> {
         let cache_data = ok_or_return!(self.cache_data.as_ref(), false);
         let integrated_data = ok_or_return!(self.integrated_data.as_ref(), false);
+        let authored_data = ok_or_return!(self.authored_data.as_ref(), false);
         Ok(integrated_data.meta.has_registered_store_element(&hash)?
-            || cache_data.meta.has_registered_store_element(&hash)?)
+            || cache_data.meta.has_registered_store_element(&hash)?
+            || authored_data.meta.has_registered_store_element(&hash)?)
     }
 
     /// Same as valid_header but checks for StoreEntry validation
@@ -583,8 +667,13 @@ where
     pub fn valid_entry(&self, hash: &EntryHash) -> CascadeResult<bool> {
         let cache_data = ok_or_return!(self.cache_data.as_ref(), false);
         let integrated_data = ok_or_return!(self.integrated_data.as_ref(), false);
+        let authored_data = ok_or_return!(self.authored_data.as_ref(), false);
         if cache_data.meta.has_any_registered_store_entry(hash)? {
             // Found a entry header in the cache
+            return Ok(true);
+        }
+        if authored_data.meta.has_any_registered_store_entry(hash)? {
+            // Found a entry header in the authored store
             return Ok(true);
         }
         if integrated_data.meta.has_any_registered_store_entry(hash)? {
@@ -603,6 +692,7 @@ where
     ) -> CascadeResult<bool> {
         let cache_data = ok_or_return!(self.cache_data.as_ref(), false);
         let integrated_data = ok_or_return!(self.integrated_data.as_ref(), false);
+        let authored_data = ok_or_return!(self.authored_data.as_ref(), false);
         if self.valid_header(&header_hash)? {
             return Ok(true);
         }
@@ -612,6 +702,13 @@ where
                 .has_registered_store_entry(eh, header_hash)?
             {
                 // Found a entry header in the cache
+                return Ok(true);
+            }
+            if authored_data
+                .meta
+                .has_registered_store_entry(eh, header_hash)?
+            {
+                // Found a entry header in the authored
                 return Ok(true);
             }
             if integrated_data
@@ -640,6 +737,52 @@ where
         self.create_entry_details(entry_hash).await
     }
 
+    /// Find the oldest live element in either the authored or cache stores
+    fn get_oldest_live_element<MA: MetadataBufT<AuthoredPrefix>, MC: MetadataBufT>(
+        &self,
+        entry_hash: &EntryHash,
+        authored_data: &DbPair<MA, AuthoredPrefix>,
+        cache_data: &DbPair<MC>,
+        env: &EnvironmentRead,
+    ) -> CascadeResult<Search> {
+        fresh_reader!(env, |r| {
+            let oldest_live_header = authored_data
+                .meta
+                .get_headers(&r, entry_hash.clone())?
+                .chain(cache_data.meta.get_headers(&r, entry_hash.clone())?)
+                .filter_map(|header| {
+                    if authored_data
+                        .meta
+                        .get_deletes_on_header(&r, header.header_hash.clone())?
+                        .next()?
+                        .is_none()
+                        && cache_data
+                            .meta
+                            .get_deletes_on_header(&r, header.header_hash.clone())?
+                            .next()?
+                            .is_none()
+                    {
+                        Ok(Some(header))
+                    } else {
+                        Ok(None)
+                    }
+                })
+                .min()?;
+
+            match oldest_live_header {
+                Some(oldest_live_header) => {
+                    // We have an oldest live header now get the element
+                    Ok(self
+                        .get_element_local_raw(&oldest_live_header.header_hash)?
+                        .map(Search::Found)
+                        // It's not local so check the network
+                        .unwrap_or(Search::Continue(oldest_live_header.header_hash)))
+                }
+                None => Ok(Search::NotInCascade),
+            }
+        })
+    }
+
     #[instrument(skip(self, options))]
     /// Returns the oldest live [Element] for this [EntryHash] by getting the
     /// latest available metadata from authorities combined with this agents authored data.
@@ -654,46 +797,16 @@ where
             .await?;
 
         let cache_data = ok_or_return!(self.cache_data.as_ref(), None);
+        let authored_data = ok_or_return!(self.authored_data.as_ref(), None);
         let env = ok_or_return!(self.env.as_ref(), None);
-        // Meta Cache
-        let oldest_live_element = fresh_reader!(env, |r| {
-            match cache_data.meta.get_dht_status(&r, &entry_hash)? {
-                EntryDhtStatus::Live => {
-                    let oldest_live_header = cache_data
-                        .meta
-                        .get_headers(&r, entry_hash)?
-                        .filter_map(|header| {
-                            if cache_data
-                                .meta
-                                .get_deletes_on_header(&r, header.header_hash.clone())?
-                                .next()?
-                                .is_none()
-                            {
-                                Ok(Some(header))
-                            } else {
-                                Ok(None)
-                            }
-                        })
-                        .min()?
-                        .expect("Status is live but no headers?");
 
-                    // We have an oldest live header now get the element
-                    CascadeResult::Ok(
-                        self.get_element_local_raw(&oldest_live_header.header_hash)?
-                            .map(Search::Found)
-                            // It's not local so check the network
-                            .unwrap_or(Search::Continue(oldest_live_header.header_hash)),
-                    )
-                }
-                EntryDhtStatus::Dead
-                | EntryDhtStatus::Pending
-                | EntryDhtStatus::Rejected
-                | EntryDhtStatus::Abandoned
-                | EntryDhtStatus::Conflict
-                | EntryDhtStatus::Withdrawn
-                | EntryDhtStatus::Purged => CascadeResult::Ok(Search::NotInCascade),
-            }
-        })?;
+        // Meta Cache and Meta Authored
+        let oldest_live_element = self.get_oldest_live_element(
+            &entry_hash,
+            authored_data,
+            &DbPair::from(cache_data),
+            &env,
+        )?;
 
         // Network
         match oldest_live_element {
@@ -732,12 +845,22 @@ where
     ) -> CascadeResult<Option<Element>> {
         let cache_data = ok_or_return!(self.cache_data.as_ref(), None);
         let integrated_data = ok_or_return!(self.integrated_data.as_ref(), None);
+        let authored_data = ok_or_return!(self.authored_data.as_ref(), None);
         let env = ok_or_return!(self.env.as_ref(), None);
         debug!("in get header");
         let found_local_delete = fresh_reader!(env, |r| {
             let in_cache = || {
                 DatabaseResult::Ok({
                     cache_data
+                        .meta
+                        .get_deletes_on_header(&r, header_hash.clone())?
+                        .next()?
+                        .is_some()
+                })
+            };
+            let in_authored = || {
+                DatabaseResult::Ok({
+                    authored_data
                         .meta
                         .get_deletes_on_header(&r, header_hash.clone())?
                         .next()?
@@ -753,7 +876,7 @@ where
                         .is_some()
                 })
             };
-            DatabaseResult::Ok(in_cache()? || in_vault()?)
+            DatabaseResult::Ok(in_cache()? || in_authored()? || in_vault()?)
         })?;
         if found_local_delete {
             return Ok(None);
@@ -904,6 +1027,7 @@ where
         self.fetch_links(key.into(), options).await?;
 
         let cache_data = ok_or_return!(self.cache_data.as_ref(), vec![]);
+        let authored_data = ok_or_return!(self.authored_data.as_ref(), vec![]);
         let env = ok_or_return!(self.env.as_ref(), vec![]);
         fresh_reader!(env, |r| {
             // Meta Cache
@@ -912,7 +1036,17 @@ where
                 .meta
                 .get_live_links(&r, key)?
                 .map(|l| Ok(l.into_link()))
-                .collect()?)
+                .chain(
+                    authored_data
+                        .meta
+                        .get_live_links(&r, key)?
+                        .map(|l| Ok(l.into_link())),
+                )
+                // Need to collect into a Set first to remove
+                // duplicates from authored and cache
+                .collect::<HashSet<_>>()?
+                .into_iter()
+                .collect())
         })
     }
 
@@ -928,8 +1062,10 @@ where
         self.fetch_links(key.into(), options).await?;
 
         let cache_data = ok_or_return!(self.cache_data.as_ref(), vec![]);
+        let authored_data = ok_or_return!(self.authored_data.as_ref(), vec![]);
         let env = ok_or_return!(self.env.as_ref(), vec![]);
         // Get the links and collect the CreateLink / DeleteLink hashes by time.
+        // Search authored and combine with cache_data
         let links = fresh_reader!(env, |r| {
             cache_data
                 .meta
@@ -940,21 +1076,25 @@ where
                         .meta
                         .get_link_removes_on_link_add(&r, link_add.link_add_hash.clone())?
                         .collect::<BTreeSet<_>>()?;
-                    // Create timed header hash
-                    let link_add = TimedHeaderHash {
-                        timestamp: link_add.timestamp,
-                        header_hash: link_add.link_add_hash,
-                    };
                     // Return all link removes with this link add
-                    Ok((link_add, link_removes))
+                    Ok((link_add.link_add_hash, link_removes))
                 })
+                .chain(authored_data.meta.get_links_all(&r, key)?.map(|link_add| {
+                    // Collect the link removes on this link add
+                    let link_removes = authored_data
+                        .meta
+                        .get_link_removes_on_link_add(&r, link_add.link_add_hash.clone())?
+                        .collect::<BTreeSet<_>>()?;
+                    // Return all link removes with this link add
+                    Ok((link_add.link_add_hash, link_removes))
+                }))
                 .collect::<BTreeMap<_, _>>()
         })?;
         // Get the headers from the element stores
         fallible_iterator::convert(links.into_iter().map(Ok))
             .filter_map(|(create_link, delete_links)| {
                 // Get the create link data
-                match self.get_header_local_raw_with_sig(&create_link.header_hash)? {
+                match self.get_header_local_raw_with_sig(&create_link)? {
                     Some(create_link)
                         if create_link.header().header_type() == HeaderType::CreateLink =>
                     {

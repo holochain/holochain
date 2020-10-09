@@ -83,8 +83,8 @@ ghost_actor::ghost_chan! {
             dna_hash: DnaHash,
             // The agent_id / agent_pub_key context.
             to_agent: AgentPubKey,
-            // TODO - parameters
-        ) -> (); // TODO - proper return type
+            header_hash: HeaderHash,
+        ) -> ValidationPackageResponse;
 
         /// A remote node is requesting entry data from us.
         fn get(
