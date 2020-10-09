@@ -1419,6 +1419,84 @@ where
             Ok(elements)
         }
     }
+
+    pub fn get_validation_package_local(
+        &self,
+        agent: AgentPubKey,
+        header_seq: u32,
+        hash: HeaderHash,
+    ) -> CascadeResult<Option<Vec<Element>>> {
+        let cache_data = ok_or_return!(self.cache_data.as_ref(), None);
+        let env = ok_or_return!(self.env.as_ref(), None);
+        if fresh_reader!(env, |r| {
+            cache_data
+                .meta
+                .get_activity(
+                    &r,
+                    ChainItemKey::Full(agent.clone(), header_seq, hash.clone()),
+                )?
+                .next()
+        })?
+        .is_none()
+        {
+            return Ok(None);
+        }
+
+        let range = Some(0..header_seq);
+        let hashes = Self::get_agent_activity_from_cache(agent.clone(), &range, cache_data, env)?;
+        if hashes.len() == header_seq as usize {
+            let mut elements = Vec::with_capacity(hashes.len());
+            for hash in hashes {
+                match self.get_element_local_raw(&hash)? {
+                    Some(el) => elements.push(el),
+                    None => return Ok(None),
+                }
+            }
+            if elements.len() == header_seq as usize {
+                return Ok(Some(elements));
+            }
+        }
+        Ok(None)
+    }
+
+    pub async fn get_validation_package(
+        &mut self,
+        agent: AgentPubKey,
+        header_seq: u32,
+        hash: HeaderHash,
+    ) -> CascadeResult<Option<Vec<Element>>> {
+        if let Some(elements) =
+            self.get_validation_package_local(agent.clone(), header_seq, hash.clone())?
+        {
+            return Ok(Some(elements));
+        }
+
+        let network = ok_or_return!(self.network.as_mut(), None);
+        match network.get_validation_package(agent, hash).await?.0 {
+            Some(validation_package) => {
+                for element in &validation_package.0 {
+                    self.update_stores(element.clone()).await?;
+                }
+                Ok(Some(validation_package.0))
+            }
+            None => Ok(None),
+        }
+    }
+
+    // fn local_cascade(&mut self) -> Self {
+    //     Cascade {
+    //         integrated_data: self.integrated_data.clone(),
+    //         authored_data: self.authored_data.clone(),
+    //         pending_data: self.pending_data.clone(),
+    //         rejected_data: self.rejected_data.clone(),
+    //         cache_data: match &mut self.cache_data {
+    //             Some(db) => Some(db.into()),
+    //             None => None,
+    //         },
+    //         env: self.env.clone(),
+    //         network: None,
+    //     }
+    // }
 }
 
 impl<'a, M: MetadataBufT> From<&'a DbPairMut<'a, M>> for DbPair<'a, M> {
@@ -1429,6 +1507,26 @@ impl<'a, M: MetadataBufT> From<&'a DbPairMut<'a, M>> for DbPair<'a, M> {
         }
     }
 }
+
+// impl<'a, M, P> Clone for DbPair<'a, M, P>
+// where
+//     P: PrefixType,
+//     M: MetadataBufT<P>,
+// {
+//     fn clone(&self) -> Self {
+//         DbPair::new(&self.element, &self.meta)
+//     }
+// }
+
+// impl<'a, 'b: 'a, M, P> From<&'b mut DbPairMut<'a, M, P>> for DbPairMut<'a, M, P>
+// where
+//     P: PrefixType,
+//     M: MetadataBufT<P>,
+// {
+//     fn from(i: &'b mut DbPairMut<'a, M, P>) -> Self {
+//         DbPairMut::new(&mut i.element, &mut i.meta)
+//     }
+// }
 
 #[cfg(test)]
 /// Helper function for easily setting up cascades during tests

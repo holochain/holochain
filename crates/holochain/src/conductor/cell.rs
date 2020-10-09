@@ -448,17 +448,29 @@ impl Cell {
             .retrieve_header(header_hash, Default::default())
             .await?
         {
-            Some(shh) => shh.into_header_and_signature().0.into_content(),
+            Some(shh) => shh.into_header_and_signature().0,
             None => return Ok(None.into()),
         };
 
         // This agent is the author so get the validation package from the source chain
         if header.author() == self.id.agent_pubkey() {
             let ribosome = self.get_ribosome().await?;
-            validation_package::get_as_author(header, env, &ribosome.dna_file, &self.conductor_api)
-                .await
+            validation_package::get_as_author(
+                header.into_content(),
+                env,
+                &ribosome.dna_file,
+                &self.conductor_api,
+            )
+            .await
         } else {
-            todo!("Implement authority returning validation package")
+            let ribosome = self.get_ribosome().await?;
+            validation_package::get_as_authority(
+                header,
+                env,
+                &ribosome.dna_file,
+                &self.conductor_api,
+            )
+            .await
         }
     }
 

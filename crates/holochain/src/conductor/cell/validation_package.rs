@@ -1,8 +1,8 @@
 use holochain_state::{env::EnvironmentRead, error::DatabaseResult, prelude::*};
-use holochain_types::dna::DnaFile;
+use holochain_types::{dna::DnaFile, HeaderHashed};
 use holochain_zome_types::Header;
 
-use crate::core::state::cascade::{Cascade, DbPair};
+use crate::core::state::cascade::{Cascade, DbPair, DbPairMut};
 
 use super::*;
 
@@ -82,8 +82,7 @@ pub(super) async fn get_as_author(
                 &ChainQueryFilter::default()
                     .include_entries(true)
                     .entry_type(EntryType::App(app_entry_type))
-                    // Range is exclusive but we want to include this header
-                    .sequence_range(0..header_seq + 1),
+                    .sequence_range(0..header_seq),
             )?;
             Ok(Some(ValidationPackage::new(elements)).into())
         }
@@ -91,8 +90,94 @@ pub(super) async fn get_as_author(
             let elements = source_chain.query(
                 &ChainQueryFilter::default()
                     .include_entries(true)
-                    .sequence_range(0..header_seq + 1),
+                    .sequence_range(0..header_seq),
             )?;
+            Ok(Some(ValidationPackage::new(elements)).into())
+        }
+    }
+}
+
+pub(super) async fn get_as_authority(
+    header: HeaderHashed,
+    env: EnvironmentRead,
+    dna_file: &DnaFile,
+    conductor_api: &impl CellConductorApiT,
+) -> CellResult<ValidationPackageResponse> {
+    // Get author and hash
+    let (header, header_hash) = header.into_inner();
+    let agent = header.author().clone();
+
+    // Get the header data
+    let (app_entry_type, header_seq) = match header
+        .entry_type()
+        .cloned()
+        .map(|et| (et, header.header_seq()))
+    {
+        Some((EntryType::App(aet), header_seq)) => (aet, header_seq),
+        _ => return Ok(None.into()),
+    };
+
+    //Get entry def
+    let entry_def = get_entry_def_from_ids(
+        app_entry_type.zome_id(),
+        app_entry_type.id(),
+        dna_file,
+        conductor_api,
+    )
+    .await?;
+
+    // Get the required validation package
+    let required_validation_type = match entry_def {
+        Some(ed) => ed.required_validation_type,
+        None => return Ok(None.into()),
+    };
+
+    let mut element_cache = ElementBuf::cache(env.clone())?;
+    let mut meta_cache = MetadataBuf::cache(env.clone())?;
+    let cascade = Cascade::empty().with_cache(DbPairMut::new(&mut element_cache, &mut meta_cache));
+    // Gather the package
+    match required_validation_type {
+        RequiredValidationType::Element => {
+            // TODO: I'm not sure if we should handle this case, it seems like they should already have the element
+            Ok(None.into())
+        }
+        RequiredValidationType::SubChain => {
+            let query = ChainQueryFilter::default()
+                .include_entries(true)
+                .entry_type(EntryType::App(app_entry_type))
+                .sequence_range(0..header_seq);
+
+            // Collect and return the sub chain
+            let elements =
+                match cascade.get_validation_package_local(agent, header_seq, header_hash)? {
+                    Some(elements) => elements,
+                    None => return Ok(None.into()),
+                };
+
+            let elements = elements
+                .into_iter()
+                .filter(|el| query.check(el.header()))
+                .collect();
+
+            Ok(Some(ValidationPackage::new(elements)).into())
+        }
+        RequiredValidationType::Full => {
+            let query = &ChainQueryFilter::default()
+                .include_entries(true)
+                .sequence_range(0..header_seq);
+
+            // Collect and return the sub chain
+            let elements =
+                match cascade.get_validation_package_local(agent, header_seq, header_hash)? {
+                    Some(elements) => elements,
+                    None => return Ok(None.into()),
+                };
+
+            let elements = elements
+                .into_iter()
+                .filter(|el| query.check(el.header()))
+                .collect();
+
             Ok(Some(ValidationPackage::new(elements)).into())
         }
     }
