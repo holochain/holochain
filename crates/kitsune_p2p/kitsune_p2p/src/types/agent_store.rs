@@ -136,3 +136,35 @@ impl AgentInfo {
         self.signed_at_ms
     }
 }
+
+#[cfg(test)]
+mod tests {
+
+    use super::KitsuneSpace;
+    use super::KitsuneAgent;
+    use super::AgentInfoSignedKey;
+    use fixt::prelude::*;
+    use crate::fixt::AgentInfoSignedFixturator;
+
+    #[test]
+    fn bytes_test() {
+        let space = KitsuneSpace::from([1; 36].to_vec());
+        let agent = KitsuneAgent::from([2; 36].to_vec());
+        let mut agent_info_signed = fixt!(AgentInfoSigned);
+        agent_info_signed.agent_info.space = space;
+        agent_info_signed.agent_info.agent = agent;
+
+        // Implicitly test the From in addition to the bytes fns.
+        let agent_info_signed_key = AgentInfoSignedKey::from(&agent_info_signed);
+        assert_eq!(
+            &[1; 32],
+            agent_info_signed_key.space_bytes(),
+        );
+        assert_eq!(
+            &[2; 32],
+            agent_info_signed_key.agent_bytes(),
+        );
+
+    }
+
+}
