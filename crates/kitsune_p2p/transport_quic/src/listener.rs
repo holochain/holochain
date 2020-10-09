@@ -6,6 +6,8 @@ use kitsune_p2p_types::{
 use std::{collections::HashMap, net::SocketAddr};
 
 /// Convert quinn async read/write streams into Vec<u8> senders / receivers.
+/// Quic bi-streams are Async Read/Write - But the kitsune transport api
+/// uses Vec<u8> Streams / Sinks - This code translates into that.
 fn tx_bi_chan(
     mut bi_send: quinn::SendStream,
     mut bi_recv: quinn::RecvStream,
@@ -45,38 +47,6 @@ fn tx_bi_chan(
     (write_send, read_recv)
 }
 
-ghost_actor::ghost_chan! {
-    /// Internal Sender
-    chan ListenerInner<TransportError> {
-        /// Use our binding to establish a new outgoing connection.
-        fn raw_connect(addr: SocketAddr) -> quinn::Connecting;
-
-        /// Take a quinn connecting instance pulling it into our logic.
-        /// Shared code for both incoming and outgoing connections.
-        /// For outgoing create_channel we may also wish to create a channel.
-        fn take_connecting(
-            maybe_con: quinn::Connecting,
-            with_channel: bool,
-        ) -> Option<(
-            Url2,
-            TransportChannelWrite,
-            TransportChannelRead,
-        )>;
-
-        /// Finalization step for taking control of a connection.
-        /// Places it in our hash map for use establishing outgoing channels.
-        fn set_connection(
-            url: Url2,
-            con: quinn::Connection,
-        ) -> ();
-
-        /// If we get an error making outgoing channels,
-        /// or if the incoming channel receiver stops,
-        /// we want to remove this connection from our pool. It is done.
-        fn drop_connection(url: Url2) -> ();
-    }
-}
-
 /// QUIC implementation of kitsune TransportListener actor.
 struct TransportListenerQuic {
     /// internal api logic
@@ -110,6 +80,38 @@ impl ghost_actor::GhostControlHandler for TransportListenerQuic {
     }
 }
 
+ghost_actor::ghost_chan! {
+    /// Internal Sender
+    chan ListenerInner<TransportError> {
+        /// Use our binding to establish a new outgoing connection.
+        fn raw_connect(addr: SocketAddr) -> quinn::Connecting;
+
+        /// Take a quinn connecting instance pulling it into our logic.
+        /// Shared code for both incoming and outgoing connections.
+        /// For outgoing create_channel we may also wish to create a channel.
+        fn take_connecting(
+            maybe_con: quinn::Connecting,
+            with_channel: bool,
+        ) -> Option<(
+            Url2,
+            TransportChannelWrite,
+            TransportChannelRead,
+        )>;
+
+        /// Finalization step for taking control of a connection.
+        /// Places it in our hash map for use establishing outgoing channels.
+        fn set_connection(
+            url: Url2,
+            con: quinn::Connection,
+        ) -> ();
+
+        /// If we get an error making outgoing channels,
+        /// or if the incoming channel receiver stops,
+        /// we want to remove this connection from our pool. It is done.
+        fn drop_connection(url: Url2) -> ();
+    }
+}
+
 impl ghost_actor::GhostHandler<ListenerInner> for TransportListenerQuic {}
 
 impl ListenerInnerHandler for TransportListenerQuic {
@@ -133,19 +135,30 @@ impl ListenerInnerHandler for TransportListenerQuic {
         let i_s = self.internal_sender.clone();
         let mut incoming_channel_sender = self.incoming_channel_sender.clone();
         Ok(async move {
+            // we only need to deal with the connection object
+            // and the bi-streams receiver.
             let quinn::NewConnection {
                 connection: con,
                 mut bi_streams,
                 ..
             } = maybe_con.await.map_err(TransportError::other)?;
+
+            // if we are making an outgoing connection
+            // we also need to make an initial channel
             let out = if with_channel {
                 let (bi_send, bi_recv) = con.open_bi().await.map_err(TransportError::other)?;
                 Some(tx_bi_chan(bi_send, bi_recv))
             } else {
                 None
             };
+
+            // Construct our url from the low-level data
             let url = url2!("{}://{}", crate::SCHEME, con.remote_address());
+
+            // pass the connection off to our actor
             i_s.set_connection(url.clone(), con).await?;
+
+            // pass any incoming channels off to our actor
             let url_clone = url.clone();
             tokio::task::spawn(async move {
                 while let Some(Ok((bi_send, bi_recv))) = bi_streams.next().await {
@@ -159,6 +172,7 @@ impl ListenerInnerHandler for TransportListenerQuic {
                     }
                 }
             });
+
             Ok(out.map(move |(write, read)| (url, write, read)))
         }
         .boxed()
@@ -198,10 +212,14 @@ impl TransportListenerHandler for TransportListenerQuic {
         &mut self,
         url: Url2,
     ) -> TransportListenerHandlerResult<(Url2, TransportChannelWrite, TransportChannelRead)> {
+        // if we already have an open connection to the remote end,
+        // just directly try to open the bi-stream channel.
         let maybe_bi = self.connections.get(&url).map(|con| con.open_bi());
 
         let i_s = self.internal_sender.clone();
         Ok(async move {
+            // if we already had a connection and the bi-stream
+            // channel is successfully opened, return early using that
             if let Some(maybe_bi) = maybe_bi {
                 match maybe_bi.await {
                     Ok((bi_send, bi_recv)) => {
@@ -209,10 +227,15 @@ impl TransportListenerHandler for TransportListenerQuic {
                         return Ok((url, write, read));
                     }
                     Err(_) => {
+                        // otherwise, we should drop any existing channel
+                        // we have... it no longer works for us
                         i_s.drop_connection(url.clone()).await?;
                     }
                 }
             }
+
+            // we did not successfully use an existing connection.
+            // instead, try establishing a new one with a new channel.
             let addr = crate::url_to_addr(&url, crate::SCHEME).await?;
             let maybe_con = i_s.raw_connect(addr).await?;
             let (url, write, read) = i_s.take_connecting(maybe_con, true).await?.unwrap();
@@ -288,6 +311,7 @@ pub async fn spawn_transport_listener_quic(
     Ok((sender, receiver))
 }
 
+// TODO - modernize all this taking hints from TLS code in proxy crate.
 mod danger {
     use kitsune_p2p_types::transport::{TransportError, TransportResult};
     use quinn::{
