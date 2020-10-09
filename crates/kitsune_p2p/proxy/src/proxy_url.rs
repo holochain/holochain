@@ -33,7 +33,7 @@ impl ProxyUrl {
     pub fn from_full(full: &str) -> TransportResult<Self> {
         macro_rules! err {
             ($h:literal) => {
-                TransportError::from(format!("Invalid Proxy Url({}): {}", $h, full))
+                TransportError::from(format!("Invalid Proxy Url({}): {}: at: {}:{}", $h, full, file!(), line!()))
             };
         }
         let full = url2::try_url2!("{}", full).map_err(|_| err!("parse"))?;
