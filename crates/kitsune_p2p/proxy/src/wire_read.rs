@@ -1,6 +1,7 @@
 use crate::*;
 use futures::{sink::SinkExt, stream::StreamExt};
 
+/// Wrap a TransportChannelRead in code that decodes ProxyWire items.
 pub(crate) fn wrap_wire_read(
     mut read: TransportChannelRead,
 ) -> futures::channel::mpsc::Receiver<ProxyWire> {

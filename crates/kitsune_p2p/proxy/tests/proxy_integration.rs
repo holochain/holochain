@@ -1,11 +1,8 @@
-use kitsune_p2p_types::{
-    transport::*,
-    dependencies::ghost_actor,
-};
-use kitsune_p2p_proxy::*;
-use ghost_actor::dependencies::tracing;
-use std::sync::Arc;
 use futures::stream::StreamExt;
+use ghost_actor::dependencies::tracing;
+use kitsune_p2p_proxy::*;
+use kitsune_p2p_types::{dependencies::ghost_actor, transport::*};
+use std::sync::Arc;
 
 fn init_tracing() {
     let _ = ghost_actor::dependencies::tracing::subscriber::set_global_default(

@@ -1,9 +1,11 @@
-#![allow(clippy::large_enum_variant)]
-
 use crate::*;
 use futures::{sink::SinkExt, stream::StreamExt};
 use ghost_actor::dependencies::tracing;
 use std::collections::HashMap;
+
+/// How often should NAT nodes refresh their proxy contract?
+/// Note - ProxyTo entries will be expired at double this time.
+const PROXY_KEEPALIVE_MS: u64 = 10000;
 
 /// Wrap a transport listener sender/receiver in kitsune proxy logic.
 pub async fn spawn_kitsune_proxy_listener(
@@ -14,6 +16,7 @@ pub async fn spawn_kitsune_proxy_listener(
     ghost_actor::GhostSender<TransportListener>,
     TransportIncomingChannelReceiver,
 )> {
+    // sort out our proxy config
     let (tls, accept_proxy_cb, proxy_url): (TlsConfig, AcceptProxyCallback, Option<ProxyUrl>) =
         match proxy_config.as_ref() {
             ProxyConfig::RemoteProxyClient { tls, proxy_url } => (
@@ -27,9 +30,11 @@ pub async fn spawn_kitsune_proxy_listener(
             } => (tls.clone(), accept_proxy_cb.clone(), None),
         };
 
+    // Configure our own proxy url based of connection details / tls cert.
     let this_url = sub_sender.bound_url().await?;
     let this_url = ProxyUrl::new(this_url.as_str(), tls.cert_digest.clone())?;
 
+    // ghost acto builder!
     let builder = ghost_actor::actor_builder::GhostActorBuilder::new();
 
     let channel_factory = builder.channel_factory().clone();
@@ -42,10 +47,10 @@ pub async fn spawn_kitsune_proxy_listener(
 
     let (evt_send, evt_recv) = futures::channel::mpsc::channel(10);
 
+    // spawn the actor
     tokio::task::spawn(
         builder.spawn(
             InnerListen::new(
-                channel_factory,
                 i_s.clone(),
                 this_url,
                 tls,
@@ -57,10 +62,26 @@ pub async fn spawn_kitsune_proxy_listener(
         ),
     );
 
+    // if we want to be proxied, we need to connect to our proxy
+    // and manage that connection contract
     if let Some(proxy_url) = proxy_url {
-        i_s.req_proxy(proxy_url).await?;
+        i_s.req_proxy(proxy_url.clone()).await?;
+
+        // Set up a timer to refresh our proxy contract at keepalive interval
+        let i_s_c = i_s.clone();
+        tokio::task::spawn(async move {
+            tokio::time::delay_for(std::time::Duration::from_millis(PROXY_KEEPALIVE_MS)).await;
+
+            if i_s_c.req_proxy(proxy_url.clone()).await.is_err() {
+                // either we failed because the actor is already shutdown
+                // or the remote end rejected us.
+                // if it's the latter - shut down our ghost actor : )
+                let _ = i_s_c.ghost_actor_shutdown().await;
+            }
+        });
     }
 
+    // handle incoming channels from our sub transport
     tokio::task::spawn(async move {
         while let Some((url, write, read)) = sub_receiver.next().await {
             // spawn so we can process incoming requests in parallel
@@ -81,16 +102,16 @@ pub async fn spawn_kitsune_proxy_listener(
     Ok((sender, evt_recv))
 }
 
-#[allow(dead_code)]
+/// An item in our proxy_list - a client we have agreed to proxy for
 struct ProxyTo {
+    /// the low-level connection url
     base_connection_url: url2::Url2,
-    proxy_url: ProxyUrl,
+
+    /// when this proxy contract expires
     expires_at: std::time::Instant,
 }
 
-#[allow(dead_code)]
 struct InnerListen {
-    channel_factory: ghost_actor::actor_builder::GhostActorChannelFactory<Self>,
     i_s: ghost_actor::GhostSender<Internal>,
     this_url: ProxyUrl,
     accept_proxy_cb: AcceptProxyCallback,
@@ -104,7 +125,6 @@ struct InnerListen {
 
 impl InnerListen {
     pub async fn new(
-        channel_factory: ghost_actor::actor_builder::GhostActorChannelFactory<Self>,
         i_s: ghost_actor::GhostSender<Internal>,
         this_url: ProxyUrl,
         tls: TlsConfig,
@@ -121,7 +141,6 @@ impl InnerListen {
         let (tls_server_config, tls_client_config) = gen_tls_configs(&tls)?;
 
         Ok(Self {
-            channel_factory,
             i_s,
             this_url,
             accept_proxy_cb,
@@ -248,10 +267,17 @@ impl InternalHandler for InnerListen {
             self.this_url.short(),
             base_url
         );
+        let accept_proxy_cb = self.accept_proxy_cb.clone();
         let proxy_url = ProxyUrl::new(self.this_url.as_base().as_str(), cert_digest.0.into())?;
         let i_s = self.i_s.clone();
         Ok(async move {
-            // just accepting all proxy requests for now
+            if !accept_proxy_cb(vec![32].into()).await {
+                write
+                    .send(ProxyWire::failure("Proxy Request Rejected".into()))
+                    .await
+                    .map_err(TransportError::other)?;
+                return Ok(());
+            }
 
             i_s.register_proxy_to(proxy_url.clone(), base_url).await?;
 
@@ -273,6 +299,10 @@ impl InternalHandler for InnerListen {
         read: futures::channel::mpsc::Receiver<ProxyWire>,
     ) -> InternalHandlerResult<()> {
         let short = self.this_url.short().to_string();
+
+        // just prune the proxy_list every time before we check for now
+        let now = std::time::Instant::now();
+        self.proxy_list.retain(|_, p| p.expires_at >= now);
 
         let proxy_to = if let Some(proxy_to) = self.proxy_list.get(&dest_proxy_url) {
             Some(proxy_to.base_connection_url.clone())
@@ -350,14 +380,14 @@ impl InternalHandler for InnerListen {
         proxy_url: ProxyUrl,
         base_url: url2::Url2,
     ) -> InternalHandlerResult<()> {
+        // expire ProxyTo entries at double the proxy keepalive timeframe.
         let expires_at = std::time::Instant::now()
-            .checked_add(std::time::Duration::from_millis(60000))
+            .checked_add(std::time::Duration::from_millis(PROXY_KEEPALIVE_MS * 2))
             .unwrap();
         self.proxy_list.insert(
-            proxy_url.clone(),
+            proxy_url,
             ProxyTo {
                 base_connection_url: base_url,
-                proxy_url,
                 expires_at,
             },
         );
