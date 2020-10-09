@@ -8,6 +8,7 @@ use fallible_iterator::FallibleIterator;
 use holo_hash::{AgentPubKey, EntryHash};
 use holochain_state::{env::EnvironmentRead, env::EnvironmentWrite, fresh_reader};
 use holochain_types::{
+    chain::AgentActivityExt,
     element::{GetElementResponse, RawGetEntryResponse},
     header::WireUpdateRelationship,
     metadata::TimedHeaderHash,
@@ -172,13 +173,31 @@ pub fn handle_get_agent_activity(
     let element_integrated = ElementBuf::vault(env.clone(), false)?;
     let meta_integrated = MetadataBuf::vault(env.clone())?;
 
-    fresh_reader!(env, |r| {
-        Ok(AgentActivity::new(
-            meta_integrated
+    if options.include_activity {
+        fresh_reader!(env, |r| {
+            Ok(AgentActivity::valid(
+                meta_integrated
+                    .get_activity(&r, ChainItemKey::Agent(agent))?
+                    .filter_map(|h| element_integrated.get_header(&h.header_hash))
+                    .filter(|shh| Ok(query.check(shh.header())))
+                    .collect()?,
+            ))
+        })
+    } else {
+        fresh_reader!(env, |r| {
+            match meta_integrated
                 .get_activity(&r, ChainItemKey::Agent(agent))?
-                .filter_map(|h| element_integrated.get_header(&h.header_hash))
-                .filter(|shh| Ok(query.check(shh.header())))
-                .collect()?,
-        ))
-    })
+                .last()?
+            {
+                Some(h) => {
+                    // TODO: Just get the sequence number from the key (Doable in the next PR)
+                    match element_integrated.get_header(&h.header_hash)? {
+                        Some(shh) => Ok(AgentActivity::valid_without_activity(shh.header())),
+                        None => Ok(AgentActivity::empty()),
+                    }
+                }
+                None => Ok(AgentActivity::empty()),
+            }
+        })
+    }
 }
