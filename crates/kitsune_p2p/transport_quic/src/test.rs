@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod tests {
     use crate::*;
-    use futures::{future::FutureExt, stream::StreamExt};
-    use kitsune_p2p_types::{transport::transport_connection::*, transport::transport_listener::*};
+    use futures::stream::StreamExt;
+    use kitsune_p2p_types::transport::*;
 
     #[tokio::test(threaded_scheduler)]
     async fn test_message() {
@@ -20,62 +20,20 @@ mod tests {
                 .unwrap();
 
         tokio::task::spawn(async move {
-            while let Some(evt) = events2.next().await {
-                match evt {
-                    TransportListenerEvent::IncomingConnection {
-                        respond,
-                        sender: con,
-                        receiver: mut evt,
-                        ..
-                    } => {
-                        respond.respond(Ok(async move { Ok(()) }.boxed().into()));
-                        println!(
-                            "events2 incoming connection: {}",
-                            con.remote_url().await.unwrap(),
-                        );
-                        while let Some(evt) = evt.next().await {
-                            match evt {
-                                TransportConnectionEvent::IncomingChannel {
-                                    respond,
-                                    url,
-                                    mut send,
-                                    recv,
-                                    ..
-                                } => {
-                                    respond.respond(Ok(async move {
-                                        let data = recv.read_to_end().await;
-                                        println!(
-                                            "message from {} : {}",
-                                            url,
-                                            String::from_utf8_lossy(&data),
-                                        );
-                                        let data =
-                                            format!("echo: {}", String::from_utf8_lossy(&data))
-                                                .into_bytes();
-                                        send.write_and_close(data).await?;
-                                        Ok(())
-                                    }
-                                    .boxed()
-                                    .into()));
-                                }
-                            }
-                        }
-                    }
-                }
+            while let Some((url, mut write, read)) = events2.next().await {
+                println!("events2 incoming connection: {}", url,);
+                let data = read.read_to_end().await;
+                println!("message from {} : {}", url, String::from_utf8_lossy(&data),);
+                let data = format!("echo: {}", String::from_utf8_lossy(&data)).into_bytes();
+                write.write_and_close(data).await?;
             }
+            TransportResult::Ok(())
         });
 
         let bound2 = listener2.bound_url().await.unwrap();
         println!("listener2 bound to: {}", bound2);
 
-        let (con1, _evt_con_1) = listener1.connect(bound2).await.unwrap();
-
-        println!(
-            "listener1 opened connection to 2 - remote_url: {}",
-            con1.remote_url().await.unwrap()
-        );
-
-        let resp = con1.request(b"hello".to_vec()).await.unwrap();
+        let resp = listener1.request(bound2, b"hello".to_vec()).await.unwrap();
 
         println!("got resp: {}", String::from_utf8_lossy(&resp));
 
