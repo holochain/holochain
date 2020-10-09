@@ -1613,6 +1613,7 @@ dependencies = [
  "fixt",
  "futures",
  "ghost_actor",
+ "holo_hash",
  "kitsune_p2p_types",
  "serde",
  "serde_bytes",

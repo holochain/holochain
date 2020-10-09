@@ -22,7 +22,7 @@ use holochain_serialized_bytes::{SerializedBytes, UnsafeBytes};
 use holochain_state::{
     env::EnvironmentWrite,
     fresh_reader_test,
-    test_utils::{test_conductor_env, test_wasm_env, test_p2p_env, TestEnvironment},
+    test_utils::{test_conductor_env, test_p2p_env, test_wasm_env, TestEnvironment},
 };
 use holochain_types::{
     app::InstalledCell,

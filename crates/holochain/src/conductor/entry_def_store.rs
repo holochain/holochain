@@ -181,7 +181,9 @@ mod tests {
     use super::EntryDefBufferKey;
     use crate::conductor::Conductor;
     use holo_hash::HasHash;
-    use holochain_state::test_utils::{test_conductor_env, test_wasm_env, test_p2p_env, TestEnvironment};
+    use holochain_state::test_utils::{
+        test_conductor_env, test_p2p_env, test_wasm_env, TestEnvironment,
+    };
     use holochain_types::{
         dna::{wasm::DnaWasmHashed, zome::Zome},
         test_utils::fake_dna_zomes,
@@ -261,7 +263,10 @@ mod tests {
         std::mem::drop(handle);
 
         // Restart conductor and check defs are still here
-        let handle = Conductor::builder().test(test_env, wasm_env, p2p_env).await.unwrap();
+        let handle = Conductor::builder()
+            .test(test_env, wasm_env, p2p_env)
+            .await
+            .unwrap();
 
         assert_eq!(handle.get_entry_def(&post_def_key).await, Some(post_def));
         assert_eq!(

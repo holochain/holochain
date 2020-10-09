@@ -1,8 +1,8 @@
 //! Definitions for events emited from the KitsuneP2p actor.
 
-use std::sync::Arc;
 use crate::types::agent_store::AgentInfoSigned;
 use crate::types::agent_store::AgentInfoSignedKey;
+use std::sync::Arc;
 
 /// Gather a list of op-hashes from our implementor that meet criteria.
 #[derive(Debug)]

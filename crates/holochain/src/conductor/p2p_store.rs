@@ -20,7 +20,7 @@ impl PartialEq for AgentKvKey {
     }
 }
 
-impl Eq for AgentKvKey { }
+impl Eq for AgentKvKey {}
 
 impl PartialOrd for AgentKvKey {
     fn partial_cmp(&self, other: &AgentKvKey) -> Option<std::cmp::Ordering> {
@@ -59,7 +59,13 @@ impl AsRef<[u8]> for AgentKvKey {
 
 impl BufKey for AgentKvKey {
     fn from_key_bytes_or_friendly_panic(bytes: &[u8]) -> Self {
-        assert_eq!(bytes.len(), AGENT_KEY_LEN, "AgentKvKey needs to be {} bytes long, found {} bytes", AGENT_KEY_LEN, bytes.len());
+        assert_eq!(
+            bytes.len(),
+            AGENT_KEY_LEN,
+            "AgentKvKey needs to be {} bytes long, found {} bytes",
+            AGENT_KEY_LEN,
+            bytes.len()
+        );
         let mut inner = [0; AGENT_KEY_LEN];
         inner.copy_from_slice(bytes);
         Self(inner)
@@ -113,24 +119,17 @@ mod tests {
 
         let env = environ.guard();
         env.with_commit(|writer| {
-            store_buf.as_store_ref().put(
-                writer,
-                &(&agent_info_signed).into(),
-                &agent_info_signed,
-            )
+            store_buf
+                .as_store_ref()
+                .put(writer, &(&agent_info_signed).into(), &agent_info_signed)
         })
         .unwrap();
 
         let ret = &store_buf
             .as_store_ref()
-            .get(
-                &env.reader().unwrap(),
-                &(&agent_info_signed).into(),
-            )
+            .get(&env.reader().unwrap(), &(&agent_info_signed).into())
             .unwrap();
 
-        dbg!(&ret);
-        dbg!(&agent_info_signed);
         assert_eq!(ret, &Some(agent_info_signed),);
     }
 }

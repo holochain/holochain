@@ -254,7 +254,9 @@ pub mod test {
     use crate::fixt::WasmRibosomeFixturator;
     use futures::future::FutureExt;
     use holochain_serialized_bytes::prelude::*;
-    use holochain_state::test_utils::{test_conductor_env, test_wasm_env, test_p2p_env, TestEnvironment};
+    use holochain_state::test_utils::{
+        test_conductor_env, test_p2p_env, test_wasm_env, TestEnvironment,
+    };
     use holochain_types::{
         app::{InstallAppDnaPayload, InstallAppPayload, InstalledCell},
         cell::CellId,
@@ -287,7 +289,10 @@ pub mod test {
             tmpdir: _p2p_tmpdir,
         } = test_p2p_env();
         let tmpdir = test_env.tmpdir.clone();
-        let conductor_handle = Conductor::builder().test(test_env, wasm_env, p2p_env).await.unwrap();
+        let conductor_handle = Conductor::builder()
+            .test(test_env, wasm_env, p2p_env)
+            .await
+            .unwrap();
         (tmpdir, conductor_handle)
     }
 

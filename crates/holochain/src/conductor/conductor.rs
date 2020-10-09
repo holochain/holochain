@@ -63,10 +63,10 @@ use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
 use tracing::*;
 
+use crate::conductor::p2p_store::AgentKv;
 pub use builder::*;
 use futures::future::{self, TryFutureExt};
 use holo_hash::DnaHash;
-use crate::conductor::p2p_store::AgentKv;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 
 #[cfg(test)]
@@ -628,17 +628,15 @@ where
         let p2p_kv = AgentKv::new(environ.clone().into())?;
         let env = environ.guard();
         Ok(env.with_commit(|writer| {
-            p2p_kv.as_store_ref().put(
-                writer,
-                &(&agent_info_signed).into(),
-                &agent_info_signed,
-            )
+            p2p_kv
+                .as_store_ref()
+                .put(writer, &(&agent_info_signed).into(), &agent_info_signed)
         })?)
     }
 
     pub(super) fn get_agent_info_signed(
         &self,
-        agent_info_signed_key: kitsune_p2p::agent_store::AgentInfoSignedKey
+        agent_info_signed_key: kitsune_p2p::agent_store::AgentInfoSignedKey,
     ) -> ConductorResult<Option<AgentInfoSigned>> {
         let environ = self.p2p_env.clone();
 
@@ -646,7 +644,9 @@ where
         let env = environ.guard();
         let reader = env.reader()?;
 
-        Ok(p2p_kv.as_store_ref().get(&reader, &agent_info_signed_key.into())?)
+        Ok(p2p_kv
+            .as_store_ref()
+            .get(&reader, &agent_info_signed_key.into())?)
     }
 
     pub(super) async fn put_wasm(
@@ -1024,7 +1024,9 @@ pub mod tests {
     use super::*;
     use super::{Conductor, ConductorState};
     use crate::conductor::dna_store::MockDnaStore;
-    use holochain_state::test_utils::{test_conductor_env, test_wasm_env, test_p2p_env, TestEnvironment};
+    use holochain_state::test_utils::{
+        test_conductor_env, test_p2p_env, test_wasm_env, TestEnvironment,
+    };
     use holochain_types::test_utils::fake_cell_id;
 
     #[tokio::test(threaded_scheduler)]

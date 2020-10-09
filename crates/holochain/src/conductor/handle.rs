@@ -6,16 +6,20 @@
 //! A ConductorHandle can be produced via [Conductor::into_handle]
 //!
 //! ```rust, no_run
-//! # async fn async_main () {
-//! # use holochain_state::test_utils::{test_conductor_env, test_wasm_env, TestEnvironment};
+//! async fn async_main () {
+//! use holochain_state::test_utils::{test_conductor_env, test_wasm_env, test_p2p_env, TestEnvironment};
 //! use holochain::conductor::{Conductor, ConductorBuilder, ConductorHandle};
-//! # let env = test_conductor_env();
-//! #   let TestEnvironment {
-//! #       env: wasm_env,
-//! #      tmpdir: _tmpdir,
-//! # } = test_wasm_env();
+//! let env = test_conductor_env();
+//! let TestEnvironment {
+//!  env: wasm_env,
+//!  tmpdir: _tmpdir,
+//! } = test_wasm_env();
+//! let TestEnvironment {
+//!  env: p2p_env,
+//!  tmpdir: _p2p_tmpdir,
+//! } = test_p2p_env();
 //! let handle: ConductorHandle = ConductorBuilder::new()
-//!    .test(env, wasm_env)
+//!    .test(env, wasm_env, p2p_env)
 //!    .await
 //!    .unwrap();
 //!
@@ -69,9 +73,9 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::*;
 
-use holochain_p2p::event::HolochainP2pEvent::PutAgentInfoSigned;
-use holochain_p2p::event::HolochainP2pEvent::GetAgentInfoSigned;
 use futures::future::FutureExt;
+use holochain_p2p::event::HolochainP2pEvent::GetAgentInfoSigned;
+use holochain_p2p::event::HolochainP2pEvent::PutAgentInfoSigned;
 
 #[cfg(test)]
 use super::state::ConductorState;
@@ -282,12 +286,24 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     ) -> ConductorResult<()> {
         let lock = self.conductor.read().await;
         match event {
-            PutAgentInfoSigned { agent_info_signed, respond, .. } => {
-                let res = lock.put_agent_info_signed(agent_info_signed).map_err(holochain_p2p::HolochainP2pError::other);
+            PutAgentInfoSigned {
+                agent_info_signed,
+                respond,
+                ..
+            } => {
+                let res = lock
+                    .put_agent_info_signed(agent_info_signed)
+                    .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
-            GetAgentInfoSigned { agent_info_signed_key, respond, .. } => {
-                let res = lock.get_agent_info_signed(agent_info_signed_key).map_err(holochain_p2p::HolochainP2pError::other);
+            GetAgentInfoSigned {
+                agent_info_signed_key,
+                respond,
+                ..
+            } => {
+                let res = lock
+                    .get_agent_info_signed(agent_info_signed_key)
+                    .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
             _ => {

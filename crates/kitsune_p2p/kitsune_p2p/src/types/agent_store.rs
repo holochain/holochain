@@ -1,11 +1,11 @@
 //! Data structures to be stored in the agent/peer database.
 
 use crate::types::KitsuneAgent;
+use crate::types::KitsuneBinType;
 use crate::types::KitsuneP2pError;
 use crate::types::KitsuneSignature;
 use crate::types::KitsuneSpace;
 use url2::Url2;
-use crate::types::KitsuneBinType;
 
 /// A list of Urls.
 pub type Urls = Vec<Url2>;
@@ -31,10 +31,7 @@ impl AgentInfoSignedKey {
 
 impl From<(KitsuneSpace, KitsuneAgent)> for AgentInfoSignedKey {
     fn from((space, agent): (KitsuneSpace, KitsuneAgent)) -> Self {
-        Self {
-            space,
-            agent,
-        }
+        Self { space, agent }
     }
 }
 
@@ -50,8 +47,14 @@ pub struct AgentInfoSigned {
 impl From<&AgentInfoSigned> for AgentInfoSignedKey {
     fn from(agent_info_signed: &AgentInfoSigned) -> Self {
         Self {
-            space: agent_info_signed.as_agent_info_ref().as_space_ref().to_owned(),
-            agent: agent_info_signed.as_agent_info_ref().as_agent_ref().to_owned(),
+            space: agent_info_signed
+                .as_agent_info_ref()
+                .as_space_ref()
+                .to_owned(),
+            agent: agent_info_signed
+                .as_agent_info_ref()
+                .as_agent_ref()
+                .to_owned(),
         }
     }
 }

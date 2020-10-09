@@ -292,7 +292,9 @@ mod test {
     use super::*;
     use crate::conductor::Conductor;
     use anyhow::Result;
-    use holochain_state::test_utils::{test_conductor_env, test_wasm_env, test_p2p_env, TestEnvironment};
+    use holochain_state::test_utils::{
+        test_conductor_env, test_p2p_env, test_wasm_env, TestEnvironment,
+    };
     use holochain_types::{
         app::InstallAppDnaPayload,
         observability,
@@ -315,7 +317,9 @@ mod test {
             tmpdir: _p2p_tmpdir,
         } = test_p2p_env();
         let _tmpdir = test_env.tmpdir.clone();
-        let handle = Conductor::builder().test(test_env, wasm_env, p2p_env).await?;
+        let handle = Conductor::builder()
+            .test(test_env, wasm_env, p2p_env)
+            .await?;
         let shutdown = handle.take_shutdown_handle().await.unwrap();
         let admin_api = RealAdminInterfaceApi::new(handle.clone());
         let uuid = Uuid::new_v4();

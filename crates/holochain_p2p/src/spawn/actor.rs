@@ -178,7 +178,10 @@ impl ghost_actor::GhostHandler<kitsune_p2p::event::KitsuneP2pEvent> for Holochai
 
 impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
     /// We need to store signed agent info.
-    fn handle_put_agent_info_signed(&mut self, input: kitsune_p2p::event::PutAgentInfoSignedEvt) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<()> {
+    fn handle_put_agent_info_signed(
+        &mut self,
+        input: kitsune_p2p::event::PutAgentInfoSignedEvt,
+    ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<()> {
         let kitsune_p2p::event::PutAgentInfoSignedEvt {
             space,
             agent,
@@ -191,7 +194,9 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
             Ok(evt_sender
                 .put_agent_info_signed(space, agent, agent_info_signed)
                 .await?)
-        }.boxed().into())
+        }
+        .boxed()
+        .into())
     }
 
     /// We need to get previously stored agent info.
@@ -211,7 +216,9 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
             Ok(evt_sender
                 .get_agent_info_signed(space, agent, agent_info_signed_key)
                 .await?)
-        }.boxed().into())
+        }
+        .boxed()
+        .into())
     }
 
     #[tracing::instrument(skip(self, space, to_agent, from_agent, payload))]

@@ -8,6 +8,7 @@ use holochain::conductor::{
 };
 use holochain::core::ribosome::ZomeCallInvocation;
 use holochain::fixt::*;
+use holochain_state::test_utils::test_p2p_env;
 use holochain_state::test_utils::{test_conductor_env, test_wasm_env, TestEnvironment};
 use holochain_types::app::InstalledCell;
 use holochain_types::cell::CellId;
@@ -21,7 +22,6 @@ use holochain_zome_types::ExternInput;
 use holochain_zome_types::ZomeCallResponse;
 use std::sync::Arc;
 use tempdir::TempDir;
-use holochain_state::test_utils::test_p2p_env;
 
 #[derive(Serialize, Deserialize, SerializedBytes)]
 struct CreateMessageInput {

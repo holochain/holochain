@@ -7,6 +7,7 @@ use crate::types::KitsuneAgent;
 use crate::types::KitsuneSignature;
 use crate::types::KitsuneSpace;
 use fixt::prelude::*;
+use holo_hash::fixt::ThirtySixBytesFixturator;
 use url2::url2;
 
 fixturator!(
@@ -36,17 +37,17 @@ fixturator!(
 
 fixturator!(
     KitsuneAgent;
-    from Bytes;
+    from ThirtySixBytes;
 );
 
 fixturator!(
     KitsuneSpace;
-    from Bytes;
+    from ThirtySixBytes;
 );
 
 fixturator!(
     KitsuneSignature;
-    from Bytes;
+    from ThirtySixBytes;
 );
 
 fixturator!(

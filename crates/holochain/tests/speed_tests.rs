@@ -25,6 +25,7 @@ use holochain::conductor::{
 };
 use holochain::fixt::*;
 use holochain::{core::ribosome::ZomeCallInvocation, test_utils::warm_wasm_tests};
+use holochain_state::test_utils::test_p2p_env;
 use holochain_state::test_utils::{test_conductor_env, test_wasm_env, TestEnvironment};
 use holochain_types::app::InstalledCell;
 use holochain_types::cell::CellId;
@@ -40,7 +41,6 @@ use test_case::test_case;
 use test_utils::*;
 use test_wasm_common::{AnchorInput, TestString};
 use tracing::instrument;
-use holochain_state::test_utils::test_p2p_env;
 
 mod test_utils;
 
