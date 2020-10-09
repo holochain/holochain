@@ -209,7 +209,7 @@ async fn get_agent_activity_test() {
         .expect("Failed to get any activity from alice");
 
     let expected_activity: Vec<_> = expected_activity
-        .0
+        .activity
         .into_iter()
         .map(|shh| Element::new(shh, None))
         .collect();

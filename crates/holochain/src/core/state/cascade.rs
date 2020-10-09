@@ -1226,7 +1226,7 @@ where
         let network = ok_or_return!(self.network.as_mut());
         let agent_activity = network.get_agent_activity(agent, query, options).await?;
         for activity in agent_activity {
-            for shh in activity.0 {
+            for shh in activity.activity {
                 self.update_agent_activity_stores(shh).await?;
             }
         }
