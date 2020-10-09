@@ -46,11 +46,16 @@ impl From<&actor::GetLinksOptions> for GetLinksOptions {
 
 /// Get agent activity options help control how the get is processed at various levels.
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct GetActivityOptions;
+pub struct GetActivityOptions {
+    /// Include the activity headers in the response
+    pub include_activity: bool,
+}
 
 impl From<&actor::GetActivityOptions> for GetActivityOptions {
-    fn from(_a: &actor::GetActivityOptions) -> Self {
-        Self {}
+    fn from(a: &actor::GetActivityOptions) -> Self {
+        Self {
+            include_activity: a.include_activity,
+        }
     }
 }
 

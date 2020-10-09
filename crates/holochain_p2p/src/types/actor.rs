@@ -155,11 +155,17 @@ pub struct GetActivityOptions {
     /// Note - if all requests time-out you will receive an empty result,
     /// not a timeout error.
     pub timeout_ms: Option<u64>,
+    /// [Remote]
+    /// Include the activity headers in the response
+    pub include_activity: bool,
 }
 
 impl Default for GetActivityOptions {
     fn default() -> Self {
-        Self { timeout_ms: None }
+        Self {
+            timeout_ms: None,
+            include_activity: true,
+        }
     }
 }
 

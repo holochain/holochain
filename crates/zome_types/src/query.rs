@@ -4,6 +4,7 @@ use crate::{
     element::SignedHeaderHashed,
     header::{EntryType, Header, HeaderType},
 };
+use holo_hash::HeaderHash;
 pub use holochain_serialized_bytes::prelude::*;
 
 /// Query arguments
@@ -26,7 +27,45 @@ pub struct ChainQueryFilter {
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 /// An agents chain elements returned from a agent_activity_query
-pub struct AgentActivity(pub Vec<SignedHeaderHashed>);
+pub struct AgentActivity {
+    /// Headers on this chain.
+    pub activity: Vec<SignedHeaderHashed>,
+    /// The status of this chain.
+    pub status: ChainStatus,
+}
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+/// Status of the agent activity chain
+pub enum ChainStatus {
+    /// This authority has no information on the chain.
+    Empty,
+    /// The chain is valid as at this header sequence and header hash.
+    Valid(ChainHead),
+    /// Chain is forked.
+    Forked(ChainFork),
+    /// Chain is invalid because of this header.
+    Invalid(HeaderHash),
+}
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+/// The header at the head of the chain
+pub struct ChainHead {
+    /// Sequence number of this chain head.
+    pub header_seq: u32,
+    /// Hash of this chain head
+    pub hash: HeaderHash,
+}
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+/// The chain has been forked by these two headers
+pub struct ChainFork {
+    /// The point where the chain has forked.
+    pub fork_seq: u32,
+    /// The first header at this sequence position.
+    pub first_header: HeaderHash,
+    /// The second header at this sequence position.
+    pub second_header: HeaderHash,
+}
 
 impl ChainQueryFilter {
     /// Create a no-op ChainQueryFilter which returns everything
@@ -84,13 +123,6 @@ impl ChainQueryFilter {
             })
             .unwrap_or(true);
         check_range && check_header_type && check_entry_type
-    }
-}
-
-impl AgentActivity {
-    /// Create a new set of headers from an agents chain activity
-    pub fn new(headers: Vec<SignedHeaderHashed>) -> Self {
-        Self(headers)
     }
 }
 

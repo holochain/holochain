@@ -4,6 +4,7 @@ use fallible_iterator::FallibleIterator;
 use hdk3::prelude::ValidationPackage;
 use holo_hash::HeaderHash;
 use holochain_p2p::HolochainP2pCellT;
+use holochain_types::chain::AgentActivityExt;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::query::{AgentActivity, ChainQueryFilter};
 
@@ -181,7 +182,7 @@ async fn get_agent_activity_test() {
         .into_iter()
         .rev()
         .collect();
-    let expected_activity = AgentActivity::new(expected_activity);
+    let expected_activity = AgentActivity::valid(expected_activity);
     assert_eq!(agent_activity, expected_activity);
 
     // Commit private messages
@@ -220,7 +221,7 @@ async fn get_agent_activity_test() {
         .into_iter()
         .rev()
         .collect();
-    let expected_activity = AgentActivity::new(expected_activity);
+    let expected_activity = AgentActivity::valid(expected_activity);
     assert_eq!(agent_activity, expected_activity);
 
     // Commit private messages
@@ -278,7 +279,7 @@ async fn get_agent_activity_test() {
         .rev()
         .collect();
 
-    let expected_activity = AgentActivity::new(expected_activity);
+    let expected_activity = AgentActivity::valid(expected_activity);
     assert_eq!(agent_activity, expected_activity);
 
     ConductorTestData::shutdown_conductor(handle).await;
