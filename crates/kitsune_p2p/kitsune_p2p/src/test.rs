@@ -7,8 +7,6 @@ mod tests {
     };
     use futures::future::FutureExt;
     use ghost_actor::GhostControlSender;
-    use fixt::prelude::*;
-    use crate::fixt::AgentInfoSignedFixturator;
     use std::sync::Arc;
 
     #[tokio::test(threaded_scheduler)]

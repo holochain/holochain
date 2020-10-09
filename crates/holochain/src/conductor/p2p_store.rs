@@ -43,8 +43,6 @@ impl From<&AgentInfoSigned> for AgentKvKey {
 impl From<AgentInfoSignedKey> for AgentKvKey {
     fn from(agent_info_signed_key: AgentInfoSignedKey) -> Self {
         let mut bytes = [0; AGENT_KEY_LEN];
-        dbg!(agent_info_signed_key.space_bytes());
-        dbg!(agent_info_signed_key.agent_bytes());
         bytes[..AGENT_KEY_COMPONENT_LEN].copy_from_slice(agent_info_signed_key.space_bytes());
         bytes[AGENT_KEY_COMPONENT_LEN..].copy_from_slice(agent_info_signed_key.agent_bytes());
         Self(bytes)
@@ -99,12 +97,40 @@ impl AgentKv {
 #[cfg(test)]
 mod tests {
 
+    use super::AgentKvKey;
     use fixt::prelude::*;
+    use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSignedKey;
     use holochain_p2p::kitsune_p2p::fixt::AgentInfoSignedFixturator;
     use holochain_state::buffer::KvStoreT;
     use holochain_state::env::ReadManager;
     use holochain_state::env::WriteManager;
     use holochain_state::test_utils::test_p2p_env;
+    use kitsune_p2p::KitsuneBinType;
+
+    #[test]
+    fn kv_key_from() {
+        let agent_info_signed = fixt!(AgentInfoSigned);
+
+        let kv_key = AgentKvKey::from(AgentInfoSignedKey::from(&agent_info_signed));
+
+        let bytes = kv_key.as_ref().to_owned();
+
+        assert_eq!(
+            &bytes[..32],
+            agent_info_signed
+                .as_agent_info_ref()
+                .as_space_ref()
+                .get_bytes(),
+        );
+
+        assert_eq!(
+            &bytes[32..],
+            agent_info_signed
+                .as_agent_info_ref()
+                .as_agent_ref()
+                .get_bytes(),
+        );
+    }
 
     #[tokio::test(threaded_scheduler)]
     async fn test_store_agent_info_signed() {
