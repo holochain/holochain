@@ -6,6 +6,7 @@ use crate::core::ribosome::{
     RibosomeT,
 };
 
+use super::api::CellConductorApiT;
 use error::{EntryDefStoreError, EntryDefStoreResult};
 use fallible_iterator::FallibleIterator;
 use holochain_serialized_bytes::prelude::*;
@@ -18,6 +19,7 @@ use holochain_state::{
 use holochain_types::dna::{zome::Zome, DnaFile};
 use holochain_zome_types::entry_def::EntryDef;
 use holochain_zome_types::header::EntryDefIndex;
+use holochain_zome_types::header::ZomeId;
 use std::{collections::HashMap, convert::TryInto};
 
 pub mod error;
@@ -119,6 +121,41 @@ impl BufferedStore for EntryDefBuf {
     fn flush_to_txn_ref(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
         self.0.flush_to_txn_ref(writer)?;
         Ok(())
+    }
+}
+
+/// Get an [EntryDef] from the entry def store
+/// or fallback to running the zome
+pub(crate) async fn get_entry_def(
+    entry_def_index: EntryDefIndex,
+    zome: Zome,
+    dna_file: &DnaFile,
+    conductor_api: &impl CellConductorApiT,
+) -> EntryDefStoreResult<Option<EntryDef>> {
+    // Try to get the entry def from the entry def store
+    let key = EntryDefBufferKey::new(zome, entry_def_index);
+    let entry_def = { conductor_api.get_entry_def(&key).await };
+
+    // If it's not found run the ribosome and get the entry defs
+    match &entry_def {
+        Some(_) => Ok(entry_def),
+        None => Ok(get_entry_defs(dna_file.clone())?
+            .get(entry_def_index.index())
+            .map(|(_, v)| v.clone())),
+    }
+}
+
+pub(crate) async fn get_entry_def_from_ids(
+    zome_id: ZomeId,
+    entry_def_index: EntryDefIndex,
+    dna_file: &DnaFile,
+    conductor_api: &impl CellConductorApiT,
+) -> EntryDefStoreResult<Option<EntryDef>> {
+    match dna_file.dna.zomes.get(zome_id.index()) {
+        Some((_, zome)) => {
+            get_entry_def(entry_def_index, zome.clone(), dna_file, conductor_api).await
+        }
+        None => Ok(None),
     }
 }
 
@@ -229,12 +266,14 @@ mod tests {
             visibility: EntryVisibility::Public,
             crdt_type: CrdtType,
             required_validations: 5.into(),
+            required_validation_type: Default::default(),
         };
         let comment_def = EntryDef {
             id: "comment".into(),
             visibility: EntryVisibility::Private,
             crdt_type: CrdtType,
             required_validations: 5.into(),
+            required_validation_type: Default::default(),
         };
         let dna_wasm = DnaWasmHashed::from_content(TestWasm::EntryDefs.into())
             .await

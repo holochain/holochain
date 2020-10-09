@@ -4,7 +4,7 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use crate::core::state::cascade::error::CascadeResult;
 use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
-use crate::core::{workflow::integrate_dht_ops_workflow::integrate_to_cache, SourceChainError};
+use crate::core::{workflow::integrate_dht_ops_workflow::integrate_to_authored, SourceChainError};
 use holochain_p2p::actor::GetOptions;
 use holochain_types::element::SignedHeaderHashed;
 use holochain_zome_types::header::builder;
@@ -81,10 +81,10 @@ pub fn delete_link<'a>(
         let element = source_chain
             .get_element(&header_hash)?
             .expect("Element we just put in SourceChain must be gettable");
-        integrate_to_cache(
+        integrate_to_authored(
             &element,
             workspace.source_chain.elements(),
-            &mut workspace.cache_meta,
+            &mut workspace.meta_authored,
         )
         .await
         .map_err(Box::new)

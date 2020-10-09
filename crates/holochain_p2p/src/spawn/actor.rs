@@ -5,7 +5,9 @@ use futures::future::FutureExt;
 use crate::types::AgentPubKeyExt;
 
 use ghost_actor::dependencies::{tracing, tracing_futures::Instrument};
-use holochain_types::{element::GetElementResponse, Timestamp};
+use holochain_types::{
+    element::GetElementResponse, validate::ValidationPackageResponse, Timestamp,
+};
 use holochain_zome_types::zome::FunctionName;
 use kitsune_p2p::actor::KitsuneP2pSender;
 use kitsune_p2p::agent_store::AgentInfoSigned;
@@ -172,6 +174,27 @@ impl HolochainP2pActor {
         .boxed()
         .into())
     }
+
+    /// Receiving an incoming validation package request
+    fn handle_incoming_get_validation_package(
+        &mut self,
+        dna_hash: DnaHash,
+        agent_pub_key: AgentPubKey,
+        header_hash: HeaderHash,
+    ) -> kitsune_p2p::actor::KitsuneP2pHandlerResult<Vec<u8>> {
+        let evt_sender = self.evt_sender.clone();
+        Ok(async move {
+            let res = evt_sender
+                .get_validation_package(dna_hash, agent_pub_key, header_hash)
+                .await;
+
+            res.and_then(|r| Ok(SerializedBytes::try_from(r)?))
+                .map_err(kitsune_p2p::KitsuneP2pError::from)
+                .map(|res| UnsafeBytes::from(res).into())
+        }
+        .boxed()
+        .into())
+    }
 }
 
 impl ghost_actor::GhostHandler<kitsune_p2p::event::KitsuneP2pEvent> for HolochainP2pActor {}
@@ -264,6 +287,9 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
             crate::wire::WireMessage::ValidationReceipt { receipt } => {
                 self.handle_incoming_validation_receipt(space, to_agent, receipt)
             }
+            crate::wire::WireMessage::GetValidationPackage { header_hash } => {
+                self.handle_incoming_get_validation_package(space, to_agent, header_hash)
+            }
         }
     }
 
@@ -286,6 +312,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
             | crate::wire::WireMessage::Get { .. }
             | crate::wire::WireMessage::GetMeta { .. }
             | crate::wire::WireMessage::GetLinks { .. }
+            | crate::wire::WireMessage::GetValidationPackage { .. }
             | crate::wire::WireMessage::ValidationReceipt { .. } => {
                 Err(HolochainP2pError::invalid_p2p_message(
                     "invalid call type message in a notify".to_string(),
@@ -507,9 +534,24 @@ impl HolochainP2pHandler for HolochainP2pActor {
 
     fn handle_get_validation_package(
         &mut self,
-        _input: actor::GetValidationPackage,
-    ) -> HolochainP2pHandlerResult<()> {
-        Ok(async move { Ok(()) }.boxed().into())
+        input: actor::GetValidationPackage,
+    ) -> HolochainP2pHandlerResult<ValidationPackageResponse> {
+        let space = input.dna_hash.into_kitsune();
+        let to_agent = input.request_from.into_kitsune();
+        let from_agent = input.agent_pub_key.into_kitsune();
+
+        let req = crate::wire::WireMessage::get_validation_package(input.header_hash).encode()?;
+
+        let kitsune_p2p = self.kitsune_p2p.clone();
+        Ok(async move {
+            let response = kitsune_p2p
+                .rpc_single(space, to_agent, from_agent, req)
+                .await?;
+            let response = SerializedBytes::from(UnsafeBytes::from(response)).try_into()?;
+            Ok(response)
+        }
+        .boxed()
+        .into())
     }
 
     #[tracing::instrument(skip(self, dna_hash, from_agent, dht_hash, options))]

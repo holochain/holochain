@@ -73,7 +73,7 @@ impl ChainQueryFilter {
                 header
                     .entry_type()
                     .map(|header_entry_type| *header_entry_type == *entry_type)
-                    .unwrap_or(true)
+                    .unwrap_or(false)
             })
             .unwrap_or(true);
         check_range && check_header_type && check_entry_type
@@ -144,11 +144,11 @@ mod tests {
 
         assert_eq!(
             map_query(&query_1, &headers),
-            [true, false, true, false, true, true].to_vec()
+            [true, false, false, false, true, false].to_vec()
         );
         assert_eq!(
             map_query(&query_2, &headers),
-            [false, true, true, true, false, true].to_vec()
+            [false, true, false, true, false, false].to_vec()
         );
     }
 
@@ -234,7 +234,7 @@ mod tests {
                     .sequence_range(0..1000),
                 &headers
             ),
-            [true, false, true, false, true, true].to_vec()
+            [true, false, false, false, true, false].to_vec()
         );
     }
 }
