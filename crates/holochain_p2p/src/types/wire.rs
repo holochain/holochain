@@ -50,6 +50,9 @@ pub(crate) enum WireMessage {
         link_key: WireLinkMetaKey,
         options: event::GetLinksOptions,
     },
+    GetValidationPackage {
+        header_hash: HeaderHash,
+    },
 }
 
 impl WireMessage {
@@ -107,5 +110,8 @@ impl WireMessage {
 
     pub fn get_links(link_key: WireLinkMetaKey, options: event::GetLinksOptions) -> WireMessage {
         Self::GetLinks { link_key, options }
+    }
+    pub fn get_validation_package(header_hash: HeaderHash) -> WireMessage {
+        Self::GetValidationPackage { header_hash }
     }
 }

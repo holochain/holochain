@@ -1,7 +1,6 @@
 pub use crate::basic_test;
 pub use crate::bool::BoolFixturator;
-pub use crate::bytes::Bytes;
-pub use crate::bytes::BytesFixturator;
+pub use crate::bytes::{Bytes, BytesFixturator, BytesNotEmpty, BytesNotEmptyFixturator};
 pub use crate::curve;
 pub use crate::enum_fixturator;
 pub use crate::fixt;

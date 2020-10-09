@@ -18,8 +18,8 @@ use holochain_state::{
 };
 use holochain_types::dna::{zome::Zome, DnaFile};
 use holochain_zome_types::entry_def::EntryDef;
-use holochain_zome_types::header::AppEntryType;
 use holochain_zome_types::header::EntryDefIndex;
+use holochain_zome_types::header::ZomeId;
 use std::{collections::HashMap, convert::TryInto};
 
 pub mod error;
@@ -127,23 +127,35 @@ impl BufferedStore for EntryDefBuf {
 /// Get an [EntryDef] from the entry def store
 /// or fallback to running the zome
 pub(crate) async fn get_entry_def(
-    entry_type: &AppEntryType,
+    entry_def_index: EntryDefIndex,
     zome: Zome,
     dna_file: &DnaFile,
     conductor_api: &impl CellConductorApiT,
 ) -> EntryDefStoreResult<Option<EntryDef>> {
-    let entry_def_index = u8::from(entry_type.id()) as usize;
-
     // Try to get the entry def from the entry def store
-    let key = EntryDefBufferKey::new(zome, entry_type.id());
+    let key = EntryDefBufferKey::new(zome, entry_def_index);
     let entry_def = { conductor_api.get_entry_def(&key).await };
 
     // If it's not found run the ribosome and get the entry defs
     match &entry_def {
         Some(_) => Ok(entry_def),
         None => Ok(get_entry_defs(dna_file.clone())?
-            .get(entry_def_index)
+            .get(entry_def_index.index())
             .map(|(_, v)| v.clone())),
+    }
+}
+
+pub(crate) async fn get_entry_def_from_ids(
+    zome_id: ZomeId,
+    entry_def_index: EntryDefIndex,
+    dna_file: &DnaFile,
+    conductor_api: &impl CellConductorApiT,
+) -> EntryDefStoreResult<Option<EntryDef>> {
+    match dna_file.dna.zomes.get(zome_id.index()) {
+        Some((_, zome)) => {
+            get_entry_def(entry_def_index, zome.clone(), dna_file, conductor_api).await
+        }
+        None => Ok(None),
     }
 }
 
