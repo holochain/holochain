@@ -71,6 +71,8 @@ use tracing::*;
 pub use types::Outcome;
 
 #[cfg(test)]
+mod network_call_tests;
+#[cfg(test)]
 mod tests;
 
 mod error;
@@ -217,7 +219,7 @@ async fn validate_op(
     };
 
     // Get the validation package
-    let validation_package = get_validation_package(&entry_def).await?;
+    let validation_package = get_validation_package(&element, &entry_def, network.clone()).await?;
 
     // Get the EntryDefId associated with this Element if there is one
     let entry_def_id = entry_def.map(|ed| ed.id);
@@ -319,7 +321,7 @@ async fn get_associated_entry_def(
     match get_app_entry_type(element, cascade).await? {
         Some(aet) => {
             let zome = get_zome_info(&aet, dna_file)?.1.clone();
-            Ok(get_entry_def(&aet, zome, dna_file, conductor_api).await?)
+            Ok(get_entry_def(aet.id(), zome, dna_file, conductor_api).await?)
         }
         None => Ok(None),
     }
@@ -506,17 +508,30 @@ fn extract_app_type(element: &Element) -> Option<AppEntryType> {
 /// Get the validation package based on
 /// the requirements set by the AppEntryType
 async fn get_validation_package(
+    element: &Element,
     entry_def: &Option<EntryDef>,
+    mut network: HolochainP2pCell,
 ) -> AppValidationResult<Option<ValidationPackage>> {
     match entry_def {
         Some(entry_def) => {
             Ok(match entry_def.required_validation_type {
                 // Only needs the element
                 RequiredValidationType::Element => None,
-                RequiredValidationType::SubChain => {
-                    todo!("Implement getting the sub chain validation package")
+                RequiredValidationType::SubChain | RequiredValidationType::Full => {
+                    // TODO: What if this is the same author that is validating?
+                    // We probably don't want to do a network call although
+                    // it will just short circuit
+
+                    // Get from author
+                    let agent_id = element.header().author().clone();
+                    let header_hash = element.header_address().clone();
+                    network
+                        .get_validation_package(agent_id, header_hash)
+                        .await?
+                        .into()
+                    // TODO: Fallback to gossiper if author is unavailable
+                    // TODO: Fallback to RegisterAgentActivity if gossiper is unavailable
                 }
-                RequiredValidationType::Full => todo!("Implement getting the full chain"),
             })
         }
         None => {
@@ -547,7 +562,9 @@ pub async fn run_validation_callback_direct(
         Err(outcome) => return outcome.try_into(),
     };
 
-    let validation_package = get_validation_package(&entry_def).await?.map(Arc::new);
+    let validation_package = get_validation_package(&element, &entry_def, network.clone())
+        .await?
+        .map(Arc::new);
     let entry_def_id = entry_def.map(|ed| ed.id);
 
     let element = Arc::new(element);

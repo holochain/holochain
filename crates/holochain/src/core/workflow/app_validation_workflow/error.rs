@@ -1,3 +1,4 @@
+use holochain_p2p::HolochainP2pError;
 use holochain_types::cell::CellId;
 use holochain_zome_types::header::ZomeId;
 use thiserror::Error;
@@ -17,6 +18,8 @@ pub enum AppValidationError {
     DnaMissing(CellId),
     #[error(transparent)]
     EntryDefStoreError(#[from] EntryDefStoreError),
+    #[error(transparent)]
+    HolochainP2pError(#[from] HolochainP2pError),
     #[error("Links cannot be called on multiple zomes for validation")]
     LinkMultipleZomes,
     #[error(transparent)]
