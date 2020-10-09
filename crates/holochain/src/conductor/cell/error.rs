@@ -1,7 +1,9 @@
 use crate::{
     conductor::api::error::ConductorApiError,
+    conductor::entry_def_store::error::EntryDefStoreError,
     core::{
         ribosome::{error::RibosomeError, guest_callback::init::InitResult},
+        state::cascade::error::CascadeError,
         workflow::{
             error::WorkflowError, produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError,
         },
@@ -19,6 +21,8 @@ use thiserror::Error;
 pub enum CellError {
     #[error("error dealing with workspace state: {0}")]
     DatabaseError(#[from] DatabaseError),
+    #[error(transparent)]
+    CascadeError(#[from] CascadeError),
     #[error("The Dna was not found in the store")]
     DnaMissing,
     #[error("Failed to join the create cell task: {0}")]
@@ -31,6 +35,8 @@ pub enum CellError {
     CellWithoutGenesis(CellId),
     #[error("The cell failed to cleanup its environment because: {0}. Recommend manually deleting the database at: {1}")]
     Cleanup(String, PathBuf),
+    #[error(transparent)]
+    EntryDefStoreError(#[from] EntryDefStoreError),
     #[error(transparent)]
     WorkflowError(#[from] Box<WorkflowError>),
     #[error(transparent)]
