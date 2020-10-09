@@ -219,7 +219,10 @@ async fn validate_op(
     };
 
     // Get the validation package
-    let validation_package = get_validation_package(&element, &entry_def, network.clone()).await?;
+    let validation_package = {
+        let cascade = workspace.full_cascade(network.clone());
+        get_validation_package(&element, &entry_def, cascade).await?
+    };
 
     // Get the EntryDefId associated with this Element if there is one
     let entry_def_id = entry_def.map(|ed| ed.id);
@@ -510,7 +513,7 @@ fn extract_app_type(element: &Element) -> Option<AppEntryType> {
 async fn get_validation_package(
     element: &Element,
     entry_def: &Option<EntryDef>,
-    mut network: HolochainP2pCell,
+    mut cascade: Cascade<'_>,
 ) -> AppValidationResult<Option<ValidationPackage>> {
     match entry_def {
         Some(entry_def) => {
@@ -525,10 +528,11 @@ async fn get_validation_package(
                     // Get from author
                     let agent_id = element.header().author().clone();
                     let header_hash = element.header_address().clone();
-                    network
-                        .get_validation_package(agent_id, header_hash)
+                    let header_seq = element.header().header_seq();
+                    cascade
+                        .get_validation_package(agent_id, header_seq, header_hash)
                         .await?
-                        .into()
+                        .map(ValidationPackage::new)
                     // TODO: Fallback to gossiper if author is unavailable
                     // TODO: Fallback to RegisterAgentActivity if gossiper is unavailable
                 }
@@ -562,9 +566,13 @@ pub async fn run_validation_callback_direct(
         Err(outcome) => return outcome.try_into(),
     };
 
-    let validation_package = get_validation_package(&element, &entry_def, network.clone())
-        .await?
-        .map(Arc::new);
+    let validation_package = {
+        let mut workspace = workspace_lock.write().await;
+        let cascade = workspace.cascade(network.clone());
+        get_validation_package(&element, &entry_def, cascade)
+            .await?
+            .map(Arc::new)
+    };
     let entry_def_id = entry_def.map(|ed| ed.id);
 
     let element = Arc::new(element);
