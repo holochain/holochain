@@ -1600,6 +1600,7 @@ name = "kitsune_p2p_proxy"
 version = "0.0.1"
 dependencies = [
  "base64 0.12.3",
+ "blake2b_simd",
  "derive_more",
  "futures",
  "kitsune_p2p_types",
@@ -1610,6 +1611,7 @@ dependencies = [
  "serde",
  "serde_bytes",
  "tokio",
+ "tracing-subscriber",
  "webpki",
 ]
 
