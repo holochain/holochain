@@ -12,10 +12,11 @@ edition = "2018"
 
 [dependencies]
 base64 = "0.12"
+blake2b_simd = "0.5.10"
 derive_more = "0.99.7"
 futures = "0.3"
 kitsune_p2p_types = { version = "0.0.1", path = "../types" }
-lair_keystore_api = "0.0.1-alpha.4"
+lair_keystore_api = "0.0.1-alpha.5"
 nanoid = "0.3"
 rmp-serde = "0.14"
 rustls = { version = "0.18", features = [ "dangerous_configuration" ] }
@@ -23,3 +24,6 @@ serde = { version = "1", features = [ "derive" ] }
 serde_bytes = "0.11"
 tokio = { version = "0.2", features = [ "full" ] }
 webpki = "0.21.2"
+
+[dev-dependencies]
+tracing-subscriber = "0.2"

@@ -71,7 +71,7 @@ fn remove_invalid_link(_: ()) -> ExternResult<HeaderHash> {
 }
 
 #[hdk_extern]
-fn validate(_element: Element) -> ExternResult<ValidateCallbackResult> {
+fn validate(_element: ValidateData) -> ExternResult<ValidateCallbackResult> {
     Ok(ValidateCallbackResult::Valid)
 }
 

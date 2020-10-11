@@ -495,3 +495,17 @@ impl From<EntryDefIndex> for u8 {
         ei.0
     }
 }
+
+impl EntryDefIndex {
+    /// Use as an index into a slice
+    pub fn index(&self) -> usize {
+        self.0 as usize
+    }
+}
+
+impl ZomeId {
+    /// Use as an index into a slice
+    pub fn index(&self) -> usize {
+        self.0 as usize
+    }
+}

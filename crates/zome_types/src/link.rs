@@ -1,5 +1,4 @@
-use crate::header::CreateLink;
-use crate::header::DeleteLink;
+use crate::element::SignedHeaderHashed;
 use holochain_serialized_bytes::prelude::*;
 
 /// Opaque tag for the link applied at the app layer, used to differentiate
@@ -82,23 +81,26 @@ impl Links {
     }
 }
 
+type CreateLinkWithDeleteLinks = Vec<(SignedHeaderHashed, Vec<SignedHeaderHashed>)>;
 #[derive(Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-pub struct LinkDetails(Vec<(CreateLink, Vec<DeleteLink>)>);
+/// CreateLinks with and DeleteLinks on them
+/// `[CreateLink, [DeleteLink]]`
+pub struct LinkDetails(CreateLinkWithDeleteLinks);
 
-impl From<Vec<(CreateLink, Vec<DeleteLink>)>> for LinkDetails {
-    fn from(v: Vec<(CreateLink, Vec<DeleteLink>)>) -> Self {
+impl From<CreateLinkWithDeleteLinks> for LinkDetails {
+    fn from(v: CreateLinkWithDeleteLinks) -> Self {
         Self(v)
     }
 }
 
-impl From<LinkDetails> for Vec<(CreateLink, Vec<DeleteLink>)> {
+impl From<LinkDetails> for CreateLinkWithDeleteLinks {
     fn from(link_details: LinkDetails) -> Self {
         link_details.0
     }
 }
 
 impl LinkDetails {
-    pub fn into_inner(self) -> Vec<(CreateLink, Vec<DeleteLink>)> {
+    pub fn into_inner(self) -> CreateLinkWithDeleteLinks {
         self.into()
     }
 }

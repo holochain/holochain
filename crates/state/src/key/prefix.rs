@@ -6,6 +6,8 @@ const INTEGRATED_PREFIX: u8 = 0x0;
 const PENDING_PREFIX: u8 = 0x1;
 /// Prefix for the database of rejected data (has been judged and found invalid)
 const REJECTED_PREFIX: u8 = 0x2;
+/// Prefix for authored database
+const AUTHORED_PREFIX: u8 = 0x3;
 
 /// Prefix length 1 + hash length 36
 // TODO: B-02112 change to 39 bytes
@@ -52,6 +54,10 @@ pub struct PendingPrefix;
 /// Prefix key for data that has been rejected
 pub struct RejectedPrefix;
 
+#[derive(PartialOrd, Clone, Ord, PartialEq, Eq, Debug)]
+/// Prefix key for data that has been authored
+pub struct AuthoredPrefix;
+
 impl PrefixType for IntegratedPrefix {
     const PREFIX: u8 = INTEGRATED_PREFIX;
 }
@@ -62,6 +68,10 @@ impl PrefixType for PendingPrefix {
 
 impl PrefixType for RejectedPrefix {
     const PREFIX: u8 = REJECTED_PREFIX;
+}
+
+impl PrefixType for AuthoredPrefix {
+    const PREFIX: u8 = AUTHORED_PREFIX;
 }
 
 impl<P: PrefixType> PrefixHashKey<P> {

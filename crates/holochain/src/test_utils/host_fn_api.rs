@@ -23,8 +23,8 @@ use holochain_state::{
 };
 use holochain_types::{cell::CellId, dna::DnaFile, element::Element, Entry};
 use holochain_zome_types::{
+    element::SignedHeaderHashed,
     entry_def,
-    header::*,
     link::{Link, LinkTag},
     metadata::Details,
     zome::ZomeName,
@@ -95,10 +95,21 @@ pub struct CallData {
 }
 
 impl CallData {
+    /// Create CallData for the first zome.
     pub async fn create(
         cell_id: &CellId,
         handle: &ConductorHandle,
         dna_file: &DnaFile,
+    ) -> (EnvironmentWrite, CallData) {
+        Self::create_for_zome(cell_id, handle, dna_file, 0).await
+    }
+
+    /// Create CallData for a specific zome if there are multiple.
+    pub async fn create_for_zome(
+        cell_id: &CellId,
+        handle: &ConductorHandle,
+        dna_file: &DnaFile,
+        zome_index: usize,
     ) -> (EnvironmentWrite, CallData) {
         let env = handle.get_cell_env(cell_id).await.unwrap();
         let keystore = env.keystore().clone();
@@ -108,7 +119,7 @@ impl CallData {
 
         let zome_path = (
             cell_id.clone(),
-            dna_file.dna().zomes.get(0).unwrap().0.clone(),
+            dna_file.dna().zomes.get(zome_index).unwrap().0.clone(),
         )
             .into();
         let ribosome = WasmRibosome::new(dna_file.clone());
@@ -479,7 +490,7 @@ pub async fn get_link_details<'env>(
     base: EntryHash,
     tag: LinkTag,
     options: GetLinksOptions,
-) -> Vec<(CreateLink, Vec<DeleteLink>)> {
+) -> Vec<(SignedHeaderHashed, Vec<SignedHeaderHashed>)> {
     let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
 
     let mut cascade = workspace.cascade(call_data.network);

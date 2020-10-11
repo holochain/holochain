@@ -192,6 +192,36 @@ where
     }
 }
 
+/// Create an CasBufFreshSync with a clone of the scratch
+/// from another CasBufFreshSync
+impl<P, C> From<&CasBufFreshSync<C, P>> for CasBufFreshSync<C, P>
+where
+    C: HashableContent + BufVal + Send + Sync,
+    HoloHashOf<C>: BufKey,
+    C::HashType: PrimitiveHashType + HashTypeSync + Send + Sync,
+    P: PrefixType,
+{
+    fn from(other: &CasBufFreshSync<C, P>) -> Self {
+        Self {
+            env: other.env.clone(),
+            inner: (&other.inner).into(),
+        }
+    }
+}
+
+impl<C, P> From<&CasBufUsedSync<C, P>> for CasBufUsedSync<C, P>
+where
+    C: HashableContent + BufVal + Send + Sync,
+    HoloHashOf<C>: BufKey,
+    C::HashType: PrimitiveHashType + HashTypeSync + Send + Sync,
+    P: PrefixType,
+{
+    fn from(other: &CasBufUsedSync<C, P>) -> Self {
+        Self((&other.0).into())
+    }
+}
+
+
 impl<C, P> LoadDbFixture for CasBufUsedSync<C, P>
 where
     C: Ord, // needed to put in HashSet

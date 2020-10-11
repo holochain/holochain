@@ -82,6 +82,14 @@ impl ElementBuf<RejectedPrefix> {
     }
 }
 
+impl ElementBuf<AuthoredPrefix> {
+    /// Create a element buf for all authored elements.
+    /// This reuses the database but is the data is completely separate.
+    pub fn authored(env: EnvironmentRead, allow_private: bool) -> DatabaseResult<Self> {
+        ElementBuf::new_vault(env, allow_private)
+    }
+}
+
 impl<P> ElementBuf<P>
 where
     P: PrefixType,
@@ -412,5 +420,20 @@ mod tests {
         }
 
         Ok(())
+    }
+}
+
+/// Create an ElementBuf with a clone of the scratch
+/// from another ElementBuf
+impl<P> From<&ElementBuf<P>> for ElementBuf<P>
+where
+    P: PrefixType,
+{
+    fn from(other: &ElementBuf<P>) -> Self {
+        Self {
+            public_entries: (&other.public_entries).into(),
+            private_entries: other.private_entries.as_ref().map(|pe| pe.into()),
+            headers: (&other.headers).into(),
+        }
     }
 }

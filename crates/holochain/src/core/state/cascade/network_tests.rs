@@ -5,7 +5,9 @@ use crate::{
             element_buf::ElementBuf,
             metadata::{MetadataBuf, MetadataBufT},
         },
-        workflow::{integrate_dht_ops_workflow::integrate_to_cache, CallZomeWorkspace},
+        workflow::integrate_dht_ops_workflow::integrate_single_metadata,
+        workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertResult,
+        workflow::CallZomeWorkspace,
     },
     test_utils::test_network,
 };
@@ -25,12 +27,13 @@ use holochain_p2p::{
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::{
     env::{EnvironmentWrite, ReadManager},
-    prelude::{BufferedStore, WriteManager},
+    prelude::{BufferedStore, IntegratedPrefix, WriteManager},
     test_utils::test_cell_env,
 };
 use holochain_types::{
     app::InstalledCell,
     cell::CellId,
+    dht_op::produce_op_lights_from_elements,
     dna::{DnaDef, DnaFile},
     element::{Element, GetElementResponse, WireElement},
     entry::option_entry_hashed,
@@ -88,7 +91,7 @@ async fn get_updates_cache() {
 
     // Check the cache has been updated
     let result = workspace
-        .cache_cas
+        .element_cache
         .get_element(&expected.0)
         .unwrap()
         .unwrap();
@@ -145,7 +148,7 @@ async fn get_meta_updates_meta_cache() {
 
         // Check the cache has been updated
         workspace
-            .cache_meta
+            .meta_cache
             .get_headers(
                 &reader,
                 match expected.0.hash_type().clone() {
@@ -307,28 +310,22 @@ async fn get_from_another_agent() {
     assert_eq!(entry_details.updates.len(), 1);
     assert_eq!(entry_details.entry_dht_status, EntryDhtStatus::Dead);
     assert_eq!(
-        HeaderHash::with_data_sync(entry_details.headers.get(0).unwrap()),
+        *entry_details.headers.get(0).unwrap().header_address(),
         header_hash
     );
     assert_eq!(
-        HeaderHash::with_data_sync(&Header::Delete(
-            entry_details.deletes.get(0).unwrap().clone()
-        )),
+        *entry_details.deletes.get(0).unwrap().header_address(),
         remove_hash
     );
     assert_eq!(
-        HeaderHash::with_data_sync(&Header::Update(
-            entry_details.updates.get(0).unwrap().clone()
-        )),
+        *entry_details.updates.get(0).unwrap().header_address(),
         update_hash
     );
 
     assert_eq!(header_details.deletes.len(), 1);
     assert_eq!(*header_details.element.header_address(), header_hash);
     assert_eq!(
-        HeaderHash::with_data_sync(&Header::Delete(
-            header_details.deletes.get(0).unwrap().clone()
-        )),
+        *entry_details.deletes.get(0).unwrap().header_address(),
         remove_hash
     );
 
@@ -481,6 +478,8 @@ async fn get_links_from_another_agent() {
     let (link_add, link_removes) = links.get(0).unwrap().clone();
     assert_eq!(link_removes.len(), 1);
     let link_remove = link_removes.get(0).unwrap().clone();
+    let link_remove = unwrap_to::unwrap_to!(link_remove.header() => Header::DeleteLink).clone();
+    let link_add = unwrap_to::unwrap_to!(link_add.header() => Header::CreateLink).clone();
     assert_eq!(link_add.tag, link_tag);
     assert_eq!(link_add.target_address, target_entry_hash);
     assert_eq!(link_add.base_address, base_entry_hash);
@@ -648,7 +647,8 @@ async fn fake_authority<'env>(env: &EnvironmentWrite, hash: AnyDhtHash, call_dat
         .put(shh, option_entry_hashed(e).await)
         .unwrap();
 
-    integrate_to_cache(&element, &element_vault, &mut meta_vault)
+    // TODO: figure this out
+    integrate_to_integrated(&element, &element_vault, &mut meta_vault)
         .await
         .unwrap();
 
@@ -658,4 +658,17 @@ async fn fake_authority<'env>(env: &EnvironmentWrite, hash: AnyDhtHash, call_dat
             meta_vault.flush_to_txn(writer)
         })
         .unwrap();
+}
+
+async fn integrate_to_integrated<C: MetadataBufT<IntegratedPrefix>>(
+    element: &Element,
+    element_store: &ElementBuf<IntegratedPrefix>,
+    meta_store: &mut C,
+) -> DhtOpConvertResult<()> {
+    // Produce the light directly
+    for op in produce_op_lights_from_elements(vec![element]).await? {
+        // we don't integrate element data, because it is already in our vault.
+        integrate_single_metadata(op, element_store, meta_store)?
+    }
+    Ok(())
 }

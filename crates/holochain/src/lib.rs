@@ -2,6 +2,8 @@
 // FIXME: uncomment this deny [TK-01128]
 // #![deny(missing_docs)]
 
+#![allow(deprecated)]
+
 pub mod conductor;
 #[allow(missing_docs)]
 pub mod core;
