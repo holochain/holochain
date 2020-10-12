@@ -94,7 +94,9 @@ pub(super) async fn get_as_author(
             )?;
             Ok(Some(ValidationPackage::new(elements)).into())
         }
-        RequiredValidationType::Custom => todo!("call the validation callback"),
+        RequiredValidationType::Custom => {
+            todo!("call the validation callback and cache the package")
+        }
     }
 }
 
@@ -190,6 +192,17 @@ pub(super) async fn get_as_authority(
 
             Ok(Some(ValidationPackage::new(elements)).into())
         }
-        RequiredValidationType::Custom => todo!("Get validation package from cached data"),
+        RequiredValidationType::Custom => {
+            let elements = match cascade.get_validation_package_local(
+                agent,
+                &header_hashed,
+                required_validation_type,
+            )? {
+                Some(elements) => elements,
+                None => return Ok(None.into()),
+            };
+
+            Ok(Some(ValidationPackage::new(elements)).into())
+        }
     }
 }

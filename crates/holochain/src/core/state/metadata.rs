@@ -117,6 +117,16 @@ where
     /// Deregister a published [Header] on the authoring agent's public key
     fn deregister_activity(&mut self, header: &Header) -> DatabaseResult<()>;
 
+    /// Registers a custom validation package on a [HeaderHash]
+    fn register_validation_package(
+        &mut self,
+        hash: &HeaderHash,
+        package: impl IntoIterator<Item = HeaderHash>,
+    );
+
+    /// Deregister a custom validation package on a [HeaderHash]
+    fn deregister_validation_package(&mut self, header: &HeaderHash);
+
     /// Registers a [Header::Update] on the referenced [Header] or [Entry]
     fn register_update(&mut self, update: header::Update) -> DatabaseResult<()>;
 
@@ -159,6 +169,13 @@ where
     ) -> DatabaseResult<
         Box<dyn FallibleIterator<Item = (u32, HeaderHash), Error = DatabaseError> + '_>,
     >;
+
+    /// Get a custom validation package on this header hash
+    fn get_validation_package<'r, R: Readable>(
+        &'r self,
+        r: &'r R,
+        hash: &HeaderHash,
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>;
 
     /// Returns all the hashes of [Update] headers registered on an [Entry]
     fn get_updates<'r, R: Readable>(
@@ -529,6 +546,25 @@ where
         self.misc_meta.delete(MiscMetaKey::chain_item(&key).into())
     }
 
+    fn register_validation_package(
+        &mut self,
+        hash: &HeaderHash,
+        package: impl IntoIterator<Item = HeaderHash>,
+    ) {
+        let key: SysMetaKey = hash.clone().into();
+        for hash in package {
+            self.system_meta.insert(
+                PrefixBytesKey::new(key.clone()),
+                SysMetaVal::CustomPackage(hash),
+            );
+        }
+    }
+
+    fn deregister_validation_package(&mut self, hash: &HeaderHash) {
+        let key: SysMetaKey = hash.clone().into();
+        self.system_meta.delete_all(PrefixBytesKey::new(key));
+    }
+
     fn get_headers<'r, R: Readable>(
         &'r self,
         r: &'r R,
@@ -645,6 +681,26 @@ where
                 Ok((sequence, header_hash))
             },
         )))
+    }
+
+    fn get_validation_package<'r, R: Readable>(
+        &'r self,
+        r: &'r R,
+        hash: &HeaderHash,
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>
+    {
+        Ok(Box::new(
+            fallible_iterator::convert(
+                self.system_meta
+                    .get(r, &SysMetaKey::from(hash.clone()).into())?,
+            )
+            .filter_map(|h| {
+                Ok(match h {
+                    SysMetaVal::CustomPackage(h) => Some(h),
+                    _ => None,
+                })
+            }),
+        ))
     }
 
     // TODO: For now this is only checking for deletes
