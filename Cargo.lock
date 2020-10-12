@@ -1630,6 +1630,7 @@ dependencies = [
  "rustls 0.18.1",
  "serde",
  "serde_bytes",
+ "structopt",
  "tokio",
  "tracing-subscriber",
  "webpki",

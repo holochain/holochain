@@ -91,10 +91,12 @@ async fn tls_client(
                 write.close().await.map_err(TransportError::other)?;
             }
 
+            /*
             if !cli.wants_read() {
                 tokio::time::delay_for(std::time::Duration::from_millis(10)).await;
                 continue;
             }
+            */
 
             tracing::trace!("{}: CLI tls wants read", short);
 

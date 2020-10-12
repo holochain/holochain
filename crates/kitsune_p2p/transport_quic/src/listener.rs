@@ -1,5 +1,6 @@
 use crate::*;
 use futures::{future::FutureExt, sink::SinkExt, stream::StreamExt};
+use ghost_actor::dependencies::tracing;
 use kitsune_p2p_types::{
     dependencies::{ghost_actor, ghost_actor::GhostControlSender},
     transport::*,
@@ -36,6 +37,7 @@ fn tx_bi_chan(
             if read == 0 {
                 continue;
             }
+            tracing::debug!("QUIC received {} bytes", read);
             read_send
                 .send(buf[0..read].to_vec())
                 .await
@@ -122,6 +124,7 @@ impl ListenerInnerHandler for TransportListenerQuic {
         &mut self,
         addr: SocketAddr,
     ) -> ListenerInnerHandlerResult<quinn::Connecting> {
+        tracing::debug!("attempt raw connect: {:?}", addr);
         let out = self
             .quinn_endpoint
             .connect(&addr, "stub.stub")
@@ -157,6 +160,7 @@ impl ListenerInnerHandler for TransportListenerQuic {
 
             // Construct our url from the low-level data
             let url = url2!("{}://{}", crate::SCHEME, con.remote_address());
+            tracing::debug!("QUIC handle connection: {}", url);
 
             // pass the connection off to our actor
             i_s.set_connection(url.clone(), con).await?;

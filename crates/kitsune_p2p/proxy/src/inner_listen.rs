@@ -159,6 +159,7 @@ impl ghost_actor::GhostControlHandler for InnerListen {
         async move {
             let _ = self.sub_sender.ghost_actor_shutdown().await;
             self.evt_send.close_channel();
+            tracing::warn!("proxy listener actor SHUTDOWN");
         }
         .boxed()
         .into()

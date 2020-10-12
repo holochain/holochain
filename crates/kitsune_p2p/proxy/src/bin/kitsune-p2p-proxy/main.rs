@@ -1,17 +1,50 @@
-//use kitsune_p2p_proxy::*;
+use futures::stream::StreamExt;
+use kitsune_p2p_proxy::*;
 use kitsune_p2p_transport_quic::*;
-use kitsune_p2p_types::transport::*;
+use kitsune_p2p_types::{dependencies::ghost_actor, transport::*};
+use structopt::StructOpt;
+
+mod opt;
+use opt::*;
 
 #[tokio::main]
 async fn main() {
+    let _ = ghost_actor::dependencies::tracing::subscriber::set_global_default(
+        tracing_subscriber::FmtSubscriber::builder()
+            .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+            .finish(),
+    );
+
     if let Err(e) = inner().await {
         eprintln!("{:?}", e);
     }
 }
 
 async fn inner() -> TransportResult<()> {
-    let config = ConfigListenerQuic::default();
-    let (listener, _events) = spawn_transport_listener_quic(config).await?;
-    println!("Hello: {}", listener.bound_url().await?);
-    Ok(())
+    let opt = Opt::from_args();
+
+    let (listener, events) = spawn_transport_listener_quic(opt.into()).await?;
+
+    let proxy_config = ProxyConfig::local_proxy_server(
+        TlsConfig::new_ephemeral().await?,
+        AcceptProxyCallback::accept_all(),
+    );
+
+    let (listener, mut events) =
+        spawn_kitsune_proxy_listener(proxy_config, listener, events).await?;
+
+    tokio::task::spawn(async move {
+        while let Some((url, mut write, _read)) = events.next().await {
+            eprintln!(
+                "{} is trying to talk directly to us - dump proxy state",
+                url
+            );
+            let _ = write.write_and_close(b"[stub proxy state]".to_vec()).await;
+        }
+    });
+
+    println!("{}", listener.bound_url().await?);
+
+    // wait for ctrl-c
+    futures::future::pending().await
 }
