@@ -527,10 +527,13 @@ async fn get_validation_package(
 
                     // Get from author
                     let agent_id = element.header().author().clone();
-                    let header_hash = element.header_address().clone();
-                    let header_seq = element.header().header_seq();
+                    let header_hashed = element.header_hashed();
                     cascade
-                        .get_validation_package(agent_id, header_seq, header_hash)
+                        .get_validation_package(
+                            agent_id,
+                            header_hashed,
+                            entry_def.required_validation_type,
+                        )
                         .await?
                         .map(ValidationPackage::new)
                     // TODO: Fallback to gossiper if author is unavailable

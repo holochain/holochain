@@ -12,7 +12,7 @@ use crate::core::workflow::integrate_dht_ops_workflow::integrate_single_metadata
 use either::Either;
 use error::CascadeResult;
 use fallible_iterator::FallibleIterator;
-use holo_hash::{hash_type::AnyDht, AgentPubKey, AnyDhtHash, EntryHash, HeaderHash};
+use holo_hash::{hash_type::AnyDht, AgentPubKey, AnyDhtHash, EntryHash, HasHash, HeaderHash};
 use holochain_p2p::{actor::GetActivityOptions, HolochainP2pCellT};
 use holochain_p2p::{
     actor::{GetLinksOptions, GetMetaOptions, GetOptions},
@@ -28,7 +28,7 @@ use holochain_types::{
     entry::option_entry_hashed,
     link::{GetLinksResponse, WireLinkMetaKey},
     metadata::{EntryDhtStatus, MetadataSet, TimedHeaderHash},
-    EntryHashed,
+    EntryHashed, HeaderHashed,
 };
 use holochain_zome_types::{
     element::SignedHeader,
@@ -38,6 +38,7 @@ use holochain_zome_types::{
     link::Link,
     metadata::{Details, ElementDetails, EntryDetails},
     query::ChainQueryFilter,
+    validate::RequiredValidationType,
 };
 use std::collections::HashSet;
 use std::collections::{BTreeMap, BTreeSet};
@@ -1423,12 +1424,28 @@ where
     pub fn get_validation_package_local(
         &self,
         agent: AgentPubKey,
+        header: &HeaderHashed,
+        required_validation_type: RequiredValidationType,
+    ) -> CascadeResult<Option<Vec<Element>>> {
+        match required_validation_type {
+            RequiredValidationType::Element => Ok(None),
+            RequiredValidationType::SubChain | RequiredValidationType::Full => {
+                let hash = header.as_hash().clone();
+                let header_seq = header.header_seq();
+                self.get_chain_validation_package_local(agent, header_seq, hash)
+            } // TODO: Add custom validation caching
+        }
+    }
+
+    fn get_chain_validation_package_local(
+        &self,
+        agent: AgentPubKey,
         header_seq: u32,
         hash: HeaderHash,
     ) -> CascadeResult<Option<Vec<Element>>> {
         let cache_data = ok_or_return!(self.cache_data.as_ref(), None);
         let env = ok_or_return!(self.env.as_ref(), None);
-        if fresh_reader!(env, |r| {
+        let activity_is_not_cached = fresh_reader!(env, |r| {
             cache_data
                 .meta
                 .get_activity(
@@ -1437,13 +1454,14 @@ where
                 )?
                 .next()
         })?
-        .is_none()
-        {
+        .is_none();
+
+        if activity_is_not_cached {
             return Ok(None);
         }
 
         let range = Some(0..header_seq);
-        let hashes = Self::get_agent_activity_from_cache(agent.clone(), &range, cache_data, env)?;
+        let hashes = Self::get_agent_activity_from_cache(agent, &range, cache_data, env)?;
         if hashes.len() == header_seq as usize {
             let mut elements = Vec::with_capacity(hashes.len());
             for hash in hashes {
@@ -1462,41 +1480,33 @@ where
     pub async fn get_validation_package(
         &mut self,
         agent: AgentPubKey,
-        header_seq: u32,
-        hash: HeaderHash,
+        header: &HeaderHashed,
+        required_validation_type: RequiredValidationType,
     ) -> CascadeResult<Option<Vec<Element>>> {
         if let Some(elements) =
-            self.get_validation_package_local(agent.clone(), header_seq, hash.clone())?
+            self.get_validation_package_local(agent.clone(), header, required_validation_type)?
         {
             return Ok(Some(elements));
         }
 
         let network = ok_or_return!(self.network.as_mut(), None);
-        match network.get_validation_package(agent, hash).await?.0 {
+        match network
+            .get_validation_package(agent, header.as_hash().clone())
+            .await?
+            .0
+        {
             Some(validation_package) => {
                 for element in &validation_package.0 {
                     self.update_stores(element.clone()).await?;
                 }
+
+                // TODO: Add metadata for custom package caching
+
                 Ok(Some(validation_package.0))
             }
             None => Ok(None),
         }
     }
-
-    // fn local_cascade(&mut self) -> Self {
-    //     Cascade {
-    //         integrated_data: self.integrated_data.clone(),
-    //         authored_data: self.authored_data.clone(),
-    //         pending_data: self.pending_data.clone(),
-    //         rejected_data: self.rejected_data.clone(),
-    //         cache_data: match &mut self.cache_data {
-    //             Some(db) => Some(db.into()),
-    //             None => None,
-    //         },
-    //         env: self.env.clone(),
-    //         network: None,
-    //     }
-    // }
 }
 
 impl<'a, M: MetadataBufT> From<&'a DbPairMut<'a, M>> for DbPair<'a, M> {
@@ -1507,26 +1517,6 @@ impl<'a, M: MetadataBufT> From<&'a DbPairMut<'a, M>> for DbPair<'a, M> {
         }
     }
 }
-
-// impl<'a, M, P> Clone for DbPair<'a, M, P>
-// where
-//     P: PrefixType,
-//     M: MetadataBufT<P>,
-// {
-//     fn clone(&self) -> Self {
-//         DbPair::new(&self.element, &self.meta)
-//     }
-// }
-
-// impl<'a, 'b: 'a, M, P> From<&'b mut DbPairMut<'a, M, P>> for DbPairMut<'a, M, P>
-// where
-//     P: PrefixType,
-//     M: MetadataBufT<P>,
-// {
-//     fn from(i: &'b mut DbPairMut<'a, M, P>) -> Self {
-//         DbPairMut::new(&mut i.element, &mut i.meta)
-//     }
-// }
 
 #[cfg(test)]
 /// Helper function for easily setting up cascades during tests

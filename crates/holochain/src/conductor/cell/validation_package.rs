@@ -135,6 +135,9 @@ pub(super) async fn get_as_authority(
     let mut element_cache = ElementBuf::cache(env.clone())?;
     let mut meta_cache = MetadataBuf::cache(env.clone())?;
     let cascade = Cascade::empty().with_cache(DbPairMut::new(&mut element_cache, &mut meta_cache));
+
+    let header_hashed = HeaderHashed::with_pre_hashed(header, header_hash);
+
     // Gather the package
     match required_validation_type {
         RequiredValidationType::Element => {
@@ -148,11 +151,14 @@ pub(super) async fn get_as_authority(
                 .sequence_range(0..header_seq);
 
             // Collect and return the sub chain
-            let elements =
-                match cascade.get_validation_package_local(agent, header_seq, header_hash)? {
-                    Some(elements) => elements,
-                    None => return Ok(None.into()),
-                };
+            let elements = match cascade.get_validation_package_local(
+                agent,
+                &header_hashed,
+                required_validation_type,
+            )? {
+                Some(elements) => elements,
+                None => return Ok(None.into()),
+            };
 
             let elements = elements
                 .into_iter()
@@ -167,11 +173,14 @@ pub(super) async fn get_as_authority(
                 .sequence_range(0..header_seq);
 
             // Collect and return the sub chain
-            let elements =
-                match cascade.get_validation_package_local(agent, header_seq, header_hash)? {
-                    Some(elements) => elements,
-                    None => return Ok(None.into()),
-                };
+            let elements = match cascade.get_validation_package_local(
+                agent,
+                &header_hashed,
+                required_validation_type,
+            )? {
+                Some(elements) => elements,
+                None => return Ok(None.into()),
+            };
 
             let elements = elements
                 .into_iter()
