@@ -5,6 +5,7 @@ use crate::core::ribosome::ZomesToInvoke;
 use crate::core::workflow::CallZomeWorkspaceLock;
 use derive_more::Constructor;
 use holo_hash::AnyDhtHash;
+use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::dna::zome::{HostFnAccess, Permission};
 use holochain_zome_types::header::AppEntryType;
@@ -31,6 +32,7 @@ impl ValidationPackageInvocation {
 #[derive(Clone, Constructor)]
 pub struct ValidationPackageHostAccess {
     pub workspace: CallZomeWorkspaceLock,
+    pub network: HolochainP2pCell,
 }
 
 impl From<ValidationPackageHostAccess> for HostAccess {
@@ -256,6 +258,7 @@ mod slow_tests {
     use crate::fixt::ValidationPackageHostAccessFixturator;
     use crate::fixt::ValidationPackageInvocationFixturator;
     use crate::fixt::WasmRibosomeFixturator;
+    use hdk3::prelude::{AppEntryType, EntryVisibility};
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::validate::ValidationPackage;
 
@@ -292,6 +295,8 @@ mod slow_tests {
                 .next()
                 .unwrap();
         validation_package_invocation.zome_name = TestWasm::ValidationPackageSuccess.into();
+        validation_package_invocation.app_entry_type =
+            AppEntryType::new(3.into(), 0.into(), EntryVisibility::Public);
 
         let result = ribosome
             .run_validation_package(host_access, validation_package_invocation)

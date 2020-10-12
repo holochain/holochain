@@ -14,6 +14,9 @@ use crate::{
     core::ribosome::guest_callback::validate_link::ValidateLinkHostAccess,
     core::ribosome::guest_callback::validate_link::ValidateLinkInvocation,
     core::ribosome::guest_callback::validate_link::ValidateLinkResult,
+    core::ribosome::guest_callback::validation_package::ValidationPackageHostAccess,
+    core::ribosome::guest_callback::validation_package::ValidationPackageInvocation,
+    core::ribosome::guest_callback::validation_package::ValidationPackageResult,
     core::ribosome::wasm_ribosome::WasmRibosome,
     core::ribosome::Invocation,
     core::ribosome::ZomesToInvoke,
@@ -218,20 +221,26 @@ async fn validate_op(
         get_associated_entry_def(&element, &dna_file, conductor_api, cascade).await?
     };
 
+    // Create the ribosome
+    let ribosome = WasmRibosome::new(dna_file);
+
     // Get the validation package
-    let validation_package = {
-        let cascade = workspace.full_cascade(network.clone());
-        get_validation_package(&element, &entry_def, cascade).await?
-    };
+    let validation_package = get_validation_package(
+        &element,
+        &entry_def,
+        Some(workspace),
+        &ribosome,
+        &workspace_lock,
+        network,
+    )
+    .await?;
 
     // Get the EntryDefId associated with this Element if there is one
     let entry_def_id = entry_def.map(|ed| ed.id);
 
     // Get the zome names
-    let zomes_to_invoke = get_zomes_to_invoke(&element, &dna_file, workspace, network).await?;
-
-    // Create the ribosome
-    let ribosome = WasmRibosome::new(dna_file);
+    let zomes_to_invoke =
+        get_zomes_to_invoke(&element, ribosome.dna_file(), workspace, network).await?;
 
     let outcome = match element.header() {
         Header::DeleteLink(delete_link) => {
@@ -513,14 +522,22 @@ fn extract_app_type(element: &Element) -> Option<AppEntryType> {
 async fn get_validation_package(
     element: &Element,
     entry_def: &Option<EntryDef>,
-    mut cascade: Cascade<'_>,
-) -> AppValidationResult<Option<ValidationPackage>> {
+    workspace: Option<&mut AppValidationWorkspace>,
+    ribosome: &impl RibosomeT,
+    workspace_lock: &CallZomeWorkspaceLock,
+    network: &HolochainP2pCell,
+) -> AppValidationOutcome<Option<ValidationPackage>> {
     match entry_def {
         Some(entry_def) => {
-            Ok(match entry_def.required_validation_type {
+            match entry_def.required_validation_type {
                 // Only needs the element
-                RequiredValidationType::Element => None,
+                RequiredValidationType::Element => Ok(None),
                 RequiredValidationType::SubChain | RequiredValidationType::Full => {
+                    let mut lock = workspace_lock.write().await;
+                    let mut cascade = match workspace {
+                        Some(workspace) => workspace.full_cascade(network.clone()),
+                        None => lock.cascade(network.clone()),
+                    };
                     // TODO: What if this is the same author that is validating?
                     // We probably don't want to do a network call although
                     // it will just short circuit
@@ -529,14 +546,64 @@ async fn get_validation_package(
                     let agent_id = element.header().author().clone();
                     let header_hash = element.header_address().clone();
                     let header_seq = element.header().header_seq();
-                    cascade
+                    Ok(cascade
                         .get_validation_package(agent_id, header_seq, header_hash)
                         .await?
-                        .map(ValidationPackage::new)
+                        .map(ValidationPackage::new))
                     // TODO: Fallback to gossiper if author is unavailable
                     // TODO: Fallback to RegisterAgentActivity if gossiper is unavailable
                 }
-            })
+                RequiredValidationType::Custom => {
+                    // TODO: Fix get validation package to get custom and chains
+                    let validation_package = {
+                        let mut lock = workspace_lock.write().await;
+                        let mut cascade = match workspace {
+                            Some(workspace) => workspace.full_cascade(network.clone()),
+                            None => lock.cascade(network.clone()),
+                        };
+                        let agent_id = element.header().author().clone();
+                        let header_hash = element.header_address().clone();
+                        let header_seq = element.header().header_seq();
+                        cascade
+                            .get_validation_package(agent_id, header_seq, header_hash)
+                            .await?
+                            .map(ValidationPackage::new)
+                    };
+                    // TODO: Fallback to gossiper
+                    // TODO: Fallback to callback
+                    match &validation_package {
+                        Some(_) => Ok(validation_package),
+                        None => {
+                            let access = ValidationPackageHostAccess::new(
+                                workspace_lock.clone(),
+                                network.clone(),
+                            );
+                            let app_entry_type = match element.header().entry_type() {
+                                Some(EntryType::App(a)) => a.clone(),
+                                _ => return Ok(None),
+                            };
+                            let zome_name = ribosome
+                                .dna_file()
+                                .dna()
+                                .zomes
+                                .get(app_entry_type.zome_id().index())
+                                .ok_or_else(|| {
+                                    AppValidationError::ZomeId(app_entry_type.zome_id())
+                                })?
+                                .0
+                                .clone();
+                            let invocation =
+                                ValidationPackageInvocation::new(zome_name, app_entry_type);
+                            match ribosome.run_validation_package(access, invocation)? {
+                                ValidationPackageResult::Success(validation_package) => Ok(Some(validation_package)),
+                                ValidationPackageResult::Fail(reason) => Outcome::exit_with_rejected(reason),
+                                ValidationPackageResult::UnresolvedDependencies(deps) => Outcome::exit_with_awaiting(deps),
+                                ValidationPackageResult::NotImplemented => Outcome::exit_with_rejected(format!("Entry definition specifies a custom validation package but the callback isn't defined for {:?}", element)),
+                            }
+                        }
+                    }
+                }
+            }
         }
         None => {
             // Not an entry header type so no package
@@ -567,11 +634,19 @@ pub async fn run_validation_callback_direct(
     };
 
     let validation_package = {
-        let mut workspace = workspace_lock.write().await;
-        let cascade = workspace.cascade(network.clone());
-        get_validation_package(&element, &entry_def, cascade)
-            .await?
-            .map(Arc::new)
+        let outcome = get_validation_package(
+            &element,
+            &entry_def,
+            None,
+            ribosome,
+            &workspace_lock,
+            &network,
+        )
+        .await;
+        match outcome {
+            Ok(vp) => vp.map(Arc::new),
+            Err(outcome) => return outcome.try_into(),
+        }
     };
     let entry_def_id = entry_def.map(|ed| ed.id);
 

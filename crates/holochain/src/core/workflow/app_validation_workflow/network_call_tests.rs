@@ -6,7 +6,11 @@ use holo_hash::HeaderHash;
 use holochain_p2p::HolochainP2pCellT;
 use holochain_types::chain::AgentActivityExt;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::query::{AgentActivity, ChainQueryFilter};
+use holochain_zome_types::{
+    query::{AgentActivity, ChainQueryFilter},
+    ZomeCallResponse,
+};
+use matches::assert_matches;
 
 use crate::{
     core::state::cascade::Cascade,
@@ -327,6 +331,56 @@ async fn get_agent_activity_test() {
 
     let expected_activity = AgentActivity::valid(expected_activity);
     assert_eq!(agent_activity, expected_activity);
+
+    ConductorTestData::shutdown_conductor(handle).await;
+}
+
+#[tokio::test(threaded_scheduler)]
+async fn get_custom_package_test() {
+    observability::test_run().ok();
+
+    let zomes = vec![TestWasm::ValidationPackageSuccess];
+    let conductor_test = ConductorTestData::new(zomes, true).await;
+    let ConductorTestData {
+        __tmpdir,
+        handle,
+        alice_call_data,
+        ..
+    } = conductor_test;
+    let alice_cell_id = &alice_call_data.cell_id;
+
+    let invocation = new_invocation(
+        &alice_cell_id,
+        "commit_artist",
+        (),
+        TestWasm::ValidationPackageSuccess,
+    )
+    .unwrap();
+    let result = handle.call_zome(invocation).await;
+
+    assert_matches!(result, Err(_));
+
+    let invocation = new_invocation(
+        &alice_cell_id,
+        "commit_songs",
+        (),
+        TestWasm::ValidationPackageSuccess,
+    )
+    .unwrap();
+    let result = handle.call_zome(invocation).await.unwrap().unwrap();
+
+    assert_matches!(result, ZomeCallResponse::Ok(_));
+
+    let invocation = new_invocation(
+        &alice_cell_id,
+        "commit_artist",
+        (),
+        TestWasm::ValidationPackageSuccess,
+    )
+    .unwrap();
+    let result = handle.call_zome(invocation).await.unwrap().unwrap();
+
+    assert_matches!(result, ZomeCallResponse::Ok(_));
 
     ConductorTestData::shutdown_conductor(handle).await;
 }

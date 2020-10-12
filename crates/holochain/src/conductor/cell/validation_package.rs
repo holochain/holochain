@@ -94,6 +94,7 @@ pub(super) async fn get_as_author(
             )?;
             Ok(Some(ValidationPackage::new(elements)).into())
         }
+        RequiredValidationType::Custom => todo!("call the validation callback"),
     }
 }
 
@@ -180,5 +181,6 @@ pub(super) async fn get_as_authority(
 
             Ok(Some(ValidationPackage::new(elements)).into())
         }
+        RequiredValidationType::Custom => todo!("Get validation package from cached data"),
     }
 }
