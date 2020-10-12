@@ -1481,6 +1481,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "if-addrs"
+version = "0.6.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f12906406f12abf5569643c46b29aec78313dc1537b17dd5c5250169790c4db9"
+dependencies = [
+ "if-addrs-sys",
+ "libc",
+ "winapi 0.3.9",
+]
+
+[[package]]
+name = "if-addrs-sys"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9e2556f16544202bcfe0aa5d20a01a6b815f736b136b3ad76dc547ee6b5bb1df"
+dependencies = [
+ "cc",
+ "libc",
+]
+
+[[package]]
 name = "indexmap"
 version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1601,6 +1622,7 @@ dependencies = [
  "blake2b_simd",
  "derive_more",
  "futures",
+ "kitsune_p2p_transport_quic",
  "kitsune_p2p_types",
  "lair_keystore_api",
  "nanoid",
@@ -1618,6 +1640,7 @@ name = "kitsune_p2p_transport_quic"
 version = "0.0.1"
 dependencies = [
  "futures",
+ "if-addrs",
  "kitsune_p2p_types",
  "lair_keystore_api",
  "nanoid",
