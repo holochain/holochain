@@ -10,7 +10,7 @@ pub(crate) fn wrap_wire_write(
 
     tokio::task::spawn(async move {
         while let Some(wire) = recv.next().await {
-            tracing::debug!("proxy write {:?}", wire);
+            tracing::trace!("proxy write {:?}", wire);
             let wire = wire.encode()?;
             write.send(wire).await?;
         }

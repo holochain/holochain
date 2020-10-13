@@ -82,12 +82,10 @@ async fn tls_server(
                 write.close().await.map_err(TransportError::other)?;
             }
 
-            /*
             if !srv.wants_read() {
                 tokio::time::delay_for(std::time::Duration::from_millis(10)).await;
                 continue;
             }
-            */
 
             tracing::trace!("{}: SRV tls wants read", short);
 

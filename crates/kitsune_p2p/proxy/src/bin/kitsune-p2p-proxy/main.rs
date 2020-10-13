@@ -1,4 +1,5 @@
 use futures::stream::StreamExt;
+use ghost_actor::dependencies::tracing;
 use kitsune_p2p_proxy::*;
 use kitsune_p2p_transport_quic::*;
 use kitsune_p2p_types::{
@@ -40,7 +41,7 @@ async fn inner() -> TransportResult<()> {
 
     tokio::task::spawn(async move {
         while let Some((url, mut write, _read)) = events.next().await {
-            eprintln!(
+            tracing::debug!(
                 "{} is trying to talk directly to us - dump proxy state",
                 url
             );

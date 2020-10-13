@@ -12,9 +12,9 @@ pub(crate) fn wrap_wire_read(
         let mut buf = Vec::new();
         while let Some(data) = read.next().await {
             buf.extend_from_slice(&data);
-            tracing::debug!("proxy read pending {} bytes", buf.len());
+            tracing::trace!("proxy read pending {} bytes", buf.len());
             while let Ok((read_size, wire)) = ProxyWire::decode(&buf) {
-                tracing::debug!("proxy read {:?}", wire);
+                tracing::trace!("proxy read {:?}", wire);
                 buf.drain(..read_size);
                 send.send(wire).await.map_err(TransportError::other)?;
             }
