@@ -1,6 +1,7 @@
 use crate::*;
 use futures::{sink::SinkExt, stream::StreamExt};
 use ghost_actor::dependencies::tracing;
+use kitsune_p2p_types::dependencies::serde_json;
 use std::collections::HashMap;
 
 /// How often should NAT nodes refresh their proxy contract?
@@ -439,6 +440,31 @@ impl InternalHandler for InnerListen {
 impl ghost_actor::GhostHandler<TransportListener> for InnerListen {}
 
 impl TransportListenerHandler for InnerListen {
+    fn handle_debug(&mut self) -> TransportListenerHandlerResult<serde_json::Value> {
+        let url = self.this_url.to_string();
+        let sub = self.sub_sender.debug();
+        let proxy = self
+            .proxy_list
+            .iter()
+            .map(|(k, v)| {
+                serde_json::json! {{
+                    "proxy_url": k.to_string(),
+                    "base_url": v.base_connection_url.to_string(),
+                }}
+            })
+            .collect::<Vec<_>>();
+        Ok(async move {
+            let sub = sub.await?;
+            Ok(serde_json::json! {{
+                "sub_transport": sub,
+                "url": url,
+                "proxy": proxy,
+            }})
+        }
+        .boxed()
+        .into())
+    }
+
     fn handle_bound_url(&mut self) -> TransportListenerHandlerResult<url2::Url2> {
         let this_url: url2::Url2 = (&self.this_url).into();
         Ok(async move { Ok(this_url) }.boxed().into())

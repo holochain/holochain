@@ -40,24 +40,27 @@ async fn inner() -> TransportResult<()> {
 
     tokio::task::spawn(async move {
         while let Some((url, mut write, read)) = events.next().await {
-            eprintln!("ERR incoming msg from {}", url);
+            eprintln!("# ERR incoming msg from {}", url);
             drop(read);
             let _ = write.write_and_close(Vec::with_capacity(0)).await;
         }
     });
 
     println!(
-        "SELF URL (you can ignore this : ) {}",
+        "# SELF URL (you can ignore this : ) {}",
         listener.bound_url().await?
     );
 
     let proxy_url = ProxyUrl::from(&opt.proxy_url);
-    println!("Attempting to connect to {}", proxy_url);
+    println!("# Attempting to connect to {}", proxy_url);
 
     let (_url, mut write, read) = listener.create_channel(proxy_url.into()).await?;
-    write.write_and_close(b"test".to_vec()).await?;
+    write.write_and_close(Vec::with_capacity(0)).await?;
     let res = read.read_to_end().await;
-    println!("{}", String::from_utf8_lossy(&res));
+    println!(
+        "#DEBUG:START#\n{}\n#DEBUG:END#",
+        String::from_utf8_lossy(&res)
+    );
 
     Ok(())
 }

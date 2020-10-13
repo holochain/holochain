@@ -1,7 +1,10 @@
 use futures::stream::StreamExt;
 use kitsune_p2p_proxy::*;
 use kitsune_p2p_transport_quic::*;
-use kitsune_p2p_types::{dependencies::ghost_actor, transport::*};
+use kitsune_p2p_types::{
+    dependencies::{ghost_actor, serde_json},
+    transport::*,
+};
 use structopt::StructOpt;
 
 mod opt;
@@ -33,17 +36,25 @@ async fn inner() -> TransportResult<()> {
     let (listener, mut events) =
         spawn_kitsune_proxy_listener(proxy_config, listener, events).await?;
 
+    println!("{}", listener.bound_url().await?);
+
     tokio::task::spawn(async move {
         while let Some((url, mut write, _read)) = events.next().await {
             eprintln!(
                 "{} is trying to talk directly to us - dump proxy state",
                 url
             );
-            let _ = write.write_and_close(b"[stub proxy state]".to_vec()).await;
+            match listener.debug().await {
+                Ok(dump) => {
+                    let dump = serde_json::to_string_pretty(&dump).unwrap();
+                    let _ = write.write_and_close(dump.into_bytes()).await;
+                }
+                Err(e) => {
+                    let _ = write.write_and_close(format!("{:?}", e).into_bytes()).await;
+                }
+            }
         }
     });
-
-    println!("{}", listener.bound_url().await?);
 
     // wait for ctrl-c
     futures::future::pending().await

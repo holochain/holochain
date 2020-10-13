@@ -2,7 +2,7 @@ use crate::*;
 use futures::{future::FutureExt, sink::SinkExt, stream::StreamExt};
 use ghost_actor::dependencies::tracing;
 use kitsune_p2p_types::{
-    dependencies::{ghost_actor, ghost_actor::GhostControlSender},
+    dependencies::{ghost_actor, ghost_actor::GhostControlSender, serde_json},
     transport::*,
 };
 use std::{collections::HashMap, net::SocketAddr};
@@ -204,6 +204,19 @@ impl ListenerInnerHandler for TransportListenerQuic {
 impl ghost_actor::GhostHandler<TransportListener> for TransportListenerQuic {}
 
 impl TransportListenerHandler for TransportListenerQuic {
+    fn handle_debug(&mut self) -> TransportListenerHandlerResult<serde_json::Value> {
+        let url = self.bound_url.clone();
+        let connections = self.connections.keys().cloned().collect::<Vec<_>>();
+        Ok(async move {
+            Ok(serde_json::json! {{
+                "url": url,
+                "connections": connections,
+            }})
+        }
+        .boxed()
+        .into())
+    }
+
     fn handle_bound_url(&mut self) -> TransportListenerHandlerResult<Url2> {
         let out = self.bound_url.clone();
         Ok(async move { Ok(out) }.boxed().into())

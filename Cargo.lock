@@ -1661,6 +1661,8 @@ dependencies = [
  "ghost_actor",
  "nanoid",
  "once_cell",
+ "serde",
+ "serde_json",
  "thiserror",
  "tokio",
  "url2",
