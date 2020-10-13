@@ -13,8 +13,8 @@ fn init_tracing() {
 }
 
 #[tokio::test(threaded_scheduler)]
-async fn test_inner_listen() {
-    if let Err(e) = test_inner_listen_inner().await {
+async fn test_proxy_integration() {
+    if let Err(e) = test_inner().await {
         panic!("{:?}", e);
     }
 }
@@ -45,7 +45,7 @@ async fn connect(
     Ok(bind)
 }
 
-async fn test_inner_listen_inner() -> TransportResult<()> {
+async fn test_inner() -> TransportResult<()> {
     init_tracing();
 
     let proxy_config1 = ProxyConfig::local_proxy_server(

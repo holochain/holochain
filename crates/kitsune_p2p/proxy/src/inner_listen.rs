@@ -205,6 +205,8 @@ ghost_actor::ghost_chan! {
 
 impl ghost_actor::GhostHandler<Internal> for InnerListen {}
 
+// If we're forwarding data to another channel,
+// we need to forward all data read from a reader to a writer.
 fn cross_join_channel_forward(
     mut write: futures::channel::mpsc::Sender<ProxyWire>,
     mut read: futures::channel::mpsc::Receiver<ProxyWire>,
@@ -306,12 +308,16 @@ impl InternalHandler for InnerListen {
         let now = std::time::Instant::now();
         self.proxy_list.retain(|_, p| p.expires_at >= now);
 
+        // first check to see if we should proxy this
+        // to a client we are servicing.
         let proxy_to = if let Some(proxy_to) = self.proxy_list.get(&dest_proxy_url) {
             Some(proxy_to.base_connection_url.clone())
         } else {
             None
         };
 
+        // if we're not proxying for a client,
+        // check to see if our owner is the destination.
         if proxy_to.is_none() && dest_proxy_url.as_base() == self.this_url.as_base() {
             tracing::debug!("{}: chan new to self, hooking connection", short);
 
@@ -330,6 +336,10 @@ impl InternalHandler for InnerListen {
         }
 
         // if we are proxying - forward to another channel
+        // this is sensitive to url naming...
+        // we're assuming our sub-transport is holding open a connection
+        // and the channel create will re-use that.
+        // If it is not, it will try to create a new connection that may fail.
         let fut = match proxy_to {
             None => self
                 .i_s
