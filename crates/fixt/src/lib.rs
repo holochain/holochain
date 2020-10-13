@@ -9,6 +9,8 @@ pub mod string;
 pub mod unit;
 pub use paste;
 
+use rand::SeedableRng;
+
 #[derive(Clone)]
 /// the Fixturator is the struct that we wrap in our FooFixturator newtypes to impl Iterator over
 /// each combination of Item and Curve needs its own Iterator implementation for Fixturator
@@ -67,6 +69,21 @@ impl<Curve, Item> Fixturator<Item, Curve> {
             item: std::marker::PhantomData,
         }
     }
+}
+
+lazy_static::lazy_static! {
+    /// The key to access the ChainEntries database
+    pub static ref FIXTURATOR_RNG: rand::rngs::StdRng = {
+        let seed: u64 = match std::env::var("FIXTURATOR_SEED") {
+            Ok(seed_str) => {
+                seed_str.parse().expect(&format!("Expected integer seed, got: {}", seed_str))
+            },
+            Err(std::env::VarError::NotPresent) => { rand::random() },
+            Err(std::env::VarError::NotUnicode(v)) => { panic!("Invalid FIXTURATOR_SEED value: {:?}", v) },
+        };
+        println!("Fixturator seed: {}", seed);
+        rand::rngs::StdRng::seed_from_u64(seed)
+    };
 }
 
 // /// set of basic tests that can be used to test any FooFixturator implementation

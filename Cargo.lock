@@ -815,6 +815,7 @@ name = "fixt"
 version = "0.0.1"
 dependencies = [
  "holochain_serialized_bytes",
+ "lazy_static",
  "paste 0.1.12",
  "rand 0.7.3",
  "serde",
