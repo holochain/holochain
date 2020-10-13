@@ -26,21 +26,25 @@ pub fn create_link<'a>(
 
     let header_hash =
         tokio_safe_block_on::tokio_safe_block_forever_on(tokio::task::spawn(async move {
-            let mut guard = call_context.host_access.workspace().write().await;
-            let workspace: &mut CallZomeWorkspace = &mut guard;
-            // push the header into the source chain
-            let header_hash = workspace.source_chain.put(header_builder, None).await?;
-            let element = workspace
-                .source_chain
-                .get_element(&header_hash)?
-                .expect("Element we just put in SourceChain must be gettable");
-            integrate_to_authored(
-                &element,
-                workspace.source_chain.elements(),
-                &mut workspace.meta_authored,
-            )
-            .await
-            .map_err(Box::new)?;
+            let header_hash = {
+                let mut guard = call_context.host_access.workspace().write().await;
+                let workspace: &mut CallZomeWorkspace = &mut guard;
+                // push the header into the source chain
+                let header_hash = workspace.source_chain.put(header_builder, None).await?;
+                let element = workspace
+                    .source_chain
+                    .get_element(&header_hash)?
+                    .expect("Element we just put in SourceChain must be gettable");
+                integrate_to_authored(
+                    &element,
+                    workspace.source_chain.elements(),
+                    &mut workspace.meta_authored,
+                )
+                .await
+                .map_err(Box::new)?;
+                header_hash
+            };
+            std::mem::drop(call_context);
             SourceChainResult::Ok(header_hash)
         }))??;
 

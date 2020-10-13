@@ -25,6 +25,7 @@ pub fn get<'a>(
             .cascade(network)
             .dht_get(hash, options.into())
             .await?;
+        std::mem::drop(call_context);
 
         Ok(GetOutput::new(maybe_element))
     })

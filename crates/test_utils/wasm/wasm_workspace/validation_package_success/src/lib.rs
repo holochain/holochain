@@ -1,6 +1,8 @@
 use hdk3::prelude::*;
 
-#[hdk_entry(id = "song", required_validation_type = "custom")]
+const NUM_SONGS: usize = 30;
+
+#[hdk_entry(id = "song", required_validation_type = "element")]
 struct Song;
 
 #[hdk_entry(id = "artist", required_validation_type = "custom")]
@@ -19,15 +21,17 @@ fn validation_package(
         // Artist
         1 => {
             let links = get_links!(author)?.into_inner();
-            let mut songs = Vec::with_capacity(30);
+            let mut songs = Vec::with_capacity(NUM_SONGS);
             // Need to post at least 30 songs to be an artist on this dht
-            for link in links.into_iter().take(30) {
+            for link in links.into_iter().take(NUM_SONGS) {
                 match get!(link.target)? {
-                    Some(song) => songs.push(song),
+                    Some(song) => {
+                        songs.push(song)
+                    }
                     None => break,
                 }
             }
-            if songs.len() >= 30 {
+            if songs.len() >= NUM_SONGS {
                 Ok(ValidationPackageCallbackResult::Success(
                     ValidationPackage::new(songs),
                 ))
@@ -52,7 +56,7 @@ fn commit_artist(_: ()) -> ExternResult<HeaderHash> {
 fn commit_songs(_: ()) -> ExternResult<()> {
     let author: EntryHash = agent_info!()?.agent_initial_pubkey.into();
     let hash = hash_entry!(Song)?;
-    for _ in 0..30 {
+    for _ in 0..NUM_SONGS {
         create_entry!(Song)?;
         create_link!(author.clone(), hash.clone())?;
     }

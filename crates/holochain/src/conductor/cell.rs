@@ -434,6 +434,7 @@ impl Cell {
         Ok(())
     }
 
+    #[instrument(skip(self))]
     /// a remote node is attempting to retrieve a validation package
     async fn handle_get_validation_package(
         &self,
@@ -452,18 +453,19 @@ impl Cell {
             None => return Ok(None.into()),
         };
 
+        let ribosome = self.get_ribosome().await?;
+
         // This agent is the author so get the validation package from the source chain
         if header.author() == self.id.agent_pubkey() {
-            let ribosome = self.get_ribosome().await?;
             validation_package::get_as_author(
-                header.into_content(),
+                header,
                 env,
-                &ribosome.dna_file,
+                &ribosome,
                 &self.conductor_api,
+                &self.holochain_p2p_cell,
             )
             .await
         } else {
-            let ribosome = self.get_ribosome().await?;
             validation_package::get_as_authority(
                 header,
                 env,
