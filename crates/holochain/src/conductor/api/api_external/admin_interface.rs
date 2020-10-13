@@ -131,6 +131,10 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 let cell_ids = self.conductor_handle.list_cell_ids().await?;
                 Ok(AdminResponse::ListCellIds(cell_ids))
             }
+            ListActiveAppIds => {
+                let app_ids = self.conductor_handle.list_active_app_ids().await?;
+                Ok(AdminResponse::ListActiveAppIds(app_ids))
+            }
             ActivateApp { app_id } => {
                 // Activate app
                 self.conductor_handle.activate_app(app_id.clone()).await?;
@@ -232,6 +236,8 @@ pub enum AdminRequest {
     GenerateAgentPubKey,
     /// List all the cell ids in the conductor
     ListCellIds,
+    /// List all the active app ids in the conductor
+    ListActiveAppIds,
     /// Activate an app
     ActivateApp {
         /// The AppId to activate
@@ -272,6 +278,8 @@ pub enum AdminResponse {
     GenerateAgentPubKey(AgentPubKey),
     /// Listing all the cell ids in the conductor
     ListCellIds(Vec<CellId>),
+    /// Listing all the active app ids in the conductor
+    ListActiveAppIds(Vec<AppId>),
     /// [AppInterfaceApi] successfully attached
     AppInterfaceAttached {
         /// Port of the new [AppInterfaceApi]
@@ -303,7 +311,7 @@ mod test {
     use uuid::Uuid;
 
     #[tokio::test(threaded_scheduler)]
-    async fn install_list_dna() -> Result<()> {
+    async fn install_list_dna_app() -> Result<()> {
         observability::test_run().ok();
         let test_env = test_conductor_env();
         let TestEnvironment {
@@ -358,6 +366,12 @@ mod test {
             .await;
 
         assert_matches!(res, AdminResponse::ListCellIds(v) if v == vec![cell_id]);
+
+        let res = admin_api
+            .handle_admin_request(AdminRequest::ListActiveAppIds)
+            .await;
+
+        assert_matches!(res, AdminResponse::ListActiveAppIds(v) if v == vec!["test".to_string()]);
 
         handle.shutdown().await;
         tokio::time::timeout(std::time::Duration::from_secs(1), shutdown)
