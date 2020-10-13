@@ -13,6 +13,7 @@ edition = "2018"
 [dependencies]
 holochain_serialized_bytes = "=0.0.45"
 lazy_static = "1.4"
+parking_lot = "0.10"
 paste = "=0.1.12"
 rand = "0.7"
 serde = { version = "1.0.104", features = [ "derive" ] }

@@ -73,16 +73,16 @@ impl<Curve, Item> Fixturator<Item, Curve> {
 
 lazy_static::lazy_static! {
     /// The key to access the ChainEntries database
-    pub static ref FIXTURATOR_RNG: rand::rngs::StdRng = {
+    pub static ref FIXTURATOR_RNG: std::sync::Arc<parking_lot::Mutex<rand::rngs::StdRng>> = {
         let seed: u64 = match std::env::var("FIXTURATOR_SEED") {
             Ok(seed_str) => {
-                seed_str.parse().expect(&format!("Expected integer seed, got: {}", seed_str))
+                seed_str.parse().expect("Expected integer for FIXTURATOR_SEED")
             },
             Err(std::env::VarError::NotPresent) => { rand::random() },
             Err(std::env::VarError::NotUnicode(v)) => { panic!("Invalid FIXTURATOR_SEED value: {:?}", v) },
         };
         println!("Fixturator seed: {}", seed);
-        rand::rngs::StdRng::seed_from_u64(seed)
+        std::sync::Arc::new(parking_lot::Mutex::new(rand::rngs::StdRng::seed_from_u64(seed)))
     };
 }
 
