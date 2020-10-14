@@ -205,7 +205,14 @@ pub fn handle_get_agent_activity(
                     // TODO: Just get the sequence number from the key (Doable in the next PR)
                     match element_integrated.get_header(&h.header_hash)? {
                         Some(shh) => Ok(AgentActivity::valid_without_activity(shh.header())),
-                        None => Ok(AgentActivity::empty()),
+                        None => match element_rejected.get_header(&h.header_hash)? {
+                            // TODO: Note that the chain is still valid even though the individual
+                            // header has been rejected. I'm not sure how this will play
+                            // out when we add warrants because the warrant will make the
+                            // chain invalid. @freesig
+                            Some(shh) => Ok(AgentActivity::valid_without_activity(shh.header())),
+                            None => Ok(AgentActivity::empty()),
+                        },
                     }
                 }
                 None => Ok(AgentActivity::empty()),
