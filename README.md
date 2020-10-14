@@ -11,9 +11,9 @@ This repository contains the core Holochain libraries and binaries.
 
 This is the most recent and well maintained version of Holochain with a refactored state model (you may see references to it as Holochain RSM).
 
-## Code Status 
+## Code Status
 
-This code is in alpha. It is not for production use. The code is guaranteed NOT secure. 
+This code is in alpha. It is not for production use. The code is guaranteed NOT secure.
 
 We will be frequently and heavily restructuring code APIs and data chains until Beta.
 
@@ -27,6 +27,41 @@ Assuming you have [installed the nix shell](https://nixos.wiki/wiki/Nix_Installa
 nix-shell
 hc-install
 ```
+
+## Usage
+
+``` bash
+$ holochain --help
+USAGE:
+    holochain [FLAGS] [OPTIONS]
+
+FLAGS:
+    -h, --help           Prints help information
+    -i, --interactive    Receive helpful prompts to create missing files and directories,
+                             useful when running a conductor for the first time
+    -V, --version        Prints version information
+
+OPTIONS:
+    -c, --config-path <config-path>
+            Path to a TOML file containing conductor configuration
+```
+
+Running `holochain` requires a config file.  You can generate one in the default configuration file locations using interactive mode:
+
+``` bash
+$ holochain -i
+There is no conductor config TOML file at the path specified (/home/eric/.config/holochain/conductor-config.toml)
+Would you like to create a default config file at this location? [Y/n]
+Y
+Conductor config written.
+There is no database environment set at the path specified (/home/eric/.local/share/holochain/databases)
+Would you like to create one now? [Y/n]
+Y
+LMDB environment created.
+Conductor ready.
+```
+
+As well as creating the config file this process also instantiates the initial LMDB database environment.   If you provide a config file on first run with just the `-c` flag `holochain` will also initialize the environment even if not in interactive mode.
 
 ## Development Environment
 

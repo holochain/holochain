@@ -25,3 +25,4 @@ fixt = { path = "../../fixt" }
 
 [dev-dependencies]
 assert_matches = "1.3"
+holo_hash = { path = "../../holo_hash" }
