@@ -6,16 +6,20 @@
 //! A ConductorHandle can be produced via [Conductor::into_handle]
 //!
 //! ```rust, no_run
-//! # async fn async_main () {
-//! # use holochain_state::test_utils::{test_conductor_env, test_wasm_env, TestEnvironment};
+//! async fn async_main () {
+//! use holochain_state::test_utils::{test_conductor_env, test_wasm_env, test_p2p_env, TestEnvironment};
 //! use holochain::conductor::{Conductor, ConductorBuilder, ConductorHandle};
-//! # let env = test_conductor_env();
-//! #   let TestEnvironment {
-//! #       env: wasm_env,
-//! #      tmpdir: _tmpdir,
-//! # } = test_wasm_env();
+//! let env = test_conductor_env();
+//! let TestEnvironment {
+//!  env: wasm_env,
+//!  tmpdir: _tmpdir,
+//! } = test_wasm_env();
+//! let TestEnvironment {
+//!  env: p2p_env,
+//!  tmpdir: _p2p_tmpdir,
+//! } = test_p2p_env();
 //! let handle: ConductorHandle = ConductorBuilder::new()
-//!    .test(env, wasm_env)
+//!    .test(env, wasm_env, p2p_env)
 //!    .await
 //!    .unwrap();
 //!
@@ -68,6 +72,10 @@ use holochain_types::{
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::*;
+
+use futures::future::FutureExt;
+use holochain_p2p::event::HolochainP2pEvent::GetAgentInfoSigned;
+use holochain_p2p::event::HolochainP2pEvent::PutAgentInfoSigned;
 
 #[cfg(test)]
 use super::state::ConductorState;
@@ -177,6 +185,9 @@ pub trait ConductorHandleT: Send + Sync {
     /// List Cell Ids
     async fn list_cell_ids(&self) -> ConductorResult<Vec<CellId>>;
 
+    /// List Active AppIds
+    async fn list_active_app_ids(&self) -> ConductorResult<Vec<AppId>>;
+
     /// Dump the cells state
     #[allow(clippy::ptr_arg)]
     async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String>;
@@ -270,15 +281,41 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     #[instrument(skip(self))]
+    /// Warning: returning an error from this function kills the network for the conductor.
     async fn dispatch_holochain_p2p_event(
         &self,
         cell_id: &CellId,
         event: holochain_p2p::event::HolochainP2pEvent,
     ) -> ConductorResult<()> {
         let lock = self.conductor.read().await;
-        let cell: &Cell = lock.cell_by_id(cell_id)?;
-        trace!(agent = ?cell_id.agent_pubkey(), event = ?event);
-        cell.handle_holochain_p2p_event(event).await?;
+        match event {
+            PutAgentInfoSigned {
+                agent_info_signed,
+                respond,
+                ..
+            } => {
+                let res = lock
+                    .put_agent_info_signed(agent_info_signed)
+                    .map_err(holochain_p2p::HolochainP2pError::other);
+                respond.respond(Ok(async move { res }.boxed().into()));
+            }
+            GetAgentInfoSigned {
+                kitsune_space,
+                kitsune_agent,
+                respond,
+                ..
+            } => {
+                let res = lock
+                    .get_agent_info_signed(kitsune_space, kitsune_agent)
+                    .map_err(holochain_p2p::HolochainP2pError::other);
+                respond.respond(Ok(async move { res }.boxed().into()));
+            }
+            _ => {
+                let cell: &Cell = lock.cell_by_id(cell_id)?;
+                trace!(agent = ?cell_id.agent_pubkey(), event = ?event);
+                cell.handle_holochain_p2p_event(event).await?;
+            }
+        }
         Ok(())
     }
 
@@ -405,6 +442,10 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
     async fn list_cell_ids(&self) -> ConductorResult<Vec<CellId>> {
         self.conductor.read().await.list_cell_ids().await
+    }
+
+    async fn list_active_app_ids(&self) -> ConductorResult<Vec<AppId>> {
+        self.conductor.read().await.list_active_app_ids().await
     }
 
     async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
