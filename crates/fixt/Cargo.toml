@@ -16,6 +16,7 @@ lazy_static = "1.4"
 parking_lot = "0.10"
 paste = "=0.1.12"
 rand = "0.7"
+rand_core = "0.5"
 serde = { version = "1.0.104", features = [ "derive" ] }
 strum = "0.18.0"
 strum_macros = "0.18.0"

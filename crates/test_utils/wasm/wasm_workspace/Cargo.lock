@@ -88,6 +88,7 @@ dependencies = [
  "parking_lot",
  "paste 0.1.12",
  "rand",
+ "rand_core",
  "serde",
  "strum",
  "strum_macros",

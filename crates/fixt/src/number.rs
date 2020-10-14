@@ -8,11 +8,11 @@ macro_rules! fixturator_unsigned {
             0,
             {
                 let mut rng = crate::rng();
-                if (*rng).gen() {
-                    (*rng).gen()
+                if rng.gen() {
+                    rng.gen()
                 } else {
                     vec![<$t>::max_value(), <$t>::min_value(), 1]
-                        .choose(&mut (*rng))
+                        .choose(&mut rng)
                         .unwrap()
                         .to_owned()
                 }
@@ -77,11 +77,11 @@ macro_rules! fixturator_signed {
             0,
             {
                 let mut rng = crate::rng();
-                if (*rng).gen() {
-                    (*rng).gen()
+                if rng.gen() {
+                    rng.gen()
                 } else {
                     vec![<$t>::max_value(), <$t>::min_value(), 1]
-                        .choose(&mut (*rng))
+                        .choose(&mut rng)
                         .unwrap()
                         .to_owned()
                 }
@@ -166,8 +166,8 @@ macro_rules! fixturator_float {
             0.0,
             {
                 let mut rng = crate::rng();
-                if (*rng).gen() {
-                    (*rng).gen()
+                if rng.gen() {
+                    rng.gen()
                 } else {
                     vec![
                         std::$t::NEG_INFINITY,
@@ -177,7 +177,7 @@ macro_rules! fixturator_float {
                         0.0,
                         1.0,
                     ]
-                    .choose(&mut (*rng))
+                    .choose(&mut rng)
                     .unwrap()
                     .to_owned()
                 }

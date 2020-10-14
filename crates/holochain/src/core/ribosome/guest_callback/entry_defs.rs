@@ -169,7 +169,7 @@ mod test {
             ));
         }
 
-        results.shuffle(&mut *rng);
+        results.shuffle(&mut rng);
 
         let result: EntryDefsResult = results.into();
 

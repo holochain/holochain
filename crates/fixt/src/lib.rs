@@ -253,7 +253,7 @@ macro_rules! fixturator {
 
                 impl [<$type:camel Variant>] {
                     fn random() -> Self {
-                        [<$type:camel Variant>]::iter().choose(&mut *$crate::rng()).unwrap()
+                        [<$type:camel Variant>]::iter().choose(&mut $crate::rng()).unwrap()
                     }
                     fn nth(index: usize) -> Self {
                         expr! {
@@ -639,7 +639,7 @@ macro_rules! enum_fixturator {
         fixturator!(
             $enum,
             $empty,
-            { $enum::iter().choose(&mut *crate::rng()).unwrap() },
+            { $enum::iter().choose(&mut crate::rng()).unwrap() },
             {
                 let ret = $enum::iter().cycle().nth(self.0.index).unwrap();
                 self.0.index += 1;

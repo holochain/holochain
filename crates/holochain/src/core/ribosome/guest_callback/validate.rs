@@ -171,12 +171,12 @@ mod test {
             (vec![cb_valid(), cb_ud(), cb_invalid()], result_invalid()),
         ] {
             // order of the results should not change the final result
-            results.shuffle(&mut *rng);
+            results.shuffle(&mut rng);
 
             // number of times a callback result appears should not change the final result
             let number_of_extras = rng.gen_range(0, 5);
             for _ in 0..number_of_extras {
-                let maybe_extra = results.choose(&mut *rng).cloned();
+                let maybe_extra = results.choose(&mut rng).cloned();
                 match maybe_extra {
                     Some(extra) => results.push(extra),
                     _ => {}
