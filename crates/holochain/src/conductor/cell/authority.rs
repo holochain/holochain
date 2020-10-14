@@ -14,8 +14,8 @@ use holochain_types::{
     metadata::TimedHeaderHash,
 };
 use holochain_zome_types::{
-    element::SignedHeaderHashed, header::conversions::WrongHeaderError, query::AgentActivity,
-    query::ChainQueryFilter,
+    element::SignedHeaderHashed, header::conversions::WrongHeaderError, query::Activity,
+    query::AgentActivity, query::ChainQueryFilter,
 };
 use std::{collections::BTreeSet, convert::TryInto};
 use tracing::*;
@@ -172,16 +172,28 @@ pub fn handle_get_agent_activity(
 ) -> CellResult<AgentActivity> {
     let element_integrated = ElementBuf::vault(env.clone(), false)?;
     let meta_integrated = MetadataBuf::vault(env.clone())?;
+    let element_rejected = ElementBuf::rejected(env.clone())?;
+    let meta_rejected = MetadataBuf::rejected(env.clone())?;
 
     if options.include_activity {
         fresh_reader!(env, |r| {
-            Ok(AgentActivity::valid(
-                meta_integrated
+            let mut activity: Vec<Activity> = meta_integrated
+                .get_activity(&r, ChainItemKey::Agent(agent.clone()))?
+                .filter_map(|h| element_integrated.get_header(&h.header_hash))
+                .filter(|shh| Ok(query.check(shh.header())))
+                .map(|shh| Ok(Activity::valid(shh)))
+                .collect()?;
+            activity.extend(
+                meta_rejected
                     .get_activity(&r, ChainItemKey::Agent(agent))?
-                    .filter_map(|h| element_integrated.get_header(&h.header_hash))
+                    .filter_map(|h| element_rejected.get_header(&h.header_hash))
                     .filter(|shh| Ok(query.check(shh.header())))
-                    .collect()?,
-            ))
+                    .map(|shh| Ok(Activity::rejected(shh)))
+                    .collect::<Vec<_>>()?,
+            );
+            // TODO: Add abandoned
+            activity.sort_unstable_by_key(|a| a.header.header().header_seq());
+            Ok(AgentActivity::valid(activity))
         })
     } else {
         fresh_reader!(env, |r| {
