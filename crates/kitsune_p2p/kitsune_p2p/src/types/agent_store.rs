@@ -1,7 +1,6 @@
 //! Data structures to be stored in the agent/peer database.
 
 use crate::types::KitsuneAgent;
-use crate::types::KitsuneBinType;
 use crate::types::KitsuneP2pError;
 use crate::types::KitsuneSignature;
 use crate::types::KitsuneSpace;
@@ -10,31 +9,6 @@ use url2::Url2;
 /// A list of Urls.
 pub type Urls = Vec<Url2>;
 
-/// A space/agent pair that defines the key for AgentInfo across all spaces.
-#[derive(Debug)]
-pub struct AgentInfoSignedKey {
-    space: KitsuneSpace,
-    agent: KitsuneAgent,
-}
-
-impl AgentInfoSignedKey {
-    /// Wraps get_bytes for the space.
-    pub fn space_bytes(&self) -> &[u8] {
-        &self.space.get_bytes()
-    }
-
-    /// Wrapgs get_bytes for the agent.
-    pub fn agent_bytes(&self) -> &[u8] {
-        &self.agent.get_bytes()
-    }
-}
-
-impl From<(KitsuneSpace, KitsuneAgent)> for AgentInfoSignedKey {
-    fn from((space, agent): (KitsuneSpace, KitsuneAgent)) -> Self {
-        Self { space, agent }
-    }
-}
-
 /// Value in the peer database that tracks an Agent's representation as signed by that agent.
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, derive_more::AsRef)]
 pub struct AgentInfoSigned {
@@ -42,21 +16,6 @@ pub struct AgentInfoSigned {
     signature: KitsuneSignature,
     // The agent info.
     agent_info: AgentInfo,
-}
-
-impl From<&AgentInfoSigned> for AgentInfoSignedKey {
-    fn from(agent_info_signed: &AgentInfoSigned) -> Self {
-        Self {
-            space: agent_info_signed
-                .as_agent_info_ref()
-                .as_space_ref()
-                .to_owned(),
-            agent: agent_info_signed
-                .as_agent_info_ref()
-                .as_agent_ref()
-                .to_owned(),
-        }
-    }
 }
 
 impl AgentInfoSigned {
@@ -134,29 +93,5 @@ impl AgentInfo {
     /// Accessor for signed_at_ms.
     pub fn signed_at_ms(&self) -> u64 {
         self.signed_at_ms
-    }
-}
-
-#[cfg(test)]
-mod tests {
-
-    use super::AgentInfoSignedKey;
-    use super::KitsuneAgent;
-    use super::KitsuneSpace;
-    use crate::fixt::AgentInfoSignedFixturator;
-    use fixt::prelude::*;
-
-    #[test]
-    fn bytes_test() {
-        let space = KitsuneSpace::from([1; 36].to_vec());
-        let agent = KitsuneAgent::from([2; 36].to_vec());
-        let mut agent_info_signed = fixt!(AgentInfoSigned);
-        agent_info_signed.agent_info.space = space;
-        agent_info_signed.agent_info.agent = agent;
-
-        // Implicitly test the From in addition to the bytes fns.
-        let agent_info_signed_key = AgentInfoSignedKey::from(&agent_info_signed);
-        assert_eq!(&[1; 32], agent_info_signed_key.space_bytes(),);
-        assert_eq!(&[2; 32], agent_info_signed_key.agent_bytes(),);
     }
 }

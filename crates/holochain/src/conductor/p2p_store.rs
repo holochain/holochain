@@ -1,7 +1,6 @@
 //! A simple KvBuf for AgentInfoSigned.
 
 use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
-use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSignedKey;
 use holochain_state::buffer::KvStore;
 use holochain_state::db::GetDb;
 use holochain_state::env::EnvironmentRead;
@@ -35,16 +34,21 @@ impl Ord for AgentKvKey {
 }
 
 impl From<&AgentInfoSigned> for AgentKvKey {
-    fn from(agent_info_signed: &AgentInfoSigned) -> Self {
-        AgentInfoSignedKey::from(agent_info_signed).into()
+    fn from(o: &AgentInfoSigned) -> Self {
+        (
+            o.as_agent_info_ref().as_space_ref(),
+            o.as_agent_info_ref().as_agent_ref(),
+        )
+            .into()
     }
 }
 
-impl From<AgentInfoSignedKey> for AgentKvKey {
-    fn from(agent_info_signed_key: AgentInfoSignedKey) -> Self {
+impl From<(&kitsune_p2p::KitsuneSpace, &kitsune_p2p::KitsuneAgent)> for AgentKvKey {
+    fn from(o: (&kitsune_p2p::KitsuneSpace, &kitsune_p2p::KitsuneAgent)) -> Self {
+        use kitsune_p2p::KitsuneBinType;
         let mut bytes = [0; AGENT_KEY_LEN];
-        bytes[..AGENT_KEY_COMPONENT_LEN].copy_from_slice(agent_info_signed_key.space_bytes());
-        bytes[AGENT_KEY_COMPONENT_LEN..].copy_from_slice(agent_info_signed_key.agent_bytes());
+        bytes[..AGENT_KEY_COMPONENT_LEN].copy_from_slice(&o.0.get_bytes());
+        bytes[AGENT_KEY_COMPONENT_LEN..].copy_from_slice(&o.1.get_bytes());
         Self(bytes)
     }
 }
@@ -99,7 +103,6 @@ mod tests {
 
     use super::AgentKvKey;
     use fixt::prelude::*;
-    use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSignedKey;
     use holochain_p2p::kitsune_p2p::fixt::AgentInfoSignedFixturator;
     use holochain_state::buffer::KvStoreT;
     use holochain_state::env::ReadManager;
@@ -111,7 +114,7 @@ mod tests {
     fn kv_key_from() {
         let agent_info_signed = fixt!(AgentInfoSigned);
 
-        let kv_key = AgentKvKey::from(AgentInfoSignedKey::from(&agent_info_signed));
+        let kv_key = AgentKvKey::from(&agent_info_signed);
 
         let bytes = kv_key.as_ref().to_owned();
 

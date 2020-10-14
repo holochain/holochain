@@ -227,17 +227,13 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         &mut self,
         input: kitsune_p2p::event::GetAgentInfoSignedEvt,
     ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<Option<AgentInfoSigned>> {
-        let kitsune_p2p::event::GetAgentInfoSignedEvt {
-            space,
-            agent,
-            agent_info_signed_key,
-        } = input;
-        let space = DnaHash::from_kitsune(&space);
-        let agent = AgentPubKey::from_kitsune(&agent);
+        let kitsune_p2p::event::GetAgentInfoSignedEvt { space, agent } = input;
+        let h_space = DnaHash::from_kitsune(&space);
+        let h_agent = AgentPubKey::from_kitsune(&agent);
         let evt_sender = self.evt_sender.clone();
         Ok(async move {
             Ok(evt_sender
-                .get_agent_info_signed(space, agent, agent_info_signed_key)
+                .get_agent_info_signed(h_space, h_agent, space, agent)
                 .await?)
         }
         .boxed()

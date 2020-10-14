@@ -4,7 +4,6 @@
 use crate::*;
 use holochain_zome_types::signature::Signature;
 use kitsune_p2p::agent_store::AgentInfoSigned;
-use kitsune_p2p::agent_store::AgentInfoSignedKey;
 
 /// Get options help control how the get is processed at various levels.
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -54,7 +53,7 @@ ghost_actor::ghost_chan! {
         fn put_agent_info_signed(dna_hash: DnaHash, to_agent: AgentPubKey, agent_info_signed: AgentInfoSigned) -> ();
 
         /// We need to get previously stored agent info.
-        fn get_agent_info_signed(dna_hash: DnaHash, to_agent: AgentPubKey, agent_info_signed_key: AgentInfoSignedKey) -> Option<AgentInfoSigned>;
+        fn get_agent_info_signed(dna_hash: DnaHash, to_agent: AgentPubKey, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>, kitsune_agent: Arc<kitsune_p2p::KitsuneAgent>) -> Option<AgentInfoSigned>;
 
         /// A remote node is attempting to make a remote call on us.
         fn call_remote(

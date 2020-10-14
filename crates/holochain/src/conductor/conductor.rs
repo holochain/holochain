@@ -636,7 +636,8 @@ where
 
     pub(super) fn get_agent_info_signed(
         &self,
-        agent_info_signed_key: kitsune_p2p::agent_store::AgentInfoSignedKey,
+        kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
+        kitsune_agent: Arc<kitsune_p2p::KitsuneAgent>,
     ) -> ConductorResult<Option<AgentInfoSigned>> {
         let environ = self.p2p_env.clone();
 
@@ -646,7 +647,7 @@ where
 
         Ok(p2p_kv
             .as_store_ref()
-            .get(&reader, &agent_info_signed_key.into())?)
+            .get(&reader, &(&*kitsune_space, &*kitsune_agent).into())?)
     }
 
     pub(super) async fn put_wasm(

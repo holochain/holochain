@@ -300,12 +300,13 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
             GetAgentInfoSigned {
-                agent_info_signed_key,
+                kitsune_space,
+                kitsune_agent,
                 respond,
                 ..
             } => {
                 let res = lock
-                    .get_agent_info_signed(agent_info_signed_key)
+                    .get_agent_info_signed(kitsune_space, kitsune_agent)
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }

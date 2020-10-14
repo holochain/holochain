@@ -1,7 +1,6 @@
 //! Definitions for events emited from the KitsuneP2p actor.
 
 use crate::types::agent_store::AgentInfoSigned;
-use crate::types::agent_store::AgentInfoSignedKey;
 use std::sync::Arc;
 
 /// Gather a list of op-hashes from our implementor that meet criteria.
@@ -59,8 +58,6 @@ pub struct GetAgentInfoSignedEvt {
     pub space: Arc<super::KitsuneSpace>,
     /// The "agent" context.
     pub agent: Arc<super::KitsuneAgent>,
-    /// The signed agent info key.
-    pub agent_info_signed_key: AgentInfoSignedKey,
 }
 
 ghost_actor::ghost_chan! {
