@@ -1,4 +1,4 @@
-use crate::{prelude::*, FIXTURATOR_RNG};
+use crate::prelude::*;
 use rand::seq::SliceRandom;
 
 macro_rules! fixturator_unsigned {
@@ -7,7 +7,7 @@ macro_rules! fixturator_unsigned {
             $t,
             0,
             {
-                let mut rng = FIXTURATOR_RNG.lock();
+                let mut rng = crate::rng();
                 if (*rng).gen() {
                     (*rng).gen()
                 } else {
@@ -76,7 +76,7 @@ macro_rules! fixturator_signed {
             $t,
             0,
             {
-                let mut rng = FIXTURATOR_RNG.lock();
+                let mut rng = crate::rng();
                 if (*rng).gen() {
                     (*rng).gen()
                 } else {
@@ -165,7 +165,7 @@ macro_rules! fixturator_float {
             $t,
             0.0,
             {
-                let mut rng = FIXTURATOR_RNG.lock();
+                let mut rng = crate::rng();
                 if (*rng).gen() {
                     (*rng).gen()
                 } else {

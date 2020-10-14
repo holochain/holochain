@@ -4,12 +4,13 @@ pub mod bool;
 pub mod bytes;
 pub mod number;
 pub mod prelude;
+mod rng;
 pub mod serialized_bytes;
 pub mod string;
 pub mod unit;
 pub use paste;
 
-use rand::SeedableRng;
+pub use rng::{random, rng};
 
 #[derive(Clone)]
 /// the Fixturator is the struct that we wrap in our FooFixturator newtypes to impl Iterator over
@@ -69,41 +70,6 @@ impl<Curve, Item> Fixturator<Item, Curve> {
             item: std::marker::PhantomData,
         }
     }
-}
-
-lazy_static::lazy_static! {
-    /// The key to access the ChainEntries database
-    pub static ref FIXTURATOR_RNG: std::sync::Arc<parking_lot::Mutex<rand::rngs::StdRng>> = {
-        let seed: u64 = match std::env::var("FIXTURATOR_SEED") {
-            Ok(seed_str) => {
-                seed_str.parse().expect("Expected integer for FIXTURATOR_SEED")
-            }
-            Err(std::env::VarError::NotPresent) => { rand::random() },
-            Err(std::env::VarError::NotUnicode(v)) => { panic!("Invalid FIXTURATOR_SEED value: {:?}", v) },
-        };
-        println!("Fixturator seed: {}", seed);
-        std::sync::Arc::new(parking_lot::Mutex::new(rand::rngs::StdRng::seed_from_u64(seed)))
-    };
-}
-
-pub fn random<T>() -> T
-where
-    rand::distributions::Standard: rand::distributions::Distribution<T>,
-{
-    use rand::Rng;
-    (*FIXTURATOR_RNG.lock()).gen()
-}
-
-pub fn rng<'a>() -> parking_lot::MutexGuard<'a, rand::rngs::StdRng> {
-    FIXTURATOR_RNG.lock()
-}
-
-pub fn with_rng<F, T>(f: F) -> T
-where
-    F: FnOnce(&mut rand::rngs::StdRng) -> T,
-{
-    let mut rng = FIXTURATOR_RNG.lock();
-    f(&mut *rng)
 }
 
 // /// set of basic tests that can be used to test any FooFixturator implementation

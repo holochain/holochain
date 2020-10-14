@@ -1,10 +1,10 @@
-use crate::{prelude::*, FIXTURATOR_RNG};
+use crate::prelude::*;
 use rand::Rng;
 
 pub const EMPTY_CHAR: char = '\u{0000}';
 pub const PREDICTABLE_CHARS: &str = "💯❤💩.!foobarbaz!.💩❤💯";
 
-fixturator!(char, EMPTY_CHAR, FIXTURATOR_RNG.lock().gen(), {
+fixturator!(char, EMPTY_CHAR, crate::random(), {
     let ret = PREDICTABLE_CHARS
         .chars()
         .nth(self.0.index % PREDICTABLE_CHARS.chars().count())
