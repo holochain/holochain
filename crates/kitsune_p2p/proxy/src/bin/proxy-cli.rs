@@ -10,6 +10,10 @@ use structopt::StructOpt;
 pub struct Opt {
     /// kitsune-proxy Url to connect to.
     pub proxy_url: String,
+
+    /// If you would like to keep pinging, set an interval here.
+    #[structopt(short = "t", long)]
+    pub time_interval_ms: Option<u64>,
 }
 
 #[tokio::main]
@@ -52,15 +56,25 @@ async fn inner() -> TransportResult<()> {
     );
 
     let proxy_url = ProxyUrl::from(&opt.proxy_url);
-    println!("# Attempting to connect to {}", proxy_url);
 
-    let (_url, mut write, read) = listener.create_channel(proxy_url.into()).await?;
-    write.write_and_close(Vec::with_capacity(0)).await?;
-    let res = read.read_to_end().await;
-    println!(
-        "#DEBUG:START#\n{}\n#DEBUG:END#",
-        String::from_utf8_lossy(&res)
-    );
+    loop {
+        println!("# Attempting to connect to {}", proxy_url);
+
+        let (_url, mut write, read) = listener.create_channel((&proxy_url).into()).await?;
+        write.write_and_close(Vec::with_capacity(0)).await?;
+        let res = read.read_to_end().await;
+        println!(
+            "#DEBUG:START#\n{}\n#DEBUG:END#",
+            String::from_utf8_lossy(&res)
+        );
+
+        match &opt.time_interval_ms {
+            None => break,
+            Some(ms) => {
+                tokio::time::delay_for(std::time::Duration::from_millis(*ms)).await;
+            }
+        }
+    }
 
     Ok(())
 }

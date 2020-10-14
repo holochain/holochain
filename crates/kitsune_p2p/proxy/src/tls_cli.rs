@@ -56,9 +56,9 @@ async fn tls_client(
 
                 let cert_digest = blake2b_32(
                     cli.get_peer_certificates()
-                        .unwrap()
+                        .ok_or_else(|| TransportError::from("tls_cli: No peer tls"))?
                         .get(0)
-                        .unwrap()
+                        .ok_or_else(|| TransportError::from("tls_cli: No peer tls"))?
                         .as_ref(),
                 );
 
