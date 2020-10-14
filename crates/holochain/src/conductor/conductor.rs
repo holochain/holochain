@@ -695,6 +695,11 @@ where
         Ok(self.cells.keys().cloned().collect())
     }
 
+    pub(super) async fn list_active_app_ids(&self) -> ConductorResult<Vec<AppId>> {
+        let active_apps = self.get_state().await?.active_apps;
+        Ok(active_apps.keys().cloned().collect())
+    }
+
     pub(super) async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
         let cell = self.cell_by_id(cell_id)?;
         let arc = cell.env();
