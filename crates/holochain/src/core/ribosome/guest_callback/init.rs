@@ -113,7 +113,7 @@ mod test {
 
     #[test]
     fn init_callback_result_fold() {
-        let mut rng = thread_rng();
+        let mut rng = fixt::rng();
 
         let result_pass = || InitResult::Pass;
         let result_ud = || {
@@ -159,12 +159,12 @@ mod test {
             (vec![cb_pass(), cb_fail(), cb_ud()], result_fail()),
         ] {
             // order of the results should not change the final result
-            results.shuffle(&mut rng);
+            results.shuffle(&mut *rng);
 
             // number of times a callback result appears should not change the final result
             let number_of_extras = rng.gen_range(0, 5);
             for _ in 0..number_of_extras {
-                let maybe_extra = results.choose(&mut rng).cloned();
+                let maybe_extra = results.choose(&mut *rng).cloned();
                 match maybe_extra {
                     Some(extra) => results.push(extra),
                     _ => {}

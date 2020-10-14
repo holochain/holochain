@@ -77,13 +77,33 @@ lazy_static::lazy_static! {
         let seed: u64 = match std::env::var("FIXTURATOR_SEED") {
             Ok(seed_str) => {
                 seed_str.parse().expect("Expected integer for FIXTURATOR_SEED")
-            },
+            }
             Err(std::env::VarError::NotPresent) => { rand::random() },
             Err(std::env::VarError::NotUnicode(v)) => { panic!("Invalid FIXTURATOR_SEED value: {:?}", v) },
         };
         println!("Fixturator seed: {}", seed);
         std::sync::Arc::new(parking_lot::Mutex::new(rand::rngs::StdRng::seed_from_u64(seed)))
     };
+}
+
+pub fn random<T>() -> T
+where
+    rand::distributions::Standard: rand::distributions::Distribution<T>,
+{
+    use rand::Rng;
+    (*FIXTURATOR_RNG.lock()).gen()
+}
+
+pub fn rng<'a>() -> parking_lot::MutexGuard<'a, rand::rngs::StdRng> {
+    FIXTURATOR_RNG.lock()
+}
+
+pub fn with_rng<F, T>(f: F) -> T
+where
+    F: FnOnce(&mut rand::rngs::StdRng) -> T,
+{
+    let mut rng = FIXTURATOR_RNG.lock();
+    f(&mut *rng)
 }
 
 // /// set of basic tests that can be used to test any FooFixturator implementation
@@ -267,7 +287,7 @@ macro_rules! fixturator {
 
                 impl [<$type:camel Variant>] {
                     fn random() -> Self {
-                        [<$type:camel Variant>]::iter().choose(&mut thread_rng()).unwrap()
+                        [<$type:camel Variant>]::iter().choose(&mut *$crate::rng()).unwrap()
                     }
                     fn nth(index: usize) -> Self {
                         expr! {
@@ -562,7 +582,7 @@ macro_rules! newtype_fixturator {
             $outer,
             $outer(vec![]),
             {
-                let mut rng = thread_rng();
+                let mut rng = $crate::rng();
                 let vec_len = rng.gen_range(0, 5);
                 let mut ret = vec![];
                 let mut inner_fixturator =
@@ -574,7 +594,7 @@ macro_rules! newtype_fixturator {
                 $outer(ret)
             },
             {
-                let mut rng = thread_rng();
+                let mut rng = $crate::rng();
                 let vec_len = rng.gen_range(0, 5);
                 let mut ret = vec![];
                 let mut inner_fixturator =
@@ -653,10 +673,7 @@ macro_rules! enum_fixturator {
         fixturator!(
             $enum,
             $empty,
-            {
-                let mut rng = rand::thread_rng();
-                $enum::iter().choose(&mut rng).unwrap()
-            },
+            { $enum::iter().choose(&mut *crate::rng()).unwrap() },
             {
                 let ret = $enum::iter().cycle().nth(self.0.index).unwrap();
                 self.0.index += 1;
