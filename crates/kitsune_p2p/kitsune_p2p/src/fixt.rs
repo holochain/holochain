@@ -36,17 +36,17 @@ fixturator!(
 
 fixturator!(
     KitsuneAgent;
-    from BytesNotEmpty;
+    from ThirtySixBytes;
 );
 
 fixturator!(
     KitsuneSpace;
-    from BytesNotEmpty;
+    from ThirtySixBytes;
 );
 
 fixturator!(
     KitsuneSignature;
-    from BytesNotEmpty;
+    from ThirtySixBytes;
 );
 
 fixturator!(
