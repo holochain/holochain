@@ -1,7 +1,7 @@
 //! Types related to an agents for chain activity
 use holo_hash::HeaderHash;
 use holochain_zome_types::{
-    element::SignedHeaderHashed, query::AgentActivity, query::ChainHead, query::ChainStatus, Header,
+    query::Activity, query::AgentActivity, query::ChainHead, query::ChainStatus, Header,
 };
 
 /// Helpers for constructing AgentActivity
@@ -9,14 +9,16 @@ pub trait AgentActivityExt {
     /// Create a valid chain activity from set of headers.
     /// The headers should from an agents chain activity and
     /// ordered in ascending order
-    fn valid(headers: Vec<SignedHeaderHashed>) -> AgentActivity {
+    fn valid(headers: Vec<Activity>) -> AgentActivity {
         let status = headers
             .last()
-            .map(|chain_head| ChainStatus::Valid(head_from_header(chain_head.header())))
+            .map(|chain_head| ChainStatus::Valid(head_from_header(chain_head.header.header())))
             .unwrap_or(ChainStatus::Empty);
         AgentActivity {
             activity: headers,
             status,
+            // TODO: Add the actual highest observed in a follow up PR
+            highest_observed: None,
         }
     }
 
@@ -26,6 +28,8 @@ pub trait AgentActivityExt {
         AgentActivity {
             activity: Vec::with_capacity(0),
             status,
+            // TODO: Add the actual highest observed in a follow up PR
+            highest_observed: None,
         }
     }
 
@@ -34,6 +38,8 @@ pub trait AgentActivityExt {
         AgentActivity {
             activity: Vec::with_capacity(0),
             status: ChainStatus::Empty,
+            // TODO: Add the actual highest observed in a follow up PR
+            highest_observed: None,
         }
     }
 }

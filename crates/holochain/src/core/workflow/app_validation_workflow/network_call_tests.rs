@@ -6,7 +6,7 @@ use holo_hash::HeaderHash;
 use holochain_p2p::HolochainP2pCellT;
 use holochain_types::chain::AgentActivityExt;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::query::{AgentActivity, ChainQueryFilter};
+use holochain_zome_types::query::{Activity, AgentActivity, ChainQueryFilter};
 
 use crate::test_utils::{
     conductor_setup::ConductorCallData, host_fn_api::*, new_invocation, wait_for_integration,
@@ -144,6 +144,21 @@ async fn get_agent_activity_test() {
     } = conductor_test;
     let alice_cell_id = &alice_call_data.cell_id;
     let alice_agent_id = alice_cell_id.agent_pubkey();
+    let alice_env = alice_call_data.env.clone();
+
+    // Helper for getting expected data
+    let get_expected = || {
+        let alice_source_chain = SourceChain::public_only(alice_env.clone().into()).unwrap();
+        let expected_activity = alice_source_chain
+            .iter_back()
+            .collect::<Vec<_>>()
+            .unwrap()
+            .into_iter()
+            .rev()
+            .map(|shh| Activity::valid(shh))
+            .collect();
+        AgentActivity::valid(expected_activity)
+    };
 
     commit_some_data("create_entry", &alice_call_data).await;
 
@@ -174,15 +189,7 @@ async fn get_agent_activity_test() {
         .expect("Failed to get any activity from alice");
 
     // Expecting every header from the latest to the beginning
-    let alice_source_chain = SourceChain::public_only(alice_call_data.env.clone().into()).unwrap();
-    let expected_activity = alice_source_chain
-        .iter_back()
-        .collect::<Vec<_>>()
-        .unwrap()
-        .into_iter()
-        .rev()
-        .collect();
-    let expected_activity = AgentActivity::valid(expected_activity);
+    let expected_activity = get_expected();
     assert_eq!(agent_activity, expected_activity);
 
     // Commit private messages
@@ -213,21 +220,14 @@ async fn get_agent_activity_test() {
         .expect("Failed to get any activity from alice");
 
     // Expecting every header from the latest to the beginning
-    let alice_source_chain = SourceChain::public_only(alice_call_data.env.clone().into()).unwrap();
-    let expected_activity = alice_source_chain
-        .iter_back()
-        .collect::<Vec<_>>()
-        .unwrap()
-        .into_iter()
-        .rev()
-        .collect();
-    let expected_activity = AgentActivity::valid(expected_activity);
+    let expected_activity = get_expected();
     assert_eq!(agent_activity, expected_activity);
 
     // Commit private messages
     let header_hash = commit_some_data("create_msg", &alice_call_data).await;
 
     // Get the entry type
+    let alice_source_chain = SourceChain::public_only(alice_call_data.env.clone().into()).unwrap();
     let entry_type = alice_source_chain
         .get_element(&header_hash)
         .unwrap()
@@ -238,6 +238,7 @@ async fn get_agent_activity_test() {
         .1
         .clone();
 
+    // Wait for alice to integrate the chain as an authority
     alice_call_data.triggers.produce_dht_ops.trigger();
     expected_count += 3 * 5;
     wait_for_integration(
@@ -248,6 +249,7 @@ async fn get_agent_activity_test() {
     )
     .await;
 
+    // Call alice and get the activity
     let mut agent_activity = alice_call_data
         .network
         .get_agent_activity(
@@ -257,29 +259,28 @@ async fn get_agent_activity_test() {
         )
         .await
         .unwrap();
+
+    // Pop out alice's response.
     let agent_activity = agent_activity
         .pop()
         .expect("Failed to get any activity from alice");
 
-    let alice_source_chain = SourceChain::public_only(alice_call_data.env.clone().into()).unwrap();
-    let expected_activity = alice_source_chain
-        .iter_back()
-        .filter_map(|shh| {
-            Ok(shh.header().entry_type().cloned().and_then(|et| {
-                if et == entry_type {
-                    Some(shh)
-                } else {
-                    None
-                }
-            }))
+    // This time we expect only activity that matches the entry type
+    let mut expected_activity = get_expected();
+    let activity = expected_activity
+        .activity
+        .iter()
+        .filter(|a| {
+            a.header
+                .header()
+                .entry_type()
+                .map(|et| *et == entry_type)
+                .unwrap_or(false)
         })
-        .collect::<Vec<_>>()
-        .unwrap()
-        .into_iter()
-        .rev()
+        .cloned()
         .collect();
+    expected_activity.activity = activity;
 
-    let expected_activity = AgentActivity::valid(expected_activity);
     assert_eq!(agent_activity, expected_activity);
 
     ConductorTestData::shutdown_conductor(handle).await;

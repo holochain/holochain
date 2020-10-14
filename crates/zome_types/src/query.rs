@@ -3,6 +3,7 @@
 use crate::{
     element::SignedHeaderHashed,
     header::{EntryType, Header, HeaderType},
+    validate::ValidationStatus,
 };
 use holo_hash::HeaderHash;
 pub use holochain_serialized_bytes::prelude::*;
@@ -29,13 +30,50 @@ pub struct ChainQueryFilter {
 /// An agents chain elements returned from a agent_activity_query
 pub struct AgentActivity {
     /// Headers on this chain.
-    pub activity: Vec<SignedHeaderHashed>,
+    pub activity: Vec<Activity>,
     /// The status of this chain.
     pub status: ChainStatus,
+    /// The highest chain header that has
+    /// been observed by this authority.
+    pub highest_observed: Option<HighestObserved>,
+}
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+/// Individual agent activity.
+/// The header with it's validation status.
+// TODO: This is a little weird because when we have warrants
+// we will have a warrant for each position in the chain that
+// is warranted. Maybe that makes this redundant?
+pub struct Activity {
+    /// The header on this chain
+    pub header: SignedHeaderHashed,
+    /// The validation status of this individual header
+    pub validation_status: ValidationStatus,
+}
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+/// The highest header sequence observed by this authority.
+/// This also includes the headers at this sequence.
+/// If there is more then one then there is a fork.
+///
+/// This type is to prevent headers being hidden by
+/// withholding the previous header.
+///
+/// The information is tracked at the edge of holochain before
+/// validation (but after drop checks).
+pub struct HighestObserved {
+    /// The highest sequence number observed.
+    pub header_seq: u32,
+    /// Hashes of any headers claiming to be at this
+    /// header sequence.
+    pub hash: Vec<HeaderHash>,
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 /// Status of the agent activity chain
+// TODO: In the future we will most likely be replaced
+// by warrants instead of Forked / Invalid so we can provide
+// evidence of why the chain has a status.
 pub enum ChainStatus {
     /// This authority has no information on the chain.
     Empty,
@@ -48,7 +86,9 @@ pub enum ChainStatus {
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-/// The header at the head of the chain
+/// The header at the head of the complete chain.
+/// This is as far as this authority can see a
+/// chain with no gaps.
 pub struct ChainHead {
     /// Sequence number of this chain head.
     pub header_seq: u32,
@@ -123,6 +163,30 @@ impl ChainQueryFilter {
             })
             .unwrap_or(true);
         check_range && check_header_type && check_entry_type
+    }
+}
+
+impl Activity {
+    /// Create a valid activity
+    pub fn valid(header: SignedHeaderHashed) -> Self {
+        Self {
+            header,
+            validation_status: ValidationStatus::Valid,
+        }
+    }
+    /// Create a rejected activity
+    pub fn rejected(header: SignedHeaderHashed) -> Self {
+        Self {
+            header,
+            validation_status: ValidationStatus::Abandoned,
+        }
+    }
+    /// Create a abandoned activity
+    pub fn abandoned(header: SignedHeaderHashed) -> Self {
+        Self {
+            header,
+            validation_status: ValidationStatus::Abandoned,
+        }
     }
 }
 
