@@ -13,7 +13,7 @@ pub use types::*;
 
 mod spawn;
 use ghost_actor::dependencies::{tracing, tracing_futures::Instrument};
-use holochain_types::element::GetElementResponse;
+use holochain_types::{element::GetElementResponse, validate::ValidationPackageResponse};
 use holochain_types::{
     link::{GetLinksResponse, WireLinkMetaKey},
     metadata::MetadataSet,
@@ -61,7 +61,11 @@ pub trait HolochainP2pCellT {
     ) -> actor::HolochainP2pResult<()>;
 
     /// Request a validation package.
-    async fn get_validation_package(&mut self) -> actor::HolochainP2pResult<()>;
+    async fn get_validation_package(
+        &mut self,
+        request_from: AgentPubKey,
+        header_hash: HeaderHash,
+    ) -> actor::HolochainP2pResult<ValidationPackageResponse>;
 
     /// Get an entry from the DHT.
     async fn get(
@@ -170,11 +174,17 @@ impl HolochainP2pCellT for HolochainP2pCell {
     }
 
     /// Request a validation package.
-    async fn get_validation_package(&mut self) -> actor::HolochainP2pResult<()> {
+    async fn get_validation_package(
+        &mut self,
+        request_from: AgentPubKey,
+        header_hash: HeaderHash,
+    ) -> actor::HolochainP2pResult<ValidationPackageResponse> {
         self.sender
             .get_validation_package(actor::GetValidationPackage {
                 dna_hash: (*self.dna_hash).clone(),
                 agent_pub_key: (*self.from_agent).clone(),
+                request_from,
+                header_hash,
             })
             .await
     }

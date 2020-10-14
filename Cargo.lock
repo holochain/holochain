@@ -1609,6 +1609,7 @@ name = "kitsune_p2p_proxy"
 version = "0.0.1"
 dependencies = [
  "base64 0.12.3",
+ "blake2b_simd",
  "derive_more",
  "futures",
  "kitsune_p2p_types",
@@ -1619,6 +1620,7 @@ dependencies = [
  "serde",
  "serde_bytes",
  "tokio",
+ "tracing-subscriber",
  "webpki",
 ]
 
@@ -1653,9 +1655,9 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore_api"
-version = "0.0.1-alpha.4"
+version = "0.0.1-alpha.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "078f78d2b0cbf8011d69db557e36fbe82363ea338936a0ca0c00267e7d71cc1d"
+checksum = "c0f755ad496c4332f0d42f5546aed724f1ff7dd94a32bd09bafca3f17a4abbae"
 dependencies = [
  "blake2b_simd",
  "byteorder",
@@ -1676,9 +1678,9 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore_client"
-version = "0.0.1-alpha.4"
+version = "0.0.1-alpha.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "55159ad08c84f62e593f886c5590fc8a5a911023f7da7de3753d029c7b5e4d6f"
+checksum = "6e87fb9a70a15f542c09122bf41ef885997c44ea1e8305910ba66c908b2def0e"
 dependencies = [
  "ghost_actor",
  "lair_keystore_api",
