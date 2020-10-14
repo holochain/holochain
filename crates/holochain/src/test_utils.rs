@@ -23,7 +23,7 @@ use holochain_serialized_bytes::{SerializedBytes, SerializedBytesError, UnsafeBy
 use holochain_state::{
     env::EnvironmentWrite,
     fresh_reader_test,
-    test_utils::{test_conductor_env, test_wasm_env, TestEnvironment},
+    test_utils::{test_conductor_env, test_p2p_env, test_wasm_env, TestEnvironment},
 };
 use holochain_types::{
     app::InstalledCell,
@@ -186,6 +186,10 @@ pub async fn setup_app(
         env: wasm_env,
         tmpdir: _tmpdir,
     } = test_wasm_env();
+    let TestEnvironment {
+        env: p2p_env,
+        tmpdir: _p2p_tmpdir,
+    } = test_p2p_env();
     let tmpdir = test_env.tmpdir.clone();
 
     let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
@@ -195,7 +199,7 @@ pub async fn setup_app(
             }]),
             ..Default::default()
         })
-        .test(test_env, wasm_env)
+        .test(test_env, wasm_env, p2p_env)
         .await
         .unwrap();
 
