@@ -128,20 +128,17 @@ async fn conductor_handle_from_config_path(
     // In interactive mode give the user a chance to create it, otherwise create it automatically
     let env_path = PathBuf::from(config.environment_path.clone());
     if !env_path.is_dir() {
-        if interactive {
-            match interactive::prompt_for_environment_dir(&env_path) {
-                Ok(true) => println!("LMDB environment created."),
-                Ok(false) => {
-                    println!("Cannot continue without LMDB environment set.");
-                    std::process::exit(ERROR_CODE);
-                }
-                result => {
-                    result.expect("Couldn't auto-create LMDB environment dir");
-                }
-            }
+        let result = if interactive {
+            interactive::prompt_for_environment_dir(&env_path)
         } else {
-            println!("Creating LMDB environment at {}.", env_path.display());
-            std::fs::create_dir_all(&env_path).expect("Couldn't auto-create LMDB environment dir");
+            std::fs::create_dir_all(&env_path)
+        };
+        match result {
+            Ok(()) => println!("Created LMDB environment at {}.", env_path.display()),
+            Err(e) => {
+                println!("Couldn't create LMDB environment: {}", e);
+                std::process::exit(ERROR_CODE);
+            }
         }
     }
 
