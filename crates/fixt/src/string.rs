@@ -4,7 +4,7 @@ use rand::Rng;
 pub const EMPTY_CHAR: char = '\u{0000}';
 pub const PREDICTABLE_CHARS: &str = "💯❤💩.!foobarbaz!.💩❤💯";
 
-fixturator!(char, EMPTY_CHAR, crate::random(), {
+fixturator!(char, EMPTY_CHAR, crate::rng().gen(), {
     let ret = PREDICTABLE_CHARS
         .chars()
         .nth(self.0.index % PREDICTABLE_CHARS.chars().count())

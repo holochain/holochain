@@ -4,13 +4,14 @@ pub mod bool;
 pub mod bytes;
 pub mod number;
 pub mod prelude;
+#[deny(missing_docs)]
 mod rng;
 pub mod serialized_bytes;
 pub mod string;
 pub mod unit;
 pub use paste;
 
-pub use rng::{random, rng};
+pub use rng::rng;
 
 #[derive(Clone)]
 /// the Fixturator is the struct that we wrap in our FooFixturator newtypes to impl Iterator over

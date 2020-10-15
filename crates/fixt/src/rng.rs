@@ -1,17 +1,25 @@
+//! Seedable random number generator to be used in all fixturator randomness
+//!
+//! In tests, when an unpredictable value causes a test failure, it's important to
+//! be able to re-run the test with the same values. This module provides a RNG
+//! whose seed will be set automatically and printed to stdout before each test run.
+//! To use a previous seed, just set the FIXT_SEED environment variable to the value
+//! of a previous run'
+
 use parking_lot::Mutex;
 use rand::SeedableRng;
 use rand::{rngs::StdRng, RngCore};
 use std::sync::Arc;
 
 lazy_static::lazy_static! {
-    /// The key to access the ChainEntries databases
-    pub static ref FIXTURATOR_RNG: FixtRng = {
-        let seed: u64 = match std::env::var("FIXTURATOR_SEED") {
+    /// The singleton global RNG for test randomness
+    pub static ref FIXT_RNG: FixtRng = {
+        let seed: u64 = match std::env::var("FIXT_SEED") {
             Ok(seed_str) => {
-                seed_str.parse().expect("Expected integer for FIXTURATOR_SEED")
+                seed_str.parse().expect("Expected integer for FIXT_SEED")
             }
             Err(std::env::VarError::NotPresent) => { rand::random() },
-            Err(std::env::VarError::NotUnicode(v)) => { panic!("Invalid FIXTURATOR_SEED value: {:?}", v) },
+            Err(std::env::VarError::NotUnicode(v)) => { panic!("Invalid FIXT_SEED value: {:?}", v) },
         };
         println!("Fixturator seed: {}", seed);
         FixtRng(Arc::new(
@@ -20,6 +28,8 @@ lazy_static::lazy_static! {
     };
 }
 
+/// A seedable RNG which uses an Arc and a Mutex to allow easy cloneability and thread safety.
+/// A singleton global instance is created in this module. See module-level docs for more info.
 #[derive(Clone)]
 pub struct FixtRng(Arc<Mutex<StdRng>>);
 
@@ -41,22 +51,8 @@ impl RngCore for FixtRng {
     }
 }
 
-pub fn random<T>() -> T
-where
-    rand::distributions::Standard: rand::distributions::Distribution<T>,
-{
-    use rand::Rng;
-    crate::rng().gen()
-}
-
+/// Access the seeded random number generator. This should be used in all places where
+/// tests produce random values.
 pub fn rng() -> FixtRng {
-    FIXTURATOR_RNG.clone()
+    FIXT_RNG.clone()
 }
-
-// fn _with_rng<F, T>(f: F) -> T
-// where
-//     F: FnOnce(&mut StdRng) -> T,
-// {
-//     let mut rng = crate::rng();
-//     f(&mut rng)
-// }
