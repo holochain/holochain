@@ -236,7 +236,7 @@ pub mod wasm_test {
         let invocation = new_invocation(
             &alice_call_data.cell_id,
             "get_links_from_other_zome",
-            (),
+            alice_call_data.cell_id.agent_pubkey().clone(),
             TestWasm::CallRemoteCaller,
         )
         .unwrap();
@@ -249,7 +249,7 @@ pub mod wasm_test {
         let invocation = new_invocation(
             &bob_call_data.cell_id,
             "get_links_from_other_zome",
-            (),
+            alice_call_data.cell_id.agent_pubkey().clone(),
             TestWasm::CallRemoteCaller,
         )
         .unwrap();
