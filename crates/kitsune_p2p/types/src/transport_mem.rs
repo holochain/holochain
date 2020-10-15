@@ -1,7 +1,7 @@
 //! A mem-only transport - largely for testing
 
-use crate::transport::{transport_connection::*, transport_listener::*, *};
-use futures::future::FutureExt;
+use crate::transport::*;
+use futures::{future::FutureExt, sink::SinkExt};
 
 use once_cell::sync::Lazy;
 use std::{
@@ -12,19 +12,17 @@ use tokio::sync::Mutex;
 
 const SCHEME: &str = "kitsune-mem";
 
-type CoreSender = futures::channel::mpsc::Sender<TransportListenerEvent>;
-
-static CORE: Lazy<Arc<Mutex<HashMap<url2::Url2, CoreSender>>>> =
+static CORE: Lazy<Arc<Mutex<HashMap<url2::Url2, TransportIncomingChannelSender>>>> =
     Lazy::new(|| Arc::new(Mutex::new(HashMap::new())));
 
-async fn get_core(url: url2::Url2) -> TransportResult<CoreSender> {
+async fn get_core(url: url2::Url2) -> TransportResult<TransportIncomingChannelSender> {
     let lock = CORE.lock().await;
     lock.get(&url)
         .ok_or_else(|| format!("bad core: {}", url).into())
         .map(|v| v.clone())
 }
 
-async fn put_core(url: url2::Url2, send: CoreSender) -> TransportResult<()> {
+async fn put_core(url: url2::Url2, send: TransportIncomingChannelSender) -> TransportResult<()> {
     let mut lock = CORE.lock().await;
     match lock.entry(url.clone()) {
         Entry::Vacant(e) => {
@@ -45,9 +43,9 @@ fn drop_core(url: url2::Url2) {
 /// Spawn / bind the listening side of a mem-only transport - largely for testing
 pub async fn spawn_bind_transport_mem() -> TransportResult<(
     ghost_actor::GhostSender<TransportListener>,
-    TransportListenerEventReceiver,
+    TransportIncomingChannelReceiver,
 )> {
-    let url = url2::url2!("{}://{}", SCHEME, nanoid::nanoid!(),);
+    let url = url2::url2!("{}://{}", SCHEME, nanoid::nanoid!());
 
     let builder = ghost_actor::actor_builder::GhostActorBuilder::new();
 
@@ -91,114 +89,25 @@ impl TransportListenerHandler for InnerListen {
         Ok(async move { Ok(url) }.boxed().into())
     }
 
-    fn handle_connect(
-        &mut self,
-        url: url2::Url2,
-    ) -> TransportListenerHandlerResult<(
-        ghost_actor::GhostSender<TransportConnection>,
-        TransportConnectionEventReceiver,
-    )> {
-        let this_url = self.url.clone();
-        Ok(async move {
-            let evt_send = get_core(url.clone()).await?;
-
-            let (send1, evt1, send2, evt2) = InnerCon::spawn(this_url, url).await?;
-
-            evt_send.incoming_connection(send1, evt1).await?;
-
-            Ok((send2, evt2))
-        }
-        .boxed()
-        .into())
-    }
-}
-
-struct InnerCon {
-    evt_send: futures::channel::mpsc::Sender<TransportConnectionEvent>,
-    this_url: url2::Url2,
-    remote_url: url2::Url2,
-}
-
-impl InnerCon {
-    pub async fn spawn(
-        url_a: url2::Url2,
-        url_b: url2::Url2,
-    ) -> TransportResult<(
-        ghost_actor::GhostSender<TransportConnection>,
-        TransportConnectionEventReceiver,
-        ghost_actor::GhostSender<TransportConnection>,
-        TransportConnectionEventReceiver,
-    )> {
-        let (evt_send1, evt_recv1) = futures::channel::mpsc::channel(10);
-        let (evt_send2, evt_recv2) = futures::channel::mpsc::channel(10);
-
-        let builder = ghost_actor::actor_builder::GhostActorBuilder::new();
-
-        let sender1 = builder
-            .channel_factory()
-            .create_channel::<TransportConnection>()
-            .await?;
-
-        tokio::task::spawn(builder.spawn(InnerCon::new(evt_send2, url_b.clone(), url_a.clone())));
-
-        let builder = ghost_actor::actor_builder::GhostActorBuilder::new();
-
-        let sender2 = builder
-            .channel_factory()
-            .create_channel::<TransportConnection>()
-            .await?;
-
-        tokio::task::spawn(builder.spawn(InnerCon::new(evt_send1, url_a, url_b)));
-
-        Ok((sender1, evt_recv1, sender2, evt_recv2))
-    }
-
-    pub fn new(
-        evt_send: futures::channel::mpsc::Sender<TransportConnectionEvent>,
-        this_url: url2::Url2,
-        remote_url: url2::Url2,
-    ) -> Self {
-        Self {
-            evt_send,
-            this_url,
-            remote_url,
-        }
-    }
-}
-
-impl ghost_actor::GhostControlHandler for InnerCon {}
-
-impl ghost_actor::GhostHandler<TransportConnection> for InnerCon {}
-
-impl TransportConnectionHandler for InnerCon {
-    fn handle_remote_url(&mut self) -> TransportConnectionHandlerResult<url2::Url2> {
-        let url = self.remote_url.clone();
-        Ok(async move { Ok(url) }.boxed().into())
-    }
-
     fn handle_create_channel(
         &mut self,
-    ) -> TransportConnectionHandlerResult<(TransportChannelWrite, TransportChannelRead)> {
-        let this_url = self.this_url.clone();
-        let evt_send = self.evt_send.clone();
+        url: url2::Url2,
+    ) -> TransportListenerHandlerResult<(url2::Url2, TransportChannelWrite, TransportChannelRead)>
+    {
+        let this_url = self.url.clone();
         Ok(async move {
-            use futures::sink::SinkExt;
-            let (send1, recv1) = futures::channel::mpsc::channel(10);
-            let send1 = send1.sink_map_err(TransportError::other);
-            let (send2, recv2) = futures::channel::mpsc::channel(10);
-            let send2 = send2.sink_map_err(TransportError::other);
+            let mut evt_send = get_core(url.clone()).await?;
+
+            let ((send1, recv1), (send2, recv2)) = create_transport_channel_pair();
+
             // if we don't spawn here there can be a deadlock on
             // incoming_channel trying to process all channel data
             // before we've returned our halves here.
             tokio::task::spawn(async move {
                 // it's ok if this errors... the channels will close.
-                let _ = evt_send
-                    .incoming_channel(this_url, Box::new(send1), Box::new(recv2))
-                    .await;
+                let _ = evt_send.send((this_url, send1, recv1)).await;
             });
-            let send2: TransportChannelWrite = Box::new(send2);
-            let recv1: TransportChannelRead = Box::new(recv1);
-            Ok((send2, recv1))
+            Ok((url, send2, recv2))
         }
         .boxed()
         .into())
@@ -210,73 +119,34 @@ mod tests {
     use super::*;
     use futures::stream::StreamExt;
 
-    fn handle_connection_event(mut recv: TransportConnectionEventReceiver) {
+    fn test_receiver(mut recv: TransportIncomingChannelReceiver) {
         tokio::task::spawn(async move {
-            while let Some(msg) = recv.next().await {
-                match msg {
-                    TransportConnectionEvent::IncomingChannel {
-                        respond,
-                        url,
-                        mut send,
-                        recv,
-                        ..
-                    } => {
-                        respond.respond(Ok(async move {
-                            let data = recv.read_to_end().await;
-                            let data =
-                                format!("echo({}): {}", url, String::from_utf8_lossy(&data),)
-                                    .into_bytes();
-                            send.write_and_close(data).await?;
-                            Ok(())
-                        }
-                        .boxed()
-                        .into()));
-                    }
-                }
+            while let Some((url, mut write, read)) = recv.next().await {
+                let data = read.read_to_end().await;
+                let data = format!("echo({}): {}", url, String::from_utf8_lossy(&data),);
+                write.write_and_close(data.into_bytes()).await?;
             }
-        });
-    }
-
-    fn handle_listener_event(mut recv: TransportListenerEventReceiver) {
-        tokio::task::spawn(async move {
-            while let Some(msg) = recv.next().await {
-                match msg {
-                    TransportListenerEvent::IncomingConnection {
-                        respond, receiver, ..
-                    } => {
-                        handle_connection_event(receiver);
-                        respond.respond(Ok(async move { Ok(()) }.boxed().into()));
-                    }
-                }
-            }
+            TransportResult::Ok(())
         });
     }
 
     #[tokio::test(threaded_scheduler)]
     async fn it_can_mem_transport() -> TransportResult<()> {
         let (bind1, evt1) = spawn_bind_transport_mem().await?;
-        handle_listener_event(evt1);
+        test_receiver(evt1);
         let (bind2, evt2) = spawn_bind_transport_mem().await?;
-        handle_listener_event(evt2);
+        test_receiver(evt2);
 
         let url1 = bind1.bound_url().await?;
         let url2 = bind2.bound_url().await?;
 
-        let (con1, con_evt1) = bind1.connect(url2.clone()).await?;
-        handle_connection_event(con_evt1);
-        let (con2, con_evt2) = bind2.connect(url1.clone()).await?;
-        handle_connection_event(con_evt2);
-
-        assert_eq!(url2, con1.remote_url().await?);
-        assert_eq!(url1, con2.remote_url().await?);
-
-        let res = con1.request(b"test1".to_vec()).await?;
+        let res = bind1.request(url2.clone(), b"test1".to_vec()).await?;
         assert_eq!(
             &format!("echo({}): test1", url1),
             &String::from_utf8_lossy(&res),
         );
 
-        let res = con2.request(b"test2".to_vec()).await?;
+        let res = bind2.request(url1.clone(), b"test2".to_vec()).await?;
         assert_eq!(
             &format!("echo({}): test2", url2),
             &String::from_utf8_lossy(&res),

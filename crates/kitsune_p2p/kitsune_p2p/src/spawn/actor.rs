@@ -66,6 +66,20 @@ impl InternalHandler for KitsuneP2pActor {
 impl ghost_actor::GhostHandler<KitsuneP2pEvent> for KitsuneP2pActor {}
 
 impl KitsuneP2pEventHandler for KitsuneP2pActor {
+    fn handle_put_agent_info_signed(
+        &mut self,
+        input: crate::event::PutAgentInfoSignedEvt,
+    ) -> KitsuneP2pEventHandlerResult<()> {
+        Ok(self.evt_sender.put_agent_info_signed(input))
+    }
+
+    fn handle_get_agent_info_signed(
+        &mut self,
+        input: crate::event::GetAgentInfoSignedEvt,
+    ) -> KitsuneP2pEventHandlerResult<Option<crate::types::agent_store::AgentInfoSigned>> {
+        Ok(self.evt_sender.get_agent_info_signed(input))
+    }
+
     fn handle_call(
         &mut self,
         space: Arc<KitsuneSpace>,

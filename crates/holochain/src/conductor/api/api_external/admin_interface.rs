@@ -131,6 +131,10 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 let cell_ids = self.conductor_handle.list_cell_ids().await?;
                 Ok(AdminResponse::ListCellIds(cell_ids))
             }
+            ListActiveAppIds => {
+                let app_ids = self.conductor_handle.list_active_app_ids().await?;
+                Ok(AdminResponse::ListActiveAppIds(app_ids))
+            }
             ActivateApp { app_id } => {
                 // Activate app
                 self.conductor_handle.activate_app(app_id.clone()).await?;
@@ -232,6 +236,8 @@ pub enum AdminRequest {
     GenerateAgentPubKey,
     /// List all the cell ids in the conductor
     ListCellIds,
+    /// List all the active app ids in the conductor
+    ListActiveAppIds,
     /// Activate an app
     ActivateApp {
         /// The AppId to activate
@@ -272,6 +278,8 @@ pub enum AdminResponse {
     GenerateAgentPubKey(AgentPubKey),
     /// Listing all the cell ids in the conductor
     ListCellIds(Vec<CellId>),
+    /// Listing all the active app ids in the conductor
+    ListActiveAppIds(Vec<AppId>),
     /// [AppInterfaceApi] successfully attached
     AppInterfaceAttached {
         /// Port of the new [AppInterfaceApi]
@@ -292,7 +300,9 @@ mod test {
     use super::*;
     use crate::conductor::Conductor;
     use anyhow::Result;
-    use holochain_state::test_utils::{test_conductor_env, test_wasm_env, TestEnvironment};
+    use holochain_state::test_utils::{
+        test_conductor_env, test_p2p_env, test_wasm_env, TestEnvironment,
+    };
     use holochain_types::{
         app::InstallAppDnaPayload,
         observability,
@@ -303,15 +313,21 @@ mod test {
     use uuid::Uuid;
 
     #[tokio::test(threaded_scheduler)]
-    async fn install_list_dna() -> Result<()> {
+    async fn install_list_dna_app() -> Result<()> {
         observability::test_run().ok();
         let test_env = test_conductor_env();
         let TestEnvironment {
             env: wasm_env,
             tmpdir: _tmpdir,
         } = test_wasm_env();
+        let TestEnvironment {
+            env: p2p_env,
+            tmpdir: _p2p_tmpdir,
+        } = test_p2p_env();
         let _tmpdir = test_env.tmpdir.clone();
-        let handle = Conductor::builder().test(test_env, wasm_env).await?;
+        let handle = Conductor::builder()
+            .test(test_env, wasm_env, p2p_env)
+            .await?;
         let shutdown = handle.take_shutdown_handle().await.unwrap();
         let admin_api = RealAdminInterfaceApi::new(handle.clone());
         let uuid = Uuid::new_v4();
@@ -358,6 +374,12 @@ mod test {
             .await;
 
         assert_matches!(res, AdminResponse::ListCellIds(v) if v == vec![cell_id]);
+
+        let res = admin_api
+            .handle_admin_request(AdminRequest::ListActiveAppIds)
+            .await;
+
+        assert_matches!(res, AdminResponse::ListActiveAppIds(v) if v == vec!["test".to_string()]);
 
         handle.shutdown().await;
         tokio::time::timeout(std::time::Duration::from_secs(1), shutdown)

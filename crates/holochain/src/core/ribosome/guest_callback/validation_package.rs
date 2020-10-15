@@ -139,12 +139,12 @@ mod test {
     async fn validate_package_callback_result_fold() {
         let mut rng = thread_rng();
 
-        let result_success = || ValidationPackageResult::Success(ValidationPackage);
+        let result_success = || ValidationPackageResult::Success(ValidationPackage(vec![]));
         let result_ud = || ValidationPackageResult::UnresolvedDependencies(vec![]);
         let result_fail = || ValidationPackageResult::Fail("".into());
         let result_not_implemented = || ValidationPackageResult::NotImplemented;
 
-        let cb_success = || ValidationPackageCallbackResult::Success(ValidationPackage);
+        let cb_success = || ValidationPackageCallbackResult::Success(ValidationPackage(vec![]));
         let cb_ud = || ValidationPackageCallbackResult::UnresolvedDependencies(vec![]);
         let cb_fail = || ValidationPackageCallbackResult::Fail("".into());
 
@@ -296,7 +296,10 @@ mod slow_tests {
         let result = ribosome
             .run_validation_package(host_access, validation_package_invocation)
             .unwrap();
-        assert_eq!(result, ValidationPackageResult::Success(ValidationPackage),);
+        assert_eq!(
+            result,
+            ValidationPackageResult::Success(ValidationPackage(vec![])),
+        );
     }
 
     #[tokio::test(threaded_scheduler)]

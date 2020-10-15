@@ -109,6 +109,7 @@ macro_rules! search_all {
 /// The default IntegratedPrefix is for databases that don't
 /// actually use prefixes (like the cache). In this case we just
 /// choose the first one (IntegratedPrefix)
+#[derive(derive_more::Constructor)]
 pub struct DbPair<'a, M, P = IntegratedPrefix>
 where
     P: PrefixType,
@@ -118,6 +119,7 @@ where
     pub meta: &'a M,
 }
 
+#[derive(derive_more::Constructor)]
 pub struct DbPairMut<'a, M, P = IntegratedPrefix>
 where
     P: PrefixType,
