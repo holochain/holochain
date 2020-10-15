@@ -49,7 +49,7 @@ where
     crate::rng().gen()
 }
 
-pub fn rng<'a>() -> FixtRng {
+pub fn rng() -> FixtRng {
     FIXTURATOR_RNG.clone()
 }
 
