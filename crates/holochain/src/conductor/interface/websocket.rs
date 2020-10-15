@@ -254,7 +254,9 @@ pub mod test {
     use crate::fixt::WasmRibosomeFixturator;
     use futures::future::FutureExt;
     use holochain_serialized_bytes::prelude::*;
-    use holochain_state::test_utils::{test_conductor_env, test_wasm_env, TestEnvironment};
+    use holochain_state::test_utils::{
+        test_conductor_env, test_p2p_env, test_wasm_env, TestEnvironment,
+    };
     use holochain_types::{
         app::{InstallAppDnaPayload, InstallAppPayload, InstalledCell},
         cell::CellId,
@@ -282,8 +284,15 @@ pub mod test {
             env: wasm_env,
             tmpdir: _tmpdir,
         } = test_wasm_env();
+        let TestEnvironment {
+            env: p2p_env,
+            tmpdir: _p2p_tmpdir,
+        } = test_p2p_env();
         let tmpdir = test_env.tmpdir.clone();
-        let conductor_handle = Conductor::builder().test(test_env, wasm_env).await.unwrap();
+        let conductor_handle = Conductor::builder()
+            .test(test_env, wasm_env, p2p_env)
+            .await
+            .unwrap();
         (tmpdir, conductor_handle)
     }
 
@@ -297,10 +306,15 @@ pub mod test {
             env: wasm_env,
             tmpdir,
         } = test_wasm_env();
+        let TestEnvironment {
+            env: p2p_env,
+            tmpdir: p2p_tmpdir,
+        } = test_p2p_env();
         tmps.push(tmpdir);
         tmps.push(test_env.tmpdir.clone());
+        tmps.push(p2p_tmpdir);
         let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
-            .test(test_env, wasm_env)
+            .test(test_env, wasm_env, p2p_env)
             .await
             .unwrap();
 
@@ -340,10 +354,14 @@ pub mod test {
             env: wasm_env,
             tmpdir: _tmpdir,
         } = test_wasm_env();
+        let TestEnvironment {
+            env: p2p_env,
+            tmpdir: _p2p_tmpdir,
+        } = test_p2p_env();
         let tmpdir = test_env.tmpdir.clone();
 
         let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
-            .test(test_env, wasm_env)
+            .test(test_env, wasm_env, p2p_env)
             .await
             .unwrap();
 

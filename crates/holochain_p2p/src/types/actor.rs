@@ -11,7 +11,10 @@ pub struct GetValidationPackage {
     pub dna_hash: DnaHash,
     /// The agent_id / agent_pub_key context.
     pub agent_pub_key: AgentPubKey,
-    // TODO - parameters
+    /// Request the package from this agent.
+    pub request_from: AgentPubKey,
+    /// Request the package for this Header
+    pub header_hash: HeaderHash,
 }
 
 #[derive(Clone, Debug)]
@@ -172,7 +175,7 @@ ghost_actor::ghost_chan! {
         ) -> ();
 
         /// Request a validation package.
-        fn get_validation_package(input: GetValidationPackage) -> (); // TODO - proper return type
+        fn get_validation_package(input: GetValidationPackage) -> ValidationPackageResponse;
 
         /// Get an entry from the DHT.
         fn get(
