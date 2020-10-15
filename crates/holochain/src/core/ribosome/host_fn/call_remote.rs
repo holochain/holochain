@@ -232,19 +232,6 @@ pub mod wasm_test {
         )
         .await;
 
-        // Bob getting links from the same zome (but different cell)
-        let invocation = new_invocation(
-            &bob_call_data.cell_id,
-            "get_links_on_foo",
-            (),
-            TestWasm::CallRemoteCallee,
-        )
-        .unwrap();
-
-        let links: Links = call(&handle, invocation).await;
-
-        assert_eq!(links.into_inner().len(), 1);
-
         // Alice gets the links from a different zome with remote call (same cell)
         let invocation = new_invocation(
             &alice_call_data.cell_id,
@@ -264,6 +251,19 @@ pub mod wasm_test {
             "get_links_from_other_zome",
             (),
             TestWasm::CallRemoteCaller,
+        )
+        .unwrap();
+
+        let links: Links = call(&handle, invocation).await;
+
+        assert_eq!(links.into_inner().len(), 1);
+
+        // Bob getting links from the same zome (but different cell)
+        let invocation = new_invocation(
+            &bob_call_data.cell_id,
+            "get_links_on_foo",
+            (),
+            TestWasm::CallRemoteCallee,
         )
         .unwrap();
 
