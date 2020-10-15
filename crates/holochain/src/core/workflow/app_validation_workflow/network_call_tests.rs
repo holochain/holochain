@@ -163,7 +163,7 @@ async fn get_agent_activity_test() {
             .rev()
             .map(|shh| Activity::valid(shh))
             .collect();
-        AgentActivity::valid(expected_activity)
+        AgentActivity::valid(expected_activity, alice_agent_id.clone())
     };
 
     commit_some_data("create_entry", &alice_call_data).await;
@@ -205,7 +205,7 @@ async fn get_agent_activity_test() {
         .with_cache(cache_data)
         .with_network(alice_call_data.network.clone());
 
-    // Cascade without entries
+    // Call the cascade without entries and check we get the headers
     let agent_activity = cascade
         .get_agent_activity(
             alice_agent_id.clone(),
@@ -215,26 +215,45 @@ async fn get_agent_activity_test() {
         .await
         .expect("Failed to get any activity from alice");
 
-    let expected_activity: Vec<_> = expected_activity
+    let expected_activity: Vec<_> = get_expected()
         .activity
         .into_iter()
-        .map(|shh| Element::new(shh, None))
+        .map(|a| Element::new(a.header, None))
         .collect();
+
     assert_eq!(agent_activity, expected_activity);
 
-    // Cascade with entries
-    let agent_activity = cascade
-        .get_agent_activity(
-            alice_agent_id.clone(),
-            ChainQueryFilter::new().include_entries(true),
-            Default::default(),
-        )
-        .await
-        .expect("Failed to get any activity from alice");
+    // Call the cascade and check we can get the entries as well
+    // Parallel gets to the same agent can overwhelm them so we
+    // need to try a few time
+    let mut agent_activity = None;
+    for _ in 0..100 {
+        let r = cascade
+            .get_agent_activity(
+                alice_agent_id.clone(),
+                ChainQueryFilter::new().include_entries(true),
+                Default::default(),
+            )
+            .await
+            .expect("Failed to get any activity from alice");
+        if !r.is_empty() {
+            agent_activity = Some(r);
+            break;
+        }
+        tokio::time::delay_for(std::time::Duration::from_millis(100)).await;
+    }
+    let agent_activity = agent_activity.expect("Failed to get any activity from alice");
 
-    let expected_activity: Vec<_> = expected_activity
+    let alice_source_chain = SourceChain::public_only(alice_call_data.env.clone().into()).unwrap();
+    let expected_activity: Vec<_> = get_expected()
+        .activity
         .into_iter()
-        .filter_map(|el| alice_source_chain.get_element(el.header_address()).unwrap())
+        // We are expecting the full elements with entries
+        .filter_map(|a| {
+            alice_source_chain
+                .get_element(a.header.header_address())
+                .unwrap()
+        })
         .collect();
     assert_eq!(agent_activity, expected_activity);
 
@@ -269,7 +288,7 @@ async fn get_agent_activity_test() {
     let expected_activity = get_expected();
     assert_eq!(agent_activity, expected_activity);
 
-    // Commit private messages
+    // Commit messages
     let header_hash = commit_some_data("create_msg", &alice_call_data).await;
 
     // Get the entry type

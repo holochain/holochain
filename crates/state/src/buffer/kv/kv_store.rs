@@ -38,9 +38,16 @@ where
 
     /// Fetch data from DB, deserialize into V type
     fn get<R: Readable>(&self, reader: &R, k: &K) -> DatabaseResult<Option<V>> {
+        let now = std::time::Instant::now();
         check_empty_key(k)?;
+        tracing::info!(line = line!(), us = ?now.elapsed().as_micros());
         match self.get_bytes(reader, k)? {
-            Some(bytes) => Ok(Some(holochain_serialized_bytes::decode(bytes)?)),
+            Some(bytes) => {
+        tracing::info!(line = line!(), us = ?now.elapsed().as_micros(), key = ?k.as_ref());
+                let r = Ok(Some(holochain_serialized_bytes::decode(bytes)?));
+        tracing::info!(line = line!(), us = ?now.elapsed().as_micros(), len = bytes.len());
+        r
+            },
             None => Ok(None),
         }
     }

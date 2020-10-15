@@ -66,9 +66,15 @@ where
         r: &'r R,
         hash: &'a HoloHashOf<C>,
     ) -> DatabaseResult<Option<HoloHashed<C>>> {
+        let now = std::time::Instant::now();
+        tracing::info!(line = line!());
         let k = PrefixHashKey::new(hash.as_hash());
+        tracing::info!(line = line!(), ms = ?now.elapsed().as_millis());
         Ok(if let Some(content) = self.0.get(r, &k)? {
-            Some(Self::deserialize_and_hash(hash.get_full_bytes(), content))
+            tracing::info!(line = line!(), ms = ?now.elapsed().as_millis());
+            let r = Some(Self::deserialize_and_hash(hash.get_full_bytes(), content));
+            tracing::info!(line = line!(), ms = ?now.elapsed().as_millis());
+            r
         } else {
             None
         })
@@ -151,6 +157,10 @@ where
     /// Check if a value is stored at this key
     pub fn contains(&self, k: &HoloHashOf<C>) -> DatabaseResult<bool> {
         fresh_reader!(self.env, |r| self.inner.contains(&r, k))
+    }
+
+    pub fn inner(&self) -> &CasBufUsedSync<C, P> {
+        &self.inner
     }
 }
 

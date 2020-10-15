@@ -5,7 +5,7 @@ use crate::{
     header::{EntryType, Header, HeaderType},
     validate::ValidationStatus,
 };
-use holo_hash::HeaderHash;
+use holo_hash::{AgentPubKey, HeaderHash};
 pub use holochain_serialized_bytes::prelude::*;
 
 /// Query arguments
@@ -29,6 +29,8 @@ pub struct ChainQueryFilter {
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 /// An agents chain elements returned from a agent_activity_query
 pub struct AgentActivity {
+    /// The agent this activity is for
+    pub agent: AgentPubKey,
     /// Headers on this chain.
     pub activity: Vec<Activity>,
     /// The status of this chain.
@@ -51,7 +53,7 @@ pub struct Activity {
     pub validation_status: ValidationStatus,
 }
 
-#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 /// The highest header sequence observed by this authority.
 /// This also includes the headers at this sequence.
 /// If there is more then one then there is a fork.
@@ -69,7 +71,7 @@ pub struct HighestObserved {
     pub hash: Vec<HeaderHash>,
 }
 
-#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Hash, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 /// Status of the agent activity chain
 // TODO: In the future we will most likely be replaced
 // by warrants instead of Forked / Invalid so we can provide
@@ -82,10 +84,10 @@ pub enum ChainStatus {
     /// Chain is forked.
     Forked(ChainFork),
     /// Chain is invalid because of this header.
-    Invalid(HeaderHash),
+    Invalid(ChainHead),
 }
 
-#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Hash, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 /// The header at the head of the complete chain.
 /// This is as far as this authority can see a
 /// chain with no gaps.
@@ -96,7 +98,7 @@ pub struct ChainHead {
     pub hash: HeaderHash,
 }
 
-#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Hash, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 /// The chain has been forked by these two headers
 pub struct ChainFork {
     /// The point where the chain has forked.

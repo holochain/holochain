@@ -615,7 +615,10 @@ impl Cell {
         options: holochain_p2p::event::GetActivityOptions,
     ) -> CellResult<AgentActivity> {
         let env = self.env.clone();
-        authority::handle_get_agent_activity(env.into(), agent, query, options)
+        info!(line = line!());
+        let r = authority::handle_get_agent_activity(env.into(), agent, query, options);
+        info!(line = line!());
+        r
     }
 
     /// a remote agent is sending us a validation receipt.
