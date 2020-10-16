@@ -8,7 +8,7 @@ pub(crate) fn spawn_tls_server(
     short: String,
     incoming_base_url: url2::Url2,
     tls_server_config: Arc<rustls::ServerConfig>,
-    evt_send: TransportIncomingChannelSender,
+    evt_send: TransportEventSender,
     write: futures::channel::mpsc::Sender<ProxyWire>,
     read: futures::channel::mpsc::Receiver<ProxyWire>,
 ) {
@@ -26,7 +26,7 @@ async fn tls_server(
     short: String,
     incoming_base_url: url2::Url2,
     tls_server_config: Arc<rustls::ServerConfig>,
-    mut evt_send: TransportIncomingChannelSender,
+    mut evt_send: TransportEventSender,
     mut write: futures::channel::mpsc::Sender<ProxyWire>,
     read: futures::channel::mpsc::Receiver<ProxyWire>,
 ) {

@@ -134,10 +134,10 @@ pub enum TransportEvent {
 }
 
 /// Send new incoming channel data.
-pub type TransportIncomingChannelSender = futures::channel::mpsc::Sender<TransportEvent>;
+pub type TransportEventSender = futures::channel::mpsc::Sender<TransportEvent>;
 
 /// Receiving a new incoming channel connection.
-pub type TransportIncomingChannelReceiver = futures::channel::mpsc::Receiver<TransportEvent>;
+pub type TransportEventReceiver = futures::channel::mpsc::Receiver<TransportEvent>;
 
 ghost_actor::ghost_chan! {
     /// Represents a transport binding for establishing connections.

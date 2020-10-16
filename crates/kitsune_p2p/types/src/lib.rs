@@ -18,3 +18,4 @@ pub use auto_stream_select::*;
 pub mod dht_arc;
 pub mod transport;
 pub mod transport_mem;
+pub mod transport_pool;

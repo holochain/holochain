@@ -55,7 +55,7 @@ struct TransportListenerQuic {
     /// internal api logic
     internal_sender: ghost_actor::GhostSender<ListenerInner>,
     /// incoming channel send to our owner
-    incoming_channel_sender: TransportIncomingChannelSender,
+    incoming_channel_sender: TransportEventSender,
     /// the url to return on 'bound_url' calls - what we bound to
     bound_url: Url2,
     /// the quinn binding (akin to a socket listener)
@@ -270,7 +270,7 @@ pub async fn spawn_transport_listener_quic(
     config: ConfigListenerQuic,
 ) -> TransportListenerResult<(
     ghost_actor::GhostSender<TransportListener>,
-    TransportIncomingChannelReceiver,
+    TransportEventReceiver,
 )> {
     let server_config = danger::configure_server(config.tls)
         .await
