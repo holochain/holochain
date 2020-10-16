@@ -13,7 +13,7 @@ fixturator!(
     Urls;
     curve Empty vec![];
     curve Unpredictable {
-        let mut rng = thread_rng();
+        let mut rng = fixt::rng();
         let vec_len = rng.gen_range(0, 5);
         let mut ret = vec![];
 
@@ -23,7 +23,7 @@ fixturator!(
         ret
     };
     curve Predictable {
-        let mut rng = thread_rng();
+        let mut rng = fixt::rng();
         let vec_len = rng.gen_range(0, 5);
         let mut ret = vec![];
 

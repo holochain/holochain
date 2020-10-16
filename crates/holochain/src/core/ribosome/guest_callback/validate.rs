@@ -150,7 +150,7 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn validate_callback_result_fold() {
-        let mut rng = thread_rng();
+        let mut rng = fixt::rng();
 
         let result_valid = || ValidateResult::Valid;
         let result_ud = || ValidateResult::UnresolvedDependencies(vec![]);
