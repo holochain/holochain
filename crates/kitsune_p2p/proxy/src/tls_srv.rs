@@ -61,7 +61,7 @@ async fn tls_server(
                 tracing::info!("{}: SRV: INCOMING TLS: {}", short, remote_proxy_url);
 
                 evt_send
-                    .send((
+                    .send(TransportEvent::IncomingChannel(
                         remote_proxy_url.into(),
                         send2.take().unwrap(),
                         recv2.take().unwrap(),

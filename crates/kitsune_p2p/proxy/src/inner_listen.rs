@@ -84,12 +84,16 @@ pub async fn spawn_kitsune_proxy_listener(
 
     // handle incoming channels from our sub transport
     tokio::task::spawn(async move {
-        while let Some((url, write, read)) = sub_receiver.next().await {
-            // spawn so we can process incoming requests in parallel
-            let i_s = i_s.clone();
-            tokio::task::spawn(async move {
-                let _ = i_s.incoming_channel(url, write, read).await;
-            });
+        while let Some(evt) = sub_receiver.next().await {
+            match evt {
+                TransportEvent::IncomingChannel(url, write, read) => {
+                    // spawn so we can process incoming requests in parallel
+                    let i_s = i_s.clone();
+                    tokio::task::spawn(async move {
+                        let _ = i_s.incoming_channel(url, write, read).await;
+                    });
+                }
+            }
         }
 
         // Our incoming channels ended,

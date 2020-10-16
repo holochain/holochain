@@ -171,7 +171,11 @@ impl ListenerInnerHandler for TransportListenerQuic {
                 while let Some(Ok((bi_send, bi_recv))) = bi_streams.next().await {
                     let (write, read) = tx_bi_chan(bi_send, bi_recv);
                     if incoming_channel_sender
-                        .send((url_clone.clone(), write, read))
+                        .send(TransportEvent::IncomingChannel(
+                            url_clone.clone(),
+                            write,
+                            read,
+                        ))
                         .await
                         .is_err()
                     {
