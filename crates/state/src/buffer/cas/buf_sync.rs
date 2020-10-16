@@ -66,15 +66,9 @@ where
         r: &'r R,
         hash: &'a HoloHashOf<C>,
     ) -> DatabaseResult<Option<HoloHashed<C>>> {
-        let now = std::time::Instant::now();
-        tracing::info!(line = line!());
         let k = PrefixHashKey::new(hash.as_hash());
-        tracing::info!(line = line!(), ms = ?now.elapsed().as_millis());
         Ok(if let Some(content) = self.0.get(r, &k)? {
-            tracing::info!(line = line!(), ms = ?now.elapsed().as_millis());
-            let r = Some(Self::deserialize_and_hash(hash.get_full_bytes(), content));
-            tracing::info!(line = line!(), ms = ?now.elapsed().as_millis());
-            r
+            Some(Self::deserialize_and_hash(hash.get_full_bytes(), content))
         } else {
             None
         })

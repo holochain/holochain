@@ -468,7 +468,6 @@ where
             tokio::task::spawn({
                 let mut network = network.clone();
                 let options = options.clone();
-                dbg!(&hash);
                 async move {
                     network
                         .get(hash.clone().into(), options)
@@ -480,12 +479,11 @@ where
 
         // try waiting on all the gets but exit if any fail
         let all_responses = futures::future::try_join_all(tasks).await?;
-        dbg!(&all_responses);
 
         // Put the data into the cache from every authority that responded
         for responses in all_responses {
             for response in responses? {
-                self.put_entry_in_cache(dbg!(response)).await?;
+                self.put_entry_in_cache(response).await?;
             }
         }
         Ok(())
@@ -1411,7 +1409,6 @@ where
 
         // Still couldn't find any activity
         if chain_hashes.is_empty() {
-            dbg!();
             Ok(vec![])
         } else {
             // Found the agent activity now get the elements
@@ -1423,7 +1420,6 @@ where
             let mut headers = Vec::with_capacity(chain_hashes.len());
             let mut entries_to_get = Vec::with_capacity(chain_hashes.len());
 
-            dbg!();
             for (_, hash) in chain_hashes {
                 // This is almost guaranteed to be a local call because
                 // we have the chain in the cache.
@@ -1451,7 +1447,7 @@ where
                         }
                     }
                     // Can't retrieve the whole chain so return with no chain
-                    None => return dbg!(Ok(vec![])),
+                    None => return Ok(vec![]),
                 }
             }
 
@@ -1459,10 +1455,9 @@ where
             // call for each entry.
             // It will be a lot faster to do this in parallel instead of series.
             let mut entries = self
-                .retrieve_entries_parallel(dbg!(entries_to_get), Default::default())
+                .retrieve_entries_parallel(entries_to_get, Default::default())
                 .await?
                 .into_iter();
-            dbg!(&entries);
 
             // We have all the entries and headers so we can
             // create the elements to return to the caller.
@@ -1476,14 +1471,13 @@ where
                             elements.push(Element::new(shh, Some(entry.into_content())))
                         }
                         // Failed to find an entry so return with no chain
-                        _ => return dbg!(Ok(vec![])),
+                        _ => return Ok(vec![]),
                     }
                 } else {
                     // Create the element without the entry.
                     elements.push(Element::new(shh, None));
                 }
             }
-            dbg!();
             Ok(elements)
         }
     }

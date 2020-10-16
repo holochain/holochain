@@ -575,10 +575,8 @@ where
                 (Valid(p), Valid(c)) => {
                     if p.header_seq == c.header_seq && p.hash != c.hash {
                         // TODO: Found a fork so insert a fork
-                    } else if p == c {
-                        // Both are the same no need to overwrite
-                        return Ok(());
-                    } else if p.header_seq > c.header_seq {
+                    } else if p == c || p.header_seq > c.header_seq {
+                        // Both are the same no need to overwrite or
                         // Previous is more recent so don't overwrite
                         return Ok(());
                     }
@@ -591,9 +589,9 @@ where
                 (Forked(p), Invalid(c)) if p.fork_seq <= c.header_seq => return Ok(()),
                 (Forked(p), Forked(c)) if p.fork_seq <= c.fork_seq => return Ok(()),
                 // ## Previous is Invalid / Forked and current is valid
-                (Invalid(_), Valid(_)) | (Forked(_), Valid(_)) | 
+                (Invalid(_), Valid(_)) | (Forked(_), Valid(_))
                 // Current is empty
-                (_, Empty) => return Ok(()),
+                | (_, Empty) => return Ok(()),
                 // Previous should never be empty
                 (Empty, _) => unreachable!("Should never cache an empty status"),
                 // The rest are reasons to overwrite
@@ -606,7 +604,8 @@ where
     }
 
     fn deregister_activity_status(&mut self, agent: &AgentPubKey) -> DatabaseResult<()> {
-        self.misc_meta.delete(MiscMetaKey::chain_status(&agent).into())
+        self.misc_meta
+            .delete(MiscMetaKey::chain_status(&agent).into())
     }
 
     fn register_activity_observed(
@@ -616,17 +615,23 @@ where
     ) -> DatabaseResult<()> {
         if let Some(mut prev_observed) = self.get_activity_observed(agent)? {
             if prev_observed.header_seq > observed.header_seq {
-            // If the previous is more recent then don't overwrite
-            } else if prev_observed.header_seq == observed.header_seq && prev_observed.hash != observed.hash {
+                // If the previous is more recent then don't overwrite
+            } else if prev_observed.header_seq == observed.header_seq
+                && prev_observed.hash != observed.hash
+            {
                 // If the observed are the same sequence
                 // Combine the hashes and overwrite
-                let diff = observed.hash.into_iter().filter(|h|prev_observed.hash.contains(h)).collect::<Vec<_>>();
+                let diff = observed
+                    .hash
+                    .into_iter()
+                    .filter(|h| prev_observed.hash.contains(h))
+                    .collect::<Vec<_>>();
                 prev_observed.hash.extend(diff);
 
                 let key = MiscMetaKey::chain_observed(&agent).into();
                 let value = MiscMetaValue::ChainObserved(prev_observed);
                 self.misc_meta.put(key, value)?;
-            } else{
+            } else {
                 let key = MiscMetaKey::chain_observed(&agent).into();
                 let value = MiscMetaValue::ChainObserved(observed);
                 self.misc_meta.put(key, value)?;
@@ -636,7 +641,8 @@ where
     }
 
     fn deregister_activity_observed(&mut self, agent: &AgentPubKey) -> DatabaseResult<()> {
-        self.misc_meta.delete(MiscMetaKey::chain_observed(&agent).into())
+        self.misc_meta
+            .delete(MiscMetaKey::chain_observed(&agent).into())
     }
 
     fn get_headers<'r, R: Readable>(
