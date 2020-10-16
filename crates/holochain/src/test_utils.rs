@@ -259,6 +259,17 @@ pub async fn wait_for_integration(
         });
         tracing::debug!(?int_limbo);
 
+        let int: Vec<_> = fresh_reader_test!(env, |r| {
+            workspace
+                .integrated_dht_ops
+                .iter(&r)
+                .unwrap()
+                .map(|(_, v)| Ok(v))
+                .collect()
+                .unwrap()
+        });
+        tracing::debug!(?int);
+
         let count = fresh_reader_test!(env, |r| {
             workspace
                 .integrated_dht_ops

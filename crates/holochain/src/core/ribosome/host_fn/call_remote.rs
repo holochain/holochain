@@ -221,7 +221,7 @@ pub mod wasm_test {
         // Plus another 14 for genesis.
         // Plus 2 cap
         // Plus 2 init
-        // Init is not run because we aren't calling the zome.
+        // Plus 9 ops for the two commits and link
         let expected_count = 9 + 14 + 2 + 2;
 
         wait_for_integration(
@@ -237,6 +237,19 @@ pub mod wasm_test {
             &alice_call_data.cell_id,
             "get_links_from_other_zome",
             alice_call_data.cell_id.agent_pubkey().clone(),
+            TestWasm::CallRemoteCaller,
+        )
+        .unwrap();
+
+        let links: Links = call(&handle, invocation).await;
+
+        assert_eq!(links.into_inner().len(), 1);
+
+        // Bob gets the links from a different zome in the same dna via remote call (different cell)
+        let invocation = new_invocation(
+            &bob_call_data.cell_id,
+            "get_links_from_my_other_zome",
+            (),
             TestWasm::CallRemoteCaller,
         )
         .unwrap();
