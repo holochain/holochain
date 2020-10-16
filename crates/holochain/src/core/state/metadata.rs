@@ -23,6 +23,7 @@ use holochain_types::{header::NewEntryHeader, link::WireLinkMetaKey};
 use holochain_types::{HeaderHashed, Timestamp};
 use holochain_zome_types::{
     header::{self, CreateLink, DeleteLink, ZomeId},
+    query::ChainFork,
     query::ChainStatus,
     query::HighestObserved,
 };
@@ -569,38 +570,49 @@ where
         // - Invalid overwrites valid and any invalids later in the chain.
         // - Later Valid headers overwrite earlier Valid.
         // - If there are two Valid status at the same seq num then insert an Invalid.
-        if let Some(prev_status) = self.get_activity_status(agent)? {
-            use ChainStatus::*;
-            match (&prev_status, &status) {
+        use ChainStatus::*;
+        let new_status = match self.get_activity_status(agent)? {
+            Some(prev_status) => match (&prev_status, &status) {
                 (Valid(p), Valid(c)) => {
                     if p.header_seq == c.header_seq && p.hash != c.hash {
-                        // TODO: Found a fork so insert a fork
+                        // Found a fork so insert a fork
+                        Some(Forked(ChainFork{
+                            fork_seq: p.header_seq,
+                            first_header: p.hash.clone(),
+                            second_header: c.hash.clone(),
+                        }))
                     } else if p == c || p.header_seq > c.header_seq {
                         // Both are the same no need to overwrite or
                         // Previous is more recent so don't overwrite
-                        return Ok(());
+                        None
+                    } else {
+                        // Otherwise overwrite with current
+                        Some(status)
                     }
-                    // Otherwise overwrite with current
                 }
                 // # Reasons to not overwrite
                 // ## Invalid / Forked where the previous is earlier in the chain
-                (Invalid(p), Forked(c)) if p.header_seq <= c.fork_seq => return Ok(()),
-                (Invalid(p), Invalid(c)) if p.header_seq <= c.header_seq => return Ok(()),
-                (Forked(p), Invalid(c)) if p.fork_seq <= c.header_seq => return Ok(()),
-                (Forked(p), Forked(c)) if p.fork_seq <= c.fork_seq => return Ok(()),
+                (Invalid(p), Forked(c)) if p.header_seq <= c.fork_seq => None,
+                (Invalid(p), Invalid(c)) if p.header_seq <= c.header_seq => None,
+                (Forked(p), Invalid(c)) if p.fork_seq <= c.header_seq => None,
+                (Forked(p), Forked(c)) if p.fork_seq <= c.fork_seq => None,
                 // ## Previous is Invalid / Forked and current is valid
                 (Invalid(_), Valid(_)) | (Forked(_), Valid(_))
                 // Current is empty
-                | (_, Empty) => return Ok(()),
+                | (_, Empty) => None,
                 // Previous should never be empty
                 (Empty, _) => unreachable!("Should never cache an empty status"),
                 // The rest are reasons to overwrite
-                _ => (),
-            }
+                _ => Some(status),
+            },
+            None => None,
+        };
+        if let Some(s) = new_status {
+            let key = MiscMetaKey::chain_status(&agent).into();
+            let value = MiscMetaValue::ChainStatus(s);
+            self.misc_meta.put(key, value)?;
         }
-        let key = MiscMetaKey::chain_status(&agent).into();
-        let value = MiscMetaValue::ChainStatus(status);
-        self.misc_meta.put(key, value)
+        Ok(())
     }
 
     fn deregister_activity_status(&mut self, agent: &AgentPubKey) -> DatabaseResult<()> {
