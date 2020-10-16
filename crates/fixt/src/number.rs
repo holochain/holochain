@@ -7,11 +7,12 @@ macro_rules! fixturator_unsigned {
             $t,
             0,
             {
-                if rand::random() {
-                    rand::random()
+                let mut rng = crate::rng();
+                if rng.gen() {
+                    rng.gen()
                 } else {
                     vec![<$t>::max_value(), <$t>::min_value(), 1]
-                        .choose(&mut rand::thread_rng())
+                        .choose(&mut rng)
                         .unwrap()
                         .to_owned()
                 }
@@ -75,11 +76,12 @@ macro_rules! fixturator_signed {
             $t,
             0,
             {
-                if rand::random() {
-                    rand::random()
+                let mut rng = crate::rng();
+                if rng.gen() {
+                    rng.gen()
                 } else {
                     vec![<$t>::max_value(), <$t>::min_value(), 1]
-                        .choose(&mut rand::thread_rng())
+                        .choose(&mut rng)
                         .unwrap()
                         .to_owned()
                 }
@@ -163,8 +165,9 @@ macro_rules! fixturator_float {
             $t,
             0.0,
             {
-                if rand::random() {
-                    rand::random()
+                let mut rng = crate::rng();
+                if rng.gen() {
+                    rng.gen()
                 } else {
                     vec![
                         std::$t::NEG_INFINITY,
@@ -174,7 +177,7 @@ macro_rules! fixturator_float {
                         0.0,
                         1.0,
                     ]
-                    .choose(&mut rand::thread_rng())
+                    .choose(&mut rng)
                     .unwrap()
                     .to_owned()
                 }
