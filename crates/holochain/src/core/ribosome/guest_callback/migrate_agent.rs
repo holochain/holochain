@@ -127,7 +127,7 @@ mod test {
 
     #[test]
     fn migrate_agent_callback_result_fold() {
-        let mut rng = thread_rng();
+        let mut rng = fixt::rng();
 
         let result_pass = || MigrateAgentResult::Pass;
         let result_fail = || {

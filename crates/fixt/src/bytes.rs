@@ -14,7 +14,7 @@ fixturator!(
     Bytes,
     vec![],
     {
-        let mut rng = rand::thread_rng();
+        let mut rng = crate::rng();
         let len = rng.gen_range(UNPREDICTABLE_MIN_LEN, UNPREDICTABLE_MAX_LEN);
         let mut u8_fixturator = U8Fixturator::new(Unpredictable);
         let mut bytes = vec![];
@@ -42,7 +42,7 @@ fixturator!(
     BytesNotEmpty,
     vec![0u8],
     {
-        let mut rng = rand::thread_rng();
+        let mut rng = crate::rng();
         let len = rng.gen_range(1, UNPREDICTABLE_MAX_LEN);
         let mut u8_fixturator = U8Fixturator::new(Unpredictable);
         let mut bytes = vec![];

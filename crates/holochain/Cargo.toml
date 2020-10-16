@@ -42,7 +42,7 @@ must_future = "0.1.1"
 nanoid = "0.3"
 num_cpus = "1.8"
 observability = { path = "../observability" }
-parking_lot = "0.10.0"
+parking_lot = "0.10"
 predicates = "1.0.4"
 rand = "0.7"
 serde = { version = "1.0.104", features = [ "derive" ] }
