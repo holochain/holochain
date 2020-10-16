@@ -108,7 +108,7 @@ mod test {
 
     #[test]
     fn post_commit_callback_result_fold() {
-        let mut rng = thread_rng();
+        let mut rng = fixt::rng();
 
         let result_success = || PostCommitResult::Success;
         let result_fail = || {
