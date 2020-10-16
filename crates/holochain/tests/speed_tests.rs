@@ -25,6 +25,7 @@ use holochain::conductor::{
 };
 use holochain::fixt::*;
 use holochain::{core::ribosome::ZomeCallInvocation, test_utils::warm_wasm_tests};
+use holochain_state::test_utils::test_p2p_env;
 use holochain_state::test_utils::{test_conductor_env, test_wasm_env, TestEnvironment};
 use holochain_types::app::InstalledCell;
 use holochain_types::cell::CellId;
@@ -332,6 +333,11 @@ pub async fn setup_app(
         tmpdir: _tmpdir,
     } = test_wasm_env();
 
+    let TestEnvironment {
+        env: p2p_env,
+        tmpdir: _p2p_tmpdir,
+    } = test_p2p_env();
+
     let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
         .config(ConductorConfig {
             admin_interfaces: Some(vec![AdminInterfaceConfig {
@@ -339,7 +345,7 @@ pub async fn setup_app(
             }]),
             ..Default::default()
         })
-        .test(test_env.clone(), wasm_env)
+        .test(test_env.clone(), wasm_env, p2p_env)
         .await
         .unwrap();
 

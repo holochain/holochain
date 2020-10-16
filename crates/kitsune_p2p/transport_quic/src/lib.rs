@@ -47,8 +47,6 @@ pub(crate) async fn url_to_addr(url: &Url2, scheme: &str) -> TransportResult<Soc
     Err(format!("could not parse '{}', as 'host:port'", rendered).into())
 }
 
-mod connection;
-
 mod listener;
 pub use listener::*;
 

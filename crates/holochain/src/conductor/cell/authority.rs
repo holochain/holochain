@@ -14,8 +14,8 @@ use holochain_types::{
     metadata::TimedHeaderHash,
 };
 use holochain_zome_types::{
-    element::SignedHeaderHashed, header::conversions::WrongHeaderError, query::AgentActivity,
-    query::ChainQueryFilter,
+    element::SignedHeaderHashed, header::conversions::WrongHeaderError, query::Activity,
+    query::AgentActivity, query::ChainHead, query::ChainQueryFilter,
 };
 use std::{collections::BTreeSet, convert::TryInto};
 use tracing::*;
@@ -172,31 +172,66 @@ pub fn handle_get_agent_activity(
 ) -> CellResult<AgentActivity> {
     let element_integrated = ElementBuf::vault(env.clone(), false)?;
     let meta_integrated = MetadataBuf::vault(env.clone())?;
+    let element_rejected = ElementBuf::rejected(env.clone())?;
+    let meta_rejected = MetadataBuf::rejected(env.clone())?;
 
     if options.include_activity {
         fresh_reader!(env, |r| {
-            Ok(AgentActivity::valid(
-                meta_integrated
-                    .get_activity(&r, ChainItemKey::Agent(agent))?
-                    .filter_map(|h| element_integrated.get_header(&h.header_hash))
+            let activity: Vec<_> = meta_integrated
+                .get_activity(&r, ChainItemKey::Agent(agent.clone()))?
+                .collect()?;
+            info!(line = line!());
+            let now = std::time::Instant::now();
+            let activity: Vec<SignedHeaderHashed> =
+                fallible_iterator::convert(activity.into_iter().map(Ok))
+                    .filter_map(|h| element_integrated.get_header_with_reader(&r, &h.header_hash))
+                    .collect()?;
+            tracing::info!(line = line!(), us = ?now.elapsed().as_micros());
+            let mut activity: Vec<Activity> = activity
+                .into_iter()
+                .filter(|shh| query.check(shh.header()))
+                .map(Activity::valid)
+                .collect();
+            activity.extend(
+                meta_rejected
+                    .get_activity(&r, ChainItemKey::Agent(agent.clone()))?
+                    .filter_map(|h| element_rejected.get_header(&h.header_hash))
                     .filter(|shh| Ok(query.check(shh.header())))
-                    .collect()?,
-            ))
+                    .map(|shh| Ok(Activity::rejected(shh)))
+                    .collect::<Vec<_>>()?,
+            );
+            // TODO: Add abandoned
+            activity.sort_unstable_by_key(|a| a.header.header().header_seq());
+            Ok(AgentActivity::valid(activity, agent))
         })
     } else {
         fresh_reader!(env, |r| {
-            match meta_integrated
-                .get_activity(&r, ChainItemKey::Agent(agent))?
-                .last()?
-            {
-                Some(h) => {
-                    // TODO: Just get the sequence number from the key (Doable in the next PR)
-                    match element_integrated.get_header(&h.header_hash)? {
-                        Some(shh) => Ok(AgentActivity::valid_without_activity(shh.header())),
-                        None => Ok(AgentActivity::empty()),
+            let integrated = meta_integrated
+                .get_activity_sequence(&r, ChainItemKey::Agent(agent.clone()))?
+                .last()?;
+            let rejected = meta_rejected
+                .get_activity_sequence(&r, ChainItemKey::Agent(agent.clone()))?
+                .last()?;
+            let chain_head = integrated.map(|i| match rejected {
+                Some(r) => {
+                    if i.0 >= r.0 {
+                        i
+                    } else {
+                        r
                     }
                 }
-                None => Ok(AgentActivity::empty()),
+                None => i,
+            });
+            match chain_head {
+                Some((header_seq, hash)) => {
+                    let chain_head = ChainHead { header_seq, hash };
+                    // TODO: Note that the chain is still valid even though the individual
+                    // header has been rejected. I'm not sure how this will play
+                    // out when we add warrants because the warrant will make the
+                    // chain invalid. @freesig
+                    Ok(AgentActivity::valid_without_activity(chain_head, agent))
+                }
+                None => Ok(AgentActivity::empty(agent)),
             }
         })
     }
