@@ -21,7 +21,12 @@ use holochain_state::{
 use holochain_types::metadata::{EntryDhtStatus, TimedHeaderHash};
 use holochain_types::{header::NewEntryHeader, link::WireLinkMetaKey};
 use holochain_types::{HeaderHashed, Timestamp};
-use holochain_zome_types::header::{self, CreateLink, DeleteLink, ZomeId};
+use holochain_zome_types::{
+    header::{self, CreateLink, DeleteLink, ZomeId},
+    query::ChainFork,
+    query::ChainStatus,
+    query::HighestObserved,
+};
 use holochain_zome_types::{link::LinkTag, Header};
 use std::fmt::Debug;
 use tracing::*;
@@ -127,6 +132,26 @@ where
     /// Deregister a custom validation package on a [HeaderHash]
     fn deregister_validation_package(&mut self, header: &HeaderHash);
 
+    /// Registers the agents chain status on the authoring agent's public key
+    fn register_activity_status(
+        &mut self,
+        agent: &AgentPubKey,
+        status: ChainStatus,
+    ) -> DatabaseResult<()>;
+
+    /// Deregister the agents chain status on the authoring agent's public key
+    fn deregister_activity_status(&mut self, agent: &AgentPubKey) -> DatabaseResult<()>;
+
+    /// Registers the highest observed sequence number on an agents chain
+    fn register_activity_observed(
+        &mut self,
+        agent: &AgentPubKey,
+        observed: HighestObserved,
+    ) -> DatabaseResult<()>;
+
+    /// Deregister the highest observed sequence number on an agents chain
+    fn deregister_activity_observed(&mut self, agent: &AgentPubKey) -> DatabaseResult<()>;
+
     /// Registers a [Header::Update] on the referenced [Header] or [Entry]
     fn register_update(&mut self, update: header::Update) -> DatabaseResult<()>;
 
@@ -176,6 +201,13 @@ where
         r: &'r R,
         hash: &HeaderHash,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>;
+
+    /// Get the current status of this agents chain
+    fn get_activity_status(&self, agent: &AgentPubKey) -> DatabaseResult<Option<ChainStatus>>;
+
+    /// Get the current highest observed header on this agents chain
+    fn get_activity_observed(&self, agent: &AgentPubKey)
+        -> DatabaseResult<Option<HighestObserved>>;
 
     /// Returns all the hashes of [Update] headers registered on an [Entry]
     fn get_updates<'r, R: Readable>(
@@ -565,6 +597,102 @@ where
         self.system_meta.delete_all(PrefixBytesKey::new(key));
     }
 
+    fn register_activity_status(
+        &mut self,
+        agent: &AgentPubKey,
+        status: ChainStatus,
+    ) -> DatabaseResult<()> {
+        // Rules to make this monotonic
+        // - Invalid overwrites valid and any invalids later in the chain.
+        // - Later Valid headers overwrite earlier Valid.
+        // - If there are two Valid status at the same seq num then insert an Invalid.
+        use ChainStatus::*;
+        let new_status = match self.get_activity_status(agent)? {
+            Some(prev_status) => match (&prev_status, &status) {
+                (Valid(p), Valid(c)) => {
+                    if p.header_seq == c.header_seq && p.hash != c.hash {
+                        // Found a fork so insert a fork
+                        Some(Forked(ChainFork{
+                            fork_seq: p.header_seq,
+                            first_header: p.hash.clone(),
+                            second_header: c.hash.clone(),
+                        }))
+                    } else if p == c || p.header_seq > c.header_seq {
+                        // Both are the same no need to overwrite or
+                        // Previous is more recent so don't overwrite
+                        None
+                    } else {
+                        // Otherwise overwrite with current
+                        Some(status)
+                    }
+                }
+                // # Reasons to not overwrite
+                // ## Invalid / Forked where the previous is earlier in the chain
+                (Invalid(p), Forked(c)) if p.header_seq <= c.fork_seq => None,
+                (Invalid(p), Invalid(c)) if p.header_seq <= c.header_seq => None,
+                (Forked(p), Invalid(c)) if p.fork_seq <= c.header_seq => None,
+                (Forked(p), Forked(c)) if p.fork_seq <= c.fork_seq => None,
+                // ## Previous is Invalid / Forked and current is valid
+                (Invalid(_), Valid(_)) | (Forked(_), Valid(_))
+                // Current is empty
+                | (_, Empty) => None,
+                // Previous should never be empty
+                (Empty, _) => unreachable!("Should never cache an empty status"),
+                // The rest are reasons to overwrite
+                _ => Some(status),
+            },
+            None => None,
+        };
+        if let Some(s) = new_status {
+            let key = MiscMetaKey::chain_status(&agent).into();
+            let value = MiscMetaValue::ChainStatus(s);
+            self.misc_meta.put(key, value)?;
+        }
+        Ok(())
+    }
+
+    fn deregister_activity_status(&mut self, agent: &AgentPubKey) -> DatabaseResult<()> {
+        self.misc_meta
+            .delete(MiscMetaKey::chain_status(&agent).into())
+    }
+
+    fn register_activity_observed(
+        &mut self,
+        agent: &AgentPubKey,
+        observed: HighestObserved,
+    ) -> DatabaseResult<()> {
+        if let Some(mut prev_observed) = self.get_activity_observed(agent)? {
+            if prev_observed.header_seq > observed.header_seq {
+                // If the previous is more recent then don't overwrite
+            } else if prev_observed.header_seq == observed.header_seq
+                && prev_observed.hash != observed.hash
+            {
+                // If the observed are the same sequence
+                // Combine the hashes and overwrite
+                let diff = observed
+                    .hash
+                    .into_iter()
+                    .filter(|h| prev_observed.hash.contains(h))
+                    .collect::<Vec<_>>();
+                prev_observed.hash.extend(diff);
+
+                let key = MiscMetaKey::chain_observed(&agent).into();
+                let value = MiscMetaValue::ChainObserved(prev_observed);
+                self.misc_meta.put(key, value)?;
+            } else {
+                let key = MiscMetaKey::chain_observed(&agent).into();
+                let value = MiscMetaValue::ChainObserved(observed);
+                self.misc_meta.put(key, value)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn deregister_activity_observed(&mut self, agent: &AgentPubKey) -> DatabaseResult<()> {
+        self.misc_meta
+            .delete(MiscMetaKey::chain_observed(&agent).into())
+    }
+
     fn get_headers<'r, R: Readable>(
         &'r self,
         r: &'r R,
@@ -701,6 +829,21 @@ where
                 })
             }),
         ))
+    }
+
+    fn get_activity_status(&self, agent: &AgentPubKey) -> DatabaseResult<Option<ChainStatus>> {
+        let key = MiscMetaKey::chain_status(&agent).into();
+        Ok(fresh_reader!(self.env, |r| self.misc_meta.get(&r, &key))?
+            .map(MiscMetaValue::chain_status))
+    }
+
+    fn get_activity_observed(
+        &self,
+        agent: &AgentPubKey,
+    ) -> DatabaseResult<Option<HighestObserved>> {
+        let key = MiscMetaKey::chain_observed(&agent).into();
+        Ok(fresh_reader!(self.env, |r| self.misc_meta.get(&r, &key))?
+            .map(MiscMetaValue::chain_observed))
     }
 
     // TODO: For now this is only checking for deletes

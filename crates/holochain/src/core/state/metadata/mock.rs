@@ -19,6 +19,18 @@ mock! {
             &mut self,
             header: &Header,
         ) -> DatabaseResult<()>;
+        fn register_activity_status(
+            &mut self,
+            agent: &AgentPubKey,
+            status: ChainStatus,
+        ) -> DatabaseResult<()>;
+        fn deregister_activity_status(&mut self, agent: &AgentPubKey) -> DatabaseResult<()>;
+        fn register_activity_observed(
+            &mut self,
+            agent: &AgentPubKey,
+            observed: HighestObserved,
+        ) -> DatabaseResult<()>;
+        fn deregister_activity_observed(&mut self, agent: &AgentPubKey) -> DatabaseResult<()>;
         fn sync_register_update(&mut self, update: header::Update) -> DatabaseResult<()>;
         fn sync_register_delete(&mut self, delete: header::Delete) -> DatabaseResult<()>;
         fn sync_deregister_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()>;
@@ -60,6 +72,9 @@ mock! {
             &self,
             hash: &HeaderHash,
         ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError>>>;
+        fn get_activity_status(&self, agent: &AgentPubKey) -> DatabaseResult<Option<ChainStatus>>;
+        fn get_activity_observed(&self, agent: &AgentPubKey)
+        -> DatabaseResult<Option<HighestObserved>>;
         fn get_updates(
             &self,
             hash: AnyDhtHash,
@@ -155,6 +170,17 @@ impl MetadataBufT for MockMetadataBuf {
         self.get_validation_package(hash)
     }
 
+    fn get_activity_status(&self, agent: &AgentPubKey) -> DatabaseResult<Option<ChainStatus>> {
+        self.get_activity_status(agent)
+    }
+
+    fn get_activity_observed(
+        &self,
+        agent: &AgentPubKey,
+    ) -> DatabaseResult<Option<HighestObserved>> {
+        self.get_activity_observed(agent)
+    }
+
     fn get_updates<'r, R: Readable>(
         &'r self,
         _reader: &'r R,
@@ -208,6 +234,26 @@ impl MetadataBufT for MockMetadataBuf {
 
     fn register_activity(&mut self, header: &Header) -> DatabaseResult<()> {
         self.sync_register_activity(header)
+    }
+    fn register_activity_status(
+        &mut self,
+        agent: &AgentPubKey,
+        status: ChainStatus,
+    ) -> DatabaseResult<()> {
+        self.register_activity_status(agent, status)
+    }
+    fn deregister_activity_status(&mut self, agent: &AgentPubKey) -> DatabaseResult<()> {
+        self.deregister_activity_status(agent)
+    }
+    fn register_activity_observed(
+        &mut self,
+        agent: &AgentPubKey,
+        observed: HighestObserved,
+    ) -> DatabaseResult<()> {
+        self.register_activity_observed(agent, observed)
+    }
+    fn deregister_activity_observed(&mut self, agent: &AgentPubKey) -> DatabaseResult<()> {
+        self.deregister_activity_observed(agent)
     }
 
     fn register_update(&mut self, update: header::Update) -> DatabaseResult<()> {

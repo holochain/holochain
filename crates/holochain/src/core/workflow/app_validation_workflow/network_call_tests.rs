@@ -8,7 +8,7 @@ use holochain_state::env::EnvironmentRead;
 use holochain_types::chain::AgentActivityExt;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::{
-    query::{AgentActivity, ChainQueryFilter},
+    query::{Activity, AgentActivity, ChainQueryFilter},
     ZomeCallResponse,
 };
 use matches::assert_matches;
@@ -32,6 +32,7 @@ use crate::{
 // if they are there.
 const NUM_ATTEMPTS: usize = 100;
 const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
+const NUM_COMMITS: usize = 1;
 
 #[tokio::test(threaded_scheduler)]
 async fn get_validation_package_test() {
@@ -156,13 +157,28 @@ async fn get_agent_activity_test() {
     } = conductor_test;
     let alice_cell_id = &alice_call_data.cell_id;
     let alice_agent_id = alice_cell_id.agent_pubkey();
+    let alice_env = alice_call_data.env.clone();
+
+    // Helper for getting expected data
+    let get_expected = || {
+        let alice_source_chain = SourceChain::public_only(alice_env.clone().into()).unwrap();
+        let expected_activity = alice_source_chain
+            .iter_back()
+            .collect::<Vec<_>>()
+            .unwrap()
+            .into_iter()
+            .rev()
+            .map(|shh| Activity::valid(shh))
+            .collect();
+        AgentActivity::valid(expected_activity, alice_agent_id.clone())
+    };
 
     commit_some_data("create_entry", &alice_call_data).await;
 
     alice_call_data.triggers.produce_dht_ops.trigger();
 
     // 3 ops per commit, 5 commits plus 7 for genesis
-    let mut expected_count = 3 * 5 + 7;
+    let mut expected_count = NUM_COMMITS * 3 + 7;
 
     wait_for_integration(
         &alice_call_data.env,
@@ -186,15 +202,7 @@ async fn get_agent_activity_test() {
         .expect("Failed to get any activity from alice");
 
     // Expecting every header from the latest to the beginning
-    let alice_source_chain = SourceChain::public_only(alice_call_data.env.clone().into()).unwrap();
-    let expected_activity = alice_source_chain
-        .iter_back()
-        .collect::<Vec<_>>()
-        .unwrap()
-        .into_iter()
-        .rev()
-        .collect();
-    let expected_activity = AgentActivity::valid(expected_activity);
+    let expected_activity = get_expected();
     assert_eq!(agent_activity, expected_activity);
 
     let mut element_cache = ElementBuf::cache(alice_call_data.env.clone().into()).unwrap();
@@ -204,7 +212,7 @@ async fn get_agent_activity_test() {
         .with_cache(cache_data)
         .with_network(alice_call_data.network.clone());
 
-    // Cascade without entries
+    // Call the cascade without entries and check we get the headers
     let agent_activity = cascade
         .get_agent_activity(
             alice_agent_id.clone(),
@@ -214,26 +222,45 @@ async fn get_agent_activity_test() {
         .await
         .expect("Failed to get any activity from alice");
 
-    let expected_activity: Vec<_> = expected_activity
+    let expected_activity: Vec<_> = get_expected()
         .activity
         .into_iter()
-        .map(|shh| Element::new(shh, None))
+        .map(|a| Element::new(a.header, None))
         .collect();
+
     assert_eq!(agent_activity, expected_activity);
 
-    // Cascade with entries
-    let agent_activity = cascade
-        .get_agent_activity(
-            alice_agent_id.clone(),
-            ChainQueryFilter::new().include_entries(true),
-            Default::default(),
-        )
-        .await
-        .expect("Failed to get any activity from alice");
+    // Call the cascade and check we can get the entries as well
+    // Parallel gets to the same agent can overwhelm them so we
+    // need to try a few time
+    let mut agent_activity = None;
+    for _ in 0..100 {
+        let r = cascade
+            .get_agent_activity(
+                alice_agent_id.clone(),
+                ChainQueryFilter::new().include_entries(true),
+                Default::default(),
+            )
+            .await
+            .expect("Failed to get any activity from alice");
+        if !r.is_empty() {
+            agent_activity = Some(r);
+            break;
+        }
+        tokio::time::delay_for(std::time::Duration::from_millis(100)).await;
+    }
+    let agent_activity = agent_activity.expect("Failed to get any activity from alice");
 
-    let expected_activity: Vec<_> = expected_activity
+    let alice_source_chain = SourceChain::public_only(alice_call_data.env.clone().into()).unwrap();
+    let expected_activity: Vec<_> = get_expected()
+        .activity
         .into_iter()
-        .filter_map(|el| alice_source_chain.get_element(el.header_address()).unwrap())
+        // We are expecting the full elements with entries
+        .filter_map(|a| {
+            alice_source_chain
+                .get_element(a.header.header_address())
+                .unwrap()
+        })
         .collect();
     assert_eq!(agent_activity, expected_activity);
 
@@ -242,7 +269,7 @@ async fn get_agent_activity_test() {
 
     alice_call_data.triggers.produce_dht_ops.trigger();
 
-    expected_count += 2 * 5;
+    expected_count += NUM_COMMITS * 2;
     wait_for_integration(
         &alice_call_data.env,
         expected_count,
@@ -265,21 +292,14 @@ async fn get_agent_activity_test() {
         .expect("Failed to get any activity from alice");
 
     // Expecting every header from the latest to the beginning
-    let alice_source_chain = SourceChain::public_only(alice_call_data.env.clone().into()).unwrap();
-    let expected_activity = alice_source_chain
-        .iter_back()
-        .collect::<Vec<_>>()
-        .unwrap()
-        .into_iter()
-        .rev()
-        .collect();
-    let expected_activity = AgentActivity::valid(expected_activity);
+    let expected_activity = get_expected();
     assert_eq!(agent_activity, expected_activity);
 
-    // Commit private messages
+    // Commit messages
     let header_hash = commit_some_data("create_msg", &alice_call_data).await;
 
     // Get the entry type
+    let alice_source_chain = SourceChain::public_only(alice_call_data.env.clone().into()).unwrap();
     let entry_type = alice_source_chain
         .get_element(&header_hash)
         .unwrap()
@@ -290,8 +310,9 @@ async fn get_agent_activity_test() {
         .1
         .clone();
 
+    // Wait for alice to integrate the chain as an authority
     alice_call_data.triggers.produce_dht_ops.trigger();
-    expected_count += 3 * 5;
+    expected_count += NUM_COMMITS * 3;
     wait_for_integration(
         &alice_call_data.env,
         expected_count,
@@ -300,6 +321,7 @@ async fn get_agent_activity_test() {
     )
     .await;
 
+    // Call alice and get the activity
     let mut agent_activity = alice_call_data
         .network
         .get_agent_activity(
@@ -309,29 +331,28 @@ async fn get_agent_activity_test() {
         )
         .await
         .unwrap();
+
+    // Pop out alice's response.
     let agent_activity = agent_activity
         .pop()
         .expect("Failed to get any activity from alice");
 
-    let alice_source_chain = SourceChain::public_only(alice_call_data.env.clone().into()).unwrap();
-    let expected_activity = alice_source_chain
-        .iter_back()
-        .filter_map(|shh| {
-            Ok(shh.header().entry_type().cloned().and_then(|et| {
-                if et == entry_type {
-                    Some(shh)
-                } else {
-                    None
-                }
-            }))
+    // This time we expect only activity that matches the entry type
+    let mut expected_activity = get_expected();
+    let activity = expected_activity
+        .activity
+        .iter()
+        .filter(|a| {
+            a.header
+                .header()
+                .entry_type()
+                .map(|et| *et == entry_type)
+                .unwrap_or(false)
         })
-        .collect::<Vec<_>>()
-        .unwrap()
-        .into_iter()
-        .rev()
+        .cloned()
         .collect();
+    expected_activity.activity = activity;
 
-    let expected_activity = AgentActivity::valid(expected_activity);
     assert_eq!(agent_activity, expected_activity);
 
     ConductorTestData::shutdown_conductor(handle).await;
@@ -445,7 +466,7 @@ async fn get_custom_package_test() {
 async fn commit_some_data(call: &'static str, alice_call_data: &ConductorCallData) -> HeaderHash {
     let mut header_hash = None;
     // Commit 5 entries
-    for _ in 0..5 {
+    for _ in 0..NUM_COMMITS {
         let invocation =
             new_invocation(&alice_call_data.cell_id, call, (), TestWasm::Create).unwrap();
         header_hash = Some(

@@ -37,8 +37,11 @@ use holochain_zome_types::{
     header::HeaderType,
     link::Link,
     metadata::{Details, ElementDetails, EntryDetails},
+    query::AgentActivity,
     query::ChainQueryFilter,
+    query::ChainStatus,
     validate::RequiredValidationType,
+    validate::ValidationStatus,
 };
 use std::collections::HashSet;
 use std::collections::{BTreeMap, BTreeSet};
@@ -308,14 +311,49 @@ where
 
     /// Put a header into the cache when receiving it from a `get_agent_activity` call.
     /// We can't produce all the ops because we don't have the entry.
-    async fn update_agent_activity_stores(&mut self, shh: SignedHeaderHashed) -> CascadeResult<()> {
+    async fn update_agent_activity_stores(
+        &mut self,
+        agent_activity: AgentActivity,
+    ) -> CascadeResult<()> {
         let cache_data = ok_or_return!(self.cache_data.as_mut());
-        let op = DhtOpLight::RegisterAgentActivity(
-            shh.header_address().clone(),
-            shh.header().author().clone().into(),
-        );
-        cache_data.element.put(shh, None)?;
-        integrate_single_metadata(op, cache_data.element, cache_data.meta)?;
+        let AgentActivity {
+            agent,
+            activity,
+            // Cache the chain status in the metadata
+            // Any invalid overwrites valid.
+            // The earlier chain issue overwrites later.
+            status,
+            // Cache the highest observed
+            // Highest overwrites lower observed.
+            // Same seq number are combined to show a fork
+            highest_observed,
+        } = agent_activity;
+        cache_data.meta.register_activity_status(&agent, status)?;
+        if let Some(highest_observed) = highest_observed {
+            cache_data
+                .meta
+                .register_activity_observed(&agent, highest_observed)?;
+        }
+        for a in activity {
+            match a.validation_status {
+                ValidationStatus::Valid => {
+                    let op = DhtOpLight::RegisterAgentActivity(
+                        a.header.header_address().clone(),
+                        a.header.header().author().clone().into(),
+                    );
+                    cache_data.element.put(a.header, None)?;
+                    integrate_single_metadata(op, cache_data.element, cache_data.meta)?;
+                }
+                ValidationStatus::Rejected => {
+                    todo!("Make a rejected cache so we can store agent activity if it's rejected")
+                }
+                ValidationStatus::Abandoned => {
+                    // TODO: This makes less sense to me.
+                    // Do we really want to send around abandoned headers?
+                    todo!("Maybe make a abandoned cache so we can store agent activity if it's rejected")
+                }
+            }
+        }
         Ok(())
     }
 
@@ -1225,11 +1263,9 @@ where
         options: GetActivityOptions,
     ) -> CascadeResult<()> {
         let network = ok_or_return!(self.network.as_mut());
-        let agent_activity = network.get_agent_activity(agent, query, options).await?;
-        for activity in agent_activity {
-            for shh in activity.activity {
-                self.update_agent_activity_stores(shh).await?;
-            }
+        let all_agent_activity = network.get_agent_activity(agent, query, options).await?;
+        for agent_activity in all_agent_activity {
+            self.update_agent_activity_stores(agent_activity).await?;
         }
         Ok(())
     }
@@ -1239,7 +1275,7 @@ where
         range: &Option<std::ops::Range<u32>>,
         cache_data: &DbPairMut<'a, MetaCache>,
         env: &EnvironmentRead,
-    ) -> CascadeResult<Vec<HeaderHash>> {
+    ) -> CascadeResult<Vec<(u32, HeaderHash)>> {
         match range {
             Some(range) => {
                 // One less than the end of an exclusive range is actually
@@ -1263,7 +1299,6 @@ where
                             // TODO: PERF: Use an iter from to start from the correct sequence
                             .skip_while(|(s, _)| Ok(*s < range.start))
                             .take_while(|(s, _)| Ok(*s < range.end))
-                            .map(|(_, hash)| Ok(hash))
                             .collect()?)
                     } else {
                         // The requested chain is not in our cache.
@@ -1276,7 +1311,6 @@ where
                 Ok(cache_data
                     .meta
                     .get_activity_sequence(&r, ChainItemKey::Agent(agent))?
-                    .map(|(_, hash)| Ok(hash))
                     .collect()?)
             }),
         }
@@ -1295,6 +1329,20 @@ where
         query: ChainQueryFilter,
         options: GetActivityOptions,
     ) -> CascadeResult<Vec<Element>> {
+        // ## When requesting a range
+        // If we have some cached agent activity then don't fetch the activity.
+        // Instead fetch just the status and see if the chain is still valid
+        // up to that point.
+        //
+        // If it's different then do a full fetch.
+        // Fetch status without activity
+        {
+            let mut options = options.clone();
+            options.include_activity = false;
+            self.fetch_agent_activity(agent.clone(), query.clone(), options)
+                .await?;
+        }
+
         let mut chain_hashes = {
             let cache_data = ok_or_return!(self.cache_data.as_ref(), vec![]);
             let env = ok_or_return!(self.env.as_ref(), vec![]);
@@ -1306,12 +1354,26 @@ where
                     return Ok(vec![]);
                 }
                 // Try getting the activity from the cache.
-                Self::get_agent_activity_from_cache(
+                let chain_hashes = Self::get_agent_activity_from_cache(
                     agent.clone(),
                     &query.sequence_range,
                     cache_data,
                     env,
-                )?
+                )?;
+                if let Some(chain_head) = chain_hashes.last() {
+                    match cache_data.meta.get_activity_status(&agent)? {
+                        Some(ChainStatus::Valid(status)) => {
+                            if status.header_seq == chain_head.0 && status.hash == chain_head.1 {
+                                chain_hashes
+                            } else {
+                                vec![]
+                            }
+                        }
+                        _ => vec![],
+                    }
+                } else {
+                    vec![]
+                }
             } else {
                 // It only makes sense to check the cache first if
                 // a range has been requested otherwise
@@ -1359,7 +1421,7 @@ where
             let mut headers = Vec::with_capacity(chain_hashes.len());
             let mut entries_to_get = Vec::with_capacity(chain_hashes.len());
 
-            for hash in chain_hashes {
+            for (_, hash) in chain_hashes {
                 // This is almost guaranteed to be a local call because
                 // we have the chain in the cache.
                 // Therefor it's ok to do this in series.
@@ -1490,7 +1552,7 @@ where
         let hashes = Self::get_agent_activity_from_cache(agent, &range, cache_data, env)?;
         if hashes.len() == header_seq as usize {
             let mut elements = Vec::with_capacity(hashes.len());
-            for hash in hashes {
+            for (_, hash) in hashes {
                 match self.get_element_local_raw(&hash)? {
                     Some(el) => elements.push(el),
                     None => return Ok(None),
