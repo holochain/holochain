@@ -36,7 +36,9 @@ use holochain_types::{
     validate::ValidationStatus,
     Entry, EntryHashed, Timestamp,
 };
-use holochain_zome_types::{element::ElementEntry, signature::Signature};
+use holochain_zome_types::{
+    element::ElementEntry, query::ChainHead, query::ChainStatus, signature::Signature,
+};
 use holochain_zome_types::{element::SignedHeader, Header};
 use produce_dht_ops_workflow::dht_op_light::{
     error::{DhtOpConvertError, DhtOpConvertResult},
@@ -172,12 +174,15 @@ async fn integrate_single_dht_op(
                 &mut workspace.elements,
                 &mut workspace.meta,
             )?),
-            ValidationStatus::Rejected => Ok(integrate_data_and_meta(
-                iv,
-                op,
-                &mut workspace.element_rejected,
-                &mut workspace.meta_rejected,
-            )?),
+            ValidationStatus::Rejected => {
+                update_activity_status(&op, &mut workspace.meta)?;
+                Ok(integrate_data_and_meta(
+                    iv,
+                    op,
+                    &mut workspace.element_rejected,
+                    &mut workspace.meta_rejected,
+                )?)
+            }
             ValidationStatus::Abandoned => {
                 // Throwing away abandoned ops
                 // TODO: keep abandoned ops but remove the entries
@@ -213,6 +218,21 @@ fn integrate_data_and_meta<P: PrefixType>(
     Ok(Outcome::Integrated(integrated))
 }
 
+/// Update the status of agent activity if an op
+/// is rejected by the agent authority.
+fn update_activity_status(
+    op: &DhtOp,
+    meta_integrated: &mut impl MetadataBufT,
+) -> WorkflowResult<()> {
+    if let DhtOp::RegisterAgentActivity(_, h) = &op {
+        let chain_head = ChainHead {
+            header_seq: h.header_seq(),
+            hash: HeaderHash::with_data_sync(h),
+        };
+        meta_integrated.register_activity_status(h.author(), ChainStatus::Invalid(chain_head))?;
+    }
+    Ok(())
+}
 /// Check if we have the required dependencies held before integrating.
 async fn op_dependencies_held(
     op: &DhtOp,

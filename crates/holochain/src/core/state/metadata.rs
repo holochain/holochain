@@ -24,6 +24,7 @@ use holochain_types::{HeaderHashed, Timestamp};
 use holochain_zome_types::{
     header::{self, CreateLink, DeleteLink, ZomeId},
     query::ChainFork,
+    query::ChainHead,
     query::ChainStatus,
     query::HighestObserved,
 };
@@ -402,6 +403,46 @@ where
         )
     }
 
+    /// Check the activity chain for forks and gaps.
+    /// If there is a fork record a forked chain status.
+    /// Otherwise if there are no gaps then record a valid chain.
+    fn update_activity_status(&mut self, header: &Header) -> DatabaseResult<()> {
+        let key = ChainItemKey::from(header);
+        let status = fresh_reader!(self.env, |r| {
+            let mut iter = self.get_activity_sequence(&r, key)?;
+            let mut last = None;
+            let mut chain_complete = true;
+            while let Some((seq, hash)) = iter.next()? {
+                if let Some((last_seq, last_hash)) = last {
+                    if last_seq == seq {
+                        // Chain is forked
+                        return Ok(Some(ChainStatus::Forked(ChainFork {
+                            fork_seq: last_seq,
+                            first_header: last_hash,
+                            second_header: hash,
+                        })));
+                    }
+                    if seq != last_seq + 1 {
+                        // Chain broken but still check for forks
+                        chain_complete = false;
+                    }
+                }
+                last = Some((seq, hash));
+            }
+            if chain_complete {
+                return Ok(Some(ChainStatus::Valid(ChainHead {
+                    header_seq: header.header_seq(),
+                    hash: HeaderHash::with_data_sync(header),
+                })));
+            }
+            DatabaseResult::Ok(None)
+        })?;
+        if let Some(status) = status {
+            self.register_activity_status(header.author(), status)?;
+        }
+        Ok(())
+    }
+
     #[cfg(test)]
     pub fn clear_all(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
         self.links_meta.clear_all(writer)?;
@@ -570,12 +611,15 @@ where
         let key = ChainItemKey::from(header);
         let key = MiscMetaKey::chain_item(&key).into();
         let value = MiscMetaValue::ChainItem(header.timestamp().clone().into());
-        self.misc_meta.put(key, value)
+        self.misc_meta.put(key, value)?;
+        self.update_activity_status(header)
     }
 
     fn deregister_activity(&mut self, header: &Header) -> DatabaseResult<()> {
         let key = ChainItemKey::from(header);
-        self.misc_meta.delete(MiscMetaKey::chain_item(&key).into())
+        self.misc_meta
+            .delete(MiscMetaKey::chain_item(&key).into())?;
+        self.update_activity_status(header)
     }
 
     fn register_validation_package(
