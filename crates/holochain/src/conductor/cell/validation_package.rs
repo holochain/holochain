@@ -1,8 +1,15 @@
+use call_zome_workflow::CallZomeWorkspaceLock;
+use holochain_p2p::HolochainP2pCell;
 use holochain_state::{env::EnvironmentRead, error::DatabaseResult, prelude::*};
 use holochain_types::{dna::DnaFile, HeaderHashed};
-use holochain_zome_types::Header;
 
-use crate::core::state::cascade::{Cascade, DbPair, DbPairMut};
+use crate::core::{
+    ribosome::guest_callback::validation_package::ValidationPackageHostAccess,
+    ribosome::guest_callback::validation_package::ValidationPackageInvocation,
+    ribosome::guest_callback::validation_package::ValidationPackageResult,
+    ribosome::RibosomeT,
+    state::cascade::{Cascade, DbPair, DbPairMut},
+};
 
 use super::*;
 
@@ -36,14 +43,18 @@ impl ValidationPackageDb {
     }
 }
 
+#[instrument(skip(header_hashed, env, ribosome, conductor_api, network))]
 pub(super) async fn get_as_author(
-    header: Header,
+    header_hashed: HeaderHashed,
     env: EnvironmentRead,
-    dna_file: &DnaFile,
+    ribosome: &impl RibosomeT,
     conductor_api: &impl CellConductorApiT,
+    network: &HolochainP2pCell,
 ) -> CellResult<ValidationPackageResponse> {
+    let header = header_hashed.as_content();
+
     // Get the source chain with public data only
-    let source_chain = SourceChain::public_only(env)?;
+    let source_chain = SourceChain::public_only(env.clone())?;
 
     // Get the header data
     let (app_entry_type, header_seq) = match header
@@ -59,7 +70,7 @@ pub(super) async fn get_as_author(
     let entry_def = get_entry_def_from_ids(
         app_entry_type.zome_id(),
         app_entry_type.id(),
-        dna_file,
+        ribosome.dna_file(),
         conductor_api,
     )
     .await?;
@@ -93,6 +104,80 @@ pub(super) async fn get_as_author(
                     .sequence_range(0..header_seq),
             )?;
             Ok(Some(ValidationPackage::new(elements)).into())
+        }
+        RequiredValidationType::Custom => {
+            let element_authored = ElementBuf::authored(env.clone(), false)?;
+            let meta_authored = MetadataBuf::authored(env.clone())?;
+            let mut element_cache = ElementBuf::cache(env.clone())?;
+            let mut meta_cache = MetadataBuf::cache(env.clone())?;
+            let cascade = Cascade::empty()
+                .with_cache(DbPairMut::new(&mut element_cache, &mut meta_cache))
+                .with_authored(DbPair::new(&element_authored, &meta_authored));
+
+            if let Some(elements) = cascade.get_validation_package_local(
+                header.author().clone(),
+                &header_hashed,
+                required_validation_type,
+            )? {
+                return Ok(Some(ValidationPackage::new(elements)).into());
+            }
+
+            let workspace_lock = CallZomeWorkspaceLock::new(CallZomeWorkspace::new(env)?);
+            let access = ValidationPackageHostAccess::new(workspace_lock, network.clone());
+            let app_entry_type = match header.entry_type() {
+                Some(EntryType::App(a)) => a.clone(),
+                _ => return Ok(None.into()),
+            };
+
+            let zome_name = match ribosome
+                .dna_file()
+                .dna()
+                .zomes
+                .get(app_entry_type.zome_id().index())
+            {
+                Some(zome_name) => zome_name.0.clone(),
+                None => {
+                    warn!(msg = "Tried to get custom validation package for header with invalid zome_id", ?header);
+                    return Ok(None.into());
+                }
+            };
+
+            let invocation = ValidationPackageInvocation::new(zome_name, app_entry_type);
+
+            match ribosome.run_validation_package(access, invocation)? {
+                ValidationPackageResult::Success(validation_package) => {
+                    // Cache the package for future calls
+                    meta_cache.register_validation_package(
+                        header_hashed.as_hash(),
+                        validation_package
+                            .0
+                            .iter()
+                            .map(|el| el.header_address().clone()),
+                    );
+
+                    Ok(Some(validation_package).into())
+                }
+                ValidationPackageResult::Fail(reason) => {
+                    warn!(
+                        msg = "Getting custom validation package fail",
+                        error = %reason,
+                        ?header
+                    );
+                    Ok(None.into())
+                }
+                ValidationPackageResult::UnresolvedDependencies(deps) => {
+                    info!(
+                        msg = "Unresolved dependencies for custom validation package",
+                        missing_dependencies = ?deps,
+                        ?header
+                    );
+                    Ok(None.into())
+                }
+                ValidationPackageResult::NotImplemented => {
+                    error!(msg = "Entry definition specifies a custom validation package but the callback isn't defined", ?header);
+                    Ok(None.into())
+                }
+            }
         }
     }
 }
@@ -186,6 +271,18 @@ pub(super) async fn get_as_authority(
                 .into_iter()
                 .filter(|el| query.check(el.header()))
                 .collect();
+
+            Ok(Some(ValidationPackage::new(elements)).into())
+        }
+        RequiredValidationType::Custom => {
+            let elements = match cascade.get_validation_package_local(
+                agent,
+                &header_hashed,
+                required_validation_type,
+            )? {
+                Some(elements) => elements,
+                None => return Ok(None.into()),
+            };
 
             Ok(Some(ValidationPackage::new(elements)).into())
         }

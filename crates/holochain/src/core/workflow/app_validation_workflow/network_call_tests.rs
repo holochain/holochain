@@ -1,15 +1,21 @@
 use std::convert::TryInto;
 
 use fallible_iterator::FallibleIterator;
-use hdk3::prelude::{Element, ValidationPackage};
+use hdk3::prelude::{Element, EntryType, RequiredValidationType, ValidationPackage};
 use holo_hash::HeaderHash;
 use holochain_p2p::HolochainP2pCellT;
+use holochain_state::env::EnvironmentRead;
 use holochain_types::chain::AgentActivityExt;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::query::{Activity, AgentActivity, ChainQueryFilter};
+use holochain_zome_types::{
+    query::{Activity, AgentActivity, ChainQueryFilter},
+    ZomeCallResponse,
+};
+use matches::assert_matches;
 
 use crate::{
     core::state::cascade::Cascade,
+    core::state::cascade::DbPair,
     core::state::cascade::DbPairMut,
     core::state::element_buf::ElementBuf,
     core::state::metadata::MetadataBuf,
@@ -21,6 +27,11 @@ use crate::{
     core::state::source_chain::SourceChain, test_utils::conductor_setup::ConductorTestData,
 };
 
+// Check if the correct number of ops are integrated
+// every 100 ms for a maximum of 10 seconds but early exit
+// if they are there.
+const NUM_ATTEMPTS: usize = 100;
+const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
 const NUM_COMMITS: usize = 1;
 
 #[tokio::test(threaded_scheduler)]
@@ -136,12 +147,6 @@ async fn get_validation_package_test() {
 async fn get_agent_activity_test() {
     observability::test_run().ok();
 
-    // Check if the correct number of ops are integrated
-    // every 100 ms for a maximum of 10 seconds but early exit
-    // if they are there.
-    let num_attempts = 100;
-    let delay_per_attempt = std::time::Duration::from_millis(100);
-
     let zomes = vec![TestWasm::Create];
     let conductor_test = ConductorTestData::new(zomes, false).await;
     let ConductorTestData {
@@ -178,8 +183,8 @@ async fn get_agent_activity_test() {
     wait_for_integration(
         &alice_call_data.env,
         expected_count,
-        num_attempts,
-        delay_per_attempt.clone(),
+        NUM_ATTEMPTS,
+        DELAY_PER_ATTEMPT.clone(),
     )
     .await;
 
@@ -268,8 +273,8 @@ async fn get_agent_activity_test() {
     wait_for_integration(
         &alice_call_data.env,
         expected_count,
-        num_attempts,
-        delay_per_attempt.clone(),
+        NUM_ATTEMPTS,
+        DELAY_PER_ATTEMPT.clone(),
     )
     .await;
 
@@ -311,8 +316,8 @@ async fn get_agent_activity_test() {
     wait_for_integration(
         &alice_call_data.env,
         expected_count,
-        num_attempts,
-        delay_per_attempt.clone(),
+        NUM_ATTEMPTS,
+        DELAY_PER_ATTEMPT.clone(),
     )
     .await;
 
@@ -349,6 +354,111 @@ async fn get_agent_activity_test() {
     expected_activity.activity = activity;
 
     assert_eq!(agent_activity, expected_activity);
+
+    ConductorTestData::shutdown_conductor(handle).await;
+}
+
+#[tokio::test(threaded_scheduler)]
+async fn get_custom_package_test() {
+    observability::test_run().ok();
+
+    let zomes = vec![TestWasm::ValidationPackageSuccess];
+    let conductor_test = ConductorTestData::new(zomes, true).await;
+    let ConductorTestData {
+        __tmpdir,
+        handle,
+        alice_call_data,
+        bob_call_data,
+        ..
+    } = conductor_test;
+    let alice_cell_id = &alice_call_data.cell_id;
+    let bob_call_data = bob_call_data.unwrap();
+
+    let invocation = new_invocation(
+        &alice_cell_id,
+        "commit_artist",
+        (),
+        TestWasm::ValidationPackageSuccess,
+    )
+    .unwrap();
+    let result = handle.call_zome(invocation).await;
+
+    assert_matches!(result, Err(_));
+
+    let invocation = new_invocation(
+        &alice_cell_id,
+        "commit_songs",
+        (),
+        TestWasm::ValidationPackageSuccess,
+    )
+    .unwrap();
+    let result = handle.call_zome(invocation).await.unwrap().unwrap();
+
+    assert_matches!(result, ZomeCallResponse::Ok(_));
+
+    let invocation = new_invocation(
+        &alice_cell_id,
+        "commit_artist",
+        (),
+        TestWasm::ValidationPackageSuccess,
+    )
+    .unwrap();
+    let result = handle.call_zome(invocation).await.unwrap().unwrap();
+
+    assert_matches!(result, ZomeCallResponse::Ok(_));
+
+    // 15 for genesis plus 1 init
+    // 1 artist is 3 ops.
+    // and 30 songs at 6 ops each.
+    let expected_count = 16 + 30 * 6 + 3;
+
+    // Wait for bob to integrate and then check they have the package cached
+    wait_for_integration(
+        &bob_call_data.env,
+        expected_count,
+        NUM_ATTEMPTS,
+        DELAY_PER_ATTEMPT.clone(),
+    )
+    .await;
+
+    let alice_source_chain = SourceChain::public_only(alice_call_data.env.clone().into()).unwrap();
+    let shh = alice_source_chain
+        .iter_back()
+        .find(|shh| {
+            Ok(shh
+                .header()
+                .entry_type()
+                .map(|et| {
+                    if let EntryType::App(aet) = et {
+                        aet.id().index() == 1
+                    } else {
+                        false
+                    }
+                })
+                .unwrap_or(false))
+        })
+        .unwrap()
+        .unwrap();
+
+    {
+        let env: EnvironmentRead = bob_call_data.env.clone().into();
+        let element_authored = ElementBuf::authored(env.clone(), false).unwrap();
+        let meta_authored = MetadataBuf::authored(env.clone()).unwrap();
+        let mut element_cache = ElementBuf::cache(env.clone()).unwrap();
+        let mut meta_cache = MetadataBuf::cache(env.clone()).unwrap();
+        let cascade = Cascade::empty()
+            .with_cache(DbPairMut::new(&mut element_cache, &mut meta_cache))
+            .with_authored(DbPair::new(&element_authored, &meta_authored));
+
+        let result = cascade
+            .get_validation_package_local(
+                alice_cell_id.agent_pubkey().clone(),
+                &shh.header_hashed(),
+                RequiredValidationType::Custom,
+            )
+            .unwrap();
+        assert_matches!(result, Some(_));
+    }
 
     ConductorTestData::shutdown_conductor(handle).await;
 }

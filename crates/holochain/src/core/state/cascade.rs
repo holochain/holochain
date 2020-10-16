@@ -1495,8 +1495,34 @@ where
                 let hash = header.as_hash().clone();
                 let header_seq = header.header_seq();
                 self.get_chain_validation_package_local(agent, header_seq, hash)
-            } // TODO: Add custom validation caching
+            }
+            RequiredValidationType::Custom => {
+                self.get_custom_validation_package_local(header.as_hash())
+            }
         }
+    }
+
+    fn get_custom_validation_package_local(
+        &self,
+        hash: &HeaderHash,
+    ) -> CascadeResult<Option<Vec<Element>>> {
+        let cache_data = ok_or_return!(self.cache_data.as_ref(), None);
+        let env = ok_or_return!(self.env.as_ref(), None);
+        fresh_reader!(env, |r| {
+            let mut iter = cache_data.meta.get_validation_package(&r, hash)?;
+            let mut elements = Vec::with_capacity(iter.size_hint().0);
+            while let Some(hash) = iter.next()? {
+                match self.get_element_local_raw(&hash)? {
+                    Some(el) => elements.push(el),
+                    None => return Ok(None),
+                }
+            }
+            if elements.is_empty() {
+                Ok(None)
+            } else {
+                Ok(Some(elements))
+            }
+        })
     }
 
     fn get_chain_validation_package_local(
@@ -1562,7 +1588,17 @@ where
                     self.update_stores(element.clone()).await?;
                 }
 
-                // TODO: Add metadata for custom package caching
+                // Add metadata for custom package caching
+                if let RequiredValidationType::Custom = required_validation_type {
+                    let cache_data = ok_or_return!(self.cache_data.as_mut(), None);
+                    cache_data.meta.register_validation_package(
+                        header.as_hash(),
+                        validation_package
+                            .0
+                            .iter()
+                            .map(|el| el.header_address().clone()),
+                    );
+                }
 
                 Ok(Some(validation_package.0))
             }
