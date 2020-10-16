@@ -18,225 +18,175 @@ let
  ) { config = config; use-stable-rust = true; };
  # END HOLONIX IMPORT BOILERPLATE
 
-in
-with holonix.pkgs;
-{
- dev-shell = stdenv.mkDerivation (holonix.shell // {
-  name = "dev-shell";
+ callPackage = holonix.pkgs.callPackage;
+ writeShellScriptBin = holonix.pkgs.writeShellScriptBin;
 
-  shellHook = holonix.pkgs.lib.concatStrings [
-   holonix.shell.shellHook
-   ''
-    touch .env
-    source .env
+in {
+  inherit holonix;
 
-    export HC_TARGET_PREFIX=$NIX_ENV_PREFIX
-    export CARGO_TARGET_DIR="$HC_TARGET_PREFIX/target"
-    export HC_TEST_WASM_DIR="$HC_TARGET_PREFIX/.wasm_target"
-    mkdir -p $HC_TEST_WASM_DIR
-    export CARGO_CACHE_RUSTC_INFO=1
+  pkgs = {
+    # release hooks
+    releaseHooks = callPackage ./release {
+      pkgs = holonix.pkgs;
+      config = config;
+    };
 
-    export HC_WASM_CACHE_PATH="$HC_TARGET_PREFIX/.wasm_cache"
-    mkdir -p $HC_WASM_CACHE_PATH
+    # main test script
+    mainTestScript = callPackage ./test {
+      pkgs = holonix.pkgs;
+    };
 
-    export PEWPEWPEW_PORT=4343
-   ''
-  ];
+    hcInstall = writeShellScriptBin "hc-install" ''
+      hc-install-holochain
+      hc-install-dna-util
 
-  buildInputs = [
-   holonix.pkgs.gnuplot
-   holonix.pkgs.flamegraph
-   holonix.pkgs.fd
-   holonix.pkgs.ngrok
-   holonix.pkgs.jq
-  ]
-   ++ holonix.shell.buildInputs
+      hc-doctor
+    '';
 
-   # release hooks
-   ++ (holonix.pkgs.callPackage ./release {
-    pkgs = holonix.pkgs;
-    config = config;
-   }).buildInputs
+    hcUninstall = writeShellScriptBin "hc-uninstall" ''
+      hc-uninstall-holochain
+      hc-uninstall-dna-util
 
-   # main test script
-   ++ (holonix.pkgs.callPackage ./test {
-    pkgs = holonix.pkgs;
-   }).buildInputs
+      hc-doctor
+    '';
 
-   ++ ([(
-    holonix.pkgs.writeShellScriptBin "hc-install" ''
-     hc-install-holochain
-     hc-install-dna-util
+    hcInstallHolochain = writeShellScriptBin "hc-install-holochain" ''
+      cargo install --path crates/holochain
+      echo 'holochain installed!'
+      echo
+    '';
 
-     hc-doctor
-    ''
-   )])
+    hcUninstallHolochain = writeShellScriptBin "hc-uninstall-holochain" ''
+      cargo uninstall holochain
+      echo 'holochain uninstalled!'
+      echo
+    '';
 
-   ++ ([(
-    holonix.pkgs.writeShellScriptBin "hc-uninstall" ''
-     hc-uninstall-holochain
-     hc-uninstall-dna-util
+    hcInstallDnaUtil = writeShellScriptBin "hc-install-dna-util" ''
+      cargo install --path crates/dna_util
+      echo 'dna util installed!'
+      echo
+    '';
+    
+    hcUninstallDnaUtil = writeShellScriptBin "hc-uninstall-dna-util" ''
+      cargo uninstall dna_util
+      echo 'dna util uninstalled!'
+      echo
+    '';
 
-     hc-doctor
-    ''
-   )])
+    hcDoctor = writeShellScriptBin "hc-doctor" ''
+      echo "### holochain doctor ###"
+      echo
 
-   ++ ([(
-    holonix.pkgs.writeShellScriptBin "hc-install-holochain" ''
-     cargo install --path crates/holochain
-     echo 'holochain installed!'
-     echo
-    ''
-   )])
+      echo "if you have installed holochain directly using hc-install it should be in the cargo root"
+      echo "if that is what you want it may be worth running hc-install to 'refresh' it as HEAD moves quickly"
+      echo
+      echo "if you are using the more stable binaries provided by holonix it should be in /nix/store/../bin"
+      echo
 
-   ++ ([(
-    holonix.pkgs.writeShellScriptBin "hc-uninstall-holochain" ''
-     cargo uninstall holochain
-     echo 'holochain uninstalled!'
-     echo
-    ''
-   )])
+      echo "cargo install root:"
+      echo $CARGO_INSTALL_ROOT
+      echo
 
-   ++ ([(
-    holonix.pkgs.writeShellScriptBin "hc-install-dna-util" ''
-     cargo install --path crates/dna_util
-     echo 'dna util installed!'
-     echo
-    ''
-   )])
+      echo "holochain binary installation:"
+      command -v holochain
+      echo
 
-   ++ ([(
-    holonix.pkgs.writeShellScriptBin "hc-uninstall-dna-util" ''
-     cargo uninstall dna_util
-     echo 'dna util uninstalled!'
-     echo
-    ''
-   )])
+      echo "dna-util binary installation"
+      command -v dna-util
+      echo
+    '';
 
-   ++ ([(
-    holonix.pkgs.writeShellScriptBin "hc-doctor" ''
-     echo "### holochain doctor ###"
-     echo
+    # convenience command for executing dna-util
+    # until such time as we have release artifacts
+    # that can be built directly as nix packages
+    dnaUtil = writeShellScriptBin "dna-util" ''
+      cargo run --manifest-path "''${HC_TARGET_PREFIX}/crates/dna_util/Cargo.toml" -- "''${@}"
+    '';
 
-     echo "if you have installed holochain directly using hc-install it should be in the cargo root"
-     echo "if that is what you want it may be worth running hc-install to 'refresh' it as HEAD moves quickly"
-     echo
-     echo "if you are using the more stable binaries provided by holonix it should be in /nix/store/../bin"
-     echo
+    hcBench = writeShellScriptBin "hc-bench" ''
+      cargo bench --bench bench
+    '';
 
-     echo "cargo install root:"
-     echo $CARGO_INSTALL_ROOT
-     echo
+    hcFmtAll = writeShellScriptBin "hc-fmt-all" ''
+      fd Cargo.toml crates | xargs -L 1 cargo fmt --manifest-path
+    '';
 
-     echo "holochain binary installation:"
-     command -v holochain
-     echo
+    hcBenchGithub = writeShellScriptBin "hc-bench-github" ''
+      set -x
 
-     echo "dna-util binary installation"
-     command -v dna-util
-     echo
-    ''
-   )])
+      # the first arg is the authentication token for github
+      # @todo this is only required because the repo is currently private
+      token=''${1}
 
-   # convenience command for executing dna-util
-   # until such time as we have release artifacts
-   # that can be built directly as nix packages
-   ++ ([(
-    holonix.pkgs.writeShellScriptBin "dna-util" ''
-    cargo run --manifest-path "''${HC_TARGET_PREFIX}/crates/dna_util/Cargo.toml" -- "''${@}"
-    ''
-   )])
+      # set the target dir to somewhere it is less likely to be accidentally deleted
+      CARGO_TARGET_DIR=$BENCH_OUTPUT_DIR
 
-   ++ ([(
-    holonix.pkgs.writeShellScriptBin "hc-bench" ''
-    cargo bench --bench bench
-    '')])
+      # run benchmarks from a github archive based on any ref github supports
+      # @param ref: the github ref to benchmark
+      function bench {
 
-   ++ ([(
-    holonix.pkgs.writeShellScriptBin "hc-fmt-all" ''
-    fd Cargo.toml crates | xargs -L 1 cargo fmt --manifest-path
-    '')])
+       ## vars
+       ref=$1
+       dir="$TMP/$ref"
+       tarball="$dir/tarball.tar.gz"
 
-   ++ ([(
-    holonix.pkgs.writeShellScriptBin "hc-bench-github" ''
-    set -x
+       ## process
 
-    # the first arg is the authentication token for github
-    # @todo this is only required because the repo is currently private
-    token=''${1}
+       ### fresh start
+       mkdir -p $dir
+       rm -f $dir/$tarball
 
-    # set the target dir to somewhere it is less likely to be accidentally deleted
-    CARGO_TARGET_DIR=$BENCH_OUTPUT_DIR
+       ### fetch code to bench
+       curl -L --cacert $SSL_CERT_FILE -H "Authorization: token $token" "https://github.com/holochain/holochain/archive/$ref.tar.gz" > $tarball
+       tar -zxvf $tarball -C $dir
 
-    # run benchmarks from a github archive based on any ref github supports
-    # @param ref: the github ref to benchmark
-    function bench {
+       ### bench code
+       cd $dir/holochain-$ref
+       cargo bench --bench bench -- --save-baseline $ref
 
-     ## vars
-     ref=$1
-     dir="$TMP/$ref"
-     tarball="$dir/tarball.tar.gz"
+      }
 
-     ## process
+      # load an existing report and push it as a comment to github
+      function add_comment_to_commit {
+       ## convert the report to POST-friendly json and push to github comment API
+       jq \
+        -n \
+        --arg report \
+        "\`\`\`$( cargo bench --bench bench -- --baseline $1 --load-baseline $2 )\`\`\`" \
+        '{body: $report}' \
+       | curl \
+        -L \
+        --cacert $SSL_CERT_FILE \
+        -H "Authorization: token $token" \
+        -X POST \
+        -H "Accept: application/vnd.github.v3+json" \
+        https://api.github.com/repos/holochain/holochain/commits/$2/comments \
+        -d@-
+      }
 
-     ### fresh start
-     mkdir -p $dir
-     rm -f $dir/$tarball
+      commit=''${2}
+      bench $commit
 
-     ### fetch code to bench
-     curl -L --cacert $SSL_CERT_FILE -H "Authorization: token $token" "https://github.com/holochain/holochain/archive/$ref.tar.gz" > $tarball
-     tar -zxvf $tarball -C $dir
+      # @todo make this flexible based on e.g. the PR base on github
+      compare=develop
+      bench $compare
+      add_comment_to_commit $compare $commit
+    '';
 
-     ### bench code
-     cd $dir/holochain-$ref
-     cargo bench --bench bench -- --save-baseline $ref
+    pewPewPew = writeShellScriptBin "pewpewpew" ''
+      # compile and build pewpewpew
+      ( cd crates/pewpewpew && cargo run )
+    '';
 
-    }
+    pewPewPewNgrok = writeShellScriptBin "pewpewpew-ngrok" ''
+      # serve up a local pewpewpew instance that github can point to for testing
+      ngrok http http://127.0.0.1:$PEWPEWPEW_PORT
+    '';
 
-    # load an existing report and push it as a comment to github
-    function add_comment_to_commit {
-     ## convert the report to POST-friendly json and push to github comment API
-     jq \
-      -n \
-      --arg report \
-      "\`\`\`$( cargo bench --bench bench -- --baseline $1 --load-baseline $2 )\`\`\`" \
-      '{body: $report}' \
-     | curl \
-      -L \
-      --cacert $SSL_CERT_FILE \
-      -H "Authorization: token $token" \
-      -X POST \
-      -H "Accept: application/vnd.github.v3+json" \
-      https://api.github.com/repos/holochain/holochain/commits/$2/comments \
-      -d@-
-    }
-
-    commit=''${2}
-    bench $commit
-
-    # @todo make this flexible based on e.g. the PR base on github
-    compare=develop
-    bench $compare
-    add_comment_to_commit $compare $commit
-    '')])
-
-    ++ ([(
-     holonix.pkgs.writeShellScriptBin "pewpewpew" ''
-     # compile and build pewpewpew
-     ( cd crates/pewpewpew && cargo run )
-     '')])
-
-    ++ ([(
-     holonix.pkgs.writeShellScriptBin "pewpewpew-ngrok" ''
-     # serve up a local pewpewpew instance that github can point to for testing
-     ngrok http http://127.0.0.1:$PEWPEWPEW_PORT
-    '')])
-
-    ++ ([(
-     holonix.pkgs.writeShellScriptBin "pewpewpew-gen-secret" ''
-     # generate a new github secret
-     cat /dev/urandom | head -c 64 | base64
-    '')])
-  ;
- });
+    pewPewPewGenSecret = writeShellScriptBin "pewpewpew-gen-secret" ''
+      # generate a new github secret
+      cat /dev/urandom | head -c 64 | base64
+    '';
+  };
 }
