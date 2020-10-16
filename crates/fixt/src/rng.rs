@@ -13,7 +13,7 @@ use std::sync::Arc;
 
 lazy_static::lazy_static! {
     /// The singleton global RNG for test randomness
-    pub static ref FIXT_RNG: FixtRng = {
+    static ref FIXT_RNG: FixtRng = {
         let seed: u64 = match std::env::var("FIXT_SEED") {
             Ok(seed_str) => {
                 seed_str.parse().expect("Expected integer for FIXT_SEED")
