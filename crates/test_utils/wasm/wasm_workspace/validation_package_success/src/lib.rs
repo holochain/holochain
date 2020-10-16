@@ -14,23 +14,19 @@ entry_defs![Song::entry_def(), Artist::entry_def()];
 fn validation_package(
     app_entry_type: AppEntryType,
 ) -> ExternResult<ValidationPackageCallbackResult> {
-    let author: EntryHash = agent_info!()?.agent_initial_pubkey.into();
-
     let index = app_entry_type.id();
     match u8::from(index) {
         // Artist
         1 => {
-            let links = get_links!(author)?.into_inner();
-            let mut songs = Vec::with_capacity(NUM_SONGS);
+            let query = QueryFilter::new()
+                .entry_type(EntryType::App(AppEntryType::new(
+                    0.into(),
+                    0.into(),
+                    EntryVisibility::Public,
+                )))
+                .include_entries(true);
+            let songs = query!(query)?.0;
             // Need to post at least 30 songs to be an artist on this dht
-            for link in links.into_iter().take(NUM_SONGS) {
-                match get!(link.target)? {
-                    Some(song) => {
-                        songs.push(song)
-                    }
-                    None => break,
-                }
-            }
             if songs.len() >= NUM_SONGS {
                 Ok(ValidationPackageCallbackResult::Success(
                     ValidationPackage::new(songs),
@@ -54,11 +50,8 @@ fn commit_artist(_: ()) -> ExternResult<HeaderHash> {
 
 #[hdk_extern]
 fn commit_songs(_: ()) -> ExternResult<()> {
-    let author: EntryHash = agent_info!()?.agent_initial_pubkey.into();
-    let hash = hash_entry!(Song)?;
     for _ in 0..NUM_SONGS {
         create_entry!(Song)?;
-        create_link!(author.clone(), hash.clone())?;
     }
     Ok(())
 }

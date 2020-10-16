@@ -545,16 +545,36 @@ async fn get_validation_package(
                     // Get from author
                     let agent_id = element.header().author().clone();
                     let header_hashed = element.header_hashed();
-                    Ok(cascade
+                    if let Some(validation_package) = cascade
                         .get_validation_package(
                             agent_id,
                             header_hashed,
                             entry_def.required_validation_type,
                         )
                         .await?
-                        .map(ValidationPackage::new))
+                        .map(ValidationPackage::new)
+                    {
+                        return Ok(Some(validation_package));
+                    }
                     // TODO: Fallback to gossiper if author is unavailable
-                    // TODO: Fallback to RegisterAgentActivity if gossiper is unavailable
+                    // Fallback to RegisterAgentActivity if gossiper is unavailable
+                    let range = 0..element.header().header_seq().checked_sub(1).unwrap_or(0);
+
+                    let mut query = holochain_zome_types::query::ChainQueryFilter::new()
+                        .sequence_range(range)
+                        .include_entries(true);
+                    if let (RequiredValidationType::SubChain, Some(et)) = (
+                        entry_def.required_validation_type,
+                        element.header().entry_type(),
+                    ) {
+                        query = query.entry_type(et.clone());
+                    }
+                    // TODO: Agent activity needs to return the activity status etc.
+                    // Ok(cascade
+                    //     .get_agent_activity(agent_id, query, Default::default())
+                    //     .await?
+                    //     .map(ValidationPackage::new))
+                    todo!()
                 }
                 RequiredValidationType::Custom => {
                     // TODO: Fix get validation package to get custom and chains

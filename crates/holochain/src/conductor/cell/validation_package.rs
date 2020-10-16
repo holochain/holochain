@@ -217,9 +217,13 @@ pub(super) async fn get_as_authority(
         None => return Ok(None.into()),
     };
 
+    let element_integrated = ElementBuf::vault(env.clone(), false)?;
+    let meta_integrated = MetadataBuf::vault(env.clone())?;
     let mut element_cache = ElementBuf::cache(env.clone())?;
     let mut meta_cache = MetadataBuf::cache(env.clone())?;
-    let cascade = Cascade::empty().with_cache(DbPairMut::new(&mut element_cache, &mut meta_cache));
+    let cascade = Cascade::empty()
+        .with_cache(DbPairMut::new(&mut element_cache, &mut meta_cache))
+        .with_integrated(DbPair::new(&element_integrated, &meta_integrated));
 
     let header_hashed = HeaderHashed::with_pre_hashed(header, header_hash);
 

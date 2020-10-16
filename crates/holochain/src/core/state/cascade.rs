@@ -38,6 +38,7 @@ use holochain_zome_types::{
     link::Link,
     metadata::{Details, ElementDetails, EntryDetails},
     query::AgentActivity,
+    query::ChainHead,
     query::ChainQueryFilter,
     query::ChainStatus,
     validate::RequiredValidationType,
@@ -1494,6 +1495,10 @@ where
             RequiredValidationType::SubChain | RequiredValidationType::Full => {
                 let hash = header.as_hash().clone();
                 let header_seq = header.header_seq();
+                // First header has an empty validation package
+                if header_seq == 0 {
+                    return Ok(Some(vec![]));
+                }
                 self.get_chain_validation_package_local(agent, header_seq, hash)
             }
             RequiredValidationType::Custom => {
@@ -1533,16 +1538,13 @@ where
     ) -> CascadeResult<Option<Vec<Element>>> {
         let cache_data = ok_or_return!(self.cache_data.as_ref(), None);
         let env = ok_or_return!(self.env.as_ref(), None);
-        let activity_is_not_cached = fresh_reader!(env, |r| {
-            cache_data
-                .meta
-                .get_activity(
-                    &r,
-                    ChainItemKey::Full(agent.clone(), header_seq, hash.clone()),
-                )?
-                .next()
-        })?
-        .is_none();
+        let activity_is_not_cached = cache_data
+            .meta
+            .get_activity_status(&agent)?
+            // header_seq - 1 because we want a valid chain up to the header before 
+            // the header that needs this validation package.
+            // This is a safe subtraction because header seq of 0 returns early above.
+            != Some(ChainStatus::Valid(ChainHead { header_seq: header_seq - 1, hash }));
 
         if activity_is_not_cached {
             return Ok(None);
@@ -1550,17 +1552,15 @@ where
 
         let range = Some(0..header_seq);
         let hashes = Self::get_agent_activity_from_cache(agent, &range, cache_data, env)?;
-        if hashes.len() == header_seq as usize {
-            let mut elements = Vec::with_capacity(hashes.len());
-            for (_, hash) in hashes {
-                match self.get_element_local_raw(&hash)? {
-                    Some(el) => elements.push(el),
-                    None => return Ok(None),
-                }
+        let mut elements = Vec::with_capacity(hashes.len());
+        for (_, hash) in hashes {
+            match self.get_element_local_raw(&hash)? {
+                Some(el) => elements.push(el),
+                None => return Ok(None),
             }
-            if elements.len() == header_seq as usize {
-                return Ok(Some(elements));
-            }
+        }
+        if elements.len() == header_seq as usize {
+            return Ok(Some(elements));
         }
         Ok(None)
     }
