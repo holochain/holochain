@@ -137,7 +137,7 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn validate_package_callback_result_fold() {
-        let mut rng = thread_rng();
+        let mut rng = fixt::rng();
 
         let result_success = || ValidationPackageResult::Success(ValidationPackage(vec![]));
         let result_ud = || ValidationPackageResult::UnresolvedDependencies(vec![]);

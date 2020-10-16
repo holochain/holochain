@@ -109,7 +109,7 @@ mod test {
     #[test]
     /// this is a non-standard fold test because the result is not so simple
     fn entry_defs_callback_result_fold() {
-        let mut rng = thread_rng();
+        let mut rng = fixt::rng();
 
         let mut zome_name_fixturator = ZomeNameFixturator::new(fixt::Unpredictable);
         let mut entry_defs_fixturator = EntryDefsFixturator::new(fixt::Unpredictable);

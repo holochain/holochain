@@ -37,7 +37,7 @@ fixturator!(
         // randomly select a thing to serialize
         let thing_to_serialize = THINGS_TO_SERIALIZE
             .to_vec()
-            .choose(&mut rand::thread_rng())
+            .choose(&mut crate::rng())
             .unwrap()
             .to_owned();
 

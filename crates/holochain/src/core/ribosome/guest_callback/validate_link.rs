@@ -196,7 +196,7 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn validate_link_add_callback_result_fold() {
-        let mut rng = thread_rng();
+        let mut rng = fixt::rng();
 
         let result_valid = || ValidateLinkResult::Valid;
         let result_invalid = || ValidateLinkResult::Invalid("".into());
