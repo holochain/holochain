@@ -202,6 +202,7 @@ pub fn handle_get_agent_activity(
             );
             // TODO: Add abandoned
             activity.sort_unstable_by_key(|a| a.header.header().header_seq());
+            // TODO: Return the real status
             Ok(AgentActivity::valid(activity, agent))
         })
     } else {

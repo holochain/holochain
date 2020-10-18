@@ -28,11 +28,11 @@ pub struct ChainQueryFilter {
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 /// An agents chain elements returned from a agent_activity_query
-pub struct AgentActivity {
+pub struct AgentActivity<H = SignedHeaderHashed> {
     /// The agent this activity is for
     pub agent: AgentPubKey,
     /// Headers on this chain.
-    pub activity: Vec<Activity>,
+    pub activity: Vec<Activity<H>>,
     /// The status of this chain.
     pub status: ChainStatus,
     /// The highest chain header that has
@@ -46,9 +46,9 @@ pub struct AgentActivity {
 // TODO: This is a little weird because when we have warrants
 // we will have a warrant for each position in the chain that
 // is warranted. Maybe that makes this redundant?
-pub struct Activity {
+pub struct Activity<H = SignedHeaderHashed> {
     /// The header on this chain
-    pub header: SignedHeaderHashed,
+    pub header: H,
     /// The validation status of this individual header
     pub validation_status: ValidationStatus,
 }

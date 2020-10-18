@@ -20,6 +20,7 @@ use holochain_p2p::{
 };
 use holochain_state::{error::DatabaseResult, fresh_reader, prelude::*};
 use holochain_types::{
+    chain::AgentActivityExt,
     dht_op::{produce_op_lights_from_element_group, produce_op_lights_from_elements, DhtOpLight},
     element::{
         Element, ElementGroup, GetElementResponse, RawGetEntryResponse, SignedHeaderHashed,
@@ -37,6 +38,7 @@ use holochain_zome_types::{
     header::HeaderType,
     link::Link,
     metadata::{Details, ElementDetails, EntryDetails},
+    query::Activity,
     query::AgentActivity,
     query::ChainHead,
     query::ChainQueryFilter,
@@ -1329,7 +1331,7 @@ where
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: GetActivityOptions,
-    ) -> CascadeResult<Vec<Element>> {
+    ) -> CascadeResult<AgentActivity<Element>> {
         // ## When requesting a range
         // If we have some cached agent activity then don't fetch the activity.
         // Instead fetch just the status and see if the chain is still valid
@@ -1345,14 +1347,17 @@ where
         }
 
         let mut chain_hashes = {
-            let cache_data = ok_or_return!(self.cache_data.as_ref(), vec![]);
-            let env = ok_or_return!(self.env.as_ref(), vec![]);
+            let cache_data = ok_or_return!(
+                self.cache_data.as_ref(),
+                AgentActivity::empty(agent.clone())
+            );
+            let env = ok_or_return!(self.env.as_ref(), AgentActivity::empty(agent.clone()));
 
             // Check if the range contains any values.
             // This also makes it safe to do `range.end - 1`
             if let Some(range) = &query.sequence_range {
                 if range.end == 0 {
-                    return Ok(vec![]);
+                    return Ok(AgentActivity::empty(agent.clone()));
                 }
                 // Try getting the activity from the cache.
                 let chain_hashes = Self::get_agent_activity_from_cache(
@@ -1390,11 +1395,14 @@ where
             self.fetch_agent_activity(agent.clone(), query.clone(), options)
                 .await?;
 
-            let cache_data = ok_or_return!(self.cache_data.as_ref(), vec![]);
-            let env = ok_or_return!(self.env.as_ref(), vec![]);
+            let cache_data = ok_or_return!(
+                self.cache_data.as_ref(),
+                AgentActivity::empty(agent.clone())
+            );
+            let env = ok_or_return!(self.env.as_ref(), AgentActivity::empty(agent.clone()));
             // Now try getting the latest activity from cache
             chain_hashes =
-                Self::get_agent_activity_from_cache(agent, &query.sequence_range, cache_data, env)?;
+                Self::get_agent_activity_from_cache(agent.clone(), &query.sequence_range, cache_data, env)?;
         }
 
         // Helper closure for checking if we should get fetch the entry
@@ -1411,7 +1419,7 @@ where
 
         // Still couldn't find any activity
         if chain_hashes.is_empty() {
-            Ok(vec![])
+            Ok(AgentActivity::empty(agent.clone()))
         } else {
             // Found the agent activity now get the elements
             //
@@ -1449,7 +1457,7 @@ where
                         }
                     }
                     // Can't retrieve the whole chain so return with no chain
-                    None => return Ok(vec![]),
+                    None => return Ok(AgentActivity::empty(agent.clone())),
                 }
             }
 
@@ -1473,14 +1481,38 @@ where
                             elements.push(Element::new(shh, Some(entry.into_content())))
                         }
                         // Failed to find an entry so return with no chain
-                        _ => return Ok(vec![]),
+                        _ => return Ok(AgentActivity::empty(agent.clone())),
                     }
                 } else {
                     // Create the element without the entry.
                     elements.push(Element::new(shh, None));
                 }
             }
-            Ok(elements)
+            // TODO: Return the status
+            let cache_data = ok_or_return!(
+                self.cache_data.as_ref(),
+                AgentActivity::empty(agent.clone())
+            );
+            // TODO: Figure out how to get the actual header status.
+            let activity = elements
+                .into_iter()
+                .map(|e| Activity {
+                    header: e,
+                    validation_status: ValidationStatus::Valid,
+                })
+                .collect();
+            let status = cache_data
+                .meta
+                .get_activity_status(&agent)?
+                .unwrap_or(ChainStatus::Empty);
+            let highest_observed = cache_data.meta.get_activity_observed(&agent)?;
+            let agent_activity = AgentActivity {
+                agent,
+                activity,
+                status,
+                highest_observed,
+            };
+            Ok(agent_activity)
         }
     }
 

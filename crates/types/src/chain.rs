@@ -36,7 +36,7 @@ pub trait AgentActivityExt {
     }
 
     /// Create an empty chain status
-    fn empty(agent: AgentPubKey) -> AgentActivity {
+    fn empty<H>(agent: AgentPubKey) -> AgentActivity<H> {
         AgentActivity {
             agent,
             activity: Vec::with_capacity(0),
