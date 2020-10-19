@@ -3,8 +3,8 @@
 
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
-use holochain_zome_types::zome::FunctionName;
-use holochain_zome_types::{capability::CapSecret, zome::ZomeName};
+use holochain_zome_types::{capability::CapSecret, query::AgentActivity, zome::ZomeName};
+use holochain_zome_types::{query::ChainQueryFilter, zome::FunctionName};
 use std::sync::Arc;
 
 mod types;
@@ -87,6 +87,14 @@ pub trait HolochainP2pCellT {
         link_key: WireLinkMetaKey,
         options: actor::GetLinksOptions,
     ) -> actor::HolochainP2pResult<Vec<GetLinksResponse>>;
+
+    /// Get agent activity from the DHT.
+    async fn get_agent_activity(
+        &mut self,
+        agent: AgentPubKey,
+        query: ChainQueryFilter,
+        options: actor::GetActivityOptions,
+    ) -> actor::HolochainP2pResult<Vec<AgentActivity>>;
 
     /// Send a validation receipt to a remote node.
     async fn send_validation_receipt(
@@ -233,6 +241,24 @@ impl HolochainP2pCellT for HolochainP2pCell {
                 (*self.dna_hash).clone(),
                 (*self.from_agent).clone(),
                 link_key,
+                options,
+            )
+            .await
+    }
+
+    /// Get agent activity from the DHT.
+    async fn get_agent_activity(
+        &mut self,
+        agent: AgentPubKey,
+        query: ChainQueryFilter,
+        options: actor::GetActivityOptions,
+    ) -> actor::HolochainP2pResult<Vec<AgentActivity>> {
+        self.sender
+            .get_agent_activity(
+                (*self.dna_hash).clone(),
+                (*self.from_agent).clone(),
+                agent,
+                query,
                 options,
             )
             .await

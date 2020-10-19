@@ -11,7 +11,7 @@ use super::{
 use crate::core::workflow::integrate_dht_ops_workflow::integrate_single_metadata;
 use error::CascadeResult;
 use fallible_iterator::FallibleIterator;
-use holo_hash::{hash_type::AnyDht, AnyDhtHash, EntryHash, HeaderHash};
+use holo_hash::{hash_type::AnyDht, AgentPubKey, AnyDhtHash, EntryHash, HeaderHash};
 use holochain_p2p::HolochainP2pCellT;
 use holochain_p2p::{
     actor::{GetLinksOptions, GetMetaOptions, GetOptions},
@@ -34,6 +34,8 @@ use holochain_zome_types::{
     header::HeaderType,
     link::Link,
     metadata::{Details, ElementDetails, EntryDetails},
+    query::AgentActivity,
+    query::ChainQueryFilter,
 };
 use std::collections::HashSet;
 use std::collections::{BTreeMap, BTreeSet};
@@ -1110,6 +1112,17 @@ where
                 }
             })
             .collect()
+    }
+
+    #[instrument(skip(self, _agent, _query, _options))]
+    /// Get agent activity from cache activity authorities
+    pub async fn get_agent_activity(
+        &mut self,
+        _agent: AgentPubKey,
+        _query: ChainQueryFilter,
+        _options: GetLinksOptions,
+    ) -> CascadeResult<AgentActivity> {
+        todo!()
     }
 }
 

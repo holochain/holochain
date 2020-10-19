@@ -1,18 +1,22 @@
 use super::error::{AuthorityDataError, CellResult};
 use crate::core::state::{
     element_buf::ElementBuf,
-    metadata::{MetadataBuf, MetadataBufT},
+    metadata::{ChainItemKey, MetadataBuf, MetadataBufT},
 };
 use fallible_iterator::FallibleIterator;
 
-use holo_hash::EntryHash;
-use holochain_state::{env::EnvironmentWrite, fresh_reader};
+use holo_hash::{AgentPubKey, EntryHash};
+use holochain_state::{env::EnvironmentRead, env::EnvironmentWrite, fresh_reader};
 use holochain_types::{
+    chain::AgentActivityExt,
     element::{GetElementResponse, RawGetEntryResponse},
     header::WireUpdateRelationship,
     metadata::TimedHeaderHash,
 };
-use holochain_zome_types::{element::SignedHeaderHashed, header::conversions::WrongHeaderError};
+use holochain_zome_types::{
+    element::SignedHeaderHashed, header::conversions::WrongHeaderError, query::AgentActivity,
+    query::ChainQueryFilter,
+};
 use std::{collections::BTreeSet, convert::TryInto};
 use tracing::*;
 
@@ -157,4 +161,43 @@ pub async fn handle_get_entry(
         debug!(handle_get_details_return = ?r);
         Ok(GetElementResponse::GetEntryFull(r))
     })
+}
+
+#[instrument(skip(env))]
+pub fn handle_get_agent_activity(
+    env: EnvironmentRead,
+    agent: AgentPubKey,
+    query: ChainQueryFilter,
+    options: holochain_p2p::event::GetActivityOptions,
+) -> CellResult<AgentActivity> {
+    let element_integrated = ElementBuf::vault(env.clone(), false)?;
+    let meta_integrated = MetadataBuf::vault(env.clone())?;
+
+    if options.include_activity {
+        fresh_reader!(env, |r| {
+            let activity: Vec<_> = meta_integrated
+                .get_activity(&r, ChainItemKey::Agent(agent.clone()))?
+                .filter_map(|h| element_integrated.get_header(&h.header_hash))
+                .filter(|shh| Ok(query.check(shh.header())))
+                .collect()?;
+            // TODO: Return the chain status and check rejected
+            Ok(AgentActivity::valid(activity))
+        })
+    } else {
+        fresh_reader!(env, |r| {
+            match meta_integrated
+                .get_activity(&r, ChainItemKey::Agent(agent))?
+                .last()?
+            {
+                Some(h) => {
+                    // TODO: Just get the sequence number from the key (Doable in the next PR)
+                    match element_integrated.get_header(&h.header_hash)? {
+                        Some(shh) => Ok(AgentActivity::valid_without_activity(shh.header())),
+                        None => Ok(AgentActivity::empty()),
+                    }
+                }
+                None => Ok(AgentActivity::empty()),
+            }
+        })
+    }
 }
