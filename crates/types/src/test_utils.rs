@@ -83,7 +83,7 @@ pub fn which_agent(key: &AgentPubKey) -> String {
         return "alice".to_string();
     }
     if key == bob {
-        return "alice".to_string();
+        return "bob".to_string();
     }
     key
 }
