@@ -37,13 +37,11 @@ pub async fn spawn_transport_pool() -> TransportResult<(
 
     let (evt_send, evt_recv) = futures::channel::mpsc::channel(10);
 
-    builder
-        .spawn(Inner {
-            i_s,
-            sub_listeners: HashMap::new(),
-            evt_send,
-        })
-        .await?;
+    tokio::task::spawn(builder.spawn(Inner {
+        i_s,
+        sub_listeners: HashMap::new(),
+        evt_send,
+    }));
 
     Ok((pool, listener, evt_recv))
 }
@@ -87,10 +85,7 @@ impl InnerChanHandler for Inner {
     ) -> InnerChanHandlerResult<()> {
         match self.sub_listeners.entry(scheme.clone()) {
             std::collections::hash_map::Entry::Occupied(_) => {
-                return Err(format!(
-                    "scheme '{}' already mapped in this pool",
-                    scheme,
-                ).into());
+                return Err(format!("scheme '{}' already mapped in this pool", scheme,).into());
             }
             std::collections::hash_map::Entry::Vacant(e) => {
                 e.insert(sub_listener);
@@ -136,28 +131,36 @@ impl ghost_actor::GhostHandler<TransportListener> for Inner {}
 
 impl TransportListenerHandler for Inner {
     fn handle_debug(&mut self) -> TransportListenerHandlerResult<serde_json::Value> {
-        let out = self.sub_listeners.iter().map(|(k, v)| {
-            let k = k.to_string();
-            let v = v.debug();
-            async move {
-                TransportResult::Ok((k, v.await?))
-            }
-        }).collect::<Vec<_>>();
+        let out = self
+            .sub_listeners
+            .iter()
+            .map(|(k, v)| {
+                let k = k.to_string();
+                let v = v.debug();
+                async move { TransportResult::Ok((k, v.await?)) }
+            })
+            .collect::<Vec<_>>();
         Ok(async move {
             let v = futures::future::try_join_all(out).await?;
-            let m = v.into_iter().collect::<serde_json::map::Map<String, serde_json::Value>>();
+            let m = v
+                .into_iter()
+                .collect::<serde_json::map::Map<String, serde_json::Value>>();
             Ok(m.into())
-        }.boxed().into())
+        }
+        .boxed()
+        .into())
     }
 
     fn handle_bound_url(&mut self) -> TransportListenerHandlerResult<url2::Url2> {
-        let urls = self.sub_listeners.iter().map(|(k, v)| {
-            let k = k.to_string();
-            let v = v.bound_url();
-            async move {
-                TransportResult::Ok((k, v.await?))
-            }
-        }).collect::<Vec<_>>();
+        let urls = self
+            .sub_listeners
+            .iter()
+            .map(|(k, v)| {
+                let k = k.to_string();
+                let v = v.bound_url();
+                async move { TransportResult::Ok((k, v.await?)) }
+            })
+            .collect::<Vec<_>>();
         Ok(async move {
             let urls = futures::future::try_join_all(urls).await?;
             let mut out = url2::url2!("kitsune-pool:pool");
@@ -168,7 +171,9 @@ impl TransportListenerHandler for Inner {
                 }
             }
             Ok(out)
-        }.boxed().into())
+        }
+        .boxed()
+        .into())
     }
 
     fn handle_create_channel(
@@ -176,13 +181,77 @@ impl TransportListenerHandler for Inner {
         url: url2::Url2,
     ) -> TransportListenerHandlerResult<(url2::Url2, TransportChannelWrite, TransportChannelRead)>
     {
+        // TODO - right now requiring sub transport scheme to create channel
+        //        would be nice to also accept a pool url && prioritize the
+        //        sub-scheme.
         let scheme = url.scheme().to_string();
         match self.sub_listeners.get(&scheme) {
-            None => return Err(format!(
-                "so sub-transport matching scheme '{}' in pool",
-                scheme,
-            ).into()),
+            None => Err(format!("no sub-transport matching scheme '{}' in pool", scheme).into()),
             Some(s) => Ok(s.create_channel(url)),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{transport::*, transport_mem::*};
+    use futures::stream::StreamExt;
+
+    fn test_receiver(mut recv: TransportEventReceiver) {
+        tokio::task::spawn(async move {
+            while let Some(evt) = recv.next().await {
+                match evt {
+                    TransportEvent::IncomingChannel(url, mut write, read) => {
+                        let data = read.read_to_end().await;
+                        let data = format!("echo({}): {}", url, String::from_utf8_lossy(&data),);
+                        write.write_and_close(data.into_bytes()).await?;
+                    }
+                }
+            }
+            TransportResult::Ok(())
+        });
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn it_can_pool_transport() -> TransportResult<()> {
+        let _ = ghost_actor::dependencies::tracing::subscriber::set_global_default(
+            tracing_subscriber::FmtSubscriber::builder()
+                .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+                .finish(),
+        );
+
+        let (c1, p1, e1) = spawn_transport_pool().await?;
+        let (sub1, sube1) = spawn_bind_transport_mem().await?;
+        let suburl1 = sub1.bound_url().await?;
+        tracing::warn!(?suburl1);
+        c1.push_sub_transport(sub1, sube1).await?;
+        test_receiver(e1);
+
+        let (c2, p2, e2) = spawn_transport_pool().await?;
+        let (sub2, sube2) = spawn_bind_transport_mem().await?;
+        let suburl2 = sub2.bound_url().await?;
+        tracing::warn!(?suburl2);
+        c2.push_sub_transport(sub2, sube2).await?;
+        test_receiver(e2);
+
+        let url1 = p1.bound_url().await?;
+        tracing::warn!(?url1);
+        let url2 = p2.bound_url().await?;
+        tracing::warn!(?url2);
+
+        let res = p1.request(suburl2.clone(), b"test1".to_vec()).await?;
+        assert_eq!(
+            &format!("echo({}): test1", suburl1),
+            &String::from_utf8_lossy(&res),
+        );
+
+        let res = p2.request(suburl1.clone(), b"test2".to_vec()).await?;
+        assert_eq!(
+            &format!("echo({}): test2", suburl2),
+            &String::from_utf8_lossy(&res),
+        );
+
+        Ok(())
     }
 }
