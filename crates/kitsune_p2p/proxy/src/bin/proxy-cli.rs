@@ -50,11 +50,6 @@ async fn inner() -> TransportResult<()> {
         }
     });
 
-    println!(
-        "# SELF URL (you can ignore this : ) {}",
-        listener.bound_url().await?
-    );
-
     let proxy_url = ProxyUrl::from(&opt.proxy_url);
 
     loop {
