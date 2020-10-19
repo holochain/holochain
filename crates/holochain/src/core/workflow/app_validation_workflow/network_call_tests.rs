@@ -6,7 +6,7 @@ use holo_hash::HeaderHash;
 use holochain_p2p::HolochainP2pCellT;
 use holochain_types::chain::AgentActivityExt;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::query::{Activity, AgentActivity, ChainQueryFilter};
+use holochain_zome_types::query::{AgentActivity, ChainQueryFilter};
 
 use crate::test_utils::{
     conductor_setup::ConductorCallData, host_fn_api::*, new_invocation, wait_for_integration,
@@ -14,6 +14,12 @@ use crate::test_utils::{
 use crate::{
     core::state::source_chain::SourceChain, test_utils::conductor_setup::ConductorTestData,
 };
+
+// Check if the correct number of ops are integrated
+// every 100 ms for a maximum of 10 seconds but early exit
+// if they are there.
+const NUM_ATTEMPTS: usize = 100;
+const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
 
 #[tokio::test(threaded_scheduler)]
 async fn get_validation_package_test() {
@@ -128,12 +134,6 @@ async fn get_validation_package_test() {
 async fn get_agent_activity_test() {
     observability::test_run().ok();
 
-    // Check if the correct number of ops are integrated
-    // every 100 ms for a maximum of 10 seconds but early exit
-    // if they are there.
-    let num_attempts = 100;
-    let delay_per_attempt = std::time::Duration::from_millis(100);
-
     let zomes = vec![TestWasm::Create];
     let conductor_test = ConductorTestData::new(zomes, false).await;
     let ConductorTestData {
@@ -155,7 +155,6 @@ async fn get_agent_activity_test() {
             .unwrap()
             .into_iter()
             .rev()
-            .map(|shh| Activity::valid(shh))
             .collect();
         AgentActivity::valid(expected_activity)
     };
@@ -170,8 +169,8 @@ async fn get_agent_activity_test() {
     wait_for_integration(
         &alice_call_data.env,
         expected_count,
-        num_attempts,
-        delay_per_attempt.clone(),
+        NUM_ATTEMPTS,
+        DELAY_PER_ATTEMPT.clone(),
     )
     .await;
 
@@ -201,8 +200,8 @@ async fn get_agent_activity_test() {
     wait_for_integration(
         &alice_call_data.env,
         expected_count,
-        num_attempts,
-        delay_per_attempt.clone(),
+        NUM_ATTEMPTS,
+        DELAY_PER_ATTEMPT.clone(),
     )
     .await;
 
@@ -244,8 +243,8 @@ async fn get_agent_activity_test() {
     wait_for_integration(
         &alice_call_data.env,
         expected_count,
-        num_attempts,
-        delay_per_attempt.clone(),
+        NUM_ATTEMPTS,
+        DELAY_PER_ATTEMPT.clone(),
     )
     .await;
 
@@ -271,8 +270,7 @@ async fn get_agent_activity_test() {
         .activity
         .iter()
         .filter(|a| {
-            a.header
-                .header()
+            a.header()
                 .entry_type()
                 .map(|et| *et == entry_type)
                 .unwrap_or(false)
