@@ -164,7 +164,7 @@ async fn get_agent_activity_test() {
     alice_call_data.triggers.produce_dht_ops.trigger();
 
     // 3 ops per commit, 5 commits plus 7 for genesis
-    let mut expected_count = 3 * 5 + 7;
+    let mut expected_count = 3 * 1 + 7;
 
     wait_for_integration(
         &alice_call_data.env,
@@ -196,7 +196,7 @@ async fn get_agent_activity_test() {
 
     alice_call_data.triggers.produce_dht_ops.trigger();
 
-    expected_count += 2 * 5;
+    expected_count += 2 * 1;
     wait_for_integration(
         &alice_call_data.env,
         expected_count,
@@ -239,7 +239,7 @@ async fn get_agent_activity_test() {
 
     // Wait for alice to integrate the chain as an authority
     alice_call_data.triggers.produce_dht_ops.trigger();
-    expected_count += 3 * 5;
+    expected_count += 3 * 1;
     wait_for_integration(
         &alice_call_data.env,
         expected_count,
@@ -286,8 +286,8 @@ async fn get_agent_activity_test() {
 
 async fn commit_some_data(call: &'static str, alice_call_data: &ConductorCallData) -> HeaderHash {
     let mut header_hash = None;
-    // Commit 5 entries
-    for _ in 0..5 {
+    // Commit entires
+    for _ in 0..1 {
         let invocation =
             new_invocation(&alice_call_data.cell_id, call, (), TestWasm::Create).unwrap();
         header_hash = Some(
