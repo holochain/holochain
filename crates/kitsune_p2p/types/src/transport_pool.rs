@@ -70,7 +70,7 @@ impl ghost_actor::GhostControlHandler for Inner {
                 let _ = sub.ghost_actor_shutdown().await;
             }
             self.evt_send.close_channel();
-            tracing::warn!("proxy listener actor SHUTDOWN");
+            tracing::warn!("transport pool actor SHUTDOWN");
         }
         .boxed()
         .into()
@@ -85,7 +85,17 @@ impl InnerChanHandler for Inner {
         scheme: String,
         sub_listener: ghost_actor::GhostSender<TransportListener>,
     ) -> InnerChanHandlerResult<()> {
-        self.sub_listeners.insert(scheme, sub_listener);
+        match self.sub_listeners.entry(scheme.clone()) {
+            std::collections::hash_map::Entry::Occupied(_) => {
+                return Err(format!(
+                    "scheme '{}' already mapped in this pool",
+                    scheme,
+                ).into());
+            }
+            std::collections::hash_map::Entry::Vacant(e) => {
+                e.insert(sub_listener);
+            }
+        }
         Ok(async move { Ok(()) }.boxed().into())
     }
 }
@@ -126,18 +136,53 @@ impl ghost_actor::GhostHandler<TransportListener> for Inner {}
 
 impl TransportListenerHandler for Inner {
     fn handle_debug(&mut self) -> TransportListenerHandlerResult<serde_json::Value> {
-        unimplemented!()
+        let out = self.sub_listeners.iter().map(|(k, v)| {
+            let k = k.to_string();
+            let v = v.debug();
+            async move {
+                TransportResult::Ok((k, v.await?))
+            }
+        }).collect::<Vec<_>>();
+        Ok(async move {
+            let v = futures::future::try_join_all(out).await?;
+            let m = v.into_iter().collect::<serde_json::map::Map<String, serde_json::Value>>();
+            Ok(m.into())
+        }.boxed().into())
     }
 
     fn handle_bound_url(&mut self) -> TransportListenerHandlerResult<url2::Url2> {
-        unimplemented!()
+        let urls = self.sub_listeners.iter().map(|(k, v)| {
+            let k = k.to_string();
+            let v = v.bound_url();
+            async move {
+                TransportResult::Ok((k, v.await?))
+            }
+        }).collect::<Vec<_>>();
+        Ok(async move {
+            let urls = futures::future::try_join_all(urls).await?;
+            let mut out = url2::url2!("kitsune-pool:pool");
+            {
+                let mut query = out.query_pairs_mut();
+                for (k, v) in urls {
+                    query.append_pair(&k, v.as_str());
+                }
+            }
+            Ok(out)
+        }.boxed().into())
     }
 
     fn handle_create_channel(
         &mut self,
-        _url: url2::Url2,
+        url: url2::Url2,
     ) -> TransportListenerHandlerResult<(url2::Url2, TransportChannelWrite, TransportChannelRead)>
     {
-        unimplemented!()
+        let scheme = url.scheme().to_string();
+        match self.sub_listeners.get(&scheme) {
+            None => return Err(format!(
+                "so sub-transport matching scheme '{}' in pool",
+                scheme,
+            ).into()),
+            Some(s) => Ok(s.create_channel(url)),
+        }
     }
 }

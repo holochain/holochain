@@ -104,8 +104,8 @@ impl TransportListenerHandler for InnerListen {
     }
 
     fn handle_bound_url(&mut self) -> TransportListenerHandlerResult<url2::Url2> {
-        let url = self.url.clone();
-        Ok(async move { Ok(url) }.boxed().into())
+        let urls = self.url.clone();
+        Ok(async move { Ok(urls) }.boxed().into())
     }
 
     fn handle_create_channel(
