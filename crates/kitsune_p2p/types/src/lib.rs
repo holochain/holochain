@@ -5,6 +5,8 @@
 pub mod dependencies {
     pub use ::futures;
     pub use ::ghost_actor;
+    pub use ::serde;
+    pub use ::serde_json;
     pub use ::thiserror;
     pub use ::tokio;
     pub use ::url2;

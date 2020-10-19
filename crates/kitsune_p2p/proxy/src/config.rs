@@ -117,6 +117,9 @@ pub(crate) fn gen_tls_configs(
     tls_server_config
         .set_single_cert(vec![cert.clone()], cert_priv_key.clone())
         .map_err(TransportError::other)?;
+    // no storage is more wire overhead,
+    // but ensures cert verification for every channel coming in.
+    tls_server_config.set_persistence(Arc::new(rustls::NoServerSessionStorage {}));
     tls_server_config.set_protocols(&[ALPN_KITSUNE_PROXY_0.to_vec()]);
     let tls_server_config = Arc::new(tls_server_config);
 
@@ -127,6 +130,9 @@ pub(crate) fn gen_tls_configs(
     tls_client_config
         .dangerous()
         .set_certificate_verifier(TlsServerVerifier::new());
+    // no storage is more wire overhead,
+    // but ensures cert verification for every channel coming in.
+    tls_client_config.set_persistence(Arc::new(rustls::NoClientSessionStorage {}));
     tls_client_config.set_protocols(&[ALPN_KITSUNE_PROXY_0.to_vec()]);
     let tls_client_config = Arc::new(tls_client_config);
 
