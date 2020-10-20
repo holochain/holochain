@@ -48,6 +48,7 @@ impl From<&ValidateHostAccess> for HostFnAccess {
     fn from(_: &ValidateHostAccess) -> Self {
         let mut access = Self::none();
         access.read_workspace = Permission::Allow;
+        access.keystore = Permission::Allow;
         access
     }
 }
@@ -194,6 +195,7 @@ mod test {
             .unwrap();
         let mut access = HostFnAccess::none();
         access.read_workspace = Permission::Allow;
+        access.keystore = Permission::Allow;
         assert_eq!(HostFnAccess::from(&validate_host_access), access);
     }
 
