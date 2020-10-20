@@ -14,7 +14,6 @@ use crate::{
     core::state::cascade::DbPairMut,
     core::state::element_buf::ElementBuf,
     core::state::metadata::MetadataBuf,
-    core::state::metadata::MetadataBufT,
     test_utils::{
         conductor_setup::ConductorCallData, host_fn_api::*, new_invocation, wait_for_integration,
     },
