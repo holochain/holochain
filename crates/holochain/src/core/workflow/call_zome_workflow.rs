@@ -297,7 +297,7 @@ pub mod tests {
         ribosome::MockRibosomeT,
         workflow::{error::WorkflowError, genesis_workflow::tests::fake_genesis},
     };
-    use crate::fixt::KeystoreSenderFixturator;
+    use crate::fixt::*;
     use ::fixt::prelude::*;
     use holo_hash::fixt::*;
     use holochain_p2p::HolochainP2pCellFixturator;
@@ -479,13 +479,18 @@ pub mod tests {
     // 4.3. Write output results via SC gatekeeper (wrap in transaction): (MVI)
     // This is handled by the workflow runner however I should test that
     // we can create outputs
-    #[ignore = "???"]
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn creates_outputs() {
         let test_env = test_cell_env();
         let env = test_env.env();
         let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
-        let ribosome = MockRibosomeT::new();
+        let mut ribosome = MockRibosomeT::new();
+        ribosome.expect_dna_file().return_const(fixt!(DnaFile));
+        ribosome.expect_call_zome_function().returning(|_, _| {
+            Ok(ZomeCallResponse::Ok(ExternOutput::new(
+                ().try_into().unwrap(),
+            )))
+        });
         // TODO: Make this mock return an output
         let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(
             crate::core::ribosome::NamedInvocation(
