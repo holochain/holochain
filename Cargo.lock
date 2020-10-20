@@ -1610,6 +1610,8 @@ dependencies = [
  "futures",
  "ghost_actor",
  "holo_hash",
+ "kitsune_p2p_proxy",
+ "kitsune_p2p_transport_quic",
  "kitsune_p2p_types",
  "serde",
  "serde_bytes",

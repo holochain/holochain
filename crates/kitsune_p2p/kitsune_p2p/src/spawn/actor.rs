@@ -1,8 +1,8 @@
 // this is largely a passthrough that routes to a specific space handler
 
-use crate::{actor, actor::*, event::*, types::*};
+use crate::{actor, actor::*, event::*, *};
 use futures::future::FutureExt;
-use kitsune_p2p_types::async_lazy::AsyncLazy;
+use kitsune_p2p_types::{async_lazy::AsyncLazy, transport::*, transport_pool::*};
 use std::{
     collections::{hash_map::Entry, HashMap},
     sync::Arc,
@@ -29,12 +29,80 @@ pub(crate) struct KitsuneP2pActor {
     spaces: HashMap<Arc<KitsuneSpace>, AsyncLazy<ghost_actor::GhostSender<KitsuneP2p>>>,
 }
 
+#[allow(clippy::type_complexity)]
+fn build_transport(
+    t_conf: TransportConfig,
+) -> std::pin::Pin<
+    Box<
+        dyn std::future::Future<
+            Output = TransportResult<(
+                ghost_actor::GhostSender<TransportListener>,
+                TransportEventReceiver,
+            )>,
+        >,
+    >,
+> {
+    Box::pin(async move {
+        match t_conf {
+            TransportConfig::Quic {
+                bind_to,
+                override_host,
+                override_port,
+            } => {
+                let sub_conf = kitsune_p2p_transport_quic::ConfigListenerQuic::default()
+                    .set_bind_to(bind_to)
+                    .set_override_host(override_host)
+                    .set_override_port(override_port);
+                Ok(kitsune_p2p_transport_quic::spawn_transport_listener_quic(sub_conf).await?)
+            }
+            TransportConfig::Proxy {
+                sub_transport,
+                proxy_config,
+            } => {
+                let (sub_lstn, sub_evt) = build_transport(*sub_transport).await?;
+                let sub_conf = match proxy_config {
+                    ProxyConfig::RemoteProxyClient { proxy_url } => {
+                        kitsune_p2p_proxy::ProxyConfig::remote_proxy_client(
+                            kitsune_p2p_proxy::TlsConfig::new_ephemeral().await?,
+                            proxy_url.into(),
+                        )
+                    }
+                    ProxyConfig::LocalProxyServer {
+                        proxy_accept_config,
+                    } => kitsune_p2p_proxy::ProxyConfig::local_proxy_server(
+                        kitsune_p2p_proxy::TlsConfig::new_ephemeral().await?,
+                        match proxy_accept_config {
+                            Some(ProxyAcceptConfig::AcceptAll) => {
+                                kitsune_p2p_proxy::AcceptProxyCallback::accept_all()
+                            }
+                            None | Some(ProxyAcceptConfig::RejectAll) => {
+                                kitsune_p2p_proxy::AcceptProxyCallback::reject_all()
+                            }
+                        },
+                    ),
+                };
+                Ok(
+                    kitsune_p2p_proxy::spawn_kitsune_proxy_listener(sub_conf, sub_lstn, sub_evt)
+                        .await?,
+                )
+            }
+        }
+    })
+}
+
 impl KitsuneP2pActor {
-    pub fn new(
+    pub async fn new(
+        config: KitsuneP2pConfig,
         channel_factory: ghost_actor::actor_builder::GhostActorChannelFactory<Self>,
         internal_sender: ghost_actor::GhostSender<Internal>,
         evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     ) -> KitsuneP2pResult<Self> {
+        let (t_pool, _t_listen, _t_event) = spawn_transport_pool().await?;
+        for t_conf in config.transport_pool {
+            let (l, e) = build_transport(t_conf).await?;
+            t_pool.push_sub_transport(l, e).await?;
+        }
+
         Ok(Self {
             channel_factory,
             internal_sender,

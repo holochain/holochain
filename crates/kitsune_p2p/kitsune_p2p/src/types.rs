@@ -20,6 +20,10 @@ pub enum KitsuneP2pError {
     #[error("Decoding Error: {0}")]
     DecodingError(Arc<String>),
 
+    /// TransportError
+    #[error(transparent)]
+    TransportError(#[from] kitsune_p2p_types::transport::TransportError),
+
     /// Other
     #[error("Other: {0}")]
     Other(Box<dyn std::error::Error + Send + Sync>),
