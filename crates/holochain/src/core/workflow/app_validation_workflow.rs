@@ -613,7 +613,6 @@ async fn get_validation_package(
                     }
                 }
                 RequiredValidationType::Custom => {
-                    // TODO: Fix get validation package to get custom and chains
                     let validation_package = {
                         let mut lock = workspace_lock.write().await;
                         let mut cascade = match workspace {
