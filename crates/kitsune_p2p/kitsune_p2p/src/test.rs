@@ -4,6 +4,7 @@ mod tests {
         event::*,
         spawn::*,
         types::{actor::KitsuneP2pSender, *},
+        KitsuneP2pConfig,
     };
     use futures::future::FutureExt;
     use ghost_actor::GhostControlSender;
@@ -18,7 +19,9 @@ mod tests {
         let a2: Arc<KitsuneAgent> =
             Arc::new(b"222222222222222222222222222222222222".to_vec().into());
 
-        let (p2p, mut evt) = spawn_kitsune_p2p().await.unwrap();
+        let (p2p, mut evt) = spawn_kitsune_p2p(KitsuneP2pConfig::default())
+            .await
+            .unwrap();
 
         let space1_clone = space1.clone();
         let a2_clone = a2.clone();
@@ -76,7 +79,9 @@ mod tests {
         let a3: Arc<KitsuneAgent> =
             Arc::new(b"333333333333333333333333333333333333".to_vec().into());
 
-        let (p2p, mut evt) = spawn_kitsune_p2p().await.unwrap();
+        let (p2p, mut evt) = spawn_kitsune_p2p(KitsuneP2pConfig::default())
+            .await
+            .unwrap();
 
         let recv_count = Arc::new(std::sync::atomic::AtomicU8::new(0));
 
@@ -142,7 +147,9 @@ mod tests {
         let a3: Arc<KitsuneAgent> =
             Arc::new(b"333333333333333333333333333333333333".to_vec().into());
 
-        let (p2p, mut evt) = spawn_kitsune_p2p().await.unwrap();
+        let (p2p, mut evt) = spawn_kitsune_p2p(KitsuneP2pConfig::default())
+            .await
+            .unwrap();
 
         let space1_clone = space1.clone();
         let r_task = tokio::task::spawn(async move {
@@ -207,7 +214,9 @@ mod tests {
         let a1: Arc<KitsuneAgent> =
             Arc::new(b"111111111111111111111111111111111111".to_vec().into());
 
-        let (p2p, mut evt) = spawn_kitsune_p2p().await.unwrap();
+        let (p2p, mut evt) = spawn_kitsune_p2p(KitsuneP2pConfig::default())
+            .await
+            .unwrap();
 
         let space1_clone = space1.clone();
         let r_task = tokio::task::spawn(async move {
@@ -277,7 +286,9 @@ mod tests {
         let oh2: Arc<KitsuneOpHash> =
             Arc::new(b"hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh".to_vec().into());
 
-        let (p2p, mut evt) = spawn_kitsune_p2p().await.unwrap();
+        let (p2p, mut evt) = spawn_kitsune_p2p(KitsuneP2pConfig::default())
+            .await
+            .unwrap();
 
         let result = Arc::new(std::sync::RwLock::new((false, false)));
 

@@ -22,10 +22,11 @@ impl ghost_actor::GhostControlHandler for HolochainP2pActor {}
 impl HolochainP2pActor {
     /// constructor
     pub async fn new(
+        config: kitsune_p2p::KitsuneP2pConfig,
         channel_factory: ghost_actor::actor_builder::GhostActorChannelFactory<Self>,
         evt_sender: futures::channel::mpsc::Sender<HolochainP2pEvent>,
     ) -> HolochainP2pResult<Self> {
-        let (kitsune_p2p, kitsune_p2p_events) = kitsune_p2p::spawn_kitsune_p2p().await?;
+        let (kitsune_p2p, kitsune_p2p_events) = kitsune_p2p::spawn_kitsune_p2p(config).await?;
 
         channel_factory.attach_receiver(kitsune_p2p_events).await?;
 

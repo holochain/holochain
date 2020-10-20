@@ -5,7 +5,9 @@ mod actor;
 use actor::*;
 
 /// Spawn a new HolochainP2p actor.  Conductor will call this on initialization.
-pub async fn spawn_holochain_p2p() -> HolochainP2pResult<(
+pub async fn spawn_holochain_p2p(
+    config: kitsune_p2p::KitsuneP2pConfig,
+) -> HolochainP2pResult<(
     ghost_actor::GhostSender<HolochainP2p>,
     HolochainP2pEventReceiver,
 )> {
@@ -17,7 +19,9 @@ pub async fn spawn_holochain_p2p() -> HolochainP2pResult<(
 
     let sender = channel_factory.create_channel::<HolochainP2p>().await?;
 
-    tokio::task::spawn(builder.spawn(HolochainP2pActor::new(channel_factory, evt_send).await?));
+    tokio::task::spawn(
+        builder.spawn(HolochainP2pActor::new(config, channel_factory, evt_send).await?),
+    );
 
     Ok((sender, evt_recv))
 }

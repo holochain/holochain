@@ -195,7 +195,7 @@ impl TransportListenerHandler for Inner {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{transport::*, transport_mem::*};
+    use crate::transport_mem::*;
     use futures::stream::StreamExt;
 
     fn test_receiver(mut recv: TransportEventReceiver) {

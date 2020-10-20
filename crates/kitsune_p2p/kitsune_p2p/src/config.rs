@@ -1,10 +1,19 @@
 use url2::Url2;
 
 /// Configure the kitsune actor
+#[non_exhaustive]
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct KitsuneP2pConfig {
     /// list of sub-transports to be included in this pool
     pub transport_pool: Vec<TransportConfig>,
+}
+
+impl Default for KitsuneP2pConfig {
+    fn default() -> Self {
+        Self {
+            transport_pool: Vec::new(),
+        }
+    }
 }
 
 /// Configure the network bindings for underlying kitsune transports

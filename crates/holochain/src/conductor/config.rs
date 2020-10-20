@@ -157,27 +157,6 @@ pub mod tests {
 
     #[test]
     fn test_config_complete_config() {
-        use holochain_p2p::kitsune_p2p::*;
-        let network_config = KitsuneP2pConfig {
-            transport_pool: vec![TransportConfig::Proxy {
-                sub_transport: Box::new(TransportConfig::Quic {
-                    bind_to: Some(url2::url2!("kitsune-quic://0.0.0.0:0")),
-                    override_host: None,
-                    override_port: None,
-                }),
-                proxy_config: ProxyConfig::LocalProxyServer {
-                    proxy_accept_config: Some(ProxyAcceptConfig::RejectAll),
-                },
-            }],
-        };
-        #[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq)]
-        struct Bob {
-            network: KitsuneP2pConfig,
-        }
-        let b = Bob {
-            network: network_config.clone(),
-        };
-        println!("NETWORK_TOML: {}", toml::to_string_pretty(&b).unwrap());
         let toml = r#"
     environment_path = "/path/to/env"
     use_dangerous_test_keystore = true
@@ -204,6 +183,18 @@ pub mod tests {
 
     "#;
         let result: ConductorResult<ConductorConfig> = config_from_toml(toml);
+        use holochain_p2p::kitsune_p2p::*;
+        let mut network_config = KitsuneP2pConfig::default();
+        network_config.transport_pool.push(TransportConfig::Proxy {
+            sub_transport: Box::new(TransportConfig::Quic {
+                bind_to: Some(url2::url2!("kitsune-quic://0.0.0.0:0")),
+                override_host: None,
+                override_port: None,
+            }),
+            proxy_config: ProxyConfig::LocalProxyServer {
+                proxy_accept_config: Some(ProxyAcceptConfig::RejectAll),
+            },
+        });
         assert_eq!(
             result.unwrap(),
             ConductorConfig {
