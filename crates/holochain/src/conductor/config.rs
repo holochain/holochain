@@ -5,7 +5,6 @@ use serde::{Deserialize, Serialize};
 
 mod admin_interface_config;
 mod dpki_config;
-mod network_config;
 mod passphrase_service_config;
 //mod logger_config;
 //mod signal_config;
@@ -18,7 +17,6 @@ pub use crate::conductor::interface::InterfaceDriver;
 pub use admin_interface_config::AdminInterfaceConfig;
 pub use dpki_config::DpkiConfig;
 //pub use logger_config::LoggerConfig;
-pub use network_config::NetworkConfig;
 pub use passphrase_service_config::PassphraseServiceConfig;
 //pub use signal_config::SignalConfig;
 use std::path::{Path, PathBuf};
@@ -37,9 +35,6 @@ pub struct ConductorConfig {
     /// DO NOT USE THIS IN PRODUCTION!
     #[serde(default)]
     pub use_dangerous_test_keystore: bool,
-
-    /// Config options for the network module. Optional.
-    pub network: Option<NetworkConfig>,
 
     /// Optional URI for a websocket connection to an outsourced signing service.
     /// Bootstrapping step for Holo closed-alpha.
@@ -75,6 +70,9 @@ pub struct ConductorConfig {
 
     /// Setup admin interfaces to control this conductor through a websocket connection
     pub admin_interfaces: Option<Vec<AdminInterfaceConfig>>,
+
+    /// Config options for the network module. Optional.
+    pub network: Option<holochain_p2p::kitsune_p2p::KitsuneP2pConfig>,
     //
     //
     // /// Which signals to emit
@@ -112,7 +110,6 @@ pub mod tests {
     use super::*;
     use matches::assert_matches;
     use std::path::{Path, PathBuf};
-    use url::Url;
 
     #[test]
     fn test_config_load_toml() {
@@ -160,16 +157,33 @@ pub mod tests {
 
     #[test]
     fn test_config_complete_config() {
+        use holochain_p2p::kitsune_p2p::*;
+        let network_config = KitsuneP2pConfig {
+            transport_pool: vec![TransportConfig::Proxy {
+                sub_transport: Box::new(TransportConfig::Quic {
+                    bind_to: Some(url2::url2!("kitsune-quic://0.0.0.0:0")),
+                    override_host: None,
+                    override_port: None,
+                }),
+                proxy_config: ProxyConfig::LocalProxyServer {
+                    proxy_accept_config: Some(ProxyAcceptConfig::RejectAll),
+                },
+            }],
+        };
+        #[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq)]
+        struct Bob {
+            network: KitsuneP2pConfig,
+        }
+        let b = Bob {
+            network: network_config.clone(),
+        };
+        println!("NETWORK_TOML: {}", toml::to_string_pretty(&b).unwrap());
         let toml = r#"
     environment_path = "/path/to/env"
     use_dangerous_test_keystore = true
 
     [passphrase_service]
     type = "cmd"
-
-    [network]
-    type = "sim2h"
-    url = "ws://localhost:9000"
 
     encryption_service_uri = "ws://localhost:9001"
     decryption_service_uri = "ws://localhost:9002"
@@ -183,15 +197,18 @@ pub mod tests {
     driver.type = "websocket"
     driver.port = 1234
 
+    [[network.transport_pool]]
+    type = 'proxy'
+    sub_transport = { type = 'quic', bind_to = 'kitsune-quic://0.0.0.0:0' }
+    proxy_config = { type = 'local_proxy_server', proxy_accept_config = 'reject_all' }
+
     "#;
         let result: ConductorResult<ConductorConfig> = config_from_toml(toml);
         assert_eq!(
             result.unwrap(),
             ConductorConfig {
                 environment_path: PathBuf::from("/path/to/env").into(),
-                network: Some(NetworkConfig::Sim2h {
-                    url: Url::parse("ws://localhost:9000/").unwrap()
-                }),
+                use_dangerous_test_keystore: true,
                 signing_service_uri: None,
                 encryption_service_uri: None,
                 decryption_service_uri: None,
@@ -204,7 +221,7 @@ pub mod tests {
                 admin_interfaces: Some(vec![AdminInterfaceConfig {
                     driver: InterfaceDriver::Websocket { port: 1234 }
                 }]),
-                use_dangerous_test_keystore: true,
+                network: Some(network_config),
             }
         );
     }

@@ -2,7 +2,7 @@ use crate::*;
 use futures::{future::FutureExt, sink::SinkExt, stream::StreamExt};
 use ghost_actor::dependencies::tracing;
 use kitsune_p2p_types::{
-    dependencies::{ghost_actor, ghost_actor::GhostControlSender, serde_json},
+    dependencies::{ghost_actor, ghost_actor::GhostControlSender, serde_json, url2},
     transport::*,
 };
 use std::{collections::HashMap, net::SocketAddr};
@@ -272,6 +272,9 @@ pub async fn spawn_transport_listener_quic(
     ghost_actor::GhostSender<TransportListener>,
     TransportEventReceiver,
 )> {
+    let bind_to = config
+        .bind_to
+        .unwrap_or_else(|| url2::url2!("kitsune-quic://0.0.0.0:0"));
     let server_config = danger::configure_server(config.tls)
         .await
         .map_err(|e| TransportError::from(format!("cert error: {:?}", e)))?;
@@ -279,7 +282,7 @@ pub async fn spawn_transport_listener_quic(
     builder.listen(server_config);
     builder.default_client_config(danger::configure_client());
     let (quinn_endpoint, incoming) = builder
-        .bind(&crate::url_to_addr(&config.bind_to, crate::SCHEME).await?)
+        .bind(&crate::url_to_addr(&bind_to, crate::SCHEME).await?)
         .map_err(TransportError::other)?;
 
     let (incoming_channel_sender, receiver) = futures::channel::mpsc::channel(10);
