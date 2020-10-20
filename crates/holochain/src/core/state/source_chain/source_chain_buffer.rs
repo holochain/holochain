@@ -101,8 +101,7 @@ impl SourceChainBuf {
                 &self
                     .get_element(&header)?
                     .expect("Element in ChainSequence but not Element store"),
-            )
-            .await?;
+            )?;
             ops.push((i, op));
         }
         Ok(ops)

@@ -123,6 +123,16 @@ where
     /// Deregister a published [Header] on the authoring agent's public key
     fn deregister_activity(&mut self, header: &Header) -> DatabaseResult<()>;
 
+    /// Register a sequence of activity onto an agent key
+    fn register_activity_sequence(
+        &mut self,
+        agent: &AgentPubKey,
+        sequence: impl IntoIterator<Item = (u32, HeaderHash)>,
+    ) -> DatabaseResult<()>;
+
+    /// Deregister a sequence of activity onto an agent key
+    fn deregister_activity_sequence(&mut self, agent: &AgentPubKey) -> DatabaseResult<()>;
+
     /// Registers the agents chain status on the authoring agent's public key
     fn register_activity_status(
         &mut self,
@@ -389,15 +399,19 @@ where
     /// Check the activity chain for forks and gaps.
     /// If there is a fork record a forked chain status.
     /// Otherwise if there are no gaps then record a valid chain.
-    fn update_activity_status(&mut self, header: &Header) -> DatabaseResult<()> {
-        let key = ChainItemKey::from(header);
+    fn update_activity_status(&mut self, agent: &AgentPubKey) -> DatabaseResult<()> {
+        let key = ChainItemKey::Agent(agent.clone());
         let status = fresh_reader!(self.env, |r| {
             let mut iter = self.get_activity_sequence(&r, key)?;
             let mut last = None;
             let mut chain_complete = true;
-            while let Some((seq, hash)) = iter.next()? {
-                if let Some((last_seq, last_hash)) = last {
-                    if last_seq == seq {
+            while let Some((header_seq, hash)) = iter.next()? {
+                if let Some(ChainHead {
+                    header_seq: last_seq,
+                    hash: last_hash,
+                }) = last
+                {
+                    if last_seq == header_seq {
                         // Chain is forked
                         return Ok(Some(ChainStatus::Forked(ChainFork {
                             fork_seq: last_seq,
@@ -405,23 +419,20 @@ where
                             second_header: hash,
                         })));
                     }
-                    if seq != last_seq + 1 {
+                    if header_seq != last_seq + 1 {
                         // Chain broken but still check for forks
                         chain_complete = false;
                     }
                 }
-                last = Some((seq, hash));
+                last = Some(ChainHead { header_seq, hash });
             }
             if chain_complete {
-                return Ok(Some(ChainStatus::Valid(ChainHead {
-                    header_seq: header.header_seq(),
-                    hash: HeaderHash::with_data_sync(header),
-                })));
+                return Ok(last.map(ChainStatus::Valid));
             }
             DatabaseResult::Ok(None)
         })?;
         if let Some(status) = status {
-            self.register_activity_status(header.author(), status)?;
+            self.register_activity_status(agent, status)?;
         }
         Ok(())
     }
@@ -595,14 +606,42 @@ where
         let key = MiscMetaKey::chain_item(&key).into();
         let value = MiscMetaValue::ChainItem(header.timestamp().clone().into());
         self.misc_meta.put(key, value)?;
-        self.update_activity_status(header)
+        self.update_activity_status(header.author())
     }
 
     fn deregister_activity(&mut self, header: &Header) -> DatabaseResult<()> {
         let key = ChainItemKey::from(header);
         self.misc_meta
             .delete(MiscMetaKey::chain_item(&key).into())?;
-        self.update_activity_status(header)
+        self.update_activity_status(header.author())
+    }
+
+    fn register_activity_sequence(
+        &mut self,
+        agent: &AgentPubKey,
+        sequence: impl IntoIterator<Item = (u32, HeaderHash)>,
+    ) -> DatabaseResult<()> {
+        for (seq, hash) in sequence {
+            let key = ChainItemKey::Full(agent.clone(), seq, hash);
+            let key = MiscMetaKey::chain_item(&key).into();
+            // TODO: Remove timestamp value as headers are already ordered
+            let value = MiscMetaValue::ChainItem(Timestamp::now());
+            self.misc_meta.put(key, value)?;
+        }
+        self.update_activity_status(agent)
+    }
+
+    fn deregister_activity_sequence(&mut self, agent: &AgentPubKey) -> DatabaseResult<()> {
+        let key = ChainItemKey::Agent(agent.clone());
+        let sequence: Vec<_> = fresh_reader!(self.env, |r| {
+            self.get_activity_sequence(&r, key)?.collect()
+        })?;
+        for (seq, hash) in sequence {
+            let k = ChainItemKey::Full(agent.clone(), seq, hash);
+            let k = MiscMetaKey::chain_item(&k).into();
+            self.misc_meta.delete(k)?;
+        }
+        self.update_activity_status(agent)
     }
 
     fn register_activity_status(
@@ -649,7 +688,7 @@ where
                 // The rest are reasons to overwrite
                 _ => Some(status),
             },
-            None => None,
+            None => Some(status),
         };
         if let Some(s) = new_status {
             let key = MiscMetaKey::chain_status(&agent).into();
@@ -692,6 +731,10 @@ where
                 let value = MiscMetaValue::ChainObserved(observed);
                 self.misc_meta.put(key, value)?;
             }
+        } else {
+            let key = MiscMetaKey::chain_observed(&agent).into();
+            let value = MiscMetaValue::ChainObserved(observed);
+            self.misc_meta.put(key, value)?;
         }
         Ok(())
     }

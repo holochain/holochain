@@ -272,13 +272,13 @@ impl SignedHeaderHashedExt for SignedHeaderHashed {
 
 impl WireElement {
     /// Convert into a [Element] when receiving from the network
-    pub async fn into_element_and_delete(self) -> (Element, Option<Element>) {
+    pub fn into_element_and_delete(self) -> (Element, Option<Element>) {
         let header = Element::new(
             SignedHeaderHashed::from_content_sync(self.signed_header),
             self.maybe_entry,
         );
         let deleted = match self.deleted {
-            Some(deleted) => Some(deleted.into_element().await),
+            Some(deleted) => Some(deleted.into_element()),
             None => None,
         };
         (header, deleted)

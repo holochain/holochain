@@ -24,6 +24,13 @@ mock! {
             agent: &AgentPubKey,
             status: ChainStatus,
         ) -> DatabaseResult<()>;
+        fn register_activity_sequence(
+            &mut self,
+            agent: &AgentPubKey,
+            sequence: Vec<(u32, HeaderHash)>,
+        ) -> DatabaseResult<()>;
+
+        fn deregister_activity_sequence(&mut self, agent: &AgentPubKey) -> DatabaseResult<()>;
         fn deregister_activity_status(&mut self, agent: &AgentPubKey) -> DatabaseResult<()>;
         fn register_activity_observed(
             &mut self,
@@ -215,6 +222,19 @@ impl MetadataBufT for MockMetadataBuf {
 
     fn register_activity(&mut self, header: &Header) -> DatabaseResult<()> {
         self.sync_register_activity(header)
+    }
+    /// Register a sequence of activity onto an agent key
+    fn register_activity_sequence(
+        &mut self,
+        agent: &AgentPubKey,
+        sequence: impl IntoIterator<Item = (u32, HeaderHash)>,
+    ) -> DatabaseResult<()> {
+        self.register_activity_sequence(agent, sequence.into_iter().collect())
+    }
+
+    /// Deregister a sequence of activity onto an agent key
+    fn deregister_activity_sequence(&mut self, agent: &AgentPubKey) -> DatabaseResult<()> {
+        self.deregister_activity_sequence(agent)
     }
     fn register_activity_status(
         &mut self,

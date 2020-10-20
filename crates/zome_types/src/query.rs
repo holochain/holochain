@@ -27,11 +27,14 @@ pub struct ChainQueryFilter {
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 /// An agents chain elements returned from a agent_activity_query
-pub struct AgentActivity {
+pub struct AgentActivity<T = SignedHeaderHashed> {
     /// The agent this activity is for
     pub agent: AgentPubKey,
-    /// Headers on this chain.
-    pub activity: Vec<SignedHeaderHashed>,
+    /// Valid headers on this chain.
+    pub valid_activity: Activity<T>,
+    /// Headers that were rejected by the agent activity
+    /// authority and therefor invalidate the chain.
+    pub rejected_activity: Activity<T>,
     /// The status of this chain.
     pub status: ChainStatus,
     /// The highest chain header that has
@@ -39,7 +42,18 @@ pub struct AgentActivity {
     pub highest_observed: Option<HighestObserved>,
 }
 
-#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
+/// The type of agent activity returned in this request
+pub enum Activity<T = SignedHeaderHashed> {
+    /// The full headers
+    Full(Vec<T>),
+    /// Just the hashes
+    Hashes(Vec<(u32, HeaderHash)>),
+    /// This activity was not requested
+    NotRequested,
+}
+
+#[derive(Clone, Debug, PartialEq, Hash, Eq, serde::Serialize, serde::Deserialize)]
 /// The highest header sequence observed by this authority.
 /// This also includes the headers at this sequence.
 /// If there is more then one then there is a fork.

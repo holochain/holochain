@@ -156,19 +156,26 @@ pub struct GetActivityOptions {
     /// not a timeout error.
     pub timeout_ms: Option<u64>,
     /// [Remote]
-    /// Include the all activity headers in the response.
+    /// Include the all valid activity headers in the response.
     /// If this is false the call becomes a lightweight response with
     /// just the chain status and highest observed header.
     /// This is useful when you want to ask an authority about the
     /// status of a chain but do not need all the headers.
-    pub include_activity: bool,
+    pub include_valid_activity: bool,
+    /// Include any rejected headers in the response.
+    pub include_rejected_activity: bool,
+    /// Include the full signed headers and hashes in the response
+    /// instead of just the hashes.
+    pub include_full_headers: bool,
 }
 
 impl Default for GetActivityOptions {
     fn default() -> Self {
         Self {
             timeout_ms: None,
-            include_activity: true,
+            include_valid_activity: true,
+            include_rejected_activity: false,
+            include_full_headers: false,
         }
     }
 }
