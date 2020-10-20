@@ -48,6 +48,7 @@ impl From<&ValidateHostAccess> for HostFnAccess {
     fn from(_: &ValidateHostAccess) -> Self {
         let mut access = Self::none();
         access.read_workspace = Permission::Allow;
+        access.keystore = Permission::Allow;
         access
     }
 }
@@ -150,7 +151,7 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn validate_callback_result_fold() {
-        let mut rng = thread_rng();
+        let mut rng = fixt::rng();
 
         let result_valid = || ValidateResult::Valid;
         let result_ud = || ValidateResult::UnresolvedDependencies(vec![]);
@@ -194,6 +195,7 @@ mod test {
             .unwrap();
         let mut access = HostFnAccess::none();
         access.read_workspace = Permission::Allow;
+        access.keystore = Permission::Allow;
         assert_eq!(HostFnAccess::from(&validate_host_access), access);
     }
 

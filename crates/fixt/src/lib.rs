@@ -4,10 +4,14 @@ pub mod bool;
 pub mod bytes;
 pub mod number;
 pub mod prelude;
+#[deny(missing_docs)]
+mod rng;
 pub mod serialized_bytes;
 pub mod string;
 pub mod unit;
 pub use paste;
+
+pub use rng::rng;
 
 #[derive(Clone)]
 /// the Fixturator is the struct that we wrap in our FooFixturator newtypes to impl Iterator over
@@ -250,7 +254,7 @@ macro_rules! fixturator {
 
                 impl [<$type:camel Variant>] {
                     fn random() -> Self {
-                        [<$type:camel Variant>]::iter().choose(&mut thread_rng()).unwrap()
+                        [<$type:camel Variant>]::iter().choose(&mut $crate::rng()).unwrap()
                     }
                     fn nth(index: usize) -> Self {
                         expr! {
@@ -545,7 +549,7 @@ macro_rules! newtype_fixturator {
             $outer,
             $outer(vec![]),
             {
-                let mut rng = thread_rng();
+                let mut rng = $crate::rng();
                 let vec_len = rng.gen_range(0, 5);
                 let mut ret = vec![];
                 let mut inner_fixturator =
@@ -557,7 +561,7 @@ macro_rules! newtype_fixturator {
                 $outer(ret)
             },
             {
-                let mut rng = thread_rng();
+                let mut rng = $crate::rng();
                 let vec_len = rng.gen_range(0, 5);
                 let mut ret = vec![];
                 let mut inner_fixturator =
@@ -636,10 +640,7 @@ macro_rules! enum_fixturator {
         fixturator!(
             $enum,
             $empty,
-            {
-                let mut rng = rand::thread_rng();
-                $enum::iter().choose(&mut rng).unwrap()
-            },
+            { $enum::iter().choose(&mut crate::rng()).unwrap() },
             {
                 let ret = $enum::iter().cycle().nth(self.0.index).unwrap();
                 self.0.index += 1;

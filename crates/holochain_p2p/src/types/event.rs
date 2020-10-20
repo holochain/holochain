@@ -45,6 +45,21 @@ impl From<&actor::GetLinksOptions> for GetLinksOptions {
     }
 }
 
+/// Get agent activity options help control how the get is processed at various levels.
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct GetActivityOptions {
+    /// Include the activity headers in the response
+    pub include_activity: bool,
+}
+
+impl From<&actor::GetActivityOptions> for GetActivityOptions {
+    fn from(a: &actor::GetActivityOptions) -> Self {
+        Self {
+            include_activity: a.include_activity,
+        }
+    }
+}
+
 ghost_actor::ghost_chan! {
     /// The HolochainP2pEvent stream allows handling events generated from
     /// the HolochainP2p actor.
@@ -109,6 +124,15 @@ ghost_actor::ghost_chan! {
             options: GetLinksOptions,
         ) -> GetLinksResponse;
 
+        /// A remote node is requesting agent activity from us.
+        fn get_agent_activity(
+            dna_hash: DnaHash,
+            to_agent: AgentPubKey,
+            agent: AgentPubKey,
+            query: ChainQueryFilter,
+            options: GetActivityOptions,
+        ) -> AgentActivity;
+
         /// A remote node has sent us a validation receipt.
         fn validation_receipt_received(
             dna_hash: DnaHash,
@@ -154,6 +178,7 @@ macro_rules! match_p2p_evt {
             HolochainP2pEvent::Get { $i, .. } => { $($t)* }
             HolochainP2pEvent::GetMeta { $i, .. } => { $($t)* }
             HolochainP2pEvent::GetLinks { $i, .. } => { $($t)* }
+            HolochainP2pEvent::GetAgentActivity { $i, .. } => { $($t)* }
             HolochainP2pEvent::ValidationReceiptReceived { $i, .. } => { $($t)* }
             HolochainP2pEvent::FetchOpHashesForConstraints { $i, .. } => { $($t)* }
             HolochainP2pEvent::FetchOpHashData { $i, .. } => { $($t)* }

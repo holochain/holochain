@@ -1,6 +1,10 @@
 //! Types for source chain queries
 
-use crate::header::{EntryType, Header, HeaderType};
+use crate::{
+    element::SignedHeaderHashed,
+    header::{EntryType, Header, HeaderType},
+};
+use holo_hash::HeaderHash;
 pub use holochain_serialized_bytes::prelude::*;
 
 /// Query arguments
@@ -19,6 +23,74 @@ pub struct ChainQueryFilter {
     pub header_type: Option<HeaderType>,
     /// Include the entries in the elements
     pub include_entries: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
+/// An agents chain elements returned from a agent_activity_query
+pub struct AgentActivity {
+    /// Headers on this chain.
+    pub activity: Vec<SignedHeaderHashed>,
+    /// The status of this chain.
+    pub status: ChainStatus,
+    /// The highest chain header that has
+    /// been observed by this authority.
+    pub highest_observed: Option<HighestObserved>,
+}
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+/// The highest header sequence observed by this authority.
+/// This also includes the headers at this sequence.
+/// If there is more then one then there is a fork.
+///
+/// This type is to prevent headers being hidden by
+/// withholding the previous header.
+///
+/// The information is tracked at the edge of holochain before
+/// validation (but after drop checks).
+pub struct HighestObserved {
+    /// The highest sequence number observed.
+    pub header_seq: u32,
+    /// Hashes of any headers claiming to be at this
+    /// header sequence.
+    pub hash: Vec<HeaderHash>,
+}
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+/// Status of the agent activity chain
+// TODO: In the future we will most likely be replaced
+// by warrants instead of Forked / Invalid so we can provide
+// evidence of why the chain has a status.
+pub enum ChainStatus {
+    /// This authority has no information on the chain.
+    Empty,
+    /// The chain is valid as at this header sequence and header hash.
+    Valid(ChainHead),
+    /// Chain is forked.
+    Forked(ChainFork),
+    /// Chain is invalid because of this header.
+    Invalid(HeaderHash),
+}
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+/// The header at the head of the complete chain.
+/// This is as far as this authority can see a
+/// chain with no gaps.
+pub struct ChainHead {
+    /// Sequence number of this chain head.
+    pub header_seq: u32,
+    /// Hash of this chain head
+    pub hash: HeaderHash,
+}
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+/// The chain has been forked by these two headers
+pub struct ChainFork {
+    /// The point where the chain has forked.
+    pub fork_seq: u32,
+    /// The first header at this sequence position.
+    pub first_header: HeaderHash,
+    /// The second header at this sequence position.
+    pub second_header: HeaderHash,
 }
 
 impl ChainQueryFilter {
