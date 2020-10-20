@@ -145,6 +145,9 @@ ghost_actor::ghost_chan! {
     /// - Transport encryption is handled internally.
     /// - See light-weight comments below on `create_channel` api.
     pub chan TransportListener<TransportError> {
+        /// Grab a debugging internal state dump.
+        fn debug() -> serde_json::Value;
+
         /// Retrieve the current url (address) this listener is bound to.
         fn bound_url() -> url2::Url2;
 

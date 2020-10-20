@@ -56,9 +56,9 @@ async fn tls_client(
 
                 let cert_digest = blake2b_32(
                     cli.get_peer_certificates()
-                        .unwrap()
+                        .ok_or_else(|| TransportError::from("tls_cli: No peer tls"))?
                         .get(0)
-                        .unwrap()
+                        .ok_or_else(|| TransportError::from("tls_cli: No peer tls"))?
                         .as_ref(),
                 );
 
@@ -80,23 +80,19 @@ async fn tls_client(
             }
 
             if cli.wants_write() {
-                tracing::trace!("{}: CLI tls wants write", short);
                 let mut data = Vec::new();
                 cli.write_tls(&mut data).map_err(TransportError::other)?;
+                tracing::trace!("{}: CLI tls wants write {} bytes", short, data.len());
                 write
                     .send(ProxyWire::chan_send(data.into()))
                     .await
                     .map_err(TransportError::other)?;
-            } else if wants_write_close && !cli.is_handshaking() {
+            }
+
+            if wants_write_close && !cli.is_handshaking() {
+                tracing::trace!("{}: CLI closing outgoing", short);
                 write.close().await.map_err(TransportError::other)?;
             }
-
-            if !cli.wants_read() {
-                tokio::time::delay_for(std::time::Duration::from_millis(10)).await;
-                continue;
-            }
-
-            tracing::trace!("{}: CLI tls wants read", short);
 
             match merge.next().await {
                 Some(Left(Some(data))) => {
@@ -104,6 +100,7 @@ async fn tls_client(
                     cli.write_all(&data).map_err(TransportError::other)?;
                 }
                 Some(Left(None)) => {
+                    tracing::trace!("{}: CLI wants close outgoing", short);
                     wants_write_close = true;
                 }
                 Some(Right(Some(wire))) => match wire {
