@@ -5,17 +5,19 @@ use crate::core::state::{
 };
 use fallible_iterator::FallibleIterator;
 
-use holo_hash::{AgentPubKey, EntryHash};
-use holochain_state::{env::EnvironmentRead, env::EnvironmentWrite, fresh_reader};
+use holo_hash::{AgentPubKey, EntryHash, HeaderHash};
+use holochain_state::{
+    env::EnvironmentRead, env::EnvironmentWrite, fresh_reader, prelude::PrefixType,
+    prelude::Readable,
+};
 use holochain_types::{
-    chain::AgentActivityExt,
     element::{GetElementResponse, RawGetEntryResponse},
     header::WireUpdateRelationship,
     metadata::TimedHeaderHash,
 };
 use holochain_zome_types::{
     element::SignedHeaderHashed, header::conversions::WrongHeaderError, query::Activity,
-    query::AgentActivity, query::ChainHead, query::ChainQueryFilter,
+    query::AgentActivity, query::ChainQueryFilter, query::ChainStatus,
 };
 use std::{collections::BTreeSet, convert::TryInto};
 use tracing::*;
@@ -167,73 +169,88 @@ pub async fn handle_get_entry(
 pub fn handle_get_agent_activity(
     env: EnvironmentRead,
     agent: AgentPubKey,
-    query: ChainQueryFilter,
+    // TODO: Query filtering breaks caching.
+    // It's easier to just send back the full chain and then filter
+    // in the cascade but it would be nice to avoid sending the filtered
+    // out headers across the network.
+    _query: ChainQueryFilter,
     options: holochain_p2p::event::GetActivityOptions,
 ) -> CellResult<AgentActivity> {
+    // Databases
     let element_integrated = ElementBuf::vault(env.clone(), false)?;
     let meta_integrated = MetadataBuf::vault(env.clone())?;
     let element_rejected = ElementBuf::rejected(env.clone())?;
     let meta_rejected = MetadataBuf::rejected(env.clone())?;
 
-    if options.include_activity {
+    // Status
+    let status = meta_integrated
+        .get_activity_status(&agent)?
+        .unwrap_or(ChainStatus::Empty);
+    let highest_observed = meta_integrated.get_activity_observed(&agent)?;
+
+    // TODO: If full headers aren't requested then query doesn't work
+
+    // Valid headers
+    let valid_activity = if options.include_valid_activity {
         fresh_reader!(env, |r| {
-            let activity: Vec<_> = meta_integrated
-                .get_activity(&r, ChainItemKey::Agent(agent.clone()))?
+            let hashes = meta_integrated
+                .get_activity_sequence(&r, ChainItemKey::Agent(agent.clone()))?
                 .collect()?;
-            info!(line = line!());
-            let now = std::time::Instant::now();
-            let activity: Vec<SignedHeaderHashed> =
-                fallible_iterator::convert(activity.into_iter().map(Ok))
-                    .filter_map(|h| element_integrated.get_header_with_reader(&r, &h.header_hash))
-                    .collect()?;
-            tracing::info!(line = line!(), us = ?now.elapsed().as_micros());
-            let mut activity: Vec<Activity> = activity
-                .into_iter()
-                .filter(|shh| query.check(shh.header()))
-                .map(Activity::valid)
-                .collect();
-            activity.extend(
-                meta_rejected
-                    .get_activity(&r, ChainItemKey::Agent(agent.clone()))?
-                    .filter_map(|h| element_rejected.get_header(&h.header_hash))
-                    .filter(|shh| Ok(query.check(shh.header())))
-                    .map(|shh| Ok(Activity::rejected(shh)))
-                    .collect::<Vec<_>>()?,
-            );
-            // TODO: Add abandoned
-            activity.sort_unstable_by_key(|a| a.header.header().header_seq());
-            // TODO: Return the real status
-            Ok(AgentActivity::valid(activity, agent))
-        })
-    } else {
-        fresh_reader!(env, |r| {
-            let integrated = meta_integrated
-                .get_activity_sequence(&r, ChainItemKey::Agent(agent.clone()))?
-                .last()?;
-            let rejected = meta_rejected
-                .get_activity_sequence(&r, ChainItemKey::Agent(agent.clone()))?
-                .last()?;
-            let chain_head = integrated.map(|i| match rejected {
-                Some(r) => {
-                    if i.0 >= r.0 {
-                        i
-                    } else {
-                        r
-                    }
-                }
-                None => i,
-            });
-            match chain_head {
-                Some((header_seq, hash)) => {
-                    let chain_head = ChainHead { header_seq, hash };
-                    // TODO: Note that the chain is still valid even though the individual
-                    // header has been rejected. I'm not sure how this will play
-                    // out when we add warrants because the warrant will make the
-                    // chain invalid. @freesig
-                    Ok(AgentActivity::valid_without_activity(chain_head, agent))
-                }
-                None => Ok(AgentActivity::empty(agent)),
+            if options.include_full_headers {
+                CellResult::Ok(Activity::Full(get_full_headers(
+                    hashes,
+                    element_integrated,
+                    &r,
+                )?))
+            } else {
+                Ok(Activity::Hashes(hashes))
             }
-        })
-    }
+        })?
+    } else {
+        Activity::NotRequested
+    };
+
+    // Rejected hashes
+    let rejected_activity = if options.include_rejected_activity {
+        fresh_reader!(env, |r| {
+            let hashes = meta_rejected
+                .get_activity_sequence(&r, ChainItemKey::Agent(agent.clone()))?
+                .collect()?;
+            if options.include_full_headers {
+                CellResult::Ok(Activity::Full(get_full_headers(
+                    hashes,
+                    element_rejected,
+                    &r,
+                )?))
+            } else {
+                Ok(Activity::Hashes(hashes))
+            }
+        })?
+    } else {
+        Activity::NotRequested
+    };
+
+    Ok(AgentActivity {
+        valid_activity,
+        rejected_activity,
+        agent,
+        status,
+        highest_observed,
+    })
+}
+
+fn get_full_headers<P: PrefixType, R: Readable>(
+    hashes: Vec<(u32, HeaderHash)>,
+    database: ElementBuf<P>,
+    reader: &R,
+) -> CellResult<Vec<SignedHeaderHashed>> {
+    info!(line = line!());
+    let now = std::time::Instant::now();
+    let headers = fallible_iterator::convert(hashes.into_iter().map(Ok))
+        .filter_map(|h| database.get_header_with_reader(reader, &h.1))
+        // .filter(|shh| Ok(query.check(shh.header())))
+        .collect()?;
+    let us = now.elapsed().as_micros();
+    tracing::info!(line = line!(), ?us);
+    Ok(headers)
 }

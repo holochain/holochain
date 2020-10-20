@@ -40,7 +40,6 @@ pub fn create_link<'a>(
                     workspace.source_chain.elements(),
                     &mut workspace.meta_authored,
                 )
-                .await
                 .map_err(Box::new)?;
                 header_hash
             };

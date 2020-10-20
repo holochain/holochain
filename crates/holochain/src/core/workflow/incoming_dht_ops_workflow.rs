@@ -17,7 +17,7 @@ use crate::core::{
         workspace::{Workspace, WorkspaceResult},
     },
 };
-use holo_hash::{DhtOpHash, HeaderHash};
+use holo_hash::DhtOpHash;
 use holochain_state::{
     buffer::BufferedStore,
     buffer::KvBufFresh,
@@ -121,8 +121,8 @@ impl IncomingDhtOpsWorkspace {
     }
 
     async fn add_to_pending(&mut self, hash: DhtOpHash, op: DhtOp) -> DhtOpConvertResult<()> {
-        let basis = op.dht_basis().await;
-        let op_light = op.to_light().await;
+        let basis = op.dht_basis();
+        let op_light = op.to_light();
         tracing::debug!(?op_light);
 
         // register the highest observed header in an agents chain
@@ -131,7 +131,7 @@ impl IncomingDhtOpsWorkspace {
                 header.author(),
                 HighestObserved {
                     header_seq: header.header_seq(),
-                    hash: vec![HeaderHash::with_data_sync(header)],
+                    hash: vec![op_light.header_hash().clone()],
                 },
             )?;
         }

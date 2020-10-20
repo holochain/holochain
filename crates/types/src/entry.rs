@@ -14,7 +14,7 @@ pub type EntryHashed = HoloHashed<Entry>;
 
 /// Convenience function for when you have an ElementEntry but need
 /// a Option EntryHashed
-pub async fn option_entry_hashed(entry: ElementEntry) -> Option<EntryHashed> {
+pub fn option_entry_hashed(entry: ElementEntry) -> Option<EntryHashed> {
     match entry {
         ElementEntry::Present(e) => Some(EntryHashed::from_content_sync(e)),
         _ => None,

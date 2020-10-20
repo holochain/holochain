@@ -113,7 +113,7 @@ mod test {
 
     #[test]
     fn init_callback_result_fold() {
-        let mut rng = thread_rng();
+        let mut rng = fixt::rng();
 
         let result_pass = || InitResult::Pass;
         let result_ud = || {

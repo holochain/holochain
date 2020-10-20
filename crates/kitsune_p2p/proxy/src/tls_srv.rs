@@ -50,9 +50,9 @@ async fn tls_server(
 
                 let cert_digest = blake2b_32(
                     srv.get_peer_certificates()
-                        .unwrap()
+                        .ok_or_else(|| TransportError::from("tls_srv: No peer tls"))?
                         .get(0)
-                        .unwrap()
+                        .ok_or_else(|| TransportError::from("tls_srv: No peer tls"))?
                         .as_ref(),
                 );
 
@@ -71,23 +71,19 @@ async fn tls_server(
             }
 
             if srv.wants_write() {
-                tracing::trace!("{}: SRV tls wants write", short);
                 let mut data = Vec::new();
                 srv.write_tls(&mut data).map_err(TransportError::other)?;
+                tracing::trace!("{}: SRV tls wants write {} bytes", short, data.len());
                 write
                     .send(ProxyWire::chan_send(data.into()))
                     .await
                     .map_err(TransportError::other)?;
-            } else if wants_write_close && !srv.is_handshaking() {
+            }
+
+            if wants_write_close && !srv.is_handshaking() {
+                tracing::trace!("{}: SRV closing outgoing", short);
                 write.close().await.map_err(TransportError::other)?;
             }
-
-            if !srv.wants_read() {
-                tokio::time::delay_for(std::time::Duration::from_millis(10)).await;
-                continue;
-            }
-
-            tracing::trace!("{}: SRV tls wants read", short);
 
             match merge.next().await {
                 Some(Left(Some(data))) => {
@@ -95,6 +91,7 @@ async fn tls_server(
                     srv.write_all(&data).map_err(TransportError::other)?;
                 }
                 Some(Left(None)) => {
+                    tracing::trace!("{}: SRV wants close outgoing", short);
                     wants_write_close = true;
                 }
                 Some(Right(Some(wire))) => match wire {

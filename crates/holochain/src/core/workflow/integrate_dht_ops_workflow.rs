@@ -473,13 +473,13 @@ fn get_header<P: PrefixType>(
 /// inline, so that they are immediately available in the authored metadata.
 /// NB: We skip integrating the element data, since it is already available in
 /// our source chain.
-pub async fn integrate_to_authored<C: MetadataBufT<AuthoredPrefix>>(
+pub fn integrate_to_authored<C: MetadataBufT<AuthoredPrefix>>(
     element: &Element,
     element_store: &ElementBuf<AuthoredPrefix>,
     meta_store: &mut C,
 ) -> DhtOpConvertResult<()> {
     // Produce the light directly
-    for op in produce_op_lights_from_elements(vec![element]).await? {
+    for op in produce_op_lights_from_elements(vec![element])? {
         // we don't integrate element data, because it is already in our vault.
         integrate_single_metadata(op, element_store, meta_store)?
     }

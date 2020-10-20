@@ -15,6 +15,11 @@ const SCHEME: &str = "kitsune-mem";
 static CORE: Lazy<Arc<Mutex<HashMap<url2::Url2, TransportIncomingChannelSender>>>> =
     Lazy::new(|| Arc::new(Mutex::new(HashMap::new())));
 
+async fn list_cores() -> TransportResult<Vec<url2::Url2>> {
+    let lock = CORE.lock().await;
+    Ok(lock.keys().cloned().collect())
+}
+
 async fn get_core(url: url2::Url2) -> TransportResult<TransportIncomingChannelSender> {
     let lock = CORE.lock().await;
     lock.get(&url)
@@ -84,6 +89,20 @@ impl ghost_actor::GhostControlHandler for InnerListen {}
 impl ghost_actor::GhostHandler<TransportListener> for InnerListen {}
 
 impl TransportListenerHandler for InnerListen {
+    fn handle_debug(&mut self) -> TransportListenerHandlerResult<serde_json::Value> {
+        let url = self.url.clone();
+        let listeners = list_cores();
+        Ok(async move {
+            let listeners = listeners.await?;
+            Ok(serde_json::json! {{
+                "url": url,
+                "listeners": listeners,
+            }})
+        }
+        .boxed()
+        .into())
+    }
+
     fn handle_bound_url(&mut self) -> TransportListenerHandlerResult<url2::Url2> {
         let url = self.url.clone();
         Ok(async move { Ok(url) }.boxed().into())
