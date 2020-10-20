@@ -1,18 +1,18 @@
 //! Types related to an agents for chain activity
 use holo_hash::{AgentPubKey, HeaderHash};
 use holochain_zome_types::{
-    query::Activity, query::AgentActivity, query::ChainHead, query::ChainStatus, Header,
+    element::SignedHeaderHashed, query::AgentActivity, query::ChainHead, query::ChainStatus, Header,
 };
 
 /// Helpers for constructing AgentActivity
 pub trait AgentActivityExt {
     /// Create a valid chain activity from set of headers.
-    /// The headers should from an agents chain activity and
-    /// ordered in ascending order
-    fn valid(headers: Vec<Activity>, agent: AgentPubKey) -> AgentActivity {
+    /// The headers should come from an agents chain activity and
+    /// be ordered in ascending order
+    fn valid(headers: Vec<SignedHeaderHashed>, agent: AgentPubKey) -> AgentActivity {
         let status = headers
             .last()
-            .map(|chain_head| ChainStatus::Valid(head_from_header(chain_head.header.header())))
+            .map(|chain_head| ChainStatus::Valid(head_from_header(chain_head.header())))
             .unwrap_or(ChainStatus::Empty);
         AgentActivity {
             agent,

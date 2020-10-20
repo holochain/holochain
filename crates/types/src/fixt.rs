@@ -51,7 +51,6 @@ use holochain_zome_types::{
 };
 use holochain_zome_types::{capability::CapClaim, header::HeaderType};
 use rand::seq::IteratorRandom;
-use rand::thread_rng;
 use rand::Rng;
 use std::collections::BTreeMap;
 use std::collections::HashSet;

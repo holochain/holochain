@@ -3,7 +3,6 @@
 use crate::{
     element::SignedHeaderHashed,
     header::{EntryType, Header, HeaderType},
-    validate::ValidationStatus,
 };
 use holo_hash::{AgentPubKey, HeaderHash};
 pub use holochain_serialized_bytes::prelude::*;
@@ -32,7 +31,7 @@ pub struct AgentActivity {
     /// The agent this activity is for
     pub agent: AgentPubKey,
     /// Headers on this chain.
-    pub activity: Vec<Activity>,
+    pub activity: Vec<SignedHeaderHashed>,
     /// The status of this chain.
     pub status: ChainStatus,
     /// The highest chain header that has
@@ -41,19 +40,6 @@ pub struct AgentActivity {
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-/// Individual agent activity.
-/// The header with it's validation status.
-// TODO: This is a little weird because when we have warrants
-// we will have a warrant for each position in the chain that
-// is warranted. Maybe that makes this redundant?
-pub struct Activity {
-    /// The header on this chain
-    pub header: SignedHeaderHashed,
-    /// The validation status of this individual header
-    pub validation_status: ValidationStatus,
-}
-
-#[derive(Clone, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 /// The highest header sequence observed by this authority.
 /// This also includes the headers at this sequence.
 /// If there is more then one then there is a fork.
@@ -165,30 +151,6 @@ impl ChainQueryFilter {
             })
             .unwrap_or(true);
         check_range && check_header_type && check_entry_type
-    }
-}
-
-impl Activity {
-    /// Create a valid activity
-    pub fn valid(header: SignedHeaderHashed) -> Self {
-        Self {
-            header,
-            validation_status: ValidationStatus::Valid,
-        }
-    }
-    /// Create a rejected activity
-    pub fn rejected(header: SignedHeaderHashed) -> Self {
-        Self {
-            header,
-            validation_status: ValidationStatus::Abandoned,
-        }
-    }
-    /// Create a abandoned activity
-    pub fn abandoned(header: SignedHeaderHashed) -> Self {
-        Self {
-            header,
-            validation_status: ValidationStatus::Abandoned,
-        }
     }
 }
 

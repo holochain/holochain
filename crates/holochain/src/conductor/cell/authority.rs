@@ -172,8 +172,6 @@ pub fn handle_get_agent_activity(
 ) -> CellResult<AgentActivity> {
     let element_integrated = ElementBuf::vault(env.clone(), false)?;
     let meta_integrated = MetadataBuf::vault(env.clone())?;
-    let element_rejected = ElementBuf::rejected(env.clone())?;
-    let meta_rejected = MetadataBuf::rejected(env.clone())?;
 
     if options.include_activity {
         fresh_reader!(env, |r| {
@@ -190,14 +188,12 @@ pub fn handle_get_agent_activity(
             let mut activity: Vec<Activity> = activity
                 .into_iter()
                 .filter(|shh| query.check(shh.header()))
-                .map(Activity::valid)
                 .collect();
             activity.extend(
                 meta_rejected
                     .get_activity(&r, ChainItemKey::Agent(agent.clone()))?
                     .filter_map(|h| element_rejected.get_header(&h.header_hash))
                     .filter(|shh| Ok(query.check(shh.header())))
-                    .map(|shh| Ok(Activity::rejected(shh)))
                     .collect::<Vec<_>>()?,
             );
             // TODO: Add abandoned

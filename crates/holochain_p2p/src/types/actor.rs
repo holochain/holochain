@@ -156,7 +156,11 @@ pub struct GetActivityOptions {
     /// not a timeout error.
     pub timeout_ms: Option<u64>,
     /// [Remote]
-    /// Include the activity headers in the response
+    /// Include the all activity headers in the response.
+    /// If this is false the call becomes a lightweight response with
+    /// just the chain status and highest observed header.
+    /// This is useful when you want to ask an authority about the
+    /// status of a chain but do not need all the headers.
     pub include_activity: bool,
 }
 
