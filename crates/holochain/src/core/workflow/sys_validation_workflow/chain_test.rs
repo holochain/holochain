@@ -133,6 +133,7 @@ async fn run_test(alice_cell_id: CellId, handle: ConductorHandle) {
         &alice_env,
         sys_validation_trigger.clone(),
         ops,
+        None,
     )
     .await
     .unwrap();
@@ -184,9 +185,14 @@ async fn run_test(alice_cell_id: CellId, handle: ConductorHandle) {
     ops.push((DhtOpHash::with_data_sync(&op), op));
 
     // Add the ops to incoming
-    incoming_dht_ops_workflow::incoming_dht_ops_workflow(&alice_env, sys_validation_trigger, ops)
-        .await
-        .unwrap();
+    incoming_dht_ops_workflow::incoming_dht_ops_workflow(
+        &alice_env,
+        sys_validation_trigger,
+        ops,
+        None,
+    )
+    .await
+    .unwrap();
 
     wait_for_integration(&alice_env, 9 + 2, 100, Duration::from_millis(100)).await;
 

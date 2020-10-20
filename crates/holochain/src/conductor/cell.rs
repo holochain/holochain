@@ -426,16 +426,21 @@ impl Cell {
     /// we are receiving a "publish" event from the network
     async fn handle_publish(
         &self,
-        _from_agent: AgentPubKey,
+        from_agent: AgentPubKey,
         _request_validation_receipt: bool,
         _dht_hash: holo_hash::AnyDhtHash,
         ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     ) -> CellResult<()> {
-        incoming_dht_ops_workflow(&self.env, self.queue_triggers.sys_validation.clone(), ops)
-            .await
-            .map_err(Box::new)
-            .map_err(ConductorApiError::from)
-            .map_err(Box::new)?;
+        incoming_dht_ops_workflow(
+            &self.env,
+            self.queue_triggers.sys_validation.clone(),
+            ops,
+            Some(from_agent),
+        )
+        .await
+        .map_err(Box::new)
+        .map_err(ConductorApiError::from)
+        .map_err(Box::new)?;
         Ok(())
     }
 

@@ -45,7 +45,7 @@ use crate::{
 use error::AppValidationResult;
 pub use error::*;
 use fallible_iterator::FallibleIterator;
-use holo_hash::DhtOpHash;
+use holo_hash::{AgentPubKey, DhtOpHash};
 use holochain_p2p::{actor::GetActivityOptions, HolochainP2pCell, HolochainP2pCellT};
 use holochain_state::{
     buffer::{BufferedStore, KvBufFresh},
@@ -159,10 +159,16 @@ async fn app_validation_workflow_inner(
         match &vlv.status {
             ValidationLimboStatus::AwaitingAppDeps(_) | ValidationLimboStatus::SysValidated => {
                 // Validate this op
-                let outcome = validate_op(op.clone(), &conductor_api, workspace, &network)
-                    .await
-                    // Get the outcome or return the error
-                    .or_else(|outcome_or_err| outcome_or_err.try_into())?;
+                let outcome = validate_op(
+                    op.clone(),
+                    vlv.from_agent.clone(),
+                    &conductor_api,
+                    workspace,
+                    &network,
+                )
+                .await
+                // Get the outcome or return the error
+                .or_else(|outcome_or_err| outcome_or_err.try_into())?;
 
                 match outcome {
                     Outcome::Accepted => {
@@ -200,6 +206,7 @@ fn to_zome_name(zomes_to_invoke: ZomesToInvoke) -> AppValidationResult<ZomeName>
 
 async fn validate_op(
     op: DhtOp,
+    from_agent: Option<AgentPubKey>,
     conductor_api: &impl CellConductorApiT,
     workspace: &mut AppValidationWorkspace,
     network: &HolochainP2pCell,
@@ -231,6 +238,7 @@ async fn validate_op(
     let validation_package = get_validation_package(
         &element,
         &entry_def,
+        from_agent,
         Some(workspace),
         &ribosome,
         &workspace_lock,
@@ -525,6 +533,7 @@ fn extract_app_type(element: &Element) -> Option<AppEntryType> {
 async fn get_validation_package(
     element: &Element,
     entry_def: &Option<EntryDef>,
+    from_agent: Option<AgentPubKey>,
     workspace: Option<&mut AppValidationWorkspace>,
     ribosome: &impl RibosomeT,
     workspace_lock: &CallZomeWorkspaceLock,
@@ -559,7 +568,19 @@ async fn get_validation_package(
                         return Ok(Some(validation_package));
                     }
 
-                    // TODO: Fallback to gossiper if author is unavailable
+                    // Fallback to gossiper if author is unavailable
+                    if let Some(from_agent) = from_agent {
+                        if let Some(validation_package) = cascade
+                            .get_validation_package(
+                                from_agent,
+                                header_hashed,
+                                entry_def.required_validation_type,
+                            )
+                            .await?
+                        {
+                            return Ok(Some(validation_package));
+                        }
+                    }
 
                     // Fallback to RegisterAgentActivity if gossiper is unavailable
                     let range = 0..element.header().header_seq().saturating_sub(1);
@@ -601,15 +622,33 @@ async fn get_validation_package(
                         };
                         let agent_id = element.header().author().clone();
                         let header_hashed = element.header_hashed();
-                        cascade
+                        let validation_package = cascade
                             .get_validation_package(
                                 agent_id,
                                 header_hashed,
                                 entry_def.required_validation_type,
                             )
-                            .await?
+                            .await?;
+
+                        // Fallback to gossiper
+                        match &validation_package {
+                            Some(_) => validation_package,
+                            None => {
+                                if let Some(from_agent) = from_agent {
+                                    cascade
+                                        .get_validation_package(
+                                            from_agent,
+                                            header_hashed,
+                                            entry_def.required_validation_type,
+                                        )
+                                        .await?
+                                } else {
+                                    None
+                                }
+                            }
+                        }
                     };
-                    // TODO: Fallback to gossiper
+
                     // Fallback to callback
                     match &validation_package {
                         Some(_) => Ok(validation_package),
@@ -677,6 +716,7 @@ pub async fn run_validation_callback_direct(
         let outcome = get_validation_package(
             &element,
             &entry_def,
+            None,
             None,
             ribosome,
             &workspace_lock,

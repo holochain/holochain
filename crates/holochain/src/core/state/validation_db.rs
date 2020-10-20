@@ -1,6 +1,6 @@
 //! # Validation Database Types
 
-use holo_hash::{AnyDhtHash, DhtOpHash};
+use holo_hash::{AgentPubKey, AnyDhtHash, DhtOpHash};
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::{
     buffer::KvBufFresh,
@@ -34,6 +34,8 @@ pub struct ValidationLimboValue {
     pub last_try: Option<Timestamp>,
     /// Number of times we have tried to validate the op
     pub num_tries: u32,
+    /// The agent that sent you this op
+    pub from_agent: Option<AgentPubKey>,
 }
 
 /// The status of a [DhtOp] in limbo
