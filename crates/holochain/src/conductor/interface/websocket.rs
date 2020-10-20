@@ -438,7 +438,7 @@ pub mod test {
         conductor_handle.shutdown().await;
     }
 
-    #[ignore]
+    #[ignore = "stub"]
     #[tokio::test(threaded_scheduler)]
     async fn deserialization_failure() {
         // TODO: B-01440: this can't be done easily yet
