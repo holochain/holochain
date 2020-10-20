@@ -114,11 +114,9 @@ pub(super) async fn get_as_author(
                 .with_cache(DbPairMut::new(&mut element_cache, &mut meta_cache))
                 .with_authored(DbPair::new(&element_authored, &meta_authored));
 
-            if let Some(elements) = cascade.get_validation_package_local(
-                header.author().clone(),
-                &header_hashed,
-                required_validation_type,
-            )? {
+            if let Some(elements) =
+                cascade.get_validation_package_local(&header_hashed, required_validation_type)?
+            {
                 return Ok(Some(ValidationPackage::new(elements)).into());
             }
 
@@ -190,7 +188,6 @@ pub(super) async fn get_as_authority(
 ) -> CellResult<ValidationPackageResponse> {
     // Get author and hash
     let (header, header_hash) = header.into_inner();
-    let agent = header.author().clone();
 
     // Get the header data
     let (app_entry_type, header_seq) = match header
@@ -240,11 +237,9 @@ pub(super) async fn get_as_authority(
                 .sequence_range(0..header_seq);
 
             // Collect and return the sub chain
-            let elements = match cascade.get_validation_package_local(
-                agent,
-                &header_hashed,
-                required_validation_type,
-            )? {
+            let elements = match cascade
+                .get_validation_package_local(&header_hashed, required_validation_type)?
+            {
                 Some(elements) => elements,
                 None => return Ok(None.into()),
             };
@@ -262,11 +257,9 @@ pub(super) async fn get_as_authority(
                 .sequence_range(0..header_seq);
 
             // Collect and return the sub chain
-            let elements = match cascade.get_validation_package_local(
-                agent,
-                &header_hashed,
-                required_validation_type,
-            )? {
+            let elements = match cascade
+                .get_validation_package_local(&header_hashed, required_validation_type)?
+            {
                 Some(elements) => elements,
                 None => return Ok(None.into()),
             };
@@ -279,11 +272,9 @@ pub(super) async fn get_as_authority(
             Ok(Some(ValidationPackage::new(elements)).into())
         }
         RequiredValidationType::Custom => {
-            let elements = match cascade.get_validation_package_local(
-                agent,
-                &header_hashed,
-                required_validation_type,
-            )? {
+            let elements = match cascade
+                .get_validation_package_local(&header_hashed, required_validation_type)?
+            {
                 Some(elements) => elements,
                 None => return Ok(None.into()),
             };

@@ -46,7 +46,7 @@ use error::AppValidationResult;
 pub use error::*;
 use fallible_iterator::FallibleIterator;
 use holo_hash::DhtOpHash;
-use holochain_p2p::{HolochainP2pCell, HolochainP2pCellT};
+use holochain_p2p::{actor::GetActivityOptions, HolochainP2pCell, HolochainP2pCellT};
 use holochain_state::{
     buffer::{BufferedStore, KvBufFresh},
     db::{INTEGRATED_DHT_OPS, INTEGRATION_LIMBO},
@@ -65,6 +65,9 @@ use holochain_zome_types::{
     header::AppEntryType,
     header::EntryType,
     header::{CreateLink, DeleteLink, ZomeId},
+    query::Activity,
+    query::AgentActivity,
+    query::ChainStatus,
     validate::RequiredValidationType,
     validate::ValidationPackage,
     zome::ZomeName,
@@ -547,18 +550,19 @@ async fn get_validation_package(
                     let header_hashed = element.header_hashed();
                     if let Some(validation_package) = cascade
                         .get_validation_package(
-                            agent_id,
+                            agent_id.clone(),
                             header_hashed,
                             entry_def.required_validation_type,
                         )
                         .await?
-                        .map(ValidationPackage::new)
                     {
                         return Ok(Some(validation_package));
                     }
+
                     // TODO: Fallback to gossiper if author is unavailable
+
                     // Fallback to RegisterAgentActivity if gossiper is unavailable
-                    let range = 0..element.header().header_seq().checked_sub(1).unwrap_or(0);
+                    let range = 0..element.header().header_seq().saturating_sub(1);
 
                     let mut query = holochain_zome_types::query::ChainQueryFilter::new()
                         .sequence_range(range)
@@ -569,12 +573,23 @@ async fn get_validation_package(
                     ) {
                         query = query.entry_type(et.clone());
                     }
-                    // TODO: Agent activity needs to return the activity status etc.
-                    // Ok(cascade
-                    //     .get_agent_activity(agent_id, query, Default::default())
-                    //     .await?
-                    //     .map(ValidationPackage::new))
-                    todo!()
+
+                    // Get the activity from the agent authority
+                    let options = GetActivityOptions {
+                        include_full_headers: true,
+                        include_valid_activity: true,
+                        ..Default::default()
+                    };
+                    match cascade.get_agent_activity(agent_id, query, options).await? {
+                        AgentActivity {
+                            status: ChainStatus::Valid(_),
+                            valid_activity: Activity::Full(elements),
+                            ..
+                        } => Ok(Some(ValidationPackage::new(elements))),
+                        // TODO: If the chain is invalid should we still return
+                        // it as the validation package?
+                        _ => Ok(None),
+                    }
                 }
                 RequiredValidationType::Custom => {
                     // TODO: Fix get validation package to get custom and chains
@@ -593,7 +608,6 @@ async fn get_validation_package(
                                 entry_def.required_validation_type,
                             )
                             .await?
-                            .map(ValidationPackage::new)
                     };
                     // TODO: Fallback to gossiper
                     // Fallback to callback

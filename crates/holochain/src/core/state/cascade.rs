@@ -33,6 +33,7 @@ use holochain_types::{
 };
 use holochain_zome_types::{
     element::SignedHeader,
+    header::EntryType,
     header::HeaderType,
     link::Link,
     metadata::{Details, ElementDetails, EntryDetails},
@@ -42,6 +43,7 @@ use holochain_zome_types::{
     query::ChainQueryFilter,
     query::ChainStatus,
     validate::RequiredValidationType,
+    validate::ValidationPackage,
 };
 use std::collections::HashSet;
 use std::collections::{BTreeMap, BTreeSet};
@@ -342,7 +344,12 @@ where
             }
             Activity::NotRequested => (),
         };
-        cache_data.meta.register_activity_status(&agent, status)?;
+        match &status {
+            ChainStatus::Empty => {}
+            ChainStatus::Valid(_) | ChainStatus::Forked(_) | ChainStatus::Invalid(_) => {
+                cache_data.meta.register_activity_status(&agent, status)?;
+            }
+        }
         if let Some(highest_observed) = highest_observed {
             cache_data
                 .meta
@@ -1691,20 +1698,17 @@ where
 
     pub fn get_validation_package_local(
         &self,
-        agent: AgentPubKey,
         header: &HeaderHashed,
         required_validation_type: RequiredValidationType,
     ) -> CascadeResult<Option<Vec<Element>>> {
         match required_validation_type {
             RequiredValidationType::Element => Ok(None),
             RequiredValidationType::SubChain | RequiredValidationType::Full => {
-                let hash = header.as_hash().clone();
-                let header_seq = header.header_seq();
                 // First header has an empty validation package
-                if header_seq == 0 {
+                if header.header_seq() == 0 {
                     return Ok(Some(vec![]));
                 }
-                self.get_chain_validation_package_local(agent, header_seq, hash)
+                self.get_chain_validation_package_local(header, required_validation_type)
             }
             RequiredValidationType::Custom => {
                 self.get_custom_validation_package_local(header.as_hash())
@@ -1737,37 +1741,59 @@ where
 
     fn get_chain_validation_package_local(
         &self,
-        agent: AgentPubKey,
-        header_seq: u32,
-        hash: HeaderHash,
+        header: &HeaderHashed,
+        required_validation_type: RequiredValidationType,
     ) -> CascadeResult<Option<Vec<Element>>> {
+        let agent = header.author();
+        let header_seq = header.header_seq();
         let cache_data = ok_or_return!(self.cache_data.as_ref(), None);
         let env = ok_or_return!(self.env.as_ref(), None);
-        let activity_is_not_cached = cache_data
-            .meta
-            .get_activity_status(&agent)?
-            // header_seq - 1 because we want a valid chain up to the header before 
+        let activity_is_cached = match cache_data.meta.get_activity_status(agent)? {
+            // header_seq - 1 because we want a valid chain up to the header before
             // the header that needs this validation package.
             // This is a safe subtraction because header seq of 0 returns early above.
-            != Some(ChainStatus::Valid(ChainHead { header_seq: header_seq - 1, hash }));
+            Some(ChainStatus::Valid(ChainHead {
+                header_seq: valid_seq,
+                ..
+            })) if valid_seq >= header_seq - 1 => true,
+            _ => false,
+        };
 
-        if activity_is_not_cached {
+        if !activity_is_cached {
             return Ok(None);
         }
 
-        let range = Some(0..header_seq);
-        let hashes = Self::get_agent_activity_from_cache(agent, &range, cache_data, env)?;
+        let query = validation_package_query(
+            header.as_content().entry_type().cloned(),
+            0..header_seq,
+            required_validation_type,
+        );
+        let hashes = Self::get_agent_activity_from_cache(
+            agent.clone(),
+            &query.sequence_range,
+            cache_data,
+            env,
+        )?;
+        // Chain not complete
+        if hashes.len() != header_seq as usize {
+            return Ok(None);
+        }
+
+        // Get the elements
         let mut elements = Vec::with_capacity(hashes.len());
         for (_, hash) in hashes {
             match self.get_element_local_raw(&hash)? {
-                Some(el) => elements.push(el),
+                Some(el) => {
+                    // Check the if we should include this element
+                    if !query.check(el.header()) {
+                        continue;
+                    }
+                    elements.push(el);
+                }
                 None => return Ok(None),
             }
         }
-        if elements.len() == header_seq as usize {
-            return Ok(Some(elements));
-        }
-        Ok(None)
+        Ok(Some(elements))
     }
 
     pub async fn get_validation_package(
@@ -1775,11 +1801,11 @@ where
         agent: AgentPubKey,
         header: &HeaderHashed,
         required_validation_type: RequiredValidationType,
-    ) -> CascadeResult<Option<Vec<Element>>> {
+    ) -> CascadeResult<Option<ValidationPackage>> {
         if let Some(elements) =
-            self.get_validation_package_local(agent.clone(), header, required_validation_type)?
+            self.get_validation_package_local(header, required_validation_type)?
         {
-            return Ok(Some(elements));
+            return Ok(Some(ValidationPackage::new(elements)));
         }
 
         let network = ok_or_return!(self.network.as_mut(), None);
@@ -1789,8 +1815,11 @@ where
             .0
         {
             Some(validation_package) => {
-                for element in &validation_package.0 {
-                    self.update_stores(element.clone())?;
+                for _element in &validation_package.0 {
+                    // TODO: I don't think it's sound to do this
+                    // because we would be adding potentially rejected
+                    // headers into our cache.
+                    // self.update_stores(element.clone())?;
                 }
 
                 // Add metadata for custom package caching
@@ -1805,11 +1834,25 @@ where
                     );
                 }
 
-                Ok(Some(validation_package.0))
+                Ok(Some(validation_package))
             }
             None => Ok(None),
         }
     }
+}
+
+fn validation_package_query(
+    entry_type: Option<EntryType>,
+    range: std::ops::Range<u32>,
+    required_validation_type: RequiredValidationType,
+) -> ChainQueryFilter {
+    let mut query = ChainQueryFilter::new().sequence_range(range);
+    if let (RequiredValidationType::SubChain, Some(entry_type)) =
+        (required_validation_type, entry_type)
+    {
+        query = query.entry_type(entry_type);
+    }
+    query
 }
 
 impl<'a, M: MetadataBufT> From<&'a DbPairMut<'a, M>> for DbPair<'a, M> {

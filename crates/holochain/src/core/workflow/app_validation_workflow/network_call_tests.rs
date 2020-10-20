@@ -5,6 +5,7 @@ use hdk3::prelude::{Element, EntryType, RequiredValidationType, ValidationPackag
 use holo_hash::HeaderHash;
 use holochain_p2p::{actor::GetActivityOptions, HolochainP2pCellT};
 use holochain_state::env::EnvironmentRead;
+use holochain_types::HeaderHashed;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::query::{
     Activity, AgentActivity, ChainHead, ChainQueryFilter, ChainStatus, HighestObserved,
@@ -48,53 +49,111 @@ async fn get_validation_package_test() {
     let alice_cell_id = &alice_call_data.cell_id;
     let alice_agent_id = alice_cell_id.agent_pubkey();
 
-    let header_hash = commit_some_data("create_entry", &alice_call_data).await;
+    // Helper to get header hashed
+    let get_header = {
+        let env = alice_call_data.env.clone();
+        move |header_hash| {
+            let alice_authored = ElementBuf::authored(env.clone().into(), false).unwrap();
+            alice_authored
+                .get_header(header_hash)
+                .unwrap()
+                .unwrap()
+                .into_header_and_signature()
+                .0
+        }
+    };
 
-    let validation_package = alice_call_data
-        .network
-        .get_validation_package(alice_agent_id.clone(), header_hash.clone())
-        .await
-        .unwrap();
+    let header_hash = commit_some_data("create_entry", &alice_call_data).await;
 
     // Expecting every header from the latest to the beginning
     let alice_source_chain = SourceChain::public_only(alice_call_data.env.clone().into()).unwrap();
     let alice_authored = alice_source_chain.elements();
     let expected_package = alice_source_chain
         .iter_back()
+        // Skip the actual entry
+        .skip(1)
         .filter_map(|shh| alice_authored.get_element(shh.header_address()))
         .collect::<Vec<_>>()
         .unwrap();
+
     let expected_package = Some(ValidationPackage::new(expected_package)).into();
+
+    // Network call
+    let validation_package = alice_call_data
+        .network
+        .get_validation_package(alice_agent_id.clone(), header_hash.clone())
+        .await
+        .unwrap();
+
     assert_eq!(validation_package, expected_package);
+
+    // Cascade
+    let header_hashed = get_header(&header_hash);
+    let validation_package = check_cascade(
+        &header_hashed,
+        RequiredValidationType::Full,
+        &alice_call_data,
+    )
+    .await;
+
+    assert_eq!(validation_package, expected_package.0);
 
     // What happens if we commit a private entry?
     let header_hash_priv = commit_some_data("create_priv_msg", &alice_call_data).await;
 
+    // Network
     // Check we still get the last package with new commits
     let validation_package = alice_call_data
         .network
-        .get_validation_package(alice_agent_id.clone(), header_hash)
+        .get_validation_package(alice_agent_id.clone(), header_hash.clone())
         .await
         .unwrap();
+
     assert_eq!(validation_package, expected_package);
+
+    // Cascade
+    let header_hashed = get_header(&header_hash);
+    let validation_package = check_cascade(
+        &header_hashed,
+        RequiredValidationType::Full,
+        &alice_call_data,
+    )
+    .await;
+
+    assert_eq!(validation_package, expected_package.0);
 
     // Get the package for the private entry, this is still full chain
     let alice_source_chain = SourceChain::public_only(alice_call_data.env.clone().into()).unwrap();
     let alice_authored = alice_source_chain.elements();
-    let validation_package = alice_call_data
-        .network
-        .get_validation_package(alice_agent_id.clone(), header_hash_priv)
-        .await
-        .unwrap();
-
     let expected_package = alice_source_chain
         .iter_back()
+        // Skip the actual entry
+        .skip(1)
         .filter_map(|shh| alice_authored.get_element(shh.header_address()))
         .collect::<Vec<_>>()
         .unwrap();
 
     let expected_package = Some(ValidationPackage::new(expected_package)).into();
+
+    // Network
+    let validation_package = alice_call_data
+        .network
+        .get_validation_package(alice_agent_id.clone(), header_hash_priv.clone())
+        .await
+        .unwrap();
+
     assert_eq!(validation_package, expected_package);
+
+    // Cascade
+    let header_hashed = get_header(&header_hash_priv);
+    let validation_package = check_cascade(
+        &header_hashed,
+        RequiredValidationType::Full,
+        &alice_call_data,
+    )
+    .await;
+
+    assert_eq!(validation_package, expected_package.0);
 
     // Test sub chain package
 
@@ -112,12 +171,6 @@ async fn get_validation_package_test() {
         .1
         .clone();
 
-    let validation_package = alice_call_data
-        .network
-        .get_validation_package(alice_agent_id.clone(), header_hash)
-        .await
-        .unwrap();
-
     // Expecting all the elements that match this entry type from the latest to the start
     let alice_source_chain = SourceChain::public_only(alice_call_data.env.clone().into()).unwrap();
     let alice_authored = alice_source_chain.elements();
@@ -133,12 +186,32 @@ async fn get_validation_package_test() {
                 }
             }))
         })
+        // Skip the actual entry
+        .skip(1)
         .collect::<Vec<_>>()
         .unwrap();
 
     let expected_package = Some(ValidationPackage::new(expected_package)).into();
+
+    // Network
+    let validation_package = alice_call_data
+        .network
+        .get_validation_package(alice_agent_id.clone(), header_hash.clone())
+        .await
+        .unwrap();
+
     assert_eq!(validation_package, expected_package);
 
+    // Cascade
+    let header_hashed = get_header(&header_hash);
+    let validation_package = check_cascade(
+        &header_hashed,
+        RequiredValidationType::SubChain,
+        &alice_call_data,
+    )
+    .await;
+
+    assert_eq!(validation_package, expected_package.0);
     ConductorTestData::shutdown_conductor(handle).await;
 }
 
@@ -467,7 +540,7 @@ async fn get_custom_package_test() {
     // 15 for genesis plus 1 init
     // 1 artist is 3 ops.
     // and 30 songs at 6 ops each.
-    let expected_count = 16 + 30 * 6 + 3;
+    let expected_count = 16 + 30 * 3 + 3;
 
     // Wait for bob to integrate and then check they have the package cached
     wait_for_integration(
@@ -499,20 +572,16 @@ async fn get_custom_package_test() {
 
     {
         let env: EnvironmentRead = bob_call_data.env.clone().into();
-        let element_authored = ElementBuf::authored(env.clone(), false).unwrap();
-        let meta_authored = MetadataBuf::authored(env.clone()).unwrap();
+        let element_integrated = ElementBuf::vault(env.clone(), false).unwrap();
+        let meta_integrated = MetadataBuf::vault(env.clone()).unwrap();
         let mut element_cache = ElementBuf::cache(env.clone()).unwrap();
         let mut meta_cache = MetadataBuf::cache(env.clone()).unwrap();
         let cascade = Cascade::empty()
             .with_cache(DbPairMut::new(&mut element_cache, &mut meta_cache))
-            .with_authored(DbPair::new(&element_authored, &meta_authored));
+            .with_integrated(DbPair::new(&element_integrated, &meta_integrated));
 
         let result = cascade
-            .get_validation_package_local(
-                alice_cell_id.agent_pubkey().clone(),
-                &shh.header_hashed(),
-                RequiredValidationType::Custom,
-            )
+            .get_validation_package_local(&shh.header_hashed(), RequiredValidationType::Custom)
             .unwrap();
         assert_matches!(result, Some(_));
     }
@@ -538,4 +607,29 @@ async fn commit_some_data(call: &'static str, alice_call_data: &ConductorCallDat
         );
     }
     header_hash.unwrap()
+}
+
+// Cascade helper function for easily getting the validation package
+async fn check_cascade(
+    header_hashed: &HeaderHashed,
+    required_validation_type: RequiredValidationType,
+    call_data: &ConductorCallData,
+) -> Option<ValidationPackage> {
+    let mut element_cache = ElementBuf::cache(call_data.env.clone().into()).unwrap();
+    let mut meta_cache = MetadataBuf::cache(call_data.env.clone().into()).unwrap();
+    let cache_data = DbPairMut::new(&mut element_cache, &mut meta_cache);
+    let mut cascade = Cascade::empty()
+        .with_cache(cache_data)
+        .with_network(call_data.network.clone());
+
+    // Cascade
+    let validation_package = cascade
+        .get_validation_package(
+            call_data.cell_id.agent_pubkey().clone(),
+            header_hashed,
+            required_validation_type,
+        )
+        .await
+        .unwrap();
+    validation_package
 }
