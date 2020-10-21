@@ -307,8 +307,24 @@ async fn validate_op_inner(
             store_element(header, workspace, network).await?;
             Ok(())
         }
-        DhtOp::RegisterUpdatedBy(_, header, entry) => {
-            register_updated_by(header, workspace, network.clone(), incoming_dht_ops_sender)
+        DhtOp::RegisterUpdatedContent(_, header, entry) => {
+            register_updated_content(header, workspace, network.clone(), incoming_dht_ops_sender)
+                .await?;
+            if let Some(entry) = entry {
+                store_entry(
+                    NewEntryHeaderRef::Update(header),
+                    entry.as_ref(),
+                    conductor_api,
+                    workspace,
+                    network.clone(),
+                )
+                .await?;
+            }
+
+            Ok(())
+        }
+        DhtOp::RegisterUpdatedElement(_, header, entry) => {
+            register_updated_element(header, workspace, network.clone(), incoming_dht_ops_sender)
                 .await?;
             if let Some(entry) = entry {
                 store_entry(
@@ -407,7 +423,7 @@ async fn sys_validate_element_inner(
     }
     match header {
         Header::Update(header) => {
-            register_updated_by(header, workspace, network, incoming_dht_ops_sender).await?;
+            register_updated_content(header, workspace, network, incoming_dht_ops_sender).await?;
         }
         Header::Delete(header) => {
             register_deleted_entry_header(header, workspace, network, incoming_dht_ops_sender)
@@ -517,7 +533,7 @@ async fn store_entry(
     Ok(())
 }
 
-async fn register_updated_by(
+async fn register_updated_content(
     entry_update: &Update,
     workspace: &mut SysValidationWorkspace,
     network: HolochainP2pCell,
@@ -530,6 +546,29 @@ async fn register_updated_by(
         |original_element: &Element| update_check(entry_update, original_element.header());
 
     check_and_hold_store_entry(
+        original_header_address,
+        workspace,
+        network,
+        incoming_dht_ops_sender,
+        dependency_check,
+    )
+    .await?;
+    Ok(())
+}
+
+async fn register_updated_element(
+    entry_update: &Update,
+    workspace: &mut SysValidationWorkspace,
+    network: HolochainP2pCell,
+    incoming_dht_ops_sender: Option<IncomingDhtOpSender>,
+) -> SysValidationResult<()> {
+    // Get data ready to validate
+    let original_header_address = &entry_update.original_header_address;
+
+    let dependency_check =
+        |original_element: &Element| update_check(entry_update, original_element.header());
+
+    check_and_hold_store_element(
         original_header_address,
         workspace,
         network,
