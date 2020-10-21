@@ -104,9 +104,13 @@ async fn tls_client(
                     wants_write_close = true;
                 }
                 Some(Right(Some(wire))) => match wire {
-                    ProxyWire::ChanSend(ChanSend(data)) => {
-                        tracing::trace!("{}: CLI incoming encrypted {} bytes", short, data.len());
-                        in_pre.get_mut().extend_from_slice(&data);
+                    ProxyWire::ChanSend(data) => {
+                        tracing::trace!(
+                            "{}: CLI incoming encrypted {} bytes",
+                            short,
+                            data.channel_data.len()
+                        );
+                        in_pre.get_mut().extend_from_slice(&data.channel_data);
                         cli.read_tls(&mut in_pre).map_err(TransportError::other)?;
                         cli.process_new_packets().map_err(TransportError::other)?;
                         while let Ok(size) = cli.read(&mut buf) {
