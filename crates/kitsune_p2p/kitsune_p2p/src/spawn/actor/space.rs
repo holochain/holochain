@@ -225,7 +225,7 @@ impl KitsuneP2pHandler for Space {
     fn handle_list_transport_bindings(&mut self) -> KitsuneP2pHandlerResult<Vec<url2::Url2>> {
         // these requests are handled at the to actor level
         // and are never propagated down to the space.
-        unimplemented!()
+        unreachable!()
     }
 
     fn handle_join(
