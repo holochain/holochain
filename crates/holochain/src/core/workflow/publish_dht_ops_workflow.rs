@@ -475,12 +475,12 @@ mod tests {
     /// - Add / Remove links: Currently publish all.
     /// ## Explication
     /// This test is a little big so a quick run down:
-    /// 1. All ops that can contain entries are created with entries (StoreElement, StoreEntry and RegisterUpdatedBy)
+    /// 1. All ops that can contain entries are created with entries (StoreElement, StoreEntry and RegisterUpdatedContent)
     /// 2. Then we create identical versions of these ops without the entires (set to None) (expect StoreEntry)
     /// 3. The workflow is run and the ops are sent to the network receiver
     /// 4. We check that the correct number of ops are received (so we know there were no other ops sent)
     /// 5. StoreEntry is __not__ expected so would show up as an extra if it was produced
-    /// 6. Every op that is received (StoreElement and RegisterUpdatedBy) is checked to match the expected versions (entries removed)
+    /// 6. Every op that is received (StoreElement and RegisterUpdatedContent) is checked to match the expected versions (entries removed)
     /// 7. Each op also has a count to check for duplicates
     #[test_case(1)]
     #[test_case(10)]
@@ -589,6 +589,7 @@ mod tests {
                 // We are only expecting Store Element and Register Replaced By ops and nothing else
                 let store_element_count = Arc::new(AtomicU32::new(0));
                 let register_replaced_by_count = Arc::new(AtomicU32::new(0));
+                let register_updated_element_count = Arc::new(AtomicU32::new(0));
                 let register_agent_activity_count = Arc::new(AtomicU32::new(0));
 
                 let expected = {
@@ -615,7 +616,7 @@ mod tests {
 
                     map.insert(op_hash, (expected_op, store_element_count.clone()));
 
-                    // Create RegisterUpdatedBy
+                    // Create RegisterUpdatedContent
                     // Op is expected to not contain the Entry
                     let (entry_update_header, sig) =
                         entry_update_header.into_header_and_signature();
@@ -627,11 +628,25 @@ mod tests {
 
                     map.insert(op_hash, (expected_op, store_element_count.clone()));
 
-                    let expected_op =
-                        DhtOp::RegisterUpdatedBy(sig.clone(), entry_update_header.clone(), None);
+                    let expected_op = DhtOp::RegisterUpdatedContent(
+                        sig.clone(),
+                        entry_update_header.clone(),
+                        None,
+                    );
                     let op_hash = DhtOpHashed::from_content_sync(expected_op.clone()).into_hash();
 
                     map.insert(op_hash, (expected_op, register_replaced_by_count.clone()));
+                    let expected_op = DhtOp::RegisterUpdatedElement(
+                        sig.clone(),
+                        entry_update_header.clone(),
+                        None,
+                    );
+                    let op_hash = DhtOpHashed::from_content_sync(expected_op.clone()).into_hash();
+
+                    map.insert(
+                        op_hash,
+                        (expected_op, register_updated_element_count.clone()),
+                    );
                     let expected_op = DhtOp::RegisterAgentActivity(sig, entry_update_header.into());
                     let op_hash = DhtOpHashed::from_content_sync(expected_op.clone()).into_hash();
                     map.insert(
@@ -663,7 +678,7 @@ mod tests {
                 let cell_network = network.to_cell(dna.clone(), agents[0].clone());
                 let (tx_complete, rx_complete) = tokio::sync::oneshot::channel();
                 // We are expecting five ops per agent
-                let total_expected = num_agents * 5;
+                let total_expected = num_agents * 6;
                 let mut recv_count: u32 = 0;
 
                 // Receive events and increment count
@@ -731,6 +746,10 @@ mod tests {
                 assert_eq!(
                     num_agents * 1,
                     register_replaced_by_count.load(Ordering::SeqCst)
+                );
+                assert_eq!(
+                    num_agents * 1,
+                    register_updated_element_count.load(Ordering::SeqCst)
                 );
                 assert_eq!(num_agents * 2, store_element_count.load(Ordering::SeqCst));
                 assert_eq!(
