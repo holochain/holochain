@@ -44,7 +44,7 @@ pub enum TransportConfig {
         sub_transport: Box<TransportConfig>,
 
         /// Determines whether we wish to:
-        /// - proxy through a remove
+        /// - proxy through a remote
         /// - be a proxy server for others
         /// - be directly addressable, but not proxy for others
         proxy_config: ProxyConfig,
