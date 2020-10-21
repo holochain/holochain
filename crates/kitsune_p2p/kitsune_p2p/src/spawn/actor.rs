@@ -34,11 +34,13 @@ fn build_transport(
 ) -> std::pin::Pin<
     Box<
         dyn std::future::Future<
-            Output = TransportResult<(
-                ghost_actor::GhostSender<TransportListener>,
-                TransportEventReceiver,
-            )>,
-        >,
+                Output = TransportResult<(
+                    ghost_actor::GhostSender<TransportListener>,
+                    TransportEventReceiver,
+                )>,
+            >
+            + 'static
+            + Send,
     >,
 > {
     Box::pin(async move {
