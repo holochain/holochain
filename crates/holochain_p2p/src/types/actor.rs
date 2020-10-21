@@ -6,6 +6,7 @@ use holochain_zome_types::request::MetadataRequest;
 use holochain_zome_types::zome::FunctionName;
 
 /// Request a validation package.
+#[derive(Clone, Debug)]
 pub struct GetValidationPackage {
     /// The dna_hash / space_hash context.
     pub dna_hash: DnaHash,
@@ -81,6 +82,7 @@ impl From<holochain_zome_types::entry::GetOptions> for GetOptions {
 /// Fields tagged with `[Network]` are network-level controls.
 /// Fields tagged with `[Remote]` are controls that will be forwarded to the
 /// remote agent processing this `GetLinks` request.
+#[derive(Clone, Debug)]
 pub struct GetMetaOptions {
     /// [Network]
     /// How many remote nodes should we make requests of / aggregate.
