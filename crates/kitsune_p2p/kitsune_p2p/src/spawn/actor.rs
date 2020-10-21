@@ -1,7 +1,7 @@
 // this is largely a passthrough that routes to a specific space handler
 
 use crate::{actor, actor::*, event::*, *};
-use futures::future::FutureExt;
+use futures::{future::FutureExt, stream::StreamExt};
 use kitsune_p2p_types::{async_lazy::AsyncLazy, transport::*, transport_pool::*};
 use std::{
     collections::{hash_map::Entry, HashMap},
@@ -22,10 +22,9 @@ ghost_actor::ghost_chan! {
 
 pub(crate) struct KitsuneP2pActor {
     channel_factory: ghost_actor::actor_builder::GhostActorChannelFactory<Self>,
-    #[allow(dead_code)]
     internal_sender: ghost_actor::GhostSender<Internal>,
-    #[allow(dead_code)]
     evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
+    transport: ghost_actor::GhostSender<TransportListener>,
     spaces: HashMap<Arc<KitsuneSpace>, AsyncLazy<ghost_actor::GhostSender<KitsuneP2p>>>,
 }
 
@@ -97,16 +96,28 @@ impl KitsuneP2pActor {
         internal_sender: ghost_actor::GhostSender<Internal>,
         evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     ) -> KitsuneP2pResult<Self> {
-        let (t_pool, _t_listen, _t_event) = spawn_transport_pool().await?;
+        let (t_pool, transport, mut t_event) = spawn_transport_pool().await?;
         for t_conf in config.transport_pool {
             let (l, e) = build_transport(t_conf).await?;
             t_pool.push_sub_transport(l, e).await?;
         }
 
+        tokio::task::spawn(async move {
+            while let Some(event) = t_event.next().await {
+                match event {
+                    TransportEvent::IncomingChannel(url, _write, _read) => {
+                        tracing::warn!("INCOMING CHANNEL: {}", url);
+                        unimplemented!()
+                    }
+                }
+            }
+        });
+
         Ok(Self {
             channel_factory,
             internal_sender,
             evt_sender,
+            transport,
             spaces: HashMap::new(),
         })
     }
@@ -206,6 +217,19 @@ impl KitsuneP2pEventHandler for KitsuneP2pActor {
 impl ghost_actor::GhostHandler<KitsuneP2p> for KitsuneP2pActor {}
 
 impl KitsuneP2pHandler for KitsuneP2pActor {
+    fn handle_list_transport_bindings(&mut self) -> KitsuneP2pHandlerResult<Vec<url2::Url2>> {
+        let fut = self.transport.bound_url();
+        Ok(async move {
+            let urls = fut.await?;
+            Ok(urls
+                .query_pairs()
+                .map(|(_, url)| url2::url2!("{}", url))
+                .collect())
+        }
+        .boxed()
+        .into())
+    }
+
     fn handle_join(
         &mut self,
         space: Arc<KitsuneSpace>,
@@ -213,10 +237,11 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
     ) -> KitsuneP2pHandlerResult<()> {
         let internal_sender = self.internal_sender.clone();
         let space2 = space.clone();
+        let transport = self.transport.clone();
         let space_sender = match self.spaces.entry(space.clone()) {
             Entry::Occupied(entry) => entry.into_mut(),
             Entry::Vacant(entry) => entry.insert(AsyncLazy::new(async move {
-                let (send, evt_recv) = spawn_space(space2)
+                let (send, evt_recv) = spawn_space(space2, transport)
                     .await
                     .expect("cannot fail to create space");
                 internal_sender

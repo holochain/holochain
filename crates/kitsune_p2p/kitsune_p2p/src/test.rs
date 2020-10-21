@@ -1,14 +1,41 @@
 #[cfg(test)]
 mod tests {
-    use crate::{
-        event::*,
-        spawn::*,
-        types::{actor::KitsuneP2pSender, *},
-        KitsuneP2pConfig,
-    };
+    use crate::{event::*, types::actor::KitsuneP2pSender, *};
     use futures::future::FutureExt;
-    use ghost_actor::GhostControlSender;
+    use ghost_actor::{dependencies::tracing, GhostControlSender};
     use std::sync::Arc;
+
+    #[tokio::test(threaded_scheduler)]
+    async fn test_transport_binding() -> Result<(), KitsuneP2pError> {
+        let _ = ghost_actor::dependencies::tracing::subscriber::set_global_default(
+            tracing_subscriber::FmtSubscriber::builder()
+                .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+                .finish(),
+        );
+
+        let mut config = KitsuneP2pConfig::default();
+        config.transport_pool.push(TransportConfig::Proxy {
+            sub_transport: Box::new(TransportConfig::Quic {
+                bind_to: Some(url2::url2!("kitsune-quic://0.0.0.0:0")),
+                override_host: None,
+                override_port: None,
+            }),
+            proxy_config: ProxyConfig::LocalProxyServer {
+                proxy_accept_config: Some(ProxyAcceptConfig::RejectAll),
+            },
+        });
+        let (p2p, _evt) = spawn_kitsune_p2p(config).await.unwrap();
+        let bindings = p2p.list_transport_bindings().await?;
+        tracing::warn!("BINDINGS: {:?}", bindings);
+        assert_eq!(1, bindings.len());
+        let binding = &bindings[0];
+        assert_eq!("kitsune-proxy", binding.scheme());
+        assert_eq!(
+            "kitsune-quic",
+            binding.path_segments().unwrap().next().unwrap()
+        );
+        Ok(())
+    }
 
     #[tokio::test(threaded_scheduler)]
     async fn test_request_workflow() {

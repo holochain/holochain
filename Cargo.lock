@@ -1618,6 +1618,7 @@ dependencies = [
  "shrinkwraprs",
  "thiserror",
  "tokio",
+ "tracing-subscriber",
  "url2",
 ]
 
