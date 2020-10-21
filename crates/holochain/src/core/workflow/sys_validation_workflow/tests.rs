@@ -167,7 +167,7 @@ async fn run_test(
         bob_makes_a_large_link(&bob_cell_id, &handle, &dna_file).await;
 
     // Integration should have 13 ops in it
-    let expected_count = 13 + expected_count;
+    let expected_count = 14 + expected_count;
 
     {
         let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
@@ -231,7 +231,14 @@ async fn run_test(
                         DhtOpLight::RegisterAddLink(hh, _) if hh == &link_add_hash => {
                             assert_eq!(i.validation_status, ValidationStatus::Rejected)
                         }
-                        DhtOpLight::RegisterUpdatedBy(hh, _, _) if hh == &bad_update_header => {
+                        DhtOpLight::RegisterUpdatedContent(hh, _, _)
+                            if hh == &bad_update_header =>
+                        {
+                            assert_eq!(i.validation_status, ValidationStatus::Rejected)
+                        }
+                        DhtOpLight::RegisterUpdatedElement(hh, _, _)
+                            if hh == &bad_update_header =>
+                        {
                             assert_eq!(i.validation_status, ValidationStatus::Rejected)
                         }
                         _ => assert_eq!(i.validation_status, ValidationStatus::Valid),

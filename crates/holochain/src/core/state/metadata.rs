@@ -479,17 +479,17 @@ where
     }
 
     fn register_update(&mut self, update: header::Update) -> DatabaseResult<()> {
-        self.register_header_on_basis(
-            AnyDhtHash::from(update.original_entry_address.clone()),
-            update,
-        )
+        let header_hash = update.original_header_address.clone();
+        let entry_hash = update.original_entry_address.clone();
+        self.register_header_on_basis(header_hash, update.clone())?;
+        self.register_header_on_basis(entry_hash, update)
     }
 
     fn deregister_update(&mut self, update: header::Update) -> DatabaseResult<()> {
-        self.deregister_header_on_basis(
-            AnyDhtHash::from(update.original_entry_address.clone()),
-            update,
-        )
+        let header_hash = update.original_header_address.clone();
+        let entry_hash = update.original_entry_address.clone();
+        self.deregister_header_on_basis(header_hash, update.clone())?;
+        self.deregister_header_on_basis(entry_hash, update)
     }
 
     fn register_delete(&mut self, delete: header::Delete) -> DatabaseResult<()> {
