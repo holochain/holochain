@@ -134,7 +134,12 @@ impl ElementTest {
                 NewEntryHeader::Update(entry_update.clone()),
                 self.entry.clone().into(),
             ),
-            DhtOp::RegisterUpdatedBy(
+            DhtOp::RegisterUpdatedContent(
+                self.sig.clone(),
+                entry_update.clone(),
+                Some(self.entry.clone().into()),
+            ),
+            DhtOp::RegisterUpdatedElement(
                 self.sig.clone(),
                 entry_update,
                 Some(self.entry.clone().into()),
@@ -276,7 +281,7 @@ async fn test_dht_basis() {
         entry_update.original_header_address = original_header_hash;
 
         // Create the op
-        let op = DhtOp::RegisterUpdatedBy(
+        let op = DhtOp::RegisterUpdatedContent(
             fixt!(Signature),
             entry_update,
             Some(update_new_entry.into()),
