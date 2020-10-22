@@ -555,7 +555,7 @@ async fn run_fixt_network(
                             .cloned()
                             .map(|element| {
                                 GetElementResponse::GetHeader(Some(Box::new(
-                                    WireElement::from_element(element, None),
+                                    WireElement::from_element(element, vec![], vec![]),
                                 )))
                                 .try_into()
                                 .unwrap()
