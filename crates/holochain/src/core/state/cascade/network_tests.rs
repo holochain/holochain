@@ -167,6 +167,7 @@ async fn get_meta_updates_meta_cache() {
 }
 
 #[tokio::test(threaded_scheduler)]
+#[ignore = "flaky"]
 async fn get_from_another_agent() {
     observability::test_run().ok();
     let dna_file = DnaFile::new(
