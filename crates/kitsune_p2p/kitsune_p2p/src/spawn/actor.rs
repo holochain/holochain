@@ -10,7 +10,7 @@ use std::{
 
 mod gossip;
 mod space;
-use ghost_actor::dependencies::tracing;
+use ghost_actor::dependencies::{must_future, tracing};
 use space::*;
 
 ghost_actor::ghost_chan! {
@@ -28,22 +28,16 @@ pub(crate) struct KitsuneP2pActor {
     spaces: HashMap<Arc<KitsuneSpace>, AsyncLazy<ghost_actor::GhostSender<KitsuneP2p>>>,
 }
 
-#[allow(clippy::type_complexity)]
 fn build_transport(
     t_conf: TransportConfig,
-) -> std::pin::Pin<
-    Box<
-        dyn std::future::Future<
-                Output = TransportResult<(
-                    ghost_actor::GhostSender<TransportListener>,
-                    TransportEventReceiver,
-                )>,
-            >
-            + 'static
-            + Send,
-    >,
+) -> must_future::MustBoxFuture<
+    'static,
+    TransportResult<(
+        ghost_actor::GhostSender<TransportListener>,
+        TransportEventReceiver,
+    )>,
 > {
-    Box::pin(async move {
+    must_future::MustBoxFuture::new(async move {
         match t_conf {
             TransportConfig::Quic {
                 bind_to,
