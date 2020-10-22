@@ -220,7 +220,8 @@ mod tests {
                 ),
                 None,
             ),
-            None,
+            vec![],
+            vec![],
         ))));
         let test_2 = GetElementResponse::GetHeader(Some(Box::new(WireElement::from_element(
             Element::new(
@@ -230,7 +231,8 @@ mod tests {
                 ),
                 None,
             ),
-            None,
+            vec![],
+            vec![],
         ))));
 
         let mut respond_queue = vec![test_1.clone(), test_2.clone()];

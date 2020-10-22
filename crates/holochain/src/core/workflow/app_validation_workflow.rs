@@ -348,7 +348,11 @@ fn get_element(op: DhtOp) -> AppValidationOutcome<Element> {
             SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(h.into()), s),
             Some(*e),
         )),
-        DhtOp::RegisterUpdatedBy(s, h, e) => Ok(Element::new(
+        DhtOp::RegisterUpdatedContent(s, h, e) => Ok(Element::new(
+            SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(h.into()), s),
+            e.map(|e| *e),
+        )),
+        DhtOp::RegisterUpdatedElement(s, h, e) => Ok(Element::new(
             SignedHeaderHashed::with_presigned(HeaderHashed::from_content_sync(h.into()), s),
             e.map(|e| *e),
         )),
