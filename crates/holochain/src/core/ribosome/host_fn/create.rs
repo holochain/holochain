@@ -281,7 +281,7 @@ pub mod wasm_test {
     }
 
     #[tokio::test(threaded_scheduler)]
-    // #[ignore = "david.b (this test is flaky)"]
+    #[ignore = "david.b (this test is flaky)"]
     // maackle: this consistently passes for me with n = 37
     //          but starts to randomly lock up at n = 38,
     //          and fails consistently for higher values
@@ -353,7 +353,7 @@ pub mod wasm_test {
 
         // ALICE DOING A CALL
 
-        let n = 37;
+        let n = 50;
 
         // alice create a bunch of entries
         let output = handle
