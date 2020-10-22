@@ -511,27 +511,36 @@ impl Cell {
             return Ok(GetElementResponse::GetHeader(None));
         }
 
-        // Look for a delete on the header and collect it
-        let deleted = meta_vault
+        // Look for a deletes on the header and collect them
+        let deletes = meta_vault
             .get_deletes_on_header(&reader, hash.clone())?
-            .next()?;
-        let deleted = match deleted {
-            Some(delete_header) => {
+            .map_err(CellError::from)
+            .map(|delete_header| {
                 let delete = delete_header.header_hash;
                 match element_vault.get_header(&delete)? {
-                    Some(delete) => Some(delete.try_into().map_err(AuthorityDataError::from)?),
-                    None => {
-                        return Err(AuthorityDataError::missing_data(delete));
-                    }
+                    Some(delete) => Ok(delete.try_into().map_err(AuthorityDataError::from)?),
+                    None => Err(AuthorityDataError::missing_data(delete)),
                 }
-            }
-            None => None,
-        };
+            })
+            .collect()?;
+
+        // Look for a updates on the header and collect them
+        let updates = meta_vault
+            .get_updates(&reader, hash.clone().into())?
+            .map_err(CellError::from)
+            .map(|update_header| {
+                let update = update_header.header_hash;
+                match element_vault.get_header(&update)? {
+                    Some(update) => Ok(update.try_into().map_err(AuthorityDataError::from)?),
+                    None => Err(AuthorityDataError::missing_data(update)),
+                }
+            })
+            .collect()?;
 
         // Get the actual header and return it with proof of deleted if there is any
         let r = element_vault
             .get_element(&hash)?
-            .map(|e| WireElement::from_element(e, deleted))
+            .map(|e| WireElement::from_element(e, deletes, updates))
             .map(Box::new);
 
         Ok(GetElementResponse::GetHeader(r))

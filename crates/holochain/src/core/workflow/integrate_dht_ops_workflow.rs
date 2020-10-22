@@ -246,7 +246,8 @@ async fn op_dependencies_held(
                     }
                 }
             }
-            DhtOp::RegisterUpdatedBy(_, entry_update, _) => {
+            DhtOp::RegisterUpdatedContent(_, entry_update, _)
+            | DhtOp::RegisterUpdatedElement(_, entry_update, _) => {
                 // Check if we have the header with entry that we are updating
                 // or defer the op.
                 if !header_with_entry_is_stored(
@@ -360,7 +361,8 @@ where
             // register agent activity on this agents pub key
             meta_store.register_activity(&header)?;
         }
-        DhtOpLight::RegisterUpdatedBy(hash, _, _) => {
+        DhtOpLight::RegisterUpdatedContent(hash, _, _)
+        | DhtOpLight::RegisterUpdatedElement(hash, _, _) => {
             let header = get_header(hash, element_store)?.try_into()?;
             meta_store.register_update(header)?;
         }
@@ -402,13 +404,12 @@ pub fn integrate_single_data<P: PrefixType>(
             DhtOp::RegisterAgentActivity(signature, header) => {
                 put_data(signature, header, None, element_store)?;
             }
-            DhtOp::RegisterUpdatedBy(signature, entry_update, _) => {
+            DhtOp::RegisterUpdatedContent(signature, entry_update, _)
+            | DhtOp::RegisterUpdatedElement(signature, entry_update, _) => {
                 put_data(signature, entry_update.into(), None, element_store)?;
             }
-            DhtOp::RegisterDeletedEntryHeader(signature, element_delete) => {
-                put_data(signature, element_delete.into(), None, element_store)?;
-            }
-            DhtOp::RegisterDeletedBy(signature, element_delete) => {
+            DhtOp::RegisterDeletedEntryHeader(signature, element_delete)
+            | DhtOp::RegisterDeletedBy(signature, element_delete) => {
                 put_data(signature, element_delete.into(), None, element_store)?;
             }
             DhtOp::RegisterAddLink(signature, link_add) => {
