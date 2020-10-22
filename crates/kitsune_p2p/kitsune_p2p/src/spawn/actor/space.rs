@@ -203,6 +203,10 @@ impl SpaceInternalHandler for Space {
                 .boxed()
                 .into())
             }
+            _ => {
+                tracing::warn!("UNHANDLED WIRE: {:?}", data);
+                Ok(async move { Ok(vec![]) }.boxed().into())
+            }
         }
     }
 
