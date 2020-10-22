@@ -1,5 +1,6 @@
 use super::*;
 use ghost_actor::dependencies::{tracing, tracing_futures::Instrument};
+use kitsune_p2p_types::codec::Codec;
 use std::collections::HashSet;
 
 /// if the user specifies None or zero (0) for remote_agent_count
@@ -180,21 +181,21 @@ impl SpaceInternalHandler for Space {
         // In the future, we will probably need to branch here, so the real
         // networking can forward the encoded data. Or, split immediate_request
         // into two variants, one for short-circuit, and one for real networking.
-        let data = wire::Wire::decode((*data).clone())?;
+        let (_, data) = wire::Wire::decode_ref(&data)?;
 
         match data {
-            wire::Wire::Call(payload) => {
-                Ok(
-                    async move { evt_sender.call(space, to_agent, from_agent, payload).await }
-                        .instrument(tracing::debug_span!("wire_call"))
-                        .boxed()
-                        .into(),
-                )
+            wire::Wire::Call(payload) => Ok(async move {
+                evt_sender
+                    .call(space, to_agent, from_agent, payload.data.into())
+                    .await
             }
+            .instrument(tracing::debug_span!("wire_call"))
+            .boxed()
+            .into()),
             wire::Wire::Notify(payload) => {
                 Ok(async move {
                     evt_sender
-                        .notify(space, to_agent, from_agent, payload)
+                        .notify(space, to_agent, from_agent, payload.data.into())
                         .await?;
                     // broadcast doesn't return anything...
                     Ok(vec![])
@@ -260,7 +261,7 @@ impl KitsuneP2pHandler for Space {
     ) -> KitsuneP2pHandlerResult<Vec<u8>> {
         let space = self.space.clone();
         let internal_sender = self.internal_sender.clone();
-        let payload = Arc::new(wire::Wire::call(payload).encode());
+        let payload = Arc::new(wire::Wire::call(payload.into()).encode_vec()?);
 
         Ok(async move {
             let start = std::time::Instant::now();
@@ -428,7 +429,7 @@ impl Space {
         } = input;
 
         // encode the data to send
-        let payload = Arc::new(wire::Wire::call(payload).encode());
+        let payload = Arc::new(wire::Wire::call(payload.into()).encode_vec()?);
 
         // TODO - we cannot write proper logic here until we have a
         //        proper peer discovery mechanism. Instead, let's
@@ -498,7 +499,7 @@ impl Space {
         let timeout_ms = timeout_ms.expect("set by handle_notify_multi");
 
         // encode the data to send
-        let payload = Arc::new(wire::Wire::notify(payload).encode());
+        let payload = Arc::new(wire::Wire::notify(payload.into()).encode_vec()?);
 
         let internal_sender = self.internal_sender.clone();
 

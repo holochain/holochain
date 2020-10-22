@@ -24,6 +24,10 @@ pub enum KitsuneP2pError {
     #[error(transparent)]
     TransportError(#[from] kitsune_p2p_types::transport::TransportError),
 
+    /// std::io::Error
+    #[error(transparent)]
+    StdIoError(#[from] std::io::Error),
+
     /// Other
     #[error("Other: {0}")]
     Other(Box<dyn std::error::Error + Send + Sync>),
