@@ -47,6 +47,7 @@ predicates = "1.0.4"
 rand = "0.7"
 serde = { version = "1.0.104", features = [ "derive" ] }
 serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
+serde_yaml = "0.8"
 shrinkwraprs = "0.3.0"
 structopt = "0.3.11"
 strum = "0.18.0"

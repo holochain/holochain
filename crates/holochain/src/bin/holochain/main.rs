@@ -152,12 +152,12 @@ async fn conductor_handle_from_config_path(
 
 /// Load config, throw friendly error on failure
 fn load_config(config_path: &ConfigFilePath, config_path_default: bool) -> ConductorConfig {
-    match ConductorConfig::load_toml(config_path.as_ref()) {
+    match ConductorConfig::load_yaml(config_path.as_ref()) {
         Err(ConductorError::ConfigMissing(_)) => {
             display_friendly_missing_config_message(config_path, config_path_default);
             std::process::exit(ERROR_CODE);
         }
-        Err(ConductorError::DeserializationError(err)) => {
+        Err(ConductorError::SerializationError(err)) => {
             display_friendly_malformed_config_message(config_path, err);
             std::process::exit(ERROR_CODE);
         }
@@ -199,11 +199,14 @@ automatically create a default config file.
     }
 }
 
-fn display_friendly_malformed_config_message(config_path: &ConfigFilePath, error: toml::de::Error) {
+fn display_friendly_malformed_config_message(
+    config_path: &ConfigFilePath,
+    error: serde_yaml::Error,
+) {
     println!(
         "
 The specified config file ({})
-could not be parsed, because it is not valid TOML. Please check and fix the
+could not be parsed, because it is not valid YAML. Please check and fix the
 file, or delete the file and run the conductor again with the -i flag to create
 a valid default configuration. Details:
 
