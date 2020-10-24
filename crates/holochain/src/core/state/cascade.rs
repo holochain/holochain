@@ -387,11 +387,15 @@ where
         match response {
             // Has header
             GetElementResponse::GetHeader(Some(we)) => {
-                let (element, delete) = we.into_element_and_delete();
+                let (element, deletes, updates) = we.into_parts();
                 self.update_stores(element)?;
 
-                if let Some(delete) = delete {
+                for delete in deletes {
                     self.update_stores(delete)?;
+                }
+
+                for update in updates {
+                    self.update_stores(update)?;
                 }
             }
             // Doesn't have header but not because it was deleted
@@ -780,10 +784,20 @@ where
                 let deletes = fresh_reader!(env, |r| cache_data
                     .meta
                     .get_deletes_on_header(&r, hash.clone())?
-                    .chain(authored_data.meta.get_deletes_on_header(&r, hash)?)
+                    .chain(authored_data.meta.get_deletes_on_header(&r, hash.clone())?)
                     .collect::<BTreeSet<_>>())?;
                 let deletes = self.render_headers(deletes, |h| h == HeaderType::Delete)?;
-                Ok(Some(ElementDetails { element, deletes }))
+                let updates = fresh_reader!(env, |r| cache_data
+                    .meta
+                    .get_updates(&r, hash.clone().into())?
+                    .chain(authored_data.meta.get_updates(&r, hash.into())?)
+                    .collect::<BTreeSet<_>>())?;
+                let updates = self.render_headers(updates, |h| h == HeaderType::Update)?;
+                Ok(Some(ElementDetails {
+                    element,
+                    deletes,
+                    updates,
+                }))
             }
             None => Ok(None),
         }
