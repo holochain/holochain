@@ -40,7 +40,11 @@ impl<'de> serde::de::Deserialize<'de> for CapSecret {
     {
         let bytes: &[u8] = serde::de::Deserialize::deserialize(deserializer)?;
         if bytes.len() != CAP_SECRET_BYTES {
-            let exp_msg = format!("a cap secret length of: {} bytes; got: {} bytes", CAP_SECRET_BYTES, bytes.len());
+            let exp_msg = format!(
+                "expected a cap secret length of: {} bytes; got: {} bytes",
+                CAP_SECRET_BYTES,
+                bytes.len()
+            );
             return Err(D::Error::invalid_value(
                 serde::de::Unexpected::Bytes(bytes),
                 &exp_msg.as_str(),
