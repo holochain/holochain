@@ -51,6 +51,7 @@ mod tests {
     use holo_hash::fixt::*;
     use ChainStatus::*;
 
+    /// TEST: The following chain status transitions have the proper precedence
     #[test]
     fn add_chain_status_test() {
         // - Invalid overwrites valid
