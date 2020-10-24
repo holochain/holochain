@@ -303,6 +303,15 @@ impl From<ChainItemKey> for HeaderHash {
     }
 }
 
+impl From<&ChainItemKey> for u32 {
+    fn from(c: &ChainItemKey) -> Self {
+        match c {
+            ChainItemKey::AgentSequence(_, s) | ChainItemKey::Full(_, s, _) => *s,
+            _ => unreachable!("Tried to get sequence from a partial key: {:?}", c),
+        }
+    }
+}
+
 impl From<&ChainItemKey> for BytesKey {
     fn from(key: &ChainItemKey) -> Self {
         use byteorder::{NativeEndian, WriteBytesExt};

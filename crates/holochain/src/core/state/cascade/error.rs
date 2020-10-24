@@ -8,6 +8,7 @@ use holochain_state::error::DatabaseError;
 use holochain_types::{dht_op::error::DhtOpError, element::error::ElementGroupError};
 use holochain_zome_types::header::conversions::WrongHeaderError;
 use thiserror::Error;
+use tokio::task::JoinError;
 
 #[derive(Error, Debug)]
 pub enum CascadeError {
@@ -25,6 +26,9 @@ pub enum CascadeError {
 
     #[error("Got an invalid response from an authority for the request hash: {0:?}")]
     InvalidResponse(AnyDhtHash),
+
+    #[error(transparent)]
+    JoinError(#[from] JoinError),
 
     #[error(transparent)]
     SourceChainError(#[from] SourceChainError),

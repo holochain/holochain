@@ -12,6 +12,7 @@ use crate::core::{
         dht_op_integration::{IntegratedDhtOpsStore, IntegrationLimboStore},
         element_buf::ElementBuf,
         metadata::MetadataBuf,
+        metadata::MetadataBufT,
         validation_db::{ValidationLimboStatus, ValidationLimboStore, ValidationLimboValue},
         workspace::{Workspace, WorkspaceResult},
     },
@@ -23,9 +24,10 @@ use holochain_state::{
     db::{INTEGRATED_DHT_OPS, INTEGRATION_LIMBO},
     env::EnvironmentWrite,
     error::DatabaseResult,
-    prelude::{EnvironmentRead, GetDb, PendingPrefix, Writer},
+    prelude::{EnvironmentRead, GetDb, IntegratedPrefix, PendingPrefix, Writer},
 };
 use holochain_types::{dht_op::DhtOp, Timestamp};
+use holochain_zome_types::query::HighestObserved;
 use tracing::instrument;
 
 #[cfg(test)]
@@ -80,6 +82,7 @@ pub struct IncomingDhtOpsWorkspace {
     pub validation_limbo: ValidationLimboStore,
     pub element_pending: ElementBuf<PendingPrefix>,
     pub meta_pending: MetadataBuf<PendingPrefix>,
+    pub meta_integrated: MetadataBuf<IntegratedPrefix>,
 }
 
 impl Workspace for IncomingDhtOpsWorkspace {
@@ -87,6 +90,7 @@ impl Workspace for IncomingDhtOpsWorkspace {
         self.validation_limbo.0.flush_to_txn_ref(writer)?;
         self.element_pending.flush_to_txn_ref(writer)?;
         self.meta_pending.flush_to_txn_ref(writer)?;
+        self.meta_integrated.flush_to_txn_ref(writer)?;
         Ok(())
     }
 }
@@ -102,7 +106,9 @@ impl IncomingDhtOpsWorkspace {
         let validation_limbo = ValidationLimboStore::new(env.clone())?;
 
         let element_pending = ElementBuf::pending(env.clone())?;
-        let meta_pending = MetadataBuf::pending(env)?;
+        let meta_pending = MetadataBuf::pending(env.clone())?;
+
+        let meta_integrated = MetadataBuf::vault(env)?;
 
         Ok(Self {
             integration_limbo,
@@ -110,13 +116,25 @@ impl IncomingDhtOpsWorkspace {
             validation_limbo,
             element_pending,
             meta_pending,
+            meta_integrated,
         })
     }
 
     async fn add_to_pending(&mut self, hash: DhtOpHash, op: DhtOp) -> DhtOpConvertResult<()> {
-        let basis = op.dht_basis().await;
-        let op_light = op.to_light().await;
+        let basis = op.dht_basis();
+        let op_light = op.to_light();
         tracing::debug!(?op_light);
+
+        // register the highest observed header in an agents chain
+        if let DhtOp::RegisterAgentActivity(_, header) = &op {
+            self.meta_integrated.register_activity_observed(
+                header.author(),
+                HighestObserved {
+                    header_seq: header.header_seq(),
+                    hash: vec![op_light.header_hash().clone()],
+                },
+            )?;
+        }
 
         integrate_single_data(op, &mut self.element_pending)?;
         integrate_single_metadata(
