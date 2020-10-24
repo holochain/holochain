@@ -61,7 +61,7 @@ impl Parse for EntryDef {
                                 }
                                 _ => unreachable!(
                                     "Invalid required_validation_type
-                                    Options are: entry, sub_chain and full"
+                                    Options are: entry, sub_chain, full and custom"
                                 ),
                             },
                             _ => unreachable!(),

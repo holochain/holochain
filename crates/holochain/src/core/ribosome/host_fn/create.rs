@@ -61,27 +61,22 @@ pub fn create<'a>(
     // if the validation fails this commit will be rolled back by virtue of the lmdb transaction
     // being atomic
     tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-        let header_hash = {
-            let mut guard = call_context.host_access.workspace().write().await;
-            let workspace: &mut CallZomeWorkspace = &mut guard;
-            let source_chain = &mut workspace.source_chain;
-            // push the header and the entry into the source chain
-            let header_hash = source_chain.put(header_builder, Some(entry)).await?;
-            // fetch the element we just added so we can integrate its DhtOps
-            let element = source_chain
-                .get_element(&header_hash)?
-                .expect("Element we just put in SourceChain must be gettable");
-            integrate_to_authored(
-                &element,
-                workspace.source_chain.elements(),
-                &mut workspace.meta_authored,
-            )
-            .map_err(Box::new)
-            .map_err(SourceChainError::from)?;
-            std::mem::drop(guard);
-            std::mem::drop(call_context);
-            header_hash
-        };
+        let mut guard = call_context.host_access.workspace().write().await;
+        let workspace: &mut CallZomeWorkspace = &mut guard;
+        let source_chain = &mut workspace.source_chain;
+        // push the header and the entry into the source chain
+        let header_hash = source_chain.put(header_builder, Some(entry)).await?;
+        // fetch the element we just added so we can integrate its DhtOps
+        let element = source_chain
+            .get_element(&header_hash)?
+            .expect("Element we just put in SourceChain must be gettable");
+        integrate_to_authored(
+            &element,
+            workspace.source_chain.elements(),
+            &mut workspace.meta_authored,
+        )
+        .map_err(Box::new)
+        .map_err(SourceChainError::from)?;
         Ok(CreateOutput::new(header_hash))
     })
 }
@@ -112,16 +107,13 @@ pub fn extract_entry_def(
         }
         _ => None,
     };
-    let r = match app_entry_type {
+    match app_entry_type {
         Some(app_entry_type) => Ok(app_entry_type),
         None => Err(RibosomeError::EntryDefs(
             call_context.zome_name.clone(),
             format!("entry def not found for {:?}", entry_def_id),
         )),
-    };
-    std::mem::drop(ribosome);
-    std::mem::drop(call_context);
-    r
+    }
 }
 
 #[cfg(test)]
@@ -356,7 +348,7 @@ pub mod wasm_test {
 
         // ALICE DOING A CALL
 
-        let n = 500;
+        let n = 50;
 
         // alice create a bunch of entries
         let output = handle

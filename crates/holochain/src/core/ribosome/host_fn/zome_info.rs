@@ -13,7 +13,7 @@ pub fn zome_info(
     call_context: Arc<CallContext>,
     _input: ZomeInfoInput,
 ) -> RibosomeResult<ZomeInfoOutput> {
-    let r = Ok(ZomeInfoOutput::new(ZomeInfo {
+    Ok(ZomeInfoOutput::new(ZomeInfo {
         dna_name: ribosome.dna_file().dna().name.clone(),
         zome_name: call_context.zome_name.clone(),
         dna_hash: ribosome.dna_file().dna_hash().clone(), // @TODO
@@ -21,10 +21,7 @@ pub fn zome_info(
         properties: SerializedBytes::try_from(()).unwrap(), // @TODO
                                                             // @todo
                                                             // public_token: "".into(),                            // @TODO
-    }));
-    std::mem::drop(call_context);
-    std::mem::drop(ribosome);
-    r
+    }))
 }
 
 #[cfg(test)]

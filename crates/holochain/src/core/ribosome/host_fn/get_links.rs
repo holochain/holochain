@@ -39,8 +39,6 @@ pub fn get_links<'a>(
             .dht_get_links(&key, GetLinksOptions::default())
             .await?;
 
-        std::mem::drop(call_context);
-
         Ok(GetLinksOutput::new(links.into()))
     })
 }

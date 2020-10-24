@@ -13,12 +13,8 @@ pub fn agent_info<'a>(
     _input: AgentInfoInput,
 ) -> RibosomeResult<AgentInfoOutput> {
     let agent_pubkey = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-        let r = {
-            let lock = call_context.host_access.workspace().read().await;
-            lock.source_chain.agent_pubkey()
-        };
-        std::mem::drop(call_context);
-        r
+        let lock = call_context.host_access.workspace().read().await;
+        lock.source_chain.agent_pubkey()
     })?;
     Ok(AgentInfoOutput::new(AgentInfo {
         agent_initial_pubkey: agent_pubkey.clone(),
