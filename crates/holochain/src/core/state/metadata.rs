@@ -32,6 +32,7 @@ use holochain_zome_types::{link::LinkTag, Header};
 use std::fmt::Debug;
 use tracing::*;
 
+use activity::*;
 pub use keys::*;
 pub use sys_meta::*;
 
@@ -40,6 +41,7 @@ pub use mock::MockMetadataBuf;
 #[cfg(test)]
 use mockall::mock;
 
+mod activity;
 #[cfg(test)]
 mod chain_test;
 mod keys;
@@ -649,45 +651,8 @@ where
         agent: &AgentPubKey,
         status: ChainStatus,
     ) -> DatabaseResult<()> {
-        // Rules to make this monotonic
-        // - Invalid overwrites valid and any invalids later in the chain.
-        // - Later Valid headers overwrite earlier Valid.
-        // - If there are two Valid status at the same seq num then insert an Invalid.
-        use ChainStatus::*;
         let new_status = match self.get_activity_status(agent)? {
-            Some(prev_status) => match (&prev_status, &status) {
-                (Valid(p), Valid(c)) => {
-                    if p.header_seq == c.header_seq && p.hash != c.hash {
-                        // Found a fork so insert a fork
-                        Some(Forked(ChainFork{
-                            fork_seq: p.header_seq,
-                            first_header: p.hash.clone(),
-                            second_header: c.hash.clone(),
-                        }))
-                    } else if p == c || p.header_seq > c.header_seq {
-                        // Both are the same no need to overwrite or
-                        // Previous is more recent so don't overwrite
-                        None
-                    } else {
-                        // Otherwise overwrite with current
-                        Some(status)
-                    }
-                }
-                // # Reasons to not overwrite
-                // ## Invalid / Forked where the previous is earlier in the chain
-                (Invalid(p), Forked(c)) if p.header_seq <= c.fork_seq => None,
-                (Invalid(p), Invalid(c)) if p.header_seq <= c.header_seq => None,
-                (Forked(p), Invalid(c)) if p.fork_seq <= c.header_seq => None,
-                (Forked(p), Forked(c)) if p.fork_seq <= c.fork_seq => None,
-                // ## Previous is Invalid / Forked and current is valid
-                (Invalid(_), Valid(_)) | (Forked(_), Valid(_))
-                // Current is empty
-                | (_, Empty) => None,
-                // Previous should never be empty
-                (Empty, _) => unreachable!("Should never cache an empty status"),
-                // The rest are reasons to overwrite
-                _ => Some(status),
-            },
+            Some(prev_status) => add_chain_status(prev_status, status),
             None => Some(status),
         };
         if let Some(s) = new_status {
