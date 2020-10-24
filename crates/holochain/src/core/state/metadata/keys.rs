@@ -317,7 +317,7 @@ impl From<&ChainItemKey> for u32 {
 
 impl From<&ChainItemKey> for BytesKey {
     fn from(key: &ChainItemKey) -> Self {
-        use byteorder::{NativeEndian, WriteBytesExt};
+        use byteorder::{BigEndian, WriteBytesExt};
         match key {
             ChainItemKey::Agent(a) => a.as_ref().into(),
             ChainItemKey::AgentSequence(a, s) => {
@@ -326,7 +326,7 @@ impl From<&ChainItemKey> for BytesKey {
                 let mut num = Vec::with_capacity(4);
 
                 // Get the header seq
-                num.write_u32::<NativeEndian>(*s).unwrap();
+                num.write_u32::<BigEndian>(*s).unwrap();
                 buf.extend(num);
                 buf.into()
             }
@@ -336,7 +336,7 @@ impl From<&ChainItemKey> for BytesKey {
                 let mut num = Vec::with_capacity(4);
 
                 // Get the header seq
-                num.write_u32::<NativeEndian>(*s).unwrap();
+                num.write_u32::<BigEndian>(*s).unwrap();
                 buf.extend(num);
 
                 // Get the header hash
@@ -351,7 +351,7 @@ impl From<&ChainItemKey> for BytesKey {
 // get from the k bytes to the chain item key
 impl From<BytesKey> for ChainItemKey {
     fn from(b: BytesKey) -> Self {
-        use byteorder::{ByteOrder, NativeEndian};
+        use byteorder::{BigEndian, ByteOrder};
         let bytes = b.0;
         const SEQ_SIZE: usize = std::mem::size_of::<u32>();
         debug_assert_eq!(bytes.len(), HOLO_HASH_SERIALIZED_LEN * 2 + SEQ_SIZE);
@@ -362,7 +362,7 @@ impl From<BytesKey> for ChainItemKey {
         // Take another 4 for the u32
         let seq_bytes: Vec<_> =
             bytes[HOLO_HASH_SERIALIZED_LEN..(HOLO_HASH_SERIALIZED_LEN + SEQ_SIZE)].to_owned();
-        let s = NativeEndian::read_u32(&seq_bytes);
+        let s = BigEndian::read_u32(&seq_bytes);
 
         // Take the rest for the header hash
         let h =

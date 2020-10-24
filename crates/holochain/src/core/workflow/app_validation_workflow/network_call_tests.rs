@@ -7,32 +7,31 @@ use holochain_p2p::{actor::GetActivityOptions, HolochainP2pCellT};
 use holochain_state::env::EnvironmentRead;
 use holochain_types::HeaderHashed;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::query::{
-    Activity, AgentActivity, ChainHead, ChainQueryFilter, ChainStatus, HighestObserved,
+use holochain_zome_types::{
+    query::{Activity, AgentActivity, ChainHead, ChainQueryFilter, ChainStatus, HighestObserved},
+    ZomeCallResponse,
 };
-use holochain_zome_types::ZomeCallResponse;
 use matches::assert_matches;
 
 use crate::{
+    conductor::ConductorHandle,
     core::state::cascade::Cascade,
     core::state::cascade::DbPair,
     core::state::cascade::DbPairMut,
     core::state::element_buf::ElementBuf,
     core::state::metadata::MetadataBuf,
-    test_utils::{
-        conductor_setup::ConductorCallData, host_fn_api::*, new_invocation, wait_for_integration,
-    },
+    test_utils::{conductor_setup::ConductorCallData, new_invocation, wait_for_integration},
 };
 use crate::{
     core::state::source_chain::SourceChain, test_utils::conductor_setup::ConductorTestData,
 };
 
+const NUM_COMMITS: usize = 10;
 // Check if the correct number of ops are integrated
 // every 100 ms for a maximum of 10 seconds but early exit
 // if they are there.
 const NUM_ATTEMPTS: usize = 100;
 const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
-const NUM_COMMITS: usize = 1;
 
 #[tokio::test(threaded_scheduler)]
 async fn get_validation_package_test() {
@@ -63,7 +62,7 @@ async fn get_validation_package_test() {
         }
     };
 
-    let header_hash = commit_some_data("create_entry", &alice_call_data).await;
+    let header_hash = commit_some_data("create_entry", &alice_call_data, &handle).await;
 
     // Expecting every header from the latest to the beginning
     let alice_source_chain = SourceChain::public_only(alice_call_data.env.clone().into()).unwrap();
@@ -99,7 +98,7 @@ async fn get_validation_package_test() {
     assert_eq!(validation_package, expected_package.0);
 
     // What happens if we commit a private entry?
-    let header_hash_priv = commit_some_data("create_priv_msg", &alice_call_data).await;
+    let header_hash_priv = commit_some_data("create_priv_msg", &alice_call_data, &handle).await;
 
     // Network
     // Check we still get the last package with new commits
@@ -158,7 +157,7 @@ async fn get_validation_package_test() {
     // Test sub chain package
 
     // Commit some entries with sub chain requirements
-    let header_hash = commit_some_data("create_msg", &alice_call_data).await;
+    let header_hash = commit_some_data("create_msg", &alice_call_data, &handle).await;
 
     // Get the entry type
     let entry_type = alice_source_chain
@@ -303,12 +302,12 @@ async fn get_agent_activity_test() {
         activity
     };
 
-    commit_some_data("create_entry", &alice_call_data).await;
+    commit_some_data("create_entry", &alice_call_data, &handle).await;
 
     alice_call_data.triggers.produce_dht_ops.trigger();
 
-    // 3 ops per commit, 5 commits plus 7 for genesis
-    let mut expected_count = NUM_COMMITS * 3 + 7;
+    // 3 ops per commit, 5 commits plus 7 for genesis + 2 for init
+    let mut expected_count = NUM_COMMITS * 3 + 9;
 
     wait_for_integration(
         &alice_call_data.env,
@@ -317,6 +316,21 @@ async fn get_agent_activity_test() {
         DELAY_PER_ATTEMPT.clone(),
     )
     .await;
+
+    let agent_activity = alice_call_data
+        .network
+        .get_agent_activity(
+            alice_agent_id.clone(),
+            ChainQueryFilter::new(),
+            GetActivityOptions {
+                include_full_headers: true,
+                include_valid_activity: true,
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(agent_activity.len(), 1);
 
     let mut agent_activity = alice_call_data
         .network
@@ -349,6 +363,7 @@ async fn get_agent_activity_test() {
             ChainQueryFilter::new(),
             GetActivityOptions {
                 include_full_headers: true,
+                retry_gets: 5,
                 ..Default::default()
             },
         )
@@ -359,32 +374,19 @@ async fn get_agent_activity_test() {
 
     assert_eq!(agent_activity, expected_activity);
 
-    // Call the cascade and check we can get the entries as well
-    // Parallel gets to the same agent can overwhelm them so we
-    // need to try a few time
-    let mut agent_activity = None;
-    for _ in 0..100 {
-        let r = cascade
-            .get_agent_activity(
-                alice_agent_id.clone(),
-                ChainQueryFilter::new().include_entries(true),
-                GetActivityOptions {
-                    include_full_headers: true,
-                    ..Default::default()
-                },
-            )
-            .await
-            .expect("Failed to get any activity from alice");
-        match r.valid_activity {
-            Activity::Full(h) if !h.is_empty() => {
-                agent_activity = Some(h);
-                break;
-            }
-            _ => (),
-        }
-        tokio::time::delay_for(std::time::Duration::from_millis(100)).await;
-    }
-    let agent_activity = agent_activity.expect("Failed to get any activity from alice");
+    let r = cascade
+        .get_agent_activity(
+            alice_agent_id.clone(),
+            ChainQueryFilter::new().include_entries(true),
+            GetActivityOptions {
+                include_full_headers: true,
+                retry_gets: 5,
+                ..Default::default()
+            },
+        )
+        .await
+        .expect("Failed to get any activity from alice");
+    let agent_activity = unwrap_to::unwrap_to!(r.valid_activity => Activity::Full).clone();
 
     let alice_source_chain = SourceChain::public_only(alice_call_data.env.clone().into()).unwrap();
     let expected_activity: Vec<_> =
@@ -398,7 +400,7 @@ async fn get_agent_activity_test() {
     assert_eq!(agent_activity, expected_activity);
 
     // Commit private messages
-    commit_some_data("create_priv_msg", &alice_call_data).await;
+    commit_some_data("create_priv_msg", &alice_call_data, &handle).await;
 
     alice_call_data.triggers.produce_dht_ops.trigger();
 
@@ -429,7 +431,7 @@ async fn get_agent_activity_test() {
     assert_eq!(agent_activity, expected_activity);
 
     // Commit messages
-    let header_hash = commit_some_data("create_msg", &alice_call_data).await;
+    let header_hash = commit_some_data("create_msg", &alice_call_data, &handle).await;
 
     // Get the entry type
     let alice_source_chain = SourceChain::public_only(alice_call_data.env.clone().into()).unwrap();
@@ -461,6 +463,7 @@ async fn get_agent_activity_test() {
             ChainQueryFilter::new().entry_type(entry_type.clone()),
             GetActivityOptions {
                 include_full_headers: true,
+                retry_gets: 5,
                 ..Default::default()
             },
         )
@@ -589,22 +592,21 @@ async fn get_custom_package_test() {
     ConductorTestData::shutdown_conductor(handle).await;
 }
 
-async fn commit_some_data(call: &'static str, alice_call_data: &ConductorCallData) -> HeaderHash {
+async fn commit_some_data(
+    call: &str,
+    alice_call_data: &ConductorCallData,
+    handle: &ConductorHandle,
+) -> HeaderHash {
     let mut header_hash = None;
     // Commit 5 entries
     for _ in 0..NUM_COMMITS {
         let invocation =
             new_invocation(&alice_call_data.cell_id, call, (), TestWasm::Create).unwrap();
-        header_hash = Some(
-            call_zome_direct(
-                &alice_call_data.env,
-                alice_call_data.call_data(TestWasm::Create),
-                invocation,
-            )
-            .await
-            .try_into()
-            .unwrap(),
-        );
+        let result = handle.call_zome(invocation).await.unwrap().unwrap();
+        let result = unwrap_to::unwrap_to!(result => ZomeCallResponse::Ok)
+            .clone()
+            .into_inner();
+        header_hash = Some(result.try_into().unwrap());
     }
     header_hash.unwrap()
 }
