@@ -1652,20 +1652,18 @@ where
                 // If full headers and include entries is requested
                 // retrieve them in parallel
                 if query.include_entries && requester_options.include_full_headers {
-                    let elements = self
-                        .retrieve_parallel(
-                            hashes.iter().map(|(_, h)| h.clone()),
-                            Default::default(),
-                        )
-                        .await?
-                        .into_iter()
-                        // Filter the headers by the query
-                        .filter(|o| match o {
-                            Some(el) => query.check(el.header()),
-                            None => true,
-                        })
-                        .collect::<Option<Vec<_>>>()
-                        .unwrap_or_else(Vec::new);
+                    let hashes = hashes.iter().map(|(_, h)| h.clone());
+                    let mut elements = self
+                        .retrieve_activity_elements(hashes.clone(), &query)
+                        .await?;
+                    let mut retry_gets = requester_options.retry_gets;
+                    while elements.is_none() && retry_gets > 0 {
+                        retry_gets -= 1;
+                        elements = self
+                            .retrieve_activity_elements(hashes.clone(), &query)
+                            .await?;
+                    }
+                    let elements = elements.unwrap_or_else(Vec::new);
                     Ok(AgentActivity {
                         valid_activity: Activity::Full(elements),
                         ..activity
@@ -1673,21 +1671,18 @@ where
                 // If only full headers is requested
                 // retrieve just the headers in parallel
                 } else if requester_options.include_full_headers {
-                    let elements = self
-                        .retrieve_headers_parallel(
-                            hashes.iter().map(|(_, h)| h.clone()),
-                            Default::default(),
-                        )
-                        .await?
-                        .into_iter()
-                        // Filter the headers by the query
-                        .filter(|o| match o {
-                            Some(el) => query.check(el.header()),
-                            None => true,
-                        })
-                        .map(|shh| shh.map(|s| Element::new(s, None)))
-                        .collect::<Option<Vec<_>>>()
-                        .unwrap_or_else(Vec::new);
+                    let hashes = hashes.iter().map(|(_, h)| h.clone());
+                    let mut elements = self
+                        .retrieve_activity_headers(hashes.clone(), &query)
+                        .await?;
+                    let mut retry_gets = requester_options.retry_gets;
+                    while elements.is_none() && retry_gets > 0 {
+                        retry_gets -= 1;
+                        elements = self
+                            .retrieve_activity_headers(hashes.clone(), &query)
+                            .await?;
+                    }
+                    let elements = elements.unwrap_or_else(Vec::new);
                     Ok(AgentActivity {
                         valid_activity: Activity::Full(elements),
                         ..activity
@@ -1699,6 +1694,41 @@ where
             }
             Activity::NotRequested => Ok(activity),
         }
+    }
+
+    async fn retrieve_activity_elements(
+        &mut self,
+        hashes: impl IntoIterator<Item = HeaderHash>,
+        query: &ChainQueryFilter,
+    ) -> CascadeResult<Option<Vec<Element>>> {
+        Ok(self
+            .retrieve_parallel(hashes, Default::default())
+            .await?
+            .into_iter()
+            // Filter the headers by the query
+            .filter(|o| match o {
+                Some(el) => query.check(el.header()),
+                None => true,
+            })
+            .collect::<Option<Vec<_>>>())
+    }
+
+    async fn retrieve_activity_headers(
+        &mut self,
+        hashes: impl IntoIterator<Item = HeaderHash>,
+        query: &ChainQueryFilter,
+    ) -> CascadeResult<Option<Vec<Element>>> {
+        Ok(self
+            .retrieve_headers_parallel(hashes, Default::default())
+            .await?
+            .into_iter()
+            // Filter the headers by the query
+            .filter(|o| match o {
+                Some(el) => query.check(el.header()),
+                None => true,
+            })
+            .map(|shh| shh.map(|s| Element::new(s, None)))
+            .collect::<Option<Vec<_>>>())
     }
 }
 
