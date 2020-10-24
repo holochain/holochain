@@ -244,13 +244,9 @@ fn get_full_headers<P: PrefixType, R: Readable>(
     database: ElementBuf<P>,
     reader: &R,
 ) -> CellResult<Vec<SignedHeaderHashed>> {
-    info!(line = line!());
-    let now = std::time::Instant::now();
-    let headers = fallible_iterator::convert(hashes.into_iter().map(Ok))
+    let headers: Vec<_> = fallible_iterator::convert(hashes.into_iter().map(Ok))
         .filter_map(|h| database.get_header_with_reader(reader, &h.1))
         // .filter(|shh| Ok(query.check(shh.header())))
         .collect()?;
-    let us = now.elapsed().as_micros();
-    tracing::info!(line = line!(), ?us);
     Ok(headers)
 }
