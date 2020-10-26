@@ -123,3 +123,28 @@ async fn chain_item_keys_ser() {
     println!("expect hash {:?}", expect_hash.clone().into_inner());
     assert_eq!(headers.pop().unwrap().header_hash, expect_hash);
 }
+
+#[tokio::test(threaded_scheduler)]
+async fn check_large_seq_queries() {
+    let (_te, mut meta_buf, mut h1, mut h2, agent_pubkey) = setup();
+    h1.header_seq = 256;
+    h2.header_seq = 1;
+    let h1_hash = HeaderHash::with_data_sync(&Header::Create(h1.clone()));
+    let h2_hash = HeaderHash::with_data_sync(&Header::Create(h2.clone()));
+
+    meta_buf.register_activity(&h1.into()).unwrap();
+    meta_buf.register_activity(&h2.into()).unwrap();
+
+    let g = meta_buf.env().guard();
+    let reader = g.reader().unwrap();
+
+    let k = ChainItemKey::Agent(agent_pubkey.clone());
+    assert_eq!(
+        &meta_buf
+            .get_activity_sequence(&reader, k)
+            .unwrap()
+            .collect::<Vec<_>>()
+            .unwrap()[..],
+        &[(1, h2_hash), (256, h1_hash)]
+    );
+}

@@ -264,16 +264,12 @@ impl TryFrom<SignedHeaderHashed> for WireUpdateRelationship {
 }
 
 impl WireNewEntryHeader {
-    pub async fn into_element(self, entry_type: EntryType, entry: Entry) -> Element {
+    pub fn into_element(self, entry_type: EntryType, entry: Entry) -> Element {
         let entry_hash = EntryHash::with_data_sync(&entry);
-        Element::new(self.into_header(entry_type, entry_hash).await, Some(entry))
+        Element::new(self.into_header(entry_type, entry_hash), Some(entry))
     }
 
-    pub async fn into_header(
-        self,
-        entry_type: EntryType,
-        entry_hash: EntryHash,
-    ) -> SignedHeaderHashed {
+    pub fn into_header(self, entry_type: EntryType, entry_hash: EntryHash) -> SignedHeaderHashed {
         match self {
             WireNewEntryHeader::Create(ec) => {
                 let signature = ec.signature;

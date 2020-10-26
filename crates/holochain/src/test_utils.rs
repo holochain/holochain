@@ -8,6 +8,10 @@ use crate::{
         ConductorBuilder, ConductorHandle,
     },
     core::ribosome::ZomeCallInvocation,
+    core::state::cascade::Cascade,
+    core::state::cascade::DbPair,
+    core::state::element_buf::ElementBuf,
+    core::state::metadata::MetadataBuf,
     core::workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace,
 };
 use ::fixt::prelude::*;
@@ -262,14 +266,32 @@ pub async fn wait_for_integration(
         });
         tracing::debug!(?int_limbo);
 
-        let count = fresh_reader_test!(env, |r| {
+        let int: Vec<_> = fresh_reader_test!(env, |r| {
             workspace
                 .integrated_dht_ops
                 .iter(&r)
                 .unwrap()
-                .count()
+                .map(|(_, v)| Ok(v))
+                .collect()
                 .unwrap()
         });
+        let count = int.len();
+
+        {
+            let s = tracing::trace_span!("wait_for_integration_deep");
+            let _g = s.enter();
+            let element_integrated = ElementBuf::vault(env.clone().into(), false).unwrap();
+            let meta_integrated = MetadataBuf::vault(env.clone().into()).unwrap();
+            let element_rejected = ElementBuf::rejected(env.clone().into()).unwrap();
+            let meta_rejected = MetadataBuf::rejected(env.clone().into()).unwrap();
+            let mut cascade = Cascade::empty()
+                .with_integrated(DbPair::new(&element_integrated, &meta_integrated))
+                .with_rejected(DbPair::new(&element_rejected, &meta_rejected));
+            for iv in int {
+                tracing::trace!(op = ?iv.op, el = ?cascade.retrieve(iv.op.header_hash().clone().into(), Default::default()).await.unwrap());
+            }
+        }
+
         if count == expected_count {
             return;
         } else {
