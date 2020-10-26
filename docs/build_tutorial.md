@@ -50,12 +50,6 @@ Install Rust
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
-Switch to the proper Rust "toolchain" that Holochain needs
-```bash
-rustup install stable-2020-08-03
-rustup default stable-2020-08-03
-```
-
 Grab and install the binaries for `holochain` and `dna-util` from github, at the right version
 ```bash
 cargo install holochain --git https://github.com/holochain/holochain.git --branch develop
