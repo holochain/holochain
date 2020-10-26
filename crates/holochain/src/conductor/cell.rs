@@ -440,7 +440,7 @@ impl Cell {
     }
 
     /// a remote node is attempting to retrieve a validation package
-    #[tracing::instrument(skip(self))]
+    #[tracing::instrument(skip(self), level = "trace")]
     async fn handle_get_validation_package(
         &self,
         header_hash: HeaderHash,
