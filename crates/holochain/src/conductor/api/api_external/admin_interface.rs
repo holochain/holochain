@@ -222,7 +222,7 @@ impl InterfaceApi for RealAdminInterfaceApi {
 /// The set of messages that a conductor understands how to handle over an Admin interface
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[cfg_attr(test, derive(Clone))]
-#[serde(rename = "snake-case", tag = "type", content = "data")]
+#[serde(rename_all = "snake_case", tag = "type", content = "data")]
 pub enum AdminRequest {
     /// Set up and register an Admin interface task
     AddAdminInterfaces(Vec<AdminInterfaceConfig>),
@@ -264,7 +264,7 @@ pub enum AdminRequest {
 /// Responses to messages received on an Admin interface
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[cfg_attr(test, derive(Clone))]
-#[serde(rename = "snake-case", tag = "type", content = "data")]
+#[serde(rename_all = "snake_case", tag = "type", content = "data")]
 pub enum AdminResponse {
     /// This response is unimplemented
     Unimplemented(AdminRequest),

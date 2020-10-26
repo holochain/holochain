@@ -273,7 +273,7 @@ pub mod test {
     use uuid::Uuid;
 
     #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-    #[serde(rename = "snake-case", tag = "type", content = "data")]
+    #[serde(rename_all = "snake_case", tag = "type", content = "data")]
     enum AdmonRequest {
         InstallsDna(String),
     }
