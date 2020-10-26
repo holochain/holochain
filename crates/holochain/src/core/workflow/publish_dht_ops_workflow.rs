@@ -133,7 +133,7 @@ pub async fn publish_dht_ops_workflow_inner(
         // For every op publish a request
         // Collect and sort ops by basis
         to_publish
-            .entry(op.dht_basis().await)
+            .entry(op.dht_basis())
             .or_insert_with(Vec::new)
             .push((op_hash, op));
     }
@@ -703,7 +703,7 @@ mod tests {
                                         match expected.get(&op_hash) {
                                             Some((expected_op, count)) => {
                                                 assert_eq!(&op, expected_op);
-                                                assert_eq!(dht_hash, expected_op.dht_basis().await);
+                                                assert_eq!(dht_hash, expected_op.dht_basis());
                                                 count.fetch_add(1, Ordering::SeqCst);
                                             }
                                             None => panic!(

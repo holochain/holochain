@@ -157,20 +157,33 @@ pub struct GetActivityOptions {
     /// Note - if all requests time-out you will receive an empty result,
     /// not a timeout error.
     pub timeout_ms: Option<u64>,
+    /// Number of times to retry getting elements in parallel.
+    /// For a small dht a large parallel get can overwhelm a single
+    /// agent and it can be worth retrying the elements that didn't
+    /// get found.
+    pub retry_gets: u8,
     /// [Remote]
-    /// Include the all activity headers in the response.
+    /// Include the all valid activity headers in the response.
     /// If this is false the call becomes a lightweight response with
     /// just the chain status and highest observed header.
     /// This is useful when you want to ask an authority about the
     /// status of a chain but do not need all the headers.
-    pub include_activity: bool,
+    pub include_valid_activity: bool,
+    /// Include any rejected headers in the response.
+    pub include_rejected_activity: bool,
+    /// Include the full signed headers and hashes in the response
+    /// instead of just the hashes.
+    pub include_full_headers: bool,
 }
 
 impl Default for GetActivityOptions {
     fn default() -> Self {
         Self {
             timeout_ms: None,
-            include_activity: true,
+            retry_gets: 0,
+            include_valid_activity: true,
+            include_rejected_activity: false,
+            include_full_headers: false,
         }
     }
 }

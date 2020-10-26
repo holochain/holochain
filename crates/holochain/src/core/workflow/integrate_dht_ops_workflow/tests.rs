@@ -206,7 +206,7 @@ impl Db {
                     let op_hash = DhtOpHashed::from_content_sync(op.clone()).into_hash();
                     let value = IntegratedDhtOpsValue {
                         validation_status: ValidationStatus::Valid,
-                        op: op.to_light().await,
+                        op: op.to_light(),
                         when_integrated: Timestamp::now().into(),
                     };
                     let mut r = workspace
@@ -220,7 +220,7 @@ impl Db {
                 Db::IntQueue(op) => {
                     let value = IntegrationLimboValue {
                         validation_status: ValidationStatus::Valid,
-                        op: op.to_light().await,
+                        op: op.to_light(),
                     };
                     let res = workspace
                         .integration_limbo
@@ -476,7 +476,7 @@ impl Db {
                     let op_hash = DhtOpHashed::from_content_sync(op.clone()).into_hash();
                     let val = IntegrationLimboValue {
                         validation_status: ValidationStatus::Valid,
-                        op: op.to_light().await,
+                        op: op.to_light(),
                     };
                     workspace
                         .integration_limbo
