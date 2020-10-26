@@ -172,8 +172,7 @@ pub mod tests {
       init_params: some_params
 
     admin_interfaces:
-      -
-        driver:
+      - driver:
           type: websocket
           port: 1234
 
