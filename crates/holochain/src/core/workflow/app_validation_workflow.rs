@@ -2,6 +2,8 @@
 
 use std::{collections::BinaryHeap, convert::TryInto, sync::Arc};
 
+use self::validation_package::{get_as_author_custom, get_as_author_full, get_as_author_sub_chain};
+
 use super::{
     error::WorkflowError, error::WorkflowResult,
     produce_dht_ops_workflow::dht_op_light::light_to_op, CallZomeWorkspace, CallZomeWorkspaceLock,
@@ -27,6 +29,7 @@ use crate::{
         ribosome::guest_callback::validate::ValidateInvocation,
         ribosome::guest_callback::validate::ValidateResult,
         ribosome::RibosomeT,
+        state::metadata::MetadataBufT,
         state::{
             cascade::DbPair,
             cascade::DbPairMut,
@@ -83,6 +86,7 @@ mod tests;
 
 mod error;
 mod types;
+pub mod validation_package;
 
 #[instrument(skip(workspace, writer, trigger_integration, conductor_api, network))]
 pub async fn app_validation_workflow(
@@ -544,152 +548,230 @@ async fn get_validation_package(
     network: &HolochainP2pCell,
 ) -> AppValidationOutcome<Option<ValidationPackage>> {
     match entry_def {
-        Some(entry_def) => {
-            match entry_def.required_validation_type {
-                // Only needs the element
-                RequiredValidationType::Element => Ok(None),
-                RequiredValidationType::SubChain | RequiredValidationType::Full => {
-                    let mut lock = workspace_lock.write().await;
-                    let mut cascade = match workspace {
-                        Some(workspace) => workspace.full_cascade(network.clone()),
-                        None => lock.cascade(network.clone()),
-                    };
-                    // TODO: What if this is the same author that is validating?
-                    // We probably don't want to do a network call although
-                    // it will just short circuit
+        Some(entry_def) => match workspace {
+            Some(workspace) => {
+                get_validation_package_remote(
+                    element,
+                    entry_def,
+                    from_agent,
+                    workspace,
+                    ribosome,
+                    workspace_lock,
+                    network,
+                )
+                .await
+            }
+            None => {
+                get_validation_package_local(
+                    element,
+                    entry_def.required_validation_type,
+                    ribosome,
+                    workspace_lock,
+                    network,
+                )
+                .await
+            }
+        },
+        None => {
+            // Not an entry header type so no package
+            Ok(None)
+        }
+    }
+}
 
-                    // Get from author
-                    let agent_id = element.header().author().clone();
-                    let header_hashed = element.header_hashed();
+async fn get_validation_package_local(
+    element: &Element,
+    required_validation_type: RequiredValidationType,
+    ribosome: &impl RibosomeT,
+    workspace_lock: &CallZomeWorkspaceLock,
+    network: &HolochainP2pCell,
+) -> AppValidationOutcome<Option<ValidationPackage>> {
+    let header_seq = element.header().header_seq();
+    match required_validation_type {
+        RequiredValidationType::Element => Ok(None),
+        RequiredValidationType::SubChain => {
+            let app_entry_type = match element.header().entry_type().cloned() {
+                Some(EntryType::App(aet)) => aet,
+                _ => return Ok(None),
+            };
+            let lock = workspace_lock.write().await;
+            Ok(Some(get_as_author_sub_chain(
+                header_seq,
+                app_entry_type,
+                &lock.source_chain,
+            )?))
+        }
+        RequiredValidationType::Full => {
+            let lock = workspace_lock.write().await;
+            Ok(Some(get_as_author_full(header_seq, &lock.source_chain)?))
+        }
+        RequiredValidationType::Custom => {
+            {
+                let mut lock = workspace_lock.write().await;
+                let cascade = lock.cascade_local();
+                if let Some(elements) =
+                    cascade.get_validation_package_local(element.header_address())?
+                {
+                    return Ok(Some(ValidationPackage::new(elements)));
+                }
+            }
+            let result = match get_as_author_custom(
+                element.header_hashed(),
+                ribosome,
+                network,
+                workspace_lock.clone(),
+            )? {
+                Some(result) => result,
+                None => return Ok(None),
+            };
+            match result {
+                ValidationPackageResult::Success(validation_package) => Ok(Some(validation_package)),
+                ValidationPackageResult::Fail(reason) => Outcome::exit_with_rejected(reason),
+                ValidationPackageResult::UnresolvedDependencies(deps) => Outcome::exit_with_awaiting(deps),
+                ValidationPackageResult::NotImplemented => Outcome::exit_with_rejected(format!("Entry definition specifies a custom validation package but the callback isn't defined for {:?}", element)),
+            }
+        }
+    }
+}
+
+async fn get_validation_package_remote(
+    element: &Element,
+    entry_def: &EntryDef,
+    from_agent: Option<AgentPubKey>,
+    workspace: &mut AppValidationWorkspace,
+    ribosome: &impl RibosomeT,
+    workspace_lock: &CallZomeWorkspaceLock,
+    network: &HolochainP2pCell,
+) -> AppValidationOutcome<Option<ValidationPackage>> {
+    match entry_def.required_validation_type {
+        // Only needs the element
+        RequiredValidationType::Element => Ok(None),
+        RequiredValidationType::SubChain | RequiredValidationType::Full => {
+            let agent_id = element.header().author().clone();
+            {
+                let mut cascade = workspace.full_cascade(network.clone());
+                // Get from author
+                let header_hashed = element.header_hashed();
+                if let Some(validation_package) = cascade
+                    .get_validation_package(agent_id.clone(), header_hashed)
+                    .await?
+                {
+                    return Ok(Some(validation_package));
+                }
+
+                // Fallback to gossiper if author is unavailable
+                if let Some(from_agent) = from_agent {
                     if let Some(validation_package) = cascade
-                        .get_validation_package(
-                            agent_id.clone(),
-                            header_hashed,
-                            entry_def.required_validation_type,
-                        )
+                        .get_validation_package(from_agent, header_hashed)
                         .await?
                     {
                         return Ok(Some(validation_package));
                     }
+                }
+            }
 
-                    // Fallback to gossiper if author is unavailable
-                    if let Some(from_agent) = from_agent {
-                        if let Some(validation_package) = cascade
-                            .get_validation_package(
-                                from_agent,
-                                header_hashed,
-                                entry_def.required_validation_type,
-                            )
-                            .await?
-                        {
-                            return Ok(Some(validation_package));
+            // Fallback to RegisterAgentActivity if gossiper is unavailable
+
+            // When getting agent activity we need to get all the elements from element authorities
+            // in parallel but if the network is small this could overwhelm the authorities and we
+            // might need to retry some of the gets.
+            // One consequence of this is the max timeout becomes the network timeout * NUM_RETRY_GETS
+            // if the data really isn't available.
+            // TODO: Another solution is to up the timeout for parallel gets.
+            const NUM_RETRY_GETS: u8 = 3;
+            let range = 0..element.header().header_seq().saturating_sub(1);
+
+            let mut query = holochain_zome_types::query::ChainQueryFilter::new()
+                .sequence_range(range)
+                .include_entries(true);
+            if let (RequiredValidationType::SubChain, Some(et)) = (
+                entry_def.required_validation_type,
+                element.header().entry_type(),
+            ) {
+                query = query.entry_type(et.clone());
+            }
+
+            // Get the activity from the agent authority
+            let options = GetActivityOptions {
+                include_full_headers: true,
+                include_valid_activity: true,
+                retry_gets: NUM_RETRY_GETS,
+                ..Default::default()
+            };
+            let activity = {
+                let mut cascade = workspace.full_cascade(network.clone());
+                cascade.get_agent_activity(agent_id, query, options).await?
+            };
+            match activity {
+                AgentActivity {
+                    status: ChainStatus::Valid(_),
+                    valid_activity: Activity::Full(elements),
+                    ..
+                } => {
+                    // Cache this as a validation package
+                    workspace.meta_cache.register_validation_package(
+                        element.header_address(),
+                        elements.iter().map(|el| el.header_address().clone()),
+                    );
+                    Ok(Some(ValidationPackage::new(elements)))
+                }
+                // TODO: If the chain is invalid should we still return
+                // it as the validation package?
+                _ => Ok(None),
+            }
+        }
+        RequiredValidationType::Custom => {
+            let validation_package = {
+                let mut cascade = workspace.full_cascade(network.clone());
+                let agent_id = element.header().author().clone();
+                let header_hashed = element.header_hashed();
+                // Call the author
+                let validation_package = cascade
+                    .get_validation_package(agent_id, header_hashed)
+                    .await?;
+
+                // Fallback to gossiper
+                match &validation_package {
+                    Some(_) => validation_package,
+                    None => {
+                        if let Some(from_agent) = from_agent {
+                            cascade
+                                .get_validation_package(from_agent, header_hashed)
+                                .await?
+                        } else {
+                            None
                         }
-                    }
-
-                    // Fallback to RegisterAgentActivity if gossiper is unavailable
-                    let range = 0..element.header().header_seq().saturating_sub(1);
-
-                    let mut query = holochain_zome_types::query::ChainQueryFilter::new()
-                        .sequence_range(range)
-                        .include_entries(true);
-                    if let (RequiredValidationType::SubChain, Some(et)) = (
-                        entry_def.required_validation_type,
-                        element.header().entry_type(),
-                    ) {
-                        query = query.entry_type(et.clone());
-                    }
-
-                    // Get the activity from the agent authority
-                    let options = GetActivityOptions {
-                        include_full_headers: true,
-                        include_valid_activity: true,
-                        ..Default::default()
-                    };
-                    match cascade.get_agent_activity(agent_id, query, options).await? {
-                        AgentActivity {
-                            status: ChainStatus::Valid(_),
-                            valid_activity: Activity::Full(elements),
-                            ..
-                        } => Ok(Some(ValidationPackage::new(elements))),
-                        // TODO: If the chain is invalid should we still return
-                        // it as the validation package?
-                        _ => Ok(None),
                     }
                 }
-                RequiredValidationType::Custom => {
-                    let validation_package = {
-                        let mut lock = workspace_lock.write().await;
-                        let mut cascade = match workspace {
-                            Some(workspace) => workspace.full_cascade(network.clone()),
-                            None => lock.cascade(network.clone()),
-                        };
-                        let agent_id = element.header().author().clone();
-                        let header_hashed = element.header_hashed();
-                        let validation_package = cascade
-                            .get_validation_package(
-                                agent_id,
-                                header_hashed,
-                                entry_def.required_validation_type,
-                            )
-                            .await?;
+            };
 
-                        // Fallback to gossiper
-                        match &validation_package {
-                            Some(_) => validation_package,
-                            None => {
-                                if let Some(from_agent) = from_agent {
-                                    cascade
-                                        .get_validation_package(
-                                            from_agent,
-                                            header_hashed,
-                                            entry_def.required_validation_type,
-                                        )
-                                        .await?
-                                } else {
-                                    None
-                                }
-                            }
-                        }
+            // Fallback to callback
+            match &validation_package {
+                Some(_) => Ok(validation_package),
+                None => {
+                    let access =
+                        ValidationPackageHostAccess::new(workspace_lock.clone(), network.clone());
+                    let app_entry_type = match element.header().entry_type() {
+                        Some(EntryType::App(a)) => a.clone(),
+                        _ => return Ok(None),
                     };
-
-                    // Fallback to callback
-                    match &validation_package {
-                        Some(_) => Ok(validation_package),
-                        None => {
-                            let access = ValidationPackageHostAccess::new(
-                                workspace_lock.clone(),
-                                network.clone(),
-                            );
-                            let app_entry_type = match element.header().entry_type() {
-                                Some(EntryType::App(a)) => a.clone(),
-                                _ => return Ok(None),
-                            };
-                            let zome_name = ribosome
-                                .dna_file()
-                                .dna()
-                                .zomes
-                                .get(app_entry_type.zome_id().index())
-                                .ok_or_else(|| {
-                                    AppValidationError::ZomeId(app_entry_type.zome_id())
-                                })?
-                                .0
-                                .clone();
-                            let invocation =
-                                ValidationPackageInvocation::new(zome_name, app_entry_type);
-                            match ribosome.run_validation_package(access, invocation)? {
+                    let zome_name = ribosome
+                        .dna_file()
+                        .dna()
+                        .zomes
+                        .get(app_entry_type.zome_id().index())
+                        .ok_or_else(|| AppValidationError::ZomeId(app_entry_type.zome_id()))?
+                        .0
+                        .clone();
+                    let invocation = ValidationPackageInvocation::new(zome_name, app_entry_type);
+                    match ribosome.run_validation_package(access, invocation)? {
                                 ValidationPackageResult::Success(validation_package) => Ok(Some(validation_package)),
                                 ValidationPackageResult::Fail(reason) => Outcome::exit_with_rejected(reason),
                                 ValidationPackageResult::UnresolvedDependencies(deps) => Outcome::exit_with_awaiting(deps),
                                 ValidationPackageResult::NotImplemented => Outcome::exit_with_rejected(format!("Entry definition specifies a custom validation package but the callback isn't defined for {:?}", element)),
                             }
-                        }
-                    }
                 }
             }
-        }
-        None => {
-            // Not an entry header type so no package
-            Ok(None)
         }
     }
 }

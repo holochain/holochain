@@ -33,16 +33,13 @@ use holochain_types::{
 };
 use holochain_zome_types::{
     element::SignedHeader,
-    header::EntryType,
     header::HeaderType,
     link::Link,
     metadata::{Details, ElementDetails, EntryDetails},
     query::Activity,
     query::AgentActivity,
-    query::ChainHead,
     query::ChainQueryFilter,
     query::ChainStatus,
-    validate::RequiredValidationType,
     validate::ValidationPackage,
 };
 use std::collections::HashSet;
@@ -1742,26 +1739,6 @@ where
 
     pub fn get_validation_package_local(
         &self,
-        header: &HeaderHashed,
-        required_validation_type: RequiredValidationType,
-    ) -> CascadeResult<Option<Vec<Element>>> {
-        match required_validation_type {
-            RequiredValidationType::Element => Ok(None),
-            RequiredValidationType::SubChain | RequiredValidationType::Full => {
-                // First header has an empty validation package
-                if header.header_seq() == 0 {
-                    return Ok(Some(vec![]));
-                }
-                self.get_chain_validation_package_local(header, required_validation_type)
-            }
-            RequiredValidationType::Custom => {
-                self.get_custom_validation_package_local(header.as_hash())
-            }
-        }
-    }
-
-    fn get_custom_validation_package_local(
-        &self,
         hash: &HeaderHash,
     ) -> CascadeResult<Option<Vec<Element>>> {
         let cache_data = ok_or_return!(self.cache_data.as_ref(), None);
@@ -1775,6 +1752,8 @@ where
                     None => return Ok(None),
                 }
             }
+            elements.sort_unstable_by_key(|el| el.header().header_seq());
+            elements.reverse();
             if elements.is_empty() {
                 Ok(None)
             } else {
@@ -1783,72 +1762,12 @@ where
         })
     }
 
-    fn get_chain_validation_package_local(
-        &self,
-        header: &HeaderHashed,
-        required_validation_type: RequiredValidationType,
-    ) -> CascadeResult<Option<Vec<Element>>> {
-        let agent = header.author();
-        let header_seq = header.header_seq();
-        let cache_data = ok_or_return!(self.cache_data.as_ref(), None);
-        let env = ok_or_return!(self.env.as_ref(), None);
-        let activity_is_cached = match cache_data.meta.get_activity_status(agent)? {
-            // header_seq - 1 because we want a valid chain up to the header before
-            // the header that needs this validation package.
-            // This is a safe subtraction because header seq of 0 returns early above.
-            Some(ChainStatus::Valid(ChainHead {
-                header_seq: valid_seq,
-                ..
-            })) if valid_seq >= header_seq - 1 => true,
-            _ => false,
-        };
-
-        if !activity_is_cached {
-            return Ok(None);
-        }
-
-        let query = validation_package_query(
-            header.as_content().entry_type().cloned(),
-            0..header_seq,
-            required_validation_type,
-        );
-        let hashes = Self::get_agent_activity_from_cache(
-            agent.clone(),
-            &query.sequence_range,
-            cache_data,
-            env,
-        )?;
-        // Chain not complete
-        if hashes.len() != header_seq as usize {
-            return Ok(None);
-        }
-
-        // Get the elements
-        let mut elements = Vec::with_capacity(hashes.len());
-        for (_, hash) in hashes {
-            match self.get_element_local_raw(&hash)? {
-                Some(el) => {
-                    // Check the if we should include this element
-                    if !query.check(el.header()) {
-                        continue;
-                    }
-                    elements.push(el);
-                }
-                None => return Ok(None),
-            }
-        }
-        Ok(Some(elements))
-    }
-
     pub async fn get_validation_package(
         &mut self,
         agent: AgentPubKey,
         header: &HeaderHashed,
-        required_validation_type: RequiredValidationType,
     ) -> CascadeResult<Option<ValidationPackage>> {
-        if let Some(elements) =
-            self.get_validation_package_local(header, required_validation_type)?
-        {
+        if let Some(elements) = self.get_validation_package_local(header.as_hash())? {
             return Ok(Some(ValidationPackage::new(elements)));
         }
 
@@ -1859,44 +1778,31 @@ where
             .0
         {
             Some(validation_package) => {
-                for _element in &validation_package.0 {
+                for element in &validation_package.0 {
                     // TODO: I don't think it's sound to do this
                     // because we would be adding potentially rejected
                     // headers into our cache.
-                    // self.update_stores(element.clone())?;
+                    // TODO: For now we are only returning validation packages
+                    // of valid headers but when we add the ability to get and
+                    // cache invalid data we need to update this as well.
+                    self.update_stores(element.clone())?;
                 }
 
                 // Add metadata for custom package caching
-                if let RequiredValidationType::Custom = required_validation_type {
-                    let cache_data = ok_or_return!(self.cache_data.as_mut(), None);
-                    cache_data.meta.register_validation_package(
-                        header.as_hash(),
-                        validation_package
-                            .0
-                            .iter()
-                            .map(|el| el.header_address().clone()),
-                    );
-                }
+                let cache_data = ok_or_return!(self.cache_data.as_mut(), None);
+                cache_data.meta.register_validation_package(
+                    header.as_hash(),
+                    validation_package
+                        .0
+                        .iter()
+                        .map(|el| el.header_address().clone()),
+                );
 
                 Ok(Some(validation_package))
             }
             None => Ok(None),
         }
     }
-}
-
-fn validation_package_query(
-    entry_type: Option<EntryType>,
-    range: std::ops::Range<u32>,
-    required_validation_type: RequiredValidationType,
-) -> ChainQueryFilter {
-    let mut query = ChainQueryFilter::new().sequence_range(range);
-    if let (RequiredValidationType::SubChain, Some(entry_type)) =
-        (required_validation_type, entry_type)
-    {
-        query = query.entry_type(entry_type);
-    }
-    query
 }
 
 impl<'a, M: MetadataBufT> From<&'a DbPairMut<'a, M>> for DbPair<'a, M> {

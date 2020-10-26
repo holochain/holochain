@@ -4,11 +4,11 @@ use holochain_state::{env::EnvironmentRead, error::DatabaseResult, prelude::*};
 use holochain_types::{dna::DnaFile, HeaderHashed};
 
 use crate::core::{
-    ribosome::guest_callback::validation_package::ValidationPackageHostAccess,
-    ribosome::guest_callback::validation_package::ValidationPackageInvocation,
-    ribosome::guest_callback::validation_package::ValidationPackageResult,
-    ribosome::RibosomeT,
+    ribosome::{guest_callback::validation_package::ValidationPackageResult, RibosomeT},
     state::cascade::{Cascade, DbPair, DbPairMut},
+    workflow::app_validation_workflow::validation_package::{
+        get_as_author_custom, get_as_author_full, get_as_author_sub_chain,
+    },
 };
 
 use super::*;
@@ -87,23 +87,14 @@ pub(super) async fn get_as_author(
             // TODO: I'm not sure if we should handle this case, it seems like they should already have the element
             Ok(None.into())
         }
-        RequiredValidationType::SubChain => {
-            // Collect and return the sub chain
-            let elements = source_chain.query(
-                &ChainQueryFilter::default()
-                    .include_entries(true)
-                    .entry_type(EntryType::App(app_entry_type))
-                    .sequence_range(0..header_seq),
-            )?;
-            Ok(Some(ValidationPackage::new(elements)).into())
-        }
+        RequiredValidationType::SubChain => Ok(Some(get_as_author_sub_chain(
+            header_seq,
+            app_entry_type,
+            &source_chain,
+        )?)
+        .into()),
         RequiredValidationType::Full => {
-            let elements = source_chain.query(
-                &ChainQueryFilter::default()
-                    .include_entries(true)
-                    .sequence_range(0..header_seq),
-            )?;
-            Ok(Some(ValidationPackage::new(elements)).into())
+            Ok(Some(get_as_author_full(header_seq, &source_chain)?).into())
         }
         RequiredValidationType::Custom => {
             let element_authored = ElementBuf::authored(env.clone(), false)?;
@@ -115,34 +106,18 @@ pub(super) async fn get_as_author(
                 .with_authored(DbPair::new(&element_authored, &meta_authored));
 
             if let Some(elements) =
-                cascade.get_validation_package_local(&header_hashed, required_validation_type)?
+                cascade.get_validation_package_local(&header_hashed.as_hash())?
             {
                 return Ok(Some(ValidationPackage::new(elements)).into());
             }
 
             let workspace_lock = CallZomeWorkspaceLock::new(CallZomeWorkspace::new(env)?);
-            let access = ValidationPackageHostAccess::new(workspace_lock, network.clone());
-            let app_entry_type = match header.entry_type() {
-                Some(EntryType::App(a)) => a.clone(),
-                _ => return Ok(None.into()),
-            };
-
-            let zome_name = match ribosome
-                .dna_file()
-                .dna()
-                .zomes
-                .get(app_entry_type.zome_id().index())
-            {
-                Some(zome_name) => zome_name.0.clone(),
-                None => {
-                    warn!(msg = "Tried to get custom validation package for header with invalid zome_id", ?header);
-                    return Ok(None.into());
-                }
-            };
-
-            let invocation = ValidationPackageInvocation::new(zome_name, app_entry_type);
-
-            match ribosome.run_validation_package(access, invocation)? {
+            let result =
+                match get_as_author_custom(&header_hashed, ribosome, network, workspace_lock)? {
+                    Some(result) => result,
+                    None => return Ok(None.into()),
+                };
+            match result {
                 ValidationPackageResult::Success(validation_package) => {
                     // Cache the package for future calls
                     meta_cache.register_validation_package(
@@ -222,8 +197,6 @@ pub(super) async fn get_as_authority(
         .with_cache(DbPairMut::new(&mut element_cache, &mut meta_cache))
         .with_integrated(DbPair::new(&element_integrated, &meta_integrated));
 
-    let header_hashed = HeaderHashed::with_pre_hashed(header, header_hash);
-
     // Gather the package
     match required_validation_type {
         RequiredValidationType::Element => {
@@ -237,9 +210,7 @@ pub(super) async fn get_as_authority(
                 .sequence_range(0..header_seq);
 
             // Collect and return the sub chain
-            let elements = match cascade
-                .get_validation_package_local(&header_hashed, required_validation_type)?
-            {
+            let elements = match cascade.get_validation_package_local(&header_hash)? {
                 Some(elements) => elements,
                 None => return Ok(None.into()),
             };
@@ -257,9 +228,7 @@ pub(super) async fn get_as_authority(
                 .sequence_range(0..header_seq);
 
             // Collect and return the sub chain
-            let elements = match cascade
-                .get_validation_package_local(&header_hashed, required_validation_type)?
-            {
+            let elements = match cascade.get_validation_package_local(&header_hash)? {
                 Some(elements) => elements,
                 None => return Ok(None.into()),
             };
@@ -272,9 +241,7 @@ pub(super) async fn get_as_authority(
             Ok(Some(ValidationPackage::new(elements)).into())
         }
         RequiredValidationType::Custom => {
-            let elements = match cascade
-                .get_validation_package_local(&header_hashed, required_validation_type)?
-            {
+            let elements = match cascade.get_validation_package_local(&header_hash)? {
                 Some(elements) => elements,
                 None => return Ok(None.into()),
             };

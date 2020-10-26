@@ -1,7 +1,7 @@
 use std::convert::TryInto;
 
 use fallible_iterator::FallibleIterator;
-use hdk3::prelude::{Element, EntryType, RequiredValidationType, ValidationPackage};
+use hdk3::prelude::{Element, EntryType, ValidationPackage};
 use holo_hash::HeaderHash;
 use holochain_p2p::{actor::GetActivityOptions, HolochainP2pCellT};
 use holochain_state::env::EnvironmentRead;
@@ -88,12 +88,7 @@ async fn get_validation_package_test() {
 
     // Cascade
     let header_hashed = get_header(&header_hash);
-    let validation_package = check_cascade(
-        &header_hashed,
-        RequiredValidationType::Full,
-        &alice_call_data,
-    )
-    .await;
+    let validation_package = check_cascade(&header_hashed, &alice_call_data).await;
 
     assert_eq!(validation_package, expected_package.0);
 
@@ -112,12 +107,7 @@ async fn get_validation_package_test() {
 
     // Cascade
     let header_hashed = get_header(&header_hash);
-    let validation_package = check_cascade(
-        &header_hashed,
-        RequiredValidationType::Full,
-        &alice_call_data,
-    )
-    .await;
+    let validation_package = check_cascade(&header_hashed, &alice_call_data).await;
 
     assert_eq!(validation_package, expected_package.0);
 
@@ -145,12 +135,7 @@ async fn get_validation_package_test() {
 
     // Cascade
     let header_hashed = get_header(&header_hash_priv);
-    let validation_package = check_cascade(
-        &header_hashed,
-        RequiredValidationType::Full,
-        &alice_call_data,
-    )
-    .await;
+    let validation_package = check_cascade(&header_hashed, &alice_call_data).await;
 
     assert_eq!(validation_package, expected_package.0);
 
@@ -203,12 +188,7 @@ async fn get_validation_package_test() {
 
     // Cascade
     let header_hashed = get_header(&header_hash);
-    let validation_package = check_cascade(
-        &header_hashed,
-        RequiredValidationType::SubChain,
-        &alice_call_data,
-    )
-    .await;
+    let validation_package = check_cascade(&header_hashed, &alice_call_data).await;
 
     assert_eq!(validation_package, expected_package.0);
     ConductorTestData::shutdown_conductor(handle).await;
@@ -584,7 +564,7 @@ async fn get_custom_package_test() {
             .with_integrated(DbPair::new(&element_integrated, &meta_integrated));
 
         let result = cascade
-            .get_validation_package_local(&shh.header_hashed(), RequiredValidationType::Custom)
+            .get_validation_package_local(shh.header_address())
             .unwrap();
         assert_matches!(result, Some(_));
     }
@@ -614,7 +594,6 @@ async fn commit_some_data(
 // Cascade helper function for easily getting the validation package
 async fn check_cascade(
     header_hashed: &HeaderHashed,
-    required_validation_type: RequiredValidationType,
     call_data: &ConductorCallData,
 ) -> Option<ValidationPackage> {
     let mut element_cache = ElementBuf::cache(call_data.env.clone().into()).unwrap();
@@ -626,11 +605,7 @@ async fn check_cascade(
 
     // Cascade
     let validation_package = cascade
-        .get_validation_package(
-            call_data.cell_id.agent_pubkey().clone(),
-            header_hashed,
-            required_validation_type,
-        )
+        .get_validation_package(call_data.cell_id.agent_pubkey().clone(), header_hashed)
         .await
         .unwrap();
     validation_package
