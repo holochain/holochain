@@ -105,7 +105,7 @@ impl InterfaceApi for RealAppInterfaceApi {
 
 /// The set of messages that a conductor understands how to handle over an App interface
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-#[serde(rename = "snake-case", tag = "type", content = "data")]
+#[serde(rename_all = "snake_case", tag = "type", content = "data")]
 pub enum AppRequest {
     /// Get info about the App
     AppInfo {
@@ -125,7 +125,7 @@ pub enum AppRequest {
 
 /// Responses to requests received on an App interface
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-#[serde(rename = "snake-case", tag = "type", content = "data")]
+#[serde(rename_all = "snake_case", tag = "type", content = "data")]
 pub enum AppResponse {
     /// There has been an error in the request
     Error(ExternalApiWireError),
@@ -146,7 +146,7 @@ pub enum AppResponse {
 
 #[allow(missing_docs)]
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-#[serde(rename = "snake-case", tag = "type", content = "data")]
+#[serde(rename_all = "snake_case", tag = "type", content = "data")]
 pub enum CryptoRequest {
     Sign(String),
     Decrypt(String),
