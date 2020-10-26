@@ -29,7 +29,7 @@ mod tests {
         });
         // Spawn the kitsune p2p actor that will respond to listing bindings.
         let (p2p, _evt) = spawn_kitsune_p2p(config).await.unwrap();
-        // List the bindings and assert that we have one binding that is a  
+        // List the bindings and assert that we have one binding that is a
         // kitsune-proxy scheme with a kitsune-quic url.
         let bindings = p2p.list_transport_bindings().await?;
         tracing::warn!("BINDINGS: {:?}", bindings);
