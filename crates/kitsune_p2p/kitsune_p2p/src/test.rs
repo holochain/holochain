@@ -13,6 +13,9 @@ mod tests {
                 .finish(),
         );
 
+        // Create a p2p config with a local proxy that rejects proxying anyone else
+        // and binds to `kitsune-quic://0.0.0.0:0`.
+        // This allows the OS to assign a port.
         let mut config = KitsuneP2pConfig::default();
         config.transport_pool.push(TransportConfig::Proxy {
             sub_transport: Box::new(TransportConfig::Quic {
@@ -24,7 +27,10 @@ mod tests {
                 proxy_accept_config: Some(ProxyAcceptConfig::RejectAll),
             },
         });
+        // Spawn the kitsune p2p actor that will respond to listing bindings.
         let (p2p, _evt) = spawn_kitsune_p2p(config).await.unwrap();
+        // List the bindings and assert that we have one binding that is a  
+        // kitsune-proxy scheme with a kitsune-quic url.
         let bindings = p2p.list_transport_bindings().await?;
         tracing::warn!("BINDINGS: {:?}", bindings);
         assert_eq!(1, bindings.len());
