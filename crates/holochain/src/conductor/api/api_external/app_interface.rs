@@ -65,14 +65,16 @@ impl AppInterfaceApi for RealAppInterfaceApi {
                 self.conductor_handle.get_app_info(&app_id).await?,
             )),
             AppRequest::SignalSubscription(_subscription) => {
-                todo!("Signal pubsub not yet implemented")
+                unimplemented!("Signal pubsub currently unimplemented")
             }
             AppRequest::ZomeCallInvocation(request) => {
                 match self.conductor_handle.call_zome(*request).await? {
                     Ok(ZomeCallResponse::Ok(output)) => {
                         Ok(AppResponse::ZomeCallInvocation(Box::new(output)))
                     }
-                    Ok(ZomeCallResponse::Unauthorized) => Ok(AppResponse::ZomeCallUnauthorized),
+                    Ok(ZomeCallResponse::Unauthorized) => Ok(AppResponse::Error(
+                        ExternalApiWireError::ZomeCallUnauthorized("".into()),
+                    )),
                     Err(e) => Ok(AppResponse::Error(e.into())),
                 }
             }
@@ -138,10 +140,6 @@ pub enum AppResponse {
 
     /// The response to a SignalSubscription message
     SignalSubscriptionUpdated,
-
-    /// The zome call is unauthorized
-    // TODO: I think this should be folded into ExternalApiWireError -MD
-    ZomeCallUnauthorized,
 }
 
 #[allow(missing_docs)]
