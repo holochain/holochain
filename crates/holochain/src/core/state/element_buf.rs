@@ -160,6 +160,14 @@ where
         Ok(self.headers.get(header_address)?.map(Into::into))
     }
 
+    pub fn get_header_with_reader<'r, 'a: 'r, R: Readable>(
+        &'a self,
+        r: &'r R,
+        header_address: &HeaderHash,
+    ) -> DatabaseResult<Option<SignedHeaderHashed>> {
+        Ok(self.headers.inner().get(r, header_address)?.map(Into::into))
+    }
+
     /// Get the Entry out of Header if it exists.
     ///
     /// If the header contains no entry data, return None

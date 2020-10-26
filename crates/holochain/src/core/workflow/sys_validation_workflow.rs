@@ -34,7 +34,7 @@ use holochain_types::{
     dht_op::DhtOp, header::NewEntryHeaderRef, test_utils::which_agent, validate::ValidationStatus,
     Entry, Timestamp,
 };
-use holochain_zome_types::signature::Signature;
+use holochain_zome_types::{entry_def::EntryVisibility, signature::Signature};
 use holochain_zome_types::{
     header::{CreateLink, Delete, DeleteLink, EntryType, Update},
     Header,
@@ -409,7 +409,9 @@ async fn sys_validate_element_inner(
         return Err(ValidationOutcome::Counterfeit(signature.clone(), header.clone()).into());
     }
     store_element(header, workspace, network.clone()).await?;
-    if let Some(entry) = &entry {
+    if let Some((entry, EntryVisibility::Public)) =
+        &entry.and_then(|e| header.entry_type().map(|et| (e, et.visibility())))
+    {
         store_entry(
             (header)
                 .try_into()
@@ -709,7 +711,7 @@ pub struct SysValidationWorkspace {
 }
 
 impl<'a> SysValidationWorkspace {
-    pub fn cascade<Network: HolochainP2pCellT>(
+    pub fn cascade<Network: HolochainP2pCellT + Clone>(
         &'a mut self,
         network: Network,
     ) -> Cascade<'a, Network> {
@@ -781,7 +783,7 @@ impl SysValidationWorkspace {
         Ok(())
     }
 
-    pub fn network_only_cascade<Network: HolochainP2pCellT>(
+    pub fn network_only_cascade<Network: HolochainP2pCellT + Clone + Send + 'static>(
         &mut self,
         network: Network,
     ) -> Cascade<'_, Network> {
@@ -825,7 +827,7 @@ impl SysValidationWorkspace {
     }
 
     /// Get a cascade over all local databases and the network
-    pub fn full_cascade<Network: HolochainP2pCellT>(
+    pub fn full_cascade<Network: HolochainP2pCellT + Clone>(
         &mut self,
         network: Network,
     ) -> Cascade<'_, Network> {

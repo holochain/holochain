@@ -757,7 +757,7 @@ impl AppValidationWorkspace {
     }
 
     /// Get a cascade over all local databases and the network
-    fn full_cascade<Network: HolochainP2pCellT>(
+    fn full_cascade<Network: HolochainP2pCellT + Clone>(
         &mut self,
         network: Network,
     ) -> Cascade<'_, Network> {

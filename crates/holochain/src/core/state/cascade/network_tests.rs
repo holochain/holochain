@@ -643,9 +643,7 @@ async fn fake_authority<'env>(env: &EnvironmentWrite, hash: AnyDhtHash, call_dat
 
     // Write to the meta vault to fake being an authority
     let (shh, e) = element.clone().into_inner();
-    element_vault
-        .put(shh, option_entry_hashed(e).await)
-        .unwrap();
+    element_vault.put(shh, option_entry_hashed(e)).unwrap();
 
     // TODO: figure this out
     integrate_to_integrated(&element, &element_vault, &mut meta_vault)
@@ -666,7 +664,7 @@ async fn integrate_to_integrated<C: MetadataBufT<IntegratedPrefix>>(
     meta_store: &mut C,
 ) -> DhtOpConvertResult<()> {
     // Produce the light directly
-    for op in produce_op_lights_from_elements(vec![element]).await? {
+    for op in produce_op_lights_from_elements(vec![element])? {
         // we don't integrate element data, because it is already in our vault.
         integrate_single_metadata(op, element_store, meta_store)?
     }
