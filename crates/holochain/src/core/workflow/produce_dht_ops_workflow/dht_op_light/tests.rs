@@ -222,29 +222,29 @@ async fn test_all_ops() {
     observability::test_run().ok();
     let builder = ElementTest::new();
     let (element, expected) = builder.entry_create();
-    let result = produce_ops_from_element(&element).await.unwrap();
+    let result = produce_ops_from_element(&element).unwrap();
     assert_eq!(result, expected);
     let builder = ElementTest::new();
     let (element, expected) = builder.entry_update();
-    let result = produce_ops_from_element(&element).await.unwrap();
+    let result = produce_ops_from_element(&element).unwrap();
     assert_eq!(result, expected);
     let builder = ElementTest::new();
     let (element, expected) = builder.entry_delete();
-    let result = produce_ops_from_element(&element).await.unwrap();
+    let result = produce_ops_from_element(&element).unwrap();
     assert_eq!(result, expected);
     let builder = ElementTest::new();
     let (element, expected) = builder.link_add();
-    let result = produce_ops_from_element(&element).await.unwrap();
+    let result = produce_ops_from_element(&element).unwrap();
     assert_eq!(result, expected);
     let builder = ElementTest::new();
     let (element, expected) = builder.link_remove();
-    let result = produce_ops_from_element(&element).await.unwrap();
+    let result = produce_ops_from_element(&element).unwrap();
     assert_eq!(result, expected);
     let builder = ElementTest::new();
     let elements = builder.others();
     for (element, expected) in elements {
         debug!(?element);
-        let result = produce_ops_from_element(&element).await.unwrap();
+        let result = produce_ops_from_element(&element).unwrap();
         assert_eq!(result, expected);
     }
 }
@@ -288,7 +288,7 @@ async fn test_dht_basis() {
         );
 
         // Get the basis
-        let result = op.dht_basis().await;
+        let result = op.dht_basis();
 
         // Check the hash matches
         assert_eq!(expected_entry_hash, result);

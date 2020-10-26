@@ -49,13 +49,20 @@ impl From<&actor::GetLinksOptions> for GetLinksOptions {
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct GetActivityOptions {
     /// Include the activity headers in the response
-    pub include_activity: bool,
+    pub include_valid_activity: bool,
+    /// Include any rejected headers in the response.
+    pub include_rejected_activity: bool,
+    /// Include the full signed headers and hashes in the response
+    /// instead of just the hashes.
+    pub include_full_headers: bool,
 }
 
 impl From<&actor::GetActivityOptions> for GetActivityOptions {
     fn from(a: &actor::GetActivityOptions) -> Self {
         Self {
-            include_activity: a.include_activity,
+            include_valid_activity: a.include_valid_activity,
+            include_rejected_activity: a.include_rejected_activity,
+            include_full_headers: a.include_full_headers,
         }
     }
 }
