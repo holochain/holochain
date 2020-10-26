@@ -45,7 +45,7 @@ async fn produce_dht_ops_workflow_inner(
             let (op, hash) = DhtOpHashed::from_content_sync(op).into_inner();
             debug!(?hash, ?op);
             let value = AuthoredDhtOpsValue {
-                op: op.to_light().await,
+                op: op.to_light(),
                 receipt_count: 0,
                 last_publish_time: None,
             };
@@ -142,7 +142,7 @@ mod tests {
                 .get_element(source_chain.chain_head().unwrap())
                 .unwrap()
                 .unwrap();
-            produce_ops_from_element(&element).await.unwrap()
+            produce_ops_from_element(&element).unwrap()
         }
     }
 
@@ -169,7 +169,6 @@ mod tests {
                 let ops = produce_ops_from_element(
                     &source_chain.get_element(h.as_hash()).unwrap().unwrap(),
                 )
-                .await
                 .unwrap();
                 all_ops.push(ops);
             }

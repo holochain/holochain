@@ -5,17 +5,19 @@ use crate::core::state::{
 };
 use fallible_iterator::FallibleIterator;
 
-use holo_hash::{AgentPubKey, EntryHash};
-use holochain_state::{env::EnvironmentRead, env::EnvironmentWrite, fresh_reader};
+use holo_hash::{AgentPubKey, EntryHash, HeaderHash};
+use holochain_state::{
+    env::EnvironmentRead, env::EnvironmentWrite, fresh_reader, prelude::PrefixType,
+    prelude::Readable,
+};
 use holochain_types::{
-    chain::AgentActivityExt,
     element::{GetElementResponse, RawGetEntryResponse},
     header::WireUpdateRelationship,
     metadata::TimedHeaderHash,
 };
 use holochain_zome_types::{
-    element::SignedHeaderHashed, header::conversions::WrongHeaderError, query::AgentActivity,
-    query::ChainQueryFilter,
+    element::SignedHeaderHashed, header::conversions::WrongHeaderError, query::Activity,
+    query::AgentActivity, query::ChainQueryFilter, query::ChainStatus,
 };
 use std::{collections::BTreeSet, convert::TryInto};
 use tracing::*;
@@ -167,37 +169,84 @@ pub async fn handle_get_entry(
 pub fn handle_get_agent_activity(
     env: EnvironmentRead,
     agent: AgentPubKey,
-    query: ChainQueryFilter,
+    // TODO: Query filtering breaks caching.
+    // It's easier to just send back the full chain and then filter
+    // in the cascade but it would be nice to avoid sending the filtered
+    // out headers across the network.
+    _query: ChainQueryFilter,
     options: holochain_p2p::event::GetActivityOptions,
 ) -> CellResult<AgentActivity> {
+    // Databases
     let element_integrated = ElementBuf::vault(env.clone(), false)?;
     let meta_integrated = MetadataBuf::vault(env.clone())?;
+    let element_rejected = ElementBuf::rejected(env.clone())?;
+    let meta_rejected = MetadataBuf::rejected(env.clone())?;
 
-    if options.include_activity {
+    // Status
+    let status = meta_integrated
+        .get_activity_status(&agent)?
+        .unwrap_or(ChainStatus::Empty);
+    let highest_observed = meta_integrated.get_activity_observed(&agent)?;
+
+    // TODO: If full headers aren't requested then query doesn't work
+
+    // Valid headers
+    let valid_activity = if options.include_valid_activity {
         fresh_reader!(env, |r| {
-            let activity: Vec<_> = meta_integrated
-                .get_activity(&r, ChainItemKey::Agent(agent.clone()))?
-                .filter_map(|h| element_integrated.get_header(&h.header_hash))
-                .filter(|shh| Ok(query.check(shh.header())))
+            let hashes = meta_integrated
+                .get_activity_sequence(&r, ChainItemKey::Agent(agent.clone()))?
                 .collect()?;
-            // TODO: Return the chain status and check rejected
-            Ok(AgentActivity::valid(activity))
-        })
-    } else {
-        fresh_reader!(env, |r| {
-            match meta_integrated
-                .get_activity(&r, ChainItemKey::Agent(agent))?
-                .last()?
-            {
-                Some(h) => {
-                    // TODO: Just get the sequence number from the key (Doable in the next PR)
-                    match element_integrated.get_header(&h.header_hash)? {
-                        Some(shh) => Ok(AgentActivity::valid_without_activity(shh.header())),
-                        None => Ok(AgentActivity::empty()),
-                    }
-                }
-                None => Ok(AgentActivity::empty()),
+            if options.include_full_headers {
+                CellResult::Ok(Activity::Full(get_full_headers(
+                    hashes,
+                    element_integrated,
+                    &r,
+                )?))
+            } else {
+                Ok(Activity::Hashes(hashes))
             }
-        })
-    }
+        })?
+    } else {
+        Activity::NotRequested
+    };
+
+    // Rejected hashes
+    let rejected_activity = if options.include_rejected_activity {
+        fresh_reader!(env, |r| {
+            let hashes = meta_rejected
+                .get_activity_sequence(&r, ChainItemKey::Agent(agent.clone()))?
+                .collect()?;
+            if options.include_full_headers {
+                CellResult::Ok(Activity::Full(get_full_headers(
+                    hashes,
+                    element_rejected,
+                    &r,
+                )?))
+            } else {
+                Ok(Activity::Hashes(hashes))
+            }
+        })?
+    } else {
+        Activity::NotRequested
+    };
+
+    Ok(AgentActivity {
+        valid_activity,
+        rejected_activity,
+        agent,
+        status,
+        highest_observed,
+    })
+}
+
+fn get_full_headers<P: PrefixType, R: Readable>(
+    hashes: Vec<(u32, HeaderHash)>,
+    database: ElementBuf<P>,
+    reader: &R,
+) -> CellResult<Vec<SignedHeaderHashed>> {
+    let headers: Vec<_> = fallible_iterator::convert(hashes.into_iter().map(Ok))
+        .filter_map(|h| database.get_header_with_reader(reader, &h.1))
+        // .filter(|shh| Ok(query.check(shh.header())))
+        .collect()?;
+    Ok(headers)
 }

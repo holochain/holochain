@@ -221,6 +221,7 @@ mod tests {
                 .finish(),
         );
 
+        // create stacked Pool<Mem> #1
         let (c1, p1, e1) = spawn_transport_pool().await?;
         let (sub1, sube1) = spawn_bind_transport_mem().await?;
         let suburl1 = sub1.bound_url().await?;
@@ -228,6 +229,7 @@ mod tests {
         c1.push_sub_transport(sub1, sube1).await?;
         test_receiver(e1);
 
+        // create stacked Pool<Mem> #2
         let (c2, p2, e2) = spawn_transport_pool().await?;
         let (sub2, sube2) = spawn_bind_transport_mem().await?;
         let suburl2 = sub2.bound_url().await?;
@@ -240,12 +242,14 @@ mod tests {
         let url2 = p2.bound_url().await?;
         tracing::warn!(?url2);
 
+        // send a request to #2 through #1 - get the response
         let res = p1.request(suburl2.clone(), b"test1".to_vec()).await?;
         assert_eq!(
             &format!("echo({}): test1", suburl1),
             &String::from_utf8_lossy(&res),
         );
 
+        // send a request to #1 through #2 - get the response
         let res = p2.request(suburl1.clone(), b"test2".to_vec()).await?;
         assert_eq!(
             &format!("echo({}): test2", suburl2),
