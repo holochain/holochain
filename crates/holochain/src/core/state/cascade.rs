@@ -1737,6 +1737,7 @@ where
             .collect::<Option<Vec<_>>>())
     }
 
+    /// Get the validation package if it is cached without going to the network
     pub fn get_validation_package_local(
         &self,
         hash: &HeaderHash,
