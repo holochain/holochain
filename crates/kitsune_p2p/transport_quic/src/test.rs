@@ -21,12 +21,16 @@ mod tests {
             .unwrap();
 
         tokio::task::spawn(async move {
-            while let Some((url, mut write, read)) = events2.next().await {
-                println!("events2 incoming connection: {}", url,);
-                let data = read.read_to_end().await;
-                println!("message from {} : {}", url, String::from_utf8_lossy(&data),);
-                let data = format!("echo: {}", String::from_utf8_lossy(&data)).into_bytes();
-                write.write_and_close(data).await?;
+            while let Some(evt) = events2.next().await {
+                match evt {
+                    TransportEvent::IncomingChannel(url, mut write, read) => {
+                        println!("events2 incoming connection: {}", url,);
+                        let data = read.read_to_end().await;
+                        println!("message from {} : {}", url, String::from_utf8_lossy(&data),);
+                        let data = format!("echo: {}", String::from_utf8_lossy(&data)).into_bytes();
+                        write.write_and_close(data).await?;
+                    }
+                }
             }
             TransportResult::Ok(())
         });

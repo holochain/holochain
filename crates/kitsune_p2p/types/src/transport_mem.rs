@@ -12,7 +12,7 @@ use tokio::sync::Mutex;
 
 const SCHEME: &str = "kitsune-mem";
 
-static CORE: Lazy<Arc<Mutex<HashMap<url2::Url2, TransportIncomingChannelSender>>>> =
+static CORE: Lazy<Arc<Mutex<HashMap<url2::Url2, TransportEventSender>>>> =
     Lazy::new(|| Arc::new(Mutex::new(HashMap::new())));
 
 async fn list_cores() -> TransportResult<Vec<url2::Url2>> {
@@ -20,14 +20,14 @@ async fn list_cores() -> TransportResult<Vec<url2::Url2>> {
     Ok(lock.keys().cloned().collect())
 }
 
-async fn get_core(url: url2::Url2) -> TransportResult<TransportIncomingChannelSender> {
+async fn get_core(url: url2::Url2) -> TransportResult<TransportEventSender> {
     let lock = CORE.lock().await;
     lock.get(&url)
         .ok_or_else(|| format!("bad core: {}", url).into())
         .map(|v| v.clone())
 }
 
-async fn put_core(url: url2::Url2, send: TransportIncomingChannelSender) -> TransportResult<()> {
+async fn put_core(url: url2::Url2, send: TransportEventSender) -> TransportResult<()> {
     let mut lock = CORE.lock().await;
     match lock.entry(url.clone()) {
         Entry::Vacant(e) => {
@@ -48,7 +48,7 @@ fn drop_core(url: url2::Url2) {
 /// Spawn / bind the listening side of a mem-only transport - largely for testing
 pub async fn spawn_bind_transport_mem() -> TransportResult<(
     ghost_actor::GhostSender<TransportListener>,
-    TransportIncomingChannelReceiver,
+    TransportEventReceiver,
 )> {
     let url = url2::url2!("{}://{}", SCHEME, nanoid::nanoid!());
 
@@ -124,7 +124,9 @@ impl TransportListenerHandler for InnerListen {
             // before we've returned our halves here.
             tokio::task::spawn(async move {
                 // it's ok if this errors... the channels will close.
-                let _ = evt_send.send((this_url, send1, recv1)).await;
+                let _ = evt_send
+                    .send(TransportEvent::IncomingChannel(this_url, send1, recv1))
+                    .await;
             });
             Ok((url, send2, recv2))
         }
@@ -138,12 +140,16 @@ mod tests {
     use super::*;
     use futures::stream::StreamExt;
 
-    fn test_receiver(mut recv: TransportIncomingChannelReceiver) {
+    fn test_receiver(mut recv: TransportEventReceiver) {
         tokio::task::spawn(async move {
-            while let Some((url, mut write, read)) = recv.next().await {
-                let data = read.read_to_end().await;
-                let data = format!("echo({}): {}", url, String::from_utf8_lossy(&data),);
-                write.write_and_close(data.into_bytes()).await?;
+            while let Some(evt) = recv.next().await {
+                match evt {
+                    TransportEvent::IncomingChannel(url, mut write, read) => {
+                        let data = read.read_to_end().await;
+                        let data = format!("echo({}): {}", url, String::from_utf8_lossy(&data),);
+                        write.write_and_close(data.into_bytes()).await?;
+                    }
+                }
             }
             TransportResult::Ok(())
         });

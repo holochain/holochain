@@ -2,13 +2,14 @@ use crate::actor::HolochainP2pRefToCell;
 use crate::HolochainP2pCell;
 use ::fixt::prelude::*;
 use holo_hash::fixt::{AgentPubKeyFixturator, DnaHashFixturator};
+use kitsune_p2p::KitsuneP2pConfig;
 
 fixturator!(
     HolochainP2pCell;
     curve Empty {
         // TODO: Make this empty
         tokio_safe_block_on::tokio_safe_block_forever_on(async {
-            let (holochain_p2p, _p2p_evt) = crate::spawn_holochain_p2p().await.unwrap();
+            let (holochain_p2p, _p2p_evt) = crate::spawn_holochain_p2p(KitsuneP2pConfig::default()).await.unwrap();
             holochain_p2p.to_cell(
                 DnaHashFixturator::new(Empty).next().unwrap(),
                 AgentPubKeyFixturator::new(Empty).next().unwrap(),
@@ -18,7 +19,7 @@ fixturator!(
     curve Unpredictable {
         // TODO: Make this unpredictable
         tokio_safe_block_on::tokio_safe_block_forever_on(async {
-            let (holochain_p2p, _p2p_evt) = crate::spawn_holochain_p2p().await.unwrap();
+            let (holochain_p2p, _p2p_evt) = crate::spawn_holochain_p2p(KitsuneP2pConfig::default()).await.unwrap();
             holochain_p2p.to_cell(
                 DnaHashFixturator::new(Unpredictable).next().unwrap(),
                 AgentPubKeyFixturator::new(Unpredictable).next().unwrap(),
@@ -27,7 +28,7 @@ fixturator!(
     };
     curve Predictable {
         tokio_safe_block_on::tokio_safe_block_forever_on(async {
-            let (holochain_p2p, _p2p_evt) = crate::spawn_holochain_p2p().await.unwrap();
+            let (holochain_p2p, _p2p_evt) = crate::spawn_holochain_p2p(KitsuneP2pConfig::default()).await.unwrap();
             holochain_p2p.to_cell(
                 DnaHashFixturator::new(Predictable).next().unwrap(),
                 AgentPubKeyFixturator::new(Predictable).next().unwrap(),
@@ -43,6 +44,7 @@ mod tests {
     use ghost_actor::GhostControlSender;
     use holochain_types::element::{Element, SignedHeaderHashed, WireElement};
     use holochain_types::{fixt::*, HeaderHashed};
+    use kitsune_p2p::KitsuneP2pConfig;
 
     macro_rules! newhash {
         ($p:ident, $c:expr) => {
@@ -68,7 +70,9 @@ mod tests {
     async fn test_call_remote_workflow() {
         let (dna, a1, a2, _) = test_setup();
 
-        let (p2p, mut evt) = spawn_holochain_p2p().await.unwrap();
+        let (p2p, mut evt) = spawn_holochain_p2p(KitsuneP2pConfig::default())
+            .await
+            .unwrap();
 
         let r_task = tokio::task::spawn(async move {
             use tokio::stream::StreamExt;
@@ -114,7 +118,9 @@ mod tests {
     async fn test_send_validation_receipt_workflow() {
         let (dna, a1, a2, _) = test_setup();
 
-        let (p2p, mut evt) = spawn_holochain_p2p().await.unwrap();
+        let (p2p, mut evt) = spawn_holochain_p2p(KitsuneP2pConfig::default())
+            .await
+            .unwrap();
 
         let r_task = tokio::task::spawn(async move {
             use tokio::stream::StreamExt;
@@ -158,7 +164,9 @@ mod tests {
     async fn test_publish_workflow() {
         let (dna, a1, a2, a3) = test_setup();
 
-        let (p2p, mut evt) = spawn_holochain_p2p().await.unwrap();
+        let (p2p, mut evt) = spawn_holochain_p2p(KitsuneP2pConfig::default())
+            .await
+            .unwrap();
 
         let recv_count = Arc::new(std::sync::atomic::AtomicU8::new(0));
 
@@ -200,7 +208,9 @@ mod tests {
     async fn test_get_workflow() {
         let (dna, a1, a2, a3) = test_setup();
 
-        let (p2p, mut evt) = spawn_holochain_p2p().await.unwrap();
+        let (p2p, mut evt) = spawn_holochain_p2p(KitsuneP2pConfig::default())
+            .await
+            .unwrap();
 
         let test_1 = GetElementResponse::GetHeader(Some(Box::new(WireElement::from_element(
             Element::new(
@@ -272,7 +282,9 @@ mod tests {
     async fn test_get_links_workflow() {
         let (dna, a1, a2, _) = test_setup();
 
-        let (p2p, mut evt) = spawn_holochain_p2p().await.unwrap();
+        let (p2p, mut evt) = spawn_holochain_p2p(KitsuneP2pConfig::default())
+            .await
+            .unwrap();
 
         let test_1 = GetLinksResponse {
             link_adds: vec![(fixt!(CreateLink), fixt!(Signature))],

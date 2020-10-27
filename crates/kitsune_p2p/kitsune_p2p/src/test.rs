@@ -1,13 +1,47 @@
 #[cfg(test)]
 mod tests {
-    use crate::{
-        event::*,
-        spawn::*,
-        types::{actor::KitsuneP2pSender, *},
-    };
+    use crate::{event::*, types::actor::KitsuneP2pSender, *};
     use futures::future::FutureExt;
-    use ghost_actor::GhostControlSender;
+    use ghost_actor::{dependencies::tracing, GhostControlSender};
     use std::sync::Arc;
+
+    #[tokio::test(threaded_scheduler)]
+    async fn test_transport_binding() -> Result<(), KitsuneP2pError> {
+        let _ = ghost_actor::dependencies::tracing::subscriber::set_global_default(
+            tracing_subscriber::FmtSubscriber::builder()
+                .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+                .finish(),
+        );
+
+        // Create a p2p config with a local proxy that rejects proxying anyone else
+        // and binds to `kitsune-quic://0.0.0.0:0`.
+        // This allows the OS to assign a port.
+        let mut config = KitsuneP2pConfig::default();
+        config.transport_pool.push(TransportConfig::Proxy {
+            sub_transport: Box::new(TransportConfig::Quic {
+                bind_to: Some(url2::url2!("kitsune-quic://0.0.0.0:0")),
+                override_host: None,
+                override_port: None,
+            }),
+            proxy_config: ProxyConfig::LocalProxyServer {
+                proxy_accept_config: Some(ProxyAcceptConfig::RejectAll),
+            },
+        });
+        // Spawn the kitsune p2p actor that will respond to listing bindings.
+        let (p2p, _evt) = spawn_kitsune_p2p(config).await.unwrap();
+        // List the bindings and assert that we have one binding that is a
+        // kitsune-proxy scheme with a kitsune-quic url.
+        let bindings = p2p.list_transport_bindings().await?;
+        tracing::warn!("BINDINGS: {:?}", bindings);
+        assert_eq!(1, bindings.len());
+        let binding = &bindings[0];
+        assert_eq!("kitsune-proxy", binding.scheme());
+        assert_eq!(
+            "kitsune-quic",
+            binding.path_segments().unwrap().next().unwrap()
+        );
+        Ok(())
+    }
 
     #[tokio::test(threaded_scheduler)]
     async fn test_request_workflow() {
@@ -18,7 +52,9 @@ mod tests {
         let a2: Arc<KitsuneAgent> =
             Arc::new(b"222222222222222222222222222222222222".to_vec().into());
 
-        let (p2p, mut evt) = spawn_kitsune_p2p().await.unwrap();
+        let (p2p, mut evt) = spawn_kitsune_p2p(KitsuneP2pConfig::default())
+            .await
+            .unwrap();
 
         let space1_clone = space1.clone();
         let a2_clone = a2.clone();
@@ -76,7 +112,9 @@ mod tests {
         let a3: Arc<KitsuneAgent> =
             Arc::new(b"333333333333333333333333333333333333".to_vec().into());
 
-        let (p2p, mut evt) = spawn_kitsune_p2p().await.unwrap();
+        let (p2p, mut evt) = spawn_kitsune_p2p(KitsuneP2pConfig::default())
+            .await
+            .unwrap();
 
         let recv_count = Arc::new(std::sync::atomic::AtomicU8::new(0));
 
@@ -142,7 +180,9 @@ mod tests {
         let a3: Arc<KitsuneAgent> =
             Arc::new(b"333333333333333333333333333333333333".to_vec().into());
 
-        let (p2p, mut evt) = spawn_kitsune_p2p().await.unwrap();
+        let (p2p, mut evt) = spawn_kitsune_p2p(KitsuneP2pConfig::default())
+            .await
+            .unwrap();
 
         let space1_clone = space1.clone();
         let r_task = tokio::task::spawn(async move {
@@ -207,7 +247,9 @@ mod tests {
         let a1: Arc<KitsuneAgent> =
             Arc::new(b"111111111111111111111111111111111111".to_vec().into());
 
-        let (p2p, mut evt) = spawn_kitsune_p2p().await.unwrap();
+        let (p2p, mut evt) = spawn_kitsune_p2p(KitsuneP2pConfig::default())
+            .await
+            .unwrap();
 
         let space1_clone = space1.clone();
         let r_task = tokio::task::spawn(async move {
@@ -277,7 +319,9 @@ mod tests {
         let oh2: Arc<KitsuneOpHash> =
             Arc::new(b"hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh".to_vec().into());
 
-        let (p2p, mut evt) = spawn_kitsune_p2p().await.unwrap();
+        let (p2p, mut evt) = spawn_kitsune_p2p(KitsuneP2pConfig::default())
+            .await
+            .unwrap();
 
         let result = Arc::new(std::sync::RwLock::new((false, false)));
 
