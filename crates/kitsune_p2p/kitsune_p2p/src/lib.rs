@@ -4,9 +4,13 @@
 mod types;
 pub use types::*;
 
+mod config;
+pub use config::*;
+
 mod spawn;
 pub use spawn::*;
 
+#[cfg(test)]
 mod test;
 
 pub mod fixt;

@@ -12,10 +12,10 @@ const PROXY_KEEPALIVE_MS: u64 = 10000;
 pub async fn spawn_kitsune_proxy_listener(
     proxy_config: Arc<ProxyConfig>,
     sub_sender: ghost_actor::GhostSender<TransportListener>,
-    mut sub_receiver: TransportIncomingChannelReceiver,
+    mut sub_receiver: TransportEventReceiver,
 ) -> TransportResult<(
     ghost_actor::GhostSender<TransportListener>,
-    TransportIncomingChannelReceiver,
+    TransportEventReceiver,
 )> {
     // sort out our proxy config
     let (tls, accept_proxy_cb, proxy_url): (TlsConfig, AcceptProxyCallback, Option<ProxyUrl>) =
@@ -84,12 +84,16 @@ pub async fn spawn_kitsune_proxy_listener(
 
     // handle incoming channels from our sub transport
     tokio::task::spawn(async move {
-        while let Some((url, write, read)) = sub_receiver.next().await {
-            // spawn so we can process incoming requests in parallel
-            let i_s = i_s.clone();
-            tokio::task::spawn(async move {
-                let _ = i_s.incoming_channel(url, write, read).await;
-            });
+        while let Some(evt) = sub_receiver.next().await {
+            match evt {
+                TransportEvent::IncomingChannel(url, write, read) => {
+                    // spawn so we can process incoming requests in parallel
+                    let i_s = i_s.clone();
+                    tokio::task::spawn(async move {
+                        let _ = i_s.incoming_channel(url, write, read).await;
+                    });
+                }
+            }
         }
 
         // Our incoming channels ended,
@@ -117,7 +121,7 @@ struct InnerListen {
     this_url: ProxyUrl,
     accept_proxy_cb: AcceptProxyCallback,
     sub_sender: ghost_actor::GhostSender<TransportListener>,
-    evt_send: TransportIncomingChannelSender,
+    evt_send: TransportEventSender,
     tls: TlsConfig,
     tls_server_config: Arc<rustls::ServerConfig>,
     tls_client_config: Arc<rustls::ClientConfig>,
@@ -131,7 +135,7 @@ impl InnerListen {
         tls: TlsConfig,
         accept_proxy_cb: AcceptProxyCallback,
         sub_sender: ghost_actor::GhostSender<TransportListener>,
-        evt_send: TransportIncomingChannelSender,
+        evt_send: TransportEventSender,
     ) -> TransportResult<Self> {
         tracing::info!(
             "{}: starting up with this_url: {}",

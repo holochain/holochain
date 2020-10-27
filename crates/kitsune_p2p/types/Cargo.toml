@@ -21,3 +21,6 @@ serde_json = { version = "1", features = [ "preserve_order" ] }
 thiserror = "1.0.18"
 tokio = { version = "0.2", features = [ "full" ] }
 url2 = "0.0.6"
+
+[dev-dependencies]
+tracing-subscriber = "0.2"

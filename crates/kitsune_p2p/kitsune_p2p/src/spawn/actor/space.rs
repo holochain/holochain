@@ -39,6 +39,7 @@ ghost_actor::ghost_chan! {
 
 pub(crate) async fn spawn_space(
     space: Arc<KitsuneSpace>,
+    transport: ghost_actor::GhostSender<TransportListener>,
 ) -> KitsuneP2pResult<(
     ghost_actor::GhostSender<KitsuneP2p>,
     KitsuneP2pEventReceiver,
@@ -64,7 +65,7 @@ pub(crate) async fn spawn_space(
         .create_channel::<KitsuneP2p>()
         .await?;
 
-    tokio::task::spawn(builder.spawn(Space::new(space, internal_sender, evt_send)));
+    tokio::task::spawn(builder.spawn(Space::new(space, internal_sender, evt_send, transport)));
 
     Ok((sender, evt_recv))
 }
@@ -137,7 +138,6 @@ impl gossip::GossipEventHandler for Space {
             })
             .collect::<Vec<_>>();
         Ok(async move {
-            use futures::stream::StreamExt;
             futures::stream::iter(all)
                 .for_each_concurrent(10, |res| async move {
                     if let Err(e) = res.await {
@@ -222,6 +222,10 @@ impl ghost_actor::GhostControlHandler for Space {}
 impl ghost_actor::GhostHandler<KitsuneP2p> for Space {}
 
 impl KitsuneP2pHandler for Space {
+    fn handle_list_transport_bindings(&mut self) -> KitsuneP2pHandlerResult<Vec<url2::Url2>> {
+        unreachable!("These requests are handled at the to actor level and are never propagated down to the space.")
+    }
+
     fn handle_join(
         &mut self,
         _space: Arc<KitsuneSpace>,
@@ -379,6 +383,8 @@ pub(crate) struct Space {
     space: Arc<KitsuneSpace>,
     internal_sender: ghost_actor::GhostSender<SpaceInternal>,
     evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
+    #[allow(dead_code)]
+    transport: ghost_actor::GhostSender<TransportListener>,
     agents: HashMap<Arc<KitsuneAgent>, AgentInfo>,
 }
 
@@ -388,11 +394,13 @@ impl Space {
         space: Arc<KitsuneSpace>,
         internal_sender: ghost_actor::GhostSender<SpaceInternal>,
         evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
+        transport: ghost_actor::GhostSender<TransportListener>,
     ) -> Self {
         Self {
             space,
             internal_sender,
             evt_sender,
+            transport,
             agents: HashMap::new(),
         }
     }
