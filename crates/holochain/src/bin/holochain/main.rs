@@ -30,7 +30,7 @@ struct Opt {
     #[structopt(
         short = "c",
         long,
-        help = "Path to a TOML file containing conductor configuration"
+        help = "Path to a YAML file containing conductor configuration"
     )]
     config_path: Option<PathBuf>,
 
@@ -177,7 +177,7 @@ Error: The conductor is set up to load its configuration from the default path:
     {path}
 
 but this file doesn't exist. If you meant to specify a path, run this command
-again with the -c option. Otherwise, please either create a TOML config file at
+again with the -c option. Otherwise, please either create a YAML config file at
 this path yourself, or rerun the command with the '-i' flag, which will help you
 automatically create a default config file.
         ",
@@ -190,7 +190,7 @@ Error: You asked to load configuration from the path:
 
     {path}
 
-but this file doesn't exist. Please either create a TOML config file at this
+but this file doesn't exist. Please either create a YAML config file at this
 path yourself, or rerun the command with the '-i' flag, which will help you
 automatically create a default config file.
         ",

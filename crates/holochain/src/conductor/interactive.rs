@@ -66,7 +66,7 @@ pub fn load_config_or_prompt_for_default(
     ConductorConfig::load_yaml(config_path.as_ref()).map(Some).or_else(|err| {
         if let ConductorError::ConfigMissing(_) = err {
             let prompt = format!(
-                "There is no conductor config TOML file at the path specified ({})\nWould you like to create a default config file at this location?",
+                "There is no conductor config YAML file at the path specified ({})\nWould you like to create a default config file at this location?",
                 config_path
             );
             if ask_yn(prompt, Some(true))? {
