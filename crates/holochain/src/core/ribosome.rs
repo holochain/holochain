@@ -149,6 +149,7 @@ impl HostAccess {
             Self::ZomeCall(ZomeCallHostAccess { network, .. })
             | Self::Init(InitHostAccess { network, .. })
             | Self::PostCommit(PostCommitHostAccess { network, .. })
+            | Self::ValidationPackage(ValidationPackageHostAccess { network, .. })
             | Self::Validate(ValidateHostAccess { network, .. })
             | Self::ValidateCreateLink(ValidateLinkHostAccess { network, .. }) => network,
             _ => panic!(
@@ -322,22 +323,22 @@ fixturator!(
         provenance: AgentPubKeyFixturator::new(Unpredictable).next().unwrap(),
     };
     curve Predictable ZomeCallInvocation {
-        cell_id: CellIdFixturator::new_indexed(Predictable, self.0.index)
+        cell_id: CellIdFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
-        zome_name: ZomeNameFixturator::new_indexed(Predictable, self.0.index)
+        zome_name: ZomeNameFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
-        cap: Some(CapSecretFixturator::new_indexed(Predictable, self.0.index)
+        cap: Some(CapSecretFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap()),
-        fn_name: FunctionNameFixturator::new_indexed(Predictable, self.0.index)
+        fn_name: FunctionNameFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
-        payload: ExternInputFixturator::new_indexed(Predictable, self.0.index)
+        payload: ExternInputFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
-        provenance: AgentPubKeyFixturator::new_indexed(Predictable, self.0.index)
+        provenance: AgentPubKeyFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
     };
