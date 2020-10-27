@@ -280,7 +280,10 @@ pub mod wasm_test {
     }
 
     #[tokio::test(threaded_scheduler)]
-    #[ignore] // david.b (this test is flakey)
+    #[ignore = "david.b (this test is flaky)"]
+    // maackle: this consistently passes for me with n = 37
+    //          but starts to randomly lock up at n = 38,
+    //          and fails consistently for higher values
     async fn multiple_create_entry_limit_test() {
         observability::test_run().unwrap();
         let dna_file = DnaFile::new(
