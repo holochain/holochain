@@ -1,32 +1,18 @@
 #[cfg(test)]
 mod tests {
-    use crate::{event::*, types::actor::KitsuneP2pSender, *};
+    use crate::{event::*, test_util::*, types::actor::KitsuneP2pSender, *};
     use futures::future::FutureExt;
     use ghost_actor::{dependencies::tracing, GhostControlSender};
     use std::sync::Arc;
 
     #[tokio::test(threaded_scheduler)]
     async fn test_transport_binding() -> Result<(), KitsuneP2pError> {
-        let _ = ghost_actor::dependencies::tracing::subscriber::set_global_default(
-            tracing_subscriber::FmtSubscriber::builder()
-                .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-                .finish(),
-        );
+        init_tracing();
 
         // Create a p2p config with a local proxy that rejects proxying anyone else
         // and binds to `kitsune-quic://0.0.0.0:0`.
         // This allows the OS to assign a port.
-        let mut config = KitsuneP2pConfig::default();
-        config.transport_pool.push(TransportConfig::Proxy {
-            sub_transport: Box::new(TransportConfig::Quic {
-                bind_to: Some(url2::url2!("kitsune-quic://0.0.0.0:0")),
-                override_host: None,
-                override_port: None,
-            }),
-            proxy_config: ProxyConfig::LocalProxyServer {
-                proxy_accept_config: Some(ProxyAcceptConfig::RejectAll),
-            },
-        });
+        let config = test_proxy_config_quic();
         // Spawn the kitsune p2p actor that will respond to listing bindings.
         let (p2p, _evt) = spawn_kitsune_p2p(config).await.unwrap();
         // List the bindings and assert that we have one binding that is a
