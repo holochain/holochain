@@ -1613,10 +1613,8 @@ version = "0.0.1"
 dependencies = [
  "assert_matches",
  "derive_more",
- "fixt",
  "futures",
  "ghost_actor",
- "holo_hash",
  "kitsune_p2p_proxy",
  "kitsune_p2p_transport_quic",
  "kitsune_p2p_types",
