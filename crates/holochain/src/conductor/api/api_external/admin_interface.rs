@@ -403,7 +403,7 @@ pub enum AdminResponse {
     ///
     /// [`AdminRequest::GenerateAgentPubKey`]: enum.AdminRequest.html#variant.GenerateAgentPubKey
     AgentPubKeyGenerated(AgentPubKey),
-    /// The succesful response to an [`AdminRequest::ListDnas`].
+    /// The successful response to an [`AdminRequest::ListDnas`].
     ///
     /// Contains a list of the hashes of all installed `Dna`s
     ///
