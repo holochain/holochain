@@ -8,7 +8,7 @@ const ORGANIZATION: &str = "holochain";
 const APPLICATION: &str = "holochain";
 const KEYS_DIRECTORY: &str = "keys";
 const DATABASES_DIRECTORY: &str = "databases";
-const CONFIG_FILENAME: &str = "conductor-config.toml";
+const CONFIG_FILENAME: &str = "conductor-config.yml";
 
 /// Returns the project root builder for holochain directories.
 fn project_root() -> Option<directories::ProjectDirs> {

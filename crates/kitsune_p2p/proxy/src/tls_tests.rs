@@ -27,18 +27,21 @@ async fn tls_server_and_client_inner() -> TransportResult<()> {
     let (tls_srv_conf, _tls_cli_conf) = gen_tls_configs(&tls_config_1)?;
     let (_tls_srv_conf, tls_cli_conf) = gen_tls_configs(&tls_config_2)?;
 
-    let (in_con_send, mut in_con_recv) =
-        futures::channel::mpsc::channel::<TransportIncomingChannel>(10);
+    let (in_con_send, mut in_con_recv) = futures::channel::mpsc::channel::<TransportEvent>(10);
 
     tokio::task::spawn(async move {
-        while let Some((_url, mut send, recv)) = in_con_recv.next().await {
-            tracing::warn!("incoming channel - reading...");
-            let data = recv.read_to_end().await;
-            let data = String::from_utf8_lossy(&data);
-            let data = format!("echo: {}", data);
-            tracing::warn!("incoming channel - responding...");
-            send.write_and_close(data.into_bytes()).await?;
-            tracing::warn!("incoming channel - responding complete.");
+        while let Some(evt) = in_con_recv.next().await {
+            match evt {
+                TransportEvent::IncomingChannel(_url, mut send, recv) => {
+                    tracing::warn!("incoming channel - reading...");
+                    let data = recv.read_to_end().await;
+                    let data = String::from_utf8_lossy(&data);
+                    let data = format!("echo: {}", data);
+                    tracing::warn!("incoming channel - responding...");
+                    send.write_and_close(data.into_bytes()).await?;
+                    tracing::warn!("incoming channel - responding complete.");
+                }
+            }
         }
         TransportResult::Ok(())
     });

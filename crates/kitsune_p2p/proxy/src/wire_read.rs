@@ -1,6 +1,7 @@
 use crate::*;
 use futures::{sink::SinkExt, stream::StreamExt};
 use ghost_actor::dependencies::tracing;
+use kitsune_p2p_types::codec::Codec;
 
 /// Wrap a TransportChannelRead in code that decodes ProxyWire items.
 pub(crate) fn wrap_wire_read(
@@ -13,9 +14,9 @@ pub(crate) fn wrap_wire_read(
         while let Some(data) = read.next().await {
             buf.extend_from_slice(&data);
             tracing::trace!("proxy read pending {} bytes", buf.len());
-            while let Ok((read_size, wire)) = ProxyWire::decode(&buf) {
+            while let Ok((read_size, wire)) = ProxyWire::decode_ref(&buf) {
                 tracing::trace!("proxy read {:?}", wire);
-                buf.drain(..read_size);
+                buf.drain(..(read_size as usize));
                 send.send(wire).await.map_err(TransportError::other)?;
             }
         }

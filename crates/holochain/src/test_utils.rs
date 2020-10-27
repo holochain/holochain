@@ -145,7 +145,10 @@ pub async fn test_network(
     dna_hash: Option<DnaHash>,
     agent_key: Option<AgentPubKey>,
 ) -> (HolochainP2pRef, HolochainP2pEventReceiver, HolochainP2pCell) {
-    let (network, recv) = spawn_holochain_p2p().await.unwrap();
+    let (network, recv) =
+        spawn_holochain_p2p(holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default())
+            .await
+            .unwrap();
     let dna = dna_hash.unwrap_or_else(|| fixt!(DnaHash));
     let mut key_fixt = AgentPubKeyFixturator::new(Predictable);
     let agent_key = agent_key.unwrap_or_else(|| key_fixt.next().unwrap());
