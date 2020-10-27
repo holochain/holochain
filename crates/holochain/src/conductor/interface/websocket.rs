@@ -273,7 +273,7 @@ pub mod test {
     use uuid::Uuid;
 
     #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-    #[serde(rename = "snake-case", tag = "type", content = "data")]
+    #[serde(rename_all = "snake_case", tag = "type", content = "data")]
     enum AdmonRequest {
         InstallsDna(String),
     }
@@ -438,7 +438,7 @@ pub mod test {
         conductor_handle.shutdown().await;
     }
 
-    #[ignore]
+    #[ignore = "stub"]
     #[tokio::test(threaded_scheduler)]
     async fn deserialization_failure() {
         // TODO: B-01440: this can't be done easily yet

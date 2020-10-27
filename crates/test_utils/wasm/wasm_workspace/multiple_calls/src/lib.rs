@@ -11,6 +11,7 @@ entry_defs![Val::entry_def()];
 fn create_entry_multiple(n: TestInt) -> ExternResult<()> {
 
     for i in 0..n.0 {
+        debug!(format!("{}", i))?;
         create_entry!(Val(i))?;
     }
 
