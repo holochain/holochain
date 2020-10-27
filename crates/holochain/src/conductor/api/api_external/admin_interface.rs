@@ -291,7 +291,7 @@ pub enum AdminRequest {
     /// [`AdminResponse::CellIdsListed`]: enum.AdminResponse.html#variant.CellIdsListed
     /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
     ListCellIds,
-    /// List the ids of all the active (activated) `App`s in the conductor.
+    /// List the ids of all the active (activated) Apps in the conductor.
     /// Takes no arguments.
     ///
     /// Will be responded to with an [`AdminResponse::ActiveAppIdsListed`]
