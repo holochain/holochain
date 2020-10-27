@@ -149,6 +149,7 @@ impl HostAccess {
             Self::ZomeCall(ZomeCallHostAccess { network, .. })
             | Self::Init(InitHostAccess { network, .. })
             | Self::PostCommit(PostCommitHostAccess { network, .. })
+            | Self::ValidationPackage(ValidationPackageHostAccess { network, .. })
             | Self::Validate(ValidateHostAccess { network, .. })
             | Self::ValidateCreateLink(ValidateLinkHostAccess { network, .. }) => network,
             _ => panic!(

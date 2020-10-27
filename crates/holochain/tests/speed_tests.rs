@@ -47,13 +47,13 @@ mod test_utils;
 const DEFAULT_NUM: usize = 2000;
 
 #[tokio::test(threaded_scheduler)]
-#[ignore]
+#[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_prep() {
     warm_wasm_tests();
 }
 
 #[tokio::test(threaded_scheduler)]
-#[ignore]
+#[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_flame() {
     let _g = observability::flame_run().unwrap();
     let _g = _g.unwrap();
@@ -61,21 +61,21 @@ async fn speed_test_flame() {
 }
 
 #[tokio::test(threaded_scheduler)]
-#[ignore]
+#[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_timed() {
     let _g = observability::test_run_timed().unwrap();
     speed_test(None).await;
 }
 
 #[tokio::test(threaded_scheduler)]
-#[ignore]
+#[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_timed_json() {
     let _g = observability::test_run_timed_json().unwrap();
     speed_test(None).await;
 }
 
 #[tokio::test(threaded_scheduler)]
-#[ignore]
+#[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_timed_flame() {
     let _g = observability::test_run_timed_flame(None).unwrap();
     speed_test(None).await;
@@ -83,7 +83,7 @@ async fn speed_test_timed_flame() {
 }
 
 #[tokio::test(threaded_scheduler)]
-#[ignore]
+#[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_timed_ice() {
     let _g = observability::test_run_timed_ice(None).unwrap();
     speed_test(None).await;
@@ -91,7 +91,7 @@ async fn speed_test_timed_ice() {
 }
 
 #[tokio::test(threaded_scheduler)]
-#[ignore]
+#[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_normal() {
     observability::test_run().unwrap();
     speed_test(None).await;
@@ -100,7 +100,7 @@ async fn speed_test_normal() {
 /// Run this test to execute the speed test, but then keep the LMDB env files
 /// around in temp dirs for inspection by e.g. `mdb_stat`
 #[tokio::test(threaded_scheduler)]
-#[ignore]
+#[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_persisted() {
     observability::test_run().unwrap();
     let env = speed_test(None).await;
@@ -120,7 +120,7 @@ async fn speed_test_persisted() {
 #[test_case(100)]
 #[test_case(1000)]
 #[test_case(2000)]
-#[ignore]
+#[ignore = "speed tests are ignored by default; unignore to run"]
 fn speed_test_all(n: usize) {
     observability::test_run().unwrap();
     holochain::conductor::tokio_runtime().block_on(speed_test(Some(n)));
