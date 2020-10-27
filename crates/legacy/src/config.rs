@@ -332,7 +332,7 @@ pub struct UiInterfaceConfiguration {
 }
 
 // #[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
-// #[serde(rename_all = "lowercase")]
+// #[serde(rename_all = "snake_case")]
 // #[serde(tag = "type")]
 // #[allow(clippy::large_enum_variant)]
 // pub enum NetworkConfig {

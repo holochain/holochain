@@ -311,7 +311,7 @@ pub mod tests {
         ribosome::MockRibosomeT,
         workflow::{error::WorkflowError, genesis_workflow::tests::fake_genesis},
     };
-    use crate::fixt::KeystoreSenderFixturator;
+    use crate::fixt::*;
     use ::fixt::prelude::*;
     use holo_hash::fixt::*;
     use holochain_p2p::HolochainP2pCellFixturator;
@@ -351,8 +351,7 @@ pub mod tests {
     // 1.  Check if there is a Capability token secret in the parameters.
     // If there isn't and the function to be called isn't public,
     // we stop the process and return an error. MVT
-    // TODO: B-01553: Finish this test when capabilities land
-    #[ignore]
+    #[ignore = "TODO: B-01553: Finish this test when capabilities land"]
     #[allow(unused_variables, unreachable_code)]
     #[tokio::test]
     async fn private_zome_call() {
@@ -412,10 +411,8 @@ pub mod tests {
     // - Check entry content matches entry schema
     //   Depending on the type of the commit, validate all possible validations for the
     //   DHT Op that would be produced by it
-
-    // TODO: B-01100 Make sure this test is in the right place when SysValidation complete
-    // so we aren't duplicating the unit test inside sys val.
-    #[ignore]
+    #[ignore = "TODO: B-01100 Make sure this test is in the right place when SysValidation 
+    complete so we aren't duplicating the unit test inside sys val."]
     #[tokio::test]
     async fn calls_system_validation<'a>() {
         observability::test_run().ok();
@@ -466,8 +463,7 @@ pub mod tests {
     // 4.2. Call app validation of list of entries and headers: (MVI)
     // - Call validate_set_of_entries_and_headers (any necessary get
     //   results where we receive None / Timeout on retrieving validation dependencies, should produce error/fail)
-    // TODO: B-01093: Finish when app val lands
-    #[ignore]
+    #[ignore = "TODO: B-01093: Finish when app val lands"]
     #[tokio::test]
     async fn calls_app_validation() {
         let test_env = test_cell_env();
@@ -497,13 +493,18 @@ pub mod tests {
     // 4.3. Write output results via SC gatekeeper (wrap in transaction): (MVI)
     // This is handled by the workflow runner however I should test that
     // we can create outputs
-    #[ignore]
-    #[tokio::test]
+    #[tokio::test(threaded_scheduler)]
     async fn creates_outputs() {
         let test_env = test_cell_env();
         let env = test_env.env();
         let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
-        let ribosome = MockRibosomeT::new();
+        let mut ribosome = MockRibosomeT::new();
+        ribosome.expect_dna_file().return_const(fixt!(DnaFile));
+        ribosome.expect_call_zome_function().returning(|_, _| {
+            Ok(ZomeCallResponse::Ok(ExternOutput::new(
+                ().try_into().unwrap(),
+            )))
+        });
         // TODO: Make this mock return an output
         let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(
             crate::core::ribosome::NamedInvocation(

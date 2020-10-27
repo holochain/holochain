@@ -446,6 +446,7 @@ impl Cell {
 
     #[instrument(skip(self))]
     /// a remote node is attempting to retrieve a validation package
+    #[tracing::instrument(skip(self), level = "trace")]
     async fn handle_get_validation_package(
         &self,
         header_hash: HeaderHash,
@@ -517,6 +518,7 @@ impl Cell {
         authority::handle_get_entry(env, hash, options).await
     }
 
+    #[tracing::instrument(skip(self))]
     async fn handle_get_element(&self, hash: HeaderHash) -> CellResult<GetElementResponse> {
         // Get the vaults
         let env_ref = self.env.guard();
@@ -652,6 +654,7 @@ impl Cell {
     }
 
     /// a remote agent is sending us a validation receipt.
+    #[tracing::instrument(skip(self))]
     async fn handle_validation_receipt(&self, _receipt: SerializedBytes) -> CellResult<()> {
         unimplemented!()
     }
@@ -704,12 +707,14 @@ impl Cell {
     }
 
     /// the network module would like this cell/agent to sign some data
+    #[tracing::instrument(skip(self))]
     async fn handle_sign_network_data(&self) -> CellResult<Signature> {
         unimplemented!()
     }
 
     /// When the Conductor determines that it's time to execute some [AutonomicProcess],
     /// whether scheduled or through an [AutonomicCue], this function gets called
+    #[tracing::instrument(skip(self, process))]
     pub async fn handle_autonomic_process(&self, process: AutonomicProcess) -> CellResult<()> {
         match process {
             AutonomicProcess::SlowHeal => unimplemented!(),
@@ -776,6 +781,7 @@ impl Cell {
     }
 
     /// Check if each Zome's init callback has been run, and if not, run it.
+    #[tracing::instrument(skip(self))]
     async fn check_or_run_zome_init(&self) -> CellResult<()> {
         // If not run it
         let env = self.env.clone();
@@ -824,6 +830,7 @@ impl Cell {
 
     /// Delete all data associated with this Cell by deleting the associated
     /// LMDB environment. Completely reverses Cell creation.
+    #[tracing::instrument(skip(self))]
     pub async fn destroy(self) -> CellResult<()> {
         let path = self.env.path().clone();
         // Remove db from global map
