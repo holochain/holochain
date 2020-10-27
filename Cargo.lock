@@ -1677,6 +1677,8 @@ dependencies = [
  "ghost_actor",
  "nanoid",
  "once_cell",
+ "paste 1.0.1",
+ "rmp-serde",
  "serde",
  "serde_json",
  "thiserror",

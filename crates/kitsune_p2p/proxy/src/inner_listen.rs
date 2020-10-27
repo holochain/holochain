@@ -239,14 +239,14 @@ impl InternalHandler for InnerListen {
         let i_s = self.i_s.clone();
         Ok(async move {
             match read.next().await {
-                Some(ProxyWire::ReqProxy(ReqProxy(cert_digest))) => {
-                    tracing::debug!("{}: req proxy: {:?}", short, cert_digest);
-                    i_s.incoming_req_proxy(base_url, cert_digest, write, read)
+                Some(ProxyWire::ReqProxy(p)) => {
+                    tracing::debug!("{}: req proxy: {:?}", short, p.cert_digest);
+                    i_s.incoming_req_proxy(base_url, p.cert_digest, write, read)
                         .await?;
                 }
-                Some(ProxyWire::ChanNew(ChanNew(proxy_url))) => {
-                    tracing::debug!("{}: chan new: {:?}", short, proxy_url);
-                    i_s.incoming_chan_new(base_url, proxy_url.into(), write, read)
+                Some(ProxyWire::ChanNew(c)) => {
+                    tracing::debug!("{}: chan new: {:?}", short, c.proxy_url);
+                    i_s.incoming_chan_new(base_url, c.proxy_url.into(), write, read)
                         .await?;
                 }
                 e => {
@@ -432,9 +432,9 @@ impl InternalHandler for InnerListen {
                 Some(r) => r,
             };
             let proxy_url = match res {
-                ProxyWire::ReqProxyOk(ReqProxyOk(proxy_url)) => proxy_url,
-                ProxyWire::Failure(Failure(reason)) => {
-                    return Err(format!("err response to proxy request: {:?}", reason).into());
+                ProxyWire::ReqProxyOk(p) => p.proxy_url,
+                ProxyWire::Failure(f) => {
+                    return Err(format!("err response to proxy request: {:?}", f.reason).into());
                 }
                 _ => return Err(format!("unexpected: {:?}", res).into()),
             };

@@ -95,9 +95,13 @@ async fn tls_server(
                     wants_write_close = true;
                 }
                 Some(Right(Some(wire))) => match wire {
-                    ProxyWire::ChanSend(ChanSend(data)) => {
-                        tracing::trace!("{}: SRV incoming encrypted {} bytes", short, data.len());
-                        in_pre.get_mut().extend_from_slice(&data);
+                    ProxyWire::ChanSend(data) => {
+                        tracing::trace!(
+                            "{}: SRV incoming encrypted {} bytes",
+                            short,
+                            data.channel_data.len()
+                        );
+                        in_pre.get_mut().extend_from_slice(&data.channel_data);
                         srv.read_tls(&mut in_pre).map_err(TransportError::other)?;
                         srv.process_new_packets().map_err(TransportError::other)?;
                         while let Ok(size) = srv.read(&mut buf) {
