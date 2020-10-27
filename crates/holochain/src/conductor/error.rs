@@ -33,11 +33,8 @@ pub enum ConductorError {
     #[error("Configuration consistency error: {0}")]
     ConfigError(String),
 
-    #[error("Config serialization error: {0}")]
-    DeserializationError(#[from] toml::de::Error),
-
     #[error("Config deserialization error: {0}")]
-    SerializationError(#[from] toml::ser::Error),
+    SerializationError(#[from] serde_yaml::Error),
 
     #[error("Attempted to call into the conductor while it is shutting down")]
     ShuttingDown,
