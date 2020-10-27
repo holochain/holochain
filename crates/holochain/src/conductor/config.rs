@@ -178,8 +178,7 @@ pub mod tests {
 
     network:
       transport_pool:
-        -
-          type: proxy
+        - type: proxy
           sub_transport:
             type: quic
             bind_to: kitsune-quic://0.0.0.0:0
