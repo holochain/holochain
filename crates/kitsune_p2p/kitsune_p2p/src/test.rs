@@ -31,12 +31,9 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_request_workflow() {
-        let space1: Arc<KitsuneSpace> =
-            Arc::new(b"ssssssssssssssssssssssssssssssssssss".to_vec().into());
-        let a1: Arc<KitsuneAgent> =
-            Arc::new(b"111111111111111111111111111111111111".to_vec().into());
-        let a2: Arc<KitsuneAgent> =
-            Arc::new(b"222222222222222222222222222222222222".to_vec().into());
+        let space1: Arc<KitsuneSpace> = TestVal::test_val();
+        let a1: Arc<KitsuneAgent> = TestVal::test_val();
+        let a2: Arc<KitsuneAgent> = TestVal::test_val();
 
         let (p2p, mut evt) = spawn_kitsune_p2p(KitsuneP2pConfig::default())
             .await
@@ -89,14 +86,10 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_broadcast_workflow() {
-        let space1: Arc<KitsuneSpace> =
-            Arc::new(b"ssssssssssssssssssssssssssssssssssss".to_vec().into());
-        let a1: Arc<KitsuneAgent> =
-            Arc::new(b"111111111111111111111111111111111111".to_vec().into());
-        let a2: Arc<KitsuneAgent> =
-            Arc::new(b"222222222222222222222222222222222222".to_vec().into());
-        let a3: Arc<KitsuneAgent> =
-            Arc::new(b"333333333333333333333333333333333333".to_vec().into());
+        let space1: Arc<KitsuneSpace> = TestVal::test_val();
+        let a1: Arc<KitsuneAgent> = TestVal::test_val();
+        let a2: Arc<KitsuneAgent> = TestVal::test_val();
+        let a3: Arc<KitsuneAgent> = TestVal::test_val();
 
         let (p2p, mut evt) = spawn_kitsune_p2p(KitsuneP2pConfig::default())
             .await
@@ -140,7 +133,7 @@ mod tests {
                 space: space1,
                 from_agent: a1,
                 // this is just a dummy value right now
-                basis: Arc::new(b"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_vec().into()),
+                basis: TestVal::test_val(),
                 remote_agent_count: Some(42),
                 timeout_ms: Some(40),
                 payload: b"test-broadcast".to_vec(),
@@ -157,14 +150,10 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_multi_request_workflow() {
-        let space1: Arc<KitsuneSpace> =
-            Arc::new(b"ssssssssssssssssssssssssssssssssssss".to_vec().into());
-        let a1: Arc<KitsuneAgent> =
-            Arc::new(b"111111111111111111111111111111111111".to_vec().into());
-        let a2: Arc<KitsuneAgent> =
-            Arc::new(b"222222222222222222222222222222222222".to_vec().into());
-        let a3: Arc<KitsuneAgent> =
-            Arc::new(b"333333333333333333333333333333333333".to_vec().into());
+        let space1: Arc<KitsuneSpace> = TestVal::test_val();
+        let a1: Arc<KitsuneAgent> = TestVal::test_val();
+        let a2: Arc<KitsuneAgent> = TestVal::test_val();
+        let a3: Arc<KitsuneAgent> = TestVal::test_val();
 
         let (p2p, mut evt) = spawn_kitsune_p2p(KitsuneP2pConfig::default())
             .await
@@ -205,7 +194,7 @@ mod tests {
                 space: space1,
                 from_agent: a1.clone(),
                 // this is just a dummy value right now
-                basis: Arc::new(b"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_vec().into()),
+                basis: TestVal::test_val(),
                 remote_agent_count: Some(2),
                 timeout_ms: Some(20),
                 as_race: true,
@@ -228,10 +217,8 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_single_agent_multi_request_workflow() {
-        let space1: Arc<KitsuneSpace> =
-            Arc::new(b"ssssssssssssssssssssssssssssssssssss".to_vec().into());
-        let a1: Arc<KitsuneAgent> =
-            Arc::new(b"111111111111111111111111111111111111".to_vec().into());
+        let space1: Arc<KitsuneSpace> = TestVal::test_val();
+        let a1: Arc<KitsuneAgent> = TestVal::test_val();
 
         let (p2p, mut evt) = spawn_kitsune_p2p(KitsuneP2pConfig::default())
             .await
@@ -270,7 +257,7 @@ mod tests {
                 space: space1,
                 from_agent: a1.clone(),
                 // this is just a dummy value right now
-                basis: Arc::new(b"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_vec().into()),
+                basis: TestVal::test_val(),
                 remote_agent_count: Some(1),
                 timeout_ms: Some(20),
                 as_race: true,
@@ -293,17 +280,12 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_gossip_workflow() {
-        let space1: Arc<KitsuneSpace> =
-            Arc::new(b"ssssssssssssssssssssssssssssssssssss".to_vec().into());
-        let a1: Arc<KitsuneAgent> =
-            Arc::new(b"111111111111111111111111111111111111".to_vec().into());
-        let a2: Arc<KitsuneAgent> =
-            Arc::new(b"222222222222222222222222222222222222".to_vec().into());
+        let space1: Arc<KitsuneSpace> = TestVal::test_val();
+        let a1: Arc<KitsuneAgent> = TestVal::test_val();
+        let a2: Arc<KitsuneAgent> = TestVal::test_val();
 
-        let oh1: Arc<KitsuneOpHash> =
-            Arc::new(b"oooooooooooooooooooooooooooooooooooo".to_vec().into());
-        let oh2: Arc<KitsuneOpHash> =
-            Arc::new(b"hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh".to_vec().into());
+        let oh1: Arc<KitsuneOpHash> = TestVal::test_val();
+        let oh2: Arc<KitsuneOpHash> = TestVal::test_val();
 
         let (p2p, mut evt) = spawn_kitsune_p2p(KitsuneP2pConfig::default())
             .await

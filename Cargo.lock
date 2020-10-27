@@ -1619,6 +1619,8 @@ dependencies = [
  "kitsune_p2p_proxy",
  "kitsune_p2p_transport_quic",
  "kitsune_p2p_types",
+ "once_cell",
+ "rand 0.7.3",
  "serde",
  "serde_bytes",
  "shrinkwraprs",
