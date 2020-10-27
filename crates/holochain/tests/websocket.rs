@@ -83,8 +83,8 @@ fn create_config(port: u16, environment_path: PathBuf) -> ConductorConfig {
 }
 
 pub fn write_config(mut path: PathBuf, config: &ConductorConfig) -> PathBuf {
-    path.push("conductor_config.toml");
-    std::fs::write(path.clone(), toml::to_string(&config).unwrap()).unwrap();
+    path.push("conductor_config.yml");
+    std::fs::write(path.clone(), serde_yaml::to_string(&config).unwrap()).unwrap();
     path
 }
 

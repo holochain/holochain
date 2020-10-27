@@ -1,7 +1,7 @@
 #![deny(missing_docs)]
 //! This module is used to configure the conductor
 
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 mod admin_interface_config;
 mod dpki_config;
@@ -84,24 +84,24 @@ pub struct ConductorConfig {
     // pub logger: LoggerConfig,
 }
 
-/// helper fnction function to load a `Config` from a toml string.
-fn config_from_toml<'a, T>(toml: &'a str) -> ConductorResult<T>
+/// helper fnction function to load a `Config` from a yaml string.
+fn config_from_yaml<T>(yaml: &str) -> ConductorResult<T>
 where
-    T: Deserialize<'a>,
+    T: DeserializeOwned,
 {
-    toml::from_str::<T>(toml).map_err(ConductorError::DeserializationError)
+    serde_yaml::from_str(yaml).map_err(ConductorError::SerializationError)
 }
 
 impl ConductorConfig {
-    /// create a ConductorConfig struct from a toml file path
-    pub fn load_toml(path: &Path) -> ConductorResult<ConductorConfig> {
-        let config_toml = std::fs::read_to_string(path).map_err(|err| match err {
+    /// create a ConductorConfig struct from a yaml file path
+    pub fn load_yaml(path: &Path) -> ConductorResult<ConductorConfig> {
+        let config_yaml = std::fs::read_to_string(path).map_err(|err| match err {
             e @ std::io::Error { .. } if e.kind() == std::io::ErrorKind::NotFound => {
                 ConductorError::ConfigMissing(path.into())
             }
             _ => err.into(),
         })?;
-        config_from_toml(&config_toml)
+        config_from_yaml(&config_yaml)
     }
 }
 
@@ -112,9 +112,9 @@ pub mod tests {
     use std::path::{Path, PathBuf};
 
     #[test]
-    fn test_config_load_toml() {
+    fn test_config_load_yaml() {
         let bad_path = Path::new("fake");
-        let result = ConductorConfig::load_toml(bad_path);
+        let result = ConductorConfig::load_yaml(bad_path);
         assert_eq!(
             "Err(ConfigMissing(\"fake\"))".to_string(),
             format!("{:?}", result)
@@ -124,20 +124,20 @@ pub mod tests {
     }
 
     #[test]
-    fn test_config_bad_toml() {
-        let result: ConductorResult<ConductorConfig> = config_from_toml("this isn't toml");
-        assert_matches!(result, Err(ConductorError::DeserializationError(_)));
+    fn test_config_bad_yaml() {
+        let result: ConductorResult<ConductorConfig> = config_from_yaml("this isn't yaml");
+        assert_matches!(result, Err(ConductorError::SerializationError(_)));
     }
 
     #[test]
     fn test_config_complete_minimal_config() {
-        let toml = r#"
-    environment_path = "/path/to/env"
+        let yaml = r#"---
+    environment_path: /path/to/env
 
-    [passphrase_service]
-    type = "cmd"
+    passphrase_service:
+      type: cmd
     "#;
-        let result: ConductorConfig = config_from_toml(toml).unwrap();
+        let result: ConductorConfig = config_from_yaml(yaml).unwrap();
         assert_eq!(
             result,
             ConductorConfig {
@@ -157,32 +157,37 @@ pub mod tests {
 
     #[test]
     fn test_config_complete_config() {
-        let toml = r#"
-    environment_path = "/path/to/env"
-    use_dangerous_test_keystore = true
+        let yaml = r#"---
+    environment_path: /path/to/env
+    use_dangerous_test_keystore: true
+    signing_service_uri: ws://localhost:9001
+    encryption_service_uri: ws://localhost:9002
+    decryption_service_uri: ws://localhost:9003
 
-    [passphrase_service]
-    type = "cmd"
+    passphrase_service:
+      type: cmd
 
-    encryption_service_uri = "ws://localhost:9001"
-    decryption_service_uri = "ws://localhost:9002"
-    signing_service_uri = "ws://localhost:9003"
+    dpki:
+      instance_id: some_id
+      init_params: some_params
 
-    [dpki]
-    instance_id = "some_id"
-    init_params = "some_params"
+    admin_interfaces:
+      - driver:
+          type: websocket
+          port: 1234
 
-    [[admin_interfaces]]
-    driver.type = "websocket"
-    driver.port = 1234
-
-    [[network.transport_pool]]
-    type = 'proxy'
-    sub_transport = { type = 'quic', bind_to = 'kitsune-quic://0.0.0.0:0' }
-    proxy_config = { type = 'local_proxy_server', proxy_accept_config = 'reject_all' }
+    network:
+      transport_pool:
+        - type: proxy
+          sub_transport:
+            type: quic
+            bind_to: kitsune-quic://0.0.0.0:0
+          proxy_config:
+            type: local_proxy_server
+            proxy_accept_config: reject_all
 
     "#;
-        let result: ConductorResult<ConductorConfig> = config_from_toml(toml);
+        let result: ConductorResult<ConductorConfig> = config_from_yaml(yaml);
         use holochain_p2p::kitsune_p2p::*;
         let mut network_config = KitsuneP2pConfig::default();
         network_config.transport_pool.push(TransportConfig::Proxy {
@@ -200,9 +205,9 @@ pub mod tests {
             ConductorConfig {
                 environment_path: PathBuf::from("/path/to/env").into(),
                 use_dangerous_test_keystore: true,
-                signing_service_uri: None,
-                encryption_service_uri: None,
-                decryption_service_uri: None,
+                signing_service_uri: Some("ws://localhost:9001".into()),
+                encryption_service_uri: Some("ws://localhost:9002".into()),
+                decryption_service_uri: Some("ws://localhost:9003".into()),
                 dpki: Some(DpkiConfig {
                     instance_id: "some_id".into(),
                     init_params: "some_params".into()
@@ -219,18 +224,16 @@ pub mod tests {
 
     #[test]
     fn test_config_keystore() {
-        let toml = r#"
-    environment_path = "/path/to/env"
-    use_dangerous_test_keystore = true
+        let yaml = r#"---
+    environment_path: /path/to/env
+    use_dangerous_test_keystore: true
+    keystore_path: /path/to/keystore
 
-    keystore_path = "/path/to/keystore"
-
-    [passphrase_service]
-    type = "fromconfig"
-    passphrase = "foobar"
-
+    passphrase_service:
+      type: fromconfig
+      passphrase: foobar
     "#;
-        let result: ConductorResult<ConductorConfig> = config_from_toml(toml);
+        let result: ConductorResult<ConductorConfig> = config_from_yaml(yaml);
         assert_eq!(
             result.unwrap(),
             ConductorConfig {
