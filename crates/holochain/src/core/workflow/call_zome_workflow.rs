@@ -1,7 +1,6 @@
 use super::{
     app_validation_workflow, error::WorkflowResult, sys_validation_workflow::sys_validate_element,
 };
-use crate::conductor::api::CellConductorApiT;
 use crate::conductor::interface::SignalBroadcaster;
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::ZomeCallInvocation;
@@ -15,6 +14,10 @@ use crate::core::{
         cascade::Cascade, element_buf::ElementBuf, metadata::MetadataBuf,
         source_chain::SourceChain, workspace::WorkspaceResult,
     },
+};
+use crate::{
+    conductor::api::CellConductorApiT,
+    core::state::cascade::{DbPair, DbPairMut},
 };
 pub use call_zome_workspace_lock::CallZomeWorkspaceLock;
 use either::Either;
@@ -272,6 +275,17 @@ impl<'a> CallZomeWorkspace {
             &mut self.meta_cache,
             network,
         )
+    }
+
+    /// Cascade without a network connection
+    pub fn cascade_local(&'a mut self) -> Cascade<'a> {
+        let authored_data = DbPair::new(&self.source_chain.elements(), &self.meta_authored);
+        let cache_data = DbPairMut::new(&mut self.element_cache, &mut self.meta_cache);
+        let integrated_data = DbPair::new(&self.element_integrated, &self.meta_integrated);
+        Cascade::empty()
+            .with_authored(authored_data)
+            .with_cache(cache_data)
+            .with_integrated(integrated_data)
     }
 
     pub fn env(&self) -> &EnvironmentRead {

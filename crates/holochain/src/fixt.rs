@@ -414,7 +414,7 @@ fixturator!(
 
 fixturator!(
     ValidationPackageHostAccess;
-    constructor fn new(CallZomeWorkspaceLock);
+    constructor fn new(CallZomeWorkspaceLock, HolochainP2pCell);
 );
 
 fixturator!(

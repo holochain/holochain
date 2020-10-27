@@ -25,9 +25,21 @@ impl Outcome {
     pub fn awaiting<E, I: Into<AnyDhtHash> + Clone>(h: &I) -> OutcomeOrError<Self, E> {
         OutcomeOrError::Outcome(Outcome::AwaitingDeps(vec![h.clone().into()]))
     }
+    /// Exit early with an awaiting outcome
+    pub fn exit_with_awaiting<T, I: Into<AnyDhtHash>, It: IntoIterator<Item = I>>(
+        h: It,
+    ) -> AppValidationOutcome<T> {
+        Err(OutcomeOrError::Outcome(Outcome::AwaitingDeps(
+            h.into_iter().map(Into::into).collect(),
+        )))
+    }
     /// Early exits with an accepted outcome
     pub fn accepted<T>() -> AppValidationOutcome<T> {
         Err(OutcomeOrError::Outcome(Outcome::Accepted))
+    }
+    /// Exit early with a rejected outcome
+    pub fn exit_with_rejected<T, I: Into<String>>(reason: I) -> AppValidationOutcome<T> {
+        Err(OutcomeOrError::Outcome(Outcome::Rejected(reason.into())))
     }
 }
 

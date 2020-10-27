@@ -65,6 +65,8 @@ pub enum RequiredValidationType {
     SubChain,
     /// The entire chain
     Full,
+    /// A custom package set by the zome
+    Custom,
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize, SerializedBytes)]

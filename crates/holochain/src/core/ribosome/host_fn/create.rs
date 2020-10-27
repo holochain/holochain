@@ -55,14 +55,13 @@ pub fn create<'a>(
         entry_type,
         entry_hash,
     };
-    let host_access = call_context.host_access();
 
     // return the hash of the committed entry
     // note that validation is handled by the workflow
     // if the validation fails this commit will be rolled back by virtue of the lmdb transaction
     // being atomic
     tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-        let mut guard = host_access.workspace().write().await;
+        let mut guard = call_context.host_access.workspace().write().await;
         let workspace: &mut CallZomeWorkspace = &mut guard;
         let source_chain = &mut workspace.source_chain;
         // push the header and the entry into the source chain

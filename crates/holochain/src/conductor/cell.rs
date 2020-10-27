@@ -426,19 +426,25 @@ impl Cell {
     /// we are receiving a "publish" event from the network
     async fn handle_publish(
         &self,
-        _from_agent: AgentPubKey,
+        from_agent: AgentPubKey,
         _request_validation_receipt: bool,
         _dht_hash: holo_hash::AnyDhtHash,
         ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     ) -> CellResult<()> {
-        incoming_dht_ops_workflow(&self.env, self.queue_triggers.sys_validation.clone(), ops)
-            .await
-            .map_err(Box::new)
-            .map_err(ConductorApiError::from)
-            .map_err(Box::new)?;
+        incoming_dht_ops_workflow(
+            &self.env,
+            self.queue_triggers.sys_validation.clone(),
+            ops,
+            Some(from_agent),
+        )
+        .await
+        .map_err(Box::new)
+        .map_err(ConductorApiError::from)
+        .map_err(Box::new)?;
         Ok(())
     }
 
+    #[instrument(skip(self))]
     /// a remote node is attempting to retrieve a validation package
     #[tracing::instrument(skip(self), level = "trace")]
     async fn handle_get_validation_package(
@@ -454,17 +460,30 @@ impl Cell {
             .retrieve_header(header_hash, Default::default())
             .await?
         {
-            Some(shh) => shh.into_header_and_signature().0.into_content(),
+            Some(shh) => shh.into_header_and_signature().0,
             None => return Ok(None.into()),
         };
 
+        let ribosome = self.get_ribosome().await?;
+
         // This agent is the author so get the validation package from the source chain
         if header.author() == self.id.agent_pubkey() {
-            let ribosome = self.get_ribosome().await?;
-            validation_package::get_as_author(header, env, &ribosome.dna_file, &self.conductor_api)
-                .await
+            validation_package::get_as_author(
+                header,
+                env,
+                &ribosome,
+                &self.conductor_api,
+                &self.holochain_p2p_cell,
+            )
+            .await
         } else {
-            todo!("Implement authority returning validation package")
+            validation_package::get_as_authority(
+                header,
+                env,
+                &ribosome.dna_file,
+                &self.conductor_api,
+            )
+            .await
         }
     }
 
