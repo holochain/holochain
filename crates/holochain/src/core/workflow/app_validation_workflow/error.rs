@@ -4,8 +4,11 @@ use holochain_zome_types::header::ZomeId;
 use thiserror::Error;
 
 use crate::{
-    conductor::entry_def_store::error::EntryDefStoreError, core::ribosome::error::RibosomeError,
-    core::state::cascade::error::CascadeError, core::validation::OutcomeOrError, from_sub_error,
+    conductor::entry_def_store::error::EntryDefStoreError,
+    core::ribosome::error::RibosomeError,
+    core::state::cascade::error::CascadeError,
+    core::{validation::OutcomeOrError, SourceChainError},
+    from_sub_error,
 };
 
 use super::types::Outcome;
@@ -24,6 +27,8 @@ pub enum AppValidationError {
     LinkMultipleZomes,
     #[error(transparent)]
     RibosomeError(#[from] RibosomeError),
+    #[error(transparent)]
+    SourceChainError(#[from] SourceChainError),
     #[error("The app entry type {0:?} zome id was out of range")]
     ZomeId(ZomeId),
 }
@@ -43,3 +48,4 @@ impl<T> From<AppValidationError> for OutcomeOrError<T, AppValidationError> {
 from_sub_error!(AppValidationError, RibosomeError);
 from_sub_error!(AppValidationError, CascadeError);
 from_sub_error!(AppValidationError, EntryDefStoreError);
+from_sub_error!(AppValidationError, SourceChainError);

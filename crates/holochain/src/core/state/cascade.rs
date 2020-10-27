@@ -12,7 +12,7 @@ use crate::core::workflow::integrate_dht_ops_workflow::integrate_single_metadata
 use either::Either;
 use error::CascadeResult;
 use fallible_iterator::FallibleIterator;
-use holo_hash::{hash_type::AnyDht, AgentPubKey, AnyDhtHash, EntryHash, HeaderHash};
+use holo_hash::{hash_type::AnyDht, AgentPubKey, AnyDhtHash, EntryHash, HasHash, HeaderHash};
 use holochain_p2p::{actor::GetActivityOptions, HolochainP2pCellT};
 use holochain_p2p::{
     actor::{GetLinksOptions, GetMetaOptions, GetOptions},
@@ -29,7 +29,7 @@ use holochain_types::{
     entry::option_entry_hashed,
     link::{GetLinksResponse, WireLinkMetaKey},
     metadata::{EntryDhtStatus, MetadataSet, TimedHeaderHash},
-    EntryHashed,
+    EntryHashed, HeaderHashed,
 };
 use holochain_zome_types::{
     element::SignedHeader,
@@ -40,6 +40,7 @@ use holochain_zome_types::{
     query::AgentActivity,
     query::ChainQueryFilter,
     query::ChainStatus,
+    validate::ValidationPackage,
 };
 use std::collections::HashSet;
 use std::collections::{BTreeMap, BTreeSet};
@@ -340,7 +341,12 @@ where
             }
             Activity::NotRequested => (),
         };
-        cache_data.meta.register_activity_status(&agent, status)?;
+        match &status {
+            ChainStatus::Empty => {}
+            ChainStatus::Valid(_) | ChainStatus::Forked(_) | ChainStatus::Invalid(_) => {
+                cache_data.meta.register_activity_status(&agent, status)?;
+            }
+        }
         if let Some(highest_observed) = highest_observed {
             cache_data
                 .meta
@@ -1729,6 +1735,74 @@ where
             })
             .map(|shh| shh.map(|s| Element::new(s, None)))
             .collect::<Option<Vec<_>>>())
+    }
+
+    /// Get the validation package if it is cached without going to the network
+    pub fn get_validation_package_local(
+        &self,
+        hash: &HeaderHash,
+    ) -> CascadeResult<Option<Vec<Element>>> {
+        let cache_data = ok_or_return!(self.cache_data.as_ref(), None);
+        let env = ok_or_return!(self.env.as_ref(), None);
+        fresh_reader!(env, |r| {
+            let mut iter = cache_data.meta.get_validation_package(&r, hash)?;
+            let mut elements = Vec::with_capacity(iter.size_hint().0);
+            while let Some(hash) = iter.next()? {
+                match self.get_element_local_raw(&hash)? {
+                    Some(el) => elements.push(el),
+                    None => return Ok(None),
+                }
+            }
+            elements.sort_unstable_by_key(|el| el.header().header_seq());
+            elements.reverse();
+            if elements.is_empty() {
+                Ok(None)
+            } else {
+                Ok(Some(elements))
+            }
+        })
+    }
+
+    pub async fn get_validation_package(
+        &mut self,
+        agent: AgentPubKey,
+        header: &HeaderHashed,
+    ) -> CascadeResult<Option<ValidationPackage>> {
+        if let Some(elements) = self.get_validation_package_local(header.as_hash())? {
+            return Ok(Some(ValidationPackage::new(elements)));
+        }
+
+        let network = ok_or_return!(self.network.as_mut(), None);
+        match network
+            .get_validation_package(agent, header.as_hash().clone())
+            .await?
+            .0
+        {
+            Some(validation_package) => {
+                for element in &validation_package.0 {
+                    // TODO: I don't think it's sound to do this
+                    // because we would be adding potentially rejected
+                    // headers into our cache.
+                    // TODO: For now we are only returning validation packages
+                    // of valid headers but when we add the ability to get and
+                    // cache invalid data we need to update this as well.
+                    self.update_stores(element.clone())?;
+                }
+
+                // Add metadata for custom package caching
+                let cache_data = ok_or_return!(self.cache_data.as_mut(), None);
+                cache_data.meta.register_validation_package(
+                    header.as_hash(),
+                    validation_package
+                        .0
+                        .iter()
+                        .map(|el| el.header_address().clone()),
+                );
+
+                Ok(Some(validation_package))
+            }
+            None => Ok(None),
+        }
     }
 }
 
