@@ -689,7 +689,7 @@ pub mod test {
         let msg = msg.try_into().unwrap();
         let respond = move |bytes: SerializedBytes| {
             let response: AdminResponse = bytes.try_into().unwrap();
-            assert_matches!(response, AdminResponse::JsonState(s) if s == expected);
+            assert_matches!(response, AdminResponse::StateDumped(s) if s == expected);
             async { Ok(()) }.boxed()
         };
         let respond = Box::new(respond);

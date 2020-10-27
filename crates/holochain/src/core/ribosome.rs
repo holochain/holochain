@@ -290,17 +290,21 @@ mockall::mock! {
 #[allow(missing_docs)] // members are self-explanitory
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct ZomeCallInvocation {
-    /// The ID of the [Cell] in which this Zome-call would be invoked
+    /// The Id of the `Cell` in which this Zome-call would be invoked
     pub cell_id: CellId,
     /// The name of the Zome containing the function that would be invoked
     pub zome_name: ZomeName,
-    /// The capability request authorization required
+    /// The capability request authorization.
+    /// This can be `None` and still succeed in the case where the function
+    /// in the zome being called has been given an Unrestricted status
+    /// via a `CapGrant`. Otherwise, it will be necessary to provide a `CapSecret` for every call.
     pub cap: Option<CapSecret>,
     /// The name of the Zome function to call
     pub fn_name: FunctionName,
-    /// The serialized data to pass an an argument to the Zome call
+    /// The serialized data to pass as an argument to the Zome call
     pub payload: ExternInput,
-    /// the provenance of the call
+    /// The provenance of the call. Provenance means the 'source'
+    /// so this expects the `AgentPubKey` of the agent calling the Zome function
     pub provenance: AgentPubKey,
 }
 
