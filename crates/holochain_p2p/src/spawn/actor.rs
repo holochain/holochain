@@ -63,7 +63,7 @@ impl HolochainP2pActor {
     }
 
     /// receiving an incoming get request from a remote node
-    #[tracing::instrument(skip(self, dna_hash, to_agent, dht_hash, options))]
+    #[tracing::instrument(skip(self, dna_hash, to_agent, dht_hash, options), level = "trace")]
     fn handle_incoming_get(
         &mut self,
         dna_hash: DnaHash,
@@ -223,6 +223,7 @@ impl ghost_actor::GhostHandler<kitsune_p2p::event::KitsuneP2pEvent> for Holochai
 
 impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
     /// We need to store signed agent info.
+    #[tracing::instrument(skip(self), level = "trace")]
     fn handle_put_agent_info_signed(
         &mut self,
         input: kitsune_p2p::event::PutAgentInfoSignedEvt,
@@ -245,6 +246,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
     }
 
     /// We need to get previously stored agent info.
+    #[tracing::instrument(skip(self), level = "trace")]
     fn handle_get_agent_info_signed(
         &mut self,
         input: kitsune_p2p::event::GetAgentInfoSignedEvt,
@@ -262,7 +264,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         .into())
     }
 
-    #[tracing::instrument(skip(self, space, to_agent, from_agent, payload))]
+    #[tracing::instrument(skip(self, space, to_agent, from_agent, payload), level = "trace")]
     fn handle_call(
         &mut self,
         space: Arc<kitsune_p2p::KitsuneSpace>,
@@ -316,6 +318,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         }
     }
 
+    #[tracing::instrument(skip(self), level = "trace")]
     fn handle_notify(
         &mut self,
         space: Arc<kitsune_p2p::KitsuneSpace>,
@@ -358,6 +361,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         }
     }
 
+    #[tracing::instrument(skip(self), level = "trace")]
     fn handle_gossip(
         &mut self,
         space: Arc<kitsune_p2p::KitsuneSpace>,
@@ -382,6 +386,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         )
     }
 
+    #[tracing::instrument(skip(self), level = "trace")]
     fn handle_fetch_op_hashes_for_constraints(
         &mut self,
         input: kitsune_p2p::event::FetchOpHashesForConstraintsEvt,
@@ -412,6 +417,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         .into())
     }
 
+    #[tracing::instrument(skip(self), level = "trace")]
     fn handle_fetch_op_hash_data(
         &mut self,
         input: kitsune_p2p::event::FetchOpHashDataEvt,
@@ -454,6 +460,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         .into())
     }
 
+    #[tracing::instrument(skip(self), level = "trace")]
     fn handle_sign_network_data(
         &mut self,
         _input: kitsune_p2p::event::SignNetworkDataEvt,
@@ -465,6 +472,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
 impl ghost_actor::GhostHandler<HolochainP2p> for HolochainP2pActor {}
 
 impl HolochainP2pHandler for HolochainP2pActor {
+    #[tracing::instrument(skip(self), level = "trace")]
     fn handle_join(
         &mut self,
         dna_hash: DnaHash,
@@ -479,6 +487,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
             .into())
     }
 
+    #[tracing::instrument(skip(self), level = "trace")]
     fn handle_leave(
         &mut self,
         dna_hash: DnaHash,
@@ -493,6 +502,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
             .into())
     }
 
+    #[tracing::instrument(skip(self), level = "trace")]
     fn handle_call_remote(
         &mut self,
         dna_hash: DnaHash,
@@ -522,6 +532,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         .into())
     }
 
+    #[tracing::instrument(skip(self), level = "trace")]
     fn handle_publish(
         &mut self,
         dna_hash: DnaHash,
@@ -556,6 +567,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         .into())
     }
 
+    #[tracing::instrument(skip(self), level = "trace")]
     fn handle_get_validation_package(
         &mut self,
         input: actor::GetValidationPackage,
@@ -578,7 +590,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         .into())
     }
 
-    #[tracing::instrument(skip(self, dna_hash, from_agent, dht_hash, options))]
+    #[tracing::instrument(skip(self, dna_hash, from_agent, dht_hash, options), level = "trace")]
     fn handle_get(
         &mut self,
         dna_hash: DnaHash,
@@ -621,6 +633,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         .into())
     }
 
+    #[tracing::instrument(skip(self), level = "trace")]
     fn handle_get_meta(
         &mut self,
         dna_hash: DnaHash,
@@ -662,6 +675,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         .into())
     }
 
+    #[tracing::instrument(skip(self), level = "trace")]
     fn handle_get_links(
         &mut self,
         dna_hash: DnaHash,
@@ -706,6 +720,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         .into())
     }
 
+    #[tracing::instrument(skip(self), level = "trace")]
     fn handle_get_agent_activity(
         &mut self,
         dna_hash: DnaHash,
@@ -755,6 +770,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         .into())
     }
 
+    #[tracing::instrument(skip(self), level = "trace")]
     fn handle_send_validation_receipt(
         &mut self,
         dna_hash: DnaHash,

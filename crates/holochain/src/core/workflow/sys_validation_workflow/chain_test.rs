@@ -24,7 +24,7 @@ use holochain_zome_types::fixt::*;
 /// verify this works is to run this with logging and check it outputs
 /// use `RUST_LOG=[agent_activity]=warn`
 #[tokio::test(threaded_scheduler)]
-#[ignore]
+#[ignore = "TODO: complete when chain validation returns actual error"]
 async fn sys_validation_agent_activity_test() {
     observability::test_run().ok();
 
