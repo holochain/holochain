@@ -66,12 +66,12 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
         use AdminRequest::*;
         match request {
             AddAdminInterfaces(configs) => {
-              self.conductor_handle
+                self.conductor_handle
                     .clone()
                     .add_admin_interfaces(configs)
                     .await?;
-              Ok(AdminResponse::AdminInterfacesAdded)
-          },
+                Ok(AdminResponse::AdminInterfacesAdded)
+            }
             InstallApp(payload) => {
                 trace!(?payload.dnas);
                 let InstallAppPayload {

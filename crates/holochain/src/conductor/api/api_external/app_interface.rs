@@ -65,8 +65,8 @@ impl AppInterfaceApi for RealAppInterfaceApi {
                 self.conductor_handle.get_app_info(&app_id).await?,
             )),
             AppRequest::ZomeCallInvocation(request) => {
-              let req = request.clone();
-              match self.conductor_handle.call_zome(*request).await? {
+                let req = request.clone();
+                match self.conductor_handle.call_zome(*request).await? {
                 Ok(ZomeCallResponse::Ok(output)) => {
                   Ok(AppResponse::ZomeCallInvocation(Box::new(output)))
                 }
@@ -175,7 +175,7 @@ pub enum AppResponse {
 
     /// The succesful response to an [`AppRequest::ZomeCallInvocation`].
     ///
-    /// Note that [`ExternOutput`] is simply a structure of [`SerializedBytes`] so the client will have 
+    /// Note that [`ExternOutput`] is simply a structure of [`SerializedBytes`] so the client will have
     /// to decode this response back into the data provided by the Zome using a [msgpack](https://msgpack.org/) library to utilize it.
     ///
     /// [`AppRequest::ZomeCallInvocation`]: enum.AppRequest.html#variant.ZomeCallInvocation
