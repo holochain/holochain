@@ -43,10 +43,14 @@ async fn inner() -> TransportResult<()> {
         spawn_kitsune_proxy_listener(proxy_config, listener, events).await?;
 
     tokio::task::spawn(async move {
-        while let Some((url, mut write, read)) = events.next().await {
-            eprintln!("# ERR incoming msg from {}", url);
-            drop(read);
-            let _ = write.write_and_close(Vec::with_capacity(0)).await;
+        while let Some(evt) = events.next().await {
+            match evt {
+                TransportEvent::IncomingChannel(url, mut write, read) => {
+                    eprintln!("# ERR incoming msg from {}", url);
+                    drop(read);
+                    let _ = write.write_and_close(Vec::with_capacity(0)).await;
+                }
+            }
         }
     });
 

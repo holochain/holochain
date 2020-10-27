@@ -1610,12 +1610,15 @@ dependencies = [
  "futures",
  "ghost_actor",
  "holo_hash",
+ "kitsune_p2p_proxy",
+ "kitsune_p2p_transport_quic",
  "kitsune_p2p_types",
  "serde",
  "serde_bytes",
  "shrinkwraprs",
  "thiserror",
  "tokio",
+ "tracing-subscriber",
  "url2",
 ]
 
@@ -1653,6 +1656,7 @@ dependencies = [
  "quinn",
  "rcgen",
  "rustls 0.17.0",
+ "serde",
  "tokio",
  "webpki",
 ]
@@ -1666,10 +1670,13 @@ dependencies = [
  "ghost_actor",
  "nanoid",
  "once_cell",
+ "paste 1.0.1",
+ "rmp-serde",
  "serde",
  "serde_json",
  "thiserror",
  "tokio",
+ "tracing-subscriber",
  "url2",
 ]
 

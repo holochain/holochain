@@ -60,7 +60,7 @@ use unwrap_to::unwrap_to;
 use crate::test_utils::host_fn_api::*;
 
 #[tokio::test(threaded_scheduler)]
-#[ignore]
+
 async fn get_updates_cache() {
     observability::test_run().ok();
     // Database setup
@@ -102,7 +102,7 @@ async fn get_updates_cache() {
 }
 
 #[tokio::test(threaded_scheduler)]
-#[ignore]
+#[ignore = "flaky!"]
 async fn get_meta_updates_meta_cache() {
     observability::test_run().ok();
     // Database setup
@@ -160,14 +160,14 @@ async fn get_meta_updates_meta_cache() {
             .collect::<Vec<_>>()
             .unwrap()
     };
-    assert_eq!(result[0], expected.1);
     assert_eq!(result.len(), 1);
+    assert_eq!(result[0], expected.1);
 
     shutdown.clean().await;
 }
 
 #[tokio::test(threaded_scheduler)]
-#[ignore]
+#[ignore = "flaky"]
 async fn get_from_another_agent() {
     observability::test_run().ok();
     let dna_file = DnaFile::new(
@@ -335,8 +335,7 @@ async fn get_from_another_agent() {
 }
 
 #[tokio::test(threaded_scheduler)]
-// @todo this is flakey for some reason
-#[ignore]
+#[ignore = "flaky for some reason"]
 async fn get_links_from_another_agent() {
     observability::test_run().ok();
     let dna_file = DnaFile::new(
@@ -643,9 +642,7 @@ async fn fake_authority<'env>(env: &EnvironmentWrite, hash: AnyDhtHash, call_dat
 
     // Write to the meta vault to fake being an authority
     let (shh, e) = element.clone().into_inner();
-    element_vault
-        .put(shh, option_entry_hashed(e).await)
-        .unwrap();
+    element_vault.put(shh, option_entry_hashed(e)).unwrap();
 
     // TODO: figure this out
     integrate_to_integrated(&element, &element_vault, &mut meta_vault)
@@ -666,7 +663,7 @@ async fn integrate_to_integrated<C: MetadataBufT<IntegratedPrefix>>(
     meta_store: &mut C,
 ) -> DhtOpConvertResult<()> {
     // Produce the light directly
-    for op in produce_op_lights_from_elements(vec![element]).await? {
+    for op in produce_op_lights_from_elements(vec![element])? {
         // we don't integrate element data, because it is already in our vault.
         integrate_single_metadata(op, element_store, meta_store)?
     }

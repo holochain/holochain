@@ -12,20 +12,22 @@ use crate::core::{
         dht_op_integration::{IntegratedDhtOpsStore, IntegrationLimboStore},
         element_buf::ElementBuf,
         metadata::MetadataBuf,
+        metadata::MetadataBufT,
         validation_db::{ValidationLimboStatus, ValidationLimboStore, ValidationLimboValue},
         workspace::{Workspace, WorkspaceResult},
     },
 };
-use holo_hash::DhtOpHash;
+use holo_hash::{AgentPubKey, DhtOpHash};
 use holochain_state::{
     buffer::BufferedStore,
     buffer::KvBufFresh,
     db::{INTEGRATED_DHT_OPS, INTEGRATION_LIMBO},
     env::EnvironmentWrite,
     error::DatabaseResult,
-    prelude::{EnvironmentRead, GetDb, PendingPrefix, Writer},
+    prelude::{EnvironmentRead, GetDb, IntegratedPrefix, PendingPrefix, Writer},
 };
 use holochain_types::{dht_op::DhtOp, Timestamp};
+use holochain_zome_types::query::HighestObserved;
 use tracing::instrument;
 
 #[cfg(test)]
@@ -36,6 +38,7 @@ pub async fn incoming_dht_ops_workflow(
     state_env: &EnvironmentWrite,
     mut sys_validation_trigger: TriggerSender,
     ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+    from_agent: Option<AgentPubKey>,
 ) -> WorkflowResult<()> {
     // set up our workspace
     let mut workspace = IncomingDhtOpsWorkspace::new(state_env.clone().into())?;
@@ -45,7 +48,9 @@ pub async fn incoming_dht_ops_workflow(
         if !workspace.op_exists(&hash)? {
             tracing::debug!(?hash, ?op);
             if should_keep(&op).await? {
-                workspace.add_to_pending(hash, op).await?;
+                workspace
+                    .add_to_pending(hash, op, from_agent.clone())
+                    .await?;
             } else {
                 tracing::warn!(
                     msg = "Dropping op because it failed counterfeit checks",
@@ -80,6 +85,7 @@ pub struct IncomingDhtOpsWorkspace {
     pub validation_limbo: ValidationLimboStore,
     pub element_pending: ElementBuf<PendingPrefix>,
     pub meta_pending: MetadataBuf<PendingPrefix>,
+    pub meta_integrated: MetadataBuf<IntegratedPrefix>,
 }
 
 impl Workspace for IncomingDhtOpsWorkspace {
@@ -87,6 +93,7 @@ impl Workspace for IncomingDhtOpsWorkspace {
         self.validation_limbo.0.flush_to_txn_ref(writer)?;
         self.element_pending.flush_to_txn_ref(writer)?;
         self.meta_pending.flush_to_txn_ref(writer)?;
+        self.meta_integrated.flush_to_txn_ref(writer)?;
         Ok(())
     }
 }
@@ -102,7 +109,9 @@ impl IncomingDhtOpsWorkspace {
         let validation_limbo = ValidationLimboStore::new(env.clone())?;
 
         let element_pending = ElementBuf::pending(env.clone())?;
-        let meta_pending = MetadataBuf::pending(env)?;
+        let meta_pending = MetadataBuf::pending(env.clone())?;
+
+        let meta_integrated = MetadataBuf::vault(env)?;
 
         Ok(Self {
             integration_limbo,
@@ -110,13 +119,30 @@ impl IncomingDhtOpsWorkspace {
             validation_limbo,
             element_pending,
             meta_pending,
+            meta_integrated,
         })
     }
 
-    async fn add_to_pending(&mut self, hash: DhtOpHash, op: DhtOp) -> DhtOpConvertResult<()> {
-        let basis = op.dht_basis().await;
-        let op_light = op.to_light().await;
+    async fn add_to_pending(
+        &mut self,
+        hash: DhtOpHash,
+        op: DhtOp,
+        from_agent: Option<AgentPubKey>,
+    ) -> DhtOpConvertResult<()> {
+        let basis = op.dht_basis();
+        let op_light = op.to_light();
         tracing::debug!(?op_light);
+
+        // register the highest observed header in an agents chain
+        if let DhtOp::RegisterAgentActivity(_, header) = &op {
+            self.meta_integrated.register_activity_observed(
+                header.author(),
+                HighestObserved {
+                    header_seq: header.header_seq(),
+                    hash: vec![op_light.header_hash().clone()],
+                },
+            )?;
+        }
 
         integrate_single_data(op, &mut self.element_pending)?;
         integrate_single_metadata(
@@ -131,6 +157,7 @@ impl IncomingDhtOpsWorkspace {
             time_added: Timestamp::now(),
             last_try: None,
             num_tries: 0,
+            from_agent,
         };
         self.validation_limbo.put(hash, vlv)?;
         Ok(())

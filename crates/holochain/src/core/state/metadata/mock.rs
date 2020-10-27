@@ -19,6 +19,25 @@ mock! {
             &mut self,
             header: &Header,
         ) -> DatabaseResult<()>;
+        fn register_activity_status(
+            &mut self,
+            agent: &AgentPubKey,
+            status: ChainStatus,
+        ) -> DatabaseResult<()>;
+        fn register_activity_sequence(
+            &mut self,
+            agent: &AgentPubKey,
+            sequence: Vec<(u32, HeaderHash)>,
+        ) -> DatabaseResult<()>;
+
+        fn deregister_activity_sequence(&mut self, agent: &AgentPubKey) -> DatabaseResult<()>;
+        fn deregister_activity_status(&mut self, agent: &AgentPubKey) -> DatabaseResult<()>;
+        fn register_activity_observed(
+            &mut self,
+            agent: &AgentPubKey,
+            observed: HighestObserved,
+        ) -> DatabaseResult<()>;
+        fn deregister_activity_observed(&mut self, agent: &AgentPubKey) -> DatabaseResult<()>;
         fn sync_register_update(&mut self, update: header::Update) -> DatabaseResult<()>;
         fn sync_register_delete(&mut self, delete: header::Delete) -> DatabaseResult<()>;
         fn sync_deregister_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()>;
@@ -27,6 +46,12 @@ mock! {
             &mut self,
             header: &Header,
         ) -> DatabaseResult<()>;
+        fn register_validation_package(
+            &mut self,
+            hash: &HeaderHash,
+            package: Vec<HeaderHash>,
+        );
+        fn deregister_validation_package(&mut self, header: &HeaderHash);
         fn sync_deregister_update(&mut self, update: header::Update) -> DatabaseResult<()>;
         fn sync_deregister_delete(&mut self, delete: header::Delete) -> DatabaseResult<()>;
         fn register_raw_on_entry(&mut self, entry_hash: EntryHash, value: SysMetaVal) -> DatabaseResult<()>;
@@ -44,6 +69,19 @@ mock! {
             &self,
             key: ChainItemKey,
         ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError>>>;
+        fn get_activity_sequence(
+            &self,
+            key: ChainItemKey,
+        ) -> DatabaseResult<
+            Box<dyn FallibleIterator<Item = (u32, HeaderHash), Error = DatabaseError>>,
+        >;
+        fn get_validation_package(
+            &self,
+            hash: &HeaderHash,
+        ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError>>>;
+        fn get_activity_status(&self, agent: &AgentPubKey) -> DatabaseResult<Option<ChainStatus>>;
+        fn get_activity_observed(&self, agent: &AgentPubKey)
+        -> DatabaseResult<Option<HighestObserved>>;
         fn get_updates(
             &self,
             hash: AnyDhtHash,
@@ -120,6 +158,35 @@ impl MetadataBufT for MockMetadataBuf {
     {
         self.get_activity(key)
     }
+    fn get_activity_sequence<'r, R: Readable>(
+        &'r self,
+        _r: &'r R,
+        key: ChainItemKey,
+    ) -> DatabaseResult<
+        Box<dyn FallibleIterator<Item = (u32, HeaderHash), Error = DatabaseError> + '_>,
+    > {
+        self.get_activity_sequence(key)
+    }
+
+    fn get_validation_package<'r, R: Readable>(
+        &'r self,
+        _r: &'r R,
+        hash: &HeaderHash,
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>
+    {
+        self.get_validation_package(hash)
+    }
+
+    fn get_activity_status(&self, agent: &AgentPubKey) -> DatabaseResult<Option<ChainStatus>> {
+        self.get_activity_status(agent)
+    }
+
+    fn get_activity_observed(
+        &self,
+        agent: &AgentPubKey,
+    ) -> DatabaseResult<Option<HighestObserved>> {
+        self.get_activity_observed(agent)
+    }
 
     fn get_updates<'r, R: Readable>(
         &'r self,
@@ -175,6 +242,39 @@ impl MetadataBufT for MockMetadataBuf {
     fn register_activity(&mut self, header: &Header) -> DatabaseResult<()> {
         self.sync_register_activity(header)
     }
+    /// Register a sequence of activity onto an agent key
+    fn register_activity_sequence(
+        &mut self,
+        agent: &AgentPubKey,
+        sequence: impl IntoIterator<Item = (u32, HeaderHash)>,
+    ) -> DatabaseResult<()> {
+        self.register_activity_sequence(agent, sequence.into_iter().collect())
+    }
+
+    /// Deregister a sequence of activity onto an agent key
+    fn deregister_activity_sequence(&mut self, agent: &AgentPubKey) -> DatabaseResult<()> {
+        self.deregister_activity_sequence(agent)
+    }
+    fn register_activity_status(
+        &mut self,
+        agent: &AgentPubKey,
+        status: ChainStatus,
+    ) -> DatabaseResult<()> {
+        self.register_activity_status(agent, status)
+    }
+    fn deregister_activity_status(&mut self, agent: &AgentPubKey) -> DatabaseResult<()> {
+        self.deregister_activity_status(agent)
+    }
+    fn register_activity_observed(
+        &mut self,
+        agent: &AgentPubKey,
+        observed: HighestObserved,
+    ) -> DatabaseResult<()> {
+        self.register_activity_observed(agent, observed)
+    }
+    fn deregister_activity_observed(&mut self, agent: &AgentPubKey) -> DatabaseResult<()> {
+        self.deregister_activity_observed(agent)
+    }
 
     fn register_update(&mut self, update: header::Update) -> DatabaseResult<()> {
         self.sync_register_update(update)
@@ -193,6 +293,18 @@ impl MetadataBufT for MockMetadataBuf {
 
     fn deregister_activity(&mut self, header: &Header) -> DatabaseResult<()> {
         self.sync_deregister_activity(header)
+    }
+
+    fn register_validation_package(
+        &mut self,
+        hash: &HeaderHash,
+        package: impl IntoIterator<Item = HeaderHash>,
+    ) {
+        self.register_validation_package(hash, package.into_iter().collect())
+    }
+
+    fn deregister_validation_package(&mut self, header: &HeaderHash) {
+        self.deregister_validation_package(header)
     }
 
     fn deregister_update(&mut self, update: header::Update) -> DatabaseResult<()> {

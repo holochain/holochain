@@ -8,6 +8,10 @@ use crate::{
         ConductorBuilder, ConductorHandle,
     },
     core::ribosome::ZomeCallInvocation,
+    core::state::cascade::Cascade,
+    core::state::cascade::DbPair,
+    core::state::element_buf::ElementBuf,
+    core::state::metadata::MetadataBuf,
     core::workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace,
 };
 use ::fixt::prelude::*;
@@ -141,7 +145,10 @@ pub async fn test_network(
     dna_hash: Option<DnaHash>,
     agent_key: Option<AgentPubKey>,
 ) -> (HolochainP2pRef, HolochainP2pEventReceiver, HolochainP2pCell) {
-    let (network, recv) = spawn_holochain_p2p().await.unwrap();
+    let (network, recv) =
+        spawn_holochain_p2p(holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default())
+            .await
+            .unwrap();
     let dna = dna_hash.unwrap_or_else(|| fixt!(DnaHash));
     let mut key_fixt = AgentPubKeyFixturator::new(Predictable);
     let agent_key = agent_key.unwrap_or_else(|| key_fixt.next().unwrap());
@@ -259,14 +266,32 @@ pub async fn wait_for_integration(
         });
         tracing::debug!(?int_limbo);
 
-        let count = fresh_reader_test!(env, |r| {
+        let int: Vec<_> = fresh_reader_test!(env, |r| {
             workspace
                 .integrated_dht_ops
                 .iter(&r)
                 .unwrap()
-                .count()
+                .map(|(_, v)| Ok(v))
+                .collect()
                 .unwrap()
         });
+        let count = int.len();
+
+        {
+            let s = tracing::trace_span!("wait_for_integration_deep");
+            let _g = s.enter();
+            let element_integrated = ElementBuf::vault(env.clone().into(), false).unwrap();
+            let meta_integrated = MetadataBuf::vault(env.clone().into()).unwrap();
+            let element_rejected = ElementBuf::rejected(env.clone().into()).unwrap();
+            let meta_rejected = MetadataBuf::rejected(env.clone().into()).unwrap();
+            let mut cascade = Cascade::empty()
+                .with_integrated(DbPair::new(&element_integrated, &meta_integrated))
+                .with_rejected(DbPair::new(&element_rejected, &meta_rejected));
+            for iv in int {
+                tracing::trace!(op = ?iv.op, el = ?cascade.retrieve(iv.op.header_hash().clone().into(), Default::default()).await.unwrap());
+            }
+        }
+
         if count == expected_count {
             return;
         } else {

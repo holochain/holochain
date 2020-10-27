@@ -18,11 +18,11 @@ async fn incoming_ops_to_limbo() {
     let signature = author.sign(&keystore, &header).await.unwrap();
 
     let op = DhtOp::RegisterAgentActivity(signature, header);
-    let op_light = op.to_light().await;
+    let op_light = op.to_light();
     let hash = DhtOpHash::with_data_sync(&op);
     let ops = vec![(hash.clone(), op.clone())];
 
-    incoming_dht_ops_workflow(&env, sys_validation_trigger.clone(), ops)
+    incoming_dht_ops_workflow(&env, sys_validation_trigger.clone(), ops, None)
         .await
         .unwrap();
     rx.listen().await.unwrap();

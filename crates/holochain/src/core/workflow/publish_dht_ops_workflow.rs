@@ -133,7 +133,7 @@ pub async fn publish_dht_ops_workflow_inner(
         // For every op publish a request
         // Collect and sort ops by basis
         to_publish
-            .entry(op.dht_basis().await)
+            .entry(op.dht_basis())
             .or_insert_with(Vec::new)
             .push((op_hash, op));
     }
@@ -290,7 +290,10 @@ mod tests {
             .collect::<Vec<_>>();
 
         // Create the network
-        let (network, mut recv) = spawn_holochain_p2p().await.unwrap();
+        let (network, mut recv) =
+            spawn_holochain_p2p(holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default())
+                .await
+                .unwrap();
         let (tx_complete, rx_complete) = tokio::sync::oneshot::channel();
         let cell_network = network.to_cell(dna.clone(), agents[0].clone());
         let mut recv_count: u32 = 0;
@@ -674,7 +677,10 @@ mod tests {
                     .collect::<Vec<_>>();
 
                 // Create the network
-                let (network, mut recv) = spawn_holochain_p2p().await.unwrap();
+                let (network, mut recv) =
+                    spawn_holochain_p2p(holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default())
+                        .await
+                        .unwrap();
                 let cell_network = network.to_cell(dna.clone(), agents[0].clone());
                 let (tx_complete, rx_complete) = tokio::sync::oneshot::channel();
                 // We are expecting five ops per agent
@@ -703,7 +709,7 @@ mod tests {
                                         match expected.get(&op_hash) {
                                             Some((expected_op, count)) => {
                                                 assert_eq!(&op, expected_op);
-                                                assert_eq!(dht_hash, expected_op.dht_basis().await);
+                                                assert_eq!(dht_hash, expected_op.dht_basis());
                                                 count.fetch_add(1, Ordering::SeqCst);
                                             }
                                             None => panic!(
