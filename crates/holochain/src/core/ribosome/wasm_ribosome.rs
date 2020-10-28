@@ -1,8 +1,12 @@
-use super::{HostAccess, ZomeCallHostAccess, host_fn::get_agent_activity::get_agent_activity, guest_callback::{
+use super::{
+    guest_callback::{
         entry_defs::EntryDefsHostAccess, init::InitHostAccess,
         migrate_agent::MigrateAgentHostAccess, post_commit::PostCommitHostAccess,
         validate::ValidateHostAccess, validation_package::ValidationPackageHostAccess,
-    }};
+    },
+    host_fn::get_agent_activity::get_agent_activity,
+    HostAccess, ZomeCallHostAccess,
+};
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;

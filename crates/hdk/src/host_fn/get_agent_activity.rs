@@ -1,7 +1,7 @@
+use crate::prelude::*;
 use holo_hash::AgentPubKey;
 use holochain_wasmer_guest::SerializedBytesError;
 use holochain_zome_types::query::{ActivityRequest, AgentActivity, ChainQueryFilter};
-use crate::prelude::*;
 
 use crate::host_fn;
 

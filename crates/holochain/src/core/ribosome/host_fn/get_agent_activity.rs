@@ -10,9 +10,7 @@ pub fn get_agent_activity(
     call_context: Arc<CallContext>,
     input: GetAgentActivityInput,
 ) -> RibosomeResult<GetAgentActivityOutput> {
-    dbg!();
     let (agent, query, activity_request) = input.into_inner();
-    dbg!();
     let options = match activity_request {
         ActivityRequest::Status => GetActivityOptions {
             include_valid_activity: false,
@@ -25,15 +23,12 @@ pub fn get_agent_activity(
             ..Default::default()
         },
     };
-    dbg!();
 
     // Get the network from the context
     let network = call_context.host_access.network().clone();
 
-    dbg!();
     // timeouts must be handled by the network
     tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-    dbg!();
         let activity = call_context
             .host_access
             .workspace()
@@ -43,7 +38,6 @@ pub fn get_agent_activity(
             .get_agent_activity(agent, query, options)
             .await?;
 
-    dbg!();
         Ok(GetAgentActivityOutput::new(activity.into()))
     })
 }

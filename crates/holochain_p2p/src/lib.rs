@@ -3,8 +3,8 @@
 
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
-use holochain_zome_types::{capability::CapSecret, zome::ZomeName};
 use holochain_types::activity::AgentActivity;
+use holochain_zome_types::{capability::CapSecret, zome::ZomeName};
 use holochain_zome_types::{query::ChainQueryFilter, zome::FunctionName};
 use std::sync::Arc;
 
