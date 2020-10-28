@@ -1,15 +1,75 @@
 use super::*;
+use futures::sink::SinkExt;
+
+/// a small debug representation of another type
+#[derive(Clone)]
+pub struct Slug(String);
+
+impl std::fmt::Debug for Slug {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+macro_rules! q_slug_from {
+    ($($t:ty => |$i:ident| $c:block,)*) => {$(
+        impl From<$t> for Slug {
+            fn from(f: $t) -> Self {
+                Slug::from(&f)
+            }
+        }
+
+        impl From<&$t> for Slug {
+            fn from(f: &$t) -> Self {
+                let $i = f;
+                Self($c)
+            }
+        }
+    )*};
+}
+
+q_slug_from! {
+    Arc<KitsuneSpace> => |s| {
+        let f = format!("{:?}", s);
+        format!("s{}", &f[13..25])
+    },
+    Arc<KitsuneAgent> => |s| {
+        let f = format!("{:?}", s);
+        format!("a{}", &f[13..25])
+    },
+    Arc<KitsuneOpHash> => |s| {
+        let f = format!("{:?}", s);
+        format!("o{}", &f[13..25])
+    },
+}
 
 /// an event type for an event emitted by the test suite harness
 #[derive(Clone, Debug)]
 pub enum HarnessEventType {
+    Close,
     Join {
-        agent: Slug,
         space: Slug,
+        agent: Slug,
     },
     StoreAgentInfo {
         agent: Slug,
         agent_info: Arc<AgentInfoSigned>,
+    },
+    Call {
+        space: Slug,
+        to_agent: Slug,
+        from_agent: Slug,
+        payload: String,
+    },
+    Notify {
+        space: Slug,
+        to_agent: Slug,
+        from_agent: Slug,
+        payload: String,
+    },
+    Gossip {
+        op_hash: Slug,
+        op_data: String,
     },
 }
 
@@ -48,6 +108,9 @@ impl HarnessEventChannel {
                         %nick,
                         ?ty,
                     );
+                    if let HarnessEventType::Close = ty {
+                        return;
+                    }
                 }
             }
         });
@@ -71,19 +134,40 @@ impl HarnessEventChannel {
         }
     }
 
+    /// close this channel.
+    pub fn close(&self) {
+        self.publish(HarnessEventType::Close);
+    }
+
     /// break off a broadcast receiver. this receiver will not get historical
     /// messages... only those that are emitted going forward
-    pub fn receive(&self) -> impl tokio::stream::StreamExt {
-        self.chan.subscribe()
+    pub fn receive(&self) -> impl tokio::stream::Stream<Item = HarnessEvent> {
+        let (mut s, r) = futures::channel::mpsc::channel(10);
+        let mut chan = self.chan.subscribe();
+        tokio::task::spawn(async move {
+            while let Some(Ok(msg)) = chan.next().await {
+                let is_close = if let HarnessEventType::Close = &msg.ty {
+                    true
+                } else {
+                    false
+                };
+                if s.send(msg).await.is_err() {
+                    break;
+                }
+                if is_close {
+                    break;
+                }
+            }
+            s.close_channel();
+        });
+        r
     }
 
     /// publish a harness event to all receivers
     pub fn publish(&self, ty: HarnessEventType) {
-        self.chan
-            .send(HarnessEvent {
-                nick: self.nick.clone(),
-                ty,
-            })
-            .expect("should be able to publish");
+        let _ = self.chan.send(HarnessEvent {
+            nick: self.nick.clone(),
+            ty,
+        });
     }
 }

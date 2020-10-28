@@ -47,46 +47,8 @@ test_val! {
     Arc<KitsuneOpHash> => { rand36() },
 }
 
-/// a small debug representation of another type
-#[derive(Clone)]
-pub struct Slug(String);
-
-impl std::fmt::Debug for Slug {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-macro_rules! q_slug_from {
-    ($($t:ty => |$i:ident| $c:block,)*) => {$(
-        impl From<$t> for Slug {
-            fn from(f: $t) -> Self {
-                Slug::from(&f)
-            }
-        }
-
-        impl From<&$t> for Slug {
-            fn from(f: &$t) -> Self {
-                let $i = f;
-                Self($c)
-            }
-        }
-    )*};
-}
-
-q_slug_from! {
-    Arc<KitsuneSpace> => |s| {
-        let f = format!("{:?}", s);
-        format!("s{}", &f[13..25])
-    },
-    Arc<KitsuneAgent> => |s| {
-        let f = format!("{:?}", s);
-        format!("a{}", &f[13..25])
-    },
-}
-
 mod harness_event;
-use harness_event::*;
+pub use harness_event::*;
 
 mod harness_agent;
 pub(crate) use harness_agent::*;
