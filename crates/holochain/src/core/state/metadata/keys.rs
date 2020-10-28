@@ -91,9 +91,11 @@ pub enum ChainItemKey {
     /// Match all headers on this agents key
     Agent(AgentPubKey),
     /// Match all headers on this agents key at this sequence number
-    AgentSequence(AgentPubKey, u32),
+    AgentStatus(AgentPubKey, ValidationStatus),
+    /// Match all headers on this agents key at this sequence number
+    AgentStatusSequence(AgentPubKey, ValidationStatus, u32),
     /// Match a specific header at this key / sequence number
-    Full(AgentPubKey, u32, HeaderHash),
+    Full(AgentPubKey, ValidationStatus, u32, HeaderHash),
 }
 
 impl LinkMetaVal {
@@ -175,6 +177,18 @@ impl From<&LinkMetaKey<'_>> for BytesKey {
             .concat(),
         }
         .into()
+    }
+}
+
+impl ChainItemKey {
+    /// Create a new chain item key from a header and a validation status
+    pub fn new(h: &Header, status: ValidationStatus) -> Self {
+        ChainItemKey::Full(
+            h.author().clone(),
+            status,
+            h.header_seq(),
+            HeaderHash::with_data_sync(h),
+        )
     }
 }
 
@@ -287,20 +301,10 @@ impl<T: PrefixType> From<LinkMetaKey<'_>> for PrefixBytesKey<T> {
     }
 }
 
-impl From<&Header> for ChainItemKey {
-    fn from(h: &Header) -> Self {
-        ChainItemKey::Full(
-            h.author().clone(),
-            h.header_seq(),
-            HeaderHash::with_data_sync(h),
-        )
-    }
-}
-
 impl From<ChainItemKey> for HeaderHash {
     fn from(c: ChainItemKey) -> Self {
         match c {
-            ChainItemKey::Full(_, _, h) => h,
+            ChainItemKey::Full(_, _, _, h) => h,
             _ => unreachable!("Tried to get header hash from a partial key: {:?}", c),
         }
     }
@@ -309,7 +313,7 @@ impl From<ChainItemKey> for HeaderHash {
 impl From<&ChainItemKey> for u32 {
     fn from(c: &ChainItemKey) -> Self {
         match c {
-            ChainItemKey::AgentSequence(_, s) | ChainItemKey::Full(_, s, _) => *s,
+            ChainItemKey::AgentStatusSequence(_, _, s) | ChainItemKey::Full(_, _, s, _) => *s,
             _ => unreachable!("Tried to get sequence from a partial key: {:?}", c),
         }
     }
@@ -318,22 +322,43 @@ impl From<&ChainItemKey> for u32 {
 impl From<&ChainItemKey> for BytesKey {
     fn from(key: &ChainItemKey) -> Self {
         use byteorder::{BigEndian, WriteBytesExt};
+        fn status(v: ValidationStatus) -> u8 {
+            match v {
+                ValidationStatus::Valid => 0,
+                ValidationStatus::Rejected => 1,
+                ValidationStatus::Abandoned => 2,
+            }
+        }
         match key {
             ChainItemKey::Agent(a) => a.as_ref().into(),
-            ChainItemKey::AgentSequence(a, s) => {
+            ChainItemKey::AgentStatus(a, v) => {
+                // Get the agent key
+                let mut buf = a.clone().into_inner();
+
+                // Add the validation status
+                buf.push(status(*v));
+                buf.into()
+            }
+            ChainItemKey::AgentStatusSequence(a, v, s) => {
                 // Get the agent key
                 let mut buf = a.clone().into_inner();
                 let mut num = Vec::with_capacity(4);
+
+                // Add the validation status
+                buf.push(status(*v));
 
                 // Get the header seq
                 num.write_u32::<BigEndian>(*s).unwrap();
                 buf.extend(num);
                 buf.into()
             }
-            ChainItemKey::Full(a, s, h) => {
+            ChainItemKey::Full(a, v, s, h) => {
                 // Get the agent key
                 let mut buf = a.clone().into_inner();
                 let mut num = Vec::with_capacity(4);
+
+                // Add the validation status
+                buf.push(status(*v));
 
                 // Get the header seq
                 num.write_u32::<BigEndian>(*s).unwrap();
@@ -354,20 +379,41 @@ impl From<BytesKey> for ChainItemKey {
         use byteorder::{BigEndian, ByteOrder};
         let bytes = b.0;
         const SEQ_SIZE: usize = std::mem::size_of::<u32>();
-        debug_assert_eq!(bytes.len(), HOLO_HASH_SERIALIZED_LEN * 2 + SEQ_SIZE);
+        const STATUS_SIZE: usize = std::mem::size_of::<u8>();
+        debug_assert_eq!(
+            bytes.len(),
+            HOLO_HASH_SERIALIZED_LEN * 2 + SEQ_SIZE + STATUS_SIZE
+        );
+        let mut start = 0;
+        let mut end = HOLO_HASH_SERIALIZED_LEN;
 
-        // Tak 36 for the AgentPubKey
-        let a = AgentPubKey::from_raw_bytes(bytes[..HOLO_HASH_SERIALIZED_LEN].to_owned());
+        // Take 36 for the AgentPubKey
+        let a = AgentPubKey::from_raw_bytes(bytes[start..end].to_owned());
+
+        start = end;
+        end += STATUS_SIZE;
+
+        // Take 1 byte for the status
+        let v = match bytes[start..end] {
+            [0] => ValidationStatus::Valid,
+            [1] => ValidationStatus::Rejected,
+            [2] => ValidationStatus::Abandoned,
+            _ => panic!("Invalid ChainItemKey"),
+        };
+
+        start = end;
+        end += SEQ_SIZE;
 
         // Take another 4 for the u32
-        let seq_bytes: Vec<_> =
-            bytes[HOLO_HASH_SERIALIZED_LEN..(HOLO_HASH_SERIALIZED_LEN + SEQ_SIZE)].to_owned();
+        let seq_bytes: Vec<_> = bytes[start..end].to_owned();
         let s = BigEndian::read_u32(&seq_bytes);
 
-        // Take the rest for the header hash
-        let h =
-            HeaderHash::from_raw_bytes(bytes[(HOLO_HASH_SERIALIZED_LEN + SEQ_SIZE)..].to_owned());
+        start = end;
+        end += HOLO_HASH_SERIALIZED_LEN;
 
-        ChainItemKey::Full(a, s, h)
+        // Take the rest for the header hash
+        let h = HeaderHash::from_raw_bytes(bytes[start..end].to_owned());
+
+        ChainItemKey::Full(a, v, s, h)
     }
 }

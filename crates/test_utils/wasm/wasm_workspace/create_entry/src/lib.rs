@@ -69,3 +69,17 @@ fn validate_create_entry_post(
     };
     Ok(r)
 }
+
+#[hdk_extern]
+fn my_activity(_: ()) -> ExternResult<AgentActivity> {
+    debug!(line!());
+    let agent = agent_info!()?.agent_latest_pubkey;
+    debug!(line!());
+    let query = QueryFilter::new();
+    debug!(line!());
+    // Ok(get_agent_activity(agent, query, ActivityRequest::Full)?)
+    let r = get_agent_activity(agent, query, ActivityRequest::Full);
+    debug!(format!("{:?}", r));
+    let r = r?;
+    Ok(r)
+}

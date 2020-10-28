@@ -2,9 +2,9 @@
 
 use super::*;
 
-use crate::fixt::CallContextFixturator;
 use crate::fixt::ZomeCallHostAccessFixturator;
 use crate::here;
+use crate::{core::state::metadata::ChainItemKey, fixt::CallContextFixturator};
 use crate::{
     core::{
         queue_consumer::TriggerSender,
@@ -318,7 +318,7 @@ impl Db {
                     let header_hash = TimedHeaderHash::from(header_hash);
                     let res = workspace
                         .meta
-                        .get_activity(&reader, (&header).into())
+                        .get_activity(&reader, ChainItemKey::new(&header, ValidationStatus::Valid))
                         .unwrap()
                         .collect::<Vec<_>>()
                         .unwrap();

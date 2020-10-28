@@ -10,10 +10,11 @@ use crate::conductor::handle::ConductorHandle;
 use crate::conductor::{api::error::ConductorApiError, entry_def_store::get_entry_def_from_ids};
 use crate::core::queue_consumer::{spawn_queue_consumer_tasks, InitialQueueTriggers};
 use crate::core::ribosome::ZomeCallInvocation;
+use holochain_types::activity::AgentActivity;
+use holochain_zome_types::header::EntryType;
 use holochain_zome_types::query::ChainQueryFilter;
 use holochain_zome_types::validate::ValidationPackage;
 use holochain_zome_types::zome::FunctionName;
-use holochain_zome_types::{header::EntryType, query::AgentActivity};
 use validation_package::ValidationPackageDb;
 
 use crate::{

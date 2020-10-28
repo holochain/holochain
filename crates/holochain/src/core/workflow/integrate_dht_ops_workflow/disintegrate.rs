@@ -22,7 +22,7 @@ where
         DhtOpLight::RegisterAgentActivity(hash, _) => {
             let header = get_header(hash, element_store)?;
             // register agent activity on this agents pub key
-            meta_store.deregister_activity(&header)?;
+            meta_store.deregister_activity(&header, ValidationStatus::Valid)?;
         }
         DhtOpLight::RegisterUpdatedContent(hash, _, _)
         | DhtOpLight::RegisterUpdatedElement(hash, _, _) => {

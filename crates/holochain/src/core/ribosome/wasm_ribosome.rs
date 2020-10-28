@@ -1,11 +1,8 @@
-use super::{
-    guest_callback::{
+use super::{HostAccess, ZomeCallHostAccess, host_fn::get_agent_activity::get_agent_activity, guest_callback::{
         entry_defs::EntryDefsHostAccess, init::InitHostAccess,
         migrate_agent::MigrateAgentHostAccess, post_commit::PostCommitHostAccess,
         validate::ValidateHostAccess, validation_package::ValidationPackageHostAccess,
-    },
-    HostAccess, ZomeCallHostAccess,
-};
+    }};
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
@@ -275,6 +272,10 @@ impl WasmRibosome {
                 "__get_link_details",
                 func!(invoke_host_function!(get_link_details)),
             );
+            ns.insert(
+                "__get_agent_activity",
+                func!(invoke_host_function!(get_agent_activity)),
+            );
             ns.insert("__query", func!(invoke_host_function!(query)));
         } else {
             ns.insert("__get", func!(invoke_host_function!(unreachable)));
@@ -282,6 +283,10 @@ impl WasmRibosome {
             ns.insert("__get_links", func!(invoke_host_function!(unreachable)));
             ns.insert(
                 "__get_link_details",
+                func!(invoke_host_function!(unreachable)),
+            );
+            ns.insert(
+                "__get_agent_activity",
                 func!(invoke_host_function!(unreachable)),
             );
             ns.insert("__query", func!(invoke_host_function!(unreachable)));

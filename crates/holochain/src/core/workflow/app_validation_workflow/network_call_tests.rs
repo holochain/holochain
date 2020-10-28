@@ -5,10 +5,13 @@ use hdk3::prelude::{Element, EntryType, ValidationPackage};
 use holo_hash::HeaderHash;
 use holochain_p2p::{actor::GetActivityOptions, HolochainP2pCellT};
 use holochain_state::env::EnvironmentRead;
-use holochain_types::HeaderHashed;
+use holochain_types::{
+    activity::{AgentActivity, ChainItems},
+    HeaderHashed,
+};
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::{
-    query::{Activity, AgentActivity, ChainHead, ChainQueryFilter, ChainStatus, HighestObserved},
+    query::{ActivityRequest, ChainHead, ChainQueryFilter, ChainStatus, HighestObserved},
     ZomeCallResponse,
 };
 use matches::assert_matches;
@@ -20,7 +23,9 @@ use crate::{
     core::state::cascade::DbPairMut,
     core::state::element_buf::ElementBuf,
     core::state::metadata::MetadataBuf,
-    test_utils::{conductor_setup::ConductorCallData, new_invocation, wait_for_integration},
+    test_utils::{
+        conductor_setup::ConductorCallData, host_fn_api, new_invocation, wait_for_integration,
+    },
 };
 use crate::{
     core::state::source_chain::SourceChain, test_utils::conductor_setup::ConductorTestData,
@@ -231,8 +236,8 @@ async fn get_agent_activity_test() {
         });
 
         AgentActivity {
-            valid_activity: Activity::Full(valid_activity),
-            rejected_activity: Activity::NotRequested,
+            valid_activity: ChainItems::Full(valid_activity),
+            rejected_activity: ChainItems::NotRequested,
             status,
             highest_observed,
             agent: alice_agent_id.clone(),
@@ -241,36 +246,36 @@ async fn get_agent_activity_test() {
 
     let get_expected = || {
         let mut activity = get_expected_full();
-        let valid_activity = unwrap_to::unwrap_to!(activity.valid_activity => Activity::Full)
+        let valid_activity = unwrap_to::unwrap_to!(activity.valid_activity => ChainItems::Full)
             .clone()
             .into_iter()
             .map(|shh| (shh.header().header_seq(), shh.header_address().clone()))
             .collect();
-        activity.valid_activity = Activity::Hashes(valid_activity);
+        activity.valid_activity = ChainItems::Hashes(valid_activity);
         activity
     };
 
     // Helper closure for changing to AgentActivity<Element> type
     let get_expected_cascade = |activity: AgentActivity| {
         let valid_activity = match activity.valid_activity {
-            Activity::Full(headers) => Activity::Full(
+            ChainItems::Full(headers) => ChainItems::Full(
                 headers
                     .into_iter()
                     .map(|shh| Element::new(shh, None))
                     .collect(),
             ),
-            Activity::Hashes(h) => Activity::Hashes(h),
-            Activity::NotRequested => Activity::NotRequested,
+            ChainItems::Hashes(h) => ChainItems::Hashes(h),
+            ChainItems::NotRequested => ChainItems::NotRequested,
         };
         let rejected_activity = match activity.rejected_activity {
-            Activity::Full(headers) => Activity::Full(
+            ChainItems::Full(headers) => ChainItems::Full(
                 headers
                     .into_iter()
                     .map(|shh| Element::new(shh, None))
                     .collect(),
             ),
-            Activity::Hashes(h) => Activity::Hashes(h),
-            Activity::NotRequested => Activity::NotRequested,
+            ChainItems::Hashes(h) => ChainItems::Hashes(h),
+            ChainItems::NotRequested => ChainItems::NotRequested,
         };
         let activity: AgentActivity<Element> = AgentActivity {
             agent: activity.agent,
@@ -283,8 +288,6 @@ async fn get_agent_activity_test() {
     };
 
     commit_some_data("create_entry", &alice_call_data, &handle).await;
-
-    alice_call_data.triggers.produce_dht_ops.trigger();
 
     // 3 ops per commit, 5 commits plus 7 for genesis + 2 for init
     let mut expected_count = NUM_COMMITS * 3 + 9;
@@ -366,11 +369,11 @@ async fn get_agent_activity_test() {
         )
         .await
         .expect("Failed to get any activity from alice");
-    let agent_activity = unwrap_to::unwrap_to!(r.valid_activity => Activity::Full).clone();
+    let agent_activity = unwrap_to::unwrap_to!(r.valid_activity => ChainItems::Full).clone();
 
     let alice_source_chain = SourceChain::public_only(alice_call_data.env.clone().into()).unwrap();
     let expected_activity: Vec<_> =
-        unwrap_to::unwrap_to!(get_expected_full().valid_activity => Activity::Full)
+        unwrap_to::unwrap_to!(get_expected_full().valid_activity => ChainItems::Full)
             .into_iter()
             .cloned()
             // We are expecting the full elements with entries
@@ -453,7 +456,7 @@ async fn get_agent_activity_test() {
     // This time we expect only activity that matches the entry type
     let mut expected_activity = get_expected_cascade(get_expected_full());
     let activity: Vec<_> =
-        unwrap_to::unwrap_to!(expected_activity.valid_activity => Activity::Full)
+        unwrap_to::unwrap_to!(expected_activity.valid_activity => ChainItems::Full)
             .into_iter()
             .filter(|a| {
                 a.header()
@@ -464,7 +467,7 @@ async fn get_agent_activity_test() {
             .cloned()
             // We are expecting the full elements with entries
             .collect();
-    expected_activity.valid_activity = Activity::Full(activity);
+    expected_activity.valid_activity = ChainItems::Full(activity);
 
     assert_eq!(agent_activity, expected_activity);
 
@@ -570,6 +573,91 @@ async fn get_custom_package_test() {
     }
 
     ConductorTestData::shutdown_conductor(handle).await;
+}
+
+#[tokio::test(threaded_scheduler)]
+async fn get_agent_activity_host_fn_test() {
+    observability::test_run().ok();
+
+    let zomes = vec![TestWasm::Create];
+    let conductor_test = ConductorTestData::new(zomes, false).await;
+    let ConductorTestData {
+        __tmpdir,
+        handle,
+        alice_call_data,
+        ..
+    } = conductor_test;
+    let alice_cell_id = &alice_call_data.cell_id;
+    let alice_agent_id = alice_cell_id.agent_pubkey();
+    let alice_env = alice_call_data.env.clone();
+
+    // Helper for getting expected data
+    let get_expected = || {
+        let alice_source_chain = SourceChain::public_only(alice_env.clone().into()).unwrap();
+        let valid_activity = alice_source_chain
+            .iter_back()
+            .collect::<Vec<_>>()
+            .unwrap()
+            .into_iter()
+            .rev()
+            .map(|shh| (shh.header().header_seq(), shh.header_address().clone()))
+            .collect::<Vec<_>>();
+        let last = valid_activity.last().cloned().unwrap();
+        let status = ChainStatus::Valid(ChainHead {
+            header_seq: last.0,
+            hash: last.1.clone(),
+        });
+        let highest_observed = Some(HighestObserved {
+            header_seq: last.0,
+            hash: vec![last.1.clone()],
+        });
+
+        holochain_zome_types::query::AgentActivity {
+            valid_activity: valid_activity,
+            rejected_activity: Vec::new(),
+            status,
+            highest_observed,
+            warranted: Vec::new(),
+        }
+    };
+
+    commit_some_data("create_entry", &alice_call_data, &handle).await;
+
+    // 3 ops per commit, 5 commits plus 7 for genesis + 2 for init
+    let expected_count = NUM_COMMITS * 3 + 9;
+
+    wait_for_integration(
+        &alice_call_data.env,
+        expected_count,
+        NUM_ATTEMPTS,
+        DELAY_PER_ATTEMPT.clone(),
+    )
+    .await;
+
+    let agent_activity = host_fn_api::get_agent_activity(
+        &alice_call_data.env,
+        alice_call_data.call_data(TestWasm::Create),
+        alice_agent_id,
+        &ChainQueryFilter::new(),
+        ActivityRequest::Full,
+    )
+    .await;
+    let expected_activity = get_expected();
+    assert_eq!(agent_activity, expected_activity);
+
+    let invocation = new_invocation(
+        &alice_call_data.cell_id,
+        "my_activity",
+        (),
+        TestWasm::Create,
+    )
+    .unwrap();
+    let result = handle.call_zome(invocation).await.unwrap().unwrap();
+    let result = unwrap_to::unwrap_to!(result => ZomeCallResponse::Ok)
+        .clone()
+        .into_inner();
+    let agent_activity: holochain_zome_types::query::AgentActivity = result.try_into().unwrap();
+    assert_eq!(agent_activity, expected_activity);
 }
 
 async fn commit_some_data(

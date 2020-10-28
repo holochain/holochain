@@ -20,6 +20,7 @@ use holochain_p2p::{
 };
 use holochain_state::{error::DatabaseResult, fresh_reader, prelude::*};
 use holochain_types::{
+    activity::{AgentActivity, ChainItems},
     chain::AgentActivityExt,
     dht_op::{produce_op_lights_from_element_group, produce_op_lights_from_elements},
     element::{
@@ -36,11 +37,10 @@ use holochain_zome_types::{
     header::HeaderType,
     link::Link,
     metadata::{Details, ElementDetails, EntryDetails},
-    query::Activity,
-    query::AgentActivity,
     query::ChainQueryFilter,
     query::ChainStatus,
     validate::ValidationPackage,
+    validate::ValidationStatus,
 };
 use std::collections::HashSet;
 use std::collections::{BTreeMap, BTreeSet};
@@ -326,20 +326,50 @@ where
             // Same seq number are combined to show a fork
             highest_observed,
             valid_activity,
+            rejected_activity,
             ..
         } = agent_activity;
         match valid_activity {
-            Activity::Full(headers) => {
+            ChainItems::Full(headers) => {
                 let hashes = headers
                     .into_iter()
                     .map(|shh| (shh.header().header_seq(), shh.header_address().clone()));
-                cache_data.meta.register_activity_sequence(&agent, hashes)?;
+                cache_data.meta.register_activity_sequence(
+                    &agent,
+                    hashes,
+                    ValidationStatus::Valid,
+                )?;
             }
-            Activity::Hashes(hashes) => {
+            ChainItems::Hashes(hashes) => {
                 let hashes = hashes.into_iter();
-                cache_data.meta.register_activity_sequence(&agent, hashes)?;
+                cache_data.meta.register_activity_sequence(
+                    &agent,
+                    hashes,
+                    ValidationStatus::Valid,
+                )?;
             }
-            Activity::NotRequested => (),
+            ChainItems::NotRequested => (),
+        };
+        match rejected_activity {
+            ChainItems::Full(headers) => {
+                let hashes = headers
+                    .into_iter()
+                    .map(|shh| (shh.header().header_seq(), shh.header_address().clone()));
+                cache_data.meta.register_activity_sequence(
+                    &agent,
+                    hashes,
+                    ValidationStatus::Rejected,
+                )?;
+            }
+            ChainItems::Hashes(hashes) => {
+                let hashes = hashes.into_iter();
+                cache_data.meta.register_activity_sequence(
+                    &agent,
+                    hashes,
+                    ValidationStatus::Rejected,
+                )?;
+            }
+            ChainItems::NotRequested => (),
         };
         match &status {
             ChainStatus::Empty => {}
@@ -1444,7 +1474,11 @@ where
                         .meta
                         .get_activity(
                             &r,
-                            ChainItemKey::AgentSequence(agent.clone(), range.end - 1),
+                            ChainItemKey::AgentStatusSequence(
+                                agent.clone(),
+                                ValidationStatus::Valid,
+                                range.end - 1,
+                            ),
                         )?
                         .next()?
                         .is_some()
@@ -1453,7 +1487,10 @@ where
                         // Note if the chain is forked there could be multiple headers at each sequence number.
                         Ok(cache_data
                             .meta
-                            .get_activity_sequence(&r, ChainItemKey::Agent(agent))?
+                            .get_activity_sequence(
+                                &r,
+                                ChainItemKey::AgentStatus(agent, ValidationStatus::Valid),
+                            )?
                             // TODO: PERF: Use an iter from to start from the correct sequence
                             .skip_while(|(s, _)| Ok(*s < range.start))
                             .take_while(|(s, _)| Ok(*s < range.end))
@@ -1468,7 +1505,10 @@ where
             None => fresh_reader!(env, |r| {
                 Ok(cache_data
                     .meta
-                    .get_activity_sequence(&r, ChainItemKey::Agent(agent))?
+                    .get_activity_sequence(
+                        &r,
+                        ChainItemKey::AgentStatus(agent, ValidationStatus::Valid),
+                    )?
                     .collect()?)
             }),
         }
@@ -1559,16 +1599,16 @@ where
         match cache_data.meta.get_activity_status(&agent)? {
             Some(status) => Ok(AgentActivity {
                 agent,
-                valid_activity: Activity::Hashes(hashes),
-                rejected_activity: Activity::NotRequested,
+                valid_activity: ChainItems::Hashes(hashes),
+                rejected_activity: ChainItems::NotRequested,
                 status,
                 highest_observed,
             }),
             // If we don't have any status then we must return an empty chain
             None => Ok(AgentActivity {
                 agent,
-                valid_activity: Activity::NotRequested,
-                rejected_activity: Activity::NotRequested,
+                valid_activity: ChainItems::NotRequested,
+                rejected_activity: ChainItems::NotRequested,
                 status: ChainStatus::Empty,
                 highest_observed,
             }),
@@ -1633,19 +1673,19 @@ where
 
         // Check if we are done
         match &activity {
-            // Activity is empty so nothing else to do.
+            // ChainItems is empty so nothing else to do.
             AgentActivity {
                 status: ChainStatus::Empty,
                 ..
             } => return Ok(activity),
-            // Activity has a status but there are no hashes
+            // ChainItems has a status but there are no hashes
             // so nothing else to do.
             AgentActivity {
-                valid_activity: Activity::Hashes(h),
+                valid_activity: ChainItems::Hashes(h),
                 ..
             } if h.is_empty() => {
                 if requester_options.include_full_headers {
-                    activity.valid_activity = Activity::Full(Vec::new());
+                    activity.valid_activity = ChainItems::Full(Vec::new());
                 }
                 return Ok(activity);
             }
@@ -1653,8 +1693,8 @@ where
         }
 
         match &activity.valid_activity {
-            Activity::Full(_) => todo!(),
-            Activity::Hashes(hashes) => {
+            ChainItems::Full(_) => todo!(),
+            ChainItems::Hashes(hashes) => {
                 // If full headers and include entries is requested
                 // retrieve them in parallel
                 if query.include_entries && requester_options.include_full_headers {
@@ -1671,7 +1711,7 @@ where
                     }
                     let elements = elements.unwrap_or_else(Vec::new);
                     Ok(AgentActivity {
-                        valid_activity: Activity::Full(elements),
+                        valid_activity: ChainItems::Full(elements),
                         ..activity
                     })
                 // If only full headers is requested
@@ -1690,7 +1730,7 @@ where
                     }
                     let elements = elements.unwrap_or_else(Vec::new);
                     Ok(AgentActivity {
-                        valid_activity: Activity::Full(elements),
+                        valid_activity: ChainItems::Full(elements),
                         ..activity
                     })
                 } else {
@@ -1698,7 +1738,7 @@ where
                     Ok(activity)
                 }
             }
-            Activity::NotRequested => Ok(activity),
+            ChainItems::NotRequested => Ok(activity),
         }
     }
 
