@@ -5,6 +5,7 @@ use crate::{
     *,
 };
 use futures::future::FutureExt;
+use ghost_actor::dependencies::tracing;
 use std::{collections::HashMap, sync::Arc};
 use tokio::stream::StreamExt;
 
@@ -30,6 +31,7 @@ macro_rules! test_val  {
     )*};
 }
 
+/// internal helper to generate randomized kitsune data items
 fn rand36<F: From<Vec<u8>>>() -> Arc<F> {
     use rand::Rng;
     let mut out = vec![0; 36];
@@ -37,6 +39,7 @@ fn rand36<F: From<Vec<u8>>>() -> Arc<F> {
     Arc::new(F::from(out))
 }
 
+// setup randomized TestVal::test_val() impls for kitsune data items
 test_val! {
     Arc<KitsuneSpace> => { rand36() },
     Arc<KitsuneAgent> => { rand36() },
@@ -44,39 +47,53 @@ test_val! {
     Arc<KitsuneOpHash> => { rand36() },
 }
 
-/// test_proxy_config_mem
-pub fn test_proxy_config_mem() -> KitsuneP2pConfig {
-    let mut config = KitsuneP2pConfig::default();
-    config.transport_pool.push(TransportConfig::Proxy {
-        sub_transport: Box::new(TransportConfig::Mem {}),
-        proxy_config: ProxyConfig::LocalProxyServer {
-            proxy_accept_config: Some(ProxyAcceptConfig::RejectAll),
-        },
-    });
-    config
+/// a small debug representation of another type
+#[derive(Clone)]
+pub struct Slug(String);
+
+impl std::fmt::Debug for Slug {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
 }
 
-/// test_proxy_config_quic
-pub fn test_proxy_config_quic() -> KitsuneP2pConfig {
-    let mut config = KitsuneP2pConfig::default();
-    config.transport_pool.push(TransportConfig::Proxy {
-        sub_transport: Box::new(TransportConfig::Quic {
-            bind_to: Some(url2::url2!("kitsune-quic://0.0.0.0:0")),
-            override_host: None,
-            override_port: None,
-        }),
-        proxy_config: ProxyConfig::LocalProxyServer {
-            proxy_accept_config: Some(ProxyAcceptConfig::RejectAll),
-        },
-    });
-    config
+macro_rules! q_slug_from {
+    ($($t:ty => |$i:ident| $c:block,)*) => {$(
+        impl From<$t> for Slug {
+            fn from(f: $t) -> Self {
+                Slug::from(&f)
+            }
+        }
+
+        impl From<&$t> for Slug {
+            fn from(f: &$t) -> Self {
+                let $i = f;
+                Self($c)
+            }
+        }
+    )*};
+}
+
+q_slug_from! {
+    Arc<KitsuneSpace> => |s| {
+        let f = format!("{:?}", s);
+        format!("s{}", &f[13..25])
+    },
+    Arc<KitsuneAgent> => |s| {
+        let f = format!("{:?}", s);
+        format!("a{}", &f[13..25])
+    },
 }
 
 /// an event type for an event emitted by the test suite harness
 #[derive(Clone, Debug)]
 pub enum HarnessEventType {
+    Join {
+        agent: Slug,
+        space: Slug,
+    },
     StoreAgentInfo {
-        agent: Arc<KitsuneAgent>,
+        agent: Slug,
         agent_info: Arc<AgentInfoSigned>,
     },
 }
@@ -101,11 +118,24 @@ pub struct HarnessEventChannel {
 }
 
 impl HarnessEventChannel {
+    /// constructor for a new harness event channel
     pub fn new(nick: impl AsRef<str>) -> Self {
-        let (chan, mut dummy_recv) = tokio::sync::broadcast::channel(10);
+        let (chan, mut trace_recv) = tokio::sync::broadcast::channel(10);
 
         // we need an active dummy recv or the sends will error
-        tokio::task::spawn(async move { while let Some(_) = dummy_recv.next().await {} });
+        tokio::task::spawn(async move {
+            while let Some(evt) = trace_recv.next().await {
+                if let Ok(evt) = evt {
+                    let HarnessEvent { nick, ty } = evt;
+                    const T: &str = "HARNESS_EVENT";
+                    tracing::debug!(
+                        %T,
+                        %nick,
+                        ?ty,
+                    );
+                }
+            }
+        });
 
         Self {
             nick: Arc::new(nick.as_ref().to_string()),
@@ -113,6 +143,7 @@ impl HarnessEventChannel {
         }
     }
 
+    /// clone this channel, but append a nickname segment to the messages
     pub fn sub_clone(&self, sub_nick: impl AsRef<str>) -> Self {
         let mut new_nick = (*self.nick).clone();
         if !new_nick.is_empty() {
@@ -125,10 +156,13 @@ impl HarnessEventChannel {
         }
     }
 
+    /// break off a broadcast receiver. this receiver will not get historical
+    /// messages... only those that are emitted going forward
     pub fn receive(&self) -> impl tokio::stream::StreamExt {
         self.chan.subscribe()
     }
 
+    /// publish a harness event to all receivers
     pub fn publish(&self, ty: HarnessEventType) {
         self.chan
             .send(HarnessEvent {
@@ -142,23 +176,57 @@ impl HarnessEventChannel {
 ghost_actor::ghost_chan! {
     /// The api for the test harness controller
     pub chan HarnessControlApi<KitsuneP2pError> {
+        /// Create a new random space id
+        /// + join all existing harness agents to it
+        /// + all new harness agents will also join it
         fn add_space() -> Arc<KitsuneSpace>;
 
+        /// Create a new agent configured to proxy for others.
         fn add_proxy_agent(nick: String) -> (
             Arc<KitsuneAgent>,
             ghost_actor::GhostSender<KitsuneP2p>,
         );
 
+        /// Create a new directly addressable agent that will
+        /// reject any proxy requests.
         fn add_direct_agent(nick: String) -> (
             Arc<KitsuneAgent>,
             ghost_actor::GhostSender<KitsuneP2p>,
         );
 
+        /// Create a new agent that will connect via proxy.
         fn add_nat_agent(nick: String, proxy_url: url2::Url2) -> (
             Arc<KitsuneAgent>,
             ghost_actor::GhostSender<KitsuneP2p>,
         );
     }
+}
+
+/// construct a test suite around a mem transport
+pub async fn spawn_test_harness_mem() -> Result<
+    (
+        ghost_actor::GhostSender<HarnessControlApi>,
+        HarnessEventChannel,
+    ),
+    KitsuneP2pError,
+> {
+    spawn_test_harness(TransportConfig::Mem {}).await
+}
+
+/// construct a test suite around a quic transport
+pub async fn spawn_test_harness_quic() -> Result<
+    (
+        ghost_actor::GhostSender<HarnessControlApi>,
+        HarnessEventChannel,
+    ),
+    KitsuneP2pError,
+> {
+    spawn_test_harness(TransportConfig::Quic {
+        bind_to: Some(url2::url2!("kitsune-quic://0.0.0.0:0")),
+        override_host: None,
+        override_port: None,
+    })
+    .await
 }
 
 /// construct a test suite around a sub transport config concept
@@ -171,6 +239,8 @@ pub async fn spawn_test_harness(
     ),
     KitsuneP2pError,
 > {
+    init_tracing();
+
     let harness_chan = HarnessEventChannel::new("");
 
     let builder = ghost_actor::actor_builder::GhostActorBuilder::new();
@@ -234,8 +304,23 @@ impl HarnessInnerHandler for HarnessActor {
         agent: Arc<KitsuneAgent>,
         p2p: ghost_actor::GhostSender<KitsuneP2p>,
     ) -> HarnessInnerHandlerResult<()> {
-        self.agents.insert(agent, p2p);
-        Ok(async move { Ok(()) }.boxed().into())
+        self.agents.insert(agent.clone(), p2p.clone());
+
+        let harness_chan = self.harness_chan.clone();
+        let space_list = self.space_list.clone();
+        Ok(async move {
+            for space in space_list {
+                p2p.join(space.clone(), agent.clone()).await?;
+
+                harness_chan.publish(HarnessEventType::Join {
+                    agent: (&agent).into(),
+                    space: space.into(),
+                });
+            }
+            Ok(())
+        }
+        .boxed()
+        .into())
     }
 }
 
@@ -273,11 +358,9 @@ impl HarnessControlApiHandler for HarnessActor {
             });
 
         let sub_harness = self.harness_chan.sub_clone(nick);
-        let space_list = self.space_list.clone();
         let i_s = self.i_s.clone();
         Ok(async move {
-            let (agent, p2p) =
-                spawn_test_agent(sub_harness, space_list, proxy_agent_config).await?;
+            let (agent, p2p) = spawn_test_agent(sub_harness, proxy_agent_config).await?;
 
             i_s.finish_agent(agent.clone(), p2p.clone()).await?;
 
@@ -303,11 +386,9 @@ impl HarnessControlApiHandler for HarnessActor {
             });
 
         let sub_harness = self.harness_chan.sub_clone(nick);
-        let space_list = self.space_list.clone();
         let i_s = self.i_s.clone();
         Ok(async move {
-            let (agent, p2p) =
-                spawn_test_agent(sub_harness, space_list, direct_agent_config).await?;
+            let (agent, p2p) = spawn_test_agent(sub_harness, direct_agent_config).await?;
 
             i_s.finish_agent(agent.clone(), p2p.clone()).await?;
 
@@ -332,10 +413,9 @@ impl HarnessControlApiHandler for HarnessActor {
             });
 
         let sub_harness = self.harness_chan.sub_clone(nick);
-        let space_list = self.space_list.clone();
         let i_s = self.i_s.clone();
         Ok(async move {
-            let (agent, p2p) = spawn_test_agent(sub_harness, space_list, nat_agent_config).await?;
+            let (agent, p2p) = spawn_test_agent(sub_harness, nat_agent_config).await?;
 
             i_s.finish_agent(agent.clone(), p2p.clone()).await?;
 
@@ -348,15 +428,10 @@ impl HarnessControlApiHandler for HarnessActor {
 
 async fn spawn_test_agent(
     harness_chan: HarnessEventChannel,
-    space_list: Vec<Arc<KitsuneSpace>>,
     config: KitsuneP2pConfig,
 ) -> Result<(Arc<KitsuneAgent>, ghost_actor::GhostSender<KitsuneP2p>), KitsuneP2pError> {
     let agent: Arc<KitsuneAgent> = TestVal::test_val();
     let (p2p, evt) = spawn_kitsune_p2p(config).await?;
-
-    for space in space_list {
-        p2p.join(space, agent.clone()).await?;
-    }
 
     let builder = ghost_actor::actor_builder::GhostActorBuilder::new();
 
@@ -395,7 +470,7 @@ impl KitsuneP2pEventHandler for AgentHarness {
         let info = Arc::new(input.agent_info_signed);
         self.agent_store.insert(input.agent.clone(), info.clone());
         self.harness_chan.publish(HarnessEventType::StoreAgentInfo {
-            agent: input.agent,
+            agent: (&input.agent).into(),
             agent_info: info,
         });
         Ok(async move { Ok(()) }.boxed().into())

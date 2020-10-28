@@ -7,14 +7,14 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_transport_binding() -> Result<(), KitsuneP2pError> {
-        init_tracing();
+        let (harness, _evt) = spawn_test_harness_quic().await?;
 
         // Create a p2p config with a local proxy that rejects proxying anyone else
         // and binds to `kitsune-quic://0.0.0.0:0`.
-        // This allows the OS to assign a port.
-        let config = test_proxy_config_quic();
-        // Spawn the kitsune p2p actor that will respond to listing bindings.
-        let (p2p, _evt) = spawn_kitsune_p2p(config).await.unwrap();
+        // This allows the OS to assign an interface / port.
+        harness.add_space().await?;
+        let (_, p2p) = harness.add_direct_agent("DIRECT".into()).await?;
+
         // List the bindings and assert that we have one binding that is a
         // kitsune-proxy scheme with a kitsune-quic url.
         let bindings = p2p.list_transport_bindings().await?;
