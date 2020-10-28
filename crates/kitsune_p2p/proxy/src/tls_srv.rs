@@ -8,7 +8,7 @@ pub(crate) fn spawn_tls_server(
     short: String,
     incoming_base_url: url2::Url2,
     tls_server_config: Arc<rustls::ServerConfig>,
-    evt_send: TransportIncomingChannelSender,
+    evt_send: TransportEventSender,
     write: futures::channel::mpsc::Sender<ProxyWire>,
     read: futures::channel::mpsc::Receiver<ProxyWire>,
 ) {
@@ -26,7 +26,7 @@ async fn tls_server(
     short: String,
     incoming_base_url: url2::Url2,
     tls_server_config: Arc<rustls::ServerConfig>,
-    mut evt_send: TransportIncomingChannelSender,
+    mut evt_send: TransportEventSender,
     mut write: futures::channel::mpsc::Sender<ProxyWire>,
     read: futures::channel::mpsc::Receiver<ProxyWire>,
 ) {
@@ -61,7 +61,7 @@ async fn tls_server(
                 tracing::info!("{}: SRV: INCOMING TLS: {}", short, remote_proxy_url);
 
                 evt_send
-                    .send((
+                    .send(TransportEvent::IncomingChannel(
                         remote_proxy_url.into(),
                         send2.take().unwrap(),
                         recv2.take().unwrap(),
@@ -95,9 +95,13 @@ async fn tls_server(
                     wants_write_close = true;
                 }
                 Some(Right(Some(wire))) => match wire {
-                    ProxyWire::ChanSend(ChanSend(data)) => {
-                        tracing::trace!("{}: SRV incoming encrypted {} bytes", short, data.len());
-                        in_pre.get_mut().extend_from_slice(&data);
+                    ProxyWire::ChanSend(data) => {
+                        tracing::trace!(
+                            "{}: SRV incoming encrypted {} bytes",
+                            short,
+                            data.channel_data.len()
+                        );
+                        in_pre.get_mut().extend_from_slice(&data.channel_data);
                         srv.read_tls(&mut in_pre).map_err(TransportError::other)?;
                         srv.process_new_packets().map_err(TransportError::other)?;
                         while let Ok(size) = srv.read(&mut buf) {

@@ -70,6 +70,8 @@ pub enum SysMetaVal {
     Activity(TimedHeaderHash),
     /// Link remove on link add
     DeleteLink(TimedHeaderHash),
+    /// Custom Validation Package
+    CustomPackage(HeaderHash),
 }
 
 // #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
@@ -191,6 +193,7 @@ impl From<SysMetaVal> for HeaderHash {
             | SysMetaVal::Delete(h)
             | SysMetaVal::DeleteLink(h)
             | SysMetaVal::Activity(h) => h.header_hash,
+            SysMetaVal::CustomPackage(h) => h,
         }
     }
 }

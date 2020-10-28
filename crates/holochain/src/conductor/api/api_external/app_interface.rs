@@ -64,19 +64,24 @@ impl AppInterfaceApi for RealAppInterfaceApi {
             AppRequest::AppInfo { app_id } => Ok(AppResponse::AppInfo(
                 self.conductor_handle.get_app_info(&app_id).await?,
             )),
-            AppRequest::SignalSubscription(_subscription) => {
-                todo!("Signal pubsub not yet implemented")
-            }
             AppRequest::ZomeCallInvocation(request) => {
+                let req = request.clone();
                 match self.conductor_handle.call_zome(*request).await? {
-                    Ok(ZomeCallResponse::Ok(output)) => {
-                        Ok(AppResponse::ZomeCallInvocation(Box::new(output)))
-                    }
-                    Ok(ZomeCallResponse::Unauthorized) => Ok(AppResponse::ZomeCallUnauthorized),
-                    Err(e) => Ok(AppResponse::Error(e.into())),
+                Ok(ZomeCallResponse::Ok(output)) => {
+                  Ok(AppResponse::ZomeCallInvocation(Box::new(output)))
                 }
+                Ok(ZomeCallResponse::Unauthorized) => {
+                  Ok(AppResponse::Error(
+                    ExternalApiWireError::ZomeCallUnauthorized(
+                      format!("No capabilities grant has been committed that allows the CapSecret {:?} to call the function {} in zome {}", req.cap, req.fn_name, req.zome_name)
+                    )
+                  ))
+                },
+                Err(e) => Ok(AppResponse::Error(e.into())),
+              }
             }
-            AppRequest::Crypto(_) => unimplemented!("Crypto methods currently unimplemented"),
+            AppRequest::SignalSubscription(_) => Ok(AppResponse::Unimplemented(request)),
+            AppRequest::Crypto(_) => Ok(AppResponse::Unimplemented(request)),
         }
     }
 }
@@ -103,50 +108,85 @@ impl InterfaceApi for RealAppInterfaceApi {
     }
 }
 
-/// The set of messages that a conductor understands how to handle over an App interface
+/// Represents the available Conductor functions to call over an App interface
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-#[serde(rename = "snake-case", tag = "type", content = "data")]
+#[serde(rename_all = "snake_case", tag = "type", content = "data")]
 pub enum AppRequest {
-    /// Get info about the App
+    /// Get info about the App identified by the given `app_id` argument.
+    /// Requires `app_id` because an App interface can be the interface to multiple
+    /// apps at the same time.
+    ///
+    /// Will be responded to with an [`AppResponse::AppInfo`]
+    /// or an [`AppResponse::Error`]
+    ///
+    /// [`AppResponse::AppInfo`]: enum.AppResponse.html#variant.AppInfo
+    /// [`AppResponse::Error`]: enum.AppResponse.html#variant.Error
     AppInfo {
         /// The AppId for which to get information
         app_id: AppId,
     },
-
-    /// Asks the conductor to do some crypto
+    /// Asks the conductor to do some crypto.
+    ///
+    /// Is currently unimplemented and will return
+    /// an [`AppResponse::Unimplemented`](enum.AppResponse.html#variant.Unimplemented)
     Crypto(Box<CryptoRequest>),
-
-    /// Call a zome function
+    /// Call a zome function. See the inner [`ZomeCallInvocation`]
+    /// struct to understand the data that must be provided.
+    ///
+    /// Will be responded to with an [`AppResponse::ZomeCallInvocation`]
+    /// or an [`AppResponse::Error`]
+    ///
+    /// [`ZomeCallInvocation`]: ../../core/ribosome/struct.ZomeCallInvocation.html
+    /// [`AppResponse::ZomeCallInvocation`]: enum.AppResponse.html#variant.ZomeCallInvocation
+    /// [`AppResponse::Error`]: enum.AppResponse.html#variant.Error
     ZomeCallInvocation(Box<ZomeCallInvocation>),
 
-    /// Update signal subscriptions
+    /// Update signal subscriptions.
+    ///
+    /// Is currently unimplemented and will return
+    /// an [`AppResponse::Unimplemented`](enum.AppResponse.html#variant.Unimplemented)
     SignalSubscription(SignalSubscription),
 }
 
 /// Responses to requests received on an App interface
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-#[serde(rename = "snake-case", tag = "type", content = "data")]
+#[serde(rename_all = "snake_case", tag = "type", content = "data")]
 pub enum AppResponse {
-    /// There has been an error in the request
+    /// This request/response is unimplemented
+    Unimplemented(AppRequest),
+
+    /// Can occur in response to any [`AppRequest`].
+    ///
+    /// There has been an error during the handling of the request.
+    /// See [`ExternalApiWireError`] for variants.
+    ///
+    /// [`AppRequest`]: enum.AppRequest.html
+    /// [`ExternalApiWireError`]: error/enum.ExternalApiWireError.html
     Error(ExternalApiWireError),
 
-    /// The response to an AppInfo request
+    /// The succesful response to an [`AppRequest::AppInfo`].
+    ///
+    /// Option will be `None` if there is no installed app with the given `app_id` value from the request.
+    /// Check out [`InstalledApp`] for details on when the Option is `Some<InstalledApp>`
+    ///
+    /// [`InstalledApp`]: ../../../holochain_types/app/struct.InstalledApp.html
+    /// [`AppRequest::AppInfo`]: enum.AppRequest.html#variant.AppInfo
     AppInfo(Option<InstalledApp>),
 
-    /// The response to a zome call
+    /// The succesful response to an [`AppRequest::ZomeCallInvocation`].
+    ///
+    /// Note that [`ExternOutput`] is simply a structure of [`SerializedBytes`] so the client will have
+    /// to decode this response back into the data provided by the Zome using a [msgpack](https://msgpack.org/) library to utilize it.
+    ///
+    /// [`AppRequest::ZomeCallInvocation`]: enum.AppRequest.html#variant.ZomeCallInvocation
+    /// [`ExternOutput`]: ../../../holochain_zome_types/zome_io/struct.ExternOutput.html
+    /// [`SerializedBytes`]: ../../../holochain_zome_types/query/struct.SerializedBytes.html
     ZomeCallInvocation(Box<ExternOutput>),
-
-    /// The response to a SignalSubscription message
-    SignalSubscriptionUpdated,
-
-    /// The zome call is unauthorized
-    // TODO: I think this should be folded into ExternalApiWireError -MD
-    ZomeCallUnauthorized,
 }
 
 #[allow(missing_docs)]
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-#[serde(rename = "snake-case", tag = "type", content = "data")]
+#[serde(rename_all = "snake_case", tag = "type", content = "data")]
 pub enum CryptoRequest {
     Sign(String),
     Decrypt(String),

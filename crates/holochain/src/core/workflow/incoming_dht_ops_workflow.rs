@@ -17,7 +17,7 @@ use crate::core::{
         workspace::{Workspace, WorkspaceResult},
     },
 };
-use holo_hash::DhtOpHash;
+use holo_hash::{AgentPubKey, DhtOpHash};
 use holochain_state::{
     buffer::BufferedStore,
     buffer::KvBufFresh,
@@ -38,6 +38,7 @@ pub async fn incoming_dht_ops_workflow(
     state_env: &EnvironmentWrite,
     mut sys_validation_trigger: TriggerSender,
     ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+    from_agent: Option<AgentPubKey>,
 ) -> WorkflowResult<()> {
     // set up our workspace
     let mut workspace = IncomingDhtOpsWorkspace::new(state_env.clone().into())?;
@@ -47,7 +48,9 @@ pub async fn incoming_dht_ops_workflow(
         if !workspace.op_exists(&hash)? {
             tracing::debug!(?hash, ?op);
             if should_keep(&op).await? {
-                workspace.add_to_pending(hash, op).await?;
+                workspace
+                    .add_to_pending(hash, op, from_agent.clone())
+                    .await?;
             } else {
                 tracing::warn!(
                     msg = "Dropping op because it failed counterfeit checks",
@@ -120,7 +123,12 @@ impl IncomingDhtOpsWorkspace {
         })
     }
 
-    async fn add_to_pending(&mut self, hash: DhtOpHash, op: DhtOp) -> DhtOpConvertResult<()> {
+    async fn add_to_pending(
+        &mut self,
+        hash: DhtOpHash,
+        op: DhtOp,
+        from_agent: Option<AgentPubKey>,
+    ) -> DhtOpConvertResult<()> {
         let basis = op.dht_basis();
         let op_light = op.to_light();
         tracing::debug!(?op_light);
@@ -149,6 +157,7 @@ impl IncomingDhtOpsWorkspace {
             time_added: Timestamp::now(),
             last_try: None,
             num_tries: 0,
+            from_agent,
         };
         self.validation_limbo.put(hash, vlv)?;
         Ok(())

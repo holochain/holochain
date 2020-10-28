@@ -30,7 +30,7 @@ struct Opt {
     #[structopt(
         short = "c",
         long,
-        help = "Path to a TOML file containing conductor configuration"
+        help = "Path to a YAML file containing conductor configuration"
     )]
     config_path: Option<PathBuf>,
 
@@ -152,12 +152,12 @@ async fn conductor_handle_from_config_path(
 
 /// Load config, throw friendly error on failure
 fn load_config(config_path: &ConfigFilePath, config_path_default: bool) -> ConductorConfig {
-    match ConductorConfig::load_toml(config_path.as_ref()) {
+    match ConductorConfig::load_yaml(config_path.as_ref()) {
         Err(ConductorError::ConfigMissing(_)) => {
             display_friendly_missing_config_message(config_path, config_path_default);
             std::process::exit(ERROR_CODE);
         }
-        Err(ConductorError::DeserializationError(err)) => {
+        Err(ConductorError::SerializationError(err)) => {
             display_friendly_malformed_config_message(config_path, err);
             std::process::exit(ERROR_CODE);
         }
@@ -177,7 +177,7 @@ Error: The conductor is set up to load its configuration from the default path:
     {path}
 
 but this file doesn't exist. If you meant to specify a path, run this command
-again with the -c option. Otherwise, please either create a TOML config file at
+again with the -c option. Otherwise, please either create a YAML config file at
 this path yourself, or rerun the command with the '-i' flag, which will help you
 automatically create a default config file.
         ",
@@ -190,7 +190,7 @@ Error: You asked to load configuration from the path:
 
     {path}
 
-but this file doesn't exist. Please either create a TOML config file at this
+but this file doesn't exist. Please either create a YAML config file at this
 path yourself, or rerun the command with the '-i' flag, which will help you
 automatically create a default config file.
         ",
@@ -199,11 +199,14 @@ automatically create a default config file.
     }
 }
 
-fn display_friendly_malformed_config_message(config_path: &ConfigFilePath, error: toml::de::Error) {
+fn display_friendly_malformed_config_message(
+    config_path: &ConfigFilePath,
+    error: serde_yaml::Error,
+) {
     println!(
         "
 The specified config file ({})
-could not be parsed, because it is not valid TOML. Please check and fix the
+could not be parsed, because it is not valid YAML. Please check and fix the
 file, or delete the file and run the conductor again with the -i flag to create
 a valid default configuration. Details:
 

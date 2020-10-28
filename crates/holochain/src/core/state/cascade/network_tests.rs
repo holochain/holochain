@@ -60,7 +60,7 @@ use unwrap_to::unwrap_to;
 use crate::test_utils::host_fn_api::*;
 
 #[tokio::test(threaded_scheduler)]
-#[ignore]
+
 async fn get_updates_cache() {
     observability::test_run().ok();
     // Database setup
@@ -102,7 +102,7 @@ async fn get_updates_cache() {
 }
 
 #[tokio::test(threaded_scheduler)]
-#[ignore]
+#[ignore = "flaky!"]
 async fn get_meta_updates_meta_cache() {
     observability::test_run().ok();
     // Database setup
@@ -160,14 +160,14 @@ async fn get_meta_updates_meta_cache() {
             .collect::<Vec<_>>()
             .unwrap()
     };
-    assert_eq!(result[0], expected.1);
     assert_eq!(result.len(), 1);
+    assert_eq!(result[0], expected.1);
 
     shutdown.clean().await;
 }
 
 #[tokio::test(threaded_scheduler)]
-#[ignore]
+#[ignore = "flaky"]
 async fn get_from_another_agent() {
     observability::test_run().ok();
     let dna_file = DnaFile::new(
@@ -335,8 +335,7 @@ async fn get_from_another_agent() {
 }
 
 #[tokio::test(threaded_scheduler)]
-// @todo this is flakey for some reason
-#[ignore]
+#[ignore = "flaky for some reason"]
 async fn get_links_from_another_agent() {
     observability::test_run().ok();
     let dna_file = DnaFile::new(

@@ -19,7 +19,7 @@ impl From<&Opt> for kitsune_p2p_transport_quic::ConfigListenerQuic {
     fn from(o: &Opt) -> Self {
         let mut out = Self::default();
         if let Some(b) = &o.bind_to {
-            out = out.set_bind_to(kitsune_p2p_types::dependencies::url2::url2!("{}", b));
+            out = out.set_bind_to(Some(kitsune_p2p_types::dependencies::url2::url2!("{}", b)));
         }
         if let Some(h) = &o.override_host {
             out = out.set_override_host(Some(h));
