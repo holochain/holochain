@@ -62,6 +62,9 @@ pub async fn load_conductor_from_legacy_config(
         if let Some(uuid) = dna_config.uuid.clone() {
             dna_file = dna_file.with_uuid(uuid).await?;
         }
+        if let Some(properties) = dna_config.properties.clone() {
+            dna_file = dna_file.with_properties(properties).await?;
+        }
         dna_hashes.insert(
             dna_key(&path, &dna_config.uuid),
             dna_file.dna_hash().clone(),
