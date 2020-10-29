@@ -3,7 +3,7 @@
 /// System time doesn't accept any arguments so usage is as simple as:
 ///
 /// ```ignore
-/// let now = sys_time!()?;
+/// let now: core::time::Duration = sys_time!()?;
 /// ```
 ///
 /// Note: sys_time returns a result like all host fns so `?` or `.ok()` is needed.
