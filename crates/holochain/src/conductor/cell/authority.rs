@@ -167,6 +167,39 @@ pub async fn handle_get_entry(
 }
 
 #[instrument(skip(env))]
+// TODO: Remove this function before merging PR
+fn remove_me_show_slow_read_issue(env: EnvironmentRead, agent: AgentPubKey) {
+    warn!(
+        msg = "Remove this function before merging PR",
+        file = file!(),
+        line = line!()
+    );
+    let element_integrated = ElementBuf::vault(env.clone(), false).unwrap();
+    let meta_integrated = MetadataBuf::vault(env.clone()).unwrap();
+    holochain_state::fresh_reader_test!(env, |r| {
+        let now = std::time::Instant::now();
+        let hashes = meta_integrated
+            .get_activity_sequence(
+                &r,
+                ChainItemKey::AgentStatus(agent.clone(), ValidationStatus::Valid),
+            )
+            .unwrap()
+            .collect::<Vec<_>>()
+            .unwrap();
+        let el = now.elapsed();
+        debug!(time_for_activity_sequence = %el.as_micros());
+        for hash in &hashes {
+            element_integrated.get_header(&hash.1).unwrap();
+        }
+        let el = now.elapsed();
+        debug!(
+            us_per_header = %el.as_micros() / hashes.len() as u128,
+            num_headers = %hashes.len()
+        );
+    });
+}
+
+#[instrument(skip(env))]
 pub fn handle_get_agent_activity(
     env: EnvironmentRead,
     agent: AgentPubKey,
@@ -177,6 +210,8 @@ pub fn handle_get_agent_activity(
     let element_integrated = ElementBuf::vault(env.clone(), false)?;
     let meta_integrated = MetadataBuf::vault(env.clone())?;
     let element_rejected = ElementBuf::rejected(env.clone())?;
+
+    remove_me_show_slow_read_issue(env.clone(), agent.clone());
 
     // Status
     let status = meta_integrated

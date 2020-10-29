@@ -4,7 +4,7 @@ use fallible_iterator::FallibleIterator;
 use hdk3::prelude::{Element, EntryType, ValidationPackage};
 use holo_hash::HeaderHash;
 use holochain_p2p::{actor::GetActivityOptions, HolochainP2pCellT};
-use holochain_state::env::EnvironmentRead;
+use holochain_state::{env::EnvironmentRead, fresh_reader_test};
 use holochain_types::{
     activity::{AgentActivity, ChainItems},
     HeaderHashed,
@@ -12,6 +12,7 @@ use holochain_types::{
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::{
     query::{ActivityRequest, ChainHead, ChainQueryFilter, ChainStatus, HighestObserved},
+    validate::ValidationStatus,
     ZomeCallResponse,
 };
 use matches::assert_matches;
@@ -22,7 +23,7 @@ use crate::{
     core::state::cascade::DbPair,
     core::state::cascade::DbPairMut,
     core::state::element_buf::ElementBuf,
-    core::state::metadata::MetadataBuf,
+    core::state::metadata::{ChainItemKey, MetadataBuf, MetadataBufT},
     test_utils::{
         conductor_setup::ConductorCallData, host_fn_api, new_invocation, wait_for_integration,
     },
@@ -658,6 +659,7 @@ async fn get_agent_activity_host_fn_test() {
         .into_inner();
     let agent_activity: holochain_zome_types::query::AgentActivity = result.try_into().unwrap();
     assert_eq!(agent_activity, expected_activity);
+    ConductorTestData::shutdown_conductor(handle).await;
 }
 
 async fn commit_some_data(
@@ -697,4 +699,130 @@ async fn check_cascade(
         .await
         .unwrap();
     validation_package
+}
+
+#[tokio::test(threaded_scheduler)]
+#[ignore = "Only shows a problem, doesn't prove something is correct"]
+/// This test shows a slow read issue.
+/// The exact same code running here in this test is 10x
+/// faster then when it is run by the cell
+async fn slow_lmdb_reads_test() {
+    observability::test_run().ok();
+    let zomes = vec![TestWasm::Create];
+    let conductor_test = ConductorTestData::new(zomes, false).await;
+    let ConductorTestData {
+        __tmpdir,
+        handle,
+        mut alice_call_data,
+        ..
+    } = conductor_test;
+    let alice_env = alice_call_data.env.clone();
+
+    // Commit some data to put some load on the network
+    let mut invocations = vec![];
+    invocations.push(
+        new_invocation(
+            &alice_call_data.cell_id,
+            "create_entry",
+            (),
+            TestWasm::Create,
+        )
+        .unwrap(),
+    );
+    invocations.push(
+        new_invocation(&alice_call_data.cell_id, "create_msg", (), TestWasm::Create).unwrap(),
+    );
+    invocations.push(
+        new_invocation(
+            &alice_call_data.cell_id,
+            "create_priv_msg",
+            (),
+            TestWasm::Create,
+        )
+        .unwrap(),
+    );
+    for _ in 0..10 {
+        for invocation in &invocations {
+            let r = handle.call_zome(invocation.clone()).await.unwrap().unwrap();
+            assert_matches!(r, ZomeCallResponse::Ok(_));
+        }
+    }
+
+    let expected_count = 9 + 3 * 2 * 10 + 2 * 10;
+    wait_for_integration(
+        &alice_call_data.env,
+        expected_count,
+        NUM_ATTEMPTS,
+        DELAY_PER_ATTEMPT.clone(),
+    )
+    .await;
+    // Get the source chain hashes
+    let alice_source_chain = SourceChain::new(alice_env.clone().into()).unwrap();
+    let hashes: Vec<_> = alice_source_chain
+        .iter_back()
+        .map(|shh| Ok(shh.header_address().clone()))
+        .collect()
+        .unwrap();
+    let num_headers = hashes.len();
+
+    // Time how long it takes to get the headers
+    let expected_count = 9 + 3 * 2 * 10 + 2 * 10;
+    wait_for_integration(
+        &alice_call_data.env,
+        expected_count,
+        NUM_ATTEMPTS,
+        DELAY_PER_ATTEMPT.clone(),
+    )
+    .await;
+
+    alice_call_data
+        .network
+        .get_agent_activity(
+            alice_call_data.cell_id.agent_pubkey().clone(),
+            ChainQueryFilter::new(),
+            Default::default(),
+        )
+        .await
+        .unwrap();
+
+    let mut low = u128::MAX;
+    let mut high = 0;
+    let mut average = 0;
+    let runs = 1000;
+    for _ in 0..runs {
+        let element_integrated = ElementBuf::vault(alice_env.clone().into(), false).unwrap();
+        let meta_integrated = MetadataBuf::vault(alice_env.clone().into()).unwrap();
+        fresh_reader_test!(alice_env, |r| {
+            let now = std::time::Instant::now();
+            let hashes = meta_integrated
+                .get_activity_sequence(
+                    &r,
+                    ChainItemKey::AgentStatus(
+                        alice_call_data.cell_id.agent_pubkey().clone(),
+                        ValidationStatus::Valid,
+                    ),
+                )
+                .unwrap()
+                .collect::<Vec<_>>()
+                .unwrap();
+            for hash in &hashes {
+                element_integrated.get_header(&hash.1).unwrap();
+            }
+            let elapsed = now.elapsed().as_micros();
+            if elapsed < low {
+                low = elapsed;
+            }
+            if elapsed > high {
+                high = elapsed;
+            }
+            average += elapsed;
+        });
+    }
+    average = average / runs;
+    println!("Average time to get {} headers {}us", num_headers, average);
+    println!("{} us per header", average / num_headers as u128);
+    println!("low {}", low / num_headers as u128);
+    println!("high {}", high / num_headers as u128);
+
+    ConductorTestData::shutdown_conductor(handle).await;
 }

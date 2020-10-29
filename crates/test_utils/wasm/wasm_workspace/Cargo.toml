@@ -44,5 +44,5 @@ members = [
 opt-level = "z"
 
 
-[patch.crates-io]
-holochain_wasmer_guest = { path = "../../../../../holochain-wasmer/crates/guest" }
+# [patch.crates-io]
+# holochain_wasmer_guest = { path = "../../../../../holochain-wasmer/crates/guest" }
