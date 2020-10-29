@@ -17,6 +17,7 @@ pub fn zome_info(
         dna_hash: ribosome.dna_file().dna_hash().clone(), // @TODO
         zome_id: ribosome.zome_name_to_id(&call_context.zome_name)?,
         properties: ribosome.dna_file().dna().properties.clone(),
+        // public_token: "".into(), // @TODO
     }))
 }
 
