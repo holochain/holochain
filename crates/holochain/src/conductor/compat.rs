@@ -210,18 +210,21 @@ pub mod tests {
                 file: dir.path().join("a.dna.gz").to_string_lossy().into(),
                 hash: "".to_string(),
                 uuid: None,
+                properties: None,
             },
             legacy::DnaConfig {
                 id: "a2".to_string(),
                 file: dir.path().join("a.dna.gz").to_string_lossy().into(),
                 hash: "".to_string(),
                 uuid: Some("significant-uuid".to_string()),
+                properties: None,
             },
             legacy::DnaConfig {
                 id: "b".to_string(),
                 file: dir.path().join("b.dna.gz").to_string_lossy().into(),
                 hash: "".to_string(),
                 uuid: None,
+                properties: None,
             },
         ];
         let instances = vec![
