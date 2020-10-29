@@ -1,12 +1,11 @@
 //! Fixturator definitions for kitsune_p2p.
 
-use crate::types::agent_store::AgentInfo;
-use crate::types::agent_store::AgentInfoSigned;
-use crate::types::agent_store::Urls;
-use crate::types::KitsuneAgent;
-use crate::types::KitsuneSignature;
-use crate::types::KitsuneSpace;
 use fixt::prelude::*;
+use kitsune_p2p::{
+    agent_store::{AgentInfo, AgentInfoSigned, Urls},
+    dependencies::url2,
+    KitsuneAgent, KitsuneSignature, KitsuneSpace,
+};
 use url2::url2;
 
 fixturator!(

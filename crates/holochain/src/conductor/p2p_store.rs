@@ -103,7 +103,7 @@ mod tests {
 
     use super::AgentKvKey;
     use fixt::prelude::*;
-    use holochain_p2p::kitsune_p2p::fixt::AgentInfoSignedFixturator;
+    use holochain_p2p::fixt::AgentInfoSignedFixturator;
     use holochain_state::buffer::KvStoreT;
     use holochain_state::env::ReadManager;
     use holochain_state::env::WriteManager;

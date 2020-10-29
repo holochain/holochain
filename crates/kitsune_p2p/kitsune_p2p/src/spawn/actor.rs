@@ -39,6 +39,9 @@ fn build_transport(
 > {
     must_future::MustBoxFuture::new(async move {
         match t_conf {
+            TransportConfig::Mem {} => {
+                Ok(kitsune_p2p_types::transport_mem::spawn_bind_transport_mem().await?)
+            }
             TransportConfig::Quic {
                 bind_to,
                 override_host,
