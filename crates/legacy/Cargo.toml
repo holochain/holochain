@@ -10,3 +10,4 @@ edition = "2018"
 
 [dependencies]
 serde = "1.0.104"
+holochain_serialized_bytes = "=0.0.45"

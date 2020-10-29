@@ -4,7 +4,7 @@
 //! for backward compatibility purposes, mainly for interoperability with Tryorama.
 //! The holochain::conductor::compat module contains a function for converting this
 //! struct into a `(Config, ConductorState)` pair.
-
+use holochain_serialized_bytes::SerializedBytes;
 use serde::*;
 use std::{collections::HashMap, path::PathBuf};
 /// Main conductor configuration struct
@@ -183,6 +183,8 @@ pub struct DnaConfig {
     pub hash: String,
     #[serde(default)]
     pub uuid: Option<String>,
+    #[serde(default)]
+    pub properties: Option<SerializedBytes>,
 }
 
 /// An instance combines a DNA with an agent.
