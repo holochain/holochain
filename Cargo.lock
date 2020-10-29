@@ -1230,6 +1230,7 @@ dependencies = [
 name = "holochain_legacy"
 version = "0.0.1"
 dependencies = [
+ "holochain_serialized_bytes",
  "serde",
 ]
 
