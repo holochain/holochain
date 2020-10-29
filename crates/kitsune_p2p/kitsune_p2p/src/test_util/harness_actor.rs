@@ -72,8 +72,6 @@ pub async fn spawn_test_harness(
     ),
     KitsuneP2pError,
 > {
-    init_tracing();
-
     let harness_chan = HarnessEventChannel::new("");
 
     let builder = ghost_actor::actor_builder::GhostActorBuilder::new();

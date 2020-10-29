@@ -6,6 +6,8 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_transport_binding() -> Result<(), KitsuneP2pError> {
+        init_tracing();
+
         let (harness, _evt) = spawn_test_harness_quic().await?;
 
         // Create a p2p config with a local proxy that rejects proxying anyone else
@@ -30,6 +32,8 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_request_workflow() -> Result<(), KitsuneP2pError> {
+        init_tracing();
+
         let (harness, _evt) = spawn_test_harness_quic().await?;
         let space = harness.add_space().await?;
         let (a1, p2p) = harness.add_direct_agent("DIRECT".into()).await?;
@@ -47,6 +51,8 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_broadcast_workflow() -> Result<(), KitsuneP2pError> {
+        init_tracing();
+
         let (harness, evt) = spawn_test_harness_quic().await?;
         let mut rcv = evt.receive();
 
@@ -90,6 +96,8 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_multi_request_workflow() -> Result<(), KitsuneP2pError> {
+        init_tracing();
+
         let (harness, _evt) = spawn_test_harness_quic().await?;
 
         let space = harness.add_space().await?;
@@ -130,6 +138,8 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_single_agent_multi_request_workflow() -> Result<(), KitsuneP2pError> {
+        init_tracing();
+
         let (harness, _evt) = spawn_test_harness_quic().await?;
 
         let space = harness.add_space().await?;
@@ -163,6 +173,8 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_gossip_workflow() -> Result<(), KitsuneP2pError> {
+        init_tracing();
+
         let (harness, _evt) = spawn_test_harness_quic().await?;
 
         let space = harness.add_space().await?;
