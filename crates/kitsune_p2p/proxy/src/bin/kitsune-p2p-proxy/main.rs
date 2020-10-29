@@ -40,18 +40,22 @@ async fn inner() -> TransportResult<()> {
     println!("{}", listener.bound_url().await?);
 
     tokio::task::spawn(async move {
-        while let Some((url, mut write, _read)) = events.next().await {
-            tracing::debug!(
-                "{} is trying to talk directly to us - dump proxy state",
-                url
-            );
-            match listener.debug().await {
-                Ok(dump) => {
-                    let dump = serde_json::to_string_pretty(&dump).unwrap();
-                    let _ = write.write_and_close(dump.into_bytes()).await;
-                }
-                Err(e) => {
-                    let _ = write.write_and_close(format!("{:?}", e).into_bytes()).await;
+        while let Some(evt) = events.next().await {
+            match evt {
+                TransportEvent::IncomingChannel(url, mut write, _read) => {
+                    tracing::debug!(
+                        "{} is trying to talk directly to us - dump proxy state",
+                        url
+                    );
+                    match listener.debug().await {
+                        Ok(dump) => {
+                            let dump = serde_json::to_string_pretty(&dump).unwrap();
+                            let _ = write.write_and_close(dump.into_bytes()).await;
+                        }
+                        Err(e) => {
+                            let _ = write.write_and_close(format!("{:?}", e).into_bytes()).await;
+                        }
+                    }
                 }
             }
         }

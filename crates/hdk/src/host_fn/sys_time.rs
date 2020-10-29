@@ -58,7 +58,7 @@
 /// Other p2p type time syncing algorithms that allow peers to adjust their clock offsets to agree
 /// on the current time within relatively tight accuracy/precision up-front in a relatively trusted
 /// environment e.g. a chess game between friends with time moves that balances security/trust and
-/// flakey networking, etc.
+/// flaky networking, etc.
 #[macro_export]
 macro_rules! sys_time {
     () => {{

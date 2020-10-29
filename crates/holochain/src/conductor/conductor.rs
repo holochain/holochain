@@ -886,7 +886,12 @@ mod builder {
                 dna_store, config, ..
             } = self;
 
-            let (holochain_p2p, p2p_evt) = holochain_p2p::spawn_holochain_p2p().await?;
+            let network_config = match &config.network {
+                None => holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default(),
+                Some(config) => config.clone(),
+            };
+            let (holochain_p2p, p2p_evt) =
+                holochain_p2p::spawn_holochain_p2p(network_config).await?;
 
             let conductor = Conductor::new(
                 environment,
@@ -988,7 +993,10 @@ mod builder {
                 tmpdir,
             } = test_env;
             let keystore = environment.keystore();
-            let (holochain_p2p, p2p_evt) = holochain_p2p::spawn_holochain_p2p().await?;
+            let (holochain_p2p, p2p_evt) = holochain_p2p::spawn_holochain_p2p(
+                holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default(),
+            )
+            .await?;
             let conductor = Conductor::new(
                 environment,
                 test_wasm_env,
@@ -1051,7 +1059,11 @@ pub mod tests {
         } = test_p2p_env();
         let dna_store = MockDnaStore::new();
         let keystore = environment.keystore().clone();
-        let (holochain_p2p, _p2p_evt) = holochain_p2p::spawn_holochain_p2p().await.unwrap();
+        let (holochain_p2p, _p2p_evt) = holochain_p2p::spawn_holochain_p2p(
+            holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default(),
+        )
+        .await
+        .unwrap();
         let conductor = Conductor::new(
             environment,
             wasm_env,

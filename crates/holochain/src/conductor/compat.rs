@@ -62,6 +62,9 @@ pub async fn load_conductor_from_legacy_config(
         if let Some(uuid) = dna_config.uuid.clone() {
             dna_file = dna_file.with_uuid(uuid).await?;
         }
+        if let Some(properties) = dna_config.properties.clone() {
+            dna_file = dna_file.with_properties(properties).await?;
+        }
         dna_hashes.insert(
             dna_key(&path, &dna_config.uuid),
             dna_file.dna_hash().clone(),
@@ -207,18 +210,21 @@ pub mod tests {
                 file: dir.path().join("a.dna.gz").to_string_lossy().into(),
                 hash: "".to_string(),
                 uuid: None,
+                properties: None,
             },
             legacy::DnaConfig {
                 id: "a2".to_string(),
                 file: dir.path().join("a.dna.gz").to_string_lossy().into(),
                 hash: "".to_string(),
                 uuid: Some("significant-uuid".to_string()),
+                properties: None,
             },
             legacy::DnaConfig {
                 id: "b".to_string(),
                 file: dir.path().join("b.dna.gz").to_string_lossy().into(),
                 hash: "".to_string(),
                 uuid: None,
+                properties: None,
             },
         ];
         let instances = vec![

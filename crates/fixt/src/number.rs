@@ -18,8 +18,8 @@ macro_rules! fixturator_unsigned {
                 }
             },
             {
-                let ret = self.0.index as $t;
-                self.0.index = ret.wrapping_add(1) as usize;
+                let ret = get_fixt_index!() as $t;
+                set_fixt_index!(ret.wrapping_add(1) as usize);
                 ret
             }
         );
@@ -87,8 +87,8 @@ macro_rules! fixturator_signed {
                 }
             },
             {
-                let ret = self.0.index as $t;
-                self.0.index = ret.wrapping_add(1) as usize;
+                let ret = get_fixt_index!() as $t;
+                set_fixt_index!(ret.wrapping_add(1) as usize);
                 // negate odds
                 let ret = if ret % 2 == 0 { ret } else { -ret };
                 ret
@@ -183,14 +183,12 @@ macro_rules! fixturator_float {
                 }
             },
             {
-                let ret = self.0.index as $t;
+                let mut index = get_fixt_index!();
+                let ret = index as $t;
 
-                let signed_ret = if self.0.index % 2 == 0 {
-                    ret
-                } else {
-                    -ret - 0.5
-                };
-                self.0.index += 1;
+                let signed_ret = if index % 2 == 0 { ret } else { -ret - 0.5 };
+                index += 1;
+                set_fixt_index!(index);
                 signed_ret
             }
         );

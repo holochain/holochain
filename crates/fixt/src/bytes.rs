@@ -24,12 +24,14 @@ fixturator!(
         bytes
     },
     {
-        let mut u8_fixturator = U8Fixturator::new_indexed(Predictable, self.0.index);
+        let mut index = get_fixt_index!();
+        let mut u8_fixturator = U8Fixturator::new_indexed(Predictable, index);
         let mut bytes = vec![];
         for _ in 0..32 {
             bytes.push(u8_fixturator.next().unwrap());
         }
-        self.0.index += 1;
+        index += 1;
+        set_fixt_index!(index);
         bytes
     }
 );
@@ -52,12 +54,14 @@ fixturator!(
         bytes
     },
     {
-        let mut u8_fixturator = U8Fixturator::new_indexed(Predictable, self.0.index);
+        let mut index = get_fixt_index!();
+        let mut u8_fixturator = U8Fixturator::new_indexed(Predictable, index);
         let mut bytes = vec![];
         for _ in 0..32 {
             bytes.push(u8_fixturator.next().unwrap());
         }
-        self.0.index += 1;
+        index += 1;
+        set_fixt_index!(index);
         bytes
     }
 );
@@ -79,7 +83,7 @@ fixturator!(
         bytes
     };
     curve Unpredictable {
-        let mut u8_fixturator = U8Fixturator::new_indexed(Predictable, self.0.index);
+        let mut u8_fixturator = U8Fixturator::new_indexed(Predictable, get_fixt_index!());
         let mut bytes = vec![];
         for _ in 0..36 {
             bytes.push(u8_fixturator.next().unwrap());
@@ -105,7 +109,7 @@ fixturator!(
         bytes
     };
     curve Predictable {
-        let mut u8_fixturator = U8Fixturator::new_indexed(Predictable, self.0.index);
+        let mut u8_fixturator = U8Fixturator::new_indexed(Predictable, get_fixt_index!());
         let mut bytes = vec![];
         for _ in 0..32 {
             bytes.push(u8_fixturator.next().unwrap());

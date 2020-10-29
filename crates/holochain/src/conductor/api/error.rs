@@ -117,6 +117,8 @@ pub enum ExternalApiWireError {
     RibosomeError(String),
     /// Error activating app
     ActivateApp(String),
+    /// The zome call is unauthorized
+    ZomeCallUnauthorized(String),
 }
 
 impl ExternalApiWireError {

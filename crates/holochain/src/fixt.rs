@@ -100,7 +100,7 @@ fixturator!(
     // note that an empty wasm will not compile
     curve Empty DnaWasm { code: Arc::new(vec![]) };
     curve Unpredictable TestWasm::iter().choose(&mut thread_rng()).unwrap().into();
-    curve Predictable TestWasm::iter().cycle().nth(self.0.index).unwrap().into();
+    curve Predictable TestWasm::iter().cycle().nth(get_fixt_index!()).unwrap().into();
 );
 
 fixturator!(
@@ -112,7 +112,7 @@ fixturator!(
 
         let mut wasms: Wasms = BTreeMap::new();
         let mut dna_wasm_fixturator = DnaWasmFixturator::new(Unpredictable);
-        for _ in (0..number_of_wasms) {
+        for _ in 0..number_of_wasms {
             let wasm = dna_wasm_fixturator.next().unwrap();
             wasms.insert(
                 tokio_safe_block_on::tokio_safe_block_forever_on(
@@ -126,8 +126,8 @@ fixturator!(
     };
     curve Predictable {
         let mut wasms: Wasms = BTreeMap::new();
-        let mut dna_wasm_fixturator = DnaWasmFixturator::new_indexed(Predictable, self.0.index);
-        for _ in (0..3) {
+        let mut dna_wasm_fixturator = DnaWasmFixturator::new_indexed(Predictable, get_fixt_index!());
+        for _ in 0..3 {
             let wasm = dna_wasm_fixturator.next().unwrap();
             wasms.insert(
                 tokio_safe_block_on::tokio_safe_block_forever_on(
@@ -155,7 +155,7 @@ fixturator!(
         let mut zome_name_fixturator = ZomeNameFixturator::new(Unpredictable);
         let wasms = WasmsFixturator::new(Unpredictable).next().unwrap();
         let mut zomes: Zomes = Vec::new();
-        for (hash, wasm) in wasms {
+        for (hash, _) in wasms {
             zomes.push((
                 zome_name_fixturator.next().unwrap(),
                 Zome {
@@ -173,12 +173,13 @@ fixturator!(
     },
     {
         // align the wasm hashes across the file and def
-        let mut zome_name_fixturator = ZomeNameFixturator::new_indexed(Predictable, self.0.index);
-        let wasms = WasmsFixturator::new_indexed(Predictable, self.0.index)
+        let mut zome_name_fixturator =
+            ZomeNameFixturator::new_indexed(Predictable, get_fixt_index!());
+        let wasms = WasmsFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap();
         let mut zomes: Zomes = Vec::new();
-        for (hash, wasm) in wasms {
+        for (hash, _) in wasms {
             zomes.push((
                 zome_name_fixturator.next().unwrap(),
                 Zome {
@@ -186,18 +187,18 @@ fixturator!(
                 },
             ));
         }
-        let mut dna_def = DnaDefFixturator::new_indexed(Predictable, self.0.index)
+        let mut dna_def = DnaDefFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap();
         dna_def.zomes = zomes;
         DnaFile {
-            dna: DnaDefFixturator::new_indexed(Predictable, self.0.index)
+            dna: DnaDefFixturator::new_indexed(Predictable, get_fixt_index!())
                 .next()
                 .unwrap(),
-            dna_hash: DnaHashFixturator::new_indexed(Predictable, self.0.index)
+            dna_hash: DnaHashFixturator::new_indexed(Predictable, get_fixt_index!())
                 .next()
                 .unwrap(),
-            code: WasmsFixturator::new_indexed(Predictable, self.0.index)
+            code: WasmsFixturator::new_indexed(Predictable, get_fixt_index!())
                 .next()
                 .unwrap(),
         }
@@ -228,7 +229,7 @@ fixturator!(
 
         let mut hashes: Vec<HeaderHash> = vec![];
         let mut header_hash_fixturator = HeaderHashFixturator::new(Unpredictable);
-        for _ in (0..number_of_hashes) {
+        for _ in 0..number_of_hashes {
             hashes.push(header_hash_fixturator.next().unwrap().into());
         }
         hashes.into()
@@ -236,7 +237,7 @@ fixturator!(
     {
         let mut hashes: Vec<HeaderHash> = vec![];
         let mut header_hash_fixturator =
-            HeaderHashFixturator::new_indexed(Predictable, self.0.index);
+            HeaderHashFixturator::new_indexed(Predictable, get_fixt_index!());
         for _ in 0..3 {
             hashes.push(header_hash_fixturator.next().unwrap().into());
         }
@@ -384,7 +385,7 @@ fixturator!(
         let mut c = ValidateCreateLinkInvocationFixturator::new(Empty)
             .next()
             .unwrap();
-        c.zome_name = self.0.curve.clone();
+        c.zome_name = get_fixt_curve!().clone();
         ValidateLinkInvocationCreate::new(c)
     };
 );
@@ -414,7 +415,7 @@ fixturator!(
 
 fixturator!(
     ValidationPackageHostAccess;
-    constructor fn new(CallZomeWorkspaceLock);
+    constructor fn new(CallZomeWorkspaceLock, HolochainP2pCell);
 );
 
 fixturator!(

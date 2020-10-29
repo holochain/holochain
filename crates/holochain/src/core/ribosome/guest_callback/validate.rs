@@ -367,7 +367,7 @@ mod slow_tests {
 
         validate_invocation.zomes_to_invoke = ZomesToInvoke::One(TestWasm::ValidateInvalid.into());
 
-        let el = fixt!(Element, entry);
+        let el = ElementFixturator::new(entry).next().unwrap();
         validate_invocation.element = Arc::new(el);
 
         let result = ribosome

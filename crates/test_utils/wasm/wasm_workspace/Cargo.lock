@@ -86,7 +86,7 @@ dependencies = [
  "holochain_serialized_bytes",
  "lazy_static",
  "parking_lot",
- "paste 0.1.12",
+ "paste",
  "rand",
  "rand_core",
  "serde",
@@ -132,7 +132,7 @@ name = "hdk3_derive"
 version = "0.0.1"
 dependencies = [
  "holochain_zome_types",
- "paste 1.0.0",
+ "paste",
  "proc-macro2 1.0.19",
  "quote 1.0.7",
  "syn 1.0.38",
@@ -293,43 +293,15 @@ dependencies = [
 
 [[package]]
 name = "paste"
-version = "0.1.12"
+version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0a229b1c58c692edcaa5b9b0948084f130f55d2dcc15b02fcc5340b2b4521476"
-dependencies = [
- "paste-impl",
- "proc-macro-hack",
-]
-
-[[package]]
-name = "paste"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6ddc8e145de01d9180ac7b78b9676f95a9c2447f6a88b2c2a04702211bc5d71"
-
-[[package]]
-name = "paste-impl"
-version = "0.1.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2e0bf239e447e67ff6d16a8bb5e4d4bd2343acf5066061c0e8e06ac5ba8ca68c"
-dependencies = [
- "proc-macro-hack",
- "proc-macro2 1.0.19",
- "quote 1.0.7",
- "syn 1.0.38",
-]
+checksum = "ba7ae1a2180ed02ddfdb5ab70c70d596a26dd642e097bb6fe78b1bde8588ed97"
 
 [[package]]
 name = "ppv-lite86"
 version = "0.2.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c36fa947111f5c62a733b652544dd0016a43ce89619538a8ef92724a6f501a20"
-
-[[package]]
-name = "proc-macro-hack"
-version = "0.5.18"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "99c605b9a0adc77b7211c6b1f722dcb613d68d66859a44f3d485a6da332b0598"
 
 [[package]]
 name = "proc-macro2"
