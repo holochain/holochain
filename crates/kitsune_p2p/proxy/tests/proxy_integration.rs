@@ -31,13 +31,17 @@ async fn connect(
     tracing::warn!("got proxy: {}", addr);
 
     tokio::task::spawn(async move {
-        while let Some((url, mut write, read)) = evt.next().await {
-            tracing::warn!("Incoming PROXY: {}", url);
-            let data = read.read_to_end().await;
-            let data = String::from_utf8_lossy(&data);
-            tracing::warn!("PROXY_READ_DATA: {}", data);
-            let data = format!("echo: {}", data);
-            write.write_and_close(data.into_bytes()).await?;
+        while let Some(evt) = evt.next().await {
+            match evt {
+                TransportEvent::IncomingChannel(url, mut write, read) => {
+                    tracing::warn!("Incoming PROXY: {}", url);
+                    let data = read.read_to_end().await;
+                    let data = String::from_utf8_lossy(&data);
+                    tracing::warn!("PROXY_READ_DATA: {}", data);
+                    let data = format!("echo: {}", data);
+                    write.write_and_close(data.into_bytes()).await?;
+                }
+            }
         }
         TransportResult::Ok(())
     });

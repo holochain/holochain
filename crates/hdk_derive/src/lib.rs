@@ -47,6 +47,9 @@ impl Parse for EntryDef {
                         match var.lit {
                             syn::Lit::Str(s) => required_validation_type = match s.value().as_str()
                             {
+                                "custom" => {
+                                    holochain_zome_types::validate::RequiredValidationType::Custom
+                                }
                                 "element" => {
                                     holochain_zome_types::validate::RequiredValidationType::Element
                                 }
@@ -58,7 +61,7 @@ impl Parse for EntryDef {
                                 }
                                 _ => unreachable!(
                                     "Invalid required_validation_type
-                                    Options are: entry, sub_chain and full"
+                                    Options are: entry, sub_chain, full and custom"
                                 ),
                             },
                             _ => unreachable!(),
@@ -146,6 +149,7 @@ impl quote::ToTokens for RequiredValidationType {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let variant = syn::Ident::new(
             match self.0 {
+                holochain_zome_types::validate::RequiredValidationType::Custom => "Custom",
                 holochain_zome_types::validate::RequiredValidationType::Element => "Element",
                 holochain_zome_types::validate::RequiredValidationType::SubChain => "SubChain",
                 holochain_zome_types::validate::RequiredValidationType::Full => "Full",

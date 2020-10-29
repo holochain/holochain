@@ -55,14 +55,13 @@ pub fn create<'a>(
         entry_type,
         entry_hash,
     };
-    let host_access = call_context.host_access();
 
     // return the hash of the committed entry
     // note that validation is handled by the workflow
     // if the validation fails this commit will be rolled back by virtue of the lmdb transaction
     // being atomic
     tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-        let mut guard = host_access.workspace().write().await;
+        let mut guard = call_context.host_access.workspace().write().await;
         let workspace: &mut CallZomeWorkspace = &mut guard;
         let source_chain = &mut workspace.source_chain;
         // push the header and the entry into the source chain
@@ -280,7 +279,10 @@ pub mod wasm_test {
     }
 
     #[tokio::test(threaded_scheduler)]
-    #[ignore] // david.b (this test is flakey)
+    #[ignore = "david.b (this test is flaky)"]
+    // maackle: this consistently passes for me with n = 37
+    //          but starts to randomly lock up at n = 38,
+    //          and fails consistently for higher values
     async fn multiple_create_entry_limit_test() {
         observability::test_run().unwrap();
         let dna_file = DnaFile::new(

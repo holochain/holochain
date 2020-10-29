@@ -290,7 +290,10 @@ mod tests {
             .collect::<Vec<_>>();
 
         // Create the network
-        let (network, mut recv) = spawn_holochain_p2p().await.unwrap();
+        let (network, mut recv) =
+            spawn_holochain_p2p(holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default())
+                .await
+                .unwrap();
         let (tx_complete, rx_complete) = tokio::sync::oneshot::channel();
         let cell_network = network.to_cell(dna.clone(), agents[0].clone());
         let mut recv_count: u32 = 0;
@@ -674,7 +677,10 @@ mod tests {
                     .collect::<Vec<_>>();
 
                 // Create the network
-                let (network, mut recv) = spawn_holochain_p2p().await.unwrap();
+                let (network, mut recv) =
+                    spawn_holochain_p2p(holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default())
+                        .await
+                        .unwrap();
                 let cell_network = network.to_cell(dna.clone(), agents[0].clone());
                 let (tx_complete, rx_complete) = tokio::sync::oneshot::channel();
                 // We are expecting five ops per agent

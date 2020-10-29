@@ -1,5 +1,6 @@
 use super::*;
 use ghost_actor::dependencies::{tracing, tracing_futures::Instrument};
+use kitsune_p2p_types::codec::Codec;
 use std::collections::HashSet;
 
 /// if the user specifies None or zero (0) for remote_agent_count
@@ -39,6 +40,7 @@ ghost_actor::ghost_chan! {
 
 pub(crate) async fn spawn_space(
     space: Arc<KitsuneSpace>,
+    transport: ghost_actor::GhostSender<TransportListener>,
 ) -> KitsuneP2pResult<(
     ghost_actor::GhostSender<KitsuneP2p>,
     KitsuneP2pEventReceiver,
@@ -64,7 +66,7 @@ pub(crate) async fn spawn_space(
         .create_channel::<KitsuneP2p>()
         .await?;
 
-    tokio::task::spawn(builder.spawn(Space::new(space, internal_sender, evt_send)));
+    tokio::task::spawn(builder.spawn(Space::new(space, internal_sender, evt_send, transport)));
 
     Ok((sender, evt_recv))
 }
@@ -137,7 +139,6 @@ impl gossip::GossipEventHandler for Space {
             })
             .collect::<Vec<_>>();
         Ok(async move {
-            use futures::stream::StreamExt;
             futures::stream::iter(all)
                 .for_each_concurrent(10, |res| async move {
                     if let Err(e) = res.await {
@@ -180,27 +181,31 @@ impl SpaceInternalHandler for Space {
         // In the future, we will probably need to branch here, so the real
         // networking can forward the encoded data. Or, split immediate_request
         // into two variants, one for short-circuit, and one for real networking.
-        let data = wire::Wire::decode((*data).clone())?;
+        let (_, data) = wire::Wire::decode_ref(&data)?;
 
         match data {
-            wire::Wire::Call(payload) => {
-                Ok(
-                    async move { evt_sender.call(space, to_agent, from_agent, payload).await }
-                        .instrument(tracing::debug_span!("wire_call"))
-                        .boxed()
-                        .into(),
-                )
+            wire::Wire::Call(payload) => Ok(async move {
+                evt_sender
+                    .call(space, to_agent, from_agent, payload.data.into())
+                    .await
             }
+            .instrument(tracing::debug_span!("wire_call"))
+            .boxed()
+            .into()),
             wire::Wire::Notify(payload) => {
                 Ok(async move {
                     evt_sender
-                        .notify(space, to_agent, from_agent, payload)
+                        .notify(space, to_agent, from_agent, payload.data.into())
                         .await?;
                     // broadcast doesn't return anything...
                     Ok(vec![])
                 }
                 .boxed()
                 .into())
+            }
+            _ => {
+                tracing::warn!("UNHANDLED WIRE: {:?}", data);
+                Ok(async move { Ok(vec![]) }.boxed().into())
             }
         }
     }
@@ -222,6 +227,10 @@ impl ghost_actor::GhostControlHandler for Space {}
 impl ghost_actor::GhostHandler<KitsuneP2p> for Space {}
 
 impl KitsuneP2pHandler for Space {
+    fn handle_list_transport_bindings(&mut self) -> KitsuneP2pHandlerResult<Vec<url2::Url2>> {
+        unreachable!("These requests are handled at the to actor level and are never propagated down to the space.")
+    }
+
     fn handle_join(
         &mut self,
         _space: Arc<KitsuneSpace>,
@@ -254,7 +263,7 @@ impl KitsuneP2pHandler for Space {
     ) -> KitsuneP2pHandlerResult<Vec<u8>> {
         let space = self.space.clone();
         let internal_sender = self.internal_sender.clone();
-        let payload = Arc::new(wire::Wire::call(payload).encode());
+        let payload = Arc::new(wire::Wire::call(payload.into()).encode_vec()?);
 
         Ok(async move {
             let start = std::time::Instant::now();
@@ -379,6 +388,8 @@ pub(crate) struct Space {
     space: Arc<KitsuneSpace>,
     internal_sender: ghost_actor::GhostSender<SpaceInternal>,
     evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
+    #[allow(dead_code)]
+    transport: ghost_actor::GhostSender<TransportListener>,
     agents: HashMap<Arc<KitsuneAgent>, AgentInfo>,
 }
 
@@ -388,11 +399,13 @@ impl Space {
         space: Arc<KitsuneSpace>,
         internal_sender: ghost_actor::GhostSender<SpaceInternal>,
         evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
+        transport: ghost_actor::GhostSender<TransportListener>,
     ) -> Self {
         Self {
             space,
             internal_sender,
             evt_sender,
+            transport,
             agents: HashMap::new(),
         }
     }
@@ -418,7 +431,7 @@ impl Space {
         } = input;
 
         // encode the data to send
-        let payload = Arc::new(wire::Wire::call(payload).encode());
+        let payload = Arc::new(wire::Wire::call(payload.into()).encode_vec()?);
 
         // TODO - we cannot write proper logic here until we have a
         //        proper peer discovery mechanism. Instead, let's
@@ -488,7 +501,7 @@ impl Space {
         let timeout_ms = timeout_ms.expect("set by handle_notify_multi");
 
         // encode the data to send
-        let payload = Arc::new(wire::Wire::notify(payload).encode());
+        let payload = Arc::new(wire::Wire::notify(payload.into()).encode_vec()?);
 
         let internal_sender = self.internal_sender.clone();
 
