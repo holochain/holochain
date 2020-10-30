@@ -11,7 +11,7 @@ These tests will be run every time you post a new pull request in CircleCI.
 ## Requirements
 
 - Having `nix-shell` installed ([instructions](https://nixos.org/download.html)).
-- Having rust and `cargo` installed and in the stable toolchain version 1.45.2 (to change when `fixt` compiles on 1.46).
+- Having rust and `cargo` installed and in the stable toolchain
 
 ## Running tests
 
