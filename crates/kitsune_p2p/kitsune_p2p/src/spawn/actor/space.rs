@@ -35,6 +35,9 @@ ghost_actor::ghost_chan! {
 
         /// List online agents that claim to be covering a basis hash
         fn list_online_agents_for_basis_hash(space: Arc<KitsuneSpace>, basis: Arc<KitsuneBasis>) -> Vec<Arc<KitsuneAgent>>;
+
+        /// Update / publish our agent info
+        fn update_agent_info() -> ();
     }
 }
 
@@ -56,7 +59,7 @@ pub(crate) async fn spawn_space(
         .attach_receiver(gossip_recv)
         .await?;
 
-    let internal_sender = builder
+    let i_s = builder
         .channel_factory()
         .create_channel::<SpaceInternal>()
         .await?;
@@ -66,7 +69,7 @@ pub(crate) async fn spawn_space(
         .create_channel::<KitsuneP2p>()
         .await?;
 
-    tokio::task::spawn(builder.spawn(Space::new(space, internal_sender, evt_send, transport)));
+    tokio::task::spawn(builder.spawn(Space::new(space, i_s, evt_send, transport)));
 
     Ok((sender, evt_recv))
 }
@@ -220,6 +223,53 @@ impl SpaceInternalHandler for Space {
         let res = self.agents.keys().cloned().collect();
         Ok(async move { Ok(res) }.boxed().into())
     }
+
+    fn handle_update_agent_info(&mut self) -> SpaceInternalHandlerResult<()> {
+        let space = self.space.clone();
+        let agent_list: Vec<Arc<KitsuneAgent>> = self.agents.keys().cloned().collect();
+        let bound_url = self.transport.bound_url();
+        let evt_sender = self.evt_sender.clone();
+        Ok(async move {
+            let bound_url = bound_url.await?;
+            let urls = bound_url
+                .query_pairs()
+                .map(|(_, sub_url)| url2::url2!("{}", sub_url))
+                .collect::<Vec<_>>();
+            for agent in agent_list {
+                let agent_info = crate::types::agent_store::AgentInfo::new(
+                    (*space).clone(),
+                    (*agent).clone(),
+                    urls.clone(),
+                    std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_millis() as u64,
+                );
+                let mut data = Vec::new();
+                kitsune_p2p_types::codec::rmp_encode(&mut data, &agent_info)?;
+                let sign_req = SignNetworkDataEvt {
+                    space: space.clone(),
+                    agent: agent.clone(),
+                    data: Arc::new(data),
+                };
+                let sig = evt_sender.sign_network_data(sign_req).await?;
+                let agent_info_signed =
+                    crate::types::agent_store::AgentInfoSigned::try_new(sig, agent_info)?;
+                tracing::debug!(?agent_info_signed);
+                evt_sender
+                    .put_agent_info_signed(PutAgentInfoSignedEvt {
+                        space: space.clone(),
+                        agent,
+                        agent_info_signed,
+                    })
+                    .await?;
+                // TODO - here, also publish to bootstrap server
+            }
+            Ok(())
+        }
+        .boxed()
+        .into())
+    }
 }
 
 impl ghost_actor::GhostControlHandler for Space {}
@@ -233,44 +283,17 @@ impl KitsuneP2pHandler for Space {
 
     fn handle_join(
         &mut self,
-        space: Arc<KitsuneSpace>,
+        _space: Arc<KitsuneSpace>,
         agent: Arc<KitsuneAgent>,
     ) -> KitsuneP2pHandlerResult<()> {
         match self.agents.entry(agent.clone()) {
             Entry::Occupied(_) => (),
             Entry::Vacant(entry) => {
-                entry.insert(AgentInfo { agent: agent.clone() });
+                entry.insert(AgentInfo { agent });
             }
         }
-        let bound_url = self.transport.bound_url();
-        let evt_sender = self.evt_sender.clone();
-        Ok(async move {
-            let bound_url = bound_url.await?;
-            let urls = bound_url
-                .query_pairs()
-                .map(|(_, sub_url)| url2::url2!("{}", sub_url))
-                .collect::<Vec<_>>();
-            let agent_info = crate::types::agent_store::AgentInfo::new(
-                (*space).clone(),
-                (*agent).clone(),
-                urls,
-                0,
-            );
-            let mut data = Vec::new();
-            kitsune_p2p_types::codec::rmp_encode(&mut data, &agent_info)?;
-            let sign_req = SignNetworkDataEvt {
-                space,
-                agent,
-                data: Arc::new(data),
-            };
-            let sig = evt_sender.sign_network_data(sign_req).await?;
-            let agent_info_signed = crate::types::agent_store::AgentInfoSigned::try_new(
-                sig,
-                agent_info,
-            )?;
-            tracing::warn!(?agent_info_signed);
-            Ok(())
-        }.boxed().into())
+        let fut = self.i_s.update_agent_info();
+        Ok(async move { fut.await }.boxed().into())
     }
 
     fn handle_leave(
@@ -290,7 +313,7 @@ impl KitsuneP2pHandler for Space {
         payload: Vec<u8>,
     ) -> KitsuneP2pHandlerResult<Vec<u8>> {
         let space = self.space.clone();
-        let internal_sender = self.internal_sender.clone();
+        let i_s = self.i_s.clone();
         let payload = Arc::new(wire::Wire::call(payload.into()).encode_vec()?);
 
         Ok(async move {
@@ -298,7 +321,7 @@ impl KitsuneP2pHandler for Space {
 
             loop {
                 // attempt to send the request right now
-                let err = match internal_sender
+                let err = match i_s
                     .immediate_request(
                         space.clone(),
                         to_agent.clone(),
@@ -414,7 +437,7 @@ struct AgentInfo {
 /// areas that share common transport infrastructure for communication.
 pub(crate) struct Space {
     space: Arc<KitsuneSpace>,
-    internal_sender: ghost_actor::GhostSender<SpaceInternal>,
+    i_s: ghost_actor::GhostSender<SpaceInternal>,
     evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     #[allow(dead_code)]
     transport: ghost_actor::GhostSender<TransportListener>,
@@ -425,13 +448,22 @@ impl Space {
     /// space constructor
     pub fn new(
         space: Arc<KitsuneSpace>,
-        internal_sender: ghost_actor::GhostSender<SpaceInternal>,
+        i_s: ghost_actor::GhostSender<SpaceInternal>,
         evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
         transport: ghost_actor::GhostSender<TransportListener>,
     ) -> Self {
+        let i_s_c = i_s.clone();
+        tokio::task::spawn(async move {
+            loop {
+                tokio::time::delay_for(std::time::Duration::from_secs(5 * 60)).await;
+                if i_s_c.update_agent_info().await.is_err() {
+                    break;
+                }
+            }
+        });
         Self {
             space,
-            internal_sender,
+            i_s,
             evt_sender,
             transport,
             agents: HashMap::new(),
@@ -467,7 +499,7 @@ impl Space {
         //        other than us - prefer that, or fall back to
         //        just reflecting the msg to ourselves.
 
-        let i_s = self.internal_sender.clone();
+        let i_s = self.i_s.clone();
         Ok(async move {
             let mut to_agent = from_agent.clone();
             'search_loop: for _ in 0..5 {
@@ -531,7 +563,7 @@ impl Space {
         // encode the data to send
         let payload = Arc::new(wire::Wire::notify(payload.into()).encode_vec()?);
 
-        let internal_sender = self.internal_sender.clone();
+        let i_s = self.i_s.clone();
 
         // check 5(ish) times but with sane min/max
         // FYI - this strategy will likely change when we are no longer
@@ -551,7 +583,7 @@ impl Space {
             let send_success_count = Arc::new(std::sync::atomic::AtomicU8::new(0));
 
             loop {
-                if let Ok(agent_list) = internal_sender
+                if let Ok(agent_list) = i_s
                     .list_online_agents_for_basis_hash(space.clone(), basis.clone())
                     .await
                 {
@@ -560,14 +592,14 @@ impl Space {
                             sent_to.insert(to_agent.clone());
                             // send the notify here - but spawn
                             // so we're not holding up this loop
-                            let internal_sender = internal_sender.clone();
+                            let i_s = i_s.clone();
                             let space = space.clone();
                             let payload = payload.clone();
                             let send_success_count = send_success_count.clone();
                             let from_agent2 = from_agent.clone();
                             tokio::task::spawn(
                                 async move {
-                                    if internal_sender
+                                    if i_s
                                         .immediate_request(space, to_agent, from_agent2, payload)
                                         .await
                                         .is_ok()

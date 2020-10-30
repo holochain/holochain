@@ -8,13 +8,29 @@ mod tests {
     async fn test_peer_info_store() -> Result<(), KitsuneP2pError> {
         init_tracing();
 
-        let (harness, _evt) = spawn_test_harness_mem().await?;
+        let (harness, evt) = spawn_test_harness_mem().await?;
+        let mut recv = evt.receive();
 
         harness.add_space().await?;
-        let (_, _p2p) = harness.add_direct_agent("DIRECT".into()).await?;
+        let (agent, _p2p) = harness.add_direct_agent("DIRECT".into()).await?;
 
         harness.ghost_actor_shutdown().await?;
-        Ok(())
+
+        let mut agent_info_signed = None;
+
+        use tokio::stream::StreamExt;
+        while let Some(item) = recv.next().await {
+            if let HarnessEventType::StoreAgentInfo { agent, .. } = item.ty {
+                agent_info_signed = Some((agent,));
+            }
+        }
+
+        if let Some(i) = agent_info_signed {
+            assert_eq!(i.0, Slug::from(agent));
+            return Ok(());
+        }
+
+        panic!("Failed to receive agent_info_sigend");
     }
 
     #[tokio::test(threaded_scheduler)]
