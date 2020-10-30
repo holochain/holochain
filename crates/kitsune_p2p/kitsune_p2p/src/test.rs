@@ -5,6 +5,19 @@ mod tests {
     use std::sync::Arc;
 
     #[tokio::test(threaded_scheduler)]
+    async fn test_peer_info_store() -> Result<(), KitsuneP2pError> {
+        init_tracing();
+
+        let (harness, _evt) = spawn_test_harness_mem().await?;
+
+        harness.add_space().await?;
+        let (_, _p2p) = harness.add_direct_agent("DIRECT".into()).await?;
+
+        harness.ghost_actor_shutdown().await?;
+        Ok(())
+    }
+
+    #[tokio::test(threaded_scheduler)]
     async fn test_transport_binding() -> Result<(), KitsuneP2pError> {
         init_tracing();
 
@@ -27,6 +40,8 @@ mod tests {
             "kitsune-quic",
             binding.path_segments().unwrap().next().unwrap()
         );
+
+        harness.ghost_actor_shutdown().await?;
         Ok(())
     }
 

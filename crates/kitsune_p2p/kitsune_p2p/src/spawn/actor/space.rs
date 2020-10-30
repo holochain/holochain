@@ -233,16 +233,44 @@ impl KitsuneP2pHandler for Space {
 
     fn handle_join(
         &mut self,
-        _space: Arc<KitsuneSpace>,
+        space: Arc<KitsuneSpace>,
         agent: Arc<KitsuneAgent>,
     ) -> KitsuneP2pHandlerResult<()> {
         match self.agents.entry(agent.clone()) {
             Entry::Occupied(_) => (),
             Entry::Vacant(entry) => {
-                entry.insert(AgentInfo { agent });
+                entry.insert(AgentInfo { agent: agent.clone() });
             }
         }
-        Ok(async move { Ok(()) }.boxed().into())
+        let bound_url = self.transport.bound_url();
+        let evt_sender = self.evt_sender.clone();
+        Ok(async move {
+            let bound_url = bound_url.await?;
+            let urls = bound_url
+                .query_pairs()
+                .map(|(_, sub_url)| url2::url2!("{}", sub_url))
+                .collect::<Vec<_>>();
+            let agent_info = crate::types::agent_store::AgentInfo::new(
+                (*space).clone(),
+                (*agent).clone(),
+                urls,
+                0,
+            );
+            let mut data = Vec::new();
+            kitsune_p2p_types::codec::rmp_encode(&mut data, &agent_info)?;
+            let sign_req = SignNetworkDataEvt {
+                space,
+                agent,
+                data: Arc::new(data),
+            };
+            let sig = evt_sender.sign_network_data(sign_req).await?;
+            let agent_info_signed = crate::types::agent_store::AgentInfoSigned::try_new(
+                sig,
+                agent_info,
+            )?;
+            tracing::warn!(?agent_info_signed);
+            Ok(())
+        }.boxed().into())
     }
 
     fn handle_leave(

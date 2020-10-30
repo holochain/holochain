@@ -35,24 +35,39 @@ pub(crate) async fn spawn_test_agent(
         .create_channel::<HarnessAgentControl>()
         .await?;
 
-    tokio::task::spawn(builder.spawn(AgentHarness::new(harness_chan)));
+    tokio::task::spawn(builder.spawn(AgentHarness::new(harness_chan).await?));
 
     Ok((agent, p2p, control))
 }
 
+use lair_keystore_api::{
+    entry::EntrySignEd25519,
+    //actor::SignEd25519PubKey,
+    internal::sign_ed25519::*,
+};
+
 struct AgentHarness {
+    #[allow(dead_code)]
+    agent: Arc<KitsuneAgent>,
+    #[allow(dead_code)]
+    priv_key: SignEd25519PrivKey,
     harness_chan: HarnessEventChannel,
     agent_store: HashMap<Arc<KitsuneAgent>, Arc<AgentInfoSigned>>,
     gossip_store: HashMap<Arc<KitsuneOpHash>, String>,
 }
 
 impl AgentHarness {
-    pub fn new(harness_chan: HarnessEventChannel) -> Self {
-        Self {
+    pub async fn new(harness_chan: HarnessEventChannel) -> Result<Self, KitsuneP2pError> {
+        let EntrySignEd25519 { priv_key, pub_key } =
+            sign_ed25519_keypair_new_from_entropy().await.map_err(KitsuneP2pError::other)?;
+        let agent: Arc<KitsuneAgent> = Arc::new((**pub_key).clone().into());
+        Ok(Self {
+            agent,
+            priv_key,
             harness_chan,
             agent_store: HashMap::new(),
             gossip_store: HashMap::new(),
-        }
+        })
     }
 }
 
@@ -182,6 +197,6 @@ impl KitsuneP2pEventHandler for AgentHarness {
         &mut self,
         _input: SignNetworkDataEvt,
     ) -> KitsuneP2pEventHandlerResult<KitsuneSignature> {
-        Ok(async move { Ok(vec![0; 64].into()) }.boxed().into())
+        Ok(async move { Ok(vec![1; 64].into()) }.boxed().into())
     }
 }
