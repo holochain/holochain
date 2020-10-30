@@ -20,6 +20,9 @@ impl Default for KitsuneP2pConfig {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum TransportConfig {
+    /// A transport that uses the local memory transport protocol
+    /// (this is mainly for testing).
+    Mem {},
     /// A transport that uses the QUIC protocol
     Quic {
         /// To which network interface / port should we bind?

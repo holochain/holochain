@@ -1,6 +1,12 @@
 #![deny(missing_docs)]
 //! P2p / dht communication framework.
 
+/// re-exported dependencies
+pub mod dependencies {
+    pub use ::kitsune_p2p_types;
+    pub use ::url2;
+}
+
 mod types;
 pub use types::*;
 
@@ -11,6 +17,7 @@ mod spawn;
 pub use spawn::*;
 
 #[cfg(test)]
-mod test;
+pub mod test_util;
 
-pub mod fixt;
+#[cfg(test)]
+mod test;
