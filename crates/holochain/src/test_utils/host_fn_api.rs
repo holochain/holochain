@@ -1,6 +1,9 @@
 use crate::{
-    conductor::interface::SignalBroadcaster,
     conductor::ConductorHandle,
+    conductor::{
+        api::{CallZomeHandle, CellConductorApi, CellConductorApiT},
+        interface::SignalBroadcaster,
+    },
     core::ribosome::RibosomeT,
     core::ribosome::ZomeCallInvocation,
     core::{
@@ -92,6 +95,7 @@ pub struct CallData {
     pub network: HolochainP2pCell,
     pub keystore: KeystoreSender,
     pub signal_tx: SignalBroadcaster,
+    pub call_zome_handle: CallZomeHandle,
 }
 
 impl CallData {
@@ -124,12 +128,15 @@ impl CallData {
             .into();
         let ribosome = WasmRibosome::new(dna_file.clone());
         let signal_tx = handle.signal_broadcaster().await;
+        let call_zome_handle =
+            CellConductorApi::new(handle.clone(), cell_id.clone()).into_call_zome_handle();
         let call_data = CallData {
             ribosome,
             zome_path,
             network,
             keystore,
             signal_tx,
+            call_zome_handle,
         };
         (env, call_data)
     }
@@ -147,6 +154,7 @@ pub async fn commit_entry<'env, E: Into<entry_def::EntryDefId>>(
         ribosome,
         signal_tx,
         zome_path,
+        call_zome_handle,
     } = call_data;
 
     let (cell_id, zome_name) = zome_path.into();
@@ -162,6 +170,7 @@ pub async fn commit_entry<'env, E: Into<entry_def::EntryDefId>>(
             keystore,
             network,
             signal_tx,
+            call_zome_handle,
             cell_id,
         );
         let call_context = CallContext::new(zome_name, host_access.into());
@@ -191,6 +200,7 @@ pub async fn delete_entry<'env>(
         ribosome,
         signal_tx,
         zome_path,
+        call_zome_handle,
     } = call_data;
 
     let (cell_id, zome_name) = zome_path.into();
@@ -205,6 +215,7 @@ pub async fn delete_entry<'env>(
             keystore,
             network,
             signal_tx,
+            call_zome_handle,
             cell_id,
         );
         let call_context = CallContext::new(zome_name, host_access.into());
@@ -241,6 +252,7 @@ pub async fn update_entry<'env, E: Into<entry_def::EntryDefId>>(
         ribosome,
         signal_tx,
         zome_path,
+        call_zome_handle,
     } = call_data;
 
     let (cell_id, zome_name) = zome_path.into();
@@ -255,6 +267,7 @@ pub async fn update_entry<'env, E: Into<entry_def::EntryDefId>>(
             keystore,
             network,
             signal_tx,
+            call_zome_handle,
             cell_id,
         );
         let call_context = CallContext::new(zome_name, host_access.into());
@@ -285,6 +298,7 @@ pub async fn get(
         ribosome,
         signal_tx,
         zome_path,
+        call_zome_handle,
     } = call_data;
 
     let (cell_id, zome_name) = zome_path.into();
@@ -302,6 +316,7 @@ pub async fn get(
             keystore,
             network,
             signal_tx,
+            call_zome_handle,
             cell_id,
         );
         let call_context = CallContext::new(zome_name, host_access.into());
@@ -324,6 +339,7 @@ pub async fn get_details<'env>(
         ribosome,
         signal_tx,
         zome_path,
+        call_zome_handle,
     } = call_data;
 
     let (cell_id, zome_name) = zome_path.into();
@@ -341,6 +357,7 @@ pub async fn get_details<'env>(
             keystore,
             network,
             signal_tx,
+            call_zome_handle,
             cell_id,
         );
         let call_context = CallContext::new(zome_name, host_access.into());
@@ -364,6 +381,7 @@ pub async fn create_link<'env>(
         ribosome,
         signal_tx,
         zome_path,
+        call_zome_handle,
     } = call_data;
 
     let (cell_id, zome_name) = zome_path.into();
@@ -378,6 +396,7 @@ pub async fn create_link<'env>(
             keystore,
             network,
             signal_tx,
+            call_zome_handle,
             cell_id,
         );
         let call_context = CallContext::new(zome_name, host_access.into());
@@ -407,6 +426,7 @@ pub async fn delete_link<'env>(
         ribosome,
         signal_tx,
         zome_path,
+        call_zome_handle,
     } = call_data;
 
     let (cell_id, zome_name) = zome_path.into();
@@ -421,6 +441,7 @@ pub async fn delete_link<'env>(
             keystore,
             network,
             signal_tx,
+            call_zome_handle,
             cell_id,
         );
         let call_context = CallContext::new(zome_name, host_access.into());
@@ -452,6 +473,7 @@ pub async fn get_links<'env>(
         ribosome,
         signal_tx,
         zome_path,
+        call_zome_handle,
     } = call_data;
 
     let (cell_id, zome_name) = zome_path.into();
@@ -466,6 +488,7 @@ pub async fn get_links<'env>(
             keystore,
             network,
             signal_tx,
+            call_zome_handle,
             cell_id,
         );
         let call_context = CallContext::new(zome_name, host_access.into());
@@ -508,6 +531,7 @@ pub async fn call_zome_direct(
         keystore,
         ribosome,
         signal_tx,
+        call_zome_handle,
         ..
     } = call_data;
 
@@ -521,6 +545,7 @@ pub async fn call_zome_direct(
             keystore,
             network,
             signal_tx,
+            call_zome_handle,
             cell_id,
         );
         let ribosome = Arc::new(ribosome);

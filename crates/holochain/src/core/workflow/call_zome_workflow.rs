@@ -87,6 +87,8 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT, C: CellConductorApi
         conductor_api,
     } = args;
 
+    let call_zome_handle = conductor_api.clone().into_call_zome_handle();
+
     let zome_name = invocation.zome_name.clone();
 
     // Get the current head
@@ -100,6 +102,7 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT, C: CellConductorApi
             keystore,
             network.clone(),
             signal_tx,
+            call_zome_handle,
             invocation.cell_id.clone(),
         );
         ribosome.call_zome_function(host_access, invocation)

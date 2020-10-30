@@ -1,6 +1,8 @@
 use crate::{
     conductor::{
-        api::RealAppInterfaceApi, dna_store::MockDnaStore, interface::SignalBroadcaster,
+        api::{CellConductorApi, CellConductorApiT, RealAppInterfaceApi},
+        dna_store::MockDnaStore,
+        interface::SignalBroadcaster,
         ConductorHandle,
     },
     core::queue_consumer::InitialQueueTriggers,
@@ -40,6 +42,7 @@ pub struct ConductorCallData {
     pub keystore: KeystoreSender,
     pub signal_tx: SignalBroadcaster,
     pub triggers: InitialQueueTriggers,
+    pub cell_conductor_api: CellConductorApi,
 }
 
 impl ConductorCallData {
@@ -50,6 +53,7 @@ impl ConductorCallData {
             .holochain_p2p()
             .to_cell(cell_id.dna_hash().clone(), cell_id.agent_pubkey().clone());
         let triggers = handle.get_cell_triggers(cell_id).await.unwrap();
+        let cell_conductor_api = CellConductorApi::new(handle.clone(), cell_id.clone());
 
         let ribosome = WasmRibosome::new(dna_file.clone());
         let signal_tx = handle.signal_broadcaster().await;
@@ -61,6 +65,7 @@ impl ConductorCallData {
             keystore,
             signal_tx,
             triggers,
+            cell_conductor_api,
         };
         call_data
     }
@@ -69,12 +74,14 @@ impl ConductorCallData {
     pub fn call_data<I: Into<ZomeName>>(&self, zome_name: I) -> CallData {
         let zome_name: ZomeName = zome_name.into();
         let zome_path = (self.cell_id.clone(), zome_name).into();
+        let call_zome_handle = self.cell_conductor_api.clone().into_call_zome_handle();
         CallData {
             ribosome: self.ribosome.clone(),
             zome_path,
             network: self.network.clone(),
             keystore: self.keystore.clone(),
             signal_tx: self.signal_tx.clone(),
+            call_zome_handle,
         }
     }
 }

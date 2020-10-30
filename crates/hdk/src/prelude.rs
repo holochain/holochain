@@ -27,6 +27,7 @@ pub use crate::hash_path::anchor::list_anchor_tags;
 pub use crate::hash_path::anchor::list_anchor_type_addresses;
 pub use crate::hash_path::anchor::Anchor;
 pub use crate::hash_path::path::Path;
+pub use crate::host_fn::call::call;
 pub use crate::map_extern;
 pub use crate::map_extern::ExternResult;
 pub use crate::query;

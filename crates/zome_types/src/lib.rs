@@ -13,6 +13,8 @@
 pub mod agent_info;
 pub mod bytes;
 #[allow(missing_docs)]
+pub mod call;
+#[allow(missing_docs)]
 pub mod call_remote;
 pub mod capability;
 #[allow(missing_docs)]

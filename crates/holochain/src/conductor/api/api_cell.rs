@@ -1,5 +1,7 @@
 //! The CellConductorApi allows Cells to talk to their Conductor
 
+use std::sync::Arc;
+
 use super::error::{ConductorApiError, ConductorApiResult};
 use crate::conductor::{
     entry_def_store::EntryDefBufferKey, interface::SignalBroadcaster, ConductorHandle,
@@ -20,6 +22,10 @@ pub struct CellConductorApi {
     conductor_handle: ConductorHandle,
     cell_id: CellId,
 }
+
+/// A handle that cn only call zome functions to avoid
+/// making write lock calls
+pub type CallZomeHandle = Arc<dyn CallZomeHandleT>;
 
 impl CellConductorApi {
     /// Instantiate from a Conductor reference and a CellId to identify which Cell
@@ -86,6 +92,10 @@ impl CellConductorApiT for CellConductorApi {
     async fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef> {
         self.conductor_handle.get_entry_def(key).await
     }
+
+    fn into_call_zome_handle(self) -> CallZomeHandle {
+        Arc::new(self)
+    }
 }
 
 /// The "internal" Conductor API interface, for a Cell to talk to its calling Conductor.
@@ -125,4 +135,28 @@ pub trait CellConductorApiT: Clone + Send + Sync + Sized {
 
     /// Get a [EntryDef] from the [EntryDefBuf]
     async fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef>;
+
+    /// Turn this into a call zome handle
+    fn into_call_zome_handle(self) -> CallZomeHandle;
+}
+
+#[async_trait]
+/// A handle that cn only call zome functions to avoid
+/// making write lock calls
+pub trait CallZomeHandleT: Send + Sync {
+    /// Invoke a zome function on a Cell
+    async fn call_zome(
+        &self,
+        invocation: ZomeCallInvocation,
+    ) -> ConductorApiResult<ZomeCallInvocationResult>;
+}
+
+#[async_trait]
+impl CallZomeHandleT for CellConductorApi {
+    async fn call_zome(
+        &self,
+        invocation: ZomeCallInvocation,
+    ) -> ConductorApiResult<ZomeCallInvocationResult> {
+        self.conductor_handle.call_zome(invocation).await
+    }
 }
