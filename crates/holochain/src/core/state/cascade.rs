@@ -1635,10 +1635,17 @@ where
         query: ChainQueryFilter,
         mut options: GetActivityOptions,
     ) -> CascadeResult<AgentActivity<Element>> {
+        const DEFAULT_ACTIVITY_TIMEOUT_MS: u64 = 1000;
         // Get the request options
         let requester_options = options.clone();
         // For now only fetching hashes until caching is worked out.
         options.include_full_headers = false;
+        // Get agent activity takes longer then other calls so we
+        // will give it a larger default timeout
+        options.timeout_ms = options
+            .timeout_ms
+            .clone()
+            .or(Some(DEFAULT_ACTIVITY_TIMEOUT_MS));
 
         // See if we have a cache hit
         let chain_hashes = match &query.sequence_range {

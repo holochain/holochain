@@ -42,6 +42,11 @@ fn create_entry(_: ()) -> ExternResult<HeaderHash> {
 }
 
 #[hdk_extern]
+fn create_post(post: Post) -> ExternResult<HeaderHash> {
+    Ok(create_entry!(&post)?)
+}
+
+#[hdk_extern]
 fn get_entry(_: ()) -> ExternResult<GetOutput> {
     Ok(GetOutput::new(get!(hash_entry!(post())?)?))
 }

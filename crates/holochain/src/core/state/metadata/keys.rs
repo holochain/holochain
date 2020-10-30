@@ -388,13 +388,13 @@ impl From<BytesKey> for ChainItemKey {
         let mut end = HOLO_HASH_SERIALIZED_LEN;
 
         // Take 36 for the AgentPubKey
-        let a = AgentPubKey::from_raw_bytes(bytes[start..end].to_owned());
+        let agent = AgentPubKey::from_raw_bytes(bytes[start..end].to_owned());
 
         start = end;
         end += STATUS_SIZE;
 
         // Take 1 byte for the status
-        let v = match bytes[start..end] {
+        let status = match bytes[start..end] {
             [0] => ValidationStatus::Valid,
             [1] => ValidationStatus::Rejected,
             [2] => ValidationStatus::Abandoned,
@@ -406,14 +406,14 @@ impl From<BytesKey> for ChainItemKey {
 
         // Take another 4 for the u32
         let seq_bytes: Vec<_> = bytes[start..end].to_owned();
-        let s = BigEndian::read_u32(&seq_bytes);
+        let sequence = BigEndian::read_u32(&seq_bytes);
 
         start = end;
         end += HOLO_HASH_SERIALIZED_LEN;
 
         // Take the rest for the header hash
-        let h = HeaderHash::from_raw_bytes(bytes[start..end].to_owned());
+        let hash = HeaderHash::from_raw_bytes(bytes[start..end].to_owned());
 
-        ChainItemKey::Full(a, v, s, h)
+        ChainItemKey::Full(agent, status, sequence, hash)
     }
 }

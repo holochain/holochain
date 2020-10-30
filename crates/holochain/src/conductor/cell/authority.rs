@@ -167,39 +167,6 @@ pub async fn handle_get_entry(
 }
 
 #[instrument(skip(env))]
-// TODO: Remove this function before merging PR
-fn remove_me_show_slow_read_issue(env: EnvironmentRead, agent: AgentPubKey) {
-    warn!(
-        msg = "Remove this function before merging PR",
-        file = file!(),
-        line = line!()
-    );
-    let element_integrated = ElementBuf::vault(env.clone(), false).unwrap();
-    let meta_integrated = MetadataBuf::vault(env.clone()).unwrap();
-    holochain_state::fresh_reader_test!(env, |r| {
-        let now = std::time::Instant::now();
-        let hashes = meta_integrated
-            .get_activity_sequence(
-                &r,
-                ChainItemKey::AgentStatus(agent.clone(), ValidationStatus::Valid),
-            )
-            .unwrap()
-            .collect::<Vec<_>>()
-            .unwrap();
-        let el = now.elapsed();
-        debug!(time_for_activity_sequence = %el.as_micros());
-        for hash in &hashes {
-            element_integrated.get_header(&hash.1).unwrap();
-        }
-        let el = now.elapsed();
-        debug!(
-            us_per_header = %el.as_micros() / hashes.len() as u128,
-            num_headers = %hashes.len()
-        );
-    });
-}
-
-#[instrument(skip(env))]
 pub fn handle_get_agent_activity(
     env: EnvironmentRead,
     agent: AgentPubKey,
@@ -210,8 +177,6 @@ pub fn handle_get_agent_activity(
     let element_integrated = ElementBuf::vault(env.clone(), false)?;
     let meta_integrated = MetadataBuf::vault(env.clone())?;
     let element_rejected = ElementBuf::rejected(env.clone())?;
-
-    remove_me_show_slow_read_issue(env.clone(), agent.clone());
 
     // Status
     let status = meta_integrated
@@ -295,4 +260,55 @@ fn check_headers<P: PrefixType, R: Readable>(
                 .collect()?,
         ))
     }
+}
+
+#[cfg(test)]
+#[instrument(skip(env))]
+// This is handy for testing performance as it shows the read times for get agent activity
+fn _show_agent_activity_read_times(env: EnvironmentRead, agent: AgentPubKey) {
+    {
+        let g = env.guard();
+        let rkv = g.rkv();
+        let stat = rkv.stat().unwrap();
+        let info = rkv.info().unwrap();
+        debug!(
+            map_size = info.map_size(),
+            last_pgno = info.last_pgno(),
+            last_txnid = info.last_txnid(),
+            max_readers = info.max_readers(),
+            num_readers = info.num_readers()
+        );
+        debug!(
+            page_size = stat.page_size(),
+            depth = stat.depth(),
+            branch_pages = stat.branch_pages(),
+            leaf_pages = stat.leaf_pages(),
+            overflow_pages = stat.overflow_pages(),
+            entries = stat.entries(),
+        );
+    }
+    let element_integrated = ElementBuf::vault(env.clone(), false).unwrap();
+    let meta_integrated = MetadataBuf::vault(env.clone()).unwrap();
+    holochain_state::fresh_reader_test!(env, |r| {
+        let now = std::time::Instant::now();
+        let hashes = meta_integrated
+            .get_activity_sequence(
+                &r,
+                ChainItemKey::AgentStatus(agent.clone(), ValidationStatus::Valid),
+            )
+            .unwrap()
+            .collect::<Vec<_>>()
+            .unwrap();
+        let el = now.elapsed();
+        debug!(time_for_activity_sequence = %el.as_micros());
+        for hash in &hashes {
+            element_integrated.get_header(&hash.1).unwrap();
+        }
+        let el = now.elapsed();
+        debug!(
+            us_per_header = %el.as_micros() / hashes.len() as u128,
+            num_headers = %hashes.len(),
+            total = %el.as_millis()
+        );
+    });
 }

@@ -24,6 +24,7 @@ use crate::{
     core::state::cascade::DbPairMut,
     core::state::element_buf::ElementBuf,
     core::state::metadata::{ChainItemKey, MetadataBuf, MetadataBufT},
+    test_utils::host_fn_api::Post,
     test_utils::{
         conductor_setup::ConductorCallData, host_fn_api, new_invocation, wait_for_integration,
     },
@@ -32,7 +33,8 @@ use crate::{
     core::state::source_chain::SourceChain, test_utils::conductor_setup::ConductorTestData,
 };
 
-const NUM_COMMITS: usize = 10;
+const NUM_COMMITS: usize = 5;
+const GET_AGENT_ACTIVITY_TIMEOUT_MS: u64 = 1000;
 // Check if the correct number of ops are integrated
 // every 100 ms for a maximum of 10 seconds but early exit
 // if they are there.
@@ -309,6 +311,7 @@ async fn get_agent_activity_test() {
             GetActivityOptions {
                 include_full_headers: true,
                 include_valid_activity: true,
+                timeout_ms: Some(GET_AGENT_ACTIVITY_TIMEOUT_MS),
                 ..Default::default()
             },
         )
@@ -321,7 +324,10 @@ async fn get_agent_activity_test() {
         .get_agent_activity(
             alice_agent_id.clone(),
             ChainQueryFilter::new(),
-            Default::default(),
+            GetActivityOptions {
+                timeout_ms: Some(GET_AGENT_ACTIVITY_TIMEOUT_MS),
+                ..Default::default()
+            },
         )
         .await
         .unwrap();
@@ -348,6 +354,7 @@ async fn get_agent_activity_test() {
             GetActivityOptions {
                 include_full_headers: true,
                 retry_gets: 5,
+                timeout_ms: Some(GET_AGENT_ACTIVITY_TIMEOUT_MS),
                 ..Default::default()
             },
         )
@@ -365,6 +372,7 @@ async fn get_agent_activity_test() {
             GetActivityOptions {
                 include_full_headers: true,
                 retry_gets: 5,
+                timeout_ms: Some(GET_AGENT_ACTIVITY_TIMEOUT_MS),
                 ..Default::default()
             },
         )
@@ -402,7 +410,10 @@ async fn get_agent_activity_test() {
         .get_agent_activity(
             alice_agent_id.clone(),
             ChainQueryFilter::new(),
-            Default::default(),
+            GetActivityOptions {
+                timeout_ms: Some(GET_AGENT_ACTIVITY_TIMEOUT_MS),
+                ..Default::default()
+            },
         )
         .await
         .unwrap();
@@ -448,6 +459,7 @@ async fn get_agent_activity_test() {
             GetActivityOptions {
                 include_full_headers: true,
                 retry_gets: 5,
+                timeout_ms: Some(GET_AGENT_ACTIVITY_TIMEOUT_MS),
                 ..Default::default()
             },
         )
@@ -707,6 +719,9 @@ async fn check_cascade(
 /// The exact same code running here in this test is 10x
 /// faster then when it is run by the cell
 async fn slow_lmdb_reads_test() {
+    let num_commits = std::env::var_os("SLOW_LMDB_COMMITS")
+        .and_then(|s| s.into_string().ok()?.parse::<usize>().ok())
+        .unwrap_or(10);
     observability::test_run().ok();
     let zomes = vec![TestWasm::Create];
     let conductor_test = ConductorTestData::new(zomes, false).await;
@@ -741,14 +756,23 @@ async fn slow_lmdb_reads_test() {
         )
         .unwrap(),
     );
-    for _ in 0..10 {
+    for i in 0..num_commits {
         for invocation in &invocations {
             let r = handle.call_zome(invocation.clone()).await.unwrap().unwrap();
             assert_matches!(r, ZomeCallResponse::Ok(_));
         }
+        let invocation = new_invocation(
+            &alice_call_data.cell_id,
+            "create_post",
+            Post(format!("{}", i)),
+            TestWasm::Create,
+        )
+        .unwrap();
+        let r = handle.call_zome(invocation.clone()).await.unwrap().unwrap();
+        assert_matches!(r, ZomeCallResponse::Ok(_));
     }
 
-    let expected_count = 9 + 3 * 2 * 10 + 2 * 10;
+    let expected_count = 9 + 3 * 3 * num_commits + 2 * num_commits;
     wait_for_integration(
         &alice_call_data.env,
         expected_count,
@@ -766,7 +790,7 @@ async fn slow_lmdb_reads_test() {
     let num_headers = hashes.len();
 
     // Time how long it takes to get the headers
-    let expected_count = 9 + 3 * 2 * 10 + 2 * 10;
+    let expected_count = 9 + 3 * 2 * num_commits + 2 * num_commits;
     wait_for_integration(
         &alice_call_data.env,
         expected_count,
@@ -780,7 +804,10 @@ async fn slow_lmdb_reads_test() {
         .get_agent_activity(
             alice_call_data.cell_id.agent_pubkey().clone(),
             ChainQueryFilter::new(),
-            Default::default(),
+            GetActivityOptions {
+                timeout_ms: Some(GET_AGENT_ACTIVITY_TIMEOUT_MS),
+                ..Default::default()
+            },
         )
         .await
         .unwrap();
@@ -823,6 +850,7 @@ async fn slow_lmdb_reads_test() {
     println!("{} us per header", average / num_headers as u128);
     println!("low {}", low / num_headers as u128);
     println!("high {}", high / num_headers as u128);
+    println!("num commits {}", num_commits);
 
     ConductorTestData::shutdown_conductor(handle).await;
 }

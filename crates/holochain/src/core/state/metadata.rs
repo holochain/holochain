@@ -448,25 +448,21 @@ where
             (Some((header_seq, hash)), None) => {
                 Ok(ChainStatus::Invalid(ChainHead { header_seq, hash }))
             }
-            (Some(a), Some(b)) => {
-                if a.0 == b.0 {
-                    Ok(ChainStatus::Forked(ChainFork {
-                        fork_seq: a.0,
-                        first_header: a.1,
-                        second_header: b.1,
-                    }))
-                } else if a.0 < b.0 {
-                    Ok(ChainStatus::Invalid(ChainHead {
-                        header_seq: a.0,
-                        hash: a.1,
-                    }))
-                } else {
-                    Ok(ChainStatus::Invalid(ChainHead {
-                        header_seq: b.0,
-                        hash: b.1,
-                    }))
-                }
-            }
+            (Some(a), Some(b)) => match a.0.cmp(&b.0) {
+                std::cmp::Ordering::Equal => Ok(ChainStatus::Forked(ChainFork {
+                    fork_seq: a.0,
+                    first_header: a.1,
+                    second_header: b.1,
+                })),
+                std::cmp::Ordering::Less => Ok(ChainStatus::Invalid(ChainHead {
+                    header_seq: a.0,
+                    hash: a.1,
+                })),
+                std::cmp::Ordering::Greater => Ok(ChainStatus::Invalid(ChainHead {
+                    header_seq: b.0,
+                    hash: b.1,
+                })),
+            },
         }
     }
 
