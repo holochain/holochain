@@ -1,3 +1,5 @@
+#![allow(unused_imports)]
+#![allow(dead_code)]
 use crate::{
     conductor::{dna_store::MockDnaStore, interface::websocket::test::setup_app},
     core::{
@@ -59,6 +61,7 @@ use unwrap_to::unwrap_to;
 
 use crate::test_utils::host_fn_api::*;
 
+/*
 #[tokio::test(threaded_scheduler)]
 #[ignore = "flaky"]
 async fn get_updates_cache() {
@@ -100,7 +103,9 @@ async fn get_updates_cache() {
 
     shutdown.clean().await;
 }
+*/
 
+/*
 #[tokio::test(threaded_scheduler)]
 #[ignore = "flaky!"]
 async fn get_meta_updates_meta_cache() {
@@ -165,6 +170,7 @@ async fn get_meta_updates_meta_cache() {
 
     shutdown.clean().await;
 }
+*/
 
 #[tokio::test(threaded_scheduler)]
 #[ignore = "flaky"]
@@ -518,6 +524,8 @@ impl Shutdown {
             .ok();
     }
 }
+
+/*
 /// Run a test network handler which accepts two data sources to draw from.
 /// It only handles Get and GetMeta requests.
 /// - When handling a Get, it pulls the corresponding Element from the `element_fixt_store`
@@ -596,6 +604,7 @@ async fn run_fixt_network(
         },
     )
 }
+*/
 
 async fn generate_fixt_store() -> (
     BTreeMap<HeaderHash, Element>,
