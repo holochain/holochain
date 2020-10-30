@@ -1230,6 +1230,7 @@ dependencies = [
 name = "holochain_legacy"
 version = "0.0.1"
 dependencies = [
+ "holochain_serialized_bytes",
  "serde",
 ]
 
@@ -1613,13 +1614,12 @@ version = "0.0.1"
 dependencies = [
  "assert_matches",
  "derive_more",
- "fixt",
  "futures",
  "ghost_actor",
- "holo_hash",
  "kitsune_p2p_proxy",
  "kitsune_p2p_transport_quic",
  "kitsune_p2p_types",
+ "rand 0.7.3",
  "serde",
  "serde_bytes",
  "shrinkwraprs",
@@ -1677,7 +1677,7 @@ dependencies = [
  "ghost_actor",
  "nanoid",
  "once_cell",
- "paste 1.0.1",
+ "paste 1.0.2",
  "rmp-serde",
  "serde",
  "serde_json",
