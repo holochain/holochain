@@ -60,7 +60,7 @@ use unwrap_to::unwrap_to;
 use crate::test_utils::host_fn_api::*;
 
 #[tokio::test(threaded_scheduler)]
-
+#[ignore = "flaky"]
 async fn get_updates_cache() {
     observability::test_run().ok();
     // Database setup
