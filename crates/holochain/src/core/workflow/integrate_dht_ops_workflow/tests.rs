@@ -1331,6 +1331,7 @@ mod slow_tests {
     /// The aim of this test is to show from a high level that committing
     /// data on one agent results in integrated data on another agent
     #[tokio::test(threaded_scheduler)]
+    #[ignore = "flaky"]
     async fn commit_entry_add_link() {
         //////////////
         //// Setup
