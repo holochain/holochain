@@ -21,8 +21,10 @@ pub struct ElementDetails {
     /// The specific element.
     /// Either a Create or an Update.
     pub element: Element,
-    /// Any Delete on this element.
+    /// Any [Delete] on this element.
     pub deletes: Vec<SignedHeaderHashed>,
+    /// Any [Update] on this element.
+    pub updates: Vec<SignedHeaderHashed>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, SerializedBytes)]

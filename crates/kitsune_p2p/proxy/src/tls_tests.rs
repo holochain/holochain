@@ -1,8 +1,9 @@
 use crate::*;
 use futures::stream::StreamExt;
+use ghost_actor::dependencies::tracing;
 
 fn init_tracing() {
-    let _ = ghost_actor::dependencies::tracing::subscriber::set_global_default(
+    let _ = tracing::subscriber::set_global_default(
         tracing_subscriber::FmtSubscriber::builder()
             .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
             .finish(),
@@ -18,21 +19,29 @@ async fn tls_server_and_client() {
 }
 
 async fn tls_server_and_client_inner() -> TransportResult<()> {
+    tracing::warn!("start test");
+
     let tls_config_1 = TlsConfig::new_ephemeral().await?;
     let tls_config_2 = TlsConfig::new_ephemeral().await?;
 
     let (tls_srv_conf, _tls_cli_conf) = gen_tls_configs(&tls_config_1)?;
     let (_tls_srv_conf, tls_cli_conf) = gen_tls_configs(&tls_config_2)?;
 
-    let (in_con_send, mut in_con_recv) =
-        futures::channel::mpsc::channel::<TransportIncomingChannel>(10);
+    let (in_con_send, mut in_con_recv) = futures::channel::mpsc::channel::<TransportEvent>(10);
 
     tokio::task::spawn(async move {
-        while let Some((_url, mut send, recv)) = in_con_recv.next().await {
-            let data = recv.read_to_end().await;
-            let data = String::from_utf8_lossy(&data);
-            let data = format!("echo: {}", data);
-            send.write_and_close(data.into_bytes()).await?;
+        while let Some(evt) = in_con_recv.next().await {
+            match evt {
+                TransportEvent::IncomingChannel(_url, mut send, recv) => {
+                    tracing::warn!("incoming channel - reading...");
+                    let data = recv.read_to_end().await;
+                    let data = String::from_utf8_lossy(&data);
+                    let data = format!("echo: {}", data);
+                    tracing::warn!("incoming channel - responding...");
+                    send.write_and_close(data.into_bytes()).await?;
+                    tracing::warn!("incoming channel - responding complete.");
+                }
+            }
         }
         TransportResult::Ok(())
     });
@@ -63,11 +72,15 @@ async fn tls_server_and_client_inner() -> TransportResult<()> {
         cli_proxy_recv,
     );
 
+    tracing::warn!("about to write");
     cli_data_send2.write_and_close(b"test".to_vec()).await?;
 
+    tracing::warn!("about to recv");
     let res = cli_data_recv2.next().await.unwrap();
     let res = String::from_utf8_lossy(&res);
     assert_eq!("echo: test", res);
+
+    tracing::warn!("end test");
 
     Ok(())
 }

@@ -80,8 +80,8 @@ impl AgentInfo {
         self.as_ref()
     }
 
-    /// Thin AsRef wrapper for id.
-    pub fn as_id_ref(&self) -> &KitsuneAgent {
+    /// Thin AsRef wrapper for agent.
+    pub fn as_agent_ref(&self) -> &KitsuneAgent {
         self.as_ref()
     }
 

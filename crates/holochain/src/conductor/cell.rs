@@ -5,15 +5,18 @@
 //! SourceChain which has already undergone Genesis.
 
 use super::{interface::SignalBroadcaster, manager::ManagedTaskAdd};
-use crate::conductor::api::CellConductorApiT;
 use crate::conductor::handle::ConductorHandle;
 use crate::conductor::{api::error::ConductorApiError, entry_def_store::get_entry_def_from_ids};
 use crate::core::queue_consumer::{spawn_queue_consumer_tasks, InitialQueueTriggers};
 use crate::core::ribosome::ZomeCallInvocation;
-use holochain_zome_types::header::EntryType;
-use holochain_zome_types::query::ChainQueryFilter;
+use crate::{
+    conductor::api::CellConductorApiT,
+    core::workflow::produce_dht_ops_workflow::dht_op_light::light_to_op,
+};
 use holochain_zome_types::validate::ValidationPackage;
 use holochain_zome_types::zome::FunctionName;
+use holochain_zome_types::{header::EntryType, query::AgentActivity};
+use holochain_zome_types::{query::ChainQueryFilter, validate::ValidationStatus};
 use validation_package::ValidationPackageDb;
 
 use crate::{
@@ -227,6 +230,11 @@ impl Cell {
     ) -> CellResult<()> {
         use holochain_p2p::event::HolochainP2pEvent::*;
         match evt {
+            PutAgentInfoSigned { .. } | GetAgentInfoSigned { .. } => {
+                // PutAgentInfoSigned needs to be handled at the conductor level where the p2p
+                // store lives.
+                unreachable!()
+            }
             CallRemote {
                 span: _span,
                 from_agent,
@@ -332,6 +340,23 @@ impl Cell {
                 .instrument(debug_span!("cell_handle_get_links"))
                 .await;
             }
+            GetAgentActivity {
+                span: _span,
+                respond,
+                agent,
+                query,
+                options,
+                ..
+            } => {
+                async {
+                    let res = self
+                        .handle_get_agent_activity(agent, query, options)
+                        .map_err(holochain_p2p::HolochainP2pError::other);
+                    respond.respond(Ok(async move { res }.boxed().into()));
+                }
+                .instrument(debug_span!("cell_handle_get_agent_activity"))
+                .await;
+            }
             ValidationReceiptReceived {
                 span: _span,
                 respond,
@@ -404,20 +429,27 @@ impl Cell {
     /// we are receiving a "publish" event from the network
     async fn handle_publish(
         &self,
-        _from_agent: AgentPubKey,
+        from_agent: AgentPubKey,
         _request_validation_receipt: bool,
         _dht_hash: holo_hash::AnyDhtHash,
         ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
     ) -> CellResult<()> {
-        incoming_dht_ops_workflow(&self.env, self.queue_triggers.sys_validation.clone(), ops)
-            .await
-            .map_err(Box::new)
-            .map_err(ConductorApiError::from)
-            .map_err(Box::new)?;
+        incoming_dht_ops_workflow(
+            &self.env,
+            self.queue_triggers.sys_validation.clone(),
+            ops,
+            Some(from_agent),
+        )
+        .await
+        .map_err(Box::new)
+        .map_err(ConductorApiError::from)
+        .map_err(Box::new)?;
         Ok(())
     }
 
+    #[instrument(skip(self))]
     /// a remote node is attempting to retrieve a validation package
+    #[tracing::instrument(skip(self), level = "trace")]
     async fn handle_get_validation_package(
         &self,
         header_hash: HeaderHash,
@@ -431,17 +463,30 @@ impl Cell {
             .retrieve_header(header_hash, Default::default())
             .await?
         {
-            Some(shh) => shh.into_header_and_signature().0.into_content(),
+            Some(shh) => shh.into_header_and_signature().0,
             None => return Ok(None.into()),
         };
 
+        let ribosome = self.get_ribosome().await?;
+
         // This agent is the author so get the validation package from the source chain
         if header.author() == self.id.agent_pubkey() {
-            let ribosome = self.get_ribosome().await?;
-            validation_package::get_as_author(header, env, &ribosome.dna_file, &self.conductor_api)
-                .await
+            validation_package::get_as_author(
+                header,
+                env,
+                &ribosome,
+                &self.conductor_api,
+                &self.holochain_p2p_cell,
+            )
+            .await
         } else {
-            todo!("Implement authority returning validation package")
+            validation_package::get_as_authority(
+                header,
+                env,
+                &ribosome.dna_file,
+                &self.conductor_api,
+            )
+            .await
         }
     }
 
@@ -476,6 +521,7 @@ impl Cell {
         authority::handle_get_entry(env, hash, options).await
     }
 
+    #[tracing::instrument(skip(self))]
     async fn handle_get_element(&self, hash: HeaderHash) -> CellResult<GetElementResponse> {
         // Get the vaults
         let env_ref = self.env.guard();
@@ -489,27 +535,36 @@ impl Cell {
             return Ok(GetElementResponse::GetHeader(None));
         }
 
-        // Look for a delete on the header and collect it
-        let deleted = meta_vault
+        // Look for a deletes on the header and collect them
+        let deletes = meta_vault
             .get_deletes_on_header(&reader, hash.clone())?
-            .next()?;
-        let deleted = match deleted {
-            Some(delete_header) => {
+            .map_err(CellError::from)
+            .map(|delete_header| {
                 let delete = delete_header.header_hash;
                 match element_vault.get_header(&delete)? {
-                    Some(delete) => Some(delete.try_into().map_err(AuthorityDataError::from)?),
-                    None => {
-                        return Err(AuthorityDataError::missing_data(delete));
-                    }
+                    Some(delete) => Ok(delete.try_into().map_err(AuthorityDataError::from)?),
+                    None => Err(AuthorityDataError::missing_data(delete)),
                 }
-            }
-            None => None,
-        };
+            })
+            .collect()?;
+
+        // Look for a updates on the header and collect them
+        let updates = meta_vault
+            .get_updates(&reader, hash.clone().into())?
+            .map_err(CellError::from)
+            .map(|update_header| {
+                let update = update_header.header_hash;
+                match element_vault.get_header(&update)? {
+                    Some(update) => Ok(update.try_into().map_err(AuthorityDataError::from)?),
+                    None => Err(AuthorityDataError::missing_data(update)),
+                }
+            })
+            .collect()?;
 
         // Get the actual header and return it with proof of deleted if there is any
         let r = element_vault
             .get_element(&hash)?
-            .map(|e| WireElement::from_element(e, deleted))
+            .map(|e| WireElement::from_element(e, deletes, updates))
             .map(Box::new);
 
         Ok(GetElementResponse::GetHeader(r))
@@ -590,7 +645,19 @@ impl Cell {
         })
     }
 
+    #[instrument(skip(self, options))]
+    fn handle_get_agent_activity(
+        &self,
+        agent: AgentPubKey,
+        query: ChainQueryFilter,
+        options: holochain_p2p::event::GetActivityOptions,
+    ) -> CellResult<AgentActivity> {
+        let env = self.env.clone();
+        authority::handle_get_agent_activity(env.into(), agent, query, options)
+    }
+
     /// a remote agent is sending us a validation receipt.
+    #[tracing::instrument(skip(self))]
     async fn handle_validation_receipt(&self, _receipt: SerializedBytes) -> CellResult<()> {
         unimplemented!()
     }
@@ -626,16 +693,22 @@ impl Cell {
         )>,
     > {
         let integrated_dht_ops = IntegratedDhtOpsBuf::new(self.env().clone().into())?;
-        let cas = ElementBuf::vault(self.env.clone().into(), false)?;
         let mut out = vec![];
         for op_hash in op_hashes {
             let val = integrated_dht_ops.get(&op_hash)?;
             if let Some(val) = val {
-                let full_op =
-                    crate::core::workflow::produce_dht_ops_workflow::dht_op_light::light_to_op(
-                        val.op, &cas,
-                    )?;
-                let basis = full_op.dht_basis().await;
+                let full_op = match &val.validation_status {
+                    ValidationStatus::Valid => {
+                        let cas = ElementBuf::vault(self.env.clone().into(), false)?;
+                        light_to_op(val.op, &cas)?
+                    }
+                    ValidationStatus::Rejected => {
+                        let cas = ElementBuf::rejected(self.env.clone().into())?;
+                        light_to_op(val.op, &cas)?
+                    }
+                    ValidationStatus::Abandoned => todo!("Add when abandoned store is added"),
+                };
+                let basis = full_op.dht_basis();
                 out.push((basis, op_hash, full_op));
             }
         }
@@ -643,12 +716,14 @@ impl Cell {
     }
 
     /// the network module would like this cell/agent to sign some data
+    #[tracing::instrument(skip(self))]
     async fn handle_sign_network_data(&self) -> CellResult<Signature> {
         unimplemented!()
     }
 
     /// When the Conductor determines that it's time to execute some [AutonomicProcess],
     /// whether scheduled or through an [AutonomicCue], this function gets called
+    #[tracing::instrument(skip(self, process))]
     pub async fn handle_autonomic_process(&self, process: AutonomicProcess) -> CellResult<()> {
         match process {
             AutonomicProcess::SlowHeal => unimplemented!(),
@@ -715,6 +790,7 @@ impl Cell {
     }
 
     /// Check if each Zome's init callback has been run, and if not, run it.
+    #[tracing::instrument(skip(self))]
     async fn check_or_run_zome_init(&self) -> CellResult<()> {
         // If not run it
         let env = self.env.clone();
@@ -763,6 +839,7 @@ impl Cell {
 
     /// Delete all data associated with this Cell by deleting the associated
     /// LMDB environment. Completely reverses Cell creation.
+    #[tracing::instrument(skip(self))]
     pub async fn destroy(self) -> CellResult<()> {
         let path = self.env.path().clone();
         // Remove db from global map

@@ -3,6 +3,7 @@ use crate::{
         api::RealAppInterfaceApi, dna_store::MockDnaStore, interface::SignalBroadcaster,
         ConductorHandle,
     },
+    core::queue_consumer::InitialQueueTriggers,
     core::ribosome::wasm_ribosome::WasmRibosome,
     test_utils::setup_app,
 };
@@ -38,6 +39,7 @@ pub struct ConductorCallData {
     pub network: HolochainP2pCell,
     pub keystore: KeystoreSender,
     pub signal_tx: SignalBroadcaster,
+    pub triggers: InitialQueueTriggers,
 }
 
 impl ConductorCallData {
@@ -47,6 +49,7 @@ impl ConductorCallData {
         let network = handle
             .holochain_p2p()
             .to_cell(cell_id.dna_hash().clone(), cell_id.agent_pubkey().clone());
+        let triggers = handle.get_cell_triggers(cell_id).await.unwrap();
 
         let ribosome = WasmRibosome::new(dna_file.clone());
         let signal_tx = handle.signal_broadcaster().await;
@@ -57,6 +60,7 @@ impl ConductorCallData {
             network,
             keystore,
             signal_tx,
+            triggers,
         };
         call_data
     }

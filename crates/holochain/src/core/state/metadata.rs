@@ -21,11 +21,18 @@ use holochain_state::{
 use holochain_types::metadata::{EntryDhtStatus, TimedHeaderHash};
 use holochain_types::{header::NewEntryHeader, link::WireLinkMetaKey};
 use holochain_types::{HeaderHashed, Timestamp};
-use holochain_zome_types::header::{self, CreateLink, DeleteLink, ZomeId};
+use holochain_zome_types::{
+    header::{self, CreateLink, DeleteLink, ZomeId},
+    query::ChainFork,
+    query::ChainHead,
+    query::ChainStatus,
+    query::HighestObserved,
+};
 use holochain_zome_types::{link::LinkTag, Header};
 use std::fmt::Debug;
 use tracing::*;
 
+use activity::*;
 pub use keys::*;
 pub use sys_meta::*;
 
@@ -34,6 +41,7 @@ pub use mock::MockMetadataBuf;
 #[cfg(test)]
 use mockall::mock;
 
+mod activity;
 #[cfg(test)]
 mod chain_test;
 mod keys;
@@ -117,6 +125,46 @@ where
     /// Deregister a published [Header] on the authoring agent's public key
     fn deregister_activity(&mut self, header: &Header) -> DatabaseResult<()>;
 
+    /// Registers a custom validation package on a [HeaderHash]
+    fn register_validation_package(
+        &mut self,
+        hash: &HeaderHash,
+        package: impl IntoIterator<Item = HeaderHash>,
+    );
+
+    /// Deregister a custom validation package on a [HeaderHash]
+    fn deregister_validation_package(&mut self, header: &HeaderHash);
+
+    /// Register a sequence of activity onto an agent key
+    fn register_activity_sequence(
+        &mut self,
+        agent: &AgentPubKey,
+        sequence: impl IntoIterator<Item = (u32, HeaderHash)>,
+    ) -> DatabaseResult<()>;
+
+    /// Deregister a sequence of activity onto an agent key
+    fn deregister_activity_sequence(&mut self, agent: &AgentPubKey) -> DatabaseResult<()>;
+
+    /// Registers the agents chain status on the authoring agent's public key
+    fn register_activity_status(
+        &mut self,
+        agent: &AgentPubKey,
+        status: ChainStatus,
+    ) -> DatabaseResult<()>;
+
+    /// Deregister the agents chain status on the authoring agent's public key
+    fn deregister_activity_status(&mut self, agent: &AgentPubKey) -> DatabaseResult<()>;
+
+    /// Registers the highest observed sequence number on an agents chain
+    fn register_activity_observed(
+        &mut self,
+        agent: &AgentPubKey,
+        observed: HighestObserved,
+    ) -> DatabaseResult<()>;
+
+    /// Deregister the highest observed sequence number on an agents chain
+    fn deregister_activity_observed(&mut self, agent: &AgentPubKey) -> DatabaseResult<()>;
+
     /// Registers a [Header::Update] on the referenced [Header] or [Entry]
     fn register_update(&mut self, update: header::Update) -> DatabaseResult<()>;
 
@@ -150,6 +198,29 @@ where
         reader: &'r R,
         key: ChainItemKey,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>;
+
+    /// Same as get activity but includes the sequence number in the iterator value
+    fn get_activity_sequence<'r, R: Readable>(
+        &'r self,
+        r: &'r R,
+        key: ChainItemKey,
+    ) -> DatabaseResult<
+        Box<dyn FallibleIterator<Item = (u32, HeaderHash), Error = DatabaseError> + '_>,
+    >;
+
+    /// Get a custom validation package on this header hash
+    fn get_validation_package<'r, R: Readable>(
+        &'r self,
+        r: &'r R,
+        hash: &HeaderHash,
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>;
+
+    /// Get the current status of this agents chain
+    fn get_activity_status(&self, agent: &AgentPubKey) -> DatabaseResult<Option<ChainStatus>>;
+
+    /// Get the current highest observed header on this agents chain
+    fn get_activity_observed(&self, agent: &AgentPubKey)
+        -> DatabaseResult<Option<HighestObserved>>;
 
     /// Returns all the hashes of [Update] headers registered on an [Entry]
     fn get_updates<'r, R: Readable>(
@@ -344,6 +415,47 @@ where
         )
     }
 
+    /// Check the activity chain for forks and gaps.
+    /// If there is a fork record a forked chain status.
+    /// Otherwise if there are no gaps then record a valid chain.
+    fn update_activity_status(&mut self, agent: &AgentPubKey) -> DatabaseResult<()> {
+        let key = ChainItemKey::Agent(agent.clone());
+        let status = fresh_reader!(self.env, |r| {
+            let mut iter = self.get_activity_sequence(&r, key)?;
+            let mut last = None;
+            let mut chain_complete = true;
+            while let Some((header_seq, hash)) = iter.next()? {
+                if let Some(ChainHead {
+                    header_seq: last_seq,
+                    hash: last_hash,
+                }) = last
+                {
+                    if last_seq == header_seq {
+                        // Chain is forked
+                        return Ok(Some(ChainStatus::Forked(ChainFork {
+                            fork_seq: last_seq,
+                            first_header: last_hash,
+                            second_header: hash,
+                        })));
+                    }
+                    if header_seq != last_seq + 1 {
+                        // Chain broken but still check for forks
+                        chain_complete = false;
+                    }
+                }
+                last = Some(ChainHead { header_seq, hash });
+            }
+            if chain_complete {
+                return Ok(last.map(ChainStatus::Valid));
+            }
+            DatabaseResult::Ok(None)
+        })?;
+        if let Some(status) = status {
+            self.register_activity_status(agent, status)?;
+        }
+        Ok(())
+    }
+
     #[cfg(test)]
     pub fn clear_all(&mut self, writer: &mut Writer) -> DatabaseResult<()> {
         self.links_meta.clear_all(writer)?;
@@ -479,17 +591,17 @@ where
     }
 
     fn register_update(&mut self, update: header::Update) -> DatabaseResult<()> {
-        self.register_header_on_basis(
-            AnyDhtHash::from(update.original_entry_address.clone()),
-            update,
-        )
+        let header_hash = update.original_header_address.clone();
+        let entry_hash = update.original_entry_address.clone();
+        self.register_header_on_basis(header_hash, update.clone())?;
+        self.register_header_on_basis(entry_hash, update)
     }
 
     fn deregister_update(&mut self, update: header::Update) -> DatabaseResult<()> {
-        self.deregister_header_on_basis(
-            AnyDhtHash::from(update.original_entry_address.clone()),
-            update,
-        )
+        let header_hash = update.original_header_address.clone();
+        let entry_hash = update.original_entry_address.clone();
+        self.deregister_header_on_basis(header_hash, update.clone())?;
+        self.deregister_header_on_basis(entry_hash, update)
     }
 
     fn register_delete(&mut self, delete: header::Delete) -> DatabaseResult<()> {
@@ -512,12 +624,125 @@ where
         let key = ChainItemKey::from(header);
         let key = MiscMetaKey::chain_item(&key).into();
         let value = MiscMetaValue::ChainItem(header.timestamp().clone().into());
-        self.misc_meta.put(key, value)
+        self.misc_meta.put(key, value)?;
+        self.update_activity_status(header.author())
     }
 
     fn deregister_activity(&mut self, header: &Header) -> DatabaseResult<()> {
         let key = ChainItemKey::from(header);
-        self.misc_meta.delete(MiscMetaKey::chain_item(&key).into())
+        self.misc_meta
+            .delete(MiscMetaKey::chain_item(&key).into())?;
+        self.update_activity_status(header.author())
+    }
+
+    fn register_activity_sequence(
+        &mut self,
+        agent: &AgentPubKey,
+        sequence: impl IntoIterator<Item = (u32, HeaderHash)>,
+    ) -> DatabaseResult<()> {
+        for (seq, hash) in sequence {
+            let key = ChainItemKey::Full(agent.clone(), seq, hash);
+            let key = MiscMetaKey::chain_item(&key).into();
+            // TODO: Remove timestamp value as headers are already ordered
+            let value = MiscMetaValue::ChainItem(Timestamp::now());
+            self.misc_meta.put(key, value)?;
+        }
+        self.update_activity_status(agent)
+    }
+
+    fn deregister_activity_sequence(&mut self, agent: &AgentPubKey) -> DatabaseResult<()> {
+        let key = ChainItemKey::Agent(agent.clone());
+        let sequence: Vec<_> = fresh_reader!(self.env, |r| {
+            self.get_activity_sequence(&r, key)?.collect()
+        })?;
+        for (seq, hash) in sequence {
+            let k = ChainItemKey::Full(agent.clone(), seq, hash);
+            let k = MiscMetaKey::chain_item(&k).into();
+            self.misc_meta.delete(k)?;
+        }
+        self.update_activity_status(agent)
+    }
+
+    fn register_validation_package(
+        &mut self,
+        hash: &HeaderHash,
+        package: impl IntoIterator<Item = HeaderHash>,
+    ) {
+        let key: SysMetaKey = hash.clone().into();
+        for hash in package {
+            self.system_meta.insert(
+                PrefixBytesKey::new(key.clone()),
+                SysMetaVal::CustomPackage(hash),
+            );
+        }
+    }
+
+    fn deregister_validation_package(&mut self, hash: &HeaderHash) {
+        let key: SysMetaKey = hash.clone().into();
+        self.system_meta.delete_all(PrefixBytesKey::new(key));
+    }
+
+    fn register_activity_status(
+        &mut self,
+        agent: &AgentPubKey,
+        status: ChainStatus,
+    ) -> DatabaseResult<()> {
+        let new_status = match self.get_activity_status(agent)? {
+            Some(prev_status) => add_chain_status(prev_status, status),
+            None => Some(status),
+        };
+        if let Some(s) = new_status {
+            let key = MiscMetaKey::chain_status(&agent).into();
+            let value = MiscMetaValue::ChainStatus(s);
+            self.misc_meta.put(key, value)?;
+        }
+        Ok(())
+    }
+
+    fn deregister_activity_status(&mut self, agent: &AgentPubKey) -> DatabaseResult<()> {
+        self.misc_meta
+            .delete(MiscMetaKey::chain_status(&agent).into())
+    }
+
+    fn register_activity_observed(
+        &mut self,
+        agent: &AgentPubKey,
+        observed: HighestObserved,
+    ) -> DatabaseResult<()> {
+        if let Some(mut prev_observed) = self.get_activity_observed(agent)? {
+            if prev_observed.header_seq > observed.header_seq {
+                // If the previous is more recent then don't overwrite
+            } else if prev_observed.header_seq == observed.header_seq
+                && prev_observed.hash != observed.hash
+            {
+                // If the observed are the same sequence
+                // Combine the hashes and overwrite
+                let diff = observed
+                    .hash
+                    .into_iter()
+                    .filter(|h| prev_observed.hash.contains(h))
+                    .collect::<Vec<_>>();
+                prev_observed.hash.extend(diff);
+
+                let key = MiscMetaKey::chain_observed(&agent).into();
+                let value = MiscMetaValue::ChainObserved(prev_observed);
+                self.misc_meta.put(key, value)?;
+            } else {
+                let key = MiscMetaKey::chain_observed(&agent).into();
+                let value = MiscMetaValue::ChainObserved(observed);
+                self.misc_meta.put(key, value)?;
+            }
+        } else {
+            let key = MiscMetaKey::chain_observed(&agent).into();
+            let value = MiscMetaValue::ChainObserved(observed);
+            self.misc_meta.put(key, value)?;
+        }
+        Ok(())
+    }
+
+    fn deregister_activity_observed(&mut self, agent: &AgentPubKey) -> DatabaseResult<()> {
+        self.misc_meta
+            .delete(MiscMetaKey::chain_observed(&agent).into())
     }
 
     fn get_headers<'r, R: Readable>(
@@ -616,6 +841,61 @@ where
                 Ok(r)
             },
         )))
+    }
+
+    fn get_activity_sequence<'r, R: Readable>(
+        &'r self,
+        r: &'r R,
+        key: ChainItemKey,
+    ) -> DatabaseResult<
+        Box<dyn FallibleIterator<Item = (u32, HeaderHash), Error = DatabaseError> + '_>,
+    > {
+        let k = MiscMetaKey::chain_item(&key).into();
+        Ok(Box::new(self.misc_meta.iter_all_key_matches(r, k)?.map(
+            |(k, _)| {
+                let k: MiscMetaKey<ChainItemPrefix> =
+                    PrefixBytesKey::<P>::from_key_bytes_or_friendly_panic(k).into();
+                let key = ChainItemKey::from(k);
+                let sequence = (&key).into();
+                let header_hash = key.into();
+                Ok((sequence, header_hash))
+            },
+        )))
+    }
+
+    fn get_validation_package<'r, R: Readable>(
+        &'r self,
+        r: &'r R,
+        hash: &HeaderHash,
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = HeaderHash, Error = DatabaseError> + '_>>
+    {
+        Ok(Box::new(
+            fallible_iterator::convert(
+                self.system_meta
+                    .get(r, &SysMetaKey::from(hash.clone()).into())?,
+            )
+            .filter_map(|h| {
+                Ok(match h {
+                    SysMetaVal::CustomPackage(h) => Some(h),
+                    _ => None,
+                })
+            }),
+        ))
+    }
+
+    fn get_activity_status(&self, agent: &AgentPubKey) -> DatabaseResult<Option<ChainStatus>> {
+        let key = MiscMetaKey::chain_status(&agent).into();
+        Ok(fresh_reader!(self.env, |r| self.misc_meta.get(&r, &key))?
+            .map(MiscMetaValue::chain_status))
+    }
+
+    fn get_activity_observed(
+        &self,
+        agent: &AgentPubKey,
+    ) -> DatabaseResult<Option<HighestObserved>> {
+        let key = MiscMetaKey::chain_observed(&agent).into();
+        Ok(fresh_reader!(self.env, |r| self.misc_meta.get(&r, &key))?
+            .map(MiscMetaValue::chain_observed))
     }
 
     // TODO: For now this is only checking for deletes

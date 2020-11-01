@@ -83,8 +83,8 @@ fn create_config(port: u16, environment_path: PathBuf) -> ConductorConfig {
 }
 
 pub fn write_config(mut path: PathBuf, config: &ConductorConfig) -> PathBuf {
-    path.push("conductor_config.toml");
-    std::fs::write(path.clone(), toml::to_string(&config).unwrap()).unwrap();
+    path.push("conductor_config.yml");
+    std::fs::write(path.clone(), serde_yaml::to_string(&config).unwrap()).unwrap();
     path
 }
 
@@ -184,7 +184,7 @@ async fn call_admin() {
     assert_ne!(&original_dna_hash, dna.dna_hash());
 
     let expects = vec![dna.dna_hash().clone()];
-    assert_matches!(response, AdminResponse::ListDnas(a) if a == expects);
+    assert_matches!(response, AdminResponse::DnasListed(a) if a == expects);
 
     holochain.kill().expect("Failed to kill holochain");
 }
@@ -327,7 +327,7 @@ async fn call_zome() {
     let response = check_timeout(&mut holochain, response, 1000).await;
 
     let expects = vec![original_dna_hash.clone()];
-    assert_matches!(response, AdminResponse::ListDnas(a) if a == expects);
+    assert_matches!(response, AdminResponse::DnasListed(a) if a == expects);
 
     // Activate cells
     let request = AdminRequest::ActivateApp {

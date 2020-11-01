@@ -26,9 +26,10 @@ pub struct WireElement {
     signed_header: SignedHeader,
     /// If there is an entry associated with this header it will be here
     maybe_entry: Option<Entry>,
-    /// If this element is deleted then we require a single delete
-    /// in the cache as proof of the tombstone
-    deleted: Option<WireDelete>,
+    /// All deletes on this header
+    deletes: Vec<WireDelete>,
+    /// Any updates on this entry.
+    updates: Vec<WireUpdateRelationship>,
 }
 
 /// A group of elements with a common entry
@@ -78,7 +79,7 @@ impl<'a> ElementGroup<'a> {
     }
 
     /// Create an element group from wire headers and an entry
-    pub async fn from_wire_elements<I: IntoIterator<Item = WireNewEntryHeader>>(
+    pub fn from_wire_elements<I: IntoIterator<Item = WireNewEntryHeader>>(
         headers_iter: I,
         entry_type: EntryType,
         entry: Entry,
@@ -90,9 +91,7 @@ impl<'a> ElementGroup<'a> {
         let entry = Cow::Owned(entry);
         for header in iter {
             headers.push(Cow::Owned(
-                header
-                    .into_header(entry_type.clone(), entry_hash.clone())
-                    .await,
+                header.into_header(entry_type.clone(), entry_hash.clone()),
             ))
         }
 
@@ -273,27 +272,44 @@ impl SignedHeaderHashedExt for SignedHeaderHashed {
 }
 
 impl WireElement {
-    /// Convert into a [Element] when receiving from the network
-    pub async fn into_element_and_delete(self) -> (Element, Option<Element>) {
+    /// Convert into a [Element], deletes and updates when receiving from the network
+    pub fn into_parts(self) -> (Element, Vec<Element>, Vec<Element>) {
+        let entry_hash = self.signed_header.header().entry_hash().cloned();
         let header = Element::new(
             SignedHeaderHashed::from_content_sync(self.signed_header),
             self.maybe_entry,
         );
-        let deleted = match self.deleted {
-            Some(deleted) => Some(deleted.into_element().await),
-            None => None,
-        };
-        (header, deleted)
+        let deletes = self
+            .deletes
+            .into_iter()
+            .map(WireDelete::into_element)
+            .collect();
+        let updates = self
+            .updates
+            .into_iter()
+            .map(|u| {
+                let entry_hash = entry_hash
+                    .clone()
+                    .expect("Updates cannot be on headers that do not have entries");
+                u.into_element(entry_hash)
+            })
+            .collect();
+        (header, deletes, updates)
     }
     /// Convert from a [Element] when sending to the network
-    pub fn from_element(e: Element, deleted: Option<WireDelete>) -> Self {
+    pub fn from_element(
+        e: Element,
+        deletes: Vec<WireDelete>,
+        updates: Vec<WireUpdateRelationship>,
+    ) -> Self {
         let (signed_header, maybe_entry) = e.into_inner();
         Self {
             signed_header: signed_header.into_inner().0,
             // TODO: consider refactoring WireElement to use ElementEntry
             // instead of Option<Entry>
             maybe_entry: maybe_entry.into_option(),
-            deleted,
+            deletes,
+            updates,
         }
     }
 

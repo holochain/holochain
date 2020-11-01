@@ -102,7 +102,7 @@ pub type ConductorApiResult<T> = Result<T, ConductorApiError>;
 /// This intends to be application developer facing
 /// so it should be readable and relevant
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes, Clone)]
-#[serde(rename = "snake-case", tag = "type", content = "data")]
+#[serde(rename_all = "snake_case", tag = "type", content = "data")]
 pub enum ExternalApiWireError {
     // TODO: B-01506 Constrain these errors so they are relevant to
     // application developers and what they would need
@@ -117,6 +117,8 @@ pub enum ExternalApiWireError {
     RibosomeError(String),
     /// Error activating app
     ActivateApp(String),
+    /// The zome call is unauthorized
+    ZomeCallUnauthorized(String),
 }
 
 impl ExternalApiWireError {

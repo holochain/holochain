@@ -1,6 +1,8 @@
+use crate::*;
 use futures::{future::FutureExt, sink::SinkExt, stream::StreamExt};
+use ghost_actor::dependencies::tracing;
 use kitsune_p2p_types::{
-    dependencies::{ghost_actor, ghost_actor::GhostControlSender, url2::*},
+    dependencies::{ghost_actor, ghost_actor::GhostControlSender, serde_json, url2},
     transport::*,
 };
 use std::{collections::HashMap, net::SocketAddr};
@@ -35,6 +37,7 @@ fn tx_bi_chan(
             if read == 0 {
                 continue;
             }
+            tracing::debug!("QUIC received {} bytes", read);
             read_send
                 .send(buf[0..read].to_vec())
                 .await
@@ -52,7 +55,9 @@ struct TransportListenerQuic {
     /// internal api logic
     internal_sender: ghost_actor::GhostSender<ListenerInner>,
     /// incoming channel send to our owner
-    incoming_channel_sender: TransportIncomingChannelSender,
+    incoming_channel_sender: TransportEventSender,
+    /// the url to return on 'bound_url' calls - what we bound to
+    bound_url: Url2,
     /// the quinn binding (akin to a socket listener)
     quinn_endpoint: quinn::Endpoint,
     /// pool of active connections
@@ -119,6 +124,7 @@ impl ListenerInnerHandler for TransportListenerQuic {
         &mut self,
         addr: SocketAddr,
     ) -> ListenerInnerHandlerResult<quinn::Connecting> {
+        tracing::debug!("attempt raw connect: {:?}", addr);
         let out = self
             .quinn_endpoint
             .connect(&addr, "stub.stub")
@@ -154,6 +160,7 @@ impl ListenerInnerHandler for TransportListenerQuic {
 
             // Construct our url from the low-level data
             let url = url2!("{}://{}", crate::SCHEME, con.remote_address());
+            tracing::debug!("QUIC handle connection: {}", url);
 
             // pass the connection off to our actor
             i_s.set_connection(url.clone(), con).await?;
@@ -164,7 +171,11 @@ impl ListenerInnerHandler for TransportListenerQuic {
                 while let Some(Ok((bi_send, bi_recv))) = bi_streams.next().await {
                     let (write, read) = tx_bi_chan(bi_send, bi_recv);
                     if incoming_channel_sender
-                        .send((url_clone.clone(), write, read))
+                        .send(TransportEvent::IncomingChannel(
+                            url_clone.clone(),
+                            write,
+                            read,
+                        ))
                         .await
                         .is_err()
                     {
@@ -197,14 +208,21 @@ impl ListenerInnerHandler for TransportListenerQuic {
 impl ghost_actor::GhostHandler<TransportListener> for TransportListenerQuic {}
 
 impl TransportListenerHandler for TransportListenerQuic {
+    fn handle_debug(&mut self) -> TransportListenerHandlerResult<serde_json::Value> {
+        let url = self.bound_url.clone();
+        let connections = self.connections.keys().cloned().collect::<Vec<_>>();
+        Ok(async move {
+            Ok(serde_json::json! {{
+                "url": url,
+                "connections": connections,
+            }})
+        }
+        .boxed()
+        .into())
+    }
+
     fn handle_bound_url(&mut self) -> TransportListenerHandlerResult<Url2> {
-        let out = url2!(
-            "{}://{}",
-            crate::SCHEME,
-            self.quinn_endpoint
-                .local_addr()
-                .map_err(TransportError::other)?,
-        );
+        let out = self.bound_url.clone();
         Ok(async move { Ok(out) }.boxed().into())
     }
 
@@ -249,16 +267,15 @@ impl TransportListenerHandler for TransportListenerQuic {
 
 /// Spawn a new QUIC TransportListenerSender.
 pub async fn spawn_transport_listener_quic(
-    bind_to: Url2,
-    cert: Option<(
-        lair_keystore_api::actor::Cert,
-        lair_keystore_api::actor::CertPrivKey,
-    )>,
+    config: ConfigListenerQuic,
 ) -> TransportListenerResult<(
     ghost_actor::GhostSender<TransportListener>,
-    TransportIncomingChannelReceiver,
+    TransportEventReceiver,
 )> {
-    let server_config = danger::configure_server(cert)
+    let bind_to = config
+        .bind_to
+        .unwrap_or_else(|| url2::url2!("kitsune-quic://0.0.0.0:0"));
+    let server_config = danger::configure_server(config.tls)
         .await
         .map_err(|e| TransportError::from(format!("cert error: {:?}", e)))?;
     let mut builder = quinn::Endpoint::builder();
@@ -299,9 +316,34 @@ pub async fn spawn_transport_listener_quic(
         TransportResult::Ok(())
     });
 
+    let mut bound_url = url2!(
+        "{}://{}",
+        crate::SCHEME,
+        quinn_endpoint.local_addr().map_err(TransportError::other)?,
+    );
+    if let Some(override_host) = &config.override_host {
+        bound_url.set_host(Some(override_host)).unwrap();
+    } else if let Some(host) = bound_url.host_str() {
+        if host == "0.0.0.0" {
+            for iface in if_addrs::get_if_addrs().map_err(TransportError::other)? {
+                // super naive - just picking the first v4 that is not 127.0.0.1
+                let addr = iface.addr.ip();
+                if let std::net::IpAddr::V4(addr) = addr {
+                    if addr != std::net::Ipv4Addr::from([127, 0, 0, 1]) {
+                        bound_url
+                            .set_host(Some(&iface.addr.ip().to_string()))
+                            .unwrap();
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
     let actor = TransportListenerQuic {
         internal_sender,
         incoming_channel_sender,
+        bound_url,
         quinn_endpoint,
         connections: HashMap::new(),
     };

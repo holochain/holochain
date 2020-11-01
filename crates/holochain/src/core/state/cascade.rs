@@ -6,19 +6,21 @@
 
 use super::{
     element_buf::ElementBuf,
-    metadata::{LinkMetaKey, MetadataBuf, MetadataBufT},
+    metadata::{ChainItemKey, LinkMetaKey, MetadataBuf, MetadataBufT},
 };
 use crate::core::workflow::integrate_dht_ops_workflow::integrate_single_metadata;
+use either::Either;
 use error::CascadeResult;
 use fallible_iterator::FallibleIterator;
-use holo_hash::{hash_type::AnyDht, AnyDhtHash, EntryHash, HeaderHash};
-use holochain_p2p::HolochainP2pCellT;
+use holo_hash::{hash_type::AnyDht, AgentPubKey, AnyDhtHash, EntryHash, HasHash, HeaderHash};
+use holochain_p2p::{actor::GetActivityOptions, HolochainP2pCellT};
 use holochain_p2p::{
     actor::{GetLinksOptions, GetMetaOptions, GetOptions},
     HolochainP2pCell,
 };
 use holochain_state::{error::DatabaseResult, fresh_reader, prelude::*};
 use holochain_types::{
+    chain::AgentActivityExt,
     dht_op::{produce_op_lights_from_element_group, produce_op_lights_from_elements},
     element::{
         Element, ElementGroup, GetElementResponse, RawGetEntryResponse, SignedHeaderHashed,
@@ -27,13 +29,18 @@ use holochain_types::{
     entry::option_entry_hashed,
     link::{GetLinksResponse, WireLinkMetaKey},
     metadata::{EntryDhtStatus, MetadataSet, TimedHeaderHash},
-    EntryHashed,
+    EntryHashed, HeaderHashed,
 };
 use holochain_zome_types::{
     element::SignedHeader,
     header::HeaderType,
     link::Link,
     metadata::{Details, ElementDetails, EntryDetails},
+    query::Activity,
+    query::AgentActivity,
+    query::ChainQueryFilter,
+    query::ChainStatus,
+    validate::ValidationPackage,
 };
 use std::collections::HashSet;
 use std::collections::{BTreeMap, BTreeSet};
@@ -138,7 +145,7 @@ pub struct Cascade<
     MetaPending = MetadataBuf<PendingPrefix>,
     MetaRejected = MetadataBuf<RejectedPrefix>,
 > where
-    Network: HolochainP2pCellT,
+    Network: HolochainP2pCellT + Clone,
     MetaVault: MetadataBufT,
     MetaAuthored: MetadataBufT<AuthoredPrefix>,
     MetaPending: MetadataBufT<PendingPrefix>,
@@ -175,7 +182,7 @@ where
     MetaCache: MetadataBufT,
     MetaVault: MetadataBufT,
     MetaAuthored: MetadataBufT<AuthoredPrefix>,
-    Network: HolochainP2pCellT,
+    Network: HolochainP2pCellT + Clone,
 {
     /// Constructs a [Cascade], for the default use case of
     /// vault + cache + network
@@ -239,7 +246,7 @@ where
     MetaAuthored: MetadataBufT<AuthoredPrefix>,
     MetaPending: MetadataBufT<PendingPrefix>,
     MetaRejected: MetadataBufT<RejectedPrefix>,
-    Network: HolochainP2pCellT,
+    Network: HolochainP2pCellT + Clone + 'static + Send,
 {
     /// Add the integrated [ElementBuf] and [MetadataBuf] to the cascade
     pub fn with_integrated(
@@ -286,7 +293,7 @@ where
     }
 
     /// Add the integrated [ElementBuf] and [MetadataBuf] to the cascade
-    pub fn with_network<N: HolochainP2pCellT>(
+    pub fn with_network<N: HolochainP2pCellT + Clone>(
         self,
         network: N,
     ) -> Cascade<'a, N, MetaVault, MetaAuthored, MetaCache, MetaPending, MetaRejected> {
@@ -301,11 +308,58 @@ where
         }
     }
 
-    async fn update_stores(&mut self, element: Element) -> CascadeResult<()> {
+    /// Put a header into the cache when receiving it from a `get_agent_activity` call.
+    /// We can't produce all the ops because we don't have the entry.
+    async fn update_agent_activity_stores(
+        &mut self,
+        agent_activity: AgentActivity,
+    ) -> CascadeResult<()> {
         let cache_data = ok_or_return!(self.cache_data.as_mut());
-        let op_lights = produce_op_lights_from_elements(vec![&element]).await?;
+        let AgentActivity {
+            agent,
+            // Cache the chain status in the metadata
+            // Any invalid overwrites valid.
+            // The earlier chain issue overwrites later.
+            status,
+            // Cache the highest observed
+            // Highest overwrites lower observed.
+            // Same seq number are combined to show a fork
+            highest_observed,
+            valid_activity,
+            ..
+        } = agent_activity;
+        match valid_activity {
+            Activity::Full(headers) => {
+                let hashes = headers
+                    .into_iter()
+                    .map(|shh| (shh.header().header_seq(), shh.header_address().clone()));
+                cache_data.meta.register_activity_sequence(&agent, hashes)?;
+            }
+            Activity::Hashes(hashes) => {
+                let hashes = hashes.into_iter();
+                cache_data.meta.register_activity_sequence(&agent, hashes)?;
+            }
+            Activity::NotRequested => (),
+        };
+        match &status {
+            ChainStatus::Empty => {}
+            ChainStatus::Valid(_) | ChainStatus::Forked(_) | ChainStatus::Invalid(_) => {
+                cache_data.meta.register_activity_status(&agent, status)?;
+            }
+        }
+        if let Some(highest_observed) = highest_observed {
+            cache_data
+                .meta
+                .register_activity_observed(&agent, highest_observed)?;
+        }
+        Ok(())
+    }
+
+    fn update_stores(&mut self, element: Element) -> CascadeResult<()> {
+        let cache_data = ok_or_return!(self.cache_data.as_mut());
+        let op_lights = produce_op_lights_from_elements(vec![&element])?;
         let (shh, e) = element.into_inner();
-        cache_data.element.put(shh, option_entry_hashed(e).await)?;
+        cache_data.element.put(shh, option_entry_hashed(e))?;
         for op in op_lights {
             integrate_single_metadata(op, cache_data.element, cache_data.meta)?
         }
@@ -313,15 +367,83 @@ where
     }
 
     #[instrument(skip(self, elements))]
-    async fn update_stores_with_element_group(
+    fn update_stores_with_element_group(
         &mut self,
         elements: ElementGroup<'_>,
     ) -> CascadeResult<()> {
         let cache_data = ok_or_return!(self.cache_data.as_mut());
-        let op_lights = produce_op_lights_from_element_group(&elements).await?;
+        let op_lights = produce_op_lights_from_element_group(&elements)?;
         cache_data.element.put_element_group(elements)?;
         for op in op_lights {
             integrate_single_metadata(op, cache_data.element, cache_data.meta)?
+        }
+        Ok(())
+    }
+
+    fn put_element_in_cache(&mut self, response: GetElementResponse) -> CascadeResult<()> {
+        match response {
+            // Has header
+            GetElementResponse::GetHeader(Some(we)) => {
+                let (element, deletes, updates) = we.into_parts();
+                self.update_stores(element)?;
+
+                for delete in deletes {
+                    self.update_stores(delete)?;
+                }
+
+                for update in updates {
+                    self.update_stores(update)?;
+                }
+            }
+            // Doesn't have header but not because it was deleted
+            GetElementResponse::GetHeader(None) => (),
+            r => {
+                error!(
+                    msg = "Got an invalid response to fetch element via header",
+                    ?r
+                );
+            }
+        }
+        Ok(())
+    }
+
+    #[instrument(skip(self, hashes, options))]
+    /// Exactly the same as fetch_elements_via_entry
+    /// except the network is cloned and a task is spawned
+    /// for each entry.
+    async fn fetch_elements_via_header_parallel<I: IntoIterator<Item = HeaderHash>>(
+        &mut self,
+        hashes: I,
+        options: GetOptions,
+    ) -> CascadeResult<()> {
+        // Network needs mut access for calls which we can't share across
+        // threads so we need to clone.
+        let network = ok_or_return!(self.network.clone());
+
+        // Spawn a task to run in parallel for each entry.
+        // This works because we don't need to use self and therefor
+        // don't need to share the &mut to our databases across threads.
+        let tasks = hashes.into_iter().map(|hash| {
+            tokio::task::spawn({
+                let mut network = network.clone();
+                let options = options.clone();
+                async move {
+                    network
+                        .get(hash.clone().into(), options)
+                        .instrument(debug_span!("fetch_element_via_entry::network_get"))
+                        .await
+                }
+            })
+        });
+
+        // try waiting on all the gets but exit if any fail
+        let all_responses = futures::future::try_join_all(tasks).await?;
+
+        // Put the data into the cache from every authority that responded
+        for responses in all_responses {
+            for response in responses? {
+                self.put_element_in_cache(response)?;
+            }
         }
         Ok(())
     }
@@ -335,24 +457,82 @@ where
         let results = network.get(hash.into(), options).await?;
         // Search through the returns for the first delete
         for response in results.into_iter() {
-            match response {
-                // Has header
-                GetElementResponse::GetHeader(Some(we)) => {
-                    let (element, delete) = we.into_element_and_delete().await;
-                    self.update_stores(element).await?;
+            self.put_element_in_cache(response)?;
+        }
+        Ok(())
+    }
 
-                    if let Some(delete) = delete {
-                        self.update_stores(delete).await?;
-                    }
+    async fn put_entry_in_cache(&mut self, response: GetElementResponse) -> CascadeResult<()> {
+        match response {
+            GetElementResponse::GetEntryFull(Some(raw)) => {
+                let RawGetEntryResponse {
+                    live_headers,
+                    deletes,
+                    entry,
+                    entry_type,
+                    updates,
+                } = *raw;
+                let elements = ElementGroup::from_wire_elements(live_headers, entry_type, entry)?;
+                let entry_hash = elements.entry_hash().clone();
+                self.update_stores_with_element_group(elements)?;
+                for delete in deletes {
+                    let element = delete.into_element();
+                    self.update_stores(element)?;
                 }
-                // Doesn't have header but not because it was deleted
-                GetElementResponse::GetHeader(None) => (),
-                r => {
-                    error!(
-                        msg = "Got an invalid response to fetch element via header",
-                        ?r
-                    );
+                for update in updates {
+                    let element = update.into_element(entry_hash.clone());
+                    self.update_stores(element)?;
                 }
+            }
+            // Authority didn't have any headers for this entry
+            GetElementResponse::GetEntryFull(None) => (),
+            r @ GetElementResponse::GetHeader(_) => {
+                error!(
+                    msg = "Got an invalid response to fetch element via entry",
+                    ?r
+                );
+            }
+            r => unimplemented!("{:?} is unimplemented for fetching via entry", r),
+        }
+        Ok(())
+    }
+
+    #[instrument(skip(self, hashes, options))]
+    /// Exactly the same as fetch_elements_via_entry
+    /// except the network is cloned and a task is spawned
+    /// for each entry.
+    async fn fetch_elements_via_entry_parallel<I: IntoIterator<Item = EntryHash>>(
+        &mut self,
+        hashes: I,
+        options: GetOptions,
+    ) -> CascadeResult<()> {
+        // Network needs mut access for calls which we can't share across
+        // threads so we need to clone.
+        let network = ok_or_return!(self.network.clone());
+
+        // Spawn a task to run in parallel for each entry.
+        // This works because we don't need to use self and therefor
+        // don't need to share the &mut to our databases across threads.
+        let tasks = hashes.into_iter().map(|hash| {
+            tokio::task::spawn({
+                let mut network = network.clone();
+                let options = options.clone();
+                async move {
+                    network
+                        .get(hash.clone().into(), options)
+                        .instrument(debug_span!("fetch_element_via_entry::network_get"))
+                        .await
+                }
+            })
+        });
+
+        // try waiting on all the gets but exit if any fail
+        let all_responses = futures::future::try_join_all(tasks).await?;
+
+        // Put the data into the cache from every authority that responded
+        for responses in all_responses {
+            for response in responses? {
+                self.put_entry_in_cache(response).await?;
             }
         }
         Ok(())
@@ -371,38 +551,7 @@ where
             .await?;
 
         for response in results {
-            match response {
-                GetElementResponse::GetEntryFull(Some(raw)) => {
-                    let RawGetEntryResponse {
-                        live_headers,
-                        deletes,
-                        entry,
-                        entry_type,
-                        updates,
-                    } = *raw;
-                    let elements =
-                        ElementGroup::from_wire_elements(live_headers, entry_type, entry).await?;
-                    let entry_hash = elements.entry_hash().clone();
-                    self.update_stores_with_element_group(elements).await?;
-                    for delete in deletes {
-                        let element = delete.into_element().await;
-                        self.update_stores(element).await?;
-                    }
-                    for update in updates {
-                        let element = update.into_element(entry_hash.clone()).await;
-                        self.update_stores(element).await?;
-                    }
-                }
-                // Authority didn't have any headers for this entry
-                GetElementResponse::GetEntryFull(None) => (),
-                r @ GetElementResponse::GetHeader(_) => {
-                    error!(
-                        msg = "Got an invalid response to fetch element via entry",
-                        ?r
-                    );
-                }
-                r => unimplemented!("{:?} is unimplemented for fetching via entry", r),
-            }
+            self.put_entry_in_cache(response).await?;
         }
         Ok(())
     }
@@ -440,7 +589,7 @@ where
                     SignedHeaderHashed::from_content_sync(SignedHeader(link_add.into(), signature)),
                     None,
                 );
-                self.update_stores(element).await?;
+                self.update_stores(element)?;
             }
             for (link_remove, signature) in link_removes {
                 debug!(?link_remove);
@@ -451,7 +600,7 @@ where
                     )),
                     None,
                 );
-                self.update_stores(element).await?;
+                self.update_stores(element)?;
             }
         }
         Ok(())
@@ -632,10 +781,20 @@ where
                 let deletes = fresh_reader!(env, |r| cache_data
                     .meta
                     .get_deletes_on_header(&r, hash.clone())?
-                    .chain(authored_data.meta.get_deletes_on_header(&r, hash)?)
+                    .chain(authored_data.meta.get_deletes_on_header(&r, hash.clone())?)
                     .collect::<BTreeSet<_>>())?;
                 let deletes = self.render_headers(deletes, |h| h == HeaderType::Delete)?;
-                Ok(Some(ElementDetails { element, deletes }))
+                let updates = fresh_reader!(env, |r| cache_data
+                    .meta
+                    .get_updates(&r, hash.clone().into())?
+                    .chain(authored_data.meta.get_updates(&r, hash.into())?)
+                    .collect::<BTreeSet<_>>())?;
+                let updates = self.render_headers(updates, |h| h == HeaderType::Update)?;
+                Ok(Some(ElementDetails {
+                    element,
+                    deletes,
+                    updates,
+                }))
             }
             None => Ok(None),
         }
@@ -903,6 +1062,135 @@ where
         })
     }
 
+    /// Same as retrieve entry but retrieves many
+    /// entries in parallel
+    pub async fn retrieve_entries_parallel<'iter, I: IntoIterator<Item = EntryHash>>(
+        &mut self,
+        hashes: I,
+        options: GetOptions,
+    ) -> CascadeResult<Vec<Option<EntryHashed>>> {
+        // Gather the entries we have locally on the left and
+        // the entries we must fetch on the right.
+        let mut entries = Vec::new();
+        let mut to_fetch = Vec::new();
+        for hash in hashes {
+            match self.get_entry_local_raw(&hash)? {
+                // This entry is local so nothing else to do.
+                Some(e) => entries.push(Either::Left(Some(e))),
+                // This entry needs to be fetched.
+                // It is added to the to_fetch and the hash is also stored
+                // in entries so we can preserve the order.
+                None => {
+                    entries.push(Either::Right(hash.clone()));
+                    to_fetch.push(hash);
+                }
+            }
+        }
+
+        // Fetch all the entries in parallel
+        self.fetch_elements_via_entry_parallel(to_fetch, options)
+            .await?;
+
+        // TODO: Could return this iterator rather then collecting but I couldn't solve the lifetimes.
+
+        // Entries are returned as options because the caller might care if some were not found.
+        fallible_iterator::convert(entries.into_iter().map(Ok))
+            .map(|either| match either {
+                // Entries on the left we have.
+                Either::Left(option) => Ok(option),
+                // Entries on the right we will try to get from the cache
+                // again because there has been a fetch.
+                Either::Right(hash) => Ok(self.get_entry_local_raw(&hash)?),
+            })
+            .collect()
+    }
+
+    /// Same as retrieve_header but retrieves many
+    /// elements in parallel
+    pub async fn retrieve_headers_parallel<'iter, I: IntoIterator<Item = HeaderHash>>(
+        &mut self,
+        hashes: I,
+        options: GetOptions,
+    ) -> CascadeResult<Vec<Option<SignedHeaderHashed>>> {
+        // Gather the elements we have locally on the left and
+        // the elements we must fetch on the right.
+        let mut headers = Vec::new();
+        let mut to_fetch = Vec::new();
+        for hash in hashes {
+            match self.get_header_local_raw_with_sig(&hash)? {
+                // This element is local so nothing else to do.
+                Some(e) => headers.push(Either::Left(Some(e))),
+                // This entry needs to be fetched.
+                // It is added to the to_fetch and the hash is also stored
+                // in entries so we can preserve the order.
+                None => {
+                    headers.push(Either::Right(hash.clone()));
+                    to_fetch.push(hash);
+                }
+            }
+        }
+
+        // Fetch all the entries in parallel
+        self.fetch_elements_via_header_parallel(to_fetch, options)
+            .await?;
+
+        // TODO: Could return this iterator rather then collecting but I couldn't solve the lifetimes.
+
+        // Entries are returned as options because the caller might care if some were not found.
+        fallible_iterator::convert(headers.into_iter().map(Ok))
+            .map(|either| match either {
+                // Entries on the left we have.
+                Either::Left(option) => Ok(option),
+                // Entries on the right we will try to get from the cache
+                // again because there has been a fetch.
+                Either::Right(hash) => Ok(self.get_header_local_raw_with_sig(&hash)?),
+            })
+            .collect()
+    }
+
+    /// Same as retrieve but retrieves many
+    /// elements in parallel
+    pub async fn retrieve_parallel<'iter, I: IntoIterator<Item = HeaderHash>>(
+        &mut self,
+        hashes: I,
+        options: GetOptions,
+    ) -> CascadeResult<Vec<Option<Element>>> {
+        // Gather the elements we have locally on the left and
+        // the elements we must fetch on the right.
+        let mut elements = Vec::new();
+        let mut to_fetch = Vec::new();
+        for hash in hashes {
+            match self.get_element_local_raw(&hash)? {
+                // This element is local so nothing else to do.
+                Some(e) => elements.push(Either::Left(Some(e))),
+                // This entry needs to be fetched.
+                // It is added to the to_fetch and the hash is also stored
+                // in entries so we can preserve the order.
+                None => {
+                    elements.push(Either::Right(hash.clone()));
+                    to_fetch.push(hash);
+                }
+            }
+        }
+
+        // Fetch all the entries in parallel
+        self.fetch_elements_via_header_parallel(to_fetch, options)
+            .await?;
+
+        // TODO: Could return this iterator rather then collecting but I couldn't solve the lifetimes.
+
+        // Entries are returned as options because the caller might care if some were not found.
+        fallible_iterator::convert(elements.into_iter().map(Ok))
+            .map(|either| match either {
+                // Entries on the left we have.
+                Either::Left(option) => Ok(option),
+                // Entries on the right we will try to get from the cache
+                // again because there has been a fetch.
+                Either::Right(hash) => Ok(self.get_element_local_raw(&hash)?),
+            })
+            .collect()
+    }
+
     /// Get the entry from the dht regardless of metadata or validation status.
     /// This call has the opportunity to hit the local cache
     /// and avoid a network call.
@@ -1110,6 +1398,411 @@ where
                 }
             })
             .collect()
+    }
+
+    async fn fetch_agent_activity(
+        &mut self,
+        agent: AgentPubKey,
+        query: ChainQueryFilter,
+        options: GetActivityOptions,
+    ) -> CascadeResult<()> {
+        let network = ok_or_return!(self.network.as_mut());
+        let all_agent_activity = network.get_agent_activity(agent, query, options).await?;
+        for agent_activity in all_agent_activity {
+            self.update_agent_activity_stores(agent_activity).await?;
+        }
+        Ok(())
+    }
+
+    async fn fetch_agent_activity_status(
+        &mut self,
+        agent: AgentPubKey,
+        query: ChainQueryFilter,
+        mut options: GetActivityOptions,
+    ) -> CascadeResult<()> {
+        options.include_valid_activity = false;
+        options.include_rejected_activity = false;
+        options.include_full_headers = false;
+        self.fetch_agent_activity(agent.clone(), query.clone(), options)
+            .await?;
+        Ok(())
+    }
+
+    fn get_agent_activity_from_cache(
+        agent: AgentPubKey,
+        range: &Option<std::ops::Range<u32>>,
+        cache_data: &DbPairMut<'a, MetaCache>,
+        env: &EnvironmentRead,
+    ) -> CascadeResult<Vec<(u32, HeaderHash)>> {
+        match range {
+            Some(range) => {
+                // One less than the end of an exclusive range is actually
+                // the last header we want in the chain.
+                fresh_reader!(env, |r| {
+                    // Check if we have up to that header in the metadata store.
+                    if cache_data
+                        .meta
+                        .get_activity(
+                            &r,
+                            ChainItemKey::AgentSequence(agent.clone(), range.end - 1),
+                        )?
+                        .next()?
+                        .is_some()
+                    {
+                        // We have the chain so collect the hashes in order of header sequence.
+                        // Note if the chain is forked there could be multiple headers at each sequence number.
+                        Ok(cache_data
+                            .meta
+                            .get_activity_sequence(&r, ChainItemKey::Agent(agent))?
+                            // TODO: PERF: Use an iter from to start from the correct sequence
+                            .skip_while(|(s, _)| Ok(*s < range.start))
+                            .take_while(|(s, _)| Ok(*s < range.end))
+                            .collect()?)
+                    } else {
+                        // The requested chain is not in our cache.
+                        Ok(vec![])
+                    }
+                })
+            }
+            // Requesting full chain so return all everything we have
+            None => fresh_reader!(env, |r| {
+                Ok(cache_data
+                    .meta
+                    .get_activity_sequence(&r, ChainItemKey::Agent(agent))?
+                    .collect()?)
+            }),
+        }
+    }
+
+    /// Check if we have a cache hit on a valid chain
+    /// and return the hashes if we do.
+    fn find_valid_activity_cache_hit(
+        &self,
+        agent: AgentPubKey,
+        sequence_range: &Option<std::ops::Range<u32>>,
+    ) -> CascadeResult<Option<Vec<(u32, HeaderHash)>>> {
+        let cache_data = ok_or_return!(self.cache_data.as_ref(), None);
+        let env = ok_or_return!(self.env.as_ref(), None);
+
+        // Check if the range contains any values.
+        // This also makes it safe to do `range.end - 1`
+        match sequence_range {
+            // The range is empty so there's not hashes to get
+            Some(r) if r.end == 0 => return Ok(Some(vec![])),
+            // It only makes sense to check the cache first if
+            // a range has been requested otherwise
+            // we must go to the network because we don't
+            // know how long the chain is.
+            None => return Ok(None),
+            _ => (),
+        }
+        // Try getting the activity from the cache.
+        let chain_hashes =
+            Self::get_agent_activity_from_cache(agent.clone(), sequence_range, cache_data, env)?;
+
+        // Get the current status
+        let cached_status = cache_data.meta.get_activity_status(&agent)?;
+
+        // If the chain is valid and the header we need is equal or below
+        // and the hashes length is equal to one more then the last header sequence number
+        // then we have a cache valid hit
+        match (chain_hashes.last(), &cached_status) {
+            (Some((chain_head_seq, _)), Some(ChainStatus::Valid(valid_status)))
+                if *chain_head_seq <= valid_status.header_seq
+                    && chain_hashes.len() as u32 == chain_head_seq + 1 =>
+            {
+                Ok(Some(chain_hashes))
+            }
+            _ => Ok(None),
+        }
+    }
+
+    /// Do a full fetch of hashes and return the activity
+    async fn fetch_and_create_activity(
+        &mut self,
+        agent: AgentPubKey,
+        query: ChainQueryFilter,
+        options: GetActivityOptions,
+    ) -> CascadeResult<AgentActivity<Element>> {
+        // Fetch the activity from the network
+        self.fetch_agent_activity(agent.clone(), query.clone(), options)
+            .await?;
+
+        let cache_data = ok_or_return!(self.cache_data.as_ref(), AgentActivity::empty(&agent));
+        let env = ok_or_return!(self.env.as_ref(), AgentActivity::empty(&agent));
+        // Now try getting the latest activity from cache
+        let hashes = Self::get_agent_activity_from_cache(
+            agent.clone(),
+            &query.sequence_range,
+            cache_data,
+            env,
+        )?;
+        self.create_activity(agent, hashes)
+    }
+
+    /// Turn the hashes into agent activity with status and highest_observed
+    // TODO: There are several parts missing to this function because we
+    // are currently constraining the behavior to only serve getting validation
+    // packages.
+    // - [ ] Return the rejected activity (with or without caching it)
+    // - [ ] Be able to handle full headers as well as hashes (with or without caching)
+    // - [ ] Maybe Empty chains should not be set to NotRequested and set to the
+    // value that reflects the requester
+    fn create_activity(
+        &self,
+        agent: AgentPubKey,
+        hashes: Vec<(u32, HeaderHash)>,
+    ) -> CascadeResult<AgentActivity<Element>> {
+        let cache_data = ok_or_return!(self.cache_data.as_ref(), AgentActivity::empty(&agent));
+        // Now try getting the latest activity from cache
+        let highest_observed = cache_data.meta.get_activity_observed(&agent)?;
+        match cache_data.meta.get_activity_status(&agent)? {
+            Some(status) => Ok(AgentActivity {
+                agent,
+                valid_activity: Activity::Hashes(hashes),
+                rejected_activity: Activity::NotRequested,
+                status,
+                highest_observed,
+            }),
+            // If we don't have any status then we must return an empty chain
+            None => Ok(AgentActivity {
+                agent,
+                valid_activity: Activity::NotRequested,
+                rejected_activity: Activity::NotRequested,
+                status: ChainStatus::Empty,
+                highest_observed,
+            }),
+        }
+    }
+
+    // TODO: The whole chain needs to be retrieved so we can
+    // check if the headers match the filter but we could store
+    // header types / entry types in the activity db to avoid this.
+    #[instrument(skip(self, agent, query, options))]
+    /// Get agent activity from agent activity authorities.
+    /// Hashes are requested from the authority and cache for valid chains.
+    /// Options:
+    /// - include_valid_activity will include the valid chain hashes.     
+    /// - include_rejected_activity will include the valid chain hashes. (unimplemented)
+    /// - include_full_headers will fetch the valid headers in parallel (requires include_valid_activity)
+    /// Query:
+    /// - include_entries will also fetch the entries in parallel (requires include_full_headers)
+    /// - sequence_range will get all the activity in the exclusive range
+    /// - header_type and entry_type will filter the activity (requires include_full_headers)
+    pub async fn get_agent_activity(
+        &mut self,
+        agent: AgentPubKey,
+        query: ChainQueryFilter,
+        mut options: GetActivityOptions,
+    ) -> CascadeResult<AgentActivity<Element>> {
+        // Get the request options
+        let requester_options = options.clone();
+        // For now only fetching hashes until caching is worked out.
+        options.include_full_headers = false;
+
+        // See if we have a cache hit
+        let chain_hashes = match &query.sequence_range {
+            Some(_) => {
+                // If we have some cached agent activity then don't fetch the activity.
+                // Instead fetch just the status and see if the chain is still valid
+                // up to that point.
+                //
+                // If it's different then do a full fetch.
+                // Fetch status without activity
+
+                // Fetch just the status
+                self.fetch_agent_activity_status(agent.clone(), query.clone(), options.clone())
+                    .await?;
+
+                // See if our cache is still valid
+                self.find_valid_activity_cache_hit(agent.clone(), &query.sequence_range)?
+            }
+            None => None,
+        };
+
+        // Create the activity
+        let mut activity = match chain_hashes {
+            // If there was no activity in the cache then try fetching it
+            None => {
+                self.fetch_and_create_activity(agent.clone(), query.clone(), options.clone())
+                    .await?
+            }
+            // Create the activity from the hashes
+            Some(chain_hashes) => self.create_activity(agent.clone(), chain_hashes)?,
+        };
+
+        // Check if we are done
+        match &activity {
+            // Activity is empty so nothing else to do.
+            AgentActivity {
+                status: ChainStatus::Empty,
+                ..
+            } => return Ok(activity),
+            // Activity has a status but there are no hashes
+            // so nothing else to do.
+            AgentActivity {
+                valid_activity: Activity::Hashes(h),
+                ..
+            } if h.is_empty() => {
+                if requester_options.include_full_headers {
+                    activity.valid_activity = Activity::Full(Vec::new());
+                }
+                return Ok(activity);
+            }
+            _ => (),
+        }
+
+        match &activity.valid_activity {
+            Activity::Full(_) => todo!(),
+            Activity::Hashes(hashes) => {
+                // If full headers and include entries is requested
+                // retrieve them in parallel
+                if query.include_entries && requester_options.include_full_headers {
+                    let hashes = hashes.iter().map(|(_, h)| h.clone());
+                    let mut elements = self
+                        .retrieve_activity_elements(hashes.clone(), &query)
+                        .await?;
+                    let mut retry_gets = requester_options.retry_gets;
+                    while elements.is_none() && retry_gets > 0 {
+                        retry_gets -= 1;
+                        elements = self
+                            .retrieve_activity_elements(hashes.clone(), &query)
+                            .await?;
+                    }
+                    let elements = elements.unwrap_or_else(Vec::new);
+                    Ok(AgentActivity {
+                        valid_activity: Activity::Full(elements),
+                        ..activity
+                    })
+                // If only full headers is requested
+                // retrieve just the headers in parallel
+                } else if requester_options.include_full_headers {
+                    let hashes = hashes.iter().map(|(_, h)| h.clone());
+                    let mut elements = self
+                        .retrieve_activity_headers(hashes.clone(), &query)
+                        .await?;
+                    let mut retry_gets = requester_options.retry_gets;
+                    while elements.is_none() && retry_gets > 0 {
+                        retry_gets -= 1;
+                        elements = self
+                            .retrieve_activity_headers(hashes.clone(), &query)
+                            .await?;
+                    }
+                    let elements = elements.unwrap_or_else(Vec::new);
+                    Ok(AgentActivity {
+                        valid_activity: Activity::Full(elements),
+                        ..activity
+                    })
+                } else {
+                    // Otherwise return just the hashes
+                    Ok(activity)
+                }
+            }
+            Activity::NotRequested => Ok(activity),
+        }
+    }
+
+    async fn retrieve_activity_elements(
+        &mut self,
+        hashes: impl IntoIterator<Item = HeaderHash>,
+        query: &ChainQueryFilter,
+    ) -> CascadeResult<Option<Vec<Element>>> {
+        Ok(self
+            .retrieve_parallel(hashes, Default::default())
+            .await?
+            .into_iter()
+            // Filter the headers by the query
+            .filter(|o| match o {
+                Some(el) => query.check(el.header()),
+                None => true,
+            })
+            .collect::<Option<Vec<_>>>())
+    }
+
+    async fn retrieve_activity_headers(
+        &mut self,
+        hashes: impl IntoIterator<Item = HeaderHash>,
+        query: &ChainQueryFilter,
+    ) -> CascadeResult<Option<Vec<Element>>> {
+        Ok(self
+            .retrieve_headers_parallel(hashes, Default::default())
+            .await?
+            .into_iter()
+            // Filter the headers by the query
+            .filter(|o| match o {
+                Some(el) => query.check(el.header()),
+                None => true,
+            })
+            .map(|shh| shh.map(|s| Element::new(s, None)))
+            .collect::<Option<Vec<_>>>())
+    }
+
+    /// Get the validation package if it is cached without going to the network
+    pub fn get_validation_package_local(
+        &self,
+        hash: &HeaderHash,
+    ) -> CascadeResult<Option<Vec<Element>>> {
+        let cache_data = ok_or_return!(self.cache_data.as_ref(), None);
+        let env = ok_or_return!(self.env.as_ref(), None);
+        fresh_reader!(env, |r| {
+            let mut iter = cache_data.meta.get_validation_package(&r, hash)?;
+            let mut elements = Vec::with_capacity(iter.size_hint().0);
+            while let Some(hash) = iter.next()? {
+                match self.get_element_local_raw(&hash)? {
+                    Some(el) => elements.push(el),
+                    None => return Ok(None),
+                }
+            }
+            elements.sort_unstable_by_key(|el| el.header().header_seq());
+            elements.reverse();
+            if elements.is_empty() {
+                Ok(None)
+            } else {
+                Ok(Some(elements))
+            }
+        })
+    }
+
+    pub async fn get_validation_package(
+        &mut self,
+        agent: AgentPubKey,
+        header: &HeaderHashed,
+    ) -> CascadeResult<Option<ValidationPackage>> {
+        if let Some(elements) = self.get_validation_package_local(header.as_hash())? {
+            return Ok(Some(ValidationPackage::new(elements)));
+        }
+
+        let network = ok_or_return!(self.network.as_mut(), None);
+        match network
+            .get_validation_package(agent, header.as_hash().clone())
+            .await?
+            .0
+        {
+            Some(validation_package) => {
+                for element in &validation_package.0 {
+                    // TODO: I don't think it's sound to do this
+                    // because we would be adding potentially rejected
+                    // headers into our cache.
+                    // TODO: For now we are only returning validation packages
+                    // of valid headers but when we add the ability to get and
+                    // cache invalid data we need to update this as well.
+                    self.update_stores(element.clone())?;
+                }
+
+                // Add metadata for custom package caching
+                let cache_data = ok_or_return!(self.cache_data.as_mut(), None);
+                cache_data.meta.register_validation_package(
+                    header.as_hash(),
+                    validation_package
+                        .0
+                        .iter()
+                        .map(|el| el.header_address().clone()),
+                );
+
+                Ok(Some(validation_package))
+            }
+            None => Ok(None),
+        }
     }
 }
 

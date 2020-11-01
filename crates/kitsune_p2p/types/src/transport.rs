@@ -127,15 +127,17 @@ pub fn create_transport_channel_pair() -> (
     ((send1, recv2), (send2, recv1))
 }
 
-/// Tuple sent through TransportIncomingChannel Sender/Receiver.
-pub type TransportIncomingChannel = (url2::Url2, TransportChannelWrite, TransportChannelRead);
+/// Enum type for events bubbled out of a Transport instance.
+pub enum TransportEvent {
+    /// A remote is establishing an incoming channel.
+    IncomingChannel(url2::Url2, TransportChannelWrite, TransportChannelRead),
+}
 
 /// Send new incoming channel data.
-pub type TransportIncomingChannelSender = futures::channel::mpsc::Sender<TransportIncomingChannel>;
+pub type TransportEventSender = futures::channel::mpsc::Sender<TransportEvent>;
 
 /// Receiving a new incoming channel connection.
-pub type TransportIncomingChannelReceiver =
-    futures::channel::mpsc::Receiver<TransportIncomingChannel>;
+pub type TransportEventReceiver = futures::channel::mpsc::Receiver<TransportEvent>;
 
 ghost_actor::ghost_chan! {
     /// Represents a transport binding for establishing connections.
@@ -145,6 +147,9 @@ ghost_actor::ghost_chan! {
     /// - Transport encryption is handled internally.
     /// - See light-weight comments below on `create_channel` api.
     pub chan TransportListener<TransportError> {
+        /// Grab a debugging internal state dump.
+        fn debug() -> serde_json::Value;
+
         /// Retrieve the current url (address) this listener is bound to.
         fn bound_url() -> url2::Url2;
 

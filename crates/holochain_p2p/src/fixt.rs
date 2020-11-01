@@ -1,19 +1,18 @@
 //! Fixturator definitions for kitsune_p2p.
 
-use crate::types::agent_store::AgentInfo;
-use crate::types::agent_store::AgentInfoSigned;
-use crate::types::agent_store::Urls;
-use crate::types::KitsuneAgent;
-use crate::types::KitsuneSignature;
-use crate::types::KitsuneSpace;
 use fixt::prelude::*;
+use kitsune_p2p::{
+    agent_store::{AgentInfo, AgentInfoSigned, Urls},
+    dependencies::url2,
+    KitsuneAgent, KitsuneSignature, KitsuneSpace,
+};
 use url2::url2;
 
 fixturator!(
     Urls;
     curve Empty vec![];
     curve Unpredictable {
-        let mut rng = thread_rng();
+        let mut rng = fixt::rng();
         let vec_len = rng.gen_range(0, 5);
         let mut ret = vec![];
 
@@ -23,7 +22,7 @@ fixturator!(
         ret
     };
     curve Predictable {
-        let mut rng = thread_rng();
+        let mut rng = fixt::rng();
         let vec_len = rng.gen_range(0, 5);
         let mut ret = vec![];
 
@@ -36,17 +35,17 @@ fixturator!(
 
 fixturator!(
     KitsuneAgent;
-    from BytesNotEmpty;
+    from ThirtySixBytes;
 );
 
 fixturator!(
     KitsuneSpace;
-    from BytesNotEmpty;
+    from ThirtySixBytes;
 );
 
 fixturator!(
     KitsuneSignature;
-    from BytesNotEmpty;
+    from ThirtySixBytes;
 );
 
 fixturator!(

@@ -42,11 +42,12 @@ must_future = "0.1.1"
 nanoid = "0.3"
 num_cpus = "1.8"
 observability = { path = "../observability" }
-parking_lot = "0.10.0"
+parking_lot = "0.10"
 predicates = "1.0.4"
 rand = "0.7"
 serde = { version = "1.0.104", features = [ "derive" ] }
 serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
+serde_yaml = "0.8"
 shrinkwraprs = "0.3.0"
 structopt = "0.3.11"
 strum = "0.18.0"
@@ -61,6 +62,7 @@ url = "1.7.2"
 url2 = "0.0.6"
 url_serde = "0.2.0"
 uuid = { version = "0.7", features = [ "serde", "v4" ] }
+kitsune_p2p = { version = "0.0.1", path = "../kitsune_p2p/kitsune_p2p" }
 
 [dev-dependencies]
 anyhow = "1.0.26"

@@ -8,7 +8,7 @@ use std::{
     ops::{Bound, RangeBounds},
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, From, Into)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, From, Into)]
 /// Type for representing a location that can wrap around
 /// a u32 dht arc
 pub struct DhtLocation(pub Wrapping<u32>);
@@ -20,7 +20,7 @@ pub struct DhtLocation(pub Wrapping<u32>);
 /// 1 more is added to represent the middle point of an odd length array
 pub const MAX_HALF_LENGTH: u32 = (u32::MAX / 2) + 1 + 1;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 /// Represents how much of a dht arc is held
 /// center_loc is where the hash is.
 /// The center_loc is the center of the arc

@@ -50,6 +50,11 @@ pub(crate) enum WireMessage {
         link_key: WireLinkMetaKey,
         options: event::GetLinksOptions,
     },
+    GetAgentActivity {
+        agent: AgentPubKey,
+        query: ChainQueryFilter,
+        options: event::GetActivityOptions,
+    },
     GetValidationPackage {
         header_hash: HeaderHash,
     },
@@ -110,6 +115,18 @@ impl WireMessage {
 
     pub fn get_links(link_key: WireLinkMetaKey, options: event::GetLinksOptions) -> WireMessage {
         Self::GetLinks { link_key, options }
+    }
+
+    pub fn get_agent_activity(
+        agent: AgentPubKey,
+        query: ChainQueryFilter,
+        options: event::GetActivityOptions,
+    ) -> WireMessage {
+        Self::GetAgentActivity {
+            agent,
+            query,
+            options,
+        }
     }
     pub fn get_validation_package(header_hash: HeaderHash) -> WireMessage {
         Self::GetValidationPackage { header_hash }

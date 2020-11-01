@@ -3,21 +3,7 @@
 
 use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::validate::ValidationPackage;
-
-/// the validation status for an op
-/// much of this happens in the subconscious
-/// an entry missing validation dependencies may cycle through Pending many times before finally
-/// reaching a final validation state or being abandoned
-#[derive(Clone, serde::Serialize, serde::Deserialize, Debug, Eq, PartialEq)]
-pub enum ValidationStatus {
-    /// all implemented validation callbacks found all dependencies and passed validation
-    Valid,
-    /// some implemented validation callback definitively failed validation
-    Rejected,
-    /// the subconscious has decided to never again attempt a conscious validation
-    /// commonly due to missing validation dependencies remaining missing for "too long"
-    Abandoned,
-}
+pub use holochain_zome_types::validate::ValidationStatus;
 
 #[derive(
     Clone,

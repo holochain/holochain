@@ -727,6 +727,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4bb454f0228b18c7f4c3b0ebbee346ed9c52e7443b0999cd543ff3571205701d"
 
 [[package]]
+name = "dtoa"
+version = "0.4.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "134951f4028bdadb9b84baf4232681efbf277da25144b9b0ad65df75946c422b"
+
+[[package]]
 name = "either"
 version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -815,8 +821,11 @@ name = "fixt"
 version = "0.0.1"
 dependencies = [
  "holochain_serialized_bytes",
- "paste 0.1.12",
+ "lazy_static",
+ "parking_lot",
+ "paste 1.0.2",
  "rand 0.7.3",
+ "rand_core 0.5.1",
  "serde",
  "strum",
  "strum_macros",
@@ -827,7 +836,7 @@ name = "fixt_test"
 version = "0.0.1"
 dependencies = [
  "fixt",
- "paste 0.1.12",
+ "paste 1.0.2",
 ]
 
 [[package]]
@@ -1093,7 +1102,7 @@ name = "hdk3_derive"
 version = "0.0.1"
 dependencies = [
  "holochain_zome_types",
- "paste 1.0.1",
+ "paste 1.0.2",
  "proc-macro2 1.0.24",
  "quote 1.0.7",
  "syn 1.0.42",
@@ -1173,6 +1182,7 @@ dependencies = [
  "holochain_websocket",
  "holochain_zome_types",
  "human-panic",
+ "kitsune_p2p",
  "lazy_static",
  "maplit",
  "matches",
@@ -1189,6 +1199,7 @@ dependencies = [
  "ring",
  "serde",
  "serde_json",
+ "serde_yaml",
  "serial_test",
  "shrinkwraprs",
  "structopt",
@@ -1230,6 +1241,7 @@ dependencies = [
 name = "holochain_legacy"
 version = "0.0.1"
 dependencies = [
+ "holochain_serialized_bytes",
  "serde",
 ]
 
@@ -1492,6 +1504,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "if-addrs"
+version = "0.6.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f12906406f12abf5569643c46b29aec78313dc1537b17dd5c5250169790c4db9"
+dependencies = [
+ "if-addrs-sys",
+ "libc",
+ "winapi 0.3.9",
+]
+
+[[package]]
+name = "if-addrs-sys"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9e2556f16544202bcfe0aa5d20a01a6b815f736b136b3ad76dc547ee6b5bb1df"
+dependencies = [
+ "cc",
+ "libc",
+]
+
+[[package]]
 name = "indexmap"
 version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1592,15 +1625,18 @@ version = "0.0.1"
 dependencies = [
  "assert_matches",
  "derive_more",
- "fixt",
  "futures",
  "ghost_actor",
+ "kitsune_p2p_proxy",
+ "kitsune_p2p_transport_quic",
  "kitsune_p2p_types",
+ "rand 0.7.3",
  "serde",
  "serde_bytes",
  "shrinkwraprs",
  "thiserror",
  "tokio",
+ "tracing-subscriber",
  "url2",
 ]
 
@@ -1612,6 +1648,7 @@ dependencies = [
  "blake2b_simd",
  "derive_more",
  "futures",
+ "kitsune_p2p_transport_quic",
  "kitsune_p2p_types",
  "lair_keystore_api",
  "nanoid",
@@ -1619,6 +1656,7 @@ dependencies = [
  "rustls 0.18.1",
  "serde",
  "serde_bytes",
+ "structopt",
  "tokio",
  "tracing-subscriber",
  "webpki",
@@ -1629,12 +1667,14 @@ name = "kitsune_p2p_transport_quic"
 version = "0.0.1"
 dependencies = [
  "futures",
+ "if-addrs",
  "kitsune_p2p_types",
  "lair_keystore_api",
  "nanoid",
  "quinn",
  "rcgen",
  "rustls 0.17.0",
+ "serde",
  "tokio",
  "webpki",
 ]
@@ -1648,8 +1688,13 @@ dependencies = [
  "ghost_actor",
  "nanoid",
  "once_cell",
+ "paste 1.0.2",
+ "rmp-serde",
+ "serde",
+ "serde_json",
  "thiserror",
  "tokio",
+ "tracing-subscriber",
  "url2",
 ]
 
@@ -1711,6 +1756,12 @@ dependencies = [
  "mortal",
  "winapi 0.3.9",
 ]
+
+[[package]]
+name = "linked-hash-map"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8dd5a6d5999d9907cda8ed67bbd137d3af8085216c2ac62de5be860bd41f304a"
 
 [[package]]
 name = "lmdb-rkv"
@@ -2200,9 +2251,9 @@ dependencies = [
 
 [[package]]
 name = "paste"
-version = "1.0.1"
+version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0520af26d4cf99643dbbe093a61507922b57232d9978d8491fdc8f7b44573c8c"
+checksum = "ba7ae1a2180ed02ddfdb5ab70c70d596a26dd642e097bb6fe78b1bde8588ed97"
 
 [[package]]
 name = "paste-impl"
@@ -3059,6 +3110,18 @@ dependencies = [
  "itoa",
  "ryu",
  "serde",
+]
+
+[[package]]
+name = "serde_yaml"
+version = "0.8.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ae3e2dd40a7cdc18ca80db804b7f461a39bb721160a85c9a1fa30134bf3c02a5"
+dependencies = [
+ "dtoa",
+ "linked-hash-map",
+ "serde",
+ "yaml-rust",
 ]
 
 [[package]]
@@ -4046,6 +4109,15 @@ checksum = "d59cefebd0c892fa2dd6de581e937301d8552cb44489cdff035c6187cb63fa5e"
 dependencies = [
  "winapi 0.2.8",
  "winapi-build",
+]
+
+[[package]]
+name = "yaml-rust"
+version = "0.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "39f0c922f1a334134dc2f7a8b67dc5d25f0735263feec974345ff706bcf20b0d"
+dependencies = [
+ "linked-hash-map",
 ]
 
 [[package]]

@@ -3,6 +3,7 @@
 
 use crate::*;
 use holochain_zome_types::signature::Signature;
+use kitsune_p2p::agent_store::AgentInfoSigned;
 
 /// Get options help control how the get is processed at various levels.
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -44,10 +45,38 @@ impl From<&actor::GetLinksOptions> for GetLinksOptions {
     }
 }
 
+/// Get agent activity options help control how the get is processed at various levels.
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct GetActivityOptions {
+    /// Include the activity headers in the response
+    pub include_valid_activity: bool,
+    /// Include any rejected headers in the response.
+    pub include_rejected_activity: bool,
+    /// Include the full signed headers and hashes in the response
+    /// instead of just the hashes.
+    pub include_full_headers: bool,
+}
+
+impl From<&actor::GetActivityOptions> for GetActivityOptions {
+    fn from(a: &actor::GetActivityOptions) -> Self {
+        Self {
+            include_valid_activity: a.include_valid_activity,
+            include_rejected_activity: a.include_rejected_activity,
+            include_full_headers: a.include_full_headers,
+        }
+    }
+}
+
 ghost_actor::ghost_chan! {
     /// The HolochainP2pEvent stream allows handling events generated from
     /// the HolochainP2p actor.
     pub chan HolochainP2pEvent<super::HolochainP2pError> {
+        /// We need to store signed agent info.
+        fn put_agent_info_signed(dna_hash: DnaHash, to_agent: AgentPubKey, agent_info_signed: AgentInfoSigned) -> ();
+
+        /// We need to get previously stored agent info.
+        fn get_agent_info_signed(dna_hash: DnaHash, to_agent: AgentPubKey, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>, kitsune_agent: Arc<kitsune_p2p::KitsuneAgent>) -> Option<AgentInfoSigned>;
+
         /// A remote node is attempting to make a remote call on us.
         fn call_remote(
             dna_hash: DnaHash,
@@ -102,6 +131,15 @@ ghost_actor::ghost_chan! {
             options: GetLinksOptions,
         ) -> GetLinksResponse;
 
+        /// A remote node is requesting agent activity from us.
+        fn get_agent_activity(
+            dna_hash: DnaHash,
+            to_agent: AgentPubKey,
+            agent: AgentPubKey,
+            query: ChainQueryFilter,
+            options: GetActivityOptions,
+        ) -> AgentActivity;
+
         /// A remote node has sent us a validation receipt.
         fn validation_receipt_received(
             dna_hash: DnaHash,
@@ -147,10 +185,13 @@ macro_rules! match_p2p_evt {
             HolochainP2pEvent::Get { $i, .. } => { $($t)* }
             HolochainP2pEvent::GetMeta { $i, .. } => { $($t)* }
             HolochainP2pEvent::GetLinks { $i, .. } => { $($t)* }
+            HolochainP2pEvent::GetAgentActivity { $i, .. } => { $($t)* }
             HolochainP2pEvent::ValidationReceiptReceived { $i, .. } => { $($t)* }
             HolochainP2pEvent::FetchOpHashesForConstraints { $i, .. } => { $($t)* }
             HolochainP2pEvent::FetchOpHashData { $i, .. } => { $($t)* }
             HolochainP2pEvent::SignNetworkData { $i, .. } => { $($t)* }
+            HolochainP2pEvent::PutAgentInfoSigned { $i, .. } => { $($t)* }
+            HolochainP2pEvent::GetAgentInfoSigned { $i, .. } => { $($t)* }
         }
     };
 }

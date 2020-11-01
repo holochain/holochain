@@ -206,7 +206,7 @@ impl Db {
                     let op_hash = DhtOpHashed::from_content_sync(op.clone()).into_hash();
                     let value = IntegratedDhtOpsValue {
                         validation_status: ValidationStatus::Valid,
-                        op: op.to_light().await,
+                        op: op.to_light(),
                         when_integrated: Timestamp::now().into(),
                     };
                     let mut r = workspace
@@ -220,7 +220,7 @@ impl Db {
                 Db::IntQueue(op) => {
                     let value = IntegrationLimboValue {
                         validation_status: ValidationStatus::Valid,
-                        op: op.to_light().await,
+                        op: op.to_light(),
                     };
                     let res = workspace
                         .integration_limbo
@@ -476,7 +476,7 @@ impl Db {
                     let op_hash = DhtOpHashed::from_content_sync(op.clone()).into_hash();
                     let val = IntegrationLimboValue {
                         validation_status: ValidationStatus::Valid,
-                        op: op.to_light().await,
+                        op: op.to_light(),
                     };
                     workspace
                         .integration_limbo
@@ -587,7 +587,11 @@ fn add_op_to_judged(mut ps: Vec<Db>, op: &DhtOp) -> Vec<Db> {
         DhtOp::RegisterAgentActivity(s, h) => {
             ps.push(Db::PendingHeader(h.clone(), Some(s.clone())));
         }
-        DhtOp::RegisterUpdatedBy(s, h, _) => {
+        DhtOp::RegisterUpdatedContent(s, h, _) => {
+            let h: Header = h.clone().try_into().unwrap();
+            ps.push(Db::PendingHeader(h.clone(), Some(s.clone())));
+        }
+        DhtOp::RegisterUpdatedElement(s, h, _) => {
             let h: Header = h.clone().try_into().unwrap();
             ps.push(Db::PendingHeader(h.clone(), Some(s.clone())));
         }
@@ -668,16 +672,19 @@ fn register_agent_activity(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     (pre_state, expect, "register agent activity")
 }
 
-#[allow(dead_code)]
-fn register_replaced_by_for_header(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-    let op = DhtOp::RegisterUpdatedBy(
+fn register_updated_element(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+    let op = DhtOp::RegisterUpdatedElement(
         a.signature.clone(),
         a.entry_update_header.clone(),
         Some(a.new_entry.clone().into()),
     );
     let pre_state = vec![
         Db::IntQueue(op.clone()),
-        Db::CasHeader(a.original_header.clone().into(), Some(a.signature.clone())),
+        Db::CasEntry(
+            a.original_entry.clone(),
+            Some(a.original_header.clone().into()),
+            Some(a.signature.clone()),
+        ),
     ];
     let pre_state = add_op_to_judged(pre_state, &op);
     let expect = vec![
@@ -687,11 +694,11 @@ fn register_replaced_by_for_header(a: TestData) -> (Vec<Db>, Vec<Db>, &'static s
             a.entry_update_header.clone().into(),
         ),
     ];
-    (pre_state, expect, "register replaced by for header")
+    (pre_state, expect, "register updated element")
 }
 
 fn register_replaced_by_for_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-    let op = DhtOp::RegisterUpdatedBy(
+    let op = DhtOp::RegisterUpdatedContent(
         a.signature.clone(),
         a.entry_update_entry.clone(),
         Some(a.new_entry.clone().into()),
@@ -821,6 +828,7 @@ async fn test_ops_state() {
         store_entry,
         register_agent_activity,
         register_replaced_by_for_entry,
+        register_updated_element,
         register_deleted_by,
         register_deleted_header_by,
         register_add_link,
@@ -1133,7 +1141,6 @@ async fn test_metadata_from_wasm_api() {
 }
 
 // This doesn't work without inline integration
-#[ignore]
 #[tokio::test(threaded_scheduler)]
 async fn test_wasm_api_without_integration_links() {
     // test workspace boilerplate
@@ -1185,8 +1192,7 @@ async fn test_wasm_api_without_integration_links() {
     assert_eq!(links[0], target_entry_hash);
 }
 
-// TODO: Evaluate if this test adds any value or remove
-#[ignore]
+#[ignore = "Evaluate if this test adds any value or remove"]
 #[tokio::test(threaded_scheduler)]
 async fn test_wasm_api_without_integration_delete() {
     // test workspace boilerplate
@@ -1255,23 +1261,23 @@ async fn test_wasm_api_without_integration_delete() {
 }
 
 #[tokio::test(threaded_scheduler)]
-#[ignore]
+#[ignore = "write this test"]
 async fn test_integrate_single_register_replaced_by_for_header() {
-    // For RegisterUpdatedBy with intended_for Header
+    // For RegisterUpdatedContent with intended_for Header
     // metadata has Update on HeaderHash but not EntryHash
     todo!("write this test")
 }
 
 #[tokio::test(threaded_scheduler)]
-#[ignore]
+#[ignore = "write this test"]
 async fn test_integrate_single_register_replaced_by_for_entry() {
-    // For RegisterUpdatedBy with intended_for Entry
+    // For RegisterUpdatedContent with intended_for Entry
     // metadata has Update on EntryHash but not HeaderHash
     todo!("write this test")
 }
 
 #[tokio::test(threaded_scheduler)]
-#[ignore]
+#[ignore = "write this test"]
 async fn test_integrate_single_register_delete_on_headerd_by() {
     // For RegisterDeletedBy
     // metadata has Delete on HeaderHash
@@ -1279,7 +1285,7 @@ async fn test_integrate_single_register_delete_on_headerd_by() {
 }
 
 #[tokio::test(threaded_scheduler)]
-#[ignore]
+#[ignore = "write this test"]
 async fn test_integrate_single_register_add_link() {
     // For RegisterAddLink
     // metadata has link on EntryHash
@@ -1287,7 +1293,7 @@ async fn test_integrate_single_register_add_link() {
 }
 
 #[tokio::test(threaded_scheduler)]
-#[ignore]
+#[ignore = "write this test"]
 async fn test_integrate_single_register_delete_link() {
     // For RegisterAddLink
     // metadata has link on EntryHash
@@ -1325,6 +1331,7 @@ mod slow_tests {
     /// The aim of this test is to show from a high level that committing
     /// data on one agent results in integrated data on another agent
     #[tokio::test(threaded_scheduler)]
+    #[ignore = "flaky"]
     async fn commit_entry_add_link() {
         //////////////
         //// Setup

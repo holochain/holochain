@@ -63,9 +63,11 @@ use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
 use tracing::*;
 
+use crate::conductor::p2p_store::AgentKv;
 pub use builder::*;
 use futures::future::{self, TryFutureExt};
 use holo_hash::DnaHash;
+use kitsune_p2p::agent_store::AgentInfoSigned;
 
 #[cfg(test)]
 use super::handle::MockConductorHandleT;
@@ -107,6 +109,9 @@ where
 
     /// An LMDB environment for storing wasm
     wasm_env: EnvironmentWrite,
+
+    /// The LMDB environment for storing AgentInfoSigned
+    p2p_env: EnvironmentWrite,
 
     /// The database for persisting [ConductorState]
     state_db: ConductorStateDb,
@@ -614,6 +619,37 @@ where
         }
     }
 
+    pub(super) fn put_agent_info_signed(
+        &self,
+        agent_info_signed: kitsune_p2p::agent_store::AgentInfoSigned,
+    ) -> ConductorResult<()> {
+        let environ = self.p2p_env.clone();
+        // let p2p = environ.get_db(&*holochain_state::db::AGENT)?;
+        let p2p_kv = AgentKv::new(environ.clone().into())?;
+        let env = environ.guard();
+        Ok(env.with_commit(|writer| {
+            p2p_kv
+                .as_store_ref()
+                .put(writer, &(&agent_info_signed).into(), &agent_info_signed)
+        })?)
+    }
+
+    pub(super) fn get_agent_info_signed(
+        &self,
+        kitsune_space: Arc<kitsune_p2p::KitsuneSpace>,
+        kitsune_agent: Arc<kitsune_p2p::KitsuneAgent>,
+    ) -> ConductorResult<Option<AgentInfoSigned>> {
+        let environ = self.p2p_env.clone();
+
+        let p2p_kv = AgentKv::new(environ.clone().into())?;
+        let env = environ.guard();
+        let reader = env.reader()?;
+
+        Ok(p2p_kv
+            .as_store_ref()
+            .get(&reader, &(&*kitsune_space, &*kitsune_agent).into())?)
+    }
+
     pub(super) async fn put_wasm(
         &self,
         dna: DnaFile,
@@ -689,6 +725,7 @@ where
     async fn new(
         env: EnvironmentWrite,
         wasm_env: EnvironmentWrite,
+        p2p_env: EnvironmentWrite,
         dna_store: DS,
         keystore: KeystoreSender,
         root_env_dir: EnvironmentRootPath,
@@ -701,6 +738,7 @@ where
         Ok(Self {
             env,
             wasm_env,
+            p2p_env,
             state_db: KvStore::new(db),
             cells: HashMap::new(),
             shutting_down: false,
@@ -838,6 +876,9 @@ mod builder {
             let wasm_environment =
                 EnvironmentWrite::new(env_path.as_ref(), EnvironmentKind::Wasm, keystore.clone())?;
 
+            let p2p_environment =
+                EnvironmentWrite::new(env_path.as_ref(), EnvironmentKind::P2P, keystore.clone())?;
+
             #[cfg(test)]
             let state = self.state;
 
@@ -845,11 +886,17 @@ mod builder {
                 dna_store, config, ..
             } = self;
 
-            let (holochain_p2p, p2p_evt) = holochain_p2p::spawn_holochain_p2p().await?;
+            let network_config = match &config.network {
+                None => holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default(),
+                Some(config) => config.clone(),
+            };
+            let (holochain_p2p, p2p_evt) =
+                holochain_p2p::spawn_holochain_p2p(network_config).await?;
 
             let conductor = Conductor::new(
                 environment,
                 wasm_environment,
+                p2p_environment,
                 dna_store,
                 keystore,
                 env_path,
@@ -939,16 +986,21 @@ mod builder {
             self,
             test_env: TestEnvironment,
             test_wasm_env: EnvironmentWrite,
+            test_p2p_env: EnvironmentWrite,
         ) -> ConductorResult<ConductorHandle> {
             let TestEnvironment {
                 env: environment,
                 tmpdir,
             } = test_env;
             let keystore = environment.keystore();
-            let (holochain_p2p, p2p_evt) = holochain_p2p::spawn_holochain_p2p().await?;
+            let (holochain_p2p, p2p_evt) = holochain_p2p::spawn_holochain_p2p(
+                holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default(),
+            )
+            .await?;
             let conductor = Conductor::new(
                 environment,
                 test_wasm_env,
+                test_p2p_env,
                 self.dna_store,
                 keystore,
                 tmpdir.path().to_path_buf().into(),
@@ -986,7 +1038,9 @@ pub mod tests {
     use super::*;
     use super::{Conductor, ConductorState};
     use crate::conductor::dna_store::MockDnaStore;
-    use holochain_state::test_utils::{test_conductor_env, test_wasm_env, TestEnvironment};
+    use holochain_state::test_utils::{
+        test_conductor_env, test_p2p_env, test_wasm_env, TestEnvironment,
+    };
     use holochain_types::test_utils::fake_cell_id;
 
     #[tokio::test(threaded_scheduler)]
@@ -999,12 +1053,21 @@ pub mod tests {
             env: wasm_env,
             tmpdir: _tmpdir,
         } = test_wasm_env();
+        let TestEnvironment {
+            env: p2p_env,
+            tmpdir: _p2p_tmpdir,
+        } = test_p2p_env();
         let dna_store = MockDnaStore::new();
         let keystore = environment.keystore().clone();
-        let (holochain_p2p, _p2p_evt) = holochain_p2p::spawn_holochain_p2p().await.unwrap();
+        let (holochain_p2p, _p2p_evt) = holochain_p2p::spawn_holochain_p2p(
+            holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default(),
+        )
+        .await
+        .unwrap();
         let conductor = Conductor::new(
             environment,
             wasm_env,
+            p2p_env,
             dna_store,
             keystore,
             tmpdir.path().to_path_buf().into(),
@@ -1046,10 +1109,14 @@ pub mod tests {
             env: wasm_env,
             tmpdir: _tmpdir,
         } = test_wasm_env();
+        let TestEnvironment {
+            env: p2p_env,
+            tmpdir: _p2p_env,
+        } = test_p2p_env();
         let state = ConductorState::default();
         let conductor = ConductorBuilder::new()
             .fake_state(state.clone())
-            .test(test_env, wasm_env)
+            .test(test_env, wasm_env, p2p_env)
             .await
             .unwrap();
         assert_eq!(state, conductor.get_state_from_handle().await.unwrap());

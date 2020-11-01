@@ -152,6 +152,10 @@ where
     pub fn contains(&self, k: &HoloHashOf<C>) -> DatabaseResult<bool> {
         fresh_reader!(self.env, |r| self.inner.contains(&r, k))
     }
+
+    pub fn inner(&self) -> &CasBufUsedSync<C, P> {
+        &self.inner
+    }
 }
 
 impl<C, P> BufferedStore for CasBufUsedSync<C, P>

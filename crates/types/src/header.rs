@@ -173,7 +173,7 @@ impl From<(Update, Signature)> for WireUpdate {
 }
 
 impl WireDelete {
-    pub async fn into_element(self) -> Element {
+    pub fn into_element(self) -> Element {
         Element::new(
             SignedHeaderHashed::from_content_sync(SignedHeader(self.delete.into(), self.signature)),
             None,
@@ -184,7 +184,7 @@ impl WireDelete {
 impl WireUpdateRelationship {
     /// Recreate the Update Element without an Entry.
     /// Useful for creating dht ops
-    pub async fn into_element(self, original_entry_address: EntryHash) -> Element {
+    pub fn into_element(self, original_entry_address: EntryHash) -> Element {
         let eu = Update {
             author: self.author,
             timestamp: self.timestamp,
@@ -264,16 +264,12 @@ impl TryFrom<SignedHeaderHashed> for WireUpdateRelationship {
 }
 
 impl WireNewEntryHeader {
-    pub async fn into_element(self, entry_type: EntryType, entry: Entry) -> Element {
+    pub fn into_element(self, entry_type: EntryType, entry: Entry) -> Element {
         let entry_hash = EntryHash::with_data_sync(&entry);
-        Element::new(self.into_header(entry_type, entry_hash).await, Some(entry))
+        Element::new(self.into_header(entry_type, entry_hash), Some(entry))
     }
 
-    pub async fn into_header(
-        self,
-        entry_type: EntryType,
-        entry_hash: EntryHash,
-    ) -> SignedHeaderHashed {
+    pub fn into_header(self, entry_type: EntryType, entry_hash: EntryHash) -> SignedHeaderHashed {
         match self {
             WireNewEntryHeader::Create(ec) => {
                 let signature = ec.signature;

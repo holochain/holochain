@@ -69,7 +69,7 @@ async fn integration_test() {
 }
 
 #[tokio::test]
-#[ignore]
+#[ignore = "stub"]
 async fn channels_properly_close() {
     // TODO
 }
