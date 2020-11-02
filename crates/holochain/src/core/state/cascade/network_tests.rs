@@ -452,6 +452,7 @@ async fn get_links_from_another_agent() {
         target: target_entry_hash.clone(),
         timestamp: links.get(0).unwrap().timestamp.clone(),
         tag: link_tag.clone(),
+        create_link_hash: link_add_hash.clone(),
     };
     assert_eq!(*links.get(0).unwrap(), expt);
 

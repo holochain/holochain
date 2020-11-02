@@ -160,5 +160,22 @@ pub mod slow_tests {
         let links: Links = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ());
 
         assert!(links.into_inner().len() == 0);
+
+        // Add some links then delete them all
+        let _h: HeaderHash =
+            crate::call_test_ribosome!(host_access, TestWasm::Link, "create_link", ());
+        let _h: HeaderHash =
+            crate::call_test_ribosome!(host_access, TestWasm::Link, "create_link", ());
+
+        let links: Links = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ());
+
+        assert!(links.into_inner().len() == 2);
+
+        crate::call_test_ribosome!(host_access, TestWasm::Link, "delete_all_links", ());
+
+        // Should be no links left
+        let links: Links = crate::call_test_ribosome!(host_access, TestWasm::Link, "get_links", ());
+
+        assert!(links.into_inner().len() == 0);
     }
 }
