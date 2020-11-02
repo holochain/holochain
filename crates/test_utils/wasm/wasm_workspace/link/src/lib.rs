@@ -30,3 +30,11 @@ fn delete_link(input: DeleteLinkInput) -> ExternResult<HeaderHash> {
 fn get_links(_: ()) -> ExternResult<Links> {
     Ok(get_links!(base()?)?)
 }
+
+#[hdk_extern]
+fn delete_all_links(_: ()) -> ExternResult<()> {
+    for link in get_links!(base()?)?.into_inner() {
+        delete_link!(link.create_link_hash)?;
+    }
+    Ok(())
+}
