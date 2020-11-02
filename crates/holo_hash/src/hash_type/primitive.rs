@@ -1,5 +1,5 @@
 use super::*;
-use crate::{hash_type, AgentPubKey, EntryHash};
+use crate::{error::HoloHashError, hash_type, AgentPubKey, EntryHash};
 
 const AGENT_PREFIX: &[u8] = &[0x84, 0x20, 0x24]; // uhCAk [132, 32, 36]
 const ENTRY_PREFIX: &[u8] = &[0x84, 0x21, 0x24]; // uhCEk [132, 33, 36]
@@ -27,6 +27,15 @@ impl<P: PrimitiveHashType> HashType for P {
     fn get_prefix(self) -> &'static [u8] {
         P::static_prefix()
     }
+
+    fn try_from_prefix(prefix: &[u8]) -> HoloHashResult<Self> {
+        if prefix == P::static_prefix() {
+            Ok(P::new())
+        } else {
+            Err(HoloHashError::BadPrefix)
+        }
+    }
+
     fn hash_name(self) -> &'static str {
         PrimitiveHashType::hash_name(self)
     }
@@ -57,56 +66,56 @@ macro_rules! primitive_hash_type {
             }
         }
 
-        impl serde::Serialize for $name {
-            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-            where
-                S: serde::Serializer,
-            {
-                serializer.serialize_bytes(self.get_prefix())
-            }
-        }
+        // impl serde::Serialize for $name {
+        //     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        //     where
+        //         S: serde::Serializer,
+        //     {
+        //         serializer.serialize_bytes(self.get_prefix())
+        //     }
+        // }
 
-        impl<'de> serde::Deserialize<'de> for $name {
-            fn deserialize<D>(deserializer: D) -> Result<$name, D::Error>
-            where
-                D: serde::Deserializer<'de>,
-            {
-                deserializer.deserialize_bytes($visitor)
-            }
-        }
+        // impl<'de> serde::Deserialize<'de> for $name {
+        //     fn deserialize<D>(deserializer: D) -> Result<$name, D::Error>
+        //     where
+        //         D: serde::Deserializer<'de>,
+        //     {
+        //         deserializer.deserialize_bytes($visitor)
+        //     }
+        // }
 
-        struct $visitor;
+        // struct $visitor;
 
-        impl<'de> serde::de::Visitor<'de> for $visitor {
-            type Value = $name;
+        // impl<'de> serde::de::Visitor<'de> for $visitor {
+        //     type Value = $name;
 
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("a HoloHash of primitive hash_type")
-            }
+        //     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        //         formatter.write_str("a HoloHash of primitive hash_type")
+        //     }
 
-            fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                match v {
-                    $prefix => Ok($name),
-                    _ => panic!("unknown hash prefix during hash deserialization {:?}", v),
-                }
-            }
+        //     fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
+        //     where
+        //         E: serde::de::Error,
+        //     {
+        //         match v {
+        //             $prefix => Ok($name),
+        //             _ => panic!("unknown hash prefix during hash deserialization {:?}", v),
+        //         }
+        //     }
 
-            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-            where
-                A: serde::de::SeqAccess<'de>,
-            {
-                let mut vec = Vec::with_capacity(seq.size_hint().unwrap_or(0));
+        //     fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+        //     where
+        //         A: serde::de::SeqAccess<'de>,
+        //     {
+        //         let mut vec = Vec::with_capacity(seq.size_hint().unwrap_or(0));
 
-                while let Some(b) = seq.next_element()? {
-                    vec.push(b);
-                }
+        //         while let Some(b) = seq.next_element()? {
+        //             vec.push(b);
+        //         }
 
-                self.visit_bytes(&vec)
-            }
-        }
+        //         self.visit_bytes(&vec)
+        //     }
+        // }
     };
 }
 

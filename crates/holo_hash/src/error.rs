@@ -18,3 +18,5 @@ pub enum HoloHashError {
     /// checksum validation failed
     BadChecksum,
 }
+
+pub type HoloHashResult<T> = Result<T, HoloHashError>;

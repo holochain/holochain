@@ -1,3 +1,5 @@
+use crate::error::HoloHashError;
+
 use super::*;
 
 #[cfg(all(test, feature = "serialized-bytes"))]
@@ -23,6 +25,15 @@ impl HashType for AnyDht {
             AnyDht::Header => Header::new().get_prefix(),
         }
     }
+
+    fn try_from_prefix(prefix: &[u8]) -> HoloHashResult<Self> {
+        match prefix {
+            ENTRY_PREFIX => Ok(AnyDht::Entry),
+            HEADER_PREFIX => Ok(AnyDht::Header),
+            _ => Err(HoloHashError::BadPrefix),
+        }
+    }
+
     fn hash_name(self) -> &'static str {
         "AnyDhtHash"
     }

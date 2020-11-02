@@ -1,5 +1,39 @@
-use crate::{HashType, HoloHash};
+use std::convert::TryFrom;
+
+use crate::{
+    error::{HoloHashError, HoloHashResult},
+    HashType, HoloHash,
+};
 use holochain_serialized_bytes::{SerializedBytes, SerializedBytesError, UnsafeBytes};
+
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
+#[repr(transparent)]
+#[serde(transparent)]
+pub struct HoloHash39(#[serde(with = "serde_bytes")] Vec<u8>);
+// pub struct HoloHash39([u8; 39]);
+
+impl<T: HashType> TryFrom<HoloHash39> for HoloHash<T> {
+    type Error = HoloHashError;
+
+    fn try_from(h: HoloHash39) -> HoloHashResult<Self> {
+        if !h.0.len() == 39 {
+            Err(HoloHashError::BadSize)
+        } else {
+            let hash_type = T::try_from_prefix(&h.0[0..3])?;
+            let hash = h.0[3..].to_vec();
+            Ok(HoloHash::with_pre_hashed_typed(hash, hash_type))
+        }
+    }
+}
+
+impl<T: HashType> From<HoloHash<T>> for HoloHash39 {
+    fn from(hash: HoloHash<T>) -> HoloHash39 {
+        let mut v = Vec::with_capacity(39);
+        v.append(&mut hash.hash_type().get_prefix().to_vec());
+        v.append(&mut hash.into_inner());
+        HoloHash39(v)
+    }
+}
 
 impl<T: HashType> std::convert::TryFrom<&HoloHash<T>> for SerializedBytes {
     type Error = SerializedBytesError;
