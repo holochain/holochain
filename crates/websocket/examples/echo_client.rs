@@ -11,7 +11,7 @@ try_from_serialized_bytes!(BroadcastMessage);
 struct ResponseMessage(pub String);
 try_from_serialized_bytes!(ResponseMessage);
 
-#[tokio::main(threaded_scheduler)]
+#[tokio::main(flavor = "multi_thread")]
 async fn main() {
     let (mut send_socket, mut recv_socket) = websocket_connect(
         url2!("ws://127.0.0.1:12345"),

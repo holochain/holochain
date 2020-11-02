@@ -39,10 +39,11 @@ shrinkwraprs = "0.3.0"
 strum = "0.18.0"
 tempdir = "0.3.7"
 thiserror = "1.0.10"
-tokio = { version = "0.2", features = [ "blocking" ] }
-tokio_safe_block_on = "0.1.2"
+tokio = { version = "0.3.3", features = [ "full" ] }
+tokio_safe_block_on = { git = "https://github.com/neonphog/tokio_safe_block_on.git",rev = "074d40929ccab649b0dcc83a4ebdbdcb70b317fb" }
+tokio_helper = { path = "../tokio_helper" }
 tracing = "=0.1.18"
 
 [dev-dependencies]
 # rmp-serde = "0.14.3"
-tokio = { version = "0.2", features = [ "full" ] }
+tokio = { version = "0.3.3", features = [ "full" ] }

@@ -137,7 +137,7 @@ mod test {
     use holochain_zome_types::ExternInput;
     use rand::prelude::*;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn validate_package_callback_result_fold() {
         let mut rng = fixt::rng();
 
@@ -177,7 +177,7 @@ mod test {
         }
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn validation_package_invocation_allow_side_effects() {
         use holochain_types::dna::zome::Permission::*;
         let validation_package_host_access =
@@ -198,7 +198,7 @@ mod test {
         );
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn validation_package_invocation_zomes() {
         let validation_package_invocation =
             ValidationPackageInvocationFixturator::new(fixt::Unpredictable)
@@ -211,7 +211,7 @@ mod test {
         );
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn validation_package_invocation_fn_components() {
         let validation_package_invocation =
             ValidationPackageInvocationFixturator::new(fixt::Unpredictable)
@@ -230,7 +230,7 @@ mod test {
         }
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn validation_package_invocation_host_input() {
         let validation_package_invocation =
             ValidationPackageInvocationFixturator::new(fixt::Unpredictable)
@@ -262,7 +262,7 @@ mod slow_tests {
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::validate::ValidationPackage;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_validation_package_unimplemented() {
         let host_access = ValidationPackageHostAccessFixturator::new(fixt::Unpredictable)
             .next()
@@ -282,7 +282,7 @@ mod slow_tests {
         assert_eq!(result, ValidationPackageResult::NotImplemented,);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_validation_package_implemented_success() {
         let host_access = ValidationPackageHostAccessFixturator::new(fixt::Unpredictable)
             .next()
@@ -307,7 +307,7 @@ mod slow_tests {
         );
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_validation_package_implemented_fail() {
         let host_access = ValidationPackageHostAccessFixturator::new(fixt::Unpredictable)
             .next()

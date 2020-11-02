@@ -133,7 +133,7 @@ mod tests {
         assert_eq!(&bytes[32..], agent_info.as_agent_ref().get_bytes(),);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_store_agent_info_signed() {
         holochain_types::observability::test_run().ok();
 

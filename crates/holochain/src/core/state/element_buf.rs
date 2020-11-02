@@ -337,7 +337,7 @@ mod tests {
     use holochain_state::{prelude::*, test_utils::test_cell_env};
     use holochain_zome_types::entry_def::EntryVisibility;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn can_write_private_entry_when_enabled() -> anyhow::Result<()> {
         let keystore = spawn_test_keystore().await?;
         let test_env = test_cell_env();
@@ -384,7 +384,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn cannot_write_private_entry_when_disabled() -> anyhow::Result<()> {
         let keystore = spawn_test_keystore().await?;
         let test_env = test_cell_env();

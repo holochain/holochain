@@ -119,7 +119,7 @@ fixturator!(
         for _ in 0..number_of_wasms {
             let wasm = dna_wasm_fixturator.next().unwrap();
             wasms.insert(
-                tokio_safe_block_on::tokio_safe_block_forever_on(
+                tokio_helper::block_on(
                     async { WasmHash::with_data(&wasm).await },
                 )
                 .into(),
@@ -134,7 +134,7 @@ fixturator!(
         for _ in 0..3 {
             let wasm = dna_wasm_fixturator.next().unwrap();
             wasms.insert(
-                tokio_safe_block_on::tokio_safe_block_forever_on(
+                tokio_helper::block_on(
                     async { WasmHash::with_data(&wasm).await },
                 )
                 .into(),
@@ -252,14 +252,14 @@ fixturator!(
 fixturator!(
     KeystoreSender;
     curve Empty {
-        tokio_safe_block_on::tokio_safe_block_forever_on(async {
+        tokio_helper::block_on(async {
             // an empty keystore
             holochain_keystore::test_keystore::spawn_test_keystore().await.unwrap()
         })
     };
     curve Unpredictable {
         // TODO: Make this unpredictable
-        tokio_safe_block_on::tokio_safe_block_forever_on(async {
+        tokio_helper::block_on(async {
             holochain_keystore::test_keystore::spawn_test_keystore().await.unwrap()
         })
     };

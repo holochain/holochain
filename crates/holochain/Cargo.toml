@@ -53,8 +53,8 @@ structopt = "0.3.11"
 strum = "0.18.0"
 tempdir = "0.3.7"
 thiserror = "1.0.10"
-tokio = { version = "0.2.11", features = [ "full" ] }
-tokio_safe_block_on = "0.1.2"
+tokio = { version = "0.3.3", features = [ "full" ] }
+tokio_safe_block_on = { git = "https://github.com/neonphog/tokio_safe_block_on.git", rev = "074d40929ccab649b0dcc83a4ebdbdcb70b317fb" }
 toml = "0.5.6"
 tracing = "=0.1.18"
 tracing-futures = "0.2.4"
@@ -63,6 +63,7 @@ url2 = "0.0.6"
 url_serde = "0.2.0"
 uuid = { version = "0.7", features = [ "serde", "v4" ] }
 kitsune_p2p = { version = "0.0.1", path = "../kitsune_p2p/kitsune_p2p" }
+tokio_helper = { path = "../tokio_helper" }
 
 [dev-dependencies]
 anyhow = "1.0.26"

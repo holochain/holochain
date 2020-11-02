@@ -417,7 +417,7 @@ pub async fn wait_for_integration(
         } else {
             tracing::debug!(?count);
         }
-        tokio::time::delay_for(delay).await;
+        tokio::time::sleep(delay).await;
     }
 }
 

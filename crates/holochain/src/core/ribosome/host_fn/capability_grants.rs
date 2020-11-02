@@ -35,7 +35,7 @@ pub mod wasm_test {
     use holochain_types::test_utils::fake_agent_pubkey_2;
     use holochain_wasm_test_utils::TestWasm;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_capability_secret_test<'a>() {
         holochain_types::observability::test_run().ok();
         // test workspace boilerplate
@@ -54,7 +54,7 @@ pub mod wasm_test {
             crate::call_test_ribosome!(host_access, TestWasm::Capability, "cap_secret", ());
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_transferable_cap_grant<'a>() {
         holochain_types::observability::test_run().ok();
         // test workspace boilerplate
@@ -93,7 +93,7 @@ pub mod wasm_test {
         assert_eq!(entry_secret, secret,);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_authorized_call() {
         // /////////
         // START DNA

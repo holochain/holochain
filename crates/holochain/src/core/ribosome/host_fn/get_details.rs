@@ -15,7 +15,7 @@ pub fn get_details<'a>(
     let network = call_context.host_access.network().clone();
 
     // timeouts must be handled by the network
-    tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+    tokio_helper::block_on(async move {
         let maybe_details = call_context
             .host_access
             .workspace()
@@ -36,7 +36,7 @@ pub mod wasm_test {
     use hdk3::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_get_details_test<'a>() {
         holochain_types::observability::test_run().ok();
 

@@ -4,7 +4,7 @@ mod tests {
     use ghost_actor::{dependencies::tracing, GhostControlSender};
     use std::sync::Arc;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_peer_info_store() -> Result<(), KitsuneP2pError> {
         init_tracing();
 
@@ -33,7 +33,7 @@ mod tests {
         panic!("Failed to receive agent_info_signed");
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_transport_binding() -> Result<(), KitsuneP2pError> {
         init_tracing();
 
@@ -61,7 +61,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_request_workflow() -> Result<(), KitsuneP2pError> {
         init_tracing();
 
@@ -80,7 +80,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_broadcast_workflow() -> Result<(), KitsuneP2pError> {
         init_tracing();
 
@@ -125,7 +125,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_multi_request_workflow() -> Result<(), KitsuneP2pError> {
         init_tracing();
 
@@ -167,7 +167,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_single_agent_multi_request_workflow() -> Result<(), KitsuneP2pError> {
         init_tracing();
 
@@ -202,7 +202,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_gossip_workflow() -> Result<(), KitsuneP2pError> {
         init_tracing();
 
@@ -223,7 +223,7 @@ mod tests {
         //        we need to actually add_*_agent to do this
         //let op2 = harness.inject_gossip_data(a2, "agent-2-data".to_string()).await?;
 
-        tokio::time::delay_for(std::time::Duration::from_millis(200)).await;
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 
         let res = harness.dump_local_gossip_data(a1).await?;
         let (op_hash, data) = res.into_iter().next().unwrap();

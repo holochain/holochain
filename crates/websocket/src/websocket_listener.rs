@@ -81,9 +81,10 @@ async fn connect(
 ) -> Result<(WebsocketSender, WebsocketReceiver)> {
     match socket_result {
         Ok(socket) => {
-            socket.set_keepalive(Some(std::time::Duration::from_secs(
-                config.tcp_keepalive_s as u64,
-            )))?;
+            // TODO(steveeJ): investigate whether we need an alternative
+            // socket.set_keepalive(Some(std::time::Duration::from_secs(
+            //     config.tcp_keepalive_s as u64,
+            // )))?;
             tracing::debug!(
                 message = "accepted incoming raw socket",
                 remote_addr = %socket.peer_addr()?,

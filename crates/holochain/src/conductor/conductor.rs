@@ -1069,7 +1069,7 @@ pub mod tests {
     };
     use holochain_types::test_utils::fake_cell_id;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn can_update_state() {
         let TestEnvironment {
             env: environment,
@@ -1123,7 +1123,7 @@ pub mod tests {
         );
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn can_set_fake_state() {
         let test_env = test_conductor_env();
         let _tmpdir = test_env.tmpdir.clone();

@@ -56,7 +56,7 @@ async fn run() -> DnaUtilResult<()> {
 }
 
 /// Main `dna-util` executable entrypoint.
-#[tokio::main(threaded_scheduler)]
+#[tokio::main(flavor = "multi_thread")]
 pub async fn main() {
     if let Err(err) = run().await {
         eprintln!("dna-util: {}", err);

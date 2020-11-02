@@ -14,7 +14,7 @@ pub fn call_remote(
     input: CallRemoteInput,
 ) -> RibosomeResult<CallRemoteOutput> {
     // it is the network's responsibility to handle timeouts and return an Err result in that case
-    let result: ZomeCallResponse = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+    let result: ZomeCallResponse = tokio_helper::block_on(async move {
         let mut network = call_context.host_access().network().clone();
         let call_remote = input.into_inner();
         network
@@ -51,7 +51,7 @@ pub mod wasm_test {
     pub use holochain_zome_types::capability::CapSecret;
     use holochain_zome_types::ExternInput;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     /// we can call a fn on a remote
     async fn call_remote_test() {
         // ////////////

@@ -12,7 +12,7 @@ pub fn agent_info<'a>(
     call_context: Arc<CallContext>,
     _input: AgentInfoInput,
 ) -> RibosomeResult<AgentInfoOutput> {
-    let agent_pubkey = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+    let agent_pubkey = tokio_helper::block_on(async move {
         let lock = call_context.host_access.workspace().read().await;
         lock.source_chain.agent_pubkey()
     })?;
@@ -34,7 +34,7 @@ pub mod test {
     use holochain_zome_types::AgentInfoInput;
     use holochain_zome_types::AgentInfoOutput;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn invoke_import_agent_info_test() {
         let test_env = holochain_state::test_utils::test_cell_env();
         let env = test_env.env();

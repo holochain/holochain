@@ -23,7 +23,7 @@ pub fn get_link_details<'a>(
     // Get the network from the context
     let network = call_context.host_access.network().clone();
 
-    tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+    tokio_helper::block_on(async move {
         // Create the key
         let key = match tag.as_ref() {
             Some(tag) => LinkMetaKey::BaseZomeTag(&base_address, zome_id, tag),
@@ -57,7 +57,7 @@ pub mod slow_tests {
     use holochain_zome_types::Header;
     use test_wasm_common::*;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_entry_hash_path_children_details() {
         let test_env = holochain_state::test_utils::test_cell_env();
         let env = test_env.env();

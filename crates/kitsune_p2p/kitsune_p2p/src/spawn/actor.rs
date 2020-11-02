@@ -7,6 +7,7 @@ use std::{
     collections::{hash_map::Entry, HashMap},
     sync::Arc,
 };
+use tokio_compat_02::FutureExt as _;
 
 pub mod bootstrap;
 mod gossip;
@@ -54,7 +55,11 @@ fn build_transport(
                     .set_bind_to(bind_to)
                     .set_override_host(override_host)
                     .set_override_port(override_port);
-                Ok(kitsune_p2p_transport_quic::spawn_transport_listener_quic(sub_conf).await?)
+                Ok(
+                    kitsune_p2p_transport_quic::spawn_transport_listener_quic(sub_conf)
+                        .compat()
+                        .await?,
+                )
             }
             TransportConfig::Proxy {
                 sub_transport,

@@ -107,9 +107,10 @@ pub async fn websocket_connect(
 ) -> Result<(WebsocketSender, WebsocketReceiver)> {
     let addr = url_to_addr(&url, config.scheme).await?;
     let socket = tokio::net::TcpStream::connect(addr).await?;
-    socket.set_keepalive(Some(std::time::Duration::from_secs(
-        config.tcp_keepalive_s as u64,
-    )))?;
+    // TODO(steveeJ): this is not available in tokio 0.3
+    // socket.set_keepalive(Some(std::time::Duration::from_secs(
+    //     config.tcp_keepalive_s as u64,
+    // )))?;
     let (socket, _) = tokio_tungstenite::client_async_with_config(
         url.as_str(),
         socket,

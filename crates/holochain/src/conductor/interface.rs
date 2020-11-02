@@ -26,7 +26,7 @@ impl SignalBroadcaster {
         self.0
             .iter_mut()
             .map(|tx| tx.send(sig.clone()))
-            .collect::<Result<Vec<_>, broadcast::SendError<Signal>>>()
+            .collect::<Result<Vec<_>, broadcast::error::SendError<Signal>>>()
             .map_err(InterfaceError::SignalSend)?;
         Ok(())
     }

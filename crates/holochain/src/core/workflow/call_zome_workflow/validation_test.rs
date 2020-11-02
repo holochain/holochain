@@ -11,7 +11,7 @@ use holochain_types::{
 use holochain_wasm_test_utils::TestWasm;
 use std::convert::TryFrom;
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn direct_validation_test() {
     observability::test_run().ok();
 

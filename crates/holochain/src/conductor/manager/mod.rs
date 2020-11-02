@@ -133,7 +133,7 @@ mod test {
     #[tokio::test]
     async fn spawn_and_handle_dying_task() -> Result<()> {
         observability::test_run().ok();
-        let (mut send_task_handle, main_task) = spawn_task_manager();
+        let (send_task_handle, main_task) = spawn_task_manager();
         let handle = tokio::spawn(async {
             Err(ConductorError::Todo("This task gotta die".to_string()).into())
         });
@@ -151,7 +151,7 @@ mod test {
         );
         // Check that the main task doesn't close straight away
         let main_handle = tokio::spawn(main_task);
-        tokio::time::delay_for(std::time::Duration::from_secs(2)).await;
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
         // Now send the handle
         if let Err(_) = send_task_handle.send(handle).await {

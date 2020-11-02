@@ -322,7 +322,7 @@ pub mod tests {
         assert!(config.dpki.is_some());
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_build_conductor_from_legacy() {
         let (legacy_config, _, dir) = legacy_fixtures_1();
         let dna1 = fake_dna_zomes(
@@ -404,7 +404,7 @@ pub mod tests {
             .unwrap();
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_build_conductor_from_legacy_regression() {
         let (legacy_config, _, dir) = legacy_fixtures_2();
         let dna1 = fake_dna_zomes(

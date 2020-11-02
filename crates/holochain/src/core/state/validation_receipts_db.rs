@@ -170,7 +170,7 @@ mod tests {
         receipt.sign(keystore).await.unwrap()
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_validation_receipts_db_populate_and_list() -> DatabaseResult<()> {
         holochain_types::observability::test_run().ok();
 

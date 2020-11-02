@@ -173,7 +173,7 @@ mod test {
         }
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn migrate_agent_invocation_allow_side_effects() {
         use holochain_types::dna::zome::Permission::*;
         let migrate_agent_host_access = MigrateAgentHostAccessFixturator::new(fixt::Unpredictable)
@@ -246,7 +246,7 @@ mod slow_tests {
     use crate::fixt::WasmRibosomeFixturator;
     use holochain_wasm_test_utils::TestWasm;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_migrate_agent_unimplemented() {
         let host_access = MigrateAgentHostAccessFixturator::new(fixt::Unpredictable)
             .next()
@@ -265,7 +265,7 @@ mod slow_tests {
         assert_eq!(result, MigrateAgentResult::Pass,);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_migrate_agent_implemented_pass() {
         let host_access = MigrateAgentHostAccessFixturator::new(fixt::Unpredictable)
             .next()
@@ -284,7 +284,7 @@ mod slow_tests {
         assert_eq!(result, MigrateAgentResult::Pass,);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_migrate_agent_implemented_fail() {
         let host_access = MigrateAgentHostAccessFixturator::new(fixt::Unpredictable)
             .next()
@@ -306,7 +306,7 @@ mod slow_tests {
         );
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_migrate_agent_multi_implemented_fail() {
         let host_access = MigrateAgentHostAccessFixturator::new(fixt::Unpredictable)
             .next()

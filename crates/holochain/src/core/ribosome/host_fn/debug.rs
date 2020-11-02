@@ -40,7 +40,7 @@ pub mod wasm_test {
     use std::sync::Arc;
 
     /// we can get an entry hash out of the fn directly
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn debug_test() {
         let ribosome = WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![]))
             .next()
@@ -55,7 +55,7 @@ pub mod wasm_test {
         assert_eq!(DebugOutput::new(()), output);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_debug_test() {
         let test_env = holochain_state::test_utils::test_cell_env();
         let env = test_env.env();
@@ -81,7 +81,7 @@ pub mod wasm_test {
         assert_eq!(output, DebugOutput::new(()));
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn wasm_line_numbers_test() {
         let test_env = holochain_state::test_utils::test_cell_env();
         let env = test_env.env();

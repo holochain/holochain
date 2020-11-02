@@ -255,7 +255,7 @@ impl DnaDefJson {
 mod tests {
     use super::*;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_extract_then_compile() {
         let tmp_dir = tempdir::TempDir::new("dna_util_test").unwrap();
 

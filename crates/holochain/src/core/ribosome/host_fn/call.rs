@@ -34,7 +34,7 @@ pub fn call(
     };
 
     // Make the call using this workspace
-    let result: ZomeCallResponse = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+    let result: ZomeCallResponse = tokio_helper::block_on(async move {
         conductor_handle
             .call_zome(invocation, workspace)
             .await
@@ -65,7 +65,7 @@ pub mod wasm_test {
         test_utils::{conductor_setup::ConductorTestData, install_app, new_invocation},
     };
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn call_test() {
         observability::test_run().ok();
 
@@ -133,7 +133,7 @@ pub mod wasm_test {
     /// When calling the same cell we need to make sure
     /// the "as at" doesn't cause the original zome call to fail
     /// when they are both writing (moving the source chain forward)
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn call_the_same_cell() {
         observability::test_run().ok();
 
@@ -171,7 +171,7 @@ pub mod wasm_test {
 
     /// test calling a different zome
     /// in a different cell.
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn bridge_call() {
         observability::test_run().ok();
 

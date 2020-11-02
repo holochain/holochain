@@ -16,7 +16,7 @@ use holochain_zome_types::header;
 use std::sync::Arc;
 use tokio::sync;
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_cell_handle_publish() {
     let TestEnvironment {
         env,

@@ -9,9 +9,9 @@ pub enum InterfaceError {
     #[error(transparent)]
     JoinError(#[from] tokio::task::JoinError),
     #[error("Error while sending a Signal to an Interface: {0:?}")]
-    SignalSend(tokio::sync::broadcast::SendError<Signal>),
+    SignalSend(tokio::sync::broadcast::error::SendError<Signal>),
     #[error(transparent)]
-    SignalReceive(tokio::sync::broadcast::RecvError),
+    SignalReceive(tokio::sync::broadcast::error::RecvError),
     #[error(transparent)]
     RequestHandler(Box<ConductorError>),
     #[error("Got an unexpected message: {0}")]

@@ -273,7 +273,7 @@ impl ZomeCallInvocation {
         let check_agent = self.provenance.clone();
         let check_secret = self.cap;
 
-        tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+        tokio_helper::block_on(async move {
             let maybe_grant: Option<CapGrant> = host_access
                 .workspace
                 .read()
@@ -612,7 +612,7 @@ pub mod wasm_test {
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn warm_wasm_tests() {
         crate::test_utils::warm_wasm_tests();
     }

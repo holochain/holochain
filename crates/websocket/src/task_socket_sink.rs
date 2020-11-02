@@ -65,7 +65,7 @@ mod tests {
 
         use tokio::stream::StreamExt;
 
-        let (mut send, mut recv) = prep_test();
+        let (send, mut recv) = prep_test();
         let (os, or) = tokio::sync::oneshot::channel();
         send.send((tungstenite::Message::Text("test1".to_string()), os))
             .await

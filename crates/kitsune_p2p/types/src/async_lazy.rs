@@ -15,7 +15,7 @@ impl<O: 'static + Clone + Send + Sync> AsyncLazy<O> {
         let (s, r) = tokio::sync::watch::channel(None);
         tokio::task::spawn(async move {
             let val: O = f.await;
-            let _ = s.broadcast(Some(val));
+            let _ = s.send(Some(val));
         });
         Self(r)
     }
@@ -25,12 +25,13 @@ impl<O: 'static + Clone + Send + Sync> AsyncLazy<O> {
     pub fn get(&self) -> impl std::future::Future<Output = O> + 'static {
         let mut r = self.0.clone();
         async move {
+            // TODO(steveeJ): discuss storing an internal state instead of relying on the receiver's state to avoid this loop
             loop {
-                match r.recv().await {
-                    Some(Some(v)) => return v,
-                    None => panic!("sender task dropped"),
-                    _ => (),
+                if let Some(v) = r.borrow().to_owned() {
+                    return v;
                 }
+
+                r.changed().await.expect("sender task dropped");
             }
         }
     }
@@ -41,10 +42,10 @@ mod tests {
     use super::*;
     use std::sync::Arc;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn async_lazy() {
         let s = AsyncLazy::new(async move {
-            tokio::time::delay_for(std::time::Duration::from_millis(20)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
             Arc::new(42)
         });
         assert_eq!(

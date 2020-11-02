@@ -64,7 +64,7 @@ use unwrap_to::unwrap_to;
 use crate::test_utils::host_fn_api::*;
 
 /*
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "flaky"]
 async fn get_updates_cache() {
     observability::test_run().ok();
@@ -108,7 +108,7 @@ async fn get_updates_cache() {
 */
 
 /*
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "flaky!"]
 async fn get_meta_updates_meta_cache() {
     observability::test_run().ok();
@@ -174,7 +174,7 @@ async fn get_meta_updates_meta_cache() {
 }
 */
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "flaky"]
 async fn get_from_another_agent() {
     observability::test_run().ok();
@@ -342,7 +342,7 @@ async fn get_from_another_agent() {
     shutdown.await.unwrap();
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "flaky for some reason"]
 async fn get_links_from_another_agent() {
     observability::test_run().ok();
@@ -547,9 +547,20 @@ async fn run_fixt_network(
         async move {
             use tokio::stream::StreamExt;
             let mut killed = killed.into_stream();
-            while let Either::Right((Some(evt), _)) =
-                futures::future::select(killed.next(), recv.next()).await
-            {
+            loop {
+                let evt = tokio::select! {
+                    _ = killed.next() => {
+                        break;
+                    }
+                    evt = recv.next() => {
+                        if let Some(evt) = evt {
+                            evt
+                        } else {
+                            continue;
+                        }
+                    }
+                };
+
                 use holochain_p2p::event::HolochainP2pEvent::*;
                 debug!(?evt);
                 match evt {

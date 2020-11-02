@@ -108,7 +108,7 @@ async fn process_incoming_message(
                 WireMessage::Request { id, data } => {
                     let data: SerializedBytes = UnsafeBytes::from(data).into();
                     tracing::trace!(message = "received request", ?data,);
-                    let mut loc_send_sink = send_sink.clone();
+                    let loc_send_sink = send_sink.clone();
                     let respond: WebsocketRespond = Box::new(move |data| {
                         //let span = tracing::debug_span!("respond");
                         async move {
@@ -304,10 +304,10 @@ mod tests {
         let Prep {
             mut recv_pub,
             mut recv_sink,
-            mut send_dispatch,
+            send_dispatch,
         } = prep_test();
 
-        let (mut my_sink_send, mut my_sink_recv) = tokio::sync::mpsc::channel(1);
+        let (my_sink_send, mut my_sink_recv) = tokio::sync::mpsc::channel(1);
 
         tokio::task::spawn(async move {
             while let Some((msg, complete)) = recv_sink.next().await {

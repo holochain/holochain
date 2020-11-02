@@ -59,7 +59,7 @@ pub async fn spawn_queue_consumer_tasks(
     env: &EnvironmentWrite,
     cell_network: HolochainP2pCell,
     conductor_api: impl CellConductorApiT + 'static,
-    mut task_sender: sync::mpsc::Sender<ManagedTaskAdd>,
+    task_sender: sync::mpsc::Sender<ManagedTaskAdd>,
     stop: sync::broadcast::Sender<()>,
 ) -> InitialQueueTriggers {
     // Publish

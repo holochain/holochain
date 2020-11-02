@@ -231,7 +231,7 @@ mod tests {
         entry_def::{EntryDef, EntryVisibility},
     };
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_store_entry_defs() {
         holochain_types::observability::test_run().ok();
 

@@ -16,7 +16,7 @@ pub fn get<'a>(
     let network = call_context.host_access.network().clone();
 
     // timeouts must be handled by the network
-    tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+    tokio_helper::block_on(async move {
         let maybe_element = call_context
             .host_access
             .workspace()

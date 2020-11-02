@@ -15,7 +15,7 @@ holochain_state = { path = "../state"}
 holochain_types = { path = "../types"}
 rkv = "0.10.4"
 structopt = "0.3"
-tokio = { version = "0.2", features = [ "full" ] }
+tokio = { version = "0.3.3", features = [ "full" ] }
 
 
 [patch.crates-io]

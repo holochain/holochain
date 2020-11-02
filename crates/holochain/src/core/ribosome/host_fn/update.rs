@@ -62,7 +62,7 @@ pub fn update<'a>(
     // note that validation is handled by the workflow
     // if the validation fails this update will be rolled back by virtue of the lmdb transaction
     // being atomic
-    tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+    tokio_helper::block_on(async move {
         let mut guard = workspace_lock.write().await;
         let workspace: &mut CallZomeWorkspace = &mut guard;
         let source_chain = &mut workspace.source_chain;

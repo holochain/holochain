@@ -30,7 +30,7 @@ impl WebsocketSender {
     /// Close the websocket
     #[must_use]
     pub fn close(&mut self, code: u16, reason: String) -> BoxFuture<'static, Result<()>> {
-        let mut send_sink = self.send_sink.clone();
+        let send_sink = self.send_sink.clone();
         async move {
             let (send, recv) = tokio::sync::oneshot::channel();
 
@@ -61,7 +61,7 @@ impl WebsocketSender {
             'static + std::error::Error + Send + Sync,
     {
         //let span = tracing::debug_span!("sender_signal");
-        let mut send_sink = self.send_sink.clone();
+        let send_sink = self.send_sink.clone();
         async move {
             let bytes: SerializedBytes = msg
                 .try_into()
@@ -99,8 +99,8 @@ impl WebsocketSender {
         <SB2 as std::convert::TryFrom<SerializedBytes>>::Error:
             'static + std::error::Error + Send + Sync,
     {
-        let mut send_sink = self.send_sink.clone();
-        let mut send_dispatch = self.send_dispatch.clone();
+        let send_sink = self.send_sink.clone();
+        let send_dispatch = self.send_dispatch.clone();
         async move {
             tracing::trace!(request_msg = ?msg);
             let bytes: SerializedBytes = msg

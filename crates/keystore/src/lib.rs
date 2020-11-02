@@ -11,7 +11,7 @@
 //! use holochain_keystore::*;
 //! use holochain_serialized_bytes::prelude::*;
 //!
-//! #[tokio::main(threaded_scheduler)]
+//! #[tokio::main(flavor = "multi_thread")]
 //! async fn main() {
 //!     tokio::task::spawn(async move {
 //!         let keystore = test_keystore::spawn_test_keystore().await.unwrap();

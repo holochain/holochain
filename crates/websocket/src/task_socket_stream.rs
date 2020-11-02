@@ -162,7 +162,7 @@ mod tests {
         let Prep {
             mut recv_sink,
             mut recv_dispatch,
-            mut send_stream,
+            send_stream,
         } = prep_test();
 
         send_stream

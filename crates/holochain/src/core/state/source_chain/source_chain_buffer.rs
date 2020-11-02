@@ -334,25 +334,29 @@ pub mod tests {
         let agent_entry = Entry::Agent(agent_pubkey.clone().into());
 
         let (dna_header, agent_header) = tokio_safe_block_on::tokio_safe_block_on(
-            async {
-                let dna_header = Header::Dna(header::Dna {
-                    author: agent_pubkey.clone(),
-                    timestamp: Timestamp(0, 0).into(),
-                    hash: dna.dna_hash().clone(),
-                });
-                let dna_header = HeaderHashed::from_content_sync(dna_header);
+            {
+                let agent_pubkey = agent_pubkey.clone();
 
-                let agent_header = Header::Create(header::Create {
-                    author: agent_pubkey.clone(),
-                    timestamp: Timestamp(1, 0).into(),
-                    header_seq: 1,
-                    prev_header: dna_header.as_hash().to_owned().into(),
-                    entry_type: header::EntryType::AgentPubKey,
-                    entry_hash: agent_pubkey.clone().into(),
-                });
-                let agent_header = HeaderHashed::from_content_sync(agent_header);
+                async move {
+                    let dna_header = Header::Dna(header::Dna {
+                        author: agent_pubkey.clone(),
+                        timestamp: Timestamp(0, 0).into(),
+                        hash: dna.dna_hash().clone(),
+                    });
+                    let dna_header = HeaderHashed::from_content_sync(dna_header);
 
-                (dna_header, agent_header)
+                    let agent_header = Header::Create(header::Create {
+                        author: agent_pubkey.clone(),
+                        timestamp: Timestamp(1, 0).into(),
+                        header_seq: 1,
+                        prev_header: dna_header.as_hash().to_owned().into(),
+                        entry_type: header::EntryType::AgentPubKey,
+                        entry_hash: agent_pubkey.clone().into(),
+                    });
+                    let agent_header = HeaderHashed::from_content_sync(agent_header);
+
+                    (dna_header, agent_header)
+                }
             },
             std::time::Duration::from_secs(1),
         )
@@ -367,7 +371,7 @@ pub mod tests {
         )
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn source_chain_buffer_iter_back() -> SourceChainResult<()> {
         let test_env = test_cell_env();
         let arc = test_env.env();
@@ -434,7 +438,7 @@ pub mod tests {
         Ok(())
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn source_chain_buffer_dump_entries_json() -> SourceChainResult<()> {
         let test_env = test_cell_env();
         let arc = test_env.env();
@@ -474,7 +478,7 @@ pub mod tests {
         Ok(())
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_header_cas_roundtrip() {
         let test_env = test_cell_env();
         let arc = test_env.env();

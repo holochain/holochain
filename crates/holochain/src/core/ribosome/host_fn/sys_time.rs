@@ -26,7 +26,7 @@ pub mod wasm_test {
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::SysTimeOutput;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn invoke_import_sys_time_test() {
         let test_env = holochain_state::test_utils::test_cell_env();
         let env = test_env.env();

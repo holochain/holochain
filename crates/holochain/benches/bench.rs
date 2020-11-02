@@ -14,8 +14,7 @@ use std::sync::Mutex;
 
 static TOKIO_RUNTIME: Lazy<Mutex<tokio::runtime::Runtime>> = Lazy::new(|| {
     Mutex::new(
-        tokio::runtime::Builder::new()
-            .threaded_scheduler()
+        tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()
             .unwrap(),
@@ -71,7 +70,8 @@ pub fn wasm_call_n(c: &mut Criterion) {
             let bytes = test_wasm_common::TestBytes::from(vec![0; n]);
             let sb: SerializedBytes = bytes.try_into().unwrap();
 
-            TOKIO_RUNTIME.lock().unwrap().enter(move || {
+            {
+                let _guard = TOKIO_RUNTIME.lock().unwrap().enter();
                 let ha = HOST_ACCESS_FIXTURATOR.lock().unwrap().next().unwrap();
 
                 b.iter(|| {
@@ -90,7 +90,7 @@ pub fn wasm_call_n(c: &mut Criterion) {
                         .maybe_call(ha.clone().into(), &i, &i.zome_name, &i.fn_name)
                         .unwrap();
                 });
-            });
+            };
         });
     }
 

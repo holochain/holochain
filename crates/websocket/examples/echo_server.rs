@@ -11,7 +11,7 @@ try_from_serialized_bytes!(BroadcastMessage);
 struct ResponseMessage(pub String);
 try_from_serialized_bytes!(ResponseMessage);
 
-#[tokio::main(threaded_scheduler)]
+#[tokio::main(flavor = "multi_thread")]
 async fn main() {
     holochain_types::observability::test_run().unwrap();
 
@@ -27,7 +27,7 @@ async fn main() {
 
     while let Some(maybe_con) = listener.next().await {
         let loc_send_b = send_b.clone();
-        let mut loc_recv_b = send_b.subscribe();
+        let loc_recv_b = send_b.subscribe();
 
         let (mut send_socket, mut recv_socket) = maybe_con.unwrap();
 
@@ -58,7 +58,11 @@ async fn main() {
         });
 
         tokio::task::spawn(async move {
-            while let Some(Ok(msg)) = loc_recv_b.next().await {
+            tokio::pin! {
+                let loc_recv_b_stream = loc_recv_b.into_stream();
+            }
+
+            while let Some(Ok(msg)) = loc_recv_b_stream.next().await {
                 send_socket.signal(msg).await.unwrap();
             }
         });

@@ -470,7 +470,7 @@ mod test {
     use matches::assert_matches;
     use uuid::Uuid;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn install_list_dna_app() -> Result<()> {
         observability::test_run().ok();
         let test_env = test_conductor_env();
@@ -546,7 +546,7 @@ mod test {
         Ok(())
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn dna_read_parses() -> Result<()> {
         let uuid = Uuid::new_v4();
         let dna = fake_dna_file(&uuid.to_string());

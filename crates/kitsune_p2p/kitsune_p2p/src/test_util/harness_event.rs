@@ -95,11 +95,13 @@ pub struct HarnessEventChannel {
 impl HarnessEventChannel {
     /// constructor for a new harness event channel
     pub fn new(nick: impl AsRef<str>) -> Self {
-        let (chan, mut trace_recv) = tokio::sync::broadcast::channel(10);
+        let (chan, trace_recv) = tokio::sync::broadcast::channel(10);
 
         // we need an active dummy recv or the sends will error
         tokio::task::spawn(async move {
-            while let Some(evt) = trace_recv.next().await {
+            let trace_recv_stream = trace_recv.into_stream();
+            tokio::pin!(trace_recv_stream);
+            while let Some(evt) = trace_recv_stream.next().await {
                 if let Ok(evt) = evt {
                     let HarnessEvent { nick, ty } = evt;
                     const T: &str = "HARNESS_EVENT";
@@ -143,9 +145,12 @@ impl HarnessEventChannel {
     /// messages... only those that are emitted going forward
     pub fn receive(&self) -> impl tokio::stream::Stream<Item = HarnessEvent> {
         let (mut s, r) = futures::channel::mpsc::channel(10);
-        let mut chan = self.chan.subscribe();
+        let chan = self.chan.subscribe();
         tokio::task::spawn(async move {
-            while let Some(Ok(msg)) = chan.next().await {
+            tokio::pin! {
+                let chan_stream = chan.into_stream();
+            }
+            while let Some(Ok(msg)) = chan_stream.next().await {
                 let is_close = if let HarnessEventType::Close = &msg.ty {
                     true
                 } else {

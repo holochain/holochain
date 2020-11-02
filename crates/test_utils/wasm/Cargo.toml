@@ -22,7 +22,8 @@ holochain_zome_types = { path = "../../zome_types" }
 rand = "0.7"
 strum = "0.18.0"
 strum_macros = "0.18.0"
-tokio_safe_block_on = "0.1.2"
+tokio_safe_block_on = { git = "https://github.com/neonphog/tokio_safe_block_on.git",rev = "074d40929ccab649b0dcc83a4ebdbdcb70b317fb" }
+tokio_helper = { path = "../../tokio_helper" }
 
 [build-dependencies]
 toml = "0.5"

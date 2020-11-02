@@ -45,16 +45,17 @@ fn setup_env(env: EnvironmentRead) -> DatabaseResult<Chains> {
 
     let jimbo_id = fake_agent_pubkey_1();
     let jessy_id = fake_agent_pubkey_2();
-    let (jimbo_entry, jessy_entry) = tokio_safe_block_on::tokio_safe_block_on(
-        async {
-            (
-                EntryHashed::from_content_sync(Entry::Agent(jimbo_id.clone().into())),
-                EntryHashed::from_content_sync(Entry::Agent(jessy_id.clone().into())),
-            )
-        },
-        std::time::Duration::from_secs(1),
-    )
-    .unwrap();
+    let (jimbo_entry, jessy_entry) = tokio_helper::new_runtime()
+        .block_on(
+            async {
+                (
+                    EntryHashed::from_content_sync(Entry::Agent(jimbo_id.clone().into())),
+                    EntryHashed::from_content_sync(Entry::Agent(jessy_id.clone().into())),
+                )
+            },
+            std::time::Duration::from_secs(1),
+        )
+        .unwrap();
 
     let jimbo_header = Header::Create(header::Create {
         author: jimbo_id.clone(),
@@ -92,7 +93,7 @@ fn setup_env(env: EnvironmentRead) -> DatabaseResult<Chains> {
     })
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn live_local_return() -> SourceChainResult<()> {
     // setup some data thats in the scratch
     let test_env = test_cell_env();
@@ -137,7 +138,7 @@ async fn live_local_return() -> SourceChainResult<()> {
     Ok(())
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn dead_local_none() -> SourceChainResult<()> {
     observability::test_run().ok();
     // setup some data thats in the scratch
@@ -183,7 +184,7 @@ async fn dead_local_none() -> SourceChainResult<()> {
     Ok(())
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn notfound_goto_cache_live() -> SourceChainResult<()> {
     observability::test_run().ok();
     // setup some data thats in the scratch
@@ -231,7 +232,7 @@ async fn notfound_goto_cache_live() -> SourceChainResult<()> {
     Ok(())
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn notfound_cache() -> DatabaseResult<()> {
     observability::test_run().ok();
     // setup some data thats in the scratch
@@ -269,7 +270,7 @@ async fn notfound_cache() -> DatabaseResult<()> {
     Ok(())
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn links_local_return() -> SourceChainResult<()> {
     // setup some data thats in the scratch
     let test_env = test_cell_env();
@@ -343,7 +344,7 @@ async fn links_local_return() -> SourceChainResult<()> {
     Ok(())
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn links_cache_return() -> SourceChainResult<()> {
     observability::test_run().ok();
     // setup some data thats in the scratch
@@ -436,7 +437,7 @@ async fn links_cache_return() -> SourceChainResult<()> {
     Ok(())
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn links_notauth_cache() -> DatabaseResult<()> {
     observability::test_run().ok();
     // setup some data thats in the scratch

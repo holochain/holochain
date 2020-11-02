@@ -42,7 +42,7 @@ const GET_AGENT_ACTIVITY_TIMEOUT_MS: u64 = 1000;
 const NUM_ATTEMPTS: usize = 100;
 const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn get_validation_package_test() {
     observability::test_run().ok();
 
@@ -203,7 +203,7 @@ async fn get_validation_package_test() {
     ConductorTestData::shutdown_conductor(handle).await;
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn get_agent_activity_test() {
     observability::test_run().ok();
 
@@ -488,7 +488,7 @@ async fn get_agent_activity_test() {
     ConductorTestData::shutdown_conductor(handle).await;
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn get_custom_package_test() {
     observability::test_run().ok();
 
@@ -589,7 +589,7 @@ async fn get_custom_package_test() {
     ConductorTestData::shutdown_conductor(handle).await;
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn get_agent_activity_host_fn_test() {
     observability::test_run().ok();
 
@@ -719,7 +719,7 @@ async fn check_cascade(
     validation_package
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "Only shows a potential problem, doesn't prove something is correct"]
 /// This test shows a potential slow read issue.
 /// The exact same code running here in this test is 10x

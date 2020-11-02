@@ -175,7 +175,7 @@ mod test {
         }
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn init_access() {
         let init_host_access = InitHostAccessFixturator::new(fixt::Unpredictable)
             .next()
@@ -231,7 +231,7 @@ mod slow_tests {
     use ::fixt::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_init_unimplemented() {
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::Crud]))
             .next()
@@ -244,7 +244,7 @@ mod slow_tests {
         assert_eq!(result, InitResult::Pass,);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_init_implemented_pass() {
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::InitPass]))
             .next()
@@ -257,7 +257,7 @@ mod slow_tests {
         assert_eq!(result, InitResult::Pass,);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_init_implemented_fail() {
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::InitFail]))
             .next()
@@ -273,7 +273,7 @@ mod slow_tests {
         );
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_init_multi_implemented_fail() {
         let ribosome =
             WasmRibosomeFixturator::new(Zomes(vec![TestWasm::InitPass, TestWasm::InitFail]))

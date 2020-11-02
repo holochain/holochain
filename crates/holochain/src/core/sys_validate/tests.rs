@@ -18,7 +18,7 @@ use holochain_zome_types::Header;
 use matches::assert_matches;
 use std::convert::TryFrom;
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn verify_header_signature_test() {
     let keystore = holochain_state::test_utils::test_keystore();
     let author = fake_agent_pubkey_1();
@@ -39,7 +39,7 @@ async fn verify_header_signature_test() {
     );
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn check_previous_header() {
     let mut header = fixt!(CreateLink);
     header.prev_header = fixt!(HeaderHash);
@@ -57,7 +57,7 @@ async fn check_previous_header() {
     assert_matches!(check_prev_header(&header.into()), Ok(()));
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn check_valid_if_dna_test() {
     let env: EnvironmentRead = test_cell_env().env.into();
     // Test data
@@ -90,7 +90,7 @@ async fn check_valid_if_dna_test() {
     );
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn check_previous_timestamp() {
     let mut header = fixt!(CreateLink);
     let mut prev_header = fixt!(CreateLink);
@@ -112,7 +112,7 @@ async fn check_previous_timestamp() {
     );
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn check_previous_seq() {
     let mut header = fixt!(CreateLink);
     let mut prev_header = fixt!(CreateLink);
@@ -156,7 +156,7 @@ async fn check_previous_seq() {
     );
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn check_entry_type_test() {
     let entry_fixt = EntryFixturator::new(Predictable);
     let et_fixt = EntryTypeFixturator::new(Predictable);
@@ -180,7 +180,7 @@ async fn check_entry_type_test() {
     }
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn check_entry_hash_test() {
     let mut ec = fixt!(Create);
     let entry = fixt!(Entry);
@@ -209,7 +209,7 @@ async fn check_entry_hash_test() {
     );
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn check_entry_size_test() {
     // let tiny = Entry::App(SerializedBytes::from(UnsafeBytes::from(vec![0; 1])));
     // let bytes = (0..16_000_000).map(|_| 0u8).into_iter().collect::<Vec<_>>();
@@ -222,7 +222,7 @@ async fn check_entry_size_test() {
     // );
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn check_update_reference_test() {
     let mut ec = fixt!(Create);
     let mut eu = fixt!(Update);
@@ -257,7 +257,7 @@ async fn check_update_reference_test() {
     );
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn check_link_tag_size_test() {
     let tiny = LinkTag(vec![0; 1]);
     let bytes = (0..401).map(|_| 0u8).into_iter().collect::<Vec<_>>();
@@ -270,7 +270,7 @@ async fn check_link_tag_size_test() {
     );
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn check_app_entry_type_test() {
     observability::test_run().ok();
     // Setup test data
@@ -341,7 +341,7 @@ async fn check_app_entry_type_test() {
     assert_matches!(check_app_entry_type(&aet, &conductor_api).await, Ok(_));
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn check_entry_not_private_test() {
     let mut ed = fixt!(EntryDef);
     ed.visibility = EntryVisibility::Public;

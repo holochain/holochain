@@ -12,14 +12,14 @@ pub fn verify_signature(
     input: VerifySignatureInput,
 ) -> RibosomeResult<VerifySignatureOutput> {
     let input = input.into_inner();
-    Ok(VerifySignatureOutput::new(
-        tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+    Ok(VerifySignatureOutput::new(tokio_helper::block_on(
+        async move {
             input
                 .key
                 .verify_signature_raw(input.as_ref(), input.as_data_ref().bytes())
                 .await
-        })?,
-    ))
+        },
+    )?))
 }
 
 #[cfg(test)]
@@ -33,7 +33,7 @@ pub mod wasm_test {
     use hdk3::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_verify_signature_test() {
         let test_env = holochain_state::test_utils::test_cell_env();
         let env = test_env.env();

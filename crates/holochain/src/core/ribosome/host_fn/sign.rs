@@ -11,15 +11,13 @@ pub fn sign(
     call_context: Arc<CallContext>,
     input: SignInput,
 ) -> RibosomeResult<SignOutput> {
-    Ok(SignOutput::new(
-        tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-            call_context
-                .host_access
-                .keystore()
-                .sign(input.into_inner())
-                .await
-        })?,
-    ))
+    Ok(SignOutput::new(tokio_helper::block_on(async move {
+        call_context
+            .host_access
+            .keystore()
+            .sign(input.into_inner())
+            .await
+    })?))
 }
 
 #[cfg(test)]
@@ -33,7 +31,7 @@ pub mod wasm_test {
     use hdk3::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_sign_test() {
         let test_env = holochain_state::test_utils::test_cell_env();
         let env = test_env.env();

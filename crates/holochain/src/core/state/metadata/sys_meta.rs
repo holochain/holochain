@@ -106,7 +106,7 @@ mod tests {
         (delete, header)
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore = "can't be tested until redirects are implemented"]
     /// Test that a header can be redirected a single hop
     async fn test_redirect_header_one_hop() -> anyhow::Result<()> {
@@ -131,7 +131,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore = "can't be tested until redirects are implemented"]
     /// Test that a header can be redirected three hops
     async fn test_redirect_header_three_hops() -> anyhow::Result<()> {
@@ -173,7 +173,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore = "can't be tested until redirects are implemented"]
     /// Test that an entry can be redirected a single hop
     async fn test_redirect_entry_one_hop() -> anyhow::Result<()> {
@@ -206,7 +206,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore = "can't be tested until redirects are implemented"]
     /// Test that an entry can be redirected three hops
     async fn test_redirect_entry_three_hops() -> anyhow::Result<()> {
@@ -254,7 +254,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore = "can't be tested until redirects are implemented"]
     /// Test that a header can be redirected a single hop
     async fn test_redirect_header_and_entry() -> anyhow::Result<()> {
@@ -301,7 +301,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn add_entry_get_headers() {
         let test_env = test_cell_env();
         let arc = test_env.env();
@@ -348,7 +348,7 @@ mod tests {
         }
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn add_entry_get_updates() {
         let test_env = test_cell_env();
         let arc = test_env.env();
@@ -404,7 +404,7 @@ mod tests {
         }
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn add_entry_get_updates_header() {
         let test_env = test_cell_env();
         let arc = test_env.env();
@@ -460,7 +460,7 @@ mod tests {
         }
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn add_entry_get_deletes() {
         let test_env = test_cell_env();
         let arc = test_env.env();
@@ -542,7 +542,7 @@ mod tests {
         }
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_entry_dht_status() {
         let test_env = test_cell_env();
         let arc = test_env.env();
@@ -680,7 +680,7 @@ mod tests {
         assert_eq!(status, EntryDhtStatus::Dead);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_entry_dht_status_one_less() {
         let test_env = test_cell_env();
         let arc = test_env.env();

@@ -32,7 +32,7 @@ struct CreateMessageInput {
 #[derive(Debug, Serialize, Deserialize, SerializedBytes)]
 pub struct ChannelName(String);
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn ser_entry_hash_test() {
     observability::test_run().ok();
     let eh = fixt!(EntryHash);
@@ -44,7 +44,7 @@ async fn ser_entry_hash_test() {
     let _eh: EntryHash = sb.try_into().unwrap();
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 /// we can call a fn on a remote
 async fn ser_regression_test() {
     observability::test_run().ok();

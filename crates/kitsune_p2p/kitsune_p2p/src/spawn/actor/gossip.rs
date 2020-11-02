@@ -63,7 +63,7 @@ async fn gossip_loop(
     loop {
         gossip_data.take_action().await?;
 
-        tokio::time::delay_for(std::time::Duration::from_millis(10)).await;
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
     }
 }
 

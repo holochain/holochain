@@ -80,7 +80,7 @@ async fn run() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[tokio::main(threaded_scheduler)]
+#[tokio::main(flavor = "multi_thread")]
 async fn main() {
     if let Err(err) = run().await {
         eprintln!("holochain-analyzer: {}", err);

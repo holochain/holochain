@@ -100,7 +100,7 @@ where
     }
 
     fn deserialize_and_hash_blocking(hash: &[u8], content: C) -> HoloHashed<C> {
-        tokio_safe_block_on::tokio_safe_block_forever_on(Self::deserialize_and_hash(hash, content))
+        tokio_helper::block_on(Self::deserialize_and_hash(hash, content))
         // TODO: make this a stream?
     }
 

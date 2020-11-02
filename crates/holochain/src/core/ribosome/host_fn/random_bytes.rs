@@ -35,7 +35,7 @@ pub mod wasm_test {
     use std::convert::TryInto;
     use std::sync::Arc;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     /// we can get some random data out of the fn directly
     async fn random_bytes_test() {
         let ribosome = WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![]))
@@ -55,7 +55,7 @@ pub mod wasm_test {
         assert_ne!(&[0; LEN], output.into_inner().as_ref(),);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     /// we can get some random data out of the fn via. a wasm call
     async fn ribosome_random_bytes_test() {
         let test_env = holochain_state::test_utils::test_cell_env();

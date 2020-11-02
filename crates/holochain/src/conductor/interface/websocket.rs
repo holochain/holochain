@@ -185,10 +185,14 @@ async fn recv_incoming_admin_msgs<A: InterfaceApi>(api: A, mut rx_from_iface: We
 async fn recv_incoming_msgs_and_outgoing_signals<A: InterfaceApi>(
     api: A,
     mut rx_from_iface: WebsocketReceiver,
-    mut rx_from_cell: broadcast::Receiver<Signal>,
+    rx_from_cell: broadcast::Receiver<Signal>,
     mut tx_to_iface: WebsocketSender,
 ) -> InterfaceResult<()> {
     trace!("CONNECTION: {}", rx_from_iface.remote_addr());
+
+    tokio::pin! {
+        let rx_from_cell_stream = rx_from_cell.into_stream();
+    }
 
     loop {
         tokio::select! {
@@ -196,7 +200,7 @@ async fn recv_incoming_msgs_and_outgoing_signals<A: InterfaceApi>(
             // across the interface
             // NOTE: we could just use futures::StreamExt::forward to hook this
             // tx and rx together in a new spawned task
-            signal = rx_from_cell.next() => {
+            signal = rx_from_cell_stream.next() => {
                 if let Some(signal) = signal {
                     let bytes = SerializedBytes::try_from(
                         signal.map_err(InterfaceError::SignalReceive)?,
@@ -389,7 +393,7 @@ pub mod test {
         )
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn serialization_failure() {
         let (_tmpdir, conductor_handle) = setup_admin().await;
         let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
@@ -409,7 +413,7 @@ pub mod test {
         conductor_handle.shutdown().await;
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn invalid_request() {
         observability::test_run().ok();
         let (_tmpdir, conductor_handle) = setup_admin().await;
@@ -439,14 +443,14 @@ pub mod test {
     }
 
     #[ignore = "stub"]
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn deserialization_failure() {
         // TODO: B-01440: this can't be done easily yet
         // because we can't serialize something that
         // doesn't deserialize
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn websocket_call_zome_function() {
         observability::test_run().ok();
         let uuid = Uuid::new_v4();
@@ -511,7 +515,7 @@ pub mod test {
         shutdown.await.unwrap();
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn activate_app() {
         observability::test_run().ok();
         let agent_key = fake_agent_pubkey_1();
@@ -627,7 +631,7 @@ pub mod test {
         shutdown.await.unwrap();
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn attach_app_interface() {
         observability::test_run().ok();
         let (_tmpdir, conductor_handle) = setup_admin().await;
@@ -647,7 +651,7 @@ pub mod test {
         shutdown.await.unwrap();
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn dump_state() {
         observability::test_run().ok();
         let uuid = Uuid::new_v4();

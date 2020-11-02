@@ -7,6 +7,7 @@ use kitsune_p2p_types::{
     transport::*,
 };
 use structopt::StructOpt;
+use tokio_compat_02::FutureExt as _;
 
 mod opt;
 use opt::*;
@@ -19,7 +20,7 @@ async fn main() {
             .finish(),
     );
 
-    if let Err(e) = inner().await {
+    if let Err(e) = inner().compat().await {
         eprintln!("{:?}", e);
     }
 }

@@ -409,8 +409,7 @@ impl KitsuneP2pHandler for Space {
                 }
 
                 // the attempt failed - wait a bit to allow agents to connect
-                tokio::time::delay_for(std::time::Duration::from_millis(NET_CONNECT_INTERVAL_MS))
-                    .await;
+                tokio::time::sleep(std::time::Duration::from_millis(NET_CONNECT_INTERVAL_MS)).await;
             }
         }
         .boxed()
@@ -520,7 +519,7 @@ impl Space {
         let i_s_c = i_s.clone();
         tokio::task::spawn(async move {
             loop {
-                tokio::time::delay_for(std::time::Duration::from_secs(5 * 60)).await;
+                tokio::time::sleep(std::time::Duration::from_secs(5 * 60)).await;
                 if i_s_c.update_agent_info().await.is_err() {
                     break;
                 }
@@ -581,7 +580,7 @@ impl Space {
                     }
                 }
 
-                tokio::time::delay_for(std::time::Duration::from_millis(20)).await;
+                tokio::time::sleep(std::time::Duration::from_millis(20)).await;
             }
 
             let mut out = Vec::new();
@@ -686,7 +685,7 @@ impl Space {
                 if (start.elapsed().as_millis() as u64) >= timeout_ms {
                     break;
                 }
-                tokio::time::delay_for(std::time::Duration::from_millis(check_interval)).await;
+                tokio::time::sleep(std::time::Duration::from_millis(check_interval)).await;
             }
             Ok(send_success_count.load(std::sync::atomic::Ordering::Relaxed))
         }

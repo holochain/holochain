@@ -18,6 +18,7 @@ members = [
   "crates/test_utils/wasm_common",
   "crates/types",
   "crates/websocket",
+  "crates/tokio_helper"
 ]
 
 exclude = [

@@ -194,7 +194,7 @@ mod test {
     use holochain_zome_types::ExternInput;
     use rand::seq::SliceRandom;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn validate_link_add_callback_result_fold() {
         let mut rng = fixt::rng();
 
@@ -227,7 +227,7 @@ mod test {
         }
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn validate_link_add_invocation_allow_side_effects() {
         let validate_link_add_host_access =
             ValidateLinkHostAccessFixturator::new(fixt::Unpredictable)
@@ -238,7 +238,7 @@ mod test {
         assert_eq!(HostFnAccess::from(&validate_link_add_host_access), access,);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn validate_link_add_invocation_zomes() {
         let validate_create_link_invocation =
             ValidateCreateLinkInvocationFixturator::new(fixt::Unpredictable)
@@ -251,7 +251,7 @@ mod test {
         );
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn validate_link_add_invocation_fn_components() {
         let validate_create_link_invocation =
             ValidateCreateLinkInvocationFixturator::new(fixt::Unpredictable)
@@ -264,7 +264,7 @@ mod test {
         }
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn validate_link_add_invocation_host_input() {
         let validate_create_link_invocation =
             ValidateCreateLinkInvocationFixturator::new(fixt::Unpredictable)
@@ -303,7 +303,7 @@ mod slow_tests {
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::zome::ZomeName;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_validate_link_add_unimplemented() {
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
             .next()
@@ -319,7 +319,7 @@ mod slow_tests {
         assert_eq!(result, ValidateLinkResult::Valid,);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_validate_implemented_valid() {
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateCreateLinkValid]))
             .next()
@@ -336,7 +336,7 @@ mod slow_tests {
         assert_eq!(result, ValidateLinkResult::Valid,);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_validate_link_add_implemented_invalid() {
         let ribosome =
             WasmRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateCreateLinkInvalid]))
@@ -360,7 +360,7 @@ mod slow_tests {
         );
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn pass_validate_link_add_test<'a>() {
         // test workspace boilerplate
         let test_env = holochain_state::test_utils::test_cell_env();
@@ -380,7 +380,7 @@ mod slow_tests {
             crate::call_test_ribosome!(host_access, TestWasm::ValidateLink, "add_valid_link", ());
 
         // the chain head should be the committed entry header
-        let chain_head = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+        let chain_head = tokio_helper::block_on(async move {
             SourceChainResult::Ok(
                 workspace_lock
                     .read()
@@ -395,7 +395,7 @@ mod slow_tests {
         assert_eq!(chain_head, output,);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn fail_validate_link_add_test<'a>() {
         // test workspace boilerplate
         let test_env = holochain_state::test_utils::test_cell_env();
@@ -416,7 +416,7 @@ mod slow_tests {
             crate::call_test_ribosome!(host_access, TestWasm::ValidateLink, "add_invalid_link", ());
 
         // the chain head should be the committed entry header
-        let chain_head = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+        let chain_head = tokio_helper::block_on(async move {
             SourceChainResult::Ok(
                 workspace_lock
                     .read()

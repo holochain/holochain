@@ -29,7 +29,7 @@ use std::{
 };
 use tracing::*;
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test(flavor = "multi_thread")]
 async fn app_validation_workflow_test() {
     observability::test_run().ok();
 

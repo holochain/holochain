@@ -60,7 +60,7 @@ pub fn create<'a>(
     // note that validation is handled by the workflow
     // if the validation fails this commit will be rolled back by virtue of the lmdb transaction
     // being atomic
-    tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+    tokio_helper::block_on(async move {
         let mut guard = call_context.host_access.workspace().write().await;
         let workspace: &mut CallZomeWorkspace = &mut guard;
         let source_chain = &mut workspace.source_chain;
@@ -149,7 +149,7 @@ pub mod wasm_test {
     use test_wasm_common::TestBytes;
     use test_wasm_common::TestInt;
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     /// we cannot commit before genesis
     async fn create_pre_genesis_test() {
         // test workspace boilerplate
@@ -185,7 +185,7 @@ pub mod wasm_test {
         );
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     /// we can get an entry hash out of the fn directly
     async fn create_entry_test<'a>() {
         // test workspace boilerplate
@@ -216,7 +216,7 @@ pub mod wasm_test {
         let output = create(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
 
         // the chain head should be the committed entry header
-        let chain_head = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+        let chain_head = tokio_helper::block_on(async move {
             SourceChainResult::Ok(
                 workspace_lock
                     .read()
@@ -231,7 +231,7 @@ pub mod wasm_test {
         assert_eq!(chain_head, output.into_inner(),);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_create_entry_test<'a>() {
         holochain_types::observability::test_run().ok();
         // test workspace boilerplate
@@ -252,7 +252,7 @@ pub mod wasm_test {
             crate::call_test_ribosome!(host_access, TestWasm::Create, "create_entry", ());
 
         // the chain head should be the committed entry header
-        let chain_head = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+        let chain_head = tokio_helper::block_on(async move {
             SourceChainResult::Ok(
                 workspace_lock
                     .read()
@@ -277,7 +277,7 @@ pub mod wasm_test {
         assert_eq!(&vec![163, 102, 111, 111], sb.bytes(),)
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore = "david.b (this test is flaky)"]
     // maackle: this consistently passes for me with n = 37
     //          but starts to randomly lock up at n = 38,
@@ -400,7 +400,7 @@ pub mod wasm_test {
         shutdown.await.unwrap();
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_serialize_bytes_hash() {
         holochain_types::observability::test_run().ok();
         #[derive(Default, SerializedBytes, Serialize, Deserialize)]

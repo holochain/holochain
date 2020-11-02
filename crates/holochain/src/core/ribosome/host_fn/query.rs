@@ -11,7 +11,7 @@ pub fn query(
     call_context: Arc<CallContext>,
     input: QueryInput,
 ) -> RibosomeResult<QueryOutput> {
-    tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+    tokio_helper::block_on(async move {
         let elements: Vec<Element> = call_context
             .host_access
             .workspace()
@@ -55,7 +55,7 @@ pub mod slow_tests {
         (test_env, host_access)
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn query_smoke_test() {
         let (_test_env, host_access) = setup().await;
 

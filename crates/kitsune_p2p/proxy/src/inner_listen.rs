@@ -71,7 +71,7 @@ pub async fn spawn_kitsune_proxy_listener(
         // Set up a timer to refresh our proxy contract at keepalive interval
         let i_s_c = i_s.clone();
         tokio::task::spawn(async move {
-            tokio::time::delay_for(std::time::Duration::from_millis(PROXY_KEEPALIVE_MS)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(PROXY_KEEPALIVE_MS)).await;
 
             if i_s_c.req_proxy(proxy_url.clone()).await.is_err() {
                 // either we failed because the actor is already shutdown

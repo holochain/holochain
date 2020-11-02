@@ -3,6 +3,7 @@ use kitsune_p2p_proxy::*;
 use kitsune_p2p_transport_quic::*;
 use kitsune_p2p_types::{dependencies::ghost_actor, transport::*};
 use structopt::StructOpt;
+use tokio_compat_02::FutureExt as _;
 
 /// Option Parsing
 #[derive(structopt::StructOpt, Debug)]
@@ -16,7 +17,7 @@ pub struct Opt {
     pub time_interval_ms: Option<u64>,
 }
 
-#[tokio::main]
+#[tokio::main(flavor = "multi_thread")]
 async fn main() {
     let _ = ghost_actor::dependencies::tracing::subscriber::set_global_default(
         tracing_subscriber::FmtSubscriber::builder()
@@ -24,7 +25,7 @@ async fn main() {
             .finish(),
     );
 
-    if let Err(e) = inner().await {
+    if let Err(e) = inner().compat().await {
         eprintln!("{:?}", e);
     }
 }
@@ -70,7 +71,7 @@ async fn inner() -> TransportResult<()> {
         match &opt.time_interval_ms {
             None => break,
             Some(ms) => {
-                tokio::time::delay_for(std::time::Duration::from_millis(*ms)).await;
+                tokio::time::sleep(std::time::Duration::from_millis(*ms)).await;
             }
         }
     }

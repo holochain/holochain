@@ -424,7 +424,7 @@ pub mod tests {
     // - Check entry content matches entry schema
     //   Depending on the type of the commit, validate all possible validations for the
     //   DHT Op that would be produced by it
-    #[ignore = "TODO: B-01100 Make sure this test is in the right place when SysValidation 
+    #[ignore = "TODO: B-01100 Make sure this test is in the right place when SysValidation
     complete so we aren't duplicating the unit test inside sys val."]
     #[tokio::test]
     async fn calls_system_validation<'a>() {
@@ -506,7 +506,7 @@ pub mod tests {
     // 4.3. Write output results via SC gatekeeper (wrap in transaction): (MVI)
     // This is handled by the workflow runner however I should test that
     // we can create outputs
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn creates_outputs() {
         let test_env = test_cell_env();
         let env = test_env.env();
