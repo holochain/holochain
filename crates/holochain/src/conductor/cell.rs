@@ -719,7 +719,7 @@ impl Cell {
     /// the network module would like this cell/agent to sign some data
     #[tracing::instrument(skip(self))]
     async fn handle_sign_network_data(&self) -> CellResult<Signature> {
-        unimplemented!()
+        Ok(vec![0; 64].into())
     }
 
     /// When the Conductor determines that it's time to execute some [AutonomicProcess],

@@ -430,6 +430,7 @@ where
                         // Create each cell
                         let cells_tasks = cells_to_create.map(
                             |(cell_id, dir, keystore, conductor_handle)| async move {
+                                tracing::info!(?cell_id, "CREATE CELL");
                                 let holochain_p2p_cell = self.holochain_p2p.to_cell(
                                     cell_id.dna_hash().clone(),
                                     cell_id.agent_pubkey().clone(),
@@ -552,8 +553,10 @@ where
     /// Add fully constructed cells to the cell map in the Conductor
     pub(super) fn add_cells(&mut self, cells: Vec<Cell>) {
         for cell in cells {
+            let cell_id = cell.id().clone();
+            tracing::info!(?cell_id, "ADD CELL");
             self.cells.insert(
-                cell.id().clone(),
+                cell_id,
                 CellItem {
                     cell,
                     _state: CellState { _active: false },
@@ -848,6 +851,8 @@ mod builder {
                 }
             }
 
+            tracing::info!(?self.config);
+
             let keystore = if let Some(keystore) = self.keystore {
                 keystore
             } else if self.config.use_dangerous_test_keystore {
@@ -928,6 +933,8 @@ mod builder {
 
             handle.add_dnas().await?;
 
+            tokio::task::spawn(p2p_event_task(p2p_evt, handle.clone()));
+
             let cell_startup_errors = handle.clone().setup_cells().await?;
 
             // TODO: This should probably be emitted over the admin interface
@@ -942,8 +949,6 @@ mod builder {
             if let Some(configs) = conductor_config.admin_interfaces {
                 handle.clone().add_admin_interfaces(configs).await?;
             }
-
-            tokio::task::spawn(p2p_event_task(p2p_evt, handle.clone()));
 
             Ok(handle)
         }

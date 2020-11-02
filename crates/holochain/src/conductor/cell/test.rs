@@ -4,6 +4,8 @@ use crate::{
     fixt::{DnaFileFixturator, SignatureFixturator},
 };
 use ::fixt::prelude::*;
+use futures::future::FutureExt;
+use ghost_actor::GhostControlSender;
 use holo_hash::HasHash;
 use holochain_p2p::actor::HolochainP2pRefToCell;
 use holochain_state::test_utils::{test_cell_env, TestEnvironment};
@@ -22,15 +24,32 @@ async fn test_cell_handle_publish() {
         env,
         tmpdir: _tmpdir,
     } = test_cell_env();
-    let (holochain_p2p, _p2p_evt) =
+    let (holochain_p2p, mut p2p_evt) =
         holochain_p2p::spawn_holochain_p2p(holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default())
             .await
             .unwrap();
+
+    let r_task = tokio::task::spawn(async move {
+        use tokio::stream::StreamExt;
+        while let Some(evt) = p2p_evt.next().await {
+            use holochain_p2p::event::HolochainP2pEvent::*;
+            match evt {
+                SignNetworkData { respond, .. } => {
+                    respond.r(Ok(async move { Ok(vec![0; 64].into()) }.boxed().into()));
+                }
+                PutAgentInfoSigned { respond, .. } => {
+                    respond.r(Ok(async move { Ok(()) }.boxed().into()));
+                }
+                _ => (),
+            }
+        }
+    });
+
     let cell_id = fake_cell_id(1);
     let dna = cell_id.dna_hash().clone();
     let agent = cell_id.agent_pubkey().clone();
 
-    let holochain_p2p_cell = holochain_p2p.to_cell(dna.clone(), agent.clone());
+    let holochain_p2p_cell = holochain_p2p.clone().to_cell(dna.clone(), agent.clone());
 
     let mut mock_handler = crate::conductor::handle::MockConductorHandleT::new();
     mock_handler
@@ -83,4 +102,7 @@ async fn test_cell_handle_publish() {
 
     stop_tx.send(()).unwrap();
     shutdown.await.unwrap();
+
+    holochain_p2p.ghost_actor_shutdown().await.unwrap();
+    r_task.await.unwrap();
 }

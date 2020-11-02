@@ -464,9 +464,19 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
     #[tracing::instrument(skip(self), level = "trace")]
     fn handle_sign_network_data(
         &mut self,
-        _input: kitsune_p2p::event::SignNetworkDataEvt,
+        input: kitsune_p2p::event::SignNetworkDataEvt,
     ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<kitsune_p2p::KitsuneSignature> {
-        unimplemented!()
+        let space = DnaHash::from_kitsune(&input.space);
+        let agent = AgentPubKey::from_kitsune(&input.agent);
+        let fut = self
+            .evt_sender
+            .sign_network_data(space, agent, input.data.to_vec());
+        Ok(async move {
+            let sig = fut.await?.0;
+            Ok(sig.into())
+        }
+        .boxed()
+        .into())
     }
 }
 

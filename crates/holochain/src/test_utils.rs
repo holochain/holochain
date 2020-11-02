@@ -20,8 +20,8 @@ use holo_hash::fixt::*;
 use holo_hash::*;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::{
-    actor::HolochainP2pRefToCell, event::HolochainP2pEventReceiver, spawn_holochain_p2p,
-    HolochainP2pCell, HolochainP2pRef, HolochainP2pSender,
+    actor::HolochainP2pRefToCell, spawn_holochain_p2p, HolochainP2pCell, HolochainP2pRef,
+    HolochainP2pSender,
 };
 use holochain_serialized_bytes::{SerializedBytes, SerializedBytesError, UnsafeBytes};
 use holochain_state::{
@@ -144,17 +144,37 @@ pub async fn fake_unique_element(
 pub async fn test_network(
     dna_hash: Option<DnaHash>,
     agent_key: Option<AgentPubKey>,
-) -> (HolochainP2pRef, HolochainP2pEventReceiver, HolochainP2pCell) {
-    let (network, recv) =
+) -> (
+    HolochainP2pRef,
+    tokio::task::JoinHandle<()>,
+    HolochainP2pCell,
+) {
+    let (network, mut recv) =
         spawn_holochain_p2p(holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default())
             .await
             .unwrap();
+    let r_task = tokio::task::spawn(async move {
+        use futures::future::FutureExt;
+        use tokio::stream::StreamExt;
+        while let Some(evt) = recv.next().await {
+            use holochain_p2p::event::HolochainP2pEvent::*;
+            match evt {
+                SignNetworkData { respond, .. } => {
+                    respond.r(Ok(async move { Ok(vec![0; 64].into()) }.boxed().into()));
+                }
+                PutAgentInfoSigned { respond, .. } => {
+                    respond.r(Ok(async move { Ok(()) }.boxed().into()));
+                }
+                _ => (),
+            }
+        }
+    });
     let dna = dna_hash.unwrap_or_else(|| fixt!(DnaHash));
     let mut key_fixt = AgentPubKeyFixturator::new(Predictable);
     let agent_key = agent_key.unwrap_or_else(|| key_fixt.next().unwrap());
     let cell_network = network.to_cell(dna.clone(), agent_key.clone());
     network.join(dna.clone(), agent_key).await.unwrap();
-    (network, recv, cell_network)
+    (network, r_task, cell_network)
 }
 
 /// Do what's necessary to install an app
