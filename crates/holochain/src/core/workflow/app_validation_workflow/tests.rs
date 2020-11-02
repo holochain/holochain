@@ -214,7 +214,8 @@ async fn run_test(
 
     // Integration should have 3 ops in it
     // Plus another 16 for genesis + init
-    let expected_count = 3 + 16;
+    // Plus 2 for Cap Grant
+    let expected_count = 3 + 16 + 2;
     let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
     wait_for_integration(&alice_env, expected_count, num_attempts, delay_per_attempt).await;
 

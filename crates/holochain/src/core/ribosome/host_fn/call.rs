@@ -24,10 +24,11 @@ pub fn call(
         provenance: call.provenance(),
     };
     let host_access = call_context.host_access();
-    let call_zome_handle = host_access.call_zome_handle();
     let result: ZomeCallResponse = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+        let call_zome_handle = host_access.call_zome_handle();
+        let workspace = host_access.workspace();
         call_zome_handle
-            .call_zome(invocation)
+            .call_zome(invocation, workspace)
             .await
             .map_err(Box::new)
     })??;
@@ -43,9 +44,11 @@ pub mod wasm_test {
     use holochain_serialized_bytes::SerializedBytes;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::{ExternInput, ZomeCallResponse};
+    use matches::assert_matches;
 
     use crate::{
-        core::ribosome::ZomeCallInvocation, test_utils::conductor_setup::ConductorTestData,
+        core::ribosome::ZomeCallInvocation,
+        test_utils::{conductor_setup::ConductorTestData, new_invocation},
     };
 
     #[tokio::test(threaded_scheduler)]
@@ -110,5 +113,30 @@ pub mod wasm_test {
             }
             _ => unreachable!(),
         }
+        ConductorTestData::shutdown_conductor(handle).await;
+    }
+
+    /// When calling the same cell we need to make sure
+    /// the "as at" doesn't cause the original zome call to fail
+    /// when they are both writing (moving the source chain forward)
+    #[tokio::test(threaded_scheduler)]
+    async fn call_the_same_cell() {
+        observability::test_run().ok();
+
+        let zomes = vec![TestWasm::WhoAmI, TestWasm::Create];
+        let conductor_test = ConductorTestData::new(zomes, false).await;
+        let ConductorTestData {
+            __tmpdir,
+            handle,
+            alice_call_data,
+            ..
+        } = conductor_test;
+        let alice_cell_id = &alice_call_data.cell_id;
+
+        let invocation =
+            new_invocation(&alice_cell_id, "call_create_entry", (), TestWasm::Create).unwrap();
+        let result = handle.call_zome(invocation).await;
+        assert_matches!(result, Ok(Ok(ZomeCallResponse::Ok(_))));
+        ConductorTestData::shutdown_conductor(handle).await;
     }
 }

@@ -1,7 +1,7 @@
 use crate::{
     conductor::ConductorHandle,
     conductor::{
-        api::{CallZomeHandle, CellConductorApi, CellConductorApiT},
+        api::{CellConductorApi, CellConductorApiT, CellConductorReadHandle},
         interface::SignalBroadcaster,
     },
     core::ribosome::RibosomeT,
@@ -95,7 +95,7 @@ pub struct CallData {
     pub network: HolochainP2pCell,
     pub keystore: KeystoreSender,
     pub signal_tx: SignalBroadcaster,
-    pub call_zome_handle: CallZomeHandle,
+    pub call_zome_handle: CellConductorReadHandle,
 }
 
 impl CallData {

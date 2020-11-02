@@ -40,7 +40,7 @@ mock! {
         fn sync_get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile>;
         fn sync_get_this_dna(&self) -> Option<DnaFile>;
         fn sync_get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef>;
-        fn into_call_zome_handle(self) -> super::CallZomeHandle;
+        fn into_call_zome_handle(self) -> super::CellConductorReadHandle;
     }
 
     trait Clone {
@@ -87,7 +87,7 @@ impl CellConductorApiT for MockCellConductorApi {
     async fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef> {
         self.sync_get_entry_def(key)
     }
-    fn into_call_zome_handle(self) -> super::CallZomeHandle {
+    fn into_call_zome_handle(self) -> super::CellConductorReadHandle {
         self.into_call_zome_handle()
     }
 }

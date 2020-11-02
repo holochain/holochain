@@ -50,20 +50,21 @@ pub struct CallZomeWorkflowArgs<Ribosome: RibosomeT, C: CellConductorApiT> {
 
 #[instrument(skip(workspace, network, keystore, writer, args, trigger_produce_dht_ops))]
 pub async fn call_zome_workflow<'env, Ribosome: RibosomeT, C: CellConductorApiT>(
-    workspace: CallZomeWorkspace,
+    workspace: CallZomeWorkspaceType,
     network: HolochainP2pCell,
     keystore: KeystoreSender,
     writer: OneshotWriter,
     args: CallZomeWorkflowArgs<Ribosome, C>,
     mut trigger_produce_dht_ops: TriggerSender,
 ) -> WorkflowResult<ZomeCallInvocationResult> {
-    let workspace_lock = CallZomeWorkspaceLock::new(workspace);
+    let should_write = workspace.should_write();
+    let workspace_lock = workspace.into_lock();
     let result = call_zome_workflow_inner(workspace_lock.clone(), network, keystore, args).await?;
 
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // commit the workspace
-    {
+    if should_write {
         let mut guard = workspace_lock.write().await;
         let workspace = &mut guard;
         writer.with_writer(|writer| Ok(workspace.flush_to_txn_ref(writer)?))?;
@@ -248,6 +249,15 @@ pub struct CallZomeWorkspace {
     pub meta_cache: MetadataBuf,
 }
 
+/// When zome calls are made from
+/// other zome calls in the same cell
+/// we need to use an existing workspace
+/// and not write to it.
+pub enum CallZomeWorkspaceType {
+    Fresh(CallZomeWorkspace),
+    Used(CallZomeWorkspaceLock),
+}
+
 impl<'a> CallZomeWorkspace {
     pub fn new(env: EnvironmentRead) -> WorkspaceResult<Self> {
         let source_chain = SourceChain::new(env.clone())?;
@@ -303,6 +313,22 @@ impl Workspace for CallZomeWorkspace {
         self.element_cache.flush_to_txn_ref(writer)?;
         self.meta_cache.flush_to_txn_ref(writer)?;
         Ok(())
+    }
+}
+
+impl CallZomeWorkspaceType {
+    pub fn into_lock(self) -> CallZomeWorkspaceLock {
+        match self {
+            CallZomeWorkspaceType::Fresh(workspace) => CallZomeWorkspaceLock::new(workspace),
+            CallZomeWorkspaceType::Used(lock) => lock,
+        }
+    }
+    pub fn should_write(&self) -> bool {
+        if let CallZomeWorkspaceType::Fresh(_) = self {
+            true
+        } else {
+            false
+        }
     }
 }
 

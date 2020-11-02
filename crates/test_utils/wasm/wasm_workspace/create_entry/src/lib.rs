@@ -69,3 +69,36 @@ fn validate_create_entry_post(
     };
     Ok(r)
 }
+
+#[hdk_extern]
+fn init(_: ()) -> ExternResult<InitCallbackResult> {
+    // grant unrestricted access to accept_cap_claim so other agents can send us claims
+    let mut functions: GrantedFunctions = HashSet::new();
+    functions.insert((zome_info!()?.zome_name, "create_entry".into()));
+    create_cap_grant!(
+        CapGrantEntry {
+            tag: "".into(),
+            // empty access converts to unrestricted
+            access: ().into(),
+            functions,
+        }
+    )?;
+
+    Ok(InitCallbackResult::Pass)
+}
+
+/// Create a post entry then 
+/// create another post through a 
+/// call
+#[hdk_extern]
+fn call_create_entry(_: ()) -> ExternResult<ZomeCallResponse> {
+    let me = agent_info!()?.agent_latest_pubkey;
+    create_entry!(post())?;
+    Ok(call(
+        me,
+        "create_entry".to_string().into(),
+        "create_entry".to_string().into(),
+        None,
+        ().try_into()?,
+    )?)
+}

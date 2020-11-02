@@ -5,7 +5,6 @@
 //! SourceChain which has already undergone Genesis.
 
 use super::{interface::SignalBroadcaster, manager::ManagedTaskAdd};
-use crate::conductor::handle::ConductorHandle;
 use crate::conductor::{api::error::ConductorApiError, entry_def_store::get_entry_def_from_ids};
 use crate::core::queue_consumer::{spawn_queue_consumer_tasks, InitialQueueTriggers};
 use crate::core::ribosome::ZomeCallInvocation;
@@ -13,6 +12,8 @@ use crate::{
     conductor::api::CellConductorApiT,
     core::workflow::produce_dht_ops_workflow::dht_op_light::light_to_op,
 };
+use crate::{conductor::handle::ConductorHandle, core::workflow::CallZomeWorkspaceType};
+use call_zome_workflow::call_zome_workspace_lock::CallZomeWorkspaceLock;
 use holochain_zome_types::validate::ValidationPackage;
 use holochain_zome_types::zome::FunctionName;
 use holochain_zome_types::{header::EntryType, query::AgentActivity};
@@ -752,21 +753,25 @@ impl Cell {
         // double ? because
         // - ConductorApiResult
         // - ZomeCallInvocationResult
-        Ok(self.call_zome(invocation).await??.try_into()?)
+        Ok(self.call_zome(invocation, None).await??.try_into()?)
     }
 
     /// Function called by the Conductor
-    #[instrument(skip(self, invocation))]
+    #[instrument(skip(self, invocation, workspace_lock))]
     pub async fn call_zome(
         &self,
         invocation: ZomeCallInvocation,
+        workspace_lock: Option<CallZomeWorkspaceLock>,
     ) -> CellResult<ZomeCallInvocationResult> {
         // Check if init has run if not run it
         self.check_or_run_zome_init().await?;
 
         let arc = self.env();
         let keystore = arc.keystore().clone();
-        let workspace = CallZomeWorkspace::new(arc.clone().into())?;
+        let workspace = match workspace_lock {
+            Some(l) => CallZomeWorkspaceType::Used(l),
+            None => CallZomeWorkspaceType::Fresh(CallZomeWorkspace::new(arc.clone().into())?),
+        };
         let conductor_api = self.conductor_api.clone();
         let signal_tx = self.signal_broadcaster().await;
         let ribosome = self.get_ribosome().await?;

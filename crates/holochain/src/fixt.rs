@@ -2,7 +2,7 @@ pub mod curve;
 
 use crate::conductor::handle::MockConductorHandleT;
 use crate::conductor::{
-    api::{CallZomeHandle, CellConductorApi},
+    api::{CellConductorApi, CellConductorReadHandle},
     interface::SignalBroadcaster,
 };
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
@@ -302,20 +302,20 @@ fixturator!(
     };
 );
 
-fn make_call_zome_handle(cell_id: CellId) -> CallZomeHandle {
+fn make_call_zome_handle(cell_id: CellId) -> CellConductorReadHandle {
     let handle = Arc::new(MockConductorHandleT::new());
     let cell_conductor_api = CellConductorApi::new(handle, cell_id);
     Arc::new(cell_conductor_api)
 }
 
 fixturator!(
-    CallZomeHandle;
+    CellConductorReadHandle;
     vanilla fn make_call_zome_handle(CellId);
 );
 
 fixturator!(
     ZomeCallHostAccess;
-    constructor fn new(CallZomeWorkspaceLock, KeystoreSender, HolochainP2pCell, SignalBroadcaster, CallZomeHandle, CellId);
+    constructor fn new(CallZomeWorkspaceLock, KeystoreSender, HolochainP2pCell, SignalBroadcaster, CellConductorReadHandle, CellId);
 );
 
 fixturator!(

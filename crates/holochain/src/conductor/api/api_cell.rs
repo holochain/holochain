@@ -3,11 +3,14 @@
 use std::sync::Arc;
 
 use super::error::{ConductorApiError, ConductorApiResult};
-use crate::conductor::{
-    entry_def_store::EntryDefBufferKey, interface::SignalBroadcaster, ConductorHandle,
-};
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::workflow::ZomeCallInvocationResult;
+use crate::{
+    conductor::{
+        entry_def_store::EntryDefBufferKey, interface::SignalBroadcaster, ConductorHandle,
+    },
+    core::workflow::CallZomeWorkspaceLock,
+};
 use async_trait::async_trait;
 use holo_hash::DnaHash;
 use holochain_keystore::KeystoreSender;
@@ -25,7 +28,7 @@ pub struct CellConductorApi {
 
 /// A handle that cn only call zome functions to avoid
 /// making write lock calls
-pub type CallZomeHandle = Arc<dyn CallZomeHandleT>;
+pub type CellConductorReadHandle = Arc<dyn CellConductorReadHandleT>;
 
 impl CellConductorApi {
     /// Instantiate from a Conductor reference and a CellId to identify which Cell
@@ -93,7 +96,7 @@ impl CellConductorApiT for CellConductorApi {
         self.conductor_handle.get_entry_def(key).await
     }
 
-    fn into_call_zome_handle(self) -> CallZomeHandle {
+    fn into_call_zome_handle(self) -> CellConductorReadHandle {
         Arc::new(self)
     }
 }
@@ -137,26 +140,34 @@ pub trait CellConductorApiT: Clone + Send + Sync + Sized {
     async fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef>;
 
     /// Turn this into a call zome handle
-    fn into_call_zome_handle(self) -> CallZomeHandle;
+    fn into_call_zome_handle(self) -> CellConductorReadHandle;
 }
 
 #[async_trait]
 /// A handle that cn only call zome functions to avoid
 /// making write lock calls
-pub trait CallZomeHandleT: Send + Sync {
+pub trait CellConductorReadHandleT: Send + Sync {
     /// Invoke a zome function on a Cell
     async fn call_zome(
         &self,
         invocation: ZomeCallInvocation,
+        workspace_lock: &CallZomeWorkspaceLock,
     ) -> ConductorApiResult<ZomeCallInvocationResult>;
 }
 
 #[async_trait]
-impl CallZomeHandleT for CellConductorApi {
+impl CellConductorReadHandleT for CellConductorApi {
     async fn call_zome(
         &self,
         invocation: ZomeCallInvocation,
+        workspace_lock: &CallZomeWorkspaceLock,
     ) -> ConductorApiResult<ZomeCallInvocationResult> {
-        self.conductor_handle.call_zome(invocation).await
+        if self.cell_id == invocation.cell_id {
+            self.conductor_handle
+                .call_zome_with_workspace(invocation, workspace_lock.clone())
+                .await
+        } else {
+            self.conductor_handle.call_zome(invocation).await
+        }
     }
 }
