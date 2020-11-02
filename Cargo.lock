@@ -3541,8 +3541,7 @@ dependencies = [
 [[package]]
 name = "tokio_safe_block_on"
 version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c6fb7c6fbaf80432ed3ab96e1a5bf33ec1ed66a5206d4edf44910ba3ba3207d"
+source = "git+https://github.com/neonphog/tokio_safe_block_on.git?branch=fix_holochain_bug#927f5a809fbc383df96c20ac8546ee0d9d205e1a"
 dependencies = [
  "futures",
  "tokio",
