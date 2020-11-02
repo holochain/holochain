@@ -60,6 +60,15 @@ pub struct GetAgentInfoSignedEvt {
     pub agent: Arc<super::KitsuneAgent>,
 }
 
+#[derive(Debug)]
+/// Get agent info as previously signed and put.
+pub struct QueryAgentInfoSignedEvt {
+    /// The "space" context.
+    pub space: Arc<super::KitsuneSpace>,
+    /// The "agent" context.
+    pub agent: Arc<super::KitsuneAgent>,
+}
+
 ghost_actor::ghost_chan! {
     /// The KitsuneP2pEvent stream allows handling events generated from the
     /// KitsuneP2p actor.
@@ -69,6 +78,9 @@ ghost_actor::ghost_chan! {
 
         /// We need to get previously stored agent info.
         fn get_agent_info_signed(input: GetAgentInfoSignedEvt) -> Option<crate::types::agent_store::AgentInfoSigned>;
+
+        /// We need to get previously stored agent info.
+        fn query_agent_info_signed(input: QueryAgentInfoSignedEvt) -> Vec<crate::types::agent_store::AgentInfoSigned>;
 
         /// We are receiving a request from a remote node.
         fn call(space: Arc<super::KitsuneSpace>, to_agent: Arc<super::KitsuneAgent>, from_agent: Arc<super::KitsuneAgent>, payload: Vec<u8>) -> Vec<u8>;
