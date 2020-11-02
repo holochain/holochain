@@ -190,6 +190,7 @@ async fn call_admin() {
 }
 
 pub async fn start_holochain(config_path: PathBuf) -> Child {
+    tracing::info!("\n\n----\nstarting holochain\n----\n\n");
     let cmd = std::process::Command::cargo_bin("holochain").unwrap();
     let mut cmd = Command::from(cmd);
     cmd.arg("--structured")
@@ -362,6 +363,7 @@ async fn call_zome() {
 
     // Call zome after resart
     let mut holochain = start_holochain(config_path).await;
+
     let mut client = retry_admin_interface(port, 10, Duration::from_millis(200)).await;
 
     // Attach App Interface

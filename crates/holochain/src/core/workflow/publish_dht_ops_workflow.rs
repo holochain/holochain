@@ -319,6 +319,12 @@ mod tests {
                                 break;
                             }
                         }
+                        SignNetworkData { respond, .. } => {
+                            respond.r(Ok(async move { Ok(vec![0; 64].into()) }.boxed().into()));
+                        }
+                        PutAgentInfoSigned { respond, .. } => {
+                            respond.r(Ok(async move { Ok(()) }.boxed().into()));
+                        }
                         _ => (),
                     }
                 }
@@ -723,6 +729,14 @@ mod tests {
                                     if recv_count == total_expected {
                                         tx_complete.take().unwrap().send(()).unwrap();
                                     }
+                                }
+                                SignNetworkData { respond, .. } => {
+                                    respond.r(Ok(async move { Ok(vec![0; 64].into()) }
+                                        .boxed()
+                                        .into()));
+                                }
+                                PutAgentInfoSigned { respond, .. } => {
+                                    respond.r(Ok(async move { Ok(()) }.boxed().into()));
                                 }
                                 _ => (),
                             }

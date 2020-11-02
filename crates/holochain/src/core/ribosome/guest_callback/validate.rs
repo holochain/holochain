@@ -444,6 +444,6 @@ mod slow_tests {
         })
         .unwrap();
 
-        assert_eq!(chain_head, output.into_inner(),);
+        assert_eq!(chain_head, output.into_inner());
     }
 }
