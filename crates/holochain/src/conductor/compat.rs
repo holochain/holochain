@@ -73,6 +73,7 @@ pub async fn load_conductor_from_legacy_config(
     }
     let mut app_install_payload = Vec::new();
 
+    let mut agent_list: HashMap<String, AgentPubKey> = HashMap::new();
     for i in &legacy.instances {
         let dna_config = legacy.dna_by_id(&i.dna).ok_or_else(|| {
             CompatConfigError::BrokenReference(format!("No DNA for id: {}", i.dna))
@@ -86,13 +87,16 @@ pub async fn load_conductor_from_legacy_config(
             })?
             .clone();
 
-        // FIXME [ B-01893 ]:
-        // currently we can't specify a seed for generating a keypair
-        // via TestKeystore, so for now we are limited to generating a
-        // unique agent every time. Once we have same-agent tests, this will
-        // have to be addressed.
-        let _agent_name = i.agent.clone();
-        let agent_pubkey = keystore.generate_sign_keypair_from_pure_entropy().await?;
+        let agent_name = i.agent.clone();
+        // make sure we create new pubkey for new agents.
+        let agent_pubkey = match agent_list.get(&agent_name) {
+            Some(pubkey) => pubkey.clone(),
+            _ => {
+                let pubkey = keystore.generate_sign_keypair_from_pure_entropy().await?;
+                agent_list.insert(agent_name, pubkey.clone());
+                pubkey
+            }
+        };
         let cell_id = CellId::new(dna_hash, agent_pubkey.clone());
         let cell_handle = i.id.clone();
         app_install_payload.push((InstalledCell::new(cell_id, cell_handle), None));
