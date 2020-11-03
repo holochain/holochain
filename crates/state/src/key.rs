@@ -1,6 +1,6 @@
 //! Traits for defining keys and values of databases
 
-use holo_hash::{HashType, HoloHash, PrimitiveHashType};
+use holo_hash::{assert_length, HashType, HoloHash, PrimitiveHashType, HOLO_HASH_RAW_LEN};
 use holochain_serialized_bytes::prelude::*;
 pub use prefix::*;
 use serde::{de::DeserializeOwned, Serialize};
@@ -82,9 +82,8 @@ impl From<IntKey> for u32 {
 
 impl<T: HashType + Send + Sync> BufKey for HoloHash<T> {
     fn from_key_bytes_or_friendly_panic(bytes: &[u8]) -> Self {
-        // FIXME: change after [ B-02112 ]
-        tracing::error!("This is NOT correct for AnyDhtHash!");
-        Self::from_raw_bytes_and_type(bytes.to_vec(), T::default())
+        assert_length(HOLO_HASH_RAW_LEN, bytes);
+        holochain_serialized_bytes::decode(bytes).expect("from_key_bytes_or_friendly_panic error")
     }
 }
 

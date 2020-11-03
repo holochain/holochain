@@ -68,7 +68,7 @@ where
     ) -> DatabaseResult<Option<HoloHashed<C>>> {
         let k = PrefixHashKey::new(hash.as_hash());
         Ok(if let Some(content) = self.0.get(r, &k)? {
-            Some(Self::deserialize_and_hash(hash.get_full_bytes(), content))
+            Some(Self::deserialize_and_hash(hash.as_ref(), content))
         } else {
             None
         })
@@ -88,7 +88,7 @@ where
     {
         Ok(Box::new(self.0.iter(r)?.map(|(h, c)| {
             let k: PrefixHashKey<P> = PrefixHashKey::from_key_bytes_or_friendly_panic(h);
-            Ok(Self::deserialize_and_hash(k.as_hash_bytes(), c))
+            Ok(Self::deserialize_and_hash(k.as_ref(), c))
         })))
     }
 

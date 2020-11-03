@@ -5,7 +5,7 @@ impl<P: PrimitiveHashType> TryFrom<&str> for HoloHash<P> {
     type Error = HoloHashError;
     fn try_from(s: &str) -> Result<Self, HoloHashError> {
         let hash_type = P::new();
-        Ok(HoloHash::from_raw_bytes(holo_hash_decode(
+        Ok(HoloHash::from_full_bytes(holo_hash_decode(
             hash_type.get_prefix(),
             s,
         )?))
@@ -28,18 +28,13 @@ impl<P: PrimitiveHashType> TryFrom<String> for HoloHash<P> {
 
 impl<T: HashType> std::fmt::Display for HoloHash<T> {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        let prefix = self.hash_type().get_prefix();
-        write!(f, "{}", holo_hash_encode(prefix, self.get_full_bytes()))
+        write!(f, "{}", holo_hash_encode(self.get_raw_bytes()))
     }
 }
 
 /// internal REPR for holo hash
-pub fn holo_hash_encode(prefix: &[u8], data: &[u8]) -> String {
-    format!(
-        "u{}{}",
-        base64::encode_config(prefix, base64::URL_SAFE_NO_PAD),
-        base64::encode_config(data, base64::URL_SAFE_NO_PAD),
-    )
+pub fn holo_hash_encode(data: &[u8]) -> String {
+    format!("u{}", base64::encode_config(data, base64::URL_SAFE_NO_PAD),)
 }
 
 /// internal PARSE for holo hash REPR

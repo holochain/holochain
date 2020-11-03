@@ -61,8 +61,8 @@ fn append_location(mut base: Vec<u8>) -> Vec<u8> {
 
 fixturator!(
     AgentPubKey;
-    curve Empty AgentPubKey::from_raw_bytes(ThirtySixHashBytesFixturator::new_indexed(Empty, get_fixt_index!()).next().unwrap());
-    curve Unpredictable AgentPubKey::from_raw_bytes(ThirtySixHashBytesFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap());
+    curve Empty AgentPubKey::from_full_bytes(ThirtySixHashBytesFixturator::new_indexed(Empty, get_fixt_index!()).next().unwrap());
+    curve Unpredictable AgentPubKey::from_full_bytes(ThirtySixHashBytesFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap());
     curve Predictable {
         // these agent keys match what the mock keystore spits out for the first two agents
         // don't mess with this unless you also update the keystore!!!
@@ -78,35 +78,35 @@ fixturator!(
 
 fixturator!(
     EntryHash;
-    constructor fn from_raw_bytes(ThirtySixHashBytes);
+    constructor fn from_full_bytes(ThirtySixHashBytes);
 );
 
 fixturator!(
     DnaHash;
-    constructor fn from_raw_bytes(ThirtySixHashBytes);
+    constructor fn from_full_bytes(ThirtySixHashBytes);
 );
 
 fixturator!(
     DhtOpHash;
-    constructor fn from_raw_bytes(ThirtySixHashBytes);
+    constructor fn from_full_bytes(ThirtySixHashBytes);
 );
 
 fixturator!(
     HeaderHash;
-    constructor fn from_raw_bytes(ThirtySixHashBytes);
+    constructor fn from_full_bytes(ThirtySixHashBytes);
 );
 
 fixturator!(
     NetIdHash;
-    constructor fn from_raw_bytes(ThirtySixHashBytes);
+    constructor fn from_full_bytes(ThirtySixHashBytes);
 );
 
 fixturator!(
     WasmHash;
-    constructor fn from_raw_bytes(ThirtySixHashBytes);
+    constructor fn from_full_bytes(ThirtySixHashBytes);
 );
 
 fixturator!(
     AnyDhtHash;
-    constructor fn from_raw_bytes_and_type(ThirtySixHashBytes, HashTypeAnyDht);
+    constructor fn from_full_bytes_and_type(ThirtySixHashBytes, HashTypeAnyDht);
 );

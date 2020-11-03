@@ -118,7 +118,7 @@ macro_rules! to_and_from_kitsune {
                 }
 
                 fn from_kitsune(k: &::std::sync::Arc<$k>) -> Self {
-                    <$h>::from_raw_bytes((**k).clone().into()).into()
+                    <$h>::from_full_bytes((**k).clone().into()).into()
                 }
             }
         )*

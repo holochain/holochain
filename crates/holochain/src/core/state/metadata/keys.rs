@@ -358,7 +358,7 @@ impl From<BytesKey> for ChainItemKey {
         debug_assert_eq!(bytes.len(), HOLO_HASH_SERIALIZED_LEN * 2 + SEQ_SIZE);
 
         // Tak 36 for the AgentPubKey
-        let a = AgentPubKey::from_raw_bytes(bytes[..HOLO_HASH_SERIALIZED_LEN].to_owned());
+        let a = AgentPubKey::from_full_bytes(bytes[..HOLO_HASH_SERIALIZED_LEN].to_owned());
 
         // Take another 4 for the u32
         let seq_bytes: Vec<_> =
@@ -367,7 +367,7 @@ impl From<BytesKey> for ChainItemKey {
 
         // Take the rest for the header hash
         let h =
-            HeaderHash::from_raw_bytes(bytes[(HOLO_HASH_SERIALIZED_LEN + SEQ_SIZE)..].to_owned());
+            HeaderHash::from_full_bytes(bytes[(HOLO_HASH_SERIALIZED_LEN + SEQ_SIZE)..].to_owned());
 
         ChainItemKey::Full(a, s, h)
     }

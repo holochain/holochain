@@ -1,6 +1,7 @@
 use crate::{
-    encode, hash_type, HashType, HashableContent, HashableContentBytes, HoloHash, HoloHashOf,
-    HoloHashed, PrimitiveHashType, HASH_CORE_LEN, HOLO_HASH_SERIALIZED_LEN,
+    assert_length, encode, hash_type, HashType, HashableContent, HashableContentBytes, HoloHash,
+    HoloHashOf, HoloHashed, PrimitiveHashType, HASH_CORE_LEN, HOLO_HASH_FULL_LEN,
+    HOLO_HASH_SERIALIZED_LEN,
 };
 use hash_type::{HashTypeAsync, HashTypeSync};
 
@@ -9,51 +10,28 @@ use hash_type::{HashTypeAsync, HashTypeSync};
 pub const MAX_HASHABLE_CONTENT_LEN: usize = 16 * 1000 * 1000; // 16 MiB
 
 impl<T: HashType> HoloHash<T> {
-    /// Construct a HoloHash from a prehashed raw 36-byte slice, with given type.
-    /// The location bytes will be calculated.
-    // TODO: revisit when changing serialization format [ B-02112 ]
+    /// Construct a HoloHash from a 32-byte hash.
+    /// The 3 prefix bytes will be added based on the provided HashType,
+    /// and the 4 location bytes will be computed.
+    ///
+    /// For convenience, 36 bytes can also be passed in, in which case
+    /// the location bytes will used as provided, not computed.
     pub fn with_pre_hashed_typed(mut hash: Vec<u8>, hash_type: T) -> Self {
-        // Assert the data size is relatively small so we are
-        // comfortable executing this synchronously / blocking
-        // tokio thread.
-
         if hash.len() == HASH_CORE_LEN {
-            //tracing::warn!("Got core 32 bytes instead of 36, recalcuating loc.");
             hash.append(&mut encode::holo_dht_location_bytes(&hash));
         }
 
-        assert_eq!(
-            HOLO_HASH_SERIALIZED_LEN,
-            hash.len(),
-            "only 36 byte hashes supported"
-        );
+        assert_length(HOLO_HASH_FULL_LEN, &hash);
 
-        HoloHash::from_raw_bytes_and_type(hash, hash_type)
+        HoloHash::from_full_bytes_and_type(hash, hash_type)
     }
 }
 
 impl<P: PrimitiveHashType> HoloHash<P> {
     /// Construct a HoloHash from a prehashed raw 32-byte slice.
     /// The location bytes will be calculated.
-    // TODO: revisit when changing serialization format [ B-02112 ]
-    pub fn with_pre_hashed(mut hash: Vec<u8>) -> Self {
-        // Assert the data size is relatively small so we are
-        // comfortable executing this synchronously / blocking
-        // tokio thread.
-        // TODO: DRY, write in terms of with_pre_hashed_typed
-
-        if hash.len() == HASH_CORE_LEN {
-            //tracing::warn!("Got core 32 bytes instead of 36, recalcuating loc.");
-            hash.append(&mut encode::holo_dht_location_bytes(&hash));
-        }
-
-        assert_eq!(
-            HOLO_HASH_SERIALIZED_LEN,
-            hash.len(),
-            "only 36 byte hashes supported"
-        );
-
-        HoloHash::from_raw_bytes(hash)
+    pub fn with_pre_hashed(hash: Vec<u8>) -> Self {
+        HoloHash::with_pre_hashed_typed(hash, P::new())
     }
 }
 
@@ -70,7 +48,7 @@ impl<T: HashTypeSync> HoloHash<T> {
                 Self::with_pre_hashed_typed(encode::blake2b_256(&bytes), content.hash_type())
             }
             HashableContentBytes::Prehashed36(bytes) => {
-                HoloHash::from_raw_bytes_and_type(bytes, content.hash_type())
+                HoloHash::from_full_bytes_and_type(bytes, content.hash_type())
             }
         }
     }
@@ -97,7 +75,7 @@ impl<T: HashTypeAsync> HoloHash<T> {
                 Self::with_pre_hashed_typed(encode::blake2b_256(&bytes), content.hash_type())
             }
             HashableContentBytes::Prehashed36(bytes) => {
-                HoloHash::from_raw_bytes_and_type(bytes, content.hash_type())
+                HoloHash::from_full_bytes_and_type(bytes, content.hash_type())
             }
         }
     }
