@@ -28,8 +28,8 @@ impl HashType for AnyDht {
 
     fn try_from_prefix(prefix: &[u8]) -> HoloHashResult<Self> {
         match prefix {
-            ENTRY_PREFIX => Ok(AnyDht::Entry),
-            HEADER_PREFIX => Ok(AnyDht::Header),
+            primitive::ENTRY_PREFIX => Ok(AnyDht::Entry),
+            primitive::HEADER_PREFIX => Ok(AnyDht::Header),
             _ => Err(HoloHashError::BadPrefix),
         }
     }

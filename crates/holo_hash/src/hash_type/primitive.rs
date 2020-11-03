@@ -1,13 +1,13 @@
 use super::*;
 use crate::{error::HoloHashError, hash_type, AgentPubKey, EntryHash};
 
-const AGENT_PREFIX: &[u8] = &[0x84, 0x20, 0x24]; // uhCAk [132, 32, 36]
-const ENTRY_PREFIX: &[u8] = &[0x84, 0x21, 0x24]; // uhCEk [132, 33, 36]
-const DHTOP_PREFIX: &[u8] = &[0x84, 0x24, 0x24]; // uhCQk [132, 36, 36]
-const DNA_PREFIX: &[u8] = &[0x84, 0x2d, 0x24]; // uhC0k [132, 45, 36]
-const NET_ID_PREFIX: &[u8] = &[0x84, 0x22, 0x24]; // uhCIk [132, 34, 36]
-const HEADER_PREFIX: &[u8] = &[0x84, 0x29, 0x24]; // uhCkk [132, 41, 36]
-const WASM_PREFIX: &[u8] = &[0x84, 0x2a, 0x24]; // uhCok [132, 42, 36]
+pub(crate) const AGENT_PREFIX: &[u8] = &[0x84, 0x20, 0x24]; // uhCAk [132, 32, 36]
+pub(crate) const ENTRY_PREFIX: &[u8] = &[0x84, 0x21, 0x24]; // uhCEk [132, 33, 36]
+pub(crate) const DHTOP_PREFIX: &[u8] = &[0x84, 0x24, 0x24]; // uhCQk [132, 36, 36]
+pub(crate) const DNA_PREFIX: &[u8] = &[0x84, 0x2d, 0x24]; // uhC0k [132, 45, 36]
+pub(crate) const NET_ID_PREFIX: &[u8] = &[0x84, 0x22, 0x24]; // uhCIk [132, 34, 36]
+pub(crate) const HEADER_PREFIX: &[u8] = &[0x84, 0x29, 0x24]; // uhCkk [132, 41, 36]
+pub(crate) const WASM_PREFIX: &[u8] = &[0x84, 0x2a, 0x24]; // uhCok [132, 42, 36]
 
 /// A PrimitiveHashType is one with a multihash prefix.
 /// In contrast, a non-primitive hash type could be one of several primitive
@@ -66,56 +66,56 @@ macro_rules! primitive_hash_type {
             }
         }
 
-        // impl serde::Serialize for $name {
-        //     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        //     where
-        //         S: serde::Serializer,
-        //     {
-        //         serializer.serialize_bytes(self.get_prefix())
-        //     }
-        // }
+        impl serde::Serialize for $name {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+            {
+                serializer.serialize_bytes(self.get_prefix())
+            }
+        }
 
-        // impl<'de> serde::Deserialize<'de> for $name {
-        //     fn deserialize<D>(deserializer: D) -> Result<$name, D::Error>
-        //     where
-        //         D: serde::Deserializer<'de>,
-        //     {
-        //         deserializer.deserialize_bytes($visitor)
-        //     }
-        // }
+        impl<'de> serde::Deserialize<'de> for $name {
+            fn deserialize<D>(deserializer: D) -> Result<$name, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                deserializer.deserialize_bytes($visitor)
+            }
+        }
 
-        // struct $visitor;
+        struct $visitor;
 
-        // impl<'de> serde::de::Visitor<'de> for $visitor {
-        //     type Value = $name;
+        impl<'de> serde::de::Visitor<'de> for $visitor {
+            type Value = $name;
 
-        //     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        //         formatter.write_str("a HoloHash of primitive hash_type")
-        //     }
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a HoloHash of primitive hash_type")
+            }
 
-        //     fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
-        //     where
-        //         E: serde::de::Error,
-        //     {
-        //         match v {
-        //             $prefix => Ok($name),
-        //             _ => panic!("unknown hash prefix during hash deserialization {:?}", v),
-        //         }
-        //     }
+            fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                match v {
+                    $prefix => Ok($name),
+                    _ => panic!("unknown hash prefix during hash deserialization {:?}", v),
+                }
+            }
 
-        //     fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-        //     where
-        //         A: serde::de::SeqAccess<'de>,
-        //     {
-        //         let mut vec = Vec::with_capacity(seq.size_hint().unwrap_or(0));
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::SeqAccess<'de>,
+            {
+                let mut vec = Vec::with_capacity(seq.size_hint().unwrap_or(0));
 
-        //         while let Some(b) = seq.next_element()? {
-        //             vec.push(b);
-        //         }
+                while let Some(b) = seq.next_element()? {
+                    vec.push(b);
+                }
 
-        //         self.visit_bytes(&vec)
-        //     }
-        // }
+                self.visit_bytes(&vec)
+            }
+        }
     };
 }
 

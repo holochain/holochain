@@ -1,37 +1,64 @@
-use std::convert::TryFrom;
-
 use crate::{
     error::{HoloHashError, HoloHashResult},
     HashType, HoloHash,
 };
 use holochain_serialized_bytes::{SerializedBytes, SerializedBytesError, UnsafeBytes};
 
-#[derive(Clone, serde::Serialize, serde::Deserialize)]
-#[repr(transparent)]
-#[serde(transparent)]
-pub struct HoloHash39(#[serde(with = "serde_bytes")] Vec<u8>);
-// pub struct HoloHash39([u8; 39]);
-
-impl<T: HashType> TryFrom<HoloHash39> for HoloHash<T> {
-    type Error = HoloHashError;
-
-    fn try_from(h: HoloHash39) -> HoloHashResult<Self> {
-        if !h.0.len() == 39 {
-            Err(HoloHashError::BadSize)
-        } else {
-            let hash_type = T::try_from_prefix(&h.0[0..3])?;
-            let hash = h.0[3..].to_vec();
-            Ok(HoloHash::with_pre_hashed_typed(hash, hash_type))
-        }
+impl<T: HashType> serde::Serialize for HoloHash<T> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut v = Vec::with_capacity(39);
+        v.append(&mut self.hash_type().get_prefix().to_vec());
+        v.append(&mut self.clone().into_inner());
+        serializer.serialize_bytes(v.as_slice())
     }
 }
 
-impl<T: HashType> From<HoloHash<T>> for HoloHash39 {
-    fn from(hash: HoloHash<T>) -> HoloHash39 {
-        let mut v = Vec::with_capacity(39);
-        v.append(&mut hash.hash_type().get_prefix().to_vec());
-        v.append(&mut hash.into_inner());
-        HoloHash39(v)
+impl<'de, T: HashType> serde::Deserialize<'de> for HoloHash<T> {
+    fn deserialize<D>(deserializer: D) -> Result<HoloHash<T>, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_bytes(HoloHashVisitor(std::marker::PhantomData))
+    }
+}
+
+struct HoloHashVisitor<T: HashType>(std::marker::PhantomData<T>);
+
+impl<'de, T: HashType> serde::de::Visitor<'de> for HoloHashVisitor<T> {
+    type Value = HoloHash<T>;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("a HoloHash of primitive hash_type")
+    }
+
+    fn visit_bytes<E>(self, h: &[u8]) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        if !h.len() == 39 {
+            todo!("err")
+        // Err(HoloHashError::BadSize)
+        } else {
+            let hash_type = T::try_from_prefix(&h[0..3]).expect("TODO");
+            let hash = h[3..39].to_vec();
+            Ok(HoloHash::from_raw_bytes_and_type(hash, hash_type))
+        }
+    }
+
+    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+    where
+        A: serde::de::SeqAccess<'de>,
+    {
+        let mut vec = Vec::with_capacity(seq.size_hint().unwrap_or(0));
+
+        while let Some(b) = seq.next_element()? {
+            vec.push(b);
+        }
+
+        self.visit_bytes(&vec)
     }
 }
 
@@ -121,10 +148,14 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
-    fn test_composite_hashtype_crossover_error_1() {
+    fn test_any_dht_deserialization() {
         {
             let h_orig = EntryHash::from_raw_bytes_and_type(vec![0xdb; 36], hash_type::Entry);
+            let buf = holochain_serialized_bytes::encode(&h_orig).unwrap();
+            let _: AnyDhtHash = holochain_serialized_bytes::decode(&buf).unwrap();
+        }
+        {
+            let h_orig = HeaderHash::from_raw_bytes_and_type(vec![0xdb; 36], hash_type::Header);
             let buf = holochain_serialized_bytes::encode(&h_orig).unwrap();
             let _: AnyDhtHash = holochain_serialized_bytes::decode(&buf).unwrap();
         }
@@ -132,44 +163,11 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn test_composite_hashtype_crossover_error_2() {
+    fn test_any_dht_deserialization_crossover_error() {
         {
-            let h_orig = EntryHash::from_raw_bytes_and_type(vec![0xdb; 36], hash_type::Entry);
+            let h_orig = DhtOpHash::from_raw_bytes_and_type(vec![0xdb; 36], hash_type::DhtOp);
             let buf = holochain_serialized_bytes::encode(&h_orig).unwrap();
             let _: AnyDhtHash = holochain_serialized_bytes::decode(&buf).unwrap();
-        }
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_composite_hashtype_crossover_error_3() {
-        {
-            let h_orig =
-                AnyDhtHash::from_raw_bytes_and_type(vec![0xdb; 36], hash_type::AnyDht::Entry);
-            let buf = holochain_serialized_bytes::encode(&h_orig).unwrap();
-            let _: EntryHash = holochain_serialized_bytes::decode(&buf).unwrap();
-        }
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_composite_hashtype_crossover_error_4() {
-        {
-            let h_orig =
-                AnyDhtHash::from_raw_bytes_and_type(vec![0xdb; 36], hash_type::AnyDht::Entry);
-            let buf = holochain_serialized_bytes::encode(&h_orig).unwrap();
-            let _: EntryHash = holochain_serialized_bytes::decode(&buf).unwrap();
-        }
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_composite_hashtype_crossover_error_5() {
-        {
-            let h_orig =
-                AnyDhtHash::from_raw_bytes_and_type(vec![0xdb; 36], hash_type::AnyDht::Header);
-            let buf = holochain_serialized_bytes::encode(&h_orig).unwrap();
-            let _: EntryHash = holochain_serialized_bytes::decode(&buf).unwrap();
         }
     }
 

@@ -1,4 +1,3 @@
-use crate::ser::HoloHash39;
 use crate::{has_hash::HasHash, HashType, PrimitiveHashType};
 
 pub(crate) const HASH_CORE_LEN: usize = 32;
@@ -10,10 +9,8 @@ pub const HOLO_HASH_SERIALIZED_LEN: usize = HASH_CORE_LEN + HASH_LOC_LEN;
 /// A HoloHash contains a vector of 36 bytes representing a 32-byte blake2b hash
 /// plus 4 bytes representing a DHT location. It also contains a zero-sized
 /// type which specifies what it is a hash of.
-#[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
-#[serde(try_from = "HoloHash39", into = "HoloHash39")]
+#[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct HoloHash<T: HashType> {
-    #[serde(with = "serde_bytes")]
     hash: Vec<u8>,
     hash_type: T,
 }
