@@ -27,6 +27,9 @@ ghost_actor::ghost_chan! {
             ghost_actor::GhostSender<KitsuneP2p>,
         );
 
+        /// Magically exchange peer data between peers in harness
+        fn magic_peer_info_exchange() -> ();
+
         /// Inject data for one specific agent to gossip to others
         fn inject_gossip_data(agent: Arc<KitsuneAgent>, data: String) -> Arc<KitsuneOpHash>;
 
@@ -274,6 +277,30 @@ impl HarnessControlApiHandler for HarnessActor {
             i_s.finish_agent(agent.clone(), p2p.clone(), ctrl).await?;
 
             Ok((agent, p2p))
+        }
+        .boxed()
+        .into())
+    }
+
+    fn handle_magic_peer_info_exchange(&mut self) -> HarnessControlApiHandlerResult<()> {
+        let ctrls = self
+            .agents
+            .values()
+            .map(|(_, ctrl)| ctrl.clone())
+            .collect::<Vec<_>>();
+
+        Ok(async move {
+            let infos = ctrls.iter().map(|c| c.dump_agent_info());
+            let infos = futures::future::try_join_all(infos).await?;
+            let infos = infos.into_iter().fold(HashMap::new(), |acc, x| {
+                x.into_iter().fold(acc, |mut acc, x| {
+                    acc.insert(Arc::new(x.as_agent_info_ref().as_agent_ref().clone()), x);
+                    acc
+                })
+            });
+            let infos = ctrls.iter().map(|c| c.inject_agent_info(infos.clone()));
+            futures::future::try_join_all(infos).await?;
+            Ok(())
         }
         .boxed()
         .into())

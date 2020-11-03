@@ -166,50 +166,67 @@ impl SpaceInternalHandler for Space {
         from_agent: Arc<KitsuneAgent>,
         data: Arc<Vec<u8>>,
     ) -> SpaceInternalHandlerResult<Vec<u8>> {
-        // Right now we are only implementing the "short-circuit"
-        // that routes messages to other agents joined on this same system.
-        // I.e. we don't bother with peer discovery because we know the
-        // remote is local.
-        if !self.agents.contains_key(&to_agent) {
-            return Err(KitsuneP2pError::RoutingAgentError(to_agent));
-        }
-
-        // to_agent *is* joined - let's forward the request
         let space = self.space.clone();
+        if self.agents.contains_key(&to_agent) {
+            // LOCAL SHORT CIRCUIT! - just forward data locally
 
-        // clone the event sender
-        let evt_sender = self.evt_sender.clone();
+            let evt_sender = self.evt_sender.clone();
 
-        // As this is a short-circuit - we need to decode the data inline - here.
-        // In the future, we will probably need to branch here, so the real
-        // networking can forward the encoded data. Or, split immediate_request
-        // into two variants, one for short-circuit, and one for real networking.
-        let (_, data) = wire::Wire::decode_ref(&data)?;
+            let (_, data) = wire::Wire::decode_ref(&data)?;
 
-        match data {
-            wire::Wire::Call(payload) => Ok(async move {
-                evt_sender
-                    .call(space, to_agent, from_agent, payload.data.into())
-                    .await
-            }
-            .instrument(tracing::debug_span!("wire_call"))
-            .boxed()
-            .into()),
-            wire::Wire::Notify(payload) => {
-                Ok(async move {
+            match data {
+                wire::Wire::Call(payload) => Ok(async move {
                     evt_sender
-                        .notify(space, to_agent, from_agent, payload.data.into())
-                        .await?;
-                    // broadcast doesn't return anything...
-                    Ok(vec![])
+                        .call(space, to_agent, from_agent, payload.data.into())
+                        .await
                 }
+                .instrument(tracing::debug_span!("wire_call"))
                 .boxed()
-                .into())
+                .into()),
+                wire::Wire::Notify(payload) => {
+                    Ok(async move {
+                        evt_sender
+                            .notify(space, to_agent, from_agent, payload.data.into())
+                            .await?;
+                        // broadcast doesn't return anything...
+                        Ok(vec![])
+                    }
+                    .boxed()
+                    .into())
+                }
+                _ => {
+                    tracing::warn!("UNHANDLED WIRE: {:?}", data);
+                    Ok(async move { Ok(vec![]) }.boxed().into())
+                }
             }
-            _ => {
-                tracing::warn!("UNHANDLED WIRE: {:?}", data);
-                Ok(async move { Ok(vec![]) }.boxed().into())
+        } else {
+            let evt_sender = self.evt_sender.clone();
+            let tx = self.transport.clone();
+            Ok(async move {
+                // see if we have an entry for this agent in our agent_store
+                let info = match evt_sender
+                    .get_agent_info_signed(GetAgentInfoSignedEvt {
+                        space,
+                        agent: to_agent.clone(),
+                    })
+                    .await?
+                {
+                    None => return Err(KitsuneP2pError::RoutingAgentError(to_agent)),
+                    Some(i) => i,
+                };
+                let url = info
+                    .as_agent_info_ref()
+                    .as_urls_ref()
+                    .get(0)
+                    .unwrap()
+                    .clone();
+                println!("GOT INFO: {:?}", url);
+                let (_, _write, _read) = tx.create_channel(url).await?;
+
+                Err(KitsuneP2pError::RoutingAgentError(to_agent))
             }
+            .boxed()
+            .into())
         }
     }
 
