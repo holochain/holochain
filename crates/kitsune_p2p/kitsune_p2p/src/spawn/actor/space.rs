@@ -220,10 +220,14 @@ impl SpaceInternalHandler for Space {
                     .get(0)
                     .unwrap()
                     .clone();
-                println!("GOT INFO: {:?}", url);
-                let (_, _write, _read) = tx.create_channel(url).await?;
-
-                Err(KitsuneP2pError::RoutingAgentError(to_agent))
+                let (_, mut write, read) = tx.create_channel(url).await?;
+                write.write_and_close(data.to_vec()).await?;
+                let read = read.read_to_end().await;
+                let (_, read) = wire::Wire::decode_ref(&read)?;
+                match read {
+                    wire::Wire::CallResp(wire::CallResp { data }) => Ok(data.into()),
+                    _ => Err(format!("bad resp: {:?}", read).into()),
+                }
             }
             .boxed()
             .into())
@@ -331,7 +335,15 @@ impl KitsuneP2pHandler for Space {
     ) -> KitsuneP2pHandlerResult<Vec<u8>> {
         let space = self.space.clone();
         let i_s = self.i_s.clone();
-        let payload = Arc::new(wire::Wire::call(payload.into()).encode_vec()?);
+        let payload = Arc::new(
+            wire::Wire::call(
+                space.clone(),
+                from_agent.clone(),
+                to_agent.clone(),
+                payload.into(),
+            )
+            .encode_vec()?,
+        );
 
         Ok(async move {
             let start = std::time::Instant::now();
@@ -507,9 +519,6 @@ impl Space {
             ..
         } = input;
 
-        // encode the data to send
-        let payload = Arc::new(wire::Wire::call(payload.into()).encode_vec()?);
-
         // TODO - we cannot write proper logic here until we have a
         //        proper peer discovery mechanism. Instead, let's
         //        give it 100 ms max to see if there is any agent
@@ -536,6 +545,17 @@ impl Space {
             }
 
             let mut out = Vec::new();
+
+            // encode the data to send
+            let payload = Arc::new(
+                wire::Wire::call(
+                    space.clone(),
+                    from_agent.clone(),
+                    to_agent.clone(),
+                    payload.into(),
+                )
+                .encode_vec()?,
+            );
 
             // Timeout on immediate requests after a small interval.
             // TODO: 20 ms is only appropriate for local calls and not
