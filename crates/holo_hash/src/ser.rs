@@ -1,7 +1,4 @@
-use crate::{
-    error::{HoloHashError, HoloHashResult},
-    HashType, HoloHash,
-};
+use crate::{HashType, HoloHash};
 use holochain_serialized_bytes::{SerializedBytes, SerializedBytesError, UnsafeBytes};
 
 impl<T: HashType> serde::Serialize for HoloHash<T> {
@@ -39,10 +36,12 @@ impl<'de, T: HashType> serde::de::Visitor<'de> for HoloHashVisitor<T> {
         E: serde::de::Error,
     {
         if !h.len() == 39 {
-            todo!("err")
-        // Err(HoloHashError::BadSize)
+            Err(serde::de::Error::custom(
+                "HoloHash serialized representation must be exactly 39 bytes",
+            ))
         } else {
-            let hash_type = T::try_from_prefix(&h[0..3]).expect("TODO");
+            let hash_type = T::try_from_prefix(&h[0..3])
+                .map_err(|e| serde::de::Error::custom(format!("HoloHash error: {:?}", e)))?;
             let hash = h[3..39].to_vec();
             Ok(HoloHash::from_raw_bytes_and_type(hash, hash_type))
         }

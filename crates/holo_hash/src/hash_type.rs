@@ -21,8 +21,6 @@ pub trait HashType:
     + Eq
     + PartialOrd
     + Ord
-    // + serde::de::DeserializeOwned
-    // + serde::Serialize
     // FIXME: REMOVE!!! This is a hack to get composite keys working with LMDB before [ B-02112 ] is done
     + Default
 {
