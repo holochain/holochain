@@ -233,13 +233,13 @@ pub mod tests {
         ];
         let instances = vec![
             legacy::InstanceConfig {
-                agent: "".to_string(),
+                agent: "ag1".to_string(),
                 dna: "a1".to_string(),
                 id: "i1".to_string(),
                 storage: legacy::StorageConfiguration::Memory,
             },
             legacy::InstanceConfig {
-                agent: "".to_string(),
+                agent: "ag2".to_string(),
                 dna: "a2".to_string(),
                 id: "i2".to_string(),
                 storage: legacy::StorageConfiguration::Memory,
