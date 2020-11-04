@@ -53,7 +53,10 @@ pub mod wasm_test {
         let output: HashEntryOutput =
             hash_entry(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
 
-        assert_eq!(output.into_inner().get_full_bytes().to_vec().len(), 36,);
+        assert_eq!(
+            *output.into_inner().hash_type(),
+            holo_hash::hash_type::Entry
+        );
     }
 
     #[tokio::test(threaded_scheduler)]
@@ -75,7 +78,10 @@ pub mod wasm_test {
         host_access.workspace = workspace_lock;
         let output: HashEntryOutput =
             crate::call_test_ribosome!(host_access, TestWasm::HashEntry, "hash_entry", input);
-        assert_eq!(output.into_inner().get_full_bytes().to_vec().len(), 36,);
+        assert_eq!(
+            *output.into_inner().hash_type(),
+            holo_hash::hash_type::Entry
+        );
     }
 
     #[tokio::test(threaded_scheduler)]

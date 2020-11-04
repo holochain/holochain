@@ -4,6 +4,9 @@ pub(crate) const HASH_PREFIX_LEN: usize = 3;
 pub(crate) const HASH_CORE_LEN: usize = 32;
 pub(crate) const HASH_LOC_LEN: usize = 4;
 
+/// Length of the core bytes (32)
+pub const HOLO_HASH_CORE_LEN: usize = HASH_CORE_LEN; // 32
+
 /// Length of the core bytes + the loc bytes (36 = 32 + 4)
 pub const HOLO_HASH_FULL_LEN: usize = HASH_CORE_LEN + HASH_LOC_LEN; // 36
 
@@ -49,20 +52,12 @@ impl<T: HashType> HoloHash<T> {
         &self.hash_type
     }
 
-    /// Get the raw byte array including the 3 byte prefix, base 32 bytes, and the 4 byte loc
+    /// Get the raw 39-byte Vec including the 3 byte prefix, base 32 bytes, and the 4 byte loc
     pub fn get_raw_bytes(&self) -> &[u8] {
         &self.hash[..]
     }
 
-    /// Get the full byte array including the base 32 bytes and the 4 byte loc
-    #[deprecated = "no need for full bytes anymore"]
-    pub fn get_full_bytes(&self) -> &[u8] {
-        &self.hash[HASH_PREFIX_LEN..]
-    }
-
     /// Fetch just the core 32 bytes (without the 4 location bytes)
-    // TODO: change once prefix is included [ B-02112 ]
-    #[deprecated = "is there a need for core bytes anymore?"]
     pub fn get_core_bytes(&self) -> &[u8] {
         let bytes = &self.hash[HASH_PREFIX_LEN..HASH_PREFIX_LEN + HASH_CORE_LEN];
         assert_length(HASH_CORE_LEN, bytes);
@@ -154,14 +149,7 @@ mod tests {
         assert_eq!(3_688_618_971, h.get_loc());
         assert_eq!(
             "[219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219]",
-            format!("{:?}", h.get_bytes()),
-        );
-        assert_eq!(
-            format!(
-                "{}(0xdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdb)",
-                t
-            ),
-            format!("{:?}", h),
+            format!("{:?}", h.get_core_bytes()),
         );
     }
 

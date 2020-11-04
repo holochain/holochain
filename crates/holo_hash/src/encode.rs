@@ -1,4 +1,7 @@
-use crate::{error::HoloHashError, HashType, HoloHash, PrimitiveHashType};
+use crate::{
+    assert_length, error::HoloHashError, HashType, HoloHash, PrimitiveHashType, HASH_CORE_LEN,
+    HASH_PREFIX_LEN, HOLO_HASH_RAW_LEN,
+};
 use std::convert::TryFrom;
 
 impl<P: PrimitiveHashType> TryFrom<&str> for HoloHash<P> {
@@ -46,18 +49,18 @@ pub fn holo_hash_decode(prefix: &[u8], s: &str) -> Result<Vec<u8>, HoloHashError
         Err(_) => return Err(HoloHashError::BadBase64),
         Ok(s) => s,
     };
-    if s.len() != 39 {
+    if s.len() != HOLO_HASH_RAW_LEN {
         return Err(HoloHashError::BadSize);
     }
-    if &s[..3] != prefix {
+    if &s[..HASH_PREFIX_LEN] != prefix {
         return Err(HoloHashError::BadPrefix);
     }
-    let s = &s[3..];
-    let loc_bytes = holo_dht_location_bytes(&s[..32]);
+    let loc_bytes = holo_dht_location_bytes(&s[HASH_PREFIX_LEN..HASH_PREFIX_LEN + HASH_CORE_LEN]);
     let loc_bytes: &[u8] = &loc_bytes;
-    if loc_bytes != &s[32..] {
+    if loc_bytes != &s[HASH_PREFIX_LEN + HASH_CORE_LEN..] {
         return Err(HoloHashError::BadChecksum);
     }
+    assert_length(HOLO_HASH_RAW_LEN, &s);
     Ok(s.to_vec())
 }
 

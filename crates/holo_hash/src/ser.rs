@@ -6,10 +6,7 @@ impl<T: HashType> serde::Serialize for HoloHash<T> {
     where
         S: serde::Serializer,
     {
-        let mut v = Vec::with_capacity(39);
-        v.append(&mut self.hash_type().get_prefix().to_vec());
-        v.append(&mut self.clone().into_inner());
-        serializer.serialize_bytes(v.as_slice())
+        serializer.serialize_bytes(self.get_raw_bytes())
     }
 }
 
