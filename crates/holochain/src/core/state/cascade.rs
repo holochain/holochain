@@ -825,17 +825,9 @@ where
                     let validation_status = cache_data.meta.get_validation_status(&r, &hash)?;
                     DatabaseResult::Ok((deletes, updates, validation_status))
                 })?;
-                let validation_status = if validation_status.is_empty()
-                    || (validation_status.len() == 1
-                        && validation_status.contains(&ValidationStatus::Valid))
-                {
-                    ValidationStatus::Valid
-                } else {
-                    validation_status
-                        .into_iter()
-                        .find(|v| *v != ValidationStatus::Valid)
-                        .expect("Must contain value due to the above checks")
-                };
+                let validation_status = validation_status
+                    .resolve()
+                    .unwrap_or(ValidationStatus::Valid);
                 let deletes = self.render_headers(deletes, |h| h == HeaderType::Delete)?;
                 let updates = self.render_headers(updates, |h| h == HeaderType::Update)?;
                 Ok(Some(ElementDetails {
@@ -983,12 +975,21 @@ where
 
             match oldest_live_header {
                 Some(oldest_live_header) => {
-                    // We have an oldest live header now get the element
-                    Ok(self
-                        .get_element_local_raw(&oldest_live_header.header_hash)?
-                        .map(Search::Found)
-                        // It's not local so check the network
-                        .unwrap_or(Search::Continue(oldest_live_header.header_hash)))
+                    // Check we don't have evidence of an invalid header
+                    if cache_data
+                        .meta
+                        .get_validation_status(&r, &oldest_live_header.header_hash)?
+                        .is_valid()
+                    {
+                        // We have an oldest live header now get the element
+                        Ok(self
+                            .get_element_local_raw(&oldest_live_header.header_hash)?
+                            .map(Search::Found)
+                            // It's not local so check the network
+                            .unwrap_or(Search::Continue(oldest_live_header.header_hash)))
+                    } else {
+                        Ok(Search::Continue(oldest_live_header.header_hash))
+                    }
                 }
                 None => Ok(Search::NotInCascade),
             }
@@ -1106,6 +1107,13 @@ where
                 .get_deletes_on_header(&r, header_hash.clone())?
                 .next()?
                 .is_none();
+
+            // Check if the header is valid
+            let is_live = is_live
+                && cache_data
+                    .meta
+                    .get_validation_status(&r, &header_hash)?
+                    .is_valid();
 
             if is_live {
                 self.get_element_local_raw(&header_hash)

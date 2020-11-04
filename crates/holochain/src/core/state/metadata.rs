@@ -42,12 +42,15 @@ pub use mock::MockMetadataBuf;
 #[cfg(test)]
 use mockall::mock;
 
+use self::status::DisputedStatus;
+
 mod activity;
 #[cfg(test)]
 mod chain_test;
 mod keys;
 #[cfg(test)]
 pub mod links_test;
+mod status;
 mod sys_meta;
 
 #[allow(missing_docs)]
@@ -307,7 +310,7 @@ where
         &'r self,
         r: &'r R,
         header_hash: &HeaderHash,
-    ) -> DatabaseResult<HashSet<ValidationStatus>>;
+    ) -> DatabaseResult<DisputedStatus>;
 
     /// Finds the redirect path and returns the final [Entry]
     fn get_canonical_entry_hash(&self, entry_hash: EntryHash) -> DatabaseResult<EntryHash>;
@@ -1077,7 +1080,7 @@ where
         &'r self,
         r: &'r R,
         hash: &HeaderHash,
-    ) -> DatabaseResult<HashSet<ValidationStatus>> {
+    ) -> DatabaseResult<DisputedStatus> {
         Ok(fallible_iterator::convert(
             self.system_meta
                 .get(r, &SysMetaKey::from(hash.clone()).into())?,
@@ -1088,7 +1091,8 @@ where
                 _ => None,
             })
         })
-        .collect()?)
+        .collect::<HashSet<_>>()?
+        .into())
     }
 
     fn get_canonical_entry_hash(&self, _entry_hash: EntryHash) -> DatabaseResult<EntryHash> {

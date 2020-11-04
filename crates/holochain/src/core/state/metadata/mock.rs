@@ -113,7 +113,7 @@ mock! {
         fn get_validation_status(
             &self,
             hash: &HeaderHash,
-        ) -> DatabaseResult<HashSet<ValidationStatus>>;
+        ) -> DatabaseResult<DisputedStatus>;
         fn get_link_removes_on_link_add(
             &self,
             link_add: HeaderHash,
@@ -266,7 +266,7 @@ impl MetadataBufT for MockMetadataBuf {
         &'r self,
         _r: &'r R,
         hash: &HeaderHash,
-    ) -> DatabaseResult<HashSet<ValidationStatus>> {
+    ) -> DatabaseResult<DisputedStatus> {
         self.get_validation_status(hash)
     }
 
