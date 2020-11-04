@@ -4,6 +4,7 @@
 /// and keep it in an agents cache.
 /// The same test can be done with an update.
 #[test]
+#[ignore = "stub"]
 fn get_rejected_delete_into_cache_as_valid() {
     // - Create a timestamp earlier then the last chain item.
     // - Send this to sys validation results in rejected header.
