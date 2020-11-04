@@ -13,7 +13,7 @@ const DEFAULT_NOTIFY_TIMEOUT_MS: u64 = 1000;
 const DEFAULT_RPC_MULTI_REMOTE_AGENT_COUNT: u8 = 2;
 
 /// if the user specifies None or zero (0) for timeout_ms
-const DEFAULT_RPC_MULTI_TIMEOUT_MS: u64 = 20;
+const DEFAULT_RPC_MULTI_TIMEOUT_MS: u64 = 2000;
 
 /// if the user specifies None or zero (0) for race_timeout_ms
 const DEFAULT_RPC_MULTI_RACE_TIMEOUT_MS: u64 = 200;
