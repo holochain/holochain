@@ -34,7 +34,7 @@ ghost_actor::ghost_chan! {
         fn immediate_request(space: Arc<KitsuneSpace>, to_agent: Arc<KitsuneAgent>, from_agent: Arc<KitsuneAgent>, data: Arc<Vec<u8>>) -> Vec<u8>;
 
         /// List online agents that claim to be covering a basis hash
-        fn list_online_agents_for_basis_hash(space: Arc<KitsuneSpace>, basis: Arc<KitsuneBasis>) -> Vec<Arc<KitsuneAgent>>;
+        fn list_online_agents_for_basis_hash(space: Arc<KitsuneSpace>, from_agent: Arc<KitsuneAgent>, basis: Arc<KitsuneBasis>) -> HashSet<Arc<KitsuneAgent>>;
 
         /// Update / publish our agent info
         fn update_agent_info() -> ();
@@ -237,12 +237,26 @@ impl SpaceInternalHandler for Space {
     fn handle_list_online_agents_for_basis_hash(
         &mut self,
         _space: Arc<KitsuneSpace>,
+        from_agent: Arc<KitsuneAgent>,
         // during short-circuit / full-sync mode,
         // we're ignoring the basis_hash and just returning everyone.
         _basis: Arc<KitsuneBasis>,
-    ) -> SpaceInternalHandlerResult<Vec<Arc<KitsuneAgent>>> {
-        let res = self.agents.keys().cloned().collect();
-        Ok(async move { Ok(res) }.boxed().into())
+    ) -> SpaceInternalHandlerResult<HashSet<Arc<KitsuneAgent>>> {
+        let mut res: HashSet<Arc<KitsuneAgent>> = self.agents.keys().cloned().collect();
+        let all_peers_fut = self
+            .evt_sender
+            .query_agent_info_signed(QueryAgentInfoSignedEvt {
+                space: self.space.clone(),
+                agent: from_agent,
+            });
+        Ok(async move {
+            for peer in all_peers_fut.await? {
+                res.insert(Arc::new(peer.as_agent_info_ref().as_agent_ref().clone()));
+            }
+            Ok(res)
+        }
+        .boxed()
+        .into())
     }
 
     fn handle_update_agent_info(&mut self) -> SpaceInternalHandlerResult<()> {
@@ -530,7 +544,11 @@ impl Space {
             let mut to_agent = from_agent.clone();
             'search_loop: for _ in 0..5 {
                 if let Ok(agent_list) = i_s
-                    .list_online_agents_for_basis_hash(space.clone(), basis.clone())
+                    .list_online_agents_for_basis_hash(
+                        space.clone(),
+                        from_agent.clone(),
+                        basis.clone(),
+                    )
                     .await
                 {
                     for a in agent_list {
@@ -621,7 +639,11 @@ impl Space {
 
             loop {
                 if let Ok(agent_list) = i_s
-                    .list_online_agents_for_basis_hash(space.clone(), basis.clone())
+                    .list_online_agents_for_basis_hash(
+                        space.clone(),
+                        from_agent.clone(),
+                        basis.clone(),
+                    )
                     .await
                 {
                     for to_agent in agent_list {

@@ -56,7 +56,6 @@ mod tests {
             .await
             .unwrap();
 
-        println!("{:#?}", res);
         assert_eq!(1, res.len());
         for r in res {
             let data = String::from_utf8_lossy(&r.response);
