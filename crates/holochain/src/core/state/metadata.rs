@@ -662,7 +662,7 @@ where
         let header: Header = new_entry_header.into();
         let header = HeaderHashed::from_content_sync(header);
         let value = SysMetaVal::RejectedNewEntry(header.into());
-        self.register_raw_on_entry(basis.clone(), value)?;
+        self.register_raw_on_entry(basis, value)?;
         Ok(())
     }
 
@@ -674,7 +674,7 @@ where
         let header: Header = new_entry_header.into();
         let header = HeaderHashed::from_content_sync(header);
         let value = SysMetaVal::RejectedNewEntry(header.into());
-        self.deregister_raw_on_entry(basis.clone(), value)?;
+        self.deregister_raw_on_entry(basis, value)?;
         Ok(())
     }
 

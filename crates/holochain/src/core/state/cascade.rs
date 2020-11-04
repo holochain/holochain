@@ -825,17 +825,15 @@ where
                     let validation_status = cache_data.meta.get_validation_status(&r, &hash)?;
                     DatabaseResult::Ok((deletes, updates, validation_status))
                 })?;
-                let validation_status = if validation_status.is_empty() {
-                    ValidationStatus::Valid
-                } else if validation_status.len() == 1
-                    && validation_status.contains(&ValidationStatus::Valid)
+                let validation_status = if validation_status.is_empty()
+                    || (validation_status.len() == 1
+                        && validation_status.contains(&ValidationStatus::Valid))
                 {
                     ValidationStatus::Valid
                 } else {
                     validation_status
                         .into_iter()
-                        .filter(|v| *v != ValidationStatus::Valid)
-                        .next()
+                        .find(|v| *v != ValidationStatus::Valid)
                         .expect("Must contain value due to the above checks")
                 };
                 let deletes = self.render_headers(deletes, |h| h == HeaderType::Delete)?;
