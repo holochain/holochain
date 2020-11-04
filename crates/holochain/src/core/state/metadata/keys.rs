@@ -106,6 +106,7 @@ impl LinkMetaVal {
             target: self.target,
             timestamp: timestamp.into(),
             tag: self.tag,
+            create_link_hash: self.link_add_hash,
         }
     }
 }

@@ -5,16 +5,19 @@
 //! SourceChain which has already undergone Genesis.
 
 use super::{interface::SignalBroadcaster, manager::ManagedTaskAdd};
-use crate::conductor::api::CellConductorApiT;
 use crate::conductor::handle::ConductorHandle;
 use crate::conductor::{api::error::ConductorApiError, entry_def_store::get_entry_def_from_ids};
 use crate::core::queue_consumer::{spawn_queue_consumer_tasks, InitialQueueTriggers};
 use crate::core::ribosome::ZomeCallInvocation;
+use crate::{
+    conductor::api::CellConductorApiT,
+    core::workflow::produce_dht_ops_workflow::dht_op_light::light_to_op,
+};
 use holochain_types::activity::AgentActivity;
 use holochain_zome_types::header::EntryType;
-use holochain_zome_types::query::ChainQueryFilter;
 use holochain_zome_types::validate::ValidationPackage;
 use holochain_zome_types::zome::FunctionName;
+use holochain_zome_types::{query::ChainQueryFilter, validate::ValidationStatus};
 use validation_package::ValidationPackageDb;
 
 use crate::{
@@ -691,15 +694,21 @@ impl Cell {
         )>,
     > {
         let integrated_dht_ops = IntegratedDhtOpsBuf::new(self.env().clone().into())?;
-        let cas = ElementBuf::vault(self.env.clone().into(), false)?;
         let mut out = vec![];
         for op_hash in op_hashes {
             let val = integrated_dht_ops.get(&op_hash)?;
             if let Some(val) = val {
-                let full_op =
-                    crate::core::workflow::produce_dht_ops_workflow::dht_op_light::light_to_op(
-                        val.op, &cas,
-                    )?;
+                let full_op = match &val.validation_status {
+                    ValidationStatus::Valid => {
+                        let cas = ElementBuf::vault(self.env.clone().into(), false)?;
+                        light_to_op(val.op, &cas)?
+                    }
+                    ValidationStatus::Rejected => {
+                        let cas = ElementBuf::rejected(self.env.clone().into())?;
+                        light_to_op(val.op, &cas)?
+                    }
+                    ValidationStatus::Abandoned => todo!("Add when abandoned store is added"),
+                };
                 let basis = full_op.dht_basis();
                 out.push((basis, op_hash, full_op));
             }
@@ -710,7 +719,7 @@ impl Cell {
     /// the network module would like this cell/agent to sign some data
     #[tracing::instrument(skip(self))]
     async fn handle_sign_network_data(&self) -> CellResult<Signature> {
-        unimplemented!()
+        Ok(vec![0; 64].into())
     }
 
     /// When the Conductor determines that it's time to execute some [AutonomicProcess],

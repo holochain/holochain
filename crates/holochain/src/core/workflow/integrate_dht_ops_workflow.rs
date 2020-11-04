@@ -33,6 +33,7 @@ use holochain_state::{
 use holochain_types::{
     dht_op::{produce_op_lights_from_elements, DhtOp, DhtOpLight, UniqueForm},
     element::{Element, SignedHeaderHashed, SignedHeaderHashedExt},
+    header::NewEntryHeader,
     validate::ValidationStatus,
     Entry, EntryHashed, Timestamp,
 };
@@ -374,6 +375,9 @@ where
         }
         DhtOpLight::StoreEntry(hash, _, _) => {
             let new_entry_header = get_header(hash, element_store)?.try_into()?;
+            if let NewEntryHeader::Update(update) = &new_entry_header {
+                meta_store.register_update(update.clone())?;
+            }
             // Reference to headers
             meta_store.register_header(new_entry_header)?;
         }

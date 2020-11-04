@@ -86,6 +86,12 @@ mod tests {
                                 .into(),
                         ));
                     }
+                    SignNetworkData { respond, .. } => {
+                        respond.r(Ok(async move { Ok(vec![0; 64].into()) }.boxed().into()));
+                    }
+                    PutAgentInfoSigned { respond, .. } => {
+                        respond.r(Ok(async move { Ok(()) }.boxed().into()));
+                    }
                     _ => (),
                 }
             }
@@ -134,6 +140,12 @@ mod tests {
                         assert_eq!(b"receipt-test".to_vec(), receipt);
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
                     }
+                    SignNetworkData { respond, .. } => {
+                        respond.r(Ok(async move { Ok(vec![0; 64].into()) }.boxed().into()));
+                    }
+                    PutAgentInfoSigned { respond, .. } => {
+                        respond.r(Ok(async move { Ok(()) }.boxed().into()));
+                    }
                     _ => (),
                 }
             }
@@ -179,6 +191,12 @@ mod tests {
                     Publish { respond, .. } => {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
                         recv_count_clone.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    }
+                    SignNetworkData { respond, .. } => {
+                        respond.r(Ok(async move { Ok(vec![0; 64].into()) }.boxed().into()));
+                    }
+                    PutAgentInfoSigned { respond, .. } => {
+                        respond.r(Ok(async move { Ok(()) }.boxed().into()));
                     }
                     _ => (),
                 }
@@ -249,6 +267,12 @@ mod tests {
                         };
                         respond.r(Ok(async move { Ok(resp) }.boxed().into()));
                     }
+                    SignNetworkData { respond, .. } => {
+                        respond.r(Ok(async move { Ok(vec![0; 64].into()) }.boxed().into()));
+                    }
+                    PutAgentInfoSigned { respond, .. } => {
+                        respond.r(Ok(async move { Ok(()) }.boxed().into()));
+                    }
                     _ => (),
                 }
             }
@@ -300,6 +324,12 @@ mod tests {
                 match evt {
                     GetLinks { respond, .. } => {
                         respond.r(Ok(async move { Ok(test_1_clone) }.boxed().into()));
+                    }
+                    SignNetworkData { respond, .. } => {
+                        respond.r(Ok(async move { Ok(vec![0; 64].into()) }.boxed().into()));
+                    }
+                    PutAgentInfoSigned { respond, .. } => {
+                        respond.r(Ok(async move { Ok(()) }.boxed().into()));
                     }
                     _ => (),
                 }

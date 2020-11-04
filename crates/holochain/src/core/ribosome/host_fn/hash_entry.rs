@@ -14,10 +14,7 @@ pub fn hash_entry(
 ) -> RibosomeResult<HashEntryOutput> {
     let entry: Entry = input.into_inner();
 
-    let entry_hash = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-        holochain_types::entry::EntryHashed::from_content_sync(entry)
-    })
-    .into_hash();
+    let entry_hash = holochain_types::entry::EntryHashed::from_content_sync(entry).into_hash();
 
     Ok(HashEntryOutput::new(entry_hash))
 }

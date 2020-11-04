@@ -22,7 +22,6 @@ pub(crate) async fn spawn_test_agent(
     ),
     KitsuneP2pError,
 > {
-    let agent: Arc<KitsuneAgent> = TestVal::test_val();
     let (p2p, evt) = spawn_kitsune_p2p(config).await?;
 
     let builder = ghost_actor::actor_builder::GhostActorBuilder::new();
@@ -35,24 +34,40 @@ pub(crate) async fn spawn_test_agent(
         .create_channel::<HarnessAgentControl>()
         .await?;
 
-    tokio::task::spawn(builder.spawn(AgentHarness::new(harness_chan)));
+    let harness = AgentHarness::new(harness_chan).await?;
+    let agent = harness.agent.clone();
+    tokio::task::spawn(builder.spawn(harness));
 
     Ok((agent, p2p, control))
 }
 
+use lair_keystore_api::{
+    entry::EntrySignEd25519,
+    //actor::SignEd25519PubKey,
+    internal::sign_ed25519::*,
+};
+
 struct AgentHarness {
+    agent: Arc<KitsuneAgent>,
+    priv_key: SignEd25519PrivKey,
     harness_chan: HarnessEventChannel,
     agent_store: HashMap<Arc<KitsuneAgent>, Arc<AgentInfoSigned>>,
     gossip_store: HashMap<Arc<KitsuneOpHash>, String>,
 }
 
 impl AgentHarness {
-    pub fn new(harness_chan: HarnessEventChannel) -> Self {
-        Self {
+    pub async fn new(harness_chan: HarnessEventChannel) -> Result<Self, KitsuneP2pError> {
+        let EntrySignEd25519 { priv_key, pub_key } = sign_ed25519_keypair_new_from_entropy()
+            .await
+            .map_err(KitsuneP2pError::other)?;
+        let agent: Arc<KitsuneAgent> = Arc::new((**pub_key).clone().into());
+        Ok(Self {
+            agent,
+            priv_key,
             harness_chan,
             agent_store: HashMap::new(),
             gossip_store: HashMap::new(),
-        }
+        })
     }
 }
 
@@ -180,8 +195,15 @@ impl KitsuneP2pEventHandler for AgentHarness {
 
     fn handle_sign_network_data(
         &mut self,
-        _input: SignNetworkDataEvt,
+        input: SignNetworkDataEvt,
     ) -> KitsuneP2pEventHandlerResult<KitsuneSignature> {
-        Ok(async move { Ok(vec![0; 64].into()) }.boxed().into())
+        let sig = sign_ed25519(self.priv_key.clone(), input.data);
+        Ok(async move {
+            let sig = sig.await.map_err(KitsuneP2pError::other)?;
+            let sig: Vec<u8> = (**sig).clone();
+            Ok(sig.into())
+        }
+        .boxed()
+        .into())
     }
 }
