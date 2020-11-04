@@ -42,7 +42,10 @@ mod tests {
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
     use ghost_actor::GhostControlSender;
-    use holochain_types::element::{Element, SignedHeaderHashed, WireElement};
+    use holochain_types::{
+        element::{Element, ElementStatus, SignedHeaderHashed, WireElement},
+        validate::ValidationStatus,
+    };
     use holochain_types::{fixt::*, HeaderHashed};
     use kitsune_p2p::KitsuneP2pConfig;
 
@@ -231,23 +234,29 @@ mod tests {
             .unwrap();
 
         let test_1 = GetElementResponse::GetHeader(Some(Box::new(WireElement::from_element(
-            Element::new(
-                SignedHeaderHashed::with_presigned(
-                    HeaderHashed::from_content_sync(fixt!(Header)),
-                    fixt!(Signature),
+            ElementStatus::new(
+                Element::new(
+                    SignedHeaderHashed::with_presigned(
+                        HeaderHashed::from_content_sync(fixt!(Header)),
+                        fixt!(Signature),
+                    ),
+                    None,
                 ),
-                None,
+                ValidationStatus::Valid,
             ),
             vec![],
             vec![],
         ))));
         let test_2 = GetElementResponse::GetHeader(Some(Box::new(WireElement::from_element(
-            Element::new(
-                SignedHeaderHashed::with_presigned(
-                    HeaderHashed::from_content_sync(fixt!(Header)),
-                    fixt!(Signature),
+            ElementStatus::new(
+                Element::new(
+                    SignedHeaderHashed::with_presigned(
+                        HeaderHashed::from_content_sync(fixt!(Header)),
+                        fixt!(Signature),
+                    ),
+                    None,
                 ),
-                None,
+                ValidationStatus::Valid,
             ),
             vec![],
             vec![],

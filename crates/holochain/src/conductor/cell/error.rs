@@ -67,6 +67,8 @@ pub enum AuthorityDataError {
     DhtOpConvertError(#[from] DhtOpConvertError),
     #[error(transparent)]
     WrongHeaderError(#[from] WrongHeaderError),
+    #[error(transparent)]
+    HeaderError(#[from] HeaderError),
     #[error("Missing element data: {0:?}")]
     MissingData(String),
     #[error("Missing metadata: {0:?}")]
