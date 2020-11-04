@@ -12,16 +12,18 @@ pub fn call(
     input: CallInput,
 ) -> RibosomeResult<CallOutput> {
     let call = input.into_inner();
-    let dna_hash = ribosome.dna_file().dna_hash().clone();
-    let to_agent = call.to_agent();
+    let dna_hash = call
+        .to_dna
+        .unwrap_or_else(|| ribosome.dna_file().dna_hash().clone());
+    let to_agent = call.to_agent;
     let cell_id = CellId::new(dna_hash, to_agent);
     let invocation = ZomeCallInvocation {
         cell_id,
-        zome_name: call.zome_name(),
-        cap: call.cap(),
-        fn_name: call.fn_name(),
-        payload: ExternInput::new(call.request()),
-        provenance: call.provenance(),
+        zome_name: call.zome_name,
+        cap: call.cap,
+        fn_name: call.fn_name,
+        payload: ExternInput::new(call.request),
+        provenance: call.provenance,
     };
     let host_access = call_context.host_access();
     let result: ZomeCallResponse = tokio_safe_block_on::tokio_safe_block_forever_on(async move {

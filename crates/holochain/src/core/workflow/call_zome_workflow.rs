@@ -46,19 +46,26 @@ pub struct CallZomeWorkflowArgs<Ribosome: RibosomeT, C: CellConductorApiT> {
     pub invocation: ZomeCallInvocation,
     pub signal_tx: SignalBroadcaster,
     pub conductor_api: C,
+    pub is_root_zome_call: bool,
 }
 
-#[instrument(skip(workspace, network, keystore, writer, args, trigger_produce_dht_ops))]
+#[instrument(skip(
+    workspace_lock,
+    network,
+    keystore,
+    writer,
+    args,
+    trigger_produce_dht_ops
+))]
 pub async fn call_zome_workflow<'env, Ribosome: RibosomeT, C: CellConductorApiT>(
-    workspace: CallZomeWorkspaceType,
+    workspace_lock: CallZomeWorkspaceLock,
     network: HolochainP2pCell,
     keystore: KeystoreSender,
     writer: OneshotWriter,
     args: CallZomeWorkflowArgs<Ribosome, C>,
     mut trigger_produce_dht_ops: TriggerSender,
 ) -> WorkflowResult<ZomeCallInvocationResult> {
-    let should_write = workspace.should_write();
-    let workspace_lock = workspace.into_lock();
+    let should_write = args.is_root_zome_call;
     let result = call_zome_workflow_inner(workspace_lock.clone(), network, keystore, args).await?;
 
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
@@ -86,6 +93,7 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT, C: CellConductorApi
         invocation,
         signal_tx,
         conductor_api,
+        ..
     } = args;
 
     let call_zome_handle = conductor_api.clone().into_call_zome_handle();
@@ -249,15 +257,6 @@ pub struct CallZomeWorkspace {
     pub meta_cache: MetadataBuf,
 }
 
-/// When zome calls are made from
-/// other zome calls in the same cell
-/// we need to use an existing workspace
-/// and not write to it.
-pub enum CallZomeWorkspaceType {
-    Fresh(CallZomeWorkspace),
-    Used(CallZomeWorkspaceLock),
-}
-
 impl<'a> CallZomeWorkspace {
     pub fn new(env: EnvironmentRead) -> WorkspaceResult<Self> {
         let source_chain = SourceChain::new(env.clone())?;
@@ -316,22 +315,6 @@ impl Workspace for CallZomeWorkspace {
     }
 }
 
-impl CallZomeWorkspaceType {
-    pub fn into_lock(self) -> CallZomeWorkspaceLock {
-        match self {
-            CallZomeWorkspaceType::Fresh(workspace) => CallZomeWorkspaceLock::new(workspace),
-            CallZomeWorkspaceType::Used(lock) => lock,
-        }
-    }
-    pub fn should_write(&self) -> bool {
-        if let CallZomeWorkspaceType::Fresh(_) = self {
-            true
-        } else {
-            false
-        }
-    }
-}
-
 #[cfg(test)]
 pub mod tests {
     use super::*;
@@ -373,6 +356,7 @@ pub mod tests {
             ribosome,
             signal_tx: SignalBroadcaster::noop(),
             conductor_api,
+            is_root_zome_call: true,
         };
         call_zome_workflow_inner(workspace.into(), network, keystore, args).await
     }
