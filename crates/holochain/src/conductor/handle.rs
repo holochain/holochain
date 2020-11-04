@@ -309,6 +309,16 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
+            QueryAgentInfoSigned {
+                kitsune_space,
+                respond,
+                ..
+            } => {
+                let res = lock
+                    .query_agent_info_signed(kitsune_space)
+                    .map_err(holochain_p2p::HolochainP2pError::other);
+                respond.respond(Ok(async move { res }.boxed().into()));
+            }
             // TODO - THIS IS A HACK
             //        A bunch of our tests are faking cells out...
             //        so we cannot pass these in properly

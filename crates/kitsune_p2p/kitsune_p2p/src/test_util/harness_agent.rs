@@ -138,6 +138,14 @@ impl KitsuneP2pEventHandler for AgentHarness {
         Ok(async move { Ok(res) }.boxed().into())
     }
 
+    fn handle_query_agent_info_signed(
+        &mut self,
+        _input: QueryAgentInfoSignedEvt,
+    ) -> KitsuneP2pEventHandlerResult<Vec<crate::types::agent_store::AgentInfoSigned>> {
+        let out = self.agent_store.values().map(|a| (**a).clone()).collect();
+        Ok(async move { Ok(out) }.boxed().into())
+    }
+
     fn handle_call(
         &mut self,
         space: Arc<super::KitsuneSpace>,
