@@ -28,13 +28,13 @@ pub enum KitsuneP2pError {
     #[error(transparent)]
     StdIoError(#[from] std::io::Error),
 
-    /// Other
-    #[error("Other: {0}")]
-    Other(Box<dyn std::error::Error + Send + Sync>),
-
     /// Reqwest crate.
     #[error(transparent)]
     Reqwest(#[from] reqwest::Error),
+    
+    /// Other
+    #[error("Other: {0}")]
+    Other(Box<dyn std::error::Error + Send + Sync>),
 }
 
 impl KitsuneP2pError {
