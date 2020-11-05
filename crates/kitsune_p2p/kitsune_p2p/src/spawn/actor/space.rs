@@ -676,10 +676,10 @@ impl Space {
                                                 .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                                         }
                                         Ok(wire::Wire::Failure(wire::Failure { reason })) => {
-                                            eprintln!("FAIL: {}", reason);
+                                            tracing::warn!("FAIL: {}", reason);
                                         }
                                         Err(e) => {
-                                            eprintln!("FAIL: {:?}", e);
+                                            tracing::warn!("FAIL: {:?}", e);
                                         }
                                         _ => (),
                                     }
