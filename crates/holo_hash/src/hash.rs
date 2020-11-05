@@ -86,7 +86,7 @@ impl<T: HashType> HoloHash<T> {
 
     /// Fetch the holo dht location for this hash
     pub fn get_loc(&self) -> u32 {
-        bytes_to_loc(&self.hash[HOLO_HASH_RAW_LEN - 4..])
+        bytes_to_loc(&self.hash[HOLO_HASH_RAW_LEN - HOLO_HASH_PREFIX_LEN..])
     }
 
     /// consume into the inner byte vector
@@ -176,11 +176,26 @@ mod tests {
     #[test]
     #[cfg(not(feature = "string-encoding"))]
     fn test_enum_types() {
-        assert_type("DnaHash", DnaHash::from_raw_36(vec![0xdb; 36]));
-        assert_type("NetIdHash", NetIdHash::from_raw_36(vec![0xdb; 36]));
-        assert_type("AgentPubKey", AgentPubKey::from_raw_36(vec![0xdb; 36]));
-        assert_type("EntryHash", EntryHash::from_raw_36(vec![0xdb; 36]));
-        assert_type("DhtOpHash", DhtOpHash::from_raw_36(vec![0xdb; 36]));
+        assert_type(
+            "DnaHash",
+            DnaHash::from_raw_36(vec![0xdb; HOLO_HASH_FULL_LEN]),
+        );
+        assert_type(
+            "NetIdHash",
+            NetIdHash::from_raw_36(vec![0xdb; HOLO_HASH_FULL_LEN]),
+        );
+        assert_type(
+            "AgentPubKey",
+            AgentPubKey::from_raw_36(vec![0xdb; HOLO_HASH_FULL_LEN]),
+        );
+        assert_type(
+            "EntryHash",
+            EntryHash::from_raw_36(vec![0xdb; HOLO_HASH_FULL_LEN]),
+        );
+        assert_type(
+            "DhtOpHash",
+            DhtOpHash::from_raw_36(vec![0xdb; HOLO_HASH_FULL_LEN]),
+        );
     }
 
     #[test]
