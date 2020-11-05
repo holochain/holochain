@@ -3,6 +3,7 @@ lazy_static::lazy_static! {
 }
 
 /// @todo make this not hardcoded.
+/// @todo handle testing vs. production better somehow.
 const BOOTSTRAP_URL: &str = "https://bootstrap.holo.host";
 
 const OP_HEADER: &str = "X-Op";
