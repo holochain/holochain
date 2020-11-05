@@ -31,6 +31,8 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_bootstrap() {
+        // Simply joining a space with an agent will hit the bootstrap service internally.
+        // Cross reference this with the values in the bootstrap service.
         let (harness, _) = spawn_test_harness_mem().await.unwrap();
         harness.add_space().await.unwrap();
         harness.add_direct_agent("alice".into()).await.unwrap();
