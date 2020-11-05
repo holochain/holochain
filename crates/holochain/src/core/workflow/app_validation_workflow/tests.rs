@@ -524,7 +524,7 @@ fn inspect_val_limbo(
             .iter(&r)
             .unwrap()
             .map(|(k, i)| {
-                let hash = DhtOpHash::from_raw_36(k.to_vec());
+                let hash = DhtOpHash::from_raw_39_panicky(k.to_vec());
                 let el = element_buf.get_element(&i.op.header_hash()).unwrap();
                 debug!(?hash, ?i, op_in_val = ?el);
                 Ok((hash, i, el))
@@ -548,7 +548,7 @@ fn inspect_integrated(
             .iter(&r)
             .unwrap()
             .map(|(k, i)| {
-                let hash = DhtOpHash::from_raw_36(k.to_vec());
+                let hash = DhtOpHash::from_raw_39_panicky(k.to_vec());
                 let el = element_buf
                     .get_element(&i.op.header_hash())
                     .unwrap()

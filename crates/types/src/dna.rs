@@ -106,7 +106,6 @@ impl DnaFile {
             code.insert(wasm_hash, wasm);
         }
         let dna_hash = holo_hash::DnaHash::with_data(&dna).await;
-        println!("DnaFile::new : {:?}", dna_hash);
         Ok(Self {
             dna,
             dna_hash,

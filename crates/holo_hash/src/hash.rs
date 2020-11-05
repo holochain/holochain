@@ -13,11 +13,7 @@ pub const HOLO_HASH_LOC_LEN: usize = 4;
 pub const HOLO_HASH_FULL_LEN: usize = HOLO_HASH_CORE_LEN + HOLO_HASH_LOC_LEN; // 36
 
 /// Length of the full HoloHash bytes (39 = 3 + 32 + 4)
-pub const HOLO_HASH_SERIALIZED_LEN: usize =
-    HOLO_HASH_PREFIX_LEN + HOLO_HASH_CORE_LEN + HOLO_HASH_LOC_LEN;
-
-/// Alias for `HOLO_HASH_SERIALIZED_LEN`
-pub const HOLO_HASH_RAW_LEN: usize = HOLO_HASH_SERIALIZED_LEN;
+pub const HOLO_HASH_RAW_LEN: usize = HOLO_HASH_PREFIX_LEN + HOLO_HASH_CORE_LEN + HOLO_HASH_LOC_LEN;
 
 /// A HoloHash contains a vector of 36 bytes representing a 32-byte blake2b hash
 /// plus 4 bytes representing a DHT location. It also contains a zero-sized
@@ -37,8 +33,7 @@ impl<T: HashType> HoloHash<T> {
         Ok(Self { hash, hash_type })
     }
     /// Raw constructor: Create a HoloHash from 39 bytes, using the prefix
-    /// bytes to determine the hash_type
-    #[deprecated = "give a proper error"]
+    /// bytes to determine the hash_type. Panics if hash_type does not match.
     pub fn from_raw_39_panicky(hash: Vec<u8>) -> Self {
         Self::from_raw_39(hash).expect("the specified hash_type does not match the prefix bytes")
     }
