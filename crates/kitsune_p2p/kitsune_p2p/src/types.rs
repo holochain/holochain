@@ -31,7 +31,7 @@ pub enum KitsuneP2pError {
     /// Reqwest crate.
     #[error(transparent)]
     Reqwest(#[from] reqwest::Error),
-    
+
     /// Other
     #[error("Other: {0}")]
     Other(Box<dyn std::error::Error + Send + Sync>),
