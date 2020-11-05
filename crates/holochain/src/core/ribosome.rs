@@ -509,7 +509,7 @@ impl std::fmt::Debug for MockRibosomeT {
 
 #[cfg(test)]
 pub mod wasm_test {
-    use crate::core::ribosome::FnComponents;
+        use crate::core::ribosome::FnComponents;
     use core::time::Duration;
 
     pub fn now() -> Duration {
@@ -541,7 +541,7 @@ pub mod wasm_test {
                     .unwrap();
 
                 // Required because otherwise the network will return routing errors
-                let (network, r_task, cell_network) = crate::test_utils::test_network(
+                let (_network, _r_task, cell_network) = crate::test_utils::test_network(
                     Some(ribosome.dna_file().dna_hash().clone()),
                     Some(author),
                 )
@@ -577,9 +577,10 @@ pub mod wasm_test {
                     }
                     crate::core::ribosome::ZomeCallResponse::Unauthorized => unreachable!(),
                 };
-                use ghost_actor::GhostControlSender;
-                network.ghost_actor_shutdown().await.unwrap();
-                r_task.await.unwrap();
+                // Causes flaky tests if we wait on these
+                // use ghost_actor::GhostControlSender;
+                // network.ghost_actor_shutdown().await.unwrap();
+                // r_task.await.unwrap();
                 output
             })
             .await
