@@ -56,12 +56,30 @@ fixturator!(
 fixturator!(
     AgentInfoSigned;
     curve Empty {
-        AgentInfoSigned::try_new(fixt!(KitsuneSignature, Empty), fixt!(AgentInfo, Empty)).unwrap()
+        let mut data = Vec::new();
+        kitsune_p2p_types::codec::rmp_encode(&mut data, &fixt!(AgentInfo, Empty)).unwrap();
+        AgentInfoSigned::try_new(
+            fixt!(KitsuneAgent, Empty),
+            fixt!(KitsuneSignature, Empty),
+            data,
+        ).unwrap()
     };
     curve Unpredictable {
-        AgentInfoSigned::try_new(fixt!(KitsuneSignature), fixt!(AgentInfo)).unwrap()
+        let mut data = Vec::new();
+        kitsune_p2p_types::codec::rmp_encode(&mut data, &fixt!(AgentInfo)).unwrap();
+        AgentInfoSigned::try_new(
+            fixt!(KitsuneAgent),
+            fixt!(KitsuneSignature),
+            data,
+        ).unwrap()
     };
     curve Predictable {
-        AgentInfoSigned::try_new(fixt!(KitsuneSignature, Predictable), fixt!(AgentInfo, Predictable)).unwrap()
+        let mut data = Vec::new();
+        kitsune_p2p_types::codec::rmp_encode(&mut data, &fixt!(AgentInfo, Predictable)).unwrap();
+        AgentInfoSigned::try_new(
+            fixt!(KitsuneAgent, Predictable),
+            fixt!(KitsuneSignature, Predictable),
+            data,
+        ).unwrap()
     };
 );
