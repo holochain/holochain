@@ -68,6 +68,46 @@ mod tests {
     }
 
     #[tokio::test(threaded_scheduler)]
+    async fn test_transport_notify_coms() -> Result<(), KitsuneP2pError> {
+        init_tracing();
+        let (harness, evt) = spawn_test_harness_mem().await?;
+        let mut rcv = evt.receive();
+
+        let space = harness.add_space().await?;
+        let (a1, p2p1) = harness.add_direct_agent("one".into()).await?;
+        let (_a2, _p2p2) = harness.add_direct_agent("two".into()).await?;
+        let (_a3, _p2p3) = harness.add_direct_agent("tre".into()).await?;
+
+        // needed until we have some way of bootstrapping
+        harness.magic_peer_info_exchange().await?;
+
+        p2p1.notify_multi(actor::NotifyMulti {
+            space: space,
+            from_agent: a1,
+            // this is just a dummy value right now
+            basis: TestVal::test_val(),
+            remote_agent_count: Some(42),
+            timeout_ms: Some(40),
+            payload: b"test-broadcast".to_vec(),
+        })
+        .await?;
+
+        harness.ghost_actor_shutdown().await?;
+
+        let mut recv_count = 0_usize;
+        while let Some(evt) = tokio::stream::StreamExt::next(&mut rcv).await {
+            if let test_util::HarnessEventType::Notify { payload, .. } = &evt.ty {
+                assert_eq!(&**payload, "test-broadcast");
+                recv_count += 1;
+            }
+        }
+
+        assert_eq!(3, recv_count);
+
+        Ok(())
+    }
+
+    #[tokio::test(threaded_scheduler)]
     async fn test_peer_info_store() -> Result<(), KitsuneP2pError> {
         init_tracing();
 

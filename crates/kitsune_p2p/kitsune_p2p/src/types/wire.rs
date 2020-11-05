@@ -32,7 +32,14 @@ kitsune_p2p_types::write_codec_enum! {
 
         /// "Notify" the remote.
         Notify(0x20) {
-            data.0: WireData,
+            space.0: Arc<KitsuneSpace>,
+            from_agent.1: Arc<KitsuneAgent>,
+            to_agent.2: Arc<KitsuneAgent>,
+            data.3: WireData,
+        },
+
+        /// "Notify" response from the remote.
+        NotifyResp(0x21) {
         },
 
         /// Publish Signed Agent Info

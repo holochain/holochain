@@ -141,6 +141,25 @@ impl KitsuneP2pActor {
                                 let resp = wire::Wire::call_resp(res.into()).encode_vec().unwrap();
                                 let _ = write.write_and_close(resp).await;
                             }
+                            wire::Wire::Notify(wire::Notify {
+                                space,
+                                from_agent,
+                                to_agent,
+                                data,
+                                ..
+                            }) => {
+                                if let Err(err) = evt_sender_clone
+                                    .notify(space, to_agent, from_agent, data.into())
+                                    .await
+                                {
+                                    let reason = format!("{:?}", err);
+                                    let fail = wire::Wire::failure(reason).encode_vec().unwrap();
+                                    let _ = write.write_and_close(fail).await;
+                                    continue;
+                                }
+                                let resp = wire::Wire::notify_resp().encode_vec().unwrap();
+                                let _ = write.write_and_close(resp).await;
+                            }
                             _ => unimplemented!(),
                         }
                     }

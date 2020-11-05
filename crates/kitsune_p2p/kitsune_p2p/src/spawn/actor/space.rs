@@ -31,7 +31,7 @@ ghost_actor::ghost_chan! {
     pub(crate) chan SpaceInternal<crate::KitsuneP2pError> {
         /// Make a remote request right-now if we have an open connection,
         /// otherwise, return an error.
-        fn immediate_request(space: Arc<KitsuneSpace>, to_agent: Arc<KitsuneAgent>, from_agent: Arc<KitsuneAgent>, data: Arc<Vec<u8>>) -> Vec<u8>;
+        fn immediate_request(space: Arc<KitsuneSpace>, to_agent: Arc<KitsuneAgent>, from_agent: Arc<KitsuneAgent>, data: Arc<Vec<u8>>) -> wire::Wire;
 
         /// List online agents that claim to be covering a basis hash
         fn list_online_agents_for_basis_hash(space: Arc<KitsuneSpace>, from_agent: Arc<KitsuneAgent>, basis: Arc<KitsuneBasis>) -> HashSet<Arc<KitsuneAgent>>;
@@ -165,7 +165,7 @@ impl SpaceInternalHandler for Space {
         to_agent: Arc<KitsuneAgent>,
         from_agent: Arc<KitsuneAgent>,
         data: Arc<Vec<u8>>,
-    ) -> SpaceInternalHandlerResult<Vec<u8>> {
+    ) -> SpaceInternalHandlerResult<wire::Wire> {
         let space = self.space.clone();
         if self.agents.contains_key(&to_agent) {
             // LOCAL SHORT CIRCUIT! - just forward data locally
@@ -176,28 +176,23 @@ impl SpaceInternalHandler for Space {
 
             match data {
                 wire::Wire::Call(payload) => Ok(async move {
-                    evt_sender
+                    let res = evt_sender
                         .call(space, to_agent, from_agent, payload.data.into())
-                        .await
+                        .await?;
+                    Ok(wire::Wire::call_resp(res.into()))
                 }
                 .instrument(tracing::debug_span!("wire_call"))
                 .boxed()
                 .into()),
-                wire::Wire::Notify(payload) => {
-                    Ok(async move {
-                        evt_sender
-                            .notify(space, to_agent, from_agent, payload.data.into())
-                            .await?;
-                        // broadcast doesn't return anything...
-                        Ok(vec![])
-                    }
-                    .boxed()
-                    .into())
+                wire::Wire::Notify(payload) => Ok(async move {
+                    evt_sender
+                        .notify(space, to_agent, from_agent, payload.data.into())
+                        .await?;
+                    Ok(wire::Wire::notify_resp())
                 }
-                _ => {
-                    tracing::warn!("UNHANDLED WIRE: {:?}", data);
-                    Ok(async move { Ok(vec![]) }.boxed().into())
-                }
+                .boxed()
+                .into()),
+                _ => unimplemented!(),
             }
         } else {
             let evt_sender = self.evt_sender.clone();
@@ -225,8 +220,8 @@ impl SpaceInternalHandler for Space {
                 let read = read.read_to_end().await;
                 let (_, read) = wire::Wire::decode_ref(&read)?;
                 match read {
-                    wire::Wire::CallResp(wire::CallResp { data }) => Ok(data.into()),
-                    _ => Err(format!("bad resp: {:?}", read).into()),
+                    wire::Wire::Failure(wire::Failure { reason }) => Err(reason.into()),
+                    _ => Ok(read),
                 }
             }
             .boxed()
@@ -376,7 +371,12 @@ impl KitsuneP2pHandler for Space {
                     ))
                     .await
                 {
-                    Ok(res) => return Ok(res),
+                    Ok(res) => {
+                        if let wire::Wire::CallResp(wire::CallResp { data }) = res {
+                            return Ok(data.into());
+                        }
+                        Err(format!("invalid response: {:?}", res).into())
+                    }
                     Err(e) => Err(e),
                 };
 
@@ -584,10 +584,12 @@ impl Space {
             )
             .await
             {
-                out.push(actor::RpcMultiResponse {
-                    agent: to_agent,
-                    response,
-                });
+                if let wire::Wire::CallResp(wire::CallResp { data }) = response {
+                    out.push(actor::RpcMultiResponse {
+                        agent: to_agent,
+                        response: data.into(),
+                    });
+                }
             }
 
             Ok(out)
@@ -614,9 +616,6 @@ impl Space {
         } = input;
 
         let timeout_ms = timeout_ms.expect("set by handle_notify_multi");
-
-        // encode the data to send
-        let payload = Arc::new(wire::Wire::notify(payload.into()).encode_vec()?);
 
         let i_s = self.i_s.clone();
 
@@ -653,18 +652,36 @@ impl Space {
                             // so we're not holding up this loop
                             let i_s = i_s.clone();
                             let space = space.clone();
-                            let payload = payload.clone();
+                            // encode the data to send
+                            let payload = Arc::new(
+                                wire::Wire::notify(
+                                    space.clone(),
+                                    from_agent.clone(),
+                                    to_agent.clone(),
+                                    payload.clone().into(),
+                                )
+                                .encode_vec()?,
+                            );
+
                             let send_success_count = send_success_count.clone();
                             let from_agent2 = from_agent.clone();
                             tokio::task::spawn(
                                 async move {
-                                    if i_s
+                                    let res = i_s
                                         .immediate_request(space, to_agent, from_agent2, payload)
-                                        .await
-                                        .is_ok()
-                                    {
-                                        send_success_count
-                                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                                        .await;
+                                    match res {
+                                        Ok(wire::Wire::NotifyResp(_)) => {
+                                            send_success_count
+                                                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                                        }
+                                        Ok(wire::Wire::Failure(wire::Failure { reason })) => {
+                                            eprintln!("FAIL: {}", reason);
+                                        }
+                                        Err(e) => {
+                                            eprintln!("FAIL: {:?}", e);
+                                        }
+                                        _ => (),
                                     }
                                 }
                                 .instrument(
