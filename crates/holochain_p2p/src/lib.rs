@@ -19,6 +19,7 @@ use holochain_types::{
     metadata::MetadataSet,
 };
 pub use spawn::*;
+pub use test::stub_network;
 pub use test::HolochainP2pCellFixturator;
 
 pub use kitsune_p2p;
