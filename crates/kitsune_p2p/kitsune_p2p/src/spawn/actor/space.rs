@@ -259,7 +259,7 @@ impl SpaceInternalHandler for Space {
                     sig,
                     data,
                 )?;
-                tracing::debug!(?agent_info_signed);
+                tracing::debug!(?agent_info, ?sig);
                 evt_sender
                     .put_agent_info_signed(PutAgentInfoSignedEvt {
                         space: space.clone(),
