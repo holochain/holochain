@@ -154,7 +154,7 @@ pub mod slow_tests {
         );
 
         assert_eq!(
-            anchor_address_one.get_core_bytes().to_vec(),
+            anchor_address_one.get_raw_32().to_vec(),
             vec![
                 138, 240, 209, 89, 206, 160, 42, 131, 107, 63, 111, 243, 67, 8, 24, 48, 151, 62,
                 108, 99, 102, 109, 57, 253, 219, 26, 255, 164, 83, 134, 245, 254
@@ -170,7 +170,7 @@ pub mod slow_tests {
         );
 
         assert_eq!(
-            anchor_address_two.get_core_bytes().to_vec(),
+            anchor_address_two.get_raw_32().to_vec(),
             vec![
                 175, 176, 111, 101, 56, 12, 198, 140, 48, 157, 209, 87, 118, 124, 157, 94, 234,
                 232, 82, 136, 228, 219, 237, 221, 195, 225, 98, 177, 76, 26, 126, 6,
@@ -203,7 +203,7 @@ pub mod slow_tests {
         assert_eq!(list_anchor_type_addresses_output.0.len(), 1,);
         assert_eq!(
             (list_anchor_type_addresses_output.0)[0]
-                .get_core_bytes()
+                .get_raw_32()
                 .to_vec(),
             vec![
                 14, 28, 21, 33, 162, 54, 200, 39, 170, 131, 53, 252, 229, 108, 231, 41, 38, 79, 4,
@@ -223,16 +223,12 @@ pub mod slow_tests {
         // should be 2 anchors under "foo" sorted by hash
         assert_eq!(list_anchor_addresses_output.0.len(), 2,);
         assert_eq!(
-            (list_anchor_addresses_output.0)[0]
-                .get_core_bytes()
-                .to_vec(),
-            anchor_address_one.get_core_bytes().to_vec(),
+            (list_anchor_addresses_output.0)[0].get_raw_32().to_vec(),
+            anchor_address_one.get_raw_32().to_vec(),
         );
         assert_eq!(
-            (list_anchor_addresses_output.0)[1]
-                .get_core_bytes()
-                .to_vec(),
-            anchor_address_two.get_core_bytes().to_vec(),
+            (list_anchor_addresses_output.0)[1].get_raw_32().to_vec(),
+            anchor_address_two.get_raw_32().to_vec(),
         );
 
         let list_anchor_tags_output: AnchorTags = crate::call_test_ribosome!(

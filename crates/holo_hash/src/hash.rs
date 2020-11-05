@@ -1,4 +1,4 @@
-use crate::{has_hash::HasHash, HashType, PrimitiveHashType};
+use crate::{error::HoloHashResult, has_hash::HasHash, HashType, PrimitiveHashType};
 
 pub(crate) const HASH_PREFIX_LEN: usize = 3;
 pub(crate) const HASH_CORE_LEN: usize = 32;
@@ -26,9 +26,16 @@ pub struct HoloHash<T: HashType> {
 }
 
 impl<T: HashType> HoloHash<T> {
-    /// Raw constructor: use a precomputed hash + location byte array in vec
-    /// form, along with a type, to construct a hash.
-    pub fn from_full_bytes_and_type(mut bytes: Vec<u8>, hash_type: T) -> Self {
+    /// Raw constructor: Create a HoloHash from 39 bytes, using the prefix
+    /// bytes to determine the hash_type
+    pub fn from_raw_39(hash: Vec<u8>) -> HoloHashResult<Self> {
+        let hash_type = T::try_from_prefix(&hash[0..3])?;
+        Ok(Self { hash, hash_type })
+    }
+
+    /// Use a precomputed hash + location byte array in vec form,
+    /// along with a type, to construct a hash. Used in this crate only, for testing.
+    pub fn from_raw_36_and_type(mut bytes: Vec<u8>, hash_type: T) -> Self {
         let mut hash = hash_type.get_prefix().to_vec();
         hash.append(&mut bytes);
         assert_length(HOLO_HASH_RAW_LEN, &hash);
@@ -53,12 +60,19 @@ impl<T: HashType> HoloHash<T> {
     }
 
     /// Get the raw 39-byte Vec including the 3 byte prefix, base 32 bytes, and the 4 byte loc
-    pub fn get_raw_bytes(&self) -> &[u8] {
+    pub fn get_raw_39(&self) -> &[u8] {
         &self.hash[..]
     }
 
+    /// Get 36-byte Vec which excludes the 3 byte prefix
+    pub fn get_raw_36(&self) -> &[u8] {
+        let bytes = &self.hash[HASH_PREFIX_LEN..];
+        assert_length(HOLO_HASH_FULL_LEN, bytes);
+        bytes
+    }
+
     /// Fetch just the core 32 bytes (without the 4 location bytes)
-    pub fn get_core_bytes(&self) -> &[u8] {
+    pub fn get_raw_32(&self) -> &[u8] {
         let bytes = &self.hash[HASH_PREFIX_LEN..HASH_PREFIX_LEN + HASH_CORE_LEN];
         assert_length(HASH_CORE_LEN, bytes);
         bytes
@@ -78,9 +92,9 @@ impl<T: HashType> HoloHash<T> {
 
 impl<P: PrimitiveHashType> HoloHash<P> {
     /// Construct from 36 raw bytes, using the known PrimitiveHashType
-    pub fn from_full_bytes(hash: Vec<u8>) -> Self {
+    pub fn from_raw_36(hash: Vec<u8>) -> Self {
         assert_length(HOLO_HASH_FULL_LEN, &hash);
-        Self::from_full_bytes_and_type(hash, P::new())
+        Self::from_raw_36_and_type(hash, P::new())
     }
 }
 
@@ -149,23 +163,23 @@ mod tests {
         assert_eq!(3_688_618_971, h.get_loc());
         assert_eq!(
             "[219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219]",
-            format!("{:?}", h.get_core_bytes()),
+            format!("{:?}", h.get_raw_32()),
         );
     }
 
     #[test]
     #[cfg(not(feature = "string-encoding"))]
     fn test_enum_types() {
-        assert_type("DnaHash", DnaHash::from_full_bytes(vec![0xdb; 36]));
-        assert_type("NetIdHash", NetIdHash::from_full_bytes(vec![0xdb; 36]));
-        assert_type("AgentPubKey", AgentPubKey::from_full_bytes(vec![0xdb; 36]));
-        assert_type("EntryHash", EntryHash::from_full_bytes(vec![0xdb; 36]));
-        assert_type("DhtOpHash", DhtOpHash::from_full_bytes(vec![0xdb; 36]));
+        assert_type("DnaHash", DnaHash::from_raw_36(vec![0xdb; 36]));
+        assert_type("NetIdHash", NetIdHash::from_raw_36(vec![0xdb; 36]));
+        assert_type("AgentPubKey", AgentPubKey::from_raw_36(vec![0xdb; 36]));
+        assert_type("EntryHash", EntryHash::from_raw_36(vec![0xdb; 36]));
+        assert_type("DhtOpHash", DhtOpHash::from_raw_36(vec![0xdb; 36]));
     }
 
     #[test]
     #[should_panic]
     fn test_fails_with_bad_size() {
-        DnaHash::from_full_bytes(vec![0xdb; 35]);
+        DnaHash::from_raw_36(vec![0xdb; 35]);
     }
 }

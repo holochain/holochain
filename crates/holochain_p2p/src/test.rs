@@ -48,7 +48,7 @@ mod tests {
 
     macro_rules! newhash {
         ($p:ident, $c:expr) => {
-            holo_hash::$p::from_full_bytes([$c as u8; 36].to_vec())
+            holo_hash::$p::from_raw_36([$c as u8; 36].to_vec())
         };
     }
 
@@ -207,7 +207,7 @@ mod tests {
         p2p.join(dna.clone(), a2.clone()).await.unwrap();
         p2p.join(dna.clone(), a3.clone()).await.unwrap();
 
-        let header_hash = holo_hash::AnyDhtHash::from_full_bytes_and_type(
+        let header_hash = holo_hash::AnyDhtHash::from_raw_36_and_type(
             b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
             holo_hash::hash_type::AnyDht::Header,
         );
@@ -282,7 +282,7 @@ mod tests {
         p2p.join(dna.clone(), a2.clone()).await.unwrap();
         p2p.join(dna.clone(), a3.clone()).await.unwrap();
 
-        let hash = holo_hash::AnyDhtHash::from_full_bytes_and_type(
+        let hash = holo_hash::AnyDhtHash::from_raw_36_and_type(
             b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
             holo_hash::hash_type::AnyDht::Header,
         );
@@ -339,7 +339,7 @@ mod tests {
         p2p.join(dna.clone(), a1.clone()).await.unwrap();
         p2p.join(dna.clone(), a2.clone()).await.unwrap();
 
-        let hash = holo_hash::EntryHash::from_full_bytes_and_type(
+        let hash = holo_hash::EntryHash::from_raw_36_and_type(
             b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
             holo_hash::hash_type::Entry,
         );

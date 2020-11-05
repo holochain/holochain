@@ -8,10 +8,8 @@ impl<P: PrimitiveHashType> TryFrom<&str> for HoloHash<P> {
     type Error = HoloHashError;
     fn try_from(s: &str) -> Result<Self, HoloHashError> {
         let hash_type = P::new();
-        Ok(HoloHash::from_full_bytes(holo_hash_decode(
-            hash_type.get_prefix(),
-            s,
-        )?))
+        dbg!(s);
+        HoloHash::from_raw_39(holo_hash_decode(hash_type.get_prefix(), s)?)
     }
 }
 
@@ -31,7 +29,7 @@ impl<P: PrimitiveHashType> TryFrom<String> for HoloHash<P> {
 
 impl<T: HashType> std::fmt::Display for HoloHash<T> {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        write!(f, "{}", holo_hash_encode(self.get_raw_bytes()))
+        write!(f, "{}", holo_hash_encode(self.get_raw_39()))
     }
 }
 

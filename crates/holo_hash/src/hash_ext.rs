@@ -23,7 +23,7 @@ impl<T: HashType> HoloHash<T> {
 
         assert_length(HOLO_HASH_FULL_LEN, &hash);
 
-        HoloHash::from_full_bytes_and_type(hash, hash_type)
+        HoloHash::from_raw_36_and_type(hash, hash_type)
     }
 }
 
@@ -48,7 +48,7 @@ impl<T: HashTypeSync> HoloHash<T> {
                 Self::with_pre_hashed_typed(encode::blake2b_256(&bytes), content.hash_type())
             }
             HashableContentBytes::Prehashed36(bytes) => {
-                HoloHash::from_full_bytes_and_type(bytes, content.hash_type())
+                HoloHash::from_raw_36_and_type(bytes, content.hash_type())
             }
         }
     }
@@ -77,7 +77,7 @@ impl<T: HashTypeAsync> HoloHash<T> {
                 Self::with_pre_hashed_typed(hash, content.hash_type())
             }
             HashableContentBytes::Prehashed36(bytes) => {
-                HoloHash::from_full_bytes_and_type(bytes, content.hash_type())
+                HoloHash::from_raw_36_and_type(bytes, content.hash_type())
             }
         }
     }

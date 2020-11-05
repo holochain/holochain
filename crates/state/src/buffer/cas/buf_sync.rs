@@ -97,7 +97,7 @@ where
         fatal_db_hash_integrity_check!(
             "CasBufUsedSync::get",
             hash_bytes,
-            data.as_hash().get_raw_bytes(),
+            data.as_hash().get_raw_39(),
             data.as_content(),
         );
         data

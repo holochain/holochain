@@ -4,7 +4,7 @@ use fixt::prelude::*;
 use kitsune_p2p::{
     agent_store::{AgentInfo, AgentInfoSigned, Urls},
     dependencies::url2,
-    KitsuneAgent, KitsuneSignature, KitsuneSpace,
+    KitsuneAgent, KitsuneBinType, KitsuneSignature, KitsuneSpace,
 };
 use url2::url2;
 
@@ -35,12 +35,12 @@ fixturator!(
 
 fixturator!(
     KitsuneAgent;
-    from ThirtySixBytes;
+    constructor fn new(ThirtySixBytes);
 );
 
 fixturator!(
     KitsuneSpace;
-    from ThirtySixBytes;
+    constructor fn new(ThirtySixBytes);
 );
 
 fixturator!(

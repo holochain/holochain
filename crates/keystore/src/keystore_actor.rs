@@ -40,7 +40,7 @@ impl KeystoreSenderExt for KeystoreSender {
     fn sign(&self, input: SignInput) -> KeystoreApiFuture<Signature> {
         use lair_keystore_api::actor::LairClientApiSender;
         let fut = self.sign_ed25519_sign_by_pub_key(
-            input.key.as_ref()[..32].to_vec().into(),
+            input.key.as_ref().to_vec().into(),
             <Vec<u8>>::from(UnsafeBytes::from(input.data)).into(),
         );
         async move {

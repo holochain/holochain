@@ -114,11 +114,11 @@ macro_rules! to_and_from_kitsune {
                 }
 
                 fn into_kitsune_raw(self) -> $k {
-                    self.into_inner().into()
+                    <$k as kitsune_p2p::KitsuneBinType>::new(self.get_raw_36().to_vec())
                 }
 
                 fn from_kitsune(k: &::std::sync::Arc<$k>) -> Self {
-                    <$h>::from_full_bytes((**k).clone().into()).into()
+                    <$h>::from_raw_36((**k).clone().into()).into()
                 }
             }
         )*
@@ -150,7 +150,7 @@ macro_rules! to_kitsune {
                 }
 
                 fn into_kitsune_raw(self) -> $k {
-                    self.into_inner().into()
+                    <$k as kitsune_p2p::KitsuneBinType>::new(self.get_raw_36().to_vec())
                 }
             }
         )*

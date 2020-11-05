@@ -6,7 +6,7 @@ impl<T: HashType> serde::Serialize for HoloHash<T> {
     where
         S: serde::Serializer,
     {
-        serializer.serialize_bytes(self.get_raw_bytes())
+        serializer.serialize_bytes(self.get_raw_39())
     }
 }
 
@@ -37,10 +37,8 @@ impl<'de, T: HashType> serde::de::Visitor<'de> for HoloHashVisitor<T> {
                 "HoloHash serialized representation must be exactly 39 bytes",
             ))
         } else {
-            let hash_type = T::try_from_prefix(&h[0..3])
-                .map_err(|e| serde::de::Error::custom(format!("HoloHash error: {:?}", e)))?;
-            let hash = h[3..39].to_vec();
-            Ok(HoloHash::from_full_bytes_and_type(hash, hash_type))
+            HoloHash::from_raw_39(h.to_vec())
+                .map_err(|e| serde::de::Error::custom(format!("HoloHash error: {:?}", e)))
         }
     }
 
@@ -97,7 +95,7 @@ mod tests {
         use holochain_serialized_bytes::SerializedBytes;
         use std::convert::TryInto;
 
-        let h_orig = DnaHash::from_full_bytes(vec![0xdb; 36]);
+        let h_orig = DnaHash::from_raw_36(vec![0xdb; 36]);
         let h: SerializedBytes = h_orig.clone().try_into().unwrap();
         let h: DnaHash = h.try_into().unwrap();
 
@@ -107,7 +105,7 @@ mod tests {
 
     #[test]
     fn test_rmp_roundtrip() {
-        let h_orig = AgentPubKey::from_full_bytes(vec![0xdb; 36]);
+        let h_orig = AgentPubKey::from_raw_36(vec![0xdb; 36]);
         let buf = holochain_serialized_bytes::encode(&h_orig).unwrap();
         let h: AgentPubKey = holochain_serialized_bytes::decode(&buf).unwrap();
 
@@ -119,23 +117,21 @@ mod tests {
     fn test_composite_hashtype_roundtrips() {
         {
             let h_orig =
-                AnyDhtHash::from_full_bytes_and_type(vec![0xdb; 36], hash_type::AnyDht::Header);
+                AnyDhtHash::from_raw_36_and_type(vec![0xdb; 36], hash_type::AnyDht::Header);
             let buf = holochain_serialized_bytes::encode(&h_orig).unwrap();
             let h: AnyDhtHash = holochain_serialized_bytes::decode(&buf).unwrap();
             assert_eq!(h_orig, h);
             assert_eq!(*h.hash_type(), hash_type::AnyDht::Header);
         }
         {
-            let h_orig =
-                AnyDhtHash::from_full_bytes_and_type(vec![0xdb; 36], hash_type::AnyDht::Entry);
+            let h_orig = AnyDhtHash::from_raw_36_and_type(vec![0xdb; 36], hash_type::AnyDht::Entry);
             let buf = holochain_serialized_bytes::encode(&h_orig).unwrap();
             let h: AnyDhtHash = holochain_serialized_bytes::decode(&buf).unwrap();
             assert_eq!(h_orig, h);
             assert_eq!(*h.hash_type(), hash_type::AnyDht::Entry);
         }
         {
-            let h_orig =
-                AnyDhtHash::from_full_bytes_and_type(vec![0xdb; 36], hash_type::AnyDht::Entry);
+            let h_orig = AnyDhtHash::from_raw_36_and_type(vec![0xdb; 36], hash_type::AnyDht::Entry);
             let buf = holochain_serialized_bytes::encode(&h_orig).unwrap();
             let h: AnyDhtHash = holochain_serialized_bytes::decode(&buf).unwrap();
             assert_eq!(h_orig, h);
@@ -146,12 +142,12 @@ mod tests {
     #[test]
     fn test_any_dht_deserialization() {
         {
-            let h_orig = EntryHash::from_full_bytes_and_type(vec![0xdb; 36], hash_type::Entry);
+            let h_orig = EntryHash::from_raw_36_and_type(vec![0xdb; 36], hash_type::Entry);
             let buf = holochain_serialized_bytes::encode(&h_orig).unwrap();
             let _: AnyDhtHash = holochain_serialized_bytes::decode(&buf).unwrap();
         }
         {
-            let h_orig = HeaderHash::from_full_bytes_and_type(vec![0xdb; 36], hash_type::Header);
+            let h_orig = HeaderHash::from_raw_36_and_type(vec![0xdb; 36], hash_type::Header);
             let buf = holochain_serialized_bytes::encode(&h_orig).unwrap();
             let _: AnyDhtHash = holochain_serialized_bytes::decode(&buf).unwrap();
         }
@@ -161,7 +157,7 @@ mod tests {
     #[should_panic]
     fn test_any_dht_deserialization_crossover_error() {
         {
-            let h_orig = DhtOpHash::from_full_bytes_and_type(vec![0xdb; 36], hash_type::DhtOp);
+            let h_orig = DhtOpHash::from_raw_36_and_type(vec![0xdb; 36], hash_type::DhtOp);
             let buf = holochain_serialized_bytes::encode(&h_orig).unwrap();
             let _: AnyDhtHash = holochain_serialized_bytes::decode(&buf).unwrap();
         }
@@ -176,8 +172,8 @@ mod tests {
         }
 
         let orig = TestData {
-            e: EntryHash::from_full_bytes_and_type(vec![0xdb; 36], hash_type::Entry),
-            h: HeaderHash::from_full_bytes(vec![0xdb; 36]),
+            e: EntryHash::from_raw_36_and_type(vec![0xdb; 36], hash_type::Entry),
+            h: HeaderHash::from_raw_36(vec![0xdb; 36]),
         };
 
         let sb: SerializedBytes = (&orig).try_into().unwrap();
@@ -196,7 +192,7 @@ mod tests {
             content: String,
         }
 
-        let any_hash = AnyDhtHash::from_full_bytes_and_type(
+        let any_hash = AnyDhtHash::from_raw_36_and_type(
             b"000000000000000000000000000000000000".to_vec(),
             hash_type::AnyDht::Header,
         );
@@ -241,7 +237,7 @@ mod tests {
         }
 
         let mut g: Generic<HeaderHash> = Generic::new();
-        let h = HeaderHash::from_full_bytes(vec![0xdb; 36]);
+        let h = HeaderHash::from_raw_36(vec![0xdb; 36]);
         g.put(&h);
         assert_eq!(h, g.get());
     }

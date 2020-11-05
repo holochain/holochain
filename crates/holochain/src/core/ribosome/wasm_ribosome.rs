@@ -119,7 +119,7 @@ impl WasmRibosome {
             .dna()
             .get_zome(zome_name)?
             .wasm_hash
-            .get_raw_bytes())
+            .get_raw_39())
     }
 
     pub fn instance(&self, call_context: CallContext) -> RibosomeResult<Instance> {
