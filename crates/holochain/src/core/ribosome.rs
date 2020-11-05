@@ -555,11 +555,12 @@ pub mod wasm_test {
                     .unwrap();
 
                 // Required because otherwise the network will return routing errors
-                let (network, r_task, cell_network) = crate::test_utils::test_network(
+                let test_network = crate::test_utils::test_network(
                     Some(ribosome.dna_file().dna_hash().clone()),
                     Some(author),
                 )
                 .await;
+                let cell_network = test_network.cell_network();
                 let cell_id = holochain_types::cell::CellId::new(
                     cell_network.dna_hash(),
                     cell_network.from_agent(),
@@ -591,9 +592,6 @@ pub mod wasm_test {
                     }
                     crate::core::ribosome::ZomeCallResponse::Unauthorized => unreachable!(),
                 };
-                use ghost_actor::GhostControlSender;
-                network.ghost_actor_shutdown().await.unwrap();
-                r_task.await.unwrap();
                 output
             })
             .await
