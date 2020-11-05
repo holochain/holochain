@@ -20,8 +20,8 @@ use holo_hash::fixt::*;
 use holo_hash::*;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::{
-    actor::HolochainP2pRefToCell, spawn_holochain_p2p, HolochainP2pCell, HolochainP2pRef,
-    HolochainP2pSender,
+    actor::HolochainP2pRefToCell, event::HolochainP2pEvent, spawn_holochain_p2p, HolochainP2pCell,
+    HolochainP2pRef, HolochainP2pSender,
 };
 use holochain_serialized_bytes::{SerializedBytes, SerializedBytesError, UnsafeBytes};
 use holochain_state::{
@@ -45,6 +45,7 @@ use holochain_zome_types::{
 };
 use std::{convert::TryInto, sync::Arc, time::Duration};
 use tempdir::TempDir;
+use tokio::sync::mpsc;
 
 #[cfg(test)]
 pub mod host_fn_api;
@@ -140,23 +141,98 @@ pub async fn fake_unique_element(
     ))
 }
 
+/// A running test network with a joined cell.
+/// Will shutdown on drop.
+pub struct TestNetwork {
+    network: Option<HolochainP2pRef>,
+    respond_task: Option<tokio::task::JoinHandle<()>>,
+    cell_network: HolochainP2pCell,
+}
+
+impl TestNetwork {
+    /// Create a new test network
+    pub fn new(
+        network: HolochainP2pRef,
+        respond_task: tokio::task::JoinHandle<()>,
+        cell_network: HolochainP2pCell,
+    ) -> Self {
+        Self {
+            network: Some(network),
+            respond_task: Some(respond_task),
+            cell_network,
+        }
+    }
+
+    /// Get the holochain p2p network
+    pub fn network(&self) -> HolochainP2pRef {
+        self.network
+            .as_ref()
+            .expect("Tried to use network while it was shutting down")
+            .clone()
+    }
+
+    /// Get the cell network
+    pub fn cell_network(&self) -> HolochainP2pCell {
+        self.cell_network.clone()
+    }
+}
+
+impl Drop for TestNetwork {
+    fn drop(&mut self) {
+        use ghost_actor::GhostControlSender;
+        let network = self.network.take().unwrap();
+        let respond_task = self.respond_task.take().unwrap();
+        tokio::task::spawn(async move {
+            network.ghost_actor_shutdown_immediate().await.ok();
+            respond_task.await.ok();
+        });
+    }
+}
+
 /// Convenience constructor for cell networks
 pub async fn test_network(
     dna_hash: Option<DnaHash>,
     agent_key: Option<AgentPubKey>,
-) -> (
-    HolochainP2pRef,
-    tokio::task::JoinHandle<()>,
-    HolochainP2pCell,
-) {
+) -> TestNetwork {
+    test_network_inner::<fn(&HolochainP2pEvent) -> bool>(dna_hash, agent_key, None).await
+}
+
+/// Convenience constructor for cell networks
+/// where you need to filter some events into a channel
+pub async fn test_network_with_events<F>(
+    dna_hash: Option<DnaHash>,
+    agent_key: Option<AgentPubKey>,
+    filter: F,
+    evt_send: mpsc::Sender<HolochainP2pEvent>,
+) -> TestNetwork
+where
+    F: Fn(&HolochainP2pEvent) -> bool + Send + 'static,
+{
+    test_network_inner(dna_hash, agent_key, Some((filter, evt_send))).await
+}
+
+async fn test_network_inner<F>(
+    dna_hash: Option<DnaHash>,
+    agent_key: Option<AgentPubKey>,
+    mut events: Option<(F, mpsc::Sender<HolochainP2pEvent>)>,
+) -> TestNetwork
+where
+    F: Fn(&HolochainP2pEvent) -> bool + Send + 'static,
+{
     let (network, mut recv) =
         spawn_holochain_p2p(holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default())
             .await
             .unwrap();
-    let r_task = tokio::task::spawn(async move {
+    let respond_task = tokio::task::spawn(async move {
         use futures::future::FutureExt;
         use tokio::stream::StreamExt;
         while let Some(evt) = recv.next().await {
+            if let Some((filter, tx)) = &mut events {
+                if filter(&evt) {
+                    tx.send(evt).await.unwrap();
+                    continue;
+                }
+            }
             use holochain_p2p::event::HolochainP2pEvent::*;
             match evt {
                 SignNetworkData { respond, .. } => {
@@ -174,7 +250,7 @@ pub async fn test_network(
     let agent_key = agent_key.unwrap_or_else(|| key_fixt.next().unwrap());
     let cell_network = network.to_cell(dna.clone(), agent_key.clone());
     network.join(dna.clone(), agent_key).await.unwrap();
-    (network, r_task, cell_network)
+    TestNetwork::new(network, respond_task, cell_network)
 }
 
 /// Do what's necessary to install an app
