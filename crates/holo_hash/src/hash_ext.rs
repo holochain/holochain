@@ -1,7 +1,6 @@
 use crate::{
     assert_length, encode, hash_type, HashType, HashableContent, HashableContentBytes, HoloHash,
-    HoloHashOf, HoloHashed, PrimitiveHashType, HASH_CORE_LEN, HOLO_HASH_CORE_LEN,
-    HOLO_HASH_FULL_LEN,
+    HoloHashOf, HoloHashed, PrimitiveHashType, HOLO_HASH_CORE_LEN, HOLO_HASH_FULL_LEN,
 };
 use hash_type::{HashTypeAsync, HashTypeSync};
 
@@ -17,7 +16,7 @@ impl<T: HashType> HoloHash<T> {
     /// For convenience, 36 bytes can also be passed in, in which case
     /// the location bytes will used as provided, not computed.
     pub fn with_pre_hashed_typed(mut hash: Vec<u8>, hash_type: T) -> Self {
-        if hash.len() == HASH_CORE_LEN {
+        if hash.len() == HOLO_HASH_CORE_LEN {
             hash.append(&mut encode::holo_dht_location_bytes(&hash));
         }
 
@@ -47,9 +46,7 @@ impl<T: HashTypeSync> HoloHash<T> {
                 }
                 Self::with_pre_hashed_typed(encode::blake2b_256(&bytes), content.hash_type())
             }
-            HashableContentBytes::Prehashed36(bytes) => {
-                HoloHash::from_raw_36_and_type(bytes, content.hash_type())
-            }
+            HashableContentBytes::Prehashed39(bytes) => HoloHash::from_raw_39_panicky(bytes),
         }
     }
 }
@@ -76,7 +73,7 @@ impl<T: HashTypeAsync> HoloHash<T> {
                 assert_length(HOLO_HASH_CORE_LEN, &hash);
                 Self::with_pre_hashed_typed(hash, content.hash_type())
             }
-            HashableContentBytes::Prehashed36(bytes) => {
+            HashableContentBytes::Prehashed39(bytes) => {
                 HoloHash::from_raw_36_and_type(bytes, content.hash_type())
             }
         }

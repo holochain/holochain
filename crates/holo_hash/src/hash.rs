@@ -1,17 +1,20 @@
 use crate::{error::HoloHashResult, has_hash::HasHash, HashType, PrimitiveHashType};
 
-pub(crate) const HASH_PREFIX_LEN: usize = 3;
-pub(crate) const HASH_CORE_LEN: usize = 32;
-pub(crate) const HASH_LOC_LEN: usize = 4;
+/// Length of the prefix bytes (3)
+pub const HOLO_HASH_PREFIX_LEN: usize = 3;
 
 /// Length of the core bytes (32)
-pub const HOLO_HASH_CORE_LEN: usize = HASH_CORE_LEN; // 32
+pub const HOLO_HASH_CORE_LEN: usize = 32;
+
+/// Length of the location bytes (4)
+pub const HOLO_HASH_LOC_LEN: usize = 4;
 
 /// Length of the core bytes + the loc bytes (36 = 32 + 4)
-pub const HOLO_HASH_FULL_LEN: usize = HASH_CORE_LEN + HASH_LOC_LEN; // 36
+pub const HOLO_HASH_FULL_LEN: usize = HOLO_HASH_CORE_LEN + HOLO_HASH_LOC_LEN; // 36
 
 /// Length of the full HoloHash bytes (39 = 3 + 32 + 4)
-pub const HOLO_HASH_SERIALIZED_LEN: usize = HASH_PREFIX_LEN + HASH_CORE_LEN + HASH_LOC_LEN;
+pub const HOLO_HASH_SERIALIZED_LEN: usize =
+    HOLO_HASH_PREFIX_LEN + HOLO_HASH_CORE_LEN + HOLO_HASH_LOC_LEN;
 
 /// Alias for `HOLO_HASH_SERIALIZED_LEN`
 pub const HOLO_HASH_RAW_LEN: usize = HOLO_HASH_SERIALIZED_LEN;
@@ -29,13 +32,21 @@ impl<T: HashType> HoloHash<T> {
     /// Raw constructor: Create a HoloHash from 39 bytes, using the prefix
     /// bytes to determine the hash_type
     pub fn from_raw_39(hash: Vec<u8>) -> HoloHashResult<Self> {
+        assert_length(HOLO_HASH_RAW_LEN, &hash);
         let hash_type = T::try_from_prefix(&hash[0..3])?;
         Ok(Self { hash, hash_type })
+    }
+    /// Raw constructor: Create a HoloHash from 39 bytes, using the prefix
+    /// bytes to determine the hash_type
+    #[deprecated = "give a proper error"]
+    pub fn from_raw_39_panicky(hash: Vec<u8>) -> Self {
+        Self::from_raw_39(hash).expect("the specified hash_type does not match the prefix bytes")
     }
 
     /// Use a precomputed hash + location byte array in vec form,
     /// along with a type, to construct a hash. Used in this crate only, for testing.
     pub fn from_raw_36_and_type(mut bytes: Vec<u8>, hash_type: T) -> Self {
+        assert_length(HOLO_HASH_FULL_LEN, &bytes);
         let mut hash = hash_type.get_prefix().to_vec();
         hash.append(&mut bytes);
         assert_length(HOLO_HASH_RAW_LEN, &hash);
@@ -43,7 +54,7 @@ impl<T: HashType> HoloHash<T> {
     }
 
     /// Change the type of this HoloHash, keeping the same bytes
-    pub(crate) fn retype<TT: HashType>(mut self, hash_type: TT) -> HoloHash<TT> {
+    pub fn retype<TT: HashType>(mut self, hash_type: TT) -> HoloHash<TT> {
         let prefix = hash_type.get_prefix();
         let _ = std::mem::replace(&mut self.hash[0], prefix[0]);
         let _ = std::mem::replace(&mut self.hash[1], prefix[1]);
@@ -66,15 +77,15 @@ impl<T: HashType> HoloHash<T> {
 
     /// Get 36-byte Vec which excludes the 3 byte prefix
     pub fn get_raw_36(&self) -> &[u8] {
-        let bytes = &self.hash[HASH_PREFIX_LEN..];
+        let bytes = &self.hash[HOLO_HASH_PREFIX_LEN..];
         assert_length(HOLO_HASH_FULL_LEN, bytes);
         bytes
     }
 
     /// Fetch just the core 32 bytes (without the 4 location bytes)
     pub fn get_raw_32(&self) -> &[u8] {
-        let bytes = &self.hash[HASH_PREFIX_LEN..HASH_PREFIX_LEN + HASH_CORE_LEN];
-        assert_length(HASH_CORE_LEN, bytes);
+        let bytes = &self.hash[HOLO_HASH_PREFIX_LEN..HOLO_HASH_PREFIX_LEN + HOLO_HASH_CORE_LEN];
+        assert_length(HOLO_HASH_CORE_LEN, bytes);
         bytes
     }
 

@@ -12,8 +12,8 @@ pub enum HoloHashError {
     /// this string is not the right size for a holo hash
     BadSize,
 
-    /// this hash does not seem to match a known holo hash prefix
-    BadPrefix,
+    /// this hash does not match a known holo hash prefix
+    BadPrefix(String, [u8; 3]),
 
     /// checksum validation failed
     BadChecksum,

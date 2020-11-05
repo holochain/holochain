@@ -1,8 +1,9 @@
 use crate::{
-    assert_length, error::HoloHashError, HashType, HoloHash, PrimitiveHashType, HASH_CORE_LEN,
-    HASH_PREFIX_LEN, HOLO_HASH_RAW_LEN,
+    assert_length, error::HoloHashError, HashType, HoloHash, PrimitiveHashType, HOLO_HASH_CORE_LEN,
+    HOLO_HASH_PREFIX_LEN, HOLO_HASH_RAW_LEN,
 };
 use std::convert::TryFrom;
+use std::convert::TryInto;
 
 impl<P: PrimitiveHashType> TryFrom<&str> for HoloHash<P> {
     type Error = HoloHashError;
@@ -50,12 +51,18 @@ pub fn holo_hash_decode(prefix: &[u8], s: &str) -> Result<Vec<u8>, HoloHashError
     if s.len() != HOLO_HASH_RAW_LEN {
         return Err(HoloHashError::BadSize);
     }
-    if &s[..HASH_PREFIX_LEN] != prefix {
-        return Err(HoloHashError::BadPrefix);
+    let actual_prefix: [u8; 3] = s[..HOLO_HASH_PREFIX_LEN].try_into().unwrap();
+    if &actual_prefix != prefix {
+        return Err(HoloHashError::BadPrefix(
+            format!("{:?}", prefix),
+            actual_prefix,
+        ));
     }
-    let loc_bytes = holo_dht_location_bytes(&s[HASH_PREFIX_LEN..HASH_PREFIX_LEN + HASH_CORE_LEN]);
+    let loc_bytes = holo_dht_location_bytes(
+        &s[HOLO_HASH_PREFIX_LEN..HOLO_HASH_PREFIX_LEN + HOLO_HASH_CORE_LEN],
+    );
     let loc_bytes: &[u8] = &loc_bytes;
-    if loc_bytes != &s[HASH_PREFIX_LEN + HASH_CORE_LEN..] {
+    if loc_bytes != &s[HOLO_HASH_PREFIX_LEN + HOLO_HASH_CORE_LEN..] {
         return Err(HoloHashError::BadChecksum);
     }
     assert_length(HOLO_HASH_RAW_LEN, &s);

@@ -1,5 +1,6 @@
 use super::*;
 use crate::{error::HoloHashError, hash_type, AgentPubKey, EntryHash};
+use std::convert::TryInto;
 
 pub(crate) const AGENT_PREFIX: &[u8] = &[0x84, 0x20, 0x24]; // uhCAk [132, 32, 36]
 pub(crate) const ENTRY_PREFIX: &[u8] = &[0x84, 0x21, 0x24]; // uhCEk [132, 33, 36]
@@ -32,7 +33,10 @@ impl<P: PrimitiveHashType> HashType for P {
         if prefix == P::static_prefix() {
             Ok(P::new())
         } else {
-            Err(HoloHashError::BadPrefix)
+            Err(HoloHashError::BadPrefix(
+                PrimitiveHashType::hash_name(P::new()).to_string(),
+                prefix.try_into().expect("3 byte prefix"),
+            ))
         }
     }
 

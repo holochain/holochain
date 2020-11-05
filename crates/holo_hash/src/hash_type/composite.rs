@@ -1,6 +1,6 @@
-use crate::error::HoloHashError;
-
 use super::*;
+use crate::error::HoloHashError;
+use std::convert::TryInto;
 
 #[cfg(all(test, feature = "serialized-bytes"))]
 use holochain_serialized_bytes::prelude::*;
@@ -30,7 +30,10 @@ impl HashType for AnyDht {
         match prefix {
             primitive::ENTRY_PREFIX => Ok(AnyDht::Entry),
             primitive::HEADER_PREFIX => Ok(AnyDht::Header),
-            _ => Err(HoloHashError::BadPrefix),
+            _ => Err(HoloHashError::BadPrefix(
+                "AnyDht".to_string(),
+                prefix.try_into().expect("3 byte prefix"),
+            )),
         }
     }
 

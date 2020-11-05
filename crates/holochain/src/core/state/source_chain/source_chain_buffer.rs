@@ -254,6 +254,7 @@ impl SourceChainBuf {
             entry_type: header::EntryType::AgentPubKey,
             entry_hash: agent_pubkey.clone().into(),
         });
+        dbg!(&agent_header, &agent_pubkey);
         self.put_raw(agent_header, Some(Entry::Agent(agent_pubkey)))
             .await?;
 
