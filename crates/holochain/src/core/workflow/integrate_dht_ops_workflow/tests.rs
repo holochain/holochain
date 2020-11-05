@@ -13,8 +13,8 @@ use crate::{
         workflow::CallZomeWorkspaceLock,
     },
     fixt::*,
-    test_utils::test_network,
 };
+use crate::{fixt::CallContextFixturator, test_utils::test_network};
 use ::fixt::prelude::*;
 use holo_hash::*;
 use holochain_state::{
@@ -1041,7 +1041,7 @@ async fn get_links(
         .zomes
         .push((zome_name.clone().into(), fixt!(Zome)));
 
-    let (_network, _r, cell_network) = test_network(Some(dna_file.dna_hash().clone()), None).await;
+    let test_network = test_network(Some(dna_file.dna_hash().clone()), None).await;
 
     // Create ribosome mock to return fixtures
     // This is a lot faster then compiling a zome
@@ -1060,7 +1060,7 @@ async fn get_links(
     let output = {
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock;
-        host_access.network = cell_network;
+        host_access.network = test_network.cell_network();
         call_context.host_access = host_access.into();
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
