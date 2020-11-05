@@ -4,7 +4,7 @@ use crate::{
         ConductorHandle,
     },
     core::queue_consumer::InitialQueueTriggers,
-    core::ribosome::wasm_ribosome::WasmRibosome,
+    core::ribosome::{wasm_ribosome::WasmRibosome, RibosomeT},
     test_utils::setup_app,
 };
 use holochain_keystore::KeystoreSender;
@@ -20,7 +20,7 @@ use holochain_zome_types::zome::ZomeName;
 use std::{convert::TryFrom, sync::Arc};
 use tempdir::TempDir;
 
-use super::host_fn_api::CallData;
+use super::{host_fn_api::CallData, install_app};
 
 /// Everything you need to run a test that uses the conductor
 pub struct ConductorTestData {
@@ -148,5 +148,18 @@ impl ConductorTestData {
         let shutdown = handle.take_shutdown_handle().await.unwrap();
         handle.shutdown().await;
         shutdown.await.unwrap();
+    }
+    /// Bring bob online if he isn't already
+    pub async fn bring_bob_online(&mut self) {
+        let dna_file = self.alice_call_data.ribosome.dna_file();
+        if self.bob_call_data.is_none() {
+            let bob_agent_id = fake_agent_pubkey_2();
+            let bob_cell_id = CellId::new(dna_file.dna_hash.clone(), bob_agent_id.clone());
+            let bob_installed_cell = InstalledCell::new(bob_cell_id.clone(), "bob_handle".into());
+            let cell_data = vec![(bob_installed_cell, None)];
+            install_app("bob_app", cell_data, self.handle.clone()).await;
+            self.bob_call_data =
+                Some(ConductorCallData::new(&bob_cell_id, &self.handle, dna_file).await);
+        }
     }
 }

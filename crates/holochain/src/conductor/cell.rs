@@ -78,6 +78,11 @@ mod validation_package;
 #[allow(missing_docs)]
 pub mod error;
 
+#[cfg(test)]
+mod gossip_test;
+#[cfg(test)]
+mod test;
+
 impl Hash for Cell {
     fn hash<H>(&self, state: &mut H)
     where
@@ -874,6 +879,3 @@ impl Cell {
         &self.queue_triggers
     }
 }
-
-#[cfg(test)]
-mod test;

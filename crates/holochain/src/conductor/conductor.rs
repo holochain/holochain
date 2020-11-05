@@ -730,6 +730,11 @@ where
     pub(super) async fn get_state_from_handle(&self) -> ConductorResult<ConductorState> {
         self.get_state().await
     }
+
+    #[cfg(test)]
+    pub(super) fn get_p2p_env(&self) -> EnvironmentWrite {
+        self.p2p_env.clone()
+    }
 }
 
 //-----------------------------------------------------------------------------

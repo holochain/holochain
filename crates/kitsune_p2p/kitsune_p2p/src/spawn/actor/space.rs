@@ -1,3 +1,5 @@
+use crate::agent_store::AgentInfoSigned;
+
 use super::*;
 use ghost_actor::dependencies::{tracing, tracing_futures::Instrument};
 use kitsune_p2p_types::codec::Codec;
@@ -92,19 +94,27 @@ impl gossip::GossipEventHandler for Space {
         dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
         since_utc_epoch_s: i64,
         until_utc_epoch_s: i64,
-    ) -> gossip::GossipEventHandlerResult<Vec<Arc<KitsuneOpHash>>> {
+    ) -> gossip::GossipEventHandlerResult<(Vec<Arc<KitsuneOpHash>>, Vec<AgentInfoSigned>)> {
         // while full-sync just redirecting to self...
         // but eventually some of these will be outgoing remote requests
         let fut = self
             .evt_sender
             .fetch_op_hashes_for_constraints(FetchOpHashesForConstraintsEvt {
                 space: self.space.clone(),
-                agent: to_agent,
+                agent: to_agent.clone(),
                 dht_arc,
                 since_utc_epoch_s,
                 until_utc_epoch_s,
             });
-        Ok(async move { fut.await }.boxed().into())
+        let peer_fut = self
+            .evt_sender
+            .query_agent_info_signed(QueryAgentInfoSignedEvt {
+                space: self.space.clone(),
+                agent: to_agent,
+            });
+        Ok(async move { Ok((fut.await?, peer_fut.await?)) }
+            .boxed()
+            .into())
     }
 
     fn handle_req_op_data(
@@ -128,6 +138,7 @@ impl gossip::GossipEventHandler for Space {
         from_agent: Arc<KitsuneAgent>,
         to_agent: Arc<KitsuneAgent>,
         ops: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
+        agents: Vec<AgentInfoSigned>,
     ) -> gossip::GossipEventHandlerResult<()> {
         let all = ops
             .into_iter()
@@ -141,8 +152,26 @@ impl gossip::GossipEventHandler for Space {
                 )
             })
             .collect::<Vec<_>>();
+        let all_agents = agents
+            .into_iter()
+            .map(|agent_info_signed| {
+                self.evt_sender
+                    .put_agent_info_signed(PutAgentInfoSignedEvt {
+                        space: self.space.clone(),
+                        agent: to_agent.clone(),
+                        agent_info_signed,
+                    })
+            })
+            .collect::<Vec<_>>();
         Ok(async move {
             futures::stream::iter(all)
+                .for_each_concurrent(10, |res| async move {
+                    if let Err(e) = res.await {
+                        ghost_actor::dependencies::tracing::error!(?e);
+                    }
+                })
+                .await;
+            futures::stream::iter(all_agents)
                 .for_each_concurrent(10, |res| async move {
                     if let Err(e) = res.await {
                         ghost_actor::dependencies::tracing::error!(?e);

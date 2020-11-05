@@ -10,7 +10,9 @@ use url2::Url2;
 pub type Urls = Vec<Url2>;
 
 /// Value in the peer database that tracks an Agent's representation as signed by that agent.
-#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, derive_more::AsRef)]
+#[derive(
+    serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, derive_more::AsRef, Hash, Eq,
+)]
 pub struct AgentInfoSigned {
     // Raw bytes of agent info signature as kitsune signature.
     signature: KitsuneSignature,
@@ -44,7 +46,9 @@ impl AgentInfoSigned {
 }
 
 /// Value that an agent signs to represent themselves on the network.
-#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, derive_more::AsRef)]
+#[derive(
+    serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, derive_more::AsRef, Hash, Eq,
+)]
 pub struct AgentInfo {
     // The space this agent info is relevant to.
     space: KitsuneSpace,
