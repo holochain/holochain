@@ -46,7 +46,7 @@ impl From<&actor::GetLinksOptions> for GetLinksOptions {
 }
 
 /// Get agent activity options help control how the get is processed at various levels.
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct GetActivityOptions {
     /// Include the activity headers in the response
     pub include_valid_activity: bool,

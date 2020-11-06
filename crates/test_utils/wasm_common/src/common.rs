@@ -58,3 +58,10 @@ pub struct LinkTags(pub Vec<LinkTag>);
 #[repr(transparent)]
 #[serde(transparent)]
 pub struct AnchorTags(pub Vec<String>);
+
+#[derive(Clone, serde::Serialize, serde::Deserialize, SerializedBytes)]
+pub struct AgentActivitySearch {
+    pub agent: AgentPubKey,
+    pub query: QueryFilter,
+    pub request: ActivityRequest,
+}

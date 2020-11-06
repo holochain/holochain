@@ -4,6 +4,8 @@ use super::*;
 
 use crate::fixt::ZomeCallHostAccessFixturator;
 use crate::here;
+use crate::test_utils::test_network;
+use crate::{core::state::metadata::ChainItemKey, fixt::CallContextFixturator};
 use crate::{
     core::{
         queue_consumer::TriggerSender,
@@ -13,7 +15,6 @@ use crate::{
     },
     fixt::*,
 };
-use crate::{fixt::CallContextFixturator, test_utils::test_network};
 use ::fixt::prelude::*;
 use holo_hash::*;
 use holochain_state::{
@@ -317,7 +318,7 @@ impl Db {
                     let header_hash = TimedHeaderHash::from(header_hash);
                     let res = workspace
                         .meta
-                        .get_activity(&reader, (&header).into())
+                        .get_activity(&reader, ChainItemKey::new(&header, ValidationStatus::Valid))
                         .unwrap()
                         .collect::<Vec<_>>()
                         .unwrap();
@@ -1309,9 +1310,9 @@ mod slow_tests {
 
     use crate::test_utils::setup_app;
     use crate::{
-        conductor::dna_store::MockDnaStore, core::state::dht_op_integration::IntegratedDhtOpsStore,
-        core::state::metadata::LinkMetaKey, core::state::metadata::MetadataBuf,
-        core::state::metadata::MetadataBufT, test_utils::host_fn_api::*,
+        core::state::dht_op_integration::IntegratedDhtOpsStore, core::state::metadata::LinkMetaKey,
+        core::state::metadata::MetadataBuf, core::state::metadata::MetadataBufT,
+        test_utils::host_fn_api::*,
     };
     use crate::{fixt::*, test_utils::wait_for_integration};
     use fallible_iterator::FallibleIterator;
@@ -1357,19 +1358,12 @@ mod slow_tests {
         let bob_cell_id = CellId::new(dna_file.dna_hash().to_owned(), bob_agent_id.clone());
         let bob_installed_cell = InstalledCell::new(bob_cell_id.clone(), "bob_handle".into());
 
-        let mut dna_store = MockDnaStore::new();
-
-        dna_store.expect_get().return_const(Some(dna_file.clone()));
-        dna_store.expect_add_dnas::<Vec<_>>().return_const(());
-        dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
-        dna_store.expect_get_entry_def().return_const(None);
-
         let (_tmpdir, _app_api, conductor) = setup_app(
             vec![(
                 "test_app",
                 vec![(alice_installed_cell, None), (bob_installed_cell, None)],
             )],
-            dna_store,
+            vec![dna_file.clone()],
         )
         .await;
 
