@@ -1,6 +1,10 @@
 pub mod curve;
 
-use crate::conductor::interface::SignalBroadcaster;
+use crate::conductor::handle::MockConductorHandleT;
+use crate::conductor::{
+    api::{CellConductorApi, CellConductorReadHandle},
+    interface::SignalBroadcaster,
+};
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
 use crate::core::ribosome::guest_callback::init::InitHostAccess;
 use crate::core::ribosome::guest_callback::init::InitInvocation;
@@ -35,13 +39,13 @@ use holo_hash::WasmHash;
 use holochain_keystore::keystore_actor::KeystoreSender;
 use holochain_p2p::HolochainP2pCellFixturator;
 use holochain_state::test_utils::test_keystore;
-use holochain_types::dna::wasm::DnaWasm;
 use holochain_types::dna::zome::Zome;
 use holochain_types::dna::DnaFile;
 use holochain_types::dna::Wasms;
 use holochain_types::dna::Zomes;
 pub use holochain_types::fixt::*;
 use holochain_types::test_utils::fake_dna_zomes;
+use holochain_types::{cell::CellId, dna::wasm::DnaWasm};
 use holochain_wasm_test_utils::strum::IntoEnumIterator;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::element::Element;
@@ -298,9 +302,20 @@ fixturator!(
     };
 );
 
+fn make_call_zome_handle(cell_id: CellId) -> CellConductorReadHandle {
+    let handle = Arc::new(MockConductorHandleT::new());
+    let cell_conductor_api = CellConductorApi::new(handle, cell_id);
+    Arc::new(cell_conductor_api)
+}
+
+fixturator!(
+    CellConductorReadHandle;
+    vanilla fn make_call_zome_handle(CellId);
+);
+
 fixturator!(
     ZomeCallHostAccess;
-    constructor fn new(CallZomeWorkspaceLock, KeystoreSender, HolochainP2pCell, SignalBroadcaster, CellId);
+    constructor fn new(CallZomeWorkspaceLock, KeystoreSender, HolochainP2pCell, SignalBroadcaster, CellConductorReadHandle, CellId);
 );
 
 fixturator!(

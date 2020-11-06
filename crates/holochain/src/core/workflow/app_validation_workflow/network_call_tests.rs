@@ -293,8 +293,8 @@ async fn get_agent_activity_test() {
 
     commit_some_data("create_entry", &alice_call_data, &handle).await;
 
-    // 3 ops per commit, 5 commits plus 7 for genesis + 2 for init
-    let mut expected_count = NUM_COMMITS * 3 + 9;
+    // 3 ops per commit, 5 commits plus 7 for genesis + 2 for init + 2 for cap
+    let mut expected_count = NUM_COMMITS * 3 + 9 + 2;
 
     wait_for_integration(
         &alice_call_data.env,

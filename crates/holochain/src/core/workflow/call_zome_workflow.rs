@@ -46,24 +46,32 @@ pub struct CallZomeWorkflowArgs<Ribosome: RibosomeT, C: CellConductorApiT> {
     pub invocation: ZomeCallInvocation,
     pub signal_tx: SignalBroadcaster,
     pub conductor_api: C,
+    pub is_root_zome_call: bool,
 }
 
-#[instrument(skip(workspace, network, keystore, writer, args, trigger_produce_dht_ops))]
+#[instrument(skip(
+    workspace_lock,
+    network,
+    keystore,
+    writer,
+    args,
+    trigger_produce_dht_ops
+))]
 pub async fn call_zome_workflow<'env, Ribosome: RibosomeT, C: CellConductorApiT>(
-    workspace: CallZomeWorkspace,
+    workspace_lock: CallZomeWorkspaceLock,
     network: HolochainP2pCell,
     keystore: KeystoreSender,
     writer: OneshotWriter,
     args: CallZomeWorkflowArgs<Ribosome, C>,
     mut trigger_produce_dht_ops: TriggerSender,
 ) -> WorkflowResult<ZomeCallInvocationResult> {
-    let workspace_lock = CallZomeWorkspaceLock::new(workspace);
+    let should_write = args.is_root_zome_call;
     let result = call_zome_workflow_inner(workspace_lock.clone(), network, keystore, args).await?;
 
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // commit the workspace
-    {
+    if should_write {
         let mut guard = workspace_lock.write().await;
         let workspace = &mut guard;
         writer.with_writer(|writer| Ok(workspace.flush_to_txn_ref(writer)?))?;
@@ -85,7 +93,10 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT, C: CellConductorApi
         invocation,
         signal_tx,
         conductor_api,
+        ..
     } = args;
+
+    let call_zome_handle = conductor_api.clone().into_call_zome_handle();
 
     let zome_name = invocation.zome_name.clone();
 
@@ -100,6 +111,7 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT, C: CellConductorApi
             keystore,
             network.clone(),
             signal_tx,
+            call_zome_handle,
             invocation.cell_id.clone(),
         );
         ribosome.call_zome_function(host_access, invocation)
@@ -344,6 +356,7 @@ pub mod tests {
             ribosome,
             signal_tx: SignalBroadcaster::noop(),
             conductor_api,
+            is_root_zome_call: true,
         };
         call_zome_workflow_inner(workspace.into(), network, keystore, args).await
     }
