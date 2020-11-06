@@ -12,7 +12,6 @@ pub mod guest_callback;
 pub mod host_fn;
 pub mod wasm_ribosome;
 
-use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
 use crate::core::ribosome::guest_callback::init::InitInvocation;
 use crate::core::ribosome::guest_callback::init::InitResult;
@@ -32,6 +31,10 @@ use crate::core::workflow::CallZomeWorkspaceLock;
 use crate::fixt::ExternInputFixturator;
 use crate::fixt::FunctionNameFixturator;
 use crate::fixt::ZomeNameFixturator;
+use crate::{
+    conductor::api::CellConductorReadHandle,
+    core::ribosome::guest_callback::entry_defs::EntryDefsInvocation,
+};
 use crate::{conductor::interface::SignalBroadcaster, core::ribosome::error::RibosomeError};
 use ::fixt::prelude::*;
 use derive_more::Constructor;
@@ -173,6 +176,16 @@ impl HostAccess {
         match self {
             Self::ZomeCall(ZomeCallHostAccess { cell_id, .. }) => cell_id,
             _ => panic!("Gave access to a host function that references a CellId"),
+        }
+    }
+
+    /// Get the call zome handle, panics if none was provided
+    pub fn call_zome_handle(&self) -> &CellConductorReadHandle {
+        match self {
+            Self::ZomeCall(ZomeCallHostAccess{call_zome_handle, .. }) => {
+                call_zome_handle
+            }
+            _ => panic!("Gave access to a host function that uses the call zome handle without providing a call zome handle"),
         }
     }
 }
@@ -390,6 +403,7 @@ pub struct ZomeCallHostAccess {
     pub keystore: KeystoreSender,
     pub network: HolochainP2pCell,
     pub signal_tx: SignalBroadcaster,
+    pub call_zome_handle: CellConductorReadHandle,
     // NB: this is kind of an odd place for this, since CellId is not really a special
     // "resource" to give access to, but rather it's a bit of data that makes sense in
     // the context of zome calls, but not every CallContext

@@ -35,9 +35,8 @@ wasm_io_types!(
     pub struct ZomeInfoOutput(crate::zome_info::ZomeInfo);
     pub struct AgentInfoInput(());
     pub struct AgentInfoOutput(crate::agent_info::AgentInfo);
-    // @todo Call is arbitrary so we need to send and receive SerializedBytes.
-    pub struct CallInput(SerializedBytes);
-    pub struct CallOutput(SerializedBytes);
+    pub struct CallInput(crate::call::Call);
+    pub struct CallOutput(ZomeCallResponse);
     // @todo List all the local capability claims.
     pub struct CapabilityClaimsInput(());
     pub struct CapabilityClaimsOutput(());

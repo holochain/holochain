@@ -12,8 +12,7 @@ use holochain_zome_types::test_utils::fake_agent_pubkey_1;
 
 use super::*;
 use crate::{
-    conductor::dna_store::MockDnaStore, conductor::ConductorHandle,
-    core::state::source_chain::SourceChain, test_utils::setup_app,
+    conductor::ConductorHandle, core::state::source_chain::SourceChain, test_utils::setup_app,
     test_utils::wait_for_integration,
 };
 use ::fixt::prelude::*;
@@ -44,16 +43,9 @@ async fn sys_validation_agent_activity_test() {
     let alice_cell_id = CellId::new(dna_file.dna_hash().to_owned(), alice_agent_id.clone());
     let alice_installed_cell = InstalledCell::new(alice_cell_id.clone(), "alice_handle".into());
 
-    let mut dna_store = MockDnaStore::new();
-
-    dna_store.expect_get().return_const(Some(dna_file.clone()));
-    dna_store.expect_add_dnas::<Vec<_>>().return_const(());
-    dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
-    dna_store.expect_get_entry_def().return_const(None);
-
     let (_tmpdir, _app_api, handle) = setup_app(
         vec![("test_app", vec![(alice_installed_cell, None)])],
-        dna_store,
+        vec![dna_file.clone()],
     )
     .await;
 

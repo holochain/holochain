@@ -14,6 +14,9 @@ ghost_actor::ghost_chan! {
 
         /// dump all local gossip data from this agent
         fn dump_local_gossip_data() -> HashMap<Arc<KitsuneOpHash>, String>;
+
+        /// dump all local peer data from this agent
+        fn dump_local_peer_data() -> HashMap<Arc<KitsuneAgent>, Arc<AgentInfoSigned>>;
     }
 }
 
@@ -110,6 +113,13 @@ impl HarnessAgentControlHandler for AgentHarness {
         &mut self,
     ) -> HarnessAgentControlHandlerResult<HashMap<Arc<KitsuneOpHash>, String>> {
         let out = self.gossip_store.clone();
+        Ok(async move { Ok(out) }.boxed().into())
+    }
+
+    fn handle_dump_local_peer_data(
+        &mut self,
+    ) -> HarnessAgentControlHandlerResult<HashMap<Arc<KitsuneAgent>, Arc<AgentInfoSigned>>> {
+        let out = self.agent_store.clone();
         Ok(async move { Ok(out) }.boxed().into())
     }
 }

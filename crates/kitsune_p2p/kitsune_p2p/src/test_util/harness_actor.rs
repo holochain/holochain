@@ -35,6 +35,9 @@ ghost_actor::ghost_chan! {
 
         /// Dump all local gossip data from a specific agent
         fn dump_local_gossip_data(agent: Arc<KitsuneAgent>) -> HashMap<Arc<KitsuneOpHash>, String>;
+
+        /// Dump all local peer data from a specific agent
+        fn dump_local_peer_data(agent: Arc<KitsuneAgent>) -> HashMap<Arc<KitsuneAgent>, Arc<AgentInfoSigned>>;
     }
 }
 
@@ -328,6 +331,18 @@ impl HarnessControlApiHandler for HarnessActor {
             .get(&agent)
             .ok_or_else(|| KitsuneP2pError::from("invalid agent"))?;
         let fut = ctrl.dump_local_gossip_data();
+        Ok(async move { fut.await }.boxed().into())
+    }
+
+    fn handle_dump_local_peer_data(
+        &mut self,
+        agent: Arc<KitsuneAgent>,
+    ) -> HarnessControlApiHandlerResult<HashMap<Arc<KitsuneAgent>, Arc<AgentInfoSigned>>> {
+        let (_, ctrl) = self
+            .agents
+            .get(&agent)
+            .ok_or_else(|| KitsuneP2pError::from("invalid agent"))?;
+        let fut = ctrl.dump_local_peer_data();
         Ok(async move { fut.await }.boxed().into())
     }
 }
