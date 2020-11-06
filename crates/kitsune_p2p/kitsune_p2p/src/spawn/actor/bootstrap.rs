@@ -1,6 +1,6 @@
 use once_cell::sync::Lazy;
 
-static CLIENT: Lazy<reqwest::Client> = Lazy::new(|| reqwest::Client::new());
+static CLIENT: Lazy<reqwest::Client> = Lazy::new(reqwest::Client::new);
 
 /// @todo make this not hardcoded.
 /// @todo handle testing vs. production better somehow.

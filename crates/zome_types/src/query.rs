@@ -1,10 +1,10 @@
 //! Types for source chain queries
 
 use crate::{
-    element::SignedHeaderHashed,
     header::{EntryType, Header, HeaderType},
+    warrant::Warrant,
 };
-use holo_hash::{AgentPubKey, HeaderHash};
+use holo_hash::HeaderHash;
 pub use holochain_serialized_bytes::prelude::*;
 
 /// Query arguments
@@ -27,30 +27,28 @@ pub struct ChainQueryFilter {
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 /// An agents chain elements returned from a agent_activity_query
-pub struct AgentActivity<T = SignedHeaderHashed> {
-    /// The agent this activity is for
-    pub agent: AgentPubKey,
+pub struct AgentActivity {
     /// Valid headers on this chain.
-    pub valid_activity: Activity<T>,
-    /// Headers that were rejected by the agent activity
-    /// authority and therefor invalidate the chain.
-    pub rejected_activity: Activity<T>,
+    pub valid_activity: Vec<(u32, HeaderHash)>,
+    /// Rejected headers on this chain.
+    pub rejected_activity: Vec<(u32, HeaderHash)>,
     /// The status of this chain.
     pub status: ChainStatus,
     /// The highest chain header that has
     /// been observed by this authority.
     pub highest_observed: Option<HighestObserved>,
+    /// Warrants about this AgentActivity.
+    /// Placeholder for future.
+    pub warrants: Vec<Warrant>,
 }
 
-#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
-/// The type of agent activity returned in this request
-pub enum Activity<T = SignedHeaderHashed> {
-    /// The full headers
-    Full(Vec<T>),
-    /// Just the hashes
-    Hashes(Vec<(u32, HeaderHash)>),
-    /// This activity was not requested
-    NotRequested,
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
+/// Get either the full activity or just the status of the chain
+pub enum ActivityRequest {
+    /// Just request the status of the chain
+    Status,
+    /// Request all the activity
+    Full,
 }
 
 #[derive(Clone, Debug, PartialEq, Hash, Eq, serde::Serialize, serde::Deserialize)]

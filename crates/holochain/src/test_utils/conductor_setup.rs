@@ -1,6 +1,7 @@
 use crate::{
     conductor::{
-        api::RealAppInterfaceApi, dna_store::MockDnaStore, interface::SignalBroadcaster,
+        api::{CellConductorApi, CellConductorApiT, RealAppInterfaceApi},
+        interface::SignalBroadcaster,
         ConductorHandle,
     },
     core::queue_consumer::InitialQueueTriggers,
@@ -40,6 +41,7 @@ pub struct ConductorCallData {
     pub keystore: KeystoreSender,
     pub signal_tx: SignalBroadcaster,
     pub triggers: InitialQueueTriggers,
+    pub cell_conductor_api: CellConductorApi,
 }
 
 impl ConductorCallData {
@@ -50,6 +52,7 @@ impl ConductorCallData {
             .holochain_p2p()
             .to_cell(cell_id.dna_hash().clone(), cell_id.agent_pubkey().clone());
         let triggers = handle.get_cell_triggers(cell_id).await.unwrap();
+        let cell_conductor_api = CellConductorApi::new(handle.clone(), cell_id.clone());
 
         let ribosome = WasmRibosome::new(dna_file.clone());
         let signal_tx = handle.signal_broadcaster().await;
@@ -61,6 +64,7 @@ impl ConductorCallData {
             keystore,
             signal_tx,
             triggers,
+            cell_conductor_api,
         };
         call_data
     }
@@ -69,12 +73,14 @@ impl ConductorCallData {
     pub fn call_data<I: Into<ZomeName>>(&self, zome_name: I) -> CallData {
         let zome_name: ZomeName = zome_name.into();
         let zome_path = (self.cell_id.clone(), zome_name).into();
+        let call_zome_handle = self.cell_conductor_api.clone().into_call_zome_handle();
         CallData {
             ribosome: self.ribosome.clone(),
             zome_path,
             network: self.network.clone(),
             keystore: self.keystore.clone(),
             signal_tx: self.signal_tx.clone(),
+            call_zome_handle,
         }
     }
 }
@@ -104,13 +110,6 @@ impl ConductorTestData {
             InstalledCell::new(bob_cell_id.clone(), "bob_handle".into())
         };
 
-        let mut dna_store = MockDnaStore::new();
-
-        dna_store.expect_get().return_const(Some(dna_file.clone()));
-        dna_store.expect_add_dnas::<Vec<_>>().return_const(());
-        dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
-        dna_store.expect_get_entry_def().return_const(None);
-
         let mut cells = vec![];
         let alice_installed_cell = alice();
         let alice_cell_id = alice_installed_cell.as_id().clone();
@@ -124,7 +123,8 @@ impl ConductorTestData {
             None
         };
 
-        let (__tmpdir, app_api, handle) = setup_app(vec![("test_app", cells)], dna_store).await;
+        let (__tmpdir, app_api, handle) =
+            setup_app(vec![("test_app", cells)], vec![dna_file.clone()]).await;
 
         let alice_call_data = ConductorCallData::new(&alice_cell_id, &handle, &dna_file).await;
 

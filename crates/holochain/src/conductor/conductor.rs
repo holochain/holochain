@@ -1066,11 +1066,7 @@ pub mod tests {
         } = test_p2p_env();
         let dna_store = MockDnaStore::new();
         let keystore = environment.keystore().clone();
-        let (holochain_p2p, _p2p_evt) = holochain_p2p::spawn_holochain_p2p(
-            holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default(),
-        )
-        .await
-        .unwrap();
+        let holochain_p2p = holochain_p2p::stub_network().await;
         let conductor = Conductor::new(
             environment,
             wasm_env,

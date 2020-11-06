@@ -3,7 +3,8 @@
 
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
-use holochain_zome_types::{capability::CapSecret, query::AgentActivity, zome::ZomeName};
+use holochain_types::activity::AgentActivity;
+use holochain_zome_types::{capability::CapSecret, zome::ZomeName};
 use holochain_zome_types::{query::ChainQueryFilter, zome::FunctionName};
 use std::sync::Arc;
 
@@ -19,6 +20,7 @@ use holochain_types::{
     metadata::MetadataSet,
 };
 pub use spawn::*;
+pub use test::stub_network;
 pub use test::HolochainP2pCellFixturator;
 
 pub use kitsune_p2p;
