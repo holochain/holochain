@@ -10,4 +10,7 @@ pub enum HdkError {
 
     #[error(transparent)]
     Wasm(#[from] holochain_wasmer_guest::WasmError),
+
+    #[error("Zome call was made which the caller was unauthorized to make")]
+    UnauthorizedZomeCall,
 }
