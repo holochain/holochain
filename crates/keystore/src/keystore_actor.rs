@@ -32,7 +32,7 @@ impl KeystoreSenderExt for KeystoreSender {
         let fut = self.sign_ed25519_new_from_entropy();
         async move {
             let (_, pk) = fut.await?;
-            Ok(holo_hash::AgentPubKey::with_pre_hashed(pk.to_vec()))
+            Ok(holo_hash::AgentPubKey::from_raw_32(pk.to_vec()))
         }
         .boxed()
         .into()
