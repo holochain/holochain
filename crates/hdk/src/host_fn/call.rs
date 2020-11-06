@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use holo_hash::{AgentPubKey, DnaHash};
 use holochain_wasmer_guest::SerializedBytesError;
 use holochain_zome_types::{
     call::Call,
@@ -8,9 +7,19 @@ use holochain_zome_types::{
 
 use crate::host_fn;
 
+/// # Call
+/// Make a Zome call in another Zome.
+/// The Zome can be in another Cell or the
+/// same Cell but must be installed on the same conductor.
+///
+/// ## Parameters
+/// - to_cell: The cell you want to call (If None will call the current cell).
+/// - zome_name: The name of the zome you want to call.
+/// - fn_name: The name of the function in the zome you are calling.
+/// - cap_secret: The capability secret if required.
+/// - request: The arguments to the function you are calling.
 pub fn call<I, O>(
-    to_agent: AgentPubKey,
-    to_dna: Option<DnaHash>,
+    to_cell: Option<CellId>,
     zome_name: ZomeName,
     fn_name: FunctionName,
     cap_secret: Option<CapSecret>,
@@ -25,7 +34,7 @@ where
     let out = host_fn!(
         __call,
         CallInput::new(Call::new(
-            to_agent, to_dna, zome_name, fn_name, cap_secret, request, provenance
+            to_cell, zome_name, fn_name, cap_secret, request, provenance
         )),
         CallOutput
     )?;

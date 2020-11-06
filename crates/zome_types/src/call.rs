@@ -1,13 +1,13 @@
 use crate::capability::CapSecret;
+use crate::cell::CellId;
 use crate::zome::FunctionName;
 use crate::zome::ZomeName;
-use holo_hash::{AgentPubKey, DnaHash};
+use holo_hash::AgentPubKey;
 use holochain_serialized_bytes::prelude::SerializedBytes;
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Call {
-    pub to_agent: AgentPubKey,
-    pub to_dna: Option<DnaHash>,
+    pub to_cell: Option<CellId>,
     pub zome_name: ZomeName,
     pub fn_name: FunctionName,
     pub cap: Option<CapSecret>,
@@ -17,8 +17,7 @@ pub struct Call {
 
 impl Call {
     pub fn new(
-        to_agent: AgentPubKey,
-        to_dna: Option<DnaHash>,
+        to_cell: Option<CellId>,
         zome_name: ZomeName,
         fn_name: FunctionName,
         cap: Option<CapSecret>,
@@ -26,8 +25,7 @@ impl Call {
         provenance: AgentPubKey,
     ) -> Self {
         Self {
-            to_agent,
-            to_dna,
+            to_cell,
             zome_name,
             fn_name,
             cap,

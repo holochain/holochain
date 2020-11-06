@@ -1,7 +1,5 @@
 use crate::{
-    conductor::{
-        api::error::ConductorApiError, dna_store::MockDnaStore, CellError, ConductorHandle,
-    },
+    conductor::{api::error::ConductorApiError, CellError, ConductorHandle},
     core::workflow::error::WorkflowError,
     core::SourceChainError,
     test_utils::{new_invocation, setup_app},
@@ -33,16 +31,9 @@ async fn direct_validation_test() {
     let alice_cell_id = CellId::new(dna_file.dna_hash().to_owned(), alice_agent_id.clone());
     let alice_installed_cell = InstalledCell::new(alice_cell_id.clone(), "alice_handle".into());
 
-    let mut dna_store = MockDnaStore::new();
-
-    dna_store.expect_get().return_const(Some(dna_file.clone()));
-    dna_store.expect_add_dnas::<Vec<_>>().return_const(());
-    dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
-    dna_store.expect_get_entry_def().return_const(None);
-
     let (_tmpdir, _app_api, handle) = setup_app(
         vec![("test_app", vec![(alice_installed_cell, None)])],
-        dna_store,
+        vec![dna_file.clone()],
     )
     .await;
 

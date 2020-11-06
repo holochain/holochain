@@ -46,13 +46,26 @@ fn whoarethey(agent_pubkey: AgentPubKey) -> ExternResult<AgentInfo> {
 // in theory the output is the same as the input
 // it's just that the output comes _from the opinion of the remote agent_
 #[hdk_extern]
-fn who_are_they_local(agent_pubkey: AgentPubKey) -> ExternResult<AgentInfo> {
+fn who_are_they_local(cell_id: CellId) -> ExternResult<AgentInfo> {
     call(
-        agent_pubkey,
-        None,
+        Some(cell_id),
         zome_info!()?.zome_name,
         "whoami".to_string().into(),
         None,
         (),
     )
+}
+
+/// Call the create entry zome from this zome.
+/// The cell id must point to a cell which includes 
+/// the "create_entry" zome.
+#[hdk_extern]
+fn call_create_entry(cell_id: CellId) -> ExternResult<HeaderHash> {
+    Ok(call(
+        Some(cell_id),
+        "create_entry".to_string().into(),
+        "create_entry".to_string().into(),
+        None,
+        (),
+    )?)
 }

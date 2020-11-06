@@ -1,5 +1,5 @@
 use crate::{
-    conductor::{dna_store::MockDnaStore, ConductorHandle},
+    conductor::ConductorHandle,
     core::ribosome::ZomeCallInvocation,
     core::state::dht_op_integration::IntegratedDhtOpsValue,
     core::state::validation_db::ValidationLimboValue,
@@ -62,19 +62,12 @@ async fn app_validation_workflow_test() {
     let bob_cell_id = CellId::new(dna_file.dna_hash().to_owned(), bob_agent_id.clone());
     let bob_installed_cell = InstalledCell::new(bob_cell_id.clone(), "bob_handle".into());
 
-    let mut dna_store = MockDnaStore::new();
-
-    dna_store.expect_get().return_const(Some(dna_file.clone()));
-    dna_store.expect_add_dnas::<Vec<_>>().return_const(());
-    dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
-    dna_store.expect_get_entry_def().return_const(None);
-
     let (_tmpdir, _app_api, handle) = setup_app(
         vec![(
             "test_app",
             vec![(alice_installed_cell, None), (bob_installed_cell, None)],
         )],
-        dna_store,
+        vec![dna_file.clone()],
     )
     .await;
 

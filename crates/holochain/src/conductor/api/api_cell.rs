@@ -147,6 +147,8 @@ pub trait CellConductorApiT: Clone + Send + Sync + Sized {
 /// A handle that cn only call zome functions to avoid
 /// making write lock calls
 pub trait CellConductorReadHandleT: Send + Sync {
+    /// Get this cell id
+    fn cell_id(&self) -> &CellId;
     /// Invoke a zome function on a Cell
     async fn call_zome(
         &self,
@@ -157,6 +159,9 @@ pub trait CellConductorReadHandleT: Send + Sync {
 
 #[async_trait]
 impl CellConductorReadHandleT for CellConductorApi {
+    fn cell_id(&self) -> &CellId {
+        &self.cell_id
+    }
     async fn call_zome(
         &self,
         invocation: ZomeCallInvocation,

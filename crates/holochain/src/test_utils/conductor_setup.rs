@@ -1,7 +1,6 @@
 use crate::{
     conductor::{
         api::{CellConductorApi, CellConductorApiT, RealAppInterfaceApi},
-        dna_store::MockDnaStore,
         interface::SignalBroadcaster,
         ConductorHandle,
     },
@@ -111,13 +110,6 @@ impl ConductorTestData {
             InstalledCell::new(bob_cell_id.clone(), "bob_handle".into())
         };
 
-        let mut dna_store = MockDnaStore::new();
-
-        dna_store.expect_get().return_const(Some(dna_file.clone()));
-        dna_store.expect_add_dnas::<Vec<_>>().return_const(());
-        dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
-        dna_store.expect_get_entry_def().return_const(None);
-
         let mut cells = vec![];
         let alice_installed_cell = alice();
         let alice_cell_id = alice_installed_cell.as_id().clone();
@@ -131,7 +123,8 @@ impl ConductorTestData {
             None
         };
 
-        let (__tmpdir, app_api, handle) = setup_app(vec![("test_app", cells)], dna_store).await;
+        let (__tmpdir, app_api, handle) =
+            setup_app(vec![("test_app", cells)], vec![dna_file.clone()]).await;
 
         let alice_call_data = ConductorCallData::new(&alice_cell_id, &handle, &dna_file).await;
 

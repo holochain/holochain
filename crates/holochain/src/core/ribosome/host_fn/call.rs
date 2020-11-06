@@ -1,22 +1,29 @@
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::{error::RibosomeResult, ZomeCallInvocation};
-use holochain_types::cell::CellId;
 use holochain_zome_types::{CallInput, ZomeCallResponse};
 use holochain_zome_types::{CallOutput, ExternInput};
 use std::sync::Arc;
 
 pub fn call(
-    ribosome: Arc<impl RibosomeT>,
+    _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: CallInput,
 ) -> RibosomeResult<CallOutput> {
+    // Get the input
     let call = input.into_inner();
-    let dna_hash = call
-        .to_dna
-        .unwrap_or_else(|| ribosome.dna_file().dna_hash().clone());
-    let to_agent = call.to_agent;
-    let cell_id = CellId::new(dna_hash, to_agent);
+
+    // Get the conductor handle
+    let host_access = call_context.host_access();
+    let conductor_handle = host_access.call_zome_handle();
+    let workspace = host_access.workspace();
+
+    // Get the cell id if it's not passed in
+    let cell_id = call
+        .to_cell
+        .unwrap_or_else(|| conductor_handle.cell_id().clone());
+
+    // Create the invocation for this call
     let invocation = ZomeCallInvocation {
         cell_id,
         zome_name: call.zome_name,
@@ -25,11 +32,10 @@ pub fn call(
         payload: ExternInput::new(call.request),
         provenance: call.provenance,
     };
-    let host_access = call_context.host_access();
+
+    // Make the call using this workspace
     let result: ZomeCallResponse = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-        let call_zome_handle = host_access.call_zome_handle();
-        let workspace = host_access.workspace();
-        call_zome_handle
+        conductor_handle
             .call_zome(invocation, workspace)
             .await
             .map_err(Box::new)
@@ -40,17 +46,23 @@ pub fn call(
 
 #[cfg(test)]
 pub mod wasm_test {
-    use std::convert::TryInto;
+    use std::convert::{TryFrom, TryInto};
 
-    use hdk3::prelude::AgentInfo;
+    use hdk3::prelude::{AgentInfo, CellId};
+    use holo_hash::HeaderHash;
     use holochain_serialized_bytes::SerializedBytes;
+    use holochain_types::{
+        app::InstalledCell,
+        dna::{DnaDef, DnaFile},
+    };
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::{ExternInput, ZomeCallResponse};
+    use holochain_zome_types::{test_utils::fake_agent_pubkey_2, ExternInput, ZomeCallResponse};
     use matches::assert_matches;
 
     use crate::{
-        core::ribosome::ZomeCallInvocation,
-        test_utils::{conductor_setup::ConductorTestData, new_invocation},
+        conductor::ConductorHandle,
+        core::{ribosome::ZomeCallInvocation, state::element_buf::ElementBuf},
+        test_utils::{conductor_setup::ConductorTestData, install_app, new_invocation},
     };
 
     #[tokio::test(threaded_scheduler)]
@@ -94,7 +106,7 @@ pub mod wasm_test {
                 zome_name: TestWasm::WhoAmI.into(),
                 cap: None,
                 fn_name: "who_are_they_local".into(),
-                payload: ExternInput::new(bob_agent_id.clone().try_into().unwrap()),
+                payload: ExternInput::new(bob_cell_id.clone().try_into().unwrap()),
                 provenance: alice_agent_id.clone(),
             })
             .await
@@ -139,6 +151,93 @@ pub mod wasm_test {
             new_invocation(&alice_cell_id, "call_create_entry", (), TestWasm::Create).unwrap();
         let result = handle.call_zome(invocation).await;
         assert_matches!(result, Ok(Ok(ZomeCallResponse::Ok(_))));
+
+        // Get the header hash of that entry
+        let header_hash: HeaderHash =
+            unwrap_to::unwrap_to!(result.unwrap().unwrap() => ZomeCallResponse::Ok)
+                .clone()
+                .into_inner()
+                .try_into()
+                .unwrap();
+
+        // Check alice's source chain contains the new value
+        let alice_source_chain =
+            ElementBuf::authored(alice_call_data.env.clone().into(), true).unwrap();
+        let el = alice_source_chain.get_element(&header_hash).unwrap();
+        assert_matches!(el, Some(_));
+
         ConductorTestData::shutdown_conductor(handle).await;
+    }
+
+    /// test calling a different zome
+    /// in a different cell.
+    #[tokio::test(threaded_scheduler)]
+    async fn bridge_call() {
+        observability::test_run().ok();
+
+        let zomes = vec![TestWasm::Create];
+        let conductor_test = ConductorTestData::new(zomes, false).await;
+        let ConductorTestData {
+            __tmpdir,
+            handle,
+            alice_call_data,
+            ..
+        } = conductor_test;
+        let alice_cell_id = &alice_call_data.cell_id;
+
+        // Install a different dna for bob
+        let zomes = vec![TestWasm::WhoAmI];
+        let bob_cell_id = install_new_app("bobs_dna", zomes, &handle).await;
+
+        // Call create_entry in the create_entry zome from the whoami zome
+        let invocation = new_invocation(
+            &bob_cell_id,
+            "call_create_entry",
+            alice_cell_id.clone(),
+            TestWasm::WhoAmI,
+        )
+        .unwrap();
+        let result = handle.call_zome(invocation).await;
+        assert_matches!(result, Ok(Ok(ZomeCallResponse::Ok(_))));
+
+        // Get the header hash of that entry
+        let header_hash: HeaderHash =
+            unwrap_to::unwrap_to!(result.unwrap().unwrap() => ZomeCallResponse::Ok)
+                .clone()
+                .into_inner()
+                .try_into()
+                .unwrap();
+
+        // Check alice's source chain contains the new value
+        let alice_source_chain =
+            ElementBuf::authored(alice_call_data.env.clone().into(), true).unwrap();
+        let el = alice_source_chain.get_element(&header_hash).unwrap();
+        assert_matches!(el, Some(_));
+
+        ConductorTestData::shutdown_conductor(handle).await;
+    }
+
+    async fn install_new_app(
+        dna_name: &str,
+        zomes: Vec<TestWasm>,
+        handle: &ConductorHandle,
+    ) -> CellId {
+        let dna_file = DnaFile::new(
+            DnaDef {
+                name: dna_name.to_string(),
+                uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
+                properties: SerializedBytes::try_from(()).unwrap(),
+                zomes: zomes.clone().into_iter().map(Into::into).collect(),
+            },
+            zomes.into_iter().map(Into::into),
+        )
+        .await
+        .unwrap();
+        let bob_agent_id = fake_agent_pubkey_2();
+        let bob_cell_id = CellId::new(dna_file.dna_hash().to_owned(), bob_agent_id.clone());
+        let bob_installed_cell = InstalledCell::new(bob_cell_id.clone(), "bob_handle".into());
+        let cell_data = vec![(bob_installed_cell, None)];
+        install_app("bob_app", cell_data, vec![dna_file], handle.clone()).await;
+        bob_cell_id
     }
 }

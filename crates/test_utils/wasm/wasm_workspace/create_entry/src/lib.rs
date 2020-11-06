@@ -90,10 +90,8 @@ fn init(_: ()) -> ExternResult<InitCallbackResult> {
 /// call
 #[hdk_extern]
 fn call_create_entry(_: ()) -> ExternResult<HeaderHash> {
-    let me = agent_info!()?.agent_latest_pubkey;
     create_entry!(post())?;
     Ok(call(
-        me,
         None,
         "create_entry".to_string().into(),
         "create_entry".to_string().into(),

@@ -1,9 +1,6 @@
 use ::fixt::prelude::*;
 use hdk3::prelude::*;
-use holochain::conductor::{
-    api::{AppInterfaceApi, AppRequest, AppResponse, RealAppInterfaceApi},
-    dna_store::MockDnaStore,
-};
+use holochain::conductor::api::{AppInterfaceApi, AppRequest, AppResponse, RealAppInterfaceApi};
 use holochain::core::ribosome::ZomeCallInvocation;
 use holochain::{
     fixt::*,
@@ -72,22 +69,9 @@ async fn gossip_test() {
     // START CONDUCTOR
     // ///////////////
 
-    let mut dna_store = MockDnaStore::new();
-
-    dna_store.expect_get().return_const(Some(dna_file.clone()));
-    dna_store
-        .expect_add_dnas::<Vec<_>>()
-        .times(2)
-        .return_const(());
-    dna_store
-        .expect_add_entry_defs::<Vec<_>>()
-        .times(2)
-        .return_const(());
-    dna_store.expect_get_entry_def().return_const(None);
-
     let (_tmpdir, app_api, handle) = setup_app(
         vec![("alice app", vec![(alice_installed_cell, None)])],
-        dna_store,
+        vec![dna_file.clone()],
     )
     .await;
 
@@ -113,7 +97,7 @@ async fn gossip_test() {
 
     // Bring Bob online
     let cell_data = vec![(bob_installed_cell, None)];
-    install_app("bob_app", cell_data, handle.clone()).await;
+    install_app("bob_app", cell_data, vec![dna_file], handle.clone()).await;
 
     // Give gossip some time to finish
     tokio::time::delay_for(std::time::Duration::from_secs(1)).await;
