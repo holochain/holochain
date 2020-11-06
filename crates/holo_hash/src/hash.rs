@@ -9,10 +9,9 @@
 //! ```text
 //! PPPCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCLLLL
 //! ^  ^                                  ^
-//! |  |                                  |
-//! \   \---------"untyped"--------------/
-//!  \                                  /
-//!   \-------------"full"-------------/
+//!  \  \---------"untyped"--------------/
+//!   \                                 /
+//!    \-------------"full"------------/
 //!
 //! P: 3 byte prefix to indicate hash type
 //! C: 32 byte hash, the "core"
