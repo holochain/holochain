@@ -11,7 +11,7 @@ const REJECTED_PREFIX: u8 = 0x2;
 const AUTHORED_PREFIX: u8 = 0x3;
 
 /// Prefix length 1 + hash length 39
-const PREFIX_KEY_SIZE: usize = HOLO_HASH_RAW_LEN + 1;
+const PREFIX_KEY_SIZE: usize = HOLO_HASH_FULL_LEN + 1;
 
 /// A key for hashes but with a prefix for reusing databases
 /// This key is optimized for databases where the key is the
@@ -123,7 +123,7 @@ impl<P: PrefixType> PrefixHashKey<P> {
     /// Get the bytes of the hash
     pub fn as_hash_bytes(&self) -> &[u8] {
         let bytes = &self.prefix_and_hash[1..];
-        assert_length(HOLO_HASH_RAW_LEN, bytes);
+        assert_length(HOLO_HASH_FULL_LEN, bytes);
         bytes
     }
 }

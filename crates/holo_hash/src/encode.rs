@@ -1,6 +1,6 @@
 use crate::{
     assert_length, error::HoloHashError, HashType, HoloHash, PrimitiveHashType, HOLO_HASH_CORE_LEN,
-    HOLO_HASH_PREFIX_LEN, HOLO_HASH_RAW_LEN,
+    HOLO_HASH_FULL_LEN, HOLO_HASH_PREFIX_LEN,
 };
 use std::convert::TryFrom;
 use std::convert::TryInto;
@@ -47,7 +47,7 @@ pub fn holo_hash_decode(prefix: &[u8], s: &str) -> Result<Vec<u8>, HoloHashError
         Err(_) => return Err(HoloHashError::BadBase64),
         Ok(s) => s,
     };
-    if s.len() != HOLO_HASH_RAW_LEN {
+    if s.len() != HOLO_HASH_FULL_LEN {
         return Err(HoloHashError::BadSize);
     }
     let actual_prefix: [u8; HOLO_HASH_PREFIX_LEN] = s[..HOLO_HASH_PREFIX_LEN].try_into().unwrap();
@@ -64,7 +64,7 @@ pub fn holo_hash_decode(prefix: &[u8], s: &str) -> Result<Vec<u8>, HoloHashError
     if loc_bytes != &s[HOLO_HASH_PREFIX_LEN + HOLO_HASH_CORE_LEN..] {
         return Err(HoloHashError::BadChecksum);
     }
-    assert_length(HOLO_HASH_RAW_LEN, &s);
+    assert_length(HOLO_HASH_FULL_LEN, &s);
     Ok(s.to_vec())
 }
 

@@ -1,5 +1,5 @@
 use super::*;
-use holo_hash::HOLO_HASH_RAW_LEN;
+use holo_hash::HOLO_HASH_FULL_LEN;
 pub(super) use misc::*;
 
 mod misc;
@@ -355,17 +355,17 @@ impl From<BytesKey> for ChainItemKey {
         use byteorder::{BigEndian, ByteOrder};
         let bytes = b.0;
         const SEQ_SIZE: usize = std::mem::size_of::<u32>();
-        debug_assert_eq!(bytes.len(), HOLO_HASH_RAW_LEN * 2 + SEQ_SIZE);
+        debug_assert_eq!(bytes.len(), HOLO_HASH_FULL_LEN * 2 + SEQ_SIZE);
 
         // Take 39 for the AgentPubKey
-        let a = AgentPubKey::from_raw_39_panicky(bytes[..HOLO_HASH_RAW_LEN].to_owned());
+        let a = AgentPubKey::from_raw_39_panicky(bytes[..HOLO_HASH_FULL_LEN].to_owned());
 
         // Take another 4 for the u32
-        let seq_bytes: Vec<_> = bytes[HOLO_HASH_RAW_LEN..(HOLO_HASH_RAW_LEN + SEQ_SIZE)].to_owned();
+        let seq_bytes: Vec<_> = bytes[HOLO_HASH_FULL_LEN..(HOLO_HASH_FULL_LEN + SEQ_SIZE)].to_owned();
         let s = BigEndian::read_u32(&seq_bytes);
 
         // Take the rest (another 39) for the header hash
-        let h = HeaderHash::from_raw_39_panicky(bytes[(HOLO_HASH_RAW_LEN + SEQ_SIZE)..].to_owned());
+        let h = HeaderHash::from_raw_39_panicky(bytes[(HOLO_HASH_FULL_LEN + SEQ_SIZE)..].to_owned());
 
         ChainItemKey::Full(a, s, h)
     }

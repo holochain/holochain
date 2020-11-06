@@ -1,3 +1,29 @@
+//! Defines the HoloHash type, used for all hashes in Holochain.
+//!
+//! HoloHashes come in a variety of types. See the `hash_type::primitive`
+//! module for the full list.
+//!
+//! HoloHashes are serialized as a plain 39-byte sequence.
+//! The structure is like so:
+//!
+//! ```text
+//! PPPCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCLLLL
+//! ^  ^                                  ^
+//! |  |                                  |
+//! \   \---------"untyped"--------------/
+//!  \                                  /
+//!   \-------------"full"-------------/
+//!
+//! P: 3 byte prefix to indicate hash type
+//! C: 32 byte hash, the "core"
+//! L: 4 byte hash of the core hash, for DHT location
+//! ```
+//!
+//! The 36 bytes which exclude the initial 3-byte type prefix are known
+//! throughout the codebase as the "untyped" hash
+//!
+//! The complete 39 bytes together are known as the "full" hash
+
 use crate::{error::HoloHashResult, has_hash::HasHash, HashType, PrimitiveHashType};
 
 /// Length of the prefix bytes (3)
@@ -9,11 +35,12 @@ pub const HOLO_HASH_CORE_LEN: usize = 32;
 /// Length of the location bytes (4)
 pub const HOLO_HASH_LOC_LEN: usize = 4;
 
-/// Length of the core bytes + the loc bytes (36 = 32 + 4)
-pub const HOLO_HASH_FULL_LEN: usize = HOLO_HASH_CORE_LEN + HOLO_HASH_LOC_LEN; // 36
+/// Length of the core bytes + the loc bytes (36 = 32 + 4),
+/// i.e. everything except the type prefix
+pub const HOLO_HASH_UNTYPED_LEN: usize = HOLO_HASH_CORE_LEN + HOLO_HASH_LOC_LEN; // 36
 
 /// Length of the full HoloHash bytes (39 = 3 + 32 + 4)
-pub const HOLO_HASH_RAW_LEN: usize = HOLO_HASH_PREFIX_LEN + HOLO_HASH_CORE_LEN + HOLO_HASH_LOC_LEN;
+pub const HOLO_HASH_FULL_LEN: usize = HOLO_HASH_PREFIX_LEN + HOLO_HASH_CORE_LEN + HOLO_HASH_LOC_LEN;
 
 /// A HoloHash contains a vector of 36 bytes representing a 32-byte blake2b hash
 /// plus 4 bytes representing a DHT location. It also contains a zero-sized
@@ -28,7 +55,7 @@ impl<T: HashType> HoloHash<T> {
     /// Raw constructor: Create a HoloHash from 39 bytes, using the prefix
     /// bytes to determine the hash_type
     pub fn from_raw_39(hash: Vec<u8>) -> HoloHashResult<Self> {
-        assert_length(HOLO_HASH_RAW_LEN, &hash);
+        assert_length(HOLO_HASH_FULL_LEN, &hash);
         let hash_type = T::try_from_prefix(&hash[0..3])?;
         Ok(Self { hash, hash_type })
     }
@@ -41,10 +68,10 @@ impl<T: HashType> HoloHash<T> {
     /// Use a precomputed hash + location byte array in vec form,
     /// along with a type, to construct a hash. Used in this crate only, for testing.
     pub fn from_raw_36_and_type(mut bytes: Vec<u8>, hash_type: T) -> Self {
-        assert_length(HOLO_HASH_FULL_LEN, &bytes);
+        assert_length(HOLO_HASH_UNTYPED_LEN, &bytes);
         let mut hash = hash_type.get_prefix().to_vec();
         hash.append(&mut bytes);
-        assert_length(HOLO_HASH_RAW_LEN, &hash);
+        assert_length(HOLO_HASH_FULL_LEN, &hash);
         Self { hash, hash_type }
     }
 
@@ -73,7 +100,7 @@ impl<T: HashType> HoloHash<T> {
     /// Get 36-byte Vec which excludes the 3 byte prefix
     pub fn get_raw_36(&self) -> &[u8] {
         let bytes = &self.hash[HOLO_HASH_PREFIX_LEN..];
-        assert_length(HOLO_HASH_FULL_LEN, bytes);
+        assert_length(HOLO_HASH_UNTYPED_LEN, bytes);
         bytes
     }
 
@@ -86,12 +113,12 @@ impl<T: HashType> HoloHash<T> {
 
     /// Fetch the holo dht location for this hash
     pub fn get_loc(&self) -> u32 {
-        bytes_to_loc(&self.hash[HOLO_HASH_RAW_LEN - HOLO_HASH_PREFIX_LEN..])
+        bytes_to_loc(&self.hash[HOLO_HASH_FULL_LEN - HOLO_HASH_PREFIX_LEN..])
     }
 
     /// consume into the inner byte vector
     pub fn into_inner(self) -> Vec<u8> {
-        assert_length(HOLO_HASH_RAW_LEN, &self.hash);
+        assert_length(HOLO_HASH_FULL_LEN, &self.hash);
         self.hash
     }
 }
@@ -99,7 +126,7 @@ impl<T: HashType> HoloHash<T> {
 impl<P: PrimitiveHashType> HoloHash<P> {
     /// Construct from 36 raw bytes, using the known PrimitiveHashType
     pub fn from_raw_36(hash: Vec<u8>) -> Self {
-        assert_length(HOLO_HASH_FULL_LEN, &hash);
+        assert_length(HOLO_HASH_UNTYPED_LEN, &hash);
         Self::from_raw_36_and_type(hash, P::new())
     }
 }
@@ -108,7 +135,7 @@ impl<T: HashType> AsRef<[u8]> for HoloHash<T> {
     // TODO: revisit this, especially after changing serialization format. [ B-02112 ]
     // Should this be 32, 36, or 39 bytes?
     fn as_ref(&self) -> &[u8] {
-        assert_length(HOLO_HASH_RAW_LEN, &self.hash);
+        assert_length(HOLO_HASH_FULL_LEN, &self.hash);
         &self.hash
     }
 }
@@ -119,7 +146,7 @@ impl<T: HashType> IntoIterator for HoloHash<T> {
     // TODO: revisit this, especially after changing serialization format. [ B-02112 ]
     // Should this be 32, 36, or 39 bytes?
     fn into_iter(self) -> Self::IntoIter {
-        self.hash.into_iter().take(HOLO_HASH_FULL_LEN)
+        self.hash.into_iter().take(HOLO_HASH_UNTYPED_LEN)
     }
 }
 
@@ -178,23 +205,23 @@ mod tests {
     fn test_enum_types() {
         assert_type(
             "DnaHash",
-            DnaHash::from_raw_36(vec![0xdb; HOLO_HASH_FULL_LEN]),
+            DnaHash::from_raw_36(vec![0xdb; HOLO_HASH_UNTYPED_LEN]),
         );
         assert_type(
             "NetIdHash",
-            NetIdHash::from_raw_36(vec![0xdb; HOLO_HASH_FULL_LEN]),
+            NetIdHash::from_raw_36(vec![0xdb; HOLO_HASH_UNTYPED_LEN]),
         );
         assert_type(
             "AgentPubKey",
-            AgentPubKey::from_raw_36(vec![0xdb; HOLO_HASH_FULL_LEN]),
+            AgentPubKey::from_raw_36(vec![0xdb; HOLO_HASH_UNTYPED_LEN]),
         );
         assert_type(
             "EntryHash",
-            EntryHash::from_raw_36(vec![0xdb; HOLO_HASH_FULL_LEN]),
+            EntryHash::from_raw_36(vec![0xdb; HOLO_HASH_UNTYPED_LEN]),
         );
         assert_type(
             "DhtOpHash",
-            DhtOpHash::from_raw_36(vec![0xdb; HOLO_HASH_FULL_LEN]),
+            DhtOpHash::from_raw_36(vec![0xdb; HOLO_HASH_UNTYPED_LEN]),
         );
     }
 
