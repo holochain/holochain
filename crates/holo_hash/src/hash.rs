@@ -177,14 +177,12 @@ fn bytes_to_loc(bytes: &[u8]) -> u32 {
 
 /// Helper for ensuring the the proper number of bytes is used in various situations
 pub fn assert_length(len: usize, hash: &[u8]) {
-    if hash.len() != len {
-        panic!(
-            "invalid holo_hash byte count, expected: {}, found: {}. {:?}",
-            len,
-            hash.len(),
-            hash
-        );
-    }
+    debug_assert_eq!(
+        hash.len(),
+        len,
+        "invalid byte count for HoloHash {:?}",
+        hash
+    );
 }
 
 #[cfg(test)]

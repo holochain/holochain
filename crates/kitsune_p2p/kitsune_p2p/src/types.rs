@@ -121,7 +121,7 @@ macro_rules! make_kitsune_bin_type {
             impl KitsuneBinType for $name {
 
                 fn new(bytes: Vec<u8>) -> Self {
-                    assert_eq!(bytes.len(), 36);
+                    debug_assert_eq!(bytes.len(), 36);
                     Self(bytes)
                 }
 

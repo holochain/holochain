@@ -51,7 +51,7 @@ pub fn holo_hash_decode(prefix: &[u8], s: &str) -> Result<Vec<u8>, HoloHashError
         return Err(HoloHashError::BadSize);
     }
     let actual_prefix: [u8; HOLO_HASH_PREFIX_LEN] = s[..HOLO_HASH_PREFIX_LEN].try_into().unwrap();
-    if &actual_prefix != prefix {
+    if actual_prefix != prefix {
         return Err(HoloHashError::BadPrefix(
             format!("{:?}", prefix),
             actual_prefix,
