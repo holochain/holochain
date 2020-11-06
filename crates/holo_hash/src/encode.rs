@@ -64,7 +64,7 @@ pub fn holo_hash_decode(prefix: &[u8], s: &str) -> Result<Vec<u8>, HoloHashError
     if loc_bytes != &s[HOLO_HASH_PREFIX_LEN + HOLO_HASH_CORE_LEN..] {
         return Err(HoloHashError::BadChecksum);
     }
-    assert_length(HOLO_HASH_FULL_LEN, &s);
+    assert_length!(HOLO_HASH_FULL_LEN, &s);
     Ok(s.to_vec())
 }
 

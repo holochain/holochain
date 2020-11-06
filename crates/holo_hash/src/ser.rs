@@ -1,7 +1,4 @@
 //! Defines the serialization rules for HoloHashes
-//!
-//!
-//!
 
 use crate::{HashType, HoloHash};
 use holochain_serialized_bytes::{SerializedBytes, SerializedBytesError, UnsafeBytes};

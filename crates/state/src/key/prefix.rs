@@ -123,7 +123,7 @@ impl<P: PrefixType> PrefixHashKey<P> {
     /// Get the bytes of the hash
     pub fn as_hash_bytes(&self) -> &[u8] {
         let bytes = &self.prefix_and_hash[1..];
-        assert_length(HOLO_HASH_FULL_LEN, bytes);
+        assert_length!(HOLO_HASH_FULL_LEN, bytes);
         bytes
     }
 }

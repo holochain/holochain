@@ -82,7 +82,7 @@ impl From<IntKey> for u32 {
 
 impl<T: HashType + Send + Sync> BufKey for HoloHash<T> {
     fn from_key_bytes_or_friendly_panic(bytes: &[u8]) -> Self {
-        assert_length(HOLO_HASH_FULL_LEN, bytes);
+        assert_length!(HOLO_HASH_FULL_LEN, bytes);
         holochain_serialized_bytes::decode(bytes).expect("from_key_bytes_or_friendly_panic error")
     }
 }

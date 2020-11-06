@@ -41,9 +41,24 @@ pub const HOLO_HASH_UNTYPED_LEN: usize = HOLO_HASH_CORE_LEN + HOLO_HASH_LOC_LEN;
 /// Length of the full HoloHash bytes (39 = 3 + 32 + 4)
 pub const HOLO_HASH_FULL_LEN: usize = HOLO_HASH_PREFIX_LEN + HOLO_HASH_CORE_LEN + HOLO_HASH_LOC_LEN;
 
+/// Helper for ensuring the the proper number of bytes is used in various situations
+#[macro_export]
+macro_rules! assert_length {
+    ($len:expr, $hash:expr) => {
+        debug_assert_eq!(
+            $hash.len(),
+            $len,
+            "invalid byte count for HoloHash {:?}",
+            $hash
+        );
+    };
+}
+
 /// A HoloHash contains a vector of 36 bytes representing a 32-byte blake2b hash
 /// plus 4 bytes representing a DHT location. It also contains a zero-sized
 /// type which specifies what it is a hash of.
+///
+/// There is custom de/serialization implemented in [ser.rs]
 #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct HoloHash<T: HashType> {
     hash: Vec<u8>,
@@ -54,7 +69,7 @@ impl<T: HashType> HoloHash<T> {
     /// Raw constructor: Create a HoloHash from 39 bytes, using the prefix
     /// bytes to determine the hash_type
     pub fn from_raw_39(hash: Vec<u8>) -> HoloHashResult<Self> {
-        assert_length(HOLO_HASH_FULL_LEN, &hash);
+        assert_length!(HOLO_HASH_FULL_LEN, &hash);
         let hash_type = T::try_from_prefix(&hash[0..3])?;
         Ok(Self { hash, hash_type })
     }
@@ -67,19 +82,17 @@ impl<T: HashType> HoloHash<T> {
     /// Use a precomputed hash + location byte array in vec form,
     /// along with a type, to construct a hash. Used in this crate only, for testing.
     pub fn from_raw_36_and_type(mut bytes: Vec<u8>, hash_type: T) -> Self {
-        assert_length(HOLO_HASH_UNTYPED_LEN, &bytes);
+        assert_length!(HOLO_HASH_UNTYPED_LEN, &bytes);
         let mut hash = hash_type.get_prefix().to_vec();
         hash.append(&mut bytes);
-        assert_length(HOLO_HASH_FULL_LEN, &hash);
+        assert_length!(HOLO_HASH_FULL_LEN, &hash);
         Self { hash, hash_type }
     }
 
     /// Change the type of this HoloHash, keeping the same bytes
     pub fn retype<TT: HashType>(mut self, hash_type: TT) -> HoloHash<TT> {
         let prefix = hash_type.get_prefix();
-        let _ = std::mem::replace(&mut self.hash[0], prefix[0]);
-        let _ = std::mem::replace(&mut self.hash[1], prefix[1]);
-        let _ = std::mem::replace(&mut self.hash[2], prefix[2]);
+        self.hash[0..2].copy_from_slice(&prefix[0..2]);
         HoloHash {
             hash: self.hash,
             hash_type,
@@ -99,14 +112,14 @@ impl<T: HashType> HoloHash<T> {
     /// Get 36-byte Vec which excludes the 3 byte prefix
     pub fn get_raw_36(&self) -> &[u8] {
         let bytes = &self.hash[HOLO_HASH_PREFIX_LEN..];
-        assert_length(HOLO_HASH_UNTYPED_LEN, bytes);
+        assert_length!(HOLO_HASH_UNTYPED_LEN, bytes);
         bytes
     }
 
     /// Fetch just the core 32 bytes (without the 4 location bytes)
     pub fn get_raw_32(&self) -> &[u8] {
         let bytes = &self.hash[HOLO_HASH_PREFIX_LEN..HOLO_HASH_PREFIX_LEN + HOLO_HASH_CORE_LEN];
-        assert_length(HOLO_HASH_CORE_LEN, bytes);
+        assert_length!(HOLO_HASH_CORE_LEN, bytes);
         bytes
     }
 
@@ -117,7 +130,7 @@ impl<T: HashType> HoloHash<T> {
 
     /// consume into the inner byte vector
     pub fn into_inner(self) -> Vec<u8> {
-        assert_length(HOLO_HASH_FULL_LEN, &self.hash);
+        assert_length!(HOLO_HASH_FULL_LEN, &self.hash);
         self.hash
     }
 }
@@ -125,14 +138,14 @@ impl<T: HashType> HoloHash<T> {
 impl<P: PrimitiveHashType> HoloHash<P> {
     /// Construct from 36 raw bytes, using the known PrimitiveHashType
     pub fn from_raw_36(hash: Vec<u8>) -> Self {
-        assert_length(HOLO_HASH_UNTYPED_LEN, &hash);
+        assert_length!(HOLO_HASH_UNTYPED_LEN, &hash);
         Self::from_raw_36_and_type(hash, P::new())
     }
 }
 
 impl<T: HashType> AsRef<[u8]> for HoloHash<T> {
     fn as_ref(&self) -> &[u8] {
-        assert_length(HOLO_HASH_FULL_LEN, &self.hash);
+        assert_length!(HOLO_HASH_FULL_LEN, &self.hash);
         &self.hash
     }
 }
@@ -169,16 +182,6 @@ fn bytes_to_loc(bytes: &[u8]) -> u32 {
         + ((bytes[1] as u32) << 8)
         + ((bytes[2] as u32) << 16)
         + ((bytes[3] as u32) << 24)
-}
-
-/// Helper for ensuring the the proper number of bytes is used in various situations
-pub fn assert_length(len: usize, hash: &[u8]) {
-    debug_assert_eq!(
-        hash.len(),
-        len,
-        "invalid byte count for HoloHash {:?}",
-        hash
-    );
 }
 
 #[cfg(test)]

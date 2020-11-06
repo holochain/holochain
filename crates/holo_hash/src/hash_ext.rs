@@ -20,7 +20,7 @@ impl<T: HashType> HoloHash<T> {
             hash.append(&mut encode::holo_dht_location_bytes(&hash));
         }
 
-        assert_length(HOLO_HASH_UNTYPED_LEN, &hash);
+        assert_length!(HOLO_HASH_UNTYPED_LEN, &hash);
 
         HoloHash::from_raw_36_and_type(hash, hash_type)
     }
@@ -79,7 +79,7 @@ fn hash_from_content<T: HashType, C: HashableContent<HashType = T>>(content: &C)
         HashableContentBytes::Content(sb) => {
             let bytes: Vec<u8> = holochain_serialized_bytes::UnsafeBytes::from(sb).into();
             let hash = encode::blake2b_256(&bytes);
-            assert_length(HOLO_HASH_CORE_LEN, &hash);
+            assert_length!(HOLO_HASH_CORE_LEN, &hash);
             HoloHash::<T>::from_raw_32_and_type(hash, content.hash_type())
         }
         HashableContentBytes::Prehashed39(bytes) => HoloHash::from_raw_39_panicky(bytes),
