@@ -13,7 +13,7 @@ use crate::{
     },
 };
 use hdk3::prelude::EntryError;
-use holo_hash::{AnyDhtHash, EntryHash, HeaderHash};
+use holo_hash::{AgentPubKey, AnyDhtHash, EntryHash, HeaderHash};
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::{
     actor::{GetLinksOptions, GetOptions, HolochainP2pRefToCell},
@@ -30,9 +30,12 @@ use holochain_zome_types::{
     entry_def,
     link::{Link, LinkTag},
     metadata::Details,
+    query::ActivityRequest,
+    query::AgentActivity,
+    query::ChainQueryFilter,
     zome::ZomeName,
-    CreateInput, CreateLinkInput, DeleteInput, DeleteLinkInput, GetDetailsInput, GetInput,
-    GetLinksInput, UpdateInput, ZomeCallResponse,
+    CreateInput, CreateLinkInput, DeleteInput, DeleteLinkInput, GetAgentActivityInput,
+    GetDetailsInput, GetInput, GetLinksInput, UpdateInput, ZomeCallResponse,
 };
 use std::sync::Arc;
 use tracing::*;
@@ -519,6 +522,50 @@ pub async fn get_link_details<'env>(
     let mut cascade = workspace.cascade(call_data.network);
     let key = LinkMetaKey::BaseZomeTag(&base, 0.into(), &tag);
     cascade.get_link_details(&key, options).await.unwrap()
+}
+
+pub async fn get_agent_activity(
+    env: &EnvironmentRead,
+    call_data: CallData,
+    agent: &AgentPubKey,
+    query: &ChainQueryFilter,
+    request: ActivityRequest,
+) -> AgentActivity {
+    let CallData {
+        network,
+        keystore,
+        ribosome,
+        signal_tx,
+        zome_path,
+        call_zome_handle,
+    } = call_data;
+
+    let (cell_id, zome_name) = zome_path.into();
+    let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
+    let workspace_lock = CallZomeWorkspaceLock::new(workspace);
+
+    let input = GetAgentActivityInput::new((agent.clone(), query.clone(), request));
+
+    let output = {
+        let host_access = ZomeCallHostAccess::new(
+            workspace_lock.clone(),
+            keystore,
+            network,
+            signal_tx,
+            call_zome_handle,
+            cell_id,
+        );
+        let call_context = CallContext::new(zome_name, host_access.into());
+        let ribosome = Arc::new(ribosome);
+        let call_context = Arc::new(call_context);
+        host_fn::get_agent_activity::get_agent_activity(
+            ribosome.clone(),
+            call_context.clone(),
+            input,
+        )
+        .unwrap()
+    };
+    output.into_inner()
 }
 
 pub async fn call_zome_direct(

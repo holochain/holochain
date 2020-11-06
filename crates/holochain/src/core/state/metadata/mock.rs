@@ -18,6 +18,7 @@ mock! {
         fn sync_register_activity(
             &mut self,
             header: &Header,
+            validation_status: ValidationStatus,
         ) -> DatabaseResult<()>;
         fn register_activity_status(
             &mut self,
@@ -28,9 +29,10 @@ mock! {
             &mut self,
             agent: &AgentPubKey,
             sequence: Vec<(u32, HeaderHash)>,
+            validation_status: ValidationStatus,
         ) -> DatabaseResult<()>;
 
-        fn deregister_activity_sequence(&mut self, agent: &AgentPubKey) -> DatabaseResult<()>;
+        fn deregister_activity_sequence(&mut self, agent: &AgentPubKey, validation_status: ValidationStatus) -> DatabaseResult<()>;
         fn deregister_activity_status(&mut self, agent: &AgentPubKey) -> DatabaseResult<()>;
         fn register_activity_observed(
             &mut self,
@@ -45,6 +47,7 @@ mock! {
         fn sync_deregister_activity(
             &mut self,
             header: &Header,
+            validation_status: ValidationStatus,
         ) -> DatabaseResult<()>;
         fn register_validation_package(
             &mut self,
@@ -239,21 +242,30 @@ impl MetadataBufT for MockMetadataBuf {
         self.sync_register_element_header(header)
     }
 
-    fn register_activity(&mut self, header: &Header) -> DatabaseResult<()> {
-        self.sync_register_activity(header)
+    fn register_activity(
+        &mut self,
+        header: &Header,
+        validation_status: ValidationStatus,
+    ) -> DatabaseResult<()> {
+        self.sync_register_activity(header, validation_status)
     }
     /// Register a sequence of activity onto an agent key
     fn register_activity_sequence(
         &mut self,
         agent: &AgentPubKey,
         sequence: impl IntoIterator<Item = (u32, HeaderHash)>,
+        validation_status: ValidationStatus,
     ) -> DatabaseResult<()> {
-        self.register_activity_sequence(agent, sequence.into_iter().collect())
+        self.register_activity_sequence(agent, sequence.into_iter().collect(), validation_status)
     }
 
     /// Deregister a sequence of activity onto an agent key
-    fn deregister_activity_sequence(&mut self, agent: &AgentPubKey) -> DatabaseResult<()> {
-        self.deregister_activity_sequence(agent)
+    fn deregister_activity_sequence(
+        &mut self,
+        agent: &AgentPubKey,
+        validation_status: ValidationStatus,
+    ) -> DatabaseResult<()> {
+        self.deregister_activity_sequence(agent, validation_status)
     }
     fn register_activity_status(
         &mut self,
@@ -291,8 +303,12 @@ impl MetadataBufT for MockMetadataBuf {
         self.sync_deregister_element_header(header)
     }
 
-    fn deregister_activity(&mut self, header: &Header) -> DatabaseResult<()> {
-        self.sync_deregister_activity(header)
+    fn deregister_activity(
+        &mut self,
+        header: &Header,
+        validation_status: ValidationStatus,
+    ) -> DatabaseResult<()> {
+        self.sync_deregister_activity(header, validation_status)
     }
 
     fn register_validation_package(

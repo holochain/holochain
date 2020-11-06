@@ -11,6 +11,7 @@ pub mod emit_signal;
 pub mod encrypt;
 pub mod entry_type_properties;
 pub mod get;
+pub mod get_agent_activity;
 pub mod get_details;
 pub mod get_link_details;
 pub mod get_links;

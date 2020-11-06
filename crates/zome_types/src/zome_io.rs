@@ -123,6 +123,14 @@ wasm_io_types!(
     pub struct GetOutput(Option<crate::element::Element>);
     pub struct GetDetailsInput((holo_hash::AnyDhtHash, crate::entry::GetOptions));
     pub struct GetDetailsOutput(Option<crate::metadata::Details>);
+    pub struct GetAgentActivityInput(
+        (
+            holo_hash::AgentPubKey,
+            crate::query::ChainQueryFilter,
+            crate::query::ActivityRequest,
+        ),
+    );
+    pub struct GetAgentActivityOutput(crate::query::AgentActivity);
     // @todo
     pub struct EntryTypePropertiesInput(());
     pub struct EntryTypePropertiesOutput(());

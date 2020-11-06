@@ -231,6 +231,7 @@ fn update_activity_status(
             hash: HeaderHash::with_data_sync(h),
         };
         meta_integrated.register_activity_status(h.author(), ChainStatus::Invalid(chain_head))?;
+        meta_integrated.register_activity(h, ValidationStatus::Rejected)?;
     }
     Ok(())
 }
@@ -383,7 +384,7 @@ where
         DhtOpLight::RegisterAgentActivity(hash, _) => {
             let header = get_header(hash, element_store)?;
             // register agent activity on this agents pub key
-            meta_store.register_activity(&header)?;
+            meta_store.register_activity(&header, ValidationStatus::Valid)?;
         }
         DhtOpLight::RegisterUpdatedContent(hash, _, _)
         | DhtOpLight::RegisterUpdatedElement(hash, _, _) => {
