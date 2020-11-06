@@ -9,6 +9,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Added validation package to entry defs see for usage [#344](https://github.com/holochain/holochain/pull/344)
 - Implemented the `emit_signals` host function [#371](https://github.com/holochain/holochain/pull/371), which broadcasts a signal across all app interfaces (fine-grained pub/sub to be done in future work)
 - get_details on a HeaderHash now returns the updates if it's an entry header
+- call host fn (This is an actual function not a macro). Allows you to call a zome that is installed on the same conductor. [#453](https://github.com/holochain/holochain/pull/453)
 - Added create link HeaderHash to the Link type
 
 ### Changed

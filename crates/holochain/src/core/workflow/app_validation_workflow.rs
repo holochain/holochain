@@ -57,8 +57,13 @@ use holochain_state::{
     prelude::*,
 };
 use holochain_types::{
-    dht_op::DhtOp, dna::zome::Zome, dna::DnaFile, test_utils::which_agent,
-    validate::ValidationStatus, Entry, HeaderHashed, Timestamp,
+    activity::{AgentActivity, ChainItems},
+    dht_op::DhtOp,
+    dna::zome::Zome,
+    dna::DnaFile,
+    test_utils::which_agent,
+    validate::ValidationStatus,
+    Entry, HeaderHashed, Timestamp,
 };
 use holochain_zome_types::{
     element::Element,
@@ -68,8 +73,6 @@ use holochain_zome_types::{
     header::AppEntryType,
     header::EntryType,
     header::{CreateLink, DeleteLink, ZomeId},
-    query::Activity,
-    query::AgentActivity,
     query::ChainStatus,
     validate::RequiredValidationType,
     validate::ValidationPackage,
@@ -705,7 +708,7 @@ async fn get_validation_package_remote(
             match activity {
                 AgentActivity {
                     status: ChainStatus::Valid(_),
-                    valid_activity: Activity::Full(elements),
+                    valid_activity: ChainItems::Full(elements),
                     ..
                 } => {
                     // Cache this as a validation package

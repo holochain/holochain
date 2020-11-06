@@ -13,7 +13,9 @@ use holochain_keystore::AgentPubKeyExt;
 use holochain_p2p::HolochainP2pCell;
 use holochain_state::{env::EnvironmentWrite, error::DatabaseResult, fresh_reader};
 use holochain_types::{dht_op::DhtOp, header::NewEntryHeaderRef, Entry};
-use holochain_zome_types::{element::ElementEntry, signature::Signature};
+use holochain_zome_types::{
+    element::ElementEntry, signature::Signature, validate::ValidationStatus,
+};
 use holochain_zome_types::{
     entry_def::{EntryDef, EntryVisibility},
     header::{AppEntryType, EntryType, Update},
@@ -103,6 +105,8 @@ pub async fn check_valid_if_dna(
     })
 }
 
+// TODO: I think this can be removed now as rollbacks are detected when inserting
+// metadata into the metadata buf.
 /// Check if there are other headers at this
 /// sequence number
 pub async fn check_chain_rollback(
@@ -110,7 +114,11 @@ pub async fn check_chain_rollback(
     workspace: &SysValidationWorkspace,
 ) -> SysValidationResult<()> {
     let header_hash = HeaderHash::with_data_sync(header);
-    let k = ChainItemKey::AgentSequence(header.author().clone(), header.header_seq());
+    let k = ChainItemKey::AgentStatusSequence(
+        header.author().clone(),
+        ValidationStatus::Valid,
+        header.header_seq(),
+    );
     let env = workspace.meta_vault.env();
     // Check there are no conflicting chain items
     // at any valid or potentially valid stores.

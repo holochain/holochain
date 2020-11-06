@@ -4,7 +4,6 @@ use crate::{
     conductor::{
         api::RealAppInterfaceApi,
         config::{AdminInterfaceConfig, ConductorConfig, InterfaceDriver},
-        dna_store::MockDnaStore,
         ConductorBuilder, ConductorHandle,
     },
     core::ribosome::ZomeCallInvocation,
@@ -32,6 +31,7 @@ use holochain_state::{
 use holochain_types::{
     app::InstalledCell,
     cell::CellId,
+    dna::DnaFile,
     element::{SignedHeaderHashed, SignedHeaderHashedExt},
     fixt::CapSecretFixturator,
     test_utils::fake_header_hash,
@@ -257,8 +257,12 @@ where
 pub async fn install_app(
     name: &str,
     cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
+    dnas: Vec<DnaFile>,
     conductor_handle: ConductorHandle,
 ) {
+    for dna in dnas {
+        conductor_handle.install_dna(dna).await.unwrap();
+    }
     conductor_handle
         .clone()
         .install_app(name.to_string(), cell_data)
@@ -282,7 +286,7 @@ pub type InstalledCellsWithProofs = Vec<(InstalledCell, Option<SerializedBytes>)
 /// apps_data is a vec of app nicknames with vecs of their cell data
 pub async fn setup_app(
     apps_data: Vec<(&str, InstalledCellsWithProofs)>,
-    dna_store: MockDnaStore,
+    dnas: Vec<DnaFile>,
 ) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
     let test_env = test_conductor_env();
     let TestEnvironment {
@@ -295,7 +299,7 @@ pub async fn setup_app(
     } = test_p2p_env();
     let tmpdir = test_env.tmpdir.clone();
 
-    let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
+    let conductor_handle = ConductorBuilder::new()
         .config(ConductorConfig {
             admin_interfaces: Some(vec![AdminInterfaceConfig {
                 driver: InterfaceDriver::Websocket { port: 0 },
@@ -307,7 +311,7 @@ pub async fn setup_app(
         .unwrap();
 
     for (app_name, cell_data) in apps_data {
-        install_app(app_name, cell_data, conductor_handle.clone()).await;
+        install_app(app_name, cell_data, dnas.clone(), conductor_handle.clone()).await;
     }
 
     let handle = conductor_handle.clone();

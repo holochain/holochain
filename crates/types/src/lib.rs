@@ -4,6 +4,7 @@
 
 #![deny(missing_docs)]
 
+pub mod activity;
 pub mod app;
 pub mod autonomic;
 pub mod cell;
