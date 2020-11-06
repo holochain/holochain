@@ -119,10 +119,7 @@ impl DnaFile {
         if self.dna_hash == dna_hash {
             Ok(())
         } else {
-            Err(DnaError::DnaHashMismatch(
-                self.dna_hash.clone(),
-                dna_hash.clone(),
-            ))
+            Err(DnaError::DnaHashMismatch(self.dna_hash.clone(), dna_hash))
         }
     }
 
