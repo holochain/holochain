@@ -120,7 +120,15 @@ macro_rules! make_kitsune_bin_type {
 
             impl KitsuneBinType for $name {
 
-                fn new(bytes: Vec<u8>) -> Self {
+                fn new(mut bytes: Vec<u8>) -> Self {
+                    if bytes.len() != 36 {
+                        // If location bytes are not included, append them now.
+                        debug_assert_eq!(bytes.len(), 32);
+                        // FIXME: no way to compute location bytes at this time,
+                        // so simply pad with 0's for now
+                        // bytes.append(&mut kitsune_location_bytes(&bytes));
+                        bytes.append(&mut [0; 4].to_vec());
+                    }
                     debug_assert_eq!(bytes.len(), 36);
                     Self(bytes)
                 }
