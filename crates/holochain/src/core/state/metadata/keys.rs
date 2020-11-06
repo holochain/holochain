@@ -361,11 +361,13 @@ impl From<BytesKey> for ChainItemKey {
         let a = AgentPubKey::from_raw_39_panicky(bytes[..HOLO_HASH_FULL_LEN].to_owned());
 
         // Take another 4 for the u32
-        let seq_bytes: Vec<_> = bytes[HOLO_HASH_FULL_LEN..(HOLO_HASH_FULL_LEN + SEQ_SIZE)].to_owned();
+        let seq_bytes: Vec<_> =
+            bytes[HOLO_HASH_FULL_LEN..(HOLO_HASH_FULL_LEN + SEQ_SIZE)].to_owned();
         let s = BigEndian::read_u32(&seq_bytes);
 
         // Take the rest (another 39) for the header hash
-        let h = HeaderHash::from_raw_39_panicky(bytes[(HOLO_HASH_FULL_LEN + SEQ_SIZE)..].to_owned());
+        let h =
+            HeaderHash::from_raw_39_panicky(bytes[(HOLO_HASH_FULL_LEN + SEQ_SIZE)..].to_owned());
 
         ChainItemKey::Full(a, s, h)
     }
