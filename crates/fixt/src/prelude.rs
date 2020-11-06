@@ -1,8 +1,8 @@
 pub use crate::basic_test;
 pub use crate::bool::BoolFixturator;
 pub use crate::bytes::{
-    Bytes, BytesFixturator, BytesNotEmpty, BytesNotEmptyFixturator, ThirtySixBytesFixturator,
-    ThirtyTwoBytesFixturator, SixtyFourBytesFixturator,
+    Bytes, BytesFixturator, BytesNotEmpty, BytesNotEmptyFixturator, SixtyFourBytesFixturator,
+    ThirtySixBytesFixturator, ThirtyTwoBytesFixturator,
 };
 pub use crate::curve;
 pub use crate::enum_fixturator;
