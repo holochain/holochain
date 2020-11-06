@@ -76,8 +76,6 @@ fn validate_create_entry_post(
 }
 
 #[hdk_extern]
-fn my_activity(_: ()) -> ExternResult<AgentActivity> {
-    let agent = agent_info!()?.agent_latest_pubkey;
-    let query = QueryFilter::new();
-    Ok(get_agent_activity(agent, query, ActivityRequest::Full)?)
+fn get_activity(input: test_wasm_common::AgentActivitySearch) -> ExternResult<AgentActivity> {
+    Ok(get_agent_activity(input.agent, input.query, input.request)?)
 }

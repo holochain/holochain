@@ -4,6 +4,7 @@ use super::*;
 
 use crate::fixt::ZomeCallHostAccessFixturator;
 use crate::here;
+use crate::test_utils::test_network;
 use crate::{core::state::metadata::ChainItemKey, fixt::CallContextFixturator};
 use crate::{
     core::{
@@ -14,7 +15,6 @@ use crate::{
     },
     fixt::*,
 };
-use crate::{fixt::CallContextFixturator, test_utils::test_network};
 use ::fixt::prelude::*;
 use holo_hash::*;
 use holochain_state::{

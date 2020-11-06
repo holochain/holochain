@@ -429,7 +429,7 @@ where
         )
     }
 
-    /// If there are any rejected of abandoned activity
+    /// If there are any rejected or abandoned activity
     /// return the earliest problem.
     fn check_for_invalid_status<R: Readable>(
         &self,
