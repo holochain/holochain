@@ -14,9 +14,10 @@ use crate::{
     core::workflow::produce_dht_ops_workflow::dht_op_light::light_to_op,
 };
 use call_zome_workflow::call_zome_workspace_lock::CallZomeWorkspaceLock;
+use holochain_types::activity::AgentActivity;
+use holochain_zome_types::header::EntryType;
 use holochain_zome_types::validate::ValidationPackage;
 use holochain_zome_types::zome::FunctionName;
-use holochain_zome_types::{header::EntryType, query::AgentActivity};
 use holochain_zome_types::{query::ChainQueryFilter, validate::ValidationStatus};
 use validation_package::ValidationPackageDb;
 

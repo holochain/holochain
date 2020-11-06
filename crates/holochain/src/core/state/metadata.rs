@@ -27,6 +27,7 @@ use holochain_zome_types::{
     query::ChainHead,
     query::ChainStatus,
     query::HighestObserved,
+    validate::ValidationStatus,
 };
 use holochain_zome_types::{link::LinkTag, Header};
 use std::fmt::Debug;
@@ -120,10 +121,18 @@ where
     fn deregister_element_header(&mut self, header: HeaderHash) -> DatabaseResult<()>;
 
     /// Registers a published [Header] on the authoring agent's public key
-    fn register_activity(&mut self, header: &Header) -> DatabaseResult<()>;
+    fn register_activity(
+        &mut self,
+        header: &Header,
+        validation_status: ValidationStatus,
+    ) -> DatabaseResult<()>;
 
     /// Deregister a published [Header] on the authoring agent's public key
-    fn deregister_activity(&mut self, header: &Header) -> DatabaseResult<()>;
+    fn deregister_activity(
+        &mut self,
+        header: &Header,
+        validation_status: ValidationStatus,
+    ) -> DatabaseResult<()>;
 
     /// Registers a custom validation package on a [HeaderHash]
     fn register_validation_package(
@@ -140,10 +149,15 @@ where
         &mut self,
         agent: &AgentPubKey,
         sequence: impl IntoIterator<Item = (u32, HeaderHash)>,
+        validation_status: ValidationStatus,
     ) -> DatabaseResult<()>;
 
     /// Deregister a sequence of activity onto an agent key
-    fn deregister_activity_sequence(&mut self, agent: &AgentPubKey) -> DatabaseResult<()>;
+    fn deregister_activity_sequence(
+        &mut self,
+        agent: &AgentPubKey,
+        valid_status: ValidationStatus,
+    ) -> DatabaseResult<()>;
 
     /// Registers the agents chain status on the authoring agent's public key
     fn register_activity_status(
@@ -415,40 +429,104 @@ where
         )
     }
 
+    /// If there are any rejected or abandoned activity
+    /// return the earliest problem.
+    fn check_for_invalid_status<R: Readable>(
+        &self,
+        agent: AgentPubKey,
+        reader: &R,
+    ) -> DatabaseResult<ChainStatus> {
+        let rejected_key = ChainItemKey::AgentStatus(agent.clone(), ValidationStatus::Rejected);
+        let abandoned_key = ChainItemKey::AgentStatus(agent, ValidationStatus::Abandoned);
+        let rejected_hash = self.get_activity_sequence(reader, rejected_key)?.next()?;
+        let abandoned_hash = self.get_activity_sequence(reader, abandoned_key)?.next()?;
+        match (rejected_hash, abandoned_hash) {
+            (None, None) => Ok(ChainStatus::Empty),
+            (None, Some((header_seq, hash))) => {
+                Ok(ChainStatus::Invalid(ChainHead { header_seq, hash }))
+            }
+            (Some((header_seq, hash)), None) => {
+                Ok(ChainStatus::Invalid(ChainHead { header_seq, hash }))
+            }
+            (Some(a), Some(b)) => match a.0.cmp(&b.0) {
+                std::cmp::Ordering::Equal => Ok(ChainStatus::Forked(ChainFork {
+                    fork_seq: a.0,
+                    first_header: a.1,
+                    second_header: b.1,
+                })),
+                std::cmp::Ordering::Less => Ok(ChainStatus::Invalid(ChainHead {
+                    header_seq: a.0,
+                    hash: a.1,
+                })),
+                std::cmp::Ordering::Greater => Ok(ChainStatus::Invalid(ChainHead {
+                    header_seq: b.0,
+                    hash: b.1,
+                })),
+            },
+        }
+    }
+
+    /// Check the valid activity sequence is complete and
+    /// doesn't have any forks or return the first fork.
+    fn calculate_activity_status(
+        &self,
+        mut activity: impl FallibleIterator<Item = (u32, HeaderHash), Error = DatabaseError>,
+    ) -> DatabaseResult<Option<ChainStatus>> {
+        let mut last = None;
+        let mut chain_complete = true;
+        while let Some((header_seq, hash)) = activity.next()? {
+            if let Some(ChainHead {
+                header_seq: last_seq,
+                hash: last_hash,
+            }) = last
+            {
+                if last_seq == header_seq {
+                    // Chain is forked
+                    return Ok(Some(ChainStatus::Forked(ChainFork {
+                        fork_seq: last_seq,
+                        first_header: last_hash,
+                        second_header: hash,
+                    })));
+                }
+                if header_seq != last_seq + 1 {
+                    // Chain broken but still check for forks
+                    chain_complete = false;
+                }
+            }
+            last = Some(ChainHead { header_seq, hash });
+        }
+        if chain_complete {
+            return Ok(last.map(ChainStatus::Valid));
+        }
+        DatabaseResult::Ok(None)
+    }
+
     /// Check the activity chain for forks and gaps.
     /// If there is a fork record a forked chain status.
     /// Otherwise if there are no gaps then record a valid chain.
     fn update_activity_status(&mut self, agent: &AgentPubKey) -> DatabaseResult<()> {
-        let key = ChainItemKey::Agent(agent.clone());
+        let key = ChainItemKey::AgentStatus(agent.clone(), ValidationStatus::Valid);
         let status = fresh_reader!(self.env, |r| {
-            let mut iter = self.get_activity_sequence(&r, key)?;
-            let mut last = None;
-            let mut chain_complete = true;
-            while let Some((header_seq, hash)) = iter.next()? {
-                if let Some(ChainHead {
-                    header_seq: last_seq,
-                    hash: last_hash,
-                }) = last
-                {
-                    if last_seq == header_seq {
-                        // Chain is forked
-                        return Ok(Some(ChainStatus::Forked(ChainFork {
-                            fork_seq: last_seq,
-                            first_header: last_hash,
-                            second_header: hash,
-                        })));
-                    }
-                    if header_seq != last_seq + 1 {
-                        // Chain broken but still check for forks
-                        chain_complete = false;
-                    }
+            let invalid_activity_status = self.check_for_invalid_status(agent.clone(), &r)?;
+            match invalid_activity_status {
+                // No invalid data so check entire valid activity
+                ChainStatus::Empty => {
+                    let iter = self.get_activity_sequence(&r, key)?;
+                    self.calculate_activity_status(iter)
                 }
-                last = Some(ChainHead { header_seq, hash });
+                // Invalid data found so check for earlier problems
+                // up to the found problem sequence number
+                ChainStatus::Invalid(ChainHead {
+                    header_seq: seq, ..
+                })
+                | ChainStatus::Forked(ChainFork { fork_seq: seq, .. }) => {
+                    let iter = self
+                        .get_activity_sequence(&r, key)?
+                        .take_while(|(s, _)| Ok(*s < seq));
+                    self.calculate_activity_status(iter)
+                }
+                _ => unreachable!(),
             }
-            if chain_complete {
-                return Ok(last.map(ChainStatus::Valid));
-            }
-            DatabaseResult::Ok(None)
         })?;
         if let Some(status) = status {
             self.register_activity_status(agent, status)?;
@@ -620,16 +698,24 @@ where
         self.update_entry_dht_status(entry_hash)
     }
 
-    fn register_activity(&mut self, header: &Header) -> DatabaseResult<()> {
-        let key = ChainItemKey::from(header);
+    fn register_activity(
+        &mut self,
+        header: &Header,
+        validation_status: ValidationStatus,
+    ) -> DatabaseResult<()> {
+        let key = ChainItemKey::new(header, validation_status);
         let key = MiscMetaKey::chain_item(&key).into();
         let value = MiscMetaValue::ChainItem(header.timestamp().clone().into());
         self.misc_meta.put(key, value)?;
         self.update_activity_status(header.author())
     }
 
-    fn deregister_activity(&mut self, header: &Header) -> DatabaseResult<()> {
-        let key = ChainItemKey::from(header);
+    fn deregister_activity(
+        &mut self,
+        header: &Header,
+        validation_status: ValidationStatus,
+    ) -> DatabaseResult<()> {
+        let key = ChainItemKey::new(header, validation_status);
         self.misc_meta
             .delete(MiscMetaKey::chain_item(&key).into())?;
         self.update_activity_status(header.author())
@@ -639,9 +725,10 @@ where
         &mut self,
         agent: &AgentPubKey,
         sequence: impl IntoIterator<Item = (u32, HeaderHash)>,
+        validation_status: ValidationStatus,
     ) -> DatabaseResult<()> {
         for (seq, hash) in sequence {
-            let key = ChainItemKey::Full(agent.clone(), seq, hash);
+            let key = ChainItemKey::Full(agent.clone(), validation_status, seq, hash);
             let key = MiscMetaKey::chain_item(&key).into();
             // TODO: Remove timestamp value as headers are already ordered
             let value = MiscMetaValue::ChainItem(Timestamp::now());
@@ -650,13 +737,17 @@ where
         self.update_activity_status(agent)
     }
 
-    fn deregister_activity_sequence(&mut self, agent: &AgentPubKey) -> DatabaseResult<()> {
-        let key = ChainItemKey::Agent(agent.clone());
+    fn deregister_activity_sequence(
+        &mut self,
+        agent: &AgentPubKey,
+        validation_status: ValidationStatus,
+    ) -> DatabaseResult<()> {
+        let key = ChainItemKey::AgentStatus(agent.clone(), validation_status);
         let sequence: Vec<_> = fresh_reader!(self.env, |r| {
             self.get_activity_sequence(&r, key)?.collect()
         })?;
         for (seq, hash) in sequence {
-            let k = ChainItemKey::Full(agent.clone(), seq, hash);
+            let k = ChainItemKey::Full(agent.clone(), validation_status, seq, hash);
             let k = MiscMetaKey::chain_item(&k).into();
             self.misc_meta.delete(k)?;
         }

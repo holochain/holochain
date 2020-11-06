@@ -44,6 +44,7 @@ pub mod timestamp;
 pub mod validate;
 #[allow(missing_docs)]
 pub mod validate_link;
+pub mod warrant;
 #[allow(missing_docs)]
 pub mod zome;
 #[allow(missing_docs)]

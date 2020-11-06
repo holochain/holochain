@@ -7,7 +7,7 @@ use holochain_state::{
     env::ReadManager,
     test_utils::{test_cell_env, TestEnvironment},
 };
-use holochain_zome_types::{test_utils::fake_agent_pubkey_1, Header};
+use holochain_zome_types::{test_utils::fake_agent_pubkey_1, validate::ValidationStatus, Header};
 
 use super::{ChainItemKey, MetadataBuf, MetadataBufT};
 
@@ -28,28 +28,32 @@ async fn check_different_seq_num_on_separate_queries() {
     let (_te, mut meta_buf, mut h1, mut h2, agent_pubkey) = setup();
     h1.header_seq = 1;
     h2.header_seq = 2;
-    meta_buf.register_activity(&h1.into()).unwrap();
-    meta_buf.register_activity(&h2.into()).unwrap();
+    meta_buf
+        .register_activity(&h1.into(), ValidationStatus::Valid)
+        .unwrap();
+    meta_buf
+        .register_activity(&h2.into(), ValidationStatus::Valid)
+        .unwrap();
 
     let g = meta_buf.env().guard();
     let reader = g.reader().unwrap();
 
-    let k = ChainItemKey::AgentSequence(agent_pubkey.clone(), 1);
+    let k = ChainItemKey::AgentStatusSequence(agent_pubkey.clone(), ValidationStatus::Valid, 1);
     assert_eq!(
         meta_buf.get_activity(&reader, k).unwrap().count().unwrap(),
         1
     );
-    let k = ChainItemKey::AgentSequence(agent_pubkey.clone(), 2);
+    let k = ChainItemKey::AgentStatusSequence(agent_pubkey.clone(), ValidationStatus::Valid, 2);
     assert_eq!(
         meta_buf.get_activity(&reader, k).unwrap().count().unwrap(),
         1
     );
-    let k = ChainItemKey::AgentSequence(agent_pubkey.clone(), 0);
+    let k = ChainItemKey::AgentStatusSequence(agent_pubkey.clone(), ValidationStatus::Valid, 0);
     assert_eq!(
         meta_buf.get_activity(&reader, k).unwrap().count().unwrap(),
         0
     );
-    let k = ChainItemKey::AgentSequence(agent_pubkey.clone(), 3);
+    let k = ChainItemKey::AgentStatusSequence(agent_pubkey.clone(), ValidationStatus::Valid, 3);
     assert_eq!(
         meta_buf.get_activity(&reader, k).unwrap().count().unwrap(),
         0
@@ -63,33 +67,37 @@ async fn check_equal_seq_num_on_same_query() {
     h2.header_seq = 1;
     let h1: Header = h1.into();
     let h2: Header = h2.into();
-    meta_buf.register_activity(&h1).unwrap();
-    meta_buf.register_activity(&h2).unwrap();
+    meta_buf
+        .register_activity(&h1, ValidationStatus::Valid)
+        .unwrap();
+    meta_buf
+        .register_activity(&h2, ValidationStatus::Valid)
+        .unwrap();
 
     let g = meta_buf.env().guard();
     let reader = g.reader().unwrap();
 
-    let k = ChainItemKey::from(&h1);
+    let k = ChainItemKey::new(&h1, ValidationStatus::Valid);
     assert_eq!(
         meta_buf.get_activity(&reader, k).unwrap().count().unwrap(),
         1
     );
-    let k = ChainItemKey::AgentSequence(agent_pubkey.clone(), 1);
+    let k = ChainItemKey::AgentStatusSequence(agent_pubkey.clone(), ValidationStatus::Valid, 1);
     assert_eq!(
         meta_buf.get_activity(&reader, k).unwrap().count().unwrap(),
         2
     );
-    let k = ChainItemKey::AgentSequence(agent_pubkey.clone(), 2);
+    let k = ChainItemKey::AgentStatusSequence(agent_pubkey.clone(), ValidationStatus::Valid, 2);
     assert_eq!(
         meta_buf.get_activity(&reader, k).unwrap().count().unwrap(),
         0
     );
-    let k = ChainItemKey::AgentSequence(agent_pubkey.clone(), 0);
+    let k = ChainItemKey::AgentStatusSequence(agent_pubkey.clone(), ValidationStatus::Valid, 0);
     assert_eq!(
         meta_buf.get_activity(&reader, k).unwrap().count().unwrap(),
         0
     );
-    let k = ChainItemKey::AgentSequence(agent_pubkey.clone(), 3);
+    let k = ChainItemKey::AgentStatusSequence(agent_pubkey.clone(), ValidationStatus::Valid, 3);
     assert_eq!(
         meta_buf.get_activity(&reader, k).unwrap().count().unwrap(),
         0
@@ -102,18 +110,20 @@ async fn chain_item_keys_ser() {
     h.header_seq = 1;
     let h = Header::Create(h);
     let expect_hash = HeaderHash::with_data_sync(&h);
-    meta_buf.register_activity(&h).unwrap();
+    meta_buf
+        .register_activity(&h, ValidationStatus::Valid)
+        .unwrap();
 
     let g = meta_buf.env().guard();
     let reader = g.reader().unwrap();
 
-    let k = ChainItemKey::from(&h);
+    let k = ChainItemKey::new(&h, ValidationStatus::Valid);
     assert_eq!(
         meta_buf.get_activity(&reader, k).unwrap().count().unwrap(),
         1
     );
 
-    let k = ChainItemKey::AgentSequence(agent_pubkey.clone(), 1);
+    let k = ChainItemKey::AgentStatusSequence(agent_pubkey.clone(), ValidationStatus::Valid, 1);
     let mut headers: Vec<_> = meta_buf
         .get_activity(&reader, k)
         .unwrap()
@@ -132,8 +142,12 @@ async fn check_large_seq_queries() {
     let h1_hash = HeaderHash::with_data_sync(&Header::Create(h1.clone()));
     let h2_hash = HeaderHash::with_data_sync(&Header::Create(h2.clone()));
 
-    meta_buf.register_activity(&h1.into()).unwrap();
-    meta_buf.register_activity(&h2.into()).unwrap();
+    meta_buf
+        .register_activity(&h1.into(), ValidationStatus::Valid)
+        .unwrap();
+    meta_buf
+        .register_activity(&h2.into(), ValidationStatus::Valid)
+        .unwrap();
 
     let g = meta_buf.env().guard();
     let reader = g.reader().unwrap();

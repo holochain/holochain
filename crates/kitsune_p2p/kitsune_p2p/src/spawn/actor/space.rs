@@ -15,7 +15,7 @@ const DEFAULT_NOTIFY_TIMEOUT_MS: u64 = 1000;
 const DEFAULT_RPC_MULTI_REMOTE_AGENT_COUNT: u8 = 2;
 
 /// if the user specifies None or zero (0) for timeout_ms
-const DEFAULT_RPC_MULTI_TIMEOUT_MS: u64 = 1000;
+const DEFAULT_RPC_MULTI_TIMEOUT_MS: u64 = 20;
 
 /// if the user specifies None or zero (0) for race_timeout_ms
 const DEFAULT_RPC_MULTI_RACE_TIMEOUT_MS: u64 = 200;
@@ -543,12 +543,13 @@ impl Space {
             from_agent,
             basis,
             //remote_agent_count,
-            //timeout_ms,
+            timeout_ms,
             //as_race,
             //race_timeout_ms,
             payload,
             ..
         } = input;
+        let timeout_ms = timeout_ms.unwrap();
 
         // encode the data to send
         let payload = Arc::new(wire::Wire::call(payload.into()).encode_vec()?);
@@ -584,7 +585,7 @@ impl Space {
             // TODO: 20 ms is only appropriate for local calls and not
             // real networking
             if let Ok(Ok(response)) = tokio::time::timeout(
-                std::time::Duration::from_millis(20),
+                std::time::Duration::from_millis(timeout_ms),
                 i_s.immediate_request(space, to_agent.clone(), from_agent.clone(), payload),
             )
             .await
