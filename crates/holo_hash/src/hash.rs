@@ -131,8 +131,6 @@ impl<P: PrimitiveHashType> HoloHash<P> {
 }
 
 impl<T: HashType> AsRef<[u8]> for HoloHash<T> {
-    // TODO: revisit this, especially after changing serialization format. [ B-02112 ]
-    // Should this be 32, 36, or 39 bytes?
     fn as_ref(&self) -> &[u8] {
         assert_length(HOLO_HASH_FULL_LEN, &self.hash);
         &self.hash
@@ -141,11 +139,10 @@ impl<T: HashType> AsRef<[u8]> for HoloHash<T> {
 
 impl<T: HashType> IntoIterator for HoloHash<T> {
     type Item = u8;
-    type IntoIter = std::iter::Take<std::vec::IntoIter<Self::Item>>;
-    // TODO: revisit this, especially after changing serialization format. [ B-02112 ]
-    // Should this be 32, 36, or 39 bytes?
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
     fn into_iter(self) -> Self::IntoIter {
-        self.hash.into_iter().take(HOLO_HASH_UNTYPED_LEN)
+        self.hash.into_iter()
     }
 }
 

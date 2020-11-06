@@ -12,17 +12,7 @@ use crate::error::HoloHashResult;
 /// Additionally, every HashableContent has an associated HashType.
 /// The HashType is the glue that binds together HashableContent with its hash.
 pub trait HashType:
-    Copy
-    + Clone
-    + std::fmt::Debug
-    + Clone
-    + std::hash::Hash
-    + PartialEq
-    + Eq
-    + PartialOrd
-    + Ord
-    // FIXME: REMOVE!!! This is a hack to get composite keys working with LMDB before [ B-02112 ] is done
-    + Default
+    Copy + Clone + std::fmt::Debug + Clone + std::hash::Hash + PartialEq + Eq + PartialOrd + Ord
 {
     /// Get the 3-byte prefix for the underlying primitive hash type
     fn get_prefix(self) -> &'static [u8];

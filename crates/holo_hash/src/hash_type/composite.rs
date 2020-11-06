@@ -44,14 +44,6 @@ impl HashType for AnyDht {
 
 impl HashTypeAsync for AnyDht {}
 
-// FIXME: REMOVE [ B-02112 ]
-impl Default for AnyDht {
-    fn default() -> Self {
-        // HACK: SO WRONG
-        AnyDht::Header
-    }
-}
-
 #[derive(serde::Deserialize, serde::Serialize)]
 enum AnyDhtSerial {
     /// The hash of an Entry of EntryType::Agent
