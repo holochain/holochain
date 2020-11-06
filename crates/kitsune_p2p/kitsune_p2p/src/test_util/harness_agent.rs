@@ -60,6 +60,7 @@ impl AgentHarness {
         let EntrySignEd25519 { priv_key, pub_key } = sign_ed25519_keypair_new_from_entropy()
             .await
             .map_err(KitsuneP2pError::other)?;
+        debug_assert_eq!(pub_key.len(), 36);
         let agent: Arc<KitsuneAgent> = Arc::new(KitsuneAgent::new((**pub_key).clone()));
         Ok(Self {
             agent,

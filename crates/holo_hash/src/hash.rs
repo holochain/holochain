@@ -112,7 +112,7 @@ impl<T: HashType> HoloHash<T> {
 
     /// Fetch the holo dht location for this hash
     pub fn get_loc(&self) -> u32 {
-        bytes_to_loc(&self.hash[HOLO_HASH_FULL_LEN - HOLO_HASH_PREFIX_LEN..])
+        bytes_to_loc(&self.hash[HOLO_HASH_FULL_LEN - HOLO_HASH_LOC_LEN..])
     }
 
     /// consume into the inner byte vector

@@ -30,7 +30,7 @@ mod tests {
             return Ok(());
         }
 
-        panic!("Failed to receive agent_info_sigend");
+        panic!("Failed to receive agent_info_signed");
     }
 
     #[tokio::test(threaded_scheduler)]
