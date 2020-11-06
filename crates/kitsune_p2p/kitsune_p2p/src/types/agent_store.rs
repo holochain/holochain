@@ -99,3 +99,15 @@ impl AgentInfo {
         self.signed_at_ms
     }
 }
+
+impl From<AgentInfoSigned> for AgentInfo {
+    fn from(ais: AgentInfoSigned) -> Self {
+        ais.agent_info
+    }
+}
+
+impl From<AgentInfo> for KitsuneAgent {
+    fn from(ai: AgentInfo) -> Self {
+        ai.agent
+    }
+}

@@ -20,14 +20,15 @@ ghost_actor::ghost_chan! {
             dht_arc: DhtArc,
             since_utc_epoch_s: i64,
             until_utc_epoch_s: i64,
-        ) -> (Vec<Arc<KitsuneOpHash>>, Vec<AgentInfoSigned>);
+        ) -> (Vec<Arc<KitsuneOpHash>>, Vec<(Arc<KitsuneAgent>, u64)>);
 
         /// fetch op data for op hash list
         fn req_op_data(
             from_agent: Arc<KitsuneAgent>,
             to_agent: Arc<KitsuneAgent>,
             op_hashes: Vec<Arc<KitsuneOpHash>>,
-        ) -> Vec<(Arc<KitsuneOpHash>, Vec<u8>)>;
+            peer_hashes: Vec<Arc<KitsuneAgent>>,
+        ) -> (Vec<(Arc<KitsuneOpHash>, Vec<u8>)>, Vec<AgentInfoSigned>);
 
         /// we have gossip to forward
         fn gossip_ops(
@@ -107,7 +108,7 @@ impl GossipData {
 
         // required so from_iters below know the build_hasher type
         type S = HashSet<Arc<KitsuneOpHash>>;
-        type A = HashSet<AgentInfoSigned>;
+        type A = HashSet<(Arc<KitsuneAgent>, u64)>;
 
         // we'll just fetch all with no constraints for now
         let (op_hashes_from, agent_info_from) = self
@@ -145,6 +146,7 @@ impl GossipData {
         let from_needs_agents = agent_info_to
             .difference(&agent_info_from)
             .cloned()
+            .map(|(ai, _)| ai)
             .collect::<Vec<_>>();
 
         // values that from_agent has, and to_agent needs
@@ -155,83 +157,59 @@ impl GossipData {
         let to_needs_agents = agent_info_from
             .difference(&agent_info_to)
             .cloned()
+            .map(|(ai, _)| ai)
             .collect::<Vec<_>>();
 
         // fetch values that to_agent needs from from_agent
-        if !to_needs.is_empty() {
-            if let Ok(result) = self
+        if !to_needs.is_empty() || !to_needs_agents.is_empty() {
+            if let Ok((r_ops, r_peers)) = self
                 .evt_send
                 .req_op_data(
                     from_agent.clone(), // from not to because we're initiating
                     from_agent.clone(),
                     to_needs,
+                    to_needs_agents,
                 )
                 .await
             {
-                if !result.is_empty() {
+                if !r_ops.is_empty() || !r_peers.is_empty() {
                     if let Err(e) = self
                         .evt_send
-                        .gossip_ops(
-                            from_agent.clone(),
-                            to_agent.clone(),
-                            result,
-                            to_needs_agents,
-                        )
+                        .gossip_ops(from_agent.clone(), to_agent.clone(), r_ops, r_peers)
                         .await
                     {
                         tracing::error!(?e);
                     }
                 }
             }
-        } else if !to_needs_agents.is_empty() {
-            if let Err(e) = self
-                .evt_send
-                .gossip_ops(
-                    from_agent.clone(),
-                    to_agent.clone(),
-                    Vec::new(),
-                    to_needs_agents,
-                )
-                .await
-            {
-                tracing::error!(?e);
-            }
         }
 
         // fetch values that from_agent needs from to_agent
-        if !from_needs.is_empty() {
-            if let Ok(result) = self
+        if !from_needs.is_empty() || !from_needs_agents.is_empty() {
+            if let Ok((r_ops, r_peers)) = self
                 .evt_send
-                .req_op_data(from_agent.clone(), to_agent.clone(), from_needs)
+                .req_op_data(
+                    from_agent.clone(),
+                    to_agent.clone(),
+                    from_needs,
+                    from_needs_agents,
+                )
                 .await
             {
-                if !result.is_empty() {
+                if !r_ops.is_empty() || !r_peers.is_empty() {
                     if let Err(e) = self
                         .evt_send
                         .gossip_ops(
                             to_agent.clone(), // we fetched from to
                             from_agent.clone(),
-                            result,
-                            from_needs_agents,
+                            r_ops,
+                            r_peers,
                         )
                         .await
                     {
                         tracing::error!(?e);
                     }
                 }
-            }
-        } else if !from_needs_agents.is_empty() {
-            if let Err(e) = self
-                .evt_send
-                .gossip_ops(
-                    to_agent.clone(), // we fetched from to
-                    from_agent.clone(),
-                    Vec::new(),
-                    from_needs_agents,
-                )
-                .await
-            {
-                tracing::error!(?e);
             }
         }
 

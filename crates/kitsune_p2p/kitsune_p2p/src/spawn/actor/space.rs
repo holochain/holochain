@@ -94,7 +94,8 @@ impl gossip::GossipEventHandler for Space {
         dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
         since_utc_epoch_s: i64,
         until_utc_epoch_s: i64,
-    ) -> gossip::GossipEventHandlerResult<(Vec<Arc<KitsuneOpHash>>, Vec<AgentInfoSigned>)> {
+    ) -> gossip::GossipEventHandlerResult<(Vec<Arc<KitsuneOpHash>>, Vec<(Arc<KitsuneAgent>, u64)>)>
+    {
         // while full-sync just redirecting to self...
         // but eventually some of these will be outgoing remote requests
         let fut = self
@@ -112,9 +113,20 @@ impl gossip::GossipEventHandler for Space {
                 space: self.space.clone(),
                 agent: to_agent,
             });
-        Ok(async move { Ok((fut.await?, peer_fut.await?)) }
-            .boxed()
-            .into())
+        Ok(async move {
+            let agent_infos = peer_fut.await?;
+            let agent_infos = agent_infos
+                .into_iter()
+                .map(|ai| {
+                    let ai: types::agent_store::AgentInfo = ai.into();
+                    let time = ai.signed_at_ms();
+                    (Arc::new(ai.into()), time)
+                })
+                .collect();
+            Ok((fut.await?, agent_infos))
+        }
+        .boxed()
+        .into())
     }
 
     fn handle_req_op_data(
@@ -122,15 +134,36 @@ impl gossip::GossipEventHandler for Space {
         _from_agent: Arc<KitsuneAgent>,
         to_agent: Arc<KitsuneAgent>,
         op_hashes: Vec<Arc<KitsuneOpHash>>,
-    ) -> gossip::GossipEventHandlerResult<Vec<(Arc<KitsuneOpHash>, Vec<u8>)>> {
+        peer_hashes: Vec<Arc<KitsuneAgent>>,
+    ) -> gossip::GossipEventHandlerResult<(Vec<(Arc<KitsuneOpHash>, Vec<u8>)>, Vec<AgentInfoSigned>)>
+    {
         // while full-sync just redirecting to self...
         // but eventually some of these will be outgoing remote requests
         let fut = self.evt_sender.fetch_op_hash_data(FetchOpHashDataEvt {
             space: self.space.clone(),
-            agent: to_agent,
+            agent: to_agent.clone(),
             op_hashes,
         });
-        Ok(async move { fut.await }.boxed().into())
+        let peer_fut = self
+            .evt_sender
+            .query_agent_info_signed(QueryAgentInfoSignedEvt {
+                space: self.space.clone(),
+                agent: to_agent,
+            });
+        Ok(async move {
+            let agent_infos = peer_fut.await?;
+            let peer_hashes = peer_hashes
+                .into_iter()
+                .map(|a| (*a).clone())
+                .collect::<HashSet<_>>();
+            let agent_infos = agent_infos
+                .into_iter()
+                .filter(|ai| peer_hashes.contains(ai.as_agent_info_ref().as_agent_ref()))
+                .collect();
+            Ok((fut.await?, agent_infos))
+        }
+        .boxed()
+        .into())
     }
 
     fn handle_gossip_ops(
