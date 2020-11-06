@@ -94,8 +94,7 @@ impl gossip::GossipEventHandler for Space {
         dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
         since_utc_epoch_s: i64,
         until_utc_epoch_s: i64,
-    ) -> gossip::GossipEventHandlerResult<(Vec<Arc<KitsuneOpHash>>, Vec<(Arc<KitsuneAgent>, u64)>)>
-    {
+    ) -> gossip::GossipEventHandlerResult<OpHashesAgentHashes> {
         // while full-sync just redirecting to self...
         // but eventually some of these will be outgoing remote requests
         let fut = self
@@ -135,8 +134,7 @@ impl gossip::GossipEventHandler for Space {
         to_agent: Arc<KitsuneAgent>,
         op_hashes: Vec<Arc<KitsuneOpHash>>,
         peer_hashes: Vec<Arc<KitsuneAgent>>,
-    ) -> gossip::GossipEventHandlerResult<(Vec<(Arc<KitsuneOpHash>, Vec<u8>)>, Vec<AgentInfoSigned>)>
-    {
+    ) -> gossip::GossipEventHandlerResult<OpDataAgentInfo> {
         // while full-sync just redirecting to self...
         // but eventually some of these will be outgoing remote requests
         let fut = self.evt_sender.fetch_op_hash_data(FetchOpHashDataEvt {

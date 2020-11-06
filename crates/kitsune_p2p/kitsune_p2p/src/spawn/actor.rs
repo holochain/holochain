@@ -11,6 +11,8 @@ use std::{
 mod gossip;
 mod space;
 use ghost_actor::dependencies::{must_future, tracing};
+use gossip::OpDataAgentInfo;
+use gossip::OpHashesAgentHashes;
 use space::*;
 
 ghost_actor::ghost_chan! {

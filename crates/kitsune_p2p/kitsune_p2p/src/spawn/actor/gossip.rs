@@ -20,7 +20,7 @@ ghost_actor::ghost_chan! {
             dht_arc: DhtArc,
             since_utc_epoch_s: i64,
             until_utc_epoch_s: i64,
-        ) -> (Vec<Arc<KitsuneOpHash>>, Vec<(Arc<KitsuneAgent>, u64)>);
+        ) -> OpHashesAgentHashes;
 
         /// fetch op data for op hash list
         fn req_op_data(
@@ -28,7 +28,7 @@ ghost_actor::ghost_chan! {
             to_agent: Arc<KitsuneAgent>,
             op_hashes: Vec<Arc<KitsuneOpHash>>,
             peer_hashes: Vec<Arc<KitsuneAgent>>,
-        ) -> (Vec<(Arc<KitsuneOpHash>, Vec<u8>)>, Vec<AgentInfoSigned>);
+        ) -> OpDataAgentInfo;
 
         /// we have gossip to forward
         fn gossip_ops(
@@ -41,6 +41,8 @@ ghost_actor::ghost_chan! {
 }
 
 pub type GossipEventReceiver = futures::channel::mpsc::Receiver<GossipEvent>;
+pub type OpHashesAgentHashes = (Vec<Arc<KitsuneOpHash>>, Vec<(Arc<KitsuneAgent>, u64)>);
+pub type OpDataAgentInfo = (Vec<(Arc<KitsuneOpHash>, Vec<u8>)>, Vec<AgentInfoSigned>);
 
 /// spawn a gossip module to control gossip for a space
 pub fn spawn_gossip_module() -> GossipEventReceiver {
