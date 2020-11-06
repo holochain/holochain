@@ -93,10 +93,10 @@ fixturator!(
 );
 
 /// A type alias for a Vec<u8> whose fixturator is expected to only return
-/// a Vec of length 36
+/// a Vec of length 32
 pub type ThirtyTwoBytes = Vec<u8>;
 
-// Simply generate "bytes" which is a Vec<u8> of 36 bytes
+// Simply generate "bytes" which is a Vec<u8> of 32 bytes
 fixturator!(
     ThirtyTwoBytes;
     curve Empty [0; 32].to_vec();
@@ -115,5 +115,31 @@ fixturator!(
             bytes.push(u8_fixturator.next().unwrap());
         }
         bytes
-    }
+    };
+);
+
+/// A type alias for a Vec<u8> whose fixturator is expected to only return
+/// a Vec of length 64
+pub type SixtyFourBytes = Vec<u8>;
+
+// Simply generate "bytes" which is a Vec<u8> of 32 bytes
+fixturator!(
+    SixtyFourBytes;
+    curve Empty [0; 64].to_vec();
+    curve Unpredictable {
+        let mut u8_fixturator = U8Fixturator::new(Unpredictable);
+        let mut bytes = vec![];
+        for _ in 0..64 {
+            bytes.push(u8_fixturator.next().unwrap());
+        }
+        bytes
+    };
+    curve Predictable {
+        let mut u8_fixturator = U8Fixturator::new_indexed(Predictable, get_fixt_index!());
+        let mut bytes = vec![];
+        for _ in 0..64 {
+            bytes.push(u8_fixturator.next().unwrap());
+        }
+        bytes
+    };
 );

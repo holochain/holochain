@@ -285,5 +285,4 @@ impl HolochainP2pCellT for HolochainP2pCell {
 
 pub use kitsune_p2p::dht_arc;
 
-pub mod fixt;
 mod test;

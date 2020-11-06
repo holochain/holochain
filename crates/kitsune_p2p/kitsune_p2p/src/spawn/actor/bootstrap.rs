@@ -14,28 +14,32 @@ pub async fn put(
 ) -> crate::types::actor::KitsuneP2pResult<()> {
     let mut data = Vec::new();
     kitsune_p2p_types::codec::rmp_encode(&mut data, &agent_info_signed)?;
-    CLIENT
+    dbg!(&data);
+    let res = CLIENT
         .post(BOOTSTRAP_URL)
         .body(data)
         .header(OP_HEADER, OP_PUT)
         .header(reqwest::header::CONTENT_TYPE, "application/octet")
         .send()
         .await?;
-    Ok(())
+    if res.status().is_success() {
+        Ok(())
+    }
+    else {
+        // dbg!(&res);
+        Err(crate::KitsuneP2pError::Bootstrap(std::sync::Arc::new(res.text().await?)))
+    }
 }
 
 #[cfg(test)]
 mod tests {
 
-    use crate::test_util::spawn_test_harness_mem;
-    use crate::test_util::HarnessControlApiSender;
+    use crate::fixt::AgentInfoSignedFixturator;
+    use fixt::prelude::*;
 
     #[tokio::test(threaded_scheduler)]
     async fn test_bootstrap() {
-        // Simply joining a space with an agent will hit the bootstrap service internally.
-        // Cross reference this with the values in the bootstrap service.
-        let (harness, _) = spawn_test_harness_mem().await.unwrap();
-        harness.add_space().await.unwrap();
-        harness.add_direct_agent("alice".into()).await.unwrap();
+        // Simply hitting the endpoint.
+        super::put(fixt!(AgentInfoSigned)).await.unwrap();
     }
 }

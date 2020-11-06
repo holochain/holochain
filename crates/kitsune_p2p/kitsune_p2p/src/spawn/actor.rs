@@ -8,7 +8,7 @@ use std::{
     sync::Arc,
 };
 
-mod bootstrap;
+pub mod bootstrap;
 mod gossip;
 mod space;
 use ghost_actor::dependencies::{must_future, tracing};

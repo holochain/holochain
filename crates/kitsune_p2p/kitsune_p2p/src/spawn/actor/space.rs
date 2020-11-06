@@ -1,5 +1,4 @@
 use super::*;
-use crate::spawn::actor::bootstrap;
 use ghost_actor::dependencies::{tracing, tracing_futures::Instrument};
 use kitsune_p2p_types::codec::Codec;
 use std::collections::HashSet;
@@ -269,7 +268,8 @@ impl SpaceInternalHandler for Space {
                     .await?;
 
                 // Push to the bootstrap as well.
-                bootstrap::put(agent_info_signed).await?;
+                #[cfg(not(test))]
+                crate::spawn::actor::bootstrap::put(agent_info_signed).await?;
             }
             Ok(())
         }

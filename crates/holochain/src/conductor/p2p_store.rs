@@ -111,12 +111,12 @@ mod tests {
 
     use super::AgentKvKey;
     use fixt::prelude::*;
-    use holochain_p2p::fixt::AgentInfoFixturator;
-    use holochain_p2p::fixt::AgentInfoSignedFixturator;
     use holochain_state::buffer::KvStoreT;
     use holochain_state::env::ReadManager;
     use holochain_state::env::WriteManager;
     use holochain_state::test_utils::test_p2p_env;
+    use kitsune_p2p::fixt::AgentInfoFixturator;
+    use kitsune_p2p::fixt::AgentInfoSignedFixturator;
     use kitsune_p2p::KitsuneBinType;
     use std::convert::TryInto;
 

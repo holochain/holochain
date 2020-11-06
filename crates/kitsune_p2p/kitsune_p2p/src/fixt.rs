@@ -1,11 +1,11 @@
 //! Fixturator definitions for kitsune_p2p.
 
-use fixt::prelude::*;
-use kitsune_p2p::{
+use crate::{
     agent_store::{AgentInfo, AgentInfoSigned, Urls},
     dependencies::url2,
     KitsuneAgent, KitsuneSignature, KitsuneSpace,
 };
+use fixt::prelude::*;
 use url2::url2;
 
 fixturator!(
@@ -35,7 +35,7 @@ fixturator!(
 
 fixturator!(
     KitsuneAgent;
-    from ThirtySixBytes;
+    from ThirtyTwoBytes;
 );
 
 fixturator!(
@@ -45,7 +45,7 @@ fixturator!(
 
 fixturator!(
     KitsuneSignature;
-    from ThirtySixBytes;
+    from SixtyFourBytes;
 );
 
 fixturator!(

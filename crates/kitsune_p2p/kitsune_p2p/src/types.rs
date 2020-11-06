@@ -32,6 +32,10 @@ pub enum KitsuneP2pError {
     #[error(transparent)]
     Reqwest(#[from] reqwest::Error),
 
+    /// Bootstrap call failed.
+    #[error("Bootstrap Error: {0}")]
+    Bootstrap(Arc<String>),
+
     /// Other
     #[error("Other: {0}")]
     Other(Box<dyn std::error::Error + Send + Sync>),
