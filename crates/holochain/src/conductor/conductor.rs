@@ -1018,10 +1018,9 @@ mod builder {
                 tmpdir,
             } = test_env;
             let keystore = environment.keystore();
-            let (holochain_p2p, p2p_evt) = holochain_p2p::spawn_holochain_p2p(
-                holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default(),
-            )
-            .await?;
+            let (holochain_p2p, p2p_evt) =
+                holochain_p2p::spawn_holochain_p2p(self.config.network.clone().unwrap_or_default())
+                    .await?;
             let conductor = Conductor::new(
                 environment,
                 test_wasm_env,

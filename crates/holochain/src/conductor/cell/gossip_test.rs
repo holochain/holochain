@@ -7,6 +7,7 @@ use hdk3::prelude::*;
 use holochain_state::buffer::KvStoreT;
 use holochain_state::fresh_reader_test;
 use holochain_wasm_test_utils::TestWasm;
+use kitsune_p2p::KitsuneP2pConfig;
 use matches::assert_matches;
 use test_wasm_common::{AnchorInput, TestString};
 
@@ -66,10 +67,14 @@ async fn gossip_test() {
 }
 
 #[tokio::test(threaded_scheduler)]
+#[ignore = "Conductors are not currently talking to each other"]
 async fn agent_info_test() {
     observability::test_run().ok();
+    let mut network_config = KitsuneP2pConfig::default();
+    network_config.transport_pool = vec![kitsune_p2p::TransportConfig::Mem {}];
     let zomes = vec![TestWasm::Anchor];
-    let mut conductor_test = ConductorTestData::new(zomes, false).await;
+    let conductor_test =
+        ConductorTestData::with_network_config(zomes.clone(), false, network_config.clone()).await;
     let handle = conductor_test.handle.clone();
     let alice_call_data = &conductor_test.alice_call_data;
     let alice_cell_id = &alice_call_data.cell_id;
@@ -88,42 +93,47 @@ async fn agent_info_test() {
     let p2p_env = handle.get_p2p_env().await;
     let p2p_kv = AgentKv::new(p2p_env.clone().into()).unwrap();
 
-    let key: AgentKvKey = (&dna_kit, &alice_kit).into();
+    let alice_key: AgentKvKey = (&dna_kit, &alice_kit).into();
 
-    let agent_info = fresh_reader_test!(p2p_env, |r| {
-        p2p_kv
-            .as_store_ref()
-            .iter(&r)
-            .unwrap()
-            .map(|(k, v)| Ok((k.to_vec(), v)))
-            .collect::<Vec<_>>()
-            .unwrap()
+    let (agent_info, len) = fresh_reader_test!(p2p_env, |r| {
+        let agent_info = p2p_kv.as_store_ref().get(&r, &alice_key).unwrap();
+        let len = p2p_kv.as_store_ref().iter(&r).unwrap().count().unwrap();
+        (agent_info, len)
     });
-    dbg!(agent_info);
-
-    // Give publish time to finish
-    tokio::time::delay_for(std::time::Duration::from_secs(1)).await;
+    tracing::debug!(?agent_info);
+    assert_matches!(agent_info, Some(_));
+    // Expecting one agent info in the peer store
+    assert_eq!(len, 1);
 
     // Bring Bob online
-    conductor_test.bring_bob_online().await;
-    let bob_call_data = conductor_test.bob_call_data.as_ref().unwrap();
-    let bob_cell_id = &bob_call_data.cell_id;
+    let bob_conductor_test =
+        ConductorTestData::with_network_config(zomes, true, network_config.clone()).await;
+    let bob_agent_id = bob_conductor_test
+        .bob_call_data
+        .as_ref()
+        .unwrap()
+        .cell_id
+        .agent_pubkey();
+    let bob_kit: kitsune_p2p::KitsuneAgent = bob_agent_id.clone().into_inner().into();
+    let bob_key: AgentKvKey = (&dna_kit, &bob_kit).into();
+
+    // Give publish time to finish
+    tokio::time::delay_for(std::time::Duration::from_secs(2)).await;
 
     let p2p_kv = AgentKv::new(p2p_env.clone().into()).unwrap();
-
-    let agent_info = fresh_reader_test!(p2p_env, |r| {
-        p2p_kv
-            .as_store_ref()
-            .iter(&r)
-            .unwrap()
-            .map(|(k, v)| Ok((k.to_vec(), v)))
-            .collect::<Vec<_>>()
-            .unwrap()
+    let (alice_agent_info, bob_agent_info, len) = fresh_reader_test!(p2p_env, |r| {
+        let alice_agent_info = p2p_kv.as_store_ref().get(&r, &alice_key).unwrap();
+        let bob_agent_info = p2p_kv.as_store_ref().get(&r, &bob_key).unwrap();
+        let len = p2p_kv.as_store_ref().iter(&r).unwrap().count().unwrap();
+        (alice_agent_info, bob_agent_info, len)
     });
-    dbg!(agent_info);
-
-    // Give gossip some time to finish
-    tokio::time::delay_for(std::time::Duration::from_secs(1)).await;
+    tracing::debug!(?alice_agent_info);
+    tracing::debug!(?bob_agent_info);
+    assert_matches!(alice_agent_info, Some(_));
+    assert_matches!(bob_agent_info, Some(_));
+    // Expecting one agent info in the peer store
+    assert_eq!(len, 2);
 
     ConductorTestData::shutdown_conductor(handle).await;
+    ConductorTestData::shutdown_conductor(bob_conductor_test.handle).await;
 }
