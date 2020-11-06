@@ -13,6 +13,7 @@ use crate::{
     conductor::api::CellConductorApiT,
     core::workflow::produce_dht_ops_workflow::dht_op_light::light_to_op,
 };
+use call_zome_workflow::call_zome_workspace_lock::CallZomeWorkspaceLock;
 use holochain_zome_types::validate::ValidationPackage;
 use holochain_zome_types::zome::FunctionName;
 use holochain_zome_types::{header::EntryType, query::AgentActivity};
@@ -752,21 +753,29 @@ impl Cell {
         // double ? because
         // - ConductorApiResult
         // - ZomeCallInvocationResult
-        Ok(self.call_zome(invocation).await??.try_into()?)
+        Ok(self.call_zome(invocation, None).await??.try_into()?)
     }
 
     /// Function called by the Conductor
-    #[instrument(skip(self, invocation))]
+    #[instrument(skip(self, invocation, workspace_lock))]
     pub async fn call_zome(
         &self,
         invocation: ZomeCallInvocation,
+        workspace_lock: Option<CallZomeWorkspaceLock>,
     ) -> CellResult<ZomeCallInvocationResult> {
         // Check if init has run if not run it
         self.check_or_run_zome_init().await?;
 
         let arc = self.env();
         let keystore = arc.keystore().clone();
-        let workspace = CallZomeWorkspace::new(arc.clone().into())?;
+
+        // If there is no existing zome call then this is the root zome call
+        let is_root_zome_call = workspace_lock.is_none();
+        let workspace_lock = match workspace_lock {
+            Some(l) => l,
+            None => CallZomeWorkspaceLock::new(CallZomeWorkspace::new(arc.clone().into())?),
+        };
+
         let conductor_api = self.conductor_api.clone();
         let signal_tx = self.signal_broadcaster().await;
         let ribosome = self.get_ribosome().await?;
@@ -776,9 +785,10 @@ impl Cell {
             invocation,
             conductor_api,
             signal_tx,
+            is_root_zome_call,
         };
         Ok(call_zome_workflow(
-            workspace,
+            workspace_lock,
             self.holochain_p2p_cell.clone(),
             keystore,
             arc.clone().into(),
