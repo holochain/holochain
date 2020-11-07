@@ -110,7 +110,7 @@ async fn run_test(
             let _g = s.enter();
             let element_buf = ElementBuf::vault(alice_env.clone().into(), true).unwrap();
             for (k, i) in &res {
-                let hash = DhtOpHash::from_raw_bytes(k.clone());
+                let hash = DhtOpHash::from_raw_39(k.clone());
                 let el = element_buf.get_element(&i.op.header_hash()).unwrap();
                 debug!(?hash, ?i, op_in_val = ?el);
             }

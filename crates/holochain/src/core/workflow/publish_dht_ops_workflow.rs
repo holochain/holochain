@@ -107,7 +107,7 @@ pub async fn publish_dht_ops_workflow_inner(
                     .unwrap_or(true);
                 if needs_publish {
                     r.last_publish_time = Some(now_ts);
-                    Some((DhtOpHash::with_pre_hashed(k.to_vec()), r))
+                    Some((DhtOpHash::from_raw_39_panicky(k.to_vec()), r))
                 } else {
                     None
                 }
@@ -436,7 +436,7 @@ mod tests {
                     .unwrap()
                     .map(|(k, mut v)| {
                         v.receipt_count = DEFAULT_RECEIPT_BUNDLE_SIZE;
-                        Ok((DhtOpHash::with_pre_hashed(k.to_vec()), v))
+                        Ok((DhtOpHash::from_raw_39_panicky(k.to_vec()), v))
                     })
                     .collect::<Vec<_>>()
                     .unwrap();
