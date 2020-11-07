@@ -2,10 +2,10 @@ use once_cell::sync::Lazy;
 
 static CLIENT: Lazy<reqwest::Client> = Lazy::new(reqwest::Client::new);
 
-/// @todo make this not hardcoded.
-/// @todo handle testing vs. production better somehow.
 const BOOTSTRAP_URL_ENV: &str = "P2P_BOOTSTRAP_URL";
 const BOOTSTRAP_URL_DEFAULT: &str = "https://bootstrap.holo.host";
+#[allow(dead_code)]
+const BOOTSTRAP_URL_DEV: &str = "https://bootstrap-dev.holohost.workers.dev";
 
 #[allow(clippy::declare_interior_mutable_const)]
 const BOOTSTRAP_URL: Lazy<Option<String>> = Lazy::new(|| match std::env::var(BOOTSTRAP_URL_ENV) {
@@ -48,7 +48,6 @@ pub async fn put(
                 .header(reqwest::header::CONTENT_TYPE, "application/octet")
                 .send()
                 .await?;
-            dbg!(&res);
             if res.status().is_success() {
                 Ok(())
             } else {
@@ -101,7 +100,7 @@ mod tests {
 
         // Simply hitting the endpoint should be OK.
         super::put(
-            Some(super::BOOTSTRAP_URL_DEFAULT.to_string()),
+            Some(super::BOOTSTRAP_URL_DEV.to_string()),
             agent_info_signed,
         )
         .await
@@ -109,7 +108,7 @@ mod tests {
 
         // We should get back an error if we don't have a good signature.
         assert!(super::put(
-            Some(super::BOOTSTRAP_URL_DEFAULT.to_string()),
+            Some(super::BOOTSTRAP_URL_DEV.to_string()),
             fixt!(AgentInfoSigned)
         )
         .await
