@@ -14,6 +14,8 @@ pub use holo_hash::*;
 use holochain_zome_types::zome::ZomeName;
 use std::collections::BTreeMap;
 
+use self::error::DnaResult;
+
 /// Zomes need to be an ordered map from ZomeName to a Zome
 pub type Zomes = Vec<(ZomeName, zome::Zome)>;
 
@@ -111,21 +113,33 @@ impl DnaFile {
         })
     }
 
+    /// Verify that the DNA hash in the file matches the DnaDef
+    pub async fn verify_hash(&self) -> Result<(), DnaError> {
+        let dna_hash = holo_hash::DnaHash::with_data(&self.dna).await;
+        if self.dna_hash == dna_hash {
+            Ok(())
+        } else {
+            Err(DnaError::DnaHashMismatch(self.dna_hash.clone(), dna_hash))
+        }
+    }
+
     /// Load dna_file bytecode into this rust struct.
     pub async fn from_file_content(data: &[u8]) -> Result<Self, DnaError> {
         // Not super efficient memory-wise, but doesn't block any threads
         let data = data.to_vec();
-        tokio::task::spawn_blocking(move || {
+        let dna_file = tokio::task::spawn_blocking(move || {
             let mut gz = flate2::read::GzDecoder::new(&data[..]);
             let mut bytes = Vec::new();
             use std::io::Read;
             gz.read_to_end(&mut bytes)?;
             let sb: SerializedBytes = UnsafeBytes::from(bytes).into();
             let dna_file: DnaFile = sb.try_into()?;
-            Ok(dna_file)
+            DnaResult::Ok(dna_file)
         })
         .await
-        .expect("blocking thread panicked - panicking here too")
+        .expect("blocking thread panicked - panicking here too")?;
+        dna_file.verify_hash().await?;
+        Ok(dna_file)
     }
 
     /// Transform this DnaFile into a new DnaFile with different properties
@@ -171,6 +185,8 @@ impl DnaFile {
     pub async fn to_file_content(&self) -> Result<Vec<u8>, DnaError> {
         // Not super efficient memory-wise, but doesn't block any threads
         let dna_file = self.clone();
+        // TODO: remove
+        dna_file.verify_hash().await.expect("TODO, remove");
         tokio::task::spawn_blocking(move || {
             let data: SerializedBytes = dna_file.try_into()?;
             let mut enc = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
