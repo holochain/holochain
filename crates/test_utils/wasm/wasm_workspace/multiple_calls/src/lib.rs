@@ -1,6 +1,6 @@
 use hdk3::prelude::*;
-use test_wasm_common::TestInt;
 use test_wasm_common::TestBytes;
+use test_wasm_common::TestInt;
 
 #[hdk_entry(id = "post")]
 struct Val(u32);
@@ -9,7 +9,6 @@ entry_defs![Val::entry_def()];
 
 #[hdk_extern]
 fn create_entry_multiple(n: TestInt) -> ExternResult<()> {
-
     for i in 0..n.0 {
         debug!(format!("{}", i))?;
         create_entry!(Val(i))?;
@@ -20,7 +19,6 @@ fn create_entry_multiple(n: TestInt) -> ExternResult<()> {
 
 #[hdk_extern]
 fn get_entry_multiple(n: TestInt) -> ExternResult<TestBytes> {
-
     let mut bytes = vec![];
     'test_loop: for i in 0..n.0 {
         match get!(hash_entry!(Val(i))?)? {
@@ -31,7 +29,7 @@ fn get_entry_multiple(n: TestInt) -> ExternResult<TestBytes> {
                     // harness decide what that means
                     None => break 'test_loop,
                 }
-            },
+            }
             // as above
             None => break 'test_loop,
         }
