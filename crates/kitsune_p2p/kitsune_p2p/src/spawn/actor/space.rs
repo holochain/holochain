@@ -268,8 +268,7 @@ impl SpaceInternalHandler for Space {
                     .await?;
 
                 // Push to the bootstrap as well.
-                #[cfg(not(test))]
-                crate::spawn::actor::bootstrap::put(agent_info_signed).await?;
+                crate::spawn::actor::bootstrap::put(None, agent_info_signed).await?;
             }
             Ok(())
         }

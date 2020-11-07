@@ -35,7 +35,7 @@ fixturator!(
 
 fixturator!(
     KitsuneAgent;
-    from ThirtyTwoBytes;
+    from ThirtySixBytes;
 );
 
 fixturator!(

@@ -4,29 +4,60 @@ static CLIENT: Lazy<reqwest::Client> = Lazy::new(reqwest::Client::new);
 
 /// @todo make this not hardcoded.
 /// @todo handle testing vs. production better somehow.
-const BOOTSTRAP_URL: &str = "https://bootstrap.holo.host";
+const BOOTSTRAP_URL_ENV: &str = "P2P_BOOTSTRAP_URL";
+const BOOTSTRAP_URL_DEFAULT: &str = "https://bootstrap.holo.host";
+
+#[allow(clippy::declare_interior_mutable_const)]
+const BOOTSTRAP_URL: Lazy<Option<String>> = Lazy::new(|| match std::env::var(BOOTSTRAP_URL_ENV) {
+    Ok(v) => {
+        // If the environment variable is set and empty then don't bootstrap at all.
+        if v.is_empty() {
+            None
+        } else {
+            Some(v)
+        }
+    }
+    // If the environment variable is not set then fallback to the default.
+    Err(_) => Some(BOOTSTRAP_URL_DEFAULT.to_string()),
+});
 
 const OP_HEADER: &str = "X-Op";
 const OP_PUT: &str = "put";
 
 pub async fn put(
+    url_override: Option<String>,
     agent_info_signed: crate::types::agent_store::AgentInfoSigned,
 ) -> crate::types::actor::KitsuneP2pResult<()> {
-    let mut data = Vec::new();
-    kitsune_p2p_types::codec::rmp_encode(&mut data, &agent_info_signed)?;
-    let res = CLIENT
-        .post(BOOTSTRAP_URL)
-        .body(data)
-        .header(OP_HEADER, OP_PUT)
-        .header(reqwest::header::CONTENT_TYPE, "application/octet")
-        .send()
-        .await?;
-    if res.status().is_success() {
-        Ok(())
-    } else {
-        Err(crate::KitsuneP2pError::Bootstrap(std::sync::Arc::new(
-            res.text().await?,
-        )))
+    let url: Option<String> = match url_override {
+        Some(url) => Some(url),
+        #[allow(clippy::borrow_interior_mutable_const)]
+        None => match Lazy::force(&BOOTSTRAP_URL) {
+            Some(url) => Some(url.to_string()),
+            None => None,
+        },
+    };
+
+    match url {
+        Some(url) => {
+            let mut data = Vec::new();
+            kitsune_p2p_types::codec::rmp_encode(&mut data, &agent_info_signed)?;
+            let res = CLIENT
+                .post(&url)
+                .body(data)
+                .header(OP_HEADER, OP_PUT)
+                .header(reqwest::header::CONTENT_TYPE, "application/octet")
+                .send()
+                .await?;
+            dbg!(&res);
+            if res.status().is_success() {
+                Ok(())
+            } else {
+                Err(crate::KitsuneP2pError::Bootstrap(std::sync::Arc::new(
+                    res.text().await?,
+                )))
+            }
+        }
+        None => Ok(()),
     }
 }
 
@@ -69,9 +100,19 @@ mod tests {
                 .unwrap();
 
         // Simply hitting the endpoint should be OK.
-        super::put(agent_info_signed).await.unwrap();
+        super::put(
+            Some(super::BOOTSTRAP_URL_DEFAULT.to_string()),
+            agent_info_signed,
+        )
+        .await
+        .unwrap();
 
         // We should get back an error if we don't have a good signature.
-        assert!(super::put(fixt!(AgentInfoSigned)).await.is_err());
+        assert!(super::put(
+            Some(super::BOOTSTRAP_URL_DEFAULT.to_string()),
+            fixt!(AgentInfoSigned)
+        )
+        .await
+        .is_err());
     }
 }
