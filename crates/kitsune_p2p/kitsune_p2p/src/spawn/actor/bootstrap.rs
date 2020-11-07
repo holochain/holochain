@@ -66,6 +66,7 @@ mod tests {
     use crate::fixt::*;
     use crate::types::agent_store::*;
     use crate::types::KitsuneAgent;
+    use crate::types::KitsuneBinType;
     use crate::types::KitsuneSignature;
     use fixt::prelude::*;
     use lair_keystore_api::internal::sign_ed25519::sign_ed25519_keypair_new_from_entropy;
@@ -75,7 +76,7 @@ mod tests {
     async fn test_bootstrap() {
         let keypair = sign_ed25519_keypair_new_from_entropy().await.unwrap();
         let space = fixt!(KitsuneSpace);
-        let agent = KitsuneAgent((*keypair.pub_key.0).clone());
+        let agent = KitsuneAgent::new((*keypair.pub_key.0).clone());
         let urls = fixt!(Urls);
         let now = std::time::SystemTime::now();
         let millis = now
