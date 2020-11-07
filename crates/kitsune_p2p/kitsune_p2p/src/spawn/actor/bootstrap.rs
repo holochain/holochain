@@ -64,6 +64,7 @@ pub async fn put(
 mod tests {
 
     use crate::fixt::*;
+    use crate::spawn::actor::space::AGENT_INFO_EXPIRES_AFTER_MS;
     use crate::types::agent_store::*;
     use crate::types::KitsuneAgent;
     use crate::types::KitsuneBinType;
@@ -88,6 +89,7 @@ mod tests {
             agent.clone(),
             urls,
             (millis - 100).try_into().unwrap(),
+            AGENT_INFO_EXPIRES_AFTER_MS,
         );
         let mut data = Vec::new();
         kitsune_p2p_types::codec::rmp_encode(&mut data, &agent_info).unwrap();

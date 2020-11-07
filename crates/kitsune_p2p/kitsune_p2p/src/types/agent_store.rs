@@ -58,7 +58,11 @@ pub struct AgentInfo {
     // List of urls the agent can be reached at, in the agent's own preference order.
     urls: Urls,
     // The unix ms timestamp that the agent info was signed at, according to the agent's own clock.
+    #[as_ref(ignore)]
     signed_at_ms: u64,
+    // The expiry ttl for the agent info relative to the signing time.
+    #[as_ref(ignore)]
+    expires_after_ms: u64,
 }
 
 impl std::convert::TryFrom<&AgentInfoSigned> for AgentInfo {
@@ -72,12 +76,19 @@ impl std::convert::TryFrom<&AgentInfoSigned> for AgentInfo {
 
 impl AgentInfo {
     /// Constructor.
-    pub fn new(space: KitsuneSpace, agent: KitsuneAgent, urls: Urls, signed_at_ms: u64) -> Self {
+    pub fn new(
+        space: KitsuneSpace,
+        agent: KitsuneAgent,
+        urls: Urls,
+        signed_at_ms: u64,
+        expires_after_ms: u64,
+    ) -> Self {
         Self {
             space,
             agent,
             urls,
             signed_at_ms,
+            expires_after_ms,
         }
     }
 }
@@ -107,5 +118,10 @@ impl AgentInfo {
     /// Accessor for signed_at_ms.
     pub fn signed_at_ms(&self) -> u64 {
         self.signed_at_ms
+    }
+
+    /// Accessor for expires_after_ms.
+    pub fn expires_after_ms(&self) -> u64 {
+        self.expires_after_ms
     }
 }
