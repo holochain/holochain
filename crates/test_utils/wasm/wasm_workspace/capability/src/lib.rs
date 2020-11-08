@@ -9,14 +9,12 @@ fn init(_: ()) -> ExternResult<InitCallbackResult> {
     let mut functions: GrantedFunctions = HashSet::new();
     functions.insert((zome_info!()?.zome_name, "accept_cap_claim".into()));
     // functions.insert((zome_info!()?.zome_name, "needs_cap_claim".into()));
-    create_cap_grant!(
-        CapGrantEntry {
-            tag: "".into(),
-            // empty access converts to unrestricted
-            access: ().into(),
-            functions,
-        }
-    )?;
+    create_cap_grant!(CapGrantEntry {
+        tag: "".into(),
+        // empty access converts to unrestricted
+        access: ().into(),
+        functions,
+    })?;
 
     Ok(InitCallbackResult::Pass)
 }
@@ -39,9 +37,7 @@ fn cap_grant_entry(secret: CapSecret) -> ExternResult<CapGrantEntry> {
 
 #[hdk_extern]
 pub fn transferable_cap_grant(secret: CapSecret) -> ExternResult<HeaderHash> {
-    Ok(create_cap_grant!(
-        cap_grant_entry(secret)?
-    )?)
+    Ok(create_cap_grant!(cap_grant_entry(secret)?)?)
 }
 
 #[hdk_extern]

@@ -32,6 +32,7 @@ use super::{
     state::ConductorState,
     CellError,
 };
+use crate::conductor::p2p_store::AgentKv;
 use crate::{
     conductor::{
         api::error::ConductorApiResult, cell::Cell, config::ConductorConfig,
@@ -40,6 +41,9 @@ use crate::{
     core::signal::Signal,
     core::state::{source_chain::SourceChainBuf, wasm::WasmBuf},
 };
+pub use builder::*;
+use futures::future::{self, TryFutureExt};
+use holo_hash::DnaHash;
 use holochain_keystore::{
     lair_keystore::spawn_lair_keystore, test_keystore::spawn_test_keystore, KeystoreSender,
     KeystoreSenderExt,
@@ -58,16 +62,12 @@ use holochain_types::{
     cell::CellId,
     dna::{wasm::DnaWasmHashed, DnaFile},
 };
+use kitsune_p2p::agent_store::AgentInfoSigned;
 use std::collections::HashMap;
+use std::convert::TryInto;
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
 use tracing::*;
-
-use crate::conductor::p2p_store::AgentKv;
-pub use builder::*;
-use futures::future::{self, TryFutureExt};
-use holo_hash::DnaHash;
-use kitsune_p2p::agent_store::AgentInfoSigned;
 
 #[cfg(test)]
 use super::handle::MockConductorHandleT;
@@ -631,9 +631,11 @@ where
         let p2p_kv = AgentKv::new(environ.clone().into())?;
         let env = environ.guard();
         Ok(env.with_commit(|writer| {
-            p2p_kv
-                .as_store_ref()
-                .put(writer, &(&agent_info_signed).into(), &agent_info_signed)
+            p2p_kv.as_store_ref().put(
+                writer,
+                &(&agent_info_signed).try_into()?,
+                &agent_info_signed,
+            )
         })?)
     }
 

@@ -278,10 +278,20 @@ mod tests {
             .unwrap();
 
         let dna_filename = tmp_dir.path().join("test-dna.dna.gz");
+        let content1 = dna_file.to_file_content().await.unwrap();
 
-        tokio::fs::write(&dna_filename, dna_file.to_file_content().await.unwrap())
+        tokio::fs::write(&dna_filename, content1.clone())
             .await
             .unwrap();
+
+        {
+            let dna_file_path = dna_filename.as_path().canonicalize().unwrap();
+            let dir = dna_file_path_convert(&dna_file_path, true).unwrap();
+            tokio::fs::create_dir_all(&dir).await.unwrap();
+            let content2 = tokio::fs::read(dna_file_path).await.unwrap();
+
+            assert_eq!(content1, content2);
+        };
 
         expand(&dna_filename).await.unwrap();
 
@@ -291,8 +301,8 @@ mod tests {
             .await
             .unwrap();
 
-        let dna_file_content = tokio::fs::read(&dna_filename).await.unwrap();
-        let dna_file2 = DnaFile::from_file_content(&dna_file_content).await.unwrap();
+        let content = tokio::fs::read(&dna_filename).await.unwrap();
+        let dna_file2 = DnaFile::from_file_content(&content).await.unwrap();
 
         assert_eq!(dna_file, dna_file2);
     }

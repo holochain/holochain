@@ -29,6 +29,7 @@ let
   t-merge = pkgs.writeShellScriptBin "hc-merge-test"
   ''
   set -euxo pipefail
+  export P2P_BOOTSTRAP_URL=
   RUST_BACKTRACE=1 \
   hn-rust-fmt-check \
   && hn-rust-clippy \

@@ -235,7 +235,7 @@ mod tests {
                         ..
                     });
 
-                    Ok(DhtOpHash::with_pre_hashed(k.to_vec()))
+                    Ok(DhtOpHash::from_raw_39_panicky(k.to_vec()))
                 })
                 .collect::<HashSet<_>>()
                 .unwrap();

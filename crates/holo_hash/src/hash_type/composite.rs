@@ -1,4 +1,6 @@
 use super::*;
+use crate::error::HoloHashError;
+use std::convert::TryInto;
 
 #[cfg(all(test, feature = "serialized-bytes"))]
 use holochain_serialized_bytes::prelude::*;
@@ -23,20 +25,24 @@ impl HashType for AnyDht {
             AnyDht::Header => Header::new().get_prefix(),
         }
     }
+
+    fn try_from_prefix(prefix: &[u8]) -> HoloHashResult<Self> {
+        match prefix {
+            primitive::ENTRY_PREFIX => Ok(AnyDht::Entry),
+            primitive::HEADER_PREFIX => Ok(AnyDht::Header),
+            _ => Err(HoloHashError::BadPrefix(
+                "AnyDht".to_string(),
+                prefix.try_into().expect("3 byte prefix"),
+            )),
+        }
+    }
+
     fn hash_name(self) -> &'static str {
         "AnyDhtHash"
     }
 }
 
 impl HashTypeAsync for AnyDht {}
-
-// FIXME: REMOVE [ B-02112 ]
-impl Default for AnyDht {
-    fn default() -> Self {
-        // HACK: SO WRONG
-        AnyDht::Header
-    }
-}
 
 #[derive(serde::Deserialize, serde::Serialize)]
 enum AnyDhtSerial {
