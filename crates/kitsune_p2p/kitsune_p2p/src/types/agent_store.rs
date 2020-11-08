@@ -10,7 +10,7 @@ use url2::Url2;
 pub type Urls = Vec<Url2>;
 
 /// Value in the peer database that tracks an Agent's representation as signed by that agent.
-#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, derive_more::AsRef)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, derive_more::AsRef, std::cmp::Ord, std::cmp::Eq, std::cmp::PartialOrd)]
 pub struct AgentInfoSigned {
     // Agent public key that needs to be the same as the agent in the signed agent_info.
     agent: KitsuneAgent,
