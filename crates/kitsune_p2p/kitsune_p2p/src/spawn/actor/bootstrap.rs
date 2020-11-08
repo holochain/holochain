@@ -2,6 +2,9 @@ use once_cell::sync::Lazy;
 use crate::types::KitsuneSpace;
 use crate::types::agent_store::AgentInfoSigned;
 use std::convert::TryInto;
+use once_cell::sync::OnceCell;
+use std::convert::TryFrom;
+use crate::types::KitsuneBinType;
 
 static CLIENT: Lazy<reqwest::Client> = Lazy::new(reqwest::Client::new);
 
@@ -26,6 +29,8 @@ const BOOTSTRAP_URL: Lazy<Option<String>> = Lazy::new(|| match std::env::var(BOO
     // If the environment variable is not set then fallback to the default.
     Err(_) => Some(BOOTSTRAP_URL_DEFAULT.to_string()),
 });
+
+pub static NOW_OFFSET_MILLIS: OnceCell<i64> = OnceCell::new();
 
 const OP_HEADER: &str = "X-Op";
 const OP_PUT: &str = "put";
@@ -86,22 +91,75 @@ pub async fn put(
     }
 }
 
+fn local_now() -> crate::types::actor::KitsuneP2pResult<u64> {
+    Ok(std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_millis().try_into()?)
+}
+
 #[allow(dead_code)]
 pub async fn now(url_override: Option<String>) -> crate::types::actor::KitsuneP2pResult<u64> {
     match do_api(url_override, OP_NOW, ()).await {
+        // If the server gives us something useful we use it.
         Ok(Some(v)) => Ok(v),
-        Ok(None) => {
-            let local_now = std::time::SystemTime::now();
-            Ok(local_now.duration_since(std::time::UNIX_EPOCH)?.as_millis().try_into()?)
-        },
+        // If we don't have a server url we should trust ourselves.
+        Ok(None) => Ok(local_now()?),
+        // Any error from the server should be handled by the caller.
+        // The caller will probably fallback to the local_now.
         Err(e) => Err(e),
+    }
+}
+
+pub async fn now_once(url_override: Option<String>) -> crate::types::actor::KitsuneP2pResult<u64> {
+    match NOW_OFFSET_MILLIS.get() {
+        Some(offset) => Ok(u64::try_from(i64::try_from(local_now()?)? + offset)?),
+        None => {
+            let offset: i64 = match now(url_override.clone()).await {
+                Ok(v) => {
+                    let offset = v as i64 - local_now()? as i64;
+                    match NOW_OFFSET_MILLIS.set(offset) {
+                        Ok(_) => offset,
+                        Err(v) => v,
+                    }
+                },
+                // @todo Do something more sophisticated here with errors.
+                // Currently just falls back to a zero offset if the server is not happy.
+                Err(_) => {
+                    let offset = 0;
+                    match NOW_OFFSET_MILLIS.set(offset) {
+                        Ok(_) => offset,
+                        Err(v) => v,
+                    }
+                },
+            };
+
+            Ok(u64::try_from(i64::try_from(local_now()?)? + offset)?)
+        }
+    }
+}
+
+#[derive(serde::Deserialize, serde::Serialize, derive_more::From, derive_more::Into)]
+pub struct RandomLimit(u32);
+
+impl Default for RandomLimit {
+    fn default() -> Self {
+        Self(RANDOM_LIMIT_DEFAULT)
     }
 }
 
 #[derive(serde::Deserialize, serde::Serialize)]
 pub struct RandomQuery {
     pub space: KitsuneSpace,
-    pub limit: u32,
+    pub limit: RandomLimit,
+}
+
+impl Default for RandomQuery {
+    fn default() -> Self {
+        Self {
+            // This is useless, it's here as a placeholder so that ..Default::default() syntax
+            // works for limits, not because you'd actually ever want a "default" space.
+            space: KitsuneSpace::new(vec![0; 36]),
+            ..Default::default()
+        }
+    }
 }
 
 #[allow(dead_code)]
@@ -182,14 +240,19 @@ mod tests {
         let local_millis: u64 = local_now.duration_since(std::time::UNIX_EPOCH).unwrap().as_millis().try_into().unwrap();
 
         // We should be able to get a milliseconds timestamp back.
-        let remote_now = super::now(Some(super::BOOTSTRAP_URL_DEV.to_string()))
+        let remote_now: u64 = super::now(Some(super::BOOTSTRAP_URL_DEV.to_string()))
             .await
             .unwrap();
-        let threshold = 1000;
+        let threshold = 5000;
 
         assert!(
             (remote_now - local_millis) < threshold
         );
+
+        // Now once should return some number and the remote server offset should be set in the
+        // NOW_OFFSET_MILLIS once cell.
+        let _: u64 = super::now_once(Some(super::BOOTSTRAP_URL_DEV.to_string())).await.unwrap();
+        assert!(super::NOW_OFFSET_MILLIS.get().is_some());
     }
 
     #[tokio::test(threaded_scheduler)]
@@ -234,7 +297,7 @@ mod tests {
             Some(super::BOOTSTRAP_URL_DEV.to_string()),
             super::RandomQuery {
                 space: space.clone(),
-                limit: super::RANDOM_LIMIT_DEFAULT,
+                ..Default::default()
             },
         )
         .await
@@ -250,7 +313,7 @@ mod tests {
             Some(super::BOOTSTRAP_URL_DEV.to_string()),
             super::RandomQuery {
                 space: space.clone(),
-                limit: 1,
+                limit: 1.into(),
             },
         )
         .await

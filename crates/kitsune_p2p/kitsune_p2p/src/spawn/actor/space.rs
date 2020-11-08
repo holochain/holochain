@@ -244,10 +244,7 @@ impl SpaceInternalHandler for Space {
                     (*space).clone(),
                     (*agent).clone(),
                     urls.clone(),
-                    std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap()
-                        .as_millis() as u64,
+                    crate::spawn::actor::bootstrap::now_once(None).await?,
                     AGENT_INFO_EXPIRES_AFTER_MS,
                 );
                 let mut data = Vec::new();
