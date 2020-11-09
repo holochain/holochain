@@ -44,6 +44,11 @@ impl AgentInfoSigned {
         self.as_ref()
     }
 
+    /// Thin wrapper around AsRef for KitsuneAgent.
+    pub fn as_agent_ref(&self) -> &KitsuneAgent {
+        self.as_ref()
+    }
+
     /// Thin wrapper around AsRef for AgentInfo
     pub fn as_agent_info_ref(&self) -> &[u8] {
         self.agent_info.as_ref()
@@ -114,9 +119,9 @@ impl AgentInfo {
     }
 }
 
-impl From<AgentInfoSigned> for AgentInfo {
-    fn from(ais: AgentInfoSigned) -> Self {
-        ais.agent_info
+impl From<AgentInfoSigned> for KitsuneAgent {
+    fn from(ai: AgentInfoSigned) -> Self {
+        ai.agent
     }
 }
 

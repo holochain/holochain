@@ -3,7 +3,7 @@ use crate::agent_store::AgentInfoSigned;
 use super::*;
 use ghost_actor::dependencies::{tracing, tracing_futures::Instrument};
 use kitsune_p2p_types::codec::Codec;
-use std::collections::HashSet;
+use std::{collections::HashSet, convert::TryFrom};
 
 /// if the user specifies None or zero (0) for remote_agent_count
 const DEFAULT_NOTIFY_REMOTE_AGENT_COUNT: u8 = 5;
@@ -117,11 +117,11 @@ impl gossip::GossipEventHandler for Space {
             let agent_infos = agent_infos
                 .into_iter()
                 .map(|ai| {
-                    let ai: types::agent_store::AgentInfo = ai.into();
+                    let ai = types::agent_store::AgentInfo::try_from(&ai)?;
                     let time = ai.signed_at_ms();
-                    (Arc::new(ai.into()), time)
+                    Ok((Arc::new(ai.into()), time))
                 })
-                .collect();
+                .collect::<Result<Vec<_>, KitsuneP2pError>>()?;
             Ok((fut.await?, agent_infos))
         }
         .boxed()
@@ -156,7 +156,7 @@ impl gossip::GossipEventHandler for Space {
                 .collect::<HashSet<_>>();
             let agent_infos = agent_infos
                 .into_iter()
-                .filter(|ai| peer_hashes.contains(ai.as_agent_info_ref().as_agent_ref()))
+                .filter(|ai| peer_hashes.contains(ai.as_agent_ref()))
                 .collect();
             Ok((fut.await?, agent_infos))
         }
