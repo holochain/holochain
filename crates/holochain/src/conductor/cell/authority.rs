@@ -7,17 +7,18 @@ use fallible_iterator::FallibleIterator;
 
 use holo_hash::{AgentPubKey, EntryHash, HeaderHash};
 use holochain_state::{
-    env::EnvironmentRead, env::EnvironmentWrite, fresh_reader, prelude::PrefixType,
-    prelude::Readable,
+    env::EnvironmentRead, env::EnvironmentWrite, error::DatabaseError, fresh_reader,
+    prelude::PrefixType, prelude::Readable,
 };
+use holochain_types::activity::{AgentActivity, ChainItems};
 use holochain_types::{
     element::{GetElementResponse, RawGetEntryResponse},
     header::WireUpdateRelationship,
     metadata::TimedHeaderHash,
 };
 use holochain_zome_types::{
-    element::SignedHeaderHashed, header::conversions::WrongHeaderError, query::Activity,
-    query::AgentActivity, query::ChainQueryFilter, query::ChainStatus,
+    element::SignedHeaderHashed, header::conversions::WrongHeaderError, query::ChainQueryFilter,
+    query::ChainStatus, validate::ValidationStatus,
 };
 use std::{collections::BTreeSet, convert::TryInto};
 use tracing::*;
@@ -169,18 +170,13 @@ pub async fn handle_get_entry(
 pub fn handle_get_agent_activity(
     env: EnvironmentRead,
     agent: AgentPubKey,
-    // TODO: Query filtering breaks caching.
-    // It's easier to just send back the full chain and then filter
-    // in the cascade but it would be nice to avoid sending the filtered
-    // out headers across the network.
-    _query: ChainQueryFilter,
+    query: ChainQueryFilter,
     options: holochain_p2p::event::GetActivityOptions,
 ) -> CellResult<AgentActivity> {
     // Databases
     let element_integrated = ElementBuf::vault(env.clone(), false)?;
     let meta_integrated = MetadataBuf::vault(env.clone())?;
     let element_rejected = ElementBuf::rejected(env.clone())?;
-    let meta_rejected = MetadataBuf::rejected(env.clone())?;
 
     // Status
     let status = meta_integrated
@@ -188,46 +184,36 @@ pub fn handle_get_agent_activity(
         .unwrap_or(ChainStatus::Empty);
     let highest_observed = meta_integrated.get_activity_observed(&agent)?;
 
-    // TODO: If full headers aren't requested then query doesn't work
-
     // Valid headers
     let valid_activity = if options.include_valid_activity {
         fresh_reader!(env, |r| {
-            let hashes = meta_integrated
-                .get_activity_sequence(&r, ChainItemKey::Agent(agent.clone()))?
-                .collect()?;
-            if options.include_full_headers {
-                CellResult::Ok(Activity::Full(get_full_headers(
-                    hashes,
-                    element_integrated,
-                    &r,
-                )?))
-            } else {
-                Ok(Activity::Hashes(hashes))
-            }
+            let hashes = meta_integrated.get_activity_sequence(
+                &r,
+                ChainItemKey::AgentStatus(agent.clone(), ValidationStatus::Valid),
+            )?;
+            check_headers(
+                hashes,
+                query.clone(),
+                options.clone(),
+                element_integrated,
+                &r,
+            )
         })?
     } else {
-        Activity::NotRequested
+        ChainItems::NotRequested
     };
 
     // Rejected hashes
     let rejected_activity = if options.include_rejected_activity {
         fresh_reader!(env, |r| {
-            let hashes = meta_rejected
-                .get_activity_sequence(&r, ChainItemKey::Agent(agent.clone()))?
-                .collect()?;
-            if options.include_full_headers {
-                CellResult::Ok(Activity::Full(get_full_headers(
-                    hashes,
-                    element_rejected,
-                    &r,
-                )?))
-            } else {
-                Ok(Activity::Hashes(hashes))
-            }
+            let hashes = meta_integrated.get_activity_sequence(
+                &r,
+                ChainItemKey::AgentStatus(agent.clone(), ValidationStatus::Rejected),
+            )?;
+            check_headers(hashes, query, options, element_rejected, &r)
         })?
     } else {
-        Activity::NotRequested
+        ChainItems::NotRequested
     };
 
     Ok(AgentActivity {
@@ -239,14 +225,90 @@ pub fn handle_get_agent_activity(
     })
 }
 
-fn get_full_headers<P: PrefixType, R: Readable>(
-    hashes: Vec<(u32, HeaderHash)>,
+fn get_full_headers<'a, P: PrefixType + 'a, R: Readable>(
+    hashes: impl FallibleIterator<Item = (u32, HeaderHash), Error = DatabaseError> + 'a,
+    query: ChainQueryFilter,
+    database: ElementBuf<P>,
+    reader: &'a R,
+) -> impl FallibleIterator<Item = (u32, SignedHeaderHashed), Error = DatabaseError> + 'a {
+    hashes
+        .filter_map(move |(s, h)| {
+            Ok(database
+                .get_header_with_reader(reader, &h)?
+                .map(|shh| (s, shh)))
+        })
+        .filter(move |(_, shh)| Ok(query.check(shh.header())))
+}
+
+fn check_headers<P: PrefixType, R: Readable>(
+    hashes: impl FallibleIterator<Item = (u32, HeaderHash), Error = DatabaseError>,
+    query: ChainQueryFilter,
+    options: holochain_p2p::event::GetActivityOptions,
     database: ElementBuf<P>,
     reader: &R,
-) -> CellResult<Vec<SignedHeaderHashed>> {
-    let headers: Vec<_> = fallible_iterator::convert(hashes.into_iter().map(Ok))
-        .filter_map(|h| database.get_header_with_reader(reader, &h.1))
-        // .filter(|shh| Ok(query.check(shh.header())))
-        .collect()?;
-    Ok(headers)
+) -> CellResult<ChainItems> {
+    if options.include_full_headers {
+        CellResult::Ok(ChainItems::Full(
+            get_full_headers(hashes, query, database, reader)
+                .map(|(_, shh)| Ok(shh))
+                .collect()?,
+        ))
+    } else {
+        Ok(ChainItems::Hashes(
+            get_full_headers(hashes, query, database, reader)
+                .map(|(s, shh)| Ok((s, shh.into_inner().1)))
+                .collect()?,
+        ))
+    }
+}
+
+#[cfg(test)]
+#[instrument(skip(env))]
+// This is handy for testing performance as it shows the read times for get agent activity
+fn _show_agent_activity_read_times(env: EnvironmentRead, agent: AgentPubKey) {
+    {
+        let g = env.guard();
+        let rkv = g.rkv();
+        let stat = rkv.stat().unwrap();
+        let info = rkv.info().unwrap();
+        debug!(
+            map_size = info.map_size(),
+            last_pgno = info.last_pgno(),
+            last_txnid = info.last_txnid(),
+            max_readers = info.max_readers(),
+            num_readers = info.num_readers()
+        );
+        debug!(
+            page_size = stat.page_size(),
+            depth = stat.depth(),
+            branch_pages = stat.branch_pages(),
+            leaf_pages = stat.leaf_pages(),
+            overflow_pages = stat.overflow_pages(),
+            entries = stat.entries(),
+        );
+    }
+    let element_integrated = ElementBuf::vault(env.clone(), false).unwrap();
+    let meta_integrated = MetadataBuf::vault(env.clone()).unwrap();
+    holochain_state::fresh_reader_test!(env, |r| {
+        let now = std::time::Instant::now();
+        let hashes = meta_integrated
+            .get_activity_sequence(
+                &r,
+                ChainItemKey::AgentStatus(agent.clone(), ValidationStatus::Valid),
+            )
+            .unwrap()
+            .collect::<Vec<_>>()
+            .unwrap();
+        let el = now.elapsed();
+        debug!(time_for_activity_sequence = %el.as_micros());
+        for hash in &hashes {
+            element_integrated.get_header(&hash.1).unwrap();
+        }
+        let el = now.elapsed();
+        debug!(
+            us_per_header = %el.as_micros() / hashes.len() as u128,
+            num_headers = %hashes.len(),
+            total = %el.as_millis()
+        );
+    });
 }

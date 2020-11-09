@@ -25,7 +25,7 @@ impl CounTree {
     pub fn ensure(countree: CounTree) -> ExternResult<HeaderHash> {
         match get!(hash_entry!(countree)?)? {
             Some(element) => Ok(element.header_address().to_owned()),
-            None => Ok(create_entry!(countree)?)
+            None => Ok(create_entry!(countree)?),
         }
     }
 
@@ -42,11 +42,9 @@ impl CounTree {
     /// this is silly as being offline resets the counter >.<
     pub fn incsert(header_hash: HeaderHash) -> ExternResult<HeaderHash> {
         let current: CounTree = match get!(header_hash.clone())? {
-            Some(element) => {
-                match element.entry().to_app_option()? {
-                    Some(v) => v,
-                    None => return Self::new(),
-                }
+            Some(element) => match element.entry().to_app_option()? {
+                Some(v) => v,
+                None => return Self::new(),
             },
             None => return Self::new(),
         };

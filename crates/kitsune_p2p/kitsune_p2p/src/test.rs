@@ -133,7 +133,7 @@ mod tests {
             return Ok(());
         }
 
-        panic!("Failed to receive agent_info_sigend");
+        panic!("Failed to receive agent_info_signed");
     }
 
     #[tokio::test(threaded_scheduler)]
@@ -366,11 +366,9 @@ mod tests {
 
         let res = harness.dump_local_peer_data(a1.clone()).await?;
         let num_agent_info = res.len();
-        let mut res = res.into_iter();
-        let (agent_hash, _agent_info) = res.next().unwrap();
-        assert_eq!(a1, agent_hash);
-        let (agent_hash, _agent_info) = res.next().unwrap();
-        assert_eq!(a2, agent_hash);
+
+        assert!(res.contains_key(&a1));
+        assert!(res.contains_key(&a2));
         assert_eq!(num_agent_info, 2);
 
         harness.ghost_actor_shutdown().await.unwrap();

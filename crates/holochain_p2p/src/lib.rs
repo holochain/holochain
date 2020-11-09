@@ -3,7 +3,8 @@
 
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
-use holochain_zome_types::{capability::CapSecret, query::AgentActivity, zome::ZomeName};
+use holochain_types::activity::AgentActivity;
+use holochain_zome_types::{capability::CapSecret, zome::ZomeName};
 use holochain_zome_types::{query::ChainQueryFilter, zome::FunctionName};
 use std::sync::Arc;
 
@@ -284,5 +285,4 @@ impl HolochainP2pCellT for HolochainP2pCell {
 
 pub use kitsune_p2p::dht_arc;
 
-pub mod fixt;
 mod test;

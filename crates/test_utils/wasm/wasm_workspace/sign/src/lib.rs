@@ -6,6 +6,10 @@ fn sign(sign_input: SignInput) -> ExternResult<Signature> {
 }
 
 #[hdk_extern]
-fn verify_signature(verify_signature_input: VerifySignatureInput) -> ExternResult<VerifySignatureOutput> {
-    Ok(VerifySignatureOutput::new(verify_signature!(verify_signature_input)?))
+fn verify_signature(
+    verify_signature_input: VerifySignatureInput,
+) -> ExternResult<VerifySignatureOutput> {
+    Ok(VerifySignatureOutput::new(verify_signature!(
+        verify_signature_input
+    )?))
 }

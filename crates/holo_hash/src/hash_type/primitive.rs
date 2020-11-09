@@ -1,13 +1,14 @@
 use super::*;
-use crate::{hash_type, AgentPubKey, EntryHash};
+use crate::{error::HoloHashError, hash_type, AgentPubKey, EntryHash};
+use std::convert::TryInto;
 
-const AGENT_PREFIX: &[u8] = &[0x84, 0x20, 0x24]; // uhCAk [132, 32, 36]
-const ENTRY_PREFIX: &[u8] = &[0x84, 0x21, 0x24]; // uhCEk [132, 33, 36]
-const DHTOP_PREFIX: &[u8] = &[0x84, 0x24, 0x24]; // uhCQk [132, 36, 36]
-const DNA_PREFIX: &[u8] = &[0x84, 0x2d, 0x24]; // uhC0k [132, 45, 36]
-const NET_ID_PREFIX: &[u8] = &[0x84, 0x22, 0x24]; // uhCIk [132, 34, 36]
-const HEADER_PREFIX: &[u8] = &[0x84, 0x29, 0x24]; // uhCkk [132, 41, 36]
-const WASM_PREFIX: &[u8] = &[0x84, 0x2a, 0x24]; // uhCok [132, 42, 36]
+pub(crate) const AGENT_PREFIX: &[u8] = &[0x84, 0x20, 0x24]; // uhCAk [132, 32, 36]
+pub(crate) const ENTRY_PREFIX: &[u8] = &[0x84, 0x21, 0x24]; // uhCEk [132, 33, 36]
+pub(crate) const DHTOP_PREFIX: &[u8] = &[0x84, 0x24, 0x24]; // uhCQk [132, 36, 36]
+pub(crate) const DNA_PREFIX: &[u8] = &[0x84, 0x2d, 0x24]; // uhC0k [132, 45, 36]
+pub(crate) const NET_ID_PREFIX: &[u8] = &[0x84, 0x22, 0x24]; // uhCIk [132, 34, 36]
+pub(crate) const HEADER_PREFIX: &[u8] = &[0x84, 0x29, 0x24]; // uhCkk [132, 41, 36]
+pub(crate) const WASM_PREFIX: &[u8] = &[0x84, 0x2a, 0x24]; // uhCok [132, 42, 36]
 
 /// A PrimitiveHashType is one with a multihash prefix.
 /// In contrast, a non-primitive hash type could be one of several primitive
@@ -27,6 +28,18 @@ impl<P: PrimitiveHashType> HashType for P {
     fn get_prefix(self) -> &'static [u8] {
         P::static_prefix()
     }
+
+    fn try_from_prefix(prefix: &[u8]) -> HoloHashResult<Self> {
+        if prefix == P::static_prefix() {
+            Ok(P::new())
+        } else {
+            Err(HoloHashError::BadPrefix(
+                PrimitiveHashType::hash_name(P::new()).to_string(),
+                prefix.try_into().expect("3 byte prefix"),
+            ))
+        }
+    }
+
     fn hash_name(self) -> &'static str {
         PrimitiveHashType::hash_name(self)
     }
@@ -47,13 +60,6 @@ macro_rules! primitive_hash_type {
             }
             fn hash_name(self) -> &'static str {
                 stringify!($display)
-            }
-        }
-
-        // FIXME: REMOVE [ B-02112 ]
-        impl Default for $name {
-            fn default() -> Self {
-                Self
             }
         }
 

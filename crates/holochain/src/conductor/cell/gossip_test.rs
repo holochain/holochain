@@ -7,7 +7,7 @@ use hdk3::prelude::*;
 use holochain_state::buffer::KvStoreT;
 use holochain_state::fresh_reader_test;
 use holochain_wasm_test_utils::TestWasm;
-use kitsune_p2p::KitsuneP2pConfig;
+use kitsune_p2p::{KitsuneBinType, KitsuneP2pConfig};
 use matches::assert_matches;
 use test_wasm_common::{AnchorInput, TestString};
 
@@ -81,14 +81,16 @@ async fn agent_info_test() {
     let alice_agent_id = alice_cell_id.agent_pubkey();
 
     // Kitsune types
-    let dna_kit: kitsune_p2p::KitsuneSpace = alice_call_data
-        .ribosome
-        .dna_file
-        .dna_hash()
-        .clone()
-        .into_inner()
-        .into();
-    let alice_kit: kitsune_p2p::KitsuneAgent = alice_agent_id.clone().into_inner().into();
+    let dna_kit = kitsune_p2p::KitsuneSpace::new(
+        alice_call_data
+            .ribosome
+            .dna_file
+            .dna_hash()
+            .get_raw_36()
+            .to_vec(),
+    );
+
+    let alice_kit = kitsune_p2p::KitsuneAgent::new(alice_agent_id.get_raw_36().to_vec());
 
     let p2p_env = handle.get_p2p_env().await;
     let p2p_kv = AgentKv::new(p2p_env.clone().into()).unwrap();
@@ -114,7 +116,7 @@ async fn agent_info_test() {
         .unwrap()
         .cell_id
         .agent_pubkey();
-    let bob_kit: kitsune_p2p::KitsuneAgent = bob_agent_id.clone().into_inner().into();
+    let bob_kit = kitsune_p2p::KitsuneAgent::new(bob_agent_id.get_raw_36().to_vec());
     let bob_key: AgentKvKey = (&dna_kit, &bob_kit).into();
 
     // Give publish time to finish

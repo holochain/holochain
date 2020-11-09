@@ -42,6 +42,11 @@ fn create_entry(_: ()) -> ExternResult<HeaderHash> {
 }
 
 #[hdk_extern]
+fn create_post(post: Post) -> ExternResult<HeaderHash> {
+    Ok(create_entry!(&post)?)
+}
+
+#[hdk_extern]
 fn get_entry(_: ()) -> ExternResult<GetOutput> {
     Ok(GetOutput::new(get!(hash_entry!(post())?)?))
 }
@@ -68,6 +73,11 @@ fn validate_create_entry_post(
         _ => ValidateCallbackResult::Valid,
     };
     Ok(r)
+}
+
+#[hdk_extern]
+fn get_activity(input: test_wasm_common::AgentActivitySearch) -> ExternResult<AgentActivity> {
+    Ok(get_agent_activity(input.agent, input.query, input.request)?)
 }
 
 #[hdk_extern]

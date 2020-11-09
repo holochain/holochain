@@ -79,6 +79,9 @@ pub enum DatabaseError {
 
     #[error("Key range must be not empty and start < end")]
     InvalidKeyRange,
+
+    #[error("Unable to construct a value key")]
+    KeyConstruction,
 }
 
 impl PartialEq for DatabaseError {

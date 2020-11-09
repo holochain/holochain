@@ -1,11 +1,13 @@
 //! A simple KvBuf for AgentInfoSigned.
 
+use holochain_p2p::kitsune_p2p::agent_store::AgentInfo;
 use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
 use holochain_state::buffer::KvStore;
 use holochain_state::db::GetDb;
 use holochain_state::env::EnvironmentRead;
 use holochain_state::error::DatabaseResult;
 use holochain_state::key::BufKey;
+use std::convert::TryInto;
 
 const AGENT_KEY_LEN: usize = 64;
 const AGENT_KEY_COMPONENT_LEN: usize = 32;
@@ -33,13 +35,19 @@ impl Ord for AgentKvKey {
     }
 }
 
-impl From<&AgentInfoSigned> for AgentKvKey {
-    fn from(o: &AgentInfoSigned) -> Self {
-        (
-            o.as_agent_info_ref().as_space_ref(),
-            o.as_agent_info_ref().as_agent_ref(),
-        )
-            .into()
+impl std::convert::TryFrom<&AgentInfoSigned> for AgentKvKey {
+    type Error = holochain_state::error::DatabaseError;
+    fn try_from(agent_info_signed: &AgentInfoSigned) -> Result<Self, Self::Error> {
+        let agent_info: AgentInfo = agent_info_signed
+            .try_into()
+            .map_err(|_| holochain_state::error::DatabaseError::KeyConstruction)?;
+        Ok((&agent_info).into())
+    }
+}
+
+impl From<&AgentInfo> for AgentKvKey {
+    fn from(o: &AgentInfo) -> Self {
+        (o.as_space_ref(), o.as_agent_ref()).into()
     }
 }
 
@@ -103,36 +111,26 @@ mod tests {
 
     use super::AgentKvKey;
     use fixt::prelude::*;
-    use holochain_p2p::fixt::AgentInfoSignedFixturator;
     use holochain_state::buffer::KvStoreT;
     use holochain_state::env::ReadManager;
     use holochain_state::env::WriteManager;
     use holochain_state::test_utils::test_p2p_env;
+    use kitsune_p2p::fixt::AgentInfoFixturator;
+    use kitsune_p2p::fixt::AgentInfoSignedFixturator;
     use kitsune_p2p::KitsuneBinType;
+    use std::convert::TryInto;
 
     #[test]
     fn kv_key_from() {
-        let agent_info_signed = fixt!(AgentInfoSigned);
+        let agent_info = fixt!(AgentInfo);
 
-        let kv_key = AgentKvKey::from(&agent_info_signed);
+        let kv_key = AgentKvKey::from(&agent_info);
 
         let bytes = kv_key.as_ref().to_owned();
 
-        assert_eq!(
-            &bytes[..32],
-            agent_info_signed
-                .as_agent_info_ref()
-                .as_space_ref()
-                .get_bytes(),
-        );
+        assert_eq!(&bytes[..32], agent_info.as_space_ref().get_bytes(),);
 
-        assert_eq!(
-            &bytes[32..],
-            agent_info_signed
-                .as_agent_info_ref()
-                .as_agent_ref()
-                .get_bytes(),
-        );
+        assert_eq!(&bytes[32..], agent_info.as_agent_ref().get_bytes(),);
     }
 
     #[tokio::test(threaded_scheduler)]
@@ -148,15 +146,20 @@ mod tests {
 
         let env = environ.guard();
         env.with_commit(|writer| {
-            store_buf
-                .as_store_ref()
-                .put(writer, &(&agent_info_signed).into(), &agent_info_signed)
+            store_buf.as_store_ref().put(
+                writer,
+                &(&agent_info_signed).try_into().unwrap(),
+                &agent_info_signed,
+            )
         })
         .unwrap();
 
         let ret = &store_buf
             .as_store_ref()
-            .get(&env.reader().unwrap(), &(&agent_info_signed).into())
+            .get(
+                &env.reader().unwrap(),
+                &(&agent_info_signed).try_into().unwrap(),
+            )
             .unwrap();
 
         assert_eq!(ret, &Some(agent_info_signed),);
