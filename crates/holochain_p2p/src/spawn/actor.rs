@@ -265,6 +265,25 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         .into())
     }
 
+    /// We need to get previously stored agent info.
+    #[tracing::instrument(skip(self), level = "trace")]
+    fn handle_query_agent_info_signed(
+        &mut self,
+        input: kitsune_p2p::event::QueryAgentInfoSignedEvt,
+    ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<Vec<AgentInfoSigned>> {
+        let kitsune_p2p::event::QueryAgentInfoSignedEvt { space, agent } = input;
+        let h_space = DnaHash::from_kitsune(&space);
+        let h_agent = AgentPubKey::from_kitsune(&agent);
+        let evt_sender = self.evt_sender.clone();
+        Ok(async move {
+            Ok(evt_sender
+                .query_agent_info_signed(h_space, h_agent, space, agent)
+                .await?)
+        }
+        .boxed()
+        .into())
+    }
+
     #[tracing::instrument(skip(self, space, to_agent, from_agent, payload), level = "trace")]
     fn handle_call(
         &mut self,

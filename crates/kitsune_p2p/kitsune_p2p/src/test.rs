@@ -240,4 +240,35 @@ mod tests {
         harness.ghost_actor_shutdown().await.unwrap();
         Ok(())
     }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn test_peer_data_workflow() -> Result<(), KitsuneP2pError> {
+        init_tracing();
+
+        let (harness, _evt) = spawn_test_harness_quic().await?;
+
+        let space = harness.add_space().await?;
+        let (a1, p2p) = harness.add_direct_agent("DIRECT".into()).await?;
+
+        let res = harness.dump_local_peer_data(a1.clone()).await?;
+        let num_agent_info = res.len();
+        let (agent_hash, _agent_info) = res.into_iter().next().unwrap();
+        assert_eq!(a1, agent_hash);
+        assert_eq!(num_agent_info, 1);
+
+        let a2: Arc<KitsuneAgent> = TestVal::test_val();
+        p2p.join(space.clone(), a2.clone()).await?;
+
+        tokio::time::delay_for(std::time::Duration::from_millis(200)).await;
+
+        let res = harness.dump_local_peer_data(a1.clone()).await?;
+        let num_agent_info = res.len();
+
+        assert!(res.contains_key(&a1));
+        assert!(res.contains_key(&a2));
+        assert_eq!(num_agent_info, 2);
+
+        harness.ghost_actor_shutdown().await.unwrap();
+        Ok(())
+    }
 }

@@ -80,6 +80,11 @@ mod validation_package;
 #[allow(missing_docs)]
 pub mod error;
 
+#[cfg(test)]
+mod gossip_test;
+#[cfg(test)]
+mod test;
+
 impl Hash for Cell {
     fn hash<H>(&self, state: &mut H)
     where
@@ -232,7 +237,7 @@ impl Cell {
     ) -> CellResult<()> {
         use holochain_p2p::event::HolochainP2pEvent::*;
         match evt {
-            PutAgentInfoSigned { .. } | GetAgentInfoSigned { .. } => {
+            PutAgentInfoSigned { .. } | GetAgentInfoSigned { .. } | QueryAgentInfoSigned { .. } => {
                 // PutAgentInfoSigned needs to be handled at the conductor level where the p2p
                 // store lives.
                 unreachable!()
@@ -885,6 +890,3 @@ impl Cell {
         &self.queue_triggers
     }
 }
-
-#[cfg(test)]
-mod test;

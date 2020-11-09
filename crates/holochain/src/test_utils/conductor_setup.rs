@@ -5,8 +5,7 @@ use crate::{
         ConductorHandle,
     },
     core::queue_consumer::InitialQueueTriggers,
-    core::ribosome::wasm_ribosome::WasmRibosome,
-    test_utils::setup_app,
+    core::ribosome::{wasm_ribosome::WasmRibosome, RibosomeT},
 };
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::{actor::HolochainP2pRefToCell, HolochainP2pCell};
@@ -18,10 +17,11 @@ use holochain_types::{
 };
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::zome::ZomeName;
+use kitsune_p2p::KitsuneP2pConfig;
 use std::{convert::TryFrom, sync::Arc};
 use tempdir::TempDir;
 
-use super::host_fn_api::CallData;
+use super::{host_fn_api::CallData, install_app, setup_app_with_network};
 
 /// Everything you need to run a test that uses the conductor
 pub struct ConductorTestData {
@@ -86,7 +86,25 @@ impl ConductorCallData {
 }
 
 impl ConductorTestData {
+    /// Create a new conductor and test data
     pub async fn new(zomes: Vec<TestWasm>, with_bob: bool) -> Self {
+        Self::new_inner(zomes, with_bob, None).await
+    }
+
+    /// New test data that creates a conductor using a custom network config
+    pub async fn with_network_config(
+        zomes: Vec<TestWasm>,
+        with_bob: bool,
+        network: KitsuneP2pConfig,
+    ) -> Self {
+        Self::new_inner(zomes, with_bob, Some(network)).await
+    }
+
+    async fn new_inner(
+        zomes: Vec<TestWasm>,
+        with_bob: bool,
+        network: Option<KitsuneP2pConfig>,
+    ) -> Self {
         let dna_file = DnaFile::new(
             DnaDef {
                 name: "conductor_test".to_string(),
@@ -123,8 +141,12 @@ impl ConductorTestData {
             None
         };
 
-        let (__tmpdir, app_api, handle) =
-            setup_app(vec![("test_app", cells)], vec![dna_file.clone()]).await;
+        let (__tmpdir, app_api, handle) = setup_app_with_network(
+            vec![("test_app", cells)],
+            vec![dna_file.clone()],
+            network.unwrap_or_default(),
+        )
+        .await;
 
         let alice_call_data = ConductorCallData::new(&alice_cell_id, &handle, &dna_file).await;
 
@@ -148,5 +170,24 @@ impl ConductorTestData {
         let shutdown = handle.take_shutdown_handle().await.unwrap();
         handle.shutdown().await;
         shutdown.await.unwrap();
+    }
+    /// Bring bob online if he isn't already
+    pub async fn bring_bob_online(&mut self) {
+        let dna_file = self.alice_call_data.ribosome.dna_file();
+        if self.bob_call_data.is_none() {
+            let bob_agent_id = fake_agent_pubkey_2();
+            let bob_cell_id = CellId::new(dna_file.dna_hash.clone(), bob_agent_id.clone());
+            let bob_installed_cell = InstalledCell::new(bob_cell_id.clone(), "bob_handle".into());
+            let cell_data = vec![(bob_installed_cell, None)];
+            install_app(
+                "bob_app",
+                cell_data,
+                vec![dna_file.clone()],
+                self.handle.clone(),
+            )
+            .await;
+            self.bob_call_data =
+                Some(ConductorCallData::new(&bob_cell_id, &self.handle, dna_file).await);
+        }
     }
 }
