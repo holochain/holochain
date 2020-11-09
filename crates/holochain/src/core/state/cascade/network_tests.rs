@@ -37,6 +37,7 @@ use holochain_types::{
     cell::CellId,
     dht_op::produce_op_lights_from_elements,
     dna::{DnaDef, DnaFile},
+    element::ElementStatus,
     element::{Element, GetElementResponse, WireElement},
     entry::option_entry_hashed,
     fixt::*,
@@ -51,6 +52,7 @@ use holochain_zome_types::{
     header::*,
     link::Link,
     metadata::{Details, EntryDhtStatus},
+    validate::ValidationStatus,
 };
 use maplit::btreeset;
 use std::collections::BTreeMap;
@@ -564,7 +566,11 @@ async fn run_fixt_network(
                             .cloned()
                             .map(|element| {
                                 GetElementResponse::GetHeader(Some(Box::new(
-                                    WireElement::from_element(element, vec![], vec![]),
+                                    WireElement::from_element(
+                                        ElementStatus::new(element, ValidationStatus::Valid),
+                                        vec![],
+                                        vec![],
+                                    ),
                                 )))
                                 .try_into()
                                 .unwrap()
