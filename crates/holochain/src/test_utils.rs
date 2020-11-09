@@ -23,11 +23,7 @@ use holochain_p2p::{
     HolochainP2pRef, HolochainP2pSender,
 };
 use holochain_serialized_bytes::{SerializedBytes, SerializedBytesError, UnsafeBytes};
-use holochain_state::{
-    env::EnvironmentWrite,
-    fresh_reader_test,
-    test_utils::{test_conductor_env, test_p2p_env, test_wasm_env, TestEnvironment},
-};
+use holochain_state::{env::EnvironmentWrite, fresh_reader_test, test_utils::test_environments};
 use holochain_types::{
     app::InstalledCell,
     cell::CellId,
@@ -310,16 +306,7 @@ async fn setup_app_inner(
     dnas: Vec<DnaFile>,
     network: Option<KitsuneP2pConfig>,
 ) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
-    let test_env = test_conductor_env();
-    let TestEnvironment {
-        env: wasm_env,
-        tmpdir: _tmpdir,
-    } = test_wasm_env();
-    let TestEnvironment {
-        env: p2p_env,
-        tmpdir: _p2p_tmpdir,
-    } = test_p2p_env();
-    let tmpdir = test_env.tmpdir.clone();
+    let envs = test_environments();
 
     let conductor_handle = ConductorBuilder::new()
         .config(ConductorConfig {
@@ -329,7 +316,7 @@ async fn setup_app_inner(
             network,
             ..Default::default()
         })
-        .test(test_env, wasm_env, p2p_env)
+        .test(&envs)
         .await
         .unwrap();
 
@@ -340,7 +327,7 @@ async fn setup_app_inner(
     let handle = conductor_handle.clone();
 
     (
-        tmpdir,
+        envs.tempdir(),
         RealAppInterfaceApi::new(conductor_handle, "test-interface".into()),
         handle,
     )
