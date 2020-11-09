@@ -242,17 +242,13 @@ pub async fn handle_get_element(
 
     // Get the actual header and return it with proof of deleted if there is any
     let mut r = element_vault.get_element(&hash)?;
+    let mut status = ValidationStatus::Valid;
     if r.is_none() {
         r = element_rejected.get_element(&hash)?;
+        status = ValidationStatus::Rejected;
     }
     let r = r
-        .map(|e| {
-            WireElement::from_element(
-                ElementStatus::new(e, ValidationStatus::Rejected),
-                deletes,
-                updates,
-            )
-        })
+        .map(|e| WireElement::from_element(ElementStatus::new(e, status), deletes, updates))
         .map(Box::new);
 
     Ok(GetElementResponse::GetHeader(r))
