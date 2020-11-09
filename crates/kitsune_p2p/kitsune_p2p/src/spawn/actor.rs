@@ -12,6 +12,8 @@ pub mod bootstrap;
 mod gossip;
 mod space;
 use ghost_actor::dependencies::{must_future, tracing};
+use gossip::OpDataAgentInfo;
+use gossip::OpHashesAgentHashes;
 use space::*;
 
 ghost_actor::ghost_chan! {
@@ -157,6 +159,13 @@ impl KitsuneP2pEventHandler for KitsuneP2pActor {
         input: crate::event::GetAgentInfoSignedEvt,
     ) -> KitsuneP2pEventHandlerResult<Option<crate::types::agent_store::AgentInfoSigned>> {
         Ok(self.evt_sender.get_agent_info_signed(input))
+    }
+
+    fn handle_query_agent_info_signed(
+        &mut self,
+        input: crate::event::QueryAgentInfoSignedEvt,
+    ) -> KitsuneP2pEventHandlerResult<Vec<crate::types::agent_store::AgentInfoSigned>> {
+        Ok(self.evt_sender.query_agent_info_signed(input))
     }
 
     fn handle_call(

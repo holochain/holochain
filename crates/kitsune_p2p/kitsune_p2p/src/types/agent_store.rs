@@ -10,7 +10,9 @@ use url2::Url2;
 pub type Urls = Vec<Url2>;
 
 /// Value in the peer database that tracks an Agent's representation as signed by that agent.
-#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, derive_more::AsRef)]
+#[derive(
+    serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, derive_more::AsRef, Hash, Eq,
+)]
 pub struct AgentInfoSigned {
     // Agent public key that needs to be the same as the agent in the signed agent_info.
     agent: KitsuneAgent,
@@ -42,6 +44,11 @@ impl AgentInfoSigned {
         self.as_ref()
     }
 
+    /// Thin wrapper around AsRef for KitsuneAgent.
+    pub fn as_agent_ref(&self) -> &KitsuneAgent {
+        self.as_ref()
+    }
+
     /// Thin wrapper around AsRef for AgentInfo
     pub fn as_agent_info_ref(&self) -> &[u8] {
         self.agent_info.as_ref()
@@ -49,7 +56,9 @@ impl AgentInfoSigned {
 }
 
 /// Value that an agent signs to represent themselves on the network.
-#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, derive_more::AsRef)]
+#[derive(
+    serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, derive_more::AsRef, Hash, Eq,
+)]
 pub struct AgentInfo {
     // The space this agent info is relevant to.
     space: KitsuneSpace,
@@ -107,5 +116,17 @@ impl AgentInfo {
     /// Accessor for signed_at_ms.
     pub fn signed_at_ms(&self) -> u64 {
         self.signed_at_ms
+    }
+}
+
+impl From<AgentInfoSigned> for KitsuneAgent {
+    fn from(ai: AgentInfoSigned) -> Self {
+        ai.agent
+    }
+}
+
+impl From<AgentInfo> for KitsuneAgent {
+    fn from(ai: AgentInfo) -> Self {
+        ai.agent
     }
 }
