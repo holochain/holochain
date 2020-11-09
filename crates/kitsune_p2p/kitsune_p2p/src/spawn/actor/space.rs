@@ -3,7 +3,10 @@ use crate::agent_store::AgentInfoSigned;
 use super::*;
 use ghost_actor::dependencies::{tracing, tracing_futures::Instrument};
 use kitsune_p2p_types::codec::Codec;
-use std::{collections::HashSet, convert::TryFrom};
+use std::{
+    collections::HashSet,
+    convert::{TryFrom, TryInto},
+};
 
 /// if the user specifies None or zero (0) for remote_agent_count
 const DEFAULT_NOTIFY_REMOTE_AGENT_COUNT: u8 = 5;
@@ -269,12 +272,8 @@ impl SpaceInternalHandler for Space {
                     None => return Err(KitsuneP2pError::RoutingAgentError(to_agent)),
                     Some(i) => i,
                 };
-                let url = info
-                    .as_agent_info_ref()
-                    .as_urls_ref()
-                    .get(0)
-                    .unwrap()
-                    .clone();
+                let info: crate::types::agent_store::AgentInfo = (&info).try_into()?;
+                let url = info.as_urls_ref().get(0).unwrap().clone();
                 let (_, mut write, read) = tx.create_channel(url).await?;
                 write.write_and_close(data.to_vec()).await?;
                 let read = read.read_to_end().await;
@@ -306,7 +305,7 @@ impl SpaceInternalHandler for Space {
             });
         Ok(async move {
             for peer in all_peers_fut.await? {
-                res.insert(Arc::new(peer.as_agent_info_ref().as_agent_ref().clone()));
+                res.insert(Arc::new(peer.as_agent_ref().clone()));
             }
             Ok(res)
         }
