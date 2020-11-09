@@ -299,7 +299,7 @@ pub mod wasm_test {
                         },
                         _ => unreachable!(),
                     },
-                    _ => unreachable!(),
+                    _ => unreachable!("Couldn't get {:?}", new_grant_header_hash),
                 }
             }
             _ => unreachable!(),

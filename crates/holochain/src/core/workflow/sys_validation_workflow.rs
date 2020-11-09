@@ -50,6 +50,8 @@ pub mod types;
 #[cfg(test)]
 mod chain_test;
 #[cfg(test)]
+mod test_ideas;
+#[cfg(test)]
 mod tests;
 
 #[instrument(skip(
