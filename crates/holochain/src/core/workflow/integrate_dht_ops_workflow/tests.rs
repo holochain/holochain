@@ -4,6 +4,7 @@ use super::*;
 
 use crate::fixt::ZomeCallHostAccessFixturator;
 use crate::here;
+use crate::test_utils::test_network;
 use crate::{core::state::metadata::ChainItemKey, fixt::CallContextFixturator};
 use crate::{
     core::{
@@ -13,7 +14,6 @@ use crate::{
         workflow::CallZomeWorkspaceLock,
     },
     fixt::*,
-    test_utils::test_network,
 };
 use ::fixt::prelude::*;
 use holo_hash::*;
@@ -1041,7 +1041,7 @@ async fn get_links(
         .zomes
         .push((zome_name.clone().into(), fixt!(Zome)));
 
-    let (_network, _r, cell_network) = test_network(Some(dna_file.dna_hash().clone()), None).await;
+    let test_network = test_network(Some(dna_file.dna_hash().clone()), None).await;
 
     // Create ribosome mock to return fixtures
     // This is a lot faster then compiling a zome
@@ -1060,7 +1060,7 @@ async fn get_links(
     let output = {
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock;
-        host_access.network = cell_network;
+        host_access.network = test_network.cell_network();
         call_context.host_access = host_access.into();
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
@@ -1310,9 +1310,9 @@ mod slow_tests {
 
     use crate::test_utils::setup_app;
     use crate::{
-        conductor::dna_store::MockDnaStore, core::state::dht_op_integration::IntegratedDhtOpsStore,
-        core::state::metadata::LinkMetaKey, core::state::metadata::MetadataBuf,
-        core::state::metadata::MetadataBufT, test_utils::host_fn_api::*,
+        core::state::dht_op_integration::IntegratedDhtOpsStore, core::state::metadata::LinkMetaKey,
+        core::state::metadata::MetadataBuf, core::state::metadata::MetadataBufT,
+        test_utils::host_fn_api::*,
     };
     use crate::{fixt::*, test_utils::wait_for_integration};
     use fallible_iterator::FallibleIterator;
@@ -1358,19 +1358,12 @@ mod slow_tests {
         let bob_cell_id = CellId::new(dna_file.dna_hash().to_owned(), bob_agent_id.clone());
         let bob_installed_cell = InstalledCell::new(bob_cell_id.clone(), "bob_handle".into());
 
-        let mut dna_store = MockDnaStore::new();
-
-        dna_store.expect_get().return_const(Some(dna_file.clone()));
-        dna_store.expect_add_dnas::<Vec<_>>().return_const(());
-        dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
-        dna_store.expect_get_entry_def().return_const(None);
-
         let (_tmpdir, _app_api, conductor) = setup_app(
             vec![(
                 "test_app",
                 vec![(alice_installed_cell, None), (bob_installed_cell, None)],
             )],
-            dna_store,
+            vec![dna_file.clone()],
         )
         .await;
 

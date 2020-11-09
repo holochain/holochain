@@ -1,5 +1,5 @@
 use crate::{
-    conductor::{dna_store::MockDnaStore, ConductorHandle},
+    conductor::ConductorHandle,
     core::{
         state::{element_buf::ElementBuf, validation_db::ValidationLimboStatus},
         workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace,
@@ -49,19 +49,12 @@ async fn sys_validation_workflow_test() {
     let bob_cell_id = CellId::new(dna_file.dna_hash().to_owned(), bob_agent_id.clone());
     let bob_installed_cell = InstalledCell::new(bob_cell_id.clone(), "bob_handle".into());
 
-    let mut dna_store = MockDnaStore::new();
-
-    dna_store.expect_get().return_const(Some(dna_file.clone()));
-    dna_store.expect_add_dnas::<Vec<_>>().return_const(());
-    dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
-    dna_store.expect_get_entry_def().return_const(None);
-
     let (_tmpdir, _app_api, handle) = setup_app(
         vec![(
             "test_app",
             vec![(alice_installed_cell, None), (bob_installed_cell, None)],
         )],
-        dna_store,
+        vec![dna_file.clone()],
     )
     .await;
 
@@ -117,7 +110,7 @@ async fn run_test(
             let _g = s.enter();
             let element_buf = ElementBuf::vault(alice_env.clone().into(), true).unwrap();
             for (k, i) in &res {
-                let hash = DhtOpHash::from_raw_bytes(k.clone());
+                let hash = DhtOpHash::from_raw_39(k.clone());
                 let el = element_buf.get_element(&i.op.header_hash()).unwrap();
                 debug!(?hash, ?i, op_in_val = ?el);
             }

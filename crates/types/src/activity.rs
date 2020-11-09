@@ -32,7 +32,7 @@ pub enum ChainItems<T = SignedHeaderHashed> {
     Full(Vec<T>),
     /// Just the hashes
     Hashes(Vec<(u32, HeaderHash)>),
-    /// This activity was not requested
+    /// Activity was not requested
     NotRequested,
 }
 
@@ -59,7 +59,7 @@ impl From<AgentActivity<Element>> for holochain_zome_types::query::AgentActivity
             rejected_activity,
             status: a.status,
             highest_observed: a.highest_observed,
-            warranted: Vec::with_capacity(0),
+            warrants: Vec::with_capacity(0),
         }
     }
 }

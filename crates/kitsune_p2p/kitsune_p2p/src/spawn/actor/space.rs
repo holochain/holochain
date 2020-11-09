@@ -1,7 +1,9 @@
+use crate::agent_store::AgentInfoSigned;
+
 use super::*;
 use ghost_actor::dependencies::{tracing, tracing_futures::Instrument};
 use kitsune_p2p_types::codec::Codec;
-use std::collections::HashSet;
+use std::{collections::HashSet, convert::TryFrom};
 
 /// if the user specifies None or zero (0) for remote_agent_count
 const DEFAULT_NOTIFY_REMOTE_AGENT_COUNT: u8 = 5;
@@ -92,19 +94,38 @@ impl gossip::GossipEventHandler for Space {
         dht_arc: kitsune_p2p_types::dht_arc::DhtArc,
         since_utc_epoch_s: i64,
         until_utc_epoch_s: i64,
-    ) -> gossip::GossipEventHandlerResult<Vec<Arc<KitsuneOpHash>>> {
+    ) -> gossip::GossipEventHandlerResult<OpHashesAgentHashes> {
         // while full-sync just redirecting to self...
         // but eventually some of these will be outgoing remote requests
         let fut = self
             .evt_sender
             .fetch_op_hashes_for_constraints(FetchOpHashesForConstraintsEvt {
                 space: self.space.clone(),
-                agent: to_agent,
+                agent: to_agent.clone(),
                 dht_arc,
                 since_utc_epoch_s,
                 until_utc_epoch_s,
             });
-        Ok(async move { fut.await }.boxed().into())
+        let peer_fut = self
+            .evt_sender
+            .query_agent_info_signed(QueryAgentInfoSignedEvt {
+                space: self.space.clone(),
+                agent: to_agent,
+            });
+        Ok(async move {
+            let agent_infos = peer_fut.await?;
+            let agent_infos = agent_infos
+                .into_iter()
+                .map(|ai| {
+                    let ai = types::agent_store::AgentInfo::try_from(&ai)?;
+                    let time = ai.signed_at_ms();
+                    Ok((Arc::new(ai.into()), time))
+                })
+                .collect::<Result<Vec<_>, KitsuneP2pError>>()?;
+            Ok((fut.await?, agent_infos))
+        }
+        .boxed()
+        .into())
     }
 
     fn handle_req_op_data(
@@ -112,15 +133,35 @@ impl gossip::GossipEventHandler for Space {
         _from_agent: Arc<KitsuneAgent>,
         to_agent: Arc<KitsuneAgent>,
         op_hashes: Vec<Arc<KitsuneOpHash>>,
-    ) -> gossip::GossipEventHandlerResult<Vec<(Arc<KitsuneOpHash>, Vec<u8>)>> {
+        peer_hashes: Vec<Arc<KitsuneAgent>>,
+    ) -> gossip::GossipEventHandlerResult<OpDataAgentInfo> {
         // while full-sync just redirecting to self...
         // but eventually some of these will be outgoing remote requests
         let fut = self.evt_sender.fetch_op_hash_data(FetchOpHashDataEvt {
             space: self.space.clone(),
-            agent: to_agent,
+            agent: to_agent.clone(),
             op_hashes,
         });
-        Ok(async move { fut.await }.boxed().into())
+        let peer_fut = self
+            .evt_sender
+            .query_agent_info_signed(QueryAgentInfoSignedEvt {
+                space: self.space.clone(),
+                agent: to_agent,
+            });
+        Ok(async move {
+            let agent_infos = peer_fut.await?;
+            let peer_hashes = peer_hashes
+                .into_iter()
+                .map(|a| (*a).clone())
+                .collect::<HashSet<_>>();
+            let agent_infos = agent_infos
+                .into_iter()
+                .filter(|ai| peer_hashes.contains(ai.as_agent_ref()))
+                .collect();
+            Ok((fut.await?, agent_infos))
+        }
+        .boxed()
+        .into())
     }
 
     fn handle_gossip_ops(
@@ -128,6 +169,7 @@ impl gossip::GossipEventHandler for Space {
         from_agent: Arc<KitsuneAgent>,
         to_agent: Arc<KitsuneAgent>,
         ops: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
+        agents: Vec<AgentInfoSigned>,
     ) -> gossip::GossipEventHandlerResult<()> {
         let all = ops
             .into_iter()
@@ -141,8 +183,26 @@ impl gossip::GossipEventHandler for Space {
                 )
             })
             .collect::<Vec<_>>();
+        let all_agents = agents
+            .into_iter()
+            .map(|agent_info_signed| {
+                self.evt_sender
+                    .put_agent_info_signed(PutAgentInfoSignedEvt {
+                        space: self.space.clone(),
+                        agent: to_agent.clone(),
+                        agent_info_signed,
+                    })
+            })
+            .collect::<Vec<_>>();
         Ok(async move {
             futures::stream::iter(all)
+                .for_each_concurrent(10, |res| async move {
+                    if let Err(e) = res.await {
+                        ghost_actor::dependencies::tracing::error!(?e);
+                    }
+                })
+                .await;
+            futures::stream::iter(all_agents)
                 .for_each_concurrent(10, |res| async move {
                     if let Err(e) = res.await {
                         ghost_actor::dependencies::tracing::error!(?e);
@@ -250,20 +310,25 @@ impl SpaceInternalHandler for Space {
                 let sign_req = SignNetworkDataEvt {
                     space: space.clone(),
                     agent: agent.clone(),
-                    data: Arc::new(data),
+                    data: Arc::new(data.clone()),
                 };
                 let sig = evt_sender.sign_network_data(sign_req).await?;
-                let agent_info_signed =
-                    crate::types::agent_store::AgentInfoSigned::try_new(sig, agent_info)?;
-                tracing::debug!(?agent_info_signed);
+                let agent_info_signed = crate::types::agent_store::AgentInfoSigned::try_new(
+                    (*agent).clone(),
+                    sig.clone(),
+                    data,
+                )?;
+                tracing::debug!(?agent_info, ?sig);
                 evt_sender
                     .put_agent_info_signed(PutAgentInfoSignedEvt {
                         space: space.clone(),
                         agent,
-                        agent_info_signed,
+                        agent_info_signed: agent_info_signed.clone(),
                     })
                     .await?;
-                // TODO - here, also publish to bootstrap server
+
+                // Push to the bootstrap as well.
+                crate::spawn::actor::bootstrap::put(None, agent_info_signed).await?;
             }
             Ok(())
         }

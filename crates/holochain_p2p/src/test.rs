@@ -1,15 +1,131 @@
-use crate::actor::HolochainP2pRefToCell;
 use crate::HolochainP2pCell;
+use crate::{actor::*, *};
 use ::fixt::prelude::*;
-use holo_hash::fixt::{AgentPubKeyFixturator, DnaHashFixturator};
-use kitsune_p2p::KitsuneP2pConfig;
+use holo_hash::{
+    fixt::{AgentPubKeyFixturator, DnaHashFixturator},
+    AgentPubKey, DnaHash,
+};
+
+struct StubNetwork;
+
+impl ghost_actor::GhostHandler<HolochainP2p> for StubNetwork {}
+impl ghost_actor::GhostControlHandler for StubNetwork {}
+
+#[allow(unused_variables)]
+impl HolochainP2pHandler for StubNetwork {
+    fn handle_join(
+        &mut self,
+        dna_hash: DnaHash,
+        agent_pub_key: AgentPubKey,
+    ) -> HolochainP2pHandlerResult<()> {
+        Err("stub".into())
+    }
+    fn handle_leave(
+        &mut self,
+        dna_hash: DnaHash,
+        agent_pub_key: AgentPubKey,
+    ) -> HolochainP2pHandlerResult<()> {
+        Err("stub".into())
+    }
+    fn handle_call_remote(
+        &mut self,
+        dna_hash: DnaHash,
+        from_agent: AgentPubKey,
+        to_agent: AgentPubKey,
+        zome_name: ZomeName,
+        fn_name: FunctionName,
+        cap: Option<CapSecret>,
+        request: SerializedBytes,
+    ) -> HolochainP2pHandlerResult<SerializedBytes> {
+        Err("stub".into())
+    }
+    fn handle_publish(
+        &mut self,
+        dna_hash: DnaHash,
+        from_agent: AgentPubKey,
+        request_validation_receipt: bool,
+        dht_hash: holo_hash::AnyDhtHash,
+        ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+        timeout_ms: Option<u64>,
+    ) -> HolochainP2pHandlerResult<()> {
+        Err("stub".into())
+    }
+    fn handle_get_validation_package(
+        &mut self,
+        input: actor::GetValidationPackage,
+    ) -> HolochainP2pHandlerResult<ValidationPackageResponse> {
+        Err("stub".into())
+    }
+    fn handle_get(
+        &mut self,
+        dna_hash: DnaHash,
+        from_agent: AgentPubKey,
+        dht_hash: holo_hash::AnyDhtHash,
+        options: actor::GetOptions,
+    ) -> HolochainP2pHandlerResult<Vec<GetElementResponse>> {
+        Err("stub".into())
+    }
+    fn handle_get_meta(
+        &mut self,
+        dna_hash: DnaHash,
+        from_agent: AgentPubKey,
+        dht_hash: holo_hash::AnyDhtHash,
+        options: actor::GetMetaOptions,
+    ) -> HolochainP2pHandlerResult<Vec<MetadataSet>> {
+        Err("stub".into())
+    }
+    fn handle_get_links(
+        &mut self,
+        dna_hash: DnaHash,
+        from_agent: AgentPubKey,
+        link_key: WireLinkMetaKey,
+        options: actor::GetLinksOptions,
+    ) -> HolochainP2pHandlerResult<Vec<GetLinksResponse>> {
+        Err("stub".into())
+    }
+    fn handle_get_agent_activity(
+        &mut self,
+        dna_hash: DnaHash,
+        from_agent: AgentPubKey,
+        agent: AgentPubKey,
+        query: ChainQueryFilter,
+        options: actor::GetActivityOptions,
+    ) -> HolochainP2pHandlerResult<Vec<AgentActivity>> {
+        Err("stub".into())
+    }
+    fn handle_send_validation_receipt(
+        &mut self,
+        dna_hash: DnaHash,
+        to_agent: AgentPubKey,
+        from_agent: AgentPubKey,
+        receipt: SerializedBytes,
+    ) -> HolochainP2pHandlerResult<()> {
+        Err("stub".into())
+    }
+}
+
+/// Spawn a stub network that doesn't respond to any messages.
+/// Use `test_network()` if you want a real test network.
+pub async fn stub_network() -> ghost_actor::GhostSender<HolochainP2p> {
+    let builder = ghost_actor::actor_builder::GhostActorBuilder::new();
+
+    let channel_factory = builder.channel_factory().clone();
+
+    let sender = channel_factory
+        .create_channel::<HolochainP2p>()
+        .await
+        .unwrap();
+
+    tokio::task::spawn(builder.spawn(StubNetwork));
+
+    sender
+}
 
 fixturator!(
     HolochainP2pCell;
     curve Empty {
-        // TODO: Make this empty
         tokio_safe_block_on::tokio_safe_block_forever_on(async {
-            let (holochain_p2p, _p2p_evt) = crate::spawn_holochain_p2p(KitsuneP2pConfig::default()).await.unwrap();
+            let holochain_p2p = crate::test::stub_network().await;
             holochain_p2p.to_cell(
                 DnaHashFixturator::new(Empty).next().unwrap(),
                 AgentPubKeyFixturator::new(Empty).next().unwrap(),
@@ -17,38 +133,29 @@ fixturator!(
         })
     };
     curve Unpredictable {
-        // TODO: Make this unpredictable
-        tokio_safe_block_on::tokio_safe_block_forever_on(async {
-            let (holochain_p2p, _p2p_evt) = crate::spawn_holochain_p2p(KitsuneP2pConfig::default()).await.unwrap();
-            holochain_p2p.to_cell(
-                DnaHashFixturator::new(Unpredictable).next().unwrap(),
-                AgentPubKeyFixturator::new(Unpredictable).next().unwrap(),
-            )
-        })
+        HolochainP2pCellFixturator::new(Empty).next().unwrap()
     };
     curve Predictable {
-        tokio_safe_block_on::tokio_safe_block_forever_on(async {
-            let (holochain_p2p, _p2p_evt) = crate::spawn_holochain_p2p(KitsuneP2pConfig::default()).await.unwrap();
-            holochain_p2p.to_cell(
-                DnaHashFixturator::new(Predictable).next().unwrap(),
-                AgentPubKeyFixturator::new(Predictable).next().unwrap(),
-            )
-        })
+        HolochainP2pCellFixturator::new(Empty).next().unwrap()
     };
 );
+
 #[cfg(test)]
 mod tests {
     use crate::*;
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
     use ghost_actor::GhostControlSender;
-    use holochain_types::element::{Element, SignedHeaderHashed, WireElement};
+    use holochain_types::{
+        element::{Element, ElementStatus, SignedHeaderHashed, WireElement},
+        validate::ValidationStatus,
+    };
     use holochain_types::{fixt::*, HeaderHashed};
     use kitsune_p2p::KitsuneP2pConfig;
 
     macro_rules! newhash {
         ($p:ident, $c:expr) => {
-            holo_hash::$p::from_raw_bytes([$c as u8; 36].to_vec())
+            holo_hash::$p::from_raw_36([$c as u8; HOLO_HASH_UNTYPED_LEN].to_vec())
         };
     }
 
@@ -207,7 +314,7 @@ mod tests {
         p2p.join(dna.clone(), a2.clone()).await.unwrap();
         p2p.join(dna.clone(), a3.clone()).await.unwrap();
 
-        let header_hash = holo_hash::AnyDhtHash::from_raw_bytes_and_type(
+        let header_hash = holo_hash::AnyDhtHash::from_raw_36_and_type(
             b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
             holo_hash::hash_type::AnyDht::Header,
         );
@@ -231,23 +338,29 @@ mod tests {
             .unwrap();
 
         let test_1 = GetElementResponse::GetHeader(Some(Box::new(WireElement::from_element(
-            Element::new(
-                SignedHeaderHashed::with_presigned(
-                    HeaderHashed::from_content_sync(fixt!(Header)),
-                    fixt!(Signature),
+            ElementStatus::new(
+                Element::new(
+                    SignedHeaderHashed::with_presigned(
+                        HeaderHashed::from_content_sync(fixt!(Header)),
+                        fixt!(Signature),
+                    ),
+                    None,
                 ),
-                None,
+                ValidationStatus::Valid,
             ),
             vec![],
             vec![],
         ))));
         let test_2 = GetElementResponse::GetHeader(Some(Box::new(WireElement::from_element(
-            Element::new(
-                SignedHeaderHashed::with_presigned(
-                    HeaderHashed::from_content_sync(fixt!(Header)),
-                    fixt!(Signature),
+            ElementStatus::new(
+                Element::new(
+                    SignedHeaderHashed::with_presigned(
+                        HeaderHashed::from_content_sync(fixt!(Header)),
+                        fixt!(Signature),
+                    ),
+                    None,
                 ),
-                None,
+                ValidationStatus::Valid,
             ),
             vec![],
             vec![],
@@ -282,7 +395,7 @@ mod tests {
         p2p.join(dna.clone(), a2.clone()).await.unwrap();
         p2p.join(dna.clone(), a3.clone()).await.unwrap();
 
-        let hash = holo_hash::AnyDhtHash::from_raw_bytes_and_type(
+        let hash = holo_hash::AnyDhtHash::from_raw_36_and_type(
             b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
             holo_hash::hash_type::AnyDht::Header,
         );
@@ -339,7 +452,7 @@ mod tests {
         p2p.join(dna.clone(), a1.clone()).await.unwrap();
         p2p.join(dna.clone(), a2.clone()).await.unwrap();
 
-        let hash = holo_hash::EntryHash::from_raw_bytes_and_type(
+        let hash = holo_hash::EntryHash::from_raw_36_and_type(
             b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
             holo_hash::hash_type::Entry,
         );

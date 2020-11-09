@@ -1,6 +1,7 @@
 //! This is a temporary quick-hack gossip module for use with the
 //! in-memory / full-sync / non-sharded networking module
 
+use crate::agent_store::AgentInfoSigned;
 use crate::{types::actor::KitsuneP2pResult, *};
 use ghost_actor::dependencies::{tracing, tracing_futures};
 use kitsune_p2p_types::dht_arc::DhtArc;
@@ -19,25 +20,29 @@ ghost_actor::ghost_chan! {
             dht_arc: DhtArc,
             since_utc_epoch_s: i64,
             until_utc_epoch_s: i64,
-        ) -> Vec<Arc<KitsuneOpHash>>;
+        ) -> OpHashesAgentHashes;
 
         /// fetch op data for op hash list
         fn req_op_data(
             from_agent: Arc<KitsuneAgent>,
             to_agent: Arc<KitsuneAgent>,
             op_hashes: Vec<Arc<KitsuneOpHash>>,
-        ) -> Vec<(Arc<KitsuneOpHash>, Vec<u8>)>;
+            peer_hashes: Vec<Arc<KitsuneAgent>>,
+        ) -> OpDataAgentInfo;
 
         /// we have gossip to forward
         fn gossip_ops(
             from_agent: Arc<KitsuneAgent>,
             to_agent: Arc<KitsuneAgent>,
             ops: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
+            agents: Vec<AgentInfoSigned>,
         ) -> ();
     }
 }
 
 pub type GossipEventReceiver = futures::channel::mpsc::Receiver<GossipEvent>;
+pub type OpHashesAgentHashes = (Vec<Arc<KitsuneOpHash>>, Vec<(Arc<KitsuneAgent>, u64)>);
+pub type OpDataAgentInfo = (Vec<(Arc<KitsuneOpHash>, Vec<u8>)>, Vec<AgentInfoSigned>);
 
 /// spawn a gossip module to control gossip for a space
 pub fn spawn_gossip_module() -> GossipEventReceiver {
@@ -88,6 +93,7 @@ impl GossipData {
         let list = self.evt_send.list_neighbor_agents().await?;
         // super naive gossip just processes all combinations
         // also causes duplication because it runs pairs from both sides
+        tracing::debug!(?list);
         for a1 in list.iter() {
             for a2 in list.iter() {
                 // at the very least, avoid gossiping with ourselves
@@ -105,37 +111,45 @@ impl GossipData {
 
         // required so from_iters below know the build_hasher type
         type S = HashSet<Arc<KitsuneOpHash>>;
+        type A = HashSet<(Arc<KitsuneAgent>, u64)>;
 
         // we'll just fetch all with no constraints for now
-        let op_hashes_from: S = HashSet::from_iter(
-            self.evt_send
-                .req_op_hashes(
-                    from_agent.clone(), // from not to because we're initiating
-                    from_agent.clone(),
-                    DhtArc::new(0, u32::MAX),
-                    i64::MIN,
-                    i64::MAX,
-                )
-                .await?,
-        );
+        let (op_hashes_from, agent_info_from) = self
+            .evt_send
+            .req_op_hashes(
+                from_agent.clone(), // from not to because we're initiating
+                from_agent.clone(),
+                DhtArc::new(0, u32::MAX),
+                i64::MIN,
+                i64::MAX,
+            )
+            .await?;
+        let op_hashes_from: S = HashSet::from_iter(op_hashes_from);
+        let agent_info_from: A = HashSet::from_iter(agent_info_from);
 
         // we'll just fetch all with no constraints for now
-        let op_hashes_to: S = HashSet::from_iter(
-            self.evt_send
-                .req_op_hashes(
-                    from_agent.clone(),
-                    to_agent.clone(),
-                    DhtArc::new(0, u32::MAX),
-                    i64::MIN,
-                    i64::MAX,
-                )
-                .await?,
-        );
+        let (op_hashes_to, agent_info_to) = self
+            .evt_send
+            .req_op_hashes(
+                from_agent.clone(),
+                to_agent.clone(),
+                DhtArc::new(0, u32::MAX),
+                i64::MIN,
+                i64::MAX,
+            )
+            .await?;
+        let op_hashes_to: S = HashSet::from_iter(op_hashes_to);
+        let agent_info_to: A = HashSet::from_iter(agent_info_to);
 
         // values that to_agent has, and from_agent needs
         let from_needs = op_hashes_to
             .difference(&op_hashes_from)
             .cloned()
+            .collect::<Vec<_>>();
+        let from_needs_agents = agent_info_to
+            .difference(&agent_info_from)
+            .cloned()
+            .map(|(ai, _)| ai)
             .collect::<Vec<_>>();
 
         // values that from_agent has, and to_agent needs
@@ -143,22 +157,28 @@ impl GossipData {
             .difference(&op_hashes_to)
             .cloned()
             .collect::<Vec<_>>();
+        let to_needs_agents = agent_info_from
+            .difference(&agent_info_to)
+            .cloned()
+            .map(|(ai, _)| ai)
+            .collect::<Vec<_>>();
 
         // fetch values that to_agent needs from from_agent
-        if !to_needs.is_empty() {
-            if let Ok(result) = self
+        if !to_needs.is_empty() || !to_needs_agents.is_empty() {
+            if let Ok((r_ops, r_peers)) = self
                 .evt_send
                 .req_op_data(
                     from_agent.clone(), // from not to because we're initiating
                     from_agent.clone(),
                     to_needs,
+                    to_needs_agents,
                 )
                 .await
             {
-                if !result.is_empty() {
+                if !r_ops.is_empty() || !r_peers.is_empty() {
                     if let Err(e) = self
                         .evt_send
-                        .gossip_ops(from_agent.clone(), to_agent.clone(), result)
+                        .gossip_ops(from_agent.clone(), to_agent.clone(), r_ops, r_peers)
                         .await
                     {
                         tracing::error!(?e);
@@ -168,19 +188,25 @@ impl GossipData {
         }
 
         // fetch values that from_agent needs from to_agent
-        if !from_needs.is_empty() {
-            if let Ok(result) = self
+        if !from_needs.is_empty() || !from_needs_agents.is_empty() {
+            if let Ok((r_ops, r_peers)) = self
                 .evt_send
-                .req_op_data(from_agent.clone(), to_agent.clone(), from_needs)
+                .req_op_data(
+                    from_agent.clone(),
+                    to_agent.clone(),
+                    from_needs,
+                    from_needs_agents,
+                )
                 .await
             {
-                if !result.is_empty() {
+                if !r_ops.is_empty() || !r_peers.is_empty() {
                     if let Err(e) = self
                         .evt_send
                         .gossip_ops(
                             to_agent.clone(), // we fetched from to
                             from_agent.clone(),
-                            result,
+                            r_ops,
+                            r_peers,
                         )
                         .await
                     {

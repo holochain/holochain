@@ -16,6 +16,7 @@ use holochain_zome_types::{
     ZomeCallResponse,
 };
 use matches::assert_matches;
+use test_wasm_common::AgentActivitySearch;
 
 use crate::{
     conductor::ConductorHandle,
@@ -292,8 +293,8 @@ async fn get_agent_activity_test() {
 
     commit_some_data("create_entry", &alice_call_data, &handle).await;
 
-    // 3 ops per commit, 5 commits plus 7 for genesis + 2 for init
-    let mut expected_count = NUM_COMMITS * 3 + 9;
+    // 3 ops per commit, 5 commits plus 7 for genesis + 2 for init + 2 for cap
+    let mut expected_count = NUM_COMMITS * 3 + 9 + 2;
 
     wait_for_integration(
         &alice_call_data.env,
@@ -630,7 +631,7 @@ async fn get_agent_activity_host_fn_test() {
             rejected_activity: Vec::new(),
             status,
             highest_observed,
-            warranted: Vec::new(),
+            warrants: Vec::new(),
         }
     };
 
@@ -658,10 +659,15 @@ async fn get_agent_activity_host_fn_test() {
     let expected_activity = get_expected();
     assert_eq!(agent_activity, expected_activity);
 
+    let search = AgentActivitySearch {
+        agent: alice_agent_id.clone(),
+        query: ChainQueryFilter::new(),
+        request: ActivityRequest::Full,
+    };
     let invocation = new_invocation(
         &alice_call_data.cell_id,
-        "my_activity",
-        (),
+        "get_activity",
+        search,
         TestWasm::Create,
     )
     .unwrap();
@@ -714,10 +720,13 @@ async fn check_cascade(
 }
 
 #[tokio::test(threaded_scheduler)]
-#[ignore = "Only shows a problem, doesn't prove something is correct"]
-/// This test shows a slow read issue.
+#[ignore = "Only shows a potential problem, doesn't prove something is correct"]
+/// This test shows a potential slow read issue.
 /// The exact same code running here in this test is 10x
 /// faster then when it is run by the cell
+///
+/// This may not turn out to be a real issue, but this illustrates a way to reproduce this behavior,
+/// and may be something we want to investigate more in the future.
 async fn slow_lmdb_reads_test() {
     let num_commits = std::env::var_os("SLOW_LMDB_COMMITS")
         .and_then(|s| s.into_string().ok()?.parse::<usize>().ok())

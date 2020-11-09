@@ -3,6 +3,7 @@
 
 use crate::*;
 use ghost_actor::dependencies::futures::future::FutureExt;
+use holo_hash::{HOLO_HASH_CORE_LEN, HOLO_HASH_PREFIX_LEN};
 use holochain_zome_types::signature::SignInput;
 use holochain_zome_types::signature::Signature;
 
@@ -31,7 +32,7 @@ impl KeystoreSenderExt for KeystoreSender {
         let fut = self.sign_ed25519_new_from_entropy();
         async move {
             let (_, pk) = fut.await?;
-            Ok(holo_hash::AgentPubKey::with_pre_hashed(pk.to_vec()))
+            Ok(holo_hash::AgentPubKey::from_raw_32(pk.to_vec()))
         }
         .boxed()
         .into()
@@ -40,7 +41,9 @@ impl KeystoreSenderExt for KeystoreSender {
     fn sign(&self, input: SignInput) -> KeystoreApiFuture<Signature> {
         use lair_keystore_api::actor::LairClientApiSender;
         let fut = self.sign_ed25519_sign_by_pub_key(
-            input.key.as_ref()[..32].to_vec().into(),
+            input.key.as_ref()[HOLO_HASH_PREFIX_LEN..HOLO_HASH_PREFIX_LEN + HOLO_HASH_CORE_LEN]
+                .to_vec()
+                .into(),
             <Vec<u8>>::from(UnsafeBytes::from(input.data)).into(),
         );
         async move {

@@ -58,7 +58,7 @@ where
     ) -> DatabaseResult<Option<HoloHashed<C>>> {
         let k = PrefixHashKey::new(hash.as_hash());
         Ok(if let Some(content) = self.0.get(r, &k)? {
-            Some(Self::deserialize_and_hash(hash.get_full_bytes(), content).await)
+            Some(Self::deserialize_and_hash(hash.get_raw_39(), content).await)
         } else {
             None
         })
@@ -109,7 +109,7 @@ where
         fatal_db_hash_integrity_check!(
             "CasBufUsedAsync::get",
             hash_bytes,
-            data.as_hash().get_full_bytes(),
+            data.as_hash().get_raw_39(),
             data.as_content(),
         );
         data

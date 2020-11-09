@@ -37,9 +37,9 @@ pub struct AgentActivity {
     /// The highest chain header that has
     /// been observed by this authority.
     pub highest_observed: Option<HighestObserved>,
-    /// Warrants on this agent.
+    /// Warrants about this AgentActivity.
     /// Placeholder for future.
-    pub warranted: Vec<Warrant>,
+    pub warrants: Vec<Warrant>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
