@@ -1,5 +1,5 @@
 use super::*;
-use holo_hash::HOLO_HASH_SERIALIZED_LEN;
+use holo_hash::HOLO_HASH_FULL_LEN;
 use holochain_zome_types::validate::ValidationStatus;
 pub(super) use misc::*;
 
@@ -383,7 +383,7 @@ impl From<&ChainItemKey> for BytesKey {
     }
 }
 
-// TODO: This is way to fragile there must be a better way
+// TODO: This is way too fragile, there must be a better way
 // get from the k bytes to the chain item key
 impl From<BytesKey> for ChainItemKey {
     fn from(b: BytesKey) -> Self {
@@ -391,15 +391,12 @@ impl From<BytesKey> for ChainItemKey {
         let bytes = b.0;
         const SEQ_SIZE: usize = std::mem::size_of::<u32>();
         const STATUS_SIZE: usize = std::mem::size_of::<u8>();
-        debug_assert_eq!(
-            bytes.len(),
-            HOLO_HASH_SERIALIZED_LEN * 2 + SEQ_SIZE + STATUS_SIZE
-        );
+        debug_assert_eq!(bytes.len(), HOLO_HASH_FULL_LEN * 2 + SEQ_SIZE + STATUS_SIZE);
         let mut start = 0;
-        let mut end = HOLO_HASH_SERIALIZED_LEN;
+        let mut end = HOLO_HASH_FULL_LEN;
 
         // Take 36 for the AgentPubKey
-        let agent = AgentPubKey::from_raw_bytes(bytes[start..end].to_owned());
+        let agent = AgentPubKey::from_raw_39_panicky(bytes[start..end].to_owned());
 
         start = end;
         end += STATUS_SIZE;
@@ -420,10 +417,10 @@ impl From<BytesKey> for ChainItemKey {
         let sequence = BigEndian::read_u32(&seq_bytes);
 
         start = end;
-        end += HOLO_HASH_SERIALIZED_LEN;
+        end += HOLO_HASH_FULL_LEN;
 
         // Take the rest for the header hash
-        let hash = HeaderHash::from_raw_bytes(bytes[start..end].to_owned());
+        let hash = HeaderHash::from_raw_39_panicky(bytes[start..end].to_owned());
 
         ChainItemKey::Full(agent, status, sequence, hash)
     }

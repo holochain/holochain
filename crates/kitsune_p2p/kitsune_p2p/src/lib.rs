@@ -21,3 +21,5 @@ pub mod test_util;
 
 #[cfg(test)]
 mod test;
+
+pub mod fixt;

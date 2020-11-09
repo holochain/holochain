@@ -26,7 +26,7 @@ pub fn fake_dna_wasm() -> DnaWasm {
 /// simple Zome fixture
 pub fn fake_zome() -> Zome {
     Zome {
-        wasm_hash: holo_hash::WasmHash::from_raw_bytes(vec![0; 36]),
+        wasm_hash: holo_hash::WasmHash::from_raw_32(vec![0; 32]),
     }
 }
 

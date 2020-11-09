@@ -250,20 +250,25 @@ impl SpaceInternalHandler for Space {
                 let sign_req = SignNetworkDataEvt {
                     space: space.clone(),
                     agent: agent.clone(),
-                    data: Arc::new(data),
+                    data: Arc::new(data.clone()),
                 };
                 let sig = evt_sender.sign_network_data(sign_req).await?;
-                let agent_info_signed =
-                    crate::types::agent_store::AgentInfoSigned::try_new(sig, agent_info)?;
-                tracing::debug!(?agent_info_signed);
+                let agent_info_signed = crate::types::agent_store::AgentInfoSigned::try_new(
+                    (*agent).clone(),
+                    sig.clone(),
+                    data,
+                )?;
+                tracing::debug!(?agent_info, ?sig);
                 evt_sender
                     .put_agent_info_signed(PutAgentInfoSignedEvt {
                         space: space.clone(),
                         agent,
-                        agent_info_signed,
+                        agent_info_signed: agent_info_signed.clone(),
                     })
                     .await?;
-                // TODO - here, also publish to bootstrap server
+
+                // Push to the bootstrap as well.
+                crate::spawn::actor::bootstrap::put(None, agent_info_signed).await?;
             }
             Ok(())
         }

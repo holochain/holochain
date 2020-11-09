@@ -1,5 +1,6 @@
 //! Holochain DnaError type.
 
+use holo_hash::DnaHash;
 use thiserror::Error;
 
 /// Holochain DnaError type.
@@ -37,6 +38,10 @@ pub enum DnaError {
     /// InvalidWasmHash
     #[error("InvalidWasmHash")]
     InvalidWasmHash,
+
+    /// DnaHashMismatch
+    #[error("DNA hash of file does not match contents.\nHash in file: {0}\nActual hash: {1}")]
+    DnaHashMismatch(DnaHash, DnaHash),
 }
 
 impl From<std::io::Error> for DnaError {
@@ -44,3 +49,6 @@ impl From<std::io::Error> for DnaError {
         Self::StdIoError(error.to_string())
     }
 }
+
+/// Result type for DnaError
+pub type DnaResult<T> = Result<T, DnaError>;

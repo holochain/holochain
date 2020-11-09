@@ -32,11 +32,11 @@ macro_rules! test_val  {
 }
 
 /// internal helper to generate randomized kitsune data items
-fn rand36<F: From<Vec<u8>>>() -> Arc<F> {
+fn rand36<F: KitsuneBinType>() -> Arc<F> {
     use rand::Rng;
     let mut out = vec![0; 36];
     rand::thread_rng().fill(&mut out[..]);
-    Arc::new(F::from(out))
+    Arc::new(F::new(out))
 }
 
 // setup randomized TestVal::test_val() impls for kitsune data items
