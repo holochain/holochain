@@ -219,7 +219,7 @@ mod tests {
     use tokio::task::JoinHandle;
     use tracing_futures::Instrument;
 
-    const RECV_TIMEOUT: Duration = Duration::from_millis(3000);
+    const RECV_TIMEOUT: Duration = Duration::from_millis(30000);
 
     /// publish ops setup
     async fn setup<'env>(
