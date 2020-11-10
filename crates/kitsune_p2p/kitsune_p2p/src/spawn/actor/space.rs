@@ -1,7 +1,7 @@
 use crate::agent_store::AgentInfoSigned;
 
 use super::*;
-use ghost_actor::dependencies::{futures::TryStreamExt, tracing, tracing_futures::Instrument};
+use ghost_actor::dependencies::{tracing, tracing_futures::Instrument};
 use kitsune_p2p_types::codec::Codec;
 use std::{collections::HashSet, convert::TryFrom};
 
@@ -84,31 +84,29 @@ impl gossip::GossipEventHandler for Space {
     ) -> gossip::GossipEventHandlerResult<Vec<Arc<KitsuneAgent>>> {
         // while full-sync this is just a clone of list_by_basis
         let all_agents = self
-            .agents
+            .local_joined_agents
             .keys()
             .cloned()
-            .map(|agent| {
-                self.evt_sender
-                    .query_agent_info_signed(QueryAgentInfoSignedEvt {
-                        space: self.space.clone(),
-                        agent,
-                    })
-            })
-            .collect::<Vec<_>>();
+            .collect::<HashSet<_>>();
+        let agent = self.local_joined_agents.keys().next().cloned();
+        let fut = match agent {
+            Some(agent) => self
+                .evt_sender
+                .query_agent_info_signed(QueryAgentInfoSignedEvt {
+                    space: self.space.clone(),
+                    agent,
+                }),
+            None => async { Ok(Vec::new()) }.boxed().into(),
+        };
         Ok(async move {
-            let res = futures::stream::iter(all_agents)
-                .buffer_unordered(10)
-                .map_ok(|res| {
-                    res.into_iter()
-                        .map(|ai| Arc::new(ai.into_agent()))
-                        .collect::<Vec<_>>()
-                })
-                .try_collect::<Vec<_>>()
+            let mut peer_store = fut
                 .await?
                 .into_iter()
-                .flatten()
-                .collect();
-            Ok(res)
+                .map(|ai| Arc::new(ai.into_agent()))
+                .filter(|a| !all_agents.contains(a))
+                .collect::<Vec<_>>();
+            peer_store.extend(all_agents);
+            Ok(peer_store)
         }
         .boxed()
         .into())
@@ -118,9 +116,7 @@ impl gossip::GossipEventHandler for Space {
         &mut self,
         input: ReqOpHashesEvt,
     ) -> gossip::GossipEventHandlerResult<OpHashesAgentHashes> {
-        if self.agents.contains_key(&input.to_agent) {
-            // while full-sync just redirecting to self...
-            // but eventually some of these will be outgoing remote requests
+        if self.local_joined_agents.contains_key(&input.to_agent) {
             let fut = local_req_op_hashes(&self.evt_sender, self.space.clone(), input);
             Ok(async move { fut.await }.boxed().into())
         } else {
@@ -179,7 +175,7 @@ impl gossip::GossipEventHandler for Space {
         &mut self,
         input: ReqOpDataEvt,
     ) -> gossip::GossipEventHandlerResult<OpDataAgentInfo> {
-        if self.agents.contains_key(&input.to_agent) {
+        if self.local_joined_agents.contains_key(&input.to_agent) {
             let fut = local_req_op_data(&self.evt_sender, self.space.clone(), input);
             Ok(async move { fut.await }.boxed().into())
         } else {
@@ -366,7 +362,7 @@ impl SpaceInternalHandler for Space {
         data: Arc<Vec<u8>>,
     ) -> SpaceInternalHandlerResult<wire::Wire> {
         let space = self.space.clone();
-        if self.agents.contains_key(&to_agent) {
+        if self.local_joined_agents.contains_key(&to_agent) {
             // LOCAL SHORT CIRCUIT! - just forward data locally
 
             let evt_sender = self.evt_sender.clone();
@@ -432,7 +428,8 @@ impl SpaceInternalHandler for Space {
         // we're ignoring the basis_hash and just returning everyone.
         _basis: Arc<KitsuneBasis>,
     ) -> SpaceInternalHandlerResult<HashSet<Arc<KitsuneAgent>>> {
-        let mut res: HashSet<Arc<KitsuneAgent>> = self.agents.keys().cloned().collect();
+        let mut res: HashSet<Arc<KitsuneAgent>> =
+            self.local_joined_agents.keys().cloned().collect();
         let all_peers_fut = self
             .evt_sender
             .query_agent_info_signed(QueryAgentInfoSignedEvt {
@@ -451,7 +448,7 @@ impl SpaceInternalHandler for Space {
 
     fn handle_update_agent_info(&mut self) -> SpaceInternalHandlerResult<()> {
         let space = self.space.clone();
-        let agent_list: Vec<Arc<KitsuneAgent>> = self.agents.keys().cloned().collect();
+        let agent_list: Vec<Arc<KitsuneAgent>> = self.local_joined_agents.keys().cloned().collect();
         let bound_url = self.transport.bound_url();
         let evt_sender = self.evt_sender.clone();
         Ok(async move {
@@ -516,7 +513,7 @@ impl KitsuneP2pHandler for Space {
         _space: Arc<KitsuneSpace>,
         agent: Arc<KitsuneAgent>,
     ) -> KitsuneP2pHandlerResult<()> {
-        match self.agents.entry(agent.clone()) {
+        match self.local_joined_agents.entry(agent.clone()) {
             Entry::Occupied(_) => (),
             Entry::Vacant(entry) => {
                 entry.insert(AgentInfo { agent });
@@ -531,7 +528,7 @@ impl KitsuneP2pHandler for Space {
         _space: Arc<KitsuneSpace>,
         agent: Arc<KitsuneAgent>,
     ) -> KitsuneP2pHandlerResult<()> {
-        self.agents.remove(&agent);
+        self.local_joined_agents.remove(&agent);
         Ok(async move { Ok(()) }.boxed().into())
     }
 
@@ -684,7 +681,7 @@ pub(crate) struct Space {
     evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     #[allow(dead_code)]
     transport: ghost_actor::GhostSender<TransportListener>,
-    agents: HashMap<Arc<KitsuneAgent>, AgentInfo>,
+    local_joined_agents: HashMap<Arc<KitsuneAgent>, AgentInfo>,
 }
 
 impl Space {
@@ -709,7 +706,7 @@ impl Space {
             i_s,
             evt_sender,
             transport,
-            agents: HashMap::new(),
+            local_joined_agents: HashMap::new(),
         }
     }
 
