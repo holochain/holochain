@@ -110,20 +110,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "serialized-bytes")]
-    fn test_serializes_as_raw_bytes() {
-        use holochain_serialized_bytes::SerializedBytes;
-        use std::convert::TryInto;
-
-        let h_orig = DnaHash::from_raw_36(vec![0xdb; HOLO_HASH_UNTYPED_LEN]);
-        let h: SerializedBytes = h_orig.clone().try_into().unwrap();
-        let h: DnaHash = h.try_into().unwrap();
-
-        assert_eq!(h_orig, h);
-        assert_eq!(*h.hash_type(), hash_type::Dna::new());
-    }
-
-    #[test]
     fn test_rmp_roundtrip() {
         let h_orig = AgentPubKey::from_raw_36(vec![0xdb; HOLO_HASH_UNTYPED_LEN]);
         let buf = holochain_serialized_bytes::encode(&h_orig).unwrap();
@@ -140,7 +126,7 @@ mod tests {
             vec![
                 132, 32, 36, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219,
                 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219,
-                219, 219, 219, 219, 219, 219, 219, 219, 219,
+                219, 219, 219, 219, 219, 219,
             ]
         );
     }
