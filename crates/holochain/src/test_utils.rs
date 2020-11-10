@@ -277,7 +277,7 @@ pub async fn install_app(
 
     let errors = conductor_handle.setup_cells().await.unwrap();
 
-    assert!(errors.is_empty());
+    assert!(errors.is_empty(), "{:?}", errors);
 }
 
 /// Payload for installing cells

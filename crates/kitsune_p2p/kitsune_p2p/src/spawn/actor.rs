@@ -1,6 +1,6 @@
 // this is largely a passthrough that routes to a specific space handler
 
-use crate::{actor, actor::*, event::*, *};
+use crate::{actor, actor::*, event::*, gossip::*, *};
 use futures::{future::FutureExt, stream::StreamExt};
 use kitsune_p2p_types::{async_lazy::AsyncLazy, transport::*, transport_pool::*};
 use std::{
@@ -12,8 +12,6 @@ pub mod bootstrap;
 mod gossip;
 mod space;
 use ghost_actor::dependencies::{must_future, tracing};
-use gossip::OpDataAgentInfo;
-use gossip::OpHashesAgentHashes;
 use space::*;
 
 ghost_actor::ghost_chan! {
@@ -104,66 +102,140 @@ impl KitsuneP2pActor {
             t_pool.push_sub_transport(l, e).await?;
         }
 
-        let evt_sender_clone = evt_sender.clone();
-        tokio::task::spawn(async move {
-            while let Some(event) = t_event.next().await {
-                match event {
-                    TransportEvent::IncomingChannel(_url, mut write, read) => {
-                        let read = read.read_to_end().await;
-                        use kitsune_p2p_types::codec::Codec;
-                        let read = match wire::Wire::decode_ref(&read) {
-                            Err(err) => {
-                                let reason = format!("{:?}", err);
-                                let fail = wire::Wire::failure(reason).encode_vec().unwrap();
-                                let _ = write.write_and_close(fail).await;
-                                continue;
-                            }
-                            Ok((_, r)) => r,
-                        };
-                        match read {
-                            wire::Wire::Call(wire::Call {
-                                space,
-                                from_agent,
-                                to_agent,
-                                data,
-                                ..
-                            }) => {
-                                let res = match evt_sender_clone
-                                    .call(space, to_agent, from_agent, data.into())
-                                    .await
-                                {
-                                    Err(err) => {
+        tokio::task::spawn({
+            let evt_sender = evt_sender.clone();
+            async move {
+                while let Some(event) = t_event.next().await {
+                    match event {
+                        TransportEvent::IncomingChannel(_url, mut write, read) => {
+                            let read = read.read_to_end().await;
+                            use kitsune_p2p_types::codec::Codec;
+                            let read = match wire::Wire::decode_ref(&read) {
+                                Err(err) => {
+                                    let reason = format!("{:?}", err);
+                                    let fail = wire::Wire::failure(reason).encode_vec().unwrap();
+                                    let _ = write.write_and_close(fail).await;
+                                    continue;
+                                }
+                                Ok((_, r)) => r,
+                            };
+                            match read {
+                                wire::Wire::Call(wire::Call {
+                                    space,
+                                    from_agent,
+                                    to_agent,
+                                    data,
+                                    ..
+                                }) => {
+                                    let res = match evt_sender
+                                        .call(space, to_agent, from_agent, data.into())
+                                        .await
+                                    {
+                                        Err(err) => {
+                                            let reason = format!("{:?}", err);
+                                            let fail =
+                                                wire::Wire::failure(reason).encode_vec().unwrap();
+                                            let _ = write.write_and_close(fail).await;
+                                            continue;
+                                        }
+                                        Ok(r) => r,
+                                    };
+                                    let resp =
+                                        wire::Wire::call_resp(res.into()).encode_vec().unwrap();
+                                    let _ = write.write_and_close(resp).await;
+                                }
+                                wire::Wire::Notify(wire::Notify {
+                                    space,
+                                    from_agent,
+                                    to_agent,
+                                    data,
+                                    ..
+                                }) => {
+                                    if let Err(err) = evt_sender
+                                        .notify(space, to_agent, from_agent, data.into())
+                                        .await
+                                    {
                                         let reason = format!("{:?}", err);
                                         let fail =
                                             wire::Wire::failure(reason).encode_vec().unwrap();
                                         let _ = write.write_and_close(fail).await;
                                         continue;
                                     }
-                                    Ok(r) => r,
-                                };
-                                let resp = wire::Wire::call_resp(res.into()).encode_vec().unwrap();
-                                let _ = write.write_and_close(resp).await;
-                            }
-                            wire::Wire::Notify(wire::Notify {
-                                space,
-                                from_agent,
-                                to_agent,
-                                data,
-                                ..
-                            }) => {
-                                if let Err(err) = evt_sender_clone
-                                    .notify(space, to_agent, from_agent, data.into())
-                                    .await
-                                {
-                                    let reason = format!("{:?}", err);
-                                    let fail = wire::Wire::failure(reason).encode_vec().unwrap();
-                                    let _ = write.write_and_close(fail).await;
-                                    continue;
+                                    let resp = wire::Wire::notify_resp().encode_vec().unwrap();
+                                    let _ = write.write_and_close(resp).await;
                                 }
-                                let resp = wire::Wire::notify_resp().encode_vec().unwrap();
-                                let _ = write.write_and_close(resp).await;
+                                wire::Wire::FetchOpHashes(wire::FetchOpHashes {
+                                    space,
+                                    from_agent,
+                                    to_agent,
+                                    dht_arc,
+                                    since_utc_epoch_s,
+                                    until_utc_epoch_s,
+                                }) => {
+                                    let input = ReqOpHashesEvt::new(
+                                        from_agent,
+                                        to_agent,
+                                        dht_arc,
+                                        since_utc_epoch_s,
+                                        until_utc_epoch_s,
+                                    );
+                                    let (hashes, agent_hashes) = match local_req_op_hashes(
+                                        &evt_sender,
+                                        space,
+                                        input,
+                                    )
+                                    .await
+                                    {
+                                        Err(err) => {
+                                            let reason = format!("{:?}", err);
+                                            let fail =
+                                                wire::Wire::failure(reason).encode_vec().unwrap();
+                                            let _ = write.write_and_close(fail).await;
+                                            continue;
+                                        }
+                                        Ok(r) => r,
+                                    };
+                                    let resp =
+                                        wire::Wire::fetch_op_hashes_response(hashes, agent_hashes)
+                                            .encode_vec()
+                                            .expect("This encoding should never fail");
+                                    let _ = write.write_and_close(resp).await;
+                                }
+                                wire::Wire::FetchOpData(wire::FetchOpData {
+                                    space,
+                                    from_agent,
+                                    to_agent,
+                                    op_hashes,
+                                    peer_hashes,
+                                }) => {
+                                    let input = ReqOpDataEvt::new(
+                                        from_agent,
+                                        to_agent,
+                                        op_hashes,
+                                        peer_hashes,
+                                    );
+                                    let (op_data, agent_infos) =
+                                        match local_req_op_data(&evt_sender, space, input).await {
+                                            Err(err) => {
+                                                let reason = format!("{:?}", err);
+                                                let fail = wire::Wire::failure(reason)
+                                                    .encode_vec()
+                                                    .unwrap();
+                                                let _ = write.write_and_close(fail).await;
+                                                continue;
+                                            }
+                                            Ok(r) => r,
+                                        };
+                                    let op_data =
+                                        op_data.into_iter().map(|(h, op)| (h, op.into())).collect();
+                                    let resp =
+                                        wire::Wire::fetch_op_data_response(op_data, agent_infos)
+                                            .encode_vec()
+                                            .expect("This encoding should never fail");
+                                    let _ = write.write_and_close(resp).await;
+                                }
+                                _ => unimplemented!("{:?}", read),
                             }
-                            _ => unimplemented!(),
                         }
                     }
                 }

@@ -49,6 +49,11 @@ impl AgentInfoSigned {
         self.as_ref()
     }
 
+    /// Thin wrapper around Into for KitsuneAgent.
+    pub fn into_agent(self) -> KitsuneAgent {
+        self.into()
+    }
+
     /// Thin wrapper around AsRef for AgentInfo
     pub fn as_agent_info_ref(&self) -> &[u8] {
         self.agent_info.as_ref()

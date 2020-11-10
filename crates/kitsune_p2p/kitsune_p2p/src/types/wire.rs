@@ -47,27 +47,35 @@ kitsune_p2p_types::write_codec_enum! {
             data.0: AgentInfoSigned,
         },
 
-        /// Fetch Agent Info Hashes with Constraints
-        AgentFetchHashes(0x31) {
-            dht_arc.0: DhtArc,
-            since_utc_epoch_s.1: i64,
-            until_utc_epoch_s.2: i64,
-            hashes.3: Vec<WireData>,
+        /// Fetch DhtOp and Agent Hashes with Constraints
+        FetchOpHashes(0x31) {
+            space.0: Arc<KitsuneSpace>,
+            from_agent.1: Arc<KitsuneAgent>,
+            to_agent.2: Arc<KitsuneAgent>,
+            dht_arc.3: DhtArc,
+            since_utc_epoch_s.4: i64,
+            until_utc_epoch_s.5: i64,
         },
 
-        /// List of hashes response to AgentFetchHashes
-        AgentFetchHashesResponse(0x32) {
-            hashes.0: Vec<WireData>,
+        /// List of hashes response to FetchOpHashes
+        FetchOpHashesResponse(0x32) {
+            hashes.0: Vec<Arc<KitsuneOpHash>>,
+            peer_hashes.1: Vec<(Arc<KitsuneAgent>, u64)>,
         },
 
-        /// Fetch Agent Info Data for Hash List
-        AgentFetchDataForHashList(0x33) {
-            hashes.0: Vec<WireData>,
+        /// Fetch DhtOp data and AgentInfo for hashes lists
+        FetchOpData(0x33) {
+            space.0: Arc<KitsuneSpace>,
+            from_agent.1: Arc<KitsuneAgent>,
+            to_agent.2: Arc<KitsuneAgent>,
+            op_hashes.3: Vec<Arc<KitsuneOpHash>>,
+            peer_hashes.4: Vec<Arc<KitsuneAgent>>,
         },
 
-        /// List of agent data response to AgentFetchDataForHashList
-        AgentFetchDataForHashListResponse(0x34) {
-            agent_info.0: Vec<(WireData, AgentInfoSigned)>,
+        /// Lists of data in response to FetchOpData
+        FetchOpDataResponse(0x34) {
+            op_data.0: Vec<(Arc<KitsuneOpHash>, WireData)>,
+            agent_infos.1: Vec<AgentInfoSigned>,
         },
     }
 }
