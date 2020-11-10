@@ -92,7 +92,7 @@ impl<T: HashType> HoloHash<T> {
     /// Change the type of this HoloHash, keeping the same bytes
     pub fn retype<TT: HashType>(mut self, hash_type: TT) -> HoloHash<TT> {
         let prefix = hash_type.get_prefix();
-        self.hash[0..2].copy_from_slice(&prefix[0..2]);
+        self.hash[0..HOLO_HASH_PREFIX_LEN].copy_from_slice(&prefix[0..HOLO_HASH_PREFIX_LEN]);
         HoloHash {
             hash: self.hash,
             hash_type,
