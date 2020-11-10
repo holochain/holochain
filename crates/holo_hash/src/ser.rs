@@ -91,9 +91,27 @@ mod tests {
     use holochain_serialized_bytes::prelude::*;
     use std::convert::TryInto;
 
+    #[derive(serde::Deserialize)]
+    #[serde(transparent)]
+    struct TestByteArray(#[serde(with = "serde_bytes")] Vec<u8>);
+
     #[test]
     #[cfg(feature = "serialized-bytes")]
     fn test_serialized_bytes_roundtrip() {
+        use holochain_serialized_bytes::SerializedBytes;
+        use std::convert::TryInto;
+
+        let h_orig = DnaHash::from_raw_36(vec![0xdb; HOLO_HASH_UNTYPED_LEN]);
+        let h: SerializedBytes = h_orig.clone().try_into().unwrap();
+        let h: DnaHash = h.try_into().unwrap();
+
+        assert_eq!(h_orig, h);
+        assert_eq!(*h.hash_type(), hash_type::Dna::new());
+    }
+
+    #[test]
+    #[cfg(feature = "serialized-bytes")]
+    fn test_serializes_as_raw_bytes() {
         use holochain_serialized_bytes::SerializedBytes;
         use std::convert::TryInto;
 
@@ -113,6 +131,18 @@ mod tests {
 
         assert_eq!(h_orig, h);
         assert_eq!(*h.hash_type(), hash_type::Agent::new());
+
+        // Make sure that the representation is a raw 39-byte array
+        let array: TestByteArray = holochain_serialized_bytes::decode(&buf).unwrap();
+        assert_eq!(array.0.len(), HOLO_HASH_FULL_LEN);
+        assert_eq!(
+            array.0,
+            vec![
+                132, 32, 36, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219,
+                219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219,
+                219, 219, 219, 219, 219, 219, 219, 219, 219,
+            ]
+        );
     }
 
     #[test]
