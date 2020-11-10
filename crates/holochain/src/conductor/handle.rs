@@ -7,19 +7,11 @@
 //!
 //! ```rust, no_run
 //! async fn async_main () {
-//! use holochain_state::test_utils::{test_conductor_env, test_wasm_env, test_p2p_env, TestEnvironment};
+//! use holochain_state::test_utils::{test_environments, TestEnvironment};
 //! use holochain::conductor::{Conductor, ConductorBuilder, ConductorHandle};
-//! let env = test_conductor_env();
-//! let TestEnvironment {
-//!  env: wasm_env,
-//!  tmpdir: _tmpdir,
-//! } = test_wasm_env();
-//! let TestEnvironment {
-//!  env: p2p_env,
-//!  tmpdir: _p2p_tmpdir,
-//! } = test_p2p_env();
+//! let envs = test_environments();
 //! let handle: ConductorHandle = ConductorBuilder::new()
-//!    .test(env, wasm_env, p2p_env)
+//!    .test(&envs)
 //!    .await
 //!    .unwrap();
 //!
