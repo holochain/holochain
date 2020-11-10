@@ -6,7 +6,7 @@ use crate::{
 };
 use holochain_types::test_utils::fake_cell_id;
 use shrinkwraprs::Shrinkwrap;
-use std::{path::PathBuf, sync::Arc};
+use std::sync::Arc;
 use tempdir::TempDir;
 
 /// Create a [TestEnvironment] of [EnvironmentKind::Cell], backed by a temp directory.
@@ -111,15 +111,9 @@ impl TestEnvironments {
     /// Create all three non-cell environments at once
     pub fn new(tempdir: TempDir) -> Self {
         use EnvironmentKind::*;
-        let conductor = EnvironmentWrite::new(
-            &tempdir.path().join("conductor"),
-            Conductor,
-            test_keystore(),
-        )
-        .unwrap();
-        let wasm =
-            EnvironmentWrite::new(&tempdir.path().join("wasm"), Wasm, test_keystore()).unwrap();
-        let p2p = EnvironmentWrite::new(&tempdir.path().join("p2p"), P2p, test_keystore()).unwrap();
+        let conductor = EnvironmentWrite::new(&tempdir.path(), Conductor, test_keystore()).unwrap();
+        let wasm = EnvironmentWrite::new(&tempdir.path(), Wasm, test_keystore()).unwrap();
+        let p2p = EnvironmentWrite::new(&tempdir.path(), P2p, test_keystore()).unwrap();
         Self {
             conductor,
             wasm,
@@ -143,18 +137,6 @@ impl TestEnvironments {
     /// Get the root temp dir for these environments
     pub fn tempdir(&self) -> Arc<TempDir> {
         self.tempdir.clone()
-    }
-
-    pub fn conductor_path(&self) -> PathBuf {
-        self.tempdir.path().join("conductor")
-    }
-
-    pub fn wasm_path(&self) -> PathBuf {
-        self.tempdir.path().join("wasm")
-    }
-
-    pub fn p2p_path(&self) -> PathBuf {
-        self.tempdir.path().join("p2p")
     }
 }
 
