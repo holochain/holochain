@@ -242,6 +242,9 @@ where
                 PutAgentInfoSigned { respond, .. } => {
                     respond.r(Ok(async move { Ok(()) }.boxed().into()));
                 }
+                QueryAgentInfoSigned { respond, .. } => {
+                    respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
+                }
                 _ => (),
             }
         }
