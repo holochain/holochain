@@ -3,7 +3,10 @@ use crate::agent_store::AgentInfoSigned;
 use super::*;
 use ghost_actor::dependencies::{tracing, tracing_futures::Instrument};
 use kitsune_p2p_types::codec::Codec;
-use std::{collections::HashSet, convert::TryFrom};
+use std::{
+    collections::HashSet,
+    convert::{TryFrom, TryInto},
+};
 
 /// if the user specifies None or zero (0) for remote_agent_count
 const DEFAULT_NOTIFY_REMOTE_AGENT_COUNT: u8 = 5;
@@ -33,10 +36,10 @@ ghost_actor::ghost_chan! {
     pub(crate) chan SpaceInternal<crate::KitsuneP2pError> {
         /// Make a remote request right-now if we have an open connection,
         /// otherwise, return an error.
-        fn immediate_request(space: Arc<KitsuneSpace>, to_agent: Arc<KitsuneAgent>, from_agent: Arc<KitsuneAgent>, data: Arc<Vec<u8>>) -> Vec<u8>;
+        fn immediate_request(space: Arc<KitsuneSpace>, to_agent: Arc<KitsuneAgent>, from_agent: Arc<KitsuneAgent>, data: Arc<Vec<u8>>) -> wire::Wire;
 
         /// List online agents that claim to be covering a basis hash
-        fn list_online_agents_for_basis_hash(space: Arc<KitsuneSpace>, basis: Arc<KitsuneBasis>) -> Vec<Arc<KitsuneAgent>>;
+        fn list_online_agents_for_basis_hash(space: Arc<KitsuneSpace>, from_agent: Arc<KitsuneAgent>, basis: Arc<KitsuneBasis>) -> HashSet<Arc<KitsuneAgent>>;
 
         /// Update / publish our agent info
         fn update_agent_info() -> ();
@@ -225,63 +228,89 @@ impl SpaceInternalHandler for Space {
         to_agent: Arc<KitsuneAgent>,
         from_agent: Arc<KitsuneAgent>,
         data: Arc<Vec<u8>>,
-    ) -> SpaceInternalHandlerResult<Vec<u8>> {
-        // Right now we are only implementing the "short-circuit"
-        // that routes messages to other agents joined on this same system.
-        // I.e. we don't bother with peer discovery because we know the
-        // remote is local.
-        if !self.agents.contains_key(&to_agent) {
-            return Err(KitsuneP2pError::RoutingAgentError(to_agent));
-        }
-
-        // to_agent *is* joined - let's forward the request
+    ) -> SpaceInternalHandlerResult<wire::Wire> {
         let space = self.space.clone();
+        if self.agents.contains_key(&to_agent) {
+            // LOCAL SHORT CIRCUIT! - just forward data locally
 
-        // clone the event sender
-        let evt_sender = self.evt_sender.clone();
+            let evt_sender = self.evt_sender.clone();
 
-        // As this is a short-circuit - we need to decode the data inline - here.
-        // In the future, we will probably need to branch here, so the real
-        // networking can forward the encoded data. Or, split immediate_request
-        // into two variants, one for short-circuit, and one for real networking.
-        let (_, data) = wire::Wire::decode_ref(&data)?;
+            let (_, data) = wire::Wire::decode_ref(&data)?;
 
-        match data {
-            wire::Wire::Call(payload) => Ok(async move {
-                evt_sender
-                    .call(space, to_agent, from_agent, payload.data.into())
-                    .await
-            }
-            .instrument(tracing::debug_span!("wire_call"))
-            .boxed()
-            .into()),
-            wire::Wire::Notify(payload) => {
-                Ok(async move {
+            match data {
+                wire::Wire::Call(payload) => Ok(async move {
+                    let res = evt_sender
+                        .call(space, to_agent, from_agent, payload.data.into())
+                        .await?;
+                    Ok(wire::Wire::call_resp(res.into()))
+                }
+                .instrument(tracing::debug_span!("wire_call"))
+                .boxed()
+                .into()),
+                wire::Wire::Notify(payload) => Ok(async move {
                     evt_sender
                         .notify(space, to_agent, from_agent, payload.data.into())
                         .await?;
-                    // broadcast doesn't return anything...
-                    Ok(vec![])
+                    Ok(wire::Wire::notify_resp())
                 }
                 .boxed()
-                .into())
+                .into()),
+                _ => unimplemented!(),
             }
-            _ => {
-                tracing::warn!("UNHANDLED WIRE: {:?}", data);
-                Ok(async move { Ok(vec![]) }.boxed().into())
+        } else {
+            let evt_sender = self.evt_sender.clone();
+            let tx = self.transport.clone();
+            Ok(async move {
+                // see if we have an entry for this agent in our agent_store
+                let info = match evt_sender
+                    .get_agent_info_signed(GetAgentInfoSignedEvt {
+                        space,
+                        agent: to_agent.clone(),
+                    })
+                    .await?
+                {
+                    None => return Err(KitsuneP2pError::RoutingAgentError(to_agent)),
+                    Some(i) => i,
+                };
+                let info: crate::types::agent_store::AgentInfo = (&info).try_into()?;
+                let url = info.as_urls_ref().get(0).unwrap().clone();
+                let (_, mut write, read) = tx.create_channel(url).await?;
+                write.write_and_close(data.to_vec()).await?;
+                let read = read.read_to_end().await;
+                let (_, read) = wire::Wire::decode_ref(&read)?;
+                match read {
+                    wire::Wire::Failure(wire::Failure { reason }) => Err(reason.into()),
+                    _ => Ok(read),
+                }
             }
+            .boxed()
+            .into())
         }
     }
 
     fn handle_list_online_agents_for_basis_hash(
         &mut self,
         _space: Arc<KitsuneSpace>,
+        from_agent: Arc<KitsuneAgent>,
         // during short-circuit / full-sync mode,
         // we're ignoring the basis_hash and just returning everyone.
         _basis: Arc<KitsuneBasis>,
-    ) -> SpaceInternalHandlerResult<Vec<Arc<KitsuneAgent>>> {
-        let res = self.agents.keys().cloned().collect();
-        Ok(async move { Ok(res) }.boxed().into())
+    ) -> SpaceInternalHandlerResult<HashSet<Arc<KitsuneAgent>>> {
+        let mut res: HashSet<Arc<KitsuneAgent>> = self.agents.keys().cloned().collect();
+        let all_peers_fut = self
+            .evt_sender
+            .query_agent_info_signed(QueryAgentInfoSignedEvt {
+                space: self.space.clone(),
+                agent: from_agent,
+            });
+        Ok(async move {
+            for peer in all_peers_fut.await? {
+                res.insert(Arc::new(peer.as_agent_ref().clone()));
+            }
+            Ok(res)
+        }
+        .boxed()
+        .into())
     }
 
     fn handle_update_agent_info(&mut self) -> SpaceInternalHandlerResult<()> {
@@ -379,7 +408,15 @@ impl KitsuneP2pHandler for Space {
     ) -> KitsuneP2pHandlerResult<Vec<u8>> {
         let space = self.space.clone();
         let i_s = self.i_s.clone();
-        let payload = Arc::new(wire::Wire::call(payload.into()).encode_vec()?);
+        let payload = Arc::new(
+            wire::Wire::call(
+                space.clone(),
+                from_agent.clone(),
+                to_agent.clone(),
+                payload.into(),
+            )
+            .encode_vec()?,
+        );
 
         Ok(async move {
             let start = std::time::Instant::now();
@@ -398,7 +435,12 @@ impl KitsuneP2pHandler for Space {
                     ))
                     .await
                 {
-                    Ok(res) => return Ok(res),
+                    Ok(res) => {
+                        if let wire::Wire::CallResp(wire::CallResp { data }) = res {
+                            return Ok(data.into());
+                        }
+                        Err(format!("invalid response: {:?}", res).into())
+                    }
                     Err(e) => Err(e),
                 };
 
@@ -556,9 +598,6 @@ impl Space {
         } = input;
         let timeout_ms = timeout_ms.unwrap();
 
-        // encode the data to send
-        let payload = Arc::new(wire::Wire::call(payload.into()).encode_vec()?);
-
         // TODO - we cannot write proper logic here until we have a
         //        proper peer discovery mechanism. Instead, let's
         //        give it 100 ms max to see if there is any agent
@@ -570,7 +609,11 @@ impl Space {
             let mut to_agent = from_agent.clone();
             'search_loop: for _ in 0..5 {
                 if let Ok(agent_list) = i_s
-                    .list_online_agents_for_basis_hash(space.clone(), basis.clone())
+                    .list_online_agents_for_basis_hash(
+                        space.clone(),
+                        from_agent.clone(),
+                        basis.clone(),
+                    )
                     .await
                 {
                     for a in agent_list {
@@ -586,6 +629,17 @@ impl Space {
 
             let mut out = Vec::new();
 
+            // encode the data to send
+            let payload = Arc::new(
+                wire::Wire::call(
+                    space.clone(),
+                    from_agent.clone(),
+                    to_agent.clone(),
+                    payload.into(),
+                )
+                .encode_vec()?,
+            );
+
             // Timeout on immediate requests after a small interval.
             // TODO: 20 ms is only appropriate for local calls and not
             // real networking
@@ -595,10 +649,12 @@ impl Space {
             )
             .await
             {
-                out.push(actor::RpcMultiResponse {
-                    agent: to_agent,
-                    response,
-                });
+                if let wire::Wire::CallResp(wire::CallResp { data }) = response {
+                    out.push(actor::RpcMultiResponse {
+                        agent: to_agent,
+                        response: data.into(),
+                    });
+                }
             }
 
             Ok(out)
@@ -626,9 +682,6 @@ impl Space {
 
         let timeout_ms = timeout_ms.expect("set by handle_notify_multi");
 
-        // encode the data to send
-        let payload = Arc::new(wire::Wire::notify(payload.into()).encode_vec()?);
-
         let i_s = self.i_s.clone();
 
         // check 5(ish) times but with sane min/max
@@ -650,7 +703,11 @@ impl Space {
 
             loop {
                 if let Ok(agent_list) = i_s
-                    .list_online_agents_for_basis_hash(space.clone(), basis.clone())
+                    .list_online_agents_for_basis_hash(
+                        space.clone(),
+                        from_agent.clone(),
+                        basis.clone(),
+                    )
                     .await
                 {
                     for to_agent in agent_list {
@@ -660,18 +717,36 @@ impl Space {
                             // so we're not holding up this loop
                             let i_s = i_s.clone();
                             let space = space.clone();
-                            let payload = payload.clone();
+                            // encode the data to send
+                            let payload = Arc::new(
+                                wire::Wire::notify(
+                                    space.clone(),
+                                    from_agent.clone(),
+                                    to_agent.clone(),
+                                    payload.clone().into(),
+                                )
+                                .encode_vec()?,
+                            );
+
                             let send_success_count = send_success_count.clone();
                             let from_agent2 = from_agent.clone();
                             tokio::task::spawn(
                                 async move {
-                                    if i_s
+                                    let res = i_s
                                         .immediate_request(space, to_agent, from_agent2, payload)
-                                        .await
-                                        .is_ok()
-                                    {
-                                        send_success_count
-                                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                                        .await;
+                                    match res {
+                                        Ok(wire::Wire::NotifyResp(_)) => {
+                                            send_success_count
+                                                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                                        }
+                                        Ok(wire::Wire::Failure(wire::Failure { reason })) => {
+                                            tracing::warn!("FAIL: {}", reason);
+                                        }
+                                        Err(e) => {
+                                            tracing::warn!("FAIL: {:?}", e);
+                                        }
+                                        _ => (),
                                     }
                                 }
                                 .instrument(

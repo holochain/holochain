@@ -237,6 +237,10 @@ mod tests {
     #![allow(dead_code)]
 
     use super::*;
+    use std::sync::Arc;
+
+    #[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+    pub struct Sub(pub Vec<u8>);
 
     write_codec_enum! {
         /// Codec
@@ -248,6 +252,9 @@ mod tests {
 
                 /// type 2
                 age.1: u32,
+
+                /// type 3
+                sub.2: Arc<Sub>,
             },
             /// nother variant
             BobTwo(0x43) {
@@ -257,7 +264,7 @@ mod tests {
 
     #[test]
     fn test_encode_decode() {
-        let bob = Bob::bob_one(true, 42);
+        let bob = Bob::bob_one(true, 42, Arc::new(Sub(b"test".to_vec())));
         let data = bob.encode_vec().unwrap();
         let res = Bob::decode_ref(&data).unwrap().1;
         assert_eq!(bob, res);

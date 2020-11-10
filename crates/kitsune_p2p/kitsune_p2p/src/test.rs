@@ -5,6 +5,109 @@ mod tests {
     use std::sync::Arc;
 
     #[tokio::test(threaded_scheduler)]
+    async fn test_transport_coms() -> Result<(), KitsuneP2pError> {
+        init_tracing();
+        let (harness, _evt) = spawn_test_harness_mem().await?;
+
+        let space = harness.add_space().await?;
+        let (a1, p2p1) = harness.add_direct_agent("one".into()).await?;
+        let (a2, p2p2) = harness.add_direct_agent("two".into()).await?;
+
+        // needed until we have some way of bootstrapping
+        harness.magic_peer_info_exchange().await?;
+
+        let r1 = p2p1
+            .rpc_single(space.clone(), a2.clone(), a1.clone(), b"m1".to_vec())
+            .await?;
+        let r2 = p2p2
+            .rpc_single(space.clone(), a1, a2, b"m2".to_vec())
+            .await?;
+        assert_eq!(b"echo: m1".to_vec(), r1);
+        assert_eq!(b"echo: m2".to_vec(), r2);
+        harness.ghost_actor_shutdown().await?;
+        Ok(())
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn test_transport_multi_coms() -> Result<(), KitsuneP2pError> {
+        init_tracing();
+        let (harness, _evt) = spawn_test_harness_mem().await?;
+
+        let space = harness.add_space().await?;
+        let (a1, p2p1) = harness.add_direct_agent("one".into()).await?;
+        let (a2, _p2p2) = harness.add_direct_agent("two".into()).await?;
+        let (a3, _p2p3) = harness.add_direct_agent("tre".into()).await?;
+
+        // needed until we have some way of bootstrapping
+        harness.magic_peer_info_exchange().await?;
+
+        let res = p2p1
+            .rpc_multi(actor::RpcMulti {
+                space: space,
+                from_agent: a1.clone(),
+                // this is just a dummy value right now
+                basis: TestVal::test_val(),
+                remote_agent_count: Some(2),
+                timeout_ms: Some(20),
+                as_race: true,
+                race_timeout_ms: Some(20),
+                payload: b"test-multi-request".to_vec(),
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(1, res.len());
+        for r in res {
+            let data = String::from_utf8_lossy(&r.response);
+            assert_eq!("echo: test-multi-request", &data);
+            assert!(r.agent == a2 || r.agent == a3);
+        }
+
+        harness.ghost_actor_shutdown().await?;
+        Ok(())
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn test_transport_notify_coms() -> Result<(), KitsuneP2pError> {
+        init_tracing();
+        let (harness, evt) = spawn_test_harness_mem().await?;
+        let mut rcv = evt.receive();
+
+        let space = harness.add_space().await?;
+        let (a1, p2p1) = harness.add_direct_agent("one".into()).await?;
+        let (_a2, _p2p2) = harness.add_direct_agent("two".into()).await?;
+        let (_a3, _p2p3) = harness.add_direct_agent("tre".into()).await?;
+
+        // needed until we have some way of bootstrapping
+        harness.magic_peer_info_exchange().await?;
+
+        p2p1.notify_multi(actor::NotifyMulti {
+            space: space,
+            from_agent: a1,
+            // this is just a dummy value right now
+            basis: TestVal::test_val(),
+            remote_agent_count: Some(42),
+            timeout_ms: Some(40),
+            payload: b"test-broadcast".to_vec(),
+        })
+        .await?;
+
+        harness.ghost_actor_shutdown().await?;
+
+        let mut recv_count = 0_usize;
+        while let Some(evt) = tokio::stream::StreamExt::next(&mut rcv).await {
+            if let test_util::HarnessEventType::Notify { payload, .. } = &evt.ty {
+                assert_eq!(&**payload, "test-broadcast");
+                recv_count += 1;
+            }
+        }
+
+        assert_eq!(3, recv_count);
+
+        Ok(())
+    }
+
+    #[tokio::test(threaded_scheduler)]
     async fn test_peer_info_store() -> Result<(), KitsuneP2pError> {
         init_tracing();
 
