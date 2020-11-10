@@ -3,6 +3,12 @@ use super::*;
 ghost_actor::ghost_chan! {
     /// controller for test harness agent actor
     pub(crate) chan HarnessAgentControl<KitsuneP2pError> {
+        /// dump agent info from peer_store
+        fn dump_agent_info() -> Vec<Arc<AgentInfoSigned>>;
+
+        /// inject a bunch of agent info
+        fn inject_agent_info(info: HashMap<Arc<KitsuneAgent>, Arc<AgentInfoSigned>>) -> ();
+
         /// inject data to be gradually gossiped
         fn inject_gossip_data(data: String) -> Arc<KitsuneOpHash>;
 
@@ -80,6 +86,21 @@ impl ghost_actor::GhostControlHandler for AgentHarness {}
 impl ghost_actor::GhostHandler<HarnessAgentControl> for AgentHarness {}
 
 impl HarnessAgentControlHandler for AgentHarness {
+    fn handle_dump_agent_info(
+        &mut self,
+    ) -> HarnessAgentControlHandlerResult<Vec<Arc<AgentInfoSigned>>> {
+        let all = self.agent_store.values().map(|a| a.clone()).collect();
+        Ok(async move { Ok(all) }.boxed().into())
+    }
+
+    fn handle_inject_agent_info(
+        &mut self,
+        info: HashMap<Arc<KitsuneAgent>, Arc<AgentInfoSigned>>,
+    ) -> HarnessAgentControlHandlerResult<()> {
+        self.agent_store.extend(info);
+        Ok(async move { Ok(()) }.boxed().into())
+    }
+
     fn handle_inject_gossip_data(
         &mut self,
         data: String,
