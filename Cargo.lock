@@ -1846,9 +1846,9 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore_api"
-version = "0.0.1-alpha.5"
+version = "0.0.1-alpha.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c0f755ad496c4332f0d42f5546aed724f1ff7dd94a32bd09bafca3f17a4abbae"
+checksum = "424950ea71dfa85289cefda13ef8f89d29f1fce71728807b810a69edfed213fa"
 dependencies = [
  "blake2b_simd",
  "byteorder",
@@ -1869,9 +1869,9 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore_client"
-version = "0.0.1-alpha.5"
+version = "0.0.1-alpha.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e87fb9a70a15f542c09122bf41ef885997c44ea1e8305910ba66c908b2def0e"
+checksum = "df55a917ffb484763d0067b4305dafe2677778e2aa775a9d202f41e1cc6101eb"
 dependencies = [
  "ghost_actor",
  "lair_keystore_api",

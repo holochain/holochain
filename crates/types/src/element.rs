@@ -1,7 +1,7 @@
 //! Defines a Element, the basic unit of Holochain data.
 
 use crate::{
-    header::{WireDelete, WireNewEntryHeader, WireUpdateRelationship},
+    header::{WireDelete, WireHeaderStatus, WireNewEntryHeader, WireUpdateRelationship},
     prelude::*,
     EntryHashed, HeaderHashed,
 };
@@ -9,7 +9,7 @@ use error::{ElementGroupError, ElementGroupResult};
 use holochain_keystore::KeystoreError;
 use holochain_serialized_bytes::prelude::*;
 pub use holochain_zome_types::element::*;
-use holochain_zome_types::entry::Entry;
+use holochain_zome_types::{entry::Entry, validate::ValidationStatus};
 use holochain_zome_types::{
     entry_def::EntryVisibility,
     header::{EntryType, Header},
@@ -26,17 +26,29 @@ pub struct WireElement {
     signed_header: SignedHeader,
     /// If there is an entry associated with this header it will be here
     maybe_entry: Option<Entry>,
+    /// The validation status of this element.
+    validation_status: ValidationStatus,
     /// All deletes on this header
-    deletes: Vec<WireDelete>,
+    deletes: Vec<WireHeaderStatus<WireDelete>>,
     /// Any updates on this entry.
-    updates: Vec<WireUpdateRelationship>,
+    updates: Vec<WireHeaderStatus<WireUpdateRelationship>>,
 }
 
 /// A group of elements with a common entry
 #[derive(Debug, Clone)]
 pub struct ElementGroup<'a> {
     headers: Vec<Cow<'a, SignedHeaderHashed>>,
+    rejected: Vec<Cow<'a, SignedHeaderHashed>>,
     entry: Cow<'a, EntryHashed>,
+}
+
+/// Element with it's status
+#[derive(Debug, Clone, derive_more::Constructor)]
+pub struct ElementStatus {
+    /// The element this status applies to.
+    pub element: Element,
+    /// Validation status of this element.
+    pub status: ValidationStatus,
 }
 
 impl<'a> ElementGroup<'a> {
@@ -75,27 +87,54 @@ impl<'a> ElementGroup<'a> {
     }
     /// Get owned iterator of signed headers
     pub fn owned_signed_headers(&self) -> impl Iterator<Item = SignedHeaderHashed> + 'a {
-        self.headers.clone().into_iter().map(|shh| shh.into_owned())
+        self.headers
+            .clone()
+            .into_iter()
+            .chain(self.rejected.clone().into_iter())
+            .map(|shh| shh.into_owned())
+    }
+
+    /// Get the valid header hashes
+    pub fn valid_hashes(&self) -> impl Iterator<Item = &HeaderHash> {
+        self.headers.iter().map(|shh| shh.header_address())
+    }
+
+    /// Get the rejected header hashes
+    pub fn rejected_hashes(&self) -> impl Iterator<Item = &HeaderHash> {
+        self.rejected.iter().map(|shh| shh.header_address())
     }
 
     /// Create an element group from wire headers and an entry
-    pub fn from_wire_elements<I: IntoIterator<Item = WireNewEntryHeader>>(
+    pub fn from_wire_elements<I: IntoIterator<Item = WireHeaderStatus<WireNewEntryHeader>>>(
         headers_iter: I,
         entry_type: EntryType,
         entry: Entry,
     ) -> ElementGroupResult<ElementGroup<'a>> {
         let iter = headers_iter.into_iter();
-        let mut headers = Vec::with_capacity(iter.size_hint().0);
+        let mut valid = Vec::with_capacity(iter.size_hint().0);
+        let mut rejected = Vec::with_capacity(iter.size_hint().0);
         let entry = EntryHashed::from_content_sync(entry);
         let entry_hash = entry.as_hash().clone();
         let entry = Cow::Owned(entry);
-        for header in iter {
-            headers.push(Cow::Owned(
-                header.into_header(entry_type.clone(), entry_hash.clone()),
-            ))
+        for wire in iter {
+            match wire.validation_status {
+                ValidationStatus::Valid => valid.push(Cow::Owned(
+                    wire.header
+                        .into_header(entry_type.clone(), entry_hash.clone()),
+                )),
+                ValidationStatus::Rejected => rejected.push(Cow::Owned(
+                    wire.header
+                        .into_header(entry_type.clone(), entry_hash.clone()),
+                )),
+                ValidationStatus::Abandoned => todo!(),
+            }
         }
 
-        Ok(Self { headers, entry })
+        Ok(Self {
+            headers: valid,
+            rejected,
+            entry,
+        })
     }
 }
 
@@ -123,17 +162,17 @@ pub struct RawGetEntryResponse {
     /// These can be collapsed to NewEntryHeaderLight
     /// Which omits the EntryHash and EntryType,
     /// saving 32 bytes each
-    pub live_headers: BTreeSet<WireNewEntryHeader>,
+    pub live_headers: BTreeSet<WireHeaderStatus<WireNewEntryHeader>>,
     /// just the hashes of headers to delete
     // TODO: Perf could just send the HeaderHash of the
     // header being deleted but we would need to only ever store
     // if there was a header delete in our MetadataBuf and
     // not the delete header hash as we do now.
-    pub deletes: Vec<WireDelete>,
+    pub deletes: Vec<WireHeaderStatus<WireDelete>>,
     /// Any updates on this entry.
     /// Note you will need to ask for "all_live_headers_with_metadata"
     /// to get this back
-    pub updates: Vec<WireUpdateRelationship>,
+    pub updates: Vec<WireHeaderStatus<WireUpdateRelationship>>,
     /// The entry shared across all headers
     pub entry: Entry,
     /// The entry_type shared across all headers
@@ -151,17 +190,17 @@ impl RawGetEntryResponse {
     /// or there is no entry or the entry hash is different
     pub fn from_elements<E>(
         elements: E,
-        deletes: Vec<WireDelete>,
-        updates: Vec<WireUpdateRelationship>,
+        deletes: Vec<WireHeaderStatus<WireDelete>>,
+        updates: Vec<WireHeaderStatus<WireUpdateRelationship>>,
     ) -> Option<Self>
     where
-        E: IntoIterator<Item = Element>,
+        E: IntoIterator<Item = ElementStatus>,
     {
         let mut elements = elements.into_iter();
-        elements.next().map(|element| {
+        elements.next().map(|ElementStatus { element, status }| {
             let mut live_headers = BTreeSet::new();
             let (new_entry_header, entry_type, entry) = Self::from_element(element);
-            live_headers.insert(new_entry_header);
+            live_headers.insert(WireHeaderStatus::new(new_entry_header, status));
             let r = Self {
                 live_headers,
                 deletes,
@@ -169,11 +208,13 @@ impl RawGetEntryResponse {
                 entry,
                 entry_type,
             };
-            elements.fold(r, |mut response, element| {
+            elements.fold(r, |mut response, ElementStatus { element, status }| {
                 let (new_entry_header, entry_type, entry) = Self::from_element(element);
                 debug_assert_eq!(response.entry, entry);
                 debug_assert_eq!(response.entry_type, entry_type);
-                response.live_headers.insert(new_entry_header);
+                response
+                    .live_headers
+                    .insert(WireHeaderStatus::new(new_entry_header, status));
                 response
             })
         })
@@ -273,7 +314,7 @@ impl SignedHeaderHashedExt for SignedHeaderHashed {
 
 impl WireElement {
     /// Convert into a [Element], deletes and updates when receiving from the network
-    pub fn into_parts(self) -> (Element, Vec<Element>, Vec<Element>) {
+    pub fn into_parts(self) -> (ElementStatus, Vec<ElementStatus>, Vec<ElementStatus>) {
         let entry_hash = self.signed_header.header().entry_hash().cloned();
         let header = Element::new(
             SignedHeaderHashed::from_content_sync(self.signed_header),
@@ -282,7 +323,7 @@ impl WireElement {
         let deletes = self
             .deletes
             .into_iter()
-            .map(WireDelete::into_element)
+            .map(WireHeaderStatus::<WireDelete>::into_element_status)
             .collect();
         let updates = self
             .updates
@@ -291,23 +332,29 @@ impl WireElement {
                 let entry_hash = entry_hash
                     .clone()
                     .expect("Updates cannot be on headers that do not have entries");
-                u.into_element(entry_hash)
+                u.into_element_status(entry_hash)
             })
             .collect();
-        (header, deletes, updates)
+        (
+            ElementStatus::new(header, self.validation_status),
+            deletes,
+            updates,
+        )
     }
     /// Convert from a [Element] when sending to the network
     pub fn from_element(
-        e: Element,
-        deletes: Vec<WireDelete>,
-        updates: Vec<WireUpdateRelationship>,
+        e: ElementStatus,
+        deletes: Vec<WireHeaderStatus<WireDelete>>,
+        updates: Vec<WireHeaderStatus<WireUpdateRelationship>>,
     ) -> Self {
-        let (signed_header, maybe_entry) = e.into_inner();
+        let ElementStatus { element, status } = e;
+        let (signed_header, maybe_entry) = element.into_inner();
         Self {
             signed_header: signed_header.into_inner().0,
             // TODO: consider refactoring WireElement to use ElementEntry
             // instead of Option<Entry>
             maybe_entry: maybe_entry.into_option(),
+            validation_status: status,
             deletes,
             updates,
         }
