@@ -234,6 +234,22 @@ impl KitsuneP2pActor {
                                             .expect("This encoding should never fail");
                                     let _ = write.write_and_close(resp).await;
                                 }
+                                wire::Wire::AgentInfoQuery(q) => {
+                                    match agent_info_query(q, evt_sender.clone()).await {
+                                        Ok(r) => {
+                                            let resp = wire::Wire::agent_info_query_resp(r)
+                                                .encode_vec()
+                                                .unwrap();
+                                            let _ = write.write_and_close(resp).await;
+                                        }
+                                        Err(err) => {
+                                            let reason = format!("{:?}", err);
+                                            let fail =
+                                                wire::Wire::failure(reason).encode_vec().unwrap();
+                                            let _ = write.write_and_close(fail).await;
+                                        }
+                                    }
+                                }
                                 _ => unimplemented!("{:?}", read),
                             }
                         }
@@ -249,6 +265,41 @@ impl KitsuneP2pActor {
             transport,
             spaces: HashMap::new(),
         })
+    }
+}
+
+async fn agent_info_query(
+    q: wire::AgentInfoQuery,
+    evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
+) -> Result<Vec<crate::types::agent_store::AgentInfoSigned>, KitsuneP2pError> {
+    let wire::AgentInfoQuery {
+        space,
+        to_agent,
+        by_agent,
+        by_basis_arc,
+    } = q;
+
+    if let Some(by_agent) = by_agent {
+        if let Some(agent) = evt_sender
+            .get_agent_info_signed(GetAgentInfoSignedEvt {
+                space,
+                agent: by_agent,
+            })
+            .await?
+        {
+            Ok(vec![agent])
+        } else {
+            Ok(vec![])
+        }
+    } else if let Some(_by_basis_arc) = by_basis_arc {
+        Ok(evt_sender
+            .query_agent_info_signed(QueryAgentInfoSignedEvt {
+                space,
+                agent: to_agent,
+            })
+            .await?)
+    } else {
+        Err("must specify by_agent or by_basis_arc".into())
     }
 }
 
