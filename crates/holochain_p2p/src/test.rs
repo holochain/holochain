@@ -146,7 +146,10 @@ mod tests {
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
     use ghost_actor::GhostControlSender;
-    use holochain_types::element::{Element, SignedHeaderHashed, WireElement};
+    use holochain_types::{
+        element::{Element, ElementStatus, SignedHeaderHashed, WireElement},
+        validate::ValidationStatus,
+    };
     use holochain_types::{fixt::*, HeaderHashed};
     use kitsune_p2p::KitsuneP2pConfig;
 
@@ -162,6 +165,7 @@ mod tests {
         holo_hash::AgentPubKey,
         holo_hash::AgentPubKey,
     ) {
+        observability::test_run().unwrap();
         (
             newhash!(DnaHash, 's'),
             newhash!(AgentPubKey, '1'),
@@ -272,11 +276,6 @@ mod tests {
     }
 
     #[tokio::test(threaded_scheduler)]
-    // @TODO flaky test
-    // ---- test::tests::test_publish_workflow stdout ----
-    // thread 'test::tests::test_publish_workflow' panicked at 'assertion failed: `(left == right)`
-    //   left: `3`,
-    //  right: `0`', crates/holochain_p2p/src/test.rs:181:9
     async fn test_publish_workflow() {
         let (dna, a1, a2, a3) = test_setup();
 
@@ -302,6 +301,9 @@ mod tests {
                     PutAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
                     }
+                    QueryAgentInfoSigned { respond, .. } => {
+                        respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
+                    }
                     _ => (),
                 }
             }
@@ -316,7 +318,7 @@ mod tests {
             holo_hash::hash_type::AnyDht::Header,
         );
 
-        p2p.publish(dna, a1, true, header_hash, vec![], Some(20))
+        p2p.publish(dna, a1, true, header_hash, vec![], Some(200))
             .await
             .unwrap();
 
@@ -335,23 +337,29 @@ mod tests {
             .unwrap();
 
         let test_1 = GetElementResponse::GetHeader(Some(Box::new(WireElement::from_element(
-            Element::new(
-                SignedHeaderHashed::with_presigned(
-                    HeaderHashed::from_content_sync(fixt!(Header)),
-                    fixt!(Signature),
+            ElementStatus::new(
+                Element::new(
+                    SignedHeaderHashed::with_presigned(
+                        HeaderHashed::from_content_sync(fixt!(Header)),
+                        fixt!(Signature),
+                    ),
+                    None,
                 ),
-                None,
+                ValidationStatus::Valid,
             ),
             vec![],
             vec![],
         ))));
         let test_2 = GetElementResponse::GetHeader(Some(Box::new(WireElement::from_element(
-            Element::new(
-                SignedHeaderHashed::with_presigned(
-                    HeaderHashed::from_content_sync(fixt!(Header)),
-                    fixt!(Signature),
+            ElementStatus::new(
+                Element::new(
+                    SignedHeaderHashed::with_presigned(
+                        HeaderHashed::from_content_sync(fixt!(Header)),
+                        fixt!(Signature),
+                    ),
+                    None,
                 ),
-                None,
+                ValidationStatus::Valid,
             ),
             vec![],
             vec![],

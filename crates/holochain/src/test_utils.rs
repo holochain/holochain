@@ -43,6 +43,7 @@ use holochain_zome_types::{
     header::{Create, EntryType, Header},
     ExternInput,
 };
+use kitsune_p2p::KitsuneP2pConfig;
 use std::{convert::TryInto, sync::Arc, time::Duration};
 use tempdir::TempDir;
 use tokio::sync::mpsc;
@@ -241,6 +242,9 @@ where
                 PutAgentInfoSigned { respond, .. } => {
                     respond.r(Ok(async move { Ok(()) }.boxed().into()));
                 }
+                QueryAgentInfoSigned { respond, .. } => {
+                    respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
+                }
                 _ => (),
             }
         }
@@ -276,7 +280,7 @@ pub async fn install_app(
 
     let errors = conductor_handle.setup_cells().await.unwrap();
 
-    assert!(errors.is_empty());
+    assert!(errors.is_empty(), "{:?}", errors);
 }
 
 /// Payload for installing cells
@@ -287,6 +291,24 @@ pub type InstalledCellsWithProofs = Vec<(InstalledCell, Option<SerializedBytes>)
 pub async fn setup_app(
     apps_data: Vec<(&str, InstalledCellsWithProofs)>,
     dnas: Vec<DnaFile>,
+) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
+    setup_app_inner(apps_data, dnas, None).await
+}
+
+/// Setup an app with a custom network config for testing
+/// apps_data is a vec of app nicknames with vecs of their cell data.
+pub async fn setup_app_with_network(
+    apps_data: Vec<(&str, InstalledCellsWithProofs)>,
+    dnas: Vec<DnaFile>,
+    network: KitsuneP2pConfig,
+) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
+    setup_app_inner(apps_data, dnas, Some(network)).await
+}
+
+async fn setup_app_inner(
+    apps_data: Vec<(&str, InstalledCellsWithProofs)>,
+    dnas: Vec<DnaFile>,
+    network: Option<KitsuneP2pConfig>,
 ) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
     let test_env = test_conductor_env();
     let TestEnvironment {
@@ -304,6 +326,7 @@ pub async fn setup_app(
             admin_interfaces: Some(vec![AdminInterfaceConfig {
                 driver: InterfaceDriver::Websocket { port: 0 },
             }]),
+            network,
             ..Default::default()
         })
         .test(test_env, wasm_env, p2p_env)

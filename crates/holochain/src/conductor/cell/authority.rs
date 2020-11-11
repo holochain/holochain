@@ -1,18 +1,26 @@
 use super::error::{AuthorityDataError, CellResult};
-use crate::core::state::{
-    element_buf::ElementBuf,
-    metadata::{ChainItemKey, MetadataBuf, MetadataBufT},
+use crate::{
+    conductor::CellError,
+    core::state::{
+        element_buf::ElementBuf,
+        metadata::{ChainItemKey, MetadataBuf, MetadataBufT},
+    },
 };
 use fallible_iterator::FallibleIterator;
 
 use holo_hash::{AgentPubKey, EntryHash, HeaderHash};
 use holochain_state::{
-    env::EnvironmentRead, env::EnvironmentWrite, error::DatabaseError, fresh_reader,
-    prelude::PrefixType, prelude::Readable,
+    env::EnvironmentRead,
+    env::{EnvironmentWrite, ReadManager},
+    error::DatabaseError,
+    fresh_reader,
+    prelude::PrefixType,
+    prelude::Readable,
 };
 use holochain_types::activity::{AgentActivity, ChainItems};
 use holochain_types::{
-    element::{GetElementResponse, RawGetEntryResponse},
+    element::{ElementStatus, GetElementResponse, RawGetEntryResponse, WireElement},
+    header::WireHeaderStatus,
     header::WireUpdateRelationship,
     metadata::TimedHeaderHash,
 };
@@ -31,18 +39,23 @@ pub async fn handle_get_entry(
 ) -> CellResult<GetElementResponse> {
     // Get the vaults
     let element_vault = ElementBuf::vault(state_env.clone().into(), false)?;
+    let element_rejected = ElementBuf::rejected(state_env.clone().into())?;
     let meta_vault = MetadataBuf::vault(state_env.clone().into())?;
 
     // ## Helper closures to DRY and make more readable
 
     // ### Render headers closure
     // Render headers from TimedHeaderHash to SignedHeaderHash
-    let render_header = |timed_header_hash: TimedHeaderHash| {
+    let render_header_and_status = |timed_header_hash: TimedHeaderHash| {
         let header_hash = timed_header_hash.header_hash;
-        let r = element_vault
-            .get_header(&header_hash)?
-            .ok_or_else(|| AuthorityDataError::missing_data(header_hash))?;
-        CellResult::Ok(r)
+        let mut status = ValidationStatus::Valid;
+        let mut r = element_vault.get_header(&header_hash)?;
+        if r.is_none() {
+            r = element_rejected.get_header(&header_hash)?;
+            status = ValidationStatus::Rejected;
+        }
+        let r = r.ok_or_else(|| AuthorityDataError::missing_data(header_hash))?;
+        CellResult::Ok((r, status))
     };
 
     // ### Get entry data closure
@@ -71,7 +84,7 @@ pub async fn handle_get_entry(
         let mut deletes = Vec::new();
         let mut updates = Vec::new();
         let headers = meta_vault
-            .get_headers(&reader, hash.clone())?
+            .get_all_headers(&reader, hash.clone())?
             .collect::<Vec<_>>()?;
         let mut live_headers = BTreeSet::new();
 
@@ -83,16 +96,17 @@ pub async fn handle_get_entry(
                         .get_deletes_on_header(&reader, hash.header_hash.clone())?
                         .iterator(),
                 );
-                let header = render_header(hash)?;
-                live_headers.insert(header.try_into()?);
+                let header_status = render_header_and_status(hash)?;
+                live_headers.insert(header_status.try_into()?);
             }
             let updates_returns = meta_vault
                 .get_updates(&reader, hash.clone().into())?
                 .collect::<Vec<_>>()?;
             let updates_returns = updates_returns.into_iter().map(|update| {
-                let update: WireUpdateRelationship = render_header(update)?
-                    .try_into()
-                    .map_err(AuthorityDataError::from)?;
+                let update: WireHeaderStatus<WireUpdateRelationship> =
+                    render_header_and_status(update)?
+                        .try_into()
+                        .map_err(AuthorityDataError::from)?;
                 CellResult::Ok(update)
             });
             updates = updates_returns.collect::<Result<_, _>>()?;
@@ -116,7 +130,7 @@ pub async fn handle_get_entry(
 
                 // Otherwise gather the header
                 } else {
-                    let header = render_header(hash)?;
+                    let header = render_header_and_status(hash)?;
                     live_headers.insert(header.try_into()?);
                 }
             }
@@ -124,7 +138,7 @@ pub async fn handle_get_entry(
 
         let mut return_deletes = Vec::with_capacity(deletes.len());
         for delete in deletes {
-            let header = render_header(delete?)?;
+            let header = render_header_and_status(delete?)?;
             return_deletes.push(header.try_into().map_err(AuthorityDataError::from)?);
         }
         CellResult::Ok((live_headers, return_deletes, updates))
@@ -136,10 +150,10 @@ pub async fn handle_get_entry(
     // Get the entry from the first header
 
     fresh_reader!(state_env, |reader| {
-        let first_header = meta_vault.get_headers(&reader, hash.clone())?.next()?;
+        let first_header = meta_vault.get_all_headers(&reader, hash.clone())?.next()?;
         let entry_data = match first_header {
             Some(first_header) => {
-                let header = render_header(first_header)?;
+                let header = render_header_and_status(first_header)?.0;
                 Some(get_entry(header)?)
             }
             None => None,
@@ -164,6 +178,80 @@ pub async fn handle_get_entry(
         debug!(handle_get_details_return = ?r);
         Ok(GetElementResponse::GetEntryFull(r))
     })
+}
+
+#[tracing::instrument(skip(env))]
+pub async fn handle_get_element(
+    env: EnvironmentWrite,
+    hash: HeaderHash,
+) -> CellResult<GetElementResponse> {
+    // Get the vaults
+    let env_ref = env.guard();
+    let reader = env_ref.reader()?;
+    let element_vault = ElementBuf::vault(env.clone().into(), false)?;
+    let meta_vault = MetadataBuf::vault(env.clone().into())?;
+    let element_rejected = ElementBuf::rejected(env.clone().into())?;
+
+    // Check that we have the authority to serve this request because we have
+    // done the StoreElement validation
+    if !meta_vault.has_any_registered_store_element(&hash)? {
+        return Ok(GetElementResponse::GetHeader(None));
+    }
+
+    // Look for a deletes on the header and collect them
+    let deletes = meta_vault
+        .get_deletes_on_header(&reader, hash.clone())?
+        .map_err(CellError::from)
+        .map(|delete_header| {
+            let delete_hash = delete_header.header_hash;
+            let mut status = ValidationStatus::Valid;
+            let mut delete = element_vault.get_header(&delete_hash)?;
+            if delete.is_none() {
+                delete = element_rejected.get_header(&delete_hash)?;
+                status = ValidationStatus::Rejected;
+            }
+            match delete {
+                Some(delete) => Ok((delete, status)
+                    .try_into()
+                    .map_err(AuthorityDataError::from)?),
+                None => Err(AuthorityDataError::missing_data(delete)),
+            }
+        })
+        .collect()?;
+
+    // Look for a updates on the header and collect them
+    let updates = meta_vault
+        .get_updates(&reader, hash.clone().into())?
+        .map_err(CellError::from)
+        .map(|update_header| {
+            let update_hash = update_header.header_hash;
+            let mut status = ValidationStatus::Valid;
+            let mut update = element_vault.get_header(&update_hash)?;
+            if update.is_none() {
+                update = element_rejected.get_header(&update_hash)?;
+                status = ValidationStatus::Rejected;
+            }
+            match update {
+                Some(update) => Ok((update, status)
+                    .try_into()
+                    .map_err(AuthorityDataError::from)?),
+                None => Err(AuthorityDataError::missing_data(update)),
+            }
+        })
+        .collect()?;
+
+    // Get the actual header and return it with proof of deleted if there is any
+    let mut r = element_vault.get_element(&hash)?;
+    let mut status = ValidationStatus::Valid;
+    if r.is_none() {
+        r = element_rejected.get_element(&hash)?;
+        status = ValidationStatus::Rejected;
+    }
+    let r = r
+        .map(|e| WireElement::from_element(ElementStatus::new(e, status), deletes, updates))
+        .map(Box::new);
+
+    Ok(GetElementResponse::GetHeader(r))
 }
 
 #[instrument(skip(env))]
