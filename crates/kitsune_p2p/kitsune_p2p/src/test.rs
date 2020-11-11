@@ -374,4 +374,70 @@ mod tests {
         harness.ghost_actor_shutdown().await.unwrap();
         Ok(())
     }
+
+    /// Test that we can gossip across a in memory transport layer.
+    #[tokio::test(threaded_scheduler)]
+    async fn test_gossip_transport() -> Result<(), KitsuneP2pError> {
+        init_tracing();
+        let (harness, _evt) = spawn_test_harness_mem().await?;
+
+        harness.add_space().await?;
+
+        // - Add the first agent
+        let (a1, _) = harness.add_direct_agent("one".into()).await?;
+
+        // - Insert some data for agent 1
+        let op1 = harness
+            .inject_gossip_data(a1.clone(), "agent-1-data".to_string())
+            .await?;
+
+        // - Check agent one has the data
+        let res = harness.dump_local_gossip_data(a1.clone()).await?;
+        let num_gossip = res.len();
+        let data = res.get(&op1);
+        assert_eq!(Some(&"agent-1-data".to_string()), data);
+        assert_eq!(num_gossip, 1);
+
+        // - Add the second agent
+        let (a2, _) = harness.add_direct_agent("two".into()).await?;
+
+        // - Insert some data for agent 2
+        let op2 = harness
+            .inject_gossip_data(a2.clone(), "agent-2-data".to_string())
+            .await?;
+
+        // - Check agent two only has this data
+        let res = harness.dump_local_gossip_data(a2.clone()).await?;
+        let num_gossip = res.len();
+        let data = res.get(&op2);
+        assert_eq!(Some(&"agent-2-data".to_string()), data);
+        assert_eq!(num_gossip, 1);
+
+        // TODO: remove when we have bootstrapping for tests
+        // needed until we have some way of bootstrapping
+        harness.magic_peer_info_exchange().await?;
+
+        tokio::time::delay_for(std::time::Duration::from_millis(200)).await;
+
+        // - Check agent one now has all the data
+        let res = harness.dump_local_gossip_data(a1.clone()).await?;
+        let num_gossip = res.len();
+        let data = res.get(&op1);
+        assert_eq!(Some(&"agent-1-data".to_string()), data);
+        let data = res.get(&op2);
+        assert_eq!(Some(&"agent-2-data".to_string()), data);
+        assert_eq!(num_gossip, 2);
+
+        // - Check agent two now has all the data
+        let res = harness.dump_local_gossip_data(a2.clone()).await?;
+        let num_gossip = res.len();
+        let data = res.get(&op1);
+        assert_eq!(Some(&"agent-1-data".to_string()), data);
+        let data = res.get(&op2);
+        assert_eq!(Some(&"agent-2-data".to_string()), data);
+        assert_eq!(num_gossip, 2);
+
+        harness.ghost_actor_shutdown().await?;
+        Ok(())
+    }
 }
