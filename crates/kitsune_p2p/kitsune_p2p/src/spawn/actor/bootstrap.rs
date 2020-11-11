@@ -5,29 +5,17 @@ use once_cell::sync::Lazy;
 use once_cell::sync::OnceCell;
 use std::convert::TryFrom;
 use std::convert::TryInto;
+use url2::Url2;
 
 static CLIENT: Lazy<reqwest::Client> = Lazy::new(reqwest::Client::new);
 
-const BOOTSTRAP_URL_ENV: &str = "P2P_BOOTSTRAP_URL";
+#[allow(dead_code)]
 const BOOTSTRAP_URL_DEFAULT: &str = "https://bootstrap.holo.host";
 #[allow(dead_code)]
 const BOOTSTRAP_URL_DEV: &str = "https://bootstrap-dev.holohost.workers.dev";
 
 #[allow(dead_code)]
 const RANDOM_LIMIT_DEFAULT: u32 = 16;
-
-static BOOTSTRAP_URL: Lazy<Option<String>> = Lazy::new(|| match std::env::var(BOOTSTRAP_URL_ENV) {
-    Ok(v) => {
-        // If the environment variable is set and empty then don't bootstrap at all.
-        if v.is_empty() {
-            None
-        } else {
-            Some(v)
-        }
-    }
-    // If the environment variable is not set then fallback to the default.
-    Err(_) => Some(BOOTSTRAP_URL_DEFAULT.to_string()),
-});
 
 pub static NOW_OFFSET_MILLIS: OnceCell<i64> = OnceCell::new();
 
@@ -36,28 +24,17 @@ const OP_PUT: &str = "put";
 const OP_NOW: &str = "now";
 const OP_RANDOM: &str = "random";
 
-fn select_url(url_override: Option<String>) -> Option<String> {
-    match url_override {
-        Some(url) => Some(url),
-        #[allow(clippy::borrow_interior_mutable_const)]
-        None => match Lazy::force(&BOOTSTRAP_URL) {
-            Some(url) => Some(url.to_string()),
-            None => None,
-        },
-    }
-}
-
 async fn do_api<I: serde::Serialize, O: serde::de::DeserializeOwned>(
-    url_override: Option<String>,
+    url: Option<Url2>,
     op: &str,
     input: I,
 ) -> crate::types::actor::KitsuneP2pResult<Option<O>> {
     let mut body_data = Vec::new();
     kitsune_p2p_types::codec::rmp_encode(&mut body_data, &input)?;
-    match select_url(url_override) {
+    match url {
         Some(url) => {
             let res = CLIENT
-                .post(&url)
+                .post(url.as_str())
                 .body(body_data)
                 .header(OP_HEADER, op)
                 .header(reqwest::header::CONTENT_TYPE, "application/octet")
@@ -78,10 +55,10 @@ async fn do_api<I: serde::Serialize, O: serde::de::DeserializeOwned>(
 }
 
 pub async fn put(
-    url_override: Option<String>,
+    url: Option<Url2>,
     agent_info_signed: crate::types::agent_store::AgentInfoSigned,
 ) -> crate::types::actor::KitsuneP2pResult<()> {
-    match do_api(url_override, OP_PUT, agent_info_signed).await {
+    match do_api(url, OP_PUT, agent_info_signed).await {
         Ok(Some(())) => Ok(()),
         Ok(None) => Ok(()),
         Err(e) => Err(e),
@@ -96,8 +73,8 @@ fn local_now() -> crate::types::actor::KitsuneP2pResult<u64> {
 }
 
 #[allow(dead_code)]
-pub async fn now(url_override: Option<String>) -> crate::types::actor::KitsuneP2pResult<u64> {
-    match do_api(url_override, OP_NOW, ()).await {
+pub async fn now(url: Option<Url2>) -> crate::types::actor::KitsuneP2pResult<u64> {
+    match do_api(url, OP_NOW, ()).await {
         // If the server gives us something useful we use it.
         Ok(Some(v)) => Ok(v),
         // If we don't have a server url we should trust ourselves.
@@ -108,11 +85,11 @@ pub async fn now(url_override: Option<String>) -> crate::types::actor::KitsuneP2
     }
 }
 
-pub async fn now_once(url_override: Option<String>) -> crate::types::actor::KitsuneP2pResult<u64> {
+pub async fn now_once(url: Option<Url2>) -> crate::types::actor::KitsuneP2pResult<u64> {
     match NOW_OFFSET_MILLIS.get() {
         Some(offset) => Ok(u64::try_from(i64::try_from(local_now()?)? + offset)?),
         None => {
-            let offset: i64 = match now(url_override.clone()).await {
+            let offset: i64 = match now(url.clone()).await {
                 Ok(v) => {
                     let offset = v as i64 - local_now()? as i64;
                     match NOW_OFFSET_MILLIS.set(offset) {
@@ -164,10 +141,10 @@ impl Default for RandomQuery {
 
 #[allow(dead_code)]
 pub async fn random(
-    url_override: Option<String>,
+    url: Option<Url2>,
     query: RandomQuery,
 ) -> crate::types::actor::KitsuneP2pResult<Vec<AgentInfoSigned>> {
-    let outer_vec: Vec<serde_bytes::ByteBuf> = match do_api(url_override, OP_RANDOM, query).await {
+    let outer_vec: Vec<serde_bytes::ByteBuf> = match do_api(url, OP_RANDOM, query).await {
         Ok(Some(v)) => v,
         Ok(None) => Vec::new(),
         Err(e) => return Err(e),
@@ -222,7 +199,7 @@ mod tests {
 
         // Simply hitting the endpoint should be OK.
         super::put(
-            Some(super::BOOTSTRAP_URL_DEV.to_string()),
+            Some(url2::url2!("{}", super::BOOTSTRAP_URL_DEV)),
             agent_info_signed,
         )
         .await
@@ -230,7 +207,7 @@ mod tests {
 
         // We should get back an error if we don't have a good signature.
         assert!(super::put(
-            Some(super::BOOTSTRAP_URL_DEV.to_string()),
+            Some(url2::url2!("{}", super::BOOTSTRAP_URL_DEV)),
             fixt!(AgentInfoSigned)
         )
         .await
@@ -248,7 +225,7 @@ mod tests {
             .unwrap();
 
         // We should be able to get a milliseconds timestamp back.
-        let remote_now: u64 = super::now(Some(super::BOOTSTRAP_URL_DEV.to_string()))
+        let remote_now: u64 = super::now(Some(url2::url2!("{}", super::BOOTSTRAP_URL_DEV)))
             .await
             .unwrap();
         let threshold = 5000;
@@ -257,7 +234,7 @@ mod tests {
 
         // Now once should return some number and the remote server offset should be set in the
         // NOW_OFFSET_MILLIS once cell.
-        let _: u64 = super::now_once(Some(super::BOOTSTRAP_URL_DEV.to_string()))
+        let _: u64 = super::now_once(Some(url2::url2!("{}", super::BOOTSTRAP_URL_DEV)))
             .await
             .unwrap();
         assert!(super::NOW_OFFSET_MILLIS.get().is_some());
@@ -266,7 +243,7 @@ mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn test_random() {
         let space = fixt!(KitsuneSpace, Unpredictable);
-        let now = super::now(Some(super::BOOTSTRAP_URL_DEV.to_string()))
+        let now = super::now(Some(url2::url2!("{}", super::BOOTSTRAP_URL_DEV)))
             .await
             .unwrap();
 
@@ -294,7 +271,7 @@ mod tests {
             .unwrap();
 
             super::put(
-                Some(super::BOOTSTRAP_URL_DEV.to_string()),
+                Some(url2::url2!("{}", super::BOOTSTRAP_URL_DEV)),
                 agent_info_signed.clone(),
             )
             .await
@@ -304,7 +281,7 @@ mod tests {
         }
 
         let mut random = super::random(
-            Some(super::BOOTSTRAP_URL_DEV.to_string()),
+            Some(url2::url2!("{}", super::BOOTSTRAP_URL_DEV)),
             super::RandomQuery {
                 space: space.clone(),
                 ..Default::default()
@@ -320,7 +297,7 @@ mod tests {
         assert!(random == expected);
 
         let random_single = super::random(
-            Some(super::BOOTSTRAP_URL_DEV.to_string()),
+            Some(url2::url2!("{}", super::BOOTSTRAP_URL_DEV)),
             super::RandomQuery {
                 space: space.clone(),
                 limit: 1.into(),

@@ -6,12 +6,15 @@ use url2::Url2;
 pub struct KitsuneP2pConfig {
     /// list of sub-transports to be included in this pool
     pub transport_pool: Vec<TransportConfig>,
+    /// The service used for peers to discover each before they are peers.
+    pub bootstrap_service: Option<Url2>,
 }
 
 impl Default for KitsuneP2pConfig {
     fn default() -> Self {
         Self {
             transport_pool: Vec::new(),
+            bootstrap_service: None,
         }
     }
 }

@@ -177,6 +177,7 @@ pub mod tests {
           port: 1234
 
     network:
+      bootstrap_service: https://bootstrap.holo.host
       transport_pool:
         - type: proxy
           sub_transport:
@@ -190,6 +191,7 @@ pub mod tests {
         let result: ConductorResult<ConductorConfig> = config_from_yaml(yaml);
         use holochain_p2p::kitsune_p2p::*;
         let mut network_config = KitsuneP2pConfig::default();
+        network_config.bootstrap_service = Some(url2::url2!("https://bootstrap.holo.host"));
         network_config.transport_pool.push(TransportConfig::Proxy {
             sub_transport: Box::new(TransportConfig::Quic {
                 bind_to: Some(url2::url2!("kitsune-quic://0.0.0.0:0")),
