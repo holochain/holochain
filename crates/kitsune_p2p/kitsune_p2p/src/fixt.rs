@@ -50,7 +50,7 @@ fixturator!(
 
 fixturator!(
     AgentInfo;
-    constructor fn new(KitsuneSpace, KitsuneAgent, Urls, U64);
+    constructor fn new(KitsuneSpace, KitsuneAgent, Urls, U64, U64);
 );
 
 fixturator!(

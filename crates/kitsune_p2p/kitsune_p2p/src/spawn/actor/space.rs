@@ -29,6 +29,10 @@ const NET_CONNECT_INTERVAL_MS: u64 = 20;
 /// Max amount of time we should wait for connections to be established.
 const NET_CONNECT_MAX_MS: u64 = 2000;
 
+/// Agent info can expire 20 minutes after it is signed.
+/// This is somewhat arbitrary and open to tweaking.
+pub const AGENT_INFO_EXPIRES_AFTER_MS: u64 = 60 * 1000 * 20;
+
 ghost_actor::ghost_chan! {
     pub(crate) chan SpaceInternal<crate::KitsuneP2pError> {
         /// Make a remote request right-now if we have an open connection,
@@ -466,6 +470,7 @@ impl SpaceInternalHandler for Space {
                         .duration_since(std::time::UNIX_EPOCH)
                         .unwrap()
                         .as_millis() as u64,
+                    AGENT_INFO_EXPIRES_AFTER_MS,
                 );
                 let mut data = Vec::new();
                 kitsune_p2p_types::codec::rmp_encode(&mut data, &agent_info)?;
