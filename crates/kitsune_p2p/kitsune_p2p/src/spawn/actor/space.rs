@@ -50,6 +50,7 @@ ghost_actor::ghost_chan! {
 pub(crate) async fn spawn_space(
     space: Arc<KitsuneSpace>,
     transport: ghost_actor::GhostSender<TransportListener>,
+    config: Arc<KitsuneP2pConfig>,
 ) -> KitsuneP2pResult<(
     ghost_actor::GhostSender<KitsuneP2p>,
     KitsuneP2pEventReceiver,
@@ -75,7 +76,7 @@ pub(crate) async fn spawn_space(
         .create_channel::<KitsuneP2p>()
         .await?;
 
-    tokio::task::spawn(builder.spawn(Space::new(space, i_s, evt_send, transport)));
+    tokio::task::spawn(builder.spawn(Space::new(space, i_s, evt_send, transport, config)));
 
     Ok((sender, evt_recv))
 }
@@ -455,6 +456,7 @@ impl SpaceInternalHandler for Space {
         let agent_list: Vec<Arc<KitsuneAgent>> = self.local_joined_agents.keys().cloned().collect();
         let bound_url = self.transport.bound_url();
         let evt_sender = self.evt_sender.clone();
+        let bootstrap_service = self.config.bootstrap_service.clone();
         Ok(async move {
             let bound_url = bound_url.await?;
             let urls = bound_url
@@ -492,7 +494,8 @@ impl SpaceInternalHandler for Space {
                     .await?;
 
                 // Push to the bootstrap as well.
-                crate::spawn::actor::bootstrap::put(None, agent_info_signed).await?;
+                crate::spawn::actor::bootstrap::put(bootstrap_service.clone(), agent_info_signed)
+                    .await?;
             }
             Ok(())
         }
@@ -684,6 +687,7 @@ pub(crate) struct Space {
     #[allow(dead_code)]
     transport: ghost_actor::GhostSender<TransportListener>,
     local_joined_agents: HashMap<Arc<KitsuneAgent>, AgentInfo>,
+    config: Arc<KitsuneP2pConfig>,
 }
 
 impl Space {
@@ -693,6 +697,7 @@ impl Space {
         i_s: ghost_actor::GhostSender<SpaceInternal>,
         evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
         transport: ghost_actor::GhostSender<TransportListener>,
+        config: Arc<KitsuneP2pConfig>,
     ) -> Self {
         let i_s_c = i_s.clone();
         tokio::task::spawn(async move {
@@ -709,6 +714,7 @@ impl Space {
             evt_sender,
             transport,
             local_joined_agents: HashMap::new(),
+            config,
         }
     }
 
