@@ -36,6 +36,14 @@ pub enum KitsuneP2pError {
     #[error("Bootstrap Error: {0}")]
     Bootstrap(Arc<String>),
 
+    /// SystemTime call failed.
+    #[error(transparent)]
+    SystemTime(#[from] std::time::SystemTimeError),
+
+    /// Integer casting failed.
+    #[error(transparent)]
+    TryFromInt(#[from] std::num::TryFromIntError),
+
     /// Other
     #[error("Other: {0}")]
     Other(Box<dyn std::error::Error + Send + Sync>),
