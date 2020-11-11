@@ -174,9 +174,7 @@ pub async fn random(
     };
     let ret: Result<Vec<AgentInfoSigned>, _> = outer_vec
         .into_iter()
-        .map(|bytes| {
-            kitsune_p2p_types::codec::rmp_decode(&mut AsRef::<[u8]>::as_ref(&bytes))
-        })
+        .map(|bytes| kitsune_p2p_types::codec::rmp_decode(&mut AsRef::<[u8]>::as_ref(&bytes)))
         .collect();
     Ok(ret?)
 }
