@@ -27,6 +27,7 @@ pub(crate) struct KitsuneP2pActor {
     evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     transport: ghost_actor::GhostSender<TransportListener>,
     spaces: HashMap<Arc<KitsuneSpace>, AsyncLazy<ghost_actor::GhostSender<KitsuneP2p>>>,
+    config: Arc<KitsuneP2pConfig>,
 }
 
 fn build_transport(
@@ -97,7 +98,7 @@ impl KitsuneP2pActor {
         evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     ) -> KitsuneP2pResult<Self> {
         let (t_pool, transport, mut t_event) = spawn_transport_pool().await?;
-        for t_conf in config.transport_pool {
+        for t_conf in config.transport_pool.clone() {
             let (l, e) = build_transport(t_conf).await?;
             t_pool.push_sub_transport(l, e).await?;
         }
@@ -264,6 +265,7 @@ impl KitsuneP2pActor {
             evt_sender,
             transport,
             spaces: HashMap::new(),
+            config: Arc::new(config),
         })
     }
 }
@@ -425,10 +427,11 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         let internal_sender = self.internal_sender.clone();
         let space2 = space.clone();
         let transport = self.transport.clone();
+        let config = Arc::clone(&self.config);
         let space_sender = match self.spaces.entry(space.clone()) {
             Entry::Occupied(entry) => entry.into_mut(),
             Entry::Vacant(entry) => entry.insert(AsyncLazy::new(async move {
-                let (send, evt_recv) = spawn_space(space2, transport)
+                let (send, evt_recv) = spawn_space(space2, transport, config)
                     .await
                     .expect("cannot fail to create space");
                 internal_sender
