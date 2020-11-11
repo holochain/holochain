@@ -1,10 +1,10 @@
-use once_cell::sync::Lazy;
-use crate::types::KitsuneSpace;
 use crate::types::agent_store::AgentInfoSigned;
-use std::convert::TryInto;
+use crate::types::KitsuneBinType;
+use crate::types::KitsuneSpace;
+use once_cell::sync::Lazy;
 use once_cell::sync::OnceCell;
 use std::convert::TryFrom;
-use crate::types::KitsuneBinType;
+use std::convert::TryInto;
 
 static CLIENT: Lazy<reqwest::Client> = Lazy::new(reqwest::Client::new);
 
@@ -64,15 +64,13 @@ async fn do_api<I: serde::Serialize, O: serde::de::DeserializeOwned>(
                 .send()
                 .await?;
             if res.status().is_success() {
-                Ok(Some(
-                    kitsune_p2p_types::codec::rmp_decode(
-                        &mut res.bytes().await?.as_ref()
-                    )?
-                ))
+                Ok(Some(kitsune_p2p_types::codec::rmp_decode(
+                    &mut res.bytes().await?.as_ref(),
+                )?))
             } else {
-                return Err(crate::KitsuneP2pError::Bootstrap(std::sync::Arc::new(
+                Err(crate::KitsuneP2pError::Bootstrap(std::sync::Arc::new(
                     res.text().await?,
-                )));
+                )))
             }
         }
         None => Ok(None),
@@ -84,14 +82,17 @@ pub async fn put(
     agent_info_signed: crate::types::agent_store::AgentInfoSigned,
 ) -> crate::types::actor::KitsuneP2pResult<()> {
     match do_api(url_override, OP_PUT, agent_info_signed).await {
-        Ok(Some(v)) => Ok(v),
+        Ok(Some(())) => Ok(()),
         Ok(None) => Ok(()),
         Err(e) => Err(e),
     }
 }
 
 fn local_now() -> crate::types::actor::KitsuneP2pResult<u64> {
-    Ok(std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_millis().try_into()?)
+    Ok(std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)?
+        .as_millis()
+        .try_into()?)
 }
 
 #[allow(dead_code)]
@@ -118,7 +119,7 @@ pub async fn now_once(url_override: Option<String>) -> crate::types::actor::Kits
                         Ok(_) => offset,
                         Err(v) => v,
                     }
-                },
+                }
                 // @todo Do something more sophisticated here with errors.
                 // Currently just falls back to a zero offset if the server is not happy.
                 Err(_) => {
@@ -127,7 +128,7 @@ pub async fn now_once(url_override: Option<String>) -> crate::types::actor::Kits
                         Ok(_) => offset,
                         Err(v) => v,
                     }
-                },
+                }
             };
 
             Ok(u64::try_from(i64::try_from(local_now()?)? + offset)?)
@@ -168,9 +169,7 @@ pub async fn random(
 ) -> crate::types::actor::KitsuneP2pResult<Vec<AgentInfoSigned>> {
     match do_api(url_override, OP_RANDOM, query).await {
         Ok(Some(v)) => Ok(v),
-        Ok(None) => {
-            Ok(Vec::new())
-        },
+        Ok(None) => Ok(Vec::new()),
         Err(e) => Err(e),
     }
 }
@@ -236,7 +235,12 @@ mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn test_now() {
         let local_now = std::time::SystemTime::now();
-        let local_millis: u64 = local_now.duration_since(std::time::UNIX_EPOCH).unwrap().as_millis().try_into().unwrap();
+        let local_millis: u64 = local_now
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis()
+            .try_into()
+            .unwrap();
 
         // We should be able to get a milliseconds timestamp back.
         let remote_now: u64 = super::now(Some(super::BOOTSTRAP_URL_DEV.to_string()))
@@ -244,20 +248,22 @@ mod tests {
             .unwrap();
         let threshold = 5000;
 
-        assert!(
-            (remote_now - local_millis) < threshold
-        );
+        assert!((remote_now - local_millis) < threshold);
 
         // Now once should return some number and the remote server offset should be set in the
         // NOW_OFFSET_MILLIS once cell.
-        let _: u64 = super::now_once(Some(super::BOOTSTRAP_URL_DEV.to_string())).await.unwrap();
+        let _: u64 = super::now_once(Some(super::BOOTSTRAP_URL_DEV.to_string()))
+            .await
+            .unwrap();
         assert!(super::NOW_OFFSET_MILLIS.get().is_some());
     }
 
     #[tokio::test(threaded_scheduler)]
     async fn test_random() {
         let space = fixt!(KitsuneSpace);
-        let now = super::now(Some(super::BOOTSTRAP_URL_DEV.to_string())).await.unwrap();
+        let now = super::now(Some(super::BOOTSTRAP_URL_DEV.to_string()))
+            .await
+            .unwrap();
 
         let alice = sign_ed25519_keypair_new_from_entropy().await.unwrap();
         let bob = sign_ed25519_keypair_new_from_entropy().await.unwrap();
@@ -274,13 +280,13 @@ mod tests {
             );
             let mut data = Vec::new();
             kitsune_p2p_types::codec::rmp_encode(&mut data, &agent_info).unwrap();
-            let signature = agent
-                .sign(std::sync::Arc::new(data.clone()))
-                .await
-                .unwrap();
-            let agent_info_signed =
-                AgentInfoSigned::try_new(kitsune_agent, KitsuneSignature((*signature.0).clone()), data)
-                    .unwrap();
+            let signature = agent.sign(std::sync::Arc::new(data.clone())).await.unwrap();
+            let agent_info_signed = AgentInfoSigned::try_new(
+                kitsune_agent,
+                KitsuneSignature((*signature.0).clone()),
+                data,
+            )
+            .unwrap();
 
             super::put(
                 Some(super::BOOTSTRAP_URL_DEV.to_string()),
