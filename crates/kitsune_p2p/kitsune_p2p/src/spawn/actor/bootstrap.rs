@@ -8,26 +8,13 @@ use std::convert::TryInto;
 
 static CLIENT: Lazy<reqwest::Client> = Lazy::new(reqwest::Client::new);
 
-const BOOTSTRAP_URL_ENV: &str = "P2P_BOOTSTRAP_URL";
+#[allow(dead_code)]
 const BOOTSTRAP_URL_DEFAULT: &str = "https://bootstrap.holo.host";
 #[allow(dead_code)]
 const BOOTSTRAP_URL_DEV: &str = "https://bootstrap-dev.holohost.workers.dev";
 
 #[allow(dead_code)]
 const RANDOM_LIMIT_DEFAULT: u32 = 16;
-
-static BOOTSTRAP_URL: Lazy<Option<String>> = Lazy::new(|| match std::env::var(BOOTSTRAP_URL_ENV) {
-    Ok(v) => {
-        // If the environment variable is set and empty then don't bootstrap at all.
-        if v.is_empty() {
-            None
-        } else {
-            Some(v)
-        }
-    }
-    // If the environment variable is not set then fallback to the default.
-    Err(_) => Some(BOOTSTRAP_URL_DEFAULT.to_string()),
-});
 
 pub static NOW_OFFSET_MILLIS: OnceCell<i64> = OnceCell::new();
 
@@ -36,25 +23,14 @@ const OP_PUT: &str = "put";
 const OP_NOW: &str = "now";
 const OP_RANDOM: &str = "random";
 
-fn select_url(url_override: Option<String>) -> Option<String> {
-    match url_override {
-        Some(url) => Some(url),
-        #[allow(clippy::borrow_interior_mutable_const)]
-        None => match Lazy::force(&BOOTSTRAP_URL) {
-            Some(url) => Some(url.to_string()),
-            None => None,
-        },
-    }
-}
-
 async fn do_api<I: serde::Serialize, O: serde::de::DeserializeOwned>(
-    url_override: Option<String>,
+    url: Option<String>,
     op: &str,
     input: I,
 ) -> crate::types::actor::KitsuneP2pResult<Option<O>> {
     let mut body_data = Vec::new();
     kitsune_p2p_types::codec::rmp_encode(&mut body_data, &input)?;
-    match select_url(url_override) {
+    match url {
         Some(url) => {
             let res = CLIENT
                 .post(&url)
