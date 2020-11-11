@@ -9,6 +9,7 @@ use std::{
 };
 
 pub mod bootstrap;
+mod discover;
 mod gossip;
 mod space;
 use ghost_actor::dependencies::{must_future, tracing};
@@ -470,6 +471,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         to_agent: Arc<KitsuneAgent>,
         from_agent: Arc<KitsuneAgent>,
         payload: Vec<u8>,
+        timeout_ms: Option<u64>,
     ) -> KitsuneP2pHandlerResult<Vec<u8>> {
         let space_sender = match self.spaces.get_mut(&space) {
             None => return Err(KitsuneP2pError::RoutingSpaceError(space)),
@@ -478,7 +480,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         Ok(async move {
             space_sender
                 .await
-                .rpc_single(space, to_agent, from_agent, payload)
+                .rpc_single(space, to_agent, from_agent, payload, timeout_ms)
                 .await
         }
         .boxed()

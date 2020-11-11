@@ -76,9 +76,9 @@ kitsune_p2p_types::write_codec_enum! {
         /// Query Agent data from a remote node
         AgentInfoQuery(0x40) {
             space.0: Arc<KitsuneSpace>,
-            to_agent.0: Arc<KitsuneAgent>,
-            by_agent.1: Option<Arc<KitsuneAgent>>,
-            by_basis_arc.2: Option<(Arc<KitsuneBasis>, DhtArc)>,
+            to_agent.1: Arc<KitsuneAgent>,
+            by_agent.2: Option<Arc<KitsuneAgent>>,
+            by_basis_arc.3: Option<(Arc<KitsuneBasis>, DhtArc)>,
         },
 
         /// Response type for agent info query

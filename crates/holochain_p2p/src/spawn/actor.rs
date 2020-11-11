@@ -553,7 +553,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         let kitsune_p2p = self.kitsune_p2p.clone();
         Ok(async move {
             let result = kitsune_p2p
-                .rpc_single(space, to_agent, from_agent, req)
+                .rpc_single(space, to_agent, from_agent, req, None)
                 .await?;
             let result = UnsafeBytes::from(result).into();
             Ok(result)
@@ -611,7 +611,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         let kitsune_p2p = self.kitsune_p2p.clone();
         Ok(async move {
             let response = kitsune_p2p
-                .rpc_single(space, to_agent, from_agent, req)
+                .rpc_single(space, to_agent, from_agent, req, None)
                 .await?;
             let response = SerializedBytes::from(UnsafeBytes::from(response)).try_into()?;
             Ok(response)
@@ -817,7 +817,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         let kitsune_p2p = self.kitsune_p2p.clone();
         Ok(async move {
             kitsune_p2p
-                .rpc_single(space, to_agent, from_agent, req)
+                .rpc_single(space, to_agent, from_agent, req, None)
                 .await?;
             Ok(())
         }
