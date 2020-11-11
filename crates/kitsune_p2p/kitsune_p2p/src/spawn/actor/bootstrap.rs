@@ -14,7 +14,7 @@ const BOOTSTRAP_URL_DEFAULT: &str = "https://bootstrap.holo.host";
 const BOOTSTRAP_URL_DEV: &str = "https://bootstrap-dev.holohost.workers.dev";
 
 #[allow(dead_code)]
-const RANDOM_LIMIT_DEFAULT: u32 = 256;
+const RANDOM_LIMIT_DEFAULT: u32 = 16;
 
 #[allow(clippy::declare_interior_mutable_const)]
 static BOOTSTRAP_URL: Lazy<Option<String>> = Lazy::new(|| match std::env::var(BOOTSTRAP_URL_ENV) {
