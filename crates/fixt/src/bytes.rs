@@ -75,7 +75,7 @@ fixturator!(
     ThirtySixBytes;
     curve Empty [0; 36].to_vec();
     curve Predictable {
-        let mut u8_fixturator = U8Fixturator::new(Unpredictable);
+        let mut u8_fixturator = U8Fixturator::new(Predictable);
         let mut bytes = vec![];
         for _ in 0..36 {
             bytes.push(u8_fixturator.next().unwrap());
@@ -83,7 +83,7 @@ fixturator!(
         bytes
     };
     curve Unpredictable {
-        let mut u8_fixturator = U8Fixturator::new_indexed(Predictable, get_fixt_index!());
+        let mut u8_fixturator = U8Fixturator::new_indexed(Unpredictable, get_fixt_index!());
         let mut bytes = vec![];
         for _ in 0..36 {
             bytes.push(u8_fixturator.next().unwrap());

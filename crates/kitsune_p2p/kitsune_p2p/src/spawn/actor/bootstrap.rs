@@ -157,7 +157,7 @@ impl Default for RandomQuery {
             // This is useless, it's here as a placeholder so that ..Default::default() syntax
             // works for limits, not because you'd actually ever want a "default" space.
             space: KitsuneSpace::new(vec![0; 36]),
-            ..Default::default()
+            limit: RandomLimit::default(),
         }
     }
 }
@@ -167,11 +167,18 @@ pub async fn random(
     url_override: Option<String>,
     query: RandomQuery,
 ) -> crate::types::actor::KitsuneP2pResult<Vec<AgentInfoSigned>> {
-    match do_api(url_override, OP_RANDOM, query).await {
-        Ok(Some(v)) => Ok(v),
-        Ok(None) => Ok(Vec::new()),
-        Err(e) => Err(e),
-    }
+    let outer_vec: Vec<serde_bytes::ByteBuf> = match do_api(url_override, OP_RANDOM, query).await {
+        Ok(Some(v)) => v,
+        Ok(None) => Vec::new(),
+        Err(e) => return Err(e),
+    };
+    let ret: Result<Vec<AgentInfoSigned>, _> = outer_vec
+        .into_iter()
+        .map(|bytes| {
+            kitsune_p2p_types::codec::rmp_decode(&mut AsRef::<[u8]>::as_ref(&bytes))
+        })
+        .collect();
+    Ok(ret?)
 }
 
 #[cfg(test)]
@@ -260,7 +267,7 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_random() {
-        let space = fixt!(KitsuneSpace);
+        let space = fixt!(KitsuneSpace, Unpredictable);
         let now = super::now(Some(super::BOOTSTRAP_URL_DEV.to_string()))
             .await
             .unwrap();
@@ -324,7 +331,7 @@ mod tests {
         .await
         .unwrap();
 
-        assert!(random.len() == 1);
+        assert!(random_single.len() == 1);
         assert!(expected[0] == random_single[0] || expected[1] == random_single[0]);
     }
 }
