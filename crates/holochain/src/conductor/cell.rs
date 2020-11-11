@@ -53,7 +53,7 @@ use holochain_state::{
 use holochain_types::{
     autonomic::AutonomicProcess,
     cell::CellId,
-    element::{GetElementResponse, WireElement},
+    element::GetElementResponse,
     link::{GetLinksResponse, WireLinkMetaKey},
     metadata::{MetadataSet, TimedHeaderHash},
     validate::ValidationPackageResponse,
@@ -79,6 +79,11 @@ mod validation_package;
 
 #[allow(missing_docs)]
 pub mod error;
+
+#[cfg(test)]
+mod gossip_test;
+#[cfg(test)]
+mod test;
 
 impl Hash for Cell {
     fn hash<H>(&self, state: &mut H)
@@ -232,7 +237,7 @@ impl Cell {
     ) -> CellResult<()> {
         use holochain_p2p::event::HolochainP2pEvent::*;
         match evt {
-            PutAgentInfoSigned { .. } | GetAgentInfoSigned { .. } => {
+            PutAgentInfoSigned { .. } | GetAgentInfoSigned { .. } | QueryAgentInfoSigned { .. } => {
                 // PutAgentInfoSigned needs to be handled at the conductor level where the p2p
                 // store lives.
                 unreachable!()
@@ -525,51 +530,8 @@ impl Cell {
 
     #[tracing::instrument(skip(self))]
     async fn handle_get_element(&self, hash: HeaderHash) -> CellResult<GetElementResponse> {
-        // Get the vaults
-        let env_ref = self.env.guard();
-        let reader = env_ref.reader()?;
-        let element_vault = ElementBuf::vault(self.env.clone().into(), false)?;
-        let meta_vault = MetadataBuf::vault(self.env.clone().into())?;
-
-        // Check that we have the authority to serve this request because we have
-        // done the StoreElement validation
-        if !meta_vault.has_registered_store_element(&hash)? {
-            return Ok(GetElementResponse::GetHeader(None));
-        }
-
-        // Look for a deletes on the header and collect them
-        let deletes = meta_vault
-            .get_deletes_on_header(&reader, hash.clone())?
-            .map_err(CellError::from)
-            .map(|delete_header| {
-                let delete = delete_header.header_hash;
-                match element_vault.get_header(&delete)? {
-                    Some(delete) => Ok(delete.try_into().map_err(AuthorityDataError::from)?),
-                    None => Err(AuthorityDataError::missing_data(delete)),
-                }
-            })
-            .collect()?;
-
-        // Look for a updates on the header and collect them
-        let updates = meta_vault
-            .get_updates(&reader, hash.clone().into())?
-            .map_err(CellError::from)
-            .map(|update_header| {
-                let update = update_header.header_hash;
-                match element_vault.get_header(&update)? {
-                    Some(update) => Ok(update.try_into().map_err(AuthorityDataError::from)?),
-                    None => Err(AuthorityDataError::missing_data(update)),
-                }
-            })
-            .collect()?;
-
-        // Get the actual header and return it with proof of deleted if there is any
-        let r = element_vault
-            .get_element(&hash)?
-            .map(|e| WireElement::from_element(e, deletes, updates))
-            .map(Box::new);
-
-        Ok(GetElementResponse::GetHeader(r))
+        let env = self.env.clone();
+        authority::handle_get_element(env, hash).await
     }
 
     #[instrument(skip(self, _dht_hash, _options))]
@@ -885,6 +847,3 @@ impl Cell {
         &self.queue_triggers
     }
 }
-
-#[cfg(test)]
-mod test;

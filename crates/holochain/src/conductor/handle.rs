@@ -210,6 +210,9 @@ pub trait ConductorHandleT: Send + Sync {
     async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite>;
 
     #[cfg(test)]
+    async fn get_p2p_env(&self) -> EnvironmentWrite;
+
+    #[cfg(test)]
     async fn get_cell_triggers(&self, cell_id: &CellId)
         -> ConductorApiResult<InitialQueueTriggers>;
 
@@ -313,6 +316,16 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             } => {
                 let res = lock
                     .get_agent_info_signed(kitsune_space, kitsune_agent)
+                    .map_err(holochain_p2p::HolochainP2pError::other);
+                respond.respond(Ok(async move { res }.boxed().into()));
+            }
+            QueryAgentInfoSigned {
+                kitsune_space,
+                respond,
+                ..
+            } => {
+                let res = lock
+                    .query_agent_info_signed(kitsune_space)
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
@@ -498,6 +511,12 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         let lock = self.conductor.read().await;
         let cell = lock.cell_by_id(cell_id)?;
         Ok(cell.env().clone())
+    }
+
+    #[cfg(test)]
+    async fn get_p2p_env(&self) -> EnvironmentWrite {
+        let lock = self.conductor.read().await;
+        lock.get_p2p_env()
     }
 
     #[cfg(test)]

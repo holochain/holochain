@@ -1,5 +1,6 @@
 use super::*;
 use holo_hash::HOLO_HASH_FULL_LEN;
+use holochain_zome_types::validate::ValidationStatus;
 pub(super) use misc::*;
 
 mod misc;
@@ -62,6 +63,9 @@ pub enum SysMetaVal {
     /// A header that results in a new entry
     /// Either a [Create] or [Update]
     NewEntry(TimedHeaderHash),
+    /// A header that results in a new entry
+    /// Either a [Create] or [Update]
+    RejectedNewEntry(TimedHeaderHash),
     /// An [Update] [Header]
     Update(TimedHeaderHash),
     /// An [Header::Delete]
@@ -72,6 +76,8 @@ pub enum SysMetaVal {
     DeleteLink(TimedHeaderHash),
     /// Custom Validation Package
     CustomPackage(HeaderHash),
+    /// Validation Status
+    ValidationStatus(ValidationStatus),
 }
 
 // #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
@@ -203,11 +209,15 @@ impl From<SysMetaVal> for HeaderHash {
     fn from(v: SysMetaVal) -> Self {
         match v {
             SysMetaVal::NewEntry(h)
+            | SysMetaVal::RejectedNewEntry(h)
             | SysMetaVal::Update(h)
             | SysMetaVal::Delete(h)
             | SysMetaVal::DeleteLink(h)
             | SysMetaVal::Activity(h) => h.header_hash,
             SysMetaVal::CustomPackage(h) => h,
+            SysMetaVal::ValidationStatus(_) => {
+                unreachable!("Tried to get the header hash from a validation status")
+            }
         }
     }
 }

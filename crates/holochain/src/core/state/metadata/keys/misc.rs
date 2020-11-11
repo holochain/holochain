@@ -42,6 +42,12 @@ impl PrefixType for ChainObservedPrefix {
     const PREFIX: u8 = 0x4;
 }
 
+#[derive(PartialOrd, Clone, Ord, PartialEq, Eq, Debug)]
+pub struct RejectedStoreElementPrefix;
+impl PrefixType for RejectedStoreElementPrefix {
+    const PREFIX: u8 = 0x5;
+}
+
 impl<P: PrefixType> MiscMetaKey<P> {
     /// Create a new prefix bytes key
     pub fn new<I: IntoIterator<Item = u8>>(bytes: I) -> Self {
@@ -84,6 +90,16 @@ impl MiscMetaKey<EntryStatusPrefix> {
 impl MiscMetaKey<StoreElementPrefix> {
     /// Create a store entry key
     pub fn store_element(hash: &HeaderHash) -> MiscMetaKey<StoreElementPrefix> {
+        let bytes: SerializedBytes = hash
+            .try_into()
+            .expect("Header Hash can't fail to serialize");
+        MiscMetaKey::new(bytes.bytes().iter().copied())
+    }
+}
+
+impl MiscMetaKey<RejectedStoreElementPrefix> {
+    /// Create a store entry key
+    pub fn rejected_store_element(hash: &HeaderHash) -> MiscMetaKey<StoreElementPrefix> {
         let bytes: SerializedBytes = hash
             .try_into()
             .expect("Header Hash can't fail to serialize");
