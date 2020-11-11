@@ -73,7 +73,7 @@ kitsune_p2p_types::write_codec_enum! {
             agent_infos.1: Vec<AgentInfoSigned>,
         },
 
-        /// Query Agent data from a remoto node
+        /// Query Agent data from a remote node
         AgentInfoQuery(0x40) {
             space.0: Arc<KitsuneSpace>,
             to_agent.0: Arc<KitsuneAgent>,
