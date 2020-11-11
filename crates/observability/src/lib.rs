@@ -77,6 +77,10 @@ use fmt::*;
 
 mod flames;
 mod fmt;
+mod open;
+
+pub use open::OpenSpanExt;
+pub use opentelemetry::api::Context;
 
 #[derive(Debug, Clone)]
 /// Sets the kind of structured logging output you want
@@ -95,6 +99,8 @@ pub enum Output {
     FlameTimed,
     /// Creates a flamegraph from timed spans using idle time
     IceTimed,
+    /// Opentelemetry tracing
+    OpenTel,
     /// No logging to console
     None,
 }
@@ -115,6 +121,7 @@ impl FromStr for Output {
             "LogTimed" => Ok(Output::LogTimed),
             "FlameTimed" => Ok(Output::FlameTimed),
             "Compact" => Ok(Output::Compact),
+            "OpenTel" => Ok(Output::OpenTel),
             "None" => Ok(Output::None),
             _ => Err("Could not parse log output type".into()),
         }
@@ -132,6 +139,16 @@ pub fn test_run() -> Result<(), errors::TracingError> {
         return Ok(());
     }
     init_fmt(Output::Log)
+}
+
+pub fn test_run_open() -> Result<(), errors::TracingError> {
+    if let (None, None) = (
+        std::env::var_os("RUST_LOG"),
+        std::env::var_os("CUSTOM_FILTER"),
+    ) {
+        return Ok(());
+    }
+    init_fmt(Output::OpenTel)
 }
 
 /// Same as test_run but with timed spans
@@ -301,6 +318,18 @@ pub fn init_fmt(output: Output) -> Result<(), errors::TracingError> {
         Output::Compact => {
             let subscriber = subscriber.compact();
             finish(subscriber.with_env_filter(filter).finish())
+        }
+        Output::OpenTel => {
+            use opentelemetry::api::Provider;
+            let tracer = opentelemetry::sdk::Provider::default().get_tracer("component_name");
+            let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
+            finish(
+                subscriber
+                    .with_env_filter(filter)
+                    .finish()
+                    .with(telemetry)
+                    .with(open::OpenLayer),
+            )
         }
         Output::None => Ok(()),
     }
