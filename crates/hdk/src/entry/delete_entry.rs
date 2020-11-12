@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-/// Alias to delete!
+/// Alias to delete
 ///
 /// Takes any expression that evaluates to the HeaderHash of the deleted element.
 ///
@@ -8,5 +8,5 @@ use crate::prelude::*;
 /// delete_entry(entry_hash(foo_entry)?)?;
 /// ```
 pub fn delete_entry(hash: HeaderHash) -> HdkResult<HeaderHash> {
-    delete!(hash)
+    delete(hash)
 }

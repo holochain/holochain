@@ -16,5 +16,5 @@ use crate::prelude::*;
 ///
 /// @see create_cap_grant
 pub fn delete_cap_grant(hash: HeaderHash) -> HdkResult<HeaderHash> {
-    delete!(hash)
+    delete(hash)
 }
