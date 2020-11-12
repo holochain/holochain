@@ -1,8 +1,4 @@
 use crate::prelude::*;
-use holo_hash::AgentPubKey;
-use holochain_zome_types::query::{ActivityRequest, AgentActivity, ChainQueryFilter};
-
-use crate::host_fn;
 
 pub fn get_agent_activity(
     agent: AgentPubKey,

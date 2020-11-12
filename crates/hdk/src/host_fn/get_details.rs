@@ -1,3 +1,5 @@
+use crate::prelude::*;
+
 /// Get an element from the hash AND the details for the entry or header hash passed in.
 /// Returns None if the entry/header does not exist.
 /// The details returned are a contextual mix of elements and header hashes, see below.
@@ -38,20 +40,17 @@
 ///
 /// Note: There are multiple header types that exist and operate entirely outside of CRUD elements
 ///       so they cannot reference or be referenced by CRUD, so are immutable or have their own
-///       mutation logic (e.g. link create/delete) and will not be included in get_details! results
+///       mutation logic (e.g. link create/delete) and will not be included in get_details results
 ///       e.g. the DNA itself, links, migrations, etc.
-///       However the element will still be returned by get_details! if a header hash is passed,
+///       However the element will still be returned by get_details if a header hash is passed,
 ///       these header-only elements will have None as the entry value.
-#[macro_export]
-macro_rules! get_details {
-    ( $hash:expr, $options:expr ) => {{
-        $crate::host_fn!(
-            __get_details,
-            $crate::prelude::GetDetailsInput::new(($hash.into(), $options)),
-            $crate::prelude::GetDetailsOutput
-        )
-    }};
-    ( $hash:expr ) => {
-        get_details!($hash, $crate::prelude::GetOptions)
-    };
+pub fn get_details<H: Into<AnyDhtHash>>(
+    hash: H,
+    options: GetOptions,
+) -> HdkResult<Option<Details>> {
+    host_fn!(
+        __get_details,
+        GetDetailsInput::new((hash.into(), options)),
+        GetDetailsOutput
+    )
 }

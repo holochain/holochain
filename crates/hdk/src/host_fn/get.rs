@@ -6,7 +6,7 @@
 ///
 /// An element is no longer live once it is referenced by a valid delete element.
 /// An update to an element does not change its liveness.
-/// @see get_details! for more information about how CRUD elements reference each other.
+/// @see get_details for more information about how CRUD elements reference each other.
 ///
 /// Note: `get!` __always triggers and blocks on a network call__.
 ///       @todo implement a 'get optimistic' that returns based on the current opinion of the world
@@ -26,7 +26,7 @@
 ///       pointing to a single entry, it is not the "current value" of an entry in a CRUD sense.
 ///       e.g. If "foo" is created then updated to "bar", a `get!` on the hash of "foo" will return
 ///            "foo" as part of an element with the "oldest live" header.
-///            To discover "bar" the agent needs to call `get_details!` and decide how it wants to
+///            To discover "bar" the agent needs to call `get_details` and decide how it wants to
 ///            collapse many potential creates, updates and deletes down into a single or filtered
 ///            set of updates, to "walk the tree".
 ///       e.g. Updates could include a proof of work and a tree would collapse to a simple
@@ -37,7 +37,7 @@
 ///       e.g. Domain/user names could be claimed on a "first come, first serve" basis with only
 ///            creates and deletes allowed by validation rules, the "oldest live" element _does_
 ///            represent the element pointing at the first agent to claim a name, but it could also
-///            be checked manually by the app with `get_details!`.
+///            be checked manually by the app with `get_details`.
 ///
 /// Note: "oldest live" is only as good as the information available to the authorities the agent
 ///       contacts on their current network partition, there could always be an older live entry
