@@ -17,16 +17,13 @@
 /// c.f. get_links that returns only the creates that have not been deleted.
 ///
 /// @see get_links
-#[macro_export]
-macro_rules! get_link_details {
-    ( $base:expr ) => {
-        $crate::get_link_details!($base, None)
-    };
-    ( $base:expr, $tag:expr ) => {{
-        $crate::host_fn!(
-            __get_link_details,
-            GetLinkDetailsInput::new(($base, $tag.into())),
-            GetLinkDetailsOutput
-        )
-    }};
+pub fn get_link_details(
+    base: EntryHash,
+    link_tag: Option<LinkTag>,
+) -> HdkResult<LinkDetails> {
+    host_fn!(
+        __get_link_details,
+        GetLinkDetailsInput::new((base, link_tag)),
+        GetLinkDetailsOutput
+    )
 }

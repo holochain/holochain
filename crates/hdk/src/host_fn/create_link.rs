@@ -29,7 +29,7 @@ use crate::prelude::*;
 /// - only reference other entries of the same entry type (e.g. comments can _not_ update posts)
 ///
 /// @see get_details and get! for more information about CRUD
-/// @see get_links! and get_link_details! for more information about filtering by tag
+/// @see get_links! and get_link_details for more information about filtering by tag
 ///
 /// Generally links and CRUDs _do not interact_ beyond the fact that links need entry hashes to
 /// reference for the base and target to already exist due to a prior create or update.
