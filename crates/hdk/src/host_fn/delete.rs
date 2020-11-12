@@ -19,3 +19,11 @@ macro_rules! delete {
         )
     }};
 }
+pub fn delete(hash:HeaderHash) -> HdkExtern<HeaderHash> {
+    host_externs!(__delete);
+    host_fn!(
+        __delete,
+        DeleteInput::new(hash),
+        DeleteOutput
+    )
+}
