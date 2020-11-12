@@ -1,3 +1,5 @@
+use crate::prelude::*;
+
 /// General macro that can create any entry type.
 ///
 /// This is used under the hood by `create_entry`, `create_cap_grant` and `create_cap_claim`.
@@ -11,14 +13,14 @@
 /// @see create_entry
 /// @see create_cap_grant
 /// @see create_cap_claim
-#[macro_export]
-macro_rules! create {
-    ( $type:expr, $entry:expr ) => {{
-        $crate::prelude::host_externs!(__create);
-        $crate::host_fn!(
-            __create,
-            $crate::prelude::CreateInput::new(($type.into(), $entry.into(),)),
-            $crate::prelude::CreateOutput
-        )
-    }};
+pub fn create<D: Into<EntryDefId>, E: Into<Entry>>(
+    entry_def_id: D,
+    entry: E,
+) -> HdkResult<HeaderHash> {
+    host_externs!(__create);
+    host_fn!(
+        __create,
+        CreateInput::new((entry_def_id.into(), entry.into())),
+        CreateOutput
+    )
 }

@@ -25,5 +25,5 @@ where
     host_externs!(__create);
     let entry_def_id = EntryDefId::from(input);
     let sb = SerializedBytes::try_from(input)?;
-    create!(entry_def_id, Entry::App(sb.try_into()?))
+    create(entry_def_id, Entry::App(sb.try_into()?))
 }
