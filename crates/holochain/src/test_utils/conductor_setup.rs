@@ -1,12 +1,13 @@
 use crate::{
     conductor::{
-        api::{CellConductorApi, CellConductorApiT, RealAppInterfaceApi},
+        api::{CellConductorApi, CellConductorApiT},
         interface::SignalBroadcaster,
         ConductorHandle,
     },
     core::queue_consumer::InitialQueueTriggers,
     core::ribosome::{wasm_ribosome::WasmRibosome, RibosomeT},
 };
+use holo_hash::AgentPubKey;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::{actor::HolochainP2pRefToCell, HolochainP2pCell};
 use holochain_serialized_bytes::SerializedBytes;
@@ -22,15 +23,6 @@ use std::{convert::TryFrom, sync::Arc};
 use tempdir::TempDir;
 
 use super::{host_fn_api::CallData, install_app, setup_app_with_network};
-
-/// Everything you need to run a test that uses the conductor
-pub struct ConductorTestData {
-    pub __tmpdir: Arc<TempDir>,
-    pub app_api: RealAppInterfaceApi,
-    pub handle: ConductorHandle,
-    pub alice_call_data: ConductorCallData,
-    pub bob_call_data: Option<ConductorCallData>,
-}
 
 /// Everything you need to make a call with the host fn api
 pub struct ConductorCallData {
@@ -85,10 +77,27 @@ impl ConductorCallData {
     }
 }
 
+/// Everything you need to run a test that uses the conductor
+pub struct ConductorTestData {
+    __tmpdir: Arc<TempDir>,
+    // app_api: RealAppInterfaceApi,
+    handle: ConductorHandle,
+    alice_call_data: ConductorCallData,
+    bob_call_data: Option<ConductorCallData>,
+}
+
 impl ConductorTestData {
+    pub async fn _new(
+        _dnas: Vec<DnaDef>,
+        _agents: Vec<AgentPubKey>,
+        _network_config: KitsuneP2pConfig,
+    ) -> Self {
+        todo!()
+    }
+
     /// Create a new conductor and test data
-    pub async fn new(zomes: Vec<TestWasm>, with_bob: bool) -> Self {
-        Self::new_inner(zomes, with_bob, None).await
+    pub async fn two_agents(zomes: Vec<TestWasm>, with_bob: bool) -> Self {
+        Self::two_agents_inner(zomes, with_bob, None).await
     }
 
     /// New test data that creates a conductor using a custom network config
@@ -97,10 +106,10 @@ impl ConductorTestData {
         with_bob: bool,
         network: KitsuneP2pConfig,
     ) -> Self {
-        Self::new_inner(zomes, with_bob, Some(network)).await
+        Self::two_agents_inner(zomes, with_bob, Some(network)).await
     }
 
-    async fn new_inner(
+    async fn two_agents_inner(
         zomes: Vec<TestWasm>,
         with_bob: bool,
         network: Option<KitsuneP2pConfig>,
@@ -141,53 +150,70 @@ impl ConductorTestData {
             None
         };
 
-        let (__tmpdir, app_api, handle) = setup_app_with_network(
+        let (__tmpdir, _app_api, handle) = setup_app_with_network(
             vec![("test_app", cells)],
             vec![dna_file.clone()],
             network.unwrap_or_default(),
         )
         .await;
 
-        let alice_call_data = ConductorCallData::new(&alice_cell_id, &handle, &dna_file).await;
+        let alice_call_data =
+            ConductorCallData::new(&alice_cell_id, &handle.clone(), &dna_file).await;
 
         let bob_call_data = match bob_cell_id {
             Some(bob_cell_id) => {
-                Some(ConductorCallData::new(&bob_cell_id, &handle, &dna_file).await)
+                Some(ConductorCallData::new(&bob_cell_id, &handle.clone(), &dna_file).await)
             }
             None => None,
         };
 
         Self {
             __tmpdir,
-            app_api,
+            // app_api,
             handle,
             alice_call_data,
             bob_call_data,
         }
     }
+
     /// Shutdown the conductor
-    pub async fn shutdown_conductor(handle: ConductorHandle) {
-        let shutdown = handle.take_shutdown_handle().await.unwrap();
-        handle.shutdown().await;
+    pub async fn shutdown_conductor(&mut self) {
+        let shutdown = self.handle.take_shutdown_handle().await.unwrap();
+        self.handle.shutdown().await;
         shutdown.await.unwrap();
     }
+
     /// Bring bob online if he isn't already
     pub async fn bring_bob_online(&mut self) {
-        let dna_file = self.alice_call_data.ribosome.dna_file();
-        if self.bob_call_data.is_none() {
+        let dna_file = self.alice_call_data().ribosome.dna_file().clone();
+        if self.bob_call_data().is_none() {
             let bob_agent_id = fake_agent_pubkey_2();
             let bob_cell_id = CellId::new(dna_file.dna_hash.clone(), bob_agent_id.clone());
             let bob_installed_cell = InstalledCell::new(bob_cell_id.clone(), "bob_handle".into());
             let cell_data = vec![(bob_installed_cell, None)];
-            install_app(
-                "bob_app",
-                cell_data,
-                vec![dna_file.clone()],
-                self.handle.clone(),
-            )
-            .await;
+            install_app("bob_app", cell_data, vec![dna_file.clone()], self.handle()).await;
             self.bob_call_data =
-                Some(ConductorCallData::new(&bob_cell_id, &self.handle, dna_file).await);
+                Some(ConductorCallData::new(&bob_cell_id, &self.handle(), &dna_file).await);
         }
+    }
+
+    pub fn handle(&self) -> ConductorHandle {
+        self.handle.clone()
+    }
+
+    pub fn alice_call_data(&self) -> &ConductorCallData {
+        &self.alice_call_data
+    }
+
+    pub fn bob_call_data(&self) -> Option<&ConductorCallData> {
+        self.bob_call_data.as_ref()
+    }
+
+    pub fn alice_call_data_mut(&mut self) -> &mut ConductorCallData {
+        &mut self.alice_call_data
+    }
+
+    pub fn bob_call_data_mut(&mut self) -> Option<&mut ConductorCallData> {
+        self.bob_call_data.as_mut()
     }
 }
