@@ -18,10 +18,10 @@
 /// @see CapClaim
 /// @see cap grant functions
 pub fn create_cap_claim(
-    input: crate::prelude::CapClaimEntry
+    cap_claim_entry: crate::prelude::CapClaimEntry,
 ) -> Result<holo_hash::HeaderHash, crate::prelude::SerializedBytesError> {
     crate::prelude::create!(
         crate::prelude::EntryDefId::CapClaim,
-        crate::prelude::Entry::CapClaim(input)
+        crate::prelude::Entry::CapClaim(cap_claim_entry)
     )
 }

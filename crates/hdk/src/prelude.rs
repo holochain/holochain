@@ -1,8 +1,8 @@
 pub use crate::agent_info;
 pub use crate::call_remote;
-pub use crate::create;
 pub use crate::capability::create_cap_claim::create_cap_claim;
-pub use crate::create_cap_grant;
+pub use crate::capability::create_cap_grant::create_cap_grant;
+pub use crate::create;
 pub use crate::create_entry;
 pub use crate::create_link;
 pub use crate::debug;

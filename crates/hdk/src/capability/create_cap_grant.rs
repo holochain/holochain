@@ -78,12 +78,11 @@
 /// @see CapAccess
 /// @see create_cap_claim!
 /// @see generate_cap_secret!
-#[macro_export]
-macro_rules! create_cap_grant {
-    ( $input:expr ) => {{
-        create!(
-            $crate::prelude::EntryDefId::CapGrant,
-            $crate::prelude::Entry::CapGrant($input)
-        )
-    }};
+pub fn create_cap_grant(
+    cap_grant_entry: crate::prelude::CapGrantEntry,
+) -> Result<holo_hash::HeaderHash, crate::prelude::SerializedBytesError> {
+    crate::prelude::create!(
+        crate::prelude::EntryDefId::CapGrant,
+        crate::prelude::Entry::CapGrant(cap_grant_entry)
+    )
 }
