@@ -3,7 +3,7 @@
 /// There are several positional arguments to the macro:
 ///
 /// - agent: The address of the agent to call the RPC style remote function on.
-/// - zome: The zome to call the remote function in. Use zome_info!() to get the current zome info.
+/// - zome: The zome to call the remote function in. Use zome_info() to get the current zome info.
 /// - fn_name: The name of the function in the zome to call.
 /// - request: The payload to send to the remote function; receiver needs to deserialize cleanly.
 ///

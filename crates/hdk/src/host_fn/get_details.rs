@@ -34,7 +34,7 @@
 ///       any time they need to represent 1 or "foo" for a create, update or delete.
 ///       If you need to disambiguate entry values, provide uniqueness in the entry value such as
 ///       a unique hash (e.g. current chain head), timestamp (careful about collisions!), or random
-///       bytes/uuid (see random_bytes!() and the uuid rust crate that supports uuids from bytes).
+///       bytes/uuid (see random_bytes() and the uuid rust crate that supports uuids from bytes).
 ///
 /// Note: There are multiple header types that exist and operate entirely outside of CRUD elements
 ///       so they cannot reference or be referenced by CRUD, so are immutable or have their own

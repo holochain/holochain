@@ -1,9 +1,11 @@
+use crate::prelude::*;
+
 /// Trivial macro to return the current system time from the host.
 ///
 /// System time doesn't accept any arguments so usage is as simple as:
 ///
 /// ```ignore
-/// let now = sys_time!()?;
+/// let now = sys_time()?;
 /// ```
 ///
 /// Note: sys_time returns a result like all host fns so `?` or `.ok()` is needed.
@@ -59,13 +61,10 @@
 /// on the current time within relatively tight accuracy/precision up-front in a relatively trusted
 /// environment e.g. a chess game between friends with time moves that balances security/trust and
 /// flaky networking, etc.
-#[macro_export]
-macro_rules! sys_time {
-    () => {{
-        $crate::host_fn!(
-            __sys_time,
-            $crate::prelude::SysTimeInput::new(()),
-            $crate::prelude::SysTimeOutput
-        )
-    }};
+pub fn sys_time() -> HdkResult<core::time::Duration> {
+    host_fn!(
+        __sys_time,
+        SysTimeInput::new(()),
+        SysTimeOutput
+    )
 }

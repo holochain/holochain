@@ -3,8 +3,8 @@ use hdk3::prelude::*;
 #[hdk_extern]
 fn set_access(_: ()) -> ExternResult<()> {
     let mut functions: GrantedFunctions = HashSet::new();
-    functions.insert((zome_info!()?.zome_name, "whoami".into()));
-    create_cap_grant!(CapGrantEntry {
+    functions.insert((zome_info()?.zome_name, "whoami".into()));
+    create_cap_grant(CapGrantEntry {
         tag: "".into(),
         // empty access converts to unrestricted
         access: ().into(),
@@ -27,7 +27,7 @@ fn whoami(_: ()) -> ExternResult<AgentInfo> {
 fn whoarethey(agent_pubkey: AgentPubKey) -> ExternResult<AgentInfo> {
     let response: ZomeCallResponse = call_remote!(
         agent_pubkey,
-        zome_info!()?.zome_name,
+        zome_info()?.zome_name,
         "whoami".to_string().into(),
         None,
         ().try_into()?
@@ -49,7 +49,7 @@ fn whoarethey(agent_pubkey: AgentPubKey) -> ExternResult<AgentInfo> {
 fn who_are_they_local(cell_id: CellId) -> ExternResult<AgentInfo> {
     call(
         Some(cell_id),
-        zome_info!()?.zome_name,
+        zome_info()?.zome_name,
         "whoami".to_string().into(),
         None,
         (),

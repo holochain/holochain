@@ -678,7 +678,7 @@ the sugar that it provides.
 The HDK macros simply expand to this extern boilerplate, saving you from typing
 out a few macros to input/output data for the host. They also offer some
 convenience wrappers around `host_call!()` that do exactly what you'd expect,
-e.g. `create_entry!( ... )` vs. `host_call!(__create, ... )`.
+e.g. `create_entry( ... )` vs. `host_call!(__create, ... )`.
 
 Think of the HDK as a tool and safety net but also don't feel you can't peek
 under the hood to see what is there.

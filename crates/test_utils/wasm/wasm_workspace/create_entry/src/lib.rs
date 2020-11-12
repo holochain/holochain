@@ -38,27 +38,27 @@ fn priv_msg() -> PrivMsg {
 
 #[hdk_extern]
 fn create_entry(_: ()) -> ExternResult<HeaderHash> {
-    Ok(create_entry!(post())?)
+    Ok(hdk3::prelude::create_entry(&post())?)
 }
 
 #[hdk_extern]
 fn create_post(post: Post) -> ExternResult<HeaderHash> {
-    Ok(create_entry!(&post)?)
+    Ok(hdk3::prelude::create_entry(&post)?)
 }
 
 #[hdk_extern]
 fn get_entry(_: ()) -> ExternResult<GetOutput> {
-    Ok(GetOutput::new(get!(hash_entry!(post())?)?))
+    Ok(GetOutput::new(get!(hash_entry(post())?)?))
 }
 
 #[hdk_extern]
 fn create_msg(_: ()) -> ExternResult<HeaderHash> {
-    Ok(create_entry!(msg())?)
+    Ok(hdk3::prelude::create_entry(&msg())?)
 }
 
 #[hdk_extern]
 fn create_priv_msg(_: ()) -> ExternResult<HeaderHash> {
-    Ok(create_entry!(priv_msg())?)
+    Ok(hdk3::prelude::create_entry(&priv_msg())?)
 }
 
 #[hdk_extern]
@@ -84,8 +84,8 @@ fn get_activity(input: test_wasm_common::AgentActivitySearch) -> ExternResult<Ag
 fn init(_: ()) -> ExternResult<InitCallbackResult> {
     // grant unrestricted access to accept_cap_claim so other agents can send us claims
     let mut functions: GrantedFunctions = HashSet::new();
-    functions.insert((zome_info!()?.zome_name, "create_entry".into()));
-    create_cap_grant!(CapGrantEntry {
+    functions.insert((zome_info()?.zome_name, "create_entry".into()));
+    create_cap_grant(CapGrantEntry {
         tag: "".into(),
         // empty access converts to unrestricted
         access: ().into(),
@@ -100,7 +100,7 @@ fn init(_: ()) -> ExternResult<InitCallbackResult> {
 /// call
 #[hdk_extern]
 fn call_create_entry(_: ()) -> ExternResult<HeaderHash> {
-    create_entry!(post())?;
+    hdk3::prelude::create_entry(&post())?;
     Ok(call(
         None,
         "create_entry".to_string().into(),

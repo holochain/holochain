@@ -1,3 +1,5 @@
+use crate::prelude::*;
+
 /// Hash anything that that implements TryInto<SerializedBytes> into an entry hash.
 ///
 /// Hashes are typed in holochain, e.g. HeaderHash and EntryHash are different and yield different
@@ -21,32 +23,32 @@
 /// Anything that is annotated with #[hdk_entry( .. )] or entry_def!( .. ) implements this so is
 /// compatible automatically.
 ///
-/// hash_entry! is "dumb" in that it doesn't check the entry is defined, committed, on the DHT or
+/// hash_entry is "dumb" in that it doesn't check the entry is defined, committed, on the DHT or
 /// any other validation, it simply generates the hash for the serialized representation of
 /// something in the same way that the DHT would.
 ///
-/// It is strongly recommended that you use the `hash_entry!` macro to calculate hashes to avoid
+/// It is strongly recommended that you use the `hash_entry` macro to calculate hashes to avoid
 /// inconsistencies between hashes in the wasm guest and the host.
 /// For example, a lot of the crypto crates in rust compile to wasm so in theory could generate the
 /// hash in the guest, but there is the potential that the serialization logic could be slightly
 /// different, etc.
 ///
 /// ```ignore
-/// let foo_hash = hash_entry!(foo)?;
+/// let foo_hash = hash_entry(foo)?;
 /// ```
-#[macro_export]
-macro_rules! hash_entry {
-    ( $input:expr ) => {{
-        $crate::prelude::host_externs!(__hash_entry);
-
-        let try_sb = $crate::prelude::SerializedBytes::try_from($input);
-        match try_sb {
-            Ok(sb) => $crate::host_fn!(
-                __hash_entry,
-                $crate::prelude::HashEntryInput::new($crate::prelude::Entry::App(sb.try_into()?)),
-                $crate::prelude::HashEntryOutput
-            ),
-            Err(e) => Err(e),
-        }
-    }};
+pub fn hash_entry<
+    I: std::convert::TryInto<
+        SerializedBytes,
+        Error = SerializedBytesError,
+    >,
+>(
+    input: I,
+) -> HdkResult<EntryHash> {
+    host_externs!(__hash_entry);
+    let sb: SerializedBytes = input.try_into()?;
+    host_fn!(
+        __hash_entry,
+        HashEntryInput::new(Entry::App(sb.try_into()?)),
+        HashEntryOutput
+    )
 }

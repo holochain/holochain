@@ -1,3 +1,5 @@
+use crate::prelude::*;
+
 /// Create a CapClaim on the local source chain.
 ///
 /// Recipients of secrets for use in redemption of CapGrants use CapClaim entries to save it.
@@ -18,10 +20,10 @@
 /// @see CapClaim
 /// @see cap grant functions
 pub fn create_cap_claim(
-    cap_claim_entry: crate::prelude::CapClaimEntry,
-) -> Result<holo_hash::HeaderHash, crate::prelude::SerializedBytesError> {
-    crate::prelude::create!(
-        crate::prelude::EntryDefId::CapClaim,
-        crate::prelude::Entry::CapClaim(cap_claim_entry)
+    cap_claim_entry: CapClaimEntry,
+) -> HdkResult<HeaderHash> {
+    create!(
+        EntryDefId::CapClaim,
+        Entry::CapClaim(cap_claim_entry)
     )
 }

@@ -1,7 +1,9 @@
+use crate::prelude::*;
+
 /// Trivial macro to get N cryptographically strong random bytes.
 ///
 /// ```ignore
-/// let five_bytes = random_bytes!(5)?;
+/// let five_bytes = random_bytes(5)?;
 /// ```
 ///
 /// It's not possible to generate random bytes from inside the wasm guest so the data is provided
@@ -22,13 +24,11 @@
 /// PRNG from there.
 ///
 /// @see the rand rust crate
-#[macro_export]
-macro_rules! random_bytes {
-    ( $bytes:expr ) => {{
-        $crate::host_fn!(
-            __random_bytes,
-            $crate::prelude::RandomBytesInput::new($bytes),
-            $crate::prelude::RandomBytesOutput
-        )
-    }};
+pub fn random_bytes(number_of_bytes: u32) -> HdkResult<Vec<u8>> {
+    host_fn!(
+        __random_bytes,
+        RandomBytesInput::new(number_of_bytes),
+        RandomBytesOutput
+    )
+    .map(|bytes| bytes.into_vec())
 }

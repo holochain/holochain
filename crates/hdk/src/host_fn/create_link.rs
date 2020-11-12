@@ -33,7 +33,7 @@
 /// reference for the base and target to already exist due to a prior create or update.
 /// The entry value only needs to exist on the DHT for the link to validate, it doesn't need to be
 /// live and can have any combination of valid/invalid crud headers.
-/// i.e. if you use link_entries! to create relationships between two entries, then update_entry!
+/// i.e. if you use link_entries! to create relationships between two entries, then update_entry
 /// on the base, the links will still only be visible to get_link(s_details)! against the original
 /// base, there is no logic to "bring forward" links to the updated entry because:
 ///

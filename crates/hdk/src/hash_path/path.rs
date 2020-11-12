@@ -257,7 +257,7 @@ impl TryFrom<&LinkTag> for Path {
 impl Path {
     /// What is the hash for the current Path?
     pub fn hash(&self) -> Result<holo_hash::EntryHash, HdkError> {
-        Ok(hash_entry!(self)?)
+        Ok(hash_entry(self)?)
     }
 
     /// Does an entry exist at the hash we expect?
@@ -268,7 +268,7 @@ impl Path {
     /// Recursively touch this and every parent that doesn't exist yet.
     pub fn ensure(&self) -> Result<(), HdkError> {
         if !self.exists()? {
-            create_entry!(self)?;
+            create_entry(self)?;
             if let Some(parent) = self.parent() {
                 parent.ensure()?;
                 create_link!(parent.hash()?, self.hash()?, LinkTag::try_from(self)?)?;

@@ -12,7 +12,7 @@
 ///
 /// To 'undo' a delete a new grant with a new secret will need to be issued.
 ///
-/// @see create_cap_grant!
+/// @see create_cap_grant
 #[macro_export]
 macro_rules! delete_cap_grant {
     ( $hash:expr ) => {{

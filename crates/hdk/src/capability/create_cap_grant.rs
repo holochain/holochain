@@ -1,3 +1,5 @@
+use crate::prelude::*;
+
 /// Create a CapGrant on the grantor's chain.
 ///
 /// When an agent wants to expose externs to be called remotely by other agents they need to select
@@ -76,13 +78,13 @@
 ///
 /// @see ZomeCallCapGrant
 /// @see CapAccess
-/// @see create_cap_claim!
+/// @see create_cap_claim
 /// @see generate_cap_secret!
 pub fn create_cap_grant(
-    cap_grant_entry: crate::prelude::CapGrantEntry,
-) -> Result<holo_hash::HeaderHash, crate::prelude::SerializedBytesError> {
-    crate::prelude::create!(
-        crate::prelude::EntryDefId::CapGrant,
-        crate::prelude::Entry::CapGrant(cap_grant_entry)
+    cap_grant_entry: CapGrantEntry,
+) -> HdkResult<HeaderHash> {
+    create!(
+        EntryDefId::CapGrant,
+        Entry::CapGrant(cap_grant_entry)
     )
 }

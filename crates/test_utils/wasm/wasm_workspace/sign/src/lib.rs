@@ -2,7 +2,7 @@ use hdk3::prelude::*;
 
 #[hdk_extern]
 fn sign(sign_input: SignInput) -> ExternResult<Signature> {
-    Ok(sign!(sign_input)?)
+    Ok(hdk3::prelude::sign(sign_input.key, sign_input.data)?)
 }
 
 #[hdk_extern]

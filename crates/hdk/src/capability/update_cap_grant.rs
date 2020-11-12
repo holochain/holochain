@@ -5,7 +5,7 @@
 /// The hash evalutes to the HeaderHash of the deleted grant.
 /// The input evalutes to the new grant.
 ///
-/// @see create_cap_grant!
+/// @see create_cap_grant
 /// @see delete_cap_grant!
 #[macro_export]
 macro_rules! update_cap_grant {

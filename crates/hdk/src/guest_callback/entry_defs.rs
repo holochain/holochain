@@ -5,7 +5,7 @@
 ///
 /// For example, the Foo::entry_def() style works best in the entry_defs callback as it doesn't
 /// require an instantiated Foo in order to get the definition.
-/// On the other hand, EntryDef::from(Foo::new()) works better when e.g. using create_entry!() as
+/// On the other hand, EntryDef::from(Foo::new()) works better when e.g. using create_entry() as
 /// an instance of Foo already exists and we need the entry def id back for creates and updates.
 ///
 /// If you don't want to use the macro you can simply implement similar fns youself.
@@ -14,7 +14,7 @@
 /// impls are just a loose set of conventions.
 ///
 /// It's actually entirely possible to interact with core directly without any of these.
-/// e.g. create_entry!() is just building a tuple of EntryDefId and Entry::App under the hood.
+/// e.g. create_entry() is just building a tuple of EntryDefId and Entry::App under the hood.
 ///
 /// This requires that TryFrom and TryInto SerializedBytes is implemented for the entry type,
 /// which implies that serde::Serialize and serde::Deserialize is also implemented.

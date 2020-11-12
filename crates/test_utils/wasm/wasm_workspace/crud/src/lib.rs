@@ -20,7 +20,7 @@ fn entry_details(entry_hash: EntryHash) -> ExternResult<GetDetailsOutput> {
 
 #[hdk_extern]
 fn entry_hash(countree: countree::CounTree) -> ExternResult<EntryHash> {
-    Ok(hash_entry!(countree)?)
+    Ok(hash_entry(countree)?)
 }
 
 #[hdk_extern]
