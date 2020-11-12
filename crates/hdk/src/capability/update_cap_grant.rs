@@ -17,3 +17,13 @@ macro_rules! update_cap_grant {
         )
     }};
 }
+pub fn update_cap_grant(
+    hash: HeaderHash,
+    input: CapGrantEntry,
+) -> HdkResult<HeaderHash> {
+    update!(
+        hash,
+        EntryDefId::CapGrant,
+        Entry::CapGrant(input),
+    )
+}
