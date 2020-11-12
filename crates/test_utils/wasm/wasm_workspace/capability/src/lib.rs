@@ -43,7 +43,7 @@ pub fn transferable_cap_grant(secret: CapSecret) -> ExternResult<HeaderHash> {
 #[hdk_extern]
 pub fn roll_cap_grant(header_hash: HeaderHash) -> ExternResult<HeaderHash> {
     let secret = generate_cap_secret()?;
-    Ok(update_cap_grant!(header_hash, cap_grant_entry(secret)?)?)
+    Ok(update_cap_grant(header_hash, cap_grant_entry(secret)?)?)
 }
 
 #[hdk_extern]
