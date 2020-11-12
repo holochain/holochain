@@ -1,4 +1,3 @@
-pub use crate::agent_info;
 pub use crate::call_remote;
 pub use crate::capability::create_cap_claim::create_cap_claim;
 pub use crate::capability::create_cap_grant::create_cap_grant;
@@ -30,6 +29,7 @@ pub use crate::hash_path::anchor::list_anchor_type_addresses;
 pub use crate::hash_path::anchor::Anchor;
 pub use crate::hash_path::path::Path;
 pub use crate::host_fn;
+pub use crate::host_fn::agent_info::agent_info;
 pub use crate::host_fn::call::call;
 pub use crate::host_fn::get_agent_activity::get_agent_activity;
 pub use crate::host_fn::hash_entry::hash_entry;

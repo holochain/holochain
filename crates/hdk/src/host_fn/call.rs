@@ -30,7 +30,7 @@ where
     O: TryFrom<SerializedBytes, Error = SerializedBytesError>,
 {
     let request: SerializedBytes = request.try_into()?;
-    let provenance = agent_info!()?.agent_latest_pubkey;
+    let provenance = agent_info()?.agent_latest_pubkey;
     let out = host_fn!(
         __call,
         CallInput::new(Call::new(

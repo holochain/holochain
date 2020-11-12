@@ -17,7 +17,7 @@ fn set_access(_: ()) -> ExternResult<()> {
 // returns the current agent info
 #[hdk_extern]
 fn whoami(_: ()) -> ExternResult<AgentInfo> {
-    Ok(agent_info!()?)
+    Ok(agent_info()?)
 }
 
 // returns the agent info reported by the given pub key

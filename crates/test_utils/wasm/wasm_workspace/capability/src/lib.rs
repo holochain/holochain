@@ -104,7 +104,7 @@ fn send_assigned_cap_claim(agent: AgentPubKey) -> ExternResult<()> {
         this_zome,
         "accept_cap_claim".into(),
         None,
-        CapClaim::new(tag, agent_info!()?.agent_latest_pubkey, secret,).try_into()?
+        CapClaim::new(tag, agent_info()?.agent_latest_pubkey, secret,).try_into()?
     )?;
     Ok(())
 }
