@@ -36,12 +36,7 @@ use crate::prelude::*;
 /// ```ignore
 /// let foo_hash = hash_entry(foo)?;
 /// ```
-pub fn hash_entry<
-    I: std::convert::TryInto<
-        SerializedBytes,
-        Error = SerializedBytesError,
-    >,
->(
+pub fn hash_entry<I: std::convert::TryInto<SerializedBytes, Error = SerializedBytesError>>(
     input: I,
 ) -> HdkResult<EntryHash> {
     host_externs!(__hash_entry);

@@ -8,9 +8,5 @@ use crate::prelude::*;
 /// In general any holochain compatible wasm can be compiled and run in any zome so the zome info
 /// needs to be looked up at runtime to e.g. know where to send/receive call_remote rpc calls to.
 pub fn zome_info() -> HdkResult<ZomeInfo> {
-    host_fn!(
-        __zome_info,
-        ZomeInfoInput::new(()),
-        ZomeInfoOutput
-    )
+    host_fn!(__zome_info, ZomeInfoInput::new(()), ZomeInfoOutput)
 }

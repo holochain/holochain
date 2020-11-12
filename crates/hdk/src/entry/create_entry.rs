@@ -17,9 +17,11 @@ use crate::prelude::*;
 /// ```
 ///
 /// @see get! and get_details! for more information on CRUD
-pub fn create_entry<'a, I: 'a>(
-    input: &'a I
-) -> HdkResult<HeaderHash> where EntryDefId: From<&'a I>, SerializedBytes: TryFrom<&'a I, Error = SerializedBytesError> {
+pub fn create_entry<'a, I: 'a>(input: &'a I) -> HdkResult<HeaderHash>
+where
+    EntryDefId: From<&'a I>,
+    SerializedBytes: TryFrom<&'a I, Error = SerializedBytesError>,
+{
     host_externs!(__create);
     let entry_def_id = EntryDefId::from(input);
     let sb = SerializedBytes::try_from(input)?;

@@ -1,6 +1,8 @@
+use crate::prelude::*;
+
 /// Deletes a CapGrant.
 ///
-/// The input to delete_cap_grant! evalutes to the HeaderHash of the CapGrant element to delete.
+/// The input to delete_cap_grant evalutes to the HeaderHash of the CapGrant element to delete.
 /// Deletes can reference both CapGrant creates and updates.
 ///
 /// There are no branching CRUD trees for CapGrant entries because they are always local on the
@@ -13,9 +15,6 @@
 /// To 'undo' a delete a new grant with a new secret will need to be issued.
 ///
 /// @see create_cap_grant
-#[macro_export]
-macro_rules! delete_cap_grant {
-    ( $hash:expr ) => {{
-        $crate::delete!($hash)
-    }};
+pub fn delete_cap_grant(hash: HeaderHash) -> HdkResult<HeaderHash> {
+    delete!(hash)
 }
