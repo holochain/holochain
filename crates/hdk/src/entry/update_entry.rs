@@ -26,7 +26,7 @@ use crate::prelude::*;
 ///
 /// @see create_entry
 /// @see update!
-/// @see delete_entry!
+/// @see delete_entry
 pub fn update_entry<'a, I: 'a>(hash: HeaderHash, input: &'a I) -> HdkResult<HeaderHash>
 where
     EntryDefId: From<&'a I>,

@@ -17,5 +17,5 @@ fn read(header_hash: HeaderHash) -> ExternResult<GetOutput> {
 
 #[hdk_extern]
 fn delete(header_hash: HeaderHash) -> ExternResult<HeaderHash> {
-    Ok(delete_entry!(header_hash)?)
+    Ok(delete_entry(header_hash)?)
 }

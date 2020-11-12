@@ -1,6 +1,6 @@
 /// General macro that can delete any entry type.
 ///
-/// This is used under the hood by `delete_entry!`, `delete_cap_grant` and `delete_cap_claim!`.
+/// This is used under the hood by `delete_entry`, `delete_cap_grant` and `delete_cap_claim!`.
 /// @todo implement delete_cap_claim
 ///
 /// The host builds a `Delete` header for the passed entry and commits a new element to the chain.

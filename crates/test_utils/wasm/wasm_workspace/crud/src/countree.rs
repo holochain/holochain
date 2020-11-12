@@ -53,6 +53,6 @@ impl CounTree {
     }
 
     pub fn dec(header_hash: HeaderHash) -> ExternResult<HeaderHash> {
-        Ok(delete_entry!(header_hash)?)
+        Ok(delete_entry(header_hash)?)
     }
 }
