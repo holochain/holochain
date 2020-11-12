@@ -1,3 +1,5 @@
+use crate::prelude::*;
+
 /// Create a link from a base entry to a target entry, with an optional tag.
 ///
 /// Links represent the general idea of relationships between entries.
@@ -53,18 +55,16 @@
 /// If you have the hash of the identity entry you can get all the links, if you have the entry or
 /// header hash for any of the creates or updates you can lookup the identity entry hash out of the
 /// body of the create/update entry.
-#[macro_export]
-macro_rules! create_link {
-    ( $base:expr, $target:expr ) => {
-        $crate::create_link!($base, $target, vec![])
-    };
-    ( $base:expr, $target:expr, $tag:expr ) => {{
-        $crate::prelude::host_externs!(__create_link);
+pub fn create_link<'a, T: 'a + Into<LinkTag>>(
+    base: EntryHash,
+    target: EntryHash,
+    tag: T,
+) -> HdkResult<HeaderHash> {
+    host_externs!(__create_link);
 
-        $crate::host_fn!(
-            __create_link,
-            $crate::prelude::CreateLinkInput::new(($base, $target, $tag.into())),
-            $crate::prelude::CreateLinkOutput
-        )
-    }};
+    host_fn!(
+        __create_link,
+        CreateLinkInput::new((base, target, tag.into())),
+        CreateLinkOutput
+    )
 }

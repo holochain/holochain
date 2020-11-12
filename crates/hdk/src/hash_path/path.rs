@@ -271,7 +271,7 @@ impl Path {
             create_entry(self)?;
             if let Some(parent) = self.parent() {
                 parent.ensure()?;
-                create_link!(parent.hash()?, self.hash()?, LinkTag::try_from(self)?)?;
+                create_link(parent.hash()?, self.hash()?, LinkTag::try_from(self)?)?;
             }
         }
         Ok(())

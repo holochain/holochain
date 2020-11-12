@@ -18,7 +18,7 @@ fn target() -> ExternResult<EntryHash> {
 
 #[hdk_extern]
 fn create_link(_: ()) -> ExternResult<HeaderHash> {
-    Ok(create_link!(base()?, target()?)?)
+    Ok(hdk3::prelude::create_link(base()?, target()?, ())?)
 }
 
 #[hdk_extern]
