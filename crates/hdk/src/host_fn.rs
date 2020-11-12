@@ -49,6 +49,7 @@ pub mod zome_info;
 #[macro_export]
 macro_rules! host_fn {
     ( $f:ident, $input:expr, $outputt:ty ) => {{
+        use holochain_wasmer_guest::GuestPtr;
         $crate::prelude::holochain_externs!();
 
         let result: Result<$outputt, $crate::prelude::SerializedBytesError> =
