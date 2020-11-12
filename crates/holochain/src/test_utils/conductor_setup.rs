@@ -82,8 +82,7 @@ pub struct ConductorTestData {
     __tmpdir: Arc<TempDir>,
     // app_api: RealAppInterfaceApi,
     handle: ConductorHandle,
-    alice_call_data: ConductorCallData,
-    bob_call_data: Option<ConductorCallData>,
+    call_data: Vec<ConductorCallData>,
 }
 
 impl ConductorTestData {
@@ -157,22 +156,19 @@ impl ConductorTestData {
         )
         .await;
 
-        let alice_call_data =
-            ConductorCallData::new(&alice_cell_id, &handle.clone(), &dna_file).await;
+        let mut call_data = Vec::new();
 
-        let bob_call_data = match bob_cell_id {
-            Some(bob_cell_id) => {
-                Some(ConductorCallData::new(&bob_cell_id, &handle.clone(), &dna_file).await)
-            }
-            None => None,
+        call_data.push(ConductorCallData::new(&alice_cell_id, &handle.clone(), &dna_file).await);
+
+        if let Some(bob_cell_id) = bob_cell_id {
+            call_data.push(ConductorCallData::new(&bob_cell_id, &handle.clone(), &dna_file).await);
         };
 
         Self {
             __tmpdir,
             // app_api,
             handle,
-            alice_call_data,
-            bob_call_data,
+            call_data,
         }
     }
 
@@ -192,8 +188,8 @@ impl ConductorTestData {
             let bob_installed_cell = InstalledCell::new(bob_cell_id.clone(), "bob_handle".into());
             let cell_data = vec![(bob_installed_cell, None)];
             install_app("bob_app", cell_data, vec![dna_file.clone()], self.handle()).await;
-            self.bob_call_data =
-                Some(ConductorCallData::new(&bob_cell_id, &self.handle(), &dna_file).await);
+            self.call_data
+                .push(ConductorCallData::new(&bob_cell_id, &self.handle(), &dna_file).await);
         }
     }
 
@@ -202,18 +198,18 @@ impl ConductorTestData {
     }
 
     pub fn alice_call_data(&self) -> &ConductorCallData {
-        &self.alice_call_data
+        &self.call_data[0]
     }
 
     pub fn bob_call_data(&self) -> Option<&ConductorCallData> {
-        self.bob_call_data.as_ref()
+        self.call_data.get(1)
     }
 
     pub fn alice_call_data_mut(&mut self) -> &mut ConductorCallData {
-        &mut self.alice_call_data
+        &mut self.call_data[0]
     }
 
     pub fn bob_call_data_mut(&mut self) -> Option<&mut ConductorCallData> {
-        self.bob_call_data.as_mut()
+        self.call_data.get_mut(1)
     }
 }
