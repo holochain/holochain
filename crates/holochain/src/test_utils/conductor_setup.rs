@@ -19,7 +19,7 @@ use holochain_types::{
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::zome::ZomeName;
 use kitsune_p2p::KitsuneP2pConfig;
-use std::{convert::TryFrom, sync::Arc};
+use std::{collections::HashMap, convert::TryFrom, sync::Arc};
 use tempdir::TempDir;
 
 use super::{host_fn_api::CallData, install_app, setup_app_with_network};
@@ -82,16 +82,58 @@ pub struct ConductorTestData {
     __tmpdir: Arc<TempDir>,
     // app_api: RealAppInterfaceApi,
     handle: ConductorHandle,
-    call_data: Vec<ConductorCallData>,
+    call_data: HashMap<CellId, ConductorCallData>,
 }
 
 impl ConductorTestData {
-    pub async fn _new(
-        _dnas: Vec<DnaDef>,
-        _agents: Vec<AgentPubKey>,
-        _network_config: KitsuneP2pConfig,
+    pub async fn new(
+        dna_files: Vec<DnaFile>,
+        agents: Vec<AgentPubKey>,
+        network_config: KitsuneP2pConfig,
     ) -> Self {
-        todo!()
+        let num_agents = agents.len();
+        let num_dnas = dna_files.len();
+        let mut cells = Vec::with_capacity(num_dnas * num_agents);
+        let mut cell_id_by_dna_file = Vec::with_capacity(num_dnas);
+        for dna_file in dna_files.iter() {
+            let mut cell_ids = Vec::with_capacity(num_agents);
+            for (i, agent_id) in agents.iter().enumerate() {
+                let cell_id = CellId::new(dna_file.dna_hash().to_owned(), agent_id.clone());
+                cells.push((
+                    InstalledCell::new(cell_id.clone(), format!("agent-{}", i)),
+                    None,
+                ));
+                cell_ids.push(cell_id);
+            }
+            cell_id_by_dna_file.push((dna_file, cell_ids));
+        }
+        // let cell_ids: Vec<CellId> = cells
+        //     .iter()
+        //     .map(|(cell, _)| cell.as_id())
+        //     .cloned()
+        //     .collect();
+
+        let (__tmpdir, _app_api, handle) =
+            setup_app_with_network(vec![("test_app", cells)], dna_files.clone(), network_config)
+                .await;
+
+        let mut call_data = HashMap::new();
+
+        for (dna_file, cell_ids) in cell_id_by_dna_file {
+            for cell_id in cell_ids {
+                call_data.insert(
+                    cell_id.clone(),
+                    ConductorCallData::new(&cell_id, &handle, &dna_file).await,
+                );
+            }
+        }
+
+        Self {
+            __tmpdir,
+            // app_api,
+            handle,
+            call_data,
+        }
     }
 
     /// Create a new conductor and test data
@@ -125,51 +167,12 @@ impl ConductorTestData {
         .await
         .unwrap();
 
-        let alice = || {
-            let alice_agent_id = fake_agent_pubkey_1();
-            let alice_cell_id = CellId::new(dna_file.dna_hash().to_owned(), alice_agent_id.clone());
-            InstalledCell::new(alice_cell_id.clone(), "alice_handle".into())
-        };
-        let bob = || {
-            let bob_agent_id = fake_agent_pubkey_2();
-            let bob_cell_id = CellId::new(dna_file.dna_hash().to_owned(), bob_agent_id.clone());
-            InstalledCell::new(bob_cell_id.clone(), "bob_handle".into())
-        };
-
-        let mut cells = vec![];
-        let alice_installed_cell = alice();
-        let alice_cell_id = alice_installed_cell.as_id().clone();
-        cells.push((alice_installed_cell, None));
-        let bob_cell_id = if with_bob {
-            let bob_installed_cell = bob();
-            let bob_cell_id = Some(bob_installed_cell.as_id().clone());
-            cells.push((bob_installed_cell, None));
-            bob_cell_id
-        } else {
-            None
-        };
-
-        let (__tmpdir, _app_api, handle) = setup_app_with_network(
-            vec![("test_app", cells)],
-            vec![dna_file.clone()],
-            network.unwrap_or_default(),
-        )
-        .await;
-
-        let mut call_data = Vec::new();
-
-        call_data.push(ConductorCallData::new(&alice_cell_id, &handle.clone(), &dna_file).await);
-
-        if let Some(bob_cell_id) = bob_cell_id {
-            call_data.push(ConductorCallData::new(&bob_cell_id, &handle.clone(), &dna_file).await);
-        };
-
-        Self {
-            __tmpdir,
-            // app_api,
-            handle,
-            call_data,
+        let mut agents = vec![fake_agent_pubkey_1()];
+        if with_bob {
+            agents.push(fake_agent_pubkey_2());
         }
+
+        Self::new(vec![dna_file], agents, network.unwrap_or_default()).await
     }
 
     /// Shutdown the conductor
@@ -188,8 +191,10 @@ impl ConductorTestData {
             let bob_installed_cell = InstalledCell::new(bob_cell_id.clone(), "bob_handle".into());
             let cell_data = vec![(bob_installed_cell, None)];
             install_app("bob_app", cell_data, vec![dna_file.clone()], self.handle()).await;
-            self.call_data
-                .push(ConductorCallData::new(&bob_cell_id, &self.handle(), &dna_file).await);
+            self.call_data.insert(
+                bob_cell_id.clone(),
+                ConductorCallData::new(&bob_cell_id, &self.handle(), &dna_file).await,
+            );
         }
     }
 
@@ -198,18 +203,15 @@ impl ConductorTestData {
     }
 
     pub fn alice_call_data(&self) -> &ConductorCallData {
-        &self.call_data[0]
+        &self.call_data.values().nth(0).unwrap()
     }
 
     pub fn bob_call_data(&self) -> Option<&ConductorCallData> {
-        self.call_data.get(1)
+        self.call_data.values().nth(1)
     }
 
     pub fn alice_call_data_mut(&mut self) -> &mut ConductorCallData {
-        &mut self.call_data[0]
-    }
-
-    pub fn bob_call_data_mut(&mut self) -> Option<&mut ConductorCallData> {
-        self.call_data.get_mut(1)
+        let key = self.call_data.keys().nth(0).unwrap().clone();
+        self.call_data.get_mut(&key).unwrap()
     }
 }
