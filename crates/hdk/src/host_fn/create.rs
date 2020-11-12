@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-/// General macro that can create any entry type.
+/// General function that can create any entry type.
 ///
 /// This is used under the hood by `create_entry`, `create_cap_grant` and `create_cap_claim`.
 ///

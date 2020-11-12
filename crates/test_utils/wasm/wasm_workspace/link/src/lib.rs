@@ -23,7 +23,7 @@ fn create_link(_: ()) -> ExternResult<HeaderHash> {
 
 #[hdk_extern]
 fn delete_link(input: DeleteLinkInput) -> ExternResult<HeaderHash> {
-    Ok(delete_link!(input.into_inner())?)
+    Ok(hdk3::prelude::delete_link(input.into_inner())?)
 }
 
 #[hdk_extern]
@@ -34,7 +34,7 @@ fn get_links(_: ()) -> ExternResult<Links> {
 #[hdk_extern]
 fn delete_all_links(_: ()) -> ExternResult<()> {
     for link in get_links!(base()?)?.into_inner() {
-        delete_link!(link.create_link_hash)?;
+        hdk3::prelude::delete_link(link.create_link_hash)?;
     }
     Ok(())
 }

@@ -44,7 +44,7 @@ fn add_valid_link_inner() -> ExternResult<HeaderHash> {
 #[hdk_extern]
 fn remove_valid_link(_: ()) -> ExternResult<HeaderHash> {
     let valid_link = add_valid_link_inner()?;
-    Ok(delete_link!(valid_link)?)
+    Ok(delete_link(valid_link)?)
 }
 
 #[hdk_extern]
@@ -69,7 +69,7 @@ fn add_invalid_link_inner() -> ExternResult<HeaderHash> {
 #[hdk_extern]
 fn remove_invalid_link(_: ()) -> ExternResult<HeaderHash> {
     let valid_link = add_invalid_link_inner()?;
-    Ok(delete_link!(valid_link)?)
+    Ok(delete_link(valid_link)?)
 }
 
 #[hdk_extern]
