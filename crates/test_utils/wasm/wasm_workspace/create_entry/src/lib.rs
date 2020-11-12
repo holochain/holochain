@@ -106,6 +106,6 @@ fn call_create_entry(_: ()) -> ExternResult<HeaderHash> {
         "create_entry".to_string().into(),
         "create_entry".to_string().into(),
         None,
-        (),
+        &(),
     )?)
 }

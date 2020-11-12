@@ -29,16 +29,25 @@ use crate::prelude::*;
 /// };
 /// let deserialized_thing: SharedThing = serialized_bytes.try_into()?;
 /// ```
-pub fn call_remote(
+pub fn call_remote<'a, I: 'a, O>(
     agent: AgentPubKey,
     zome: ZomeName,
     fn_name: FunctionName,
     cap_secret: Option<CapSecret>,
-    payload: SerializedBytes,
-) -> HdkResult<ZomeCallResponse> {
-    host_fn!(
+    payload: &'a I,
+) -> HdkResult<O>
+where
+    SerializedBytes: TryFrom<&'a I, Error = SerializedBytesError>,
+    O: TryFrom<SerializedBytes, Error = SerializedBytesError>,
+{
+    let payload = SerializedBytes::try_from(payload)?;
+    let out = host_fn!(
         __call_remote,
         CallRemoteInput::new(CallRemote::new(agent, zome, fn_name, cap_secret, payload)),
         CallRemoteOutput
-    )
+    )?;
+    match out {
+        ZomeCallResponse::Ok(o) => Ok(O::try_from(o.into_inner())?),
+        ZomeCallResponse::Unauthorized => Err(HdkError::UnauthorizedZomeCall),
+    }
 }

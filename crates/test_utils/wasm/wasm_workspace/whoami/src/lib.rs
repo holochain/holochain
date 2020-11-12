@@ -30,7 +30,7 @@ fn whoarethey(agent_pubkey: AgentPubKey) -> ExternResult<AgentInfo> {
         zome_info()?.zome_name,
         "whoami".to_string().into(),
         None,
-        ().try_into()?
+        &(),
     )?;
 
     match response {
@@ -52,12 +52,12 @@ fn who_are_they_local(cell_id: CellId) -> ExternResult<AgentInfo> {
         zome_info()?.zome_name,
         "whoami".to_string().into(),
         None,
-        (),
+        &(),
     )
 }
 
 /// Call the create entry zome from this zome.
-/// The cell id must point to a cell which includes 
+/// The cell id must point to a cell which includes
 /// the "create_entry" zome.
 #[hdk_extern]
 fn call_create_entry(cell_id: CellId) -> ExternResult<HeaderHash> {
@@ -66,6 +66,6 @@ fn call_create_entry(cell_id: CellId) -> ExternResult<HeaderHash> {
         "create_entry".to_string().into(),
         "create_entry".to_string().into(),
         None,
-        (),
+        &(),
     )?)
 }

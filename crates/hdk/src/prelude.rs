@@ -55,6 +55,7 @@ pub use holochain_wasmer_guest::*;
 pub use holochain_zome_types;
 pub use holochain_zome_types::agent_info::AgentInfo;
 pub use holochain_zome_types::bytes::Bytes;
+pub use holochain_zome_types::call::Call;
 pub use holochain_zome_types::call_remote::CallRemote;
 pub use holochain_zome_types::capability::*;
 pub use holochain_zome_types::cell::*;
