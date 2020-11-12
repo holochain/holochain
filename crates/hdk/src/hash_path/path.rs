@@ -302,7 +302,7 @@ impl Path {
         Self::ensure(&self)?;
         Ok(get_link_details(
             self.hash()?,
-            holochain_zome_types::link::LinkTag::new(NAME)
+            Some(holochain_zome_types::link::LinkTag::new(NAME)),
         )?)
     }
 }

@@ -1,3 +1,5 @@
+use crate::prelude::*;
+
 /// Get all link creates and deletes that reference a base entry hash, optionally filtered by tag
 ///
 /// Tag filtering is a simple bytes prefix.
@@ -17,10 +19,7 @@
 /// c.f. get_links that returns only the creates that have not been deleted.
 ///
 /// @see get_links
-pub fn get_link_details(
-    base: EntryHash,
-    link_tag: Option<LinkTag>,
-) -> HdkResult<LinkDetails> {
+pub fn get_link_details(base: EntryHash, link_tag: Option<LinkTag>) -> HdkResult<LinkDetails> {
     host_fn!(
         __get_link_details,
         GetLinkDetailsInput::new((base, link_tag)),
