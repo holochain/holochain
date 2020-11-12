@@ -92,7 +92,7 @@ let links = get_links!(foo_entry_hash)?;
 debug!(links)?;
 ```
 
-### call_remote!, zome_info, agent_info
+### call_remote, zome_info, agent_info
 
 ```rust
 // Get your agent key
@@ -100,7 +100,7 @@ let agent_pubkey = agent_info()?.agent_pubkey;
 // Get the name of this zome
 let zome_name = zome_info()?.zome_name;
 // Call your friends foo function
-let result: SerializedBytes = call_remote!(
+let result: SerializedBytes = call_remote(
     my_friends_agent_pubkey,
     zome_name,
     "foo".to_string(),

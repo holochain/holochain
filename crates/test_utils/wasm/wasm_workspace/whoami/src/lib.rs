@@ -25,7 +25,7 @@ fn whoami(_: ()) -> ExternResult<AgentInfo> {
 // it's just that the output comes _from the opinion of the remote agent_
 #[hdk_extern]
 fn whoarethey(agent_pubkey: AgentPubKey) -> ExternResult<AgentInfo> {
-    let response: ZomeCallResponse = call_remote!(
+    let response: ZomeCallResponse = call_remote(
         agent_pubkey,
         zome_info()?.zome_name,
         "whoami".to_string().into(),

@@ -70,7 +70,7 @@ fn needs_cap_claim(_: ()) -> ExternResult<()> {
 
 #[hdk_extern]
 fn try_cap_claim(cap_for: CapFor) -> ExternResult<ZomeCallResponse> {
-    let result: ZomeCallResponse = call_remote!(
+    let result: ZomeCallResponse = call_remote(
         cap_for.1,
         zome_info()?.zome_name,
         "needs_cap_claim".to_string().into(),
@@ -99,7 +99,7 @@ fn send_assigned_cap_claim(agent: AgentPubKey) -> ExternResult<()> {
     })?;
 
     // send the assigned cap token
-    call_remote!(
+    call_remote(
         agent,
         this_zome,
         "accept_cap_claim".into(),
