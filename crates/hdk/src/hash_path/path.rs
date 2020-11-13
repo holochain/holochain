@@ -262,7 +262,7 @@ impl Path {
 
     /// Does an entry exist at the hash we expect?
     pub fn exists(&self) -> Result<bool, HdkError> {
-        Ok(get!(self.hash()?)?.is_some())
+        Ok(get(self.hash()?, GetOptions)?.is_some())
     }
 
     /// Recursively touch this and every parent that doesn't exist yet.
@@ -290,7 +290,10 @@ impl Path {
     /// Only returns links between anchors, not to other entries that might have their own links.
     pub fn children(&self) -> Result<holochain_zome_types::link::Links, HdkError> {
         Self::ensure(&self)?;
-        let links = get_links!(self.hash()?, holochain_zome_types::link::LinkTag::new(NAME))?;
+        let links = get_links(
+            self.hash()?,
+            Some(holochain_zome_types::link::LinkTag::new(NAME)),
+        )?;
         // Only need one of each hash to build the tree.
         let mut unwrapped: Vec<holochain_zome_types::link::Link> = links.into_inner();
         unwrapped.sort();

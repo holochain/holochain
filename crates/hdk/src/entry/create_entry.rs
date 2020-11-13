@@ -16,7 +16,7 @@ use crate::prelude::*;
 /// create_entry(Foo(50))?;
 /// ```
 ///
-/// @see get! and get_details for more information on CRUD
+/// @see get and get_details for more information on CRUD
 pub fn create_entry<'a, I: 'a>(input: &'a I) -> HdkResult<HeaderHash>
 where
     EntryDefId: From<&'a I>,

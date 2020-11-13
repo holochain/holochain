@@ -80,13 +80,15 @@ pub fn anchor(anchor_type: String, anchor_text: String) -> Result<holo_hash::Ent
 /// Returns None if the hash doesn't point to an anchor.
 /// We can't do anything fancy like ensure the anchor if not exists because we only have a hash.
 pub fn get_anchor(anchor_address: holo_hash::EntryHash) -> Result<Option<Anchor>, HdkError> {
-    Ok(match get!(anchor_address)?.and_then(|el| el.into()) {
-        Some(Entry::App(eb)) => {
-            let path = Path::try_from(SerializedBytes::from(eb))?;
-            Some(Anchor::try_from(&path)?)
-        }
-        _ => None,
-    })
+    Ok(
+        match crate::prelude::get(anchor_address, GetOptions)?.and_then(|el| el.into()) {
+            Some(Entry::App(eb)) => {
+                let path = Path::try_from(SerializedBytes::from(eb))?;
+                Some(Anchor::try_from(&path)?)
+            }
+            _ => None,
+        },
+    )
 }
 
 /// Returns every entry hash in a vector from the root of an anchor.

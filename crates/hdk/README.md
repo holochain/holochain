@@ -72,7 +72,7 @@ entry_def!(Bar EntryDef {
 entry_defs!(vec![Foo::entry_def(), Bar::entry_def()]);
 ```
 
-### create_entry, get!, hash_entry, create_link, get_links!, debug!
+### create_entry, get, hash_entry, create_link, get_links, debug!
 
 ```rust
 // Create your entry types
@@ -87,7 +87,7 @@ let bar_entry_hash = hash_entry(bar)?;
 // Link from foo (base) to bar (target)
 let _link_add_header_hash = create_link(foo_entry_hash.clone(), bar_entry_hash)?;
 // Get the links back
-let links = get_links!(foo_entry_hash)?;
+let links = get_links(foo_entry_hash)?;
 // Print out the links
 debug!(links)?;
 ```

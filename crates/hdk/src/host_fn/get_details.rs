@@ -10,7 +10,7 @@ use crate::prelude::*;
 /// Note: If a header hash is passed in the element returned is the specified element.
 ///       If an entry hash is passed in all the headers (so implicitly all the elements) are
 ///       returned for the entry that matches that hash.
-///       @see get! for more information about what "oldest live" means.
+///       @see get for more information about what "oldest live" means.
 ///
 /// The details returned include relevant creates, updates and deletes for the hash passed in.
 ///
