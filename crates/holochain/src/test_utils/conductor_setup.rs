@@ -1,3 +1,4 @@
+use super::{host_fn_api::CallData, install_app, setup_app_inner};
 use crate::{
     conductor::{
         api::{CellConductorApi, CellConductorApiT},
@@ -7,7 +8,7 @@ use crate::{
     core::queue_consumer::InitialQueueTriggers,
     core::ribosome::{wasm_ribosome::WasmRibosome, RibosomeT},
 };
-use holo_hash::AgentPubKey;
+use holo_hash::{AgentPubKey, DnaHash};
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::{actor::HolochainP2pRefToCell, HolochainP2pCell};
 use holochain_serialized_bytes::SerializedBytes;
@@ -24,8 +25,6 @@ use holochain_zome_types::zome::ZomeName;
 use kitsune_p2p::KitsuneP2pConfig;
 use std::{collections::HashMap, convert::TryFrom, sync::Arc};
 use tempdir::TempDir;
-
-use super::{host_fn_api::CallData, install_app, setup_app_inner};
 
 /// Everything you need to make a call with the host fn api
 pub struct ConductorCallData {
@@ -93,7 +92,7 @@ impl ConductorTestData {
         dna_files: Vec<DnaFile>,
         agents: Vec<AgentPubKey>,
         network_config: KitsuneP2pConfig,
-    ) -> Self {
+    ) -> (Self, HashMap<DnaHash, Vec<CellId>>) {
         let num_agents = agents.len();
         let num_dnas = dna_files.len();
         let mut cells = Vec::with_capacity(num_dnas * num_agents);
@@ -121,7 +120,7 @@ impl ConductorTestData {
 
         let mut call_data = HashMap::new();
 
-        for (dna_file, cell_ids) in cell_id_by_dna_file {
+        for (dna_file, cell_ids) in cell_id_by_dna_file.iter() {
             for cell_id in cell_ids {
                 call_data.insert(
                     cell_id.clone(),
@@ -130,12 +129,17 @@ impl ConductorTestData {
             }
         }
 
-        Self {
+        let this = Self {
             __tmpdir,
             // app_api,
             handle,
             call_data,
-        }
+        };
+        let installed = cell_id_by_dna_file
+            .into_iter()
+            .map(|(dna_file, cell_ids)| (dna_file.dna_hash().clone(), cell_ids))
+            .collect();
+        (this, installed)
     }
 
     /// Create a new conductor and test data
@@ -174,13 +178,15 @@ impl ConductorTestData {
             agents.push(fake_agent_pubkey_2());
         }
 
-        Self::new(
+        let (this, _) = Self::new(
             test_environments(),
             vec![dna_file],
             agents,
             network.unwrap_or_default(),
         )
-        .await
+        .await;
+
+        this
     }
 
     /// Shutdown the conductor
@@ -223,5 +229,9 @@ impl ConductorTestData {
     pub fn alice_call_data_mut(&mut self) -> &mut ConductorCallData {
         let key = self.call_data.keys().nth(0).unwrap().clone();
         self.call_data.get_mut(&key).unwrap()
+    }
+
+    pub fn call_data(&self, cell_id: &CellId) -> Option<&ConductorCallData> {
+        self.call_data.get(cell_id)
     }
 }

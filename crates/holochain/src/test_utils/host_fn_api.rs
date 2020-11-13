@@ -177,7 +177,7 @@ impl CallData {
     }
 }
 
-pub async fn commit_entry<'env, E: Into<entry_def::EntryDefId>>(
+pub async fn commit_entry<E: Into<entry_def::EntryDefId>>(
     env: &EnvironmentWrite,
     call_data: CallData,
     entry: Entry,

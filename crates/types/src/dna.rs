@@ -72,6 +72,7 @@ impl_hashable_content!(DnaDef, Dna);
 pub type Wasms = BTreeMap<holo_hash::WasmHash, wasm::DnaWasm>;
 
 /// Represents a full DNA file including WebAssembly bytecode.
+/// NB: This is *not* cheap to Clone, since it contains full wasm bytecode
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, SerializedBytes)]
 pub struct DnaFile {
     /// The hashable portion that can be shared with hApp code.
