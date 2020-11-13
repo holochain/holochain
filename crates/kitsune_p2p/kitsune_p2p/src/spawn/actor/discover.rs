@@ -286,6 +286,10 @@ where
 
             let elapsed_ms = start_time.elapsed().as_millis() as u64;
 
+            if elapsed_ms >= stage_2_timeout_even_if_none_ms {
+                break;
+            }
+
             interval_ms *= 2;
             if interval_ms > stage_2_timeout_even_if_none_ms - elapsed_ms {
                 interval_ms = stage_2_timeout_even_if_none_ms - elapsed_ms;
