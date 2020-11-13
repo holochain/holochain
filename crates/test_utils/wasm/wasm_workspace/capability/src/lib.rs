@@ -78,7 +78,7 @@ fn try_cap_claim(cap_for: CapFor) -> ExternResult<ZomeCallResponse> {
         &(),
     );
 
-    // This is an awkard thing to do.
+    // This is an awkward thing to do.
     // Mapping the hdk results _back_ to what the hdk already extracted them from internally.
     // This is just so that the external test harness can assert against something.
     // Normally we would handle errors inside the wasm directly.
@@ -112,7 +112,7 @@ fn send_assigned_cap_claim(agent: AgentPubKey) -> ExternResult<()> {
         this_zome,
         "accept_cap_claim".into(),
         None,
-        &CapClaim::new(tag, agent_info()?.agent_latest_pubkey, secret,),
+        &CapClaim::new(tag, agent_info()?.agent_latest_pubkey, secret),
     )?;
     Ok(())
 }

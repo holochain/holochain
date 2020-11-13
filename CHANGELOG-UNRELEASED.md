@@ -17,6 +17,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - BREAKING: get_details and get_links_details return SignedHeaderHashed instead of the header types [#390](https://github.com/holochain/holochain/pull/390)
 - BREAKING: ZomeInfo now returns the ZomeId [#390](https://github.com/holochain/holochain/pull/390)
 - BREAKING: HoloHash now serializes as a plain 39-byte sequence, instead of a `{hash, hash_type}` structure [#459](https://github.com/holochain/holochain/pull/459)
+- BREAKING: (Almost) all HDK functions have been converted from macros to functions [#478](https://github.com/holochain/holochain/pull/478)
 
 ### Deprecated
 
