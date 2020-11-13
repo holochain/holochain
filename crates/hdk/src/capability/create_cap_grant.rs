@@ -1,3 +1,5 @@
+use crate::prelude::*;
+
 /// Create a CapGrant on the grantor's chain.
 ///
 /// When an agent wants to expose externs to be called remotely by other agents they need to select
@@ -47,7 +49,7 @@
 /// @todo ensure linear history in sys validation
 ///
 /// Secrets must be unique across all grants and claims in a source chain and should be generated
-/// using the `generate_cap_secret!` macro that sources the correct number of cryptographically
+/// using the `generate_cap_secret` function that sources the correct number of cryptographically
 /// strong random bytes from the host.
 ///
 /// @todo ensure uniqueness of secrets in sys validation
@@ -76,14 +78,8 @@
 ///
 /// @see ZomeCallCapGrant
 /// @see CapAccess
-/// @see create_cap_claim!
-/// @see generate_cap_secret!
-#[macro_export]
-macro_rules! create_cap_grant {
-    ( $input:expr ) => {{
-        create!(
-            $crate::prelude::EntryDefId::CapGrant,
-            $crate::prelude::Entry::CapGrant($input)
-        )
-    }};
+/// @see create_cap_claim
+/// @see generate_cap_secret
+pub fn create_cap_grant(cap_grant_entry: CapGrantEntry) -> HdkResult<HeaderHash> {
+    create(EntryDefId::CapGrant, Entry::CapGrant(cap_grant_entry))
 }
