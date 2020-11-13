@@ -47,12 +47,12 @@ use std::{convert::TryInto, sync::Arc, time::Duration};
 use tempdir::TempDir;
 use tokio::sync::mpsc;
 
-/// TODO: featureflagify
+// TODO: featureflagify
 // #[cfg(test)]
 #[allow(missing_docs)]
 pub mod host_fn_api;
 
-/// TODO: featureflagify
+// TODO: featureflagify
 // #[cfg(test)]
 #[allow(missing_docs)]
 pub mod conductor_setup;

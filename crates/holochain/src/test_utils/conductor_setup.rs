@@ -51,7 +51,7 @@ impl ConductorCallData {
 
         let ribosome = WasmRibosome::new(dna_file.clone());
         let signal_tx = handle.signal_broadcaster().await;
-        let call_data = ConductorCallData {
+        ConductorCallData {
             cell_id: cell_id.clone(),
             env,
             ribosome,
@@ -60,8 +60,7 @@ impl ConductorCallData {
             signal_tx,
             triggers,
             cell_conductor_api,
-        };
-        call_data
+        }
     }
 
     /// Create a CallData for a specific zome and call
@@ -211,6 +210,7 @@ impl ConductorTestData {
         self.handle.clone()
     }
 
+    #[allow(clippy::iter_nth_zero)]
     pub fn alice_call_data(&self) -> &ConductorCallData {
         &self.call_data.values().nth(0).unwrap()
     }
@@ -219,6 +219,7 @@ impl ConductorTestData {
         self.call_data.values().nth(1)
     }
 
+    #[allow(clippy::iter_nth_zero)]
     pub fn alice_call_data_mut(&mut self) -> &mut ConductorCallData {
         let key = self.call_data.keys().nth(0).unwrap().clone();
         self.call_data.get_mut(&key).unwrap()

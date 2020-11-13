@@ -161,7 +161,7 @@ impl CallData {
 
         let (cell_id, zome_name) = zome_path.into();
 
-        let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
+        let workspace = CallZomeWorkspace::new(env).unwrap();
         let workspace_lock = CallZomeWorkspaceLock::new(workspace);
         let host_access = ZomeCallHostAccess::new(
             workspace_lock.clone(),
@@ -185,7 +185,7 @@ pub async fn commit_entry<'env, E: Into<entry_def::EntryDefId>>(
 ) -> HeaderHash {
     let (ribosome, call_context, workspace_lock) = call_data.explode(env.clone().into());
     let input = CreateInput::new((entry_def_id.into(), entry));
-    let output = host_fn::create::create(ribosome.clone(), call_context.clone(), input).unwrap();
+    let output = host_fn::create::create(ribosome, call_context, input).unwrap();
 
     // Write
     let mut guard = workspace_lock.write().await;
@@ -205,7 +205,7 @@ pub async fn delete_entry<'env>(
     let (ribosome, call_context, workspace_lock) = call_data.explode(env.clone().into());
     let input = DeleteInput::new(hash);
     let output = {
-        let r = host_fn::delete::delete(ribosome.clone(), call_context.clone(), input);
+        let r = host_fn::delete::delete(ribosome, call_context, input);
         let r = r.map_err(|e| {
             debug!(%e);
             e
@@ -232,8 +232,7 @@ pub async fn update_entry<'env, E: Into<entry_def::EntryDefId>>(
 ) -> HeaderHash {
     let (ribosome, call_context, workspace_lock) = call_data.explode(env.clone().into());
     let input = UpdateInput::new((entry_def_id.into(), entry, original_header_hash));
-    let output =
-        { host_fn::update::update(ribosome.clone(), call_context.clone(), input).unwrap() };
+    let output = { host_fn::update::update(ribosome, call_context, input).unwrap() };
 
     // Write
     let mut guard = workspace_lock.write().await;
@@ -251,12 +250,9 @@ pub async fn get(
     entry_hash: AnyDhtHash,
     _options: GetOptions,
 ) -> Option<Element> {
-    let (ribosome, call_context, _) = call_data.explode(env.clone().into());
-    let input = GetInput::new((
-        entry_hash.clone().into(),
-        holochain_zome_types::entry::GetOptions,
-    ));
-    let output = { host_fn::get::get(ribosome.clone(), call_context.clone(), input).unwrap() };
+    let (ribosome, call_context, _) = call_data.explode(env.clone());
+    let input = GetInput::new((entry_hash, holochain_zome_types::entry::GetOptions));
+    let output = { host_fn::get::get(ribosome, call_context, input).unwrap() };
     output.into_inner()
 }
 
@@ -267,13 +263,8 @@ pub async fn get_details<'env>(
     _options: GetOptions,
 ) -> Option<Details> {
     let (ribosome, call_context, _) = call_data.explode(env.clone().into());
-    let input = GetDetailsInput::new((
-        entry_hash.clone().into(),
-        holochain_zome_types::entry::GetOptions,
-    ));
-    let output = {
-        host_fn::get_details::get_details(ribosome.clone(), call_context.clone(), input).unwrap()
-    };
+    let input = GetDetailsInput::new((entry_hash, holochain_zome_types::entry::GetOptions));
+    let output = { host_fn::get_details::get_details(ribosome, call_context, input).unwrap() };
     output.into_inner()
 }
 
@@ -286,9 +277,7 @@ pub async fn create_link<'env>(
 ) -> HeaderHash {
     let (ribosome, call_context, workspace_lock) = call_data.explode(env.clone().into());
     let input = CreateLinkInput::new((base.clone(), target.clone(), link_tag));
-    let output = {
-        host_fn::create_link::create_link(ribosome.clone(), call_context.clone(), input).unwrap()
-    };
+    let output = { host_fn::create_link::create_link(ribosome, call_context, input).unwrap() };
 
     // Write
     let mut guard = workspace_lock.write().await;
@@ -307,9 +296,7 @@ pub async fn delete_link<'env>(
 ) -> HeaderHash {
     let (ribosome, call_context, workspace_lock) = call_data.explode(env.clone().into());
     let input = DeleteLinkInput::new(link_add_hash);
-    let output = {
-        host_fn::delete_link::delete_link(ribosome.clone(), call_context.clone(), input).unwrap()
-    };
+    let output = { host_fn::delete_link::delete_link(ribosome, call_context, input).unwrap() };
 
     // Write
     let mut guard = workspace_lock.write().await;
@@ -330,8 +317,7 @@ pub async fn get_links<'env>(
 ) -> Vec<Link> {
     let (ribosome, call_context, workspace_lock) = call_data.explode(env.clone().into());
     let input = GetLinksInput::new((base.clone(), link_tag));
-    let output =
-        { host_fn::get_links::get_links(ribosome.clone(), call_context.clone(), input).unwrap() };
+    let output = { host_fn::get_links::get_links(ribosome, call_context, input).unwrap() };
 
     // Write
     let mut guard = workspace_lock.write().await;
@@ -364,16 +350,10 @@ pub async fn get_agent_activity(
     query: &ChainQueryFilter,
     request: ActivityRequest,
 ) -> AgentActivity {
-    let (ribosome, call_context, _) = call_data.explode(env.clone().into());
+    let (ribosome, call_context, _) = call_data.explode(env.clone());
     let input = GetAgentActivityInput::new((agent.clone(), query.clone(), request));
-    let output = {
-        host_fn::get_agent_activity::get_agent_activity(
-            ribosome.clone(),
-            call_context.clone(),
-            input,
-        )
-        .unwrap()
-    };
+    let output =
+        { host_fn::get_agent_activity::get_agent_activity(ribosome, call_context, input).unwrap() };
     output.into_inner()
 }
 
