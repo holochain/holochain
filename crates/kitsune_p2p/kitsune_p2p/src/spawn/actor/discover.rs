@@ -184,18 +184,21 @@ pub(crate) fn peer_discover(
 }
 
 /// attempt to send messages to remote nodes in a staged timeout format
-pub(crate) fn message_neighborhood<F>(
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn message_neighborhood<T, F>(
     space: &mut Space,
     from_agent: Arc<KitsuneAgent>,
+    target_node_count: u8,
     stage_1_timeout_if_any_ms: u64,
     stage_2_timeout_even_if_none_ms: u64,
     // ignored while full-sync
     _basis: Arc<KitsuneBasis>,
     payload: wire::Wire,
     accept_result_cb: F,
-) -> MustBoxFuture<'static, Vec<wire::Wire>>
+) -> MustBoxFuture<'static, Vec<T>>
 where
-    F: Fn(&wire::Wire) -> Result<(), ()> + 'static + Send + Sync,
+    T: 'static + Send,
+    F: Fn(Arc<KitsuneAgent>, wire::Wire) -> Result<T, ()> + 'static + Send + Sync,
 {
     let i_s = space.i_s.clone();
     let evt_sender = space.evt_sender.clone();
@@ -211,6 +214,29 @@ where
         let mut interval_ms = 50;
 
         loop {
+            // It is somewhat convoluted to manage both awaits on
+            // our message responses and a loop deciding to send
+            // more outgoing requests simultaneously.
+            //
+            // as a comprimize attempting to favor readable code
+            // we'll check the fetch count / timing after every full
+            // iteration before deciding to send more requests.
+
+            let fetched_count = out.lock().await.len();
+            if fetched_count >= target_node_count as usize {
+                break;
+            }
+
+            let elapsed_ms = start_time.elapsed().as_millis() as u64;
+
+            if elapsed_ms >= stage_1_timeout_if_any_ms && fetched_count > 0 {
+                break;
+            }
+
+            if elapsed_ms >= stage_2_timeout_even_if_none_ms {
+                break;
+            }
+
             if let Ok(nodes) = get_5_or_less_non_local_agents_near_basis(
                 space.clone(),
                 from_agent.clone(),
@@ -237,7 +263,10 @@ where
                             let (_, mut write, read) = fut.await?;
                             match &mut payload {
                                 wire::Wire::Notify(n) => {
-                                    n.to_agent = to_agent;
+                                    n.to_agent = to_agent.clone();
+                                }
+                                wire::Wire::Call(c) => {
+                                    c.to_agent = to_agent.clone();
                                 }
                                 _ => panic!("cannot message {:?}", payload),
                             }
@@ -245,7 +274,7 @@ where
                             write.write_and_close(payload).await?;
                             let res = read.read_to_end().await;
                             let (_, res) = wire::Wire::decode_ref(&res)?;
-                            if accept_result_cb(&res).is_ok() {
+                            if let Ok(res) = accept_result_cb(to_agent, res) {
                                 out.lock().await.push(res);
                             }
 
@@ -256,14 +285,6 @@ where
             }
 
             let elapsed_ms = start_time.elapsed().as_millis() as u64;
-
-            if elapsed_ms >= stage_1_timeout_if_any_ms && !out.lock().await.is_empty() {
-                break;
-            }
-
-            if elapsed_ms >= stage_2_timeout_even_if_none_ms {
-                break;
-            }
 
             interval_ms *= 2;
             if interval_ms > stage_2_timeout_even_if_none_ms - elapsed_ms {
