@@ -10,11 +10,6 @@ use url2::Url2;
 static CLIENT: Lazy<reqwest::Client> = Lazy::new(reqwest::Client::new);
 
 #[allow(dead_code)]
-const BOOTSTRAP_URL_DEFAULT: &str = "https://bootstrap.holo.host";
-#[allow(dead_code)]
-const BOOTSTRAP_URL_DEV: &str = "https://bootstrap-dev.holohost.workers.dev";
-
-#[allow(dead_code)]
 const RANDOM_LIMIT_DEFAULT: u32 = 16;
 
 pub static NOW_OFFSET_MILLIS: OnceCell<i64> = OnceCell::new();
@@ -199,7 +194,7 @@ mod tests {
 
         // Simply hitting the endpoint should be OK.
         super::put(
-            Some(url2::url2!("{}", super::BOOTSTRAP_URL_DEV)),
+            Some(url2::url2!("{}", crate::config::BOOTSTRAP_SERVICE_DEV)),
             agent_info_signed,
         )
         .await
@@ -207,7 +202,7 @@ mod tests {
 
         // We should get back an error if we don't have a good signature.
         assert!(super::put(
-            Some(url2::url2!("{}", super::BOOTSTRAP_URL_DEV)),
+            Some(url2::url2!("{}", crate::config::BOOTSTRAP_SERVICE_DEV)),
             fixt!(AgentInfoSigned)
         )
         .await
@@ -225,7 +220,7 @@ mod tests {
             .unwrap();
 
         // We should be able to get a milliseconds timestamp back.
-        let remote_now: u64 = super::now(Some(url2::url2!("{}", super::BOOTSTRAP_URL_DEV)))
+        let remote_now: u64 = super::now(Some(url2::url2!("{}", crate::config::BOOTSTRAP_SERVICE_DEV)))
             .await
             .unwrap();
         let threshold = 5000;
@@ -234,7 +229,7 @@ mod tests {
 
         // Now once should return some number and the remote server offset should be set in the
         // NOW_OFFSET_MILLIS once cell.
-        let _: u64 = super::now_once(Some(url2::url2!("{}", super::BOOTSTRAP_URL_DEV)))
+        let _: u64 = super::now_once(Some(url2::url2!("{}", crate::config::BOOTSTRAP_SERVICE_DEV)))
             .await
             .unwrap();
         assert!(super::NOW_OFFSET_MILLIS.get().is_some());
@@ -246,7 +241,7 @@ mod tests {
     // thread 'spawn::actor::bootstrap::tests::test_random' panicked at 'dispatch dropped without returning error', /rustc/d3fb005a39e62501b8b0b356166e515ae24e2e54/src/libstd/macros.rs:13:23
     async fn test_random() {
         let space = fixt!(KitsuneSpace, Unpredictable);
-        let now = super::now(Some(url2::url2!("{}", super::BOOTSTRAP_URL_DEV)))
+        let now = super::now(Some(url2::url2!("{}", crate::config::BOOTSTRAP_SERVICE_DEV)))
             .await
             .unwrap();
 
@@ -274,7 +269,7 @@ mod tests {
             .unwrap();
 
             super::put(
-                Some(url2::url2!("{}", super::BOOTSTRAP_URL_DEV)),
+                Some(url2::url2!("{}", crate::config::BOOTSTRAP_SERVICE_DEV)),
                 agent_info_signed.clone(),
             )
             .await
@@ -284,7 +279,7 @@ mod tests {
         }
 
         let mut random = super::random(
-            Some(url2::url2!("{}", super::BOOTSTRAP_URL_DEV)),
+            Some(url2::url2!("{}", crate::config::BOOTSTRAP_SERVICE_DEV)),
             super::RandomQuery {
                 space: space.clone(),
                 ..Default::default()
@@ -300,7 +295,7 @@ mod tests {
         assert!(random == expected);
 
         let random_single = super::random(
-            Some(url2::url2!("{}", super::BOOTSTRAP_URL_DEV)),
+            Some(url2::url2!("{}", crate::config::BOOTSTRAP_SERVICE_DEV)),
             super::RandomQuery {
                 space: space.clone(),
                 limit: 1.into(),
