@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-/// Trivial macro to get N cryptographically strong random bytes.
+/// Get N cryptographically strong random bytes.
 ///
 /// ```ignore
 /// let five_bytes = random_bytes(5)?;

@@ -1,7 +1,7 @@
 use crate::prelude::*;
 
 /// Trivial wrapper for __agent_info host function.
-/// Agent info input struct is `()` so the macro simply looks like this:
+/// Agent info input struct is `()` so the function call simply looks like this:
 ///
 /// ```ignore
 /// let agent_info = agent_info()?;

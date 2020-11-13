@@ -8,7 +8,7 @@ This kit:
 
 1. The DSL is ergonomic and composable, so optional if you want more control
 2. It is compatible with the cell-driven version of holochain
-3. Differentiates between the holochain API/interface and "sugar" macros
+3. Differentiates between the holochain API/interface and "sugar" syntax
 
 Old kits:
 
@@ -21,7 +21,11 @@ Old kits:
 
 Welcome to the HDK 3.0.
 This HDK is currently in flux, expect rapid changes.
-Currently there are helper macros to aid in writing happs.
+There are low-level macros and high-level functions to aid writing happs.
+
+The intention is that most of the time most developers will use the high level
+functions as they leverage the Rust type system better than macros can. This
+allows for more useful compiler and IDE feedback loops.
 
 ## Examples
 

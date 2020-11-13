@@ -49,7 +49,7 @@ use crate::prelude::*;
 /// @todo ensure linear history in sys validation
 ///
 /// Secrets must be unique across all grants and claims in a source chain and should be generated
-/// using the `generate_cap_secret` macro that sources the correct number of cryptographically
+/// using the `generate_cap_secret` function that sources the correct number of cryptographically
 /// strong random bytes from the host.
 ///
 /// @todo ensure uniqueness of secrets in sys validation

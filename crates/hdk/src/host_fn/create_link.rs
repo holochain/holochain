@@ -23,7 +23,7 @@ use crate::prelude::*;
 ///
 /// - creates reference a single entry
 /// - updates and deletes reference create/update elements by both their entry+header
-/// - creates, updates and deletes all have different macros, network ops and validation logic
+/// - creates, updates and deletes all have different functions, network ops and validation logic
 /// - is cryptographically guaranteed to be a DAG (not-circular) because they include headers
 /// - model "mutability" for a single thing/identity in an immutable/append-only way
 /// - only reference other entries of the same entry type (e.g. comments can _not_ update posts)

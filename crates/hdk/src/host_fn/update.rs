@@ -8,8 +8,8 @@ use crate::prelude::*;
 /// The host builds an `Update` header for the passed entry value and commits a new update to the
 /// chain.
 ///
-/// Usually you don't need to use this macro directly but it is the most general way to update an
-/// entry and standardises the internals of higher level create macros.
+/// Usually you don't need to use this function directly; it is the most general way to update an
+/// entry and standardises the internals of higher level create functions.
 ///
 /// @see update_entry
 /// @see update_cap_grant!

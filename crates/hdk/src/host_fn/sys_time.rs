@@ -13,8 +13,8 @@ use crate::prelude::*;
 /// System times can be considered "secure" or "insecure" situationally, some things to consider:
 ///
 /// - the host signing times into chain headers is using the same clock in the host_fn call so the
-///   the sys_time returned by a macro for inclusion in an entry will always be less than or equal
-///   to the time in the header of that entry unless:
+///   the sys_time returned by a function for inclusion in an entry will always be less than or
+///   equal to the time in the header of that entry unless:
 ///     - the user manually changed the system time backwards between this host_fn being called and
 ///       an entry using it being committed (NTP avoids making time go backward by stretching it)
 ///     - the sys_time call ran on a different machine, e.g. via a call_remote, to the machine that

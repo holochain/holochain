@@ -2,7 +2,7 @@ use crate::prelude::*;
 
 /// Wrapper for __call_remote host function.
 ///
-/// There are several positional arguments to the macro:
+/// There are several positional arguments:
 ///
 /// - agent: The address of the agent to call the RPC style remote function on.
 /// - zome: The zome to call the remote function in. Use zome_info() to get the current zome info.

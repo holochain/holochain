@@ -27,7 +27,7 @@ use crate::prelude::*;
 /// any other validation, it simply generates the hash for the serialized representation of
 /// something in the same way that the DHT would.
 ///
-/// It is strongly recommended that you use the `hash_entry` macro to calculate hashes to avoid
+/// It is strongly recommended that you use the `hash_entry` function to calculate hashes to avoid
 /// inconsistencies between hashes in the wasm guest and the host.
 /// For example, a lot of the crypto crates in rust compile to wasm so in theory could generate the
 /// hash in the guest, but there is the potential that the serialization logic could be slightly

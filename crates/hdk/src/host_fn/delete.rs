@@ -7,8 +7,8 @@ use crate::prelude::*;
 ///
 /// The host builds a `Delete` header for the passed entry and commits a new element to the chain.
 ///
-/// Usually you don't need to use this macro directly but it is the most general way to update an
-/// entry and standardises the internals of higher level create macros.
+/// Usually you don't need to use this function directly; it is the most general way to update an
+/// entry and standardises the internals of higher level create functions.
 pub fn delete(hash: HeaderHash) -> HdkResult<HeaderHash> {
     host_externs!(__delete);
     host_fn!(__delete, DeleteInput::new(hash), DeleteOutput)
