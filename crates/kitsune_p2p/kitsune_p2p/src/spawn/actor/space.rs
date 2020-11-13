@@ -798,7 +798,7 @@ impl Space {
             space,
             from_agent,
             basis,
-            // ignore remote_agent_count for now - broadcast to everyone
+            // always trying to notify 2 remote agents at the moment
             remote_agent_count: _,
             timeout_ms,
             payload,
@@ -806,87 +806,108 @@ impl Space {
 
         let timeout_ms = timeout_ms.expect("set by handle_notify_multi");
 
+        // as an optimization - broadcast to all local joins
+        // but don't count that toward our publish total
+        let local_all = self
+            .local_joined_agents
+            .iter()
+            .map(|agent| {
+                self.evt_sender.notify(
+                    space.clone(),
+                    agent.clone(),
+                    from_agent.clone(),
+                    payload.clone(),
+                )
+            })
+            .collect::<Vec<_>>();
+
         let i_s = self.i_s.clone();
-
-        // check 5(ish) times but with sane min/max
-        // FYI - this strategy will likely change when we are no longer
-        //       purely short-circuit, and we are looping on peer discovery.
-        const CHECK_COUNT: u64 = 5;
-        let mut check_interval = timeout_ms / CHECK_COUNT;
-        if check_interval < 10 {
-            check_interval = 10;
-        }
-        if check_interval > timeout_ms {
-            check_interval = timeout_ms;
-        }
-
+        let evt_sender = self.evt_sender.clone();
+        let tx = self.transport.clone();
+        let bootstrap_service = self.config.bootstrap_service.clone();
         Ok(async move {
-            let start = std::time::Instant::now();
+            futures::future::try_join_all(local_all).await?;
+
             let mut sent_to: HashSet<Arc<KitsuneAgent>> = HashSet::new();
             let send_success_count = Arc::new(std::sync::atomic::AtomicU8::new(0));
 
+            let start_time = std::time::Instant::now();
+            let mut interval_ms = 10;
+
             loop {
-                if let Ok(agent_list) = i_s
-                    .list_online_agents_for_basis_hash(
-                        space.clone(),
-                        from_agent.clone(),
-                        basis.clone(),
-                    )
-                    .await
+                if let Ok(nodes) = discover::get_5_or_less_non_local_agents_near_basis(
+                    space.clone(),
+                    from_agent.clone(),
+                    basis.clone(),
+                    i_s.clone(),
+                    evt_sender.clone(),
+                    bootstrap_service.clone(),
+                )
+                .await
                 {
-                    for to_agent in agent_list {
+                    let mut all = Vec::new();
+
+                    for node in nodes {
+                        let to_agent = Arc::new(node.as_agent_ref().clone());
+
                         if !sent_to.contains(&to_agent) {
                             sent_to.insert(to_agent.clone());
-                            // send the notify here - but spawn
-                            // so we're not holding up this loop
-                            let i_s = i_s.clone();
-                            let space = space.clone();
-                            // encode the data to send
-                            let payload = Arc::new(
-                                wire::Wire::notify(
-                                    space.clone(),
-                                    from_agent.clone(),
-                                    to_agent.clone(),
-                                    payload.clone().into(),
-                                )
-                                .encode_vec()?,
-                            );
 
-                            let send_success_count = send_success_count.clone();
-                            let from_agent2 = from_agent.clone();
-                            tokio::task::spawn(
-                                async move {
-                                    let res = i_s
-                                        .immediate_request(space, to_agent, from_agent2, payload)
-                                        .await;
-                                    match res {
-                                        Ok(wire::Wire::NotifyResp(_)) => {
-                                            send_success_count
-                                                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                                        }
-                                        Ok(wire::Wire::Failure(wire::Failure { reason })) => {
-                                            tracing::warn!("FAIL: {}", reason);
-                                        }
-                                        Err(e) => {
-                                            tracing::warn!("FAIL: {:?}", e);
-                                        }
-                                        _ => (),
-                                    }
+                            let ssc = send_success_count.clone();
+                            let tx = tx.clone();
+                            let space = &space;
+                            let from_agent = &from_agent;
+                            let payload = &payload;
+                            all.push(async move {
+                                let url = node
+                                    .as_urls_ref()
+                                    .get(0)
+                                    .ok_or_else(|| KitsuneP2pError::from("no url"))?
+                                    .clone();
+                                let (_, mut write, read) = tx.create_channel(url).await?;
+                                write
+                                    .write_and_close(
+                                        wire::Wire::notify(
+                                            space.clone(),
+                                            from_agent.clone(),
+                                            to_agent.clone(),
+                                            payload.clone().into(),
+                                        )
+                                        .encode_vec()?,
+                                    )
+                                    .await?;
+                                let res = read.read_to_end().await;
+                                let (_, res) = wire::Wire::decode_ref(&res)?;
+                                if let wire::Wire::NotifyResp(_) = res {
+                                    ssc.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                                 }
-                                .instrument(
-                                    ghost_actor::dependencies::tracing::debug_span!(
-                                        "handle_rpc_multi_inner_loop"
-                                    ),
-                                ),
-                            );
+                                KitsuneP2pResult::Ok(())
+                            });
                         }
                     }
+
+                    if !all.is_empty() {
+                        let _ = futures::future::join_all(all).await;
+                    }
                 }
-                if (start.elapsed().as_millis() as u64) >= timeout_ms {
+
+                if send_success_count.load(std::sync::atomic::Ordering::Relaxed) >= 2 {
                     break;
                 }
-                tokio::time::delay_for(std::time::Duration::from_millis(check_interval)).await;
+
+                let elapsed_ms = start_time.elapsed().as_millis() as u64;
+                if elapsed_ms >= timeout_ms {
+                    break;
+                }
+
+                interval_ms *= 2;
+                if interval_ms > timeout_ms - elapsed_ms {
+                    interval_ms = timeout_ms - elapsed_ms;
+                }
+
+                tokio::time::delay_for(std::time::Duration::from_millis(interval_ms)).await;
             }
+
             Ok(send_success_count.load(std::sync::atomic::Ordering::Relaxed))
         }
         .boxed()

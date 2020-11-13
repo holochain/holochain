@@ -5,6 +5,7 @@ use once_cell::sync::Lazy;
 use once_cell::sync::OnceCell;
 use std::convert::TryFrom;
 use std::convert::TryInto;
+use std::sync::Arc;
 use url2::Url2;
 
 static CLIENT: Lazy<reqwest::Client> = Lazy::new(reqwest::Client::new);
@@ -124,7 +125,7 @@ impl Default for RandomLimit {
 
 #[derive(serde::Deserialize, serde::Serialize)]
 pub struct RandomQuery {
-    pub space: KitsuneSpace,
+    pub space: Arc<KitsuneSpace>,
     pub limit: RandomLimit,
 }
 
@@ -133,7 +134,7 @@ impl Default for RandomQuery {
         Self {
             // This is useless, it's here as a placeholder so that ..Default::default() syntax
             // works for limits, not because you'd actually ever want a "default" space.
-            space: KitsuneSpace::new(vec![0; 36]),
+            space: Arc::new(KitsuneSpace::new(vec![0; 36])),
             limit: RandomLimit::default(),
         }
     }
@@ -158,7 +159,7 @@ pub async fn random(
 
 #[cfg(test)]
 mod tests {
-
+    use super::*;
     use crate::fixt::*;
     use crate::spawn::actor::space::AGENT_INFO_EXPIRES_AFTER_MS;
     use crate::types::agent_store::*;
@@ -286,7 +287,7 @@ mod tests {
         let mut random = super::random(
             Some(url2::url2!("{}", super::BOOTSTRAP_URL_DEV)),
             super::RandomQuery {
-                space: space.clone(),
+                space: Arc::new(space.clone()),
                 ..Default::default()
             },
         )
@@ -302,7 +303,7 @@ mod tests {
         let random_single = super::random(
             Some(url2::url2!("{}", super::BOOTSTRAP_URL_DEV)),
             super::RandomQuery {
-                space: space.clone(),
+                space: Arc::new(space.clone()),
                 limit: 1.into(),
             },
         )

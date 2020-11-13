@@ -32,7 +32,7 @@ use super::{
     state::ConductorState,
     CellError,
 };
-use crate::conductor::p2p_store::AgentKv;
+use crate::conductor::p2p_store::{AgentKv, AgentKvKey};
 use crate::{
     conductor::{
         api::error::ConductorApiResult, cell::Cell, config::ConductorConfig,
@@ -64,7 +64,7 @@ use holochain_types::{
 };
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use std::collections::HashMap;
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
 use tracing::*;
@@ -627,7 +627,6 @@ where
         agent_info_signed: kitsune_p2p::agent_store::AgentInfoSigned,
     ) -> ConductorResult<()> {
         let environ = self.p2p_env.clone();
-        // let p2p = environ.get_db(&*holochain_state::db::AGENT)?;
         let p2p_kv = AgentKv::new(environ.clone().into())?;
         let env = environ.guard();
         Ok(env.with_commit(|writer| {
@@ -648,11 +647,34 @@ where
 
         let p2p_kv = AgentKv::new(environ.clone().into())?;
         let env = environ.guard();
-        let reader = env.reader()?;
 
-        Ok(p2p_kv
-            .as_store_ref()
-            .get(&reader, &(&*kitsune_space, &*kitsune_agent).into())?)
+        let res = {
+            let reader = env.reader()?;
+
+            let res = p2p_kv
+                .as_store_ref()
+                .get(&reader, &(&*kitsune_space, &*kitsune_agent).into())?;
+
+            match res {
+                None => return Ok(None),
+                Some(res) => res,
+            }
+        };
+
+        let info = kitsune_p2p::agent_store::AgentInfo::try_from(&res)?;
+        let now: u64 = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+        if info.signed_at_ms() + info.expires_after_ms() <= now {
+            env.with_commit(|writer| {
+                p2p_kv
+                    .as_store_ref()
+                    .delete(writer, &(&*kitsune_space, &*kitsune_agent).into())
+            })?;
+            return Ok(None);
+        }
+        Ok(Some(res))
     }
 
     pub(super) fn query_agent_info_signed(
@@ -663,10 +685,44 @@ where
 
         let p2p_kv = AgentKv::new(environ.clone().into())?;
         let env = environ.guard();
-        let reader = env.reader()?;
+        let mut out = Vec::new();
+        let mut expired = Vec::new();
 
-        let iter = p2p_kv.as_store_ref().iter(&reader)?;
-        let out = iter.map(|(_, a)| Ok(a)).collect()?;
+        {
+            let reader = env.reader()?;
+
+            let mut iter = p2p_kv.as_store_ref().iter(&reader)?;
+
+            let now: u64 = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64;
+
+            loop {
+                match iter.next() {
+                    Ok(Some((k, v))) => {
+                        let info = kitsune_p2p::agent_store::AgentInfo::try_from(&v)?;
+                        if info.signed_at_ms() + info.expires_after_ms() <= now {
+                            expired.push(AgentKvKey::from(k));
+                        } else {
+                            out.push(v);
+                        }
+                    }
+                    Ok(None) => break,
+                    Err(e) => return Err(e.into()),
+                }
+            }
+        }
+
+        if !expired.is_empty() {
+            env.with_commit(|writer| {
+                for exp in expired {
+                    p2p_kv.as_store_ref().delete(writer, &exp)?;
+                }
+                ConductorResult::Ok(())
+            })?;
+        }
+
         Ok(out)
     }
 
