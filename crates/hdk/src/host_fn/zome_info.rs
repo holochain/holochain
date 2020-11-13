@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-/// Trivial macro to get the zome information.
+/// Get the zome information.
 /// There are no inputs to zome_info.
 ///
 /// Zome information includes dna name, hash, zome name and properties.

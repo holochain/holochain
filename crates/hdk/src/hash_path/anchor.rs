@@ -79,7 +79,7 @@ pub fn anchor(anchor_type: String, anchor_text: String) -> Result<holo_hash::Ent
 /// Attempt to get an anchor by its hash.
 /// Returns None if the hash doesn't point to an anchor.
 /// We can't do anything fancy like ensure the anchor if not exists because we only have a hash.
-pub fn get_anchor(anchor_address: holo_hash::EntryHash) -> Result<Option<Anchor>, HdkError> {
+pub fn get_anchor(anchor_address: EntryHash) -> Result<Option<Anchor>, HdkError> {
     Ok(
         match crate::prelude::get(anchor_address, GetOptions)?.and_then(|el| el.into()) {
             Some(Entry::App(eb)) => {
@@ -93,7 +93,7 @@ pub fn get_anchor(anchor_address: holo_hash::EntryHash) -> Result<Option<Anchor>
 
 /// Returns every entry hash in a vector from the root of an anchor.
 /// Hashes are sorted in the same way that paths sort children.
-pub fn list_anchor_type_addresses() -> Result<Vec<holo_hash::EntryHash>, HdkError> {
+pub fn list_anchor_type_addresses() -> Result<Vec<EntryHash>, HdkError> {
     let links = Path::from(ROOT)
         .children()?
         .into_inner()
@@ -106,7 +106,7 @@ pub fn list_anchor_type_addresses() -> Result<Vec<holo_hash::EntryHash>, HdkErro
 /// Returns every entry hash in a vector from the second level of an anchor.
 /// Uses the string argument to build the path from the root.
 /// Hashes are sorted in the same way that paths sort children.
-pub fn list_anchor_addresses(anchor_type: String) -> Result<Vec<holo_hash::EntryHash>, HdkError> {
+pub fn list_anchor_addresses(anchor_type: String) -> Result<Vec<EntryHash>, HdkError> {
     let path: Path = (&Anchor {
         anchor_type,
         anchor_text: None,

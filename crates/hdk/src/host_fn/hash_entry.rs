@@ -36,11 +36,12 @@ use crate::prelude::*;
 /// ```ignore
 /// let foo_hash = hash_entry(foo)?;
 /// ```
-pub fn hash_entry<I: std::convert::TryInto<SerializedBytes, Error = SerializedBytesError>>(
-    input: I,
-) -> HdkResult<EntryHash> {
+pub fn hash_entry<'a, I: 'a>(input: &'a I) -> HdkResult<EntryHash>
+where
+    SerializedBytes: TryFrom<&'a I, Error = SerializedBytesError>,
+{
     host_externs!(__hash_entry);
-    let sb: SerializedBytes = input.try_into()?;
+    let sb = SerializedBytes::try_from(input)?;
     host_fn!(
         __hash_entry,
         HashEntryInput::new(Entry::App(sb.try_into()?)),

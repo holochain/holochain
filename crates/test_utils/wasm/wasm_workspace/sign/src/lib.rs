@@ -9,7 +9,10 @@ fn sign(sign_input: SignInput) -> ExternResult<Signature> {
 fn verify_signature(
     verify_signature_input: VerifySignatureInput,
 ) -> ExternResult<VerifySignatureOutput> {
-    Ok(VerifySignatureOutput::new(verify_signature!(
-        verify_signature_input
+    let VerifySignatureInput {
+        key, signature, data
+    } = verify_signature_input;
+    Ok(VerifySignatureOutput::new(hdk3::prelude::verify_signature(
+        key, signature, data
     )?))
 }

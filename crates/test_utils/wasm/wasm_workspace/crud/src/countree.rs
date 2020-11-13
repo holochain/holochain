@@ -23,7 +23,7 @@ impl CounTree {
     /// commits if not exists else returns found header
     /// produces redundant headers in a partition
     pub fn ensure(countree: CounTree) -> ExternResult<HeaderHash> {
-        match get(hash_entry(countree)?, GetOptions)? {
+        match get(hash_entry(&countree)?, GetOptions)? {
             Some(element) => Ok(element.header_address().to_owned()),
             None => Ok(create_entry(&countree)?),
         }

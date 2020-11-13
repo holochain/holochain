@@ -1,4 +1,6 @@
-/// General macro that can update any entry type.
+use crate::prelude::*;
+
+/// Update any entry type.
 ///
 /// This is used under the hood by `update_entry`, `update_cap_grant!` and `update_cap_claim!`.
 /// @todo implement update_cap_claim
@@ -12,15 +14,15 @@
 /// @see update_entry
 /// @see update_cap_grant!
 /// @see update_cap_claim!
-#[macro_export]
-macro_rules! update {
-    ( $hash:expr, $type:expr, $input:expr ) => {{
-        $crate::prelude::host_externs!(__update);
-
-        $crate::host_fn!(
-            __update,
-            $crate::prelude::UpdateInput::new(($type, $input, $hash)),
-            $crate::prelude::UpdateOutput
-        )
-    }};
+pub fn update<D: Into<EntryDefId>, E: Into<Entry>>(
+    hash: HeaderHash,
+    entry_def_id: D,
+    entry: E,
+) -> HdkResult<HeaderHash> {
+    host_externs!(__update);
+    host_fn!(
+        __update,
+        UpdateInput::new((entry_def_id.into(), entry.into(), hash)),
+        UpdateOutput
+    )
 }

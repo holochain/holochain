@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-/// Trivial macro to return the current system time from the host.
+/// Trivial wrapper to return the current system time from the host.
 ///
 /// System time doesn't accept any arguments so usage is as simple as:
 ///
