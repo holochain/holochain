@@ -11,7 +11,10 @@ use holo_hash::AgentPubKey;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::{actor::HolochainP2pRefToCell, HolochainP2pCell};
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_state::env::EnvironmentWrite;
+use holochain_state::{
+    env::EnvironmentWrite,
+    test_utils::{test_environments, TestEnvironments},
+};
 use holochain_types::{
     app::InstalledCell, cell::CellId, dna::DnaDef, dna::DnaFile, test_utils::fake_agent_pubkey_1,
     test_utils::fake_agent_pubkey_2,
@@ -22,7 +25,7 @@ use kitsune_p2p::KitsuneP2pConfig;
 use std::{collections::HashMap, convert::TryFrom, sync::Arc};
 use tempdir::TempDir;
 
-use super::{host_fn_api::CallData, install_app, setup_app_with_network};
+use super::{host_fn_api::CallData, install_app, setup_app_inner};
 
 /// Everything you need to make a call with the host fn api
 pub struct ConductorCallData {
@@ -87,6 +90,7 @@ pub struct ConductorTestData {
 
 impl ConductorTestData {
     pub async fn new(
+        envs: TestEnvironments,
         dna_files: Vec<DnaFile>,
         agents: Vec<AgentPubKey>,
         network_config: KitsuneP2pConfig,
@@ -107,15 +111,14 @@ impl ConductorTestData {
             }
             cell_id_by_dna_file.push((dna_file, cell_ids));
         }
-        // let cell_ids: Vec<CellId> = cells
-        //     .iter()
-        //     .map(|(cell, _)| cell.as_id())
-        //     .cloned()
-        //     .collect();
 
-        let (__tmpdir, _app_api, handle) =
-            setup_app_with_network(vec![("test_app", cells)], dna_files.clone(), network_config)
-                .await;
+        let (__tmpdir, _app_api, handle) = setup_app_inner(
+            envs,
+            vec![("test_app", cells)],
+            dna_files.clone(),
+            Some(network_config),
+        )
+        .await;
 
         let mut call_data = HashMap::new();
 
@@ -172,7 +175,13 @@ impl ConductorTestData {
             agents.push(fake_agent_pubkey_2());
         }
 
-        Self::new(vec![dna_file], agents, network.unwrap_or_default()).await
+        Self::new(
+            test_environments(),
+            vec![dna_file],
+            agents,
+            network.unwrap_or_default(),
+        )
+        .await
     }
 
     /// Shutdown the conductor

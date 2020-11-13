@@ -23,7 +23,10 @@ use holochain_p2p::{
     HolochainP2pRef, HolochainP2pSender,
 };
 use holochain_serialized_bytes::{SerializedBytes, SerializedBytesError, UnsafeBytes};
-use holochain_state::{env::EnvironmentWrite, fresh_reader_test, test_utils::test_environments};
+use holochain_state::{
+    env::EnvironmentWrite, fresh_reader_test, test_utils::test_environments,
+    test_utils::TestEnvironments,
+};
 use holochain_types::{
     app::InstalledCell,
     cell::CellId,
@@ -44,10 +47,14 @@ use std::{convert::TryInto, sync::Arc, time::Duration};
 use tempdir::TempDir;
 use tokio::sync::mpsc;
 
-#[cfg(test)]
+/// TODO: featureflagify
+// #[cfg(test)]
+#[allow(missing_docs)]
 pub mod host_fn_api;
 
-#[cfg(test)]
+/// TODO: featureflagify
+// #[cfg(test)]
+#[allow(missing_docs)]
 pub mod conductor_setup;
 
 #[macro_export]
@@ -288,7 +295,7 @@ pub async fn setup_app(
     apps_data: Vec<(&str, InstalledCellsWithProofs)>,
     dnas: Vec<DnaFile>,
 ) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
-    setup_app_inner(apps_data, dnas, None).await
+    setup_app_inner(test_environments(), apps_data, dnas, None).await
 }
 
 /// Setup an app with a custom network config for testing
@@ -298,16 +305,16 @@ pub async fn setup_app_with_network(
     dnas: Vec<DnaFile>,
     network: KitsuneP2pConfig,
 ) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
-    setup_app_inner(apps_data, dnas, Some(network)).await
+    setup_app_inner(test_environments(), apps_data, dnas, Some(network)).await
 }
 
-async fn setup_app_inner(
+/// Setup an app with full configurability
+pub async fn setup_app_inner(
+    envs: TestEnvironments,
     apps_data: Vec<(&str, InstalledCellsWithProofs)>,
     dnas: Vec<DnaFile>,
     network: Option<KitsuneP2pConfig>,
 ) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
-    let envs = test_environments();
-
     let conductor_handle = ConductorBuilder::new()
         .config(ConductorConfig {
             admin_interfaces: Some(vec![AdminInterfaceConfig {

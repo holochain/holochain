@@ -61,6 +61,7 @@ pub mod key;
 pub mod prelude;
 pub mod transaction;
 
+/// TODO: featureflagify
 // NB: would be nice to put this under cfg(test), but then it's not visible from other crates,
 // since cfg(test) only applies to the crate in which you run tests
 pub mod test_utils;

@@ -68,11 +68,14 @@ use tracing::*;
 use futures::future::FutureExt;
 use holochain_p2p::event::HolochainP2pEvent::*;
 
-#[cfg(test)]
+/// TODO: featureflagify
+// #[cfg(test)]
 use super::state::ConductorState;
-#[cfg(test)]
+/// TODO: featureflagify
+// #[cfg(test)]
 use crate::core::queue_consumer::InitialQueueTriggers;
-#[cfg(test)]
+/// TODO: featureflagify
+// #[cfg(test)]
 use holochain_state::env::EnvironmentWrite;
 use holochain_zome_types::entry_def::EntryDef;
 
@@ -198,18 +201,22 @@ pub trait ConductorHandleT: Send + Sync {
     #[allow(clippy::ptr_arg)]
     async fn get_app_info(&self, app_id: &AppId) -> ConductorResult<Option<InstalledApp>>;
 
-    #[cfg(test)]
+    /// TODO: featureflagify
+    // #[cfg(test)]
     async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite>;
 
-    #[cfg(test)]
+    /// TODO: featureflagify
+    // #[cfg(test)]
     async fn get_p2p_env(&self) -> EnvironmentWrite;
 
-    #[cfg(test)]
+    /// TODO: featureflagify
+    // #[cfg(test)]
     async fn get_cell_triggers(&self, cell_id: &CellId)
         -> ConductorApiResult<InitialQueueTriggers>;
 
     // HACK: remove when B-01593 lands
-    #[cfg(test)]
+    /// TODO: featureflagify
+    // #[cfg(test)]
     async fn get_state_from_handle(&self) -> ConductorApiResult<ConductorState>;
 }
 
@@ -498,20 +505,23 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .get_app_info(app_id))
     }
 
-    #[cfg(test)]
+    /// TODO: featureflagify
+    // #[cfg(test)]
     async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite> {
         let lock = self.conductor.read().await;
         let cell = lock.cell_by_id(cell_id)?;
         Ok(cell.env().clone())
     }
 
-    #[cfg(test)]
+    /// TODO: featureflagify
+    // #[cfg(test)]
     async fn get_p2p_env(&self) -> EnvironmentWrite {
         let lock = self.conductor.read().await;
         lock.get_p2p_env()
     }
 
-    #[cfg(test)]
+    /// TODO: featureflagify
+    // #[cfg(test)]
     async fn get_cell_triggers(
         &self,
         cell_id: &CellId,
@@ -521,7 +531,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         Ok(cell.triggers().clone())
     }
 
-    #[cfg(test)]
+    /// TODO: featureflagify
+    // #[cfg(test)]
     async fn get_state_from_handle(&self) -> ConductorApiResult<ConductorState> {
         let lock = self.conductor.read().await;
         Ok(lock.get_state_from_handle().await?)

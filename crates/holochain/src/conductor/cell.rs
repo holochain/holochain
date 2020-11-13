@@ -82,6 +82,7 @@ pub mod error;
 
 #[cfg(test)]
 mod gossip_test;
+
 #[cfg(test)]
 mod test;
 
@@ -839,7 +840,8 @@ impl Cell {
         &self.env
     }
 
-    #[cfg(test)]
+    /// TODO: featureflagify
+    // #[cfg(test)]
     /// Get the triggers for the cell
     /// Useful for testing when you want to
     /// Cause workflows to trigger

@@ -69,7 +69,8 @@ use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
 use tracing::*;
 
-#[cfg(test)]
+/// TODO: featureflagify
+// #[cfg(test)]
 use super::handle::MockConductorHandleT;
 use fallible_iterator::FallibleIterator;
 use holochain_zome_types::entry_def::EntryDef;
@@ -728,12 +729,14 @@ where
         Ok(source_chain.dump_as_json().await?)
     }
 
-    #[cfg(test)]
+    /// TODO: featureflagify
+    // #[cfg(test)]
     pub(super) async fn get_state_from_handle(&self) -> ConductorResult<ConductorState> {
         self.get_state().await
     }
 
-    #[cfg(test)]
+    /// TODO: featureflagify
+    // #[cfg(test)]
     pub(super) fn get_p2p_env(&self) -> EnvironmentWrite {
         self.p2p_env.clone()
     }
@@ -828,9 +831,11 @@ mod builder {
         config: ConductorConfig,
         dna_store: DS,
         keystore: Option<KeystoreSender>,
-        #[cfg(test)]
+        /// TODO: featureflagify
+        // #[cfg(test)]
         state: Option<ConductorState>,
-        #[cfg(test)]
+        /// TODO: featureflagify
+        // #[cfg(test)]
         mock_handle: Option<MockConductorHandleT>,
     }
 
@@ -906,7 +911,8 @@ mod builder {
             let p2p_environment =
                 EnvironmentWrite::new(env_path.as_ref(), EnvironmentKind::P2p, keystore.clone())?;
 
-            #[cfg(test)]
+            // TODO: featureflagify
+            // #[cfg(test)]
             let state = self.state;
 
             let Self {
@@ -931,7 +937,8 @@ mod builder {
             )
             .await?;
 
-            #[cfg(test)]
+            // TODO: featureflagify
+            // #[cfg(test)]
             let conductor = Self::update_fake_state(state, conductor).await?;
 
             Self::finish(conductor, config, p2p_evt).await
@@ -982,7 +989,8 @@ mod builder {
             self
         }
 
-        #[cfg(test)]
+        /// TODO: featureflagify
+        // #[cfg(test)]
         /// Sets some fake conductor state for tests
         pub fn fake_state(mut self, state: ConductorState) -> Self {
             self.state = Some(state);
@@ -991,13 +999,15 @@ mod builder {
 
         /// Pass a mock handle in, which will be returned regardless of whatever
         /// else happens to this builder
-        #[cfg(test)]
+        /// TODO: featureflagify
+        // #[cfg(test)]
         pub fn with_mock_handle(mut self, handle: MockConductorHandleT) -> Self {
             self.mock_handle = Some(handle);
             self
         }
 
-        #[cfg(test)]
+        /// TODO: featureflagify
+        // #[cfg(test)]
         async fn update_fake_state(
             state: Option<ConductorState>,
             conductor: Conductor<DS>,
@@ -1025,7 +1035,8 @@ mod builder {
             )
             .await?;
 
-            #[cfg(test)]
+            // TODO: featureflagify
+            // #[cfg(test)]
             let conductor = Self::update_fake_state(self.state, conductor).await?;
 
             Self::finish(conductor, self.config, p2p_evt).await

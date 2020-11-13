@@ -4,6 +4,7 @@ use crate::{
     env::{EnvironmentKind, EnvironmentWrite},
     prelude::BufKey,
 };
+use holochain_keystore::KeystoreSender;
 use holochain_types::test_utils::fake_cell_id;
 use shrinkwraprs::Shrinkwrap;
 use std::sync::Arc;
@@ -104,6 +105,8 @@ pub struct TestEnvironments {
     p2p: EnvironmentWrite,
     /// The shared root temp dir for these environments
     tempdir: Arc<TempDir>,
+    /// A keystore sender shared by all environments
+    keystore: KeystoreSender,
 }
 
 #[allow(missing_docs)]
@@ -111,14 +114,17 @@ impl TestEnvironments {
     /// Create all three non-cell environments at once
     pub fn new(tempdir: TempDir) -> Self {
         use EnvironmentKind::*;
-        let conductor = EnvironmentWrite::new(&tempdir.path(), Conductor, test_keystore()).unwrap();
-        let wasm = EnvironmentWrite::new(&tempdir.path(), Wasm, test_keystore()).unwrap();
-        let p2p = EnvironmentWrite::new(&tempdir.path(), P2p, test_keystore()).unwrap();
+        let keystore = test_keystore();
+        let conductor =
+            EnvironmentWrite::new(&tempdir.path(), Conductor, keystore.clone()).unwrap();
+        let wasm = EnvironmentWrite::new(&tempdir.path(), Wasm, keystore.clone()).unwrap();
+        let p2p = EnvironmentWrite::new(&tempdir.path(), P2p, keystore.clone()).unwrap();
         Self {
             conductor,
             wasm,
             p2p,
             tempdir: Arc::new(tempdir),
+            keystore,
         }
     }
 
@@ -137,6 +143,10 @@ impl TestEnvironments {
     /// Get the root temp dir for these environments
     pub fn tempdir(&self) -> Arc<TempDir> {
         self.tempdir.clone()
+    }
+
+    pub fn keystore(&self) -> &KeystoreSender {
+        &self.keystore
     }
 }
 
