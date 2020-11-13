@@ -1,22 +1,108 @@
 use hdk3::prelude::Links;
+use holochain::test_utils::host_fn_api;
 use holochain::{
-    core::ribosome::ZomeCallInvocation,
-    test_utils::{
-        conductor_setup::{ConductorCallData, ConductorTestData},
-        host_fn_api::commit_entry,
-    },
+    core::ribosome::ZomeCallInvocation, test_utils::conductor_setup::ConductorTestData,
 };
 use holochain_keystore::keystore_actor::KeystoreSenderExt;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::test_utils::test_environments;
-use holochain_types::dna::{DnaDef, DnaFile};
+use holochain_types::{
+    dna::{DnaDef, DnaFile},
+    Entry,
+};
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::{element::SignedHeaderHashed, ExternInput, ZomeCallResponse};
+use holochain_zome_types::{ExternInput, ZomeCallResponse};
 use unwrap_to::unwrap_to;
 
-/// Many agents can reach consistency
+/// A single link with an AgentPubKey for the base and target is committed by
+/// one agent, and after a delay, all agents can get the link
 #[tokio::test(threaded_scheduler)]
-async fn many_agents_can_reach_consistency() {
+async fn many_agents_can_reach_consistency_agent_links() {
+    const NUM_AGENTS: usize = 3;
+    let consistency_delay = std::time::Duration::from_secs(30);
+
+    let envs = test_environments();
+    let zomes = vec![TestWasm::Link];
+
+    let dna_file = DnaFile::new(
+        DnaDef {
+            name: "conductor_test".to_string(),
+            uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
+            properties: SerializedBytes::try_from(()).unwrap(),
+            zomes: zomes.clone().into_iter().map(Into::into).collect(),
+        },
+        zomes.into_iter().map(Into::into),
+    )
+    .await
+    .unwrap();
+
+    let mut agents = Vec::with_capacity(NUM_AGENTS);
+
+    for _ in 0..NUM_AGENTS {
+        agents.push(
+            envs.keystore()
+                .generate_sign_keypair_from_pure_entropy()
+                .await
+                .unwrap(),
+        )
+    }
+
+    let (conductor, cell_ids) =
+        ConductorTestData::new(envs, vec![dna_file], agents, Default::default()).await;
+
+    let cell_ids = cell_ids.values().next().unwrap();
+    let committer = conductor.call_data(&cell_ids[1]).unwrap();
+    let base = cell_ids[2].agent_pubkey().clone();
+    let target = cell_ids[0].agent_pubkey().clone();
+
+    // let base = host_fn_api::commit_entry(
+    //     &committer.env,
+    //     committer.call_data(TestWasm::Link),
+    //     Entry::app(().try_into().unwrap()).unwrap(),
+    //     "path",
+    // )
+    // .await;
+    // let target = base;
+
+    host_fn_api::create_link(
+        &committer.env,
+        committer.call_data(TestWasm::Link),
+        base.clone().into(),
+        target.into(),
+        ().into(),
+    )
+    .await;
+
+    tokio::time::delay_for(consistency_delay).await;
+
+    let mut seen = [0; NUM_AGENTS];
+
+    for j in 0..2 {
+
+        for i in 0..NUM_AGENTS {
+            let cell_id = cell_ids[i].clone();
+            let cd = conductor.call_data(&cell_id).unwrap();
+
+            let links = host_fn_api::get_links(
+                &cd.env,
+                cd.call_data(TestWasm::Link),
+                base.clone().into(),
+                None,
+                Default::default(),
+            )
+            .await;
+
+            seen[i] = links.len();
+        }
+    }
+
+    assert_eq!(seen, [1; NUM_AGENTS]);
+}
+
+/// A single link with a Path for the base and target is committed by one
+/// agent, and after a delay, all agents can get the link
+#[tokio::test(threaded_scheduler)]
+async fn many_agents_can_reach_consistency_normal_links() {
     let num_agents = 30;
     let consistency_delay = std::time::Duration::from_secs(5);
 
@@ -50,12 +136,8 @@ async fn many_agents_can_reach_consistency() {
         ConductorTestData::new(envs, vec![dna_file], agents, Default::default()).await;
 
     let cell_ids = cell_ids.values().next().unwrap();
-    // let call_data: Vec<&ConductorCallData> = cell_ids
-    //     .iter()
-    //     .map(|cell_id| conductor.call_data(cell_id).unwrap())
-    //     .collect();
 
-    let create_output = conductor
+    let _create_output = conductor
         .handle()
         .call_zome(ZomeCallInvocation {
             cell_id: cell_ids[0].clone(),
