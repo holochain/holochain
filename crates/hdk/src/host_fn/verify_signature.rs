@@ -1,7 +1,7 @@
 use crate::prelude::*;
 
 /// Verify the passed signature and public key against the passed data
-pub fn verify_signature<'a, K: Into<AgentPubKey>, S: Into<Signature>, D: Into<SerializedBytes>>(
+pub fn verify_signature<K: Into<AgentPubKey>, S: Into<Signature>, D: Into<SerializedBytes>>(
     key: K,
     signature: S,
     data: D,

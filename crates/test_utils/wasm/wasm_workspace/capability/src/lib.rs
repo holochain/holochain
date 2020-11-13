@@ -70,15 +70,23 @@ fn needs_cap_claim(_: ()) -> ExternResult<()> {
 
 #[hdk_extern]
 fn try_cap_claim(cap_for: CapFor) -> ExternResult<ZomeCallResponse> {
-    let result: ZomeCallResponse = call_remote(
+    let result: HdkResult<()> = call_remote(
         cap_for.1,
         zome_info()?.zome_name,
         "needs_cap_claim".to_string().into(),
         Some(cap_for.0),
         &(),
-    )?;
+    );
 
-    Ok(result)
+    // This is an awkard thing to do.
+    // Mapping the hdk results _back_ to what the hdk already extracted them from internally.
+    // This is just so that the external test harness can assert against something.
+    // Normally we would handle errors inside the wasm directly.
+    match result {
+        Ok(v) => Ok(ZomeCallResponse::Ok(ExternOutput::new(v.try_into()?))),
+        Err(HdkError::UnauthorizedZomeCall) => Ok(ZomeCallResponse::Unauthorized),
+        _ => unreachable!(),
+    }
 }
 
 #[hdk_extern]
