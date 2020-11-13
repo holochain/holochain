@@ -798,13 +798,14 @@ impl Space {
             space,
             from_agent,
             basis,
-            // always trying to notify 2 remote agents at the moment
+            // not compatible with current strategy
             remote_agent_count: _,
             timeout_ms,
             payload,
         } = input;
 
         let timeout_ms = timeout_ms.expect("set by handle_notify_multi");
+        let stage_1_timeout_ms = timeout_ms / 2;
 
         // as an optimization - broadcast to all local joins
         // but don't count that toward our publish total
@@ -821,94 +822,28 @@ impl Space {
             })
             .collect::<Vec<_>>();
 
-        let i_s = self.i_s.clone();
-        let evt_sender = self.evt_sender.clone();
-        let tx = self.transport.clone();
-        let bootstrap_service = self.config.bootstrap_service.clone();
+        let remote_fut = discover::message_neighborhood(
+            self,
+            from_agent.clone(),
+            stage_1_timeout_ms,
+            timeout_ms,
+            basis,
+            wire::Wire::notify(
+                space.clone(),
+                from_agent.clone(),
+                from_agent,
+                payload.into(),
+            ),
+            |w| match w {
+                wire::Wire::NotifyResp(_) => Ok(()),
+                _ => Err(()),
+            },
+        );
+
         Ok(async move {
             futures::future::try_join_all(local_all).await?;
 
-            let mut sent_to: HashSet<Arc<KitsuneAgent>> = HashSet::new();
-            let send_success_count = Arc::new(std::sync::atomic::AtomicU8::new(0));
-
-            let start_time = std::time::Instant::now();
-            let mut interval_ms = 10;
-
-            loop {
-                if let Ok(nodes) = discover::get_5_or_less_non_local_agents_near_basis(
-                    space.clone(),
-                    from_agent.clone(),
-                    basis.clone(),
-                    i_s.clone(),
-                    evt_sender.clone(),
-                    bootstrap_service.clone(),
-                )
-                .await
-                {
-                    let mut all = Vec::new();
-
-                    for node in nodes {
-                        let to_agent = Arc::new(node.as_agent_ref().clone());
-
-                        if !sent_to.contains(&to_agent) {
-                            sent_to.insert(to_agent.clone());
-
-                            let ssc = send_success_count.clone();
-                            let tx = tx.clone();
-                            let space = &space;
-                            let from_agent = &from_agent;
-                            let payload = &payload;
-                            all.push(async move {
-                                let url = node
-                                    .as_urls_ref()
-                                    .get(0)
-                                    .ok_or_else(|| KitsuneP2pError::from("no url"))?
-                                    .clone();
-                                let (_, mut write, read) = tx.create_channel(url).await?;
-                                write
-                                    .write_and_close(
-                                        wire::Wire::notify(
-                                            space.clone(),
-                                            from_agent.clone(),
-                                            to_agent.clone(),
-                                            payload.clone().into(),
-                                        )
-                                        .encode_vec()?,
-                                    )
-                                    .await?;
-                                let res = read.read_to_end().await;
-                                let (_, res) = wire::Wire::decode_ref(&res)?;
-                                if let wire::Wire::NotifyResp(_) = res {
-                                    ssc.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                                }
-                                KitsuneP2pResult::Ok(())
-                            });
-                        }
-                    }
-
-                    if !all.is_empty() {
-                        let _ = futures::future::join_all(all).await;
-                    }
-                }
-
-                if send_success_count.load(std::sync::atomic::Ordering::Relaxed) >= 2 {
-                    break;
-                }
-
-                let elapsed_ms = start_time.elapsed().as_millis() as u64;
-                if elapsed_ms >= timeout_ms {
-                    break;
-                }
-
-                interval_ms *= 2;
-                if interval_ms > timeout_ms - elapsed_ms {
-                    interval_ms = timeout_ms - elapsed_ms;
-                }
-
-                tokio::time::delay_for(std::time::Duration::from_millis(interval_ms)).await;
-            }
-
-            Ok(send_success_count.load(std::sync::atomic::Ordering::Relaxed))
+            Ok(remote_fut.await.len() as u8)
         }
         .boxed()
         .into())

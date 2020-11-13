@@ -151,7 +151,7 @@ pub(crate) fn peer_discover(
         };
 
         let start_time = std::time::Instant::now();
-        let mut interval_ms = 10;
+        let mut interval_ms = 50;
 
         loop {
             if let Ok(res) = check_local().await {
@@ -183,6 +183,104 @@ pub(crate) fn peer_discover(
     .into()
 }
 
+/// attempt to send messages to remote nodes in a staged timeout format
+pub(crate) fn message_neighborhood<F>(
+    space: &mut Space,
+    from_agent: Arc<KitsuneAgent>,
+    stage_1_timeout_if_any_ms: u64,
+    stage_2_timeout_even_if_none_ms: u64,
+    // ignored while full-sync
+    _basis: Arc<KitsuneBasis>,
+    payload: wire::Wire,
+    accept_result_cb: F,
+) -> MustBoxFuture<'static, Vec<wire::Wire>>
+where
+    F: Fn(&wire::Wire) -> Result<(), ()> + 'static + Send + Sync,
+{
+    let i_s = space.i_s.clone();
+    let evt_sender = space.evt_sender.clone();
+    let tx = space.transport.clone();
+    let bootstrap_service = space.config.bootstrap_service.clone();
+    let space = space.space.clone();
+    let accept_result_cb = Arc::new(accept_result_cb);
+    async move {
+        let out = Arc::new(tokio::sync::Mutex::new(Vec::new()));
+
+        let mut sent_to = HashSet::new();
+        let start_time = std::time::Instant::now();
+        let mut interval_ms = 50;
+
+        loop {
+            if let Ok(nodes) = get_5_or_less_non_local_agents_near_basis(
+                space.clone(),
+                from_agent.clone(),
+                _basis.clone(),
+                i_s.clone(),
+                evt_sender.clone(),
+                bootstrap_service.clone(),
+            )
+            .await
+            {
+                for node in nodes {
+                    let to_agent = Arc::new(node.as_agent_ref().clone());
+                    if !sent_to.contains(&to_agent) {
+                        sent_to.insert(to_agent.clone());
+                        let url = match node.as_urls_ref().get(0) {
+                            None => continue,
+                            Some(url) => url.clone(),
+                        };
+                        let fut = tx.create_channel(url);
+                        let mut payload = payload.clone();
+                        let accept_result_cb = accept_result_cb.clone();
+                        let out = out.clone();
+                        tokio::task::spawn(async move {
+                            let (_, mut write, read) = fut.await?;
+                            match &mut payload {
+                                wire::Wire::Notify(n) => {
+                                    n.to_agent = to_agent;
+                                }
+                                _ => panic!("cannot message {:?}", payload),
+                            }
+                            let payload = payload.encode_vec()?;
+                            write.write_and_close(payload).await?;
+                            let res = read.read_to_end().await;
+                            let (_, res) = wire::Wire::decode_ref(&res)?;
+                            if accept_result_cb(&res).is_ok() {
+                                out.lock().await.push(res);
+                            }
+
+                            KitsuneP2pResult::Ok(())
+                        });
+                    }
+                }
+            }
+
+            let elapsed_ms = start_time.elapsed().as_millis() as u64;
+
+            if elapsed_ms >= stage_1_timeout_if_any_ms && !out.lock().await.is_empty() {
+                break;
+            }
+
+            if elapsed_ms >= stage_2_timeout_even_if_none_ms {
+                break;
+            }
+
+            interval_ms *= 2;
+            if interval_ms > stage_2_timeout_even_if_none_ms - elapsed_ms {
+                interval_ms = stage_2_timeout_even_if_none_ms - elapsed_ms;
+            }
+
+            tokio::time::delay_for(std::time::Duration::from_millis(interval_ms)).await;
+        }
+
+        let mut lock = out.lock().await;
+        lock.drain(..).collect()
+    }
+    .boxed()
+    .into()
+}
+
+/// search for agents to contact
 pub(crate) fn get_5_or_less_non_local_agents_near_basis(
     space: Arc<KitsuneSpace>,
     from_agent: Arc<KitsuneAgent>,
@@ -190,7 +288,7 @@ pub(crate) fn get_5_or_less_non_local_agents_near_basis(
     _basis: Arc<KitsuneBasis>,
     i_s: ghost_actor::GhostSender<SpaceInternal>,
     evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
-    bootstrap_url: Option<url2::Url2>,
+    bootstrap_service: Option<url2::Url2>,
 ) -> MustBoxFuture<'static, KitsuneP2pResult<HashSet<AgentInfo>>> {
     async move {
         let mut out = HashSet::new();
@@ -222,7 +320,7 @@ pub(crate) fn get_5_or_less_non_local_agents_near_basis(
         }
 
         if let Ok(list) = super::bootstrap::random(
-            bootstrap_url,
+            bootstrap_service,
             super::bootstrap::RandomQuery {
                 space: space.clone(),
                 // grap a couple extra incase they happen to be local
