@@ -6,10 +6,7 @@ use holochain::{
 use holochain_keystore::keystore_actor::KeystoreSenderExt;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::test_utils::test_environments;
-use holochain_types::{
-    dna::{DnaDef, DnaFile},
-    Entry,
-};
+use holochain_types::dna::{DnaDef, DnaFile};
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::{ExternInput, ZomeCallResponse};
 use unwrap_to::unwrap_to;
@@ -18,8 +15,8 @@ use unwrap_to::unwrap_to;
 /// one agent, and after a delay, all agents can get the link
 #[tokio::test(threaded_scheduler)]
 async fn many_agents_can_reach_consistency_agent_links() {
-    const NUM_AGENTS: usize = 3;
-    let consistency_delay = std::time::Duration::from_secs(30);
+    const NUM_AGENTS: usize = 2;
+    let consistency_delay = std::time::Duration::from_secs(50);
 
     let envs = test_environments();
     let zomes = vec![TestWasm::Link];
@@ -52,8 +49,8 @@ async fn many_agents_can_reach_consistency_agent_links() {
 
     let cell_ids = cell_ids.values().next().unwrap();
     let committer = conductor.call_data(&cell_ids[1]).unwrap();
-    let base = cell_ids[2].agent_pubkey().clone();
-    let target = cell_ids[0].agent_pubkey().clone();
+    let base = cell_ids[0].agent_pubkey().clone();
+    let target = cell_ids[1].agent_pubkey().clone();
 
     // let base = host_fn_api::commit_entry(
     //     &committer.env,
@@ -74,26 +71,22 @@ async fn many_agents_can_reach_consistency_agent_links() {
     .await;
 
     tokio::time::delay_for(consistency_delay).await;
-
     let mut seen = [0; NUM_AGENTS];
 
-    for j in 0..2 {
+    for i in 0..NUM_AGENTS {
+        let cell_id = cell_ids[i].clone();
+        let cd = conductor.call_data(&cell_id).unwrap();
 
-        for i in 0..NUM_AGENTS {
-            let cell_id = cell_ids[i].clone();
-            let cd = conductor.call_data(&cell_id).unwrap();
+        let links = host_fn_api::get_links(
+            &cd.env,
+            cd.call_data(TestWasm::Link),
+            base.clone().into(),
+            None,
+            Default::default(),
+        )
+        .await;
 
-            let links = host_fn_api::get_links(
-                &cd.env,
-                cd.call_data(TestWasm::Link),
-                base.clone().into(),
-                None,
-                Default::default(),
-            )
-            .await;
-
-            seen[i] = links.len();
-        }
+        seen[i] = links.len();
     }
 
     assert_eq!(seen, [1; NUM_AGENTS]);
