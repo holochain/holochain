@@ -329,12 +329,11 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
-            SignNetworkData {
-                respond,
-                data,
-                ..
-            } => {
-                let signature = cell_id.agent_pubkey().sign_raw(self.keystore(), &data).await?;
+            SignNetworkData { respond, data, .. } => {
+                let signature = cell_id
+                    .agent_pubkey()
+                    .sign_raw(self.keystore(), &data)
+                    .await?;
                 respond.respond(Ok(async move { Ok(signature) }.boxed().into()));
             }
             _ => {

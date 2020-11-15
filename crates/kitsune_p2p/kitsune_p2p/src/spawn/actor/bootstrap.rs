@@ -220,18 +220,24 @@ mod tests {
             .unwrap();
 
         // We should be able to get a milliseconds timestamp back.
-        let remote_now: u64 = super::now(Some(url2::url2!("{}", crate::config::BOOTSTRAP_SERVICE_DEV)))
-            .await
-            .unwrap();
+        let remote_now: u64 = super::now(Some(url2::url2!(
+            "{}",
+            crate::config::BOOTSTRAP_SERVICE_DEV
+        )))
+        .await
+        .unwrap();
         let threshold = 5000;
 
         assert!((remote_now - local_millis) < threshold);
 
         // Now once should return some number and the remote server offset should be set in the
         // NOW_OFFSET_MILLIS once cell.
-        let _: u64 = super::now_once(Some(url2::url2!("{}", crate::config::BOOTSTRAP_SERVICE_DEV)))
-            .await
-            .unwrap();
+        let _: u64 = super::now_once(Some(url2::url2!(
+            "{}",
+            crate::config::BOOTSTRAP_SERVICE_DEV
+        )))
+        .await
+        .unwrap();
         assert!(super::NOW_OFFSET_MILLIS.get().is_some());
     }
 
@@ -241,9 +247,12 @@ mod tests {
     // thread 'spawn::actor::bootstrap::tests::test_random' panicked at 'dispatch dropped without returning error', /rustc/d3fb005a39e62501b8b0b356166e515ae24e2e54/src/libstd/macros.rs:13:23
     async fn test_random() {
         let space = fixt!(KitsuneSpace, Unpredictable);
-        let now = super::now(Some(url2::url2!("{}", crate::config::BOOTSTRAP_SERVICE_DEV)))
-            .await
-            .unwrap();
+        let now = super::now(Some(url2::url2!(
+            "{}",
+            crate::config::BOOTSTRAP_SERVICE_DEV
+        )))
+        .await
+        .unwrap();
 
         let alice = sign_ed25519_keypair_new_from_entropy().await.unwrap();
         let bob = sign_ed25519_keypair_new_from_entropy().await.unwrap();
