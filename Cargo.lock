@@ -1767,6 +1767,7 @@ name = "kitsune_p2p"
 version = "0.0.1"
 dependencies = [
  "assert_matches",
+ "backtrace",
  "derive_more",
  "fixt",
  "futures",
