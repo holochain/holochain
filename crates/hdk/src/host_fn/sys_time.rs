@@ -1,9 +1,11 @@
-/// Trivial macro to return the current system time from the host.
+use crate::prelude::*;
+
+/// Trivial wrapper to return the current system time from the host.
 ///
 /// System time doesn't accept any arguments so usage is as simple as:
 ///
 /// ```ignore
-/// let now = sys_time!()?;
+/// let now = sys_time()?;
 /// ```
 ///
 /// Note: sys_time returns a result like all host fns so `?` or `.ok()` is needed.
@@ -11,8 +13,8 @@
 /// System times can be considered "secure" or "insecure" situationally, some things to consider:
 ///
 /// - the host signing times into chain headers is using the same clock in the host_fn call so the
-///   the sys_time returned by a macro for inclusion in an entry will always be less than or equal
-///   to the time in the header of that entry unless:
+///   the sys_time returned by a function for inclusion in an entry will always be less than or
+///   equal to the time in the header of that entry unless:
 ///     - the user manually changed the system time backwards between this host_fn being called and
 ///       an entry using it being committed (NTP avoids making time go backward by stretching it)
 ///     - the sys_time call ran on a different machine, e.g. via a call_remote, to the machine that
@@ -59,13 +61,6 @@
 /// on the current time within relatively tight accuracy/precision up-front in a relatively trusted
 /// environment e.g. a chess game between friends with time moves that balances security/trust and
 /// flaky networking, etc.
-#[macro_export]
-macro_rules! sys_time {
-    () => {{
-        $crate::host_fn!(
-            __sys_time,
-            $crate::prelude::SysTimeInput::new(()),
-            $crate::prelude::SysTimeOutput
-        )
-    }};
+pub fn sys_time() -> HdkResult<core::time::Duration> {
+    host_fn!(__sys_time, SysTimeInput::new(()), SysTimeOutput)
 }

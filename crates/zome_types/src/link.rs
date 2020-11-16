@@ -34,6 +34,12 @@ impl From<Vec<u8>> for LinkTag {
     }
 }
 
+impl From<()> for LinkTag {
+    fn from(_: ()) -> Self {
+        Self(Vec::new())
+    }
+}
+
 impl AsRef<Vec<u8>> for LinkTag {
     fn as_ref(&self) -> &Vec<u8> {
         &self.0

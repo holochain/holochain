@@ -31,19 +31,20 @@ fn add_valid_link(_: ()) -> ExternResult<HeaderHash> {
 }
 
 fn add_valid_link_inner() -> ExternResult<HeaderHash> {
-    let always_linkable_entry_hash = hash_entry!(MaybeLinkable::AlwaysLinkable)?;
-    create_entry!(MaybeLinkable::AlwaysLinkable)?;
+    let always_linkable_entry_hash = hash_entry(&MaybeLinkable::AlwaysLinkable)?;
+    create_entry(&MaybeLinkable::AlwaysLinkable)?;
 
-    Ok(create_link!(
+    Ok(create_link(
         always_linkable_entry_hash.clone(),
-        always_linkable_entry_hash
+        always_linkable_entry_hash,
+        ()
     )?)
 }
 
 #[hdk_extern]
 fn remove_valid_link(_: ()) -> ExternResult<HeaderHash> {
     let valid_link = add_valid_link_inner()?;
-    Ok(delete_link!(valid_link)?)
+    Ok(delete_link(valid_link)?)
 }
 
 #[hdk_extern]
@@ -52,22 +53,23 @@ fn add_invalid_link(_: ()) -> ExternResult<HeaderHash> {
 }
 
 fn add_invalid_link_inner() -> ExternResult<HeaderHash> {
-    let always_linkable_entry_hash = hash_entry!(MaybeLinkable::AlwaysLinkable)?;
-    let never_linkable_entry_hash = hash_entry!(MaybeLinkable::NeverLinkable)?;
+    let always_linkable_entry_hash = hash_entry(&MaybeLinkable::AlwaysLinkable)?;
+    let never_linkable_entry_hash = hash_entry(&MaybeLinkable::NeverLinkable)?;
 
-    create_entry!(MaybeLinkable::AlwaysLinkable)?;
-    create_entry!(MaybeLinkable::NeverLinkable)?;
+    create_entry(&MaybeLinkable::AlwaysLinkable)?;
+    create_entry(&MaybeLinkable::NeverLinkable)?;
 
-    Ok(create_link!(
+    Ok(create_link(
         never_linkable_entry_hash,
-        always_linkable_entry_hash
+        always_linkable_entry_hash,
+        ()
     )?)
 }
 
 #[hdk_extern]
 fn remove_invalid_link(_: ()) -> ExternResult<HeaderHash> {
     let valid_link = add_invalid_link_inner()?;
-    Ok(delete_link!(valid_link)?)
+    Ok(delete_link(valid_link)?)
 }
 
 #[hdk_extern]
@@ -80,7 +82,7 @@ fn validate_delete_link(
     validate_delete_link: ValidateDeleteLinkData,
 ) -> ExternResult<ValidateLinkCallbackResult> {
     let delete_link = validate_delete_link.delete_link;
-    let base: Option<MaybeLinkable> = match get!(delete_link.base_address.clone())? {
+    let base: Option<MaybeLinkable> = match get(delete_link.base_address.clone(), GetOptions)? {
         Some(b) => b.entry().to_app_option()?,
         None => {
             return Ok(ValidateLinkCallbackResult::UnresolvedDependencies(vec![

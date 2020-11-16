@@ -1,3 +1,5 @@
+use crate::prelude::*;
+
 /// Create a link from a base entry to a target entry, with an optional tag.
 ///
 /// Links represent the general idea of relationships between entries.
@@ -21,19 +23,19 @@
 ///
 /// - creates reference a single entry
 /// - updates and deletes reference create/update elements by both their entry+header
-/// - creates, updates and deletes all have different macros, network ops and validation logic
+/// - creates, updates and deletes all have different functions, network ops and validation logic
 /// - is cryptographically guaranteed to be a DAG (not-circular) because they include headers
 /// - model "mutability" for a single thing/identity in an immutable/append-only way
 /// - only reference other entries of the same entry type (e.g. comments can _not_ update posts)
 ///
-/// @see get_details! and get! for more information about CRUD
-/// @see get_links! and get_link_details! for more information about filtering by tag
+/// @see get_details and get for more information about CRUD
+/// @see get_links and get_link_details for more information about filtering by tag
 ///
 /// Generally links and CRUDs _do not interact_ beyond the fact that links need entry hashes to
 /// reference for the base and target to already exist due to a prior create or update.
 /// The entry value only needs to exist on the DHT for the link to validate, it doesn't need to be
 /// live and can have any combination of valid/invalid crud headers.
-/// i.e. if you use link_entries! to create relationships between two entries, then update_entry!
+/// i.e. if you use link_entries! to create relationships between two entries, then update_entry
 /// on the base, the links will still only be visible to get_link(s_details)! against the original
 /// base, there is no logic to "bring forward" links to the updated entry because:
 ///
@@ -53,18 +55,16 @@
 /// If you have the hash of the identity entry you can get all the links, if you have the entry or
 /// header hash for any of the creates or updates you can lookup the identity entry hash out of the
 /// body of the create/update entry.
-#[macro_export]
-macro_rules! create_link {
-    ( $base:expr, $target:expr ) => {
-        $crate::create_link!($base, $target, vec![])
-    };
-    ( $base:expr, $target:expr, $tag:expr ) => {{
-        $crate::prelude::host_externs!(__create_link);
+pub fn create_link<'a, T: 'a + Into<LinkTag>>(
+    base: EntryHash,
+    target: EntryHash,
+    tag: T,
+) -> HdkResult<HeaderHash> {
+    host_externs!(__create_link);
 
-        $crate::host_fn!(
-            __create_link,
-            $crate::prelude::CreateLinkInput::new(($base, $target, $tag.into())),
-            $crate::prelude::CreateLinkOutput
-        )
-    }};
+    host_fn!(
+        __create_link,
+        CreateLinkInput::new((base, target, tag.into())),
+        CreateLinkOutput
+    )
 }
