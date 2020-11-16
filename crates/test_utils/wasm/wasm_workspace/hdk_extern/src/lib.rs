@@ -9,7 +9,6 @@ fn foo(_: ()) -> ExternResult<TestString> {
 #[hdk_extern]
 fn bar(_: ()) -> ExternResult<TestString> {
     // It should be possible to call our extern functions just like regular functions.
-    // `foo` is a blacklisted symbol name according to clippy ¯\_(ツ)_/¯
-    let fo0: TestString = foo(())?;
-    Ok(TestString::from(format!("{}{}", fo0.0, "bar")))
+    let foo: TestString = foo(())?;
+    Ok(TestString::from(format!("{}{}", foo.0, "bar")))
 }
