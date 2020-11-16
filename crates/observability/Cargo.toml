@@ -8,7 +8,7 @@ edition = "2018"
 chrono = "0.4.6"
 inferno = "0.10.0"
 serde_json = { version = "1.0.51", features = [ "preserve_order" ] }
-thiserror = "1.0.10"
+thiserror = "1.0.22"
 tracing = "=0.1.18"
 tracing-core = "=0.1.13"
 tracing-flame = "0.1.0"
