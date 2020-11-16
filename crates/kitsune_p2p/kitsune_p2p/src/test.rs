@@ -47,20 +47,20 @@ mod tests {
                 from_agent: a1.clone(),
                 // this is just a dummy value right now
                 basis: TestVal::test_val(),
-                remote_agent_count: Some(2),
-                timeout_ms: Some(20),
+                remote_agent_count: Some(5),
+                timeout_ms: Some(200),
                 as_race: true,
-                race_timeout_ms: Some(20),
+                race_timeout_ms: Some(100),
                 payload: b"test-multi-request".to_vec(),
             })
             .await
             .unwrap();
 
-        assert_eq!(1, res.len());
+        assert_eq!(3, res.len());
         for r in res {
             let data = String::from_utf8_lossy(&r.response);
             assert_eq!("echo: test-multi-request", &data);
-            assert!(r.agent == a2 || r.agent == a3);
+            assert!(r.agent == a1 || r.agent == a2 || r.agent == a3);
         }
 
         harness.ghost_actor_shutdown().await?;
@@ -266,11 +266,11 @@ mod tests {
 
         harness.ghost_actor_shutdown().await?;
 
-        assert_eq!(1, res.len());
+        assert_eq!(3, res.len());
         for r in res {
             let data = String::from_utf8_lossy(&r.response);
             assert_eq!("echo: test-multi-request", &data);
-            assert!(r.agent == a2 || r.agent == a3);
+            assert!(r.agent == a1 || r.agent == a2 || r.agent == a3);
         }
 
         Ok(())

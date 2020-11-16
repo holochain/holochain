@@ -38,11 +38,11 @@ fn create_channel(name: ChannelName) -> ExternResult<EntryHash> {
     debug!(format!("channel name {:?}", name))?;
     let path = channels_path();
     let channel = Channel::new(name.into());
-    let channel_hash = hash_entry!(&channel)?;
+    let channel_hash = hash_entry(&channel)?;
     let sb: SerializedBytes = channel_hash.clone().try_into().unwrap();
-    create_entry!(&channel)?;
+    create_entry(&channel)?;
     debug!(format!("sb in channel {:?}", sb))?;
-    create_link!(hash_entry!(&path)?, channel_hash.clone())?;
+    create_link(hash_entry(&path)?, channel_hash.clone(), ())?;
     Ok(channel_hash)
 }
 
@@ -54,8 +54,8 @@ fn create_message(input: CreateMessageInput) -> ExternResult<EntryHash> {
         content,
     } = input;
     let message = ChannelMessage::new(content);
-    let message_hash = hash_entry!(&message)?;
-    create_entry!(&message)?;
-    create_link!(channel_hash, message_hash.clone())?;
+    let message_hash = hash_entry(&message)?;
+    create_entry(&message)?;
+    create_link(channel_hash, message_hash.clone(), ())?;
     Ok(message_hash)
 }

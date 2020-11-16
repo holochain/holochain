@@ -27,7 +27,7 @@ where
 }
 
 /// Apply to a data item to indicate it can be encoded / decoded.
-pub trait Codec: Sized {
+pub trait Codec: Clone + Sized {
     /// Encode this item to given writer.
     /// You may wish to first wrap your writer in a BufWriter.
     fn encode<W>(&self, w: &mut W) -> Result<(), std::io::Error>
@@ -125,7 +125,7 @@ macro_rules! write_codec_enum {
         $crate::dependencies::paste::item! {
             $(
                 $(#[doc = $var_doc])*
-                #[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq)]
+                #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
                 pub struct [< $var_name:camel >] {
                     $(
                         $(#[doc = $type_doc])* pub [< $type_name:snake >]: $type_ty,
@@ -174,7 +174,7 @@ macro_rules! write_codec_enum {
             )*
 
             $(#[doc = $codec_doc])*
-            #[derive(Debug, PartialEq)]
+            #[derive(Clone, Debug, PartialEq)]
             pub enum [< $codec_name:camel >] {
                 $(
                     $(#[doc = $var_doc])*
@@ -239,7 +239,7 @@ mod tests {
     use super::*;
     use std::sync::Arc;
 
-    #[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+    #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
     pub struct Sub(pub Vec<u8>);
 
     write_codec_enum! {
