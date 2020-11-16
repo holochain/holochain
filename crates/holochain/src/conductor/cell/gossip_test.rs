@@ -67,6 +67,21 @@ async fn gossip_test() {
 }
 
 #[tokio::test(threaded_scheduler)]
+async fn signature_smoke_test() {
+    observability::test_run().ok();
+    let mut network_config = KitsuneP2pConfig::default();
+    network_config.transport_pool = vec![kitsune_p2p::TransportConfig::Mem {}];
+    // Hit an actual bootstrap service so it can blow up and return an error if we get our end of
+    // things totally wrong.
+    network_config.bootstrap_service = Some(url2::url2!("{}", kitsune_p2p::BOOTSTRAP_SERVICE_DEV));
+    let zomes = vec![TestWasm::Anchor];
+    let conductor_test =
+        ConductorTestData::with_network_config(zomes.clone(), false, network_config.clone()).await;
+    let handle = conductor_test.handle.clone();
+    ConductorTestData::shutdown_conductor(handle).await;
+}
+
+#[tokio::test(threaded_scheduler)]
 #[ignore = "Conductors are not currently talking to each other"]
 async fn agent_info_test() {
     observability::test_run().ok();
