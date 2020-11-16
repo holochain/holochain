@@ -204,41 +204,13 @@ pub fn hdk_entry(attrs: TokenStream, code: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn hdk_extern(_attrs: TokenStream, item: TokenStream) -> TokenStream {
     // extern mapping is only valid for functions
-    // let mut item_fn: syn::ItemFn = syn::parse(item).unwrap();
     let item_fn = syn::parse_macro_input!(item as syn::ItemFn);
 
     // extract the ident of the fn
     // this will be exposed as the external facing extern
     let external_fn_ident = item_fn.sig.ident.clone();
-
-    // build a new internal fn ident that is compatible with map_extern!
-    // this needs to be sufficiently unlikely to have namespace collisions with other fns
-    //
-    // @todo can we do this by wrapping the external facing extern in an inner module with the
-    // crazy name rather than the function itself getting a weird name??
-    // e.g. something like this:
-    // ```rust
-    // pub fn foo ( .. ) -> ExternResult< .. > {
-    //  // .. do stuff
-    // }
-    // pub mod foo_hdk_extern_mod {
-    // // does the no_mangle + extern hoist this out of the mod scope from the host's perspective?
-    //  #[no_mangle]
-    //  pub extern "C" foo (ptr: GuestPtr) -> GuestPtr {
-    //   // .. boilerplate
-    //  }
-    // }
-    // ```
-    // let internal_fn_ident = syn::Ident::new(
-    //     &format!("{}_hdk_extern", external_fn_ident.to_string()),
-    //     item_fn.sig.ident.span(),
-    // );
     let internal_fn_ident = external_fn_ident.clone();
 
-    // replace the ident in-place with the new internal ident
-    // item_fn.sig.ident = internal_fn_ident.clone();
-
-    // add a map_extern! and include the modified item_fn
     (quote::quote! {
         map_extern!(#external_fn_ident, #internal_fn_ident);
         #item_fn
