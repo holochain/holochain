@@ -392,7 +392,6 @@ mod tests {
 
         p2p.join(dna.clone(), a1.clone()).await.unwrap();
         p2p.join(dna.clone(), a2.clone()).await.unwrap();
-        //p2p.join(dna.clone(), a3.clone()).await.unwrap();
 
         let hash = holo_hash::AnyDhtHash::from_raw_36_and_type(
             b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
