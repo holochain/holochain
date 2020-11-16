@@ -65,6 +65,7 @@ use holochain_zome_types::signature::Signature;
 use holochain_zome_types::validate::RequiredValidationType;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::ExternInput;
+use observability::OpenSpanExt;
 use std::{
     collections::{BTreeMap, BTreeSet},
     convert::TryInto,
@@ -73,7 +74,6 @@ use std::{
 use tokio::sync;
 use tracing::*;
 use tracing_futures::Instrument;
-use observability::OpenSpanExt;
 
 mod authority;
 mod validation_package;

@@ -1119,7 +1119,8 @@ dependencies = [
 [[package]]
 name = "ghost_actor"
 version = "0.3.0-alpha.1"
-source = "git+https://github.com/holochain/ghost_actor.git?branch=add_observability#d400de8a3b22dbc3fd2a78943cb4f6b2e4cc5b84"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6d5180a86962ed70e36dd39b469d1c17d1a4cfefa610e63be5bbb10a4cec9bcc"
 dependencies = [
  "futures",
  "must_future",
@@ -1861,8 +1862,9 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore_api"
-version = "0.0.1-alpha.7"
-source = "git+https://github.com/holochain/lair.git?branch=bump_ga#5c0355a87fec63f88f1625283f51f8cdb6986e67"
+version = "0.0.1-alpha.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6e635eb7138566c139cd28b63e9d5983292c8e0e7576b3cda1fcfa32b3127717"
 dependencies = [
  "blake2b_simd",
  "byteorder",
@@ -1883,8 +1885,9 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore_client"
-version = "0.0.1-alpha.7"
-source = "git+https://github.com/holochain/lair.git?branch=bump_ga#5c0355a87fec63f88f1625283f51f8cdb6986e67"
+version = "0.0.1-alpha.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "573c0df3428bca8176fc287a26f8fa986408dc5ced8ad90a31a98f850594aaac"
 dependencies = [
  "ghost_actor",
  "lair_keystore_api",
