@@ -29,10 +29,10 @@ async fn authored_test() {
     let delay_per_attempt = Duration::from_millis(100);
 
     let zomes = vec![TestWasm::Create];
-    let mut conductor = ConductorTestData::two_agents(zomes, true).await;
-    let handle = conductor.handle();
-    let alice_call_data = conductor.alice_call_data();
-    let bob_call_data = conductor.bob_call_data().unwrap();
+    let mut conductor_test = ConductorTestData::two_agents(zomes, true).await;
+    let handle = conductor_test.handle();
+    let alice_call_data = conductor_test.alice_call_data();
+    let bob_call_data = conductor_test.bob_call_data().unwrap();
 
     let entry = Post("Hi there".into());
     let entry_hash = EntryHash::with_data_sync(&Entry::try_from(entry.clone()).unwrap());
@@ -108,5 +108,5 @@ async fn authored_test() {
         .unwrap()
         .expect("Bob should now have the entry in their authored because they committed it");
 
-    conductor.shutdown_conductor().await;
+    conductor_test.shutdown_conductor().await;
 }

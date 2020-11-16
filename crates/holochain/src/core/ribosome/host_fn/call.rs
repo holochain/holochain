@@ -70,10 +70,10 @@ pub mod wasm_test {
         observability::test_run().ok();
 
         let zomes = vec![TestWasm::WhoAmI];
-        let mut conductor = ConductorTestData::two_agents(zomes, true).await;
-        let handle = conductor.handle();
-        let bob_cell_id = conductor.bob_call_data().unwrap().cell_id.clone();
-        let alice_call_data = conductor.alice_call_data();
+        let mut conductor_test = ConductorTestData::two_agents(zomes, true).await;
+        let handle = conductor_test.handle();
+        let bob_cell_id = conductor_test.bob_call_data().unwrap().cell_id.clone();
+        let alice_call_data = conductor_test.alice_call_data();
         let alice_cell_id = &alice_call_data.cell_id;
         let alice_agent_id = alice_cell_id.agent_pubkey();
         let bob_agent_id = bob_cell_id.agent_pubkey();
@@ -121,7 +121,7 @@ pub mod wasm_test {
             }
             _ => unreachable!(),
         }
-        conductor.shutdown_conductor().await;
+        conductor_test.shutdown_conductor().await;
     }
 
     /// When calling the same cell we need to make sure
@@ -132,9 +132,9 @@ pub mod wasm_test {
         observability::test_run().ok();
 
         let zomes = vec![TestWasm::WhoAmI, TestWasm::Create];
-        let mut conductor = ConductorTestData::two_agents(zomes, false).await;
-        let handle = conductor.handle();
-        let alice_call_data = conductor.alice_call_data();
+        let mut conductor_test = ConductorTestData::two_agents(zomes, false).await;
+        let handle = conductor_test.handle();
+        let alice_call_data = conductor_test.alice_call_data();
         let alice_cell_id = &alice_call_data.cell_id;
 
         let invocation =
@@ -156,7 +156,7 @@ pub mod wasm_test {
         let el = alice_source_chain.get_element(&header_hash).unwrap();
         assert_matches!(el, Some(_));
 
-        conductor.shutdown_conductor().await;
+        conductor_test.shutdown_conductor().await;
     }
 
     /// test calling a different zome
@@ -166,9 +166,9 @@ pub mod wasm_test {
         observability::test_run().ok();
 
         let zomes = vec![TestWasm::Create];
-        let mut conductor = ConductorTestData::two_agents(zomes, false).await;
-        let handle = conductor.handle();
-        let alice_call_data = conductor.alice_call_data();
+        let mut conductor_test = ConductorTestData::two_agents(zomes, false).await;
+        let handle = conductor_test.handle();
+        let alice_call_data = conductor_test.alice_call_data();
         let alice_cell_id = &alice_call_data.cell_id;
 
         // Install a different dna for bob
@@ -200,7 +200,7 @@ pub mod wasm_test {
         let el = alice_source_chain.get_element(&header_hash).unwrap();
         assert_matches!(el, Some(_));
 
-        conductor.shutdown_conductor().await;
+        conductor_test.shutdown_conductor().await;
     }
 
     async fn install_new_app(
