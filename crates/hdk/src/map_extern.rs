@@ -25,7 +25,7 @@ use crate::prelude::*;
 macro_rules! map_extern {
     ( $name:tt, $f:ident ) => {
         $crate::paste::paste! {
-            mod [<__ $name _extern>] {
+            mod [< __ $name _extern >] {
                 use $crate::prelude::*;
                 use std::convert::TryFrom;
 
