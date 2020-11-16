@@ -8,7 +8,7 @@ This kit:
 
 1. The DSL is ergonomic and composable, so optional if you want more control
 2. It is compatible with the cell-driven version of holochain
-3. Differentiates between the holochain API/interface and "sugar" macros
+3. Differentiates between the holochain API/interface and "sugar" syntax
 
 Old kits:
 
@@ -21,7 +21,11 @@ Old kits:
 
 Welcome to the HDK 3.0.
 This HDK is currently in flux, expect rapid changes.
-Currently there are helper macros to aid in writing happs.
+There are low-level macros and high-level functions to aid writing happs.
+
+The intention is that most of the time most developers will use the high level
+functions as they leverage the Rust type system better than macros can. This
+allows for more useful compiler and IDE feedback loops.
 
 ## Examples
 
@@ -72,35 +76,35 @@ entry_def!(Bar EntryDef {
 entry_defs!(vec![Foo::entry_def(), Bar::entry_def()]);
 ```
 
-### create_entry!, get!, hash_entry!, create_link!, get_links!, debug!
+### create_entry, get, hash_entry, create_link, get_links, debug!
 
 ```rust
 // Create your entry types
 let foo = Foo;
 let bar = Bar;
 // Commit the entries
-let _foo_header_hash = create_entry!(foo.clone())?;
-let _bar_header_hash = create_entry!(bar.clone())?;
+let _foo_header_hash = create_entry(foo.clone())?;
+let _bar_header_hash = create_entry(bar.clone())?;
 // Get the entry hash of each entry
-let foo_entry_hash = hash_entry!(foo)?;
-let bar_entry_hash = hash_entry!(bar)?;
+let foo_entry_hash = hash_entry(foo)?;
+let bar_entry_hash = hash_entry(bar)?;
 // Link from foo (base) to bar (target)
-let _link_add_header_hash = create_link!(foo_entry_hash.clone(), bar_entry_hash)?;
+let _link_add_header_hash = create_link(foo_entry_hash.clone(), bar_entry_hash)?;
 // Get the links back
-let links = get_links!(foo_entry_hash)?;
+let links = get_links(foo_entry_hash)?;
 // Print out the links
 debug!(links)?;
 ```
 
-### call_remote!, zome_info!, agent_info!
+### call_remote, zome_info, agent_info
 
 ```rust
 // Get your agent key
-let agent_pubkey = agent_info!()?.agent_pubkey;
+let agent_pubkey = agent_info()?.agent_pubkey;
 // Get the name of this zome
-let zome_name = zome_info!()?.zome_name;
+let zome_name = zome_info()?.zome_name;
 // Call your friends foo function
-let result: SerializedBytes = call_remote!(
+let result: SerializedBytes = call_remote(
     my_friends_agent_pubkey,
     zome_name,
     "foo".to_string(),
@@ -119,7 +123,7 @@ can also be done directly as follows:
 
 ```rust
 // Commit foo
-let foo_header_hash = create_entry!(foo.clone())?;
+let foo_header_hash = create_entry(foo.clone())?;
 // Call the api directly:
 // Create the Entry from bar.
 let entry = Entry::App(bar.clone().try_into()?);
@@ -790,7 +794,7 @@ the sugar that it provides.
 The HDK macros simply expand to this extern boilerplate, saving you from typing
 out a few macros to input/output data for the host. They also offer some
 convenience wrappers around `host_call!()` that do exactly what you'd expect,
-e.g. `create_entry!( ... )` vs. `host_call!(__create, ... )`.
+e.g. `create_entry( ... )` vs. `host_call!(__create, ... )`.
 
 Think of the HDK as a tool and safety net but also don't feel you can't peek
 under the hood to see what is there.

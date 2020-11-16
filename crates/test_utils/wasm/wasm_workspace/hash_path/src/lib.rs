@@ -21,7 +21,7 @@ fn ensure(path_string: TestString) -> ExternResult<()> {
 
 #[hdk_extern]
 fn delete_link(delete_link: DeleteLinkInput) -> ExternResult<HeaderHash> {
-    Ok(delete_link!(delete_link.into_inner())?)
+    Ok(hdk3::prelude::delete_link(delete_link.into_inner())?)
 }
 
 #[hdk_extern]
