@@ -75,10 +75,9 @@ async fn signature_smoke_test() {
     // things totally wrong.
     network_config.bootstrap_service = Some(url2::url2!("{}", kitsune_p2p::BOOTSTRAP_SERVICE_DEV));
     let zomes = vec![TestWasm::Anchor];
-    let conductor_test =
+    let mut conductor =
         ConductorTestData::with_network_config(zomes.clone(), false, network_config.clone()).await;
-    let handle = conductor_test.handle.clone();
-    ConductorTestData::shutdown_conductor(handle).await;
+    conductor.shutdown_conductor().await;
 }
 
 #[tokio::test(threaded_scheduler)]

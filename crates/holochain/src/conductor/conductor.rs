@@ -42,6 +42,7 @@ use crate::{
     core::state::{source_chain::SourceChainBuf, wasm::WasmBuf},
 };
 pub use builder::*;
+use fallible_iterator::FallibleIterator;
 use futures::future::{self, TryFutureExt};
 use holo_hash::DnaHash;
 use holochain_keystore::{
@@ -62,6 +63,7 @@ use holochain_types::{
     cell::CellId,
     dna::{wasm::DnaWasmHashed, DnaFile},
 };
+use holochain_zome_types::entry_def::EntryDef;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use std::collections::HashMap;
 use std::convert::TryInto;
@@ -69,11 +71,8 @@ use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
 use tracing::*;
 
-/// TODO: featureflagify
-// #[cfg(test)]
+#[cfg(feature = "test_utils")]
 use super::handle::MockConductorHandleT;
-use fallible_iterator::FallibleIterator;
-use holochain_zome_types::entry_def::EntryDef;
 
 /// Conductor-specific Cell state, this can probably be stored in a database.
 /// Hypothesis: If nothing remains in this struct, then the Conductor state is
@@ -729,14 +728,12 @@ where
         Ok(source_chain.dump_as_json().await?)
     }
 
-    /// TODO: featureflagify
-    // #[cfg(test)]
+    #[cfg(feature = "test_utils")]
     pub(super) async fn get_state_from_handle(&self) -> ConductorResult<ConductorState> {
         self.get_state().await
     }
 
-    /// TODO: featureflagify
-    // #[cfg(test)]
+    #[cfg(feature = "test_utils")]
     pub(super) fn get_p2p_env(&self) -> EnvironmentWrite {
         self.p2p_env.clone()
     }
@@ -831,11 +828,9 @@ mod builder {
         config: ConductorConfig,
         dna_store: DS,
         keystore: Option<KeystoreSender>,
-        /// TODO: featureflagify
-        // #[cfg(test)]
+        #[cfg(feature = "test_utils")]
         state: Option<ConductorState>,
-        /// TODO: featureflagify
-        // #[cfg(test)]
+        #[cfg(feature = "test_utils")]
         mock_handle: Option<MockConductorHandleT>,
     }
 
@@ -911,8 +906,7 @@ mod builder {
             let p2p_environment =
                 EnvironmentWrite::new(env_path.as_ref(), EnvironmentKind::P2p, keystore.clone())?;
 
-            // TODO: featureflagify
-            // #[cfg(test)]
+            #[cfg(feature = "test_utils")]
             let state = self.state;
 
             let Self {
@@ -937,8 +931,7 @@ mod builder {
             )
             .await?;
 
-            // TODO: featureflagify
-            // #[cfg(test)]
+            #[cfg(feature = "test_utils")]
             let conductor = Self::update_fake_state(state, conductor).await?;
 
             Self::finish(conductor, config, p2p_evt).await
@@ -989,8 +982,7 @@ mod builder {
             self
         }
 
-        /// TODO: featureflagify
-        // #[cfg(test)]
+        #[cfg(feature = "test_utils")]
         /// Sets some fake conductor state for tests
         pub fn fake_state(mut self, state: ConductorState) -> Self {
             self.state = Some(state);
@@ -999,15 +991,13 @@ mod builder {
 
         /// Pass a mock handle in, which will be returned regardless of whatever
         /// else happens to this builder
-        /// TODO: featureflagify
-        // #[cfg(test)]
+        #[cfg(feature = "test_utils")]
         pub fn with_mock_handle(mut self, handle: MockConductorHandleT) -> Self {
             self.mock_handle = Some(handle);
             self
         }
 
-        /// TODO: featureflagify
-        // #[cfg(test)]
+        #[cfg(feature = "test_utils")]
         async fn update_fake_state(
             state: Option<ConductorState>,
             conductor: Conductor<DS>,
@@ -1035,8 +1025,7 @@ mod builder {
             )
             .await?;
 
-            // TODO: featureflagify
-            // #[cfg(test)]
+            #[cfg(feature = "test_utils")]
             let conductor = Self::update_fake_state(self.state, conductor).await?;
 
             Self::finish(conductor, self.config, p2p_evt).await

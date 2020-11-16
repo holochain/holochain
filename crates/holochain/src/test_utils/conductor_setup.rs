@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use super::{host_fn_api::CallData, install_app, setup_app_inner};
 use crate::{
     conductor::{

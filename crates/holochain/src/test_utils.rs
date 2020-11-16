@@ -47,16 +47,13 @@ use std::{convert::TryInto, sync::Arc, time::Duration};
 use tempdir::TempDir;
 use tokio::sync::mpsc;
 
-// TODO: featureflagify
-// #[cfg(test)]
-#[allow(missing_docs)]
+#[cfg(feature = "test_utils")]
 pub mod host_fn_api;
 
-// TODO: featureflagify
-// #[cfg(test)]
-#[allow(missing_docs)]
+#[cfg(feature = "test_utils")]
 pub mod conductor_setup;
 
+/// Produce file and line number info at compile-time
 #[macro_export]
 macro_rules! here {
     ($test: expr) => {

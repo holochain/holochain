@@ -840,8 +840,7 @@ impl Cell {
         &self.env
     }
 
-    /// TODO: featureflagify
-    // #[cfg(test)]
+    #[cfg(feature = "test_utils")]
     /// Get the triggers for the cell
     /// Useful for testing when you want to
     /// Cause workflows to trigger

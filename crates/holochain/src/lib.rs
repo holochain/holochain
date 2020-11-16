@@ -1,7 +1,6 @@
 //! All the components you need to build a Holochain Conductor
-// FIXME: uncomment this deny [TK-01128]
-// #![deny(missing_docs)]
 
+// #![deny(missing_docs)]
 #![allow(deprecated)]
 
 pub mod conductor;
@@ -9,6 +8,7 @@ pub mod conductor;
 pub mod core;
 #[allow(missing_docs)]
 pub mod fixt;
+// #[cfg(feature = "test_utils")]
 #[deny(missing_docs)]
 pub mod test_utils;
 

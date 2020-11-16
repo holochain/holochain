@@ -54,6 +54,8 @@ use super::{
 use crate::core::workflow::ZomeCallInvocationResult;
 use crate::core::{ribosome::ZomeCallInvocation, workflow::CallZomeWorkspaceLock};
 use derive_more::From;
+use futures::future::FutureExt;
+use holochain_p2p::event::HolochainP2pEvent::*;
 use holochain_types::{
     app::{AppId, InstalledApp, InstalledCell, MembraneProof},
     autonomic::AutonomicCue,
@@ -61,23 +63,17 @@ use holochain_types::{
     dna::DnaFile,
     prelude::*,
 };
+use holochain_zome_types::entry_def::EntryDef;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::*;
 
-use futures::future::FutureExt;
-use holochain_p2p::event::HolochainP2pEvent::*;
-
-/// TODO: featureflagify
-// #[cfg(test)]
+#[cfg(feature = "test_utils")]
 use super::state::ConductorState;
-/// TODO: featureflagify
-// #[cfg(test)]
+#[cfg(feature = "test_utils")]
 use crate::core::queue_consumer::InitialQueueTriggers;
-/// TODO: featureflagify
-// #[cfg(test)]
+#[cfg(feature = "test_utils")]
 use holochain_state::env::EnvironmentWrite;
-use holochain_zome_types::entry_def::EntryDef;
 
 /// A handle to the Conductor that can easily be passed around and cheaply cloned
 pub type ConductorHandle = Arc<dyn ConductorHandleT>;
@@ -201,22 +197,21 @@ pub trait ConductorHandleT: Send + Sync {
     #[allow(clippy::ptr_arg)]
     async fn get_app_info(&self, app_id: &AppId) -> ConductorResult<Option<InstalledApp>>;
 
-    /// TODO: featureflagify
-    // #[cfg(test)]
+    /// Retrieve the LMDB environment for this cell. FOR TESTING ONLY.
+    #[cfg(feature = "test_utils")]
     async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite>;
 
-    /// TODO: featureflagify
-    // #[cfg(test)]
+    /// Retrieve the LMDB environment for networking. FOR TESTING ONLY.
+    #[cfg(feature = "test_utils")]
     async fn get_p2p_env(&self) -> EnvironmentWrite;
 
-    /// TODO: featureflagify
-    // #[cfg(test)]
+    /// Retrieve Senders for triggering workflows. FOR TESTING ONLY.
+    #[cfg(feature = "test_utils")]
     async fn get_cell_triggers(&self, cell_id: &CellId)
         -> ConductorApiResult<InitialQueueTriggers>;
 
-    // HACK: remove when B-01593 lands
-    /// TODO: featureflagify
-    // #[cfg(test)]
+    /// Retrieve the ConductorState. FOR TESTING ONLY.
+    #[cfg(feature = "test_utils")]
     async fn get_state_from_handle(&self) -> ConductorApiResult<ConductorState>;
 }
 
@@ -505,23 +500,20 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .get_app_info(app_id))
     }
 
-    /// TODO: featureflagify
-    // #[cfg(test)]
+    #[cfg(feature = "test_utils")]
     async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite> {
         let lock = self.conductor.read().await;
         let cell = lock.cell_by_id(cell_id)?;
         Ok(cell.env().clone())
     }
 
-    /// TODO: featureflagify
-    // #[cfg(test)]
+    #[cfg(feature = "test_utils")]
     async fn get_p2p_env(&self) -> EnvironmentWrite {
         let lock = self.conductor.read().await;
         lock.get_p2p_env()
     }
 
-    /// TODO: featureflagify
-    // #[cfg(test)]
+    #[cfg(feature = "test_utils")]
     async fn get_cell_triggers(
         &self,
         cell_id: &CellId,
@@ -531,8 +523,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         Ok(cell.triggers().clone())
     }
 
-    /// TODO: featureflagify
-    // #[cfg(test)]
+    #[cfg(feature = "test_utils")]
     async fn get_state_from_handle(&self) -> ConductorApiResult<ConductorState> {
         let lock = self.conductor.read().await;
         Ok(lock.get_state_from_handle().await?)
