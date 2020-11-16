@@ -875,7 +875,7 @@ dependencies = [
  "holochain_serialized_bytes",
  "lazy_static",
  "parking_lot",
- "paste 1.0.2",
+ "paste 1.0.3",
  "rand 0.7.3",
  "rand_core 0.5.1",
  "serde",
@@ -888,7 +888,7 @@ name = "fixt_test"
 version = "0.0.1"
 dependencies = [
  "fixt",
- "paste 1.0.2",
+ "paste 1.0.3",
 ]
 
 [[package]]
@@ -1174,6 +1174,7 @@ dependencies = [
  "holo_hash",
  "holochain_wasmer_guest",
  "holochain_zome_types",
+ "paste 1.0.3",
  "serde",
  "serde_bytes",
  "thiserror",
@@ -1184,7 +1185,7 @@ name = "hdk3_derive"
 version = "0.0.1"
 dependencies = [
  "holochain_zome_types",
- "paste 1.0.2",
+ "paste 1.0.3",
  "proc-macro2 1.0.24",
  "quote 1.0.7",
  "syn 1.0.48",
@@ -1835,7 +1836,7 @@ dependencies = [
  "ghost_actor",
  "nanoid",
  "once_cell",
- "paste 1.0.2",
+ "paste 1.0.3",
  "rmp-serde",
  "serde",
  "serde_json",
@@ -2414,9 +2415,9 @@ dependencies = [
 
 [[package]]
 name = "paste"
-version = "1.0.2"
+version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba7ae1a2180ed02ddfdb5ab70c70d596a26dd642e097bb6fe78b1bde8588ed97"
+checksum = "7151b083b0664ed58ed669fcdd92f01c3d2fdbf10af4931a301474950b52bfa9"
 
 [[package]]
 name = "paste-impl"

@@ -205,7 +205,7 @@ pub fn hdk_entry(attrs: TokenStream, code: TokenStream) -> TokenStream {
 pub fn hdk_extern(_attrs: TokenStream, item: TokenStream) -> TokenStream {
     // extern mapping is only valid for functions
     // let mut item_fn: syn::ItemFn = syn::parse(item).unwrap();
-    let mut item_fn = syn::parse_macro_input!(item as syn::ItemFn);
+    let item_fn = syn::parse_macro_input!(item as syn::ItemFn);
 
     // extract the ident of the fn
     // this will be exposed as the external facing extern
@@ -229,13 +229,14 @@ pub fn hdk_extern(_attrs: TokenStream, item: TokenStream) -> TokenStream {
     //  }
     // }
     // ```
-    let internal_fn_ident = syn::Ident::new(
-        &format!("{}_hdk_extern", external_fn_ident.to_string()),
-        item_fn.sig.ident.span(),
-    );
+    // let internal_fn_ident = syn::Ident::new(
+    //     &format!("{}_hdk_extern", external_fn_ident.to_string()),
+    //     item_fn.sig.ident.span(),
+    // );
+    let internal_fn_ident = external_fn_ident.clone();
 
     // replace the ident in-place with the new internal ident
-    item_fn.sig.ident = internal_fn_ident.clone();
+    // item_fn.sig.ident = internal_fn_ident.clone();
 
     // add a map_extern! and include the modified item_fn
     (quote::quote! {
