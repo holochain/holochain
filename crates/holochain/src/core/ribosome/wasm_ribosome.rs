@@ -537,21 +537,13 @@ pub mod wasm_test {
         let mut host_access = fixt!(ZomeCallHostAccess, Predictable);
         host_access.workspace = workspace_lock;
 
-        let foo_result: TestString = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::HdkExtern,
-            "foo",
-            ()
-        );
+        let foo_result: TestString =
+            crate::call_test_ribosome!(host_access, TestWasm::HdkExtern, "foo", ());
 
         assert_eq!("foo", foo_result.0.as_str());
 
-        let bar_result: TestString = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::HdkExtern,
-            "bar",
-            ()
-        );
+        let bar_result: TestString =
+            crate::call_test_ribosome!(host_access, TestWasm::HdkExtern, "bar", ());
 
         assert_eq!("foobar", bar_result.0.as_str());
     }
