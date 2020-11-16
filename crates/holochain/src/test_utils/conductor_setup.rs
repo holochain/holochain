@@ -231,7 +231,7 @@ impl ConductorTestData {
         self.call_data.get_mut(&key).unwrap()
     }
 
-    pub fn call_data(&self, cell_id: &CellId) -> Option<&ConductorCallData> {
-        self.call_data.get(cell_id)
+    pub fn call_data(&mut self, cell_id: &CellId) -> Option<&mut ConductorCallData> {
+        self.call_data.get_mut(cell_id)
     }
 }

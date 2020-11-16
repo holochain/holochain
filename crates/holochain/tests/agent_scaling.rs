@@ -14,9 +14,10 @@ use unwrap_to::unwrap_to;
 /// A single link with an AgentPubKey for the base and target is committed by
 /// one agent, and after a delay, all agents can get the link
 #[tokio::test(threaded_scheduler)]
+#[cfg(feature = "slow_tests")]
 async fn many_agents_can_reach_consistency_agent_links() {
-    const NUM_AGENTS: usize = 2;
-    let consistency_delay = std::time::Duration::from_secs(50);
+    const NUM_AGENTS: usize = 20;
+    let consistency_delay = std::time::Duration::from_secs(5);
 
     let envs = test_environments();
     let zomes = vec![TestWasm::Link];
@@ -44,22 +45,13 @@ async fn many_agents_can_reach_consistency_agent_links() {
         )
     }
 
-    let (conductor, cell_ids) =
+    let (mut conductor, cell_ids) =
         ConductorTestData::new(envs, vec![dna_file], agents, Default::default()).await;
 
     let cell_ids = cell_ids.values().next().unwrap();
     let committer = conductor.call_data(&cell_ids[1]).unwrap();
     let base = cell_ids[0].agent_pubkey().clone();
     let target = cell_ids[1].agent_pubkey().clone();
-
-    // let base = host_fn_api::commit_entry(
-    //     &committer.env,
-    //     committer.call_data(TestWasm::Link),
-    //     Entry::app(().try_into().unwrap()).unwrap(),
-    //     "path",
-    // )
-    // .await;
-    // let target = base;
 
     host_fn_api::create_link(
         &committer.env,
@@ -69,6 +61,8 @@ async fn many_agents_can_reach_consistency_agent_links() {
         ().into(),
     )
     .await;
+
+    committer.triggers.produce_dht_ops.trigger();
 
     tokio::time::delay_for(consistency_delay).await;
     let mut seen = [0; NUM_AGENTS];
@@ -89,12 +83,13 @@ async fn many_agents_can_reach_consistency_agent_links() {
         seen[i] = links.len();
     }
 
-    assert_eq!(seen, [1; NUM_AGENTS]);
+    assert_eq!(seen.to_vec(), [1; NUM_AGENTS].to_vec());
 }
 
 /// A single link with a Path for the base and target is committed by one
 /// agent, and after a delay, all agents can get the link
 #[tokio::test(threaded_scheduler)]
+#[cfg(feature = "slow_tests")]
 async fn many_agents_can_reach_consistency_normal_links() {
     let num_agents = 30;
     let consistency_delay = std::time::Duration::from_secs(5);
