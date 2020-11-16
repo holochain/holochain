@@ -6,7 +6,7 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_transport_coms() -> Result<(), KitsuneP2pError> {
-        init_tracing();
+        observability::test_run().ok();
         let (harness, _evt) = spawn_test_harness_mem().await?;
 
         let space = harness.add_space().await?;
@@ -30,7 +30,7 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_transport_multi_coms() -> Result<(), KitsuneP2pError> {
-        init_tracing();
+        observability::test_run().ok();
         let (harness, _evt) = spawn_test_harness_mem().await?;
 
         let space = harness.add_space().await?;
@@ -69,7 +69,7 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_transport_notify_coms() -> Result<(), KitsuneP2pError> {
-        init_tracing();
+        observability::test_run().ok();
         let (harness, evt) = spawn_test_harness_mem().await?;
         let mut rcv = evt.receive();
 
@@ -109,7 +109,7 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_peer_info_store() -> Result<(), KitsuneP2pError> {
-        init_tracing();
+        observability::test_run().ok();
 
         let (harness, evt) = spawn_test_harness_mem().await?;
         let mut recv = evt.receive();
@@ -138,7 +138,7 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_transport_binding() -> Result<(), KitsuneP2pError> {
-        init_tracing();
+        observability::test_run().ok();
 
         let (harness, _evt) = spawn_test_harness_quic().await?;
 
@@ -166,7 +166,7 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_request_workflow() -> Result<(), KitsuneP2pError> {
-        init_tracing();
+        observability::test_run().ok();
 
         let (harness, _evt) = spawn_test_harness_quic().await?;
         let space = harness.add_space().await?;
@@ -185,7 +185,10 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_broadcast_workflow() -> Result<(), KitsuneP2pError> {
-        init_tracing();
+        observability::test_run_open().ok();
+        let span = tracing::debug_span!("test");
+        let _g = span.enter();
+        observability::span_context!(span);
 
         let (harness, evt) = spawn_test_harness_quic().await?;
         let mut rcv = evt.receive();
@@ -225,12 +228,13 @@ mod tests {
 
         assert_eq!(3, recv_count);
 
+        observability::span_context!(span);
         Ok(())
     }
 
     #[tokio::test(threaded_scheduler)]
     async fn test_multi_request_workflow() -> Result<(), KitsuneP2pError> {
-        init_tracing();
+        observability::test_run().ok();
 
         let (harness, _evt) = spawn_test_harness_quic().await?;
 
@@ -272,7 +276,7 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_single_agent_multi_request_workflow() -> Result<(), KitsuneP2pError> {
-        init_tracing();
+        observability::test_run().ok();
 
         let (harness, _evt) = spawn_test_harness_quic().await?;
 
@@ -307,7 +311,7 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_gossip_workflow() -> Result<(), KitsuneP2pError> {
-        init_tracing();
+        observability::test_run().ok();
 
         let (harness, _evt) = spawn_test_harness_quic().await?;
 
@@ -346,7 +350,7 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_peer_data_workflow() -> Result<(), KitsuneP2pError> {
-        init_tracing();
+        observability::test_run().ok();
 
         let (harness, _evt) = spawn_test_harness_quic().await?;
 
@@ -378,7 +382,7 @@ mod tests {
     /// Test that we can gossip across a in memory transport layer.
     #[tokio::test(threaded_scheduler)]
     async fn test_gossip_transport() -> Result<(), KitsuneP2pError> {
-        init_tracing();
+        observability::test_run().ok();
         let (harness, _evt) = spawn_test_harness_mem().await?;
 
         harness.add_space().await?;

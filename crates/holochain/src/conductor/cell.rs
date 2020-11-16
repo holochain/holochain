@@ -73,6 +73,7 @@ use std::{
 use tokio::sync;
 use tracing::*;
 use tracing_futures::Instrument;
+use observability::OpenSpanExt;
 
 mod authority;
 mod validation_package;
@@ -243,7 +244,7 @@ impl Cell {
                 unreachable!()
             }
             CallRemote {
-                span: _span,
+                span_context: _,
                 from_agent,
                 zome_name,
                 fn_name,
@@ -263,7 +264,7 @@ impl Cell {
                 .await;
             }
             Publish {
-                span: _span,
+                span_context,
                 respond,
                 from_agent,
                 request_validation_receipt,
@@ -272,6 +273,7 @@ impl Cell {
                 ..
             } => {
                 async {
+                    tracing::Span::set_current_context(span_context);
                     let res = self
                         .handle_publish(from_agent, request_validation_receipt, dht_hash, ops)
                         .await
@@ -282,7 +284,7 @@ impl Cell {
                 .await;
             }
             GetValidationPackage {
-                span: _span,
+                span_context: _,
                 respond,
                 header_hash,
                 ..
@@ -298,7 +300,7 @@ impl Cell {
                 .await;
             }
             Get {
-                span: _span,
+                span_context: _,
                 respond,
                 dht_hash,
                 options,
@@ -315,7 +317,7 @@ impl Cell {
                 .await;
             }
             GetMeta {
-                span: _span,
+                span_context: _,
                 respond,
                 dht_hash,
                 options,
@@ -332,7 +334,7 @@ impl Cell {
                 .await;
             }
             GetLinks {
-                span: _span,
+                span_context: _,
                 respond,
                 link_key,
                 options,
@@ -348,7 +350,7 @@ impl Cell {
                 .await;
             }
             GetAgentActivity {
-                span: _span,
+                span_context: _,
                 respond,
                 agent,
                 query,
@@ -365,7 +367,7 @@ impl Cell {
                 .await;
             }
             ValidationReceiptReceived {
-                span: _span,
+                span_context: _,
                 respond,
                 receipt,
                 ..
@@ -381,7 +383,7 @@ impl Cell {
                 .await;
             }
             FetchOpHashesForConstraints {
-                span: _span,
+                span_context: _,
                 respond,
                 dht_arc,
                 since,
@@ -398,7 +400,7 @@ impl Cell {
                 .await;
             }
             FetchOpHashData {
-                span: _span,
+                span_context: _,
                 respond,
                 op_hashes,
                 ..
@@ -414,7 +416,7 @@ impl Cell {
                 .await;
             }
             SignNetworkData {
-                span: _span,
+                span_context: _,
                 respond,
                 ..
             } => {

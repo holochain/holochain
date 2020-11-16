@@ -54,14 +54,6 @@ async fn speed_test_prep() {
 
 #[tokio::test(threaded_scheduler)]
 #[ignore = "speed tests are ignored by default; unignore to run"]
-async fn speed_test_flame() {
-    let _g = observability::flame_run().unwrap();
-    let _g = _g.unwrap();
-    speed_test(None).await;
-}
-
-#[tokio::test(threaded_scheduler)]
-#[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_timed() {
     let _g = observability::test_run_timed().unwrap();
     speed_test(None).await;
