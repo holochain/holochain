@@ -648,33 +648,31 @@ where
         let p2p_kv = AgentKv::new(environ.clone().into())?;
         let env = environ.guard();
 
-        let res = {
-            let reader = env.reader()?;
-
+        env.with_commit(|writer| {
             let res = p2p_kv
                 .as_store_ref()
-                .get(&reader, &(&*kitsune_space, &*kitsune_agent).into())?;
+                .get(writer, &(&*kitsune_space, &*kitsune_agent).into())?;
 
-            match res {
+            let res = match res {
                 None => return Ok(None),
                 Some(res) => res,
-            }
-        };
+            };
 
-        let info = kitsune_p2p::agent_store::AgentInfo::try_from(&res)?;
-        let now: u64 = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as u64;
-        if info.signed_at_ms() + info.expires_after_ms() <= now {
-            env.with_commit(|writer| {
+            let info = kitsune_p2p::agent_store::AgentInfo::try_from(&res)?;
+            let now: u64 = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64;
+
+            if info.signed_at_ms() + info.expires_after_ms() <= now {
                 p2p_kv
                     .as_store_ref()
-                    .delete(writer, &(&*kitsune_space, &*kitsune_agent).into())
-            })?;
-            return Ok(None);
-        }
-        Ok(Some(res))
+                    .delete(writer, &(&*kitsune_space, &*kitsune_agent).into())?;
+                return Ok(None);
+            }
+
+            Ok(Some(res))
+        })
     }
 
     pub(super) fn query_agent_info_signed(
@@ -685,43 +683,43 @@ where
 
         let p2p_kv = AgentKv::new(environ.clone().into())?;
         let env = environ.guard();
+
         let mut out = Vec::new();
-        let mut expired = Vec::new();
+        env.with_commit(|writer| {
+            let mut expired = Vec::new();
 
-        {
-            let reader = env.reader()?;
+            {
+                let mut iter = p2p_kv.as_store_ref().iter(writer)?;
 
-            let mut iter = p2p_kv.as_store_ref().iter(&reader)?;
+                let now: u64 = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis() as u64;
 
-            let now: u64 = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_millis() as u64;
-
-            loop {
-                match iter.next() {
-                    Ok(Some((k, v))) => {
-                        let info = kitsune_p2p::agent_store::AgentInfo::try_from(&v)?;
-                        if info.signed_at_ms() + info.expires_after_ms() <= now {
-                            expired.push(AgentKvKey::from(k));
-                        } else {
-                            out.push(v);
+                loop {
+                    match iter.next() {
+                        Ok(Some((k, v))) => {
+                            let info = kitsune_p2p::agent_store::AgentInfo::try_from(&v)?;
+                            if info.signed_at_ms() + info.expires_after_ms() <= now {
+                                expired.push(AgentKvKey::from(k));
+                            } else {
+                                out.push(v);
+                            }
                         }
+                        Ok(None) => break,
+                        Err(e) => return Err(e.into()),
                     }
-                    Ok(None) => break,
-                    Err(e) => return Err(e.into()),
                 }
             }
-        }
 
-        if !expired.is_empty() {
-            env.with_commit(|writer| {
+            if !expired.is_empty() {
                 for exp in expired {
                     p2p_kv.as_store_ref().delete(writer, &exp)?;
                 }
-                ConductorResult::Ok(())
-            })?;
-        }
+            }
+
+            ConductorResult::Ok(())
+        })?;
 
         Ok(out)
     }
