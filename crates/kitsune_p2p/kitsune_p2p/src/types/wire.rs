@@ -42,11 +42,6 @@ kitsune_p2p_types::write_codec_enum! {
         NotifyResp(0x21) {
         },
 
-        /// Publish Signed Agent Info
-        AgentPublish(0x30) {
-            data.0: AgentInfoSigned,
-        },
-
         /// Fetch DhtOp and Agent Hashes with Constraints
         FetchOpHashes(0x31) {
             space.0: Arc<KitsuneSpace>,
@@ -76,6 +71,19 @@ kitsune_p2p_types::write_codec_enum! {
         FetchOpDataResponse(0x34) {
             op_data.0: Vec<(Arc<KitsuneOpHash>, WireData)>,
             agent_infos.1: Vec<AgentInfoSigned>,
+        },
+
+        /// Query Agent data from a remote node
+        AgentInfoQuery(0x40) {
+            space.0: Arc<KitsuneSpace>,
+            to_agent.1: Arc<KitsuneAgent>,
+            by_agent.2: Option<Arc<KitsuneAgent>>,
+            by_basis_arc.3: Option<(Arc<KitsuneBasis>, DhtArc)>,
+        },
+
+        /// Response type for agent info query
+        AgentInfoQueryResp(0x41) {
+            agent_infos.0: Vec<AgentInfoSigned>,
         },
     }
 }

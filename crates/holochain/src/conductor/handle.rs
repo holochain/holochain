@@ -329,12 +329,12 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
-            // TODO - THIS IS A HACK
-            //        A bunch of our tests are faking cells out...
-            //        so we cannot pass these in properly
-            //        intercepting here until that's all fixed
-            SignNetworkData { respond, .. } => {
-                respond.respond(Ok(async move { Ok(vec![0; 64].into()) }.boxed().into()));
+            SignNetworkData { respond, data, .. } => {
+                let signature = cell_id
+                    .agent_pubkey()
+                    .sign_raw(self.keystore(), &data)
+                    .await?;
+                respond.respond(Ok(async move { Ok(signature) }.boxed().into()));
             }
             _ => {
                 let cell: &Cell = lock.cell_by_id(cell_id)?;

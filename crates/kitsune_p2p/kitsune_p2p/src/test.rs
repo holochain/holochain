@@ -17,10 +17,10 @@ mod tests {
         harness.magic_peer_info_exchange().await?;
 
         let r1 = p2p1
-            .rpc_single(space.clone(), a2.clone(), a1.clone(), b"m1".to_vec())
+            .rpc_single(space.clone(), a2.clone(), a1.clone(), b"m1".to_vec(), None)
             .await?;
         let r2 = p2p2
-            .rpc_single(space.clone(), a1, a2, b"m2".to_vec())
+            .rpc_single(space.clone(), a1, a2, b"m2".to_vec(), None)
             .await?;
         assert_eq!(b"echo: m1".to_vec(), r1);
         assert_eq!(b"echo: m2".to_vec(), r2);
@@ -176,7 +176,9 @@ mod tests {
         let a2: Arc<KitsuneAgent> = TestVal::test_val();
         p2p.join(space.clone(), a2.clone()).await?;
 
-        let res = p2p.rpc_single(space, a2, a1, b"hello".to_vec()).await?;
+        let res = p2p
+            .rpc_single(space, a2, a1, b"hello".to_vec(), None)
+            .await?;
         assert_eq!(b"echo: hello".to_vec(), res);
 
         harness.ghost_actor_shutdown().await?;

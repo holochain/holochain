@@ -8,7 +8,10 @@ use std::{
     sync::Arc,
 };
 
-pub mod bootstrap;
+/// The bootstrap service is much more thoroughly documented in the default service implementation.
+/// @see https://github.com/holochain/bootstrap
+mod bootstrap;
+mod discover;
 mod gossip;
 mod space;
 use ghost_actor::dependencies::{must_future, tracing};
@@ -27,6 +30,7 @@ pub(crate) struct KitsuneP2pActor {
     evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     transport: ghost_actor::GhostSender<TransportListener>,
     spaces: HashMap<Arc<KitsuneSpace>, AsyncLazy<ghost_actor::GhostSender<KitsuneP2p>>>,
+    config: Arc<KitsuneP2pConfig>,
 }
 
 fn build_transport(
@@ -97,7 +101,7 @@ impl KitsuneP2pActor {
         evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     ) -> KitsuneP2pResult<Self> {
         let (t_pool, transport, mut t_event) = spawn_transport_pool().await?;
-        for t_conf in config.transport_pool {
+        for t_conf in config.transport_pool.clone() {
             let (l, e) = build_transport(t_conf).await?;
             t_pool.push_sub_transport(l, e).await?;
         }
@@ -234,6 +238,22 @@ impl KitsuneP2pActor {
                                             .expect("This encoding should never fail");
                                     let _ = write.write_and_close(resp).await;
                                 }
+                                wire::Wire::AgentInfoQuery(q) => {
+                                    match agent_info_query(q, evt_sender.clone()).await {
+                                        Ok(r) => {
+                                            let resp = wire::Wire::agent_info_query_resp(r)
+                                                .encode_vec()
+                                                .unwrap();
+                                            let _ = write.write_and_close(resp).await;
+                                        }
+                                        Err(err) => {
+                                            let reason = format!("{:?}", err);
+                                            let fail =
+                                                wire::Wire::failure(reason).encode_vec().unwrap();
+                                            let _ = write.write_and_close(fail).await;
+                                        }
+                                    }
+                                }
                                 _ => unimplemented!("{:?}", read),
                             }
                         }
@@ -248,7 +268,43 @@ impl KitsuneP2pActor {
             evt_sender,
             transport,
             spaces: HashMap::new(),
+            config: Arc::new(config),
         })
+    }
+}
+
+async fn agent_info_query(
+    q: wire::AgentInfoQuery,
+    evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
+) -> Result<Vec<crate::types::agent_store::AgentInfoSigned>, KitsuneP2pError> {
+    let wire::AgentInfoQuery {
+        space,
+        to_agent,
+        by_agent,
+        by_basis_arc,
+    } = q;
+
+    if let Some(by_agent) = by_agent {
+        if let Some(agent) = evt_sender
+            .get_agent_info_signed(GetAgentInfoSignedEvt {
+                space,
+                agent: by_agent,
+            })
+            .await?
+        {
+            Ok(vec![agent])
+        } else {
+            Ok(vec![])
+        }
+    } else if let Some(_by_basis_arc) = by_basis_arc {
+        Ok(evt_sender
+            .query_agent_info_signed(QueryAgentInfoSignedEvt {
+                space,
+                agent: to_agent,
+            })
+            .await?)
+    } else {
+        Err("must specify by_agent or by_basis_arc".into())
     }
 }
 
@@ -374,10 +430,11 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         let internal_sender = self.internal_sender.clone();
         let space2 = space.clone();
         let transport = self.transport.clone();
+        let config = Arc::clone(&self.config);
         let space_sender = match self.spaces.entry(space.clone()) {
             Entry::Occupied(entry) => entry.into_mut(),
             Entry::Vacant(entry) => entry.insert(AsyncLazy::new(async move {
-                let (send, evt_recv) = spawn_space(space2, transport)
+                let (send, evt_recv) = spawn_space(space2, transport, config)
                     .await
                     .expect("cannot fail to create space");
                 internal_sender
@@ -416,6 +473,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         to_agent: Arc<KitsuneAgent>,
         from_agent: Arc<KitsuneAgent>,
         payload: Vec<u8>,
+        timeout_ms: Option<u64>,
     ) -> KitsuneP2pHandlerResult<Vec<u8>> {
         let space_sender = match self.spaces.get_mut(&space) {
             None => return Err(KitsuneP2pError::RoutingSpaceError(space)),
@@ -424,7 +482,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         Ok(async move {
             space_sender
                 .await
-                .rpc_single(space, to_agent, from_agent, payload)
+                .rpc_single(space, to_agent, from_agent, payload, timeout_ms)
                 .await
         }
         .boxed()
