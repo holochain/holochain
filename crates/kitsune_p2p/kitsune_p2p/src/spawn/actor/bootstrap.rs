@@ -7,18 +7,39 @@ use std::convert::TryFrom;
 use std::convert::TryInto;
 use url2::Url2;
 
+/// Reuse a single reqwest Client for efficiency as we likely need several connections.
 static CLIENT: Lazy<reqwest::Client> = Lazy::new(reqwest::Client::new);
 
 #[allow(dead_code)]
+/// The number of random agent infos we want to collect from the bootstrap service when we want to
+/// populate an empty local space.
+/// @todo expose this to network config.
 const RANDOM_LIMIT_DEFAULT: u32 = 16;
 
+/// A cell to hold our local offset for calculating a 'now' that is compatible with the remote
+/// service. This is much less precise and comprehensive than NTP style calculations.
+/// We simply need to ensure that we don't sign things 'in the future' from the perspective of the
+/// remote service, and any inaccuracy caused by network latency or similar problems is negligible
+/// relative to the expiry times.
 pub static NOW_OFFSET_MILLIS: OnceCell<i64> = OnceCell::new();
 
+/// The HTTP header name for setting the op on POST requests.
 const OP_HEADER: &str = "X-Op";
+/// The header op to tell the service to put a signed agent info.
 const OP_PUT: &str = "put";
+/// The header op to tell the service to return its opinion of 'now' in milliseconds.
 const OP_NOW: &str = "now";
+/// The header op to tell the service to return a random set of agents in a specific space.
 const OP_RANDOM: &str = "random";
 
+/// Standard interface to the remote bootstrap service.
+///
+/// - url: the url of the bootstrap service or None to short circuit and not send a request
+/// - op: the header op for the remote service
+/// - input: op-specific struct that will be messagepack encoded and sent as binary data in the
+///          body of the POST
+///
+/// Output type O is op specific and needs to be messagepack decodeable.
 async fn do_api<I: serde::Serialize, O: serde::de::DeserializeOwned>(
     url: Option<Url2>,
     op: &str,
@@ -49,6 +70,10 @@ async fn do_api<I: serde::Serialize, O: serde::de::DeserializeOwned>(
     }
 }
 
+/// `do_api` wrapper for the `put` op.
+///
+/// Input must be an AgentInfoSigned with a valid siganture otherwise the remote service will not
+/// accept the data.
 pub async fn put(
     url: Option<Url2>,
     agent_info_signed: crate::types::agent_store::AgentInfoSigned,
@@ -60,6 +85,7 @@ pub async fn put(
     }
 }
 
+/// Simple wrapper to get the local time as milliseconds, to be compared against the remote time.
 fn local_now() -> crate::types::actor::KitsuneP2pResult<u64> {
     Ok(std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)?
@@ -67,6 +93,9 @@ fn local_now() -> crate::types::actor::KitsuneP2pResult<u64> {
         .try_into()?)
 }
 
+/// Thin `do_api` wrapper for the `now` op.
+///
+/// There is no input to the `now` endpoint, just `()` to be encoded as nil in messagepack.
 #[allow(dead_code)]
 pub async fn now(url: Option<Url2>) -> crate::types::actor::KitsuneP2pResult<u64> {
     match do_api(url, OP_NOW, ()).await {
@@ -80,6 +109,10 @@ pub async fn now(url: Option<Url2>) -> crate::types::actor::KitsuneP2pResult<u64
     }
 }
 
+/// Thick wrapper around `do_api` for the `now` op.
+///
+/// Calculates the offset on the first call and caches it in the cell above.
+/// Only calls `now` once then keeps the offset for the static lifetime.
 pub async fn now_once(url: Option<Url2>) -> crate::types::actor::KitsuneP2pResult<u64> {
     match NOW_OFFSET_MILLIS.get() {
         Some(offset) => Ok(u64::try_from(i64::try_from(local_now()?)? + offset)?),
@@ -108,18 +141,12 @@ pub async fn now_once(url: Option<Url2>) -> crate::types::actor::KitsuneP2pResul
     }
 }
 
-#[derive(serde::Deserialize, serde::Serialize, derive_more::From, derive_more::Into)]
-pub struct RandomLimit(u32);
-
-impl Default for RandomLimit {
-    fn default() -> Self {
-        Self(RANDOM_LIMIT_DEFAULT)
-    }
-}
-
+/// Struct to be encoded for the `random` op.
 #[derive(serde::Deserialize, serde::Serialize)]
 pub struct RandomQuery {
+    // The space to get random agents from.
     pub space: KitsuneSpace,
+    // The maximum number of random agents to retrieve for this query.
     pub limit: RandomLimit,
 }
 
@@ -134,6 +161,25 @@ impl Default for RandomQuery {
     }
 }
 
+#[derive(serde::Deserialize, serde::Serialize, derive_more::From, derive_more::Into)]
+pub struct RandomLimit(u32);
+
+impl Default for RandomLimit {
+    fn default() -> Self {
+        Self(RANDOM_LIMIT_DEFAULT)
+    }
+}
+
+/// `do_api` wrapper around the `random` op.
+///
+/// Fetches up to `limit` agent infos randomly from the `space`.
+///
+/// If there are fewer than `limit` agents listing themselves in the space then `limit` agents will
+/// be returned in a random order.
+///
+/// The ordering is random, the return is not sorted.
+/// Randomness is determined by the bootstrap service, it is one of the important roles of the
+/// service to mitigate eclipse attacks by having a strong randomness implementation.
 #[allow(dead_code)]
 pub async fn random(
     url: Option<Url2>,

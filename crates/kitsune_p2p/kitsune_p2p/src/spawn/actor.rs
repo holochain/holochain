@@ -8,7 +8,9 @@ use std::{
     sync::Arc,
 };
 
-pub mod bootstrap;
+/// The bootstrap service is much more thoroughly documented in the default service implementation.
+/// @see https://github.com/holochain/bootstrap
+mod bootstrap;
 mod discover;
 mod gossip;
 mod space;
