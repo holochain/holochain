@@ -24,6 +24,7 @@ pub enum TestWasm {
     HashEntry,
     Foo,
     HashPath,
+    HdkExtern,
     Imports,
     InitFail,
     InitPass,
@@ -67,6 +68,7 @@ impl From<TestWasm> for ZomeName {
             TestWasm::HashEntry => "hash_entry",
             TestWasm::Foo => "foo",
             TestWasm::HashPath => "hash_path",
+            TestWasm::HdkExtern => "hdk_extern",
             TestWasm::Imports => "imports",
             TestWasm::InitFail => "init_fail",
             TestWasm::InitPass => "init_pass",
@@ -125,6 +127,9 @@ impl From<TestWasm> for DnaWasm {
             TestWasm::Foo => get_code("wasm32-unknown-unknown/release/test_wasm_foo.wasm"),
             TestWasm::HashPath => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_hash_path.wasm")
+            }
+            TestWasm::HdkExtern => {
+                get_code("wasm32-unknown-unknown/release/test_wasm_hdk_extern.wasm")
             }
             TestWasm::Imports => get_code("wasm32-unknown-unknown/release/test_wasm_imports.wasm"),
             TestWasm::InitFail => {
