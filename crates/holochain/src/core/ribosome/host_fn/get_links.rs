@@ -84,6 +84,16 @@ pub mod slow_tests {
             TestString::from("foo.bar".to_string())
         );
 
+        // ensure a really long path
+        println!("x");
+        let _: () = crate::call_test_ribosome!(
+            host_access,
+            TestWasm::HashPath,
+            "ensure",
+            TestString::from(vec!["bing"; 1000].join("."))
+        );
+        println!("x");
+
         // ensure foo.baz
         let _: () = crate::call_test_ribosome!(
             host_access,

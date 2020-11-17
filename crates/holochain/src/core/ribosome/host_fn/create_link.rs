@@ -17,6 +17,7 @@ pub fn create_link<'a>(
     input: CreateLinkInput,
 ) -> RibosomeResult<CreateLinkOutput> {
     let (base_address, target_address, tag) = input.into_inner();
+    dbg!(&tag.0.len());
 
     // extract the zome position
     let zome_id = ribosome.zome_name_to_id(&call_context.zome_name)?;
