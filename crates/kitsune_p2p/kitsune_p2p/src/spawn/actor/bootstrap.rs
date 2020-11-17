@@ -5,6 +5,7 @@ use once_cell::sync::Lazy;
 use once_cell::sync::OnceCell;
 use std::convert::TryFrom;
 use std::convert::TryInto;
+use std::sync::Arc;
 use url2::Url2;
 
 /// Reuse a single reqwest Client for efficiency as we likely need several connections.
@@ -145,7 +146,7 @@ pub async fn now_once(url: Option<Url2>) -> crate::types::actor::KitsuneP2pResul
 #[derive(serde::Deserialize, serde::Serialize)]
 pub struct RandomQuery {
     // The space to get random agents from.
-    pub space: KitsuneSpace,
+    pub space: Arc<KitsuneSpace>,
     // The maximum number of random agents to retrieve for this query.
     pub limit: RandomLimit,
 }
@@ -155,7 +156,7 @@ impl Default for RandomQuery {
         Self {
             // This is useless, it's here as a placeholder so that ..Default::default() syntax
             // works for limits, not because you'd actually ever want a "default" space.
-            space: KitsuneSpace::new(vec![0; 36]),
+            space: Arc::new(KitsuneSpace::new(vec![0; 36])),
             limit: RandomLimit::default(),
         }
     }
@@ -199,7 +200,7 @@ pub async fn random(
 
 #[cfg(test)]
 mod tests {
-
+    use super::*;
     use crate::fixt::*;
     use crate::spawn::actor::space::AGENT_INFO_EXPIRES_AFTER_MS;
     use crate::types::agent_store::*;
@@ -336,7 +337,7 @@ mod tests {
         let mut random = super::random(
             Some(url2::url2!("{}", crate::config::BOOTSTRAP_SERVICE_DEV)),
             super::RandomQuery {
-                space: space.clone(),
+                space: Arc::new(space.clone()),
                 ..Default::default()
             },
         )
@@ -352,7 +353,7 @@ mod tests {
         let random_single = super::random(
             Some(url2::url2!("{}", crate::config::BOOTSTRAP_SERVICE_DEV)),
             super::RandomQuery {
-                space: space.clone(),
+                space: Arc::new(space.clone()),
                 limit: 1.into(),
             },
         )

@@ -1,7 +1,9 @@
 #![allow(dead_code)]
 use super::*;
+use crate::agent_store::AgentInfo;
 use ghost_actor::dependencies::must_future::MustBoxFuture;
 use kitsune_p2p_types::codec::Codec;
+use std::collections::HashSet;
 use std::convert::TryFrom;
 
 /// This enum represents the outcomes from peer discovery
@@ -28,6 +30,7 @@ pub(crate) fn peer_discover(
     let i_s = space.i_s.clone();
     let evt_sender = space.evt_sender.clone();
     let tx = space.transport.clone();
+    let bootstrap_service = space.config.bootstrap_service.clone();
     let space = space.space.clone();
     async move {
         // run tx.create_channel an conver success result into our return type
@@ -68,22 +71,17 @@ pub(crate) fn peer_discover(
         };
 
         let check_network = || async {
-            // this is naive while full-synced
-            // just pulling 3 random nodes to query
-            // eventually we'll need to pick nodes close to our target
+            let nodes = get_5_or_less_non_local_agents_near_basis(
+                space.clone(),
+                from_agent.clone(),
+                Arc::new(KitsuneBasis(to_agent.to_vec())),
+                i_s.clone(),
+                evt_sender.clone(),
+                bootstrap_service.clone(),
+            )
+            .await?;
 
-            // first pull back our full peer store
-            let mut nodes = evt_sender
-                .query_agent_info_signed(QueryAgentInfoSignedEvt {
-                    space: space.clone(),
-                    agent: from_agent.clone(),
-                })
-                .await?;
-
-            // randomize the results
-            rand::seq::SliceRandom::shuffle(&mut nodes[..], &mut rand::thread_rng());
-
-            // make an AgentInfoQuery request to 3 random agents
+            // make an AgentInfoQuery request to the returned agents
             // return the first one to sucessfully return a result
             let (req_info, _) = futures::future::select_ok(nodes.into_iter().take(3).map(|info| {
                 // grr we need to move info in but not everything else...
@@ -92,7 +90,6 @@ pub(crate) fn peer_discover(
                 let space = &space;
                 let to_agent = &to_agent;
                 async move {
-                    let info = types::agent_store::AgentInfo::try_from(&info)?;
                     let url = info
                         .as_urls_ref()
                         .get(0)
@@ -154,7 +151,7 @@ pub(crate) fn peer_discover(
         };
 
         let start_time = std::time::Instant::now();
-        let mut interval_ms = 10;
+        let mut interval_ms = 50;
 
         loop {
             if let Ok(res) = check_local().await {
@@ -181,6 +178,213 @@ pub(crate) fn peer_discover(
 
             tokio::time::delay_for(std::time::Duration::from_millis(interval_ms)).await;
         }
+    }
+    .boxed()
+    .into()
+}
+
+/// attempt to send messages to remote nodes in a staged timeout format
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn message_neighborhood<T, F>(
+    space: &mut Space,
+    from_agent: Arc<KitsuneAgent>,
+    target_node_count: u8,
+    stage_1_timeout_if_any_ms: u64,
+    stage_2_timeout_even_if_none_ms: u64,
+    // ignored while full-sync
+    _basis: Arc<KitsuneBasis>,
+    payload: wire::Wire,
+    accept_result_cb: F,
+) -> MustBoxFuture<'static, Vec<T>>
+where
+    T: 'static + Send,
+    F: Fn(Arc<KitsuneAgent>, wire::Wire) -> Result<T, ()> + 'static + Send + Sync,
+{
+    let i_s = space.i_s.clone();
+    let evt_sender = space.evt_sender.clone();
+    let tx = space.transport.clone();
+    let bootstrap_service = space.config.bootstrap_service.clone();
+    let space = space.space.clone();
+    let accept_result_cb = Arc::new(accept_result_cb);
+    async move {
+        let out = Arc::new(tokio::sync::Mutex::new(Vec::new()));
+
+        let mut sent_to = HashSet::new();
+        let start_time = std::time::Instant::now();
+        let mut interval_ms = 50;
+
+        loop {
+            // It is somewhat convoluted to manage both awaits on
+            // our message responses and a loop deciding to send
+            // more outgoing requests simultaneously.
+            //
+            // as a comprimize attempting to favor readable code
+            // we'll check the fetch count / timing after every full
+            // iteration before deciding to send more requests.
+
+            let fetched_count = out.lock().await.len();
+            if fetched_count >= target_node_count as usize {
+                break;
+            }
+
+            let elapsed_ms = start_time.elapsed().as_millis() as u64;
+
+            if elapsed_ms >= stage_1_timeout_if_any_ms && fetched_count > 0 {
+                break;
+            }
+
+            if elapsed_ms >= stage_2_timeout_even_if_none_ms {
+                break;
+            }
+
+            if let Ok(nodes) = get_5_or_less_non_local_agents_near_basis(
+                space.clone(),
+                from_agent.clone(),
+                _basis.clone(),
+                i_s.clone(),
+                evt_sender.clone(),
+                bootstrap_service.clone(),
+            )
+            .await
+            {
+                for node in nodes {
+                    let to_agent = Arc::new(node.as_agent_ref().clone());
+                    if !sent_to.contains(&to_agent) {
+                        sent_to.insert(to_agent.clone());
+                        let url = match node.as_urls_ref().get(0) {
+                            None => continue,
+                            Some(url) => url.clone(),
+                        };
+                        let fut = tx.create_channel(url);
+                        let mut payload = payload.clone();
+                        let accept_result_cb = accept_result_cb.clone();
+                        let out = out.clone();
+                        tokio::task::spawn(async move {
+                            let (_, mut write, read) = fut.await?;
+                            match &mut payload {
+                                wire::Wire::Notify(n) => {
+                                    n.to_agent = to_agent.clone();
+                                }
+                                wire::Wire::Call(c) => {
+                                    c.to_agent = to_agent.clone();
+                                }
+                                _ => panic!("cannot message {:?}", payload),
+                            }
+                            let payload = payload.encode_vec()?;
+                            write.write_and_close(payload).await?;
+                            let res = read.read_to_end().await;
+                            let (_, res) = wire::Wire::decode_ref(&res)?;
+                            if let Ok(res) = accept_result_cb(to_agent, res) {
+                                out.lock().await.push(res);
+                            }
+
+                            KitsuneP2pResult::Ok(())
+                        });
+                    }
+                }
+            }
+
+            let elapsed_ms = start_time.elapsed().as_millis() as u64;
+
+            if elapsed_ms >= stage_2_timeout_even_if_none_ms {
+                break;
+            }
+
+            interval_ms *= 2;
+            if interval_ms > stage_2_timeout_even_if_none_ms - elapsed_ms {
+                interval_ms = stage_2_timeout_even_if_none_ms - elapsed_ms;
+            }
+
+            tokio::time::delay_for(std::time::Duration::from_millis(interval_ms)).await;
+        }
+
+        let mut lock = out.lock().await;
+        lock.drain(..).collect()
+    }
+    .boxed()
+    .into()
+}
+
+/// search for agents to contact
+pub(crate) fn get_5_or_less_non_local_agents_near_basis(
+    space: Arc<KitsuneSpace>,
+    from_agent: Arc<KitsuneAgent>,
+    // ignored while full-sync
+    _basis: Arc<KitsuneBasis>,
+    i_s: ghost_actor::GhostSender<SpaceInternal>,
+    evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
+    bootstrap_service: Option<url2::Url2>,
+) -> MustBoxFuture<'static, KitsuneP2pResult<HashSet<AgentInfo>>> {
+    async move {
+        let mut out = HashSet::new();
+
+        if let Ok(mut list) = evt_sender
+            .query_agent_info_signed(QueryAgentInfoSignedEvt {
+                space: space.clone(),
+                agent: from_agent.clone(),
+            })
+            .await
+        {
+            // randomize the results
+            rand::seq::SliceRandom::shuffle(&mut list[..], &mut rand::thread_rng());
+            for item in list {
+                if let Ok(info) = AgentInfo::try_from(&item) {
+                    if let Ok(is_local) = i_s
+                        .is_agent_local(Arc::new(info.as_agent_ref().clone()))
+                        .await
+                    {
+                        if !is_local {
+                            out.insert(info);
+                        }
+                    }
+                }
+                if out.len() >= 5 {
+                    return Ok(out);
+                }
+            }
+        }
+
+        if let Ok(list) = super::bootstrap::random(
+            bootstrap_service,
+            super::bootstrap::RandomQuery {
+                space: space.clone(),
+                // grap a couple extra incase they happen to be local
+                limit: 8.into(),
+            },
+        )
+        .await
+        {
+            for item in list {
+                // TODO - someday some validation here
+                if let Ok(info) = AgentInfo::try_from(&item) {
+                    if let Ok(is_local) = i_s
+                        .is_agent_local(Arc::new(info.as_agent_ref().clone()))
+                        .await
+                    {
+                        if !is_local {
+                            // we got a result - let's add it to our store for the future
+                            let _ = evt_sender
+                                .put_agent_info_signed(PutAgentInfoSignedEvt {
+                                    space: space.clone(),
+                                    agent: from_agent.clone(),
+                                    agent_info_signed: item.clone(),
+                                })
+                                .await;
+                            out.insert(info);
+                        }
+                    }
+                }
+                if out.len() >= 5 {
+                    return Ok(out);
+                }
+            }
+        }
+
+        if out.is_empty() {
+            return Err("could not find any peers".into());
+        }
+
+        Ok(out)
     }
     .boxed()
     .into()
