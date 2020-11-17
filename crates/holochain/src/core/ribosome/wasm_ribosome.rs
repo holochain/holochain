@@ -61,11 +61,11 @@ use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::ribosome::ZomesToInvoke;
 use fallible_iterator::FallibleIterator;
+use holochain_types::dna::DnaError;
 use holochain_types::dna::{
     zome::{HostFnAccess, Permission},
     DnaDefHashed, DnaFile,
 };
-use holochain_types::dna::{DnaDef, DnaError};
 use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::entry_def::EntryDefsCallbackResult;
 use holochain_zome_types::init::InitCallbackResult;

@@ -5,7 +5,7 @@ use crate::{
         ConductorHandle,
     },
     core::queue_consumer::InitialQueueTriggers,
-    core::ribosome::{wasm_ribosome::WasmRibosome, RibosomeT},
+    core::ribosome::wasm_ribosome::WasmRibosome,
 };
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::{actor::HolochainP2pRefToCell, HolochainP2pCell};

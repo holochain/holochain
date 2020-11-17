@@ -59,7 +59,6 @@ use holochain_state::{
 use holochain_types::{
     activity::{AgentActivity, ChainItems},
     dht_op::DhtOp,
-    dna::DnaFile,
     dna::{zome::Zome, DnaDef, DnaDefHashed},
     test_utils::which_agent,
     validate::ValidationStatus,

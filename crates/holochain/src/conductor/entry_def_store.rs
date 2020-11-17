@@ -17,7 +17,7 @@ use holochain_state::{
     error::{DatabaseError, DatabaseResult},
     prelude::*,
 };
-use holochain_types::dna::{zome::Zome, DnaDef, DnaDefHashed, DnaFile};
+use holochain_types::dna::{zome::Zome, DnaDefHashed, DnaFile};
 use holochain_zome_types::entry_def::EntryDef;
 use holochain_zome_types::header::EntryDefIndex;
 use holochain_zome_types::header::ZomeId;

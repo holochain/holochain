@@ -1,7 +1,6 @@
 use crate::{
-    assert_length, encode, error::HoloHashError, error::HoloHashResult, hash_type, HashType,
-    HashableContent, HashableContentBytes, HoloHash, HoloHashOf, HoloHashed, PrimitiveHashType,
-    HOLO_HASH_CORE_LEN, HOLO_HASH_UNTYPED_LEN,
+    assert_length, encode, hash_type, HashType, HashableContent, HashableContentBytes, HoloHash,
+    HoloHashOf, HoloHashed, PrimitiveHashType, HOLO_HASH_CORE_LEN, HOLO_HASH_UNTYPED_LEN,
 };
 use hash_type::{HashTypeAsync, HashTypeSync};
 
