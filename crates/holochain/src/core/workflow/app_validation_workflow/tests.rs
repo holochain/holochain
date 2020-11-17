@@ -17,8 +17,13 @@ use holo_hash::{AnyDhtHash, DhtOpHash, EntryHash, HeaderHash};
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::{env::EnvironmentWrite, fresh_reader_test};
 use holochain_types::{
-    app::InstalledCell, cell::CellId, dht_op::DhtOpLight, dna::DnaDef, dna::DnaFile,
-    test_utils::fake_agent_pubkey_1, test_utils::fake_agent_pubkey_2, validate::ValidationStatus,
+    app::InstalledCell,
+    cell::CellId,
+    dht_op::DhtOpLight,
+    dna::{DnaDef, DnaFile, DnaT},
+    test_utils::fake_agent_pubkey_1,
+    test_utils::fake_agent_pubkey_2,
+    validate::ValidationStatus,
     Entry,
 };
 use holochain_wasm_test_utils::TestWasm;

@@ -539,7 +539,7 @@ pub mod wasm_test {
             tokio::task::spawn(async move {
                 use holo_hash::*;
                 use holochain_p2p::HolochainP2pCellT;
-                // ensure type of test wasm
+                use holochain_types::dna::DnaT;
                 use std::convert::TryInto;
                 use $crate::core::ribosome::RibosomeT;
 

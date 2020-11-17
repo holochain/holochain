@@ -1,5 +1,5 @@
 use holochain_p2p::HolochainP2pCell;
-use holochain_types::HeaderHashed;
+use holochain_types::{dna::DnaT, HeaderHashed};
 use holochain_zome_types::{
     header::AppEntryType, header::EntryType, query::ChainQueryFilter, validate::ValidationPackage,
 };

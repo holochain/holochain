@@ -36,7 +36,7 @@ use holochain_types::{
     app::InstalledCell,
     cell::CellId,
     dht_op::produce_op_lights_from_elements,
-    dna::{DnaDef, DnaFile},
+    dna::{DnaDef, DnaFile, DnaT},
     element::ElementStatus,
     element::{Element, GetElementResponse, WireElement},
     entry::option_entry_hashed,

@@ -6,6 +6,7 @@ use fallible_iterator::FallibleIterator;
 use hdk3::prelude::*;
 use holochain_state::buffer::KvStoreT;
 use holochain_state::fresh_reader_test;
+use holochain_types::dna::DnaT;
 use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p::{KitsuneBinType, KitsuneP2pConfig};
 use matches::assert_matches;

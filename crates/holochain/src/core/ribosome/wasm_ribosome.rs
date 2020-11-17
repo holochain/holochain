@@ -64,7 +64,7 @@ use fallible_iterator::FallibleIterator;
 use holochain_types::dna::DnaError;
 use holochain_types::dna::{
     zome::{HostFnAccess, Permission},
-    DnaDefHashed, DnaFile,
+    DnaDefHashed, DnaFile, DnaT,
 };
 use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::entry_def::EntryDefsCallbackResult;

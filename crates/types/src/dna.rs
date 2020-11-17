@@ -71,6 +71,18 @@ impl_hashable_content!(DnaDef, Dna);
 /// Wasms need to be an ordered map from WasmHash to a DnaWasm
 pub type Wasms = BTreeMap<holo_hash::WasmHash, wasm::DnaWasm>;
 
+/// DNA is application code executable by Holochain
+pub trait DnaT {
+    /// The DnaDef along with its hash
+    fn dna(&self) -> &DnaDefHashed;
+
+    /// Just the DnaDef
+    fn dna_def(&self) -> &DnaDef;
+
+    /// The hash of the DnaDef
+    fn dna_hash(&self) -> &holo_hash::DnaHash;
+}
+
 /// Represents a full DNA file including WebAssembly bytecode.
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, SerializedBytes)]
 pub struct DnaFile {
@@ -87,6 +99,20 @@ impl From<DnaFile> for (DnaDef, Vec<wasm::DnaWasm>) {
             dna_file.dna.into_content(),
             dna_file.code.into_iter().map(|(_, w)| w).collect(),
         )
+    }
+}
+
+impl DnaT for DnaFile {
+    fn dna(&self) -> &DnaDefHashed {
+        &self.dna
+    }
+
+    fn dna_def(&self) -> &DnaDef {
+        &self.dna
+    }
+
+    fn dna_hash(&self) -> &holo_hash::DnaHash {
+        self.dna.as_hash()
     }
 }
 
@@ -146,21 +172,6 @@ impl DnaFile {
         let (mut dna, wasm): (DnaDef, Vec<wasm::DnaWasm>) = self.into();
         dna.uuid = uuid;
         DnaFile::new(dna, wasm).await
-    }
-
-    /// The DnaDef along with its hash
-    pub fn dna(&self) -> &DnaDefHashed {
-        &self.dna
-    }
-
-    /// Just the DnaDef
-    pub fn dna_def(&self) -> &DnaDef {
-        &self.dna
-    }
-
-    /// The hash of the DnaDef
-    pub fn dna_hash(&self) -> &holo_hash::DnaHash {
-        self.dna.as_hash()
     }
 
     /// The bytes of the WASM zomes referenced in the Dna portion.

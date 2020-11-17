@@ -14,7 +14,7 @@ use holochain_serialized_bytes::prelude::*;
 use holochain_types::{
     app::{AppId, InstallAppDnaPayload, InstallAppPayload, InstalledApp, InstalledCell},
     cell::CellId,
-    dna::{DnaFile, JsonProperties},
+    dna::{DnaFile, DnaT, JsonProperties},
 };
 use std::path::PathBuf;
 use tracing::*;

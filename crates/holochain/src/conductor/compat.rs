@@ -10,7 +10,7 @@ use holochain_keystore::{test_keystore::spawn_test_keystore, KeystoreError};
 use holochain_types::{
     app::InstalledCell,
     cell::CellId,
-    dna::{DnaError, DnaFile},
+    dna::{DnaError, DnaFile, DnaT},
 };
 use std::fs;
 use std::{collections::HashMap, io::Read, path::Path};

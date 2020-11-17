@@ -53,7 +53,7 @@ pub mod wasm_test {
     use holochain_serialized_bytes::SerializedBytes;
     use holochain_types::{
         app::InstalledCell,
-        dna::{DnaDef, DnaFile},
+        dna::{DnaDef, DnaFile, DnaT},
     };
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::{test_utils::fake_agent_pubkey_2, ExternInput, ZomeCallResponse};

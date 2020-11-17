@@ -244,6 +244,7 @@ mod slow_tests {
     use crate::fixt::MigrateAgentHostAccessFixturator;
     use crate::fixt::MigrateAgentInvocationFixturator;
     use crate::fixt::WasmRibosomeFixturator;
+    use holochain_types::dna::DnaT;
     use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(threaded_scheduler)]

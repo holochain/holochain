@@ -60,7 +60,7 @@ use holochain_state::{
 use holochain_types::{
     app::{AppId, InstalledApp, InstalledCell, MembraneProof},
     cell::CellId,
-    dna::{wasm::DnaWasmHashed, DnaFile},
+    dna::{wasm::DnaWasmHashed, DnaFile, DnaT},
 };
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use std::collections::HashMap;

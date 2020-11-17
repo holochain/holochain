@@ -6,7 +6,10 @@ use crate::{
 };
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_types::{
-    app::InstalledCell, cell::CellId, dna::DnaDef, dna::DnaFile, test_utils::fake_agent_pubkey_1,
+    app::InstalledCell,
+    cell::CellId,
+    dna::{DnaDef, DnaFile, DnaT},
+    test_utils::fake_agent_pubkey_1,
 };
 use holochain_wasm_test_utils::TestWasm;
 use std::convert::TryFrom;

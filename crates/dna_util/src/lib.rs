@@ -38,7 +38,7 @@
 //! ```
 
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::dna::{wasm::DnaWasm, zome::Zome, DnaDef, DnaFile};
+use holochain_types::dna::{wasm::DnaWasm, zome::Zome, DnaDef, DnaFile, DnaT};
 use holochain_zome_types::zome::ZomeName;
 use std::{collections::BTreeMap, path::PathBuf};
 

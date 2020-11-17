@@ -260,6 +260,7 @@ pub mod test {
     use holochain_types::{
         app::{InstallAppDnaPayload, InstallAppPayload, InstalledCell},
         cell::CellId,
+        dna::DnaT,
         observability,
         test_utils::{fake_agent_pubkey_1, fake_dna_file, fake_dna_zomes},
     };

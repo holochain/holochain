@@ -25,6 +25,7 @@ use holochain_state::{
 use holochain_types::{
     dht_op::{DhtOp, DhtOpHashed},
     dna::DnaDefHashed,
+    dna::DnaT,
     fixt::*,
     header::NewEntryHeader,
     metadata::TimedHeaderHash,
@@ -1319,8 +1320,12 @@ mod slow_tests {
     use holochain_serialized_bytes::SerializedBytes;
     use holochain_state::{db::GetDb, db::INTEGRATED_DHT_OPS, env::ReadManager};
     use holochain_types::{
-        app::InstalledCell, cell::CellId, dna::DnaDef, dna::DnaFile, observability,
-        test_utils::fake_agent_pubkey_1, Entry,
+        app::InstalledCell,
+        cell::CellId,
+        dna::{DnaDef, DnaFile, DnaT},
+        observability,
+        test_utils::fake_agent_pubkey_1,
+        Entry,
     };
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::test_utils::fake_agent_pubkey_2;

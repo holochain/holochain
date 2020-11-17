@@ -135,8 +135,13 @@ pub mod wasm_test {
     use hdk3::prelude::*;
     use holo_hash::{AnyDhtHash, EntryHash};
     use holochain_types::{
-        app::InstalledCell, cell::CellId, dna::DnaDef, dna::DnaFile, fixt::AppEntry, observability,
-        test_utils::fake_agent_pubkey_1, test_utils::fake_agent_pubkey_2,
+        app::InstalledCell,
+        cell::CellId,
+        dna::{DnaDef, DnaFile, DnaT},
+        fixt::AppEntry,
+        observability,
+        test_utils::fake_agent_pubkey_1,
+        test_utils::fake_agent_pubkey_2,
     };
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::entry_def::EntryDefId;

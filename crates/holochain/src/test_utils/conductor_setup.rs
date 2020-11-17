@@ -12,7 +12,7 @@ use holochain_p2p::{actor::HolochainP2pRefToCell, HolochainP2pCell};
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::env::EnvironmentWrite;
 use holochain_types::{
-    app::InstalledCell, cell::CellId, dna::DnaDef, dna::DnaFile, test_utils::fake_agent_pubkey_1,
+    app::InstalledCell, cell::CellId, dna::{DnaDef, DnaFile, DnaT}, test_utils::fake_agent_pubkey_1,
     test_utils::fake_agent_pubkey_2,
 };
 use holochain_wasm_test_utils::TestWasm;
