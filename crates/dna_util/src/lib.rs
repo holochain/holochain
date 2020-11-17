@@ -142,7 +142,7 @@ pub async fn expand(dna_file_path: &impl AsRef<std::path::Path>) -> DnaUtilResul
 
     // Might be more efficient to extract the DnaDef / Wasm from the DnaFile
     // then pass by value here.
-    let dna_json = DnaDefJson::from_dna_def(dna_file.dna().clone())?;
+    let dna_json = DnaDefJson::from_dna_def(dna_file.dna().clone().into_content())?;
     let dna_json = serde_json::to_string_pretty(&dna_json)?;
 
     let mut json_filename = dir.clone();

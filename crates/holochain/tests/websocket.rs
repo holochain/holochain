@@ -175,7 +175,7 @@ async fn call_admin() {
     let response = check_timeout(&mut holochain, response, 3000).await;
 
     let tmp_wasm = dna.code().values().cloned().collect::<Vec<_>>();
-    let mut tmp_dna = dna.dna().clone();
+    let mut tmp_dna = dna.dna_def().clone();
     tmp_dna.properties = properties.try_into().unwrap();
     let dna = holochain_types::dna::DnaFile::new(tmp_dna, tmp_wasm)
         .await

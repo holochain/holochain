@@ -1,6 +1,7 @@
 use crate::{
-    assert_length, encode, hash_type, HashType, HashableContent, HashableContentBytes, HoloHash,
-    HoloHashOf, HoloHashed, PrimitiveHashType, HOLO_HASH_CORE_LEN, HOLO_HASH_UNTYPED_LEN,
+    assert_length, encode, error::HoloHashError, error::HoloHashResult, hash_type, HashType,
+    HashableContent, HashableContentBytes, HoloHash, HoloHashOf, HoloHashed, PrimitiveHashType,
+    HOLO_HASH_CORE_LEN, HOLO_HASH_UNTYPED_LEN,
 };
 use hash_type::{HashTypeAsync, HashTypeSync};
 
@@ -52,6 +53,17 @@ where
         let hash: HoloHashOf<C> = HoloHash::<T>::with_data_sync(&content);
         Self { content, hash }
     }
+
+    /// Verify that the cached hash matches the content.
+    /// Important to run this after e.g. deserialization.
+    pub fn verify_hash_sync(&self) -> Result<(), HoloHash<T>> {
+        let hash = HoloHash::<T>::with_data_sync(&self.content);
+        if self.hash == hash {
+            Ok(())
+        } else {
+            Err(hash)
+        }
+    }
 }
 
 impl<T: HashTypeAsync> HoloHash<T> {
@@ -71,6 +83,17 @@ where
     pub async fn from_content(content: C) -> Self {
         let hash: HoloHashOf<C> = HoloHash::<T>::with_data(&content).await;
         Self { content, hash }
+    }
+
+    /// Verify that the cached hash matches the content.
+    /// Important to run this after e.g. deserialization.
+    pub async fn verify_hash(&self) -> Result<(), HoloHash<T>> {
+        let hash = HoloHash::<T>::with_data(&self.content).await;
+        if self.hash == hash {
+            Ok(())
+        } else {
+            Err(hash)
+        }
     }
 }
 

@@ -48,10 +48,10 @@ pub struct DnaDef {
 }
 
 impl DnaDef {
-    /// Calculate DnaHash for DnaDef
-    pub async fn dna_hash(&self) -> DnaHash {
-        DnaHash::with_data(self).await
-    }
+    // /// Calculate DnaHash for DnaDef
+    // pub async fn dna_hash(&self) -> DnaHash {
+    //     DnaHash::with_data(self).await
+    // }
 
     /// Return a Zome
     pub fn get_zome(&self, zome_name: &ZomeName) -> Result<&zome::Zome, DnaError> {
@@ -75,11 +75,7 @@ pub type Wasms = BTreeMap<holo_hash::WasmHash, wasm::DnaWasm>;
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, SerializedBytes)]
 pub struct DnaFile {
     /// The hashable portion that can be shared with hApp code.
-    pub dna: DnaDef,
-
-    /// The hash of `self.dna` converted through `SerializedBytes`.
-    /// (This can be a full holo_hash because we never send a `DnaFile` to Wasm.)
-    pub dna_hash: holo_hash::DnaHash,
+    pub dna: DnaDefHashed,
 
     /// The bytes of the WASM zomes referenced in the Dna portion.
     pub code: Wasms,
@@ -88,7 +84,7 @@ pub struct DnaFile {
 impl From<DnaFile> for (DnaDef, Vec<wasm::DnaWasm>) {
     fn from(dna_file: DnaFile) -> (DnaDef, Vec<wasm::DnaWasm>) {
         (
-            dna_file.dna,
+            dna_file.dna.into_content(),
             dna_file.code.into_iter().map(|(_, w)| w).collect(),
         )
     }
@@ -105,22 +101,16 @@ impl DnaFile {
             let wasm_hash = holo_hash::WasmHash::with_data(&wasm).await;
             code.insert(wasm_hash, wasm);
         }
-        let dna_hash = holo_hash::DnaHash::with_data(&dna).await;
-        Ok(Self {
-            dna,
-            dna_hash,
-            code,
-        })
+        let dna = DnaDefHashed::from_content(dna).await;
+        Ok(Self { dna, code })
     }
 
     /// Verify that the DNA hash in the file matches the DnaDef
     pub async fn verify_hash(&self) -> Result<(), DnaError> {
-        let dna_hash = holo_hash::DnaHash::with_data(&self.dna).await;
-        if self.dna_hash == dna_hash {
-            Ok(())
-        } else {
-            Err(DnaError::DnaHashMismatch(self.dna_hash.clone(), dna_hash))
-        }
+        self.dna
+            .verify_hash()
+            .await
+            .map_err(|hash| DnaError::DnaHashMismatch(self.dna.as_hash().clone(), hash))
     }
 
     /// Load dna_file bytecode into this rust struct.
@@ -158,14 +148,19 @@ impl DnaFile {
         DnaFile::new(dna, wasm).await
     }
 
-    /// The hashable portion that can be shared with hApp code.
-    pub fn dna(&self) -> &DnaDef {
+    /// The DnaDef along with its hash
+    pub fn dna(&self) -> &DnaDefHashed {
         &self.dna
     }
 
-    /// The hash of the dna def
+    /// Just the DnaDef
+    pub fn dna_def(&self) -> &DnaDef {
+        &self.dna
+    }
+
+    /// The hash of the DnaDef
     pub fn dna_hash(&self) -> &holo_hash::DnaHash {
-        &self.dna_hash
+        self.dna.as_hash()
     }
 
     /// The bytes of the WASM zomes referenced in the Dna portion.
@@ -201,6 +196,6 @@ impl DnaFile {
 
 impl std::fmt::Debug for DnaFile {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!("DnaFile(dna_hash = {})", self.dna_hash))
+        f.write_fmt(format_args!("DnaFile(dna_hash = {})", self.dna_hash()))
     }
 }

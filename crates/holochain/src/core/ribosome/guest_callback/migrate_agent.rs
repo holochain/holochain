@@ -257,7 +257,7 @@ mod slow_tests {
         let mut migrate_agent_invocation = MigrateAgentInvocationFixturator::new(fixt::Empty)
             .next()
             .unwrap();
-        migrate_agent_invocation.dna_def = ribosome.dna_file.dna.clone();
+        migrate_agent_invocation.dna_def = ribosome.dna_file.dna_def().clone();
 
         let result = ribosome
             .run_migrate_agent(host_access, migrate_agent_invocation)
@@ -276,7 +276,7 @@ mod slow_tests {
         let mut migrate_agent_invocation = MigrateAgentInvocationFixturator::new(fixt::Empty)
             .next()
             .unwrap();
-        migrate_agent_invocation.dna_def = ribosome.dna_file.dna.clone();
+        migrate_agent_invocation.dna_def = ribosome.dna_file.dna_def().clone();
 
         let result = ribosome
             .run_migrate_agent(host_access, migrate_agent_invocation)
@@ -295,7 +295,7 @@ mod slow_tests {
         let mut migrate_agent_invocation = MigrateAgentInvocationFixturator::new(fixt::Empty)
             .next()
             .unwrap();
-        migrate_agent_invocation.dna_def = ribosome.dna_file.dna.clone();
+        migrate_agent_invocation.dna_def = ribosome.dna_file.dna_def().clone();
 
         let result = ribosome
             .run_migrate_agent(host_access, migrate_agent_invocation)
@@ -320,7 +320,7 @@ mod slow_tests {
         let mut migrate_agent_invocation = MigrateAgentInvocationFixturator::new(fixt::Empty)
             .next()
             .unwrap();
-        migrate_agent_invocation.dna_def = ribosome.dna_file.dna.clone();
+        migrate_agent_invocation.dna_def = ribosome.dna_file.dna_def().clone();
 
         let result = ribosome
             .run_migrate_agent(host_access, migrate_agent_invocation)

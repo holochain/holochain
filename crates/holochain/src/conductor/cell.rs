@@ -786,7 +786,7 @@ impl Cell {
             .get_dna(id.dna_hash())
             .await
             .ok_or(CellError::DnaMissing)?;
-        let dna_def = dna_file.dna().clone();
+        let dna_def = dna_file.dna_def().clone();
 
         // Get the ribosome
         let ribosome = WasmRibosome::new(dna_file);

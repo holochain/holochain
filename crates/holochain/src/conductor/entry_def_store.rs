@@ -9,6 +9,7 @@ use crate::core::ribosome::{
 use super::api::CellConductorApiT;
 use error::{EntryDefStoreError, EntryDefStoreResult};
 use fallible_iterator::FallibleIterator;
+use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::{
@@ -16,7 +17,7 @@ use holochain_state::{
     error::{DatabaseError, DatabaseResult},
     prelude::*,
 };
-use holochain_types::dna::{zome::Zome, DnaDef, DnaFile};
+use holochain_types::dna::{zome::Zome, DnaDef, DnaDefHashed, DnaFile};
 use holochain_zome_types::entry_def::EntryDef;
 use holochain_zome_types::header::EntryDefIndex;
 use holochain_zome_types::header::ZomeId;
@@ -129,17 +130,17 @@ impl BufferedStore for EntryDefBuf {
 pub(crate) async fn get_entry_def(
     entry_def_index: EntryDefIndex,
     zome: Zome,
-    dna_def: &DnaDef,
+    dna_def: &DnaDefHashed,
     conductor_api: &impl CellConductorApiT,
 ) -> EntryDefStoreResult<Option<EntryDef>> {
     // Try to get the entry def from the entry def store
     let key = EntryDefBufferKey::new(zome, entry_def_index);
     let entry_def = conductor_api.get_entry_def(&key).await;
-    let dna_hash = dna_def.dna_hash().await; // TODO: cache
+    let dna_hash = dna_def.as_hash();
     let dna_file = conductor_api
-        .get_dna(&dna_hash)
+        .get_dna(dna_hash)
         .await
-        .ok_or_else(|| EntryDefStoreError::DnaFileMissing(dna_hash))?;
+        .ok_or_else(|| EntryDefStoreError::DnaFileMissing(dna_hash.clone()))?;
 
     // If it's not found run the ribosome and get the entry defs
     match &entry_def {
@@ -153,7 +154,7 @@ pub(crate) async fn get_entry_def(
 pub(crate) async fn get_entry_def_from_ids(
     zome_id: ZomeId,
     entry_def_index: EntryDefIndex,
-    dna_def: &DnaDef,
+    dna_def: &DnaDefHashed,
     conductor_api: &impl CellConductorApiT,
 ) -> EntryDefStoreResult<Option<EntryDef>> {
     match dna_def.zomes.get(zome_id.index()) {

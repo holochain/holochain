@@ -60,7 +60,7 @@ use holochain_types::{
     activity::{AgentActivity, ChainItems},
     dht_op::DhtOp,
     dna::DnaFile,
-    dna::{zome::Zome, DnaDef},
+    dna::{zome::Zome, DnaDef, DnaDefHashed},
     test_utils::which_agent,
     validate::ValidationStatus,
     Entry, HeaderHashed, Timestamp,
@@ -344,7 +344,7 @@ async fn validate_op(
 /// Other header types will None.
 async fn get_associated_entry_def(
     element: &Element,
-    dna_def: &DnaDef,
+    dna_def: &DnaDefHashed,
     conductor_api: &impl CellConductorApiT,
     cascade: Cascade<'_>,
 ) -> AppValidationOutcome<Option<EntryDef>> {

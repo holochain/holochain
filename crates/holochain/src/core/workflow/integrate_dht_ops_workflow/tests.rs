@@ -24,6 +24,7 @@ use holochain_state::{
 };
 use holochain_types::{
     dht_op::{DhtOp, DhtOpHashed},
+    dna::DnaDefHashed,
     fixt::*,
     header::NewEntryHeader,
     metadata::TimedHeaderHash,
@@ -885,13 +886,11 @@ async fn commit_entry<'env>(
     );
 
     // Create a dna file with the correct zome name in the desired position (ZomeId)
-    let mut dna_file = DnaFileFixturator::new(Empty).next().unwrap();
-    dna_file.dna.zomes.clear();
-    dna_file
-        .dna
-        .zomes
-        .push((zome_name.clone().into(), fixt!(Zome)));
-    let dna_def = dna_file.dna().clone();
+    let dna_file = DnaFileFixturator::new(Empty).next().unwrap();
+    let mut dna_def = dna_file.dna_def().clone();
+    dna_def.zomes.clear();
+    dna_def.zomes.push((zome_name.clone().into(), fixt!(Zome)));
+    let dna_def = DnaDefHashed::from_content(dna_def).await;
 
     // Create ribosome mock to return fixtures
     // This is a lot faster then compiling a zome
@@ -981,14 +980,12 @@ async fn create_link(
     let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
     let workspace_lock = CallZomeWorkspaceLock::new(workspace);
 
-    // Create data for calls
-    let mut dna_file = DnaFileFixturator::new(Empty).next().unwrap();
-    dna_file.dna.zomes.clear();
-    dna_file
-        .dna
-        .zomes
-        .push((zome_name.clone().into(), fixt!(Zome)));
-    let dna_def = dna_file.dna().clone();
+    // Create a dna file with the correct zome name in the desired position (ZomeId)
+    let dna_file = DnaFileFixturator::new(Empty).next().unwrap();
+    let mut dna_def = dna_file.dna_def().clone();
+    dna_def.zomes.clear();
+    dna_def.zomes.push((zome_name.clone().into(), fixt!(Zome)));
+    let dna_def = DnaDefHashed::from_content(dna_def).await;
 
     // Create ribosome mock to return fixtures
     // This is a lot faster then compiling a zome
@@ -1035,16 +1032,14 @@ async fn get_links(
     let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
     let workspace_lock = CallZomeWorkspaceLock::new(workspace);
 
-    // Create data for calls
-    let mut dna_file = DnaFileFixturator::new(Empty).next().unwrap();
-    dna_file.dna.zomes.clear();
-    dna_file
-        .dna
-        .zomes
-        .push((zome_name.clone().into(), fixt!(Zome)));
-    let dna_def = dna_file.dna().clone();
+    // Create a dna file with the correct zome name in the desired position (ZomeId)
+    let dna_file = DnaFileFixturator::new(Empty).next().unwrap();
+    let mut dna_def = dna_file.dna_def().clone();
+    dna_def.zomes.clear();
+    dna_def.zomes.push((zome_name.clone().into(), fixt!(Zome)));
+    let dna_def = DnaDefHashed::from_content(dna_def).await;
 
-    let test_network = test_network(Some(dna_file.dna_hash().clone()), None).await;
+    let test_network = test_network(Some(dna_def.as_hash().clone()), None).await;
 
     // Create ribosome mock to return fixtures
     // This is a lot faster then compiling a zome

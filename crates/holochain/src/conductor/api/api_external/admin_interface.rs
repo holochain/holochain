@@ -558,9 +558,9 @@ mod test {
         let properties = Some(JsonProperties::new(json.clone()));
         let result = read_parse_dna(dna_path, properties).await?;
         let properties = JsonProperties::new(json);
-        let mut dna = dna.dna().clone();
+        let mut dna = dna.dna_def().clone();
         dna.properties = properties.try_into().unwrap();
-        assert_eq!(&dna, result.dna());
+        assert_eq!(&dna, result.dna_def());
         Ok(())
     }
 }

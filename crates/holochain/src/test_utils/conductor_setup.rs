@@ -176,7 +176,7 @@ impl ConductorTestData {
         let dna_file = self.alice_call_data.ribosome.dna_file().clone();
         if self.bob_call_data.is_none() {
             let bob_agent_id = fake_agent_pubkey_2();
-            let bob_cell_id = CellId::new(dna_file.dna_hash.clone(), bob_agent_id.clone());
+            let bob_cell_id = CellId::new(dna_file.dna_hash().clone(), bob_agent_id.clone());
             let bob_installed_cell = InstalledCell::new(bob_cell_id.clone(), "bob_handle".into());
             let cell_data = vec![(bob_installed_cell, None)];
             install_app(

@@ -750,7 +750,7 @@ where
             }
         }
         if dna_def_buf.get(dna.dna_hash()).await?.is_none() {
-            dna_def_buf.put(dna.dna().clone()).await?;
+            dna_def_buf.put(dna.dna_def().clone()).await?;
         }
         {
             let env = environ.guard();

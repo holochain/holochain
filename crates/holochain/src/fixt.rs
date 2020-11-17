@@ -40,6 +40,7 @@ use holochain_keystore::keystore_actor::KeystoreSender;
 use holochain_p2p::HolochainP2pCellFixturator;
 use holochain_state::test_utils::test_keystore;
 use holochain_types::dna::zome::Zome;
+use holochain_types::dna::DnaDefHashed;
 use holochain_types::dna::DnaFile;
 use holochain_types::dna::Wasms;
 use holochain_types::dna::Zomes;
@@ -149,8 +150,9 @@ fixturator!(
     DnaFile,
     {
         DnaFile {
-            dna: DnaDefFixturator::new(Empty).next().unwrap(),
-            dna_hash: DnaHashFixturator::new(Empty).next().unwrap(),
+            dna: tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+                DnaDefHashed::from_content(DnaDefFixturator::new(Empty).next().unwrap()).await
+            }),
             code: WasmsFixturator::new(Empty).next().unwrap(),
         }
     },
@@ -169,9 +171,11 @@ fixturator!(
         }
         let mut dna_def = DnaDefFixturator::new(Unpredictable).next().unwrap();
         dna_def.zomes = zomes;
+        let dna = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+            DnaDefHashed::from_content(dna_def).await
+        });
         DnaFile {
-            dna: dna_def,
-            dna_hash: DnaHashFixturator::new(Unpredictable).next().unwrap(),
+            dna,
             code: WasmsFixturator::new(Unpredictable).next().unwrap(),
         }
     },
@@ -195,13 +199,11 @@ fixturator!(
             .next()
             .unwrap();
         dna_def.zomes = zomes;
+        let dna = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+            DnaDefHashed::from_content(dna_def).await
+        });
         DnaFile {
-            dna: DnaDefFixturator::new_indexed(Predictable, get_fixt_index!())
-                .next()
-                .unwrap(),
-            dna_hash: DnaHashFixturator::new_indexed(Predictable, get_fixt_index!())
-                .next()
-                .unwrap(),
+            dna,
             code: WasmsFixturator::new_indexed(Predictable, get_fixt_index!())
                 .next()
                 .unwrap(),

@@ -63,7 +63,7 @@ use crate::core::ribosome::ZomesToInvoke;
 use fallible_iterator::FallibleIterator;
 use holochain_types::dna::{
     zome::{HostFnAccess, Permission},
-    DnaFile,
+    DnaDefHashed, DnaFile,
 };
 use holochain_types::dna::{DnaDef, DnaError};
 use holochain_wasmer_host::prelude::*;
@@ -360,7 +360,7 @@ macro_rules! do_callback {
 }
 
 impl RibosomeT for WasmRibosome {
-    fn dna_def(&self) -> &DnaDef {
+    fn dna_def(&self) -> &DnaDefHashed {
         self.dna_file.dna()
     }
 

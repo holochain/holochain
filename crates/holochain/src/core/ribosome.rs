@@ -49,8 +49,8 @@ use holo_hash::AgentPubKey;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::dna::zome::HostFnAccess;
 use holochain_types::dna::DnaFile;
+use holochain_types::dna::{zome::HostFnAccess, DnaDefHashed};
 use holochain_types::fixt::CapSecretFixturator;
 use holochain_types::fixt::CellIdFixturator;
 use holochain_types::{cell::CellId, dna::DnaDef};
@@ -426,7 +426,7 @@ impl From<&ZomeCallHostAccess> for HostFnAccess {
 /// real concrete type is [WasmRibosome]
 #[automock]
 pub trait RibosomeT: Sized + std::fmt::Debug {
-    fn dna_def(&self) -> &DnaDef;
+    fn dna_def(&self) -> &DnaDefHashed;
 
     fn zomes_to_invoke(&self, zomes_to_invoke: ZomesToInvoke) -> Vec<ZomeName>;
 
@@ -538,6 +538,7 @@ pub mod wasm_test {
             let mut host_access = $host_access.clone();
             let input = $input.clone();
             tokio::task::spawn(async move {
+                use holo_hash::*;
                 use holochain_p2p::HolochainP2pCellT;
                 // ensure type of test wasm
                 use std::convert::TryInto;
@@ -556,7 +557,7 @@ pub mod wasm_test {
 
                 // Required because otherwise the network will return routing errors
                 let test_network = crate::test_utils::test_network(
-                    Some(ribosome.dna_def().dna_hash().await.clone()), // TODO: cache
+                    Some(ribosome.dna_def().as_hash().clone()),
                     Some(author),
                 )
                 .await;

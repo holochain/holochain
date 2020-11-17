@@ -326,6 +326,7 @@ pub mod tests {
     use crate::fixt::*;
     use ::fixt::prelude::*;
     use holo_hash::fixt::*;
+    use holo_hash::*;
     use holochain_p2p::HolochainP2pCellFixturator;
     use holochain_serialized_bytes::prelude::*;
     use holochain_state::{env::ReadManager, test_utils::test_cell_env};
@@ -348,10 +349,7 @@ pub mod tests {
     ) -> WorkflowResult<ZomeCallInvocationResult> {
         let keystore = fixt!(KeystoreSender);
         let network = fixt!(HolochainP2pCell);
-        let cell_id = CellId::new(
-            ribosome.dna_def().dna_hash().await.clone(),
-            fixt!(AgentPubKey),
-        );
+        let cell_id = CellId::new(ribosome.dna_def().as_hash().clone(), fixt!(AgentPubKey));
         let conductor_api = Arc::new(MockConductorHandleT::new());
         let conductor_api = CellConductorApi::new(conductor_api, cell_id);
         let args = CallZomeWorkflowArgs {
@@ -380,7 +378,7 @@ pub mod tests {
         // FIXME: CAP: Set this function to private
         let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(
             crate::core::ribosome::NamedInvocation(
-                holochain_types::fixt::CellIdFixturator::new(fixt::Unpredictable)
+                holochain_types::fixt::CellIdFixturator::new(::fixt::Unpredictable)
                     .next()
                     .unwrap(),
                 TestWasm::Foo.into(),
@@ -452,7 +450,7 @@ pub mod tests {
 
         let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(
             crate::core::ribosome::NamedInvocation(
-                holochain_types::fixt::CellIdFixturator::new(fixt::Unpredictable)
+                holochain_types::fixt::CellIdFixturator::new(::fixt::Unpredictable)
                     .next()
                     .unwrap(),
                 TestWasm::Foo.into(),
@@ -488,7 +486,7 @@ pub mod tests {
         let ribosome = MockRibosomeT::new();
         let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(
             crate::core::ribosome::NamedInvocation(
-                holochain_types::fixt::CellIdFixturator::new(fixt::Unpredictable)
+                holochain_types::fixt::CellIdFixturator::new(::fixt::Unpredictable)
                     .next()
                     .unwrap(),
                 TestWasm::Foo.into(),
@@ -525,7 +523,7 @@ pub mod tests {
         // TODO: Make this mock return an output
         let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(
             crate::core::ribosome::NamedInvocation(
-                holochain_types::fixt::CellIdFixturator::new(fixt::Unpredictable)
+                holochain_types::fixt::CellIdFixturator::new(::fixt::Unpredictable)
                     .next()
                     .unwrap(),
                 TestWasm::Foo.into(),
