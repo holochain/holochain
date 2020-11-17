@@ -307,7 +307,9 @@ async fn check_app_entry_type_test() {
     // ## ZomeId out of range
     conductor_api.checkpoint();
     conductor_api.expect_sync_get_entry_def().return_const(None);
-    conductor_api.expect_sync_get_dna().return_const(Some(dna_file.clone()));
+    conductor_api
+        .expect_sync_get_dna()
+        .return_const(Some(dna_file.clone()));
     conductor_api
         .expect_sync_get_this_dna()
         .return_const(Some(dna_file));
