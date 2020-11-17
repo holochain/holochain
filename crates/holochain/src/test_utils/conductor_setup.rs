@@ -173,7 +173,7 @@ impl ConductorTestData {
     }
     /// Bring bob online if he isn't already
     pub async fn bring_bob_online(&mut self) {
-        let dna_file = self.alice_call_data.ribosome.dna_file();
+        let dna_file = self.alice_call_data.ribosome.dna_file().clone();
         if self.bob_call_data.is_none() {
             let bob_agent_id = fake_agent_pubkey_2();
             let bob_cell_id = CellId::new(dna_file.dna_hash.clone(), bob_agent_id.clone());
@@ -187,7 +187,7 @@ impl ConductorTestData {
             )
             .await;
             self.bob_call_data =
-                Some(ConductorCallData::new(&bob_cell_id, &self.handle, dna_file).await);
+                Some(ConductorCallData::new(&bob_cell_id, &self.handle, &dna_file).await);
         }
     }
 }

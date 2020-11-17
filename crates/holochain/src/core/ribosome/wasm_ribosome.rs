@@ -61,11 +61,11 @@ use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::ribosome::ZomesToInvoke;
 use fallible_iterator::FallibleIterator;
-use holochain_types::dna::DnaError;
 use holochain_types::dna::{
     zome::{HostFnAccess, Permission},
     DnaFile,
 };
+use holochain_types::dna::{DnaDef, DnaError};
 use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::entry_def::EntryDefsCallbackResult;
 use holochain_zome_types::init::InitCallbackResult;
@@ -99,6 +99,10 @@ impl WasmRibosome {
     /// Create a new instance
     pub fn new(dna_file: DnaFile) -> Self {
         Self { dna_file }
+    }
+
+    pub fn dna_file(&self) -> &DnaFile {
+        &self.dna_file
     }
 
     pub fn module(&self, call_context: CallContext) -> RibosomeResult<Module> {
@@ -356,8 +360,8 @@ macro_rules! do_callback {
 }
 
 impl RibosomeT for WasmRibosome {
-    fn dna_file(&self) -> &DnaFile {
-        &self.dna_file
+    fn dna_def(&self) -> &DnaDef {
+        self.dna_file.dna()
     }
 
     fn zomes_to_invoke(&self, zomes_to_invoke: ZomesToInvoke) -> Vec<ZomeName> {
@@ -375,7 +379,7 @@ impl RibosomeT for WasmRibosome {
 
     fn zome_name_to_id(&self, zome_name: &ZomeName) -> RibosomeResult<ZomeId> {
         match self
-            .dna_file()
+            .dna_file
             .dna
             .zomes
             .iter()

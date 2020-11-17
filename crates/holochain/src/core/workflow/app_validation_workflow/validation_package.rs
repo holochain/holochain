@@ -54,8 +54,7 @@ pub fn get_as_author_custom(
     };
 
     let zome_name = match ribosome
-        .dna_file()
-        .dna()
+        .dna_def()
         .zomes
         .get(app_entry_type.zome_id().index())
     {

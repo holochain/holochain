@@ -891,11 +891,12 @@ async fn commit_entry<'env>(
         .dna
         .zomes
         .push((zome_name.clone().into(), fixt!(Zome)));
+    let dna_def = dna_file.dna().clone();
 
     // Create ribosome mock to return fixtures
     // This is a lot faster then compiling a zome
     let mut ribosome = MockRibosomeT::new();
-    ribosome.expect_dna_file().return_const(dna_file);
+    ribosome.expect_dna_def().return_const(dna_def);
     ribosome
         .expect_zome_name_to_id()
         .returning(|_| Ok(ZomeId::from(1)));
@@ -987,11 +988,12 @@ async fn create_link(
         .dna
         .zomes
         .push((zome_name.clone().into(), fixt!(Zome)));
+    let dna_def = dna_file.dna().clone();
 
     // Create ribosome mock to return fixtures
     // This is a lot faster then compiling a zome
     let mut ribosome = MockRibosomeT::new();
-    ribosome.expect_dna_file().return_const(dna_file);
+    ribosome.expect_dna_def().return_const(dna_def);
     ribosome
         .expect_zome_name_to_id()
         .returning(|_| Ok(ZomeId::from(1)));
@@ -1040,13 +1042,14 @@ async fn get_links(
         .dna
         .zomes
         .push((zome_name.clone().into(), fixt!(Zome)));
+    let dna_def = dna_file.dna().clone();
 
     let test_network = test_network(Some(dna_file.dna_hash().clone()), None).await;
 
     // Create ribosome mock to return fixtures
     // This is a lot faster then compiling a zome
     let mut ribosome = MockRibosomeT::new();
-    ribosome.expect_dna_file().return_const(dna_file);
+    ribosome.expect_dna_def().return_const(dna_def);
     ribosome
         .expect_zome_name_to_id()
         .returning(|_| Ok(ZomeId::from(1)));

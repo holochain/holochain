@@ -70,7 +70,7 @@ pub(super) async fn get_as_author(
     let entry_def = get_entry_def_from_ids(
         app_entry_type.zome_id(),
         app_entry_type.id(),
-        ribosome.dna_file(),
+        ribosome.dna_def(),
         conductor_api,
     )
     .await?;
@@ -178,7 +178,7 @@ pub(super) async fn get_as_authority(
     let entry_def = get_entry_def_from_ids(
         app_entry_type.zome_id(),
         app_entry_type.id(),
-        dna_file,
+        dna_file.dna(),
         conductor_api,
     )
     .await?;

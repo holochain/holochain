@@ -215,7 +215,7 @@ pub async fn check_app_entry_type(
         .1
         .clone();
 
-    let entry_def = get_entry_def(entry_type.id(), zome, &dna_file, conductor_api).await?;
+    let entry_def = get_entry_def(entry_type.id(), zome, dna_file.dna(), conductor_api).await?;
 
     // Check the visibility and return
     match entry_def {

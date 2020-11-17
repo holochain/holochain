@@ -348,7 +348,10 @@ pub mod tests {
     ) -> WorkflowResult<ZomeCallInvocationResult> {
         let keystore = fixt!(KeystoreSender);
         let network = fixt!(HolochainP2pCell);
-        let cell_id = CellId::new(ribosome.dna_file().dna_hash().clone(), fixt!(AgentPubKey));
+        let cell_id = CellId::new(
+            ribosome.dna_def().dna_hash().await.clone(),
+            fixt!(AgentPubKey),
+        );
         let conductor_api = Arc::new(MockConductorHandleT::new());
         let conductor_api = CellConductorApi::new(conductor_api, cell_id);
         let args = CallZomeWorkflowArgs {
@@ -424,7 +427,7 @@ pub mod tests {
     // - Check entry content matches entry schema
     //   Depending on the type of the commit, validate all possible validations for the
     //   DHT Op that would be produced by it
-    #[ignore = "TODO: B-01100 Make sure this test is in the right place when SysValidation 
+    #[ignore = "TODO: B-01100 Make sure this test is in the right place when SysValidation
     complete so we aren't duplicating the unit test inside sys val."]
     #[tokio::test]
     async fn calls_system_validation<'a>() {
@@ -512,7 +515,8 @@ pub mod tests {
         let env = test_env.env();
         let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
         let mut ribosome = MockRibosomeT::new();
-        ribosome.expect_dna_file().return_const(fixt!(DnaFile));
+        let dna_def = fixt!(DnaFile).dna().clone();
+        ribosome.expect_dna_def().return_const(dna_def);
         ribosome.expect_call_zome_function().returning(|_, _| {
             Ok(ZomeCallResponse::Ok(ExternOutput::new(
                 ().try_into().unwrap(),
