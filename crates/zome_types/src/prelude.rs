@@ -38,3 +38,4 @@ pub use crate::validate_link::ValidateLinkCallbackResult;
 pub use crate::zome::FunctionName;
 pub use crate::zome::ZomeName;
 pub use crate::zome_info::ZomeInfo;
+pub use crate::*;

@@ -6,8 +6,11 @@ use std::collections::HashMap;
 mod api;
 use api::*;
 
+mod ribosome;
+
 use super::error::RibosomeResult;
 
+#[derive(Debug)]
 pub struct InlineDna<'f> {
     zomes: HashMap<ZomeName, InlineZome<'f>>,
 }
@@ -21,6 +24,12 @@ impl<'f> InlineDna<'f> {
 #[derive(Default)]
 pub struct InlineZome<'f> {
     functions: HashMap<FunctionName, InlineZomeFn<'f>>,
+}
+
+impl<'f> std::fmt::Debug for InlineZome<'f> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("<InlineZome>"))
+    }
 }
 
 impl<'f> InlineZome<'f> {
