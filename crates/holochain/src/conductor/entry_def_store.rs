@@ -145,7 +145,7 @@ pub(crate) async fn get_entry_def(
     // If it's not found run the ribosome and get the entry defs
     match &entry_def {
         Some(_) => Ok(entry_def),
-        None => Ok(get_entry_defs(dna_file.clone())?
+        None => Ok(get_entry_defs(dna_file)?
             .get(entry_def_index.index())
             .map(|(_, v)| v.clone())),
     }
