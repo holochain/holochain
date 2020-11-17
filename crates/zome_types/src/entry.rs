@@ -29,7 +29,7 @@ pub type CapGrantEntry = ZomeCallCapGrant;
 /// The data type written to the source chain to denote a capability claim
 pub type CapClaimEntry = CapClaim;
 
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
+#[derive(PartialEq, Debug, Default, Clone, Serialize, Deserialize)]
 /// @todo make some options for get
 pub struct GetOptions;
 

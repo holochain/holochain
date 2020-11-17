@@ -10,6 +10,7 @@
 pub mod error;
 pub mod guest_callback;
 pub mod host_fn;
+pub mod inline_dna;
 pub mod wasm_ribosome;
 
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
