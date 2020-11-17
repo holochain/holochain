@@ -499,12 +499,11 @@ pub trait RibosomeT: Sized + std::fmt::Debug {
         invocation: ValidateLinkInvocation<I>,
     ) -> RibosomeResult<ValidateLinkResult>;
 
-    fn call_iterator<R: 'static + RibosomeT, I: 'static + Invocation>(
+    fn call_iterator<I: 'static + Invocation>(
         &self,
         access: HostAccess,
-        ribosome: R,
         invocation: I,
-    ) -> CallIterator<R, I>;
+    ) -> CallIterator<Self, I>;
 
     /// Runs the specified zome fn. Returns the cursor used by HDK,
     /// so that it can be passed on to source chain manager for transactional writes

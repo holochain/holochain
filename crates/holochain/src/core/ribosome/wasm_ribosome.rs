@@ -343,7 +343,7 @@ macro_rules! do_callback {
     ( $self:ident, $access:ident, $invocation:ident, $callback_result:ty ) => {{
         let mut results: Vec<(ZomeName, $callback_result)> = Vec::new();
         // fallible iterator syntax instead of for loop
-        let mut call_iterator = $self.call_iterator($access.into(), $self.clone(), $invocation);
+        let mut call_iterator = $self.call_iterator($access.into(), $invocation);
         while let Some(output) = call_iterator.next()? {
             let (zome_name, callback_result) = output;
             let callback_result: $callback_result = callback_result.into();
@@ -428,13 +428,12 @@ impl RibosomeT for WasmRibosome {
         }
     }
 
-    fn call_iterator<R: RibosomeT, I: crate::core::ribosome::Invocation>(
+    fn call_iterator<I: crate::core::ribosome::Invocation>(
         &self,
         access: HostAccess,
-        ribosome: R,
         invocation: I,
-    ) -> CallIterator<R, I> {
-        CallIterator::new(access, ribosome, invocation)
+    ) -> CallIterator<Self, I> {
+        CallIterator::new(access, self.clone(), invocation)
     }
 
     /// Runs the specified zome fn. Returns the cursor used by HDK,
@@ -449,13 +448,11 @@ impl RibosomeT for WasmRibosome {
             let zome_name = invocation.zome_name.clone();
             let fn_name = invocation.fn_name.clone();
 
-            let guest_output: ExternOutput = match self
-                .call_iterator(host_access.into(), self.clone(), invocation)
-                .next()?
-            {
-                Some(result) => result.1,
-                None => return Err(RibosomeError::ZomeFnNotExists(zome_name, fn_name)),
-            };
+            let guest_output: ExternOutput =
+                match self.call_iterator(host_access.into(), invocation).next()? {
+                    Some(result) => result.1,
+                    None => return Err(RibosomeError::ZomeFnNotExists(zome_name, fn_name)),
+                };
 
             ZomeCallResponse::Ok(guest_output)
         } else {

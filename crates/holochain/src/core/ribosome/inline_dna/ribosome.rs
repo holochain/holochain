@@ -48,12 +48,11 @@ impl<'f> RibosomeT for InlineDna<'f> {
         todo!()
     }
 
-    fn call_iterator<R: RibosomeT, I: crate::core::ribosome::Invocation>(
+    fn call_iterator<I: crate::core::ribosome::Invocation>(
         &self,
         access: HostAccess,
-        ribosome: R,
         invocation: I,
-    ) -> CallIterator<R, I> {
+    ) -> CallIterator<Self, I> {
         todo!()
     }
 
