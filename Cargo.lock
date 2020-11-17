@@ -1265,6 +1265,7 @@ dependencies = [
  "holochain_zome_types",
  "human-panic",
  "kitsune_p2p",
+ "kitsune_p2p_types",
  "lazy_static",
  "maplit",
  "matches",

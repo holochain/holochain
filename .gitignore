@@ -13,4 +13,5 @@ perf.data.old
 .env
 *.folded
 *.svg
+.todo.md
 

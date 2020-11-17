@@ -99,7 +99,8 @@ pub(crate) mod wire;
 macro_rules! to_and_from_kitsune {
     ($($i:ident<$h:ty> -> $k:ty,)*) => {
         $(
-            pub(crate) trait $i: ::std::clone::Clone + Sized {
+            #[allow(missing_docs)]
+            pub trait $i: ::std::clone::Clone + Sized {
                 fn into_kitsune(self) -> ::std::sync::Arc<$k>;
                 fn into_kitsune_raw(self) -> $k;
                 fn to_kitsune(&self) -> ::std::sync::Arc<$k> {
