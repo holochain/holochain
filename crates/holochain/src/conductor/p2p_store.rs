@@ -1,12 +1,14 @@
 //! A simple KvBuf for AgentInfoSigned.
 
+use fallible_iterator::FallibleIterator;
+use holo_hash::{AgentPubKey, DnaHash};
 use holochain_p2p::kitsune_p2p::agent_store::AgentInfo;
 use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
-use holochain_state::buffer::KvStore;
-use holochain_state::db::GetDb;
-use holochain_state::env::EnvironmentRead;
-use holochain_state::error::DatabaseResult;
-use holochain_state::key::BufKey;
+use holochain_state::{buffer::KvStore, buffer::KvStoreT, fresh_reader};
+use holochain_state::{db::GetDb, prelude::Readable};
+use holochain_state::{env::EnvironmentRead, error::DatabaseError};
+use holochain_state::{env::EnvironmentWrite, error::DatabaseResult};
+use holochain_state::{env::WriteManager, key::BufKey};
 use std::convert::TryInto;
 
 const AGENT_KEY_LEN: usize = 64;
@@ -48,6 +50,14 @@ impl std::convert::TryFrom<&AgentInfoSigned> for AgentKvKey {
 impl From<&AgentInfo> for AgentKvKey {
     fn from(o: &AgentInfo) -> Self {
         (o.as_space_ref(), o.as_agent_ref()).into()
+    }
+}
+
+impl From<(DnaHash, AgentPubKey)> for AgentKvKey {
+    fn from((space, agent): (DnaHash, AgentPubKey)) -> Self {
+        let space = holochain_p2p::space_holo_to_kit(space);
+        let agent = holochain_p2p::agent_holo_to_kit(agent);
+        (&space, &agent).into()
     }
 }
 
@@ -100,29 +110,88 @@ impl AsRef<KvStore<AgentKvKey, AgentInfoSigned>> for AgentKv {
 }
 
 impl AgentKv {
-    /// Thin AsRef wrapper for the inner store.
-    pub fn as_store_ref(&self) -> &KvStore<AgentKvKey, AgentInfoSigned> {
-        self.as_ref()
-    }
-}
-
-impl AgentKv {
     /// Constructor.
     pub fn new(env: EnvironmentRead) -> DatabaseResult<Self> {
         let db = env.get_db(&*holochain_state::db::AGENT)?;
         Ok(Self(KvStore::new(db)))
     }
+
+    /// Thin AsRef wrapper for the inner store.
+    pub fn as_store_ref(&self) -> &KvStore<AgentKvKey, AgentInfoSigned> {
+        self.as_ref()
+    }
+
+    /// Get a single agent info from the database
+    pub fn get_agent_info<'r, R: Readable>(
+        &'r self,
+        reader: &'r R,
+        space: DnaHash,
+        agent: AgentPubKey,
+    ) -> DatabaseResult<Option<AgentInfoSigned>> {
+        let key: AgentKvKey = (space, agent).into();
+        self.0.get(reader, &key)
+    }
+
+    /// Get an iterator of the agent info stored in this database.
+    pub fn iter<'r, R: Readable>(
+        &'r self,
+        reader: &'r R,
+    ) -> DatabaseResult<
+        impl FallibleIterator<Item = (AgentKvKey, AgentInfoSigned), Error = DatabaseError> + 'r,
+    > {
+        Ok(self
+            .as_store_ref()
+            .iter(reader)?
+            .map(|(k, v)| Ok((k.into(), v))))
+    }
+}
+
+/// Inject multiple agent info entries into the peer store
+pub fn inject_agent_infos<I: IntoIterator<Item = AgentInfoSigned> + Send>(
+    env: EnvironmentWrite,
+    iter: I,
+) -> DatabaseResult<()> {
+    let p2p_store = AgentKv::new(env.clone().into())?;
+    let env_ref = env.guard();
+    Ok(env_ref.with_commit(|writer| {
+        for agent_info_signed in iter {
+            p2p_store.as_store_ref().put(
+                writer,
+                &(&agent_info_signed).try_into()?,
+                &agent_info_signed,
+            )?
+        }
+        DatabaseResult::Ok(())
+    })?)
+}
+
+/// Helper function to get all the peer data from this conductor
+pub fn all_agent_infos(env: EnvironmentRead) -> DatabaseResult<Vec<AgentInfoSigned>> {
+    let p2p_store = AgentKv::new(env.clone())?;
+    fresh_reader!(env, |r| {
+        p2p_store.iter(&r)?.map(|(_, v)| Ok(v)).collect()
+    })
+}
+
+/// Helper function to get a single agent info
+pub fn get_single_agent_info(
+    env: EnvironmentRead,
+    space: DnaHash,
+    agent: AgentPubKey,
+) -> DatabaseResult<Option<AgentInfoSigned>> {
+    let p2p_store = AgentKv::new(env.clone())?;
+    fresh_reader!(env, |r| { p2p_store.get_agent_info(&r, space, agent) })
 }
 
 #[cfg(test)]
 mod tests {
 
-    use super::AgentKvKey;
+    use super::*;
     use fixt::prelude::*;
-    use holochain_state::buffer::KvStoreT;
     use holochain_state::env::ReadManager;
     use holochain_state::env::WriteManager;
     use holochain_state::test_utils::test_p2p_env;
+    use holochain_state::{buffer::KvStoreT, fresh_reader_test, test_utils::TestEnvironment};
     use kitsune_p2p::fixt::AgentInfoFixturator;
     use kitsune_p2p::fixt::AgentInfoSignedFixturator;
     use kitsune_p2p::KitsuneBinType;
@@ -171,5 +240,40 @@ mod tests {
             .unwrap();
 
         assert_eq!(ret, &Some(agent_info_signed),);
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn add_agent_info_to_peer_env() {
+        observability::test_run().ok();
+        let TestEnvironment { env, tmpdir: _t } = test_p2p_env();
+        let p2p_store = AgentKv::new(env.clone().into()).unwrap();
+
+        // - Check no data in the store to start
+        let count = fresh_reader_test!(env, |r| p2p_store
+            .as_store_ref()
+            .iter(&r)
+            .unwrap()
+            .count()
+            .unwrap());
+
+        assert_eq!(count, 0);
+
+        // - Get agents and space
+        let agent_infos = AgentInfoSignedFixturator::new(Unpredictable)
+            .take(5)
+            .collect::<Vec<_>>();
+
+        let mut expect = agent_infos.clone();
+        expect.sort();
+
+        // - Inject some data
+        inject_agent_infos(env.clone(), agent_infos).unwrap();
+
+        // - Check the same data is now in the store
+        let mut agents = all_agent_infos(env.clone().into()).unwrap();
+
+        agents.sort();
+
+        assert_eq!(expect, agents);
     }
 }

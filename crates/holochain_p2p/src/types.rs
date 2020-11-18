@@ -91,6 +91,16 @@ impl From<&str> for HolochainP2pError {
     }
 }
 
+/// Turn an [AgentKey] into a [KitsuneAgent]
+pub fn agent_holo_to_kit(a: holo_hash::AgentPubKey) -> kitsune_p2p::KitsuneAgent {
+    a.into_kitsune_raw()
+}
+
+/// Turn a [DnaHash] into a [KitsuneSpace]
+pub fn space_holo_to_kit(d: holo_hash::DnaHash) -> kitsune_p2p::KitsuneSpace {
+    d.into_kitsune_raw()
+}
+
 pub mod actor;
 pub mod event;
 
@@ -99,8 +109,7 @@ pub(crate) mod wire;
 macro_rules! to_and_from_kitsune {
     ($($i:ident<$h:ty> -> $k:ty,)*) => {
         $(
-            #[allow(missing_docs)]
-            pub trait $i: ::std::clone::Clone + Sized {
+            pub(crate) trait $i: ::std::clone::Clone + Sized {
                 fn into_kitsune(self) -> ::std::sync::Arc<$k>;
                 fn into_kitsune_raw(self) -> $k;
                 fn to_kitsune(&self) -> ::std::sync::Arc<$k> {

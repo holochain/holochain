@@ -54,8 +54,6 @@ pub mod host_fn_api;
 #[cfg(test)]
 pub mod conductor_setup;
 
-pub mod peer_data;
-
 #[macro_export]
 macro_rules! here {
     ($test: expr) => {
