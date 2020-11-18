@@ -71,7 +71,7 @@ workflows:
  tests:
   jobs:
    - merge-test
-   - merge-test-mac
+   # - merge-test-mac
  docker-builds:
   triggers:
    - schedule:
