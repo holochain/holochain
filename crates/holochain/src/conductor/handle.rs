@@ -26,7 +26,7 @@
 //! // handles are cloneable
 //! let handle2 = handle.clone();
 //!
-//! assert_eq!(handle.list_dnas().await, Ok(vec![]));
+//! assert_eq!(handle.list_dnas().await.unwrap(), vec![]);
 //! handle.shutdown().await;
 //!
 //! // handle2 will only get errors from now on, since the other handle
