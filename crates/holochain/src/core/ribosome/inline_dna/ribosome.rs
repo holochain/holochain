@@ -20,11 +20,11 @@ use crate::core::ribosome::{
     },
     HostAccess, Invocation, RibosomeT, ZomeCallHostAccess, ZomeCallInvocation, ZomesToInvoke,
 };
-use holochain_types::dna::DnaFile;
+use holochain_types::dna::{DnaDefHashed, DnaFile};
 use holochain_zome_types::prelude::*;
 
 impl<'f> RibosomeT for InlineDna<'f> {
-    fn dna_file(&self) -> &DnaFile {
+    fn dna_def(&self) -> &DnaDefHashed {
         todo!()
     }
 
