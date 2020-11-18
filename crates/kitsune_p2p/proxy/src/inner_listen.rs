@@ -113,7 +113,7 @@ struct ProxyTo {
     base_connection_url: url2::Url2,
 
     /// when this proxy contract expires
-    expires_at: std::time::Instant,
+    _expires_at: std::time::Instant,
 }
 
 struct InnerListen {
@@ -309,8 +309,8 @@ impl InternalHandler for InnerListen {
         let short = self.this_url.short().to_string();
 
         // just prune the proxy_list every time before we check for now
-        let now = std::time::Instant::now();
-        self.proxy_list.retain(|_, p| p.expires_at >= now);
+        // let now = std::time::Instant::now();
+        // self.proxy_list.retain(|_, p| p.expires_at >= now);
 
         // first check to see if we should proxy this
         // to a client we are servicing.
@@ -404,7 +404,7 @@ impl InternalHandler for InnerListen {
             proxy_url,
             ProxyTo {
                 base_connection_url: base_url,
-                expires_at,
+                _expires_at: expires_at,
             },
         );
         Ok(async move { Ok(()) }.boxed().into())
