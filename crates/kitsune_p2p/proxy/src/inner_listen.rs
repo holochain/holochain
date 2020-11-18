@@ -345,6 +345,18 @@ impl InternalHandler for InnerListen {
                 );
             } else {
                 tracing::warn!("Dropping message for {}", dest_proxy_url.as_full_str());
+                return Ok(async move {
+                    write
+                        .send(ProxyWire::failure(format!(
+                            "Dropped message to {}",
+                            dest_proxy_url.as_full_str()
+                        )))
+                        .await
+                        .map_err(TransportError::other)?;
+                    Ok(())
+                }
+                .boxed()
+                .into());
             }
 
             return Ok(async move { Ok(()) }.boxed().into());
