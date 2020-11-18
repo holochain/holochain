@@ -532,6 +532,7 @@ pub mod wasm_test {
             .expect("Time went backwards")
     }
 
+    /// Directly call a function in a TestWasm
     #[macro_export]
     macro_rules! call_test_ribosome {
         ( $host_access:expr, $test_wasm:expr, $fn_name:literal, $input:expr ) => {{

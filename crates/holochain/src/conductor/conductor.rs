@@ -42,6 +42,7 @@ use crate::{
     core::state::{source_chain::SourceChainBuf, wasm::WasmBuf},
 };
 pub use builder::*;
+use fallible_iterator::FallibleIterator;
 use futures::future::{self, TryFutureExt};
 use holo_hash::DnaHash;
 use holochain_keystore::{
@@ -62,6 +63,7 @@ use holochain_types::{
     cell::CellId,
     dna::{wasm::DnaWasmHashed, DnaFile},
 };
+use holochain_zome_types::entry_def::EntryDef;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
@@ -69,10 +71,8 @@ use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
 use tracing::*;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test_utils"))]
 use super::handle::MockConductorHandleT;
-use fallible_iterator::FallibleIterator;
-use holochain_zome_types::entry_def::EntryDef;
 
 /// Conductor-specific Cell state, this can probably be stored in a database.
 /// Hypothesis: If nothing remains in this struct, then the Conductor state is
@@ -782,12 +782,12 @@ where
         Ok(source_chain.dump_as_json().await?)
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test_utils"))]
     pub(super) async fn get_state_from_handle(&self) -> ConductorResult<ConductorState> {
         self.get_state().await
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test_utils"))]
     pub(super) fn get_p2p_env(&self) -> EnvironmentWrite {
         self.p2p_env.clone()
     }
@@ -874,7 +874,7 @@ mod builder {
 
     use super::*;
     use crate::conductor::{dna_store::RealDnaStore, ConductorHandle};
-    use holochain_state::{env::EnvironmentKind, test_utils::TestEnvironment};
+    use holochain_state::{env::EnvironmentKind, test_utils::TestEnvironments};
 
     /// A configurable Builder for Conductor and sometimes ConductorHandle
     #[derive(Default)]
@@ -882,9 +882,9 @@ mod builder {
         config: ConductorConfig,
         dna_store: DS,
         keystore: Option<KeystoreSender>,
-        #[cfg(test)]
+        #[cfg(any(test, feature = "test_utils"))]
         state: Option<ConductorState>,
-        #[cfg(test)]
+        #[cfg(any(test, feature = "test_utils"))]
         mock_handle: Option<MockConductorHandleT>,
     }
 
@@ -958,9 +958,9 @@ mod builder {
                 EnvironmentWrite::new(env_path.as_ref(), EnvironmentKind::Wasm, keystore.clone())?;
 
             let p2p_environment =
-                EnvironmentWrite::new(env_path.as_ref(), EnvironmentKind::P2P, keystore.clone())?;
+                EnvironmentWrite::new(env_path.as_ref(), EnvironmentKind::P2p, keystore.clone())?;
 
-            #[cfg(test)]
+            #[cfg(any(test, feature = "test_utils"))]
             let state = self.state;
 
             let Self {
@@ -985,7 +985,7 @@ mod builder {
             )
             .await?;
 
-            #[cfg(test)]
+            #[cfg(any(test, feature = "test_utils"))]
             let conductor = Self::update_fake_state(state, conductor).await?;
 
             Self::finish(conductor, config, p2p_evt).await
@@ -1036,7 +1036,7 @@ mod builder {
             self
         }
 
-        #[cfg(test)]
+        #[cfg(any(test, feature = "test_utils"))]
         /// Sets some fake conductor state for tests
         pub fn fake_state(mut self, state: ConductorState) -> Self {
             self.state = Some(state);
@@ -1045,13 +1045,13 @@ mod builder {
 
         /// Pass a mock handle in, which will be returned regardless of whatever
         /// else happens to this builder
-        #[cfg(test)]
+        #[cfg(any(test, feature = "test_utils"))]
         pub fn with_mock_handle(mut self, handle: MockConductorHandleT) -> Self {
             self.mock_handle = Some(handle);
             self
         }
 
-        #[cfg(test)]
+        #[cfg(any(test, feature = "test_utils"))]
         async fn update_fake_state(
             state: Option<ConductorState>,
             conductor: Conductor<DS>,
@@ -1063,32 +1063,23 @@ mod builder {
         }
 
         /// Build a Conductor with a test environment
-        pub async fn test(
-            self,
-            test_env: TestEnvironment,
-            test_wasm_env: EnvironmentWrite,
-            test_p2p_env: EnvironmentWrite,
-        ) -> ConductorResult<ConductorHandle> {
-            let TestEnvironment {
-                env: environment,
-                tmpdir,
-            } = test_env;
-            let keystore = environment.keystore();
+        pub async fn test(self, envs: &TestEnvironments) -> ConductorResult<ConductorHandle> {
+            let keystore = envs.conductor().keystore();
             let (holochain_p2p, p2p_evt) =
                 holochain_p2p::spawn_holochain_p2p(self.config.network.clone().unwrap_or_default())
                     .await?;
             let conductor = Conductor::new(
-                environment,
-                test_wasm_env,
-                test_p2p_env,
+                envs.conductor(),
+                envs.wasm(),
+                envs.p2p(),
                 self.dna_store,
                 keystore,
-                tmpdir.path().to_path_buf().into(),
+                envs.tempdir().path().to_path_buf().into(),
                 holochain_p2p,
             )
             .await?;
 
-            #[cfg(test)]
+            #[cfg(any(test, feature = "test_utils"))]
             let conductor = Self::update_fake_state(self.state, conductor).await?;
 
             Self::finish(conductor, self.config, p2p_evt).await
@@ -1118,35 +1109,22 @@ pub mod tests {
     use super::*;
     use super::{Conductor, ConductorState};
     use crate::conductor::dna_store::MockDnaStore;
-    use holochain_state::test_utils::{
-        test_conductor_env, test_p2p_env, test_wasm_env, TestEnvironment,
-    };
+    use holochain_state::test_utils::test_environments;
     use holochain_types::test_utils::fake_cell_id;
 
     #[tokio::test(threaded_scheduler)]
     async fn can_update_state() {
-        let TestEnvironment {
-            env: environment,
-            tmpdir,
-        } = test_conductor_env();
-        let TestEnvironment {
-            env: wasm_env,
-            tmpdir: _tmpdir,
-        } = test_wasm_env();
-        let TestEnvironment {
-            env: p2p_env,
-            tmpdir: _p2p_tmpdir,
-        } = test_p2p_env();
+        let envs = test_environments();
         let dna_store = MockDnaStore::new();
-        let keystore = environment.keystore().clone();
+        let keystore = envs.conductor().keystore().clone();
         let holochain_p2p = holochain_p2p::stub_network().await;
         let conductor = Conductor::new(
-            environment,
-            wasm_env,
-            p2p_env,
+            envs.conductor(),
+            envs.wasm(),
+            envs.p2p(),
             dna_store,
             keystore,
-            tmpdir.path().to_path_buf().into(),
+            envs.tempdir().path().to_path_buf().into(),
             holochain_p2p,
         )
         .await
@@ -1179,20 +1157,11 @@ pub mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn can_set_fake_state() {
-        let test_env = test_conductor_env();
-        let _tmpdir = test_env.tmpdir.clone();
-        let TestEnvironment {
-            env: wasm_env,
-            tmpdir: _tmpdir,
-        } = test_wasm_env();
-        let TestEnvironment {
-            env: p2p_env,
-            tmpdir: _p2p_env,
-        } = test_p2p_env();
+        let envs = test_environments();
         let state = ConductorState::default();
         let conductor = ConductorBuilder::new()
             .fake_state(state.clone())
-            .test(test_env, wasm_env, p2p_env)
+            .test(&envs)
             .await
             .unwrap();
         assert_eq!(state, conductor.get_state_from_handle().await.unwrap());

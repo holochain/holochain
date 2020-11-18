@@ -1,5 +1,3 @@
-use std::convert::TryInto;
-
 use fallible_iterator::FallibleIterator;
 use hdk3::prelude::{Element, EntryType, ValidationPackage};
 use holo_hash::HeaderHash;
@@ -16,6 +14,7 @@ use holochain_zome_types::{
     ZomeCallResponse,
 };
 use matches::assert_matches;
+use std::convert::TryInto;
 use test_wasm_common::AgentActivitySearch;
 
 use crate::{
@@ -47,13 +46,9 @@ async fn get_validation_package_test() {
     observability::test_run().ok();
 
     let zomes = vec![TestWasm::Create];
-    let conductor_test = ConductorTestData::new(zomes, false).await;
-    let ConductorTestData {
-        __tmpdir,
-        handle,
-        mut alice_call_data,
-        ..
-    } = conductor_test;
+    let mut conductor_test = ConductorTestData::two_agents(zomes, false).await;
+    let handle = conductor_test.handle();
+    let alice_call_data = conductor_test.alice_call_data_mut();
     let alice_cell_id = &alice_call_data.cell_id;
     let alice_agent_id = alice_cell_id.agent_pubkey();
 
@@ -200,7 +195,7 @@ async fn get_validation_package_test() {
     let validation_package = check_cascade(&header_hashed, &alice_call_data).await;
 
     assert_eq!(validation_package, expected_package.0);
-    ConductorTestData::shutdown_conductor(handle).await;
+    conductor_test.shutdown_conductor().await;
 }
 
 #[tokio::test(threaded_scheduler)]
@@ -208,13 +203,9 @@ async fn get_agent_activity_test() {
     observability::test_run().ok();
 
     let zomes = vec![TestWasm::Create];
-    let conductor_test = ConductorTestData::new(zomes, false).await;
-    let ConductorTestData {
-        __tmpdir,
-        handle,
-        mut alice_call_data,
-        ..
-    } = conductor_test;
+    let mut conductor_test = ConductorTestData::two_agents(zomes, false).await;
+    let handle = conductor_test.handle();
+    let alice_call_data = conductor_test.alice_call_data_mut();
     let alice_cell_id = &alice_call_data.cell_id;
     let alice_agent_id = alice_cell_id.agent_pubkey();
     let alice_env = alice_call_data.env.clone();
@@ -485,7 +476,7 @@ async fn get_agent_activity_test() {
 
     assert_eq!(agent_activity, expected_activity);
 
-    ConductorTestData::shutdown_conductor(handle).await;
+    conductor_test.shutdown_conductor().await;
 }
 
 #[tokio::test(threaded_scheduler)]
@@ -493,16 +484,11 @@ async fn get_custom_package_test() {
     observability::test_run().ok();
 
     let zomes = vec![TestWasm::ValidationPackageSuccess];
-    let conductor_test = ConductorTestData::new(zomes, true).await;
-    let ConductorTestData {
-        __tmpdir,
-        handle,
-        alice_call_data,
-        bob_call_data,
-        ..
-    } = conductor_test;
+    let mut conductor_test = ConductorTestData::two_agents(zomes, true).await;
+    let handle = conductor_test.handle();
+    let alice_call_data = conductor_test.alice_call_data();
+    let bob_call_data = conductor_test.bob_call_data().unwrap();
     let alice_cell_id = &alice_call_data.cell_id;
-    let bob_call_data = bob_call_data.unwrap();
 
     let invocation = new_invocation(
         &alice_cell_id,
@@ -586,7 +572,7 @@ async fn get_custom_package_test() {
         assert_matches!(result, Some(_));
     }
 
-    ConductorTestData::shutdown_conductor(handle).await;
+    conductor_test.shutdown_conductor().await;
 }
 
 #[tokio::test(threaded_scheduler)]
@@ -594,13 +580,9 @@ async fn get_agent_activity_host_fn_test() {
     observability::test_run().ok();
 
     let zomes = vec![TestWasm::Create];
-    let conductor_test = ConductorTestData::new(zomes, false).await;
-    let ConductorTestData {
-        __tmpdir,
-        handle,
-        alice_call_data,
-        ..
-    } = conductor_test;
+    let mut conductor_test = ConductorTestData::two_agents(zomes, false).await;
+    let handle = conductor_test.handle();
+    let alice_call_data = conductor_test.alice_call_data();
     let alice_cell_id = &alice_call_data.cell_id;
     let alice_agent_id = alice_cell_id.agent_pubkey();
     let alice_env = alice_call_data.env.clone();
@@ -677,7 +659,7 @@ async fn get_agent_activity_host_fn_test() {
         .into_inner();
     let agent_activity: holochain_zome_types::query::AgentActivity = result.try_into().unwrap();
     assert_eq!(agent_activity, expected_activity);
-    ConductorTestData::shutdown_conductor(handle).await;
+    conductor_test.shutdown_conductor().await;
 }
 
 async fn commit_some_data(
@@ -733,13 +715,9 @@ async fn slow_lmdb_reads_test() {
         .unwrap_or(10);
     observability::test_run().ok();
     let zomes = vec![TestWasm::Create];
-    let conductor_test = ConductorTestData::new(zomes, false).await;
-    let ConductorTestData {
-        __tmpdir,
-        handle,
-        mut alice_call_data,
-        ..
-    } = conductor_test;
+    let mut conductor_test = ConductorTestData::two_agents(zomes, false).await;
+    let handle = conductor_test.handle();
+    let alice_call_data = conductor_test.alice_call_data_mut();
     let alice_env = alice_call_data.env.clone();
 
     // Commit some data to put some load on the network
@@ -861,5 +839,5 @@ async fn slow_lmdb_reads_test() {
     println!("high {}", high / num_headers as u128);
     println!("num commits {}", num_commits);
 
-    ConductorTestData::shutdown_conductor(handle).await;
+    conductor_test.shutdown_conductor().await;
 }
