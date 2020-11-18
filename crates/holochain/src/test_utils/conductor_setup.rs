@@ -83,7 +83,6 @@ impl ConductorCallData {
 /// Everything you need to run a test that uses the conductor
 pub struct ConductorTestData {
     __tmpdir: Arc<TempDir>,
-    // app_api: RealAppInterfaceApi,
     handle: ConductorHandle,
     call_data: HashMap<CellId, ConductorCallData>,
 }
