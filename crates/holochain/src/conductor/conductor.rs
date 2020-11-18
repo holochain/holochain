@@ -510,9 +510,7 @@ where
                 .insert(app.installed_app_id.clone(), app.cell_data)
                 .is_some();
             if is_active || is_inactive {
-                Err(ConductorError::AppAlreadyInstalled(
-                    app.installed_app_id.clone(),
-                ))
+                Err(ConductorError::AppAlreadyInstalled(app.installed_app_id))
             } else {
                 Ok(state)
             }
@@ -530,7 +528,7 @@ where
             let cell_data = state
                 .inactive_apps
                 .remove(&installed_app_id)
-                .ok_or(ConductorError::AppNotInstalled(installed_app_id.clone()))?;
+                .ok_or_else(|| ConductorError::AppNotInstalled(installed_app_id.clone()))?;
             state.active_apps.insert(installed_app_id, cell_data);
             Ok(state)
         })
@@ -550,7 +548,7 @@ where
                     let cell_ids = state
                         .active_apps
                         .remove(&installed_app_id)
-                        .ok_or(ConductorError::AppNotActive(installed_app_id.clone()))?;
+                        .ok_or_else(|| ConductorError::AppNotActive(installed_app_id.clone()))?;
                     state.inactive_apps.insert(installed_app_id, cell_ids);
                     Ok(state)
                 }
