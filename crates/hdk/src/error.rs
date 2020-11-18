@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, Error)]
 pub enum HdkError {
     #[error(transparent)]
     EntryError(#[from] holochain_zome_types::entry::EntryError),
@@ -14,3 +14,5 @@ pub enum HdkError {
     #[error("Zome call was made which the caller was unauthorized to make")]
     UnauthorizedZomeCall,
 }
+
+pub type HdkResult<T> = Result<T, HdkError>;

@@ -242,6 +242,9 @@ where
                 PutAgentInfoSigned { respond, .. } => {
                     respond.r(Ok(async move { Ok(()) }.boxed().into()));
                 }
+                QueryAgentInfoSigned { respond, .. } => {
+                    respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
+                }
                 _ => (),
             }
         }
@@ -277,7 +280,7 @@ pub async fn install_app(
 
     let errors = conductor_handle.setup_cells().await.unwrap();
 
-    assert!(errors.is_empty());
+    assert!(errors.is_empty(), "{:?}", errors);
 }
 
 /// Payload for installing cells

@@ -36,6 +36,14 @@ pub enum KitsuneP2pError {
     #[error("Bootstrap Error: {0}")]
     Bootstrap(Arc<String>),
 
+    /// SystemTime call failed.
+    #[error(transparent)]
+    SystemTime(#[from] std::time::SystemTimeError),
+
+    /// Integer casting failed.
+    #[error(transparent)]
+    TryFromInt(#[from] std::num::TryFromIntError),
+
     /// Other
     #[error("Other: {0}")]
     Other(Box<dyn std::error::Error + Send + Sync>),
@@ -123,8 +131,8 @@ macro_rules! make_kitsune_bin_type {
                 serde::Serialize,
                 serde::Deserialize,
             )]
-            #[shrinkwrap(mutable, unsafe_ignore_visibility)]
-            pub struct $name(#[serde(with = "serde_bytes")] Vec<u8>);
+            #[shrinkwrap(mutable)]
+            pub struct $name(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
             impl KitsuneBinType for $name {
 
@@ -210,6 +218,7 @@ impl std::fmt::Debug for KitsuneSignature {
 pub mod actor;
 pub mod agent_store;
 pub mod event;
+pub mod gossip;
 pub(crate) mod wire;
 
 pub use kitsune_p2p_types::dht_arc;

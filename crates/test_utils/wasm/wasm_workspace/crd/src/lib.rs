@@ -7,15 +7,15 @@ entry_defs![Thing::entry_def()];
 
 #[hdk_extern]
 fn create(_: ()) -> ExternResult<HeaderHash> {
-    Ok(create_entry!(Thing)?)
+    Ok(create_entry(&Thing)?)
 }
 
 #[hdk_extern]
 fn read(header_hash: HeaderHash) -> ExternResult<GetOutput> {
-    Ok(GetOutput::new(get!(header_hash)?))
+    Ok(GetOutput::new(get(header_hash, GetOptions)?))
 }
 
 #[hdk_extern]
 fn delete(header_hash: HeaderHash) -> ExternResult<HeaderHash> {
-    Ok(delete_entry!(header_hash)?)
+    Ok(delete_entry(header_hash)?)
 }

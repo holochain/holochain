@@ -112,7 +112,8 @@ impl InterfaceApi for RealAppInterfaceApi {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(rename_all = "snake_case", tag = "type", content = "data")]
 pub enum AppRequest {
-    /// Get info about the App identified by the given `app_id` argument.
+    /// Get info about the App identified by the given `app_id` argument,
+    /// including info about each Cell installed by this App.
     /// Requires `app_id` because an App interface can be the interface to multiple
     /// apps at the same time.
     ///

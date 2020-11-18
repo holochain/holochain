@@ -165,6 +165,7 @@ mod tests {
         holo_hash::AgentPubKey,
         holo_hash::AgentPubKey,
     ) {
+        observability::test_run().unwrap();
         (
             newhash!(DnaHash, 's'),
             newhash!(AgentPubKey, '1'),
@@ -275,11 +276,6 @@ mod tests {
     }
 
     #[tokio::test(threaded_scheduler)]
-    // @TODO flaky test
-    // ---- test::tests::test_publish_workflow stdout ----
-    // thread 'test::tests::test_publish_workflow' panicked at 'assertion failed: `(left == right)`
-    //   left: `3`,
-    //  right: `0`', crates/holochain_p2p/src/test.rs:181:9
     async fn test_publish_workflow() {
         let (dna, a1, a2, a3) = test_setup();
 
@@ -305,6 +301,9 @@ mod tests {
                     PutAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
                     }
+                    QueryAgentInfoSigned { respond, .. } => {
+                        respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
+                    }
                     _ => (),
                 }
             }
@@ -319,7 +318,7 @@ mod tests {
             holo_hash::hash_type::AnyDht::Header,
         );
 
-        p2p.publish(dna, a1, true, header_hash, vec![], Some(20))
+        p2p.publish(dna, a1, true, header_hash, vec![], Some(200))
             .await
             .unwrap();
 
@@ -331,7 +330,7 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_get_workflow() {
-        let (dna, a1, a2, a3) = test_setup();
+        let (dna, a1, a2, _a3) = test_setup();
 
         let (p2p, mut evt) = spawn_holochain_p2p(KitsuneP2pConfig::default())
             .await
@@ -393,7 +392,6 @@ mod tests {
 
         p2p.join(dna.clone(), a1.clone()).await.unwrap();
         p2p.join(dna.clone(), a2.clone()).await.unwrap();
-        p2p.join(dna.clone(), a3.clone()).await.unwrap();
 
         let hash = holo_hash::AnyDhtHash::from_raw_36_and_type(
             b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
@@ -405,7 +403,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(1, res.len());
+        assert_eq!(2, res.len());
 
         for r in res {
             assert!(r == test_1 || r == test_2);
@@ -463,7 +461,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(1, res.len());
+        assert_eq!(2, res.len());
 
         for r in res {
             assert_eq!(r, test_1);

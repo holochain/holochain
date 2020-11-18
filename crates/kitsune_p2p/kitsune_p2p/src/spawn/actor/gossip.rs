@@ -2,7 +2,7 @@
 //! in-memory / full-sync / non-sharded networking module
 
 use crate::agent_store::AgentInfoSigned;
-use crate::{types::actor::KitsuneP2pResult, *};
+use crate::{types::actor::KitsuneP2pResult, types::gossip::*, *};
 use ghost_actor::dependencies::{tracing, tracing_futures};
 use kitsune_p2p_types::dht_arc::DhtArc;
 use std::{collections::HashSet, iter::FromIterator, sync::Arc};
@@ -15,19 +15,12 @@ ghost_actor::ghost_chan! {
 
         /// fetch op list from/to with constraints
         fn req_op_hashes(
-            from_agent: Arc<KitsuneAgent>,
-            to_agent: Arc<KitsuneAgent>,
-            dht_arc: DhtArc,
-            since_utc_epoch_s: i64,
-            until_utc_epoch_s: i64,
+            input: ReqOpHashesEvt,
         ) -> OpHashesAgentHashes;
 
         /// fetch op data for op hash list
         fn req_op_data(
-            from_agent: Arc<KitsuneAgent>,
-            to_agent: Arc<KitsuneAgent>,
-            op_hashes: Vec<Arc<KitsuneOpHash>>,
-            peer_hashes: Vec<Arc<KitsuneAgent>>,
+            input: ReqOpDataEvt
         ) -> OpDataAgentInfo;
 
         /// we have gossip to forward
@@ -41,8 +34,6 @@ ghost_actor::ghost_chan! {
 }
 
 pub type GossipEventReceiver = futures::channel::mpsc::Receiver<GossipEvent>;
-pub type OpHashesAgentHashes = (Vec<Arc<KitsuneOpHash>>, Vec<(Arc<KitsuneAgent>, u64)>);
-pub type OpDataAgentInfo = (Vec<(Arc<KitsuneOpHash>, Vec<u8>)>, Vec<AgentInfoSigned>);
 
 /// spawn a gossip module to control gossip for a space
 pub fn spawn_gossip_module() -> GossipEventReceiver {
@@ -116,13 +107,13 @@ impl GossipData {
         // we'll just fetch all with no constraints for now
         let (op_hashes_from, agent_info_from) = self
             .evt_send
-            .req_op_hashes(
+            .req_op_hashes(ReqOpHashesEvt::new(
                 from_agent.clone(), // from not to because we're initiating
                 from_agent.clone(),
                 DhtArc::new(0, u32::MAX),
                 i64::MIN,
                 i64::MAX,
-            )
+            ))
             .await?;
         let op_hashes_from: S = HashSet::from_iter(op_hashes_from);
         let agent_info_from: A = HashSet::from_iter(agent_info_from);
@@ -130,13 +121,13 @@ impl GossipData {
         // we'll just fetch all with no constraints for now
         let (op_hashes_to, agent_info_to) = self
             .evt_send
-            .req_op_hashes(
+            .req_op_hashes(ReqOpHashesEvt::new(
                 from_agent.clone(),
                 to_agent.clone(),
                 DhtArc::new(0, u32::MAX),
                 i64::MIN,
                 i64::MAX,
-            )
+            ))
             .await?;
         let op_hashes_to: S = HashSet::from_iter(op_hashes_to);
         let agent_info_to: A = HashSet::from_iter(agent_info_to);
@@ -167,12 +158,12 @@ impl GossipData {
         if !to_needs.is_empty() || !to_needs_agents.is_empty() {
             if let Ok((r_ops, r_peers)) = self
                 .evt_send
-                .req_op_data(
+                .req_op_data(ReqOpDataEvt::new(
                     from_agent.clone(), // from not to because we're initiating
                     from_agent.clone(),
                     to_needs,
                     to_needs_agents,
-                )
+                ))
                 .await
             {
                 if !r_ops.is_empty() || !r_peers.is_empty() {
@@ -191,12 +182,12 @@ impl GossipData {
         if !from_needs.is_empty() || !from_needs_agents.is_empty() {
             if let Ok((r_ops, r_peers)) = self
                 .evt_send
-                .req_op_data(
+                .req_op_data(ReqOpDataEvt::new(
                     from_agent.clone(),
                     to_agent.clone(),
                     from_needs,
                     from_needs_agents,
-                )
+                ))
                 .await
             {
                 if !r_ops.is_empty() || !r_peers.is_empty() {
