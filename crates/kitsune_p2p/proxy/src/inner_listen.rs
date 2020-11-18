@@ -113,7 +113,7 @@ struct ProxyTo {
     base_connection_url: url2::Url2,
 
     /// when this proxy contract expires
-    _expires_at: std::time::Instant,
+    expires_at: std::time::Instant,
 }
 
 struct InnerListen {
@@ -309,8 +309,8 @@ impl InternalHandler for InnerListen {
         let short = self.this_url.short().to_string();
 
         // just prune the proxy_list every time before we check for now
-        // let now = std::time::Instant::now();
-        // self.proxy_list.retain(|_, p| p.expires_at >= now);
+        let now = std::time::Instant::now();
+        self.proxy_list.retain(|_, p| p.expires_at >= now);
 
         // first check to see if we should proxy this
         // to a client we are servicing.
@@ -322,7 +322,7 @@ impl InternalHandler for InnerListen {
 
         // if we're not proxying for a client,
         // check to see if our owner is the destination.
-        if proxy_to.is_none() && dest_proxy_url.as_base() == self.this_url.as_base() {
+        if proxy_to.is_none() && dest_proxy_url.as_full() == self.this_url.as_full() {
             tracing::debug!("{}: chan new to self, hooking connection", short);
 
             // Hey! They're trying to talk to us!
@@ -404,7 +404,7 @@ impl InternalHandler for InnerListen {
             proxy_url,
             ProxyTo {
                 base_connection_url: base_url,
-                _expires_at: expires_at,
+                expires_at,
             },
         );
         Ok(async move { Ok(()) }.boxed().into())
