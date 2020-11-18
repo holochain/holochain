@@ -591,11 +591,11 @@ where
             .into_iter()
             .map(|dna_def| {
                 // Load all wasms for each dna_def from the wasm db into memory
-                let wasms = dna_def.zomes.clone().into_iter().map(|(_, zome)| {
+                let wasms = dna_def.zomes.clone().into_iter().map(|(zome_name, zome)| {
                     let wasm_buf = wasm_buf.clone();
                     async move {
                         wasm_buf
-                            .get(&zome.wasm_hash)
+                            .get(&zome.wasm_hash(&zome_name)?)
                             .await?
                             .map(|hashed| hashed.into_content())
                             .ok_or(ConductorError::WasmMissing)

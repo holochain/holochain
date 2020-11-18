@@ -14,7 +14,7 @@ pub use holo_hash::*;
 use holochain_zome_types::zome::ZomeName;
 use std::collections::BTreeMap;
 
-use self::error::DnaResult;
+use self::{error::DnaResult, zome::Zome};
 
 /// Zomes need to be an ordered map from ZomeName to a Zome
 pub type Zomes = Vec<(ZomeName, zome::Zome)>;
@@ -54,12 +54,19 @@ impl DnaDef {
     // }
 
     /// Return a Zome
-    pub fn get_zome(&self, zome_name: &ZomeName) -> Result<&zome::Zome, DnaError> {
+    pub fn get_wasm_zome(&self, zome_name: &ZomeName) -> Result<&zome::WasmZome, DnaError> {
         self.zomes
             .iter()
             .find(|(name, _)| name == zome_name)
             .map(|(_, zome)| zome)
             .ok_or_else(|| DnaError::ZomeNotFound(format!("Zome '{}' not found", &zome_name,)))
+            .and_then(|zome| {
+                if let Zome::Wasm(wasm_zome) = zome {
+                    Ok(wasm_zome)
+                } else {
+                    Err(DnaError::NonWasmZome(zome_name.clone()))
+                }
+            })
     }
 }
 
@@ -181,7 +188,7 @@ impl DnaFile {
 
     /// Fetch the Webassembly byte code for a zome.
     pub fn get_wasm_for_zome(&self, zome_name: &ZomeName) -> Result<&wasm::DnaWasm, DnaError> {
-        let wasm_hash = &self.dna.get_zome(zome_name)?.wasm_hash;
+        let wasm_hash = &self.dna.get_wasm_zome(zome_name)?.wasm_hash;
         self.code
             .get(wasm_hash)
             .ok_or_else(|| DnaError::InvalidWasmHash)

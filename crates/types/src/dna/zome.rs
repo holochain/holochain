@@ -2,12 +2,48 @@
 
 use derive_more::Constructor;
 use holochain_serialized_bytes::prelude::*;
+use holochain_zome_types::zome::ZomeName;
+
+use super::{error::DnaResult, DnaError};
 
 /// Represents an individual "zome".
 #[derive(
-    Serialize, Deserialize, Hash, Clone, Debug, PartialEq, PartialOrd, Ord, SerializedBytes,
+    Serialize,
+    Deserialize,
+    Hash,
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    SerializedBytes,
+    derive_more::From,
 )]
-pub struct Zome {
+pub enum Zome {
+    /// A zome defined by Wasm bytecode
+    Wasm(WasmZome),
+
+    /// A zome defined by Rust closures
+    Inline,
+}
+
+impl Zome {
+    /// If this is a Wasm zome, return the WasmHash.
+    /// If not, return an error with the provided zome name
+    pub fn wasm_hash(&self, zome_name: &ZomeName) -> DnaResult<holo_hash::WasmHash> {
+        match self {
+            Zome::Wasm(WasmZome { wasm_hash }) => Ok(wasm_hash.clone()),
+            _ => Err(DnaError::NonWasmZome(zome_name.clone())),
+        }
+    }
+}
+
+/// A zome defined by Wasm bytecode
+#[derive(
+    Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, SerializedBytes,
+)]
+pub struct WasmZome {
     /// The WasmHash representing the WASM byte code for this zome.
     pub wasm_hash: holo_hash::WasmHash,
 }
@@ -43,11 +79,9 @@ pub enum Permission {
 impl Zome {
     /// create a Zome from a holo_hash WasmHash instead of a holo_hash one
     pub fn from_hash(wasm_hash: holo_hash::WasmHash) -> Self {
-        Self { wasm_hash }
+        WasmZome { wasm_hash }.into()
     }
 }
-
-impl Eq for Zome {}
 
 impl HostFnAccess {
     /// Allow all access

@@ -122,7 +122,7 @@ impl WasmRibosome {
         Ok(self
             .dna_file
             .dna()
-            .get_zome(zome_name)?
+            .get_wasm_zome(zome_name)?
             .wasm_hash
             .get_raw_39())
     }

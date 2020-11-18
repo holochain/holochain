@@ -39,7 +39,7 @@ use holo_hash::WasmHash;
 use holochain_keystore::keystore_actor::KeystoreSender;
 use holochain_p2p::HolochainP2pCellFixturator;
 use holochain_state::test_utils::test_keystore;
-use holochain_types::dna::zome::Zome;
+use holochain_types::dna::zome::WasmZome;
 use holochain_types::dna::DnaDefHashed;
 use holochain_types::dna::DnaFile;
 use holochain_types::dna::Wasms;
@@ -164,9 +164,10 @@ fixturator!(
         for (hash, _) in wasms {
             zomes.push((
                 zome_name_fixturator.next().unwrap(),
-                Zome {
+                WasmZome {
                     wasm_hash: hash.to_owned(),
-                },
+                }
+                .into(),
             ));
         }
         let mut dna_def = DnaDefFixturator::new(Unpredictable).next().unwrap();
@@ -190,9 +191,10 @@ fixturator!(
         for (hash, _) in wasms {
             zomes.push((
                 zome_name_fixturator.next().unwrap(),
-                Zome {
+                WasmZome {
                     wasm_hash: hash.to_owned(),
-                },
+                }
+                .into(),
             ));
         }
         let mut dna_def = DnaDefFixturator::new_indexed(Predictable, get_fixt_index!())

@@ -1,4 +1,4 @@
-use holochain_types::dna::wasm::DnaWasm;
+use holochain_types::dna::{wasm::DnaWasm, zome::WasmZome};
 pub extern crate strum;
 #[macro_use]
 extern crate strum_macros;
@@ -218,7 +218,7 @@ impl From<TestWasm> for Zome {
             let (_, wasm_hash) = holochain_types::dna::wasm::DnaWasmHashed::from_content(dna_wasm)
                 .await
                 .into_inner();
-            Self { wasm_hash }
+            WasmZome { wasm_hash }.into()
         })
     }
 }
