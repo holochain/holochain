@@ -12,7 +12,7 @@ use holo_hash::*;
 use holochain_keystore::KeystoreSenderExt;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::{
-    app::{AppId, InstallAppDnaPayload, InstallAppPayload, InstalledApp, InstalledCell},
+    app::{InstallAppDnaPayload, InstallAppPayload, InstalledApp, InstalledAppId, InstalledCell},
     cell::CellId,
     dna::{DnaFile, JsonProperties},
 };
@@ -75,7 +75,7 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             InstallApp(payload) => {
                 trace!(?payload.dnas);
                 let InstallAppPayload {
-                    app_id,
+                    installed_app_id,
                     agent_key,
                     dnas,
                 } = *payload;
@@ -105,14 +105,17 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 // Call genesis
                 self.conductor_handle
                     .clone()
-                    .install_app(app_id.clone(), cell_ids_with_proofs.clone())
+                    .install_app(installed_app_id.clone(), cell_ids_with_proofs.clone())
                     .await?;
 
                 let cell_data = cell_ids_with_proofs
                     .into_iter()
                     .map(|(cell_data, _)| cell_data)
                     .collect();
-                let app = InstalledApp { app_id, cell_data };
+                let app = InstalledApp {
+                    installed_app_id,
+                    cell_data,
+                };
                 Ok(AdminResponse::AppInstalled(app))
             }
             ListDnas => {
@@ -136,9 +139,11 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 let app_ids = self.conductor_handle.list_active_app_ids().await?;
                 Ok(AdminResponse::ActiveAppIdsListed(app_ids))
             }
-            ActivateApp { app_id } => {
+            ActivateApp { installed_app_id } => {
                 // Activate app
-                self.conductor_handle.activate_app(app_id.clone()).await?;
+                self.conductor_handle
+                    .activate_app(installed_app_id.clone())
+                    .await?;
 
                 // Create cells
                 let errors = self.conductor_handle.clone().setup_cells().await?;
@@ -149,18 +154,20 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                     // We only care about this app for the activate command
                     .find(|cell_error| match cell_error {
                         CreateAppError::Failed {
-                            app_id: error_app_id,
+                            installed_app_id: error_app_id,
                             ..
-                        } => error_app_id == &app_id,
+                        } => error_app_id == &installed_app_id,
                     })
                     // There was an error in this app so return it
                     .map(|this_app_error| Ok(AdminResponse::Error(this_app_error.into())))
                     // No error, return success
                     .unwrap_or(Ok(AdminResponse::AppActivated))
             }
-            DeactivateApp { app_id } => {
+            DeactivateApp { installed_app_id } => {
                 // Activate app
-                self.conductor_handle.deactivate_app(app_id.clone()).await?;
+                self.conductor_handle
+                    .deactivate_app(installed_app_id.clone())
+                    .await?;
                 Ok(AdminResponse::AppDeactivated)
             }
             AttachAppInterface { port } => {
@@ -228,7 +235,7 @@ impl InterfaceApi for RealAdminInterfaceApi {
 ///
 /// Expects a serialized object with any contents of the enum on a key `data`
 /// and the enum variant on a key `type`, e.g.
-/// `{ type: 'activate_app', data: { app_id: 'test_app' } }`
+/// `{ type: 'activate_app', data: { installed_app_id: 'test_app' } }`
 ///
 /// [`AdminResponse`]: enum.AdminResponse.html
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
@@ -300,7 +307,7 @@ pub enum AdminRequest {
     /// [`AdminResponse::ActiveAppIdsListed`]: enum.AdminResponse.html#variant.ActiveAppIdsListed
     /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
     ListActiveAppIds,
-    /// Changes the `App` specified by argument `app_id` from an inactive state to an active state in the conductor,
+    /// Changes the `App` specified by argument `installed_app_id` from an inactive state to an active state in the conductor,
     /// meaning that Zome calls can now be made and the `App` will be loaded on a reboot of the conductor.
     /// It is likely to want to call this after calling [`AdminRequest::InstallApp`], since a freshly
     /// installed `App` is not activated automatically.
@@ -312,10 +319,10 @@ pub enum AdminRequest {
     /// [`AdminResponse::AppActivated`]: enum.AdminResponse.html#variant.AppActivated
     /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
     ActivateApp {
-        /// The AppId to activate
-        app_id: AppId,
+        /// The InstalledAppId to activate
+        installed_app_id: InstalledAppId,
     },
-    /// Changes the `App` specified by argument `app_id` from an active state to an inactive state in the conductor,
+    /// Changes the `App` specified by argument `installed_app_id` from an active state to an inactive state in the conductor,
     /// meaning that Zome calls can no longer be made, and the `App` will not be loaded on a
     /// reboot of the conductor.
     ///
@@ -325,8 +332,8 @@ pub enum AdminRequest {
     /// [`AdminResponse::AppDeactivated`]: enum.AdminResponse.html#variant.AppDeactivated
     /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
     DeactivateApp {
-        /// The AppId to deactivate
-        app_id: AppId,
+        /// The InstalledAppId to deactivate
+        installed_app_id: InstalledAppId,
     },
     /// Open up a new websocket interface at the networking port
     /// (optionally) specified by argument `port` (or using any free port if argument `port` is `None`)
@@ -420,7 +427,7 @@ pub enum AdminResponse {
     /// Contains a list of all the active `App` ids in the conductor
     ///
     /// [`AdminRequest::ListActiveAppIds`]: enum.AdminRequest.html#variant.ListActiveAppIds
-    ActiveAppIdsListed(Vec<AppId>),
+    ActiveAppIdsListed(Vec<InstalledAppId>),
     /// The succesful response to an [`AdminRequest::AttachAppInterface`].
     ///
     /// `AppInterfaceApi` successfully attached.
@@ -499,12 +506,12 @@ mod test {
         let agent_key = fake_agent_pubkey_1();
         let cell_id = CellId::new(dna.dna_hash().clone(), agent_key.clone());
         let expected_cell_ids = InstalledApp {
-            app_id: "test".to_string(),
+            installed_app_id: "test".to_string(),
             cell_data: vec![InstalledCell::new(cell_id.clone(), "".to_string())],
         };
         let payload = InstallAppPayload {
             dnas: vec![dna_payload],
-            app_id: "test".to_string(),
+            installed_app_id: "test".to_string(),
             agent_key,
         };
 
@@ -521,7 +528,7 @@ mod test {
 
         let res = admin_api
             .handle_admin_request(AdminRequest::ActivateApp {
-                app_id: "test".to_string(),
+                installed_app_id: "test".to_string(),
             })
             .await;
 

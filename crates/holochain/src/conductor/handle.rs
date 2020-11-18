@@ -63,7 +63,7 @@ use crate::core::workflow::ZomeCallInvocationResult;
 use crate::core::{ribosome::ZomeCallInvocation, workflow::CallZomeWorkspaceLock};
 use derive_more::From;
 use holochain_types::{
-    app::{AppId, InstalledApp, InstalledCell, MembraneProof},
+    app::{InstalledApp, InstalledAppId, InstalledCell, MembraneProof},
     autonomic::AutonomicCue,
     cell::CellId,
     dna::DnaFile,
@@ -172,7 +172,7 @@ pub trait ConductorHandleT: Send + Sync {
     #[allow(clippy::ptr_arg)]
     async fn install_app(
         self: Arc<Self>,
-        app_id: AppId,
+        installed_app_id: InstalledAppId,
         cell_data_with_proofs: Vec<(InstalledCell, Option<MembraneProof>)>,
     ) -> ConductorResult<()>;
 
@@ -182,17 +182,17 @@ pub trait ConductorHandleT: Send + Sync {
 
     /// Activate an app
     #[allow(clippy::ptr_arg)]
-    async fn activate_app(&self, app_id: AppId) -> ConductorResult<()>;
+    async fn activate_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<()>;
 
     /// Deactivate an app
     #[allow(clippy::ptr_arg)]
-    async fn deactivate_app(&self, app_id: AppId) -> ConductorResult<()>;
+    async fn deactivate_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<()>;
 
     /// List Cell Ids
     async fn list_cell_ids(&self) -> ConductorResult<Vec<CellId>>;
 
     /// List Active AppIds
-    async fn list_active_app_ids(&self) -> ConductorResult<Vec<AppId>>;
+    async fn list_active_app_ids(&self) -> ConductorResult<Vec<InstalledAppId>>;
 
     /// Dump the cells state
     #[allow(clippy::ptr_arg)]
@@ -204,7 +204,10 @@ pub trait ConductorHandleT: Send + Sync {
 
     /// Get info about an installed App, whether active or inactive
     #[allow(clippy::ptr_arg)]
-    async fn get_app_info(&self, app_id: &AppId) -> ConductorResult<Option<InstalledApp>>;
+    async fn get_app_info(
+        &self,
+        installed_app_id: &InstalledAppId,
+    ) -> ConductorResult<Option<InstalledApp>>;
 
     #[cfg(test)]
     async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite>;
@@ -404,7 +407,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
     async fn install_app(
         self: Arc<Self>,
-        app_id: AppId,
+        installed_app_id: InstalledAppId,
         cell_data: Vec<(InstalledCell, Option<MembraneProof>)>,
     ) -> ConductorResult<()> {
         self.conductor
@@ -420,7 +423,10 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .await?;
 
         let cell_data = cell_data.into_iter().map(|(c, _)| c).collect();
-        let app = InstalledApp { app_id, cell_data };
+        let app = InstalledApp {
+            installed_app_id,
+            cell_data,
+        };
 
         // Update the db
         self.conductor
@@ -458,20 +464,20 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         Ok(r)
     }
 
-    async fn activate_app(&self, app_id: AppId) -> ConductorResult<()> {
+    async fn activate_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<()> {
         self.conductor
             .write()
             .await
-            .activate_app_in_db(app_id)
+            .activate_app_in_db(installed_app_id)
             .await
     }
 
-    async fn deactivate_app(&self, app_id: AppId) -> ConductorResult<()> {
+    async fn deactivate_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<()> {
         let cell_ids_to_remove = self
             .conductor
             .write()
             .await
-            .deactivate_app_in_db(app_id)
+            .deactivate_app_in_db(installed_app_id)
             .await?;
         self.conductor
             .write()
@@ -484,7 +490,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         self.conductor.read().await.list_cell_ids().await
     }
 
-    async fn list_active_app_ids(&self) -> ConductorResult<Vec<AppId>> {
+    async fn list_active_app_ids(&self) -> ConductorResult<Vec<InstalledAppId>> {
         self.conductor.read().await.list_active_app_ids().await
     }
 
@@ -496,14 +502,17 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         self.conductor.read().await.signal_broadcaster()
     }
 
-    async fn get_app_info(&self, app_id: &AppId) -> ConductorResult<Option<InstalledApp>> {
+    async fn get_app_info(
+        &self,
+        installed_app_id: &InstalledAppId,
+    ) -> ConductorResult<Option<InstalledApp>> {
         Ok(self
             .conductor
             .read()
             .await
             .get_state()
             .await?
-            .get_app_info(app_id))
+            .get_app_info(installed_app_id))
     }
 
     #[cfg(test)]
