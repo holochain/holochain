@@ -6,6 +6,8 @@ use holochain_zome_types::zome::ZomeName;
 
 use super::{error::DnaResult, DnaError};
 
+pub mod inline_zome;
+
 /// Represents an individual "zome".
 #[derive(
     Serialize,

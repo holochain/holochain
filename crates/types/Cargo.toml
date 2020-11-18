@@ -45,4 +45,5 @@ tracing = "=0.1.18"
 
 [dev-dependencies]
 # rmp-serde = "0.14.3"
+maplit = "1"
 tokio = { version = "0.2", features = [ "full" ] }

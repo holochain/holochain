@@ -1429,6 +1429,7 @@ dependencies = [
  "holochain_serialized_bytes",
  "holochain_zome_types",
  "lazy_static",
+ "maplit",
  "must_future",
  "nanoid",
  "observability",
