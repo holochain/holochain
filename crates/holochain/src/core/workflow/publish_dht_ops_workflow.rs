@@ -107,7 +107,7 @@ pub async fn publish_dht_ops_workflow_inner(
                     .unwrap_or(true);
                 if needs_publish {
                     r.last_publish_time = Some(now_ts);
-                    Some((DhtOpHash::with_pre_hashed(k.to_vec()), r))
+                    Some((DhtOpHash::from_raw_39_panicky(k.to_vec()), r))
                 } else {
                     None
                 }
@@ -183,15 +183,12 @@ mod tests {
             SourceChainError,
         },
         fixt::{CreateLinkFixturator, EntryFixturator},
+        test_utils::{test_network_with_events, TestNetwork},
     };
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
-    use ghost_actor::GhostControlSender;
     use holo_hash::fixt::*;
-    use holochain_p2p::{
-        actor::{HolochainP2p, HolochainP2pRefToCell, HolochainP2pSender},
-        spawn_holochain_p2p, HolochainP2pRef,
-    };
+    use holochain_p2p::{actor::HolochainP2pSender, HolochainP2pRef};
     use holochain_state::{
         buffer::BufferedStore,
         env::{EnvironmentWrite, ReadManager, WriteManager},
@@ -231,7 +228,7 @@ mod tests {
         num_hash: u32,
         panic_on_publish: bool,
     ) -> (
-        ghost_actor::GhostSender<HolochainP2p>,
+        TestNetwork,
         HolochainP2pCell,
         JoinHandle<()>,
         tokio::sync::oneshot::Receiver<()>,
@@ -290,12 +287,21 @@ mod tests {
             .collect::<Vec<_>>();
 
         // Create the network
-        let (network, mut recv) =
-            spawn_holochain_p2p(holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default())
-                .await
-                .unwrap();
+        let filter_events = |evt: &_| match evt {
+            holochain_p2p::event::HolochainP2pEvent::Publish { .. } => true,
+            _ => false,
+        };
+        let (tx, mut recv) = tokio::sync::mpsc::channel(10);
+        let test_network = test_network_with_events(
+            Some(dna.clone()),
+            Some(agents[0].clone()),
+            filter_events,
+            tx,
+        )
+        .await;
         let (tx_complete, rx_complete) = tokio::sync::oneshot::channel();
-        let cell_network = network.to_cell(dna.clone(), agents[0].clone());
+        let cell_network = test_network.cell_network();
+        let network = test_network.network();
         let mut recv_count: u32 = 0;
         let total_expected = num_agents * num_hash;
 
@@ -326,13 +332,14 @@ mod tests {
         });
 
         // Join some agents onto the network
-        for agent in agents {
+        // Skip the first agent as it has already joined
+        for agent in agents.into_iter().skip(1) {
             HolochainP2pRef::join(&network, dna.clone(), agent)
                 .await
                 .unwrap();
         }
 
-        (network, cell_network, recv_task, rx_complete)
+        (test_network, cell_network, recv_task, rx_complete)
     }
 
     /// Call the workflow
@@ -362,7 +369,7 @@ mod tests {
             let env = test_env.env();
 
             // Setup
-            let (network, cell_network, recv_task, rx_complete) =
+            let (_network, cell_network, recv_task, rx_complete) =
                 setup(env.clone(), num_agents, num_hash, false).await;
 
             call_workflow(env.clone().into(), cell_network).await;
@@ -387,9 +394,6 @@ mod tests {
             };
 
             // Shutdown
-            tokio::time::timeout(Duration::from_secs(10), network.ghost_actor_shutdown())
-                .await
-                .ok();
             tokio::time::timeout(Duration::from_secs(10), check)
                 .await
                 .ok();
@@ -417,7 +421,7 @@ mod tests {
             let env_ref = env.guard();
 
             // Setup
-            let (network, cell_network, recv_task, _) =
+            let (_network, cell_network, recv_task, _) =
                 setup(env.clone(), num_agents, num_hash, true).await;
 
             // Update the authored to have > R counts
@@ -432,7 +436,7 @@ mod tests {
                     .unwrap()
                     .map(|(k, mut v)| {
                         v.receipt_count = DEFAULT_RECEIPT_BUNDLE_SIZE;
-                        Ok((DhtOpHash::with_pre_hashed(k.to_vec()), v))
+                        Ok((DhtOpHash::from_raw_39_panicky(k.to_vec()), v))
                     })
                     .collect::<Vec<_>>()
                     .unwrap();
@@ -460,9 +464,6 @@ mod tests {
             .await;
 
             // Shutdown
-            tokio::time::timeout(Duration::from_secs(10), network.ghost_actor_shutdown())
-                .await
-                .ok();
             tokio::time::timeout(Duration::from_secs(10), recv_task)
                 .await
                 .ok();
@@ -677,11 +678,20 @@ mod tests {
                     .collect::<Vec<_>>();
 
                 // Create the network
-                let (network, mut recv) =
-                    spawn_holochain_p2p(holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default())
-                        .await
-                        .unwrap();
-                let cell_network = network.to_cell(dna.clone(), agents[0].clone());
+
+                let filter_events = |evt: &_| match evt {
+                    holochain_p2p::event::HolochainP2pEvent::Publish { .. } => true,
+                    _ => false,
+                };
+                let (tx, mut recv) = tokio::sync::mpsc::channel(10);
+                let test_network = test_network_with_events(
+                    Some(dna.clone()),
+                    Some(agents[0].clone()),
+                    filter_events,
+                    tx,
+                )
+                .await;
+                let cell_network = test_network.cell_network();
                 let (tx_complete, rx_complete) = tokio::sync::oneshot::channel();
                 // We are expecting five ops per agent
                 let total_expected = num_agents * 6;
@@ -732,10 +742,13 @@ mod tests {
                 });
 
                 // Join some agents onto the network
-                for agent in agents {
-                    HolochainP2pRef::join(&network, dna.clone(), agent)
-                        .await
-                        .unwrap()
+                {
+                    let network = test_network.network();
+                    for agent in agents {
+                        HolochainP2pRef::join(&network, dna.clone(), agent)
+                            .await
+                            .unwrap()
+                    }
                 }
 
                 call_workflow(env.clone().into(), cell_network).await;
@@ -764,9 +777,6 @@ mod tests {
                 );
 
                 // Shutdown
-                tokio::time::timeout(Duration::from_secs(10), network.ghost_actor_shutdown())
-                    .await
-                    .ok();
                 tokio::time::timeout(Duration::from_secs(10), recv_task)
                     .await
                     .ok();

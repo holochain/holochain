@@ -20,11 +20,12 @@ use holochain_p2p::{
 };
 use holochain_state::{error::DatabaseResult, fresh_reader, prelude::*};
 use holochain_types::{
+    activity::{AgentActivity, ChainItems},
     chain::AgentActivityExt,
     dht_op::{produce_op_lights_from_element_group, produce_op_lights_from_elements},
     element::{
-        Element, ElementGroup, GetElementResponse, RawGetEntryResponse, SignedHeaderHashed,
-        SignedHeaderHashedExt,
+        Element, ElementGroup, ElementStatus, GetElementResponse, RawGetEntryResponse,
+        SignedHeaderHashed, SignedHeaderHashedExt,
     },
     entry::option_entry_hashed,
     link::{GetLinksResponse, WireLinkMetaKey},
@@ -36,11 +37,9 @@ use holochain_zome_types::{
     header::HeaderType,
     link::Link,
     metadata::{Details, ElementDetails, EntryDetails},
-    query::Activity,
-    query::AgentActivity,
     query::ChainQueryFilter,
     query::ChainStatus,
-    validate::ValidationPackage,
+    validate::{ValidationPackage, ValidationStatus},
 };
 use std::collections::HashSet;
 use std::collections::{BTreeMap, BTreeSet};
@@ -326,20 +325,50 @@ where
             // Same seq number are combined to show a fork
             highest_observed,
             valid_activity,
+            rejected_activity,
             ..
         } = agent_activity;
         match valid_activity {
-            Activity::Full(headers) => {
+            ChainItems::Full(headers) => {
                 let hashes = headers
                     .into_iter()
                     .map(|shh| (shh.header().header_seq(), shh.header_address().clone()));
-                cache_data.meta.register_activity_sequence(&agent, hashes)?;
+                cache_data.meta.register_activity_sequence(
+                    &agent,
+                    hashes,
+                    ValidationStatus::Valid,
+                )?;
             }
-            Activity::Hashes(hashes) => {
+            ChainItems::Hashes(hashes) => {
                 let hashes = hashes.into_iter();
-                cache_data.meta.register_activity_sequence(&agent, hashes)?;
+                cache_data.meta.register_activity_sequence(
+                    &agent,
+                    hashes,
+                    ValidationStatus::Valid,
+                )?;
             }
-            Activity::NotRequested => (),
+            ChainItems::NotRequested => (),
+        };
+        match rejected_activity {
+            ChainItems::Full(headers) => {
+                let hashes = headers
+                    .into_iter()
+                    .map(|shh| (shh.header().header_seq(), shh.header_address().clone()));
+                cache_data.meta.register_activity_sequence(
+                    &agent,
+                    hashes,
+                    ValidationStatus::Rejected,
+                )?;
+            }
+            ChainItems::Hashes(hashes) => {
+                let hashes = hashes.into_iter();
+                cache_data.meta.register_activity_sequence(
+                    &agent,
+                    hashes,
+                    ValidationStatus::Rejected,
+                )?;
+            }
+            ChainItems::NotRequested => (),
         };
         match &status {
             ChainStatus::Empty => {}
@@ -355,10 +384,14 @@ where
         Ok(())
     }
 
-    fn update_stores(&mut self, element: Element) -> CascadeResult<()> {
+    fn update_stores(&mut self, element_status: ElementStatus) -> CascadeResult<()> {
         let cache_data = ok_or_return!(self.cache_data.as_mut());
+        let ElementStatus { element, status } = element_status;
         let op_lights = produce_op_lights_from_elements(vec![&element])?;
         let (shh, e) = element.into_inner();
+        cache_data
+            .meta
+            .register_validation_status(shh.header_address().clone(), status);
         cache_data.element.put(shh, option_entry_hashed(e))?;
         for op in op_lights {
             integrate_single_metadata(op, cache_data.element, cache_data.meta)?
@@ -373,6 +406,20 @@ where
     ) -> CascadeResult<()> {
         let cache_data = ok_or_return!(self.cache_data.as_mut());
         let op_lights = produce_op_lights_from_element_group(&elements)?;
+
+        // Register the valid hashes
+        for hash in elements.valid_hashes().cloned() {
+            cache_data
+                .meta
+                .register_validation_status(hash, ValidationStatus::Valid);
+        }
+        // Register the rejected hashes
+        for hash in elements.valid_hashes().cloned() {
+            cache_data
+                .meta
+                .register_validation_status(hash, ValidationStatus::Valid);
+        }
+
         cache_data.element.put_element_group(elements)?;
         for op in op_lights {
             integrate_single_metadata(op, cache_data.element, cache_data.meta)?
@@ -384,8 +431,8 @@ where
         match response {
             // Has header
             GetElementResponse::GetHeader(Some(we)) => {
-                let (element, deletes, updates) = we.into_parts();
-                self.update_stores(element)?;
+                let (element_status, deletes, updates) = we.into_parts();
+                self.update_stores(element_status)?;
 
                 for delete in deletes {
                     self.update_stores(delete)?;
@@ -476,12 +523,12 @@ where
                 let entry_hash = elements.entry_hash().clone();
                 self.update_stores_with_element_group(elements)?;
                 for delete in deletes {
-                    let element = delete.into_element();
-                    self.update_stores(element)?;
+                    let element_status = delete.into_element_status();
+                    self.update_stores(element_status)?;
                 }
                 for update in updates {
-                    let element = update.into_element(entry_hash.clone());
-                    self.update_stores(element)?;
+                    let element_status = update.into_element_status(entry_hash.clone());
+                    self.update_stores(element_status)?;
                 }
             }
             // Authority didn't have any headers for this entry
@@ -589,7 +636,9 @@ where
                     SignedHeaderHashed::from_content_sync(SignedHeader(link_add.into(), signature)),
                     None,
                 );
-                self.update_stores(element)?;
+                // TODO: Assuming links are also valid headers.
+                // We will need to prove this is the case in the future.
+                self.update_stores(ElementStatus::new(element, ValidationStatus::Valid))?;
             }
             for (link_remove, signature) in link_removes {
                 debug!(?link_remove);
@@ -600,7 +649,9 @@ where
                     )),
                     None,
                 );
-                self.update_stores(element)?;
+                // TODO: Assuming links are also valid headers.
+                // We will need to prove this is the case in the future.
+                self.update_stores(ElementStatus::new(element, ValidationStatus::Valid))?;
             }
         }
         Ok(())
@@ -626,7 +677,7 @@ where
             hash: &EntryHash,
         ) -> CascadeResult<Option<Element>> {
             fresh_reader!(db.meta.env(), |r| {
-                let mut iter = db.meta.get_headers(&r, hash.clone())?;
+                let mut iter = db.meta.get_all_headers(&r, hash.clone())?;
                 while let Some(h) = iter.next()? {
                     return_if_ok!(db.element.get_element(&h.header_hash)?)
                 }
@@ -736,6 +787,13 @@ where
                     .chain(authored_data.meta.get_headers(&r, hash.clone())?)
                     .collect::<BTreeSet<_>>()?;
 
+                // Get the rejected "headers that created this entry" hashes
+                let rejected_headers = cache_data
+                    .meta
+                    .get_rejected_headers(&r, hash.clone())?
+                    .chain(authored_data.meta.get_rejected_headers(&r, hash.clone())?)
+                    .collect::<BTreeSet<_>>()?;
+
                 // Get the delete hashes
                 let deletes = cache_data
                     .meta
@@ -757,11 +815,15 @@ where
                 let headers = self.render_headers(headers, |h| {
                     h == HeaderType::Update || h == HeaderType::Create
                 })?;
+                let rejected_headers = self.render_headers(rejected_headers, |h| {
+                    h == HeaderType::Update || h == HeaderType::Create
+                })?;
                 let deletes = self.render_headers(deletes, |h| h == HeaderType::Delete)?;
                 let updates = self.render_headers(updates, |h| h == HeaderType::Update)?;
                 Ok(Some(EntryDetails {
                     entry: entry.into_content(),
                     headers,
+                    rejected_headers,
                     deletes,
                     updates,
                     entry_dht_status,
@@ -778,20 +840,28 @@ where
         match self.get_element_local_raw(&hash)? {
             Some(element) => {
                 let hash = element.header_address().clone();
-                let deletes = fresh_reader!(env, |r| cache_data
-                    .meta
-                    .get_deletes_on_header(&r, hash.clone())?
-                    .chain(authored_data.meta.get_deletes_on_header(&r, hash.clone())?)
-                    .collect::<BTreeSet<_>>())?;
+                let (deletes, updates, validation_status) = fresh_reader!(env, |r| {
+                    let deletes = cache_data
+                        .meta
+                        .get_deletes_on_header(&r, hash.clone())?
+                        .chain(authored_data.meta.get_deletes_on_header(&r, hash.clone())?)
+                        .collect::<BTreeSet<_>>()?;
+                    let updates = cache_data
+                        .meta
+                        .get_updates(&r, hash.clone().into())?
+                        .chain(authored_data.meta.get_updates(&r, hash.clone().into())?)
+                        .collect::<BTreeSet<_>>()?;
+                    let validation_status = cache_data.meta.get_validation_status(&r, &hash)?;
+                    DatabaseResult::Ok((deletes, updates, validation_status))
+                })?;
+                let validation_status = validation_status
+                    .resolve()
+                    .unwrap_or(ValidationStatus::Valid);
                 let deletes = self.render_headers(deletes, |h| h == HeaderType::Delete)?;
-                let updates = fresh_reader!(env, |r| cache_data
-                    .meta
-                    .get_updates(&r, hash.clone().into())?
-                    .chain(authored_data.meta.get_updates(&r, hash.into())?)
-                    .collect::<BTreeSet<_>>())?;
                 let updates = self.render_headers(updates, |h| h == HeaderType::Update)?;
                 Ok(Some(ElementDetails {
                     element,
+                    validation_status,
                     deletes,
                     updates,
                 }))
@@ -816,9 +886,13 @@ where
         let cache_data = ok_or_return!(self.cache_data.as_ref(), false);
         let integrated_data = ok_or_return!(self.integrated_data.as_ref(), false);
         let authored_data = ok_or_return!(self.authored_data.as_ref(), false);
-        Ok(integrated_data.meta.has_registered_store_element(&hash)?
-            || cache_data.meta.has_registered_store_element(&hash)?
-            || authored_data.meta.has_registered_store_element(&hash)?)
+        Ok(integrated_data
+            .meta
+            .has_valid_registered_store_element(&hash)?
+            || cache_data.meta.has_valid_registered_store_element(&hash)?
+            || authored_data
+                .meta
+                .has_valid_registered_store_element(&hash)?)
     }
 
     /// Same as valid_header but checks for StoreEntry validation
@@ -930,12 +1004,21 @@ where
 
             match oldest_live_header {
                 Some(oldest_live_header) => {
-                    // We have an oldest live header now get the element
-                    Ok(self
-                        .get_element_local_raw(&oldest_live_header.header_hash)?
-                        .map(Search::Found)
-                        // It's not local so check the network
-                        .unwrap_or(Search::Continue(oldest_live_header.header_hash)))
+                    // Check we don't have evidence of an invalid header
+                    if cache_data
+                        .meta
+                        .get_validation_status(&r, &oldest_live_header.header_hash)?
+                        .is_valid()
+                    {
+                        // We have an oldest live header now get the element
+                        Ok(self
+                            .get_element_local_raw(&oldest_live_header.header_hash)?
+                            .map(Search::Found)
+                            // It's not local so check the network
+                            .unwrap_or(Search::Continue(oldest_live_header.header_hash)))
+                    } else {
+                        Ok(Search::Continue(oldest_live_header.header_hash))
+                    }
                 }
                 None => Ok(Search::NotInCascade),
             }
@@ -1053,6 +1136,13 @@ where
                 .get_deletes_on_header(&r, header_hash.clone())?
                 .next()?
                 .is_none();
+
+            // Check if the header is valid
+            let is_live = is_live
+                && cache_data
+                    .meta
+                    .get_validation_status(&r, &header_hash)?
+                    .is_valid();
 
             if is_live {
                 self.get_element_local_raw(&header_hash)
@@ -1444,7 +1534,11 @@ where
                         .meta
                         .get_activity(
                             &r,
-                            ChainItemKey::AgentSequence(agent.clone(), range.end - 1),
+                            ChainItemKey::AgentStatusSequence(
+                                agent.clone(),
+                                ValidationStatus::Valid,
+                                range.end - 1,
+                            ),
                         )?
                         .next()?
                         .is_some()
@@ -1453,7 +1547,10 @@ where
                         // Note if the chain is forked there could be multiple headers at each sequence number.
                         Ok(cache_data
                             .meta
-                            .get_activity_sequence(&r, ChainItemKey::Agent(agent))?
+                            .get_activity_sequence(
+                                &r,
+                                ChainItemKey::AgentStatus(agent, ValidationStatus::Valid),
+                            )?
                             // TODO: PERF: Use an iter from to start from the correct sequence
                             .skip_while(|(s, _)| Ok(*s < range.start))
                             .take_while(|(s, _)| Ok(*s < range.end))
@@ -1468,7 +1565,10 @@ where
             None => fresh_reader!(env, |r| {
                 Ok(cache_data
                     .meta
-                    .get_activity_sequence(&r, ChainItemKey::Agent(agent))?
+                    .get_activity_sequence(
+                        &r,
+                        ChainItemKey::AgentStatus(agent, ValidationStatus::Valid),
+                    )?
                     .collect()?)
             }),
         }
@@ -1559,16 +1659,16 @@ where
         match cache_data.meta.get_activity_status(&agent)? {
             Some(status) => Ok(AgentActivity {
                 agent,
-                valid_activity: Activity::Hashes(hashes),
-                rejected_activity: Activity::NotRequested,
+                valid_activity: ChainItems::Hashes(hashes),
+                rejected_activity: ChainItems::NotRequested,
                 status,
                 highest_observed,
             }),
             // If we don't have any status then we must return an empty chain
             None => Ok(AgentActivity {
                 agent,
-                valid_activity: Activity::NotRequested,
-                rejected_activity: Activity::NotRequested,
+                valid_activity: ChainItems::NotRequested,
+                rejected_activity: ChainItems::NotRequested,
                 status: ChainStatus::Empty,
                 highest_observed,
             }),
@@ -1595,10 +1695,17 @@ where
         query: ChainQueryFilter,
         mut options: GetActivityOptions,
     ) -> CascadeResult<AgentActivity<Element>> {
+        const DEFAULT_ACTIVITY_TIMEOUT_MS: u64 = 1000;
         // Get the request options
         let requester_options = options.clone();
         // For now only fetching hashes until caching is worked out.
         options.include_full_headers = false;
+        // Get agent activity takes longer then other calls so we
+        // will give it a larger default timeout
+        options.timeout_ms = options
+            .timeout_ms
+            .clone()
+            .or(Some(DEFAULT_ACTIVITY_TIMEOUT_MS));
 
         // See if we have a cache hit
         let chain_hashes = match &query.sequence_range {
@@ -1633,19 +1740,19 @@ where
 
         // Check if we are done
         match &activity {
-            // Activity is empty so nothing else to do.
+            // ChainItems is empty so nothing else to do.
             AgentActivity {
                 status: ChainStatus::Empty,
                 ..
             } => return Ok(activity),
-            // Activity has a status but there are no hashes
+            // ChainItems has a status but there are no hashes
             // so nothing else to do.
             AgentActivity {
-                valid_activity: Activity::Hashes(h),
+                valid_activity: ChainItems::Hashes(h),
                 ..
             } if h.is_empty() => {
                 if requester_options.include_full_headers {
-                    activity.valid_activity = Activity::Full(Vec::new());
+                    activity.valid_activity = ChainItems::Full(Vec::new());
                 }
                 return Ok(activity);
             }
@@ -1653,8 +1760,8 @@ where
         }
 
         match &activity.valid_activity {
-            Activity::Full(_) => todo!(),
-            Activity::Hashes(hashes) => {
+            ChainItems::Full(_) => todo!(),
+            ChainItems::Hashes(hashes) => {
                 // If full headers and include entries is requested
                 // retrieve them in parallel
                 if query.include_entries && requester_options.include_full_headers {
@@ -1671,7 +1778,7 @@ where
                     }
                     let elements = elements.unwrap_or_else(Vec::new);
                     Ok(AgentActivity {
-                        valid_activity: Activity::Full(elements),
+                        valid_activity: ChainItems::Full(elements),
                         ..activity
                     })
                 // If only full headers is requested
@@ -1690,7 +1797,7 @@ where
                     }
                     let elements = elements.unwrap_or_else(Vec::new);
                     Ok(AgentActivity {
-                        valid_activity: Activity::Full(elements),
+                        valid_activity: ChainItems::Full(elements),
                         ..activity
                     })
                 } else {
@@ -1698,7 +1805,7 @@ where
                     Ok(activity)
                 }
             }
-            Activity::NotRequested => Ok(activity),
+            ChainItems::NotRequested => Ok(activity),
         }
     }
 
@@ -1786,7 +1893,12 @@ where
                     // TODO: For now we are only returning validation packages
                     // of valid headers but when we add the ability to get and
                     // cache invalid data we need to update this as well.
-                    self.update_stores(element.clone())?;
+                    // TODO: Assuming validation packages are also valid headers.
+                    // We will need to prove this is the case in the future.
+                    self.update_stores(ElementStatus::new(
+                        element.clone(),
+                        ValidationStatus::Valid,
+                    ))?;
                 }
 
                 // Add metadata for custom package caching

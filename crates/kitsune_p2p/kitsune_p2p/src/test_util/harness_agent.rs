@@ -3,11 +3,20 @@ use super::*;
 ghost_actor::ghost_chan! {
     /// controller for test harness agent actor
     pub(crate) chan HarnessAgentControl<KitsuneP2pError> {
+        /// dump agent info from peer_store
+        fn dump_agent_info() -> Vec<Arc<AgentInfoSigned>>;
+
+        /// inject a bunch of agent info
+        fn inject_agent_info(info: HashMap<Arc<KitsuneAgent>, Arc<AgentInfoSigned>>) -> ();
+
         /// inject data to be gradually gossiped
         fn inject_gossip_data(data: String) -> Arc<KitsuneOpHash>;
 
         /// dump all local gossip data from this agent
         fn dump_local_gossip_data() -> HashMap<Arc<KitsuneOpHash>, String>;
+
+        /// dump all local peer data from this agent
+        fn dump_local_peer_data() -> HashMap<Arc<KitsuneAgent>, Arc<AgentInfoSigned>>;
     }
 }
 
@@ -22,7 +31,6 @@ pub(crate) async fn spawn_test_agent(
     ),
     KitsuneP2pError,
 > {
-    let agent: Arc<KitsuneAgent> = TestVal::test_val();
     let (p2p, evt) = spawn_kitsune_p2p(config).await?;
 
     let builder = ghost_actor::actor_builder::GhostActorBuilder::new();
@@ -35,24 +43,41 @@ pub(crate) async fn spawn_test_agent(
         .create_channel::<HarnessAgentControl>()
         .await?;
 
-    tokio::task::spawn(builder.spawn(AgentHarness::new(harness_chan)));
+    let harness = AgentHarness::new(harness_chan).await?;
+    let agent = harness.agent.clone();
+    tokio::task::spawn(builder.spawn(harness));
 
     Ok((agent, p2p, control))
 }
 
+use lair_keystore_api::{
+    entry::EntrySignEd25519,
+    //actor::SignEd25519PubKey,
+    internal::sign_ed25519::*,
+};
+
 struct AgentHarness {
+    agent: Arc<KitsuneAgent>,
+    priv_key: SignEd25519PrivKey,
     harness_chan: HarnessEventChannel,
     agent_store: HashMap<Arc<KitsuneAgent>, Arc<AgentInfoSigned>>,
     gossip_store: HashMap<Arc<KitsuneOpHash>, String>,
 }
 
 impl AgentHarness {
-    pub fn new(harness_chan: HarnessEventChannel) -> Self {
-        Self {
+    pub async fn new(harness_chan: HarnessEventChannel) -> Result<Self, KitsuneP2pError> {
+        let EntrySignEd25519 { priv_key, pub_key } = sign_ed25519_keypair_new_from_entropy()
+            .await
+            .map_err(KitsuneP2pError::other)?;
+        let pub_key = (**pub_key).clone();
+        let agent: Arc<KitsuneAgent> = Arc::new(KitsuneAgent::new(pub_key));
+        Ok(Self {
+            agent,
+            priv_key,
             harness_chan,
             agent_store: HashMap::new(),
             gossip_store: HashMap::new(),
-        }
+        })
     }
 }
 
@@ -61,6 +86,21 @@ impl ghost_actor::GhostControlHandler for AgentHarness {}
 impl ghost_actor::GhostHandler<HarnessAgentControl> for AgentHarness {}
 
 impl HarnessAgentControlHandler for AgentHarness {
+    fn handle_dump_agent_info(
+        &mut self,
+    ) -> HarnessAgentControlHandlerResult<Vec<Arc<AgentInfoSigned>>> {
+        let all = self.agent_store.values().map(|a| a.clone()).collect();
+        Ok(async move { Ok(all) }.boxed().into())
+    }
+
+    fn handle_inject_agent_info(
+        &mut self,
+        info: HashMap<Arc<KitsuneAgent>, Arc<AgentInfoSigned>>,
+    ) -> HarnessAgentControlHandlerResult<()> {
+        self.agent_store.extend(info);
+        Ok(async move { Ok(()) }.boxed().into())
+    }
+
     fn handle_inject_gossip_data(
         &mut self,
         data: String,
@@ -74,6 +114,13 @@ impl HarnessAgentControlHandler for AgentHarness {
         &mut self,
     ) -> HarnessAgentControlHandlerResult<HashMap<Arc<KitsuneOpHash>, String>> {
         let out = self.gossip_store.clone();
+        Ok(async move { Ok(out) }.boxed().into())
+    }
+
+    fn handle_dump_local_peer_data(
+        &mut self,
+    ) -> HarnessAgentControlHandlerResult<HashMap<Arc<KitsuneAgent>, Arc<AgentInfoSigned>>> {
+        let out = self.agent_store.clone();
         Ok(async move { Ok(out) }.boxed().into())
     }
 }
@@ -100,6 +147,14 @@ impl KitsuneP2pEventHandler for AgentHarness {
     ) -> KitsuneP2pEventHandlerResult<Option<crate::types::agent_store::AgentInfoSigned>> {
         let res = self.agent_store.get(&input.agent).map(|i| (**i).clone());
         Ok(async move { Ok(res) }.boxed().into())
+    }
+
+    fn handle_query_agent_info_signed(
+        &mut self,
+        _input: QueryAgentInfoSignedEvt,
+    ) -> KitsuneP2pEventHandlerResult<Vec<crate::types::agent_store::AgentInfoSigned>> {
+        let out = self.agent_store.values().map(|a| (**a).clone()).collect();
+        Ok(async move { Ok(out) }.boxed().into())
     }
 
     fn handle_call(
@@ -180,8 +235,15 @@ impl KitsuneP2pEventHandler for AgentHarness {
 
     fn handle_sign_network_data(
         &mut self,
-        _input: SignNetworkDataEvt,
+        input: SignNetworkDataEvt,
     ) -> KitsuneP2pEventHandlerResult<KitsuneSignature> {
-        Ok(async move { Ok(vec![0; 64].into()) }.boxed().into())
+        let sig = sign_ed25519(self.priv_key.clone(), input.data);
+        Ok(async move {
+            let sig = sig.await.map_err(KitsuneP2pError::other)?;
+            let sig: Vec<u8> = (**sig).clone();
+            Ok(sig.into())
+        }
+        .boxed()
+        .into())
     }
 }

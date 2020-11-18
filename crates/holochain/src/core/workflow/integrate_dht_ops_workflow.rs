@@ -177,12 +177,8 @@ async fn integrate_single_dht_op(
             )?),
             ValidationStatus::Rejected => {
                 update_activity_status(&op, &mut workspace.meta)?;
-                Ok(integrate_data_and_meta(
-                    iv,
-                    op,
-                    &mut workspace.element_rejected,
-                    &mut workspace.meta_rejected,
-                )?)
+                update_validation_status(&op, &mut workspace.meta)?;
+                Ok(integrate_data(iv, op, &mut workspace.element_rejected)?)
             }
             ValidationStatus::Abandoned => {
                 // Throwing away abandoned ops
@@ -219,6 +215,22 @@ fn integrate_data_and_meta<P: PrefixType>(
     Ok(Outcome::Integrated(integrated))
 }
 
+/// Integrate data only
+fn integrate_data<P: PrefixType>(
+    iv: IntegrationLimboValue,
+    op: DhtOp,
+    element_store: &mut ElementBuf<P>,
+) -> DhtOpConvertResult<Outcome> {
+    integrate_single_data(op, element_store)?;
+    let integrated = IntegratedDhtOpsValue {
+        validation_status: iv.validation_status,
+        op: iv.op,
+        when_integrated: Timestamp::now(),
+    };
+    debug!("integrating");
+    Ok(Outcome::Integrated(integrated))
+}
+
 /// Update the status of agent activity if an op
 /// is rejected by the agent authority.
 fn update_activity_status(
@@ -231,9 +243,25 @@ fn update_activity_status(
             hash: HeaderHash::with_data_sync(h),
         };
         meta_integrated.register_activity_status(h.author(), ChainStatus::Invalid(chain_head))?;
+        meta_integrated.register_activity(h, ValidationStatus::Rejected)?;
     }
     Ok(())
 }
+
+/// Rejected headers still need to be stored in the metadata vault so
+/// they can be served for a get details call.
+fn update_validation_status(
+    op: &DhtOp,
+    meta_integrated: &mut impl MetadataBufT,
+) -> WorkflowResult<()> {
+    match op {
+        DhtOp::StoreElement(_, h, _) => meta_integrated.register_rejected_element_header(h)?,
+        DhtOp::StoreEntry(_, h, _) => meta_integrated.register_rejected_header(h.clone())?,
+        _ => (),
+    }
+    Ok(())
+}
+
 /// Check if we have the required dependencies held before integrating.
 async fn op_dependencies_held(
     op: &DhtOp,
@@ -383,7 +411,7 @@ where
         DhtOpLight::RegisterAgentActivity(hash, _) => {
             let header = get_header(hash, element_store)?;
             // register agent activity on this agents pub key
-            meta_store.register_activity(&header)?;
+            meta_store.register_activity(&header, ValidationStatus::Valid)?;
         }
         DhtOpLight::RegisterUpdatedContent(hash, _, _)
         | DhtOpLight::RegisterUpdatedElement(hash, _, _) => {

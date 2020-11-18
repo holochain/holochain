@@ -1,8 +1,9 @@
+use crate::prelude::*;
+
 /// Create a CapClaim on the local source chain.
 ///
 /// Recipients of secrets for use in redemption of CapGrants use CapClaim entries to save it.
 ///
-/// The macro input must evaluate to a `CapClaim` struct.
 /// The `CapClaim` contains the secret, tag and issuing agent.
 /// Only the secret should ever be sent back to the issuing agent, everything else is for local
 /// administering, querying and filtering only.
@@ -18,12 +19,6 @@
 ///
 /// @see CapClaim
 /// @see cap grant functions
-#[macro_export]
-macro_rules! create_cap_claim {
-    ( $input:expr ) => {{
-        create!(
-            $crate::prelude::EntryDefId::CapClaim,
-            $crate::prelude::Entry::CapClaim($input)
-        )
-    }};
+pub fn create_cap_claim(cap_claim_entry: CapClaimEntry) -> HdkResult<HeaderHash> {
+    create(EntryDefId::CapClaim, Entry::CapClaim(cap_claim_entry))
 }

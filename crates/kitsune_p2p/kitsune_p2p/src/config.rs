@@ -1,17 +1,25 @@
 use url2::Url2;
 
+/// The default production bootstrap service url.
+pub const BOOTSTRAP_SERVICE_DEFAULT: &str = "https://bootstrap.holo.host";
+/// The default development bootstrap service url.
+pub const BOOTSTRAP_SERVICE_DEV: &str = "https://bootstrap-dev.holohost.workers.dev";
+
 /// Configure the kitsune actor
 #[non_exhaustive]
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct KitsuneP2pConfig {
     /// list of sub-transports to be included in this pool
     pub transport_pool: Vec<TransportConfig>,
+    /// The service used for peers to discover each before they are peers.
+    pub bootstrap_service: Option<Url2>,
 }
 
 impl Default for KitsuneP2pConfig {
     fn default() -> Self {
         Self {
             transport_pool: Vec::new(),
+            bootstrap_service: None,
         }
     }
 }

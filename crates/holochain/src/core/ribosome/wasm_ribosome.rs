@@ -4,6 +4,7 @@ use super::{
         migrate_agent::MigrateAgentHostAccess, post_commit::PostCommitHostAccess,
         validate::ValidateHostAccess, validation_package::ValidationPackageHostAccess,
     },
+    host_fn::get_agent_activity::get_agent_activity,
     HostAccess, ZomeCallHostAccess,
 };
 use crate::core::ribosome::error::RibosomeError;
@@ -119,7 +120,7 @@ impl WasmRibosome {
             .dna()
             .get_zome(zome_name)?
             .wasm_hash
-            .get_full_bytes())
+            .get_raw_39())
     }
 
     pub fn instance(&self, call_context: CallContext) -> RibosomeResult<Instance> {
@@ -275,6 +276,10 @@ impl WasmRibosome {
                 "__get_link_details",
                 func!(invoke_host_function!(get_link_details)),
             );
+            ns.insert(
+                "__get_agent_activity",
+                func!(invoke_host_function!(get_agent_activity)),
+            );
             ns.insert("__query", func!(invoke_host_function!(query)));
         } else {
             ns.insert("__get", func!(invoke_host_function!(unreachable)));
@@ -282,6 +287,10 @@ impl WasmRibosome {
             ns.insert("__get_links", func!(invoke_host_function!(unreachable)));
             ns.insert(
                 "__get_link_details",
+                func!(invoke_host_function!(unreachable)),
+            );
+            ns.insert(
+                "__get_agent_activity",
                 func!(invoke_host_function!(unreachable)),
             );
             ns.insert("__query", func!(invoke_host_function!(unreachable)));

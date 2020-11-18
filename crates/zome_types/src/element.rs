@@ -81,7 +81,7 @@ impl Element {
     }
 }
 
-/// Small struct to allow the return type of `query!()` to be a vector of elements
+/// Small struct to allow the return type of `query()` to be a vector of elements
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub struct ElementVec(pub Vec<Element>);
 

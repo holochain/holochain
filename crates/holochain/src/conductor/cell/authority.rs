@@ -1,23 +1,32 @@
 use super::error::{AuthorityDataError, CellResult};
-use crate::core::state::{
-    element_buf::ElementBuf,
-    metadata::{ChainItemKey, MetadataBuf, MetadataBufT},
+use crate::{
+    conductor::CellError,
+    core::state::{
+        element_buf::ElementBuf,
+        metadata::{ChainItemKey, MetadataBuf, MetadataBufT},
+    },
 };
 use fallible_iterator::FallibleIterator;
 
 use holo_hash::{AgentPubKey, EntryHash, HeaderHash};
 use holochain_state::{
-    env::EnvironmentRead, env::EnvironmentWrite, fresh_reader, prelude::PrefixType,
+    env::EnvironmentRead,
+    env::{EnvironmentWrite, ReadManager},
+    error::DatabaseError,
+    fresh_reader,
+    prelude::PrefixType,
     prelude::Readable,
 };
+use holochain_types::activity::{AgentActivity, ChainItems};
 use holochain_types::{
-    element::{GetElementResponse, RawGetEntryResponse},
+    element::{ElementStatus, GetElementResponse, RawGetEntryResponse, WireElement},
+    header::WireHeaderStatus,
     header::WireUpdateRelationship,
     metadata::TimedHeaderHash,
 };
 use holochain_zome_types::{
-    element::SignedHeaderHashed, header::conversions::WrongHeaderError, query::Activity,
-    query::AgentActivity, query::ChainQueryFilter, query::ChainStatus,
+    element::SignedHeaderHashed, header::conversions::WrongHeaderError, query::ChainQueryFilter,
+    query::ChainStatus, validate::ValidationStatus,
 };
 use std::{collections::BTreeSet, convert::TryInto};
 use tracing::*;
@@ -30,18 +39,23 @@ pub async fn handle_get_entry(
 ) -> CellResult<GetElementResponse> {
     // Get the vaults
     let element_vault = ElementBuf::vault(state_env.clone().into(), false)?;
+    let element_rejected = ElementBuf::rejected(state_env.clone().into())?;
     let meta_vault = MetadataBuf::vault(state_env.clone().into())?;
 
     // ## Helper closures to DRY and make more readable
 
     // ### Render headers closure
     // Render headers from TimedHeaderHash to SignedHeaderHash
-    let render_header = |timed_header_hash: TimedHeaderHash| {
+    let render_header_and_status = |timed_header_hash: TimedHeaderHash| {
         let header_hash = timed_header_hash.header_hash;
-        let r = element_vault
-            .get_header(&header_hash)?
-            .ok_or_else(|| AuthorityDataError::missing_data(header_hash))?;
-        CellResult::Ok(r)
+        let mut status = ValidationStatus::Valid;
+        let mut r = element_vault.get_header(&header_hash)?;
+        if r.is_none() {
+            r = element_rejected.get_header(&header_hash)?;
+            status = ValidationStatus::Rejected;
+        }
+        let r = r.ok_or_else(|| AuthorityDataError::missing_data(header_hash))?;
+        CellResult::Ok((r, status))
     };
 
     // ### Get entry data closure
@@ -70,7 +84,7 @@ pub async fn handle_get_entry(
         let mut deletes = Vec::new();
         let mut updates = Vec::new();
         let headers = meta_vault
-            .get_headers(&reader, hash.clone())?
+            .get_all_headers(&reader, hash.clone())?
             .collect::<Vec<_>>()?;
         let mut live_headers = BTreeSet::new();
 
@@ -82,16 +96,17 @@ pub async fn handle_get_entry(
                         .get_deletes_on_header(&reader, hash.header_hash.clone())?
                         .iterator(),
                 );
-                let header = render_header(hash)?;
-                live_headers.insert(header.try_into()?);
+                let header_status = render_header_and_status(hash)?;
+                live_headers.insert(header_status.try_into()?);
             }
             let updates_returns = meta_vault
                 .get_updates(&reader, hash.clone().into())?
                 .collect::<Vec<_>>()?;
             let updates_returns = updates_returns.into_iter().map(|update| {
-                let update: WireUpdateRelationship = render_header(update)?
-                    .try_into()
-                    .map_err(AuthorityDataError::from)?;
+                let update: WireHeaderStatus<WireUpdateRelationship> =
+                    render_header_and_status(update)?
+                        .try_into()
+                        .map_err(AuthorityDataError::from)?;
                 CellResult::Ok(update)
             });
             updates = updates_returns.collect::<Result<_, _>>()?;
@@ -115,7 +130,7 @@ pub async fn handle_get_entry(
 
                 // Otherwise gather the header
                 } else {
-                    let header = render_header(hash)?;
+                    let header = render_header_and_status(hash)?;
                     live_headers.insert(header.try_into()?);
                 }
             }
@@ -123,7 +138,7 @@ pub async fn handle_get_entry(
 
         let mut return_deletes = Vec::with_capacity(deletes.len());
         for delete in deletes {
-            let header = render_header(delete?)?;
+            let header = render_header_and_status(delete?)?;
             return_deletes.push(header.try_into().map_err(AuthorityDataError::from)?);
         }
         CellResult::Ok((live_headers, return_deletes, updates))
@@ -135,10 +150,10 @@ pub async fn handle_get_entry(
     // Get the entry from the first header
 
     fresh_reader!(state_env, |reader| {
-        let first_header = meta_vault.get_headers(&reader, hash.clone())?.next()?;
+        let first_header = meta_vault.get_all_headers(&reader, hash.clone())?.next()?;
         let entry_data = match first_header {
             Some(first_header) => {
-                let header = render_header(first_header)?;
+                let header = render_header_and_status(first_header)?.0;
                 Some(get_entry(header)?)
             }
             None => None,
@@ -165,22 +180,91 @@ pub async fn handle_get_entry(
     })
 }
 
+#[tracing::instrument(skip(env))]
+pub async fn handle_get_element(
+    env: EnvironmentWrite,
+    hash: HeaderHash,
+) -> CellResult<GetElementResponse> {
+    // Get the vaults
+    let env_ref = env.guard();
+    let reader = env_ref.reader()?;
+    let element_vault = ElementBuf::vault(env.clone().into(), false)?;
+    let meta_vault = MetadataBuf::vault(env.clone().into())?;
+    let element_rejected = ElementBuf::rejected(env.clone().into())?;
+
+    // Check that we have the authority to serve this request because we have
+    // done the StoreElement validation
+    if !meta_vault.has_any_registered_store_element(&hash)? {
+        return Ok(GetElementResponse::GetHeader(None));
+    }
+
+    // Look for a deletes on the header and collect them
+    let deletes = meta_vault
+        .get_deletes_on_header(&reader, hash.clone())?
+        .map_err(CellError::from)
+        .map(|delete_header| {
+            let delete_hash = delete_header.header_hash;
+            let mut status = ValidationStatus::Valid;
+            let mut delete = element_vault.get_header(&delete_hash)?;
+            if delete.is_none() {
+                delete = element_rejected.get_header(&delete_hash)?;
+                status = ValidationStatus::Rejected;
+            }
+            match delete {
+                Some(delete) => Ok((delete, status)
+                    .try_into()
+                    .map_err(AuthorityDataError::from)?),
+                None => Err(AuthorityDataError::missing_data(delete)),
+            }
+        })
+        .collect()?;
+
+    // Look for a updates on the header and collect them
+    let updates = meta_vault
+        .get_updates(&reader, hash.clone().into())?
+        .map_err(CellError::from)
+        .map(|update_header| {
+            let update_hash = update_header.header_hash;
+            let mut status = ValidationStatus::Valid;
+            let mut update = element_vault.get_header(&update_hash)?;
+            if update.is_none() {
+                update = element_rejected.get_header(&update_hash)?;
+                status = ValidationStatus::Rejected;
+            }
+            match update {
+                Some(update) => Ok((update, status)
+                    .try_into()
+                    .map_err(AuthorityDataError::from)?),
+                None => Err(AuthorityDataError::missing_data(update)),
+            }
+        })
+        .collect()?;
+
+    // Get the actual header and return it with proof of deleted if there is any
+    let mut r = element_vault.get_element(&hash)?;
+    let mut status = ValidationStatus::Valid;
+    if r.is_none() {
+        r = element_rejected.get_element(&hash)?;
+        status = ValidationStatus::Rejected;
+    }
+    let r = r
+        .map(|e| WireElement::from_element(ElementStatus::new(e, status), deletes, updates))
+        .map(Box::new);
+
+    Ok(GetElementResponse::GetHeader(r))
+}
+
 #[instrument(skip(env))]
 pub fn handle_get_agent_activity(
     env: EnvironmentRead,
     agent: AgentPubKey,
-    // TODO: Query filtering breaks caching.
-    // It's easier to just send back the full chain and then filter
-    // in the cascade but it would be nice to avoid sending the filtered
-    // out headers across the network.
-    _query: ChainQueryFilter,
+    query: ChainQueryFilter,
     options: holochain_p2p::event::GetActivityOptions,
 ) -> CellResult<AgentActivity> {
     // Databases
     let element_integrated = ElementBuf::vault(env.clone(), false)?;
     let meta_integrated = MetadataBuf::vault(env.clone())?;
     let element_rejected = ElementBuf::rejected(env.clone())?;
-    let meta_rejected = MetadataBuf::rejected(env.clone())?;
 
     // Status
     let status = meta_integrated
@@ -188,46 +272,36 @@ pub fn handle_get_agent_activity(
         .unwrap_or(ChainStatus::Empty);
     let highest_observed = meta_integrated.get_activity_observed(&agent)?;
 
-    // TODO: If full headers aren't requested then query doesn't work
-
     // Valid headers
     let valid_activity = if options.include_valid_activity {
         fresh_reader!(env, |r| {
-            let hashes = meta_integrated
-                .get_activity_sequence(&r, ChainItemKey::Agent(agent.clone()))?
-                .collect()?;
-            if options.include_full_headers {
-                CellResult::Ok(Activity::Full(get_full_headers(
-                    hashes,
-                    element_integrated,
-                    &r,
-                )?))
-            } else {
-                Ok(Activity::Hashes(hashes))
-            }
+            let hashes = meta_integrated.get_activity_sequence(
+                &r,
+                ChainItemKey::AgentStatus(agent.clone(), ValidationStatus::Valid),
+            )?;
+            check_headers(
+                hashes,
+                query.clone(),
+                options.clone(),
+                element_integrated,
+                &r,
+            )
         })?
     } else {
-        Activity::NotRequested
+        ChainItems::NotRequested
     };
 
     // Rejected hashes
     let rejected_activity = if options.include_rejected_activity {
         fresh_reader!(env, |r| {
-            let hashes = meta_rejected
-                .get_activity_sequence(&r, ChainItemKey::Agent(agent.clone()))?
-                .collect()?;
-            if options.include_full_headers {
-                CellResult::Ok(Activity::Full(get_full_headers(
-                    hashes,
-                    element_rejected,
-                    &r,
-                )?))
-            } else {
-                Ok(Activity::Hashes(hashes))
-            }
+            let hashes = meta_integrated.get_activity_sequence(
+                &r,
+                ChainItemKey::AgentStatus(agent.clone(), ValidationStatus::Rejected),
+            )?;
+            check_headers(hashes, query, options, element_rejected, &r)
         })?
     } else {
-        Activity::NotRequested
+        ChainItems::NotRequested
     };
 
     Ok(AgentActivity {
@@ -239,14 +313,90 @@ pub fn handle_get_agent_activity(
     })
 }
 
-fn get_full_headers<P: PrefixType, R: Readable>(
-    hashes: Vec<(u32, HeaderHash)>,
+fn get_full_headers<'a, P: PrefixType + 'a, R: Readable>(
+    hashes: impl FallibleIterator<Item = (u32, HeaderHash), Error = DatabaseError> + 'a,
+    query: ChainQueryFilter,
+    database: ElementBuf<P>,
+    reader: &'a R,
+) -> impl FallibleIterator<Item = (u32, SignedHeaderHashed), Error = DatabaseError> + 'a {
+    hashes
+        .filter_map(move |(s, h)| {
+            Ok(database
+                .get_header_with_reader(reader, &h)?
+                .map(|shh| (s, shh)))
+        })
+        .filter(move |(_, shh)| Ok(query.check(shh.header())))
+}
+
+fn check_headers<P: PrefixType, R: Readable>(
+    hashes: impl FallibleIterator<Item = (u32, HeaderHash), Error = DatabaseError>,
+    query: ChainQueryFilter,
+    options: holochain_p2p::event::GetActivityOptions,
     database: ElementBuf<P>,
     reader: &R,
-) -> CellResult<Vec<SignedHeaderHashed>> {
-    let headers: Vec<_> = fallible_iterator::convert(hashes.into_iter().map(Ok))
-        .filter_map(|h| database.get_header_with_reader(reader, &h.1))
-        // .filter(|shh| Ok(query.check(shh.header())))
-        .collect()?;
-    Ok(headers)
+) -> CellResult<ChainItems> {
+    if options.include_full_headers {
+        CellResult::Ok(ChainItems::Full(
+            get_full_headers(hashes, query, database, reader)
+                .map(|(_, shh)| Ok(shh))
+                .collect()?,
+        ))
+    } else {
+        Ok(ChainItems::Hashes(
+            get_full_headers(hashes, query, database, reader)
+                .map(|(s, shh)| Ok((s, shh.into_inner().1)))
+                .collect()?,
+        ))
+    }
+}
+
+#[cfg(test)]
+#[instrument(skip(env))]
+// This is handy for testing performance as it shows the read times for get agent activity
+fn _show_agent_activity_read_times(env: EnvironmentRead, agent: AgentPubKey) {
+    {
+        let g = env.guard();
+        let rkv = g.rkv();
+        let stat = rkv.stat().unwrap();
+        let info = rkv.info().unwrap();
+        debug!(
+            map_size = info.map_size(),
+            last_pgno = info.last_pgno(),
+            last_txnid = info.last_txnid(),
+            max_readers = info.max_readers(),
+            num_readers = info.num_readers()
+        );
+        debug!(
+            page_size = stat.page_size(),
+            depth = stat.depth(),
+            branch_pages = stat.branch_pages(),
+            leaf_pages = stat.leaf_pages(),
+            overflow_pages = stat.overflow_pages(),
+            entries = stat.entries(),
+        );
+    }
+    let element_integrated = ElementBuf::vault(env.clone(), false).unwrap();
+    let meta_integrated = MetadataBuf::vault(env.clone()).unwrap();
+    holochain_state::fresh_reader_test!(env, |r| {
+        let now = std::time::Instant::now();
+        let hashes = meta_integrated
+            .get_activity_sequence(
+                &r,
+                ChainItemKey::AgentStatus(agent.clone(), ValidationStatus::Valid),
+            )
+            .unwrap()
+            .collect::<Vec<_>>()
+            .unwrap();
+        let el = now.elapsed();
+        debug!(time_for_activity_sequence = %el.as_micros());
+        for hash in &hashes {
+            element_integrated.get_header(&hash.1).unwrap();
+        }
+        let el = now.elapsed();
+        debug!(
+            us_per_header = %el.as_micros() / hashes.len() as u128,
+            num_headers = %hashes.len(),
+            total = %el.as_millis()
+        );
+    });
 }

@@ -1,4 +1,5 @@
 use crate::element::SignedHeaderHashed;
+use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
 
 /// Opaque tag for the link applied at the app layer, used to differentiate
@@ -33,6 +34,12 @@ impl From<Vec<u8>> for LinkTag {
     }
 }
 
+impl From<()> for LinkTag {
+    fn from(_: ()) -> Self {
+        Self(Vec::new())
+    }
+}
+
 impl AsRef<Vec<u8>> for LinkTag {
     fn as_ref(&self) -> &Vec<u8> {
         &self.0
@@ -58,6 +65,8 @@ pub struct Link {
     pub timestamp: std::time::SystemTime,
     /// A tag used to find this link
     pub tag: LinkTag,
+    /// The hash of this link's create header
+    pub create_link_hash: HeaderHash,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, SerializedBytes, PartialEq, Clone, Debug)]

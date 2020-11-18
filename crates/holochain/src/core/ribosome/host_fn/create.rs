@@ -120,7 +120,6 @@ pub fn extract_entry_def(
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use super::create;
-    use crate::conductor::dna_store::MockDnaStore;
     use crate::core::ribosome::error::RibosomeError;
     use crate::core::ribosome::ZomeCallInvocation;
     use crate::core::state::source_chain::ChainInvalidReason;
@@ -329,19 +328,12 @@ pub mod wasm_test {
         // START CONDUCTOR
         // ///////////////
 
-        let mut dna_store = MockDnaStore::new();
-
-        dna_store.expect_get().return_const(Some(dna_file.clone()));
-        dna_store.expect_add_dnas::<Vec<_>>().return_const(());
-        dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
-        dna_store.expect_get_entry_def().return_const(None);
-
         let (_tmpdir, _app_api, handle) = setup_app(
             vec![(
                 "APPropriated",
                 vec![(alice_installed_cell, None), (bob_installed_cell, None)],
             )],
-            dna_store,
+            vec![dna_file.clone()],
         )
         .await;
 

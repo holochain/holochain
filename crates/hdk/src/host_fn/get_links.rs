@@ -1,3 +1,5 @@
+use crate::prelude::*;
+
 /// Returns all links that reference a base entry hash, optionally filtered by tag.
 ///
 /// Tag filtering is a simple bytes prefix.
@@ -17,16 +19,10 @@
 /// deleted c.f. get_link_details that returns all the creates and all the deletes together.
 ///
 /// @see get_link_details
-#[macro_export]
-macro_rules! get_links {
-    ( $base:expr ) => {
-        $crate::get_links!($base, None)
-    };
-    ( $base:expr, $tag:expr ) => {{
-        $crate::host_fn!(
-            __get_links,
-            $crate::prelude::GetLinksInput::new(($base, $tag.into())),
-            $crate::prelude::GetLinksOutput
-        )
-    }};
+pub fn get_links(base: EntryHash, link_tag: Option<LinkTag>) -> HdkResult<Links> {
+    host_fn!(
+        __get_links,
+        GetLinksInput::new((base, link_tag)),
+        GetLinksOutput
+    )
 }

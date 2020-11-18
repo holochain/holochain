@@ -59,8 +59,8 @@ use super::{
     manager::TaskManagerRunHandle,
     Cell, Conductor,
 };
-use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::workflow::ZomeCallInvocationResult;
+use crate::core::{ribosome::ZomeCallInvocation, workflow::CallZomeWorkspaceLock};
 use derive_more::From;
 use holochain_types::{
     app::{AppId, InstalledApp, InstalledCell, MembraneProof},
@@ -74,8 +74,7 @@ use tokio::sync::RwLock;
 use tracing::*;
 
 use futures::future::FutureExt;
-use holochain_p2p::event::HolochainP2pEvent::GetAgentInfoSigned;
-use holochain_p2p::event::HolochainP2pEvent::PutAgentInfoSigned;
+use holochain_p2p::event::HolochainP2pEvent::*;
 
 #[cfg(test)]
 use super::state::ConductorState;
@@ -137,6 +136,13 @@ pub trait ConductorHandleT: Send + Sync {
     async fn call_zome(
         &self,
         invocation: ZomeCallInvocation,
+    ) -> ConductorApiResult<ZomeCallInvocationResult>;
+
+    /// Invoke a zome function on a Cell with a workspace
+    async fn call_zome_with_workspace(
+        &self,
+        invocation: ZomeCallInvocation,
+        workspace_lock: CallZomeWorkspaceLock,
     ) -> ConductorApiResult<ZomeCallInvocationResult>;
 
     /// Cue the autonomic system to perform some action early (experimental)
@@ -202,6 +208,9 @@ pub trait ConductorHandleT: Send + Sync {
 
     #[cfg(test)]
     async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite>;
+
+    #[cfg(test)]
+    async fn get_p2p_env(&self) -> EnvironmentWrite;
 
     #[cfg(test)]
     async fn get_cell_triggers(&self, cell_id: &CellId)
@@ -310,6 +319,23 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
+            QueryAgentInfoSigned {
+                kitsune_space,
+                respond,
+                ..
+            } => {
+                let res = lock
+                    .query_agent_info_signed(kitsune_space)
+                    .map_err(holochain_p2p::HolochainP2pError::other);
+                respond.respond(Ok(async move { res }.boxed().into()));
+            }
+            SignNetworkData { respond, data, .. } => {
+                let signature = cell_id
+                    .agent_pubkey()
+                    .sign_raw(self.keystore(), &data)
+                    .await?;
+                respond.respond(Ok(async move { Ok(signature) }.boxed().into()));
+            }
             _ => {
                 let cell: &Cell = lock.cell_by_id(cell_id)?;
                 trace!(agent = ?cell_id.agent_pubkey(), event = ?event);
@@ -329,7 +355,21 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         let lock = self.conductor.read().await;
         debug!(cell_id = ?invocation.cell_id);
         let cell: &Cell = lock.cell_by_id(&invocation.cell_id)?;
-        Ok(cell.call_zome(invocation).await?)
+        Ok(cell.call_zome(invocation, None).await?)
+    }
+
+    async fn call_zome_with_workspace(
+        &self,
+        invocation: ZomeCallInvocation,
+        workspace_lock: CallZomeWorkspaceLock,
+    ) -> ConductorApiResult<ZomeCallInvocationResult> {
+        // FIXME: D-01058: We are holding this read lock for
+        // the entire call to call_zome and blocking
+        // any writes to the conductor
+        let lock = self.conductor.read().await;
+        debug!(cell_id = ?invocation.cell_id);
+        let cell: &Cell = lock.cell_by_id(&invocation.cell_id)?;
+        Ok(cell.call_zome(invocation, Some(workspace_lock)).await?)
     }
 
     async fn autonomic_cue(&self, cue: AutonomicCue, cell_id: &CellId) -> ConductorApiResult<()> {
@@ -471,6 +511,12 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         let lock = self.conductor.read().await;
         let cell = lock.cell_by_id(cell_id)?;
         Ok(cell.env().clone())
+    }
+
+    #[cfg(test)]
+    async fn get_p2p_env(&self) -> EnvironmentWrite {
+        let lock = self.conductor.read().await;
+        lock.get_p2p_env()
     }
 
     #[cfg(test)]

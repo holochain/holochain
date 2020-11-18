@@ -132,7 +132,7 @@ impl IntegratedDhtOpsBuf {
         Ok(Box::new(
             self.store
                 .iter(r)?
-                .map(move |(k, v)| Ok((DhtOpHash::with_pre_hashed(k.to_vec()), v)))
+                .map(move |(k, v)| Ok((DhtOpHash::from_raw_39_panicky(k.to_vec()), v)))
                 .filter_map(move |(k, v)| match from {
                     Some(time) if v.when_integrated >= time => Ok(Some((k, v))),
                     None => Ok(Some((k, v))),

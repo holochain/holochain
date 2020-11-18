@@ -38,22 +38,27 @@ fn priv_msg() -> PrivMsg {
 
 #[hdk_extern]
 fn create_entry(_: ()) -> ExternResult<HeaderHash> {
-    Ok(create_entry!(post())?)
+    Ok(hdk3::prelude::create_entry(&post())?)
+}
+
+#[hdk_extern]
+fn create_post(post: Post) -> ExternResult<HeaderHash> {
+    Ok(hdk3::prelude::create_entry(&post)?)
 }
 
 #[hdk_extern]
 fn get_entry(_: ()) -> ExternResult<GetOutput> {
-    Ok(GetOutput::new(get!(hash_entry!(post())?)?))
+    Ok(GetOutput::new(get(hash_entry(&post())?, GetOptions)?))
 }
 
 #[hdk_extern]
 fn create_msg(_: ()) -> ExternResult<HeaderHash> {
-    Ok(create_entry!(msg())?)
+    Ok(hdk3::prelude::create_entry(&msg())?)
 }
 
 #[hdk_extern]
 fn create_priv_msg(_: ()) -> ExternResult<HeaderHash> {
-    Ok(create_entry!(priv_msg())?)
+    Ok(hdk3::prelude::create_entry(&priv_msg())?)
 }
 
 #[hdk_extern]
@@ -68,4 +73,39 @@ fn validate_create_entry_post(
         _ => ValidateCallbackResult::Valid,
     };
     Ok(r)
+}
+
+#[hdk_extern]
+fn get_activity(input: test_wasm_common::AgentActivitySearch) -> ExternResult<AgentActivity> {
+    Ok(get_agent_activity(input.agent, input.query, input.request)?)
+}
+
+#[hdk_extern]
+fn init(_: ()) -> ExternResult<InitCallbackResult> {
+    // grant unrestricted access to accept_cap_claim so other agents can send us claims
+    let mut functions: GrantedFunctions = HashSet::new();
+    functions.insert((zome_info()?.zome_name, "create_entry".into()));
+    create_cap_grant(CapGrantEntry {
+        tag: "".into(),
+        // empty access converts to unrestricted
+        access: ().into(),
+        functions,
+    })?;
+
+    Ok(InitCallbackResult::Pass)
+}
+
+/// Create a post entry then
+/// create another post through a
+/// call
+#[hdk_extern]
+fn call_create_entry(_: ()) -> ExternResult<HeaderHash> {
+    hdk3::prelude::create_entry(&post())?;
+    Ok(call(
+        None,
+        "create_entry".to_string().into(),
+        "create_entry".to_string().into(),
+        None,
+        &(),
+    )?)
 }

@@ -27,11 +27,17 @@ ghost_actor::ghost_chan! {
             ghost_actor::GhostSender<KitsuneP2p>,
         );
 
+        /// Magically exchange peer data between peers in harness
+        fn magic_peer_info_exchange() -> ();
+
         /// Inject data for one specific agent to gossip to others
         fn inject_gossip_data(agent: Arc<KitsuneAgent>, data: String) -> Arc<KitsuneOpHash>;
 
         /// Dump all local gossip data from a specific agent
         fn dump_local_gossip_data(agent: Arc<KitsuneAgent>) -> HashMap<Arc<KitsuneOpHash>, String>;
+
+        /// Dump all local peer data from a specific agent
+        fn dump_local_peer_data(agent: Arc<KitsuneAgent>) -> HashMap<Arc<KitsuneAgent>, Arc<AgentInfoSigned>>;
     }
 }
 
@@ -279,6 +285,30 @@ impl HarnessControlApiHandler for HarnessActor {
         .into())
     }
 
+    fn handle_magic_peer_info_exchange(&mut self) -> HarnessControlApiHandlerResult<()> {
+        let ctrls = self
+            .agents
+            .values()
+            .map(|(_, ctrl)| ctrl.clone())
+            .collect::<Vec<_>>();
+
+        Ok(async move {
+            let infos = ctrls.iter().map(|c| c.dump_agent_info());
+            let infos = futures::future::try_join_all(infos).await?;
+            let infos = infos.into_iter().fold(HashMap::new(), |acc, x| {
+                x.into_iter().fold(acc, |mut acc, x| {
+                    acc.insert(Arc::new(x.as_agent_ref().clone()), x);
+                    acc
+                })
+            });
+            let infos = ctrls.iter().map(|c| c.inject_agent_info(infos.clone()));
+            futures::future::try_join_all(infos).await?;
+            Ok(())
+        }
+        .boxed()
+        .into())
+    }
+
     fn handle_inject_gossip_data(
         &mut self,
         agent: Arc<KitsuneAgent>,
@@ -301,6 +331,18 @@ impl HarnessControlApiHandler for HarnessActor {
             .get(&agent)
             .ok_or_else(|| KitsuneP2pError::from("invalid agent"))?;
         let fut = ctrl.dump_local_gossip_data();
+        Ok(async move { fut.await }.boxed().into())
+    }
+
+    fn handle_dump_local_peer_data(
+        &mut self,
+        agent: Arc<KitsuneAgent>,
+    ) -> HarnessControlApiHandlerResult<HashMap<Arc<KitsuneAgent>, Arc<AgentInfoSigned>>> {
+        let (_, ctrl) = self
+            .agents
+            .get(&agent)
+            .ok_or_else(|| KitsuneP2pError::from("invalid agent"))?;
+        let fut = ctrl.dump_local_peer_data();
         Ok(async move { fut.await }.boxed().into())
     }
 }

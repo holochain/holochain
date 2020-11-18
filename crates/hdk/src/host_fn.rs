@@ -11,6 +11,7 @@ pub mod emit_signal;
 pub mod encrypt;
 pub mod entry_type_properties;
 pub mod get;
+pub mod get_agent_activity;
 pub mod get_details;
 pub mod get_link_details;
 pub mod get_links;
@@ -48,10 +49,14 @@ pub mod zome_info;
 #[macro_export]
 macro_rules! host_fn {
     ( $f:ident, $input:expr, $outputt:ty ) => {{
+        use $crate::prelude::GuestPtr;
         $crate::prelude::holochain_externs!();
 
         let result: Result<$outputt, $crate::prelude::SerializedBytesError> =
             $crate::prelude::host_call!($f, $input);
-        result.map(|r| r.into_inner())
+        match result {
+            Ok(v) => Ok(v.into_inner()),
+            Err(e) => Err($crate::prelude::HdkError::SerializedBytes(e)),
+        }
     }};
 }

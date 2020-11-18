@@ -265,6 +265,25 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         .into())
     }
 
+    /// We need to get previously stored agent info.
+    #[tracing::instrument(skip(self), level = "trace")]
+    fn handle_query_agent_info_signed(
+        &mut self,
+        input: kitsune_p2p::event::QueryAgentInfoSignedEvt,
+    ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<Vec<AgentInfoSigned>> {
+        let kitsune_p2p::event::QueryAgentInfoSignedEvt { space, agent } = input;
+        let h_space = DnaHash::from_kitsune(&space);
+        let h_agent = AgentPubKey::from_kitsune(&agent);
+        let evt_sender = self.evt_sender.clone();
+        Ok(async move {
+            Ok(evt_sender
+                .query_agent_info_signed(h_space, h_agent, space, agent)
+                .await?)
+        }
+        .boxed()
+        .into())
+    }
+
     #[tracing::instrument(skip(self, space, to_agent, from_agent, payload), level = "trace")]
     fn handle_call(
         &mut self,
@@ -464,9 +483,19 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
     #[tracing::instrument(skip(self), level = "trace")]
     fn handle_sign_network_data(
         &mut self,
-        _input: kitsune_p2p::event::SignNetworkDataEvt,
+        input: kitsune_p2p::event::SignNetworkDataEvt,
     ) -> kitsune_p2p::event::KitsuneP2pEventHandlerResult<kitsune_p2p::KitsuneSignature> {
-        unimplemented!()
+        let space = DnaHash::from_kitsune(&input.space);
+        let agent = AgentPubKey::from_kitsune(&input.agent);
+        let fut = self
+            .evt_sender
+            .sign_network_data(space, agent, input.data.to_vec());
+        Ok(async move {
+            let sig = fut.await?.0;
+            Ok(sig.into())
+        }
+        .boxed()
+        .into())
     }
 }
 
@@ -524,7 +553,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         let kitsune_p2p = self.kitsune_p2p.clone();
         Ok(async move {
             let result = kitsune_p2p
-                .rpc_single(space, to_agent, from_agent, req)
+                .rpc_single(space, to_agent, from_agent, req, None)
                 .await?;
             let result = UnsafeBytes::from(result).into();
             Ok(result)
@@ -582,7 +611,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         let kitsune_p2p = self.kitsune_p2p.clone();
         Ok(async move {
             let response = kitsune_p2p
-                .rpc_single(space, to_agent, from_agent, req)
+                .rpc_single(space, to_agent, from_agent, req, None)
                 .await?;
             let response = SerializedBytes::from(UnsafeBytes::from(response)).try_into()?;
             Ok(response)
@@ -788,7 +817,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
         let kitsune_p2p = self.kitsune_p2p.clone();
         Ok(async move {
             kitsune_p2p
-                .rpc_single(space, to_agent, from_agent, req)
+                .rpc_single(space, to_agent, from_agent, req, None)
                 .await?;
             Ok(())
         }

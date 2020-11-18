@@ -27,9 +27,10 @@ use holochain_zome_types::{
     query::ChainHead,
     query::ChainStatus,
     query::HighestObserved,
+    validate::ValidationStatus,
 };
 use holochain_zome_types::{link::LinkTag, Header};
-use std::fmt::Debug;
+use std::{collections::HashSet, fmt::Debug};
 use tracing::*;
 
 use activity::*;
@@ -41,12 +42,15 @@ pub use mock::MockMetadataBuf;
 #[cfg(test)]
 use mockall::mock;
 
+use self::status::DisputedStatus;
+
 mod activity;
 #[cfg(test)]
 mod chain_test;
 mod keys;
 #[cfg(test)]
 pub mod links_test;
+mod status;
 mod sys_meta;
 
 #[allow(missing_docs)]
@@ -57,7 +61,6 @@ mod mock;
 ///
 /// Unfortunately this cannot be automocked because of the lifetimes required
 /// for returning iterators from these trait methods, which automock doesn't support.
-#[async_trait::async_trait]
 pub trait MetadataBufT<P = IntegratedPrefix>
 where
     P: PrefixType,
@@ -90,9 +93,22 @@ where
         value: SysMetaVal,
     ) -> DatabaseResult<()>;
 
-    /// Register a HeaderHash directly on a header hash.
+    /// Deregister a HeaderHash directly on an entry hash.
+    /// Also updates the entry dht status.
+    /// Useful when you only have hashes and not full types
+    fn deregister_raw_on_entry(
+        &mut self,
+        entry_hash: EntryHash,
+        value: SysMetaVal,
+    ) -> DatabaseResult<()>;
+
+    /// Register a value directly on a header hash.
     /// Useful when you only have hashes and not full types
     fn register_raw_on_header(&mut self, header_hash: HeaderHash, value: SysMetaVal);
+
+    /// Register a value directly on a header hash.
+    /// Useful when you only have hashes and not full types
+    fn deregister_raw_on_header(&mut self, header_hash: HeaderHash, value: SysMetaVal);
 
     /// Remove a link
     fn delete_link(&mut self, link_remove: DeleteLink) -> DatabaseResult<()>;
@@ -111,6 +127,15 @@ where
     /// Deregister a [Header::NewEntryHeader] on the referenced [Entry]
     fn deregister_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()>;
 
+    /// Registers a rejected [Header::NewEntryHeader] on the referenced [Entry]
+    fn register_rejected_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()>;
+
+    /// Deregister a rejected [Header::NewEntryHeader] on the referenced [Entry]
+    fn deregister_rejected_header(
+        &mut self,
+        new_entry_header: NewEntryHeader,
+    ) -> DatabaseResult<()>;
+
     /// Registers a [Header] when a StoreElement is processed.
     /// Useful for knowing if we can serve a header from our element vault
     fn register_element_header(&mut self, header: &Header) -> DatabaseResult<()>;
@@ -119,11 +144,27 @@ where
     /// Useful for knowing if we can serve a header from our element vault
     fn deregister_element_header(&mut self, header: HeaderHash) -> DatabaseResult<()>;
 
+    /// Registers a rejected [Header] when a StoreElement is processed.
+    /// Useful for knowing if we can serve a header from our element vault
+    fn register_rejected_element_header(&mut self, header: &Header) -> DatabaseResult<()>;
+
+    /// Deregister a rejected [Header] when a StoreElement is processed.
+    /// Useful for knowing if we can serve a header from our element vault
+    fn deregister_rejected_element_header(&mut self, header: HeaderHash) -> DatabaseResult<()>;
+
     /// Registers a published [Header] on the authoring agent's public key
-    fn register_activity(&mut self, header: &Header) -> DatabaseResult<()>;
+    fn register_activity(
+        &mut self,
+        header: &Header,
+        validation_status: ValidationStatus,
+    ) -> DatabaseResult<()>;
 
     /// Deregister a published [Header] on the authoring agent's public key
-    fn deregister_activity(&mut self, header: &Header) -> DatabaseResult<()>;
+    fn deregister_activity(
+        &mut self,
+        header: &Header,
+        validation_status: ValidationStatus,
+    ) -> DatabaseResult<()>;
 
     /// Registers a custom validation package on a [HeaderHash]
     fn register_validation_package(
@@ -140,10 +181,15 @@ where
         &mut self,
         agent: &AgentPubKey,
         sequence: impl IntoIterator<Item = (u32, HeaderHash)>,
+        validation_status: ValidationStatus,
     ) -> DatabaseResult<()>;
 
     /// Deregister a sequence of activity onto an agent key
-    fn deregister_activity_sequence(&mut self, agent: &AgentPubKey) -> DatabaseResult<()>;
+    fn deregister_activity_sequence(
+        &mut self,
+        agent: &AgentPubKey,
+        valid_status: ValidationStatus,
+    ) -> DatabaseResult<()>;
 
     /// Registers the agents chain status on the authoring agent's public key
     fn register_activity_status(
@@ -177,8 +223,28 @@ where
     /// Deregister a [Header::Delete] on the Header of an Entry
     fn deregister_delete(&mut self, delete: header::Delete) -> DatabaseResult<()>;
 
-    /// Returns all the [HeaderHash]es of headers that created this [Entry]
+    /// Registers a ValidationStatus on a Header hash
+    fn register_validation_status(&mut self, hash: HeaderHash, status: ValidationStatus);
+
+    /// Deregister a ValidationStatus on a Header hash
+    fn deregister_validation_status(&mut self, hash: HeaderHash, status: ValidationStatus);
+
+    /// Returns all the valid [HeaderHash]es of headers that created this [Entry]
     fn get_headers<'r, R: Readable>(
+        &'r self,
+        reader: &'r R,
+        entry_hash: EntryHash,
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>;
+
+    /// Returns all the rejected [HeaderHash]es of headers that created this [Entry]
+    fn get_rejected_headers<'r, R: Readable>(
+        &'r self,
+        reader: &'r R,
+        entry_hash: EntryHash,
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>;
+
+    /// Returns all the valid and rejected [HeaderHash]es of headers that created this [Entry]
+    fn get_all_headers<'r, R: Readable>(
         &'r self,
         reader: &'r R,
         entry_hash: EntryHash,
@@ -250,6 +316,15 @@ where
         entry_hash: &EntryHash,
     ) -> DatabaseResult<EntryDhtStatus>;
 
+    /// Returns the current set of [ValidationStatus] for a [Header].
+    /// A set of disputed status is returned.
+    /// If the set only contains one entry there is no dispute.
+    fn get_validation_status<'r, R: Readable>(
+        &'r self,
+        r: &'r R,
+        header_hash: &HeaderHash,
+    ) -> DatabaseResult<DisputedStatus>;
+
     /// Finds the redirect path and returns the final [Entry]
     fn get_canonical_entry_hash(&self, entry_hash: EntryHash) -> DatabaseResult<EntryHash>;
 
@@ -263,8 +338,14 @@ where
         link_add: HeaderHash,
     ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>;
 
-    /// Finds if there is a StoreElement for this header
-    fn has_registered_store_element(&self, hash: &HeaderHash) -> DatabaseResult<bool>;
+    /// Finds if there is a valid or rejected StoreElement for this header
+    fn has_any_registered_store_element(&self, hash: &HeaderHash) -> DatabaseResult<bool>;
+
+    /// Finds if there is a valid StoreElement for this header
+    fn has_valid_registered_store_element(&self, hash: &HeaderHash) -> DatabaseResult<bool>;
+
+    /// Finds if there is a rejected StoreElement for this header
+    fn has_rejected_registered_store_element(&self, hash: &HeaderHash) -> DatabaseResult<bool>;
 
     /// Finds if there is a StoreEntry for this header
     fn has_registered_store_entry(
@@ -415,40 +496,104 @@ where
         )
     }
 
+    /// If there are any rejected or abandoned activity
+    /// return the earliest problem.
+    fn check_for_invalid_status<R: Readable>(
+        &self,
+        agent: AgentPubKey,
+        reader: &R,
+    ) -> DatabaseResult<ChainStatus> {
+        let rejected_key = ChainItemKey::AgentStatus(agent.clone(), ValidationStatus::Rejected);
+        let abandoned_key = ChainItemKey::AgentStatus(agent, ValidationStatus::Abandoned);
+        let rejected_hash = self.get_activity_sequence(reader, rejected_key)?.next()?;
+        let abandoned_hash = self.get_activity_sequence(reader, abandoned_key)?.next()?;
+        match (rejected_hash, abandoned_hash) {
+            (None, None) => Ok(ChainStatus::Empty),
+            (None, Some((header_seq, hash))) => {
+                Ok(ChainStatus::Invalid(ChainHead { header_seq, hash }))
+            }
+            (Some((header_seq, hash)), None) => {
+                Ok(ChainStatus::Invalid(ChainHead { header_seq, hash }))
+            }
+            (Some(a), Some(b)) => match a.0.cmp(&b.0) {
+                std::cmp::Ordering::Equal => Ok(ChainStatus::Forked(ChainFork {
+                    fork_seq: a.0,
+                    first_header: a.1,
+                    second_header: b.1,
+                })),
+                std::cmp::Ordering::Less => Ok(ChainStatus::Invalid(ChainHead {
+                    header_seq: a.0,
+                    hash: a.1,
+                })),
+                std::cmp::Ordering::Greater => Ok(ChainStatus::Invalid(ChainHead {
+                    header_seq: b.0,
+                    hash: b.1,
+                })),
+            },
+        }
+    }
+
+    /// Check the valid activity sequence is complete and
+    /// doesn't have any forks or return the first fork.
+    fn calculate_activity_status(
+        &self,
+        mut activity: impl FallibleIterator<Item = (u32, HeaderHash), Error = DatabaseError>,
+    ) -> DatabaseResult<Option<ChainStatus>> {
+        let mut last = None;
+        let mut chain_complete = true;
+        while let Some((header_seq, hash)) = activity.next()? {
+            if let Some(ChainHead {
+                header_seq: last_seq,
+                hash: last_hash,
+            }) = last
+            {
+                if last_seq == header_seq {
+                    // Chain is forked
+                    return Ok(Some(ChainStatus::Forked(ChainFork {
+                        fork_seq: last_seq,
+                        first_header: last_hash,
+                        second_header: hash,
+                    })));
+                }
+                if header_seq != last_seq + 1 {
+                    // Chain broken but still check for forks
+                    chain_complete = false;
+                }
+            }
+            last = Some(ChainHead { header_seq, hash });
+        }
+        if chain_complete {
+            return Ok(last.map(ChainStatus::Valid));
+        }
+        DatabaseResult::Ok(None)
+    }
+
     /// Check the activity chain for forks and gaps.
     /// If there is a fork record a forked chain status.
     /// Otherwise if there are no gaps then record a valid chain.
     fn update_activity_status(&mut self, agent: &AgentPubKey) -> DatabaseResult<()> {
-        let key = ChainItemKey::Agent(agent.clone());
+        let key = ChainItemKey::AgentStatus(agent.clone(), ValidationStatus::Valid);
         let status = fresh_reader!(self.env, |r| {
-            let mut iter = self.get_activity_sequence(&r, key)?;
-            let mut last = None;
-            let mut chain_complete = true;
-            while let Some((header_seq, hash)) = iter.next()? {
-                if let Some(ChainHead {
-                    header_seq: last_seq,
-                    hash: last_hash,
-                }) = last
-                {
-                    if last_seq == header_seq {
-                        // Chain is forked
-                        return Ok(Some(ChainStatus::Forked(ChainFork {
-                            fork_seq: last_seq,
-                            first_header: last_hash,
-                            second_header: hash,
-                        })));
-                    }
-                    if header_seq != last_seq + 1 {
-                        // Chain broken but still check for forks
-                        chain_complete = false;
-                    }
+            let invalid_activity_status = self.check_for_invalid_status(agent.clone(), &r)?;
+            match invalid_activity_status {
+                // No invalid data so check entire valid activity
+                ChainStatus::Empty => {
+                    let iter = self.get_activity_sequence(&r, key)?;
+                    self.calculate_activity_status(iter)
                 }
-                last = Some(ChainHead { header_seq, hash });
+                // Invalid data found so check for earlier problems
+                // up to the found problem sequence number
+                ChainStatus::Invalid(ChainHead {
+                    header_seq: seq, ..
+                })
+                | ChainStatus::Forked(ChainFork { fork_seq: seq, .. }) => {
+                    let iter = self
+                        .get_activity_sequence(&r, key)?
+                        .take_while(|(s, _)| Ok(*s < seq));
+                    self.calculate_activity_status(iter)
+                }
+                _ => unreachable!(),
             }
-            if chain_complete {
-                return Ok(last.map(ChainStatus::Valid));
-            }
-            DatabaseResult::Ok(None)
         })?;
         if let Some(status) = status {
             self.register_activity_status(agent, status)?;
@@ -463,7 +608,6 @@ where
     }
 }
 
-#[async_trait::async_trait]
 impl<P> MetadataBufT<P> for MetadataBuf<P>
 where
     P: PrefixType,
@@ -559,9 +703,24 @@ where
         self.update_entry_dht_status(entry_hash)
     }
 
+    fn deregister_raw_on_entry(
+        &mut self,
+        entry_hash: EntryHash,
+        value: SysMetaVal,
+    ) -> DatabaseResult<()> {
+        self.system_meta
+            .delete(SysMetaKey::from(entry_hash.clone()).into(), value);
+        self.update_entry_dht_status(entry_hash)
+    }
+
     fn register_raw_on_header(&mut self, header_hash: HeaderHash, value: SysMetaVal) {
         self.system_meta
             .insert(SysMetaKey::from(header_hash).into(), value);
+    }
+
+    fn deregister_raw_on_header(&mut self, header_hash: HeaderHash, value: SysMetaVal) {
+        self.system_meta
+            .delete(SysMetaKey::from(header_hash).into(), value);
     }
 
     fn register_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()> {
@@ -578,6 +737,27 @@ where
         Ok(())
     }
 
+    fn register_rejected_header(&mut self, new_entry_header: NewEntryHeader) -> DatabaseResult<()> {
+        let basis = new_entry_header.entry().clone();
+        let header: Header = new_entry_header.into();
+        let header = HeaderHashed::from_content_sync(header);
+        let value = SysMetaVal::RejectedNewEntry(header.into());
+        self.register_raw_on_entry(basis, value)?;
+        Ok(())
+    }
+
+    fn deregister_rejected_header(
+        &mut self,
+        new_entry_header: NewEntryHeader,
+    ) -> DatabaseResult<()> {
+        let basis = new_entry_header.entry().clone();
+        let header: Header = new_entry_header.into();
+        let header = HeaderHashed::from_content_sync(header);
+        let value = SysMetaVal::RejectedNewEntry(header.into());
+        self.deregister_raw_on_entry(basis, value)?;
+        Ok(())
+    }
+
     fn register_element_header(&mut self, header: &Header) -> DatabaseResult<()> {
         self.misc_meta.put(
             MiscMetaKey::store_element(&HeaderHash::with_data_sync(header)).into(),
@@ -588,6 +768,18 @@ where
     fn deregister_element_header(&mut self, hash: HeaderHash) -> DatabaseResult<()> {
         self.misc_meta
             .delete(MiscMetaKey::store_element(&hash).into())
+    }
+
+    fn register_rejected_element_header(&mut self, header: &Header) -> DatabaseResult<()> {
+        self.misc_meta.put(
+            MiscMetaKey::rejected_store_element(&HeaderHash::with_data_sync(header)).into(),
+            MiscMetaValue::new_store_element(),
+        )
+    }
+
+    fn deregister_rejected_element_header(&mut self, hash: HeaderHash) -> DatabaseResult<()> {
+        self.misc_meta
+            .delete(MiscMetaKey::rejected_store_element(&hash).into())
     }
 
     fn register_update(&mut self, update: header::Update) -> DatabaseResult<()> {
@@ -620,16 +812,32 @@ where
         self.update_entry_dht_status(entry_hash)
     }
 
-    fn register_activity(&mut self, header: &Header) -> DatabaseResult<()> {
-        let key = ChainItemKey::from(header);
+    fn register_validation_status(&mut self, hash: HeaderHash, status: ValidationStatus) {
+        self.register_raw_on_header(hash, SysMetaVal::ValidationStatus(status))
+    }
+
+    fn deregister_validation_status(&mut self, hash: HeaderHash, status: ValidationStatus) {
+        self.deregister_raw_on_header(hash, SysMetaVal::ValidationStatus(status))
+    }
+
+    fn register_activity(
+        &mut self,
+        header: &Header,
+        validation_status: ValidationStatus,
+    ) -> DatabaseResult<()> {
+        let key = ChainItemKey::new(header, validation_status);
         let key = MiscMetaKey::chain_item(&key).into();
         let value = MiscMetaValue::ChainItem(header.timestamp().clone().into());
         self.misc_meta.put(key, value)?;
         self.update_activity_status(header.author())
     }
 
-    fn deregister_activity(&mut self, header: &Header) -> DatabaseResult<()> {
-        let key = ChainItemKey::from(header);
+    fn deregister_activity(
+        &mut self,
+        header: &Header,
+        validation_status: ValidationStatus,
+    ) -> DatabaseResult<()> {
+        let key = ChainItemKey::new(header, validation_status);
         self.misc_meta
             .delete(MiscMetaKey::chain_item(&key).into())?;
         self.update_activity_status(header.author())
@@ -639,9 +847,10 @@ where
         &mut self,
         agent: &AgentPubKey,
         sequence: impl IntoIterator<Item = (u32, HeaderHash)>,
+        validation_status: ValidationStatus,
     ) -> DatabaseResult<()> {
         for (seq, hash) in sequence {
-            let key = ChainItemKey::Full(agent.clone(), seq, hash);
+            let key = ChainItemKey::Full(agent.clone(), validation_status, seq, hash);
             let key = MiscMetaKey::chain_item(&key).into();
             // TODO: Remove timestamp value as headers are already ordered
             let value = MiscMetaValue::ChainItem(Timestamp::now());
@@ -650,13 +859,17 @@ where
         self.update_activity_status(agent)
     }
 
-    fn deregister_activity_sequence(&mut self, agent: &AgentPubKey) -> DatabaseResult<()> {
-        let key = ChainItemKey::Agent(agent.clone());
+    fn deregister_activity_sequence(
+        &mut self,
+        agent: &AgentPubKey,
+        validation_status: ValidationStatus,
+    ) -> DatabaseResult<()> {
+        let key = ChainItemKey::AgentStatus(agent.clone(), validation_status);
         let sequence: Vec<_> = fresh_reader!(self.env, |r| {
             self.get_activity_sequence(&r, key)?.collect()
         })?;
         for (seq, hash) in sequence {
-            let k = ChainItemKey::Full(agent.clone(), seq, hash);
+            let k = ChainItemKey::Full(agent.clone(), validation_status, seq, hash);
             let k = MiscMetaKey::chain_item(&k).into();
             self.misc_meta.delete(k)?;
         }
@@ -759,6 +972,47 @@ where
             .filter_map(|h| {
                 Ok(match h {
                     SysMetaVal::NewEntry(h) => Some(h),
+                    _ => None,
+                })
+            }),
+        ))
+    }
+
+    fn get_all_headers<'r, R: Readable>(
+        &'r self,
+        r: &'r R,
+        entry_hash: EntryHash,
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
+    {
+        Ok(Box::new(
+            fallible_iterator::convert(
+                self.system_meta
+                    .get(r, &SysMetaKey::from(entry_hash).into())?,
+            )
+            .filter_map(|h| {
+                Ok(match h {
+                    SysMetaVal::NewEntry(h) => Some(h),
+                    SysMetaVal::RejectedNewEntry(h) => Some(h),
+                    _ => None,
+                })
+            }),
+        ))
+    }
+
+    fn get_rejected_headers<'r, R: Readable>(
+        &'r self,
+        r: &'r R,
+        entry_hash: EntryHash,
+    ) -> DatabaseResult<Box<dyn FallibleIterator<Item = TimedHeaderHash, Error = DatabaseError> + '_>>
+    {
+        Ok(Box::new(
+            fallible_iterator::convert(
+                self.system_meta
+                    .get(r, &SysMetaKey::from(entry_hash).into())?,
+            )
+            .filter_map(|h| {
+                Ok(match h {
+                    SysMetaVal::RejectedNewEntry(h) => Some(h),
                     _ => None,
                 })
             }),
@@ -912,6 +1166,25 @@ where
             .unwrap_or(EntryDhtStatus::Dead))
     }
 
+    fn get_validation_status<'r, R: Readable>(
+        &'r self,
+        r: &'r R,
+        hash: &HeaderHash,
+    ) -> DatabaseResult<DisputedStatus> {
+        Ok(fallible_iterator::convert(
+            self.system_meta
+                .get(r, &SysMetaKey::from(hash.clone()).into())?,
+        )
+        .filter_map(|h| {
+            Ok(match h {
+                SysMetaVal::ValidationStatus(s) => Some(s),
+                _ => None,
+            })
+        })
+        .collect::<HashSet<_>>()?
+        .into())
+    }
+
     fn get_canonical_entry_hash(&self, _entry_hash: EntryHash) -> DatabaseResult<EntryHash> {
         todo!("Cannot implement until redirects are implemented")
     }
@@ -940,10 +1213,26 @@ where
         ))
     }
 
-    fn has_registered_store_element(&self, hash: &HeaderHash) -> DatabaseResult<bool> {
+    fn has_any_registered_store_element(&self, hash: &HeaderHash) -> DatabaseResult<bool> {
+        fresh_reader!(self.env, |r| DatabaseResult::Ok(
+            self.misc_meta
+                .contains(&r, &MiscMetaKey::store_element(hash).into())?
+                || self
+                    .misc_meta
+                    .contains(&r, &MiscMetaKey::rejected_store_element(hash).into())?
+        ))
+    }
+
+    fn has_valid_registered_store_element(&self, hash: &HeaderHash) -> DatabaseResult<bool> {
         fresh_reader!(self.env, |r| self
             .misc_meta
             .contains(&r, &MiscMetaKey::store_element(hash).into()))
+    }
+
+    fn has_rejected_registered_store_element(&self, hash: &HeaderHash) -> DatabaseResult<bool> {
+        fresh_reader!(self.env, |r| self
+            .misc_meta
+            .contains(&r, &MiscMetaKey::rejected_store_element(hash).into()))
     }
 
     fn has_registered_store_entry(

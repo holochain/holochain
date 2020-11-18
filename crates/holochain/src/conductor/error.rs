@@ -84,6 +84,9 @@ pub enum ConductorError {
 
     #[error(transparent)]
     KeystoreError(#[from] holochain_keystore::KeystoreError),
+
+    #[error(transparent)]
+    KitsuneP2pError(#[from] kitsune_p2p::KitsuneP2pError),
 }
 
 #[derive(Error, Debug)]

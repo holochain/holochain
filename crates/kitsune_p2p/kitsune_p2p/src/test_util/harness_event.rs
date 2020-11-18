@@ -2,7 +2,7 @@ use super::*;
 use futures::sink::SinkExt;
 
 /// a small debug representation of another type
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct Slug(String);
 
 impl std::fmt::Debug for Slug {

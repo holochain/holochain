@@ -8,7 +8,9 @@ use holochain_serialized_bytes::prelude::*;
 /// much of this happens in the subconscious
 /// an entry missing validation dependencies may cycle through Pending many times before finally
 /// reaching a final validation state or being abandoned
-#[derive(Clone, serde::Serialize, serde::Deserialize, Debug, Eq, PartialEq)]
+#[derive(
+    Clone, Copy, Hash, serde::Serialize, serde::Deserialize, PartialOrd, Ord, Debug, Eq, PartialEq,
+)]
 pub enum ValidationStatus {
     /// all implemented validation callbacks found all dependencies and passed validation
     Valid,

@@ -1,3 +1,5 @@
+#![allow(unused_imports)]
+#![allow(dead_code)]
 use crate::{
     conductor::{dna_store::MockDnaStore, interface::websocket::test::setup_app},
     core::{
@@ -35,6 +37,7 @@ use holochain_types::{
     cell::CellId,
     dht_op::produce_op_lights_from_elements,
     dna::{DnaDef, DnaFile},
+    element::ElementStatus,
     element::{Element, GetElementResponse, WireElement},
     entry::option_entry_hashed,
     fixt::*,
@@ -49,6 +52,7 @@ use holochain_zome_types::{
     header::*,
     link::Link,
     metadata::{Details, EntryDhtStatus},
+    validate::ValidationStatus,
 };
 use maplit::btreeset;
 use std::collections::BTreeMap;
@@ -59,6 +63,7 @@ use unwrap_to::unwrap_to;
 
 use crate::test_utils::host_fn_api::*;
 
+/*
 #[tokio::test(threaded_scheduler)]
 #[ignore = "flaky"]
 async fn get_updates_cache() {
@@ -100,7 +105,9 @@ async fn get_updates_cache() {
 
     shutdown.clean().await;
 }
+*/
 
+/*
 #[tokio::test(threaded_scheduler)]
 #[ignore = "flaky!"]
 async fn get_meta_updates_meta_cache() {
@@ -165,6 +172,7 @@ async fn get_meta_updates_meta_cache() {
 
     shutdown.clean().await;
 }
+*/
 
 #[tokio::test(threaded_scheduler)]
 #[ignore = "flaky"]
@@ -446,6 +454,7 @@ async fn get_links_from_another_agent() {
         target: target_entry_hash.clone(),
         timestamp: links.get(0).unwrap().timestamp.clone(),
         tag: link_tag.clone(),
+        create_link_hash: link_add_hash.clone(),
     };
     assert_eq!(*links.get(0).unwrap(), expt);
 
@@ -518,6 +527,8 @@ impl Shutdown {
             .ok();
     }
 }
+
+/*
 /// Run a test network handler which accepts two data sources to draw from.
 /// It only handles Get and GetMeta requests.
 /// - When handling a Get, it pulls the corresponding Element from the `element_fixt_store`
@@ -555,7 +566,11 @@ async fn run_fixt_network(
                             .cloned()
                             .map(|element| {
                                 GetElementResponse::GetHeader(Some(Box::new(
-                                    WireElement::from_element(element, vec![], vec![]),
+                                    WireElement::from_element(
+                                        ElementStatus::new(element, ValidationStatus::Valid),
+                                        vec![],
+                                        vec![],
+                                    ),
                                 )))
                                 .try_into()
                                 .unwrap()
@@ -596,6 +611,7 @@ async fn run_fixt_network(
         },
     )
 }
+*/
 
 async fn generate_fixt_store() -> (
     BTreeMap<HeaderHash, Element>,
