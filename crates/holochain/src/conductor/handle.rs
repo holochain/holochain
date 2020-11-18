@@ -68,11 +68,11 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::*;
 
-#[cfg(feature = "test_utils")]
+#[cfg(any(test, feature = "test_utils"))]
 use super::state::ConductorState;
-#[cfg(feature = "test_utils")]
+#[cfg(any(test, feature = "test_utils"))]
 use crate::core::queue_consumer::InitialQueueTriggers;
-#[cfg(feature = "test_utils")]
+#[cfg(any(test, feature = "test_utils"))]
 use holochain_state::env::EnvironmentWrite;
 
 /// A handle to the Conductor that can easily be passed around and cheaply cloned
@@ -198,20 +198,20 @@ pub trait ConductorHandleT: Send + Sync {
     async fn get_app_info(&self, app_id: &AppId) -> ConductorResult<Option<InstalledApp>>;
 
     /// Retrieve the LMDB environment for this cell. FOR TESTING ONLY.
-    #[cfg(feature = "test_utils")]
+    #[cfg(any(test, feature = "test_utils"))]
     async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite>;
 
     /// Retrieve the LMDB environment for networking. FOR TESTING ONLY.
-    #[cfg(feature = "test_utils")]
+    #[cfg(any(test, feature = "test_utils"))]
     async fn get_p2p_env(&self) -> EnvironmentWrite;
 
     /// Retrieve Senders for triggering workflows. FOR TESTING ONLY.
-    #[cfg(feature = "test_utils")]
+    #[cfg(any(test, feature = "test_utils"))]
     async fn get_cell_triggers(&self, cell_id: &CellId)
         -> ConductorApiResult<InitialQueueTriggers>;
 
     /// Retrieve the ConductorState. FOR TESTING ONLY.
-    #[cfg(feature = "test_utils")]
+    #[cfg(any(test, feature = "test_utils"))]
     async fn get_state_from_handle(&self) -> ConductorApiResult<ConductorState>;
 }
 
@@ -500,20 +500,20 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .get_app_info(app_id))
     }
 
-    #[cfg(feature = "test_utils")]
+    #[cfg(any(test, feature = "test_utils"))]
     async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite> {
         let lock = self.conductor.read().await;
         let cell = lock.cell_by_id(cell_id)?;
         Ok(cell.env().clone())
     }
 
-    #[cfg(feature = "test_utils")]
+    #[cfg(any(test, feature = "test_utils"))]
     async fn get_p2p_env(&self) -> EnvironmentWrite {
         let lock = self.conductor.read().await;
         lock.get_p2p_env()
     }
 
-    #[cfg(feature = "test_utils")]
+    #[cfg(any(test, feature = "test_utils"))]
     async fn get_cell_triggers(
         &self,
         cell_id: &CellId,
@@ -523,7 +523,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         Ok(cell.triggers().clone())
     }
 
-    #[cfg(feature = "test_utils")]
+    #[cfg(any(test, feature = "test_utils"))]
     async fn get_state_from_handle(&self) -> ConductorApiResult<ConductorState> {
         let lock = self.conductor.read().await;
         Ok(lock.get_state_from_handle().await?)

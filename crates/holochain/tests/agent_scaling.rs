@@ -1,3 +1,5 @@
+#![cfg(feature = "test_utils")]
+
 use hdk3::prelude::Links;
 use holochain::test_utils::host_fn_api;
 use holochain::{

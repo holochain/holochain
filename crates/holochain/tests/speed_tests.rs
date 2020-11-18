@@ -23,8 +23,8 @@ use holochain::conductor::{
     dna_store::MockDnaStore,
     ConductorBuilder, ConductorHandle,
 };
+use holochain::core::ribosome::ZomeCallInvocation;
 use holochain::fixt::*;
-use holochain::{core::ribosome::ZomeCallInvocation, test_utils::warm_wasm_tests};
 use holochain_state::test_utils::{test_environments, TestEnvironments};
 use holochain_types::app::InstalledCell;
 use holochain_types::cell::CellId;
@@ -46,9 +46,10 @@ mod test_utils;
 const DEFAULT_NUM: usize = 2000;
 
 #[tokio::test(threaded_scheduler)]
+#[cfg(feature = "test_utils")]
 #[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_prep() {
-    warm_wasm_tests();
+    holochain::test_utils::warm_wasm_tests();
 }
 
 #[tokio::test(threaded_scheduler)]

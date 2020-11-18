@@ -840,7 +840,7 @@ impl Cell {
         &self.env
     }
 
-    #[cfg(feature = "test_utils")]
+    #[cfg(any(test, feature = "test_utils"))]
     /// Get the triggers for the cell
     /// Useful for testing when you want to
     /// Cause workflows to trigger

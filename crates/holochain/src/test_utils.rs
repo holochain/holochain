@@ -47,10 +47,10 @@ use std::{convert::TryInto, sync::Arc, time::Duration};
 use tempdir::TempDir;
 use tokio::sync::mpsc;
 
-#[cfg(feature = "test_utils")]
+#[cfg(any(test, feature = "test_utils"))]
 pub mod host_fn_api;
 
-#[cfg(feature = "test_utils")]
+#[cfg(any(test, feature = "test_utils"))]
 pub mod conductor_setup;
 
 /// Produce file and line number info at compile-time

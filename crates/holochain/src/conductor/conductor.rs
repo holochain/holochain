@@ -71,7 +71,7 @@ use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
 use tracing::*;
 
-#[cfg(feature = "test_utils")]
+#[cfg(any(test, feature = "test_utils"))]
 use super::handle::MockConductorHandleT;
 
 /// Conductor-specific Cell state, this can probably be stored in a database.
@@ -782,12 +782,12 @@ where
         Ok(source_chain.dump_as_json().await?)
     }
 
-    #[cfg(feature = "test_utils")]
+    #[cfg(any(test, feature = "test_utils"))]
     pub(super) async fn get_state_from_handle(&self) -> ConductorResult<ConductorState> {
         self.get_state().await
     }
 
-    #[cfg(feature = "test_utils")]
+    #[cfg(any(test, feature = "test_utils"))]
     pub(super) fn get_p2p_env(&self) -> EnvironmentWrite {
         self.p2p_env.clone()
     }
@@ -882,9 +882,9 @@ mod builder {
         config: ConductorConfig,
         dna_store: DS,
         keystore: Option<KeystoreSender>,
-        #[cfg(feature = "test_utils")]
+        #[cfg(any(test, feature = "test_utils"))]
         state: Option<ConductorState>,
-        #[cfg(feature = "test_utils")]
+        #[cfg(any(test, feature = "test_utils"))]
         mock_handle: Option<MockConductorHandleT>,
     }
 
@@ -960,7 +960,7 @@ mod builder {
             let p2p_environment =
                 EnvironmentWrite::new(env_path.as_ref(), EnvironmentKind::P2p, keystore.clone())?;
 
-            #[cfg(feature = "test_utils")]
+            #[cfg(any(test, feature = "test_utils"))]
             let state = self.state;
 
             let Self {
@@ -985,7 +985,7 @@ mod builder {
             )
             .await?;
 
-            #[cfg(feature = "test_utils")]
+            #[cfg(any(test, feature = "test_utils"))]
             let conductor = Self::update_fake_state(state, conductor).await?;
 
             Self::finish(conductor, config, p2p_evt).await
@@ -1036,7 +1036,7 @@ mod builder {
             self
         }
 
-        #[cfg(feature = "test_utils")]
+        #[cfg(any(test, feature = "test_utils"))]
         /// Sets some fake conductor state for tests
         pub fn fake_state(mut self, state: ConductorState) -> Self {
             self.state = Some(state);
@@ -1045,13 +1045,13 @@ mod builder {
 
         /// Pass a mock handle in, which will be returned regardless of whatever
         /// else happens to this builder
-        #[cfg(feature = "test_utils")]
+        #[cfg(any(test, feature = "test_utils"))]
         pub fn with_mock_handle(mut self, handle: MockConductorHandleT) -> Self {
             self.mock_handle = Some(handle);
             self
         }
 
-        #[cfg(feature = "test_utils")]
+        #[cfg(any(test, feature = "test_utils"))]
         async fn update_fake_state(
             state: Option<ConductorState>,
             conductor: Conductor<DS>,
@@ -1079,7 +1079,7 @@ mod builder {
             )
             .await?;
 
-            #[cfg(feature = "test_utils")]
+            #[cfg(any(test, feature = "test_utils"))]
             let conductor = Self::update_fake_state(self.state, conductor).await?;
 
             Self::finish(conductor, self.config, p2p_evt).await
