@@ -2,6 +2,15 @@
 #[derive(structopt::StructOpt, Debug)]
 #[structopt(name = "kitsune-p2p-proxy")]
 pub struct Opt {
+    /// Generate a new self-signed certificate file/priv key and exit.
+    /// Danger - this cert is written unencrypted to disk.
+    #[structopt(long)]
+    pub danger_gen_unenc_cert: Option<std::path::PathBuf>,
+
+    /// Use a dangerous unencryted tls cert/priv key for this proxy.
+    #[structopt(long)]
+    pub danger_use_unenc_cert: Option<std::path::PathBuf>,
+
     /// To which network interface / port should we bind?
     /// Default: "kitsune-quic://0.0.0.0:0".
     #[structopt(short = "b", long)]
