@@ -110,16 +110,12 @@ pub struct HostFnApi {
 
 impl HostFnApi {
     /// Create HostFnApi for the first zome.
+    #[deprecated = "use create_for_zome"]
     pub async fn create(
         cell_id: &CellId,
         handle: &ConductorHandle,
         dna_file: &DnaFile,
     ) -> HostFnApi {
-        assert_eq!(
-            dna_file.dna().zomes.len(),
-            1,
-            "Can't use HostFnApi::create with a DNA containing more than one zome."
-        );
         Self::create_for_zome(cell_id, handle, dna_file, 0).await
     }
 
