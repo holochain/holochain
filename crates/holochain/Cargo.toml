@@ -22,7 +22,7 @@ either = "1.5.0"
 fallible-iterator = "0.2.0"
 fixt = { version = "0.0.1", path = "../fixt" }
 futures = "0.3.1"
-ghost_actor = "0.2.1"
+ghost_actor = "0.3.0-alpha.1"
 ring = "0.16"
 holo_hash = { version = "0.0.1", path = "../holo_hash", features = ["full"] }
 holochain_keystore = { version = "0.0.1", path = "../keystore" }
@@ -41,7 +41,7 @@ mockall = "0.8"
 must_future = "0.1.1"
 nanoid = "0.3"
 num_cpus = "1.8"
-observability = { path = "../observability" }
+observability = "0.1"
 parking_lot = "0.10"
 predicates = "1.0.4"
 rand = "0.7"
@@ -56,7 +56,7 @@ thiserror = "1.0.22"
 tokio = { version = "0.2.11", features = [ "full" ] }
 tokio_safe_block_on = "0.1.2"
 toml = "0.5.6"
-tracing = "=0.1.18"
+tracing = "=0.1.21"
 tracing-futures = "0.2.4"
 url = "1.7.2"
 url2 = "0.0.6"

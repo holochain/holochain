@@ -31,7 +31,7 @@ use tracing::*;
 
 #[tokio::test(threaded_scheduler)]
 async fn app_validation_workflow_test() {
-    observability::test_run().ok();
+    observability::test_run_open().ok();
 
     let dna_file = DnaFile::new(
         DnaDef {
