@@ -1174,28 +1174,16 @@ pub mod tests {
     /// same InstalledAppId
     #[tokio::test(threaded_scheduler)]
     async fn app_ids_are_unique() {
-        let TestEnvironment {
-            env: environment,
-            tmpdir,
-        } = test_conductor_env();
-        let TestEnvironment {
-            env: wasm_env,
-            tmpdir: _tmpdir,
-        } = test_wasm_env();
-        let TestEnvironment {
-            env: p2p_env,
-            tmpdir: _p2p_tmpdir,
-        } = test_p2p_env();
+        let environments = test_environments();
         let dna_store = MockDnaStore::new();
-        let keystore = environment.keystore().clone();
         let holochain_p2p = holochain_p2p::stub_network().await;
         let mut conductor = Conductor::new(
-            environment,
-            wasm_env,
-            p2p_env,
+            environments.conductor(),
+            environments.wasm(),
+            environments.p2p(),
             dna_store,
-            keystore,
-            tmpdir.path().to_path_buf().into(),
+            environments.keystore().clone(),
+            environments.tempdir().path().to_path_buf().into(),
             holochain_p2p,
         )
         .await
