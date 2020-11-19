@@ -6,7 +6,10 @@ use std::collections::HashMap;
 
 /// How often should NAT nodes refresh their proxy contract?
 /// Note - ProxyTo entries will be expired at double this time.
-const PROXY_KEEPALIVE_MS: u64 = 10000;
+const PROXY_KEEPALIVE_MS: u64 = 30000;
+/// How much longer the proxy should wait to remove the contract
+/// if no keep alive is received.
+const KEEPALIVE_MULTIPLIER: u64 = 2;
 
 /// Wrap a transport listener sender/receiver in kitsune proxy logic.
 pub async fn spawn_kitsune_proxy_listener(
@@ -71,14 +74,20 @@ pub async fn spawn_kitsune_proxy_listener(
         // Set up a timer to refresh our proxy contract at keepalive interval
         let i_s_c = i_s.clone();
         tokio::task::spawn(async move {
-            tokio::time::delay_for(std::time::Duration::from_millis(PROXY_KEEPALIVE_MS)).await;
+            loop {
+                tokio::time::delay_for(std::time::Duration::from_millis(PROXY_KEEPALIVE_MS)).await;
 
-            if i_s_c.req_proxy(proxy_url.clone()).await.is_err() {
-                // either we failed because the actor is already shutdown
-                // or the remote end rejected us.
-                // if it's the latter - shut down our ghost actor : )
-                let _ = i_s_c.ghost_actor_shutdown().await;
+                if i_s_c.req_proxy(proxy_url.clone()).await.is_err() {
+                    tracing::error!("renewing proxy failed");
+                    // either we failed because the actor is already shutdown
+                    // or the remote end rejected us.
+                    // if it's the latter - shut down our ghost actor : )
+                    let _ = i_s_c.ghost_actor_shutdown().await;
+                    break;
+                }
+                tracing::info!("Proxy renewed for {:?}", proxy_url);
             }
+            tracing::error!("Keep alive closed");
         });
     }
 
@@ -107,6 +116,7 @@ pub async fn spawn_kitsune_proxy_listener(
     Ok((sender, evt_recv))
 }
 
+#[derive(Debug)]
 /// An item in our proxy_list - a client we have agreed to proxy for
 struct ProxyTo {
     /// the low-level connection url
@@ -323,18 +333,34 @@ impl InternalHandler for InnerListen {
         // if we're not proxying for a client,
         // check to see if our owner is the destination.
         if proxy_to.is_none() && dest_proxy_url.as_base() == self.this_url.as_base() {
-            tracing::debug!("{}: chan new to self, hooking connection", short);
+            if dest_proxy_url.as_full() == self.this_url.as_full() {
+                tracing::debug!("{}: chan new to self, hooking connection", short);
 
-            // Hey! They're trying to talk to us!
-            // Let's connect them to our owner.
-            tls_srv::spawn_tls_server(
-                short,
-                base_url,
-                self.tls_server_config.clone(),
-                self.evt_send.clone(),
-                write,
-                read,
-            );
+                // Hey! They're trying to talk to us!
+                // Let's connect them to our owner.
+                tls_srv::spawn_tls_server(
+                    short,
+                    base_url,
+                    self.tls_server_config.clone(),
+                    self.evt_send.clone(),
+                    write,
+                    read,
+                );
+            } else {
+                tracing::warn!("Dropping message for {}", dest_proxy_url.as_full_str());
+                return Ok(async move {
+                    write
+                        .send(ProxyWire::failure(format!(
+                            "Dropped message to {}",
+                            dest_proxy_url.as_full_str()
+                        )))
+                        .await
+                        .map_err(TransportError::other)?;
+                    Ok(())
+                }
+                .boxed()
+                .into());
+            }
 
             return Ok(async move { Ok(()) }.boxed().into());
         }
@@ -391,6 +417,7 @@ impl InternalHandler for InnerListen {
         .into())
     }
 
+    #[tracing::instrument(skip(self))]
     fn handle_register_proxy_to(
         &mut self,
         proxy_url: ProxyUrl,
@@ -398,7 +425,9 @@ impl InternalHandler for InnerListen {
     ) -> InternalHandlerResult<()> {
         // expire ProxyTo entries at double the proxy keepalive timeframe.
         let expires_at = std::time::Instant::now()
-            .checked_add(std::time::Duration::from_millis(PROXY_KEEPALIVE_MS * 2))
+            .checked_add(std::time::Duration::from_millis(
+                PROXY_KEEPALIVE_MS * KEEPALIVE_MULTIPLIER,
+            ))
             .unwrap();
         self.proxy_list.insert(
             proxy_url,

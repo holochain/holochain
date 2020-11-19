@@ -61,6 +61,14 @@ impl From<(&kitsune_p2p::KitsuneSpace, &kitsune_p2p::KitsuneAgent)> for AgentKvK
     }
 }
 
+impl From<&[u8]> for AgentKvKey {
+    fn from(f: &[u8]) -> Self {
+        let mut o = [0_u8; AGENT_KEY_LEN];
+        o.copy_from_slice(&f[..AGENT_KEY_LEN]);
+        Self(o)
+    }
+}
+
 impl AsRef<[u8]> for AgentKvKey {
     fn as_ref(&self) -> &[u8] {
         &self.0

@@ -18,7 +18,7 @@ const DEFAULT_RPC_SINGLE_TIMEOUT_MS: u64 = 2000;
 const DEFAULT_RPC_MULTI_REMOTE_AGENT_COUNT: u8 = 2;
 
 /// if the user specifies None or zero (0) for timeout_ms
-const DEFAULT_RPC_MULTI_TIMEOUT_MS: u64 = 20;
+const DEFAULT_RPC_MULTI_TIMEOUT_MS: u64 = 2000;
 
 /// if the user specifies None or zero (0) for race_timeout_ms
 const DEFAULT_RPC_MULTI_RACE_TIMEOUT_MS: u64 = 200;
@@ -29,10 +29,6 @@ pub const AGENT_INFO_EXPIRES_AFTER_MS: u64 = 60 * 1000 * 20;
 
 ghost_actor::ghost_chan! {
     pub(crate) chan SpaceInternal<crate::KitsuneP2pError> {
-        /// Make a remote request right-now if we have an open connection,
-        /// otherwise, return an error.
-        fn immediate_request(space: Arc<KitsuneSpace>, to_agent: Arc<KitsuneAgent>, from_agent: Arc<KitsuneAgent>, data: Arc<Vec<u8>>) -> wire::Wire;
-
         /// List online agents that claim to be covering a basis hash
         fn list_online_agents_for_basis_hash(space: Arc<KitsuneSpace>, from_agent: Arc<KitsuneAgent>, basis: Arc<KitsuneBasis>) -> HashSet<Arc<KitsuneAgent>>;
 
@@ -356,72 +352,6 @@ pub fn local_req_op_data(
 impl ghost_actor::GhostHandler<SpaceInternal> for Space {}
 
 impl SpaceInternalHandler for Space {
-    fn handle_immediate_request(
-        &mut self,
-        _space: Arc<KitsuneSpace>,
-        to_agent: Arc<KitsuneAgent>,
-        from_agent: Arc<KitsuneAgent>,
-        data: Arc<Vec<u8>>,
-    ) -> SpaceInternalHandlerResult<wire::Wire> {
-        let space = self.space.clone();
-        if self.local_joined_agents.contains(&to_agent) {
-            // LOCAL SHORT CIRCUIT! - just forward data locally
-
-            let evt_sender = self.evt_sender.clone();
-
-            let (_, data) = wire::Wire::decode_ref(&data)?;
-
-            match data {
-                wire::Wire::Call(payload) => Ok(async move {
-                    let res = evt_sender
-                        .call(space, to_agent, from_agent, payload.data.into())
-                        .await?;
-                    Ok(wire::Wire::call_resp(res.into()))
-                }
-                .instrument(tracing::debug_span!("wire_call"))
-                .boxed()
-                .into()),
-                wire::Wire::Notify(payload) => Ok(async move {
-                    evt_sender
-                        .notify(space, to_agent, from_agent, payload.data.into())
-                        .await?;
-                    Ok(wire::Wire::notify_resp())
-                }
-                .boxed()
-                .into()),
-                _ => unimplemented!(),
-            }
-        } else {
-            let evt_sender = self.evt_sender.clone();
-            let tx = self.transport.clone();
-            Ok(async move {
-                // see if we have an entry for this agent in our agent_store
-                let info = match evt_sender
-                    .get_agent_info_signed(GetAgentInfoSignedEvt {
-                        space,
-                        agent: to_agent.clone(),
-                    })
-                    .await?
-                {
-                    None => return Err(KitsuneP2pError::RoutingAgentError(to_agent)),
-                    Some(i) => i,
-                };
-                let info = types::agent_store::AgentInfo::try_from(&info)?;
-                let url = info.as_urls_ref().get(0).unwrap().clone();
-                let (_, mut write, read) = tx.create_channel(url).await?;
-                write.write_and_close(data.to_vec()).await?;
-                let read = read.read_to_end().await;
-                let (_, read) = wire::Wire::decode_ref(&read)?;
-                match read {
-                    wire::Wire::Failure(wire::Failure { reason }) => Err(reason.into()),
-                    _ => Ok(read),
-                }
-            }
-            .boxed()
-            .into())
-        }
-    }
-
     fn handle_list_online_agents_for_basis_hash(
         &mut self,
         _space: Arc<KitsuneSpace>,
@@ -703,7 +633,6 @@ impl Space {
 
     /// actual logic for handle_rpc_multi ...
     /// the top-level handler may or may not spawn a task for this
-    #[allow(unused_variables, unused_assignments, unused_mut)]
     #[tracing::instrument(skip(self, input))]
     fn handle_rpc_multi_inner(
         &mut self,
@@ -713,73 +642,74 @@ impl Space {
             space,
             from_agent,
             basis,
-            //remote_agent_count,
+            remote_agent_count,
             timeout_ms,
             //as_race,
             //race_timeout_ms,
             payload,
             ..
         } = input;
+        let remote_agent_count = remote_agent_count.unwrap();
         let timeout_ms = timeout_ms.unwrap();
+        let stage_1_timeout_ms = timeout_ms / 2;
 
-        // TODO - we cannot write proper logic here until we have a
-        //        proper peer discovery mechanism. Instead, let's
-        //        give it 100 ms max to see if there is any agent
-        //        other than us - prefer that, or fall back to
-        //        just reflecting the msg to ourselves.
-
-        let i_s = self.i_s.clone();
-        Ok(async move {
-            let mut to_agent = from_agent.clone();
-            'search_loop: for _ in 0..5 {
-                if let Ok(agent_list) = i_s
-                    .list_online_agents_for_basis_hash(
+        // as an optimization - request to all local joins
+        // but don't count that toward our request total
+        let local_all = self
+            .local_joined_agents
+            .iter()
+            .map(|agent| {
+                let agent = agent.clone();
+                self.evt_sender
+                    .call(
                         space.clone(),
+                        agent.clone(),
                         from_agent.clone(),
-                        basis.clone(),
+                        payload.clone(),
                     )
-                    .await
-                {
-                    for a in agent_list {
-                        if a != from_agent {
-                            to_agent = a;
-                            break 'search_loop;
-                        }
+                    .then(|r| async move { (r, agent) })
+            })
+            .collect::<Vec<_>>();
+
+        let remote_fut = discover::message_neighborhood(
+            self,
+            from_agent.clone(),
+            remote_agent_count,
+            stage_1_timeout_ms,
+            timeout_ms,
+            basis,
+            wire::Wire::call(
+                space.clone(),
+                from_agent.clone(),
+                from_agent,
+                payload.into(),
+            ),
+            |a, w| match w {
+                wire::Wire::CallResp(c) => Ok(actor::RpcMultiResponse {
+                    agent: a,
+                    response: c.data.into(),
+                }),
+                _ => Err(()),
+            },
+        );
+
+        Ok(async move {
+            let mut out: Vec<actor::RpcMultiResponse> = futures::future::join_all(local_all)
+                .await
+                .into_iter()
+                .filter_map(|(r, a)| {
+                    if let Ok(r) = r {
+                        Some(actor::RpcMultiResponse {
+                            agent: a,
+                            response: r,
+                        })
+                    } else {
+                        None
                     }
-                }
+                })
+                .collect();
 
-                tokio::time::delay_for(std::time::Duration::from_millis(20)).await;
-            }
-
-            let mut out = Vec::new();
-
-            // encode the data to send
-            let payload = Arc::new(
-                wire::Wire::call(
-                    space.clone(),
-                    from_agent.clone(),
-                    to_agent.clone(),
-                    payload.into(),
-                )
-                .encode_vec()?,
-            );
-
-            // Timeout on immediate requests after a small interval.
-            // TODO: 20 ms is only appropriate for local calls and not
-            // real networking
-            if let Ok(Ok(response)) = tokio::time::timeout(
-                std::time::Duration::from_millis(timeout_ms),
-                i_s.immediate_request(space, to_agent.clone(), from_agent.clone(), payload),
-            )
-            .await
-            {
-                if let wire::Wire::CallResp(wire::CallResp { data }) = response {
-                    out.push(actor::RpcMultiResponse {
-                        agent: to_agent,
-                        response: data.into(),
-                    });
-                }
-            }
+            out.append(&mut remote_fut.await);
 
             Ok(out)
         }
@@ -798,96 +728,53 @@ impl Space {
             space,
             from_agent,
             basis,
-            // ignore remote_agent_count for now - broadcast to everyone
-            remote_agent_count: _,
+            remote_agent_count,
             timeout_ms,
             payload,
         } = input;
 
+        let remote_agent_count = remote_agent_count.expect("set by handle_notify_multi");
         let timeout_ms = timeout_ms.expect("set by handle_notify_multi");
+        let stage_1_timeout_ms = timeout_ms / 2;
 
-        let i_s = self.i_s.clone();
+        // as an optimization - broadcast to all local joins
+        // but don't count that toward our publish total
+        let local_all = self
+            .local_joined_agents
+            .iter()
+            .map(|agent| {
+                self.evt_sender.notify(
+                    space.clone(),
+                    agent.clone(),
+                    from_agent.clone(),
+                    payload.clone(),
+                )
+            })
+            .collect::<Vec<_>>();
 
-        // check 5(ish) times but with sane min/max
-        // FYI - this strategy will likely change when we are no longer
-        //       purely short-circuit, and we are looping on peer discovery.
-        const CHECK_COUNT: u64 = 5;
-        let mut check_interval = timeout_ms / CHECK_COUNT;
-        if check_interval < 10 {
-            check_interval = 10;
-        }
-        if check_interval > timeout_ms {
-            check_interval = timeout_ms;
-        }
+        let remote_fut = discover::message_neighborhood(
+            self,
+            from_agent.clone(),
+            remote_agent_count,
+            stage_1_timeout_ms,
+            timeout_ms,
+            basis,
+            wire::Wire::notify(
+                space.clone(),
+                from_agent.clone(),
+                from_agent,
+                payload.into(),
+            ),
+            |_, w| match w {
+                wire::Wire::NotifyResp(_) => Ok(()),
+                _ => Err(()),
+            },
+        );
 
         Ok(async move {
-            let start = std::time::Instant::now();
-            let mut sent_to: HashSet<Arc<KitsuneAgent>> = HashSet::new();
-            let send_success_count = Arc::new(std::sync::atomic::AtomicU8::new(0));
+            futures::future::try_join_all(local_all).await?;
 
-            loop {
-                if let Ok(agent_list) = i_s
-                    .list_online_agents_for_basis_hash(
-                        space.clone(),
-                        from_agent.clone(),
-                        basis.clone(),
-                    )
-                    .await
-                {
-                    for to_agent in agent_list {
-                        if !sent_to.contains(&to_agent) {
-                            sent_to.insert(to_agent.clone());
-                            // send the notify here - but spawn
-                            // so we're not holding up this loop
-                            let i_s = i_s.clone();
-                            let space = space.clone();
-                            // encode the data to send
-                            let payload = Arc::new(
-                                wire::Wire::notify(
-                                    space.clone(),
-                                    from_agent.clone(),
-                                    to_agent.clone(),
-                                    payload.clone().into(),
-                                )
-                                .encode_vec()?,
-                            );
-
-                            let send_success_count = send_success_count.clone();
-                            let from_agent2 = from_agent.clone();
-                            tokio::task::spawn(
-                                async move {
-                                    let res = i_s
-                                        .immediate_request(space, to_agent, from_agent2, payload)
-                                        .await;
-                                    match res {
-                                        Ok(wire::Wire::NotifyResp(_)) => {
-                                            send_success_count
-                                                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                                        }
-                                        Ok(wire::Wire::Failure(wire::Failure { reason })) => {
-                                            tracing::warn!("FAIL: {}", reason);
-                                        }
-                                        Err(e) => {
-                                            tracing::warn!("FAIL: {:?}", e);
-                                        }
-                                        _ => (),
-                                    }
-                                }
-                                .instrument(
-                                    ghost_actor::dependencies::tracing::debug_span!(
-                                        "handle_rpc_multi_inner_loop"
-                                    ),
-                                ),
-                            );
-                        }
-                    }
-                }
-                if (start.elapsed().as_millis() as u64) >= timeout_ms {
-                    break;
-                }
-                tokio::time::delay_for(std::time::Duration::from_millis(check_interval)).await;
-            }
-            Ok(send_success_count.load(std::sync::atomic::Ordering::Relaxed))
+            Ok(remote_fut.await.len() as u8)
         }
         .boxed()
         .into())

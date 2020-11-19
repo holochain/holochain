@@ -330,7 +330,7 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_get_workflow() {
-        let (dna, a1, a2, a3) = test_setup();
+        let (dna, a1, a2, _a3) = test_setup();
 
         let (p2p, mut evt) = spawn_holochain_p2p(KitsuneP2pConfig::default())
             .await
@@ -392,7 +392,6 @@ mod tests {
 
         p2p.join(dna.clone(), a1.clone()).await.unwrap();
         p2p.join(dna.clone(), a2.clone()).await.unwrap();
-        p2p.join(dna.clone(), a3.clone()).await.unwrap();
 
         let hash = holo_hash::AnyDhtHash::from_raw_36_and_type(
             b"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_vec(),
@@ -404,7 +403,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(1, res.len());
+        assert_eq!(2, res.len());
 
         for r in res {
             assert!(r == test_1 || r == test_2);
@@ -462,7 +461,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(1, res.len());
+        assert_eq!(2, res.len());
 
         for r in res {
             assert_eq!(r, test_1);
