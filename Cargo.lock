@@ -1268,7 +1268,6 @@ dependencies = [
  "hdk3",
  "holo_hash",
  "holochain_keystore",
- "holochain_legacy",
  "holochain_p2p",
  "holochain_serialized_bytes",
  "holochain_state",
@@ -1331,14 +1330,6 @@ dependencies = [
  "thiserror",
  "tokio",
  "tracing",
-]
-
-[[package]]
-name = "holochain_legacy"
-version = "0.0.1"
-dependencies = [
- "holochain_serialized_bytes",
- "serde",
 ]
 
 [[package]]
