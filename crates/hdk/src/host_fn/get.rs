@@ -46,5 +46,8 @@ use crate::prelude::*;
 ///       on another partition, and of course the oldest live entry could be deleted and no longer
 ///       be live.
 pub fn get<H: Into<AnyDhtHash>>(hash: H, options: GetOptions) -> HdkResult<Option<Element>> {
-    host_fn!(__get, GetInput::new((hash.into(), options)), GetOutput)
+    Ok(
+        host_call::<GetInput, GetOutput>(__get, &GetInput::new((hash.into(), options)))?
+            .into_inner(),
+    )
 }

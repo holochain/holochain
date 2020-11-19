@@ -17,10 +17,9 @@ pub fn create<D: Into<EntryDefId>, E: Into<Entry>>(
     entry_def_id: D,
     entry: E,
 ) -> HdkResult<HeaderHash> {
-    host_externs!(__create);
-    host_fn!(
+    Ok(host_call::<CreateInput, CreateOutput>(
         __create,
-        CreateInput::new((entry_def_id.into(), entry.into())),
-        CreateOutput
-    )
+        &CreateInput::new((entry_def_id.into(), entry.into())),
+    )?
+    .into_inner())
 }

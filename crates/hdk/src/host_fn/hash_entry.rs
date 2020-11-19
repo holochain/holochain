@@ -40,11 +40,10 @@ pub fn hash_entry<'a, I: 'a>(input: &'a I) -> HdkResult<EntryHash>
 where
     SerializedBytes: TryFrom<&'a I, Error = SerializedBytesError>,
 {
-    host_externs!(__hash_entry);
     let sb = SerializedBytes::try_from(input)?;
-    host_fn!(
+    Ok(host_call::<HashEntryInput, HashEntryOutput>(
         __hash_entry,
-        HashEntryInput::new(Entry::App(sb.try_into()?)),
-        HashEntryOutput
-    )
+        &HashEntryInput::new(Entry::App(sb.try_into()?)),
+    )?
+    .into_inner())
 }

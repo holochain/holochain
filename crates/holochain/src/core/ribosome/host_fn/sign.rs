@@ -96,7 +96,7 @@ pub mod wasm_test {
                     TestWasm::Sign,
                     "sign",
                     hdk3::prelude::holochain_zome_types::zome_io::SignInput::new(
-                        SignInput::new_raw(k.clone(), data.clone())
+                        Sign::new_raw(k.clone(), data.clone())
                     )
                 );
 

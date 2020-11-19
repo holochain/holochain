@@ -74,7 +74,7 @@ pub mod wasm_test {
         // the line numbers will show as coming from this test because we made the input here
         let output: DebugOutput = crate::call_test_ribosome!(
             host_access,
-            TestWasm::Imports,
+            TestWasm::Debug,
             "debug",
             DebugInput::new(debug_msg!(format!("ribosome debug {}", "works!")))
         );

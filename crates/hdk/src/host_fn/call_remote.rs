@@ -41,11 +41,12 @@ where
     O: TryFrom<SerializedBytes, Error = SerializedBytesError>,
 {
     let payload = SerializedBytes::try_from(payload)?;
-    let out = host_fn!(
+    let out = host_call::<CallRemoteInput, CallRemoteOutput>(
         __call_remote,
-        CallRemoteInput::new(CallRemote::new(agent, zome, fn_name, cap_secret, payload)),
-        CallRemoteOutput
-    )?;
+        &CallRemoteInput::new(CallRemote::new(agent, zome, fn_name, cap_secret, payload)),
+    )?
+    .into_inner();
+
     match out {
         ZomeCallResponse::Ok(o) => Ok(O::try_from(o.into_inner())?),
         ZomeCallResponse::Unauthorized => Err(HdkError::UnauthorizedZomeCall),
