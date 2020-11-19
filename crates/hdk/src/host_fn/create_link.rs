@@ -60,8 +60,6 @@ pub fn create_link<'a, T: 'a + Into<LinkTag>>(
     target: EntryHash,
     tag: T,
 ) -> HdkResult<HeaderHash> {
-    host_externs!(__create_link);
-
     host_fn!(
         __create_link,
         CreateLinkInput::new((base, target, tag.into())),

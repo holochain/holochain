@@ -25,9 +25,7 @@ use crate::{
     core::state::element_buf::ElementBuf,
     core::state::metadata::{ChainItemKey, MetadataBuf, MetadataBufT},
     test_utils::host_fn_api::Post,
-    test_utils::{
-        conductor_setup::ConductorCallData, host_fn_api, new_invocation, wait_for_integration,
-    },
+    test_utils::{conductor_setup::CellHostFnApi, new_invocation, wait_for_integration},
 };
 use crate::{
     core::state::source_chain::SourceChain, test_utils::conductor_setup::ConductorTestData,
@@ -630,14 +628,14 @@ async fn get_agent_activity_host_fn_test() {
     )
     .await;
 
-    let agent_activity = host_fn_api::get_agent_activity(
-        &alice_call_data.env,
-        alice_call_data.call_data(TestWasm::Create),
-        alice_agent_id,
-        &ChainQueryFilter::new(),
-        ActivityRequest::Full,
-    )
-    .await;
+    let agent_activity = alice_call_data
+        .get_api(TestWasm::Create)
+        .get_agent_activity(
+            alice_agent_id,
+            &ChainQueryFilter::new(),
+            ActivityRequest::Full,
+        )
+        .await;
     let expected_activity = get_expected();
     assert_eq!(agent_activity, expected_activity);
 
@@ -664,7 +662,7 @@ async fn get_agent_activity_host_fn_test() {
 
 async fn commit_some_data(
     call: &str,
-    alice_call_data: &ConductorCallData,
+    alice_call_data: &CellHostFnApi,
     handle: &ConductorHandle,
 ) -> HeaderHash {
     let mut header_hash = None;
@@ -684,7 +682,7 @@ async fn commit_some_data(
 // Cascade helper function for easily getting the validation package
 async fn check_cascade(
     header_hashed: &HeaderHashed,
-    call_data: &ConductorCallData,
+    call_data: &CellHostFnApi,
 ) -> Option<ValidationPackage> {
     let mut element_cache = ElementBuf::cache(call_data.env.clone().into()).unwrap();
     let mut meta_cache = MetadataBuf::cache(call_data.env.clone().into()).unwrap();
