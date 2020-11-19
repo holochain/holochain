@@ -191,7 +191,7 @@ mod tests {
     use holochain_state::env::ReadManager;
     use holochain_state::env::WriteManager;
     use holochain_state::test_utils::test_p2p_env;
-    use holochain_state::{buffer::KvStoreT, fresh_reader_test, test_utils::TestEnvironment};
+    use holochain_state::{buffer::KvStoreT, fresh_reader_test};
     use kitsune_p2p::fixt::AgentInfoFixturator;
     use kitsune_p2p::fixt::AgentInfoSignedFixturator;
     use kitsune_p2p::KitsuneBinType;
@@ -245,7 +245,8 @@ mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn add_agent_info_to_peer_env() {
         observability::test_run().ok();
-        let TestEnvironment { env, tmpdir: _t } = test_p2p_env();
+        let t_env = test_p2p_env();
+        let env = t_env.env();
         let p2p_store = AgentKv::new(env.clone().into()).unwrap();
 
         // - Check no data in the store to start
