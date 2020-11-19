@@ -7,19 +7,11 @@
 //!
 //! ```rust, no_run
 //! async fn async_main () {
-//! use holochain_state::test_utils::{test_conductor_env, test_wasm_env, test_p2p_env, TestEnvironment};
+//! use holochain_state::test_utils::{test_environments, TestEnvironment};
 //! use holochain::conductor::{Conductor, ConductorBuilder, ConductorHandle};
-//! let env = test_conductor_env();
-//! let TestEnvironment {
-//!  env: wasm_env,
-//!  tmpdir: _tmpdir,
-//! } = test_wasm_env();
-//! let TestEnvironment {
-//!  env: p2p_env,
-//!  tmpdir: _p2p_tmpdir,
-//! } = test_p2p_env();
+//! let envs = test_environments();
 //! let handle: ConductorHandle = ConductorBuilder::new()
-//!    .test(env, wasm_env, p2p_env)
+//!    .test(&envs)
 //!    .await
 //!    .unwrap();
 //!
@@ -62,6 +54,8 @@ use super::{
 use crate::core::workflow::ZomeCallInvocationResult;
 use crate::core::{ribosome::ZomeCallInvocation, workflow::CallZomeWorkspaceLock};
 use derive_more::From;
+use futures::future::FutureExt;
+use holochain_p2p::event::HolochainP2pEvent::*;
 use holochain_types::{
     app::{AppId, InstalledApp, InstalledCell, MembraneProof},
     autonomic::AutonomicCue,
@@ -69,20 +63,17 @@ use holochain_types::{
     dna::DnaFile,
     prelude::*,
 };
+use holochain_zome_types::entry_def::EntryDef;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::*;
 
-use futures::future::FutureExt;
-use holochain_p2p::event::HolochainP2pEvent::*;
-
-#[cfg(test)]
+#[cfg(any(test, feature = "test_utils"))]
 use super::state::ConductorState;
-#[cfg(test)]
+#[cfg(any(test, feature = "test_utils"))]
 use crate::core::queue_consumer::InitialQueueTriggers;
-#[cfg(test)]
+#[cfg(any(test, feature = "test_utils"))]
 use holochain_state::env::EnvironmentWrite;
-use holochain_zome_types::entry_def::EntryDef;
 
 /// A handle to the Conductor that can easily be passed around and cheaply cloned
 pub type ConductorHandle = Arc<dyn ConductorHandleT>;
@@ -206,18 +197,21 @@ pub trait ConductorHandleT: Send + Sync {
     #[allow(clippy::ptr_arg)]
     async fn get_app_info(&self, app_id: &AppId) -> ConductorResult<Option<InstalledApp>>;
 
-    #[cfg(test)]
+    /// Retrieve the LMDB environment for this cell. FOR TESTING ONLY.
+    #[cfg(any(test, feature = "test_utils"))]
     async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite>;
 
-    #[cfg(test)]
+    /// Retrieve the LMDB environment for networking. FOR TESTING ONLY.
+    #[cfg(any(test, feature = "test_utils"))]
     async fn get_p2p_env(&self) -> EnvironmentWrite;
 
-    #[cfg(test)]
+    /// Retrieve Senders for triggering workflows. FOR TESTING ONLY.
+    #[cfg(any(test, feature = "test_utils"))]
     async fn get_cell_triggers(&self, cell_id: &CellId)
         -> ConductorApiResult<InitialQueueTriggers>;
 
-    // HACK: remove when B-01593 lands
-    #[cfg(test)]
+    /// Retrieve the ConductorState. FOR TESTING ONLY.
+    #[cfg(any(test, feature = "test_utils"))]
     async fn get_state_from_handle(&self) -> ConductorApiResult<ConductorState>;
 }
 
@@ -506,20 +500,20 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .get_app_info(app_id))
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test_utils"))]
     async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite> {
         let lock = self.conductor.read().await;
         let cell = lock.cell_by_id(cell_id)?;
         Ok(cell.env().clone())
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test_utils"))]
     async fn get_p2p_env(&self) -> EnvironmentWrite {
         let lock = self.conductor.read().await;
         lock.get_p2p_env()
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test_utils"))]
     async fn get_cell_triggers(
         &self,
         cell_id: &CellId,
@@ -529,7 +523,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         Ok(cell.triggers().clone())
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test_utils"))]
     async fn get_state_from_handle(&self) -> ConductorApiResult<ConductorState> {
         let lock = self.conductor.read().await;
         Ok(lock.get_state_from_handle().await?)
