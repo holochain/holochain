@@ -40,7 +40,6 @@ pub fn hash_entry<'a, I: 'a>(input: &'a I) -> HdkResult<EntryHash>
 where
     SerializedBytes: TryFrom<&'a I, Error = SerializedBytesError>,
 {
-    host_externs!(__hash_entry);
     let sb = SerializedBytes::try_from(input)?;
     host_fn!(
         __hash_entry,
