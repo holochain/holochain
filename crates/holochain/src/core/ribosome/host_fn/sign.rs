@@ -95,9 +95,10 @@ pub mod wasm_test {
                     host_access,
                     TestWasm::Sign,
                     "sign",
-                    hdk3::prelude::holochain_zome_types::zome_io::SignInput::new(
-                        Sign::new_raw(k.clone(), data.clone())
-                    )
+                    hdk3::prelude::holochain_zome_types::zome_io::SignInput::new(Sign::new_raw(
+                        k.clone(),
+                        data.clone()
+                    ))
                 );
 
                 assert_eq!(expect, output.as_ref().to_vec());
