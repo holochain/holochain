@@ -79,6 +79,7 @@ impl AppInterfaceApi for RealAppInterfaceApi {
                     )
                   ))
                 },
+                Ok(ZomeCallResponse::NetworkError(e)) => unreachable!("Interface zome calls should never be routed to the network. This is a bug. Got {}", e),
                 Err(e) => Ok(AppResponse::Error(e.into())),
               }
             }
