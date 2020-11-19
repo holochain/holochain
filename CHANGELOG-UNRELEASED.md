@@ -19,6 +19,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - BREAKING: HoloHash now serializes as a plain 39-byte sequence, instead of a `{hash, hash_type}` structure [#459](https://github.com/holochain/holochain/pull/459)
 - BREAKING: (Almost) all HDK functions have been converted from macros to functions [#478](https://github.com/holochain/holochain/pull/478)
 - Admin interface method `install_app` has its `app_id` field renamed to `installed_app_id` so as not to conflict with the future concept of an "app id"
+- Admin interface method `list_active_app_ids` renamed to `list_active_apps`
 
 ### Deprecated
 
