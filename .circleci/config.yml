@@ -18,6 +18,22 @@ commands:
       command: ./docker/push.sh << parameters.box >> $CIRCLE_BRANCH
 
 jobs:
+  build-binary-packages:
+    docker:
+     - image: nixos/nix
+    environment:
+     NIXPKGS_ALLOW_UNFREE: 1
+    steps:
+      - checkout
+      - run:
+         name: Build the holochain Nix package
+         no_output_timeout: 45m
+         command: nix build --verbose -f default.nix pkgs.applications.holochain
+      - run:
+         name: Build the dna-util Nix package
+         no_output_timeout: 15m
+         command: nix build --verbose -f default.nix pkgs.applications.dnaUtil
+
   merge-test:
     docker:
      - image: holochain/holochain:circle.build.develop
@@ -30,7 +46,9 @@ jobs:
     steps:
       - checkout
       - run:
-          command: nix-shell --run hc-merge-test
+         name: Run the merge tests
+         no_output_timeout: 30m
+         command: nix-shell --pure --argstr flavor ci --run hc-merge-test
 
   merge-test-mac:
    macos:
@@ -50,7 +68,7 @@ jobs:
         sh <(curl -L https://nixos.org/nix/install) --darwin-use-unencrypted-nix-store-volume
         . /Users/distiller/.nix-profile/etc/profile.d/nix.sh
         # do tests
-        nix-shell --run hc-merge-test
+        nix-shell --argstr flavor ci --run hc-merge-test
 
   docker-build-latest:
    resource_class: large
@@ -70,6 +88,7 @@ workflows:
  version: 2.1
  tests:
   jobs:
+   - build-binary-packages
    - merge-test
    # - merge-test-mac
  docker-builds:

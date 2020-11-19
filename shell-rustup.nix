@@ -1,5 +1,5 @@
 { nixpkgs ? import <nixpkgs> {}
-, flavor ? "coreDev"
+, flavor ? "coreDevRustup"
 , ... } @ args:
 
 let
