@@ -293,6 +293,16 @@ impl<'e> WriteManager<'e> for EnvironmentWriteRef<'e> {
     }
 }
 
+impl<'e> WriteManager<'e> for EnvironmentWrite {
+    fn with_commit<E, R, F: Send>(&self, f: F) -> Result<R, E>
+    where
+        E: From<DatabaseError>,
+        F: FnOnce(&mut Writer) -> Result<R, E>,
+    {
+        EnvironmentWriteRef::with_commit(&self.guard(), f)
+    }
+}
+
 impl<'e> EnvironmentWriteRef<'e> {
     /// Access the underlying Rkv lock guard
     #[cfg(test)]
