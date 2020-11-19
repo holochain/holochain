@@ -6,7 +6,7 @@ use crate::{
 };
 use ::fixt::prelude::*;
 use holo_hash::HasHash;
-use holochain_state::test_utils::{test_cell_env, TestEnvironment};
+use holochain_state::test_utils::test_cell_env;
 use holochain_types::{
     dht_op::{DhtOp, DhtOpHashed},
     test_utils::{fake_agent_pubkey_2, fake_cell_id},
@@ -18,10 +18,8 @@ use tokio::sync;
 
 #[tokio::test(threaded_scheduler)]
 async fn test_cell_handle_publish() {
-    let TestEnvironment {
-        env,
-        tmpdir: _tmpdir,
-    } = test_cell_env();
+    let cell_env = test_cell_env();
+    let env = cell_env.env();
 
     let cell_id = fake_cell_id(1);
     let dna = cell_id.dna_hash().clone();
