@@ -27,6 +27,9 @@ use super::{
         keep_alive_task, spawn_task_manager, ManagedTaskAdd, ManagedTaskHandle,
         TaskManagerRunHandle,
     },
+    p2p_store::all_agent_infos,
+    p2p_store::get_single_agent_info,
+    p2p_store::inject_agent_infos,
     paths::EnvironmentRootPath,
     state::AppInterfaceId,
     state::ConductorState,
@@ -636,6 +639,28 @@ where
                 &agent_info_signed,
             )
         })?)
+    }
+
+    pub(super) fn add_agent_infos(
+        &self,
+        agent_infos: Vec<AgentInfoSigned>,
+    ) -> ConductorApiResult<()> {
+        Ok(inject_agent_infos(self.p2p_env.clone(), agent_infos)?)
+    }
+
+    pub(super) fn get_agent_infos(
+        &self,
+        cell_id: Option<CellId>,
+    ) -> ConductorApiResult<Vec<AgentInfoSigned>> {
+        match cell_id {
+            Some(c) => {
+                let (d, a) = c.into_dna_and_agent();
+                Ok(get_single_agent_info(self.p2p_env.clone().into(), d, a)?
+                    .map(|a| vec![a])
+                    .unwrap_or_default())
+            }
+            None => Ok(all_agent_infos(self.p2p_env.clone().into())?),
+        }
     }
 
     pub(super) fn get_agent_info_signed(

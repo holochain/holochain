@@ -243,27 +243,36 @@ where
 #[cfg(test)]
 pub mod test {
     use super::*;
-    use crate::conductor::{
-        api::{error::ExternalApiWireError, AdminRequest, AdminResponse, RealAdminInterfaceApi},
-        conductor::ConductorBuilder,
-        dna_store::MockDnaStore,
-        state::ConductorState,
-        Conductor, ConductorHandle,
+    use crate::{conductor::p2p_store::AgentKv, core::state::source_chain::SourceChainBuf};
+    use crate::{conductor::p2p_store::AgentKvKey, fixt::WasmRibosomeFixturator};
+    use crate::{
+        conductor::{
+            api::{
+                error::ExternalApiWireError, AdminRequest, AdminResponse, RealAdminInterfaceApi,
+            },
+            conductor::ConductorBuilder,
+            dna_store::MockDnaStore,
+            state::ConductorState,
+            Conductor, ConductorHandle,
+        },
+        test_utils::conductor_setup::ConductorTestData,
     };
-    use crate::core::state::source_chain::SourceChainBuf;
-    use crate::fixt::WasmRibosomeFixturator;
+    use fallible_iterator::FallibleIterator;
+    use fixt::prelude::*;
     use futures::future::FutureExt;
     use holochain_serialized_bytes::prelude::*;
-    use holochain_state::test_utils::test_environments;
+    use holochain_state::{buffer::KvStoreT, fresh_reader_test, test_utils::test_environments};
     use holochain_types::{
         app::{InstallAppDnaPayload, InstallAppPayload, InstalledCell},
         cell::CellId,
+        dna::{DnaDef, DnaFile},
         observability,
         test_utils::{fake_agent_pubkey_1, fake_dna_file, fake_dna_zomes},
     };
     use holochain_wasm_test_utils::TestWasm;
     use holochain_websocket::WebsocketMessage;
-    use holochain_zome_types::ExternInput;
+    use holochain_zome_types::{test_utils::fake_agent_pubkey_2, ExternInput};
+    use kitsune_p2p::{agent_store::AgentInfoSigned, fixt::AgentInfoSignedFixturator};
     use matches::assert_matches;
     use mockall::predicate;
     use std::{collections::HashMap, convert::TryInto};
@@ -662,5 +671,150 @@ pub mod test {
         handle_incoming_message(msg, admin_api).await.unwrap();
         conductor_handle.shutdown().await;
         shutdown.await.unwrap();
+    }
+
+    async fn make_dna(uuid: &str, zomes: Vec<TestWasm>) -> DnaFile {
+        DnaFile::new(
+            DnaDef {
+                name: "conductor_test".to_string(),
+                uuid: uuid.to_string(),
+                properties: SerializedBytes::try_from(()).unwrap(),
+                zomes: zomes.clone().into_iter().map(Into::into).collect(),
+            },
+            zomes.into_iter().map(Into::into),
+        )
+        .await
+        .unwrap()
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    /// Check that we can add and get agent info for a conductor
+    /// across the admin websocket.
+    async fn add_agent_info_via_admin() {
+        observability::test_run().ok();
+        let test_envs = test_environments();
+        let env = test_envs.p2p();
+        let agents = vec![fake_agent_pubkey_1(), fake_agent_pubkey_2()];
+        let dnas = vec![
+            make_dna("1", vec![TestWasm::Anchor]).await,
+            make_dna("2", vec![TestWasm::Anchor]).await,
+        ];
+        let mut conductor_test =
+            ConductorTestData::new(test_envs, dnas.clone(), agents.clone(), Default::default())
+                .await
+                .0;
+        let handle = conductor_test.handle();
+        let dnas = dnas
+            .into_iter()
+            .map(|d| d.dna_hash().clone())
+            .collect::<Vec<_>>();
+        let p2p_store = AgentKv::new(env.clone().into()).unwrap();
+
+        // - Check no data in the store to start
+        let count = fresh_reader_test!(env, |r| p2p_store
+            .as_store_ref()
+            .iter(&r)
+            .unwrap()
+            .count()
+            .unwrap());
+
+        assert_eq!(count, 4);
+
+        // - Get agents and space
+        let agent_infos = AgentInfoSignedFixturator::new(Unpredictable)
+            .take(5)
+            .collect::<Vec<_>>();
+
+        let mut expect = to_key(agent_infos.clone());
+        let k00: AgentKvKey = (dnas[0].clone(), agents[0].clone()).into();
+        let k01: AgentKvKey = (dnas[0].clone(), agents[1].clone()).into();
+        let k10: AgentKvKey = (dnas[1].clone(), agents[0].clone()).into();
+        let k11: AgentKvKey = (dnas[1].clone(), agents[1].clone()).into();
+        expect.push(k00.clone());
+        expect.push(k01.clone());
+        expect.push(k10.clone());
+        expect.push(k11.clone());
+        expect.sort();
+
+        dbg!();
+        let admin_api = RealAdminInterfaceApi::new(handle.clone());
+        dbg!();
+
+        // - Add the agent infos
+        let req = AdminRequest::AddAgentInfo { agent_infos };
+        let r = make_req(admin_api.clone(), req).await.await.unwrap();
+        assert_matches!(r, AdminResponse::AgentInfoAdded);
+
+        // - Request all the infos
+        let req = AdminRequest::RequestAgentInfo { cell_id: None };
+        let r = make_req(admin_api.clone(), req).await.await.unwrap();
+        let results = to_key(unwrap_to::unwrap_to!(r => AdminResponse::AgentInfoRequested).clone());
+        assert_eq!(expect, results);
+
+        // - Request the dna 0 agent 0
+        let req = AdminRequest::RequestAgentInfo {
+            cell_id: Some(CellId::new(dnas[0].clone(), agents[0].clone())),
+        };
+        let r = make_req(admin_api.clone(), req).await.await.unwrap();
+        let results = to_key(unwrap_to::unwrap_to!(r => AdminResponse::AgentInfoRequested).clone());
+
+        assert_eq!(vec![k00], results);
+
+        // - Request the dna 0 agent 1
+        let req = AdminRequest::RequestAgentInfo {
+            cell_id: Some(CellId::new(dnas[0].clone(), agents[1].clone())),
+        };
+        let r = make_req(admin_api.clone(), req).await.await.unwrap();
+        let results = to_key(unwrap_to::unwrap_to!(r => AdminResponse::AgentInfoRequested).clone());
+
+        assert_eq!(vec![k01], results);
+
+        // - Request the dna 1 agent 0
+        let req = AdminRequest::RequestAgentInfo {
+            cell_id: Some(CellId::new(dnas[1].clone(), agents[0].clone())),
+        };
+        let r = make_req(admin_api.clone(), req).await.await.unwrap();
+        let results = to_key(unwrap_to::unwrap_to!(r => AdminResponse::AgentInfoRequested).clone());
+
+        assert_eq!(vec![k10], results);
+
+        // - Request the dna 1 agent 1
+        let req = AdminRequest::RequestAgentInfo {
+            cell_id: Some(CellId::new(dnas[1].clone(), agents[1].clone())),
+        };
+        let r = make_req(admin_api.clone(), req).await.await.unwrap();
+        let results = to_key(unwrap_to::unwrap_to!(r => AdminResponse::AgentInfoRequested).clone());
+
+        assert_eq!(vec![k11], results);
+
+        conductor_test.shutdown_conductor().await;
+    }
+
+    async fn make_req(
+        admin_api: RealAdminInterfaceApi,
+        req: AdminRequest,
+    ) -> tokio::sync::oneshot::Receiver<AdminResponse> {
+        let msg = req.try_into().unwrap();
+        let (tx, rx) = tokio::sync::oneshot::channel();
+
+        let respond = move |bytes: SerializedBytes| {
+            let response: AdminResponse = bytes.try_into().unwrap();
+            tx.send(response).unwrap();
+            async { Ok(()) }.boxed()
+        };
+        let respond = Box::new(respond);
+        let msg = WebsocketMessage::Request(msg, respond);
+
+        handle_incoming_message(msg, admin_api).await.unwrap();
+        rx
+    }
+
+    fn to_key(r: Vec<AgentInfoSigned>) -> Vec<AgentKvKey> {
+        let mut results = r
+            .into_iter()
+            .map(|a| AgentKvKey::try_from(&a).unwrap())
+            .collect::<Vec<_>>();
+        results.sort();
+        results
     }
 }
