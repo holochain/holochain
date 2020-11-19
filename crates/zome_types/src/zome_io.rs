@@ -173,4 +173,7 @@ pub enum ZomeCallResponse {
     /// Cap grant failure.
     /// Something like a 401 http response.
     Unauthorized,
+    /// This was a zome call made remotely but
+    /// something has failed on the network
+    NetworkError(String),
 }

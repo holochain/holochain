@@ -591,6 +591,7 @@ pub mod wasm_test {
                         guest_output.into_inner().try_into().unwrap()
                     }
                     crate::core::ribosome::ZomeCallResponse::Unauthorized => unreachable!(),
+                    crate::core::ribosome::ZomeCallResponse::NetworkError(_) => unreachable!(),
                 };
                 output
             })
