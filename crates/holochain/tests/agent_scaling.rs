@@ -1,7 +1,6 @@
 #![cfg(feature = "test_utils")]
 
 use hdk3::prelude::Links;
-use holochain::test_utils::host_fn_api;
 use holochain::{
     core::ribosome::ZomeCallInvocation, test_utils::conductor_setup::ConductorTestData,
 };
@@ -55,14 +54,10 @@ async fn many_agents_can_reach_consistency_agent_links() {
     let base = cell_ids[0].agent_pubkey().clone();
     let target = cell_ids[1].agent_pubkey().clone();
 
-    host_fn_api::create_link(
-        &committer.env,
-        committer.call_data(TestWasm::Link),
-        base.clone().into(),
-        target.into(),
-        ().into(),
-    )
-    .await;
+    committer
+        .call_data(TestWasm::Link)
+        .create_link(base.clone().into(), target.into(), ().into())
+        .await;
 
     committer.triggers.produce_dht_ops.trigger();
 
@@ -73,14 +68,10 @@ async fn many_agents_can_reach_consistency_agent_links() {
         let cell_id = cell_ids[i].clone();
         let cd = conductor.call_data(&cell_id).unwrap();
 
-        let links = host_fn_api::get_links(
-            &cd.env,
-            cd.call_data(TestWasm::Link),
-            base.clone().into(),
-            None,
-            Default::default(),
-        )
-        .await;
+        let links = cd
+            .call_data(TestWasm::Link)
+            .get_links(base.clone().into(), None, Default::default())
+            .await;
 
         seen[i] = links.len();
     }

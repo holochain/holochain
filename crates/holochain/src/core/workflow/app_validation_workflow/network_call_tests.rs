@@ -25,9 +25,7 @@ use crate::{
     core::state::element_buf::ElementBuf,
     core::state::metadata::{ChainItemKey, MetadataBuf, MetadataBufT},
     test_utils::host_fn_api::Post,
-    test_utils::{
-        conductor_setup::ConductorCallData, host_fn_api, new_invocation, wait_for_integration,
-    },
+    test_utils::{conductor_setup::ConductorCallData, new_invocation, wait_for_integration},
 };
 use crate::{
     core::state::source_chain::SourceChain, test_utils::conductor_setup::ConductorTestData,
@@ -630,14 +628,14 @@ async fn get_agent_activity_host_fn_test() {
     )
     .await;
 
-    let agent_activity = host_fn_api::get_agent_activity(
-        &alice_call_data.env,
-        alice_call_data.call_data(TestWasm::Create),
-        alice_agent_id,
-        &ChainQueryFilter::new(),
-        ActivityRequest::Full,
-    )
-    .await;
+    let agent_activity = alice_call_data
+        .call_data(TestWasm::Create)
+        .get_agent_activity(
+            alice_agent_id,
+            &ChainQueryFilter::new(),
+            ActivityRequest::Full,
+        )
+        .await;
     let expected_activity = get_expected();
     assert_eq!(agent_activity, expected_activity);
 

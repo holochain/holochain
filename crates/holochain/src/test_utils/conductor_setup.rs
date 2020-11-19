@@ -70,6 +70,7 @@ impl ConductorCallData {
         let zome_path = (self.cell_id.clone(), zome_name).into();
         let call_zome_handle = self.cell_conductor_api.clone().into_call_zome_handle();
         CallData {
+            env: self.env.clone(),
             ribosome: self.ribosome.clone(),
             zome_path,
             network: self.network.clone(),

@@ -25,7 +25,7 @@ use holochain_p2p::{
 };
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::{
-    env::{EnvironmentRead, EnvironmentWrite},
+    env::EnvironmentWrite,
     prelude::{GetDb, WriteManager},
 };
 use holochain_types::{cell::CellId, dna::DnaFile, element::Element, Entry};
@@ -97,6 +97,7 @@ pub enum MaybeLinkable {
 
 #[derive(Clone)]
 pub struct CallData {
+    pub env: EnvironmentWrite,
     pub ribosome: WasmRibosome,
     pub zome_path: ZomePath,
     pub network: HolochainP2pCell,
@@ -111,7 +112,7 @@ impl CallData {
         cell_id: &CellId,
         handle: &ConductorHandle,
         dna_file: &DnaFile,
-    ) -> (EnvironmentWrite, CallData) {
+    ) -> CallData {
         Self::create_for_zome(cell_id, handle, dna_file, 0).await
     }
 
@@ -121,7 +122,7 @@ impl CallData {
         handle: &ConductorHandle,
         dna_file: &DnaFile,
         zome_index: usize,
-    ) -> (EnvironmentWrite, CallData) {
+    ) -> CallData {
         let env = handle.get_cell_env(cell_id).await.unwrap();
         let keystore = env.keystore().clone();
         let network = handle
@@ -137,33 +138,42 @@ impl CallData {
         let signal_tx = handle.signal_broadcaster().await;
         let call_zome_handle =
             CellConductorApi::new(handle.clone(), cell_id.clone()).into_call_zome_handle();
-        let call_data = CallData {
+        CallData {
+            env,
             ribosome,
             zome_path,
             network,
             keystore,
             signal_tx,
             call_zome_handle,
-        };
-        (env, call_data)
+        }
+    }
+
+    pub fn env(&self) -> EnvironmentWrite {
+        self.env.clone()
     }
 
     pub fn explode(
-        self,
-        env: EnvironmentRead,
-    ) -> (Arc<WasmRibosome>, Arc<CallContext>, CallZomeWorkspaceLock) {
+        &self,
+    ) -> (
+        EnvironmentWrite,
+        Arc<WasmRibosome>,
+        Arc<CallContext>,
+        CallZomeWorkspaceLock,
+    ) {
         let CallData {
+            env,
             network,
             keystore,
             ribosome,
             signal_tx,
             zome_path,
             call_zome_handle,
-        } = self;
+        } = self.clone();
 
         let (cell_id, zome_name) = zome_path.into();
 
-        let workspace = CallZomeWorkspace::new(env).unwrap();
+        let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
         let workspace_lock = CallZomeWorkspaceLock::new(workspace);
         let host_access = ZomeCallHostAccess::new(
             workspace_lock.clone(),
@@ -175,212 +185,183 @@ impl CallData {
         );
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(CallContext::new(zome_name, host_access.into()));
-        (ribosome, call_context, workspace_lock)
+        (env, ribosome, call_context, workspace_lock)
     }
 }
 
-pub async fn commit_entry<E: Into<entry_def::EntryDefId>>(
-    env: &EnvironmentWrite,
-    call_data: CallData,
-    entry: Entry,
-    entry_def_id: E,
-) -> HeaderHash {
-    let (ribosome, call_context, workspace_lock) = call_data.explode(env.clone().into());
-    let input = CreateInput::new((entry_def_id.into(), entry));
-    let output = host_fn::create::create(ribosome, call_context, input).unwrap();
+impl CallData {
+    pub async fn commit_entry<E: Into<entry_def::EntryDefId>>(
+        &self,
+        entry: Entry,
+        entry_def_id: E,
+    ) -> HeaderHash {
+        let (env, ribosome, call_context, workspace_lock) = self.explode();
+        let input = CreateInput::new((entry_def_id.into(), entry));
+        let output = host_fn::create::create(ribosome, call_context, input).unwrap();
 
-    // Write
-    let mut guard = workspace_lock.write().await;
-    let workspace = &mut guard;
-    env.guard()
-        .with_commit(|writer| workspace.flush_to_txn_ref(writer))
-        .unwrap();
+        // Write
+        let mut guard = workspace_lock.write().await;
+        let workspace = &mut guard;
+        env.with_commit(|writer| workspace.flush_to_txn_ref(writer))
+            .unwrap();
 
-    output.into_inner()
-}
+        output.into_inner()
+    }
 
-pub async fn delete_entry<'env>(
-    env: &EnvironmentWrite,
-    call_data: CallData,
-    hash: HeaderHash,
-) -> HeaderHash {
-    let (ribosome, call_context, workspace_lock) = call_data.explode(env.clone().into());
-    let input = DeleteInput::new(hash);
-    let output = {
-        let r = host_fn::delete::delete(ribosome, call_context, input);
-        let r = r.map_err(|e| {
-            debug!(%e);
-            e
-        });
-        r.unwrap()
-    };
+    pub async fn delete_entry<'env>(&self, hash: HeaderHash) -> HeaderHash {
+        let (env, ribosome, call_context, workspace_lock) = self.explode();
+        let input = DeleteInput::new(hash);
+        let output = {
+            let r = host_fn::delete::delete(ribosome, call_context, input);
+            let r = r.map_err(|e| {
+                debug!(%e);
+                e
+            });
+            r.unwrap()
+        };
 
-    // Write
-    let mut guard = workspace_lock.write().await;
-    let workspace = &mut guard;
-    env.guard()
-        .with_commit(|writer| workspace.flush_to_txn_ref(writer))
-        .unwrap();
+        // Write
+        let mut guard = workspace_lock.write().await;
+        let workspace = &mut guard;
+        env.with_commit(|writer| workspace.flush_to_txn_ref(writer))
+            .unwrap();
 
-    output.into_inner()
-}
+        output.into_inner()
+    }
 
-pub async fn update_entry<'env, E: Into<entry_def::EntryDefId>>(
-    env: &EnvironmentWrite,
-    call_data: CallData,
-    entry: Entry,
-    entry_def_id: E,
-    original_header_hash: HeaderHash,
-) -> HeaderHash {
-    let (ribosome, call_context, workspace_lock) = call_data.explode(env.clone().into());
-    let input = UpdateInput::new((entry_def_id.into(), entry, original_header_hash));
-    let output = { host_fn::update::update(ribosome, call_context, input).unwrap() };
+    pub async fn update_entry<'env, E: Into<entry_def::EntryDefId>>(
+        &self,
+        entry: Entry,
+        entry_def_id: E,
+        original_header_hash: HeaderHash,
+    ) -> HeaderHash {
+        let (env, ribosome, call_context, workspace_lock) = self.explode();
+        let input = UpdateInput::new((entry_def_id.into(), entry, original_header_hash));
+        let output = { host_fn::update::update(ribosome, call_context, input).unwrap() };
 
-    // Write
-    let mut guard = workspace_lock.write().await;
-    let workspace = &mut guard;
-    env.guard()
-        .with_commit(|writer| workspace.flush_to_txn_ref(writer))
-        .unwrap();
+        // Write
+        let mut guard = workspace_lock.write().await;
+        let workspace = &mut guard;
+        env.with_commit(|writer| workspace.flush_to_txn_ref(writer))
+            .unwrap();
 
-    output.into_inner()
-}
+        output.into_inner()
+    }
 
-pub async fn get(
-    env: &EnvironmentRead,
-    call_data: CallData,
-    entry_hash: AnyDhtHash,
-    _options: GetOptions,
-) -> Option<Element> {
-    let (ribosome, call_context, _) = call_data.explode(env.clone());
-    let input = GetInput::new((entry_hash, holochain_zome_types::entry::GetOptions));
-    let output = { host_fn::get::get(ribosome, call_context, input).unwrap() };
-    output.into_inner()
-}
+    pub async fn get(&self, entry_hash: AnyDhtHash, _options: GetOptions) -> Option<Element> {
+        let (_, ribosome, call_context, _) = self.explode();
+        let input = GetInput::new((entry_hash, holochain_zome_types::entry::GetOptions));
+        let output = { host_fn::get::get(ribosome, call_context, input).unwrap() };
+        output.into_inner()
+    }
 
-pub async fn get_details<'env>(
-    env: &EnvironmentWrite,
-    call_data: CallData,
-    entry_hash: AnyDhtHash,
-    _options: GetOptions,
-) -> Option<Details> {
-    let (ribosome, call_context, _) = call_data.explode(env.clone().into());
-    let input = GetDetailsInput::new((entry_hash, holochain_zome_types::entry::GetOptions));
-    let output = { host_fn::get_details::get_details(ribosome, call_context, input).unwrap() };
-    output.into_inner()
-}
+    pub async fn get_details<'env>(
+        &self,
+        entry_hash: AnyDhtHash,
+        _options: GetOptions,
+    ) -> Option<Details> {
+        let (_, ribosome, call_context, _) = self.explode();
+        let input = GetDetailsInput::new((entry_hash, holochain_zome_types::entry::GetOptions));
+        let output = { host_fn::get_details::get_details(ribosome, call_context, input).unwrap() };
+        output.into_inner()
+    }
 
-pub async fn create_link<'env>(
-    env: &EnvironmentWrite,
-    call_data: CallData,
-    base: EntryHash,
-    target: EntryHash,
-    link_tag: LinkTag,
-) -> HeaderHash {
-    let (ribosome, call_context, workspace_lock) = call_data.explode(env.clone().into());
-    let input = CreateLinkInput::new((base.clone(), target.clone(), link_tag));
-    let output = { host_fn::create_link::create_link(ribosome, call_context, input).unwrap() };
+    pub async fn create_link<'env>(
+        &self,
+        base: EntryHash,
+        target: EntryHash,
+        link_tag: LinkTag,
+    ) -> HeaderHash {
+        let (env, ribosome, call_context, workspace_lock) = self.explode();
+        let input = CreateLinkInput::new((base.clone(), target.clone(), link_tag));
+        let output = { host_fn::create_link::create_link(ribosome, call_context, input).unwrap() };
 
-    // Write
-    let mut guard = workspace_lock.write().await;
-    let workspace = &mut guard;
-    env.guard()
-        .with_commit(|writer| workspace.flush_to_txn_ref(writer))
-        .unwrap();
+        // Write
+        let mut guard = workspace_lock.write().await;
+        let workspace = &mut guard;
+        env.with_commit(|writer| workspace.flush_to_txn_ref(writer))
+            .unwrap();
 
-    output.into_inner()
-}
+        output.into_inner()
+    }
 
-pub async fn delete_link<'env>(
-    env: &EnvironmentWrite,
-    call_data: CallData,
-    link_add_hash: HeaderHash,
-) -> HeaderHash {
-    let (ribosome, call_context, workspace_lock) = call_data.explode(env.clone().into());
-    let input = DeleteLinkInput::new(link_add_hash);
-    let output = { host_fn::delete_link::delete_link(ribosome, call_context, input).unwrap() };
+    pub async fn delete_link<'env>(&self, link_add_hash: HeaderHash) -> HeaderHash {
+        let (env, ribosome, call_context, workspace_lock) = self.explode();
+        let input = DeleteLinkInput::new(link_add_hash);
+        let output = { host_fn::delete_link::delete_link(ribosome, call_context, input).unwrap() };
 
-    // Write
-    let mut guard = workspace_lock.write().await;
-    let workspace = &mut guard;
-    env.guard()
-        .with_commit(|writer| workspace.flush_to_txn_ref(writer))
-        .unwrap();
+        // Write
+        let mut guard = workspace_lock.write().await;
+        let workspace = &mut guard;
+        env.with_commit(|writer| workspace.flush_to_txn_ref(writer))
+            .unwrap();
 
-    output.into_inner()
-}
+        output.into_inner()
+    }
 
-pub async fn get_links<'env>(
-    env: &EnvironmentWrite,
-    call_data: CallData,
-    base: EntryHash,
-    link_tag: Option<LinkTag>,
-    _options: GetLinksOptions,
-) -> Vec<Link> {
-    let (ribosome, call_context, workspace_lock) = call_data.explode(env.clone().into());
-    let input = GetLinksInput::new((base.clone(), link_tag));
-    let output = { host_fn::get_links::get_links(ribosome, call_context, input).unwrap() };
+    pub async fn get_links<'env>(
+        &self,
+        base: EntryHash,
+        link_tag: Option<LinkTag>,
+        _options: GetLinksOptions,
+    ) -> Vec<Link> {
+        let (env, ribosome, call_context, workspace_lock) = self.explode();
+        let input = GetLinksInput::new((base.clone(), link_tag));
+        let output = { host_fn::get_links::get_links(ribosome, call_context, input).unwrap() };
 
-    // Write
-    let mut guard = workspace_lock.write().await;
-    let workspace = &mut guard;
-    env.guard()
-        .with_commit(|writer| workspace.flush_to_txn_ref(writer))
-        .unwrap();
+        // Write
+        let mut guard = workspace_lock.write().await;
+        let workspace = &mut guard;
+        env.with_commit(|writer| workspace.flush_to_txn_ref(writer))
+            .unwrap();
 
-    output.into_inner().into()
-}
+        output.into_inner().into()
+    }
 
-pub async fn get_link_details<'env>(
-    env: &EnvironmentWrite,
-    call_data: CallData,
-    base: EntryHash,
-    tag: LinkTag,
-    options: GetLinksOptions,
-) -> Vec<(SignedHeaderHashed, Vec<SignedHeaderHashed>)> {
-    let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
+    pub async fn get_link_details<'env>(
+        &self,
+        base: EntryHash,
+        tag: LinkTag,
+        options: GetLinksOptions,
+    ) -> Vec<(SignedHeaderHashed, Vec<SignedHeaderHashed>)> {
+        let mut workspace = CallZomeWorkspace::new(self.env.clone().into()).unwrap();
+        let mut cascade = workspace.cascade(self.network.clone());
+        let key = LinkMetaKey::BaseZomeTag(&base, 0.into(), &tag);
+        cascade.get_link_details(&key, options).await.unwrap()
+    }
 
-    let mut cascade = workspace.cascade(call_data.network);
-    let key = LinkMetaKey::BaseZomeTag(&base, 0.into(), &tag);
-    cascade.get_link_details(&key, options).await.unwrap()
-}
+    pub async fn get_agent_activity(
+        &self,
+        agent: &AgentPubKey,
+        query: &ChainQueryFilter,
+        request: ActivityRequest,
+    ) -> AgentActivity {
+        let (_, ribosome, call_context, _) = self.explode();
+        let input = GetAgentActivityInput::new((agent.clone(), query.clone(), request));
+        let output = {
+            host_fn::get_agent_activity::get_agent_activity(ribosome, call_context, input).unwrap()
+        };
+        output.into_inner()
+    }
 
-pub async fn get_agent_activity(
-    env: &EnvironmentRead,
-    call_data: CallData,
-    agent: &AgentPubKey,
-    query: &ChainQueryFilter,
-    request: ActivityRequest,
-) -> AgentActivity {
-    let (ribosome, call_context, _) = call_data.explode(env.clone());
-    let input = GetAgentActivityInput::new((agent.clone(), query.clone(), request));
-    let output =
-        { host_fn::get_agent_activity::get_agent_activity(ribosome, call_context, input).unwrap() };
-    output.into_inner()
-}
+    pub async fn call_zome_direct(&self, invocation: ZomeCallInvocation) -> SerializedBytes {
+        let (env, ribosome, call_context, workspace_lock) = self.explode();
 
-pub async fn call_zome_direct(
-    env: &EnvironmentWrite,
-    call_data: CallData,
-    invocation: ZomeCallInvocation,
-) -> SerializedBytes {
-    let (ribosome, call_context, workspace_lock) = call_data.explode(env.clone().into());
+        let output = {
+            let host_access = call_context.host_access();
+            let zcha = unwrap_to!(host_access => HostAccess::ZomeCall).clone();
+            ribosome.call_zome_function(zcha, invocation).unwrap()
+        };
 
-    let output = {
-        let host_access = call_context.host_access();
-        let zcha = unwrap_to!(host_access => HostAccess::ZomeCall).clone();
-        ribosome.call_zome_function(zcha, invocation).unwrap()
-    };
+        // Write
+        let mut guard = workspace_lock.write().await;
+        let workspace = &mut guard;
+        env.with_commit(|writer| workspace.flush_to_txn_ref(writer))
+            .unwrap();
+        let output = unwrap_to!(output => ZomeCallResponse::Ok).clone();
 
-    // Write
-    let mut guard = workspace_lock.write().await;
-    let workspace = &mut guard;
-    env.guard()
-        .with_commit(|writer| workspace.flush_to_txn_ref(writer))
-        .unwrap();
-    let output = unwrap_to!(output => ZomeCallResponse::Ok).clone();
-
-    output.into_inner()
+        output.into_inner()
+    }
 }
 
 macro_rules! test_entry_impl {

@@ -308,35 +308,26 @@ async fn bob_links_in_a_legit_way(
     let base_entry_hash = EntryHash::with_data_sync(&Entry::try_from(base.clone()).unwrap());
     let target_entry_hash = EntryHash::with_data_sync(&Entry::try_from(target.clone()).unwrap());
     let link_tag = fixt!(LinkTag);
-    let (bob_env, call_data) = CallData::create(bob_cell_id, handle, dna_file).await;
+    let call_data = CallData::create(bob_cell_id, handle, dna_file).await;
     // 3
-    commit_entry(
-        &bob_env,
-        call_data.clone(),
-        base.clone().try_into().unwrap(),
-        POST_ID,
-    )
-    .await;
+    call_data
+        .commit_entry(base.clone().try_into().unwrap(), POST_ID)
+        .await;
 
     // 4
-    commit_entry(
-        &bob_env,
-        call_data.clone(),
-        target.clone().try_into().unwrap(),
-        POST_ID,
-    )
-    .await;
+    call_data
+        .commit_entry(target.clone().try_into().unwrap(), POST_ID)
+        .await;
 
     // 5
     // Link the entries
-    let link_add_address = create_link(
-        &bob_env,
-        call_data.clone(),
-        base_entry_hash.clone(),
-        target_entry_hash.clone(),
-        link_tag.clone(),
-    )
-    .await;
+    let link_add_address = call_data
+        .create_link(
+            base_entry_hash.clone(),
+            target_entry_hash.clone(),
+            link_tag.clone(),
+        )
+        .await;
 
     // Produce and publish these commits
     let mut triggers = handle.get_cell_triggers(&bob_cell_id).await.unwrap();
@@ -360,47 +351,37 @@ async fn bob_makes_a_large_link(
     let bytes = (0..401).map(|_| 0u8).into_iter().collect::<Vec<_>>();
     let link_tag = LinkTag(bytes);
 
-    let (bob_env, call_data) = CallData::create(bob_cell_id, handle, dna_file).await;
+    let call_data = CallData::create(bob_cell_id, handle, dna_file).await;
 
     // 6
-    let original_header_address = commit_entry(
-        &bob_env,
-        call_data.clone(),
-        base.clone().try_into().unwrap(),
-        POST_ID,
-    )
-    .await;
+    let original_header_address = call_data
+        .commit_entry(base.clone().try_into().unwrap(), POST_ID)
+        .await;
 
     // 7
-    commit_entry(
-        &bob_env,
-        call_data.clone(),
-        target.clone().try_into().unwrap(),
-        POST_ID,
-    )
-    .await;
+    call_data
+        .commit_entry(target.clone().try_into().unwrap(), POST_ID)
+        .await;
 
     // 8
     // Commit a large header
-    let link_add_address = create_link(
-        &bob_env,
-        call_data.clone(),
-        base_entry_hash.clone(),
-        target_entry_hash.clone(),
-        link_tag.clone(),
-    )
-    .await;
+    let link_add_address = call_data
+        .create_link(
+            base_entry_hash.clone(),
+            target_entry_hash.clone(),
+            link_tag.clone(),
+        )
+        .await;
 
     // 9
     // Commit a bad update entry
-    let bad_update_header = update_entry(
-        &bob_env,
-        call_data.clone(),
-        bad_update.clone().try_into().unwrap(),
-        MSG_ID,
-        original_header_address,
-    )
-    .await;
+    let bad_update_header = call_data
+        .update_entry(
+            bad_update.clone().try_into().unwrap(),
+            MSG_ID,
+            original_header_address,
+        )
+        .await;
 
     // Produce and publish these commits
     let mut triggers = handle.get_cell_triggers(&bob_cell_id).await.unwrap();
@@ -414,28 +395,23 @@ async fn dodgy_bob(bob_cell_id: &CellId, handle: &ConductorHandle, dna_file: &Dn
     let base_entry_hash = EntryHash::with_data_sync(&Entry::try_from(base.clone()).unwrap());
     let target_entry_hash = EntryHash::with_data_sync(&Entry::try_from(target.clone()).unwrap());
     let link_tag = fixt!(LinkTag);
-    let (bob_env, call_data) = CallData::create(bob_cell_id, handle, dna_file).await;
+    let call_data = CallData::create(bob_cell_id, handle, dna_file).await;
 
     // 11
-    commit_entry(
-        &bob_env,
-        call_data.clone(),
-        base.clone().try_into().unwrap(),
-        POST_ID,
-    )
-    .await;
+    call_data
+        .commit_entry(base.clone().try_into().unwrap(), POST_ID)
+        .await;
 
     // Whoops forgot to commit that proof
 
     // Link the entries
-    create_link(
-        &bob_env,
-        call_data.clone(),
-        base_entry_hash.clone(),
-        target_entry_hash.clone(),
-        link_tag.clone(),
-    )
-    .await;
+    call_data
+        .create_link(
+            base_entry_hash.clone(),
+            target_entry_hash.clone(),
+            link_tag.clone(),
+        )
+        .await;
 
     // Produce and publish these commits
     let mut triggers = handle.get_cell_triggers(&bob_cell_id).await.unwrap();
