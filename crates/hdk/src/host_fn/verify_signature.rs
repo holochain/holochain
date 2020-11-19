@@ -6,7 +6,6 @@ pub fn verify_signature<K: Into<AgentPubKey>, S: Into<Signature>, D: Into<Serial
     signature: S,
     data: D,
 ) -> HdkResult<bool> {
-    host_externs!(__verify_signature);
     host_fn!(
         __verify_signature,
         VerifySignatureInput {
