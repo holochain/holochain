@@ -93,7 +93,7 @@ let _link_add_header_hash = create_link(foo_entry_hash.clone(), bar_entry_hash)?
 // Get the links back
 let links = get_links(foo_entry_hash)?;
 // Print out the links
-debug!(links)?;
+debug!(links);
 ```
 
 ### call_remote, zome_info, agent_info
@@ -114,7 +114,7 @@ let result: SerializedBytes = call_remote(
 // Get their output
 let output: MyOutput = result.try_into()?;
 // Print their output
-debug!(output)?;
+debug!(output);
 ```
 
 ### Direct Api Call
