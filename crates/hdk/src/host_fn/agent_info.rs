@@ -1,10 +1,5 @@
 use crate::prelude::*;
 
-// struct AgentInfoHostFh(AgentInfoInput)
-//
-// impl HostFn<AgentInfo> for AgentInfoFn {
-//     fn call(self) -> AgentInfo {
-
 /// Trivial wrapper for __agent_info host function.
 /// Agent info input struct is `()` so the function call simply looks like this:
 ///
