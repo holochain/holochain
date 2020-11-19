@@ -213,7 +213,7 @@ pub enum EnvironmentKind {
     /// Specifies the environment used to save wasm
     Wasm,
     /// State of the p2p network
-    P2P,
+    P2p,
 }
 
 impl EnvironmentKind {
@@ -223,7 +223,7 @@ impl EnvironmentKind {
             EnvironmentKind::Cell(cell_id) => PathBuf::from(cell_id.to_string()),
             EnvironmentKind::Conductor => PathBuf::from("conductor"),
             EnvironmentKind::Wasm => PathBuf::from("wasm"),
-            EnvironmentKind::P2P => PathBuf::from("p2p"),
+            EnvironmentKind::P2p => PathBuf::from("p2p"),
         }
     }
 }
