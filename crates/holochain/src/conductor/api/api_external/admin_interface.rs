@@ -135,9 +135,9 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
                 let cell_ids = self.conductor_handle.list_cell_ids().await?;
                 Ok(AdminResponse::CellIdsListed(cell_ids))
             }
-            ListActiveAppIds => {
-                let app_ids = self.conductor_handle.list_active_app_ids().await?;
-                Ok(AdminResponse::ActiveAppIdsListed(app_ids))
+            ListActiveApps => {
+                let app_ids = self.conductor_handle.list_active_apps().await?;
+                Ok(AdminResponse::ActiveAppsListed(app_ids))
             }
             ActivateApp { installed_app_id } => {
                 // Activate app
@@ -301,12 +301,12 @@ pub enum AdminRequest {
     /// List the ids of all the active (activated) Apps in the conductor.
     /// Takes no arguments.
     ///
-    /// Will be responded to with an [`AdminResponse::ActiveAppIdsListed`]
+    /// Will be responded to with an [`AdminResponse::ActiveAppsListed`]
     /// or an [`AdminResponse::Error`]
     ///
-    /// [`AdminResponse::ActiveAppIdsListed`]: enum.AdminResponse.html#variant.ActiveAppIdsListed
+    /// [`AdminResponse::ActiveAppsListed`]: enum.AdminResponse.html#variant.ActiveAppsListed
     /// [`AdminResponse::Error`]: enum.AppResponse.html#variant.Error
-    ListActiveAppIds,
+    ListActiveApps,
     /// Changes the `App` specified by argument `installed_app_id` from an inactive state to an active state in the conductor,
     /// meaning that Zome calls can now be made and the `App` will be loaded on a reboot of the conductor.
     /// It is likely to want to call this after calling [`AdminRequest::InstallApp`], since a freshly
@@ -422,12 +422,12 @@ pub enum AdminResponse {
     ///
     /// [`AdminRequest::ListCellIds`]: enum.AdminRequest.html#variant.ListCellIds
     CellIdsListed(Vec<CellId>),
-    /// The succesful response to an [`AdminRequest::ListActiveAppIds`].
+    /// The succesful response to an [`AdminRequest::ListActiveApps`].
     ///
     /// Contains a list of all the active `App` ids in the conductor
     ///
-    /// [`AdminRequest::ListActiveAppIds`]: enum.AdminRequest.html#variant.ListActiveAppIds
-    ActiveAppIdsListed(Vec<InstalledAppId>),
+    /// [`AdminRequest::ListActiveApps`]: enum.AdminRequest.html#variant.ListActiveApps
+    ActiveAppsListed(Vec<InstalledAppId>),
     /// The succesful response to an [`AdminRequest::AttachAppInterface`].
     ///
     /// `AppInterfaceApi` successfully attached.
@@ -528,10 +528,10 @@ mod test {
         assert_matches!(res, AdminResponse::CellIdsListed(v) if v == vec![cell_id]);
 
         let res = admin_api
-            .handle_admin_request(AdminRequest::ListActiveAppIds)
+            .handle_admin_request(AdminRequest::ListActiveApps)
             .await;
 
-        assert_matches!(res, AdminResponse::ActiveAppIdsListed(v) if v == vec!["test".to_string()]);
+        assert_matches!(res, AdminResponse::ActiveAppsListed(v) if v == vec!["test".to_string()]);
 
         handle.shutdown().await;
         tokio::time::timeout(std::time::Duration::from_secs(1), shutdown)

@@ -784,7 +784,7 @@ where
         Ok(self.cells.keys().cloned().collect())
     }
 
-    pub(super) async fn list_active_app_ids(&self) -> ConductorResult<Vec<InstalledAppId>> {
+    pub(super) async fn list_active_apps(&self) -> ConductorResult<Vec<InstalledAppId>> {
         let active_apps = self.get_state().await?.active_apps;
         Ok(active_apps.keys().cloned().collect())
     }

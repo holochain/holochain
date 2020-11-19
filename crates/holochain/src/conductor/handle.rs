@@ -183,7 +183,7 @@ pub trait ConductorHandleT: Send + Sync {
     async fn list_cell_ids(&self) -> ConductorResult<Vec<CellId>>;
 
     /// List Active AppIds
-    async fn list_active_app_ids(&self) -> ConductorResult<Vec<InstalledAppId>>;
+    async fn list_active_apps(&self) -> ConductorResult<Vec<InstalledAppId>>;
 
     /// Dump the cells state
     #[allow(clippy::ptr_arg)]
@@ -484,8 +484,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         self.conductor.read().await.list_cell_ids().await
     }
 
-    async fn list_active_app_ids(&self) -> ConductorResult<Vec<InstalledAppId>> {
-        self.conductor.read().await.list_active_app_ids().await
+    async fn list_active_apps(&self) -> ConductorResult<Vec<InstalledAppId>> {
+        self.conductor.read().await.list_active_apps().await
     }
 
     async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
