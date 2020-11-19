@@ -95,8 +95,10 @@ pub enum MaybeLinkable {
     NeverLinkable,
 }
 
+/// A freely callable version of the host fn api, so that host functions
+/// can be called from Rust instead of Wasm
 #[derive(Clone)]
-pub struct CallData {
+pub struct HostFnApi {
     pub env: EnvironmentWrite,
     pub ribosome: WasmRibosome,
     pub zome_path: ZomePath,
@@ -106,23 +108,28 @@ pub struct CallData {
     pub call_zome_handle: CellConductorReadHandle,
 }
 
-impl CallData {
-    /// Create CallData for the first zome.
+impl HostFnApi {
+    /// Create HostFnApi for the first zome.
     pub async fn create(
         cell_id: &CellId,
         handle: &ConductorHandle,
         dna_file: &DnaFile,
-    ) -> CallData {
+    ) -> HostFnApi {
+        assert_eq!(
+            dna_file.dna().zomes.len(),
+            1,
+            "Can't use HostFnApi::create with a DNA containing more than one zome."
+        );
         Self::create_for_zome(cell_id, handle, dna_file, 0).await
     }
 
-    /// Create CallData for a specific zome if there are multiple.
+    /// Create HostFnApi for a specific zome if there are multiple.
     pub async fn create_for_zome(
         cell_id: &CellId,
         handle: &ConductorHandle,
         dna_file: &DnaFile,
         zome_index: usize,
-    ) -> CallData {
+    ) -> HostFnApi {
         let env = handle.get_cell_env(cell_id).await.unwrap();
         let keystore = env.keystore().clone();
         let network = handle
@@ -138,7 +145,7 @@ impl CallData {
         let signal_tx = handle.signal_broadcaster().await;
         let call_zome_handle =
             CellConductorApi::new(handle.clone(), cell_id.clone()).into_call_zome_handle();
-        CallData {
+        HostFnApi {
             env,
             ribosome,
             zome_path,
@@ -161,7 +168,7 @@ impl CallData {
         Arc<CallContext>,
         CallZomeWorkspaceLock,
     ) {
-        let CallData {
+        let HostFnApi {
             env,
             network,
             keystore,
@@ -189,7 +196,7 @@ impl CallData {
     }
 }
 
-impl CallData {
+impl HostFnApi {
     pub async fn commit_entry<E: Into<entry_def::EntryDefId>>(
         &self,
         entry: Entry,

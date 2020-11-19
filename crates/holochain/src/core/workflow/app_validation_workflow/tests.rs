@@ -446,7 +446,7 @@ async fn commit_invalid(
 ) -> (HeaderHash, EntryHash) {
     let entry = ThisWasmEntry::NeverValidates;
     let entry_hash = EntryHash::with_data_sync(&Entry::try_from(entry.clone()).unwrap());
-    let call_data = CallData::create(bob_cell_id, handle, dna_file).await;
+    let call_data = HostFnApi::create(bob_cell_id, handle, dna_file).await;
     // 4
     let invalid_header_hash = call_data
         .commit_entry(entry.clone().try_into().unwrap(), INVALID_ID)
@@ -469,7 +469,7 @@ async fn commit_invalid_post(
     let entry = Post("Banana".into());
     let entry_hash = EntryHash::with_data_sync(&Entry::try_from(entry.clone()).unwrap());
     // Create call data for the 3rd zome Create
-    let call_data = CallData::create_for_zome(bob_cell_id, handle, dna_file, 2).await;
+    let call_data = HostFnApi::create_for_zome(bob_cell_id, handle, dna_file, 2).await;
     // 9
     let invalid_header_hash = call_data
         .commit_entry(entry.clone().try_into().unwrap(), POST_ID)
@@ -487,7 +487,7 @@ async fn call_zome_directly(
     dna_file: &DnaFile,
     invocation: ZomeCallInvocation,
 ) -> SerializedBytes {
-    let call_data = CallData::create(bob_cell_id, handle, dna_file).await;
+    let call_data = HostFnApi::create(bob_cell_id, handle, dna_file).await;
     // 4
     let output = call_data.call_zome_direct(invocation).await;
 

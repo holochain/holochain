@@ -1383,7 +1383,7 @@ mod slow_tests {
         // Commit the base and target.
         // Link them together.
         {
-            let call_data = CallData::create(&alice_cell_id, &conductor, &dna_file).await;
+            let call_data = HostFnApi::create(&alice_cell_id, &conductor, &dna_file).await;
 
             // 3
             call_data
@@ -1412,7 +1412,7 @@ mod slow_tests {
 
         // Check the ops
         {
-            let call_data = CallData::create(&bob_cell_id, &conductor, &dna_file).await;
+            let call_data = HostFnApi::create(&bob_cell_id, &conductor, &dna_file).await;
 
             // Wait for the ops to integrate but early exit if they do
             // 14 ops for genesis and 9 ops for two commits and a link

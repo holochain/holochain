@@ -38,7 +38,7 @@ async fn authored_test() {
     let entry_hash = EntryHash::with_data_sync(&Entry::try_from(entry.clone()).unwrap());
     // 3
     alice_call_data
-        .call_data(TestWasm::Create)
+        .get_api(TestWasm::Create)
         .commit_entry(entry.clone().try_into().unwrap(), POST_ID)
         .await;
 
@@ -84,7 +84,7 @@ async fn authored_test() {
 
     // Now bob commits the entry
     bob_call_data
-        .call_data(TestWasm::Create)
+        .get_api(TestWasm::Create)
         .commit_entry(entry.clone().try_into().unwrap(), POST_ID)
         .await;
 
