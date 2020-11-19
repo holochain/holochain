@@ -24,9 +24,8 @@ use holochain_p2p::{
 };
 use holochain_serialized_bytes::{SerializedBytes, SerializedBytesError, UnsafeBytes};
 use holochain_state::{
-    env::EnvironmentWrite,
-    fresh_reader_test,
-    test_utils::{test_conductor_env, test_p2p_env, test_wasm_env, TestEnvironment},
+    env::EnvironmentWrite, fresh_reader_test, test_utils::test_environments,
+    test_utils::TestEnvironments,
 };
 use holochain_types::{
     app::InstalledCell,
@@ -48,12 +47,13 @@ use std::{convert::TryInto, sync::Arc, time::Duration};
 use tempdir::TempDir;
 use tokio::sync::mpsc;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test_utils"))]
 pub mod host_fn_api;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test_utils"))]
 pub mod conductor_setup;
 
+/// Produce file and line number info at compile-time
 #[macro_export]
 macro_rules! here {
     ($test: expr) => {
@@ -292,7 +292,7 @@ pub async fn setup_app(
     apps_data: Vec<(&str, InstalledCellsWithProofs)>,
     dnas: Vec<DnaFile>,
 ) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
-    setup_app_inner(apps_data, dnas, None).await
+    setup_app_inner(test_environments(), apps_data, dnas, None).await
 }
 
 /// Setup an app with a custom network config for testing
@@ -302,25 +302,16 @@ pub async fn setup_app_with_network(
     dnas: Vec<DnaFile>,
     network: KitsuneP2pConfig,
 ) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
-    setup_app_inner(apps_data, dnas, Some(network)).await
+    setup_app_inner(test_environments(), apps_data, dnas, Some(network)).await
 }
 
-async fn setup_app_inner(
+/// Setup an app with full configurability
+pub async fn setup_app_inner(
+    envs: TestEnvironments,
     apps_data: Vec<(&str, InstalledCellsWithProofs)>,
     dnas: Vec<DnaFile>,
     network: Option<KitsuneP2pConfig>,
 ) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
-    let test_env = test_conductor_env();
-    let TestEnvironment {
-        env: wasm_env,
-        tmpdir: _tmpdir,
-    } = test_wasm_env();
-    let TestEnvironment {
-        env: p2p_env,
-        tmpdir: _p2p_tmpdir,
-    } = test_p2p_env();
-    let tmpdir = test_env.tmpdir.clone();
-
     let conductor_handle = ConductorBuilder::new()
         .config(ConductorConfig {
             admin_interfaces: Some(vec![AdminInterfaceConfig {
@@ -329,7 +320,7 @@ async fn setup_app_inner(
             network,
             ..Default::default()
         })
-        .test(test_env, wasm_env, p2p_env)
+        .test(&envs)
         .await
         .unwrap();
 
@@ -340,7 +331,7 @@ async fn setup_app_inner(
     let handle = conductor_handle.clone();
 
     (
-        tmpdir,
+        envs.tempdir(),
         RealAppInterfaceApi::new(conductor_handle, "test-interface".into()),
         handle,
     )
