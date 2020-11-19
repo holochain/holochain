@@ -15,3 +15,8 @@ pub mod test_utils;
 // this is here so that wasm ribosome macros can reference it
 pub use holochain_wasmer_host;
 pub use tracing;
+
+// TODO can probably move these to integration test once
+// we work out the test utils stuff
+#[cfg(test)]
+mod local_network_tests;

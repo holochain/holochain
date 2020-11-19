@@ -109,3 +109,14 @@ fn call_create_entry(_: ()) -> ExternResult<HeaderHash> {
         &(),
     )?)
 }
+
+#[hdk_extern]
+fn call_create_entry_remotely(agent: AgentPubKey) -> ExternResult<HeaderHash> {
+    Ok(call_remote(
+        agent,
+        "create_entry".to_string().into(),
+        "create_entry".to_string().into(),
+        None,
+        &(),
+    )?)
+}
