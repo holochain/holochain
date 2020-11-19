@@ -6,7 +6,9 @@ use kitsune_p2p_types::dht_arc::DhtArc;
 use std::sync::Arc;
 
 /// Type used for content data of wire messages.
-#[derive(Debug, PartialEq, Deref, AsRef, From, Into, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Deref, AsRef, From, Into, serde::Serialize, serde::Deserialize,
+)]
 pub struct WireData(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
 kitsune_p2p_types::write_codec_enum! {

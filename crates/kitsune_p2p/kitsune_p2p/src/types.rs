@@ -131,8 +131,8 @@ macro_rules! make_kitsune_bin_type {
                 serde::Serialize,
                 serde::Deserialize,
             )]
-            #[shrinkwrap(mutable, unsafe_ignore_visibility)]
-            pub struct $name(#[serde(with = "serde_bytes")] Vec<u8>);
+            #[shrinkwrap(mutable)]
+            pub struct $name(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
             impl KitsuneBinType for $name {
 

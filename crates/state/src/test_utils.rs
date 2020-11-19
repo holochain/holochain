@@ -4,6 +4,7 @@ use crate::{
     env::{EnvironmentKind, EnvironmentWrite},
     prelude::BufKey,
 };
+use holochain_keystore::KeystoreSender;
 use holochain_types::test_utils::fake_cell_id;
 use shrinkwraprs::Shrinkwrap;
 use std::sync::Arc;
@@ -25,9 +26,9 @@ pub fn test_wasm_env() -> TestEnvironment {
     test_env(EnvironmentKind::Wasm)
 }
 
-/// Create a [TestEnvironment] of [EnvironmentKind::P2P], backed by a temp directory.
+/// Create a [TestEnvironment] of [EnvironmentKind::P2p], backed by a temp directory.
 pub fn test_p2p_env() -> TestEnvironment {
-    test_env(EnvironmentKind::P2P)
+    test_env(EnvironmentKind::P2p)
 }
 
 /// Generate a test keystore pre-populated with a couple test keypairs.
@@ -66,14 +67,20 @@ fn test_env(kind: EnvironmentKind) -> TestEnvironment {
     }
 }
 
+/// Create a fresh set of test environments with a new TempDir
+pub fn test_environments() -> TestEnvironments {
+    let tempdir = TempDir::new("holochain-test-environments").unwrap();
+    TestEnvironments::new(tempdir)
+}
+
 /// A test lmdb environment with test directory
 #[derive(Clone, Shrinkwrap)]
 pub struct TestEnvironment {
     #[shrinkwrap(main_field)]
     /// lmdb environment
-    pub env: EnvironmentWrite,
+    env: EnvironmentWrite,
     /// temp directory for this environment
-    pub tmpdir: Arc<TempDir>,
+    tmpdir: Arc<TempDir>,
 }
 
 impl TestEnvironment {
@@ -88,16 +95,60 @@ impl TestEnvironment {
     }
 }
 
-// FIXME: Currently the test environments using TempDirs above immediately
-// delete the temp dirs after installation. If we ever have cases where we
-// want to flush to disk, this will probably fail. In that case we want to
-// use something like this, which owns the TempDir so it lives long enough
-//
-// /// A wrapper around an EnvironmentWrite which includes a reference to a TempDir,
-// /// so that when the TestEnvironment goes out of scope, the tempdir is deleted
-// /// from the filesystem
-// #[derive(Shrinkwrap)]
-// pub struct TestEnvironment(#[shrinkwrap(main_field)] EnvironmentWrite, TempDir);
+/// A container for all three non-cell environments
+pub struct TestEnvironments {
+    /// A test conductor environment
+    conductor: EnvironmentWrite,
+    /// A test wasm environment
+    wasm: EnvironmentWrite,
+    /// A test p2p environment
+    p2p: EnvironmentWrite,
+    /// The shared root temp dir for these environments
+    tempdir: Arc<TempDir>,
+    /// A keystore sender shared by all environments
+    keystore: KeystoreSender,
+}
+
+#[allow(missing_docs)]
+impl TestEnvironments {
+    /// Create all three non-cell environments at once
+    pub fn new(tempdir: TempDir) -> Self {
+        use EnvironmentKind::*;
+        let keystore = test_keystore();
+        let conductor =
+            EnvironmentWrite::new(&tempdir.path(), Conductor, keystore.clone()).unwrap();
+        let wasm = EnvironmentWrite::new(&tempdir.path(), Wasm, keystore.clone()).unwrap();
+        let p2p = EnvironmentWrite::new(&tempdir.path(), P2p, keystore.clone()).unwrap();
+        Self {
+            conductor,
+            wasm,
+            p2p,
+            tempdir: Arc::new(tempdir),
+            keystore,
+        }
+    }
+
+    pub fn conductor(&self) -> EnvironmentWrite {
+        self.conductor.clone()
+    }
+
+    pub fn wasm(&self) -> EnvironmentWrite {
+        self.wasm.clone()
+    }
+
+    pub fn p2p(&self) -> EnvironmentWrite {
+        self.p2p.clone()
+    }
+
+    /// Get the root temp dir for these environments
+    pub fn tempdir(&self) -> Arc<TempDir> {
+        self.tempdir.clone()
+    }
+
+    pub fn keystore(&self) -> &KeystoreSender {
+        &self.keystore
+    }
+}
 
 /// A String-based newtype suitable for database keys and values
 #[derive(
