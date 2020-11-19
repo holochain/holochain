@@ -23,11 +23,22 @@ Vagrant.configure("2") do |config|
 
   # provision the containernet tools
   config.vm.provision "shell", inline: <<-SHELL
+    # update apt database
     apt-get update
+
+    # upgade packages
     apt-get upgrade -y
+
+    # install needed tools
     apt-get install -y ansible git aptitude rsync
+
+    # clone the containernet source
     git clone https://github.com/containernet/containernet.git /root/containernet
+
+    # execute containernet ansible install script
     ( cd /root/containernet/ansible; sudo ansible-playbook -i "localhost," -c local install.yml )
+
+    # final setup for containernet execution
     ( cd /root/containernet; sudo make develop )
   SHELL
 end
