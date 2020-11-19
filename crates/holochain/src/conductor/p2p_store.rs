@@ -28,13 +28,19 @@ impl Eq for AgentKvKey {}
 
 impl PartialOrd for AgentKvKey {
     fn partial_cmp(&self, other: &AgentKvKey) -> Option<std::cmp::Ordering> {
-        PartialOrd::partial_cmp(&&self.0[..], &&other.0[..])
+        println!("{:?}\n{:?}", self, other);
+        let r = PartialOrd::partial_cmp(&&self.0[..], &&other.0[..]);
+        dbg!();
+        r
     }
 }
 
 impl Ord for AgentKvKey {
     fn cmp(&self, other: &AgentKvKey) -> std::cmp::Ordering {
-        Ord::cmp(&&self.0[..], &&other.0[..])
+        println!("{:?}\n{:?}", self, other);
+        let r = Ord::cmp(&&self.0[..], &&other.0[..]);
+        dbg!();
+        r
     }
 }
 

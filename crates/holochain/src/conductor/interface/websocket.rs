@@ -741,15 +741,37 @@ pub mod test {
         dbg!();
 
         // - Add the agent infos
+        dbg!();
         let req = AdminRequest::AddAgentInfo { agent_infos };
+        dbg!();
         let r = make_req(admin_api.clone(), req).await.await.unwrap();
+        dbg!();
         assert_matches!(r, AdminResponse::AgentInfoAdded);
+        dbg!();
 
+        let check_match = |expect: &Vec<AgentKvKey>, results: &Vec<AgentKvKey>, line| {
+            for (a, b) in expect.iter().zip(results.iter()) {
+                dbg!();
+                if a != b {
+                    dbg!();
+                    panic!("expect: {:?}\nDoesn't match {:?}\nOn line:{}", a, b, line);
+                }
+                // assert!(a == b, "{:?}:{:?} {}", a, b, line);
+                // assert_eq!(a, b, "line {}", line);
+                dbg!();
+            }
+        };
         // - Request all the infos
+        dbg!();
         let req = AdminRequest::RequestAgentInfo { cell_id: None };
+        dbg!();
         let r = make_req(admin_api.clone(), req).await.await.unwrap();
+        dbg!();
         let results = to_key(unwrap_to::unwrap_to!(r => AdminResponse::AgentInfoRequested).clone());
-        assert_eq!(expect, results);
+        dbg!();
+        check_match(&expect, &results, line!());
+        // assert_eq!(expect, results);
+        dbg!();
 
         // - Request the dna 0 agent 0
         let req = AdminRequest::RequestAgentInfo {
@@ -797,15 +819,23 @@ pub mod test {
         let msg = req.try_into().unwrap();
         let (tx, rx) = tokio::sync::oneshot::channel();
 
+        dbg!();
         let respond = move |bytes: SerializedBytes| {
+            dbg!();
             let response: AdminResponse = bytes.try_into().unwrap();
+            dbg!();
             tx.send(response).unwrap();
-            async { Ok(()) }.boxed()
+            dbg!();
+            async { dbg!(Ok(())) }.boxed()
         };
+        dbg!();
         let respond = Box::new(respond);
+        dbg!();
         let msg = WebsocketMessage::Request(msg, respond);
+        dbg!();
 
         handle_incoming_message(msg, admin_api).await.unwrap();
+        dbg!();
         rx
     }
 
