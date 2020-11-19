@@ -254,9 +254,7 @@ pub mod test {
     use crate::fixt::WasmRibosomeFixturator;
     use futures::future::FutureExt;
     use holochain_serialized_bytes::prelude::*;
-    use holochain_state::test_utils::{
-        test_conductor_env, test_p2p_env, test_wasm_env, TestEnvironment,
-    };
+    use holochain_state::test_utils::test_environments;
     use holochain_types::{
         app::{InstallAppDnaPayload, InstallAppPayload, InstalledCell},
         cell::CellId,
@@ -279,42 +277,18 @@ pub mod test {
     }
 
     async fn setup_admin() -> (Arc<TempDir>, ConductorHandle) {
-        let test_env = test_conductor_env();
-        let TestEnvironment {
-            env: wasm_env,
-            tmpdir: _tmpdir,
-        } = test_wasm_env();
-        let TestEnvironment {
-            env: p2p_env,
-            tmpdir: _p2p_tmpdir,
-        } = test_p2p_env();
-        let tmpdir = test_env.tmpdir.clone();
-        let conductor_handle = Conductor::builder()
-            .test(test_env, wasm_env, p2p_env)
-            .await
-            .unwrap();
-        (tmpdir, conductor_handle)
+        let envs = test_environments();
+        let conductor_handle = Conductor::builder().test(&envs).await.unwrap();
+        (envs.tempdir(), conductor_handle)
     }
 
     async fn setup_admin_fake_cells(
         cell_ids_with_proofs: Vec<(CellId, Option<SerializedBytes>)>,
         dna_store: MockDnaStore,
-    ) -> (Vec<Arc<TempDir>>, ConductorHandle) {
-        let mut tmps = vec![];
-        let test_env = test_conductor_env();
-        let TestEnvironment {
-            env: wasm_env,
-            tmpdir,
-        } = test_wasm_env();
-        let TestEnvironment {
-            env: p2p_env,
-            tmpdir: p2p_tmpdir,
-        } = test_p2p_env();
-        tmps.push(tmpdir);
-        tmps.push(test_env.tmpdir.clone());
-        tmps.push(p2p_tmpdir);
+    ) -> (Arc<TempDir>, ConductorHandle) {
+        let envs = test_environments();
         let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
-            .test(test_env, wasm_env, p2p_env)
+            .test(&envs)
             .await
             .unwrap();
 
@@ -329,7 +303,7 @@ pub mod test {
             .await
             .unwrap();
 
-        (tmps, conductor_handle)
+        (envs.tempdir(), conductor_handle)
     }
 
     async fn activate(conductor_handle: ConductorHandle) -> ConductorHandle {
@@ -349,19 +323,10 @@ pub mod test {
         cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
         dna_store: MockDnaStore,
     ) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
-        let test_env = test_conductor_env();
-        let TestEnvironment {
-            env: wasm_env,
-            tmpdir: _tmpdir,
-        } = test_wasm_env();
-        let TestEnvironment {
-            env: p2p_env,
-            tmpdir: _p2p_tmpdir,
-        } = test_p2p_env();
-        let tmpdir = test_env.tmpdir.clone();
+        let envs = test_environments();
 
         let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
-            .test(test_env, wasm_env, p2p_env)
+            .test(&envs)
             .await
             .unwrap();
 
@@ -383,7 +348,7 @@ pub mod test {
         let handle = conductor_handle.clone();
 
         (
-            tmpdir,
+            envs.tempdir(),
             RealAppInterfaceApi::new(conductor_handle, "test-interface".into()),
             handle,
         )
