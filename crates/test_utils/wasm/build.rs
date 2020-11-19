@@ -2,6 +2,8 @@ use std::io::Write;
 use std::process::Stdio;
 
 fn main() {
+    return;
+    
     let should_build = std::env::var_os("CARGO_FEATURE_BUILD").is_some();
     let wasms_path = format!("{}/{}/", env!("CARGO_MANIFEST_DIR"), "wasm_workspace");
     println!("cargo:rerun-if-changed=Cargo.toml");
