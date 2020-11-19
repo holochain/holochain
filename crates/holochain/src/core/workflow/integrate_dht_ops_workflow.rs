@@ -140,7 +140,7 @@ pub async fn integrate_dht_ops_workflow(
             // key. Just a possible note for the future.
             workspace.integration_limbo.put(so.hash, so.value)?;
         }
-        WorkComplete::Incomplete
+        WorkComplete::Complete
     };
 
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---

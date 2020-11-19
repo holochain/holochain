@@ -9,15 +9,6 @@ use ghost_actor::dependencies::tracing;
 use std::{collections::HashMap, sync::Arc};
 use tokio::stream::StreamExt;
 
-/// initialize tracing
-pub fn init_tracing() {
-    let _ = ghost_actor::dependencies::tracing::subscriber::set_global_default(
-        tracing_subscriber::FmtSubscriber::builder()
-            .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-            .finish(),
-    );
-}
-
 /// Utility trait for test values
 pub trait TestVal: Sized {
     fn test_val() -> Self;
