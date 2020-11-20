@@ -53,8 +53,3 @@ pub fn fake_agent_pubkey_2() -> AgentPubKey {
 pub fn fake_cap_secret() -> CapSecret {
     [0; CAP_SECRET_BYTES].into()
 }
-
-/// A fixture ZomeCallInvocationPayload for unit testing.
-pub fn fake_zome_invocation_payload() -> ExternInput {
-    ExternInput::try_from(SerializedBytes::try_from(()).unwrap()).unwrap()
-}

@@ -98,7 +98,10 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT, C: CellConductorApi
 
     let call_zome_handle = conductor_api.clone().into_call_zome_handle();
 
-    let zome_name = invocation.zome_name.clone();
+    let zome = ribosome
+        .dna_def()
+        .get_zome(&invocation.zome_name)
+        .map_err(RibosomeError::from)?;
 
     // Get the current head
     let chain_head_start_len = workspace_lock.read().await.source_chain.len();
@@ -184,7 +187,7 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT, C: CellConductorApi
                     let link_add = Arc::new(link_add.clone());
                     Either::Left(
                         app_validation_workflow::run_create_link_validation_callback(
-                            zome_name.clone(),
+                            zome.clone(),
                             link_add,
                             base,
                             target,
@@ -196,7 +199,7 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT, C: CellConductorApi
                 }
                 Header::DeleteLink(delete_link) => Either::Left(
                     app_validation_workflow::run_delete_link_validation_callback(
-                        zome_name.clone(),
+                        zome.clone(),
                         delete_link.clone(),
                         &ribosome,
                         workspace_lock.clone(),
@@ -205,7 +208,7 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT, C: CellConductorApi
                 ),
                 Header::Create(_) | Header::Update(_) | Header::Delete(_) => Either::Right(
                     app_validation_workflow::run_validation_callback_direct(
-                        zome_name.clone(),
+                        zome.clone(),
                         chain_element,
                         &ribosome,
                         workspace_lock.clone(),

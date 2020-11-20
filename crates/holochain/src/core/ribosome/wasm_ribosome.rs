@@ -61,7 +61,7 @@ use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::ribosome::ZomesToInvoke;
 use fallible_iterator::FallibleIterator;
-use holochain_types::dna::DnaError;
+use holochain_types::dna::{zome::Zome, DnaError};
 use holochain_types::dna::{
     zome::{HostFnAccess, Permission},
     DnaDefHashed, DnaFile,
@@ -108,10 +108,10 @@ impl WasmRibosome {
     }
 
     pub fn module(&self, call_context: CallContext) -> RibosomeResult<Module> {
-        let zome_name: ZomeName = call_context.zome_name();
-        let wasm: Arc<Vec<u8>> = self.dna_file.get_wasm_for_zome(&zome_name)?.code();
+        let zome_name = call_context.zome.zome_name();
+        let wasm: Arc<Vec<u8>> = self.dna_file.get_wasm_for_zome(zome_name)?.code();
         Ok(holochain_wasmer_host::instantiate::module(
-            &self.wasm_cache_key(&zome_name)?,
+            &self.wasm_cache_key(zome_name)?,
             &wasm,
             std::env::var_os(WASM_CACHE_PATH_ENV),
         )?)
@@ -130,7 +130,7 @@ impl WasmRibosome {
     }
 
     pub fn instance(&self, call_context: CallContext) -> RibosomeResult<Instance> {
-        let zome_name: ZomeName = call_context.zome_name();
+        let zome_name = call_context.zome.zome_name().clone();
         let wasm: Arc<Vec<u8>> = self.dna_file.get_wasm_for_zome(&zome_name)?.code();
         let imports: ImportObject = Self::imports(self, call_context);
         Ok(holochain_wasmer_host::instantiate::instantiate(
@@ -341,13 +341,16 @@ impl WasmRibosome {
     }
 }
 
+/// General purpose macro which relies heavily on various impls of the form:
+/// From<Vec<(ZomeName, $callback_result)>> for ValidationPackageResult
 macro_rules! do_callback {
     ( $self:ident, $access:ident, $invocation:ident, $callback_result:ty ) => {{
         let mut results: Vec<(ZomeName, $callback_result)> = Vec::new();
         // fallible iterator syntax instead of for loop
         let mut call_iterator = $self.call_iterator($access.into(), $invocation);
         while let Some(output) = call_iterator.next()? {
-            let (zome_name, callback_result) = output;
+            let (zome, callback_result) = output;
+            let zome_name: ZomeName = zome.into();
             let callback_result: $callback_result = callback_result.into();
             // return early if we have a definitive answer, no need to keep invoking callbacks
             // if we know we are done
@@ -372,11 +375,11 @@ impl RibosomeT for WasmRibosome {
         &self,
         host_access: HostAccess,
         invocation: &I,
-        zome_name: &ZomeName,
+        zome: &Zome,
         to_call: &FunctionName,
     ) -> Result<Option<ExternOutput>, RibosomeError> {
         let call_context = CallContext {
-            zome_name: zome_name.clone(),
+            zome: zome.clone(),
             host_access,
         };
         let module = self.module(call_context.clone())?;

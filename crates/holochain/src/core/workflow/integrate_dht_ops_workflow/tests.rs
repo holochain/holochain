@@ -24,6 +24,7 @@ use holochain_state::{
 };
 use holochain_types::{
     dht_op::{DhtOp, DhtOpHashed},
+    dna::zome::Zome,
     dna::DnaDefHashed,
     dna::DnaT,
     fixt::*,
@@ -889,8 +890,9 @@ async fn commit_entry<'env>(
     // Create a dna file with the correct zome name in the desired position (ZomeId)
     let dna_file = DnaFileFixturator::new(Empty).next().unwrap();
     let mut dna_def = dna_file.dna_def().clone();
+    let zome = Zome::new(zome_name.clone().into(), fixt!(ZomeDef));
     dna_def.zomes.clear();
-    dna_def.zomes.push((zome_name.clone().into(), fixt!(Zome)));
+    dna_def.zomes.push(zome.clone().into());
     let dna_def = DnaDefHashed::from_content(dna_def).await;
 
     // Create ribosome mock to return fixtures
@@ -898,7 +900,7 @@ async fn commit_entry<'env>(
     let mut ribosome = MockRibosomeT::new();
     ribosome.expect_dna_def().return_const(dna_def);
     ribosome
-        .expect_zome_name_to_id()
+        .expect_zome_to_id()
         .returning(|_| Ok(ZomeId::from(1)));
 
     ribosome
@@ -906,7 +908,7 @@ async fn commit_entry<'env>(
         .returning(move |_, _| Ok(EntryDefsResult::Defs(entry_defs_map.clone())));
 
     let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
-    call_context.zome_name = zome_name.clone();
+    call_context.zome = zome.clone();
 
     // Collect the entry from the pre-state to commit
     let entry = pre_state
@@ -984,8 +986,9 @@ async fn create_link(
     // Create a dna file with the correct zome name in the desired position (ZomeId)
     let dna_file = DnaFileFixturator::new(Empty).next().unwrap();
     let mut dna_def = dna_file.dna_def().clone();
+    let zome = Zome::new(zome_name.clone().into(), fixt!(ZomeDef));
     dna_def.zomes.clear();
-    dna_def.zomes.push((zome_name.clone().into(), fixt!(Zome)));
+    dna_def.zomes.push(zome.clone().into());
     let dna_def = DnaDefHashed::from_content(dna_def).await;
 
     // Create ribosome mock to return fixtures
@@ -993,11 +996,11 @@ async fn create_link(
     let mut ribosome = MockRibosomeT::new();
     ribosome.expect_dna_def().return_const(dna_def);
     ribosome
-        .expect_zome_name_to_id()
+        .expect_zome_to_id()
         .returning(|_| Ok(ZomeId::from(1)));
 
     let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
-    call_context.zome_name = zome_name.clone();
+    call_context.zome = zome.clone();
 
     // Call create_link
     let input = CreateLinkInput::new((base_address.into(), target_address.into(), link_tag));
@@ -1036,8 +1039,9 @@ async fn get_links(
     // Create a dna file with the correct zome name in the desired position (ZomeId)
     let dna_file = DnaFileFixturator::new(Empty).next().unwrap();
     let mut dna_def = dna_file.dna_def().clone();
+    let zome = Zome::new(zome_name.clone().into(), fixt!(ZomeDef));
     dna_def.zomes.clear();
-    dna_def.zomes.push((zome_name.clone().into(), fixt!(Zome)));
+    dna_def.zomes.push(zome.clone().into());
     let dna_def = DnaDefHashed::from_content(dna_def).await;
 
     let test_network = test_network(Some(dna_def.as_hash().clone()), None).await;
@@ -1047,11 +1051,11 @@ async fn get_links(
     let mut ribosome = MockRibosomeT::new();
     ribosome.expect_dna_def().return_const(dna_def);
     ribosome
-        .expect_zome_name_to_id()
+        .expect_zome_to_id()
         .returning(|_| Ok(ZomeId::from(1)));
 
     let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
-    call_context.zome_name = zome_name.clone();
+    call_context.zome = zome.clone();
 
     // Call get links
     let input = GetLinksInput::new((base_address.into(), Some(link_tag)));

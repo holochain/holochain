@@ -8,6 +8,7 @@ use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::dna::zome::HostFnAccess;
+use holochain_types::dna::zome::Zome;
 use holochain_zome_types::header::HeaderHashes;
 use holochain_zome_types::post_commit::PostCommitCallbackResult;
 use holochain_zome_types::zome::ZomeName;
@@ -15,13 +16,13 @@ use holochain_zome_types::ExternInput;
 
 #[derive(Clone)]
 pub struct PostCommitInvocation {
-    zome_name: ZomeName,
+    zome: Zome,
     headers: HeaderHashes,
 }
 
 impl PostCommitInvocation {
-    pub fn new(zome_name: ZomeName, headers: HeaderHashes) -> Self {
-        Self { zome_name, headers }
+    pub fn new(zome: Zome, headers: HeaderHashes) -> Self {
+        Self { zome, headers }
     }
 }
 
@@ -46,7 +47,7 @@ impl From<&PostCommitHostAccess> for HostFnAccess {
 
 impl Invocation for PostCommitInvocation {
     fn zomes(&self) -> ZomesToInvoke {
-        ZomesToInvoke::One(self.zome_name.to_owned())
+        ZomesToInvoke::One(self.zome.to_owned())
     }
     fn fn_components(&self) -> FnComponents {
         vec!["post_commit".into()].into()
@@ -165,11 +166,8 @@ mod test {
         let post_commit_invocation = PostCommitInvocationFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
-        let zome_name = post_commit_invocation.zome_name.clone();
-        assert_eq!(
-            ZomesToInvoke::One(zome_name),
-            post_commit_invocation.zomes(),
-        );
+        let zome = post_commit_invocation.zome.clone();
+        assert_eq!(ZomesToInvoke::One(zome), post_commit_invocation.zomes(),);
     }
 
     #[test]
@@ -226,7 +224,7 @@ mod slow_tests {
         let mut post_commit_invocation = PostCommitInvocationFixturator::new(fixt::Empty)
             .next()
             .unwrap();
-        post_commit_invocation.zome_name = TestWasm::Foo.into();
+        post_commit_invocation.zome = TestWasm::Foo.into();
 
         let result = ribosome
             .run_post_commit(host_access, post_commit_invocation)
@@ -245,7 +243,7 @@ mod slow_tests {
         let mut post_commit_invocation = PostCommitInvocationFixturator::new(fixt::Empty)
             .next()
             .unwrap();
-        post_commit_invocation.zome_name = TestWasm::PostCommitSuccess.into();
+        post_commit_invocation.zome = TestWasm::PostCommitSuccess.into();
 
         let result = ribosome
             .run_post_commit(host_access, post_commit_invocation)
@@ -264,7 +262,7 @@ mod slow_tests {
         let mut post_commit_invocation = PostCommitInvocationFixturator::new(fixt::Empty)
             .next()
             .unwrap();
-        post_commit_invocation.zome_name = TestWasm::PostCommitFail.into();
+        post_commit_invocation.zome = TestWasm::PostCommitFail.into();
 
         let result = ribosome
             .run_post_commit(host_access, post_commit_invocation)

@@ -59,7 +59,10 @@ use holochain_state::{
 use holochain_types::{
     activity::{AgentActivity, ChainItems},
     dht_op::DhtOp,
-    dna::{zome::Zome, DnaDef, DnaDefHashed, DnaT},
+    dna::{
+        zome::{Zome, ZomeDef},
+        DnaDef, DnaDefHashed, DnaT,
+    },
     test_utils::which_agent,
     validate::ValidationStatus,
     Entry, HeaderHashed, Timestamp,
@@ -203,10 +206,10 @@ async fn app_validation_workflow_inner(
     Ok(WorkComplete::Complete)
 }
 
-fn to_zome_name(zomes_to_invoke: ZomesToInvoke) -> AppValidationResult<ZomeName> {
+fn to_single_zome(zomes_to_invoke: ZomesToInvoke) -> AppValidationResult<Zome> {
     match zomes_to_invoke {
         ZomesToInvoke::All => Err(AppValidationError::LinkMultipleZomes),
-        ZomesToInvoke::One(zn) => Ok(zn),
+        ZomesToInvoke::One(z) => Ok(z),
     }
 }
 
@@ -261,7 +264,7 @@ async fn validate_op(
 
     let outcome = match element.header() {
         Header::DeleteLink(delete_link) => {
-            let zome_name = to_zome_name(zomes_to_invoke)?;
+            let zome_name = to_single_zome(zomes_to_invoke)?;
             // Run the link validation
             run_delete_link_validation_callback(
                 zome_name,
@@ -289,7 +292,7 @@ async fn validate_op(
             let base = Arc::new(base);
             let target = Arc::new(target);
 
-            let zome_name = to_zome_name(zomes_to_invoke)?;
+            let zome_name = to_single_zome(zomes_to_invoke)?;
 
             // Run the link validation
             run_create_link_validation_callback(
@@ -426,7 +429,7 @@ async fn get_zomes_to_invoke(
         get_app_entry_type(element, cascade).await?
     };
     match aet {
-        Some(aet) => Ok(ZomesToInvoke::One(get_zome_name(&aet, &dna_def)?)),
+        Some(aet) => Ok(ZomesToInvoke::One(get_zome(&aet, &dna_def)?.clone())),
         None => match element.header() {
             Header::CreateLink(_) | Header::DeleteLink(_) => {
                 get_link_zome(element, dna_def, workspace, network).await
@@ -439,7 +442,7 @@ async fn get_zomes_to_invoke(
 fn get_zome_info<'a>(
     entry_type: &AppEntryType,
     dna_def: &'a DnaDef,
-) -> AppValidationResult<&'a (ZomeName, Zome)> {
+) -> AppValidationResult<&'a (ZomeName, ZomeDef)> {
     let zome_index = u8::from(entry_type.zome_id()) as usize;
     Ok(dna_def
         .zomes
@@ -447,18 +450,18 @@ fn get_zome_info<'a>(
         .ok_or_else(|| AppValidationError::ZomeId(entry_type.zome_id()))?)
 }
 
-fn get_zome_name(entry_type: &AppEntryType, dna_def: &DnaDef) -> AppValidationResult<ZomeName> {
-    zome_id_to_zome_name(entry_type.zome_id(), dna_def)
+fn get_zome<'a>(entry_type: &AppEntryType, dna_def: &'a DnaDef) -> AppValidationResult<Zome> {
+    zome_id_to_zome(entry_type.zome_id(), dna_def)
 }
 
-fn zome_id_to_zome_name(zome_id: ZomeId, dna_def: &DnaDef) -> AppValidationResult<ZomeName> {
+fn zome_id_to_zome(zome_id: ZomeId, dna_def: &DnaDef) -> AppValidationResult<Zome> {
     let zome_index = u8::from(zome_id) as usize;
     Ok(dna_def
         .zomes
         .get(zome_index)
         .ok_or_else(|| AppValidationError::ZomeId(zome_id))?
-        .0
-        .clone())
+        .clone()
+        .into())
 }
 
 /// Either get the app entry type
@@ -484,8 +487,8 @@ async fn get_link_zome(
 ) -> AppValidationOutcome<ZomesToInvoke> {
     match element.header() {
         Header::CreateLink(cl) => {
-            let zome_name = zome_id_to_zome_name(cl.zome_id, dna_def)?;
-            Ok(ZomesToInvoke::One(zome_name))
+            let zome = zome_id_to_zome(cl.zome_id, dna_def)?.clone();
+            Ok(ZomesToInvoke::One(zome))
         }
         Header::DeleteLink(dl) => {
             let mut cascade = workspace.full_cascade(network.clone());
@@ -496,8 +499,8 @@ async fn get_link_zome(
 
             match shh.header() {
                 Header::CreateLink(cl) => {
-                    let zome_name = zome_id_to_zome_name(cl.zome_id, dna_def)?;
-                    Ok(ZomesToInvoke::One(zome_name))
+                    let zome = zome_id_to_zome(cl.zome_id, dna_def)?.clone();
+                    Ok(ZomesToInvoke::One(zome))
                 }
                 // The header that was found was the wrong type
                 // so lets try again.
@@ -755,14 +758,14 @@ async fn get_validation_package_remote(
                         Some(EntryType::App(a)) => a.clone(),
                         _ => return Ok(None),
                     };
-                    let zome_name = ribosome
+                    let zome = ribosome
                         .dna_def()
                         .zomes
                         .get(app_entry_type.zome_id().index())
                         .ok_or_else(|| AppValidationError::ZomeId(app_entry_type.zome_id()))?
-                        .0
-                        .clone();
-                    let invocation = ValidationPackageInvocation::new(zome_name, app_entry_type);
+                        .clone()
+                        .into();
+                    let invocation = ValidationPackageInvocation::new(zome, app_entry_type);
                     match ribosome.run_validation_package(access, invocation)? {
                                 ValidationPackageResult::Success(validation_package) => Ok(Some(validation_package)),
                                 ValidationPackageResult::Fail(reason) => Outcome::exit_with_rejected(reason),
@@ -776,7 +779,7 @@ async fn get_validation_package_remote(
 }
 
 pub async fn run_validation_callback_direct(
-    zome_name: ZomeName,
+    zome: Zome,
     element: Element,
     ribosome: &impl RibosomeT,
     workspace_lock: CallZomeWorkspaceLock,
@@ -817,7 +820,7 @@ pub async fn run_validation_callback_direct(
     let element = Arc::new(element);
 
     run_validation_callback_inner(
-        ZomesToInvoke::One(zome_name),
+        ZomesToInvoke::One(zome),
         element,
         validation_package,
         entry_def_id,
@@ -853,7 +856,7 @@ fn run_validation_callback_inner(
 }
 
 pub fn run_create_link_validation_callback(
-    zome_name: ZomeName,
+    zome: Zome,
     link_add: Arc<CreateLink>,
     base: Arc<Entry>,
     target: Arc<Entry>,
@@ -862,7 +865,7 @@ pub fn run_create_link_validation_callback(
     network: HolochainP2pCell,
 ) -> AppValidationResult<Outcome> {
     let invocation = ValidateCreateLinkInvocation {
-        zome_name,
+        zome,
         link_add,
         base,
         target,
@@ -872,16 +875,13 @@ pub fn run_create_link_validation_callback(
 }
 
 pub fn run_delete_link_validation_callback(
-    zome_name: ZomeName,
+    zome: Zome,
     delete_link: DeleteLink,
     ribosome: &impl RibosomeT,
     workspace_lock: CallZomeWorkspaceLock,
     network: HolochainP2pCell,
 ) -> AppValidationResult<Outcome> {
-    let invocation = ValidateDeleteLinkInvocation {
-        zome_name,
-        delete_link,
-    };
+    let invocation = ValidateDeleteLinkInvocation { zome, delete_link };
     let invocation = ValidateLinkInvocation::<ValidateDeleteLinkInvocation>::new(invocation);
     run_link_validation_callback(invocation, ribosome, workspace_lock, network)
 }

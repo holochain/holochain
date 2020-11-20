@@ -53,12 +53,12 @@ pub fn get_as_author_custom(
         _ => return Ok(None),
     };
 
-    let zome_name = match ribosome
+    let zome = match ribosome
         .dna_def()
         .zomes
         .get(app_entry_type.zome_id().index())
     {
-        Some(zome_name) => zome_name.0.clone(),
+        Some(zome_tuple) => zome_tuple.clone().into(),
         None => {
             warn!(
                 msg = "Tried to get custom validation package for header with invalid zome_id",
@@ -68,7 +68,7 @@ pub fn get_as_author_custom(
         }
     };
 
-    let invocation = ValidationPackageInvocation::new(zome_name, app_entry_type);
+    let invocation = ValidationPackageInvocation::new(zome, app_entry_type);
 
     Ok(Some(ribosome.run_validation_package(access, invocation)?))
 }

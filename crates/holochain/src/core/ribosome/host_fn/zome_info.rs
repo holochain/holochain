@@ -15,9 +15,9 @@ pub fn zome_info(
 ) -> RibosomeResult<ZomeInfoOutput> {
     Ok(ZomeInfoOutput::new(ZomeInfo {
         dna_name: ribosome.dna_def().name.clone(),
-        zome_name: call_context.zome_name.clone(),
+        zome_name: call_context.zome.zome_name().clone(),
         dna_hash: ribosome.dna_def().as_hash().clone(),
-        zome_id: ribosome.zome_name_to_id(&call_context.zome_name)?,
+        zome_id: ribosome.zome_to_id(&call_context.zome)?,
         properties: ribosome.dna_def().properties.clone(),
         // @TODO
         // public_token: "".into(),

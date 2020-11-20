@@ -17,7 +17,7 @@ pub fn get_links<'a>(
     let (base_address, tag) = input.into_inner();
 
     // Get zome id
-    let zome_id = ribosome.zome_name_to_id(&call_context.zome_name)?;
+    let zome_id = ribosome.zome_to_id(&call_context.zome)?;
 
     // Get the network from the context
     let network = call_context.host_access.network().clone();

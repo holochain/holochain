@@ -212,8 +212,8 @@ pub async fn check_app_entry_type(
         .zomes
         .get(zome_index)
         .ok_or_else(|| ValidationOutcome::ZomeId(entry_type.clone()))?
-        .1
-        .clone();
+        .clone()
+        .1;
 
     let entry_def = get_entry_def(entry_type.id(), zome, dna_file.dna(), conductor_api).await?;
 

@@ -40,6 +40,7 @@ use holochain_keystore::keystore_actor::KeystoreSender;
 use holochain_p2p::HolochainP2pCellFixturator;
 use holochain_state::test_utils::test_keystore;
 use holochain_types::dna::zome::WasmZome;
+use holochain_types::dna::zome::Zome;
 use holochain_types::dna::DnaDefHashed;
 use holochain_types::dna::DnaFile;
 use holochain_types::dna::Wasms;
@@ -52,7 +53,6 @@ use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::element::Element;
 use holochain_zome_types::header::HeaderHashes;
 use holochain_zome_types::link::LinkTag;
-use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::ExternInput;
 use rand::seq::IteratorRandom;
 use rand::thread_rng;
@@ -90,7 +90,7 @@ impl Iterator for WasmRibosomeFixturator<curve::Zomes> {
         // warm the module cache for each wasm in the ribosome
         for zome in self.0.curve.0.clone() {
             let mut call_context = CallContextFixturator::new(Empty).next().unwrap();
-            call_context.zome_name = zome.into();
+            call_context.zome = zome.into();
             ribosome.module(call_context).unwrap();
         }
 
@@ -354,7 +354,7 @@ fixturator!(
 
 fixturator!(
     PostCommitInvocation;
-    constructor fn new(ZomeName, HeaderHashes);
+    constructor fn new(Zome, HeaderHashes);
 );
 
 fixturator!(
@@ -364,7 +364,7 @@ fixturator!(
 
 fixturator!(
     ZomesToInvoke;
-    constructor fn one(ZomeName);
+    constructor fn one(Zome);
 );
 
 fn make_validate_invocation(
@@ -386,12 +386,12 @@ fixturator!(
 
 fixturator!(
     ValidateCreateLinkInvocation;
-    constructor fn new(ZomeName, CreateLink, Entry, Entry);
+    constructor fn new(Zome, CreateLink, Entry, Entry);
 );
 
 fixturator!(
     ValidateDeleteLinkInvocation;
-    constructor fn new(ZomeName, DeleteLink);
+    constructor fn new(Zome, DeleteLink);
 );
 
 /// Macros don't get along with generics.
@@ -400,11 +400,11 @@ type ValidateLinkInvocationCreate = ValidateLinkInvocation<ValidateCreateLinkInv
 fixturator!(
     ValidateLinkInvocationCreate;
     constructor fn new(ValidateCreateLinkInvocation);
-    curve ZomeName {
+    curve Zome {
         let mut c = ValidateCreateLinkInvocationFixturator::new(Empty)
             .next()
             .unwrap();
-        c.zome_name = get_fixt_curve!().clone();
+        c.zome = get_fixt_curve!().clone();
         ValidateLinkInvocationCreate::new(c)
     };
 );
@@ -429,7 +429,7 @@ fixturator!(
 
 fixturator!(
     ValidationPackageInvocation;
-    constructor fn new(ZomeName, AppEntryType);
+    constructor fn new(Zome, AppEntryType);
 );
 
 fixturator!(
@@ -452,5 +452,5 @@ fixturator!(
 
 fixturator!(
     CallContext;
-    constructor fn new(ZomeName, HostAccess);
+    constructor fn new(Zome, HostAccess);
 );

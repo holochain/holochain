@@ -30,7 +30,7 @@ pub fn update<'a>(
         holochain_types::entry::EntryHashed::from_content_sync(async_entry).into_hash();
 
     // extract the zome position
-    let header_zome_id = ribosome.zome_name_to_id(&call_context.zome_name)?;
+    let header_zome_id = ribosome.zome_to_id(&call_context.zome)?;
 
     // extract the entry defs for a zome
     let entry_type = match entry_def_id {

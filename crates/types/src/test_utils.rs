@@ -3,7 +3,10 @@
 use crate::{
     cell::CellId,
     dna::{wasm::DnaWasm, zome::Zome, JsonProperties},
-    dna::{zome::WasmZome, DnaDef, DnaFile},
+    dna::{
+        zome::{WasmZome, ZomeDef},
+        DnaDef, DnaFile,
+    },
     prelude::*,
 };
 use holochain_zome_types::capability::CapSecret;
@@ -21,14 +24,6 @@ struct FakeProperties {
 /// simple DnaWasm fixture
 pub fn fake_dna_wasm() -> DnaWasm {
     DnaWasm::from(vec![0_u8])
-}
-
-/// simple Zome fixture
-pub fn fake_zome() -> Zome {
-    WasmZome {
-        wasm_hash: holo_hash::WasmHash::from_raw_32(vec![0; 32]),
-    }
-    .into()
 }
 
 /// A fixture example dna for unit testing.

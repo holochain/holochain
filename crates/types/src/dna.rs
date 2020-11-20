@@ -14,10 +14,13 @@ pub use holo_hash::*;
 use holochain_zome_types::zome::ZomeName;
 use std::collections::BTreeMap;
 
-use self::{error::DnaResult, zome::Zome};
+use self::{
+    error::DnaResult,
+    zome::{Zome, ZomeDef},
+};
 
 /// Zomes need to be an ordered map from ZomeName to a Zome
-pub type Zomes = Vec<(ZomeName, zome::Zome)>;
+pub type Zomes = Vec<(ZomeName, zome::ZomeDef)>;
 
 /// A type to allow json values to be used as [SerializedBytes]
 #[derive(Debug, Clone, From, serde::Serialize, serde::Deserialize, SerializedBytes)]
@@ -54,14 +57,24 @@ impl DnaDef {
     // }
 
     /// Return a Zome
+    pub fn get_zome(&self, zome_name: &ZomeName) -> Result<zome::Zome, DnaError> {
+        self.zomes
+            .iter()
+            .find(|(name, _)| name == zome_name)
+            .cloned()
+            .map(|(name, def)| Zome::new(name, def))
+            .ok_or_else(|| DnaError::ZomeNotFound(format!("Zome '{}' not found", &zome_name,)))
+    }
+
+    /// Return a Zome, error if not a WasmZome
     pub fn get_wasm_zome(&self, zome_name: &ZomeName) -> Result<&zome::WasmZome, DnaError> {
         self.zomes
             .iter()
             .find(|(name, _)| name == zome_name)
-            .map(|(_, zome)| zome)
+            .map(|(_, def)| def)
             .ok_or_else(|| DnaError::ZomeNotFound(format!("Zome '{}' not found", &zome_name,)))
-            .and_then(|zome| {
-                if let Zome::Wasm(wasm_zome) = zome {
+            .and_then(|def| {
+                if let ZomeDef::Wasm(wasm_zome) = def {
                     Ok(wasm_zome)
                 } else {
                     Err(DnaError::NonWasmZome(zome_name.clone()))

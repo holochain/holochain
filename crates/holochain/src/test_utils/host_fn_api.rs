@@ -192,7 +192,8 @@ impl HostFnApi {
             cell_id,
         );
         let ribosome = Arc::new(ribosome);
-        let call_context = Arc::new(CallContext::new(zome_name, host_access.into()));
+        let zome = ribosome.dna_def().get_zome(&zome_name).unwrap();
+        let call_context = Arc::new(CallContext::new(zome, host_access.into()));
         (env, ribosome, call_context, workspace_lock)
     }
 }

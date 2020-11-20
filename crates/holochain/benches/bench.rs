@@ -6,7 +6,7 @@ use hdk3::prelude::*;
 use holo_hash::fixt::AgentPubKeyFixturator;
 use holochain::core::ribosome::RibosomeT;
 use holochain::core::ribosome::ZomeCallInvocation;
-use holochain_types::fixt::CapSecretFixturator;
+use holochain_types::{dna::zome::Zome, fixt::CapSecretFixturator};
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::ExternInput;
 use once_cell::sync::Lazy;
@@ -59,10 +59,9 @@ pub fn wasm_call_n(c: &mut Criterion) {
     let mut group = c.benchmark_group("wasm_call_n");
 
     for n in vec![
-        // 1 byte
-        1,     // 1 kb
-        1_000, // 1 mb
-        1_000_000,
+        1,         // 1 byte
+        1_000,     // 1 kb
+        1_000_000, // 1 mb
     ] {
         group.throughput(Throughput::Bytes(n as _));
 
@@ -75,9 +74,10 @@ pub fn wasm_call_n(c: &mut Criterion) {
                 let ha = HOST_ACCESS_FIXTURATOR.lock().unwrap().next().unwrap();
 
                 b.iter(|| {
+                    let zome: Zome = TestWasm::Bench.into();
                     let i = ZomeCallInvocation {
                         cell_id: CELL_ID.lock().unwrap().clone(),
-                        zome_name: TestWasm::Bench.into(),
+                        zome_name: zome.zome_name().clone(),
                         cap: Some(CAP.lock().unwrap().clone()),
                         fn_name: "echo_bytes".into(),
                         payload: ExternInput::new(sb.clone()),
@@ -87,7 +87,7 @@ pub fn wasm_call_n(c: &mut Criterion) {
                         .lock()
                         .unwrap()
                         .clone()
-                        .maybe_call(ha.clone().into(), &i, &i.zome_name, &i.fn_name)
+                        .maybe_call(ha.clone().into(), &i, &zome, &i.fn_name)
                         .unwrap();
                 });
             });

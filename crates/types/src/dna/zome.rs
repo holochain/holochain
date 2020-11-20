@@ -12,13 +12,78 @@ use super::{error::DnaResult, DnaError};
 
 pub mod inline_zome;
 
-/// Represents an individual "zome".
+/// An internal type, joining a ZomeDef with its name
+#[derive(
+    Serialize,
+    Deserialize,
+    Hash,
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    shrinkwraprs::Shrinkwrap,
+)]
+pub struct Zome {
+    name: ZomeName,
+    #[shrinkwrap(main_field)]
+    def: ZomeDef,
+}
+
+impl Zome {
+    /// Constructor
+    pub fn new(name: ZomeName, def: ZomeDef) -> Self {
+        Self { name, def }
+    }
+
+    /// Accessor
+    pub fn zome_name(&self) -> &ZomeName {
+        &self.name
+    }
+
+    /// Accessor
+    pub fn zome_def(&self) -> &ZomeDef {
+        &self.def
+    }
+
+    /// Split into components
+    pub fn into_inner(self) -> (ZomeName, ZomeDef) {
+        (self.name, self.def)
+    }
+}
+
+impl From<(ZomeName, ZomeDef)> for Zome {
+    fn from(pair: (ZomeName, ZomeDef)) -> Self {
+        Self::new(pair.0, pair.1)
+    }
+}
+
+impl From<Zome> for (ZomeName, ZomeDef) {
+    fn from(zome: Zome) -> Self {
+        zome.into_inner()
+    }
+}
+
+impl From<Zome> for ZomeName {
+    fn from(zome: Zome) -> Self {
+        zome.name
+    }
+}
+
+impl From<Zome> for ZomeDef {
+    fn from(zome: Zome) -> Self {
+        zome.def
+    }
+}
+
+/// Represents an individual "zome" definition.
 #[derive(
     Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, derive_more::From,
 )]
 // This can be untagged, since the only valid serialization target is WasmZome
 #[serde(untagged)]
-pub enum Zome {
+pub enum ZomeDef {
     /// A zome defined by Wasm bytecode
     Wasm(WasmZome),
 
@@ -27,12 +92,12 @@ pub enum Zome {
     Inline(Arc<InlineZome>),
 }
 
-impl Zome {
+impl ZomeDef {
     /// If this is a Wasm zome, return the WasmHash.
     /// If not, return an error with the provided zome name
     pub fn wasm_hash(&self, zome_name: &ZomeName) -> DnaResult<holo_hash::WasmHash> {
         match self {
-            Zome::Wasm(WasmZome { wasm_hash }) => Ok(wasm_hash.clone()),
+            ZomeDef::Wasm(WasmZome { wasm_hash }) => Ok(wasm_hash.clone()),
             _ => Err(DnaError::NonWasmZome(zome_name.clone())),
         }
     }
@@ -75,7 +140,7 @@ pub enum Permission {
     Deny,
 }
 
-impl Zome {
+impl ZomeDef {
     /// create a Zome from a holo_hash WasmHash instead of a holo_hash one
     pub fn from_hash(wasm_hash: holo_hash::WasmHash) -> Self {
         WasmZome { wasm_hash }.into()

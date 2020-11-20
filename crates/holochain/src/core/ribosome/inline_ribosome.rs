@@ -39,7 +39,7 @@ impl RibosomeT for InlineRibosome {
         &self,
         host_access: HostAccess,
         invocation: &I,
-        zome_name: &ZomeName,
+        zome: &Zome,
         to_call: &FunctionName,
     ) -> Result<Option<ExternOutput>, RibosomeError> {
         todo!()

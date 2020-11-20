@@ -50,10 +50,10 @@ use holo_hash::AgentPubKey;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::cell::CellId;
 use holochain_types::dna::{zome::HostFnAccess, DnaDefHashed};
 use holochain_types::fixt::CapSecretFixturator;
 use holochain_types::fixt::CellIdFixturator;
+use holochain_types::{cell::CellId, dna::zome::Zome};
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::capability::CapGrant;
 use holochain_zome_types::zome::FunctionName;
@@ -66,20 +66,17 @@ use std::iter::Iterator;
 
 #[derive(Clone)]
 pub struct CallContext {
-    pub zome_name: ZomeName,
+    pub zome: Zome,
     pub host_access: HostAccess,
 }
 
 impl CallContext {
-    pub fn new(zome_name: ZomeName, host_access: HostAccess) -> Self {
-        Self {
-            zome_name,
-            host_access,
-        }
+    pub fn new(zome: Zome, host_access: HostAccess) -> Self {
+        Self { zome, host_access }
     }
 
-    pub fn zome_name(&self) -> ZomeName {
-        self.zome_name.clone()
+    pub fn zome(&self) -> Zome {
+        self.zome.clone()
     }
     pub fn host_access(&self) -> HostAccess {
         self.host_access.clone()
@@ -224,12 +221,12 @@ impl From<Vec<String>> for FnComponents {
 #[derive(Clone, Debug, PartialEq)]
 pub enum ZomesToInvoke {
     All,
-    One(ZomeName),
+    One(Zome),
 }
 
 impl ZomesToInvoke {
-    pub fn one(zome_name: ZomeName) -> Self {
-        Self::One(zome_name)
+    pub fn one(zome: Zome) -> Self {
+        Self::One(zome)
     }
 }
 
@@ -387,7 +384,8 @@ impl Iterator for ZomeCallInvocationFixturator<NamedInvocation> {
 
 impl Invocation for ZomeCallInvocation {
     fn zomes(&self) -> ZomesToInvoke {
-        ZomesToInvoke::One(self.zome_name.to_owned())
+        todo!("zome_name -> zome")
+        // ZomesToInvoke::One(self.zome_name.to_owned())
     }
     fn fn_components(&self) -> FnComponents {
         vec![self.fn_name.to_owned().into()].into()
@@ -428,19 +426,21 @@ impl From<&ZomeCallHostAccess> for HostFnAccess {
 pub trait RibosomeT: Sized + std::fmt::Debug {
     fn dna_def(&self) -> &DnaDefHashed;
 
-    fn zomes_to_invoke(&self, zomes_to_invoke: ZomesToInvoke) -> Vec<ZomeName> {
+    fn zomes_to_invoke(&self, zomes_to_invoke: ZomesToInvoke) -> Vec<Zome> {
         match zomes_to_invoke {
             ZomesToInvoke::All => self
                 .dna_def()
                 .zomes
                 .iter()
-                .map(|(zome_name, _)| zome_name.clone())
+                .cloned()
+                .map(Into::into)
                 .collect(),
             ZomesToInvoke::One(zome) => vec![zome],
         }
     }
 
-    fn zome_name_to_id(&self, zome_name: &ZomeName) -> RibosomeResult<ZomeId> {
+    fn zome_to_id(&self, zome: &Zome) -> RibosomeResult<ZomeId> {
+        let zome_name = zome.zome_name();
         match self
             .dna_def()
             .zomes
@@ -462,7 +462,7 @@ pub trait RibosomeT: Sized + std::fmt::Debug {
         &self,
         access: HostAccess,
         invocation: &I,
-        zome_name: &ZomeName,
+        zome: &Zome,
         to_call: &FunctionName,
     ) -> Result<Option<ExternOutput>, RibosomeError>;
 

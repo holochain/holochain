@@ -5,8 +5,8 @@
 #![allow(missing_docs)]
 
 use crate::cell::CellId;
-use crate::dna::zome::Zome;
 use crate::dna::zome::{HostFnAccess, Permission};
+use crate::dna::zome::{Zome, ZomeDef};
 use crate::dna::DnaDef;
 use crate::dna::Zomes;
 use crate::header::NewEntryHeader;
@@ -68,6 +68,11 @@ pub struct PublicCurve;
 
 fixturator!(
     Zome;
+    constructor fn new(ZomeName, ZomeDef);
+);
+
+fixturator!(
+    ZomeDef;
     constructor fn from_hash(WasmHash);
 );
 

@@ -35,7 +35,7 @@ pub fn create<'a>(
         holochain_types::entry::EntryHashed::from_content_sync(async_entry).into_hash();
 
     // extract the zome position
-    let header_zome_id = ribosome.zome_name_to_id(&call_context.zome_name)?;
+    let header_zome_id = ribosome.zome_to_id(&call_context.zome)?;
 
     // extract the entry defs for a zome
     let entry_type = match entry_def_id {
@@ -91,7 +91,7 @@ pub fn extract_entry_def(
     {
         // the ribosome returned some defs
         EntryDefsResult::Defs(defs) => {
-            let maybe_entry_defs = defs.get(&call_context.zome_name);
+            let maybe_entry_defs = defs.get(call_context.zome.zome_name());
             match maybe_entry_defs {
                 // convert the entry def id string into a numeric position in the defs
                 Some(entry_defs) => match entry_defs.entry_def_id_position(entry_def_id.clone()) {
@@ -110,7 +110,7 @@ pub fn extract_entry_def(
     match app_entry_type {
         Some(app_entry_type) => Ok(app_entry_type),
         None => Err(RibosomeError::EntryDefs(
-            call_context.zome_name.clone(),
+            call_context.zome.zome_name().clone(),
             format!("entry def not found for {:?}", entry_def_id),
         )),
     }
@@ -169,7 +169,7 @@ pub mod wasm_test {
                 .next()
                 .unwrap();
         let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
-        call_context.zome_name = TestWasm::Create.into();
+        call_context.zome = TestWasm::Create.into();
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock;
         call_context.host_access = host_access.into();
@@ -210,7 +210,7 @@ pub mod wasm_test {
                 .next()
                 .unwrap();
         let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
-        call_context.zome_name = TestWasm::Create.into();
+        call_context.zome = TestWasm::Create.into();
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock.clone();
         call_context.host_access = host_access.into();

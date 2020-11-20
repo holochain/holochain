@@ -17,7 +17,10 @@ use holochain_state::{
     error::{DatabaseError, DatabaseResult},
     prelude::*,
 };
-use holochain_types::dna::{zome::Zome, DnaDefHashed, DnaFile};
+use holochain_types::dna::{
+    zome::{Zome, ZomeDef},
+    DnaDefHashed, DnaFile,
+};
 use holochain_zome_types::entry_def::EntryDef;
 use holochain_zome_types::header::EntryDefIndex;
 use holochain_zome_types::header::ZomeId;
@@ -30,7 +33,7 @@ pub mod error;
     Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd, Serialize, Deserialize, SerializedBytes,
 )]
 pub struct EntryDefBufferKey {
-    zome: Zome,
+    zome: ZomeDef,
     entry_def_position: EntryDefIndex,
 }
 
@@ -76,7 +79,7 @@ impl From<EntryDefStoreKey> for EntryDefBufferKey {
 
 impl EntryDefBufferKey {
     /// Create a new key
-    pub fn new(zome: Zome, entry_def_position: EntryDefIndex) -> Self {
+    pub fn new(zome: ZomeDef, entry_def_position: EntryDefIndex) -> Self {
         Self {
             zome,
             entry_def_position,
@@ -129,7 +132,7 @@ impl BufferedStore for EntryDefBuf {
 /// or fallback to running the zome
 pub(crate) async fn get_entry_def(
     entry_def_index: EntryDefIndex,
-    zome: Zome,
+    zome: ZomeDef,
     dna_def: &DnaDefHashed,
     conductor_api: &impl CellConductorApiT,
 ) -> EntryDefStoreResult<Option<EntryDef>> {
@@ -226,7 +229,10 @@ mod tests {
     use holo_hash::HasHash;
     use holochain_state::test_utils::test_environments;
     use holochain_types::{
-        dna::{wasm::DnaWasmHashed, zome::Zome},
+        dna::{
+            wasm::DnaWasmHashed,
+            zome::{Zome, ZomeDef},
+        },
         test_utils::fake_dna_zomes,
     };
     use holochain_wasm_test_utils::TestWasm;
@@ -268,11 +274,11 @@ mod tests {
             .into_hash();
 
         let post_def_key = EntryDefBufferKey {
-            zome: Zome::from_hash(dna_wasm.clone()),
+            zome: ZomeDef::from_hash(dna_wasm.clone()),
             entry_def_position: 0.into(),
         };
         let comment_def_key = EntryDefBufferKey {
-            zome: Zome::from_hash(dna_wasm),
+            zome: ZomeDef::from_hash(dna_wasm),
             entry_def_position: 1.into(),
         };
 

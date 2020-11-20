@@ -19,7 +19,7 @@ pub fn create_link<'a>(
     let (base_address, target_address, tag) = input.into_inner();
 
     // extract the zome position
-    let zome_id = ribosome.zome_name_to_id(&call_context.zome_name)?;
+    let zome_id = ribosome.zome_to_id(&call_context.zome)?;
 
     // Construct the link add
     let header_builder = builder::CreateLink::new(base_address, target_address, zome_id, tag);

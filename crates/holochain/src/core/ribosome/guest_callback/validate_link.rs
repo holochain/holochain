@@ -6,7 +6,7 @@ use derive_more::Constructor;
 use holo_hash::AnyDhtHash;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::dna::zome::{HostFnAccess, Permission};
+use holochain_types::dna::zome::{HostFnAccess, Permission, Zome};
 use holochain_zome_types::header::CreateLink;
 use holochain_zome_types::header::DeleteLink;
 use holochain_zome_types::validate_link::ValidateCreateLinkData;
@@ -38,7 +38,7 @@ impl ValidateLinkInvocation<ValidateDeleteLinkInvocation> {
 
 #[derive(Clone)]
 pub struct ValidateCreateLinkInvocation {
-    pub zome_name: ZomeName,
+    pub zome: Zome,
     // Arc here as CreateLink contains arbitrary bytes in the tag
     pub link_add: Arc<CreateLink>,
     pub base: Arc<Entry>,
@@ -47,14 +47,14 @@ pub struct ValidateCreateLinkInvocation {
 
 #[derive(Clone, derive_more::Constructor)]
 pub struct ValidateDeleteLinkInvocation {
-    pub zome_name: ZomeName,
+    pub zome: Zome,
     pub delete_link: DeleteLink,
 }
 
 impl ValidateCreateLinkInvocation {
-    pub fn new(zome_name: ZomeName, link_add: CreateLink, base: Entry, target: Entry) -> Self {
+    pub fn new(zome: Zome, link_add: CreateLink, base: Entry, target: Entry) -> Self {
         Self {
-            zome_name,
+            zome,
             link_add: Arc::new(link_add),
             base: Arc::new(base),
             target: Arc::new(target),
@@ -119,7 +119,7 @@ impl Invocation for ValidateCreateLinkInvocation {
         // links are specific to zomes so only validate in the zome the link is defined in
         // note that here it is possible there is a zome/link mismatch
         // we rely on the invocation to be built correctly
-        ZomesToInvoke::One(self.zome_name.clone())
+        ZomesToInvoke::One(self.zome.clone())
     }
     fn fn_components(&self) -> FnComponents {
         vec!["validate_create_link".into()].into()
@@ -136,7 +136,7 @@ impl Invocation for ValidateDeleteLinkInvocation {
         // links are specific to zomes so only validate in the zome the link is defined in
         // note that here it is possible there is a zome/link mismatch
         // we rely on the invocation to be built correctly
-        ZomesToInvoke::One(self.zome_name.clone())
+        ZomesToInvoke::One(self.zome.clone())
     }
     fn fn_components(&self) -> FnComponents {
         vec!["validate_delete_link".into()].into()
@@ -244,9 +244,9 @@ mod test {
             ValidateCreateLinkInvocationFixturator::new(fixt::Unpredictable)
                 .next()
                 .unwrap();
-        let zome_name = validate_create_link_invocation.zome_name.clone();
+        let zome = validate_create_link_invocation.zome.clone();
         assert_eq!(
-            ZomesToInvoke::One(zome_name),
+            ZomesToInvoke::One(zome),
             validate_create_link_invocation.zomes(),
         );
     }
@@ -300,6 +300,7 @@ mod slow_tests {
     use crate::fixt::*;
     use ::fixt::prelude::*;
     use holo_hash::HeaderHash;
+    use holochain_types::dna::zome::Zome;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::zome::ZomeName;
 
@@ -309,7 +310,7 @@ mod slow_tests {
             .next()
             .unwrap();
         let validate_invocation =
-            ValidateLinkInvocationCreateFixturator::new(ZomeName::from(TestWasm::Foo))
+            ValidateLinkInvocationCreateFixturator::new(Zome::from(TestWasm::Foo))
                 .next()
                 .unwrap();
 
@@ -324,7 +325,7 @@ mod slow_tests {
         let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateCreateLinkValid]))
             .next()
             .unwrap();
-        let validate_invocation = ValidateLinkInvocationCreateFixturator::new(ZomeName::from(
+        let validate_invocation = ValidateLinkInvocationCreateFixturator::new(Zome::from(
             TestWasm::ValidateCreateLinkValid,
         ))
         .next()
@@ -343,7 +344,7 @@ mod slow_tests {
                 .next()
                 .unwrap();
         let validate_create_link_invocation = ValidateLinkInvocationCreateFixturator::new(
-            ZomeName::from(TestWasm::ValidateCreateLinkInvalid),
+            Zome::from(TestWasm::ValidateCreateLinkInvalid),
         )
         .next()
         .unwrap();
