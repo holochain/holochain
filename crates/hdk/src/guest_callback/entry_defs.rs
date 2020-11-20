@@ -65,7 +65,7 @@ macro_rules! entry_def {
             type Error = $crate::prelude::HdkError;
             fn try_from(entry: &$crate::prelude::Entry) -> Result<Self, Self::Error> {
                 match entry {
-                    Entry::App(eb) => Ok(Self::try_from($crate::prelude::SerializedBytes::from(
+                    $crate::prelude::Entry::App(eb) => Ok(Self::try_from($crate::prelude::SerializedBytes::from(
                         eb.to_owned(),
                     ))?),
                     _ => Err($crate::prelude::SerializedBytesError::FromBytes(format!(
