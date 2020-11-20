@@ -50,5 +50,6 @@ where
     match out {
         ZomeCallResponse::Ok(o) => Ok(O::try_from(o.into_inner())?),
         ZomeCallResponse::Unauthorized => Err(HdkError::UnauthorizedZomeCall),
+        ZomeCallResponse::NetworkError(e) => Err(HdkError::ZomeCallNetworkError(e)),
     }
 }
