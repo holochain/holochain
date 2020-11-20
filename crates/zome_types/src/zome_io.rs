@@ -1,5 +1,5 @@
-use holochain_serialized_bytes::prelude::*;
 use crate::*;
+use holochain_serialized_bytes::prelude::*;
 
 use element::ElementVec;
 
@@ -89,13 +89,7 @@ wasm_io_types!(
     pub struct ScheduleInput(core::time::Duration);
     pub struct ScheduleOutput(());
     // Same as CreateInput but also takes the HeaderHash of the updated element.
-    pub struct UpdateInput(
-        (
-            entry_def::EntryDefId,
-            entry::Entry,
-            holo_hash::HeaderHash,
-        ),
-    );
+    pub struct UpdateInput((entry_def::EntryDefId, entry::Entry, holo_hash::HeaderHash));
     // Header hash of the newly committed element.
     pub struct UpdateOutput(holo_hash::HeaderHash);
     // Emit a Signal::App to subscribers on the interface
@@ -105,13 +99,7 @@ wasm_io_types!(
     pub struct DeleteInput(holo_hash::HeaderHash);
     pub struct DeleteOutput(holo_hash::HeaderHash);
     // Create a link between two entries.
-    pub struct CreateLinkInput(
-        (
-            holo_hash::EntryHash,
-            holo_hash::EntryHash,
-            link::LinkTag,
-        ),
-    );
+    pub struct CreateLinkInput((holo_hash::EntryHash, holo_hash::EntryHash, link::LinkTag));
     pub struct CreateLinkOutput(holo_hash::HeaderHash);
     // Get links by entry hash from the cascade.
     pub struct GetLinksInput((holo_hash::EntryHash, Option<link::LinkTag>));

@@ -14,13 +14,19 @@ use std::convert::TryInto;
 const AGENT_KEY_LEN: usize = 64;
 const AGENT_KEY_COMPONENT_LEN: usize = 32;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 /// Required new type for KvBuf key.
 pub struct AgentKvKey([u8; AGENT_KEY_LEN]);
 
 impl PartialEq for AgentKvKey {
     fn eq(&self, other: &Self) -> bool {
-        self == other
+        self.0 == other.0
+    }
+}
+
+impl std::fmt::Debug for AgentKvKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.0)
     }
 }
 
@@ -28,19 +34,13 @@ impl Eq for AgentKvKey {}
 
 impl PartialOrd for AgentKvKey {
     fn partial_cmp(&self, other: &AgentKvKey) -> Option<std::cmp::Ordering> {
-        println!("{:?}\n{:?}", self, other);
-        let r = PartialOrd::partial_cmp(&&self.0[..], &&other.0[..]);
-        dbg!();
-        r
+        PartialOrd::partial_cmp(&&self.0[..], &&other.0[..])
     }
 }
 
 impl Ord for AgentKvKey {
     fn cmp(&self, other: &AgentKvKey) -> std::cmp::Ordering {
-        println!("{:?}\n{:?}", self, other);
-        let r = Ord::cmp(&&self.0[..], &&other.0[..]);
-        dbg!();
-        r
+        Ord::cmp(&&self.0[..], &&other.0[..])
     }
 }
 

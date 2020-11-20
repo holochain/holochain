@@ -197,6 +197,7 @@ async fn recv_incoming_msgs_and_outgoing_signals<A: InterfaceApi>(
             // NOTE: we could just use futures::StreamExt::forward to hook this
             // tx and rx together in a new spawned task
             signal = rx_from_cell.next() => {
+                trace!("Sending signal!");
                 if let Some(signal) = signal {
                     let bytes = SerializedBytes::try_from(
                         signal.map_err(InterfaceError::SignalReceive)?,
@@ -736,42 +737,18 @@ pub mod test {
         expect.push(k11.clone());
         expect.sort();
 
-        dbg!();
         let admin_api = RealAdminInterfaceApi::new(handle.clone());
-        dbg!();
 
         // - Add the agent infos
-        dbg!();
         let req = AdminRequest::AddAgentInfo { agent_infos };
-        dbg!();
         let r = make_req(admin_api.clone(), req).await.await.unwrap();
-        dbg!();
         assert_matches!(r, AdminResponse::AgentInfoAdded);
-        dbg!();
 
-        let check_match = |expect: &Vec<AgentKvKey>, results: &Vec<AgentKvKey>, line| {
-            for (a, b) in expect.iter().zip(results.iter()) {
-                dbg!();
-                if a != b {
-                    dbg!();
-                    panic!("expect: {:?}\nDoesn't match {:?}\nOn line:{}", a, b, line);
-                }
-                // assert!(a == b, "{:?}:{:?} {}", a, b, line);
-                // assert_eq!(a, b, "line {}", line);
-                dbg!();
-            }
-        };
         // - Request all the infos
-        dbg!();
         let req = AdminRequest::RequestAgentInfo { cell_id: None };
-        dbg!();
         let r = make_req(admin_api.clone(), req).await.await.unwrap();
-        dbg!();
         let results = to_key(unwrap_to::unwrap_to!(r => AdminResponse::AgentInfoRequested).clone());
-        dbg!();
-        check_match(&expect, &results, line!());
-        // assert_eq!(expect, results);
-        dbg!();
+        assert_eq!(expect, results);
 
         // - Request the dna 0 agent 0
         let req = AdminRequest::RequestAgentInfo {
@@ -819,23 +796,15 @@ pub mod test {
         let msg = req.try_into().unwrap();
         let (tx, rx) = tokio::sync::oneshot::channel();
 
-        dbg!();
         let respond = move |bytes: SerializedBytes| {
-            dbg!();
             let response: AdminResponse = bytes.try_into().unwrap();
-            dbg!();
             tx.send(response).unwrap();
-            dbg!();
-            async { dbg!(Ok(())) }.boxed()
+            async { Ok(()) }.boxed()
         };
-        dbg!();
         let respond = Box::new(respond);
-        dbg!();
         let msg = WebsocketMessage::Request(msg, respond);
-        dbg!();
 
         handle_incoming_message(msg, admin_api).await.unwrap();
-        dbg!();
         rx
     }
 
