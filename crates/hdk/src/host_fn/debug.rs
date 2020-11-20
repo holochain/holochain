@@ -17,13 +17,9 @@ macro_rules! debug {
         $crate::debug!( "{}", $msg );
     };
     ( $msg:expr, $($tail:expr),* ) => {{
-        // We consume the result of debug!() inline because it doesn't mean anything to handle the
-        // result of a debug. Technically there is a Result that represents deserialization from
-        // the host, but the only thing the host is passing back to us is a hardcoded `Ok(())`.
-        $crate::host_fn!(
+        host_call::<DebugInput, DebugOutput>(
             __debug,
-            $crate::prelude::DebugInput::new($crate::prelude::debug_msg!($msg, $($tail),*)),
-            $crate::prelude::DebugOutput
+            &$crate::prelude::DebugInput::new($crate::prelude::debug_msg!($msg, $($tail),*)),
         ).ok();
     }};
 }
