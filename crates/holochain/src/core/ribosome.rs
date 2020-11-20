@@ -10,7 +10,7 @@
 pub mod error;
 pub mod guest_callback;
 pub mod host_fn;
-pub mod inline_dna;
+pub mod inline_ribosome;
 pub mod wasm_ribosome;
 
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
@@ -428,9 +428,35 @@ impl From<&ZomeCallHostAccess> for HostFnAccess {
 pub trait RibosomeT: Sized + std::fmt::Debug {
     fn dna_def(&self) -> &DnaDefHashed;
 
-    fn zomes_to_invoke(&self, zomes_to_invoke: ZomesToInvoke) -> Vec<ZomeName>;
+    fn zomes_to_invoke(&self, zomes_to_invoke: ZomesToInvoke) -> Vec<ZomeName> {
+        match zomes_to_invoke {
+            ZomesToInvoke::All => self
+                .dna_def()
+                .zomes
+                .iter()
+                .map(|(zome_name, _)| zome_name.clone())
+                .collect(),
+            ZomesToInvoke::One(zome) => vec![zome],
+        }
+    }
 
-    fn zome_name_to_id(&self, zome_name: &ZomeName) -> RibosomeResult<ZomeId>;
+    fn zome_name_to_id(&self, zome_name: &ZomeName) -> RibosomeResult<ZomeId> {
+        match self
+            .dna_def()
+            .zomes
+            .iter()
+            .position(|(name, _)| name == zome_name)
+        {
+            Some(index) => Ok(holochain_zome_types::header::ZomeId::from(index as u8)),
+            None => Err(RibosomeError::ZomeNotExists(zome_name.to_owned())),
+        }
+    }
+
+    fn call_iterator<I: Invocation + 'static>(
+        &self,
+        access: HostAccess,
+        invocation: I,
+    ) -> CallIterator<Self, I>;
 
     fn maybe_call<I: Invocation + 'static>(
         &self,
@@ -499,12 +525,6 @@ pub trait RibosomeT: Sized + std::fmt::Debug {
         invocation: ValidateLinkInvocation<I>,
     ) -> RibosomeResult<ValidateLinkResult>;
 
-    fn call_iterator<I: 'static + Invocation>(
-        &self,
-        access: HostAccess,
-        invocation: I,
-    ) -> CallIterator<Self, I>;
-
     /// Runs the specified zome fn. Returns the cursor used by HDK,
     /// so that it can be passed on to source chain manager for transactional writes
     fn call_zome_function(
@@ -539,7 +559,6 @@ pub mod wasm_test {
             tokio::task::spawn(async move {
                 use holo_hash::*;
                 use holochain_p2p::HolochainP2pCellT;
-                use holochain_types::dna::DnaT;
                 use std::convert::TryInto;
                 use $crate::core::ribosome::RibosomeT;
 

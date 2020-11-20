@@ -23,17 +23,14 @@ use crate::core::ribosome::{
 use holochain_types::dna::{DnaDefHashed, DnaFile};
 use holochain_zome_types::prelude::*;
 
-impl RibosomeT for InlineDna {
+#[derive(Clone, Debug)]
+pub struct InlineRibosome {
+    dna_def: DnaDefHashed,
+}
+
+impl RibosomeT for InlineRibosome {
     fn dna_def(&self) -> &DnaDefHashed {
-        todo!()
-    }
-
-    fn zomes_to_invoke(&self, zomes_to_invoke: ZomesToInvoke) -> Vec<ZomeName> {
-        todo!()
-    }
-
-    fn zome_name_to_id(&self, zome_name: &ZomeName) -> RibosomeResult<ZomeId> {
-        todo!()
+        &self.dna_def
     }
 
     /// call a function in a zome for an invocation if it exists
@@ -53,7 +50,7 @@ impl RibosomeT for InlineDna {
         access: HostAccess,
         invocation: I,
     ) -> CallIterator<Self, I> {
-        todo!()
+        CallIterator::new(access, self.clone(), invocation)
     }
 
     /// Runs the specified zome fn. Returns the cursor used by HDK,

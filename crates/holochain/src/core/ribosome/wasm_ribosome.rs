@@ -64,7 +64,7 @@ use fallible_iterator::FallibleIterator;
 use holochain_types::dna::DnaError;
 use holochain_types::dna::{
     zome::{HostFnAccess, Permission},
-    DnaDefHashed, DnaFile, DnaT,
+    DnaDefHashed, DnaFile,
 };
 use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::entry_def::EntryDefsCallbackResult;
@@ -362,32 +362,6 @@ macro_rules! do_callback {
 impl RibosomeT for WasmRibosome {
     fn dna_def(&self) -> &DnaDefHashed {
         self.dna_file.dna()
-    }
-
-    fn zomes_to_invoke(&self, zomes_to_invoke: ZomesToInvoke) -> Vec<ZomeName> {
-        match zomes_to_invoke {
-            ZomesToInvoke::All => self
-                .dna_file
-                .dna
-                .zomes
-                .iter()
-                .map(|(zome_name, _)| zome_name.clone())
-                .collect(),
-            ZomesToInvoke::One(zome) => vec![zome],
-        }
-    }
-
-    fn zome_name_to_id(&self, zome_name: &ZomeName) -> RibosomeResult<ZomeId> {
-        match self
-            .dna_file
-            .dna
-            .zomes
-            .iter()
-            .position(|(name, _)| name == zome_name)
-        {
-            Some(index) => Ok(holochain_zome_types::header::ZomeId::from(index as u8)),
-            None => Err(RibosomeError::ZomeNotExists(zome_name.to_owned())),
-        }
     }
 
     /// call a function in a zome for an invocation if it exists
