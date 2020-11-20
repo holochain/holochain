@@ -641,6 +641,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_wasm_hdk_extern"
+version = "0.0.1"
+dependencies = [
+ "hdk3",
+ "serde",
+ "test_wasm_common",
+]
+
+[[package]]
 name = "test_wasm_init_fail"
 version = "0.0.1"
 dependencies = [
