@@ -20,7 +20,7 @@ use holochain_types::{
     app::InstalledCell,
     cell::CellId,
     dht_op::DhtOpLight,
-    dna::{DnaDef, DnaFile, DnaT},
+    dna::{DnaDef, DnaFile},
     test_utils::fake_agent_pubkey_1,
     test_utils::fake_agent_pubkey_2,
     validate::ValidationStatus,

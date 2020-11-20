@@ -28,12 +28,7 @@ use holochain_state::{
     env::EnvironmentWrite,
     prelude::{GetDb, WriteManager},
 };
-use holochain_types::{
-    cell::CellId,
-    dna::{DnaFile, DnaT},
-    element::Element,
-    Entry,
-};
+use holochain_types::{cell::CellId, dna::DnaFile, element::Element, Entry};
 use holochain_zome_types::{
     element::SignedHeaderHashed,
     entry_def,

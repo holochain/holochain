@@ -21,7 +21,7 @@ use holochain_state::{
 use holochain_types::{
     app::InstalledCell,
     cell::CellId,
-    dna::{DnaDef, DnaFile, DnaT},
+    dna::{DnaDef, DnaFile},
     test_utils::fake_agent_pubkey_1,
     test_utils::fake_agent_pubkey_2,
 };

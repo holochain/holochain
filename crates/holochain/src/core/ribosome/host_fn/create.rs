@@ -137,7 +137,7 @@ pub mod wasm_test {
     use holochain_types::{
         app::InstalledCell,
         cell::CellId,
-        dna::{DnaDef, DnaFile, DnaT},
+        dna::{DnaDef, DnaFile},
         fixt::AppEntry,
         observability,
         test_utils::fake_agent_pubkey_1,

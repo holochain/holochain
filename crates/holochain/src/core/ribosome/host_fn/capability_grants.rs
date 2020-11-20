@@ -28,7 +28,7 @@ pub mod wasm_test {
     use hdk3::prelude::*;
     use holochain_types::app::InstalledCell;
     use holochain_types::cell::CellId;
-    use holochain_types::dna::{DnaDef, DnaFile, DnaT};
+    use holochain_types::dna::{DnaDef, DnaFile};
     use holochain_types::fixt::CapSecretFixturator;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_agent_pubkey_2;

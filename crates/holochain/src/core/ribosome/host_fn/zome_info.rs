@@ -2,7 +2,6 @@ use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holo_hash::HasHash;
-use holochain_types::dna::DnaT;
 use holochain_zome_types::zome_info::ZomeInfo;
 use holochain_zome_types::ZomeInfoInput;
 use holochain_zome_types::ZomeInfoOutput;

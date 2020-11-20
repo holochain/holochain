@@ -8,7 +8,7 @@ use holochain_serialized_bytes::SerializedBytes;
 use holochain_types::{
     app::InstalledCell,
     cell::CellId,
-    dna::{DnaDef, DnaFile, DnaT},
+    dna::{DnaDef, DnaFile},
     test_utils::fake_agent_pubkey_1,
 };
 use holochain_wasm_test_utils::TestWasm;

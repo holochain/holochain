@@ -26,7 +26,6 @@ use holochain_types::{
     dht_op::{DhtOp, DhtOpHashed},
     dna::zome::Zome,
     dna::DnaDefHashed,
-    dna::DnaT,
     fixt::*,
     header::NewEntryHeader,
     metadata::TimedHeaderHash,
@@ -1326,7 +1325,7 @@ mod slow_tests {
     use holochain_types::{
         app::InstalledCell,
         cell::CellId,
-        dna::{DnaDef, DnaFile, DnaT},
+        dna::{DnaDef, DnaFile},
         observability,
         test_utils::fake_agent_pubkey_1,
         Entry,

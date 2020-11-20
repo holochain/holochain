@@ -91,9 +91,6 @@ impl_hashable_content!(DnaDef, Dna);
 /// Wasms need to be an ordered map from WasmHash to a DnaWasm
 pub type Wasms = BTreeMap<holo_hash::WasmHash, wasm::DnaWasm>;
 
-/// DNA is application code executable by Holochain
-pub trait DnaT {}
-
 /// Represents a full DNA file including WebAssembly bytecode.
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, SerializedBytes)]
 pub struct DnaFile {

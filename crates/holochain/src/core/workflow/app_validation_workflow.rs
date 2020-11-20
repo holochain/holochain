@@ -61,7 +61,7 @@ use holochain_types::{
     dht_op::DhtOp,
     dna::{
         zome::{Zome, ZomeDef},
-        DnaDef, DnaDefHashed, DnaT,
+        DnaDef, DnaDefHashed,
     },
     test_utils::which_agent,
     validate::ValidationStatus,

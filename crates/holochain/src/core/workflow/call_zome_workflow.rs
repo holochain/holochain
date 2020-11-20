@@ -333,9 +333,7 @@ pub mod tests {
     use holochain_p2p::HolochainP2pCellFixturator;
     use holochain_serialized_bytes::prelude::*;
     use holochain_state::{env::ReadManager, test_utils::test_cell_env};
-    use holochain_types::{
-        cell::CellId, dna::DnaT, observability, test_utils::fake_agent_pubkey_1,
-    };
+    use holochain_types::{cell::CellId, observability, test_utils::fake_agent_pubkey_1};
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::entry::Entry;
     use holochain_zome_types::ExternInput;

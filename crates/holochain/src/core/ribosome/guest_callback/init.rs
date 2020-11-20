@@ -229,7 +229,6 @@ mod slow_tests {
     use crate::fixt::InitInvocationFixturator;
     use crate::fixt::WasmRibosomeFixturator;
     use ::fixt::prelude::*;
-    use holochain_types::dna::DnaT;
     use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(threaded_scheduler)]

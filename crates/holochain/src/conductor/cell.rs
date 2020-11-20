@@ -47,7 +47,6 @@ use holochain_types::activity::AgentActivity;
 use holochain_types::{
     autonomic::AutonomicProcess,
     cell::CellId,
-    dna::DnaT,
     element::GetElementResponse,
     link::{GetLinksResponse, WireLinkMetaKey},
     metadata::{MetadataSet, TimedHeaderHash},

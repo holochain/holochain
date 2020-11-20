@@ -9,7 +9,7 @@ use holochain_state::{
     prelude::*,
 };
 use holochain_types::{
-    dna::{DnaDef, DnaDefHashed, DnaFile, DnaT},
+    dna::{DnaDef, DnaDefHashed, DnaFile},
     prelude::*,
 };
 use holochain_zome_types::entry_def::EntryDef;

@@ -41,7 +41,7 @@ use holochain_serialized_bytes::prelude::*;
 use holochain_types::dna::{
     wasm::DnaWasm,
     zome::{WasmZome, Zome},
-    DnaDef, DnaFile, DnaT,
+    DnaDef, DnaFile,
 };
 use holochain_zome_types::zome::ZomeName;
 use std::{collections::BTreeMap, path::PathBuf};

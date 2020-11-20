@@ -12,7 +12,7 @@ use holochain_state::test_utils::test_environments;
 use holochain_types::app::InstalledCell;
 use holochain_types::cell::CellId;
 use holochain_types::dna::DnaDef;
-use holochain_types::dna::{DnaFile, DnaT};
+use holochain_types::dna::{DnaFile};
 use holochain_types::test_utils::fake_agent_pubkey_1;
 use holochain_types::{observability, test_utils::fake_agent_pubkey_2};
 use holochain_wasm_test_utils::TestWasm;

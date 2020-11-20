@@ -61,7 +61,7 @@ use holochain_state::{
 use holochain_types::{
     app::{InstalledApp, InstalledAppId, InstalledCell, MembraneProof},
     cell::CellId,
-    dna::{wasm::DnaWasmHashed, DnaFile, DnaT},
+    dna::{wasm::DnaWasmHashed, DnaFile},
 };
 use holochain_zome_types::entry_def::EntryDef;
 use kitsune_p2p::agent_store::AgentInfoSigned;
