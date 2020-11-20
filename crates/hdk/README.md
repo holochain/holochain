@@ -556,7 +556,7 @@ they are finalized on the local source chain or broadcast to the DHT network.
 In addition to the patterns we demonstrated above for externs and callbacks, we
 also need to introduce the `host_call()!` and `host_args!()` macros.
 
-The `host_call()` macro works very similarly to the `ret!()` macro in that it
+The `host_call()` function works very similarly to the `ret!()` macro in that it
 takes serializable data on the guest and sends it to the host as a `GuestPtr`.
 The difference is that instead of causing the guest to `return`, this data is
 the argument to a function that _executes and blocks immediately on the host_
@@ -572,7 +572,7 @@ always call it before anything else. Note that `host_args!()` will short circuit
 and return early with an error similar to the `?` operator if deserialization
 fails on the guest.
 
-Note that both the `host_call()` and `host_args!()` macros rely on the guest to
+Note that both the `host_call()` function and the `host_args!()` macros rely on the guest to
 correctly deserialize the values that the host is copying to the guest's memory.
 
 So, before looking at the code, here is a diagram of how our example wasm would
@@ -835,7 +835,7 @@ struct Png([u8]);
 fn _save_image(png: Png) -> Result<CreateOutput, String> {
  Ok(host_call(
   __create,
-  CreateInput::new(
+  &CreateInput::new(
    Entry::App(
     png.try_into()?
    )
