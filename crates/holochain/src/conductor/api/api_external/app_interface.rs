@@ -9,7 +9,7 @@ use crate::conductor::{
 };
 use crate::core::ribosome::ZomeCallInvocation;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::app::{AppId, InstalledApp};
+use holochain_types::app::{InstalledApp, InstalledAppId};
 use holochain_zome_types::ExternOutput;
 use holochain_zome_types::ZomeCallResponse;
 
@@ -61,8 +61,10 @@ impl AppInterfaceApi for RealAppInterfaceApi {
         request: AppRequest,
     ) -> ConductorApiResult<AppResponse> {
         match request {
-            AppRequest::AppInfo { app_id } => Ok(AppResponse::AppInfo(
-                self.conductor_handle.get_app_info(&app_id).await?,
+            AppRequest::AppInfo { installed_app_id } => Ok(AppResponse::AppInfo(
+                self.conductor_handle
+                    .get_app_info(&installed_app_id)
+                    .await?,
             )),
             AppRequest::ZomeCallInvocation(request) => {
                 let req = request.clone();
@@ -113,9 +115,9 @@ impl InterfaceApi for RealAppInterfaceApi {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(rename_all = "snake_case", tag = "type", content = "data")]
 pub enum AppRequest {
-    /// Get info about the App identified by the given `app_id` argument,
+    /// Get info about the App identified by the given `installed_app_id` argument,
     /// including info about each Cell installed by this App.
-    /// Requires `app_id` because an App interface can be the interface to multiple
+    /// Requires `installed_app_id` because an App interface can be the interface to multiple
     /// apps at the same time.
     ///
     /// Will be responded to with an [`AppResponse::AppInfo`]
@@ -124,8 +126,8 @@ pub enum AppRequest {
     /// [`AppResponse::AppInfo`]: enum.AppResponse.html#variant.AppInfo
     /// [`AppResponse::Error`]: enum.AppResponse.html#variant.Error
     AppInfo {
-        /// The AppId for which to get information
-        app_id: AppId,
+        /// The InstalledAppId for which to get information
+        installed_app_id: InstalledAppId,
     },
     /// Asks the conductor to do some crypto.
     ///
@@ -168,7 +170,7 @@ pub enum AppResponse {
 
     /// The succesful response to an [`AppRequest::AppInfo`].
     ///
-    /// Option will be `None` if there is no installed app with the given `app_id` value from the request.
+    /// Option will be `None` if there is no installed app with the given `installed_app_id` value from the request.
     /// Check out [`InstalledApp`] for details on when the Option is `Some<InstalledApp>`
     ///
     /// [`InstalledApp`]: ../../../holochain_types/app/struct.InstalledApp.html

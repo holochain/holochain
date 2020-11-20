@@ -19,7 +19,6 @@ pub fn update<D: Into<EntryDefId>, E: Into<Entry>>(
     entry_def_id: D,
     entry: E,
 ) -> HdkResult<HeaderHash> {
-    host_externs!(__update);
     host_fn!(
         __update,
         UpdateInput::new((entry_def_id.into(), entry.into(), hash)),

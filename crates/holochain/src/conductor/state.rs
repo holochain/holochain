@@ -3,7 +3,7 @@
 
 use crate::conductor::interface::InterfaceDriver;
 
-use holochain_types::app::{AppId, InstalledApp, InstalledCell};
+use holochain_types::app::{InstalledApp, InstalledAppId, InstalledCell};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -19,10 +19,10 @@ use super::api::SignalSubscription;
 pub struct ConductorState {
     /// Apps that are ready to be activated
     #[serde(default)]
-    pub inactive_apps: HashMap<AppId, Vec<InstalledCell>>,
+    pub inactive_apps: HashMap<InstalledAppId, Vec<InstalledCell>>,
     /// Apps that are active and will be loaded
     #[serde(default)]
-    pub active_apps: HashMap<AppId, Vec<InstalledCell>>,
+    pub active_apps: HashMap<InstalledAppId, Vec<InstalledCell>>,
     /// List of interfaces any UI can use to access zome functions.
     #[serde(default)]
     pub app_interfaces: HashMap<AppInterfaceId, AppInterfaceConfig>,
@@ -39,14 +39,14 @@ impl From<&str> for AppInterfaceId {
 }
 
 impl ConductorState {
-    /// Retrieve info about an installed App by its AppId
+    /// Retrieve info about an installed App by its InstalledAppId
     #[allow(clippy::ptr_arg)]
-    pub fn get_app_info(&self, app_id: &AppId) -> Option<InstalledApp> {
+    pub fn get_app_info(&self, installed_app_id: &InstalledAppId) -> Option<InstalledApp> {
         self.active_apps
-            .get(app_id)
-            .or_else(|| self.inactive_apps.get(app_id))
+            .get(installed_app_id)
+            .or_else(|| self.inactive_apps.get(installed_app_id))
             .map(|cell_data| InstalledApp {
-                app_id: app_id.clone(),
+                installed_app_id: installed_app_id.clone(),
                 cell_data: cell_data.clone(),
             })
     }
@@ -70,7 +70,7 @@ impl ConductorState {
 #[cfg_attr(test, derive(PartialEq))]
 pub struct AppInterfaceConfig {
     /// The signal subscription settings for each App
-    pub signal_subscriptions: HashMap<AppId, SignalSubscription>,
+    pub signal_subscriptions: HashMap<InstalledAppId, SignalSubscription>,
 
     /// The driver for the interface, e.g. Websocket
     pub driver: InterfaceDriver,

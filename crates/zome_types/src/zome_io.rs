@@ -1,7 +1,6 @@
 use crate::*;
-use holochain_serialized_bytes::prelude::*;
-
 use element::ElementVec;
+use holochain_serialized_bytes::prelude::*;
 
 /// All wasm shared I/O types need to share the same basic behaviours to cross the host/guest
 /// boundary in a predictable way.
