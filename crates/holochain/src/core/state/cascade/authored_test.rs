@@ -37,13 +37,10 @@ async fn authored_test() {
     let entry = Post("Hi there".into());
     let entry_hash = EntryHash::with_data_sync(&Entry::try_from(entry.clone()).unwrap());
     // 3
-    commit_entry(
-        &alice_call_data.env,
-        alice_call_data.call_data(TestWasm::Create),
-        entry.clone().try_into().unwrap(),
-        POST_ID,
-    )
-    .await;
+    alice_call_data
+        .get_api(TestWasm::Create)
+        .commit_entry(entry.clone().try_into().unwrap(), POST_ID)
+        .await;
 
     // Produce and publish these commits
     let mut triggers = handle
@@ -86,13 +83,10 @@ async fn authored_test() {
         .expect("Bob should have the entry in their integrated store because they received gossip");
 
     // Now bob commits the entry
-    commit_entry(
-        &bob_call_data.env,
-        bob_call_data.call_data(TestWasm::Create),
-        entry.clone().try_into().unwrap(),
-        POST_ID,
-    )
-    .await;
+    bob_call_data
+        .get_api(TestWasm::Create)
+        .commit_entry(entry.clone().try_into().unwrap(), POST_ID)
+        .await;
 
     // Produce and publish these commits
     let mut triggers = handle

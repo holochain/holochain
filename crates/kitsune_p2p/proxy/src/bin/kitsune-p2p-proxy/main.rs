@@ -24,15 +24,73 @@ async fn main() {
     }
 }
 
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+struct TlsFileCert {
+    #[serde(with = "serde_bytes")]
+    pub cert: Vec<u8>,
+    #[serde(with = "serde_bytes")]
+    pub priv_key: Vec<u8>,
+    #[serde(with = "serde_bytes")]
+    pub digest: Vec<u8>,
+}
+
+impl From<TlsConfig> for TlsFileCert {
+    fn from(f: TlsConfig) -> Self {
+        Self {
+            cert: f.cert.to_vec(),
+            priv_key: f.cert_priv_key.to_vec(),
+            digest: f.cert_digest.to_vec(),
+        }
+    }
+}
+
+impl From<TlsFileCert> for TlsConfig {
+    fn from(f: TlsFileCert) -> Self {
+        Self {
+            cert: f.cert.into(),
+            cert_priv_key: f.priv_key.into(),
+            cert_digest: f.digest.into(),
+        }
+    }
+}
+
 async fn inner() -> TransportResult<()> {
     let opt = Opt::from_args();
 
+    if let Some(gen_cert) = &opt.danger_gen_unenc_cert {
+        let tls = TlsConfig::new_ephemeral().await?;
+        let gen_cert2 = gen_cert.clone();
+        tokio::task::spawn_blocking(move || {
+            let tls = TlsFileCert::from(tls);
+            let mut out = Vec::new();
+            kitsune_p2p_types::codec::rmp_encode(&mut out, &tls).map_err(TransportError::other)?;
+            std::fs::write(gen_cert2, &out).map_err(TransportError::other)?;
+            TransportResult::Ok(())
+        })
+        .await
+        .map_err(TransportError::other)??;
+        println!("Generated {:?}.", gen_cert);
+        return Ok(());
+    }
+
+    let tls_conf = if let Some(use_cert) = &opt.danger_use_unenc_cert {
+        let use_cert = use_cert.clone();
+        tokio::task::spawn_blocking(move || {
+            let tls = std::fs::read(use_cert).map_err(TransportError::other)?;
+            let tls: TlsFileCert =
+                kitsune_p2p_types::codec::rmp_decode(&mut std::io::Cursor::new(&tls))
+                    .map_err(TransportError::other)?;
+            TransportResult::Ok(TlsConfig::from(tls))
+        })
+        .await
+        .map_err(TransportError::other)??
+    } else {
+        TlsConfig::new_ephemeral().await?
+    };
+
     let (listener, events) = spawn_transport_listener_quic(opt.into()).await?;
 
-    let proxy_config = ProxyConfig::local_proxy_server(
-        TlsConfig::new_ephemeral().await?,
-        AcceptProxyCallback::accept_all(),
-    );
+    let proxy_config = ProxyConfig::local_proxy_server(tls_conf, AcceptProxyCallback::accept_all());
 
     let (listener, mut events) =
         spawn_kitsune_proxy_listener(proxy_config, listener, events).await?;

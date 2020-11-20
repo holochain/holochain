@@ -6,11 +6,10 @@
 ///
 /// Note: Debugging happens _on the host side_ with the debug! macro from the tracing crate.
 ///
-/// Note: Debug returns a result like every host_fn so use `?` or `ok()` to handle it.
+/// Note: Debug does not return a result.
 ///
 /// ```ignore
-/// debug!("{:?}", foo)?;
-/// debug!("{:?}", foo).ok();
+/// debug!("{:?}", foo);
 /// ```
 #[macro_export]
 macro_rules! debug {
@@ -18,10 +17,13 @@ macro_rules! debug {
         $crate::debug!( "{}", $msg );
     };
     ( $msg:expr, $($tail:expr),* ) => {{
+        // We consume the result of debug!() inline because it doesn't mean anything to handle the
+        // result of a debug. Technically there is a Result that represents deserialization from
+        // the host, but the only thing the host is passing back to us is a hardcoded `Ok(())`.
         $crate::host_fn!(
             __debug,
             $crate::prelude::DebugInput::new($crate::prelude::debug_msg!($msg, $($tail),*)),
             $crate::prelude::DebugOutput
-        )
+        ).ok();
     }};
 }

@@ -1,5 +1,5 @@
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::{app::AppId, cell::CellId};
+use holochain_types::{app::InstalledAppId, cell::CellId};
 use std::collections::HashMap;
 
 /// Declares updated Signal subscription settings for an App.
@@ -8,7 +8,7 @@ use std::collections::HashMap;
 #[cfg_attr(test, derive(PartialEq))]
 pub struct SignalSubscription {
     /// The app for which to manage subscription
-    app_id: AppId,
+    installed_app_id: InstalledAppId,
     /// Fine-grained per-cell filters
     filters: SignalFilterSet,
 }

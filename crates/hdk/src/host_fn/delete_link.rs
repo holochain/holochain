@@ -22,7 +22,6 @@ use crate::prelude::*;
 /// All of this is bad so link creates point to entries (@see link_entries!) and deletes point to
 /// creates.
 pub fn delete_link(add_link_header: HeaderHash) -> HdkResult<HeaderHash> {
-    host_externs!(__delete_link);
     host_fn!(
         __delete_link,
         DeleteLinkInput::new(add_link_header),
