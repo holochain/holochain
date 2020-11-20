@@ -4,8 +4,7 @@ use holochain::conductor::{
 };
 use holochain_types::observability::{self, Output};
 use std::error::Error;
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use structopt::StructOpt;
 use tracing::*;
 
