@@ -23,7 +23,7 @@ use crate::core::ribosome::{
 use holochain_types::dna::{DnaDefHashed, DnaFile};
 use holochain_zome_types::prelude::*;
 
-impl<'f> RibosomeT for InlineDna<'f> {
+impl RibosomeT for InlineDna {
     fn dna_def(&self) -> &DnaDefHashed {
         todo!()
     }

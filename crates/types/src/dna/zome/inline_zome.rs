@@ -16,21 +16,48 @@ pub mod error;
 
 /// An InlineZome, which consists
 #[derive(Default)]
-pub struct InlineZome<'f> {
-    functions: HashMap<FunctionName, InlineZomeFn<'f>>,
+pub struct InlineZome {
+    uuid: String,
+    functions: HashMap<FunctionName, InlineZomeFn>,
 }
 
-impl<'f> std::fmt::Debug for InlineZome<'f> {
+impl std::fmt::Debug for InlineZome {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!("<InlineZome>"))
+        f.write_fmt(format_args!("<InlineZome {}>", self.uuid))
     }
 }
 
-impl<'f> InlineZome<'f> {
+impl PartialEq for InlineZome {
+    fn eq(&self, other: &InlineZome) -> bool {
+        self.uuid == other.uuid
+    }
+}
+
+impl PartialOrd for InlineZome {
+    fn partial_cmp(&self, other: &InlineZome) -> Option<std::cmp::Ordering> {
+        Some(self.uuid.cmp(&other.uuid))
+    }
+}
+
+impl Eq for InlineZome {}
+
+impl Ord for InlineZome {
+    fn cmp(&self, other: &InlineZome) -> std::cmp::Ordering {
+        self.uuid.cmp(&other.uuid)
+    }
+}
+
+impl std::hash::Hash for InlineZome {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.uuid.hash(state);
+    }
+}
+
+impl InlineZome {
     /// Define a new inline zome function
     pub fn function<F, I, O>(mut self, name: &str, f: F) -> Self
     where
-        F: Fn(InlineHostApi, I) -> InlineZomeResult<O> + 'f,
+        F: Fn(InlineHostApi, I) -> InlineZomeResult<O> + 'static + Send + Sync,
         I: DeserializeOwned,
         O: Serialize,
     {
@@ -51,8 +78,12 @@ impl<'f> InlineZome<'f> {
 }
 
 /// An inline zome function takes a Host API and an input, and produces an output.
-pub type InlineZomeFn<'f> =
-    Box<dyn Fn(InlineHostApi, SerializedBytes) -> InlineZomeResult<SerializedBytes> + 'f>;
+pub type InlineZomeFn = Box<
+    dyn Fn(InlineHostApi, SerializedBytes) -> InlineZomeResult<SerializedBytes>
+        + 'static
+        + Send
+        + Sync,
+>;
 
 #[cfg(test)]
 mod tests {

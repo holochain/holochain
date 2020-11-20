@@ -1,8 +1,12 @@
 //! holochain_types::dna::zome is a set of structs for working with holochain dna.
 
+use std::sync::Arc;
+
 use derive_more::Constructor;
 use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::zome::ZomeName;
+
+use self::inline_zome::InlineZome;
 
 use super::{error::DnaResult, DnaError};
 
@@ -10,24 +14,17 @@ pub mod inline_zome;
 
 /// Represents an individual "zome".
 #[derive(
-    Serialize,
-    Deserialize,
-    Hash,
-    Clone,
-    Debug,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    SerializedBytes,
-    derive_more::From,
+    Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, derive_more::From,
 )]
+// This can be untagged, since the only valid serialization target is WasmZome
+#[serde(untagged)]
 pub enum Zome {
     /// A zome defined by Wasm bytecode
     Wasm(WasmZome),
 
     /// A zome defined by Rust closures
-    Inline,
+    #[serde(skip)]
+    Inline(Arc<InlineZome>),
 }
 
 impl Zome {

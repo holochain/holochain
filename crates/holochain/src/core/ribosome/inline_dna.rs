@@ -7,12 +7,12 @@ mod ribosome;
 use super::error::RibosomeResult;
 
 #[derive(Debug)]
-pub struct InlineDna<'f> {
-    zomes: HashMap<ZomeName, InlineZome<'f>>,
+pub struct InlineDna {
+    zomes: HashMap<ZomeName, InlineZome>,
 }
 
-impl<'f> InlineDna<'f> {
-    pub fn new(zomes: HashMap<ZomeName, InlineZome<'f>>) -> Self {
+impl InlineDna {
+    pub fn new(zomes: HashMap<ZomeName, InlineZome>) -> Self {
         Self { zomes }
     }
 }
