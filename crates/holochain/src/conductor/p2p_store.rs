@@ -20,13 +20,13 @@ pub struct AgentKvKey([u8; AGENT_KEY_LEN]);
 
 impl PartialEq for AgentKvKey {
     fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
+        self.0[..] == other.0[..]
     }
 }
 
 impl std::fmt::Debug for AgentKvKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self.0)
+        write!(f, "{:?}", &self.0[..])
     }
 }
 
