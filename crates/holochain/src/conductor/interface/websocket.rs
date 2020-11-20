@@ -197,6 +197,7 @@ async fn recv_incoming_msgs_and_outgoing_signals<A: InterfaceApi>(
             // NOTE: we could just use futures::StreamExt::forward to hook this
             // tx and rx together in a new spawned task
             signal = rx_from_cell.next() => {
+                trace!("Sending signal!");
                 if let Some(signal) = signal {
                     let bytes = SerializedBytes::try_from(
                         signal.map_err(InterfaceError::SignalReceive)?,
@@ -736,9 +737,7 @@ pub mod test {
         expect.push(k11.clone());
         expect.sort();
 
-        dbg!();
         let admin_api = RealAdminInterfaceApi::new(handle.clone());
-        dbg!();
 
         // - Add the agent infos
         let req = AdminRequest::AddAgentInfo { agent_infos };
