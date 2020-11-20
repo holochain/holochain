@@ -556,7 +556,7 @@ they are finalized on the local source chain or broadcast to the DHT network.
 In addition to the patterns we demonstrated above for externs and callbacks, we
 also need to introduce the `host_call()!` and `host_args!()` macros.
 
-The `host_call!()` macro works very similarly to the `ret!()` macro in that it
+The `host_call()` function works very similarly to the `ret!()` macro in that it
 takes serializable data on the guest and sends it to the host as a `GuestPtr`.
 The difference is that instead of causing the guest to `return`, this data is
 the argument to a function that _executes and blocks immediately on the host_
@@ -572,7 +572,7 @@ always call it before anything else. Note that `host_args!()` will short circuit
 and return early with an error similar to the `?` operator if deserialization
 fails on the guest.
 
-Note that both the `host_call!()` and `host_args!()` macros rely on the guest to
+Note that both the `host_call()` function and the `host_args!()` macros rely on the guest to
 correctly deserialize the values that the host is copying to the guest's memory.
 
 So, before looking at the code, here is a diagram of how our example wasm would
@@ -595,7 +595,7 @@ It consists of a few components, some new and some already demonstrated above:
 - `holochain_externs!()` to enable the holochain host to run the wasm
 - A `Png` struct to hold binary PNG data as `u8` bytes
 - An `extern` function `save_image` that will be callable over websockets RPC
-- A `host_call!` to `__create` inside `save_image` to commit the image
+- A `host_call` to `__create` inside `save_image` to commit the image
 - A `validate_entry` callback function implementation to validate the PNG
 - Some basic validation logic to ensure the PNG is under 10mb
 - Calling `host_args!()` in both externs to accept input
@@ -625,9 +625,9 @@ pub extern "C" fn save_image(remote_ptr: GuestPtr) -> GuestPtr {
  // for this example we don't care about the result of commit entry
  // a real application should handle it
  //
- // the important bit for this example is that we use host_call!() and that the
+ // the important bit for this example is that we use host_call() and that the
  // __create function on the host will enqueue a validation callback
- let _: CreateOutput = host_call!(
+ let _: CreateOutput = host_call(
   // note that all host functions from holochain start with prefix `__`
   __create,
   CreateInput::new(
@@ -728,10 +728,10 @@ internally when it short-circuits in the case of failing to deserialize args.
 
 The two most obvious cases for using `try_result!()` are:
 
-- coupled with `host_call!()` inside simple extern functions/callbacks
+- coupled with `host_call()` inside simple extern functions/callbacks
 - to wrap vanilla rust code that returns a result to avoid logic-in-externs
 
-This example will show a simple `host_call!()` error handling but the next
+This example will show a simple `host_call()` error handling but the next
 example will show how to use all the macros together to collapse all the extern
 logic into some generic, standalone boilerplate.
 
@@ -752,7 +752,7 @@ pub extern "C" fn commit_message(remote_ptr: GuestPtr) -> GuestPtr {
  // because this is inside an extern function the short circuit logic also
  // handles memory and serialization logic for the holochain host
  let commit_entry_output: CreateOutput = try_result!(
-  host_call!(
+  host_call(
    __create,
    CreateInput::new(
     Entry::App(
@@ -793,8 +793,8 @@ the sugar that it provides.
 
 The HDK macros simply expand to this extern boilerplate, saving you from typing
 out a few macros to input/output data for the host. They also offer some
-convenience wrappers around `host_call!()` that do exactly what you'd expect,
-e.g. `create_entry( ... )` vs. `host_call!(__create, ... )`.
+convenience wrappers around `host_call()` that do exactly what you'd expect,
+e.g. `create_entry( ... )` vs. `host_call(__create, ... )`.
 
 Think of the HDK as a tool and safety net but also don't feel you can't peek
 under the hood to see what is there.
@@ -831,11 +831,11 @@ struct Png([u8]);
 // no need for special keywords on the function
 // the input args and return values are all native Rust types, not pointers
 // we can use `Result` and `?`
-// the only wasm-ey thing here is the `host_call!()` macro
+// the only wasm-ey thing here is the `host_call()` macro
 fn _save_image(png: Png) -> Result<CreateOutput, String> {
- Ok(host_call!(
+ Ok(host_call(
   __create,
-  CreateInput::new(
+  &CreateInput::new(
    Entry::App(
     png.try_into()?
    )
