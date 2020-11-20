@@ -13,7 +13,6 @@ members = [
     "hash_entry",
     "foo",
     "hash_path",
-    "imports",
     "init_fail",
     "init_pass",
     "link",
