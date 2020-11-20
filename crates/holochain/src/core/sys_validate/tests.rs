@@ -59,7 +59,7 @@ async fn check_previous_header() {
 
 #[tokio::test(threaded_scheduler)]
 async fn check_valid_if_dna_test() {
-    let env: EnvironmentRead = test_cell_env().env.into();
+    let env: EnvironmentRead = test_cell_env().env().into();
     // Test data
     let activity_return = vec![fixt!(HeaderHash)];
 

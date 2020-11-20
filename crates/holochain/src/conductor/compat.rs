@@ -106,14 +106,14 @@ pub async fn load_conductor_from_legacy_config(
 
     // There is only one app and it wont be referenced
     // externally so we can use LEGACY as the id
-    let app_id = "LEGACY".to_string();
+    let installed_app_id = "LEGACY".to_string();
     conductor
         .clone()
-        .install_app(app_id.clone(), app_install_payload)
+        .install_app(installed_app_id.clone(), app_install_payload)
         .await
         .map_err(Box::new)?;
     conductor
-        .activate_app(app_id.clone())
+        .activate_app(installed_app_id.clone())
         .await
         .map_err(Box::new)?;
     let errors = conductor.clone().setup_cells().await.map_err(Box::new)?;

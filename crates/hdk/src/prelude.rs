@@ -18,7 +18,6 @@ pub use crate::hash_path::anchor::list_anchor_tags;
 pub use crate::hash_path::anchor::list_anchor_type_addresses;
 pub use crate::hash_path::anchor::Anchor;
 pub use crate::hash_path::path::Path;
-pub use crate::host_fn;
 pub use crate::host_fn::agent_info::agent_info;
 pub use crate::host_fn::call::call;
 pub use crate::host_fn::call_remote::call_remote;
@@ -56,3 +55,6 @@ pub use holochain_zome_types;
 pub use holochain_zome_types::prelude::*;
 pub use std::collections::HashSet;
 pub use std::convert::TryFrom;
+
+// This needs to be called at least once _somewhere_ and is idempotent.
+holochain_externs!();

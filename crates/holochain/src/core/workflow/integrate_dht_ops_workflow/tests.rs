@@ -1386,37 +1386,27 @@ mod slow_tests {
         // Commit the base and target.
         // Link them together.
         {
-            let (alice_env, call_data) =
-                CallData::create(&alice_cell_id, &conductor, &dna_file).await;
+            let call_data = HostFnApi::create(&alice_cell_id, &conductor, &dna_file).await;
 
             // 3
-            commit_entry(
-                &alice_env,
-                call_data.clone(),
-                base.clone().try_into().unwrap(),
-                POST_ID,
-            )
-            .await;
+            call_data
+                .commit_entry(base.clone().try_into().unwrap(), POST_ID)
+                .await;
 
             // 4
-            commit_entry(
-                &alice_env,
-                call_data.clone(),
-                target.clone().try_into().unwrap(),
-                POST_ID,
-            )
-            .await;
+            call_data
+                .commit_entry(target.clone().try_into().unwrap(), POST_ID)
+                .await;
 
             // 5
             // Link the entries
-            create_link(
-                &alice_env,
-                call_data.clone(),
-                base_entry_hash.clone(),
-                target_entry_hash.clone(),
-                link_tag.clone(),
-            )
-            .await;
+            call_data
+                .create_link(
+                    base_entry_hash.clone(),
+                    target_entry_hash.clone(),
+                    link_tag.clone(),
+                )
+                .await;
 
             // Produce and publish these commits
             let mut triggers = conductor.get_cell_triggers(&alice_cell_id).await.unwrap();
@@ -1425,24 +1415,24 @@ mod slow_tests {
 
         // Check the ops
         {
-            let (bob_env, call_data) = CallData::create(&bob_cell_id, &conductor, &dna_file).await;
+            let call_data = HostFnApi::create(&bob_cell_id, &conductor, &dna_file).await;
 
             // Wait for the ops to integrate but early exit if they do
             // 14 ops for genesis and 9 ops for two commits and a link
             // Try 100 times for 100 millis each so maximum wait is 10 seconds
-            wait_for_integration(&bob_env, 14 + 9, 100, Duration::from_millis(100)).await;
+            wait_for_integration(&call_data.env, 14 + 9, 100, Duration::from_millis(100)).await;
 
             // Check the ops are not empty
-            let env_ref = bob_env.guard();
+            let env_ref = call_data.env.guard();
             let reader = env_ref.reader().unwrap();
-            let db = bob_env.get_db(&*INTEGRATED_DHT_OPS).unwrap();
-            let ops_db = IntegratedDhtOpsStore::new(bob_env.clone().into(), db);
+            let db = call_data.env.get_db(&*INTEGRATED_DHT_OPS).unwrap();
+            let ops_db = IntegratedDhtOpsStore::new(call_data.env.clone().into(), db);
             let ops = ops_db.iter(&reader).unwrap().collect::<Vec<_>>().unwrap();
             debug!(?ops);
             assert!(!ops.is_empty());
 
             // Check the correct links is in bobs integrated metadata vault
-            let meta = MetadataBuf::vault(bob_env.clone().into()).unwrap();
+            let meta = MetadataBuf::vault(call_data.env.clone().into()).unwrap();
             let key = LinkMetaKey::Base(&base_entry_hash);
             let links = meta
                 .get_live_links(&reader, &key)
@@ -1453,37 +1443,24 @@ mod slow_tests {
             assert_eq!(link.target, target_entry_hash);
 
             // Check bob can get the links
-            let links = get_links(
-                &bob_env,
-                call_data.clone(),
-                base_entry_hash.clone(),
-                Some(link_tag),
-                Default::default(),
-            )
-            .await;
+            let links = call_data
+                .get_links(base_entry_hash.clone(), Some(link_tag), Default::default())
+                .await;
             let link = links[0].clone();
             assert_eq!(link.target, target_entry_hash);
 
             // Check bob can get the target
-            let e = get(
-                &bob_env,
-                call_data.clone(),
-                target_entry_hash.clone().into(),
-                Default::default(),
-            )
-            .await
-            .unwrap();
+            let e = call_data
+                .get(target_entry_hash.clone().into(), Default::default())
+                .await
+                .unwrap();
             assert_eq!(e.into_inner().1.into_option().unwrap(), target_entry);
 
             // Check bob can get the base
-            let e = get(
-                &bob_env,
-                call_data.clone(),
-                base_entry_hash.clone().into(),
-                Default::default(),
-            )
-            .await
-            .unwrap();
+            let e = call_data
+                .get(base_entry_hash.clone().into(), Default::default())
+                .await
+                .unwrap();
             assert_eq!(e.into_inner().1.into_option().unwrap(), base_entry);
         }
 

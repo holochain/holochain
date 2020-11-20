@@ -551,6 +551,7 @@ pub mod wasm_test {
             .expect("Time went backwards")
     }
 
+    /// Directly call a function in a TestWasm
     #[macro_export]
     macro_rules! call_test_ribosome {
         ( $host_access:expr, $test_wasm:expr, $fn_name:literal, $input:expr ) => {{
@@ -610,6 +611,7 @@ pub mod wasm_test {
                         guest_output.into_inner().try_into().unwrap()
                     }
                     crate::core::ribosome::ZomeCallResponse::Unauthorized => unreachable!(),
+                    crate::core::ribosome::ZomeCallResponse::NetworkError(_) => unreachable!(),
                 };
                 output
             })

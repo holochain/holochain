@@ -28,7 +28,7 @@ holochain_zome_types = { path = "../zome_types", features = ["fixturators"] }
 lazy_static = "1.4.0"
 must_future = "0.1.1"
 nanoid = "0.3"
-observability = { path = "../observability" }
+observability = "0.1"
 rand = "0.7"
 regex = "1.1.2"
 serde = { version = "1.0.104", features = [ "derive", "rc" ] }
@@ -41,7 +41,7 @@ tempdir = "0.3.7"
 thiserror = "1.0.22"
 tokio = { version = "0.2", features = [ "blocking" ] }
 tokio_safe_block_on = "0.1.2"
-tracing = "=0.1.18"
+tracing = "=0.1.21"
 
 [dev-dependencies]
 # rmp-serde = "0.14.3"

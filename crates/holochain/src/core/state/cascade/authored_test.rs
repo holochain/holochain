@@ -29,26 +29,18 @@ async fn authored_test() {
     let delay_per_attempt = Duration::from_millis(100);
 
     let zomes = vec![TestWasm::Create];
-    let conductor_test = ConductorTestData::new(zomes, true).await;
-    let ConductorTestData {
-        __tmpdir,
-        handle,
-        alice_call_data,
-        bob_call_data,
-        ..
-    } = conductor_test;
-    let bob_call_data = bob_call_data.unwrap();
+    let mut conductor_test = ConductorTestData::two_agents(zomes, true).await;
+    let handle = conductor_test.handle();
+    let alice_call_data = conductor_test.alice_call_data();
+    let bob_call_data = conductor_test.bob_call_data().unwrap();
 
     let entry = Post("Hi there".into());
     let entry_hash = EntryHash::with_data_sync(&Entry::try_from(entry.clone()).unwrap());
     // 3
-    commit_entry(
-        &alice_call_data.env,
-        alice_call_data.call_data(TestWasm::Create),
-        entry.clone().try_into().unwrap(),
-        POST_ID,
-    )
-    .await;
+    alice_call_data
+        .get_api(TestWasm::Create)
+        .commit_entry(entry.clone().try_into().unwrap(), POST_ID)
+        .await;
 
     // Produce and publish these commits
     let mut triggers = handle
@@ -91,13 +83,10 @@ async fn authored_test() {
         .expect("Bob should have the entry in their integrated store because they received gossip");
 
     // Now bob commits the entry
-    commit_entry(
-        &bob_call_data.env,
-        bob_call_data.call_data(TestWasm::Create),
-        entry.clone().try_into().unwrap(),
-        POST_ID,
-    )
-    .await;
+    bob_call_data
+        .get_api(TestWasm::Create)
+        .commit_entry(entry.clone().try_into().unwrap(), POST_ID)
+        .await;
 
     // Produce and publish these commits
     let mut triggers = handle
@@ -113,5 +102,5 @@ async fn authored_test() {
         .unwrap()
         .expect("Bob should now have the entry in their authored because they committed it");
 
-    ConductorTestData::shutdown_conductor(handle).await;
+    conductor_test.shutdown_conductor().await;
 }

@@ -36,7 +36,7 @@ use tracing::*;
 
 #[tokio::test(threaded_scheduler)]
 async fn app_validation_workflow_test() {
-    observability::test_run().ok();
+    observability::test_run_open().ok();
 
     let dna_file = DnaFile::new(
         DnaDef {
@@ -451,15 +451,11 @@ async fn commit_invalid(
 ) -> (HeaderHash, EntryHash) {
     let entry = ThisWasmEntry::NeverValidates;
     let entry_hash = EntryHash::with_data_sync(&Entry::try_from(entry.clone()).unwrap());
-    let (bob_env, call_data) = CallData::create(bob_cell_id, handle, dna_file).await;
+    let call_data = HostFnApi::create(bob_cell_id, handle, dna_file).await;
     // 4
-    let invalid_header_hash = commit_entry(
-        &bob_env,
-        call_data.clone(),
-        entry.clone().try_into().unwrap(),
-        INVALID_ID,
-    )
-    .await;
+    let invalid_header_hash = call_data
+        .commit_entry(entry.clone().try_into().unwrap(), INVALID_ID)
+        .await;
 
     // Produce and publish these commits
     let mut triggers = handle.get_cell_triggers(&bob_cell_id).await.unwrap();
@@ -478,15 +474,11 @@ async fn commit_invalid_post(
     let entry = Post("Banana".into());
     let entry_hash = EntryHash::with_data_sync(&Entry::try_from(entry.clone()).unwrap());
     // Create call data for the 3rd zome Create
-    let (bob_env, call_data) = CallData::create_for_zome(bob_cell_id, handle, dna_file, 2).await;
+    let call_data = HostFnApi::create_for_zome(bob_cell_id, handle, dna_file, 2).await;
     // 9
-    let invalid_header_hash = commit_entry(
-        &bob_env,
-        call_data.clone(),
-        entry.clone().try_into().unwrap(),
-        POST_ID,
-    )
-    .await;
+    let invalid_header_hash = call_data
+        .commit_entry(entry.clone().try_into().unwrap(), POST_ID)
+        .await;
 
     // Produce and publish these commits
     let mut triggers = handle.get_cell_triggers(&bob_cell_id).await.unwrap();
@@ -500,9 +492,9 @@ async fn call_zome_directly(
     dna_file: &DnaFile,
     invocation: ZomeCallInvocation,
 ) -> SerializedBytes {
-    let (bob_env, call_data) = CallData::create(bob_cell_id, handle, dna_file).await;
+    let call_data = HostFnApi::create(bob_cell_id, handle, dna_file).await;
     // 4
-    let output = call_zome_direct(&bob_env, call_data.clone(), invocation).await;
+    let output = call_data.call_zome_direct(invocation).await;
 
     // Produce and publish these commits
     let mut triggers = handle.get_cell_triggers(&bob_cell_id).await.unwrap();

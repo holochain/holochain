@@ -213,7 +213,7 @@ pub enum EnvironmentKind {
     /// Specifies the environment used to save wasm
     Wasm,
     /// State of the p2p network
-    P2P,
+    P2p,
 }
 
 impl EnvironmentKind {
@@ -223,7 +223,7 @@ impl EnvironmentKind {
             EnvironmentKind::Cell(cell_id) => PathBuf::from(cell_id.to_string()),
             EnvironmentKind::Conductor => PathBuf::from("conductor"),
             EnvironmentKind::Wasm => PathBuf::from("wasm"),
-            EnvironmentKind::P2P => PathBuf::from("p2p"),
+            EnvironmentKind::P2p => PathBuf::from("p2p"),
         }
     }
 }
@@ -290,6 +290,16 @@ impl<'e> WriteManager<'e> for EnvironmentWriteRef<'e> {
         let result = f(&mut writer)?;
         writer.commit().map_err(Into::into)?;
         Ok(result)
+    }
+}
+
+impl<'e> WriteManager<'e> for EnvironmentWrite {
+    fn with_commit<E, R, F: Send>(&self, f: F) -> Result<R, E>
+    where
+        E: From<DatabaseError>,
+        F: FnOnce(&mut Writer) -> Result<R, E>,
+    {
+        EnvironmentWriteRef::with_commit(&self.guard(), f)
     }
 }
 

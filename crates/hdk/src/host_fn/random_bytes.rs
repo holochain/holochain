@@ -25,10 +25,10 @@ use crate::prelude::*;
 ///
 /// @see the rand rust crate
 pub fn random_bytes(number_of_bytes: u32) -> HdkResult<Vec<u8>> {
-    host_fn!(
+    Ok(host_call::<RandomBytesInput, RandomBytesOutput>(
         __random_bytes,
-        RandomBytesInput::new(number_of_bytes),
-        RandomBytesOutput
-    )
-    .map(|bytes| bytes.into_vec())
+        &RandomBytesInput::new(number_of_bytes),
+    )?
+    .into_inner()
+    .into_vec())
 }

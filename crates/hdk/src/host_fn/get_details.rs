@@ -48,9 +48,9 @@ pub fn get_details<H: Into<AnyDhtHash>>(
     hash: H,
     options: GetOptions,
 ) -> HdkResult<Option<Details>> {
-    host_fn!(
+    Ok(host_call::<GetDetailsInput, GetDetailsOutput>(
         __get_details,
-        GetDetailsInput::new((hash.into(), options)),
-        GetDetailsOutput
-    )
+        &GetDetailsInput::new((hash.into(), options)),
+    )?
+    .into_inner())
 }

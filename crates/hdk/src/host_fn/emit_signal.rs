@@ -14,5 +14,9 @@ where
     SerializedBytes: TryFrom<&'a D, Error = SerializedBytesError>,
 {
     let sb = SerializedBytes::try_from(data)?;
-    host_fn!(__emit_signal, EmitSignalInput::new(sb), EmitSignalOutput)
+    #[allow(clippy::unit_arg)]
+    Ok(
+        host_call::<EmitSignalInput, EmitSignalOutput>(__emit_signal, &EmitSignalInput::new(sb))?
+            .into_inner(),
+    )
 }

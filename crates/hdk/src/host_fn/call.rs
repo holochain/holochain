@@ -25,15 +25,20 @@ where
     let payload = SerializedBytes::try_from(payload)?;
     // @todo is this secure to set this in the wasm rather than have the host inject it?
     let provenance = agent_info()?.agent_latest_pubkey;
-    let out = host_fn!(
+    let out: ZomeCallResponse = host_call::<CallInput, CallOutput>(
         __call,
-        CallInput::new(Call::new(
-            to_cell, zome_name, fn_name, cap_secret, payload, provenance
+        &CallInput::new(Call::new(
+            to_cell, zome_name, fn_name, cap_secret, payload, provenance,
         )),
-        CallOutput
-    )?;
+    )?
+    .into_inner();
+
     match out {
         ZomeCallResponse::Ok(o) => Ok(O::try_from(o.into_inner())?),
         ZomeCallResponse::Unauthorized => Err(HdkError::UnauthorizedZomeCall),
+        ZomeCallResponse::NetworkError(e) => unreachable!(
+            "Calls should never be routed to the network. This is a bug. Got {}",
+            e
+        ),
     }
 }

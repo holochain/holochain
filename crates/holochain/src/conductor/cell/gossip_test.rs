@@ -17,9 +17,9 @@ async fn gossip_test() {
     observability::test_run().ok();
     const NUM: usize = 1;
     let zomes = vec![TestWasm::Anchor];
-    let mut conductor_test = ConductorTestData::new(zomes, false).await;
-    let handle = conductor_test.handle.clone();
-    let alice_call_data = &conductor_test.alice_call_data;
+    let mut conductor_test = ConductorTestData::two_agents(zomes, false).await;
+    let handle = conductor_test.handle();
+    let alice_call_data = &conductor_test.alice_call_data();
     let alice_cell_id = &alice_call_data.cell_id;
 
     // ALICE adding anchors
@@ -40,7 +40,7 @@ async fn gossip_test() {
 
     // Bring Bob online
     conductor_test.bring_bob_online().await;
-    let bob_call_data = conductor_test.bob_call_data.as_ref().unwrap();
+    let bob_call_data = conductor_test.bob_call_data().unwrap();
     let bob_cell_id = &bob_call_data.cell_id;
 
     // Give gossip some time to finish
@@ -64,7 +64,7 @@ async fn gossip_test() {
         _ => unreachable!(),
     }
 
-    ConductorTestData::shutdown_conductor(handle).await;
+    conductor_test.shutdown_conductor().await;
 }
 
 #[tokio::test(threaded_scheduler)]
@@ -76,10 +76,9 @@ async fn signature_smoke_test() {
     // things totally wrong.
     network_config.bootstrap_service = Some(url2::url2!("{}", kitsune_p2p::BOOTSTRAP_SERVICE_DEV));
     let zomes = vec![TestWasm::Anchor];
-    let conductor_test =
+    let mut conductor_test =
         ConductorTestData::with_network_config(zomes.clone(), false, network_config.clone()).await;
-    let handle = conductor_test.handle.clone();
-    ConductorTestData::shutdown_conductor(handle).await;
+    conductor_test.shutdown_conductor().await;
 }
 
 #[tokio::test(threaded_scheduler)]
@@ -89,10 +88,10 @@ async fn agent_info_test() {
     let mut network_config = KitsuneP2pConfig::default();
     network_config.transport_pool = vec![kitsune_p2p::TransportConfig::Mem {}];
     let zomes = vec![TestWasm::Anchor];
-    let conductor_test =
+    let mut conductor_test =
         ConductorTestData::with_network_config(zomes.clone(), false, network_config.clone()).await;
-    let handle = conductor_test.handle.clone();
-    let alice_call_data = &conductor_test.alice_call_data;
+    let handle = conductor_test.handle();
+    let alice_call_data = &conductor_test.alice_call_data();
     let alice_cell_id = &alice_call_data.cell_id;
     let alice_agent_id = alice_cell_id.agent_pubkey();
 
@@ -124,11 +123,10 @@ async fn agent_info_test() {
     assert_eq!(len, 1);
 
     // Bring Bob online
-    let bob_conductor_test =
+    let mut bob_conductor =
         ConductorTestData::with_network_config(zomes, true, network_config.clone()).await;
-    let bob_agent_id = bob_conductor_test
-        .bob_call_data
-        .as_ref()
+    let bob_agent_id = bob_conductor
+        .bob_call_data()
         .unwrap()
         .cell_id
         .agent_pubkey();
@@ -152,6 +150,6 @@ async fn agent_info_test() {
     // Expecting one agent info in the peer store
     assert_eq!(len, 2);
 
-    ConductorTestData::shutdown_conductor(handle).await;
-    ConductorTestData::shutdown_conductor(bob_conductor_test.handle).await;
+    conductor_test.shutdown_conductor().await;
+    bob_conductor.shutdown_conductor().await;
 }

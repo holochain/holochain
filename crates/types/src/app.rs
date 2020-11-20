@@ -5,8 +5,8 @@ use holo_hash::AgentPubKey;
 use holochain_serialized_bytes::SerializedBytes;
 use std::path::PathBuf;
 
-/// Placeholder used to identify apps
-pub type AppId = String;
+/// Placeholder used to identify installed apps
+pub type InstalledAppId = String;
 
 /// A friendly (nick)name used by UIs to refer to the Cells which make up the app
 pub type CellNick = String;
@@ -14,8 +14,8 @@ pub type CellNick = String;
 /// A collection of [DnaHash]es paired with an [AgentPubKey] and an app id
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct InstallAppPayload {
-    /// Placeholder to find the app
-    pub app_id: AppId,
+    /// Placeholder to find the installed app
+    pub installed_app_id: InstalledAppId,
     /// The agent that installed this app
     pub agent_key: AgentPubKey,
     /// The Dna paths in this app
@@ -90,7 +90,7 @@ impl InstalledCell {
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct InstalledApp {
     /// Placeholder to find the app
-    pub app_id: AppId,
+    pub installed_app_id: InstalledAppId,
     /// Cell data for this app
     pub cell_data: Vec<InstalledCell>,
 }

@@ -86,6 +86,8 @@ const WASM_CACHE_PATH_ENV: &str = "HC_WASM_CACHE_PATH";
 
 /// The only WasmRibosome is a Wasm ribosome.
 /// note that this is cloned on every invocation so keep clones cheap!
+// TODO: maackle:
+//       how can this possibly be cheap to clone when it contains wasm bytecode?
 #[derive(Clone, Debug)]
 pub struct WasmRibosome {
     // NOTE - Currently taking a full DnaFile here.
