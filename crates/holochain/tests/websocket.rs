@@ -161,7 +161,7 @@ async fn call_admin() {
     let agent_key = fake_agent_pubkey_1();
     let payload = InstallAppPayload {
         dnas: vec![dna_payload],
-        app_id: "test".to_string(),
+        installed_app_id: "test".to_string(),
         agent_key,
     };
     let request = AdminRequest::InstallApp(Box::new(payload));
@@ -314,7 +314,7 @@ async fn call_zome() {
     let agent_key = fake_agent_pubkey_1();
     let payload = InstallAppPayload {
         dnas: vec![dna_payload],
-        app_id: "test".to_string(),
+        installed_app_id: "test".to_string(),
         agent_key,
     };
     let request = AdminRequest::InstallApp(Box::new(payload));
@@ -332,7 +332,7 @@ async fn call_zome() {
 
     // Activate cells
     let request = AdminRequest::ActivateApp {
-        app_id: "test".to_string(),
+        installed_app_id: "test".to_string(),
     };
     let response = client.request(request);
     let response = check_timeout(&mut holochain, response, 1000).await;
@@ -410,7 +410,7 @@ async fn emit_signals() {
     let cell_id = CellId::new(dna_hash.clone(), agent_key.clone());
     let payload = InstallAppPayload {
         dnas: vec![dna_payload],
-        app_id: "test".to_string(),
+        installed_app_id: "test".to_string(),
         agent_key: agent_key.clone(),
     };
     let request = AdminRequest::InstallApp(Box::new(payload));
@@ -420,7 +420,7 @@ async fn emit_signals() {
 
     // Activate cells
     let request = AdminRequest::ActivateApp {
-        app_id: "test".to_string(),
+        installed_app_id: "test".to_string(),
     };
     let response = admin_tx.request(request);
     let response = check_timeout(&mut holochain, response, 1000).await;
@@ -492,7 +492,7 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
     let agent_key = fake_agent_pubkey_1();
     let payload = InstallAppPayload {
         dnas: vec![dna_payload],
-        app_id: "test".to_string(),
+        installed_app_id: "test".to_string(),
         agent_key,
     };
     let request = AdminRequest::InstallApp(Box::new(payload));
@@ -549,7 +549,7 @@ async fn conductor_admin_interface_ends_with_shutdown() -> Result<()> {
     let agent_key = fake_agent_pubkey_1();
     let payload = InstallAppPayload {
         dnas: vec![dna_payload],
-        app_id: "test".to_string(),
+        installed_app_id: "test".to_string(),
         agent_key,
     };
     let request = AdminRequest::InstallApp(Box::new(payload));

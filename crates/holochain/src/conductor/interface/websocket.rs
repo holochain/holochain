@@ -384,7 +384,7 @@ pub mod test {
         let agent_key = fake_agent_pubkey_1();
         let payload = InstallAppPayload {
             dnas: vec![dna_payload],
-            app_id: "test app".to_string(),
+            installed_app_id: "test app".to_string(),
             agent_key,
         };
         let msg = AdminRequest::InstallApp(Box::new(payload));
@@ -513,7 +513,7 @@ pub mod test {
 
         // Activate the app
         let msg = AdminRequest::ActivateApp {
-            app_id: "test app".to_string(),
+            installed_app_id: "test app".to_string(),
         };
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
@@ -555,7 +555,7 @@ pub mod test {
 
         // Now deactivate app
         let msg = AdminRequest::DeactivateApp {
-            app_id: "test app".to_string(),
+            installed_app_id: "test app".to_string(),
         };
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
