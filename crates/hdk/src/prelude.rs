@@ -18,7 +18,6 @@ pub use crate::hash_path::anchor::list_anchor_tags;
 pub use crate::hash_path::anchor::list_anchor_type_addresses;
 pub use crate::hash_path::anchor::Anchor;
 pub use crate::hash_path::path::Path;
-pub use crate::host_fn;
 pub use crate::host_fn::agent_info::agent_info;
 pub use crate::host_fn::call::call;
 pub use crate::host_fn::call_remote::call_remote;
@@ -77,9 +76,9 @@ pub use holochain_zome_types::query::ActivityRequest;
 pub use holochain_zome_types::query::AgentActivity;
 pub use holochain_zome_types::query::ChainQueryFilter as QueryFilter;
 pub use holochain_zome_types::query::ChainQueryFilter;
-pub use holochain_zome_types::signature::SignInput;
+pub use holochain_zome_types::signature::Sign;
 pub use holochain_zome_types::signature::Signature;
-pub use holochain_zome_types::signature::VerifySignatureInput;
+pub use holochain_zome_types::signature::VerifySignature;
 pub use holochain_zome_types::validate::RequiredValidationType;
 pub use holochain_zome_types::validate::ValidateCallbackResult;
 pub use holochain_zome_types::validate::ValidateData;
@@ -94,3 +93,6 @@ pub use holochain_zome_types::zome_info::ZomeInfo;
 pub use holochain_zome_types::*;
 pub use std::collections::HashSet;
 pub use std::convert::TryFrom;
+
+// This needs to be called at least once _somewhere_ and is idempotent.
+holochain_externs!();

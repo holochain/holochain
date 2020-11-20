@@ -4,5 +4,8 @@ use crate::prelude::*;
 ///
 /// Assuming the private key for the provided
 pub fn sign(key: AgentPubKey, data: SerializedBytes) -> HdkResult<Signature> {
-    host_fn!(__sign, SignInput { key, data }, SignOutput)
+    Ok(
+        host_call::<SignInput, SignOutput>(__sign, &SignInput::new(Sign { key, data }))?
+            .into_inner(),
+    )
 }

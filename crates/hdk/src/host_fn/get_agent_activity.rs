@@ -5,9 +5,9 @@ pub fn get_agent_activity(
     query: ChainQueryFilter,
     request: ActivityRequest,
 ) -> HdkResult<AgentActivity> {
-    host_fn!(
+    Ok(host_call::<GetAgentActivityInput, GetAgentActivityOutput>(
         __get_agent_activity,
-        GetAgentActivityInput::new((agent, query, request)),
-        GetAgentActivityOutput
-    )
+        &GetAgentActivityInput::new((agent, query, request)),
+    )?
+    .into_inner())
 }

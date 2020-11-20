@@ -4,7 +4,7 @@ use holochain_serialized_bytes::prelude::*;
 
 /// Input structure for creating a signature.
 #[derive(Debug, PartialEq, Serialize, Deserialize, SerializedBytes, Clone)]
-pub struct SignInput {
+pub struct Sign {
     /// The public key associated with the private key that should be used to
     /// generate the signature.
     pub key: holo_hash::AgentPubKey,
@@ -13,7 +13,7 @@ pub struct SignInput {
     pub data: SerializedBytes,
 }
 
-impl SignInput {
+impl Sign {
     /// construct a new SignInput struct.
     pub fn new<D>(key: holo_hash::AgentPubKey, data: D) -> Result<Self, SerializedBytesError>
     where
@@ -71,7 +71,7 @@ impl std::fmt::Debug for Signature {
 
 /// Mirror struct for SignInput that includes a signature to verify against a key and data.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
-pub struct VerifySignatureInput {
+pub struct VerifySignature {
     /// The public key associated with the private key that should be used to
     /// verify the signature.
     pub key: holo_hash::AgentPubKey,
@@ -83,25 +83,25 @@ pub struct VerifySignatureInput {
     pub data: SerializedBytes,
 }
 
-impl AsRef<Signature> for VerifySignatureInput {
+impl AsRef<Signature> for VerifySignature {
     fn as_ref(&self) -> &Signature {
         &self.signature
     }
 }
 
-impl AsRef<holo_hash::AgentPubKey> for VerifySignatureInput {
+impl AsRef<holo_hash::AgentPubKey> for VerifySignature {
     fn as_ref(&self) -> &AgentPubKey {
         &self.key
     }
 }
 
-impl AsRef<SerializedBytes> for VerifySignatureInput {
+impl AsRef<SerializedBytes> for VerifySignature {
     fn as_ref(&self) -> &SerializedBytes {
         &self.data
     }
 }
 
-impl VerifySignatureInput {
+impl VerifySignature {
     /// Alias for as_ref for data.
     pub fn as_data_ref(&self) -> &SerializedBytes {
         &self.as_ref()
@@ -117,7 +117,7 @@ impl VerifySignatureInput {
         &self.as_ref()
     }
 
-    /// construct a new SignInput struct.
+    /// construct a new VerifySignatureInput struct.
     pub fn new<D>(
         key: holo_hash::AgentPubKey,
         signature: Signature,
