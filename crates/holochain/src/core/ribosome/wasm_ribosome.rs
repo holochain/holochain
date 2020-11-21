@@ -61,10 +61,13 @@ use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::ribosome::ZomesToInvoke;
 use fallible_iterator::FallibleIterator;
-use holochain_types::dna::{zome::Zome, DnaError};
 use holochain_types::dna::{
     zome::{HostFnAccess, Permission},
     DnaDefHashed, DnaFile,
+};
+use holochain_types::dna::{
+    zome::{Zome, ZomeDef},
+    DnaError,
 };
 use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::entry_def::EntryDefsCallbackResult;
@@ -107,8 +110,7 @@ impl WasmRibosome {
         &self.dna_file
     }
 
-    pub fn module(&self, call_context: CallContext) -> RibosomeResult<Module> {
-        let zome_name = call_context.zome.zome_name();
+    pub fn module(&self, zome_name: &ZomeName) -> RibosomeResult<Module> {
         let wasm: Arc<Vec<u8>> = self.dna_file.get_wasm_for_zome(zome_name)?.code();
         Ok(holochain_wasmer_host::instantiate::module(
             &self.wasm_cache_key(zome_name)?,
@@ -382,28 +384,34 @@ impl RibosomeT for WasmRibosome {
             zome: zome.clone(),
             host_access,
         };
-        let module = self.module(call_context.clone())?;
 
-        if module.info().exports.contains_key(to_call.as_ref()) {
-            // there is a callback to_call and it is implemented in the wasm
-            // it is important to fully instantiate this (e.g. don't try to use the module above)
-            // because it builds guards against memory leaks and handles imports correctly
-            let mut instance = self.instance(call_context)?;
+        match zome.zome_def() {
+            ZomeDef::Wasm(_) => {
+                let module = self.module(zome.zome_name())?;
 
-            let result: ExternOutput = holochain_wasmer_host::guest::call(
-                &mut instance,
-                to_call.as_ref(),
-                // be aware of this clone!
-                // the whole invocation is cloned!
-                // @todo - is this a problem for large payloads like entries?
-                invocation.to_owned().host_input()?,
-            )?;
+                if module.info().exports.contains_key(to_call.as_ref()) {
+                    // there is a callback to_call and it is implemented in the wasm
+                    // it is important to fully instantiate this (e.g. don't try to use the module above)
+                    // because it builds guards against memory leaks and handles imports correctly
+                    let mut instance = self.instance(call_context)?;
 
-            Ok(Some(result))
-        } else {
-            // the func doesn't exist
-            // the callback is not implemented
-            Ok(None)
+                    let result: ExternOutput = holochain_wasmer_host::guest::call(
+                        &mut instance,
+                        to_call.as_ref(),
+                        // be aware of this clone!
+                        // the whole invocation is cloned!
+                        // @todo - is this a problem for large payloads like entries?
+                        invocation.to_owned().host_input()?,
+                    )?;
+
+                    Ok(Some(result))
+                } else {
+                    // the func doesn't exist
+                    // the callback is not implemented
+                    Ok(None)
+                }
+            }
+            ZomeDef::Inline(zome) => unimplemented!(),
         }
     }
 

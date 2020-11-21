@@ -10,7 +10,7 @@
 pub mod error;
 pub mod guest_callback;
 pub mod host_fn;
-pub mod inline_ribosome;
+// pub mod inline_ribosome; // TODO: remove completely
 pub mod wasm_ribosome;
 
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
@@ -66,8 +66,8 @@ use std::iter::Iterator;
 
 #[derive(Clone)]
 pub struct CallContext {
-    pub zome: Zome,
-    pub host_access: HostAccess,
+    pub(crate) zome: Zome,
+    pub(crate) host_access: HostAccess,
 }
 
 impl CallContext {
@@ -78,6 +78,7 @@ impl CallContext {
     pub fn zome(&self) -> Zome {
         self.zome.clone()
     }
+
     pub fn host_access(&self) -> HostAccess {
         self.host_access.clone()
     }
