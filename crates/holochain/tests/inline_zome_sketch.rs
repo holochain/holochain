@@ -10,7 +10,7 @@ use holochain_types::dna::{
 async fn one() -> anyhow::Result<()> {
     let envs = test_environments();
     let conductor = Conductor::builder().test(&envs).await?;
-    let zome: ZomeDef = InlineZome::default()
+    let zome: ZomeDef = InlineZome::new("")
         .callback("create", |api, ()| {
             let entry_def_id: EntryDefId = todo!();
             let entry: Entry = todo!();

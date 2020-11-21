@@ -15,14 +15,29 @@ pub mod api;
 pub mod error;
 
 /// An InlineZome, which consists
-#[derive(Default)]
 pub struct InlineZome {
-    uuid: String,
-    callbacks: HashMap<FunctionName, InlineZomeFn>,
+    /// Since closures cannot be serialized, we include a UUID which
+    /// is the only part of an InlineZome that gets serialized.
+    /// This uuid becomes part of the determination of the DnaHash
+    /// that it is a part of.
+    /// Think of it as a stand-in for the WasmHash of a WasmZome.
+    pub(super) uuid: String,
+
+    /// The collection of closures which define this zome.
+    /// These callbacks are directly called by the Ribosome.
+    pub(super) callbacks: HashMap<FunctionName, InlineZomeFn>,
 }
 
 impl InlineZome {
-    /// Define a new inline zome function
+    /// Create a new zome with the given UUID
+    pub fn new<S: Into<String>>(uuid: S) -> Self {
+        Self {
+            uuid: uuid.into(),
+            callbacks: HashMap::new(),
+        }
+    }
+
+    /// Define a new zome function or callback with the given name
     pub fn callback<F, I, O>(mut self, name: &str, f: F) -> Self
     where
         F: Fn(InlineHostApi, I) -> InlineZomeResult<O> + 'static + Send + Sync,
@@ -94,7 +109,7 @@ mod tests {
 
     #[test]
     fn can_create_inline_dna() {
-        let zome = InlineZome::default().callback("zome_fn_1", |api, a: ()| {
+        let zome = InlineZome::new("").callback("zome_fn_1", |api, a: ()| {
             let hash: AnyDhtHash = todo!();
             api.get(hash, GetOptions::default())
         });

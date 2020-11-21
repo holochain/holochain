@@ -1,4 +1,10 @@
-//! holochain_types::dna::zome is a set of structs for working with holochain dna.
+//! A `Zome` is a module of app-defined code which can be run by Holochain.
+//! A group of Zomes are composed to form a `Dna`.
+//!
+//! Real-world Holochain Zomes are written in Wasm.
+//! This module also provides for an "inline" zome definition, which is written
+//! using Rust closures, and is useful for quickly defining zomes on-the-fly
+//! for tests.
 
 use std::sync::Arc;
 
@@ -11,8 +17,7 @@ use self::inline_zome::InlineZome;
 use super::{error::DnaResult, DnaError};
 
 pub mod inline_zome;
-
-/// An internal type, joining a ZomeDef with its name
+/// A Holochain Zome. Includes the ZomeDef as well as the name of the Zome.
 #[derive(
     Serialize,
     Deserialize,
@@ -77,19 +82,46 @@ impl From<Zome> for ZomeDef {
     }
 }
 
-/// Represents an individual "zome" definition.
+/// Just the definition of a Zome, without the name included. This exists
+/// mainly for use in HashMaps where ZomeDefs are keyed by ZomeName.
+///
+/// NB: Only Wasm Zomes are valid to pass through round-trip serialization,
+///     because Rust functions are not serializable. Hence, this enum serializes
+///     as if it were a bare WasmZome, and when deserializing, only Wasm zomes
+///     can be produced. InlineZomes are serialized as their UUID, so that a
+///     hash can be computed, but it is invalid to attempt to deserialize them
+///     again.
+///
+///     In particular, a real-world DnaFile should only ever contain Wasm zomes!
 #[derive(
     Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, derive_more::From,
 )]
 // This can be untagged, since the only valid serialization target is WasmZome
-#[serde(untagged)]
+#[serde(untagged, into = "ZomeDefSerialized")]
 pub enum ZomeDef {
     /// A zome defined by Wasm bytecode
     Wasm(WasmZome),
 
-    /// A zome defined by Rust closures
-    #[serde(skip)]
+    /// A zome defined by Rust closures. Cannot be deserialized.
+    #[serde(skip_deserializing)]
     Inline(Arc<InlineZome>),
+}
+
+/// The serialized form of a ZomeDef, which is identical for Wasm zomes, but
+/// unwraps InlineZomes to just a bare UUID.
+#[derive(Serialize)]
+enum ZomeDefSerialized {
+    Wasm(WasmZome),
+    InlineUuid(String),
+}
+
+impl From<ZomeDef> for ZomeDefSerialized {
+    fn from(d: ZomeDef) -> Self {
+        match d {
+            ZomeDef::Wasm(zome) => Self::Wasm(zome),
+            ZomeDef::Inline(zome) => Self::InlineUuid(zome.uuid.clone()),
+        }
+    }
 }
 
 impl From<InlineZome> for ZomeDef {
