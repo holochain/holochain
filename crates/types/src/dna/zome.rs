@@ -92,6 +92,12 @@ pub enum ZomeDef {
     Inline(Arc<InlineZome>),
 }
 
+impl From<InlineZome> for ZomeDef {
+    fn from(iz: InlineZome) -> Self {
+        Self::Inline(Arc::new(iz))
+    }
+}
+
 impl ZomeDef {
     /// If this is a Wasm zome, return the WasmHash.
     /// If not, return an error with the provided zome name

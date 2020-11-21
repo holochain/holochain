@@ -18,8 +18,40 @@ pub mod error;
 #[derive(Default)]
 pub struct InlineZome {
     uuid: String,
-    functions: HashMap<FunctionName, InlineZomeFn>,
+    callbacks: HashMap<FunctionName, InlineZomeFn>,
 }
+
+impl InlineZome {
+    /// Define a new inline zome function
+    pub fn callback<F, I, O>(mut self, name: &str, f: F) -> Self
+    where
+        F: Fn(InlineHostApi, I) -> InlineZomeResult<O> + 'static + Send + Sync,
+        I: DeserializeOwned,
+        O: Serialize,
+    {
+        let z = move |api: InlineHostApi,
+                      input: SerializedBytes|
+              -> InlineZomeResult<SerializedBytes> {
+            let output = f(
+                api,
+                holochain_serialized_bytes::decode(input.bytes()).expect("TODO"),
+            )?;
+            Ok(SerializedBytes::from(UnsafeBytes::from(
+                holochain_serialized_bytes::encode(&output).expect("TODO"),
+            )))
+        };
+        self.callbacks.insert(name.into(), Box::new(z));
+        self
+    }
+}
+
+/// An inline zome function takes a Host API and an input, and produces an output.
+pub type InlineZomeFn = Box<
+    dyn Fn(InlineHostApi, SerializedBytes) -> InlineZomeResult<SerializedBytes>
+        + 'static
+        + Send
+        + Sync,
+>;
 
 impl std::fmt::Debug for InlineZome {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -53,38 +85,6 @@ impl std::hash::Hash for InlineZome {
     }
 }
 
-impl InlineZome {
-    /// Define a new inline zome function
-    pub fn function<F, I, O>(mut self, name: &str, f: F) -> Self
-    where
-        F: Fn(InlineHostApi, I) -> InlineZomeResult<O> + 'static + Send + Sync,
-        I: DeserializeOwned,
-        O: Serialize,
-    {
-        let z = move |api: InlineHostApi,
-                      input: SerializedBytes|
-              -> InlineZomeResult<SerializedBytes> {
-            let output = f(
-                api,
-                holochain_serialized_bytes::decode(input.bytes()).expect("TODO"),
-            )?;
-            Ok(SerializedBytes::from(UnsafeBytes::from(
-                holochain_serialized_bytes::encode(&output).expect("TODO"),
-            )))
-        };
-        self.functions.insert(name.into(), Box::new(z));
-        self
-    }
-}
-
-/// An inline zome function takes a Host API and an input, and produces an output.
-pub type InlineZomeFn = Box<
-    dyn Fn(InlineHostApi, SerializedBytes) -> InlineZomeResult<SerializedBytes>
-        + 'static
-        + Send
-        + Sync,
->;
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -94,7 +94,7 @@ mod tests {
 
     #[test]
     fn can_create_inline_dna() {
-        let zome = InlineZome::default().function("z1", |api, a: ()| {
+        let zome = InlineZome::default().callback("zome_fn_1", |api, a: ()| {
             let hash: AnyDhtHash = todo!();
             api.get(hash, GetOptions::default())
         });

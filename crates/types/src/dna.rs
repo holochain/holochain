@@ -34,9 +34,13 @@ impl JsonProperties {
 }
 
 /// Represents the top-level holochain dna object.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, SerializedBytes)]
+#[derive(
+    Serialize, Deserialize, Clone, Debug, PartialEq, Eq, SerializedBytes, derive_builder::Builder,
+)]
+#[builder(public)]
 pub struct DnaDef {
     /// The friendly "name" of a Holochain DNA.
+    #[builder(default = "\"Generated DnaDef\".to_string()")]
     pub name: String,
 
     /// A UUID for uniquifying this Dna.
@@ -44,6 +48,7 @@ pub struct DnaDef {
     pub uuid: String,
 
     /// Any arbitrary application properties can be included in this object.
+    #[builder(default = "().try_into().unwrap()")]
     pub properties: SerializedBytes,
 
     /// An array of zomes associated with your holochain application.
@@ -51,11 +56,6 @@ pub struct DnaDef {
 }
 
 impl DnaDef {
-    // /// Calculate DnaHash for DnaDef
-    // pub async fn dna_hash(&self) -> DnaHash {
-    //     DnaHash::with_data(self).await
-    // }
-
     /// Return a Zome
     pub fn get_zome(&self, zome_name: &ZomeName) -> Result<zome::Zome, DnaError> {
         self.zomes
@@ -80,6 +80,14 @@ impl DnaDef {
                     Err(DnaError::NonWasmZome(zome_name.clone()))
                 }
             })
+    }
+}
+
+impl DnaDefBuilder {
+    /// Provide a random UUID
+    pub fn random_uuid(&mut self) -> &mut Self {
+        self.uuid = Some(nanoid::nanoid!());
+        self
     }
 }
 
