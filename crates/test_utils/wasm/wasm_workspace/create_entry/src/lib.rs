@@ -100,7 +100,9 @@ fn init(_: ()) -> ExternResult<InitCallbackResult> {
 /// call
 #[hdk_extern]
 fn call_create_entry(_: ()) -> ExternResult<HeaderHash> {
+    // Create an entry directly via. the hdk.
     hdk3::prelude::create_entry(&post())?;
+    // Create an entry via a `call`.
     Ok(call(
         None,
         "create_entry".to_string().into(),
