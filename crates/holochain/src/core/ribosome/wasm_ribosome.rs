@@ -411,7 +411,10 @@ impl RibosomeT for WasmRibosome {
                     Ok(None)
                 }
             }
-            ZomeDef::Inline(zome) => unimplemented!(),
+            ZomeDef::Inline(zome) => {
+                let input: SerializedBytes = invocation.clone().host_input()?.into_inner();
+                Ok(zome.call(to_call, input)?)
+            }
         }
     }
 

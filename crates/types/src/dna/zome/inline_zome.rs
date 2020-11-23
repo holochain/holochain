@@ -4,12 +4,16 @@
 //! make it easy to write a zome on-the-fly or programmatically, rather than
 //! having to go through the heavy machinery of wasm compilation
 
+use holochain_serialized_bytes as sb;
 use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::zome::FunctionName;
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 
-use self::{api::InlineHostApi, error::InlineZomeResult};
+use self::{
+    api::InlineHostApi,
+    error::{InlineZomeError, InlineZomeResult},
+};
 
 pub mod api;
 pub mod error;
@@ -47,16 +51,30 @@ impl InlineZome {
         let z = move |api: InlineHostApi,
                       input: SerializedBytes|
               -> InlineZomeResult<SerializedBytes> {
-            let output = f(
-                api,
-                holochain_serialized_bytes::decode(input.bytes()).expect("TODO"),
-            )?;
+            let output = f(api, sb::decode(input.bytes()).expect("TODO"))?;
             Ok(SerializedBytes::from(UnsafeBytes::from(
-                holochain_serialized_bytes::encode(&output).expect("TODO"),
+                sb::encode(&output).expect("TODO"),
             )))
         };
         self.callbacks.insert(name.into(), Box::new(z));
         self
+    }
+
+    /// Make a call to an inline zome function
+    pub fn call<I: Serialize, O: DeserializeOwned>(
+        &self,
+        name: &FunctionName,
+        input: I,
+    ) -> InlineZomeResult<O> {
+        let f = self
+            .callbacks
+            .get(name)
+            .ok_or(InlineZomeError::NoSuchCallback(name.to_owned()))?;
+        let output = f(
+            todo!(),
+            SerializedBytes::from(UnsafeBytes::from(sb::encode(&input).expect("TODO"))),
+        )?;
+        Ok(sb::decode(output.bytes()).expect("TODO"))
     }
 }
 
