@@ -13,6 +13,7 @@ members = [
     "hash_entry",
     "foo",
     "hash_path",
+    "hdk_extern",
     "init_fail",
     "init_pass",
     "link",
