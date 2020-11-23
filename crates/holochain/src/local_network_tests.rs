@@ -26,7 +26,7 @@ use crate::{
 use shrinkwraprs::Shrinkwrap;
 use test_case::test_case;
 
-const TIMEOUT_ERROR: &'static str = "inner function \'call_create_entry_remotely_hdk_extern\' failed: ZomeCallNetworkError(\"Other: timeout\")";
+const TIMEOUT_ERROR: &'static str = "inner function \'call_create_entry_remotely\' failed: ZomeCallNetworkError(\"Other: timeout\")";
 
 #[test_case(2)]
 #[test_case(5)]
@@ -50,9 +50,12 @@ fn conductors_call_remote(num_conductors: usize) {
         let results = call_each_other(&handles[..], 50).await;
         for (_, _, result) in results {
             match result {
-                Some(r) => {
-                    assert_matches!(r, Err(RibosomeError::WasmError(WasmError::Zome(e))) if e == TIMEOUT_ERROR);
-                }
+                Some(r) => match r {
+                    Err(RibosomeError::WasmError(WasmError::Zome(e))) => {
+                        assert_eq!(e, TIMEOUT_ERROR)
+                    }
+                    _ => unreachable!(),
+                },
                 // None also means a timeout which is what we want before the
                 // agent info is shared
                 None => (),
