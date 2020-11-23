@@ -194,7 +194,9 @@ pub trait ConductorHandleT: Send + Sync {
 
     /// add a signal_channel that isn't associated
     /// with an app_interface_id, for Rust based listeners
-    async fn add_signal_channel(self: Arc<Self>) -> ConductorResult<tokio::sync::broadcast::Receiver<Signal>>;
+    async fn add_signal_channel(
+        self: Arc<Self>,
+    ) -> ConductorResult<tokio::sync::broadcast::Receiver<Signal>>;
 
     /// Access the broadcast Sender which will send a Signal across every
     /// attached app interface
