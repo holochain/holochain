@@ -33,8 +33,8 @@ impl SignalBroadcaster {
     }
 
     /// get the inner vec of senders
-    pub fn into_inner(&self) -> Vec<broadcast::Sender<Signal>> {
-        self.0.clone()
+    pub fn senders(&self) -> &Vec<broadcast::Sender<Signal>> {
+        &self.0
     }
 
     /// internal constructor
