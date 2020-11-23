@@ -125,9 +125,12 @@ where
     /// the dynamically allocated port later.
     admin_websocket_ports: Vec<u16>,
 
-    /// Collection of signal broadcasters per app interface, keyed by id
-    app_interface_signal_broadcasters:
-        HashMap<AppInterfaceId, tokio::sync::broadcast::Sender<Signal>>,
+    /// Collection of signal broadcasters.
+    /// Each one optionally affiliated with an AppInterface by its id
+    signal_broadcasters: Vec<(
+        Option<AppInterfaceId>,
+        tokio::sync::broadcast::Sender<Signal>,
+    )>,
 
     /// Channel on which to send info about tasks we want to manage
     managed_task_add_sender: mpsc::Sender<ManagedTaskAdd>,
@@ -311,16 +314,26 @@ where
                 .map_err(Box::new)?;
         // TODO: RELIABILITY: Handle this task by restarting it if it fails and log the error
         self.manage_task(ManagedTaskAdd::dont_handle(task)).await?;
-        self.app_interface_signal_broadcasters
-            .insert(interface_id, signal_broadcaster);
+        self.signal_broadcasters
+            .push((Some(interface_id), signal_broadcaster));
         Ok(port)
+    }
+
+    pub(super) fn add_signal_channel(
+        &mut self,
+    ) -> ConductorResult<tokio::sync::broadcast::Receiver<Signal>> {
+        let (signal_broadcaster, signal_receiver) =
+            tokio::sync::broadcast::channel(SIGNAL_BUFFER_SIZE);
+        // no associated AppInterfaceId
+        self.signal_broadcasters.push((None, signal_broadcaster));
+        Ok(signal_receiver)
     }
 
     pub(super) fn signal_broadcaster(&self) -> SignalBroadcaster {
         SignalBroadcaster::new(
-            self.app_interface_signal_broadcasters
-                .values()
-                .cloned()
+            self.signal_broadcasters
+                .iter()
+                .map(|sender| sender.clone().1)
                 .collect(),
         )
     }
@@ -835,7 +848,7 @@ where
             state_db: KvStore::new(db),
             cells: HashMap::new(),
             shutting_down: false,
-            app_interface_signal_broadcasters: HashMap::new(),
+            signal_broadcasters: Vec::new(),
             managed_task_add_sender: task_tx,
             managed_task_stop_broadcaster: stop_tx,
             task_manager_run_handle,

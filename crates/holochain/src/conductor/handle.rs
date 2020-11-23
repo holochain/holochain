@@ -51,8 +51,11 @@ use super::{
     manager::TaskManagerRunHandle,
     Cell, Conductor,
 };
-use crate::core::workflow::ZomeCallInvocationResult;
-use crate::core::{ribosome::ZomeCallInvocation, workflow::CallZomeWorkspaceLock};
+use crate::core::{
+    ribosome::ZomeCallInvocation,
+    signal::Signal,
+    workflow::{CallZomeWorkspaceLock, ZomeCallInvocationResult},
+};
 use derive_more::From;
 use futures::future::FutureExt;
 use holochain_p2p::event::HolochainP2pEvent::*;
@@ -189,6 +192,10 @@ pub trait ConductorHandleT: Send + Sync {
     #[allow(clippy::ptr_arg)]
     async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String>;
 
+    /// add a signal_channel that isn't associated
+    /// with an app_interface_id, for Rust based listeners
+    async fn add_signal_channel(self: Arc<Self>) -> ConductorResult<tokio::sync::broadcast::Receiver<Signal>>;
+
     /// Access the broadcast Sender which will send a Signal across every
     /// attached app interface
     async fn signal_broadcaster(&self) -> SignalBroadcaster;
@@ -251,6 +258,13 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     async fn add_app_interface(self: Arc<Self>, port: u16) -> ConductorResult<u16> {
         let mut lock = self.conductor.write().await;
         lock.add_app_interface_via_handle(port, self.clone()).await
+    }
+
+    async fn add_signal_channel(
+        self: Arc<Self>,
+    ) -> ConductorResult<tokio::sync::broadcast::Receiver<Signal>> {
+        let mut lock = self.conductor.write().await;
+        lock.add_signal_channel()
     }
 
     async fn install_dna(&self, dna: DnaFile) -> ConductorResult<()> {

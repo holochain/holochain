@@ -16,7 +16,8 @@ pub mod error;
 pub mod websocket;
 
 /// A collection of Senders to be used for emitting Signals from a Cell.
-/// There is one Sender per attached Interface
+/// Senders may have been attached one per interface, or have been added
+/// standalone
 #[derive(Clone, Debug)]
 pub struct SignalBroadcaster(Vec<broadcast::Sender<Signal>>);
 
@@ -29,6 +30,11 @@ impl SignalBroadcaster {
             .collect::<Result<Vec<_>, broadcast::SendError<Signal>>>()
             .map_err(InterfaceError::SignalSend)?;
         Ok(())
+    }
+
+    /// get the inner vec of senders
+    pub fn into_inner(&self) -> Vec<broadcast::Sender<Signal>> {
+      self.0.clone()
     }
 
     /// internal constructor
