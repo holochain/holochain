@@ -1,6 +1,5 @@
 //! Utils for Holochain tests
 
-use crate::conductor::api::RealAppInterfaceApi;
 use crate::conductor::config::AdminInterfaceConfig;
 use crate::conductor::config::ConductorConfig;
 use crate::conductor::config::InterfaceDriver;
@@ -13,6 +12,7 @@ use crate::core::state::metadata::MetadataBuf;
 use crate::core::workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace;
 use crate::nucleus::dna::DnaFile;
 use crate::nucleus::ribosome::ZomeCallInvocation;
+use crate::{conductor::api::RealAppInterfaceApi, prelude::Zome};
 use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
 use holo_hash::fixt::*;
@@ -422,18 +422,18 @@ pub async fn wait_for_integration(
 }
 
 /// Helper to create a zome invocation for tests
-pub fn new_invocation<P, Z: Into<ZomeName>>(
+pub fn new_invocation<P, Z: Into<Zome>>(
     cell_id: &CellId,
     func: &str,
     payload: P,
-    zome_name: Z,
+    zome: Z,
 ) -> Result<ZomeCallInvocation, SerializedBytesError>
 where
     P: TryInto<SerializedBytes, Error = SerializedBytesError>,
 {
     Ok(ZomeCallInvocation {
         cell_id: cell_id.clone(),
-        zome_name: zome_name.into(),
+        zome: zome.into(),
         cap: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
         fn_name: func.into(),
         payload: ExternInput::new(payload.try_into()?),

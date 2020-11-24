@@ -1,11 +1,11 @@
 use futures::StreamExt;
 use hdk3::prelude::*;
-use holochain::conductor::Conductor;
 use holochain::nucleus::dna::zome::inline_zome::InlineZome;
 use holochain::nucleus::dna::zome::ZomeDef;
 use holochain::nucleus::dna::DnaDefBuilder;
 use holochain::nucleus::dna::DnaFile;
 use holochain::nucleus::ribosome::ZomeCallInvocation;
+use holochain::{conductor::Conductor, prelude::Zome};
 use holochain_keystore::KeystoreSender;
 use holochain_state::test_utils::test_environments;
 use holochain_types::app::InstalledCell;
@@ -13,7 +13,7 @@ use holochain_types::app::InstalledCell;
 #[tokio::test(threaded_scheduler)]
 async fn one() -> anyhow::Result<()> {
     let envs = test_environments();
-    let zome: ZomeDef = InlineZome::new("")
+    let zome_def: ZomeDef = InlineZome::new("")
         .callback("create", |api, ()| {
             let entry_def_id: EntryDefId = todo!();
             let entry: Entry = todo!();
@@ -24,8 +24,9 @@ async fn one() -> anyhow::Result<()> {
             api.get(hash, GetOptions::default())
         })
         .into();
+    let zome = Zome::new("zome1".into(), zome_def);
     let dna = DnaDefBuilder::default()
-        .zomes(vec![("zome1".into(), zome.into())])
+        .zomes(vec![zome.clone().into_inner()])
         .random_uuid()
         .build()
         .unwrap();
@@ -61,7 +62,7 @@ async fn one() -> anyhow::Result<()> {
     let output = conductor
         .call_zome(ZomeCallInvocation {
             cell_id: alice_cell_id.clone(),
-            zome_name: "zome1".into(),
+            zome: zome.clone(),
             fn_name: "create".into(),
             payload: ExternInput::new(().try_into().unwrap()),
             cap: None,
@@ -71,7 +72,7 @@ async fn one() -> anyhow::Result<()> {
     let output = conductor
         .call_zome(ZomeCallInvocation {
             cell_id: bobbo_cell_id.clone(),
-            zome_name: "zome1".into(),
+            zome: zome.clone(),
             fn_name: "read".into(),
             payload: ExternInput::new(().try_into().unwrap()),
             cap: None,

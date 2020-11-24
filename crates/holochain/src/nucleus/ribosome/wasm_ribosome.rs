@@ -433,7 +433,7 @@ impl RibosomeT for WasmRibosome {
     ) -> RibosomeResult<ZomeCallResponse> {
         Ok(if invocation.is_authorized(&host_access)? {
             // make a copy of these for the error handling below
-            let zome_name = invocation.zome_name.clone();
+            let zome_name = invocation.zome.zome_name().clone();
             let fn_name = invocation.fn_name.clone();
 
             let guest_output: ExternOutput =

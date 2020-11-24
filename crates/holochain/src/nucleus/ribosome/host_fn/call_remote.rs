@@ -129,7 +129,7 @@ pub mod wasm_test {
         let _ = handle
             .call_zome(ZomeCallInvocation {
                 cell_id: bob_cell_id,
-                zome_name: TestWasm::WhoAmI.into(),
+                zome: TestWasm::WhoAmI.into(),
                 cap: None,
                 fn_name: "set_access".into(),
                 payload: ExternInput::new(().try_into().unwrap()),
@@ -143,7 +143,7 @@ pub mod wasm_test {
         let output = handle
             .call_zome(ZomeCallInvocation {
                 cell_id: alice_cell_id,
-                zome_name: TestWasm::WhoAmI.into(),
+                zome: TestWasm::WhoAmI.into(),
                 cap: None,
                 fn_name: "whoarethey".into(),
                 payload: ExternInput::new(bob_agent_id.clone().try_into().unwrap()),

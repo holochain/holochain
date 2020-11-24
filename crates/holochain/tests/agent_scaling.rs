@@ -131,7 +131,7 @@ async fn many_agents_can_reach_consistency_normal_links() {
         .handle()
         .call_zome(ZomeCallInvocation {
             cell_id: cell_ids[0].clone(),
-            zome_name: TestWasm::Link.into(),
+            zome: TestWasm::Link.into(),
             cap: None,
             fn_name: "create_link".into(),
             payload: ExternInput::new(SerializedBytes::try_from(()).unwrap()),
@@ -150,7 +150,7 @@ async fn many_agents_can_reach_consistency_normal_links() {
             .handle()
             .call_zome(ZomeCallInvocation {
                 cell_id: cell_ids[1].clone(),
-                zome_name: TestWasm::Link.into(),
+                zome: TestWasm::Link.into(),
                 cap: None,
                 fn_name: "get_links".into(),
                 payload: ExternInput::new(SerializedBytes::try_from(()).unwrap()),

@@ -8,6 +8,7 @@ use crate::core::state::source_chain::SourceChainError;
 use crate::core::state::workspace::WorkspaceError;
 use crate::core::workflow::error::WorkflowError;
 use crate::nucleus::ribosome::error::RibosomeError;
+use holo_hash::DnaHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::error::DatabaseError;
 use holochain_types::cell::CellId;
@@ -19,6 +20,10 @@ pub enum ConductorApiError {
     /// Cell was referenced, but is missing from the conductor.
     #[error("Cell was referenced, but is missing from the conductor. CellId: {0:?}")]
     CellMissing(CellId),
+
+    /// The Dna for this Cell is not installed in the conductor.
+    #[error("The Dna for this Cell is not installed in the conductor! DnaHash: {0}")]
+    DnaMissing(DnaHash),
 
     /// Cell was referenced, but is missing from the conductor.
     #[error(

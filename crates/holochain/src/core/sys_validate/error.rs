@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
 
 use super::SourceChainError;
-use crate::conductor::entry_def_store::error::EntryDefStoreError;
+use crate::conductor::{api::error::ConductorApiError, entry_def_store::error::EntryDefStoreError};
 use crate::core::state::cascade::error::CascadeError;
 use crate::core::state::workspace::WorkspaceError;
 use crate::core::validation::OutcomeOrError;
@@ -47,6 +47,8 @@ pub enum SysValidationError {
     WorkflowError(#[from] Box<WorkflowError>),
     #[error(transparent)]
     WorkspaceError(#[from] WorkspaceError),
+    #[error(transparent)]
+    ConductorApiError(#[from] Box<ConductorApiError>),
 }
 
 #[deprecated = "This will be replaced with SysValidationOutcome as we shouldn't treat outcomes as errors"]

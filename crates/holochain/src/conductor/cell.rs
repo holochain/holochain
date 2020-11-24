@@ -263,7 +263,7 @@ impl Cell {
             } => {
                 async {
                     let res = self
-                        .handle_call_remote(from_agent, zome_name, fn_name, cap, request)
+                        .handle_call_remote(from_agent, &zome_name, fn_name, cap, request)
                         .await
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
@@ -710,14 +710,19 @@ impl Cell {
     async fn handle_call_remote(
         &self,
         from_agent: AgentPubKey,
-        zome_name: ZomeName,
+        zome_name: &ZomeName,
         fn_name: FunctionName,
         cap: Option<CapSecret>,
         payload: SerializedBytes,
     ) -> CellResult<SerializedBytes> {
+        let zome = self
+            .conductor_api
+            .get_zome(zome_name)
+            .await
+            .map_err(Box::new)?;
         let invocation = ZomeCallInvocation {
             cell_id: self.id.clone(),
-            zome_name: zome_name.clone(),
+            zome,
             cap,
             payload: ExternInput::new(payload),
             provenance: from_agent,

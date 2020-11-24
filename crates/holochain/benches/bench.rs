@@ -80,7 +80,7 @@ pub fn wasm_call_n(c: &mut Criterion) {
                     let zome: Zome = TestWasm::Bench.into();
                     let i = ZomeCallInvocation {
                         cell_id: CELL_ID.lock().unwrap().clone(),
-                        zome_name: zome.zome_name().clone(),
+                        zome: zome.clone(),
                         cap: Some(CAP.lock().unwrap().clone()),
                         fn_name: "echo_bytes".into(),
                         payload: ExternInput::new(sb.clone()),

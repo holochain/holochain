@@ -9,6 +9,7 @@ use crate::conductor::interface::SignalBroadcaster;
 use crate::conductor::ConductorHandle;
 use crate::core::workflow::CallZomeWorkspaceLock;
 use crate::core::workflow::ZomeCallInvocationResult;
+use crate::nucleus::dna::zome::Zome;
 use crate::nucleus::dna::DnaFile;
 use crate::nucleus::ribosome::ZomeCallInvocation;
 use async_trait::async_trait;
@@ -17,6 +18,7 @@ use holochain_keystore::KeystoreSender;
 use holochain_types::autonomic::AutonomicCue;
 use holochain_types::cell::CellId;
 use holochain_zome_types::entry_def::EntryDef;
+use holochain_zome_types::zome::ZomeName;
 use tracing::*;
 
 /// The concrete implementation of [CellConductorApiT], which is used to give
@@ -89,8 +91,16 @@ impl CellConductorApiT for CellConductorApi {
         self.conductor_handle.get_dna(dna_hash).await
     }
 
-    async fn get_this_dna(&self) -> Option<DnaFile> {
-        self.conductor_handle.get_dna(self.cell_id.dna_hash()).await
+    async fn get_this_dna(&self) -> ConductorApiResult<DnaFile> {
+        Ok(self
+            .conductor_handle
+            .get_dna(self.cell_id.dna_hash())
+            .await
+            .ok_or_else(|| ConductorApiError::DnaMissing(self.cell_id.dna_hash().clone()))?)
+    }
+
+    async fn get_zome(&self, zome_name: &ZomeName) -> ConductorApiResult<Zome> {
+        Ok(self.get_this_dna().await?.dna_def().get_zome(zome_name)?)
     }
 
     async fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef> {
@@ -135,7 +145,10 @@ pub trait CellConductorApiT: Clone + Send + Sync + Sized {
     async fn get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile>;
 
     /// Get the [Dna] of this cell from the [DnaStore]
-    async fn get_this_dna(&self) -> Option<DnaFile>;
+    async fn get_this_dna(&self) -> ConductorApiResult<DnaFile>;
+
+    /// Get a [Zome] from this cell's Dna
+    async fn get_zome(&self, zome_name: &ZomeName) -> ConductorApiResult<Zome>;
 
     /// Get a [EntryDef] from the [EntryDefBuf]
     async fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef>;

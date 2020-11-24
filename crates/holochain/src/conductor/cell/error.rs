@@ -25,7 +25,7 @@ pub enum CellError {
     #[error("Failed to join the create cell task: {0}")]
     JoinError(#[from] tokio::task::JoinError),
     #[error("Genesis failed: {0}")]
-    Genesis(#[from] Box<ConductorApiError>),
+    Genesis(Box<ConductorApiError>),
     #[error(transparent)]
     HeaderError(#[from] HeaderError),
     #[error("This cell has not had a successful genesis and cannot be created")]
@@ -48,6 +48,8 @@ pub enum CellError {
     InitFailed(InitResult),
     #[error(transparent)]
     HolochainP2pError(#[from] HolochainP2pError),
+    #[error(transparent)]
+    ConductorApiError(#[from] Box<ConductorApiError>),
     #[error(transparent)]
     SerializedBytesError(#[from] holochain_serialized_bytes::SerializedBytesError),
     #[error(transparent)]

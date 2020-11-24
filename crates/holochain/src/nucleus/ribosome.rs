@@ -18,10 +18,10 @@ use crate::conductor::interface::SignalBroadcaster;
 use crate::core::workflow::CallZomeWorkspaceLock;
 use crate::fixt::ExternInputFixturator;
 use crate::fixt::FunctionNameFixturator;
-use crate::fixt::ZomeNameFixturator;
 use crate::nucleus::dna::zome::HostFnAccess;
 use crate::nucleus::dna::zome::Zome;
 use crate::nucleus::dna::DnaDefHashed;
+use crate::nucleus::fixt::ZomeFixturator;
 use crate::nucleus::ribosome::error::RibosomeError;
 use crate::nucleus::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
 use crate::nucleus::ribosome::guest_callback::entry_defs::EntryDefsResult;
@@ -61,7 +61,6 @@ use holochain_zome_types::capability::CapGrant;
 use holochain_zome_types::capability::CapSecret;
 use holochain_zome_types::header::ZomeId;
 use holochain_zome_types::zome::FunctionName;
-use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::ExternInput;
 use holochain_zome_types::ExternOutput;
 use holochain_zome_types::ZomeCallResponse;
@@ -273,7 +272,7 @@ impl ZomeCallInvocation {
     /// - the live cap grant needs to include the invocation's provenance AND zome/function name
     #[allow(clippy::extra_unused_lifetimes)]
     pub fn is_authorized<'a>(&self, host_access: &ZomeCallHostAccess) -> RibosomeResult<bool> {
-        let check_function = (self.zome_name.clone(), self.fn_name.clone());
+        let check_function = (self.zome.zome_name().clone(), self.fn_name.clone());
         let check_agent = self.provenance.clone();
         let check_secret = self.cap;
 
@@ -309,8 +308,8 @@ mockall::mock! {
 pub struct ZomeCallInvocation {
     /// The Id of the `Cell` in which this Zome-call would be invoked
     pub cell_id: CellId,
-    /// The name of the Zome containing the function that would be invoked
-    pub zome_name: ZomeName,
+    /// The Zome containing the function that would be invoked
+    pub zome: Zome,
     /// The capability request authorization.
     /// This can be `None` and still succeed in the case where the function
     /// in the zome being called has been given an Unrestricted status
@@ -329,7 +328,7 @@ fixturator!(
     ZomeCallInvocation;
     curve Empty ZomeCallInvocation {
         cell_id: CellIdFixturator::new(Empty).next().unwrap(),
-        zome_name: ZomeNameFixturator::new(Empty).next().unwrap(),
+        zome: ZomeFixturator::new(Empty).next().unwrap(),
         cap: Some(CapSecretFixturator::new(Empty).next().unwrap()),
         fn_name: FunctionNameFixturator::new(Empty).next().unwrap(),
         payload: ExternInputFixturator::new(Empty).next().unwrap(),
@@ -337,7 +336,7 @@ fixturator!(
     };
     curve Unpredictable ZomeCallInvocation {
         cell_id: CellIdFixturator::new(Unpredictable).next().unwrap(),
-        zome_name: ZomeNameFixturator::new(Unpredictable).next().unwrap(),
+        zome: ZomeFixturator::new(Unpredictable).next().unwrap(),
         cap: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
         fn_name: FunctionNameFixturator::new(Unpredictable).next().unwrap(),
         payload: ExternInputFixturator::new(Unpredictable).next().unwrap(),
@@ -347,7 +346,7 @@ fixturator!(
         cell_id: CellIdFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
-        zome_name: ZomeNameFixturator::new_indexed(Predictable, get_fixt_index!())
+        zome: ZomeFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
         cap: Some(CapSecretFixturator::new_indexed(Predictable, get_fixt_index!())
@@ -376,7 +375,7 @@ impl Iterator for ZomeCallInvocationFixturator<NamedInvocation> {
             .next()
             .unwrap();
         ret.cell_id = self.0.curve.0.clone();
-        ret.zome_name = self.0.curve.1.clone().into();
+        ret.zome = self.0.curve.1.clone().into();
         ret.fn_name = self.0.curve.2.clone().into();
         ret.payload = self.0.curve.3.clone();
 
@@ -391,8 +390,7 @@ impl Iterator for ZomeCallInvocationFixturator<NamedInvocation> {
 
 impl Invocation for ZomeCallInvocation {
     fn zomes(&self) -> ZomesToInvoke {
-        todo!("zome_name -> zome")
-        // ZomesToInvoke::One(self.zome_name.to_owned())
+        ZomesToInvoke::One(self.zome.to_owned())
     }
     fn fn_components(&self) -> FnComponents {
         vec![self.fn_name.to_owned().into()].into()

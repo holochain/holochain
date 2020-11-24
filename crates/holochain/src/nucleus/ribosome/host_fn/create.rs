@@ -355,7 +355,7 @@ pub mod wasm_test {
         let output = handle
             .call_zome(ZomeCallInvocation {
                 cell_id: alice_cell_id.clone(),
-                zome_name: TestWasm::MultipleCalls.into(),
+                zome: TestWasm::MultipleCalls.into(),
                 cap: None,
                 fn_name: "create_entry_multiple".into(),
                 payload: ExternInput::new(TestInt(n).try_into().unwrap()),
@@ -377,7 +377,7 @@ pub mod wasm_test {
         let output = handle
             .call_zome(ZomeCallInvocation {
                 cell_id: alice_cell_id,
-                zome_name: TestWasm::MultipleCalls.into(),
+                zome: TestWasm::MultipleCalls.into(),
                 cap: None,
                 fn_name: "get_entry_multiple".into(),
                 payload: ExternInput::new(TestInt(n).try_into().unwrap()),

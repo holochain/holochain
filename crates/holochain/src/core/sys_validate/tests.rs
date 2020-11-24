@@ -1,7 +1,7 @@
 use super::*;
-use crate::meta_mock;
 use crate::nucleus::dna::DnaDef;
 use crate::nucleus::dna::DnaFile;
+use crate::{conductor::api::error::ConductorApiError, meta_mock};
 use crate::{conductor::api::MockCellConductorApi, nucleus::dna::zome::test_wasm_to_pair};
 use ::fixt::prelude::*;
 use error::SysValidationError;
@@ -286,6 +286,7 @@ async fn check_app_entry_type_test() {
     )
     .await
     .unwrap();
+    let dna_hash = dna_file.dna_hash().to_owned();
     let mut entry_def = fixt!(EntryDef);
     entry_def.visibility = EntryVisibility::Public;
 
@@ -295,7 +296,9 @@ async fn check_app_entry_type_test() {
     // # No dna or entry def
     conductor_api.expect_sync_get_entry_def().return_const(None);
     conductor_api.expect_sync_get_dna().return_const(None);
-    conductor_api.expect_sync_get_this_dna().return_const(None);
+    conductor_api
+        .expect_sync_get_this_dna()
+        .returning(move || Err(ConductorApiError::DnaMissing(dna_hash.clone())));
 
     // ## Dna is missing
     let aet = AppEntryType::new(0.into(), 0.into(), EntryVisibility::Public);
@@ -313,7 +316,7 @@ async fn check_app_entry_type_test() {
         .return_const(Some(dna_file.clone()));
     conductor_api
         .expect_sync_get_this_dna()
-        .return_const(Some(dna_file));
+        .returning(move || Ok(dna_file.clone()));
     let aet = AppEntryType::new(0.into(), 1.into(), EntryVisibility::Public);
     assert_matches!(
         check_app_entry_type(&aet, &conductor_api).await,

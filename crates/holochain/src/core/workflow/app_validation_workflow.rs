@@ -240,7 +240,7 @@ async fn validate_op(
     // Get the dna file
     let dna_file = { conductor_api.get_this_dna().await };
     let dna_file =
-        dna_file.ok_or_else(|| AppValidationError::DnaMissing(conductor_api.cell_id().clone()))?;
+        dna_file.map_err(|_| AppValidationError::DnaMissing(conductor_api.cell_id().clone()))?;
 
     // Get the EntryDefId associated with this Element if there is one
     let entry_def = {

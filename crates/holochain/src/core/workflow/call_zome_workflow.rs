@@ -98,11 +98,7 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT, C: CellConductorApi
     } = args;
 
     let call_zome_handle = conductor_api.clone().into_call_zome_handle();
-
-    let zome = ribosome
-        .dna_def()
-        .get_zome(&invocation.zome_name)
-        .map_err(RibosomeError::from)?;
+    let zome = invocation.zome.clone();
 
     // Get the current head
     let chain_head_start_len = workspace_lock.read().await.source_chain.len();

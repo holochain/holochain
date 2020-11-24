@@ -29,7 +29,7 @@ pub fn call(
     // Create the invocation for this call
     let invocation = ZomeCallInvocation {
         cell_id,
-        zome_name: call.zome_name,
+        zome: call_context.zome(),
         cap: call.cap,
         fn_name: call.fn_name,
         payload: ExternInput::new(call.request),
@@ -90,7 +90,7 @@ pub mod wasm_test {
         let _ = handle
             .call_zome(ZomeCallInvocation {
                 cell_id: bob_cell_id.clone(),
-                zome_name: TestWasm::WhoAmI.into(),
+                zome: TestWasm::WhoAmI.into(),
                 cap: None,
                 fn_name: "set_access".into(),
                 payload: ExternInput::new(().try_into().unwrap()),
@@ -104,7 +104,7 @@ pub mod wasm_test {
         let output = handle
             .call_zome(ZomeCallInvocation {
                 cell_id: alice_cell_id.clone(),
-                zome_name: TestWasm::WhoAmI.into(),
+                zome: TestWasm::WhoAmI.into(),
                 cap: None,
                 fn_name: "who_are_they_local".into(),
                 payload: ExternInput::new(bob_cell_id.clone().try_into().unwrap()),
