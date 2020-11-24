@@ -84,7 +84,7 @@ impl GossipData {
         let list = self.evt_send.list_neighbor_agents().await?;
         // super naive gossip just processes all combinations
         // also causes duplication because it runs pairs from both sides
-        tracing::debug!(?list);
+//        tracing::debug!(?list);
         for a1 in list.iter() {
             for a2 in list.iter() {
                 // at the very least, avoid gossiping with ourselves
