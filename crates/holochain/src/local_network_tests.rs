@@ -1,28 +1,29 @@
-use std::{convert::TryFrom, sync::Arc};
+use std::convert::TryFrom;
+use std::sync::Arc;
 
-use hdk3::prelude::{CellId, WasmError};
+use hdk3::prelude::CellId;
+use hdk3::prelude::WasmError;
 use holo_hash::AgentPubKey;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::env::EnvironmentWrite;
-use holochain_types::{
-    app::InstalledCell,
-    dna::{DnaDef, DnaFile},
-};
+use holochain_types::app::InstalledCell;
+use holochain_types::dna::DnaDef;
+use holochain_types::dna::DnaFile;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::ZomeCallResponse;
 use kitsune_p2p::KitsuneP2pConfig;
 use matches::assert_matches;
 use tempdir::TempDir;
 
-use crate::{
-    conductor::p2p_store::all_agent_infos,
-    conductor::p2p_store::inject_agent_infos,
-    conductor::ConductorHandle,
-    core::ribosome::error::RibosomeError,
-    core::ribosome::error::RibosomeResult,
-    test_utils::{install_app, new_invocation, setup_app_with_network},
-};
+use crate::conductor::p2p_store::all_agent_infos;
+use crate::conductor::p2p_store::inject_agent_infos;
+use crate::conductor::ConductorHandle;
+use crate::core::ribosome::error::RibosomeError;
+use crate::core::ribosome::error::RibosomeResult;
+use crate::test_utils::install_app;
+use crate::test_utils::new_invocation;
+use crate::test_utils::setup_app_with_network;
 use shrinkwraprs::Shrinkwrap;
 use test_case::test_case;
 
@@ -55,7 +56,7 @@ fn conductors_call_remote(num_conductors: usize) {
                 }
                 // None also means a timeout which is what we want before the
                 // agent info is shared
-                None => (),
+                None => {}
             }
         }
 

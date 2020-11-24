@@ -1,19 +1,23 @@
-use super::{
-    config::{AdminInterfaceConfig, ConductorConfig, DpkiConfig, InterfaceDriver},
-    error::ConductorError,
-    state::AppInterfaceConfig,
-    ConductorBuilder, ConductorHandle,
-};
+use super::config::AdminInterfaceConfig;
+use super::config::ConductorConfig;
+use super::config::DpkiConfig;
+use super::config::InterfaceDriver;
+use super::error::ConductorError;
+use super::state::AppInterfaceConfig;
+use super::ConductorBuilder;
+use super::ConductorHandle;
 use holo_hash::*;
 use holochain_keystore::keystore_actor::KeystoreSenderExt;
-use holochain_keystore::{test_keystore::spawn_test_keystore, KeystoreError};
-use holochain_types::{
-    app::InstalledCell,
-    cell::CellId,
-    dna::{DnaError, DnaFile},
-};
+use holochain_keystore::test_keystore::spawn_test_keystore;
+use holochain_keystore::KeystoreError;
+use holochain_types::app::InstalledCell;
+use holochain_types::cell::CellId;
+use holochain_types::dna::DnaError;
+use holochain_types::dna::DnaFile;
+use std::collections::HashMap;
 use std::fs;
-use std::{collections::HashMap, io::Read, path::Path};
+use std::io::Read;
+use std::path::Path;
 use thiserror::Error;
 use tracing::*;
 
@@ -190,10 +194,12 @@ fn extract_app_interfaces(
 
 #[cfg(test)]
 pub mod tests {
-
     use super::*;
-    use crate::conductor::{handle::MockConductorHandleT, paths::EnvironmentRootPath, Conductor};
-    use holochain_types::{app::MembraneProof, test_utils::fake_dna_zomes};
+    use crate::conductor::handle::MockConductorHandleT;
+    use crate::conductor::paths::EnvironmentRootPath;
+    use crate::conductor::Conductor;
+    use holochain_types::app::MembraneProof;
+    use holochain_types::test_utils::fake_dna_zomes;
     use holochain_wasm_test_utils::TestWasm;
     use matches::assert_matches;
     use mockall::predicate;

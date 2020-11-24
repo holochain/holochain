@@ -1,7 +1,8 @@
 //! Keystore backed by lair_keystore_client.
 
 use crate::*;
-use ghost_actor::dependencies::futures::{future::FutureExt, stream::StreamExt};
+use ghost_actor::dependencies::futures::future::FutureExt;
+use ghost_actor::dependencies::futures::stream::StreamExt;
 use lair_keystore_api::actor::*;
 use lair_keystore_api::*;
 

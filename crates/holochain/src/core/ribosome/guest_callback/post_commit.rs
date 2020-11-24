@@ -94,7 +94,6 @@ impl From<Vec<PostCommitCallbackResult>> for PostCommitResult {
 
 #[cfg(test)]
 mod test {
-
     use super::PostCommitResult;
     use crate::core::ribosome::Invocation;
     use crate::core::ribosome::ZomesToInvoke;
@@ -203,7 +202,6 @@ mod test {
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
-
     use super::PostCommitResult;
     use crate::core::ribosome::RibosomeT;
     use crate::fixt::curve::Zomes;
@@ -270,10 +268,12 @@ mod slow_tests {
         assert_eq!(
             result,
             PostCommitResult::Fail(
-                vec![HeaderHashFixturator::new(fixt::Empty)
-                    .next()
-                    .unwrap()
-                    .into()]
+                vec![
+                    HeaderHashFixturator::new(fixt::Empty)
+                        .next()
+                        .unwrap()
+                        .into()
+                ]
                 .into(),
                 "empty header fail".into()
             ),

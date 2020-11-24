@@ -1,11 +1,10 @@
 //! Helper functions for interacting with the user when running a Conductor
 //! with the --interactive flag
 
-use crate::conductor::{
-    config::ConductorConfig,
-    error::{ConductorError, ConductorResult},
-    paths::ConfigFilePath,
-};
+use crate::conductor::config::ConductorConfig;
+use crate::conductor::error::ConductorError;
+use crate::conductor::error::ConductorResult;
+use crate::conductor::paths::ConfigFilePath;
 use std::path::Path;
 
 /// Prompt the user to answer Y or N.
@@ -45,7 +44,8 @@ pub fn ask_yn(prompt: String, default_yes: Option<bool>) -> std::io::Result<bool
 /// Prompts user to enter an LMDB environment path
 pub fn prompt_for_environment_dir(path: &Path) -> std::io::Result<()> {
     let prompt = format!(
-        "There is no database environment set at the path specified ({})\nWould you like to create one now?", path.display()
+        "There is no database environment set at the path specified ({})\nWould you like to create one now?",
+        path.display()
     );
     if ask_yn(prompt, Some(true))? {
         std::fs::create_dir_all(path)?;
@@ -96,7 +96,6 @@ fn save_default_config_yaml(path: &Path) -> ConductorResult<ConductorConfig> {
 
 #[cfg(test)]
 mod tests {
-
     use super::save_default_config_yaml;
     use crate::conductor::config::ConductorConfig;
     use tempdir::TempDir;

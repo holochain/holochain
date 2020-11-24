@@ -10,7 +10,9 @@ pub enum EntryDefStoreError {
     DnaError(#[from] RibosomeError),
     #[error("Unable to retrieve DNA from the DnaStore. DnaHash: {0}")]
     DnaFileMissing(holo_hash::DnaHash),
-    #[error("Too many entry definitions in a single zome. Entry definitions are limited to 255 per zome")]
+    #[error(
+        "Too many entry definitions in a single zome. Entry definitions are limited to 255 per zome"
+    )]
     TooManyEntryDefs,
     #[error("The entry def callback for {0} failed because {1}")]
     CallbackFailed(ZomeName, String),

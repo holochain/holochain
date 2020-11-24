@@ -1,18 +1,18 @@
-use std::{convert::TryFrom, time::Duration};
+use std::convert::TryFrom;
+use std::time::Duration;
 
 use super::*;
-use crate::{
-    conductor::ConductorHandle, core::state::source_chain::SourceChain, test_utils::setup_app,
-    test_utils::wait_for_integration,
-};
+use crate::conductor::ConductorHandle;
+use crate::core::state::source_chain::SourceChain;
+use crate::test_utils::setup_app;
+use crate::test_utils::wait_for_integration;
 use ::fixt::prelude::*;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_types::{
-    app::InstalledCell,
-    cell::CellId,
-    dna::{DnaDef, DnaFile},
-};
+use holochain_types::app::InstalledCell;
+use holochain_types::cell::CellId;
+use holochain_types::dna::DnaDef;
+use holochain_types::dna::DnaFile;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::fixt::*;
 use holochain_zome_types::test_utils::fake_agent_pubkey_1;

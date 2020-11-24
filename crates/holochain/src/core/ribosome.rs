@@ -13,7 +13,6 @@ pub mod host_fn;
 // pub mod inline_ribosome; // TODO: remove completely
 pub mod wasm_ribosome;
 
-use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
 use crate::core::ribosome::guest_callback::init::InitInvocation;
 use crate::core::ribosome::guest_callback::init::InitResult;
 use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentInvocation;
@@ -31,36 +30,38 @@ use crate::core::ribosome::guest_callback::CallIterator;
 use crate::core::workflow::CallZomeWorkspaceLock;
 use crate::fixt::ExternInputFixturator;
 use crate::fixt::FunctionNameFixturator;
-use crate::fixt::ZomeNameFixturator;
 use crate::{
-    conductor::api::CellConductorReadHandle,
-    core::ribosome::guest_callback::entry_defs::EntryDefsInvocation,
+    conductor::{api::CellConductorReadHandle, interface::SignalBroadcaster},
+    core::ribosome::guest_callback::entry_defs::EntryDefsResult,
 };
-use crate::{conductor::interface::SignalBroadcaster, core::ribosome::error::RibosomeError};
 use ::fixt::prelude::*;
 use derive_more::Constructor;
 use error::RibosomeResult;
-use guest_callback::{
-    entry_defs::EntryDefsHostAccess, init::InitHostAccess, migrate_agent::MigrateAgentHostAccess,
-    post_commit::PostCommitHostAccess, validate::ValidateHostAccess,
-    validation_package::ValidationPackageHostAccess,
-};
-use holo_hash::fixt::AgentPubKeyFixturator;
+use guest_callback::entry_defs::EntryDefsHostAccess;
+use guest_callback::init::InitHostAccess;
+use guest_callback::migrate_agent::MigrateAgentHostAccess;
+use guest_callback::post_commit::PostCommitHostAccess;
+use guest_callback::validate::ValidateHostAccess;
+use guest_callback::validation_package::ValidationPackageHostAccess;
 use holo_hash::AgentPubKey;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::dna::{zome::HostFnAccess, DnaDefHashed};
+use holochain_types::cell::CellId;
+use holochain_types::dna::zome::HostFnAccess;
+use holochain_types::dna::zome::Zome;
+use holochain_types::dna::DnaDefHashed;
 use holochain_types::fixt::CapSecretFixturator;
 use holochain_types::fixt::CellIdFixturator;
-use holochain_types::{cell::CellId, dna::zome::Zome};
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::capability::CapGrant;
+use holochain_zome_types::capability::CapSecret;
+use holochain_zome_types::header::ZomeId;
 use holochain_zome_types::zome::FunctionName;
 use holochain_zome_types::zome::ZomeName;
+use holochain_zome_types::ExternInput;
 use holochain_zome_types::ExternOutput;
 use holochain_zome_types::ZomeCallResponse;
-use holochain_zome_types::{capability::CapSecret, header::ZomeId, ExternInput};
 use mockall::automock;
 use std::iter::Iterator;
 
@@ -119,28 +120,28 @@ impl HostAccess {
     /// Get the workspace, panics if none was provided
     pub fn workspace(&self) -> &CallZomeWorkspaceLock {
         match self {
-            Self::ZomeCall(ZomeCallHostAccess{workspace, .. }) |
-            Self::Init(InitHostAccess{workspace, .. }) |
-            Self::MigrateAgent(MigrateAgentHostAccess{workspace, .. }) |
-            Self::ValidationPackage(ValidationPackageHostAccess{workspace, .. }) |
-            Self::PostCommit(PostCommitHostAccess{workspace, .. }) |
-            Self::Validate(ValidateHostAccess { workspace, .. }) |
-            Self::ValidateCreateLink(ValidateLinkHostAccess { workspace, .. }) => {
-                workspace
-            }
-            _ => panic!("Gave access to a host function that uses the workspace without providing a workspace"),
+            Self::ZomeCall(ZomeCallHostAccess { workspace, .. })
+            | Self::Init(InitHostAccess { workspace, .. })
+            | Self::MigrateAgent(MigrateAgentHostAccess { workspace, .. })
+            | Self::ValidationPackage(ValidationPackageHostAccess { workspace, .. })
+            | Self::PostCommit(PostCommitHostAccess { workspace, .. })
+            | Self::Validate(ValidateHostAccess { workspace, .. })
+            | Self::ValidateCreateLink(ValidateLinkHostAccess { workspace, .. }) => workspace,
+            _ => panic!(
+                "Gave access to a host function that uses the workspace without providing a workspace"
+            ),
         }
     }
 
     /// Get the keystore, panics if none was provided
     pub fn keystore(&self) -> &KeystoreSender {
         match self {
-            Self::ZomeCall(ZomeCallHostAccess{keystore, .. }) |
-            Self::Init(InitHostAccess{keystore, .. }) |
-            Self::PostCommit(PostCommitHostAccess{keystore, .. }) => {
-                keystore
-            }
-            _ => panic!("Gave access to a host function that uses the keystore without providing a keystore"),
+            Self::ZomeCall(ZomeCallHostAccess { keystore, .. })
+            | Self::Init(InitHostAccess { keystore, .. })
+            | Self::PostCommit(PostCommitHostAccess { keystore, .. }) => keystore,
+            _ => panic!(
+                "Gave access to a host function that uses the keystore without providing a keystore"
+            ),
         }
     }
 
@@ -180,10 +181,12 @@ impl HostAccess {
     /// Get the call zome handle, panics if none was provided
     pub fn call_zome_handle(&self) -> &CellConductorReadHandle {
         match self {
-            Self::ZomeCall(ZomeCallHostAccess{call_zome_handle, .. }) => {
-                call_zome_handle
-            }
-            _ => panic!("Gave access to a host function that uses the call zome handle without providing a call zome handle"),
+            Self::ZomeCall(ZomeCallHostAccess {
+                call_zome_handle, ..
+            }) => call_zome_handle,
+            _ => panic!(
+                "Gave access to a host function that uses the call zome handle without providing a call zome handle"
+            ),
         }
     }
 }
@@ -267,7 +270,7 @@ impl ZomeCallInvocation {
     /// - the live cap grant needs to include the invocation's provenance AND zome/function name
     #[allow(clippy::extra_unused_lifetimes)]
     pub fn is_authorized<'a>(&self, host_access: &ZomeCallHostAccess) -> RibosomeResult<bool> {
-        let check_function = (self.zome_name.clone(), self.fn_name.clone());
+        let check_function = (self.zome.zome_name().clone(), self.fn_name.clone());
         let check_agent = self.provenance.clone();
         let check_secret = self.cap;
 
@@ -303,8 +306,8 @@ mockall::mock! {
 pub struct ZomeCallInvocation {
     /// The Id of the `Cell` in which this Zome-call would be invoked
     pub cell_id: CellId,
-    /// The name of the Zome containing the function that would be invoked
-    pub zome_name: ZomeName,
+    /// The Zome containing the function that would be invoked
+    pub zome: Zome,
     /// The capability request authorization.
     /// This can be `None` and still succeed in the case where the function
     /// in the zome being called has been given an Unrestricted status
@@ -323,7 +326,7 @@ fixturator!(
     ZomeCallInvocation;
     curve Empty ZomeCallInvocation {
         cell_id: CellIdFixturator::new(Empty).next().unwrap(),
-        zome_name: ZomeNameFixturator::new(Empty).next().unwrap(),
+        zome: ZomeFixturator::new(Empty).next().unwrap(),
         cap: Some(CapSecretFixturator::new(Empty).next().unwrap()),
         fn_name: FunctionNameFixturator::new(Empty).next().unwrap(),
         payload: ExternInputFixturator::new(Empty).next().unwrap(),
@@ -331,7 +334,7 @@ fixturator!(
     };
     curve Unpredictable ZomeCallInvocation {
         cell_id: CellIdFixturator::new(Unpredictable).next().unwrap(),
-        zome_name: ZomeNameFixturator::new(Unpredictable).next().unwrap(),
+        zome: ZomeFixturator::new(Unpredictable).next().unwrap(),
         cap: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
         fn_name: FunctionNameFixturator::new(Unpredictable).next().unwrap(),
         payload: ExternInputFixturator::new(Unpredictable).next().unwrap(),
@@ -341,7 +344,7 @@ fixturator!(
         cell_id: CellIdFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
-        zome_name: ZomeNameFixturator::new_indexed(Predictable, get_fixt_index!())
+        zome: ZomeFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
         cap: Some(CapSecretFixturator::new_indexed(Predictable, get_fixt_index!())
@@ -370,7 +373,7 @@ impl Iterator for ZomeCallInvocationFixturator<NamedInvocation> {
             .next()
             .unwrap();
         ret.cell_id = self.0.curve.0.clone();
-        ret.zome_name = self.0.curve.1.clone().into();
+        ret.zome = self.0.curve.1.clone().into();
         ret.fn_name = self.0.curve.2.clone().into();
         ret.payload = self.0.curve.3.clone();
 
@@ -385,8 +388,7 @@ impl Iterator for ZomeCallInvocationFixturator<NamedInvocation> {
 
 impl Invocation for ZomeCallInvocation {
     fn zomes(&self) -> ZomesToInvoke {
-        todo!("zome_name -> zome")
-        // ZomesToInvoke::One(self.zome_name.to_owned())
+        ZomesToInvoke::One(self.zome.to_owned())
     }
     fn fn_components(&self) -> FnComponents {
         vec![self.fn_name.to_owned().into()].into()
@@ -633,7 +635,6 @@ pub mod wasm_test {
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
-
     #[tokio::test(threaded_scheduler)]
     async fn warm_wasm_tests() {
         crate::test_utils::warm_wasm_tests();

@@ -1,12 +1,13 @@
 use holo_hash::WasmHash;
-use holochain_state::error::{DatabaseError, DatabaseResult};
+use holochain_state::buffer::CasBufFreshAsync;
+use holochain_state::error::DatabaseError;
+use holochain_state::error::DatabaseResult;
 use holochain_state::exports::SingleStore;
-use holochain_state::{
-    buffer::CasBufFreshAsync,
-    prelude::{BufferedStore, EnvironmentRead},
-    transaction::Writer,
-};
-use holochain_types::dna::wasm::{DnaWasm, DnaWasmHashed};
+use holochain_state::prelude::BufferedStore;
+use holochain_state::prelude::EnvironmentRead;
+use holochain_state::transaction::Writer;
+use holochain_types::dna::wasm::DnaWasm;
+use holochain_types::dna::wasm::DnaWasmHashed;
 
 /// This is where wasm lives
 pub struct WasmBuf(CasBufFreshAsync<DnaWasm>);

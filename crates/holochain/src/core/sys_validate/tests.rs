@@ -1,18 +1,20 @@
 use super::*;
-use crate::{conductor::api::MockCellConductorApi, meta_mock};
+use crate::conductor::api::error::ConductorApiError;
+use crate::conductor::api::MockCellConductorApi;
+use crate::meta_mock;
 use ::fixt::prelude::*;
 use error::SysValidationError;
 use holo_hash::fixt::*;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_state::{env::EnvironmentRead, test_utils::test_cell_env};
-use holochain_types::{
-    dna::{DnaDef, DnaFile},
-    fixt::*,
-    observability,
-    test_utils::fake_agent_pubkey_1,
-    Timestamp,
-};
+use holochain_state::env::EnvironmentRead;
+use holochain_state::test_utils::test_cell_env;
+use holochain_types::dna::DnaDef;
+use holochain_types::dna::DnaFile;
+use holochain_types::fixt::*;
+use holochain_types::observability;
+use holochain_types::test_utils::fake_agent_pubkey_1;
+use holochain_types::Timestamp;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::Header;
 use matches::assert_matches;
@@ -285,6 +287,7 @@ async fn check_app_entry_type_test() {
     )
     .await
     .unwrap();
+    let dna_hash = dna_file.dna_hash().to_owned();
     let mut entry_def = fixt!(EntryDef);
     entry_def.visibility = EntryVisibility::Public;
 
@@ -294,7 +297,9 @@ async fn check_app_entry_type_test() {
     // # No dna or entry def
     conductor_api.expect_sync_get_entry_def().return_const(None);
     conductor_api.expect_sync_get_dna().return_const(None);
-    conductor_api.expect_sync_get_this_dna().return_const(None);
+    conductor_api
+        .expect_sync_get_this_dna()
+        .returning(move || Err(ConductorApiError::DnaMissing(dna_hash.clone())));
 
     // ## Dna is missing
     let aet = AppEntryType::new(0.into(), 0.into(), EntryVisibility::Public);
@@ -312,7 +317,7 @@ async fn check_app_entry_type_test() {
         .return_const(Some(dna_file.clone()));
     conductor_api
         .expect_sync_get_this_dna()
-        .return_const(Some(dna_file));
+        .returning(move || Ok(dna_file.clone()));
     let aet = AppEntryType::new(0.into(), 1.into(), EntryVisibility::Public);
     assert_matches!(
         check_app_entry_type(&aet, &conductor_api).await,

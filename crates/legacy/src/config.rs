@@ -6,7 +6,8 @@
 //! struct into a `(Config, ConductorState)` pair.
 use holochain_serialized_bytes::SerializedBytes;
 use serde::*;
-use std::{collections::HashMap, path::PathBuf};
+use std::collections::HashMap;
+use std::path::PathBuf;
 /// Main conductor configuration struct
 /// This is the root of the configuration tree / aggregates
 /// all other configuration aspects.

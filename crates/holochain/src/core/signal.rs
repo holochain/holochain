@@ -4,7 +4,8 @@
 //! - System-defined signals are produced in various places in the system
 
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::{cell::CellId, impl_from};
+use holochain_types::cell::CellId;
+use holochain_types::impl_from;
 
 /// A Signal is some information emitted from within Holochain out through
 /// an Interface

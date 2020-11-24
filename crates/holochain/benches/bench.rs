@@ -1,12 +1,15 @@
 use ::fixt::prelude::*;
+use criterion::criterion_group;
+use criterion::criterion_main;
 use criterion::BenchmarkId;
+use criterion::Criterion;
 use criterion::Throughput;
-use criterion::{criterion_group, criterion_main, Criterion};
 use hdk3::prelude::*;
 use holo_hash::fixt::AgentPubKeyFixturator;
 use holochain::core::ribosome::RibosomeT;
 use holochain::core::ribosome::ZomeCallInvocation;
-use holochain_types::{dna::zome::Zome, fixt::CapSecretFixturator};
+use holochain_types::dna::zome::Zome;
+use holochain_types::fixt::CapSecretFixturator;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::ExternInput;
 use once_cell::sync::Lazy;
@@ -77,7 +80,7 @@ pub fn wasm_call_n(c: &mut Criterion) {
                     let zome: Zome = TestWasm::Bench.into();
                     let i = ZomeCallInvocation {
                         cell_id: CELL_ID.lock().unwrap().clone(),
-                        zome_name: zome.zome_name().clone(),
+                        zome: zome.clone(),
                         cap: Some(CAP.lock().unwrap().clone()),
                         fn_name: "echo_bytes".into(),
                         payload: ExternInput::new(sb.clone()),

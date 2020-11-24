@@ -33,8 +33,11 @@ pub mod p2p_store;
 pub mod paths;
 pub mod state;
 
-pub use cell::{error::CellError, Cell};
-pub use conductor::{Conductor, ConductorBuilder, ConductorStateDb};
+pub use cell::error::CellError;
+pub use cell::Cell;
+pub use conductor::Conductor;
+pub use conductor::ConductorBuilder;
+pub use conductor::ConductorStateDb;
 pub use handle::ConductorHandle;
 
 /// setup a tokio runtime that meets the conductor's needs

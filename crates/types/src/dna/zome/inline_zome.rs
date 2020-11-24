@@ -10,10 +10,9 @@ use holochain_zome_types::zome::FunctionName;
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 
-use self::{
-    api::InlineHostApi,
-    error::{InlineZomeError, InlineZomeResult},
-};
+use self::api::InlineHostApi;
+use self::error::InlineZomeError;
+use self::error::InlineZomeResult;
 
 pub mod api;
 pub mod error;
@@ -48,9 +47,10 @@ impl InlineZome {
         I: DeserializeOwned,
         O: Serialize,
     {
-        let z = move |api: InlineHostApi,
-                      input: SerializedBytes|
-              -> InlineZomeResult<SerializedBytes> {
+        let z = move |
+            api: InlineHostApi,
+            input: SerializedBytes,
+        | -> InlineZomeResult<SerializedBytes> {
             let output = f(api, sb::decode(input.bytes()).expect("TODO"))?;
             Ok(SerializedBytes::from(UnsafeBytes::from(
                 sb::encode(&output).expect("TODO"),

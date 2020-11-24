@@ -69,6 +69,7 @@ use holochain_types::dna::DnaError;
 use holochain_types::dna::DnaFile;
 use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::entry_def::EntryDefsCallbackResult;
+use holochain_zome_types::header::ZomeId;
 use holochain_zome_types::init::InitCallbackResult;
 use holochain_zome_types::migrate_agent::MigrateAgentCallbackResult;
 use holochain_zome_types::post_commit::PostCommitCallbackResult;
@@ -78,8 +79,8 @@ use holochain_zome_types::validate_link::ValidateLinkCallbackResult;
 use holochain_zome_types::zome::FunctionName;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::CallbackResult;
+use holochain_zome_types::ExternOutput;
 use holochain_zome_types::ZomeCallResponse;
-use holochain_zome_types::{header::ZomeId, ExternOutput};
 use std::sync::Arc;
 
 /// Path to the wasm cache path
@@ -433,7 +434,7 @@ impl RibosomeT for WasmRibosome {
     ) -> RibosomeResult<ZomeCallResponse> {
         Ok(if invocation.is_authorized(&host_access)? {
             // make a copy of these for the error handling below
-            let zome_name = invocation.zome_name.clone();
+            let zome_name = invocation.zome.zome_name().clone();
             let fn_name = invocation.fn_name.clone();
 
             let guest_output: ExternOutput =

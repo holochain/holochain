@@ -1,19 +1,23 @@
+use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostAccess;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
-use crate::core::{ribosome::FnComponents, workflow::CallZomeWorkspaceLock};
+use crate::core::workflow::CallZomeWorkspaceLock;
 use derive_more::Constructor;
 use holo_hash::AnyDhtHash;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::dna::zome::{HostFnAccess, Permission, Zome};
+use holochain_types::dna::zome::HostFnAccess;
+use holochain_types::dna::zome::Permission;
+use holochain_types::dna::zome::Zome;
+use holochain_zome_types::entry::Entry;
 use holochain_zome_types::header::CreateLink;
 use holochain_zome_types::header::DeleteLink;
 use holochain_zome_types::validate_link::ValidateCreateLinkData;
+use holochain_zome_types::validate_link::ValidateDeleteLinkData;
 use holochain_zome_types::validate_link::ValidateLinkCallbackResult;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::ExternInput;
-use holochain_zome_types::{entry::Entry, validate_link::ValidateDeleteLinkData};
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -181,14 +185,14 @@ impl From<Vec<ValidateLinkCallbackResult>> for ValidateLinkResult {
 
 #[cfg(test)]
 mod test {
-
     use super::ValidateLinkResult;
     use crate::core::ribosome::Invocation;
     use crate::core::ribosome::ZomesToInvoke;
     use crate::fixt::*;
     use ::fixt::prelude::*;
     use holochain_serialized_bytes::prelude::*;
-    use holochain_types::dna::zome::{HostFnAccess, Permission};
+    use holochain_types::dna::zome::HostFnAccess;
+    use holochain_types::dna::zome::Permission;
     use holochain_zome_types::validate_link::ValidateCreateLinkData;
     use holochain_zome_types::validate_link::ValidateLinkCallbackResult;
     use holochain_zome_types::ExternInput;
@@ -291,7 +295,6 @@ mod test {
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
-
     use super::ValidateLinkResult;
     use crate::core::ribosome::RibosomeT;
     use crate::core::state::source_chain::SourceChainResult;

@@ -5,10 +5,9 @@ use crate::core::ribosome::ZomesToInvoke;
 use crate::core::workflow::CallZomeWorkspaceLock;
 use derive_more::Constructor;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::dna::{
-    zome::{HostFnAccess, Permission},
-    DnaDef,
-};
+use holochain_types::dna::zome::HostFnAccess;
+use holochain_types::dna::zome::Permission;
+use holochain_types::dna::DnaDef;
 use holochain_zome_types::migrate_agent::MigrateAgent;
 use holochain_zome_types::migrate_agent::MigrateAgentCallbackResult;
 use holochain_zome_types::zome::ZomeName;
@@ -110,7 +109,6 @@ impl From<Vec<(ZomeName, MigrateAgentCallbackResult)>> for MigrateAgentResult {
 
 #[cfg(test)]
 mod test {
-
     use super::MigrateAgentResult;
     use crate::core::ribosome::Invocation;
     use crate::core::ribosome::ZomesToInvoke;
@@ -237,7 +235,6 @@ mod test {
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
-
     use super::MigrateAgentResult;
     use crate::core::ribosome::RibosomeT;
     use crate::fixt::curve::Zomes;

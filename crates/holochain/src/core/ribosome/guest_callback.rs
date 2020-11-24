@@ -69,7 +69,6 @@ impl<R: RibosomeT, I: Invocation + 'static> FallibleIterator for CallIterator<R,
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 mod tests {
-
     use super::CallIterator;
     use crate::core::ribosome::FnComponents;
     use crate::core::ribosome::MockInvocation;

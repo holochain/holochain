@@ -1,18 +1,18 @@
-use super::{create::extract_entry_def, delete::get_original_address};
+use super::create::extract_entry_def;
+use super::delete::get_original_address;
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
-use crate::core::{
-    ribosome::RibosomeT,
-    workflow::{integrate_dht_ops_workflow::integrate_to_authored, CallZomeWorkspace},
-    SourceChainError,
-};
+use crate::core::ribosome::RibosomeT;
+use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
+use crate::core::workflow::CallZomeWorkspace;
+use crate::core::SourceChainError;
 use holo_hash::HasHash;
 use holochain_zome_types::entry_def::EntryDefId;
+use holochain_zome_types::header::builder;
+use holochain_zome_types::header::AppEntryType;
+use holochain_zome_types::header::EntryType;
 use holochain_zome_types::UpdateInput;
-use holochain_zome_types::{
-    header::{builder, AppEntryType, EntryType},
-    UpdateOutput,
-};
+use holochain_zome_types::UpdateOutput;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]

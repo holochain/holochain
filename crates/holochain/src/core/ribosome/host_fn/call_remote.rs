@@ -38,7 +38,6 @@ pub fn call_remote(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-
     use crate::conductor::dna_store::MockDnaStore;
     use crate::conductor::interface::websocket::test::setup_app;
     use crate::core::ribosome::ZomeCallInvocation;
@@ -46,7 +45,8 @@ pub mod wasm_test {
     use hdk3::prelude::*;
     use holochain_types::app::InstalledCell;
     use holochain_types::cell::CellId;
-    use holochain_types::dna::{DnaDef, DnaFile};
+    use holochain_types::dna::DnaDef;
+    use holochain_types::dna::DnaFile;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_agent_pubkey_2;
     use holochain_wasm_test_utils::TestWasm;
@@ -129,7 +129,7 @@ pub mod wasm_test {
         let _ = handle
             .call_zome(ZomeCallInvocation {
                 cell_id: bob_cell_id,
-                zome_name: TestWasm::WhoAmI.into(),
+                zome: TestWasm::WhoAmI.into(),
                 cap: None,
                 fn_name: "set_access".into(),
                 payload: ExternInput::new(().try_into().unwrap()),
@@ -143,7 +143,7 @@ pub mod wasm_test {
         let output = handle
             .call_zome(ZomeCallInvocation {
                 cell_id: alice_cell_id,
-                zome_name: TestWasm::WhoAmI.into(),
+                zome: TestWasm::WhoAmI.into(),
                 cap: None,
                 fn_name: "whoarethey".into(),
                 payload: ExternInput::new(bob_agent_id.clone().try_into().unwrap()),

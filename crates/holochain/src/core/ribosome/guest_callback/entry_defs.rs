@@ -1,6 +1,7 @@
 use crate::core::ribosome::FnComponents;
+use crate::core::ribosome::HostAccess;
 use crate::core::ribosome::Invocation;
-use crate::core::ribosome::{HostAccess, ZomesToInvoke};
+use crate::core::ribosome::ZomesToInvoke;
 use derive_more::Constructor;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::dna::zome::HostFnAccess;
@@ -92,8 +93,8 @@ impl From<Vec<(ZomeName, EntryDefsCallbackResult)>> for EntryDefsResult {
 
 #[cfg(test)]
 mod test {
-
-    use super::{EntryDefsHostAccess, EntryDefsResult};
+    use super::EntryDefsHostAccess;
+    use super::EntryDefsResult;
     use crate::core::ribosome::Invocation;
     use crate::core::ribosome::ZomesToInvoke;
     use crate::fixt::EntryDefsFixturator;

@@ -2,14 +2,18 @@ use crate::fixt::*;
 use fallible_iterator::FallibleIterator;
 use fixt::prelude::*;
 use hdk3::prelude::Create;
-use holo_hash::{AgentPubKey, HeaderHash};
-use holochain_state::{
-    env::ReadManager,
-    test_utils::{test_cell_env, TestEnvironment},
-};
-use holochain_zome_types::{test_utils::fake_agent_pubkey_1, validate::ValidationStatus, Header};
+use holo_hash::AgentPubKey;
+use holo_hash::HeaderHash;
+use holochain_state::env::ReadManager;
+use holochain_state::test_utils::test_cell_env;
+use holochain_state::test_utils::TestEnvironment;
+use holochain_zome_types::test_utils::fake_agent_pubkey_1;
+use holochain_zome_types::validate::ValidationStatus;
+use holochain_zome_types::Header;
 
-use super::{ChainItemKey, MetadataBuf, MetadataBufT};
+use super::ChainItemKey;
+use super::MetadataBuf;
+use super::MetadataBufT;
 
 fn setup() -> (TestEnvironment, MetadataBuf, Create, Create, AgentPubKey) {
     observability::test_run().ok();

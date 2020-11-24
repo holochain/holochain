@@ -1,6 +1,7 @@
+use crate::crdt::CrdtType;
+use crate::validate::RequiredValidationType;
 use crate::zome_io::ExternOutput;
 use crate::CallbackResult;
-use crate::{crdt::CrdtType, validate::RequiredValidationType};
 use holochain_serialized_bytes::prelude::*;
 
 const DEFAULT_REQUIRED_VALIDATIONS: u8 = 5;
@@ -160,12 +161,12 @@ impl CallbackResult for EntryDefsCallbackResult {
 
 #[cfg(test)]
 mod tests {
-
     use super::EntryDef;
     use super::EntryDefsCallbackResult;
     use super::EntryVisibility;
+    use crate::crdt::CrdtType;
+    use crate::validate::RequiredValidationType;
     use crate::zome_io::ExternOutput;
-    use crate::{crdt::CrdtType, validate::RequiredValidationType};
     use std::convert::TryInto;
 
     #[test]

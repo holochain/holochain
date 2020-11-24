@@ -8,7 +8,10 @@
 //! Thanks to Carmelo Piccione (@struktured) for the implementation which we ported here.
 
 use shrinkwraprs::Shrinkwrap;
-use std::{any::Any, collections::HashMap, hash::Hash, marker::PhantomData};
+use std::any::Any;
+use std::collections::HashMap;
+use std::hash::Hash;
+use std::marker::PhantomData;
 
 /// Key type for Universal map.
 #[derive(Clone, Debug)]

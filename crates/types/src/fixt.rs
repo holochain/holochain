@@ -5,8 +5,10 @@
 #![allow(missing_docs)]
 
 use crate::cell::CellId;
-use crate::dna::zome::{HostFnAccess, Permission};
-use crate::dna::zome::{Zome, ZomeDef};
+use crate::dna::zome::HostFnAccess;
+use crate::dna::zome::Permission;
+use crate::dna::zome::Zome;
+use crate::dna::zome::ZomeDef;
 use crate::dna::DnaDef;
 use crate::dna::Zomes;
 use crate::header::NewEntryHeader;
@@ -15,6 +17,8 @@ use ::fixt::prelude::*;
 use holo_hash::AgentPubKey;
 use holo_hash::EntryHash;
 use holochain_serialized_bytes::SerializedBytes;
+use holochain_zome_types::capability::CapAccess;
+use holochain_zome_types::capability::CapClaim;
 use holochain_zome_types::capability::CapGrant;
 use holochain_zome_types::capability::CapSecret;
 use holochain_zome_types::capability::CurryPayloads;
@@ -23,6 +27,8 @@ use holochain_zome_types::capability::GrantedFunctions;
 use holochain_zome_types::capability::ZomeCallCapGrant;
 use holochain_zome_types::capability::CAP_SECRET_BYTES;
 use holochain_zome_types::crdt::CrdtType;
+use holochain_zome_types::element::Element;
+use holochain_zome_types::element::SignedHeaderHashed;
 use holochain_zome_types::entry::AppEntryBytes;
 use holochain_zome_types::entry_def::EntryDef;
 use holochain_zome_types::entry_def::EntryDefId;
@@ -37,6 +43,8 @@ use holochain_zome_types::header::Delete;
 use holochain_zome_types::header::Dna;
 use holochain_zome_types::header::EntryType;
 use holochain_zome_types::header::Header;
+use holochain_zome_types::header::HeaderHashed;
+use holochain_zome_types::header::HeaderType;
 use holochain_zome_types::header::InitZomesComplete;
 use holochain_zome_types::header::OpenChain;
 use holochain_zome_types::header::Update;
@@ -46,17 +54,14 @@ use holochain_zome_types::signature::Signature;
 use holochain_zome_types::zome::FunctionName;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::Entry;
-use holochain_zome_types::{
-    capability::CapAccess, element::Element, element::SignedHeaderHashed, header::HeaderHashed,
-};
-use holochain_zome_types::{capability::CapClaim, header::HeaderType};
 use rand::seq::IteratorRandom;
 use rand::Rng;
 use std::collections::BTreeMap;
 use std::collections::HashSet;
 use std::iter::Iterator;
 
-pub use holochain_zome_types::fixt::{TimestampFixturator as ZomeTimestampFixturator, *};
+pub use holochain_zome_types::fixt::TimestampFixturator as ZomeTimestampFixturator;
+pub use holochain_zome_types::fixt::*;
 
 /// a curve to spit out Entry::App values
 #[derive(Clone)]

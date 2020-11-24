@@ -1,15 +1,16 @@
-use super::{InterfaceApi, SignalSubscription};
-use crate::conductor::{
-    api::error::{ConductorApiResult, ExternalApiWireError, SerializationError},
-    state::AppInterfaceId,
-};
-use crate::conductor::{
-    interface::error::{InterfaceError, InterfaceResult},
-    ConductorHandle,
-};
+use super::InterfaceApi;
+use super::SignalSubscription;
+use crate::conductor::api::error::ConductorApiResult;
+use crate::conductor::api::error::ExternalApiWireError;
+use crate::conductor::api::error::SerializationError;
+use crate::conductor::interface::error::InterfaceError;
+use crate::conductor::interface::error::InterfaceResult;
+use crate::conductor::state::AppInterfaceId;
+use crate::conductor::ConductorHandle;
 use crate::core::ribosome::ZomeCallInvocation;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::app::{InstalledApp, InstalledAppId};
+use holochain_types::app::InstalledApp;
+use holochain_types::app::InstalledAppId;
 use holochain_zome_types::ExternOutput;
 use holochain_zome_types::ZomeCallResponse;
 
@@ -69,19 +70,23 @@ impl AppInterfaceApi for RealAppInterfaceApi {
             AppRequest::ZomeCallInvocation(request) => {
                 let req = request.clone();
                 match self.conductor_handle.call_zome(*request).await? {
-                Ok(ZomeCallResponse::Ok(output)) => {
-                  Ok(AppResponse::ZomeCallInvocation(Box::new(output)))
+                    Ok(ZomeCallResponse::Ok(output)) => {
+                        Ok(AppResponse::ZomeCallInvocation(Box::new(output)))
+                    }
+                    Ok(ZomeCallResponse::Unauthorized) => Ok(AppResponse::Error(
+                        ExternalApiWireError::ZomeCallUnauthorized(format!(
+                            "No capabilities grant has been committed that allows the CapSecret {:?} to call the function {} in zome {}",
+                            req.cap,
+                            req.fn_name,
+                            req.zome.zome_name()
+                        )),
+                    )),
+                    Ok(ZomeCallResponse::NetworkError(e)) => unreachable!(
+                        "Interface zome calls should never be routed to the network. This is a bug. Got {}",
+                        e
+                    ),
+                    Err(e) => Ok(AppResponse::Error(e.into())),
                 }
-                Ok(ZomeCallResponse::Unauthorized) => {
-                  Ok(AppResponse::Error(
-                    ExternalApiWireError::ZomeCallUnauthorized(
-                      format!("No capabilities grant has been committed that allows the CapSecret {:?} to call the function {} in zome {}", req.cap, req.fn_name, req.zome_name)
-                    )
-                  ))
-                },
-                Ok(ZomeCallResponse::NetworkError(e)) => unreachable!("Interface zome calls should never be routed to the network. This is a bug. Got {}", e),
-                Err(e) => Ok(AppResponse::Error(e.into())),
-              }
             }
             AppRequest::SignalSubscription(_) => Ok(AppResponse::Unimplemented(request)),
             AppRequest::Crypto(_) => Ok(AppResponse::Unimplemented(request)),

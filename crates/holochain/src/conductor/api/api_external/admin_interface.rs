@@ -1,21 +1,24 @@
 use super::InterfaceApi;
-use crate::conductor::api::error::{
-    ConductorApiError, ConductorApiResult, ExternalApiWireError, SerializationError,
-};
-use crate::conductor::{
-    config::AdminInterfaceConfig,
-    error::CreateAppError,
-    interface::error::{InterfaceError, InterfaceResult},
-    ConductorHandle,
-};
+use crate::conductor::api::error::ConductorApiError;
+use crate::conductor::api::error::ConductorApiResult;
+use crate::conductor::api::error::ExternalApiWireError;
+use crate::conductor::api::error::SerializationError;
+use crate::conductor::config::AdminInterfaceConfig;
+use crate::conductor::error::CreateAppError;
+use crate::conductor::interface::error::InterfaceError;
+use crate::conductor::interface::error::InterfaceResult;
+use crate::conductor::ConductorHandle;
 use holo_hash::*;
 use holochain_keystore::KeystoreSenderExt;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::{
-    app::{InstallAppDnaPayload, InstallAppPayload, InstalledApp, InstalledAppId, InstalledCell},
-    cell::CellId,
-    dna::{DnaFile, JsonProperties},
-};
+use holochain_types::app::InstallAppDnaPayload;
+use holochain_types::app::InstallAppPayload;
+use holochain_types::app::InstalledApp;
+use holochain_types::app::InstalledAppId;
+use holochain_types::app::InstalledCell;
+use holochain_types::cell::CellId;
+use holochain_types::dna::DnaFile;
+use holochain_types::dna::JsonProperties;
 use std::path::PathBuf;
 use tracing::*;
 
@@ -466,11 +469,12 @@ mod test {
     use crate::conductor::Conductor;
     use anyhow::Result;
     use holochain_state::test_utils::test_environments;
-    use holochain_types::{
-        app::InstallAppDnaPayload,
-        observability,
-        test_utils::{fake_agent_pubkey_1, fake_dna_file, fake_dna_zomes, write_fake_dna_file},
-    };
+    use holochain_types::app::InstallAppDnaPayload;
+    use holochain_types::observability;
+    use holochain_types::test_utils::fake_agent_pubkey_1;
+    use holochain_types::test_utils::fake_dna_file;
+    use holochain_types::test_utils::fake_dna_zomes;
+    use holochain_types::test_utils::write_fake_dna_file;
     use holochain_wasm_test_utils::TestWasm;
     use matches::assert_matches;
     use uuid::Uuid;

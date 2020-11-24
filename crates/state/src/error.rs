@@ -5,7 +5,8 @@
 
 use crate::db::DbName;
 use failure::Fail;
-use holochain_types::{element::error::ElementGroupError, prelude::SerializedBytesError};
+use holochain_types::element::error::ElementGroupError;
+use holochain_types::prelude::SerializedBytesError;
 use std::path::PathBuf;
 use thiserror::Error;
 
@@ -26,7 +27,9 @@ pub enum DatabaseError {
     #[error("There is an unexpected value in an LMDB database (TODO: more info)")]
     InvalidValue,
 
-    #[error("Attempted to access a private entry in a context where no private database is specified: {0}")]
+    #[error(
+        "Attempted to access a private entry in a context where no private database is specified: {0}"
+    )]
     NoPrivateDb(String),
 
     // TODO: the following is necessary for actual backtraces, and would be ideal,

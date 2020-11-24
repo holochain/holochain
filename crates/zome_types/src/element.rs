@@ -1,14 +1,19 @@
 //! Defines a Element, the basic unit of Holochain data.
 
-use crate::{
-    entry_def::EntryVisibility,
-    header::{conversions::WrongHeaderError, CreateLink, DeleteLink, HeaderHashed},
-    signature::Signature,
-    Entry, Header,
-};
-use holo_hash::{
-    hash_type, HasHash, HashableContent, HashableContentBytes, HeaderHash, HoloHashed,
-};
+use crate::entry_def::EntryVisibility;
+use crate::header::conversions::WrongHeaderError;
+use crate::header::CreateLink;
+use crate::header::DeleteLink;
+use crate::header::HeaderHashed;
+use crate::signature::Signature;
+use crate::Entry;
+use crate::Header;
+use holo_hash::hash_type;
+use holo_hash::HasHash;
+use holo_hash::HashableContent;
+use holo_hash::HashableContentBytes;
+use holo_hash::HeaderHash;
+use holo_hash::HoloHashed;
 use holochain_serialized_bytes::prelude::*;
 
 /// a chain element which is a triple containing the signature of the header along with the

@@ -98,7 +98,6 @@ impl From<Vec<(ZomeName, InitCallbackResult)>> for InitResult {
 
 #[cfg(test)]
 mod test {
-
     use super::InitResult;
     use crate::core::ribosome::Invocation;
     use crate::core::ribosome::ZomesToInvoke;
@@ -221,7 +220,6 @@ mod test {
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
-
     use super::InitResult;
     use crate::core::ribosome::RibosomeT;
     use crate::fixt::curve::Zomes;

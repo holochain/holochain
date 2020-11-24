@@ -17,28 +17,36 @@
 
 use ::fixt::prelude::*;
 use hdk3::prelude::*;
-use holochain::conductor::{
-    api::{AdminRequest, AdminResponse, AppRequest, AppResponse, RealAppInterfaceApi},
-    config::{AdminInterfaceConfig, ConductorConfig, InterfaceDriver},
-    dna_store::MockDnaStore,
-    ConductorBuilder, ConductorHandle,
-};
+use holochain::conductor::api::AdminRequest;
+use holochain::conductor::api::AdminResponse;
+use holochain::conductor::api::AppRequest;
+use holochain::conductor::api::AppResponse;
+use holochain::conductor::api::RealAppInterfaceApi;
+use holochain::conductor::config::AdminInterfaceConfig;
+use holochain::conductor::config::ConductorConfig;
+use holochain::conductor::config::InterfaceDriver;
+use holochain::conductor::dna_store::MockDnaStore;
+use holochain::conductor::ConductorBuilder;
+use holochain::conductor::ConductorHandle;
 use holochain::core::ribosome::ZomeCallInvocation;
 use holochain::fixt::*;
-use holochain_state::test_utils::{test_environments, TestEnvironments};
+use holochain_state::test_utils::test_environments;
+use holochain_state::test_utils::TestEnvironments;
 use holochain_types::app::InstalledCell;
 use holochain_types::cell::CellId;
 use holochain_types::dna::DnaDef;
-use holochain_types::dna::{DnaFile};
+use holochain_types::dna::DnaFile;
+use holochain_types::observability;
 use holochain_types::test_utils::fake_agent_pubkey_1;
-use holochain_types::{observability, test_utils::fake_agent_pubkey_2};
+use holochain_types::test_utils::fake_agent_pubkey_2;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::WebsocketSender;
 use holochain_zome_types::ExternInput;
 use matches::assert_matches;
 use test_case::test_case;
 use test_utils::*;
-use test_wasm_common::{AnchorInput, TestString};
+use test_wasm_common::AnchorInput;
+use test_wasm_common::TestString;
 use tracing::instrument;
 
 mod test_utils;
@@ -216,7 +224,7 @@ async fn speed_test(n: Option<usize>) -> TestEnvironments {
     {
         Ok(ZomeCallInvocation {
             cell_id: cell_id.clone(),
-            zome_name: TestWasm::Anchor.into(),
+            zome: TestWasm::Anchor.into(),
             cap: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
             fn_name: func.into(),
             payload: ExternInput::new(payload.try_into()?),

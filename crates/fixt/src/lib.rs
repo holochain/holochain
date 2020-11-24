@@ -692,7 +692,6 @@ macro_rules! enum_fixturator {
 
 #[cfg(test)]
 mod tests {
-
     use crate::prelude::*;
     use crate::string::PREDICTABLE_STRS;
 

@@ -2,10 +2,9 @@
 
 use super::*;
 
-use crate::{
-    conductor::manager::ManagedTaskResult,
-    core::workflow::publish_dht_ops_workflow::{publish_dht_ops_workflow, PublishDhtOpsWorkspace},
-};
+use crate::conductor::manager::ManagedTaskResult;
+use crate::core::workflow::publish_dht_ops_workflow::publish_dht_ops_workflow;
+use crate::core::workflow::publish_dht_ops_workflow::PublishDhtOpsWorkspace;
 use holochain_state::env::EnvironmentWrite;
 
 use tokio::task::JoinHandle;

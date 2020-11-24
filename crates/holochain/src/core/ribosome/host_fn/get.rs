@@ -1,5 +1,6 @@
 use crate::core::ribosome::error::RibosomeResult;
-use crate::core::ribosome::{CallContext, RibosomeT};
+use crate::core::ribosome::CallContext;
+use crate::core::ribosome::RibosomeT;
 use holochain_zome_types::GetInput;
 use holochain_zome_types::GetOutput;
 use std::sync::Arc;

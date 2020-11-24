@@ -4,12 +4,19 @@
 //!
 //! [DhtOp]: enum.DhtOp.html
 
-use crate::element::{Element, ElementGroup};
-use crate::{header::NewEntryHeader, prelude::*};
-use error::{DhtOpError, DhtOpResult};
-use holo_hash::{hash_type, HashableContentBytes};
-use holochain_zome_types::{header, Entry, Header};
-use serde::{Deserialize, Serialize};
+use crate::element::Element;
+use crate::element::ElementGroup;
+use crate::header::NewEntryHeader;
+use crate::prelude::*;
+use error::DhtOpError;
+use error::DhtOpResult;
+use holo_hash::hash_type;
+use holo_hash::HashableContentBytes;
+use holochain_zome_types::header;
+use holochain_zome_types::Entry;
+use holochain_zome_types::Header;
+use serde::Deserialize;
+use serde::Serialize;
 
 #[allow(missing_docs)]
 pub mod error;

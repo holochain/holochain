@@ -8,67 +8,81 @@
 //! In normal use cases, a single Holochain user runs a single Conductor in a single process.
 //! However, there's no reason we can't have multiple Conductors in a single process, simulating multiple
 //! users in a testing environment.
-use super::{
-    api::{CellConductorApi, CellConductorApiT, RealAdminInterfaceApi, RealAppInterfaceApi},
-    config::{AdminInterfaceConfig, InterfaceDriver},
-    dna_store::{DnaDefBuf, DnaStore, RealDnaStore},
-    entry_def_store::{get_entry_defs, EntryDefBuf, EntryDefBufferKey},
-    error::{ConductorError, CreateAppError},
-    handle::ConductorHandleImpl,
-    interface::{
-        error::InterfaceResult,
-        websocket::{
-            spawn_admin_interface_task, spawn_app_interface_task, spawn_websocket_listener,
-            SIGNAL_BUFFER_SIZE,
-        },
-        SignalBroadcaster,
-    },
-    manager::{
-        keep_alive_task, spawn_task_manager, ManagedTaskAdd, ManagedTaskHandle,
-        TaskManagerRunHandle,
-    },
-    paths::EnvironmentRootPath,
-    state::AppInterfaceId,
-    state::ConductorState,
-    CellError,
-};
-use crate::conductor::p2p_store::{AgentKv, AgentKvKey};
-use crate::{
-    conductor::{
-        api::error::ConductorApiResult, cell::Cell, config::ConductorConfig,
-        dna_store::MockDnaStore, error::ConductorResult, handle::ConductorHandle,
-    },
-    core::signal::Signal,
-    core::state::{source_chain::SourceChainBuf, wasm::WasmBuf},
-};
+use super::api::CellConductorApi;
+use super::api::CellConductorApiT;
+use super::api::RealAdminInterfaceApi;
+use super::api::RealAppInterfaceApi;
+use super::config::AdminInterfaceConfig;
+use super::config::InterfaceDriver;
+use super::dna_store::DnaDefBuf;
+use super::dna_store::DnaStore;
+use super::dna_store::RealDnaStore;
+use super::entry_def_store::get_entry_defs;
+use super::entry_def_store::EntryDefBuf;
+use super::entry_def_store::EntryDefBufferKey;
+use super::error::ConductorError;
+use super::error::CreateAppError;
+use super::handle::ConductorHandleImpl;
+use super::interface::error::InterfaceResult;
+use super::interface::websocket::spawn_admin_interface_task;
+use super::interface::websocket::spawn_app_interface_task;
+use super::interface::websocket::spawn_websocket_listener;
+use super::interface::websocket::SIGNAL_BUFFER_SIZE;
+use super::interface::SignalBroadcaster;
+use super::manager::keep_alive_task;
+use super::manager::spawn_task_manager;
+use super::manager::ManagedTaskAdd;
+use super::manager::ManagedTaskHandle;
+use super::manager::TaskManagerRunHandle;
+use super::paths::EnvironmentRootPath;
+use super::state::AppInterfaceId;
+use super::state::ConductorState;
+use super::CellError;
+use crate::conductor::api::error::ConductorApiResult;
+use crate::conductor::cell::Cell;
+use crate::conductor::config::ConductorConfig;
+use crate::conductor::dna_store::MockDnaStore;
+use crate::conductor::error::ConductorResult;
+use crate::conductor::handle::ConductorHandle;
+use crate::conductor::p2p_store::AgentKv;
+use crate::conductor::p2p_store::AgentKvKey;
+use crate::core::signal::Signal;
+use crate::core::state::source_chain::SourceChainBuf;
+use crate::core::state::wasm::WasmBuf;
 pub use builder::*;
 use fallible_iterator::FallibleIterator;
-use futures::future::{self, TryFutureExt};
+use futures::future;
+use futures::future::TryFutureExt;
 use holo_hash::DnaHash;
-use holochain_keystore::{
-    lair_keystore::spawn_lair_keystore, test_keystore::spawn_test_keystore, KeystoreSender,
-    KeystoreSenderExt,
-};
-use holochain_state::{
-    buffer::BufferedStore,
-    buffer::{KvStore, KvStoreT},
-    db,
-    env::{EnvironmentKind, EnvironmentWrite, ReadManager},
-    exports::SingleStore,
-    fresh_reader,
-    prelude::*,
-};
-use holochain_types::{
-    app::{InstalledApp, InstalledAppId, InstalledCell, MembraneProof},
-    cell::CellId,
-    dna::{wasm::DnaWasmHashed, DnaFile},
-};
+use holochain_keystore::lair_keystore::spawn_lair_keystore;
+use holochain_keystore::test_keystore::spawn_test_keystore;
+use holochain_keystore::KeystoreSender;
+use holochain_keystore::KeystoreSenderExt;
+use holochain_state::buffer::BufferedStore;
+use holochain_state::buffer::KvStore;
+use holochain_state::buffer::KvStoreT;
+use holochain_state::db;
+use holochain_state::env::EnvironmentKind;
+use holochain_state::env::EnvironmentWrite;
+use holochain_state::env::ReadManager;
+use holochain_state::exports::SingleStore;
+use holochain_state::fresh_reader;
+use holochain_state::prelude::*;
+use holochain_types::app::InstalledApp;
+use holochain_types::app::InstalledAppId;
+use holochain_types::app::InstalledCell;
+use holochain_types::app::MembraneProof;
+use holochain_types::cell::CellId;
+use holochain_types::dna::wasm::DnaWasmHashed;
+use holochain_types::dna::DnaFile;
 use holochain_zome_types::entry_def::EntryDef;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use std::collections::HashMap;
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryFrom;
+use std::convert::TryInto;
 use std::sync::Arc;
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::mpsc;
+use tokio::sync::RwLock;
 use tracing::*;
 
 #[cfg(any(test, feature = "test_utils"))]
@@ -885,10 +899,11 @@ where
 pub type ConductorStateDb = KvStore<UnitDbKey, ConductorState>;
 
 mod builder {
-
     use super::*;
-    use crate::conductor::{dna_store::RealDnaStore, ConductorHandle};
-    use holochain_state::{env::EnvironmentKind, test_utils::TestEnvironments};
+    use crate::conductor::dna_store::RealDnaStore;
+    use crate::conductor::ConductorHandle;
+    use holochain_state::env::EnvironmentKind;
+    use holochain_state::test_utils::TestEnvironments;
 
     /// A configurable Builder for Conductor and sometimes ConductorHandle
     #[derive(Default)]
@@ -1120,8 +1135,9 @@ async fn p2p_event_task(
 
 #[cfg(test)]
 pub mod tests {
+    use super::Conductor;
+    use super::ConductorState;
     use super::*;
-    use super::{Conductor, ConductorState};
     use crate::conductor::dna_store::MockDnaStore;
     use holochain_state::test_utils::test_environments;
     use holochain_types::test_utils::fake_cell_id;

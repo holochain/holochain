@@ -1,11 +1,16 @@
-use holochain::conductor::{
-    compat::load_conductor_from_legacy_config, config::ConductorConfig, error::ConductorError,
-    interactive, paths::ConfigFilePath, Conductor, ConductorHandle,
-};
-use holochain_types::observability::{self, Output};
+use holochain::conductor::compat::load_conductor_from_legacy_config;
+use holochain::conductor::config::ConductorConfig;
+use holochain::conductor::error::ConductorError;
+use holochain::conductor::interactive;
+use holochain::conductor::paths::ConfigFilePath;
+use holochain::conductor::Conductor;
+use holochain::conductor::ConductorHandle;
+use holochain_types::observability;
+use holochain_types::observability::Output;
 use std::error::Error;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
+use std::path::PathBuf;
 use structopt::StructOpt;
 use tracing::*;
 

@@ -2,8 +2,10 @@
 //! functions available to WasmZomes, as well as a few extras for convenience.
 
 use crate::Entry;
-use holo_hash::{AnyDhtHash, HeaderHash};
-use holochain_zome_types::{entry::GetOptions, entry_def::EntryDefId};
+use holo_hash::AnyDhtHash;
+use holo_hash::HeaderHash;
+use holochain_zome_types::entry::GetOptions;
+use holochain_zome_types::entry_def::EntryDefId;
 
 use super::error::InlineZomeResult;
 

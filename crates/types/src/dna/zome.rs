@@ -13,7 +13,8 @@ use std::sync::Arc;
 
 use self::inline_zome::InlineZome;
 
-use super::{error::DnaResult, DnaError};
+use super::error::DnaResult;
+use super::DnaError;
 
 pub mod inline_zome;
 /// A Holochain Zome. Includes the ZomeDef as well as the name of the Zome.

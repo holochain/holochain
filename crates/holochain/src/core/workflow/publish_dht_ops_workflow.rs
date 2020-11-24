@@ -10,30 +10,27 @@
 //!
 //!
 
-use super::{
-    error::WorkflowResult,
-    produce_dht_ops_workflow::dht_op_light::{error::DhtOpConvertError, light_to_op},
-};
-use crate::core::{
-    queue_consumer::{OneshotWriter, WorkComplete},
-    state::{
-        dht_op_integration::AuthoredDhtOpsStore,
-        element_buf::ElementBuf,
-        workspace::{Workspace, WorkspaceResult},
-    },
-};
+use super::error::WorkflowResult;
+use super::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
+use super::produce_dht_ops_workflow::dht_op_light::light_to_op;
+use crate::core::queue_consumer::OneshotWriter;
+use crate::core::queue_consumer::WorkComplete;
+use crate::core::state::dht_op_integration::AuthoredDhtOpsStore;
+use crate::core::state::element_buf::ElementBuf;
+use crate::core::state::workspace::Workspace;
+use crate::core::state::workspace::WorkspaceResult;
 use fallible_iterator::FallibleIterator;
 use holo_hash::*;
 use holochain_p2p::HolochainP2pCell;
 use holochain_p2p::HolochainP2pCellT;
-use holochain_state::{
-    buffer::{BufferedStore, KvBufFresh},
-    db::AUTHORED_DHT_OPS,
-    fresh_reader,
-    prelude::*,
-    transaction::Writer,
-};
-use holochain_types::{dht_op::DhtOp, Timestamp};
+use holochain_state::buffer::BufferedStore;
+use holochain_state::buffer::KvBufFresh;
+use holochain_state::db::AUTHORED_DHT_OPS;
+use holochain_state::fresh_reader;
+use holochain_state::prelude::*;
+use holochain_state::transaction::Writer;
+use holochain_types::dht_op::DhtOp;
+use holochain_types::Timestamp;
 use std::collections::HashMap;
 use std::time;
 use tracing::*;
@@ -172,49 +169,47 @@ impl PublishDhtOpsWorkspace {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        core::{
-            queue_consumer::TriggerSender,
-            state::{dht_op_integration::AuthoredDhtOpsValue, source_chain::SourceChain},
-            workflow::{
-                fake_genesis,
-                produce_dht_ops_workflow::{produce_dht_ops_workflow, ProduceDhtOpsWorkspace},
-            },
-            SourceChainError,
-        },
-        fixt::{CreateLinkFixturator, EntryFixturator},
-        test_utils::{test_network_with_events, TestNetwork},
-    };
+    use crate::core::queue_consumer::TriggerSender;
+    use crate::core::state::dht_op_integration::AuthoredDhtOpsValue;
+    use crate::core::state::source_chain::SourceChain;
+    use crate::core::workflow::fake_genesis;
+    use crate::core::workflow::produce_dht_ops_workflow::produce_dht_ops_workflow;
+    use crate::core::workflow::produce_dht_ops_workflow::ProduceDhtOpsWorkspace;
+    use crate::core::SourceChainError;
+    use crate::fixt::CreateLinkFixturator;
+    use crate::fixt::EntryFixturator;
+    use crate::test_utils::test_network_with_events;
+    use crate::test_utils::TestNetwork;
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
     use holo_hash::fixt::*;
-    use holochain_p2p::{actor::HolochainP2pSender, HolochainP2pRef};
-    use holochain_state::{
-        buffer::BufferedStore,
-        env::{EnvironmentWrite, ReadManager, WriteManager},
-        error::DatabaseError,
-        test_utils::test_cell_env,
-    };
-    use holochain_types::{
-        dht_op::{DhtOp, DhtOpHashed, DhtOpLight},
-        fixt::{AppEntryTypeFixturator, SignatureFixturator},
-        observability, HeaderHashed,
-    };
+    use holochain_p2p::actor::HolochainP2pSender;
+    use holochain_p2p::HolochainP2pRef;
+    use holochain_state::buffer::BufferedStore;
+    use holochain_state::env::EnvironmentWrite;
+    use holochain_state::env::ReadManager;
+    use holochain_state::env::WriteManager;
+    use holochain_state::error::DatabaseError;
+    use holochain_state::test_utils::test_cell_env;
+    use holochain_types::dht_op::DhtOp;
+    use holochain_types::dht_op::DhtOpHashed;
+    use holochain_types::dht_op::DhtOpLight;
+    use holochain_types::fixt::AppEntryTypeFixturator;
+    use holochain_types::fixt::SignatureFixturator;
+    use holochain_types::observability;
+    use holochain_types::HeaderHashed;
+    use holochain_zome_types::element::SignedHeaderHashed;
     use holochain_zome_types::entry_def::EntryVisibility;
-    use holochain_zome_types::{
-        element::SignedHeaderHashed,
-        header::{builder, EntryType, Update},
-    };
+    use holochain_zome_types::header::builder;
+    use holochain_zome_types::header::EntryType;
+    use holochain_zome_types::header::Update;
     use matches::assert_matches;
-    use std::{
-        collections::HashMap,
-        convert::TryInto,
-        sync::{
-            atomic::{AtomicU32, Ordering},
-            Arc,
-        },
-        time::Duration,
-    };
+    use std::collections::HashMap;
+    use std::convert::TryInto;
+    use std::sync::atomic::AtomicU32;
+    use std::sync::atomic::Ordering;
+    use std::sync::Arc;
+    use std::time::Duration;
     use test_case::test_case;
     use tokio::task::JoinHandle;
     use tracing_futures::Instrument;
@@ -325,7 +320,7 @@ mod tests {
                                 break;
                             }
                         }
-                        _ => (),
+                        _ => {}
                     }
                 }
             }
@@ -734,7 +729,7 @@ mod tests {
                                         tx_complete.take().unwrap().send(()).unwrap();
                                     }
                                 }
-                                _ => (),
+                                _ => {}
                             }
                         }
                     }

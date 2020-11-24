@@ -1,19 +1,24 @@
 //! Functionality for safely accessing LMDB database references.
 
-use crate::{
-    env::EnvironmentKind,
-    error::{DatabaseError, DatabaseResult},
-    exports::IntegerStore,
-    prelude::IntKey,
-};
+use crate::env::EnvironmentKind;
+use crate::error::DatabaseError;
+use crate::error::DatabaseResult;
+use crate::exports::IntegerStore;
+use crate::prelude::IntKey;
 use derive_more::Display;
 use holochain_keystore::KeystoreSender;
-use holochain_types::universal_map::{Key as UmKey, UniversalMap};
+use holochain_types::universal_map::Key as UmKey;
+use holochain_types::universal_map::UniversalMap;
 use lazy_static::lazy_static;
 use parking_lot::RwLock;
-use rkv::{MultiStore, Rkv, SingleStore, StoreOptions};
-use std::collections::{hash_map, HashMap};
-use std::path::{Path, PathBuf};
+use rkv::MultiStore;
+use rkv::Rkv;
+use rkv::SingleStore;
+use rkv::StoreOptions;
+use std::collections::hash_map;
+use std::collections::HashMap;
+use std::path::Path;
+use std::path::PathBuf;
 
 /// TODO This is incomplete
 /// Enumeration of all databases needed by Holochain
@@ -180,7 +185,7 @@ pub(super) fn initialize_databases(rkv: &Rkv, kind: &EnvironmentKind) -> Databas
     let path = rkv.path().to_owned();
     match dbmap.entry(path.clone()) {
         hash_map::Entry::Occupied(_) => {
-            return Err(DatabaseError::EnvironmentDoubleInitialized(path))
+            return Err(DatabaseError::EnvironmentDoubleInitialized(path));
         }
         hash_map::Entry::Vacant(e) => e.insert({
             let mut um = UniversalMap::new();

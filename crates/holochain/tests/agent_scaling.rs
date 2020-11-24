@@ -1,15 +1,16 @@
 #![cfg(feature = "test_utils")]
 
 use hdk3::prelude::Links;
-use holochain::{
-    core::ribosome::ZomeCallInvocation, test_utils::conductor_setup::ConductorTestData,
-};
+use holochain::core::ribosome::ZomeCallInvocation;
+use holochain::test_utils::conductor_setup::ConductorTestData;
 use holochain_keystore::keystore_actor::KeystoreSenderExt;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::test_utils::test_environments;
-use holochain_types::dna::{DnaDef, DnaFile};
+use holochain_types::dna::DnaDef;
+use holochain_types::dna::DnaFile;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::{ExternInput, ZomeCallResponse};
+use holochain_zome_types::ExternInput;
+use holochain_zome_types::ZomeCallResponse;
 use unwrap_to::unwrap_to;
 
 /// A single link with an AgentPubKey for the base and target is committed by
@@ -122,7 +123,7 @@ async fn many_agents_can_reach_consistency_normal_links() {
         .handle()
         .call_zome(ZomeCallInvocation {
             cell_id: cell_ids[0].clone(),
-            zome_name: TestWasm::Link.into(),
+            zome: TestWasm::Link.into(),
             cap: None,
             fn_name: "create_link".into(),
             payload: ExternInput::new(SerializedBytes::try_from(()).unwrap()),
@@ -141,7 +142,7 @@ async fn many_agents_can_reach_consistency_normal_links() {
             .handle()
             .call_zome(ZomeCallInvocation {
                 cell_id: cell_ids[1].clone(),
-                zome_name: TestWasm::Link.into(),
+                zome: TestWasm::Link.into(),
                 cap: None,
                 fn_name: "get_links".into(),
                 payload: ExternInput::new(SerializedBytes::try_from(()).unwrap()),

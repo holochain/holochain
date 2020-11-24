@@ -1,34 +1,35 @@
 #![allow(missing_docs)]
 
-use super::{host_fn_api::HostFnApi, install_app, setup_app_inner};
-use crate::{
-    conductor::{
-        api::{CellConductorApi, CellConductorApiT},
-        interface::SignalBroadcaster,
-        ConductorHandle,
-    },
-    core::queue_consumer::InitialQueueTriggers,
-    core::ribosome::wasm_ribosome::WasmRibosome,
-};
-use holo_hash::{AgentPubKey, DnaHash};
+use super::host_fn_api::HostFnApi;
+use super::install_app;
+use super::setup_app_inner;
+use crate::conductor::api::CellConductorApi;
+use crate::conductor::api::CellConductorApiT;
+use crate::conductor::interface::SignalBroadcaster;
+use crate::conductor::ConductorHandle;
+use crate::core::queue_consumer::InitialQueueTriggers;
+use crate::core::ribosome::wasm_ribosome::WasmRibosome;
+use holo_hash::AgentPubKey;
+use holo_hash::DnaHash;
 use holochain_keystore::KeystoreSender;
-use holochain_p2p::{actor::HolochainP2pRefToCell, HolochainP2pCell};
+use holochain_p2p::actor::HolochainP2pRefToCell;
+use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_state::{
-    env::EnvironmentWrite,
-    test_utils::{test_environments, TestEnvironments},
-};
-use holochain_types::{
-    app::InstalledCell,
-    cell::CellId,
-    dna::{DnaDef, DnaFile},
-    test_utils::fake_agent_pubkey_1,
-    test_utils::fake_agent_pubkey_2,
-};
+use holochain_state::env::EnvironmentWrite;
+use holochain_state::test_utils::test_environments;
+use holochain_state::test_utils::TestEnvironments;
+use holochain_types::app::InstalledCell;
+use holochain_types::cell::CellId;
+use holochain_types::dna::DnaDef;
+use holochain_types::dna::DnaFile;
+use holochain_types::test_utils::fake_agent_pubkey_1;
+use holochain_types::test_utils::fake_agent_pubkey_2;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::zome::ZomeName;
 use kitsune_p2p::KitsuneP2pConfig;
-use std::{collections::HashMap, convert::TryFrom, sync::Arc};
+use std::collections::HashMap;
+use std::convert::TryFrom;
+use std::sync::Arc;
 use tempdir::TempDir;
 
 /// A "factory" for HostFnApi, which will produce them when given a ZomeName

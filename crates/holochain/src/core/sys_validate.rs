@@ -1,37 +1,43 @@
 //! # System Validation Checks
 //! This module contains all the checks we run for sys validation
 
-use super::{
-    queue_consumer::TriggerSender,
-    state::metadata::{ChainItemKey, MetadataBufT},
-    workflow::incoming_dht_ops_workflow::incoming_dht_ops_workflow,
-    workflow::sys_validation_workflow::SysValidationWorkspace,
-};
-use crate::conductor::{api::CellConductorApiT, entry_def_store::get_entry_def};
+use super::queue_consumer::TriggerSender;
+use super::state::metadata::ChainItemKey;
+use super::state::metadata::MetadataBufT;
+use super::workflow::incoming_dht_ops_workflow::incoming_dht_ops_workflow;
+use super::workflow::sys_validation_workflow::SysValidationWorkspace;
+use crate::conductor::api::CellConductorApiT;
+use crate::conductor::entry_def_store::get_entry_def;
 use fallible_iterator::FallibleIterator;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_p2p::HolochainP2pCell;
-use holochain_state::{env::EnvironmentWrite, error::DatabaseResult, fresh_reader};
-use holochain_types::{dht_op::DhtOp, header::NewEntryHeaderRef, Entry};
-use holochain_zome_types::{
-    element::ElementEntry, signature::Signature, validate::ValidationStatus,
-};
-use holochain_zome_types::{
-    entry_def::{EntryDef, EntryVisibility},
-    header::{AppEntryType, EntryType, Update},
-    link::LinkTag,
-    Header,
-};
+use holochain_state::env::EnvironmentWrite;
+use holochain_state::error::DatabaseResult;
+use holochain_state::fresh_reader;
+use holochain_types::dht_op::DhtOp;
+use holochain_types::header::NewEntryHeaderRef;
+use holochain_types::Entry;
+use holochain_zome_types::element::ElementEntry;
+use holochain_zome_types::entry_def::EntryDef;
+use holochain_zome_types::entry_def::EntryVisibility;
+use holochain_zome_types::header::AppEntryType;
+use holochain_zome_types::header::EntryType;
+use holochain_zome_types::header::Update;
+use holochain_zome_types::link::LinkTag;
+use holochain_zome_types::signature::Signature;
+use holochain_zome_types::validate::ValidationStatus;
+use holochain_zome_types::Header;
 use std::convert::TryInto;
 
-pub use crate::core::state::source_chain::{SourceChainError, SourceChainResult};
+pub use crate::core::state::source_chain::SourceChainError;
+pub use crate::core::state::source_chain::SourceChainResult;
 pub(super) use error::*;
 
 pub use holo_hash::*;
-pub use holochain_types::{
-    element::{Element, ElementExt},
-    HeaderHashed, Timestamp,
-};
+pub use holochain_types::element::Element;
+pub use holochain_types::element::ElementExt;
+pub use holochain_types::HeaderHashed;
+pub use holochain_types::Timestamp;
 
 #[allow(missing_docs)]
 mod error;
@@ -202,9 +208,7 @@ pub async fn check_app_entry_type(
     let zome_index = u8::from(entry_type.zome_id()) as usize;
     // We want to be careful about holding locks open to the conductor api
     // so calls are made in blocks
-    let dna_file = { conductor_api.get_this_dna().await };
-    let dna_file =
-        dna_file.ok_or_else(|| SysValidationError::DnaMissing(conductor_api.cell_id().clone()))?;
+    let dna_file = conductor_api.get_this_dna().await.map_err(Box::new)?;
 
     // Check if the zome is found
     let zome = dna_file

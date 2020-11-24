@@ -1,12 +1,12 @@
-use super::{error::WorkflowResult, CallZomeWorkspace, CallZomeWorkspaceLock};
-use crate::core::{
-    queue_consumer::OneshotWriter,
-    ribosome::{
-        guest_callback::init::{InitHostAccess, InitInvocation, InitResult},
-        RibosomeT,
-    },
-    state::workspace::Workspace,
-};
+use super::error::WorkflowResult;
+use super::CallZomeWorkspace;
+use super::CallZomeWorkspaceLock;
+use crate::core::queue_consumer::OneshotWriter;
+use crate::core::ribosome::guest_callback::init::InitHostAccess;
+use crate::core::ribosome::guest_callback::init::InitInvocation;
+use crate::core::ribosome::guest_callback::init::InitResult;
+use crate::core::ribosome::RibosomeT;
+use crate::core::state::workspace::Workspace;
 use derive_more::Constructor;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;

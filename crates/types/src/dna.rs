@@ -13,10 +13,9 @@ pub use holo_hash::*;
 use holochain_zome_types::zome::ZomeName;
 use std::collections::BTreeMap;
 
-use self::{
-    error::DnaResult,
-    zome::{Zome, ZomeDef},
-};
+use self::error::DnaResult;
+use self::zome::Zome;
+use self::zome::ZomeDef;
 
 /// Zomes need to be an ordered map from ZomeName to a Zome
 pub type Zomes = Vec<(ZomeName, zome::ZomeDef)>;

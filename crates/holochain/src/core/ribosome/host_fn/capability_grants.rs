@@ -18,7 +18,6 @@ pub fn capability_grants(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-
     use crate::conductor::dna_store::MockDnaStore;
     use crate::conductor::interface::websocket::test::setup_app;
     use crate::core::ribosome::ZomeCallInvocation;
@@ -28,7 +27,8 @@ pub mod wasm_test {
     use hdk3::prelude::*;
     use holochain_types::app::InstalledCell;
     use holochain_types::cell::CellId;
-    use holochain_types::dna::{DnaDef, DnaFile};
+    use holochain_types::dna::DnaDef;
+    use holochain_types::dna::DnaFile;
     use holochain_types::fixt::CapSecretFixturator;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_agent_pubkey_2;
@@ -174,7 +174,7 @@ pub mod wasm_test {
         let output = handle
             .call_zome(ZomeCallInvocation {
                 cell_id: alice_cell_id.clone(),
-                zome_name: TestWasm::Capability.into(),
+                zome: TestWasm::Capability.into(),
                 cap: None,
                 fn_name: "try_cap_claim".into(),
                 payload: ExternInput::new(
@@ -205,7 +205,7 @@ pub mod wasm_test {
         let output = handle
             .call_zome(ZomeCallInvocation {
                 cell_id: bob_cell_id.clone(),
-                zome_name: TestWasm::Capability.into(),
+                zome: TestWasm::Capability.into(),
                 cap: None,
                 fn_name: "transferable_cap_grant".into(),
                 payload: ExternInput::new(original_secret.try_into().unwrap()),
@@ -225,7 +225,7 @@ pub mod wasm_test {
         let output = handle
             .call_zome(ZomeCallInvocation {
                 cell_id: alice_cell_id.clone(),
-                zome_name: TestWasm::Capability.into(),
+                zome: TestWasm::Capability.into(),
                 cap: None,
                 fn_name: "try_cap_claim".into(),
                 payload: ExternInput::new(
@@ -259,7 +259,7 @@ pub mod wasm_test {
         let output = handle
             .call_zome(ZomeCallInvocation {
                 cell_id: bob_cell_id.clone(),
-                zome_name: TestWasm::Capability.into(),
+                zome: TestWasm::Capability.into(),
                 cap: None,
                 fn_name: "roll_cap_grant".into(),
                 payload: ExternInput::new(original_grant_hash.try_into().unwrap()),
@@ -277,7 +277,7 @@ pub mod wasm_test {
         let output = handle
             .call_zome(ZomeCallInvocation {
                 cell_id: bob_cell_id.clone(),
-                zome_name: TestWasm::Capability.into(),
+                zome: TestWasm::Capability.into(),
                 cap: None,
                 fn_name: "get_entry".into(),
                 payload: ExternInput::new(new_grant_header_hash.clone().try_into().unwrap()),
@@ -307,7 +307,7 @@ pub mod wasm_test {
         let output = handle
             .call_zome(ZomeCallInvocation {
                 cell_id: alice_cell_id.clone(),
-                zome_name: TestWasm::Capability.into(),
+                zome: TestWasm::Capability.into(),
                 cap: None,
                 fn_name: "try_cap_claim".into(),
                 payload: ExternInput::new(
@@ -336,7 +336,7 @@ pub mod wasm_test {
         let output = handle
             .call_zome(ZomeCallInvocation {
                 cell_id: alice_cell_id.clone(),
-                zome_name: TestWasm::Capability.into(),
+                zome: TestWasm::Capability.into(),
                 cap: None,
                 fn_name: "try_cap_claim".into(),
                 payload: ExternInput::new(
@@ -370,7 +370,7 @@ pub mod wasm_test {
         let _output = handle
             .call_zome(ZomeCallInvocation {
                 cell_id: bob_cell_id,
-                zome_name: TestWasm::Capability.into(),
+                zome: TestWasm::Capability.into(),
                 cap: None,
                 fn_name: "delete_cap_grant".into(),
                 payload: ExternInput::new(new_grant_header_hash.try_into().unwrap()),
@@ -383,7 +383,7 @@ pub mod wasm_test {
         let output = handle
             .call_zome(ZomeCallInvocation {
                 cell_id: alice_cell_id.clone(),
-                zome_name: TestWasm::Capability.into(),
+                zome: TestWasm::Capability.into(),
                 cap: None,
                 fn_name: "try_cap_claim".into(),
                 payload: ExternInput::new(
@@ -412,7 +412,7 @@ pub mod wasm_test {
         let output = handle
             .call_zome(ZomeCallInvocation {
                 cell_id: alice_cell_id.clone(),
-                zome_name: TestWasm::Capability.into(),
+                zome: TestWasm::Capability.into(),
                 cap: None,
                 fn_name: "try_cap_claim".into(),
                 payload: ExternInput::new(

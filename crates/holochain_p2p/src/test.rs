@@ -1,10 +1,11 @@
+use crate::actor::*;
 use crate::HolochainP2pCell;
-use crate::{actor::*, *};
+use crate::*;
 use ::fixt::prelude::*;
-use holo_hash::{
-    fixt::{AgentPubKeyFixturator, DnaHashFixturator},
-    AgentPubKey, DnaHash,
-};
+use holo_hash::fixt::AgentPubKeyFixturator;
+use holo_hash::fixt::DnaHashFixturator;
+use holo_hash::AgentPubKey;
+use holo_hash::DnaHash;
 
 struct StubNetwork;
 
@@ -146,11 +147,13 @@ mod tests {
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
     use ghost_actor::GhostControlSender;
-    use holochain_types::{
-        element::{Element, ElementStatus, SignedHeaderHashed, WireElement},
-        validate::ValidationStatus,
-    };
-    use holochain_types::{fixt::*, HeaderHashed};
+    use holochain_types::element::Element;
+    use holochain_types::element::ElementStatus;
+    use holochain_types::element::SignedHeaderHashed;
+    use holochain_types::element::WireElement;
+    use holochain_types::fixt::*;
+    use holochain_types::validate::ValidationStatus;
+    use holochain_types::HeaderHashed;
     use kitsune_p2p::KitsuneP2pConfig;
 
     macro_rules! newhash {
@@ -200,7 +203,7 @@ mod tests {
                     PutAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
                     }
-                    _ => (),
+                    _ => {}
                 }
             }
         });
@@ -254,7 +257,7 @@ mod tests {
                     PutAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
                     }
-                    _ => (),
+                    _ => {}
                 }
             }
         });
@@ -304,7 +307,7 @@ mod tests {
                     QueryAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
                     }
-                    _ => (),
+                    _ => {}
                 }
             }
         });
@@ -385,7 +388,7 @@ mod tests {
                     PutAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
                     }
-                    _ => (),
+                    _ => {}
                 }
             }
         });
@@ -442,7 +445,7 @@ mod tests {
                     PutAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
                     }
-                    _ => (),
+                    _ => {}
                 }
             }
         });

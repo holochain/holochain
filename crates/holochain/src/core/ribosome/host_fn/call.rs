@@ -29,7 +29,7 @@ pub fn call(
     // Create the invocation for this call
     let invocation = ZomeCallInvocation {
         cell_id,
-        zome_name: call.zome_name,
+        zome: call_context.zome(),
         cap: call.cap,
         fn_name: call.fn_name,
         payload: ExternInput::new(call.request),
@@ -49,24 +49,28 @@ pub fn call(
 
 #[cfg(test)]
 pub mod wasm_test {
-    use std::convert::{TryFrom, TryInto};
+    use std::convert::TryFrom;
+    use std::convert::TryInto;
 
-    use hdk3::prelude::{AgentInfo, CellId};
+    use hdk3::prelude::AgentInfo;
+    use hdk3::prelude::CellId;
     use holo_hash::HeaderHash;
     use holochain_serialized_bytes::SerializedBytes;
-    use holochain_types::{
-        app::InstalledCell,
-        dna::{DnaDef, DnaFile},
-    };
+    use holochain_types::app::InstalledCell;
+    use holochain_types::dna::DnaDef;
+    use holochain_types::dna::DnaFile;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::{test_utils::fake_agent_pubkey_2, ExternInput, ZomeCallResponse};
+    use holochain_zome_types::test_utils::fake_agent_pubkey_2;
+    use holochain_zome_types::ExternInput;
+    use holochain_zome_types::ZomeCallResponse;
     use matches::assert_matches;
 
-    use crate::{
-        conductor::ConductorHandle,
-        core::{ribosome::ZomeCallInvocation, state::element_buf::ElementBuf},
-        test_utils::{conductor_setup::ConductorTestData, install_app, new_invocation},
-    };
+    use crate::conductor::ConductorHandle;
+    use crate::core::ribosome::ZomeCallInvocation;
+    use crate::core::state::element_buf::ElementBuf;
+    use crate::test_utils::conductor_setup::ConductorTestData;
+    use crate::test_utils::install_app;
+    use crate::test_utils::new_invocation;
 
     #[tokio::test(threaded_scheduler)]
     async fn call_test() {
@@ -86,7 +90,7 @@ pub mod wasm_test {
         let _ = handle
             .call_zome(ZomeCallInvocation {
                 cell_id: bob_cell_id.clone(),
-                zome_name: TestWasm::WhoAmI.into(),
+                zome: TestWasm::WhoAmI.into(),
                 cap: None,
                 fn_name: "set_access".into(),
                 payload: ExternInput::new(().try_into().unwrap()),
@@ -100,7 +104,7 @@ pub mod wasm_test {
         let output = handle
             .call_zome(ZomeCallInvocation {
                 cell_id: alice_cell_id.clone(),
-                zome_name: TestWasm::WhoAmI.into(),
+                zome: TestWasm::WhoAmI.into(),
                 cap: None,
                 fn_name: "who_are_they_local".into(),
                 payload: ExternInput::new(bob_cell_id.clone().try_into().unwrap()),
