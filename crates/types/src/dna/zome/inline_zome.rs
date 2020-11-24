@@ -123,7 +123,6 @@ mod tests {
     use super::*;
     use holo_hash::AnyDhtHash;
     use holochain_zome_types::prelude::GetOptions;
-    use maplit::hashmap;
 
     #[test]
     fn can_create_inline_dna() {

@@ -7,7 +7,8 @@ use crate::core::ribosome::{
 };
 
 use super::api::CellConductorApiT;
-use error::{EntryDefStoreError, EntryDefStoreResult};
+use error::EntryDefStoreError;
+use error::EntryDefStoreResult;
 use fallible_iterator::FallibleIterator;
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
@@ -17,10 +18,9 @@ use holochain_state::{
     error::{DatabaseError, DatabaseResult},
     prelude::*,
 };
-use holochain_types::dna::{
-    zome::{Zome, ZomeDef},
-    DnaDefHashed, DnaFile,
-};
+use holochain_types::dna::zome::ZomeDef;
+use holochain_types::dna::DnaDefHashed;
+use holochain_types::dna::DnaFile;
 use holochain_zome_types::entry_def::EntryDef;
 use holochain_zome_types::header::EntryDefIndex;
 use holochain_zome_types::header::ZomeId;
@@ -228,13 +228,9 @@ mod tests {
     use crate::conductor::Conductor;
     use holo_hash::HasHash;
     use holochain_state::test_utils::test_environments;
-    use holochain_types::{
-        dna::{
-            wasm::DnaWasmHashed,
-            zome::{Zome, ZomeDef},
-        },
-        test_utils::fake_dna_zomes,
-    };
+    use holochain_types::dna::wasm::DnaWasmHashed;
+    use holochain_types::dna::zome::ZomeDef;
+    use holochain_types::test_utils::fake_dna_zomes;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::{
         crdt::CrdtType,

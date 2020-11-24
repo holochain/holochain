@@ -296,7 +296,6 @@ mod slow_tests {
     use crate::fixt::*;
     use ::fixt::prelude::*;
     use holo_hash::fixt::AgentPubKeyFixturator;
-    use holochain_types::fixt::*;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::CreateOutput;
     use holochain_zome_types::Entry;
