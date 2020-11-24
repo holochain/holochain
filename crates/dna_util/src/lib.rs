@@ -39,7 +39,6 @@
 
 use holochain::nucleus::dna::wasm::DnaWasm;
 use holochain::nucleus::dna::zome::WasmZome;
-use holochain::nucleus::dna::zome::Zome;
 use holochain::nucleus::dna::DnaDef;
 use holochain::nucleus::dna::DnaFile;
 use holochain_serialized_bytes::prelude::*;

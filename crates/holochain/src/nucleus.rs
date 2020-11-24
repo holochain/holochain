@@ -5,5 +5,5 @@ pub mod fixt;
 pub mod prelude;
 pub mod ribosome;
 
-#[feature(test_utils)]
+#[cfg(feature = "test_utils")]
 pub mod test_utils;

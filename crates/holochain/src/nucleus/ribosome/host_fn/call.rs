@@ -1,4 +1,3 @@
-use crate::nucleus::dna::zome::Zome;
 use crate::nucleus::ribosome::error::RibosomeResult;
 use crate::nucleus::ribosome::CallContext;
 use crate::nucleus::ribosome::RibosomeT;

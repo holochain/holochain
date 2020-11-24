@@ -7,7 +7,6 @@ use crate::nucleus::ribosome::wasm_ribosome::WasmRibosome;
 use crate::nucleus::ribosome::RibosomeT;
 
 use super::api::CellConductorApiT;
-use crate::nucleus::dna::zome::Zome;
 use crate::nucleus::dna::zome::ZomeDef;
 use crate::nucleus::dna::DnaDefHashed;
 use crate::nucleus::dna::DnaFile;
@@ -228,7 +227,6 @@ mod tests {
     use super::EntryDefBufferKey;
     use crate::conductor::Conductor;
     use crate::nucleus::dna::wasm::DnaWasmHashed;
-    use crate::nucleus::dna::zome::Zome;
     use crate::nucleus::dna::zome::ZomeDef;
     use crate::nucleus::test_utils::fake_dna_zomes;
     use holo_hash::HasHash;

@@ -6,12 +6,11 @@
 //! using Rust closures, and is useful for quickly defining zomes on-the-fly
 //! for tests.
 
-use std::{collections::HashMap, sync::Arc};
-
 use derive_more::Constructor;
 use holochain_serialized_bytes::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::zome::ZomeName;
+use std::sync::Arc;
 
 use self::inline_zome::InlineZome;
 
@@ -118,6 +117,7 @@ pub enum ZomeDef {
 /// The serialized form of a ZomeDef, which is identical for Wasm zomes, but
 /// unwraps InlineZomes to just a bare UUID.
 #[derive(Serialize)]
+#[serde(untagged)]
 enum ZomeDefSerialized {
     Wasm(WasmZome),
     InlineUuid(String),
