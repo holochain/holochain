@@ -11,7 +11,9 @@ pub enum SourceChainError {
     #[error("The source chain is empty, but is expected to have been initialized")]
     ChainEmpty,
 
-    #[error("Attempted to commit a bundle to the source chain, but the source chain head has moved since the bundle began. Bundle head: {0:?}, Current head: {1:?}")]
+    #[error(
+        "Attempted to commit a bundle to the source chain, but the source chain head has moved since the bundle began. Bundle head: {0:?}, Current head: {1:?}"
+    )]
     HeadMoved(Option<HeaderHash>, Option<HeaderHash>),
 
     #[error(

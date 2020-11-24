@@ -1,9 +1,14 @@
 //! Traits for defining keys and values of databases
 
-use holo_hash::{assert_length, HashType, HoloHash, PrimitiveHashType, HOLO_HASH_FULL_LEN};
+use holo_hash::assert_length;
+use holo_hash::HashType;
+use holo_hash::HoloHash;
+use holo_hash::PrimitiveHashType;
+use holo_hash::HOLO_HASH_FULL_LEN;
 use holochain_serialized_bytes::prelude::*;
 pub use prefix::*;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 use std::cmp::Ordering;
 
 mod prefix;
@@ -52,7 +57,11 @@ impl BufKey for IntKey {
         let boxed_slice = vec.to_vec().into_boxed_slice();
         let boxed_array: Box<[u8; 4]> = match boxed_slice.try_into() {
             Ok(ba) => ba,
-            Err(o) => panic!("Holochain detected database corruption.\n\nInvalid IntKey: expected {} bytes but got {}", 4, o.len()),
+            Err(o) => panic!(
+                "Holochain detected database corruption.\n\nInvalid IntKey: expected {} bytes but got {}",
+                4,
+                o.len()
+            ),
         };
         IntKey(*boxed_array)
     }
@@ -66,7 +75,8 @@ impl AsRef<[u8]> for IntKey {
 
 impl From<u32> for IntKey {
     fn from(u: u32) -> Self {
-        use byteorder::{NativeEndian, WriteBytesExt};
+        use byteorder::NativeEndian;
+        use byteorder::WriteBytesExt;
         let mut wtr = vec![];
         wtr.write_u32::<NativeEndian>(u).unwrap();
         Self::from_key_bytes_or_friendly_panic(&wtr)
@@ -75,7 +85,8 @@ impl From<u32> for IntKey {
 
 impl From<IntKey> for u32 {
     fn from(k: IntKey) -> u32 {
-        use byteorder::{ByteOrder, NativeEndian};
+        use byteorder::ByteOrder;
+        use byteorder::NativeEndian;
         NativeEndian::read_u32(&k.0)
     }
 }

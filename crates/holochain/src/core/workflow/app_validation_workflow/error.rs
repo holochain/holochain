@@ -3,13 +3,12 @@ use holochain_types::cell::CellId;
 use holochain_zome_types::header::ZomeId;
 use thiserror::Error;
 
-use crate::{
-    conductor::entry_def_store::error::EntryDefStoreError,
-    core::ribosome::error::RibosomeError,
-    core::state::cascade::error::CascadeError,
-    core::{validation::OutcomeOrError, SourceChainError},
-    from_sub_error,
-};
+use crate::conductor::entry_def_store::error::EntryDefStoreError;
+use crate::core::state::cascade::error::CascadeError;
+use crate::core::validation::OutcomeOrError;
+use crate::core::SourceChainError;
+use crate::from_sub_error;
+use crate::nucleus::ribosome::error::RibosomeError;
 
 use super::types::Outcome;
 

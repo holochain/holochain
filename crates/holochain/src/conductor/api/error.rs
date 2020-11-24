@@ -1,17 +1,13 @@
 //! Errors occurring during a [CellConductorApi] or [InterfaceApi] call
 
-use crate::{
-    conductor::{
-        error::{ConductorError, CreateAppError},
-        interface::error::InterfaceError,
-        CellError,
-    },
-    core::{
-        ribosome::error::RibosomeError,
-        state::{source_chain::SourceChainError, workspace::WorkspaceError},
-        workflow::error::WorkflowError,
-    },
-};
+use crate::conductor::error::ConductorError;
+use crate::conductor::error::CreateAppError;
+use crate::conductor::interface::error::InterfaceError;
+use crate::conductor::CellError;
+use crate::core::state::source_chain::SourceChainError;
+use crate::core::state::workspace::WorkspaceError;
+use crate::core::workflow::error::WorkflowError;
+use crate::nucleus::ribosome::error::RibosomeError;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::error::DatabaseError;
 use holochain_types::cell::CellId;
@@ -25,7 +21,9 @@ pub enum ConductorApiError {
     CellMissing(CellId),
 
     /// Cell was referenced, but is missing from the conductor.
-    #[error("A Cell attempted to use an CellConductorApi it was not given.\nAPI CellId: {api_cell_id:?}\nInvocation CellId: {invocation_cell_id:?}")]
+    #[error(
+        "A Cell attempted to use an CellConductorApi it was not given.\nAPI CellId: {api_cell_id:?}\nInvocation CellId: {invocation_cell_id:?}"
+    )]
     ZomeCallInvocationCellMismatch {
         /// The CellId which is referenced by the CellConductorApi
         api_cell_id: CellId,
@@ -61,7 +59,7 @@ pub enum ConductorApiError {
 
     /// DnaError
     #[error("DnaError: {0}")]
-    DnaError(#[from] holochain_types::dna::DnaError),
+    DnaError(#[from] crate::nucleus::dna::DnaError),
 
     /// The Dna file path provided was invalid
     #[error("The Dna file path provided was invalid")]

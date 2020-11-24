@@ -1,19 +1,16 @@
-use std::{
-    convert::{TryFrom, TryInto},
-    time::Duration,
-};
+use std::convert::TryFrom;
+use std::convert::TryInto;
+use std::time::Duration;
 
 use holo_hash::EntryHash;
 use holochain_types::Entry;
 use holochain_wasm_test_utils::TestWasm;
 
-use crate::{
-    core::state::element_buf::ElementBuf,
-    test_utils::{host_fn_api::*, wait_for_integration},
-};
-use crate::{
-    core::state::source_chain::SourceChain, test_utils::conductor_setup::ConductorTestData,
-};
+use crate::core::state::element_buf::ElementBuf;
+use crate::core::state::source_chain::SourceChain;
+use crate::test_utils::conductor_setup::ConductorTestData;
+use crate::test_utils::host_fn_api::*;
+use crate::test_utils::wait_for_integration;
 
 /// - Alice commits an entry and it is in their authored store
 /// - Bob doesn't have the entry in their authored store

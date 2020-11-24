@@ -4,71 +4,79 @@
 //! Elements can be added. A constructed Cell is guaranteed to have a valid
 //! SourceChain which has already undergone Genesis.
 
-use super::{interface::SignalBroadcaster, manager::ManagedTaskAdd};
+use super::interface::SignalBroadcaster;
+use super::manager::ManagedTaskAdd;
+use crate::conductor::api::error::ConductorApiError;
+use crate::conductor::api::CellConductorApi;
+use crate::conductor::api::CellConductorApiT;
+use crate::conductor::cell::error::CellResult;
+use crate::conductor::entry_def_store::get_entry_def_from_ids;
 use crate::conductor::handle::ConductorHandle;
-use crate::conductor::{api::error::ConductorApiError, entry_def_store::get_entry_def_from_ids};
-use crate::core::queue_consumer::{spawn_queue_consumer_tasks, InitialQueueTriggers};
-use crate::core::ribosome::ZomeCallInvocation;
-use crate::{
-    conductor::api::CellConductorApiT,
-    core::workflow::produce_dht_ops_workflow::dht_op_light::light_to_op,
-};
-use crate::{
-    conductor::{api::CellConductorApi, cell::error::CellResult},
-    core::ribosome::{guest_callback::init::InitResult, wasm_ribosome::WasmRibosome},
-    core::{
-        state::{
-            dht_op_integration::IntegratedDhtOpsBuf,
-            element_buf::ElementBuf,
-            metadata::{LinkMetaKey, MetadataBuf, MetadataBufT},
-            source_chain::{SourceChain, SourceChainBuf},
-        },
-        workflow::{
-            call_zome_workflow, error::WorkflowError, genesis_workflow::genesis_workflow,
-            incoming_dht_ops_workflow::incoming_dht_ops_workflow, initialize_zomes_workflow,
-            CallZomeWorkflowArgs, CallZomeWorkspace, GenesisWorkflowArgs, GenesisWorkspace,
-            InitializeZomesWorkflowArgs, ZomeCallInvocationResult,
-        },
-    },
-};
+use crate::core::queue_consumer::spawn_queue_consumer_tasks;
+use crate::core::queue_consumer::InitialQueueTriggers;
+use crate::core::state::dht_op_integration::IntegratedDhtOpsBuf;
+use crate::core::state::element_buf::ElementBuf;
+use crate::core::state::metadata::LinkMetaKey;
+use crate::core::state::metadata::MetadataBuf;
+use crate::core::state::metadata::MetadataBufT;
+use crate::core::state::source_chain::SourceChain;
+use crate::core::state::source_chain::SourceChainBuf;
+use crate::core::workflow::call_zome_workflow;
+use crate::core::workflow::error::WorkflowError;
+use crate::core::workflow::genesis_workflow::genesis_workflow;
+use crate::core::workflow::incoming_dht_ops_workflow::incoming_dht_ops_workflow;
+use crate::core::workflow::initialize_zomes_workflow;
+use crate::core::workflow::produce_dht_ops_workflow::dht_op_light::light_to_op;
+use crate::core::workflow::CallZomeWorkflowArgs;
+use crate::core::workflow::CallZomeWorkspace;
+use crate::core::workflow::GenesisWorkflowArgs;
+use crate::core::workflow::GenesisWorkspace;
+use crate::core::workflow::InitializeZomesWorkflowArgs;
+use crate::core::workflow::ZomeCallInvocationResult;
+use crate::nucleus::ribosome::guest_callback::init::InitResult;
+use crate::nucleus::ribosome::wasm_ribosome::WasmRibosome;
+use crate::nucleus::ribosome::ZomeCallInvocation;
 use call_zome_workflow::call_zome_workspace_lock::CallZomeWorkspaceLock;
-use error::{AuthorityDataError, CellError};
+use error::AuthorityDataError;
+use error::CellError;
 use fallible_iterator::FallibleIterator;
 use futures::future::FutureExt;
 use hash_type::AnyDht;
 use holo_hash::*;
 use holochain_p2p::HolochainP2pCellT;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_state::{
-    db::GetDb,
-    env::{EnvironmentRead, EnvironmentWrite, ReadManager},
-};
+use holochain_state::db::GetDb;
+use holochain_state::env::EnvironmentRead;
+use holochain_state::env::EnvironmentWrite;
+use holochain_state::env::ReadManager;
 use holochain_types::activity::AgentActivity;
-use holochain_types::{
-    autonomic::AutonomicProcess,
-    cell::CellId,
-    element::GetElementResponse,
-    link::{GetLinksResponse, WireLinkMetaKey},
-    metadata::{MetadataSet, TimedHeaderHash},
-    validate::ValidationPackageResponse,
-    Timestamp,
-};
+use holochain_types::autonomic::AutonomicProcess;
+use holochain_types::cell::CellId;
+use holochain_types::element::GetElementResponse;
+use holochain_types::link::GetLinksResponse;
+use holochain_types::link::WireLinkMetaKey;
+use holochain_types::metadata::MetadataSet;
+use holochain_types::metadata::TimedHeaderHash;
+use holochain_types::validate::ValidationPackageResponse;
+use holochain_types::Timestamp;
 use holochain_zome_types::capability::CapSecret;
+use holochain_zome_types::header::CreateLink;
+use holochain_zome_types::header::DeleteLink;
 use holochain_zome_types::header::EntryType;
-use holochain_zome_types::header::{CreateLink, DeleteLink};
+use holochain_zome_types::query::ChainQueryFilter;
 use holochain_zome_types::signature::Signature;
 use holochain_zome_types::validate::RequiredValidationType;
 use holochain_zome_types::validate::ValidationPackage;
+use holochain_zome_types::validate::ValidationStatus;
 use holochain_zome_types::zome::FunctionName;
 use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::ExternInput;
-use holochain_zome_types::{query::ChainQueryFilter, validate::ValidationStatus};
 use observability::OpenSpanExt;
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    convert::TryInto,
-    hash::{Hash, Hasher},
-};
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
+use std::convert::TryInto;
+use std::hash::Hash;
+use std::hash::Hasher;
 use tokio::sync;
 use tracing::*;
 use tracing_futures::Instrument;
@@ -806,7 +814,7 @@ impl Cell {
         .map_err(Box::new)?;
         trace!(?init_result);
         match init_result {
-            InitResult::Pass => (),
+            InitResult::Pass => {}
             r => return Err(CellError::InitFailed(r)),
         }
         Ok(())

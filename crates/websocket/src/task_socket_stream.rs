@@ -1,7 +1,8 @@
 //! This task manages the incoming messages and events from the websocket stream.
 
 use crate::*;
-use task_dispatch_incoming::{ToDispatchIncoming, ToDispatchIncomingSender};
+use task_dispatch_incoming::ToDispatchIncoming;
+use task_dispatch_incoming::ToDispatchIncomingSender;
 use task_socket_sink::ToSocketSinkSender;
 
 /// See module-level documentation for this internal task
@@ -111,7 +112,7 @@ async fn process_incoming_message(
                 .map_err(|e| Error::new(ErrorKind::Other, e))?;
             recv.await.map_err(|e| Error::new(ErrorKind::Other, e))?;
         }
-        tungstenite::Message::Pong(_) => (), // no-op
+        tungstenite::Message::Pong(_) => {} // no-op
         incoming => {
             let bytes = incoming.into_data();
             let bytes: SerializedBytes = UnsafeBytes::from(bytes).into();

@@ -1,8 +1,9 @@
 //! Collection of cells to form a holochain application
-use crate::{cell::CellId, dna::JsonProperties};
+use crate::cell::CellId;
+use derive_more::From;
 use derive_more::Into;
 use holo_hash::AgentPubKey;
-use holochain_serialized_bytes::SerializedBytes;
+use holochain_serialized_bytes::prelude::*;
 use std::path::PathBuf;
 
 /// Placeholder used to identify installed apps
@@ -93,4 +94,15 @@ pub struct InstalledApp {
     pub installed_app_id: InstalledAppId,
     /// Cell data for this app
     pub cell_data: Vec<InstalledCell>,
+}
+
+/// A type to allow json values to be used as [SerializedBytes]
+#[derive(Debug, Clone, From, serde::Serialize, serde::Deserialize, SerializedBytes)]
+pub struct JsonProperties(serde_json::Value);
+
+impl JsonProperties {
+    /// Create new properties from json value
+    pub fn new(properties: serde_json::Value) -> Self {
+        JsonProperties(properties)
+    }
 }

@@ -7,18 +7,16 @@
 // FIXME: understand the details of actually getting the DNA
 // FIXME: creating entries in the config db
 
-use super::error::{WorkflowError, WorkflowResult};
+use super::error::WorkflowError;
+use super::error::WorkflowResult;
 use crate::conductor::api::CellConductorApiT;
-use crate::core::{
-    queue_consumer::OneshotWriter,
-    state::{
-        source_chain::SourceChainBuf,
-        workspace::{Workspace, WorkspaceResult},
-    },
-};
+use crate::core::queue_consumer::OneshotWriter;
+use crate::core::state::source_chain::SourceChainBuf;
+use crate::core::state::workspace::Workspace;
+use crate::core::state::workspace::WorkspaceResult;
+use crate::nucleus::dna::DnaFile;
 use derive_more::Constructor;
 use holochain_state::prelude::*;
-use holochain_types::dna::DnaFile;
 use holochain_types::prelude::*;
 use tracing::*;
 
@@ -104,19 +102,16 @@ impl Workspace for GenesisWorkspace {
 
 #[cfg(test)]
 pub mod tests {
-
     use super::*;
 
-    use crate::{
-        conductor::api::MockCellConductorApi,
-        core::{state::source_chain::SourceChain, SourceChainResult},
-    };
+    use crate::conductor::api::MockCellConductorApi;
+    use crate::core::state::source_chain::SourceChain;
+    use crate::core::SourceChainResult;
     use fallible_iterator::FallibleIterator;
+    use crate::nucleus::test_utils::fake_dna_file;
     use holochain_state::test_utils::test_cell_env;
-    use holochain_types::{
-        observability,
-        test_utils::{fake_agent_pubkey_1, fake_dna_file},
-    };
+    use holochain_types::observability;
+    use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_zome_types::Header;
     use matches::assert_matches;
 

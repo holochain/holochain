@@ -1,11 +1,11 @@
-use crate::{
-    buffer::BufferedStore,
-    error::{DatabaseError, DatabaseResult},
-    prelude::*,
-};
+use crate::buffer::BufferedStore;
+use crate::error::DatabaseError;
+use crate::error::DatabaseResult;
+use crate::prelude::*;
 use either::Either;
 use rkv::MultiStore;
-use std::{collections::BTreeMap, fmt::Debug};
+use std::collections::BTreeMap;
+use std::fmt::Debug;
 use tracing::*;
 
 #[cfg(test)]
@@ -119,9 +119,11 @@ where
                 from_scratch_space
                     // Otherwise, chain it with the persisted content,
                     // skipping only things that we've specifically deleted or returned.
-                    .chain(persisted.filter(move |r| match r {
-                        Ok(v) => !deltas.contains_key(v),
-                        Err(_e) => true,
+                    .chain(persisted.filter(move |r| {
+                        match r {
+                            Ok(v) => !deltas.contains_key(v),
+                            Err(_e) => true,
+                        }
                     })),
             )
         };

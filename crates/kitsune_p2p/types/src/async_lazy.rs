@@ -29,7 +29,7 @@ impl<O: 'static + Clone + Send + Sync> AsyncLazy<O> {
                 match r.recv().await {
                     Some(Some(v)) => return v,
                     None => panic!("sender task dropped"),
-                    _ => (),
+                    _ => {}
                 }
             }
         }

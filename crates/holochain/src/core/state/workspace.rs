@@ -4,7 +4,8 @@
 //! Every Workflow has an associated Workspace type.
 
 use super::source_chain::SourceChainError;
-use holochain_state::{error::DatabaseError, prelude::Writer};
+use holochain_state::error::DatabaseError;
+use holochain_state::prelude::Writer;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -41,16 +42,18 @@ pub trait Workspace: Send + Sized {
 
 #[cfg(test)]
 pub mod tests {
-
     use super::Workspace;
     use crate::core::state::workspace::WorkspaceResult;
-    use holochain_state::{
-        buffer::{BufferedStore, KvBufFresh},
-        db::{GetDb, ELEMENT_VAULT_HEADERS, ELEMENT_VAULT_PUBLIC_ENTRIES},
-        prelude::*,
-        test_utils::{test_cell_env, DbString},
-    };
-    use holochain_types::{prelude::*, test_utils::fake_header_hash};
+    use holochain_state::buffer::BufferedStore;
+    use holochain_state::buffer::KvBufFresh;
+    use holochain_state::db::GetDb;
+    use holochain_state::db::ELEMENT_VAULT_HEADERS;
+    use holochain_state::db::ELEMENT_VAULT_PUBLIC_ENTRIES;
+    use holochain_state::prelude::*;
+    use holochain_state::test_utils::test_cell_env;
+    use holochain_state::test_utils::DbString;
+    use holochain_types::prelude::*;
+    use holochain_types::test_utils::fake_header_hash;
 
     pub struct TestWorkspace {
         one: KvBufFresh<HeaderHash, u32>,

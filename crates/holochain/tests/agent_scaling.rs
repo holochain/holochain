@@ -1,15 +1,16 @@
 #![cfg(feature = "test_utils")]
 
 use hdk3::prelude::Links;
-use holochain::{
-    core::ribosome::ZomeCallInvocation, test_utils::conductor_setup::ConductorTestData,
-};
+use holochain::nucleus::dna::DnaFile;
+use holochain::nucleus::ribosome::ZomeCallInvocation;
+use holochain::test_utils::conductor_setup::ConductorTestData;
+use holochain::{nucleus::dna::DnaDef, prelude::Zome};
 use holochain_keystore::keystore_actor::KeystoreSenderExt;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::test_utils::test_environments;
-use holochain_types::dna::{DnaDef, DnaFile};
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::{ExternInput, ZomeCallResponse};
+use holochain_zome_types::ExternInput;
+use holochain_zome_types::ZomeCallResponse;
 use unwrap_to::unwrap_to;
 
 /// A single link with an AgentPubKey for the base and target is committed by
@@ -28,7 +29,11 @@ async fn many_agents_can_reach_consistency_agent_links() {
             name: "conductor_test".to_string(),
             uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
             properties: SerializedBytes::try_from(()).unwrap(),
-            zomes: zomes.clone().into_iter().map(Into::into).collect(),
+            zomes: zomes
+                .clone()
+                .into_iter()
+                .map(|w| Zome::from(w).into_inner())
+                .collect(),
         },
         zomes.into_iter().map(Into::into),
     )
@@ -95,7 +100,11 @@ async fn many_agents_can_reach_consistency_normal_links() {
             name: "conductor_test".to_string(),
             uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
             properties: SerializedBytes::try_from(()).unwrap(),
-            zomes: zomes.clone().into_iter().map(Into::into).collect(),
+            zomes: zomes
+                .clone()
+                .into_iter()
+                .map(|w| Zome::from(w).into_inner())
+                .collect(),
         },
         zomes.into_iter().map(Into::into),
     )

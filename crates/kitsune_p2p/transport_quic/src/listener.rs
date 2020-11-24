@@ -1,11 +1,15 @@
 use crate::*;
-use futures::{future::FutureExt, sink::SinkExt, stream::StreamExt};
+use futures::future::FutureExt;
+use futures::sink::SinkExt;
+use futures::stream::StreamExt;
 use ghost_actor::dependencies::tracing;
-use kitsune_p2p_types::{
-    dependencies::{ghost_actor, ghost_actor::GhostControlSender, serde_json, url2},
-    transport::*,
-};
-use std::{collections::HashMap, net::SocketAddr};
+use kitsune_p2p_types::dependencies::ghost_actor;
+use kitsune_p2p_types::dependencies::ghost_actor::GhostControlSender;
+use kitsune_p2p_types::dependencies::serde_json;
+use kitsune_p2p_types::dependencies::url2;
+use kitsune_p2p_types::transport::*;
+use std::collections::HashMap;
+use std::net::SocketAddr;
 
 /// Convert quinn async read/write streams into Vec<u8> senders / receivers.
 /// Quic bi-streams are Async Read/Write - But the kitsune transport api
@@ -355,11 +359,16 @@ pub async fn spawn_transport_listener_quic(
 
 // TODO - modernize all this taking hints from TLS code in proxy crate.
 mod danger {
-    use kitsune_p2p_types::transport::{TransportError, TransportResult};
-    use quinn::{
-        Certificate, CertificateChain, ClientConfig, ClientConfigBuilder, PrivateKey, ServerConfig,
-        ServerConfigBuilder, TransportConfig,
-    };
+    use kitsune_p2p_types::transport::TransportError;
+    use kitsune_p2p_types::transport::TransportResult;
+    use quinn::Certificate;
+    use quinn::CertificateChain;
+    use quinn::ClientConfig;
+    use quinn::ClientConfigBuilder;
+    use quinn::PrivateKey;
+    use quinn::ServerConfig;
+    use quinn::ServerConfigBuilder;
+    use quinn::TransportConfig;
     use std::sync::Arc;
 
     #[allow(dead_code)]

@@ -4,45 +4,63 @@
 //! where as retrieve only checks that where the data was found
 //! the appropriate validation has been run.
 
-use super::{
-    element_buf::ElementBuf,
-    metadata::{ChainItemKey, LinkMetaKey, MetadataBuf, MetadataBufT},
-};
+use super::element_buf::ElementBuf;
+use super::metadata::ChainItemKey;
+use super::metadata::LinkMetaKey;
+use super::metadata::MetadataBuf;
+use super::metadata::MetadataBufT;
 use crate::core::workflow::integrate_dht_ops_workflow::integrate_single_metadata;
 use either::Either;
 use error::CascadeResult;
 use fallible_iterator::FallibleIterator;
-use holo_hash::{hash_type::AnyDht, AgentPubKey, AnyDhtHash, EntryHash, HasHash, HeaderHash};
-use holochain_p2p::{actor::GetActivityOptions, HolochainP2pCellT};
-use holochain_p2p::{
-    actor::{GetLinksOptions, GetMetaOptions, GetOptions},
-    HolochainP2pCell,
-};
-use holochain_state::{error::DatabaseResult, fresh_reader, prelude::*};
-use holochain_types::{
-    activity::{AgentActivity, ChainItems},
-    chain::AgentActivityExt,
-    dht_op::{produce_op_lights_from_element_group, produce_op_lights_from_elements},
-    element::{
-        Element, ElementGroup, ElementStatus, GetElementResponse, RawGetEntryResponse,
-        SignedHeaderHashed, SignedHeaderHashedExt,
-    },
-    entry::option_entry_hashed,
-    link::{GetLinksResponse, WireLinkMetaKey},
-    metadata::{EntryDhtStatus, MetadataSet, TimedHeaderHash},
-    EntryHashed, HeaderHashed,
-};
-use holochain_zome_types::{
-    element::SignedHeader,
-    header::HeaderType,
-    link::Link,
-    metadata::{Details, ElementDetails, EntryDetails},
-    query::ChainQueryFilter,
-    query::ChainStatus,
-    validate::{ValidationPackage, ValidationStatus},
-};
+use holo_hash::hash_type::AnyDht;
+use holo_hash::AgentPubKey;
+use holo_hash::AnyDhtHash;
+use holo_hash::EntryHash;
+use holo_hash::HasHash;
+use holo_hash::HeaderHash;
+use holochain_p2p::actor::GetActivityOptions;
+use holochain_p2p::actor::GetLinksOptions;
+use holochain_p2p::actor::GetMetaOptions;
+use holochain_p2p::actor::GetOptions;
+use holochain_p2p::HolochainP2pCell;
+use holochain_p2p::HolochainP2pCellT;
+use holochain_state::error::DatabaseResult;
+use holochain_state::fresh_reader;
+use holochain_state::prelude::*;
+use holochain_types::activity::AgentActivity;
+use holochain_types::activity::ChainItems;
+use holochain_types::chain::AgentActivityExt;
+use holochain_types::dht_op::produce_op_lights_from_element_group;
+use holochain_types::dht_op::produce_op_lights_from_elements;
+use holochain_types::element::Element;
+use holochain_types::element::ElementGroup;
+use holochain_types::element::ElementStatus;
+use holochain_types::element::GetElementResponse;
+use holochain_types::element::RawGetEntryResponse;
+use holochain_types::element::SignedHeaderHashed;
+use holochain_types::element::SignedHeaderHashedExt;
+use holochain_types::entry::option_entry_hashed;
+use holochain_types::link::GetLinksResponse;
+use holochain_types::link::WireLinkMetaKey;
+use holochain_types::metadata::EntryDhtStatus;
+use holochain_types::metadata::MetadataSet;
+use holochain_types::metadata::TimedHeaderHash;
+use holochain_types::EntryHashed;
+use holochain_types::HeaderHashed;
+use holochain_zome_types::element::SignedHeader;
+use holochain_zome_types::header::HeaderType;
+use holochain_zome_types::link::Link;
+use holochain_zome_types::metadata::Details;
+use holochain_zome_types::metadata::ElementDetails;
+use holochain_zome_types::metadata::EntryDetails;
+use holochain_zome_types::query::ChainQueryFilter;
+use holochain_zome_types::query::ChainStatus;
+use holochain_zome_types::validate::ValidationPackage;
+use holochain_zome_types::validate::ValidationStatus;
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::collections::HashSet;
-use std::collections::{BTreeMap, BTreeSet};
 use tracing::*;
 use tracing_futures::Instrument;
 
@@ -347,7 +365,7 @@ where
                     ValidationStatus::Valid,
                 )?;
             }
-            ChainItems::NotRequested => (),
+            ChainItems::NotRequested => {}
         };
         match rejected_activity {
             ChainItems::Full(headers) => {
@@ -368,7 +386,7 @@ where
                     ValidationStatus::Rejected,
                 )?;
             }
-            ChainItems::NotRequested => (),
+            ChainItems::NotRequested => {}
         };
         match &status {
             ChainStatus::Empty => {}
@@ -443,7 +461,7 @@ where
                 }
             }
             // Doesn't have header but not because it was deleted
-            GetElementResponse::GetHeader(None) => (),
+            GetElementResponse::GetHeader(None) => {}
             r => {
                 error!(
                     msg = "Got an invalid response to fetch element via header",
@@ -532,7 +550,7 @@ where
                 }
             }
             // Authority didn't have any headers for this entry
-            GetElementResponse::GetEntryFull(None) => (),
+            GetElementResponse::GetEntryFull(None) => {}
             r @ GetElementResponse::GetHeader(_) => {
                 error!(
                     msg = "Got an invalid response to fetch element via entry",
@@ -1594,7 +1612,7 @@ where
             // we must go to the network because we don't
             // know how long the chain is.
             None => return Ok(None),
-            _ => (),
+            _ => {}
         }
         // Try getting the activity from the cache.
         let chain_hashes =
@@ -1756,7 +1774,7 @@ where
                 }
                 return Ok(activity);
             }
-            _ => (),
+            _ => {}
         }
 
         match &activity.valid_activity {

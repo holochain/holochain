@@ -4,8 +4,8 @@
 
 use crate::capability::CapSecret;
 use crate::capability::CAP_SECRET_BYTES;
-use crate::ExternInput;
-use holo_hash::{hash_type, *};
+use holo_hash::hash_type;
+use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 
 fn fake_holo_hash<T: holo_hash::HashType>(name: u8, hash_type: T) -> HoloHash<T> {

@@ -1,19 +1,20 @@
 use super::KvIntStore;
+use crate::buffer::check_empty_key;
+use crate::buffer::iter::DrainIter;
+use crate::buffer::iter::SingleIter;
+use crate::buffer::iter::SingleIterFrom;
+use crate::buffer::iter::SingleIterKeyMatch;
 use crate::buffer::kv::generic::KvStoreT;
-use crate::buffer::{
-    check_empty_key,
-    iter::{DrainIter, SingleIter, SingleIterFrom, SingleIterKeyMatch},
-    kv::KvStore,
-    BufferedStore,
-};
-use crate::{
-    env::EnvironmentRead,
-    error::{DatabaseError, DatabaseResult},
-    fresh_reader,
-    prelude::*,
-};
+use crate::buffer::kv::KvStore;
+use crate::buffer::BufferedStore;
+use crate::env::EnvironmentRead;
+use crate::error::DatabaseError;
+use crate::error::DatabaseResult;
+use crate::fresh_reader;
+use crate::prelude::*;
 use fallible_iterator::FallibleIterator;
-use rkv::{IntegerStore, SingleStore};
+use rkv::IntegerStore;
+use rkv::SingleStore;
 use std::collections::BTreeMap;
 
 #[cfg(test)]
@@ -335,7 +336,7 @@ where
                     self.store.db().put(writer, k, &encoded)?;
                 }
                 Delete => match self.store.db().delete(writer, k) {
-                    Err(rkv::StoreError::LmdbError(rkv::LmdbError::NotFound)) => (),
+                    Err(rkv::StoreError::LmdbError(rkv::LmdbError::NotFound)) => {}
                     r => r?,
                 },
             }
@@ -378,7 +379,7 @@ where
                     .db()
                     .delete(writer, IntKey::from_key_bytes_or_friendly_panic(k))
                 {
-                    Err(rkv::StoreError::LmdbError(rkv::LmdbError::NotFound)) => (),
+                    Err(rkv::StoreError::LmdbError(rkv::LmdbError::NotFound)) => {}
                     r => r?,
                 },
             }

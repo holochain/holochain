@@ -8,7 +8,10 @@
 use crate::capability::CapClaim;
 use crate::capability::CapGrant;
 use crate::capability::ZomeCallCapGrant;
-use holo_hash::{hash_type, AgentPubKey, HashableContent, HashableContentBytes};
+use holo_hash::hash_type;
+use holo_hash::AgentPubKey;
+use holo_hash::HashableContent;
+use holo_hash::HashableContentBytes;
 use holochain_serialized_bytes::prelude::*;
 
 mod app_entry_bytes;

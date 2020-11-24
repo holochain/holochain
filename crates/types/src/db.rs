@@ -1,7 +1,8 @@
 //! Utility items related to data persistence.
 
 use crate::cell::CellId;
-use std::path::{Path, PathBuf};
+use std::path::Path;
+use std::path::PathBuf;
 
 /// Path to persistence storage.
 #[derive(Clone, Debug)]

@@ -64,6 +64,11 @@ url_serde = "0.2.0"
 uuid = { version = "0.7", features = [ "serde", "v4" ] }
 kitsune_p2p = { version = "0.0.1", path = "../kitsune_p2p/kitsune_p2p" }
 
+# Dependencies for `holochain_nucleus`
+backtrace = "0.3.27"
+derive_builder = "0.9.0"
+flate2 = "1.0.14"
+
 # Dependencies for test_utils: keep in sync with below
 hdk3 = { path = "../hdk", optional = true }
 matches = {version = "0.1.8", optional = true }

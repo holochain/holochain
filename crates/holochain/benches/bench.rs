@@ -1,12 +1,15 @@
 use ::fixt::prelude::*;
+use criterion::criterion_group;
+use criterion::criterion_main;
 use criterion::BenchmarkId;
+use criterion::Criterion;
 use criterion::Throughput;
-use criterion::{criterion_group, criterion_main, Criterion};
 use hdk3::prelude::*;
 use holo_hash::fixt::AgentPubKeyFixturator;
-use holochain::core::ribosome::RibosomeT;
-use holochain::core::ribosome::ZomeCallInvocation;
-use holochain_types::{dna::zome::Zome, fixt::CapSecretFixturator};
+use holochain::nucleus::dna::zome::Zome;
+use holochain::nucleus::ribosome::RibosomeT;
+use holochain::nucleus::ribosome::ZomeCallInvocation;
+use holochain_types::fixt::CapSecretFixturator;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::ExternInput;
 use once_cell::sync::Lazy;
@@ -22,7 +25,7 @@ static TOKIO_RUNTIME: Lazy<Mutex<tokio::runtime::Runtime>> = Lazy::new(|| {
     )
 });
 
-static WASM_RIBOSOME: Lazy<Mutex<holochain::core::ribosome::wasm_ribosome::WasmRibosome>> =
+static WASM_RIBOSOME: Lazy<Mutex<holochain::nucleus::ribosome::wasm_ribosome::WasmRibosome>> =
     Lazy::new(|| {
         Mutex::new(
             holochain::fixt::WasmRibosomeFixturator::new(holochain::fixt::curve::Zomes(vec![

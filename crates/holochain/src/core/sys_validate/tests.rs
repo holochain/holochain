@@ -1,18 +1,19 @@
 use super::*;
-use crate::{conductor::api::MockCellConductorApi, meta_mock};
+use crate::meta_mock;
+use crate::nucleus::dna::DnaDef;
+use crate::nucleus::dna::DnaFile;
+use crate::{conductor::api::MockCellConductorApi, nucleus::dna::zome::test_wasm_to_pair};
 use ::fixt::prelude::*;
 use error::SysValidationError;
 use holo_hash::fixt::*;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_state::{env::EnvironmentRead, test_utils::test_cell_env};
-use holochain_types::{
-    dna::{DnaDef, DnaFile},
-    fixt::*,
-    observability,
-    test_utils::fake_agent_pubkey_1,
-    Timestamp,
-};
+use holochain_state::env::EnvironmentRead;
+use holochain_state::test_utils::test_cell_env;
+use holochain_types::fixt::*;
+use holochain_types::observability;
+use holochain_types::test_utils::fake_agent_pubkey_1;
+use holochain_types::Timestamp;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::Header;
 use matches::assert_matches;
@@ -279,7 +280,7 @@ async fn check_app_entry_type_test() {
             name: "app_entry_type_test".to_string(),
             uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
             properties: SerializedBytes::try_from(()).unwrap(),
-            zomes: vec![TestWasm::EntryDefs.into()].into(),
+            zomes: vec![test_wasm_to_pair(TestWasm::EntryDefs)].into(),
         },
         vec![TestWasm::EntryDefs.into()],
     )

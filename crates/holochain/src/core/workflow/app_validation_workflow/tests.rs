@@ -1,37 +1,36 @@
-use crate::{
-    conductor::ConductorHandle,
-    core::ribosome::ZomeCallInvocation,
-    core::state::dht_op_integration::IntegratedDhtOpsValue,
-    core::state::validation_db::ValidationLimboValue,
-    core::{
-        state::element_buf::ElementBuf,
-        workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace,
-    },
-    test_utils::host_fn_api::*,
-    test_utils::new_invocation,
-    test_utils::setup_app,
-    test_utils::wait_for_integration,
-};
+use crate::core::state::dht_op_integration::IntegratedDhtOpsValue;
+use crate::core::state::element_buf::ElementBuf;
+use crate::core::state::validation_db::ValidationLimboValue;
+use crate::core::workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace;
+use crate::nucleus::dna::DnaDef;
+use crate::nucleus::dna::DnaFile;
+use crate::nucleus::ribosome::ZomeCallInvocation;
+use crate::test_utils::host_fn_api::*;
+use crate::test_utils::new_invocation;
+use crate::test_utils::setup_app;
+use crate::test_utils::wait_for_integration;
+use crate::{conductor::ConductorHandle, nucleus::dna::zome::test_wasm_to_pair};
 use fallible_iterator::FallibleIterator;
-use holo_hash::{AnyDhtHash, DhtOpHash, EntryHash, HeaderHash};
+use holo_hash::AnyDhtHash;
+use holo_hash::DhtOpHash;
+use holo_hash::EntryHash;
+use holo_hash::HeaderHash;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_state::{env::EnvironmentWrite, fresh_reader_test};
-use holochain_types::{
-    app::InstalledCell,
-    cell::CellId,
-    dht_op::DhtOpLight,
-    dna::{DnaDef, DnaFile},
-    test_utils::fake_agent_pubkey_1,
-    test_utils::fake_agent_pubkey_2,
-    validate::ValidationStatus,
-    Entry,
-};
+use holochain_state::env::EnvironmentWrite;
+use holochain_state::fresh_reader_test;
+use holochain_types::app::InstalledCell;
+use holochain_types::cell::CellId;
+use holochain_types::dht_op::DhtOpLight;
+use holochain_types::test_utils::fake_agent_pubkey_1;
+use holochain_types::test_utils::fake_agent_pubkey_2;
+use holochain_types::validate::ValidationStatus;
+use holochain_types::Entry;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::{element::Element, Header};
-use std::{
-    convert::{TryFrom, TryInto},
-    time::Duration,
-};
+use holochain_zome_types::element::Element;
+use holochain_zome_types::Header;
+use std::convert::TryFrom;
+use std::convert::TryInto;
+use std::time::Duration;
 use tracing::*;
 
 #[tokio::test(threaded_scheduler)]
@@ -44,9 +43,9 @@ async fn app_validation_workflow_test() {
             uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
             properties: SerializedBytes::try_from(()).unwrap(),
             zomes: vec![
-                TestWasm::Validate.into(),
-                TestWasm::ValidateLink.into(),
-                TestWasm::Create.into(),
+                test_wasm_to_pair(TestWasm::Validate),
+                test_wasm_to_pair(TestWasm::ValidateLink),
+                test_wasm_to_pair(TestWasm::Create),
             ]
             .into(),
         },
@@ -128,7 +127,7 @@ fn others((hash, i, el): &(DhtOpHash, IntegratedDhtOpsValue, Element), line: u32
         // Register agent activity will be invalid if the previous header is invalid
         // This is very hard to track in these tests and this op also doesn't
         // go through app validation so it's more productive to skip it
-        DhtOpLight::RegisterAgentActivity(_, _) => (),
+        DhtOpLight::RegisterAgentActivity(_, _) => {}
         _ => assert_eq!(i.validation_status, ValidationStatus::Valid, "{}", s),
     }
 }
@@ -434,7 +433,7 @@ async fn run_test_entry_def_id(
                 DhtOpLight::StoreElement(hh, _, _) if *hh == invalid_header_hash => {
                     assert_eq!(v.1.validation_status, ValidationStatus::Rejected, "{:?}", v);
                 }
-                _ => (),
+                _ => {}
             }
         }
 

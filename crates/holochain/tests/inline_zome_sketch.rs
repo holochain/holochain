@@ -1,15 +1,14 @@
 use futures::StreamExt;
 use hdk3::prelude::*;
-use holochain::{conductor::Conductor, core::ribosome::ZomeCallInvocation};
+use holochain::conductor::Conductor;
+use holochain::nucleus::dna::zome::inline_zome::InlineZome;
+use holochain::nucleus::dna::zome::ZomeDef;
+use holochain::nucleus::dna::DnaDefBuilder;
+use holochain::nucleus::dna::DnaFile;
+use holochain::nucleus::ribosome::ZomeCallInvocation;
 use holochain_keystore::KeystoreSender;
 use holochain_state::test_utils::test_environments;
-use holochain_types::{
-    app::InstalledCell,
-    dna::{
-        zome::{inline_zome::InlineZome, ZomeDef},
-        DnaDefBuilder, DnaFile,
-    },
-};
+use holochain_types::app::InstalledCell;
 
 #[tokio::test(threaded_scheduler)]
 async fn one() -> anyhow::Result<()> {

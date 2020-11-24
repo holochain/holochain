@@ -1,51 +1,59 @@
 //! The workflow and queue consumer for DhtOp integration
 
 use super::*;
-use crate::core::{
-    queue_consumer::{OneshotWriter, TriggerSender, WorkComplete},
-    state::{
-        cascade::error::CascadeResult,
-        cascade::Cascade,
-        cascade::DbPair,
-        dht_op_integration::{
-            IntegratedDhtOpsStore, IntegratedDhtOpsValue, IntegrationLimboStore,
-            IntegrationLimboValue,
-        },
-        element_buf::ElementBuf,
-        metadata::{MetadataBuf, MetadataBufT},
-        validation_db::ValidationLimboStore,
-        workspace::{Workspace, WorkspaceResult},
-    },
-    validation::DhtOpOrder,
-    validation::OrderedOp,
-};
+use crate::core::queue_consumer::OneshotWriter;
+use crate::core::queue_consumer::TriggerSender;
+use crate::core::queue_consumer::WorkComplete;
+use crate::core::state::cascade::error::CascadeResult;
+use crate::core::state::cascade::Cascade;
+use crate::core::state::cascade::DbPair;
+use crate::core::state::dht_op_integration::IntegratedDhtOpsStore;
+use crate::core::state::dht_op_integration::IntegratedDhtOpsValue;
+use crate::core::state::dht_op_integration::IntegrationLimboStore;
+use crate::core::state::dht_op_integration::IntegrationLimboValue;
+use crate::core::state::element_buf::ElementBuf;
+use crate::core::state::metadata::MetadataBuf;
+use crate::core::state::metadata::MetadataBufT;
+use crate::core::state::validation_db::ValidationLimboStore;
+use crate::core::state::workspace::Workspace;
+use crate::core::state::workspace::WorkspaceResult;
+use crate::core::validation::DhtOpOrder;
+use crate::core::validation::OrderedOp;
 use error::WorkflowResult;
 use fallible_iterator::FallibleIterator;
-use holo_hash::{DhtOpHash, EntryHash, HeaderHash};
-use holochain_state::{
-    buffer::BufferedStore,
-    buffer::KvBufFresh,
-    db::{INTEGRATED_DHT_OPS, INTEGRATION_LIMBO},
-    error::DatabaseResult,
-    fresh_reader,
-    prelude::*,
-};
-use holochain_types::{
-    dht_op::{produce_op_lights_from_elements, DhtOp, DhtOpLight, UniqueForm},
-    element::{Element, SignedHeaderHashed, SignedHeaderHashedExt},
-    header::NewEntryHeader,
-    validate::ValidationStatus,
-    Entry, EntryHashed, Timestamp,
-};
-use holochain_zome_types::{
-    element::ElementEntry, query::ChainHead, query::ChainStatus, signature::Signature,
-};
-use holochain_zome_types::{element::SignedHeader, Header};
-use produce_dht_ops_workflow::dht_op_light::{
-    error::{DhtOpConvertError, DhtOpConvertResult},
-    light_to_op,
-};
-use std::{collections::BinaryHeap, convert::TryInto};
+use holo_hash::DhtOpHash;
+use holo_hash::EntryHash;
+use holo_hash::HeaderHash;
+use holochain_state::buffer::BufferedStore;
+use holochain_state::buffer::KvBufFresh;
+use holochain_state::db::INTEGRATED_DHT_OPS;
+use holochain_state::db::INTEGRATION_LIMBO;
+use holochain_state::error::DatabaseResult;
+use holochain_state::fresh_reader;
+use holochain_state::prelude::*;
+use holochain_types::dht_op::produce_op_lights_from_elements;
+use holochain_types::dht_op::DhtOp;
+use holochain_types::dht_op::DhtOpLight;
+use holochain_types::dht_op::UniqueForm;
+use holochain_types::element::Element;
+use holochain_types::element::SignedHeaderHashed;
+use holochain_types::element::SignedHeaderHashedExt;
+use holochain_types::header::NewEntryHeader;
+use holochain_types::validate::ValidationStatus;
+use holochain_types::Entry;
+use holochain_types::EntryHashed;
+use holochain_types::Timestamp;
+use holochain_zome_types::element::ElementEntry;
+use holochain_zome_types::element::SignedHeader;
+use holochain_zome_types::query::ChainHead;
+use holochain_zome_types::query::ChainStatus;
+use holochain_zome_types::signature::Signature;
+use holochain_zome_types::Header;
+use produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
+use produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertResult;
+use produce_dht_ops_workflow::dht_op_light::light_to_op;
+use std::collections::BinaryHeap;
+use std::convert::TryInto;
 use tracing::*;
 
 pub use disintegrate::*;
@@ -257,7 +265,7 @@ fn update_validation_status(
     match op {
         DhtOp::StoreElement(_, h, _) => meta_integrated.register_rejected_element_header(h)?,
         DhtOp::StoreEntry(_, h, _) => meta_integrated.register_rejected_header(h.clone())?,
-        _ => (),
+        _ => {}
     }
     Ok(())
 }
@@ -269,7 +277,7 @@ async fn op_dependencies_held(
 ) -> CascadeResult<bool> {
     {
         match op {
-            DhtOp::StoreElement(_, _, _) | DhtOp::StoreEntry(_, _, _) => (),
+            DhtOp::StoreElement(_, _, _) | DhtOp::StoreEntry(_, _, _) => {}
             DhtOp::RegisterAgentActivity(_, header) => {
                 // RegisterAgentActivity is the exception where we need to make
                 // sure that we have integrated the previous RegisterAgentActivity DhtOp

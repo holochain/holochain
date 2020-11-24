@@ -1,15 +1,18 @@
 //! Module for items related to aggregating validation_receipts
 
 use fallible_iterator::FallibleIterator;
-use holo_hash::{AgentPubKey, DhtOpHash};
-use holochain_keystore::{AgentPubKeyExt, KeystoreSender};
+use holo_hash::AgentPubKey;
+use holo_hash::DhtOpHash;
+use holochain_keystore::AgentPubKeyExt;
+use holochain_keystore::KeystoreSender;
 use holochain_serialized_bytes::prelude::*;
-use holochain_state::{
-    buffer::{BufferedStore, KvvBufUsed},
-    db::GetDb,
-    error::{DatabaseError, DatabaseResult},
-    prelude::{Readable, Writer},
-};
+use holochain_state::buffer::BufferedStore;
+use holochain_state::buffer::KvvBufUsed;
+use holochain_state::db::GetDb;
+use holochain_state::error::DatabaseError;
+use holochain_state::error::DatabaseResult;
+use holochain_state::prelude::Readable;
+use holochain_state::prelude::Writer;
 use holochain_zome_types::signature::Signature;
 
 /// The result of a DhtOp Validation.
@@ -100,10 +103,8 @@ impl ValidationReceiptsBuf {
         r: &'r R,
         dht_op_hash: &DhtOpHash,
     ) -> DatabaseResult<
-        impl fallible_iterator::FallibleIterator<
-                Item = SignedValidationReceipt,
-                Error = DatabaseError,
-            > + '_,
+        impl fallible_iterator::FallibleIterator<Item = SignedValidationReceipt, Error = DatabaseError>
+        + '_,
     > {
         Ok(fallible_iterator::convert(self.0.get(r, dht_op_hash)?))
     }
@@ -150,7 +151,8 @@ impl BufferedStore for ValidationReceiptsBuf {
 mod tests {
     use super::*;
     use holochain_keystore::KeystoreSenderExt;
-    use holochain_state::{env::ReadManager, prelude::*};
+    use holochain_state::env::ReadManager;
+    use holochain_state::prelude::*;
     use holochain_types::test_utils::fake_dht_op_hash;
 
     async fn fake_vr(

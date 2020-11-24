@@ -1,20 +1,24 @@
 use ::fixt::prelude::*;
 use hdk3::prelude::*;
 use holo_hash::fixt::*;
-use holochain::conductor::{
-    api::{AppInterfaceApi, AppRequest, AppResponse, RealAppInterfaceApi},
-    dna_store::MockDnaStore,
-    ConductorBuilder, ConductorHandle,
-};
-use holochain::core::ribosome::ZomeCallInvocation;
+use holochain::conductor::api::AppInterfaceApi;
+use holochain::conductor::api::AppRequest;
+use holochain::conductor::api::AppResponse;
+use holochain::conductor::api::RealAppInterfaceApi;
+use holochain::conductor::dna_store::MockDnaStore;
+use holochain::conductor::ConductorBuilder;
+use holochain::conductor::ConductorHandle;
 use holochain::fixt::*;
+use holochain::nucleus::dna::zome::test_wasm_to_pair;
+use holochain::nucleus::dna::DnaDef;
+use holochain::nucleus::dna::DnaFile;
+use holochain::nucleus::ribosome::ZomeCallInvocation;
 use holochain_state::test_utils::test_environments;
 use holochain_types::app::InstalledCell;
 use holochain_types::cell::CellId;
-use holochain_types::dna::DnaDef;
-use holochain_types::dna::{DnaFile};
+use holochain_types::observability;
 use holochain_types::test_utils::fake_agent_pubkey_1;
-use holochain_types::{observability, test_utils::fake_agent_pubkey_2};
+use holochain_types::test_utils::fake_agent_pubkey_2;
 use holochain_wasm_test_utils::TestWasm;
 pub use holochain_zome_types::capability::CapSecret;
 use holochain_zome_types::ExternInput;
@@ -56,7 +60,7 @@ async fn ser_regression_test() {
             name: "ser_regression_test".to_string(),
             uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
             properties: SerializedBytes::try_from(()).unwrap(),
-            zomes: vec![TestWasm::SerRegression.into()].into(),
+            zomes: vec![test_wasm_to_pair(TestWasm::SerRegression)].into(),
         },
         vec![TestWasm::SerRegression.into()],
     )

@@ -1,15 +1,18 @@
 use super::error::WorkflowResult;
-use crate::core::queue_consumer::{OneshotWriter, TriggerSender, WorkComplete};
-use crate::core::state::{
-    dht_op_integration::{AuthoredDhtOpsStore, AuthoredDhtOpsValue},
-    source_chain::SourceChain,
-    workspace::{Workspace, WorkspaceResult},
-};
-use holochain_state::{
-    buffer::KvBufFresh,
-    db::AUTHORED_DHT_OPS,
-    prelude::{BufferedStore, EnvironmentRead, GetDb, Writer},
-};
+use crate::core::queue_consumer::OneshotWriter;
+use crate::core::queue_consumer::TriggerSender;
+use crate::core::queue_consumer::WorkComplete;
+use crate::core::state::dht_op_integration::AuthoredDhtOpsStore;
+use crate::core::state::dht_op_integration::AuthoredDhtOpsValue;
+use crate::core::state::source_chain::SourceChain;
+use crate::core::state::workspace::Workspace;
+use crate::core::state::workspace::WorkspaceResult;
+use holochain_state::buffer::KvBufFresh;
+use holochain_state::db::AUTHORED_DHT_OPS;
+use holochain_state::prelude::BufferedStore;
+use holochain_state::prelude::EnvironmentRead;
+use holochain_state::prelude::GetDb;
+use holochain_state::prelude::Writer;
 use holochain_types::dht_op::DhtOpHashed;
 use tracing::*;
 
@@ -91,19 +94,18 @@ mod tests {
     use fallible_iterator::FallibleIterator;
     use holo_hash::*;
 
-    use holochain_state::{
-        env::{ReadManager, WriteManager},
-        test_utils::test_cell_env,
-    };
-    use holochain_types::{
-        dht_op::{produce_ops_from_element, DhtOp},
-        fixt::*,
-        observability, Entry, EntryHashed,
-    };
-    use holochain_zome_types::{
-        entry_def::EntryVisibility,
-        header::{builder, EntryType},
-    };
+    use holochain_state::env::ReadManager;
+    use holochain_state::env::WriteManager;
+    use holochain_state::test_utils::test_cell_env;
+    use holochain_types::dht_op::produce_ops_from_element;
+    use holochain_types::dht_op::DhtOp;
+    use holochain_types::fixt::*;
+    use holochain_types::observability;
+    use holochain_types::Entry;
+    use holochain_types::EntryHashed;
+    use holochain_zome_types::entry_def::EntryVisibility;
+    use holochain_zome_types::header::builder;
+    use holochain_zome_types::header::EntryType;
     use matches::assert_matches;
     use std::collections::HashSet;
 

@@ -1,5 +1,6 @@
 use crate::buffer::iter::SingleIterRaw;
-use crate::{error::DatabaseResult, prelude::*};
+use crate::error::DatabaseResult;
+use crate::prelude::*;
 
 pub trait KvStoreT<K, V> {
     /// Fetch data from DB as raw byte slice

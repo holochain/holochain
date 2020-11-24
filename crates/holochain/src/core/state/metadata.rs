@@ -5,32 +5,43 @@
 //! [Entry]: holochain_types::Entry
 
 use fallible_iterator::FallibleIterator;
+use holo_hash::AgentPubKey;
+use holo_hash::AnyDhtHash;
+use holo_hash::EntryHash;
 use holo_hash::HasHash;
-use holo_hash::{AgentPubKey, AnyDhtHash, EntryHash, HeaderHash};
+use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
-use holochain_state::{
-    buffer::{KvBufUsed, KvvBufUsed},
-    db::{
-        CACHE_LINKS_META, CACHE_STATUS_META, CACHE_SYSTEM_META, META_VAULT_LINKS, META_VAULT_MISC,
-        META_VAULT_SYS,
-    },
-    error::{DatabaseError, DatabaseResult},
-    fresh_reader,
-    prelude::*,
-};
-use holochain_types::metadata::{EntryDhtStatus, TimedHeaderHash};
-use holochain_types::{header::NewEntryHeader, link::WireLinkMetaKey};
-use holochain_types::{HeaderHashed, Timestamp};
-use holochain_zome_types::{
-    header::{self, CreateLink, DeleteLink, ZomeId},
-    query::ChainFork,
-    query::ChainHead,
-    query::ChainStatus,
-    query::HighestObserved,
-    validate::ValidationStatus,
-};
-use holochain_zome_types::{link::LinkTag, Header};
-use std::{collections::HashSet, fmt::Debug};
+use holochain_state::buffer::KvBufUsed;
+use holochain_state::buffer::KvvBufUsed;
+use holochain_state::db::CACHE_LINKS_META;
+use holochain_state::db::CACHE_STATUS_META;
+use holochain_state::db::CACHE_SYSTEM_META;
+use holochain_state::db::META_VAULT_LINKS;
+use holochain_state::db::META_VAULT_MISC;
+use holochain_state::db::META_VAULT_SYS;
+use holochain_state::error::DatabaseError;
+use holochain_state::error::DatabaseResult;
+use holochain_state::fresh_reader;
+use holochain_state::prelude::*;
+use holochain_types::header::NewEntryHeader;
+use holochain_types::link::WireLinkMetaKey;
+use holochain_types::metadata::EntryDhtStatus;
+use holochain_types::metadata::TimedHeaderHash;
+use holochain_types::HeaderHashed;
+use holochain_types::Timestamp;
+use holochain_zome_types::header;
+use holochain_zome_types::header::CreateLink;
+use holochain_zome_types::header::DeleteLink;
+use holochain_zome_types::header::ZomeId;
+use holochain_zome_types::link::LinkTag;
+use holochain_zome_types::query::ChainFork;
+use holochain_zome_types::query::ChainHead;
+use holochain_zome_types::query::ChainStatus;
+use holochain_zome_types::query::HighestObserved;
+use holochain_zome_types::validate::ValidationStatus;
+use holochain_zome_types::Header;
+use std::collections::HashSet;
+use std::fmt::Debug;
 use tracing::*;
 
 use activity::*;

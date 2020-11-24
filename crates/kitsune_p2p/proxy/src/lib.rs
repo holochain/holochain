@@ -3,11 +3,11 @@
 
 use derive_more::*;
 use futures::future::FutureExt;
-use ghost_actor::{dependencies::must_future::MustBoxFuture, GhostControlSender};
-use kitsune_p2p_types::{
-    dependencies::{ghost_actor, url2},
-    transport::*,
-};
+use ghost_actor::dependencies::must_future::MustBoxFuture;
+use ghost_actor::GhostControlSender;
+use kitsune_p2p_types::dependencies::ghost_actor;
+use kitsune_p2p_types::dependencies::url2;
+use kitsune_p2p_types::transport::*;
 use lair_keystore_api::actor::*;
 use std::sync::Arc;
 

@@ -5,8 +5,6 @@
 pub mod net;
 pub mod queue_consumer;
 #[allow(missing_docs)]
-pub mod ribosome;
-#[allow(missing_docs)]
 pub mod signal;
 pub mod state;
 mod validation;

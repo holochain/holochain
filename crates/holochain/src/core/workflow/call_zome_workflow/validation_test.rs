@@ -1,16 +1,16 @@
-use crate::{
-    conductor::{api::error::ConductorApiError, CellError, ConductorHandle},
-    core::workflow::error::WorkflowError,
-    core::SourceChainError,
-    test_utils::{new_invocation, setup_app},
-};
+use crate::conductor::CellError;
+use crate::conductor::ConductorHandle;
+use crate::core::workflow::error::WorkflowError;
+use crate::core::SourceChainError;
+use crate::nucleus::dna::DnaDef;
+use crate::nucleus::dna::DnaFile;
+use crate::test_utils::new_invocation;
+use crate::test_utils::setup_app;
+use crate::{conductor::api::error::ConductorApiError, nucleus::dna::zome::test_wasm_to_pair};
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_types::{
-    app::InstalledCell,
-    cell::CellId,
-    dna::{DnaDef, DnaFile},
-    test_utils::fake_agent_pubkey_1,
-};
+use holochain_types::app::InstalledCell;
+use holochain_types::cell::CellId;
+use holochain_types::test_utils::fake_agent_pubkey_1;
 use holochain_wasm_test_utils::TestWasm;
 use std::convert::TryFrom;
 
@@ -23,7 +23,7 @@ async fn direct_validation_test() {
             name: "direct_validation_test".to_string(),
             uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
             properties: SerializedBytes::try_from(()).unwrap(),
-            zomes: vec![TestWasm::Update.into()].into(),
+            zomes: vec![test_wasm_to_pair(TestWasm::Update)].into(),
         },
         vec![TestWasm::Update.into()],
     )
@@ -60,7 +60,7 @@ async fn run_test(alice_cell_id: CellId, handle: ConductorHandle) {
     let result = handle.call_zome(invocation).await;
     match &result {
         Err(ConductorApiError::CellError(CellError::WorkflowError(wfe))) => match **wfe {
-            WorkflowError::SourceChainError(SourceChainError::InvalidCommit(_)) => (),
+            WorkflowError::SourceChainError(SourceChainError::InvalidCommit(_)) => {}
             _ => panic!("Expected InvalidCommit got {:?}", result),
         },
         _ => panic!("Expected InvalidCommit got {:?}", result),

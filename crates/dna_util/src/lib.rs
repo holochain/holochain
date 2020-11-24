@@ -37,14 +37,15 @@
 //!     (`dna_util -e my-dna.dna.gz` creates dir `my-dna.dna_work_dir`)
 //! ```
 
+use holochain::nucleus::dna::wasm::DnaWasm;
+use holochain::nucleus::dna::zome::WasmZome;
+use holochain::nucleus::dna::zome::Zome;
+use holochain::nucleus::dna::DnaDef;
+use holochain::nucleus::dna::DnaFile;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::dna::{
-    wasm::DnaWasm,
-    zome::{WasmZome, Zome},
-    DnaDef, DnaFile,
-};
 use holochain_zome_types::zome::ZomeName;
-use std::{collections::BTreeMap, path::PathBuf};
+use std::collections::BTreeMap;
+use std::path::PathBuf;
 
 /// DnaUtilError type.
 #[derive(Debug, thiserror::Error)]
@@ -59,7 +60,7 @@ pub enum DnaUtilError {
 
     /// DnaError
     #[error("DNA error: {0}")]
-    DnaError(#[from] holochain_types::dna::DnaError),
+    DnaError(#[from] holochain::nucleus::dna::DnaError),
 
     /// SerializedBytesError
     #[error("Internal serialization error: {0}")]
@@ -263,7 +264,7 @@ mod tests {
     async fn test_extract_then_compile() {
         let tmp_dir = tempdir::TempDir::new("dna_util_test").unwrap();
 
-        let dna_file = holochain_types::test_utils::fake_dna_zomes(
+        let dna_file = holochain::nucleus::test_utils::fake_dna_zomes(
             "bla",
             vec![
                 ("test-zome-1".into(), vec![1, 2, 3, 4].into()),

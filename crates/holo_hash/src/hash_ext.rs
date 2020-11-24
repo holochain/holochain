@@ -1,8 +1,17 @@
-use crate::{
-    assert_length, encode, hash_type, HashType, HashableContent, HashableContentBytes, HoloHash,
-    HoloHashOf, HoloHashed, PrimitiveHashType, HOLO_HASH_CORE_LEN, HOLO_HASH_UNTYPED_LEN,
-};
-use hash_type::{HashTypeAsync, HashTypeSync};
+use crate::assert_length;
+use crate::encode;
+use crate::hash_type;
+use crate::HashType;
+use crate::HashableContent;
+use crate::HashableContentBytes;
+use crate::HoloHash;
+use crate::HoloHashOf;
+use crate::HoloHashed;
+use crate::PrimitiveHashType;
+use crate::HOLO_HASH_CORE_LEN;
+use crate::HOLO_HASH_UNTYPED_LEN;
+use hash_type::HashTypeAsync;
+use hash_type::HashTypeSync;
 
 /// The maximum size to hash synchronously. Anything larger than this will
 /// take too long to hash within a single tokio context
@@ -57,11 +66,7 @@ where
     /// Important to run this after e.g. deserialization.
     pub fn verify_hash_sync(&self) -> Result<(), HoloHash<T>> {
         let hash = HoloHash::<T>::with_data_sync(&self.content);
-        if self.hash == hash {
-            Ok(())
-        } else {
-            Err(hash)
-        }
+        if self.hash == hash { Ok(()) } else { Err(hash) }
     }
 }
 
@@ -88,11 +93,7 @@ where
     /// Important to run this after e.g. deserialization.
     pub async fn verify_hash(&self) -> Result<(), HoloHash<T>> {
         let hash = HoloHash::<T>::with_data(&self.content).await;
-        if self.hash == hash {
-            Ok(())
-        } else {
-            Err(hash)
-        }
+        if self.hash == hash { Ok(()) } else { Err(hash) }
     }
 }
 

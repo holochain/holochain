@@ -2,52 +2,62 @@
 
 use super::*;
 
+use crate::core::queue_consumer::TriggerSender;
+use crate::core::state::metadata::ChainItemKey;
+use crate::core::state::metadata::LinkMetaKey;
+use crate::core::state::workspace::WorkspaceError;
+use crate::core::workflow::CallZomeWorkspaceLock;
+use crate::fixt::CallContextFixturator;
 use crate::fixt::ZomeCallHostAccessFixturator;
+use crate::fixt::*;
 use crate::here;
+use crate::nucleus::dna::zome::Zome;
+use crate::nucleus::dna::DnaDefHashed;
+use crate::nucleus::fixt::*;
+use crate::nucleus::ribosome::guest_callback::entry_defs::EntryDefsResult;
+use crate::nucleus::ribosome::host_fn;
+use crate::nucleus::ribosome::MockRibosomeT;
 use crate::test_utils::test_network;
-use crate::{core::state::metadata::ChainItemKey, fixt::CallContextFixturator};
-use crate::{
-    core::{
-        queue_consumer::TriggerSender,
-        ribosome::{guest_callback::entry_defs::EntryDefsResult, host_fn, MockRibosomeT},
-        state::{metadata::LinkMetaKey, workspace::WorkspaceError},
-        workflow::CallZomeWorkspaceLock,
-    },
-    fixt::*,
-};
 use ::fixt::prelude::*;
 use holo_hash::*;
-use holochain_state::{
-    env::{EnvironmentWrite, ReadManager, WriteManager},
-    error::DatabaseError,
-    test_utils::test_cell_env,
-};
-use holochain_types::{
-    dht_op::{DhtOp, DhtOpHashed},
-    dna::zome::Zome,
-    dna::DnaDefHashed,
-    fixt::*,
-    header::NewEntryHeader,
-    metadata::TimedHeaderHash,
-    observability,
-    validate::ValidationStatus,
-    Entry, EntryHashed, HeaderHashed,
-};
+use holochain_state::env::EnvironmentWrite;
+use holochain_state::env::ReadManager;
+use holochain_state::env::WriteManager;
+use holochain_state::error::DatabaseError;
+use holochain_state::test_utils::test_cell_env;
+use holochain_types::dht_op::DhtOp;
+use holochain_types::dht_op::DhtOpHashed;
+use holochain_types::fixt::*;
+use holochain_types::header::NewEntryHeader;
+use holochain_types::metadata::TimedHeaderHash;
+use holochain_types::observability;
+use holochain_types::validate::ValidationStatus;
+use holochain_types::Entry;
+use holochain_types::EntryHashed;
+use holochain_types::HeaderHashed;
+use holochain_zome_types::entry::GetOptions;
+use holochain_zome_types::entry_def::EntryDefs;
+use holochain_zome_types::header::builder;
+use holochain_zome_types::header::CreateLink;
+use holochain_zome_types::header::Delete;
+use holochain_zome_types::header::DeleteLink;
+use holochain_zome_types::header::Update;
+use holochain_zome_types::header::ZomeId;
+use holochain_zome_types::link::LinkTag;
+use holochain_zome_types::link::Links;
 use holochain_zome_types::signature::Signature;
-use holochain_zome_types::{
-    entry::GetOptions,
-    entry_def::EntryDefs,
-    header::{builder, CreateLink, Delete, DeleteLink, Update, ZomeId},
-    link::{LinkTag, Links},
-    zome::ZomeName,
-    CreateInput, CreateLinkInput, GetInput, GetLinksInput, Header,
-};
-use produce_dht_ops_workflow::{produce_dht_ops_workflow, ProduceDhtOpsWorkspace};
-use std::{
-    collections::BTreeMap,
-    convert::{TryFrom, TryInto},
-    sync::Arc,
-};
+use holochain_zome_types::zome::ZomeName;
+use holochain_zome_types::CreateInput;
+use holochain_zome_types::CreateLinkInput;
+use holochain_zome_types::GetInput;
+use holochain_zome_types::GetLinksInput;
+use holochain_zome_types::Header;
+use produce_dht_ops_workflow::produce_dht_ops_workflow;
+use produce_dht_ops_workflow::ProduceDhtOpsWorkspace;
+use std::collections::BTreeMap;
+use std::convert::TryFrom;
+use std::convert::TryInto;
+use std::sync::Arc;
 
 #[derive(Clone)]
 struct TestData {
@@ -144,7 +154,7 @@ impl TestData {
             Header::Update(eu) => {
                 eu.entry_hash = original_entry_hash.clone();
             }
-            _ => (),
+            _ => {}
         };
 
         // Dna Header
@@ -1304,32 +1314,35 @@ async fn test_integrate_single_register_delete_link() {
 
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
+    use std::convert::TryFrom;
+    use std::convert::TryInto;
+    use std::time::Duration;
 
-    use std::{
-        convert::{TryFrom, TryInto},
-        time::Duration,
-    };
-
+    use crate::core::state::metadata::LinkMetaKey;
+    use crate::core::state::metadata::MetadataBuf;
+    use crate::core::state::metadata::MetadataBufT;
+    use crate::fixt::*;
+    use crate::nucleus::dna::DnaDef;
+    use crate::nucleus::dna::DnaFile;
+    use crate::test_utils::host_fn_api::*;
     use crate::test_utils::setup_app;
+    use crate::test_utils::wait_for_integration;
     use crate::{
-        core::state::dht_op_integration::IntegratedDhtOpsStore, core::state::metadata::LinkMetaKey,
-        core::state::metadata::MetadataBuf, core::state::metadata::MetadataBufT,
-        test_utils::host_fn_api::*,
+        core::state::dht_op_integration::IntegratedDhtOpsStore,
+        nucleus::dna::zome::test_wasm_to_pair,
     };
-    use crate::{fixt::*, test_utils::wait_for_integration};
     use fallible_iterator::FallibleIterator;
     use fixt::prelude::*;
     use holo_hash::EntryHash;
     use holochain_serialized_bytes::SerializedBytes;
-    use holochain_state::{db::GetDb, db::INTEGRATED_DHT_OPS, env::ReadManager};
-    use holochain_types::{
-        app::InstalledCell,
-        cell::CellId,
-        dna::{DnaDef, DnaFile},
-        observability,
-        test_utils::fake_agent_pubkey_1,
-        Entry,
-    };
+    use holochain_state::db::GetDb;
+    use holochain_state::db::INTEGRATED_DHT_OPS;
+    use holochain_state::env::ReadManager;
+    use holochain_types::app::InstalledCell;
+    use holochain_types::cell::CellId;
+    use holochain_types::observability;
+    use holochain_types::test_utils::fake_agent_pubkey_1;
+    use holochain_types::Entry;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::test_utils::fake_agent_pubkey_2;
     use tracing::*;
@@ -1349,7 +1362,7 @@ mod slow_tests {
                 name: "integration_workflow_test".to_string(),
                 uuid: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
                 properties: SerializedBytes::try_from(()).unwrap(),
-                zomes: vec![TestWasm::Create.into()].into(),
+                zomes: vec![test_wasm_to_pair(TestWasm::Create)].into(),
             },
             vec![TestWasm::Create.into()],
         )

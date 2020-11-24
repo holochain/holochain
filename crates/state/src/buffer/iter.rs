@@ -1,7 +1,8 @@
 use crate::buffer::kv::KvOp;
 use crate::error::DatabaseError;
 use crate::prelude::*;
-use fallible_iterator::{DoubleEndedFallibleIterator, FallibleIterator};
+use fallible_iterator::DoubleEndedFallibleIterator;
+use fallible_iterator::FallibleIterator;
 use rkv::StoreError;
 use std::collections::BTreeMap;
 use tracing::*;
@@ -191,10 +192,12 @@ where
             // If there is a put in the scratch we want to return
             // that instead of this matching item as the scratch
             // is more up to date
-            .filter_map(move |(k, v)| match scratch.get(k) {
-                Some(KvOp::Put(sv)) => Ok(Some((k, *sv.clone()))),
-                Some(KvOp::Delete) => Ok(None),
-                None => Ok(Some((k, v))),
+            .filter_map(move |(k, v)| {
+                match scratch.get(k) {
+                    Some(KvOp::Put(sv)) => Ok(Some((k, *sv.clone()))),
+                    Some(KvOp::Delete) => Ok(None),
+                    None => Ok(Some((k, v))),
+                }
             })
             .inspect(|(k, v)| {
                 let span = trace_span!("db > filter", key = %String::from_utf8_lossy(k));
@@ -355,7 +358,7 @@ where
             self.key = Some(k);
             match self.key_back {
                 Some(k_back) if k >= k_back => return Ok(None),
-                _ => (),
+                _ => {}
             }
         }
         r
@@ -372,7 +375,7 @@ where
             self.key_back = Some(k_back);
             match self.key {
                 Some(key) if k_back <= key => return Ok(None),
-                _ => (),
+                _ => {}
             }
         }
         r
