@@ -4,6 +4,9 @@
 //! make it easy to write a zome on-the-fly or programmatically, rather than
 //! having to go through the heavy machinery of wasm compilation
 
+// WIP: remove
+#![allow(unused_variables)]
+
 use holochain_serialized_bytes as sb;
 use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::zome::FunctionName;
@@ -61,6 +64,7 @@ impl InlineZome {
     }
 
     /// Make a call to an inline zome function
+    #[allow(unreachable_code)]
     pub fn call<I: Serialize, O: DeserializeOwned>(
         &self,
         name: &FunctionName,
@@ -125,6 +129,7 @@ mod tests {
     use holochain_zome_types::prelude::GetOptions;
 
     #[test]
+    #[allow(unused_variables, unreachable_code)]
     fn can_create_inline_dna() {
         let zome = InlineZome::new("").callback("zome_fn_1", |api, a: ()| {
             let hash: AnyDhtHash = todo!();

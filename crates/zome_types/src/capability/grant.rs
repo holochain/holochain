@@ -95,10 +95,7 @@ impl CapGrant {
     ) -> bool {
         match self {
             // Grant is always valid if the author matches the check agent.
-            CapGrant::ChainAuthor(author) => {
-                dbg!(author, check_agent);
-                author == check_agent
-            },
+            CapGrant::ChainAuthor(author) => author == check_agent,
             // Otherwise we need to do more work…
             CapGrant::RemoteAgent(ZomeCallCapGrant {
                 access, functions, ..

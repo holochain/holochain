@@ -47,7 +47,6 @@ use holochain_zome_types::entry_def::EntryVisibility;
 use holochain_zome_types::header::Create;
 use holochain_zome_types::header::EntryType;
 use holochain_zome_types::header::Header;
-use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::ExternInput;
 use kitsune_p2p::KitsuneP2pConfig;
 use std::convert::TryInto;
