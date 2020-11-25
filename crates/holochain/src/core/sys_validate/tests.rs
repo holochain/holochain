@@ -286,7 +286,7 @@ async fn check_app_entry_type_test() {
     )
     .await
     .unwrap();
-    let dna_hash = dna_file.dna_hash().to_owned();
+    let dna_hash = dna_file.dna_hash().to_owned().clone();
     let mut entry_def = fixt!(EntryDef);
     entry_def.visibility = EntryVisibility::Public;
 
@@ -304,7 +304,8 @@ async fn check_app_entry_type_test() {
     let aet = AppEntryType::new(0.into(), 0.into(), EntryVisibility::Public);
     assert_matches!(
         check_app_entry_type(&aet, &conductor_api).await,
-        Err(SysValidationError::DnaMissing(_))
+        Err(SysValidationError::ConductorApiError(e))
+        if matches!(*e, ConductorApiError::DnaMissing(_))
     );
 
     // # Dna but no entry def in buffer
