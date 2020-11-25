@@ -112,6 +112,7 @@ impl SourceChain {
         check_agent: &AgentPubKey,
         check_secret: Option<&CapSecret>,
     ) -> SourceChainResult<Option<CapGrant>> {
+        dbg!(check_function, check_agent, check_secret);
         // most calls for most apps are going to be the local agent calling itself locally
         // for this case we want to short circuit without iterating the whole source chain
         let author_grant = CapGrant::from(self.agent_pubkey()?);

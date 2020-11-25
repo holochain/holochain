@@ -1,4 +1,3 @@
-use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::entry_def_store::error::EntryDefStoreError;
 use crate::core::state::cascade::error::CascadeError;
 use crate::core::workflow::error::WorkflowError;
@@ -6,6 +5,7 @@ use crate::core::workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpC
 use crate::core::SourceChainError;
 use crate::nucleus::ribosome::error::RibosomeError;
 use crate::nucleus::ribosome::guest_callback::init::InitResult;
+use crate::{conductor::api::error::ConductorApiError, nucleus::dna::DnaError};
 use holochain_p2p::HolochainP2pError;
 use holochain_state::error::DatabaseError;
 use holochain_types::cell::CellId;
@@ -34,6 +34,8 @@ pub enum CellError {
         "The cell failed to cleanup its environment because: {0}. Recommend manually deleting the database at: {1}"
     )]
     Cleanup(String, PathBuf),
+    #[error(transparent)]
+    DnaError(#[from] DnaError),
     #[error(transparent)]
     EntryDefStoreError(#[from] EntryDefStoreError),
     #[error(transparent)]

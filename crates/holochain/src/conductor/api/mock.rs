@@ -41,7 +41,7 @@ mock! {
         fn mock_signal_broadcaster(&self) -> SignalBroadcaster;
         fn sync_get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile>;
         fn sync_get_this_dna(&self) -> ConductorApiResult<DnaFile>;
-        fn sync_get_zome(&self, zome_name: &ZomeName) -> ConductorApiResult<Zome>;
+        fn sync_get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome>;
         fn sync_get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef>;
         fn into_call_zome_handle(self) -> super::CellConductorReadHandle;
     }
@@ -89,8 +89,8 @@ impl CellConductorApiT for MockCellConductorApi {
         self.sync_get_this_dna()
     }
 
-    async fn get_zome(&self, zome_name: &ZomeName) -> ConductorApiResult<Zome> {
-        self.sync_get_zome(zome_name)
+    async fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome> {
+        self.sync_get_zome(dna_hash, zome_name)
     }
 
     async fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef> {
