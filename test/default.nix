@@ -48,7 +48,7 @@ let
   for i in ''$(find crates -maxdepth 1 -mindepth 1 -type d | sort); do
     # skip some crates that aren't ready yet
     case "$i" in
-      "crates/dpki" | "crates/keystore" | "crates/legacy" | "crates/lib3h_protocol")
+      "crates/dpki" | "crates/keystore" )
         continue
         ;;
     esac
