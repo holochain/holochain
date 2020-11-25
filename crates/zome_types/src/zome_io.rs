@@ -1,5 +1,3 @@
-use crate::*;
-use element::ElementVec;
 use holochain_serialized_bytes::prelude::*;
 
 macro_rules! wasm_io_type {
@@ -26,22 +24,25 @@ macro_rules! wasm_io_type {
 /// All wasm shared I/O types need to share the same basic behaviours to cross the host/guest
 /// boundary in a predictable way.
 macro_rules! wasm_io_types {
-    ( $( fn $f:ident $in_struct:ident($in_arg:ty) -> $out_struct:ident($out_arg:ty); )* ) => {
+    ( $( fn $f:ident ( $in_arg:ty ) -> $out_arg:ty; )* ) => {
         $(
-            wasm_io_type!($in_struct($in_arg));
-            wasm_io_type!($out_struct($out_arg));
+            paste::paste! {
+                wasm_io_type!([<$f:camel Input>]($in_arg));
+                wasm_io_type!([<$f:camel Output>]($out_arg));
 
-            // Typically we only need this for input types
-            impl From<$in_arg> for $in_struct {
-                fn from(arg: $in_arg) -> Self {
-                    Self::new(arg)
+                // Typically we only need this for input types
+                impl From<$in_arg> for [<$f:camel Input>] {
+                    fn from(arg: $in_arg) -> Self {
+                        Self::new(arg)
+                    }
                 }
             }
         )*
 
         pub trait HostFnApiT {
+            type Error: std::fmt::Display + std::fmt::Debug + std::error::Error;
             $(
-                fn $f(_: $in_arg) -> $out_arg;
+                fn $f(&self, _: $in_arg) -> Result<$out_arg, Self::Error>;
             )*
         }
     }
@@ -62,83 +63,123 @@ macro_rules! wasm_io_types {
 wasm_io_type!(ExternInput(SerializedBytes));
 wasm_io_type!(ExternOutput(SerializedBytes));
 
-wasm_io_types!(
-    // The zome and agent info are constants specific to the current zome and chain.
-    // All the information is provided by core so there is no input value.
-    // These are constant for the lifetime of a zome call.
-    fn zome_info ZomeInfoInput(()) -> ZomeInfoOutput(zome_info::ZomeInfo);
-    fn agent_info AgentInfoInput(()) -> AgentInfoOutput(agent_info::AgentInfo);
-    fn call CallInput(call::Call) -> CallOutput(ZomeCallResponse);
+use crate as zt;
+
+wasm_io_types! {
+
+    // ------------------------------------------------------------------
+    // These definitions can be copy-pasted into the ribosome's HostFnApi
+    // when updated
+
+    fn agent_info (()) -> zt::agent_info::AgentInfo;
+
+    fn call (zt::call::Call) -> zt::ZomeCallResponse;
+
+    // Header hash of the DeleteLink element.
+    fn call_remote (zt::call_remote::CallRemote) -> zt::ZomeCallResponse;
+
     // @todo List all the local capability claims.
-    fn capability_claims CapabilityClaimsInput(()) -> CapabilityClaimsOutput(());
+    fn capability_claims (()) -> ();
+
     // @todo List all the local capability grants.
-    fn capability_grants CapabilityGrantsInput(()) -> CapabilityGrantsOutput(());
+    fn capability_grants (()) -> ();
+
     // @todo Get the capability for the current zome call.
-    fn capability_info CapabilityInfoInput(()) -> CapabilityInfoOutput(());
+    fn capability_info (()) -> ();
+
     // The EntryDefId determines how a create is handled on the host side.
     // CapGrant and CapClaim are handled natively.
     // App entries are referenced by entry defs then SerializedBytes stuffed into an Entry::App.
-    fn create CreateInput((entry_def::EntryDefId, entry::Entry)) -> CreateOutput(holo_hash::HeaderHash);
-    // Header hash of the newly created element.
+    // Returns HeaderHash of the newly created element.
+    fn create ((zt::entry_def::EntryDefId, zt::entry::Entry)) -> holo_hash::HeaderHash;
+
+    // Create a link between two entries.
+    fn create_link ((holo_hash::EntryHash, holo_hash::EntryHash, zt::link::LinkTag)) -> holo_hash::HeaderHash;
+
     // @todo
-    fn decrypt DecryptInput(()) -> DecryptOutput(());
+    fn decrypt (()) -> ();
+
     // @todo
-    fn encrypt EncryptInput(()) -> EncryptOutput(());
-    // @todo
-    fn showenv ShowEnvInput(()) -> ShowEnvOutput(());
-    // @todo
-    fn property PropertyInput(()) -> PropertyOutput(());
-    // Query the source chain for data.
-    fn query QueryInput(query::ChainQueryFilter) -> QueryOutput(ElementVec);
-    // the length of random bytes to create
-    fn random_bytes RandomBytesInput(u32) -> RandomBytesOutput(bytes::Bytes);
+    fn delete (holo_hash::HeaderHash) -> holo_hash::HeaderHash;
+
     // Header hash of the CreateLink element.
-    fn delete_link DeleteLinkInput(holo_hash::HeaderHash) -> DeleteLinkOutput(holo_hash::HeaderHash);
-    // Header hash of the DeleteLink element.
-    fn call_remote CallRemoteInput(call_remote::CallRemote) -> CallRemoteOutput(ZomeCallResponse);
+    fn delete_link (holo_hash::HeaderHash) -> holo_hash::HeaderHash;
+
     // @todo
-    fn send SendInput(()) -> SendOutput(());
-    // Attempt to have the keystore sign some data
-    // The pubkey in the input needs to be found in the keystore for this to work
-    fn sign SignInput(crate::signature::Sign) -> SignOutput(crate::signature::Signature);
-    fn verify_signature VerifySignatureInput(crate::signature::VerifySignature) -> VerifySignatureOutput(bool);
+    fn encrypt (()) -> ();
+
     // @todo
-    fn schedule ScheduleInput(core::time::Duration) -> ScheduleOutput(());
-    // Same as CreateInput but also takes the HeaderHash of the updated element.
-    fn update UpdateInput((entry_def::EntryDefId, entry::Entry, holo_hash::HeaderHash)) -> UpdateOutput(holo_hash::HeaderHash);
+    fn entry_type_properties (()) -> ();
+
     // Header hash of the newly committed element.
     // Emit a Signal::App to subscribers on the interface
-    fn emit_signal EmitSignalInput(signal::AppSignal) -> EmitSignalOutput(());
-    // @todo
-    fn delete DeleteInput(holo_hash::HeaderHash) -> DeleteOutput(holo_hash::HeaderHash);
-    // Create a link between two entries.
-    fn create_link CreateLinkInput((holo_hash::EntryHash, holo_hash::EntryHash, link::LinkTag)) -> CreateLinkOutput(holo_hash::HeaderHash);
-    // Get links by entry hash from the cascade.
-    fn get_links GetLinksInput((holo_hash::EntryHash, Option<link::LinkTag>)) -> GetLinksOutput(link::Links);
-    fn get_link_details GetLinkDetailsInput((holo_hash::EntryHash, Option<link::LinkTag>)) -> GetLinkDetailsOutput(link::LinkDetails);
-    // Attempt to get a live entry from the cascade.
-    fn get GetInput((holo_hash::AnyDhtHash, entry::GetOptions)) -> GetOutput(Option<element::Element>);
-    fn get_details GetDetailsInput((holo_hash::AnyDhtHash, entry::GetOptions)) -> GetDetailsOutput(Option<metadata::Details>);
-    fn get_agent_activity GetAgentActivityInput(
-        (
-            holo_hash::AgentPubKey,
-            query::ChainQueryFilter,
-            query::ActivityRequest,
-        )
-    ) -> GetAgentActivityOutput(query::AgentActivity);
-    // @todo
-    fn entry_type_properties EntryTypePropertiesInput(()) -> EntryTypePropertiesOutput(());
-    // Hash an entry on the host.
-    fn hash_entry HashEntryInput(entry::Entry) -> HashEntryOutput(holo_hash::EntryHash);
-    // Current system time, in the opinion of the host, as a `Duration`.
-    fn sys_time SysTimeInput(()) -> SysTimeOutput(core::time::Duration);
+    fn emit_signal (zt::signal::AppSignal) -> ();
+
     // The debug host import takes a DebugMsg to output wherever the host wants to display it.
     // DebugMsg includes line numbers. so the wasm tells the host about it's own code structure.
-    fn debug DebugInput(debug::DebugMsg) -> DebugOutput(());
+    fn debug (zt::debug::DebugMsg) -> ();
+
+    // Attempt to get a live entry from the cascade.
+    fn get ((holo_hash::AnyDhtHash, zt::entry::GetOptions)) -> Option<zt::element::Element>;
+
+    fn get_agent_activity (
+        (
+            holo_hash::AgentPubKey,
+            zt::query::ChainQueryFilter,
+            zt::query::ActivityRequest,
+        )
+    ) -> zt::query::AgentActivity;
+
+    fn get_details ((holo_hash::AnyDhtHash, zt::entry::GetOptions)) -> Option<zt::metadata::Details>;
+
+    // Get links by entry hash from the cascade.
+    fn get_links ((holo_hash::EntryHash, Option<zt::link::LinkTag>)) -> zt::link::Links;
+
+    fn get_link_details ((holo_hash::EntryHash, Option<zt::link::LinkTag>)) -> zt::link::LinkDetails;
+
+    // Hash an entry on the host.
+    fn hash_entry (zt::entry::Entry) -> holo_hash::EntryHash;
+
+    // @todo
+    fn property (()) -> ();
+
+    // Query the source chain for data.
+    fn query (zt::query::ChainQueryFilter) -> zt::element::ElementVec;
+
+    // the length of random bytes to create
+    fn random_bytes (u32) -> zt::bytes::Bytes;
+
+    // // @todo
+    // fn send (()) -> ();
+
+    // @todo
+    fn schedule (core::time::Duration) -> ();
+
+    // @todo
+    fn show_env (()) -> ();
+
+    // Attempt to have the keystore sign some data
+    // The pubkey in the input needs to be found in the keystore for this to work
+    fn sign (zt::signature::Sign) -> zt::signature::Signature;
+
+    // Current system time, in the opinion of the host, as a `Duration`.
+    fn sys_time (()) -> core::time::Duration;
+
+    // Same as  but also takes the HeaderHash of the updated element.
+    fn update ((zt::entry_def::EntryDefId, zt::entry::Entry, holo_hash::HeaderHash)) -> holo_hash::HeaderHash;
+
+    fn verify_signature (zt::signature::VerifySignature) -> bool;
+
     // There's nothing to go in or out of a noop.
     // Used to "defuse" host functions when side effects are not allowed.
-    fn unreachable UnreachableInput(()) -> UnreachableOutput(());
-);
+    fn unreachable (()) -> ();
+
+    // The zome and agent info are constants specific to the current zome and chain.
+    // All the information is provided by core so there is no input value.
+    // These are constant for the lifetime of a zome call.
+    fn zome_info (()) -> zt::zome_info::ZomeInfo;
+
+}
 
 /// Response to a zome call.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes, PartialEq)]
