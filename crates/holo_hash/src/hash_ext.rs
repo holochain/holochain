@@ -66,7 +66,11 @@ where
     /// Important to run this after e.g. deserialization.
     pub fn verify_hash_sync(&self) -> Result<(), HoloHash<T>> {
         let hash = HoloHash::<T>::with_data_sync(&self.content);
-        if self.hash == hash { Ok(()) } else { Err(hash) }
+        if self.hash == hash {
+            Ok(())
+        } else {
+            Err(hash)
+        }
     }
 }
 
@@ -93,7 +97,11 @@ where
     /// Important to run this after e.g. deserialization.
     pub async fn verify_hash(&self) -> Result<(), HoloHash<T>> {
         let hash = HoloHash::<T>::with_data(&self.content).await;
-        if self.hash == hash { Ok(()) } else { Err(hash) }
+        if self.hash == hash {
+            Ok(())
+        } else {
+            Err(hash)
+        }
     }
 }
 

@@ -103,12 +103,10 @@ mod tests {
 
             let signature = agent_pubkey1.sign(&keystore, &my_data_1).await.unwrap();
 
-            assert!(
-                agent_pubkey1
-                    .verify_signature(&signature, &my_data_1)
-                    .await
-                    .unwrap()
-            );
+            assert!(agent_pubkey1
+                .verify_signature(&signature, &my_data_1)
+                .await
+                .unwrap());
         })
         .await
         .unwrap();

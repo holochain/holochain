@@ -205,7 +205,11 @@ basic_test!(
         .into_iter()
         .map(|u| {
             let f = u as f32;
-            if u % 2 == 0 { f } else { -f - 0.5 }
+            if u % 2 == 0 {
+                f
+            } else {
+                -f - 0.5
+            }
         })
         .take(1000)
         .collect::<Vec<f32>>()
@@ -217,7 +221,11 @@ basic_test!(
         .into_iter()
         .map(|u| {
             let f = u as f64;
-            if u % 2 == 0 { f } else { -f - 0.5 }
+            if u % 2 == 0 {
+                f
+            } else {
+                -f - 0.5
+            }
         })
         .take(1000)
         .collect::<Vec<f64>>()
