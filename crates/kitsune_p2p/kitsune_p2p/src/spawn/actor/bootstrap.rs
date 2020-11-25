@@ -248,14 +248,12 @@ mod tests {
         .unwrap();
 
         // We should get back an error if we don't have a good signature.
-        assert!(
-            super::put(
-                Some(url2::url2!("{}", crate::config::BOOTSTRAP_SERVICE_DEV)),
-                fixt!(AgentInfoSigned)
-            )
-            .await
-            .is_err()
-        );
+        assert!(super::put(
+            Some(url2::url2!("{}", crate::config::BOOTSTRAP_SERVICE_DEV)),
+            fixt!(AgentInfoSigned)
+        )
+        .await
+        .is_err());
     }
 
     #[tokio::test(threaded_scheduler)]

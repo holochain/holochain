@@ -107,8 +107,8 @@ pub mod tests {
     use crate::conductor::api::MockCellConductorApi;
     use crate::core::state::source_chain::SourceChain;
     use crate::core::SourceChainResult;
-    use fallible_iterator::FallibleIterator;
     use crate::nucleus::test_utils::fake_dna_file;
+    use fallible_iterator::FallibleIterator;
     use holochain_state::test_utils::test_cell_env;
     use holochain_types::observability;
     use holochain_types::test_utils::fake_agent_pubkey_1;

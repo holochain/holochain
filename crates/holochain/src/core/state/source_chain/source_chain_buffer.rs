@@ -317,8 +317,8 @@ impl<'a> FallibleIterator for SourceChainBackwardIterator<'a> {
 pub mod tests {
     use super::SourceChainBuf;
     use crate::core::state::source_chain::SourceChainResult;
-    use fallible_iterator::FallibleIterator;
     use crate::nucleus::test_utils::fake_dna_file;
+    use fallible_iterator::FallibleIterator;
     use holochain_state::prelude::*;
     use holochain_state::test_utils::test_cell_env;
     use holochain_types::prelude::*;

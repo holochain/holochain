@@ -192,12 +192,10 @@ where
             // If there is a put in the scratch we want to return
             // that instead of this matching item as the scratch
             // is more up to date
-            .filter_map(move |(k, v)| {
-                match scratch.get(k) {
-                    Some(KvOp::Put(sv)) => Ok(Some((k, *sv.clone()))),
-                    Some(KvOp::Delete) => Ok(None),
-                    None => Ok(Some((k, v))),
-                }
+            .filter_map(move |(k, v)| match scratch.get(k) {
+                Some(KvOp::Put(sv)) => Ok(Some((k, *sv.clone()))),
+                Some(KvOp::Delete) => Ok(None),
+                None => Ok(Some((k, v))),
             })
             .inspect(|(k, v)| {
                 let span = trace_span!("db > filter", key = %String::from_utf8_lossy(k));
