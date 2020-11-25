@@ -12,6 +12,7 @@ use holochain_types::app::InstalledCell;
 
 #[tokio::test(threaded_scheduler)]
 #[ignore = "WIP"]
+#[allow(unused_variables, unreachable_code)]
 async fn one() -> anyhow::Result<()> {
     let envs = test_environments();
     let zome_def: ZomeDef = InlineZome::new("")

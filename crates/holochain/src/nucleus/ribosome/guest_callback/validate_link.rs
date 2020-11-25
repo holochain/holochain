@@ -305,7 +305,6 @@ mod slow_tests {
     use ::fixt::prelude::*;
     use holo_hash::HeaderHash;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::zome::ZomeName;
 
     #[tokio::test(threaded_scheduler)]
     async fn test_validate_link_add_unimplemented() {

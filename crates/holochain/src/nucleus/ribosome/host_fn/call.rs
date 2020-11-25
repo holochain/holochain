@@ -187,12 +187,10 @@ pub mod wasm_test {
         let handle = conductor_test.handle();
         let alice_call_data = conductor_test.alice_call_data();
         let alice_cell_id = &alice_call_data.cell_id;
-        println!("ALICE={:?}", alice_cell_id);
 
         // Install a different dna for bob
         let zomes = vec![TestWasm::WhoAmI];
         let bob_cell_id = install_new_app("bobs_dna", zomes, &handle).await;
-        println!("BOB={:?}", bob_cell_id);
 
         // Call create_entry in the create_entry zome from the whoami zome
         let invocation = new_invocation(
