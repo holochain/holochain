@@ -437,7 +437,7 @@ async fn get_zomes_to_invoke(
         get_app_entry_type(element, cascade).await?
     };
     match aet {
-        Some(aet) => Ok(ZomesToInvoke::One(get_zome(&aet, &dna_def)?.clone())),
+        Some(aet) => Ok(ZomesToInvoke::One(get_zome(&aet, &dna_def)?)),
         None => match element.header() {
             Header::CreateLink(_) | Header::DeleteLink(_) => {
                 get_link_zome(element, dna_def, workspace, network).await
@@ -495,7 +495,7 @@ async fn get_link_zome(
 ) -> AppValidationOutcome<ZomesToInvoke> {
     match element.header() {
         Header::CreateLink(cl) => {
-            let zome = zome_id_to_zome(cl.zome_id, dna_def)?.clone();
+            let zome = zome_id_to_zome(cl.zome_id, dna_def)?;
             Ok(ZomesToInvoke::One(zome))
         }
         Header::DeleteLink(dl) => {
@@ -507,7 +507,7 @@ async fn get_link_zome(
 
             match shh.header() {
                 Header::CreateLink(cl) => {
-                    let zome = zome_id_to_zome(cl.zome_id, dna_def)?.clone();
+                    let zome = zome_id_to_zome(cl.zome_id, dna_def)?;
                     Ok(ZomesToInvoke::One(zome))
                 }
                 // The header that was found was the wrong type

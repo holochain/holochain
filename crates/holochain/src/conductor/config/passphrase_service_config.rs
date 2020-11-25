@@ -1,4 +1,3 @@
-use serde;
 use serde::Deserialize;
 use serde::Serialize;
 use std::path::PathBuf;

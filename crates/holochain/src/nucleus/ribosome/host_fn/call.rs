@@ -39,7 +39,7 @@ pub fn call(
     // Create the invocation for this call
     let invocation = ZomeCallInvocation {
         cell_id,
-        zome: zome,
+        zome,
         cap: call.cap,
         fn_name: call.fn_name,
         payload: ExternInput::new(call.request),

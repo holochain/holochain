@@ -1,7 +1,6 @@
 #![deny(missing_docs)]
 
 use crate::conductor::interface::InterfaceDriver;
-use serde;
 use serde::Deserialize;
 use serde::Serialize;
 
