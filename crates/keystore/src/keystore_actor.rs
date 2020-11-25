@@ -4,7 +4,7 @@
 use crate::*;
 use ghost_actor::dependencies::futures::future::FutureExt;
 use holo_hash::{HOLO_HASH_CORE_LEN, HOLO_HASH_PREFIX_LEN};
-use holochain_zome_types::signature::SignInput;
+use holochain_zome_types::signature::Sign;
 use holochain_zome_types::signature::Signature;
 
 /// GhostSender type for the KeystoreApi
@@ -23,7 +23,7 @@ pub trait KeystoreSenderExt {
     fn generate_sign_keypair_from_pure_entropy(&self) -> KeystoreApiFuture<holo_hash::AgentPubKey>;
 
     /// Generate a signature for a given blob of binary data.
-    fn sign(&self, input: SignInput) -> KeystoreApiFuture<Signature>;
+    fn sign(&self, input: Sign) -> KeystoreApiFuture<Signature>;
 }
 
 impl KeystoreSenderExt for KeystoreSender {
@@ -38,7 +38,7 @@ impl KeystoreSenderExt for KeystoreSender {
         .into()
     }
 
-    fn sign(&self, input: SignInput) -> KeystoreApiFuture<Signature> {
+    fn sign(&self, input: Sign) -> KeystoreApiFuture<Signature> {
         use lair_keystore_api::actor::LairClientApiSender;
         let fut = self.sign_ed25519_sign_by_pub_key(
             input.key.as_ref()[HOLO_HASH_PREFIX_LEN..HOLO_HASH_PREFIX_LEN + HOLO_HASH_CORE_LEN]
