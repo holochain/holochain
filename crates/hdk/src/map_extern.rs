@@ -1,3 +1,5 @@
+use crate::prelude::*;
+
 /// Hides away the gross bit where we hook up integer pointers to length-prefixed guest memory
 /// to serialization and deserialization, and returning things to the host, and memory allocation
 /// and deallocation.
@@ -22,25 +24,31 @@
 #[macro_export]
 macro_rules! map_extern {
     ( $name:tt, $f:ident ) => {
-        #[no_mangle]
-        pub extern "C" fn $name(ptr: $crate::prelude::GuestPtr) -> $crate::prelude::GuestPtr {
-            let input: $crate::prelude::ExternInput = $crate::prelude::host_args!(ptr);
-            let result = $f($crate::prelude::try_result!(
-                input.into_inner().try_into(),
-                "failed to deserialize args"
-            ));
-            let result_value = $crate::prelude::try_result!(
-                result,
-                // TODO: this name includes "_hdk_extern", should we strip it off?
-                concat!("inner function '", stringify!($f), "' failed")
-            );
-            let result_sb = $crate::prelude::try_result!(
-                $crate::prelude::SerializedBytes::try_from(result_value),
-                "inner function result serialization error"
-            );
-            $crate::prelude::ret!($crate::prelude::ExternOutput::new(result_sb));
+        $crate::paste::paste! {
+            mod [< __ $name _extern >] {
+                use $crate::prelude::*;
+                use std::convert::TryFrom;
+
+                #[no_mangle]
+                pub extern "C" fn $name(ptr: GuestPtr) -> GuestPtr {
+                    let input: ExternInput = host_args!(ptr);
+                    let result = super::$f(try_result!(
+                        input.into_inner().try_into(),
+                        "failed to deserialize args"
+                    ));
+                    let result_value = try_result!(
+                        result,
+                        concat!("inner function '", stringify!($f), "' failed")
+                    );
+                    let result_sb = try_result!(
+                        SerializedBytes::try_from(result_value),
+                        "inner function result serialization error"
+                    );
+                    ret!(ExternOutput::new(result_sb));
+                }
+            }
         }
     };
 }
 
-pub type ExternResult<T> = Result<T, crate::prelude::HdkError>;
+pub type ExternResult<T> = Result<T, HdkError>;
