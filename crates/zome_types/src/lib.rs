@@ -38,6 +38,7 @@ pub mod migrate_agent;
 pub mod post_commit;
 pub mod query;
 pub mod request;
+pub mod signal;
 pub mod signature;
 pub mod timestamp;
 #[allow(missing_docs)]

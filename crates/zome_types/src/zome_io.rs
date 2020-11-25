@@ -91,7 +91,7 @@ wasm_io_types!(
     fn _update UpdateInput((entry_def::EntryDefId, entry::Entry, holo_hash::HeaderHash)) -> UpdateOutput(holo_hash::HeaderHash);
     // Header hash of the newly committed element.
     // Emit a Signal::App to subscribers on the interface
-    fn _emitsignal EmitSignalInput(SerializedBytes) -> EmitSignalOutput(());
+    fn _emitsignal EmitSignalInput(signal::AppSignal) -> EmitSignalOutput(());
     // @todo
     fn _delete DeleteInput(holo_hash::HeaderHash) -> DeleteOutput(holo_hash::HeaderHash);
     // Create a link between two entries.
