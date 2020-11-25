@@ -33,6 +33,7 @@ pub mod wasm_test {
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_agent_pubkey_2;
     use holochain_wasm_test_utils::TestWasm;
+    use matches::assert_matches;
 
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_capability_secret_test<'a>() {
@@ -195,7 +196,7 @@ pub mod wasm_test {
                 let response: SerializedBytes = guest_output.into_inner();
                 let inner_response: ZomeCallResponse = response.try_into().unwrap();
                 // the inner response should be unauthorized
-                assert_eq!(inner_response, ZomeCallResponse::Unauthorized,);
+                assert_matches!(inner_response, ZomeCallResponse::Unauthorized(_, _, _, _));
             }
             _ => unreachable!(),
         }
@@ -328,7 +329,7 @@ pub mod wasm_test {
                 let response: SerializedBytes = guest_output.into_inner();
                 let inner_response: ZomeCallResponse = response.try_into().unwrap();
                 // the inner response should be unauthorized
-                assert_eq!(inner_response, ZomeCallResponse::Unauthorized,);
+                assert_matches!(inner_response, ZomeCallResponse::Unauthorized(_, _, _, _));
             }
             _ => unreachable!(),
         }
@@ -404,7 +405,7 @@ pub mod wasm_test {
                 let response: SerializedBytes = guest_output.into_inner();
                 let inner_response: ZomeCallResponse = response.try_into().unwrap();
                 // the inner response should be unauthorized
-                assert_eq!(inner_response, ZomeCallResponse::Unauthorized,);
+                assert_matches!(inner_response, ZomeCallResponse::Unauthorized(_, _, _, _));
             }
             _ => unreachable!(),
         }
@@ -433,7 +434,7 @@ pub mod wasm_test {
                 let response: SerializedBytes = guest_output.into_inner();
                 let inner_response: ZomeCallResponse = response.try_into().unwrap();
                 // the inner response should be unauthorized
-                assert_eq!(inner_response, ZomeCallResponse::Unauthorized,);
+                assert_matches!(inner_response, ZomeCallResponse::Unauthorized(_, _, _, _));
             }
             _ => unreachable!(),
         }

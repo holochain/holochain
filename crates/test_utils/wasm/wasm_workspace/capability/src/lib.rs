@@ -84,7 +84,9 @@ fn try_cap_claim(cap_for: CapFor) -> ExternResult<ZomeCallResponse> {
     // Normally we would handle errors inside the wasm directly.
     match result {
         Ok(v) => Ok(ZomeCallResponse::Ok(ExternOutput::new(v.try_into()?))),
-        Err(HdkError::UnauthorizedZomeCall) => Ok(ZomeCallResponse::Unauthorized),
+        Err(HdkError::UnauthorizedZomeCall(c, z, f, p)) => {
+            Ok(ZomeCallResponse::Unauthorized(c, z, f, p))
+        }
         _ => unreachable!(),
     }
 }
