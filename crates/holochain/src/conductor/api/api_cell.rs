@@ -98,8 +98,13 @@ impl CellConductorApiT for CellConductorApi {
             .ok_or_else(|| ConductorApiError::DnaMissing(self.cell_id.dna_hash().clone()))?)
     }
 
-    async fn get_zome(&self, zome_name: &ZomeName) -> ConductorApiResult<Zome> {
-        Ok(self.get_this_dna().await?.dna_def().get_zome(zome_name)?)
+    async fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome> {
+        Ok(self
+            .get_dna(dna_hash)
+            .await
+            .ok_or_else(|| ConductorApiError::DnaMissing(dna_hash.clone()))?
+            .dna_def()
+            .get_zome(zome_name)?)
     }
 
     async fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef> {
@@ -147,7 +152,7 @@ pub trait CellConductorApiT: Clone + Send + Sync + Sized {
     async fn get_this_dna(&self) -> ConductorApiResult<DnaFile>;
 
     /// Get a [Zome] from this cell's Dna
-    async fn get_zome(&self, zome_name: &ZomeName) -> ConductorApiResult<Zome>;
+    async fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome>;
 
     /// Get a [EntryDef] from the [EntryDefBuf]
     async fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef>;
@@ -162,12 +167,16 @@ pub trait CellConductorApiT: Clone + Send + Sync + Sized {
 pub trait CellConductorReadHandleT: Send + Sync {
     /// Get this cell id
     fn cell_id(&self) -> &CellId;
+
     /// Invoke a zome function on a Cell
     async fn call_zome(
         &self,
         invocation: ZomeCallInvocation,
         workspace_lock: &CallZomeWorkspaceLock,
     ) -> ConductorApiResult<ZomeCallInvocationResult>;
+
+    /// Get a zome from this cell's Dna
+    async fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome>;
 }
 
 #[async_trait]
@@ -175,6 +184,7 @@ impl CellConductorReadHandleT for CellConductorApi {
     fn cell_id(&self) -> &CellId {
         &self.cell_id
     }
+
     async fn call_zome(
         &self,
         invocation: ZomeCallInvocation,
@@ -187,5 +197,9 @@ impl CellConductorReadHandleT for CellConductorApi {
         } else {
             self.conductor_handle.call_zome(invocation).await
         }
+    }
+
+    async fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome> {
+        CellConductorApiT::get_zome(self, dna_hash, zome_name).await
     }
 }

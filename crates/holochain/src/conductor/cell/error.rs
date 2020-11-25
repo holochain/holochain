@@ -9,6 +9,7 @@ use crate::core::SourceChainError;
 use holochain_p2p::HolochainP2pError;
 use holochain_state::error::DatabaseError;
 use holochain_types::cell::CellId;
+use holochain_types::dna::DnaError;
 use holochain_types::header::error::HeaderError;
 use holochain_zome_types::header::conversions::WrongHeaderError;
 use std::path::PathBuf;
@@ -34,6 +35,8 @@ pub enum CellError {
         "The cell failed to cleanup its environment because: {0}. Recommend manually deleting the database at: {1}"
     )]
     Cleanup(String, PathBuf),
+    #[error(transparent)]
+    DnaError(#[from] DnaError),
     #[error(transparent)]
     EntryDefStoreError(#[from] EntryDefStoreError),
     #[error(transparent)]

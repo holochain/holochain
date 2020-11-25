@@ -717,9 +717,11 @@ impl Cell {
     ) -> CellResult<SerializedBytes> {
         let zome = self
             .conductor_api
-            .get_zome(zome_name)
+            .get_this_dna()
             .await
-            .map_err(Box::new)?;
+            .map_err(Box::new)?
+            .dna_def()
+            .get_zome(zome_name)?;
         let invocation = ZomeCallInvocation {
             cell_id: self.id.clone(),
             zome,

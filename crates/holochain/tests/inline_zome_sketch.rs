@@ -16,6 +16,7 @@ use holochain_types::dna::DnaFile;
 use holochain_types::dna::DnaFile;
 
 #[tokio::test(threaded_scheduler)]
+#[ignore = "WIP"]
 async fn one() -> anyhow::Result<()> {
     let envs = test_environments();
     let zome_def: ZomeDef = InlineZome::new("")

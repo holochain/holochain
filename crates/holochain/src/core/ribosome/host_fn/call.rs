@@ -26,10 +26,20 @@ pub fn call(
         .to_cell
         .unwrap_or_else(|| conductor_handle.cell_id().clone());
 
+    let dna_hash = cell_id.dna_hash();
+    let zome_name = call.zome_name.clone();
+
+    // NB: The Zome on the CallContext in general does NOT match the
+    // zome_name on the Call, so we have to go get it
+    let zome = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+        conductor_handle.get_zome(&dna_hash, &zome_name).await
+    })
+    .map_err(Box::new)?;
+
     // Create the invocation for this call
     let invocation = ZomeCallInvocation {
         cell_id,
-        zome: call_context.zome(),
+        zome: zome,
         cap: call.cap,
         fn_name: call.fn_name,
         payload: ExternInput::new(call.request),
