@@ -50,9 +50,10 @@ impl InlineZome {
         I: DeserializeOwned,
         O: Serialize,
     {
-        let z = move |api: InlineHostApi,
-                      input: SerializedBytes|
-              -> InlineZomeResult<SerializedBytes> {
+        let z = move |
+            api: InlineHostApi,
+            input: SerializedBytes,
+        | -> InlineZomeResult<SerializedBytes> {
             let output = f(api, sb::decode(input.bytes()).expect("TODO"))?;
             Ok(SerializedBytes::from(UnsafeBytes::from(
                 sb::encode(&output).expect("TODO"),
@@ -66,6 +67,7 @@ impl InlineZome {
     #[allow(unreachable_code)]
     pub fn call<I: Serialize, O: DeserializeOwned>(
         &self,
+        // api: HostFnApi,
         name: &FunctionName,
         input: I,
     ) -> InlineZomeResult<O> {

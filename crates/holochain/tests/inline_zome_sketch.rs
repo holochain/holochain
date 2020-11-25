@@ -16,16 +16,21 @@ use holochain_types::dna::DnaFile;
 use holochain_types::dna::DnaFile;
 
 #[tokio::test(threaded_scheduler)]
-#[ignore = "WIP"]
-#[allow(unused_variables, unreachable_code)]
 async fn one() -> anyhow::Result<()> {
     let envs = test_environments();
+    let entry_def = EntryDef::new(
+        "entry".into(),
+        Default::default(),
+        Default::default(),
+        Default::default(),
+        Default::default(),
+    );
     let zome_def: ZomeDef = InlineZome::new("")
-        .callback("create", |api, ()| {
-            let entry_def_id: EntryDefId = todo!();
-            let entry: Entry = todo!();
+        .callback("create", move |api, ()| {
+            let entry_def_id: EntryDefId = entry_def.id.clone();
+            let entry = Entry::app(().try_into().unwrap()).unwrap();
             let hash = api.create_entry(entry_def_id, entry)?;
-            Ok(())
+            Ok(hash)
         })
         .callback("read", |api, hash: EntryHash| {
             api.get(hash, GetOptions::default())
