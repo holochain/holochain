@@ -1,7 +1,6 @@
 // Legacy config that will probably change
 #![allow(missing_docs)]
 
-use serde;
 use serde::Deserialize;
 use serde::Serialize;
 
