@@ -31,6 +31,7 @@ macro_rules! map_extern {
             ));
             let result_value = $crate::prelude::try_result!(
                 result,
+                // TODO: this name includes "_hdk_extern", should we strip it off?
                 concat!("inner function '", stringify!($f), "' failed")
             );
             let result_sb = $crate::prelude::try_result!(

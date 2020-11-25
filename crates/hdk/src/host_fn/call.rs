@@ -35,7 +35,9 @@ where
 
     match out {
         ZomeCallResponse::Ok(o) => Ok(O::try_from(o.into_inner())?),
-        ZomeCallResponse::Unauthorized => Err(HdkError::UnauthorizedZomeCall),
+        ZomeCallResponse::Unauthorized(c, z, f, p) => {
+            Err(HdkError::UnauthorizedZomeCall(c, z, f, p))
+        }
         ZomeCallResponse::NetworkError(e) => unreachable!(
             "Calls should never be routed to the network. This is a bug. Got {}",
             e

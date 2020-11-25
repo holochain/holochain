@@ -1,5 +1,10 @@
 use crate::*;
+use crate::{
+    prelude::CellId,
+    zome::{FunctionName, ZomeName},
+};
 use element::ElementVec;
+use holo_hash::AgentPubKey;
 use holochain_serialized_bytes::prelude::*;
 
 /// All wasm shared I/O types need to share the same basic behaviours to cross the host/guest
@@ -161,7 +166,7 @@ pub enum ZomeCallResponse {
     Ok(ExternOutput),
     /// Cap grant failure.
     /// Something like a 401 http response.
-    Unauthorized,
+    Unauthorized(CellId, ZomeName, FunctionName, AgentPubKey),
     /// This was a zome call made remotely but
     /// something has failed on the network
     NetworkError(String),

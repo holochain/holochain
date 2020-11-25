@@ -444,7 +444,12 @@ impl RibosomeT for WasmRibosome {
 
             ZomeCallResponse::Ok(guest_output)
         } else {
-            ZomeCallResponse::Unauthorized
+            ZomeCallResponse::Unauthorized(
+                invocation.cell_id.clone(),
+                invocation.zome.zome_name().clone(),
+                invocation.fn_name.clone(),
+                invocation.provenance.clone(),
+            )
         })
     }
 
