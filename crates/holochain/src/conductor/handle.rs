@@ -8,7 +8,7 @@
 //! ```rust, no_run
 //! async fn async_main () {
 //! use holochain_state::test_utils::{test_environments, TestEnvironment};
-//! use crate::conductor::{Conductor, ConductorBuilder, ConductorHandle};
+//! use holochain::conductor::{Conductor, ConductorBuilder, ConductorHandle};
 //! let envs = test_environments();
 //! let handle: ConductorHandle = ConductorBuilder::new()
 //!    .test(&envs)

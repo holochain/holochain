@@ -93,13 +93,13 @@ impl From<Zome> for ZomeDef {
 /// mainly for use in HashMaps where ZomeDefs are keyed by ZomeName.
 ///
 /// NB: Only Wasm Zomes are valid to pass through round-trip serialization,
-///     because Rust functions are not serializable. Hence, this enum serializes
-///     as if it were a bare WasmZome, and when deserializing, only Wasm zomes
-///     can be produced. InlineZomes are serialized as their UUID, so that a
-///     hash can be computed, but it is invalid to attempt to deserialize them
-///     again.
+/// because Rust functions are not serializable. Hence, this enum serializes
+/// as if it were a bare WasmZome, and when deserializing, only Wasm zomes
+/// can be produced. InlineZomes are serialized as their UUID, so that a
+/// hash can be computed, but it is invalid to attempt to deserialize them
+/// again.
 ///
-///     In particular, a real-world DnaFile should only ever contain Wasm zomes!
+/// In particular, a real-world DnaFile should only ever contain Wasm zomes!
 #[derive(
     Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, derive_more::From,
 )]
