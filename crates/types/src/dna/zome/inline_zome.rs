@@ -42,7 +42,7 @@ impl InlineZome {
             uuid: uuid.into(),
             callbacks: HashMap::new(),
         }
-        .callback("entry_defs".into(), Box::new(entry_defs_callback))
+        .callback("entry_defs", Box::new(entry_defs_callback))
     }
 
     /// Define a new zome function or callback with the given name
