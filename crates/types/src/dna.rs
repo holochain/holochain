@@ -21,9 +21,7 @@ use self::zome::ZomeDef;
 pub type Zomes = Vec<(ZomeName, zome::ZomeDef)>;
 
 /// A type to allow json values to be used as [SerializedBytes]
-#[derive(
-    Debug, Clone, derive_more::From, serde::Serialize, serde::Deserialize, SerializedBytes,
-)]
+#[derive(Debug, Clone, derive_more::From, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct JsonProperties(serde_json::Value);
 
 impl JsonProperties {
