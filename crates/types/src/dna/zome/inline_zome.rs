@@ -6,8 +6,11 @@
 
 use holochain_serialized_bytes as sb;
 use holochain_serialized_bytes::prelude::*;
-use holochain_zome_types::zome::FunctionName;
-use holochain_zome_types::zome_io::HostFnApiT;
+use holochain_zome_types::{prelude::EntryDefsCallbackResult, zome_io::HostFnApiT};
+use holochain_zome_types::{
+    prelude::{EntryDef, EntryDefs},
+    zome::FunctionName,
+};
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 
@@ -28,6 +31,9 @@ pub struct InlineZome {
     /// Think of it as a stand-in for the WasmHash of a WasmZome.
     pub(super) uuid: String,
 
+    // /// The EntryDefs returned by the `entry_defs` callback function,
+    // /// which will be automatically provided
+    // pub(super) entry_defs: EntryDefs,
     /// The collection of closures which define this zome.
     /// These callbacks are directly called by the Ribosome.
     pub(super) callbacks: HashMap<FunctionName, InlineZomeFn>,
@@ -35,11 +41,14 @@ pub struct InlineZome {
 
 impl InlineZome {
     /// Create a new zome with the given UUID
-    pub fn new<S: Into<String>>(uuid: S) -> Self {
+    pub fn new<S: Into<String>>(uuid: S, entry_defs: Vec<EntryDef>) -> Self {
+        let entry_defs_callback =
+            move |_, _: ()| Ok(EntryDefsCallbackResult::Defs(entry_defs.clone().into()));
         Self {
             uuid: uuid.into(),
             callbacks: HashMap::new(),
         }
+        .callback("entry_defs".into(), Box::new(entry_defs_callback))
     }
 
     /// Define a new zome function or callback with the given name
@@ -55,7 +64,9 @@ impl InlineZome {
                 sb::encode(&output).expect("TODO"),
             )))
         };
-        self.callbacks.insert(name.into(), Box::new(z));
+        if self.callbacks.insert(name.into(), Box::new(z)).is_some() {
+            tracing::warn!("Replacing existing InlineZome callback '{}'", name);
+        };
         self
     }
 
@@ -63,7 +74,7 @@ impl InlineZome {
     #[allow(unreachable_code)]
     pub fn call<I: Serialize, O: DeserializeOwned>(
         &self,
-        api: impl HostFnApiT,
+        api: BoxApi,
         name: &FunctionName,
         input: I,
     ) -> InlineZomeResult<O> {
@@ -73,7 +84,7 @@ impl InlineZome {
             .get(name)
             .ok_or_else(|| InlineZomeError::NoSuchCallback(name.to_owned()))?;
         let output = f(
-            todo!(),
+            api,
             SerializedBytes::from(UnsafeBytes::from(sb::encode(&input).expect("TODO"))),
         )?;
         Ok(sb::decode(output.bytes()).expect("TODO"))
@@ -126,7 +137,7 @@ mod tests {
     #[test]
     #[allow(unused_variables, unreachable_code)]
     fn can_create_inline_dna() {
-        let zome = InlineZome::new("").callback("zome_fn_1", |api, a: ()| {
+        let zome = InlineZome::new("", vec![]).callback("zome_fn_1", |api, a: ()| {
             let hash: AnyDhtHash = todo!();
             Ok(api
                 .get((hash, GetOptions::default()))

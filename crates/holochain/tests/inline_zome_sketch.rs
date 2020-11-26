@@ -20,7 +20,7 @@ async fn one() -> anyhow::Result<()> {
         Default::default(),
         Default::default(),
     );
-    let zome_def: ZomeDef = InlineZome::new("")
+    let zome_def: ZomeDef = InlineZome::new("", vec![entry_def.clone()])
         .callback("create", move |api, ()| {
             let entry_def_id: EntryDefId = entry_def.id.clone();
             let entry = Entry::app(().try_into().unwrap()).unwrap();
