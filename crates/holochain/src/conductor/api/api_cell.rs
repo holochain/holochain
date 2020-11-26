@@ -7,7 +7,10 @@ use super::error::ConductorApiResult;
 use crate::{conductor::ConductorHandle, core::ribosome::ZomeCallInvocation};
 use crate::{
     conductor::{entry_def_store::EntryDefBufferKey, interface::SignalBroadcaster},
-    core::workflow::ZomeCallInvocationResult,
+    core::workflow::{
+        call_zome_workflow::call_zome_workspace_lock::CallZomeWorkspaceLock,
+        ZomeCallInvocationResult,
+    },
 };
 use async_trait::async_trait;
 use holo_hash::DnaHash;

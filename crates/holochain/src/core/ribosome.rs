@@ -30,6 +30,7 @@ use crate::core::ribosome::guest_callback::CallIterator;
 use crate::core::workflow::CallZomeWorkspaceLock;
 use crate::fixt::ExternInputFixturator;
 use crate::fixt::FunctionNameFixturator;
+use crate::fixt::*;
 use crate::{
     conductor::{api::CellConductorReadHandle, interface::SignalBroadcaster},
     core::ribosome::guest_callback::entry_defs::EntryDefsResult,
@@ -58,12 +59,13 @@ use holochain_zome_types::capability::CapGrant;
 use holochain_zome_types::capability::CapSecret;
 use holochain_zome_types::header::ZomeId;
 use holochain_zome_types::zome::FunctionName;
-use holochain_zome_types::zome::ZomeName;
 use holochain_zome_types::ExternInput;
 use holochain_zome_types::ExternOutput;
 use holochain_zome_types::ZomeCallResponse;
 use mockall::automock;
 use std::iter::Iterator;
+
+use self::{error::RibosomeError, guest_callback::entry_defs::EntryDefsInvocation};
 
 #[derive(Clone)]
 pub struct CallContext {

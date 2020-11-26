@@ -69,7 +69,6 @@ use holochain_types::dna::DnaError;
 use holochain_types::dna::DnaFile;
 use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::entry_def::EntryDefsCallbackResult;
-use holochain_zome_types::header::ZomeId;
 use holochain_zome_types::init::InitCallbackResult;
 use holochain_zome_types::migrate_agent::MigrateAgentCallbackResult;
 use holochain_zome_types::post_commit::PostCommitCallbackResult;
@@ -88,8 +87,6 @@ const WASM_CACHE_PATH_ENV: &str = "HC_WASM_CACHE_PATH";
 
 /// The only WasmRibosome is a Wasm ribosome.
 /// note that this is cloned on every invocation so keep clones cheap!
-// TODO: maackle:
-//       how can this possibly be cheap to clone when it contains wasm bytecode?
 #[derive(Clone, Debug)]
 pub struct WasmRibosome {
     // NOTE - Currently taking a full DnaFile here.
@@ -514,7 +511,6 @@ impl RibosomeT for WasmRibosome {
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use hdk3::prelude::*;

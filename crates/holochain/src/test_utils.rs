@@ -12,7 +12,6 @@ use crate::core::state::cascade::DbPair;
 use crate::core::state::element_buf::ElementBuf;
 use crate::core::state::metadata::MetadataBuf;
 use crate::core::workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace;
-use crate::prelude::Zome;
 use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
 use holo_hash::fixt::*;
@@ -33,6 +32,7 @@ use holochain_state::test_utils::test_environments;
 use holochain_state::test_utils::TestEnvironments;
 use holochain_types::app::InstalledCell;
 use holochain_types::cell::CellId;
+use holochain_types::dna::zome::Zome;
 use holochain_types::dna::DnaFile;
 use holochain_types::element::SignedHeaderHashed;
 use holochain_types::element::SignedHeaderHashedExt;
@@ -73,9 +73,7 @@ macro_rules! here {
 /// expected functions, return data and with_f checks
 #[macro_export]
 macro_rules! meta_mock {
-    () => {{
-        $crate::core::state::metadata::MockMetadataBuf::new()
-    }};
+    () => {{ $crate::core::state::metadata::MockMetadataBuf::new() }};
     ($fun:ident) => {{
         let d: Vec<holochain_types::metadata::TimedHeaderHash> = Vec::new();
         meta_mock!($fun, d)
