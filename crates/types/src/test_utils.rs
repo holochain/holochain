@@ -3,8 +3,6 @@
 use crate::cell::CellId;
 use crate::dna::wasm::DnaWasm;
 use crate::dna::zome::WasmZome;
-use crate::dna::zome::Zome;
-use crate::dna::zome::ZomeDef;
 use crate::dna::DnaDef;
 use crate::dna::DnaFile;
 use crate::dna::JsonProperties;

@@ -4,7 +4,6 @@
 use backtrace::Backtrace;
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
-use holochain_wasm_test_utils::TestWasm;
 use serde::Deserialize;
 use serde::Serialize;
 use std::fmt;
