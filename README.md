@@ -43,14 +43,14 @@ FLAGS:
 
 OPTIONS:
     -c, --config-path <config-path>
-            Path to a TOML file containing conductor configuration
+            Path to a YAML file containing conductor configuration
 ```
 
 Running `holochain` requires a config file.  You can generate one in the default configuration file locations using interactive mode:
 
 ``` bash
 $ holochain -i
-There is no conductor config TOML file at the path specified (/home/eric/.config/holochain/conductor-config.toml)
+There is no conductor config YAML file at the path specified (/home/eric/.config/holochain/conductor-config.yml)
 Would you like to create a default config file at this location? [Y/n]
 Y
 Conductor config written.
