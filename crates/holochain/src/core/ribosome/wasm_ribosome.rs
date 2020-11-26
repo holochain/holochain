@@ -408,9 +408,10 @@ impl RibosomeT for WasmRibosome {
                 }
             }
             ZomeDef::Inline(zome) => {
-                let input: SerializedBytes = invocation.clone().host_input()?.into_inner();
+                let input = invocation.clone().host_input()?;
                 let api = HostFnApi::new(Arc::new(self.clone()), Arc::new(call_context));
-                Ok(zome.call(Box::new(api), to_call, input)?)
+                let result = zome.maybe_call(Box::new(api), to_call, input)?;
+                Ok(result)
             }
         }
     }

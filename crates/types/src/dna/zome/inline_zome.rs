@@ -4,20 +4,14 @@
 //! make it easy to write a zome on-the-fly or programmatically, rather than
 //! having to go through the heavy machinery of wasm compilation
 
+use self::error::InlineZomeResult;
 use holochain_serialized_bytes as sb;
 use holochain_serialized_bytes::prelude::*;
+use holochain_zome_types::{prelude::EntryDef, zome::FunctionName, ExternInput, ExternOutput};
 use holochain_zome_types::{prelude::EntryDefsCallbackResult, zome_io::HostFnApiT};
-use holochain_zome_types::{
-    prelude::{EntryDef, EntryDefs},
-    zome::FunctionName,
-};
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 
-use self::error::InlineZomeError;
-use self::error::InlineZomeResult;
-
-pub mod api;
 pub mod error;
 
 type BoxApi = Box<dyn HostFnApiT>;
@@ -70,24 +64,19 @@ impl InlineZome {
         self
     }
 
-    /// Make a call to an inline zome function
-    #[allow(unreachable_code)]
-    pub fn call<I: Serialize, O: DeserializeOwned>(
+    /// Make a call to an inline zome callback.
+    /// If the callback doesn't exist, return None.
+    pub fn maybe_call(
         &self,
         api: BoxApi,
         name: &FunctionName,
-        input: I,
-    ) -> InlineZomeResult<O> {
-        dbg!(self.callbacks.keys().collect::<Vec<_>>());
-        let f = self
-            .callbacks
-            .get(name)
-            .ok_or_else(|| InlineZomeError::NoSuchCallback(name.to_owned()))?;
-        let output = f(
-            api,
-            SerializedBytes::from(UnsafeBytes::from(sb::encode(&input).expect("TODO"))),
-        )?;
-        Ok(sb::decode(output.bytes()).expect("TODO"))
+        input: ExternInput,
+    ) -> InlineZomeResult<Option<ExternOutput>> {
+        if let Some(f) = self.callbacks.get(name) {
+            Ok(Some(ExternOutput::new(f(api, input.into_inner())?)))
+        } else {
+            Ok(None)
+        }
     }
 }
 
