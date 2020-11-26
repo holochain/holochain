@@ -22,20 +22,19 @@ use matches::assert_matches;
 use std::convert::TryInto;
 use test_wasm_common::AgentActivitySearch;
 
-use crate::conductor::ConductorHandle;
-use crate::core::state::cascade::Cascade;
-use crate::core::state::cascade::DbPair;
-use crate::core::state::cascade::DbPairMut;
-use crate::core::state::element_buf::ElementBuf;
-use crate::core::state::metadata::ChainItemKey;
-use crate::core::state::metadata::MetadataBuf;
-use crate::core::state::metadata::MetadataBufT;
-use crate::core::state::source_chain::SourceChain;
-use crate::test_utils::conductor_setup::CellHostFnApi;
-use crate::test_utils::conductor_setup::ConductorTestData;
-use crate::test_utils::host_fn_api::Post;
-use crate::test_utils::new_invocation;
-use crate::test_utils::wait_for_integration;
+use crate::{
+    conductor::ConductorHandle,
+    core::state::cascade::Cascade,
+    core::state::cascade::DbPair,
+    core::state::cascade::DbPairMut,
+    core::state::element_buf::ElementBuf,
+    core::state::metadata::{ChainItemKey, MetadataBuf, MetadataBufT},
+    test_utils::host_fn_api::Post,
+    test_utils::{conductor_setup::CellHostFnCaller, new_invocation, wait_for_integration},
+};
+use crate::{
+    core::state::source_chain::SourceChain, test_utils::conductor_setup::ConductorTestData,
+};
 
 const NUM_COMMITS: usize = 5;
 const GET_AGENT_ACTIVITY_TIMEOUT_MS: u64 = 1000;
@@ -170,13 +169,11 @@ async fn get_validation_package_test() {
         .iter_back()
         .filter_map(|shh| alice_authored.get_element(shh.header_address()))
         .filter_map(|el| {
-            Ok(el.header().entry_type().cloned().and_then(|et| {
-                if et == entry_type {
-                    Some(el)
-                } else {
-                    None
-                }
-            }))
+            Ok(el
+                .header()
+                .entry_type()
+                .cloned()
+                .and_then(|et| if et == entry_type { Some(el) } else { None }))
         })
         // Skip the actual entry
         .skip(1)
@@ -668,7 +665,7 @@ async fn get_agent_activity_host_fn_test() {
 
 async fn commit_some_data(
     call: &str,
-    alice_call_data: &CellHostFnApi,
+    alice_call_data: &CellHostFnCaller,
     handle: &ConductorHandle,
 ) -> HeaderHash {
     let mut header_hash = None;
@@ -688,7 +685,7 @@ async fn commit_some_data(
 // Cascade helper function for easily getting the validation package
 async fn check_cascade(
     header_hashed: &HeaderHashed,
-    call_data: &CellHostFnApi,
+    call_data: &CellHostFnCaller,
 ) -> Option<ValidationPackage> {
     let mut element_cache = ElementBuf::cache(call_data.env.clone().into()).unwrap();
     let mut meta_cache = MetadataBuf::cache(call_data.env.clone().into()).unwrap();

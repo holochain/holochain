@@ -238,7 +238,7 @@ async fn get_from_another_agent() {
     let entry = Post("Bananas are good for you".into());
     let entry_hash = EntryHash::with_data_sync(&Entry::try_from(entry.clone()).unwrap());
     let header_hash = {
-        let call_data = HostFnApi::create(&bob_cell_id, &handle, &dna_file).await;
+        let call_data = HostFnCaller::create(&bob_cell_id, &handle, &dna_file).await;
         let header_hash = call_data
             .commit_entry(entry.clone().try_into().unwrap(), POST_ID)
             .await;
@@ -251,7 +251,7 @@ async fn get_from_another_agent() {
 
     // Alice get element from bob
     let element = {
-        let call_data = HostFnApi::create(&alice_cell_id, &handle, &dna_file).await;
+        let call_data = HostFnCaller::create(&alice_cell_id, &handle, &dna_file).await;
         call_data
             .get(entry_hash.clone().into(), options.clone())
             .await
@@ -270,7 +270,7 @@ async fn get_from_another_agent() {
 
     let new_entry = Post("Bananas are bendy".into());
     let (remove_hash, update_hash) = {
-        let call_data = HostFnApi::create(&bob_cell_id, &handle, &dna_file).await;
+        let call_data = HostFnCaller::create(&bob_cell_id, &handle, &dna_file).await;
         let remove_hash = call_data.delete_entry(header_hash.clone()).await;
 
         fake_authority(remove_hash.clone().into(), &call_data).await;
@@ -287,7 +287,7 @@ async fn get_from_another_agent() {
 
     // Alice get element from bob
     let (entry_details, header_details) = {
-        let call_data = HostFnApi::create(&alice_cell_id, &handle, &dna_file).await;
+        let call_data = HostFnCaller::create(&alice_cell_id, &handle, &dna_file).await;
         debug!(the_entry_hash = ?entry_hash);
         let entry_details = call_data
             .get_details(entry_hash.into(), options.clone())
@@ -385,7 +385,7 @@ async fn get_links_from_another_agent() {
     let target_entry_hash = EntryHash::with_data_sync(&Entry::try_from(target.clone()).unwrap());
     let link_tag = fixt!(LinkTag);
     let link_add_hash = {
-        let call_data = HostFnApi::create(&bob_cell_id, &handle, &dna_file).await;
+        let call_data = HostFnCaller::create(&bob_cell_id, &handle, &dna_file).await;
         let base_header_hash = call_data
             .commit_entry(base.clone().try_into().unwrap(), POST_ID)
             .await;
@@ -413,7 +413,7 @@ async fn get_links_from_another_agent() {
 
     // Alice get links from bob
     let links = {
-        let call_data = HostFnApi::create(&alice_cell_id, &handle, &dna_file).await;
+        let call_data = HostFnCaller::create(&alice_cell_id, &handle, &dna_file).await;
 
         call_data
             .get_links(base_entry_hash.clone(), None, link_options.clone())
@@ -432,7 +432,7 @@ async fn get_links_from_another_agent() {
 
     // Remove the link
     {
-        let call_data = HostFnApi::create(&bob_cell_id, &handle, &dna_file).await;
+        let call_data = HostFnCaller::create(&bob_cell_id, &handle, &dna_file).await;
 
         // Link the entries
         let link_remove_hash = call_data.delete_link(link_add_hash.clone()).await;
@@ -441,7 +441,7 @@ async fn get_links_from_another_agent() {
     }
 
     let links = {
-        let call_data = HostFnApi::create(&alice_cell_id, &handle, &dna_file).await;
+        let call_data = HostFnCaller::create(&alice_cell_id, &handle, &dna_file).await;
 
         call_data
             .get_link_details(
@@ -612,7 +612,7 @@ async fn generate_fixt_store() -> (
     (store, meta_store)
 }
 
-async fn fake_authority(hash: AnyDhtHash, call_data: &HostFnApi) {
+async fn fake_authority(hash: AnyDhtHash, call_data: &HostFnCaller) {
     // Check bob can get the entry
     let element = call_data
         .get(hash.clone().into(), GetOptions::default())

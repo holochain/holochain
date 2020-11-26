@@ -21,7 +21,7 @@ use holochain_types::test_utils::fake_dna_zomes;
 use holochain_types::test_utils::write_fake_dna_file;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::*;
-use holochain_zome_types::*;
+use holochain_zome_types::{signal::AppSignal, *};
 use matches::assert_matches;
 use std::path::PathBuf;
 use std::process::Stdio;
@@ -467,7 +467,7 @@ async fn emit_signals() {
     let sig2: SerializedBytes = unwrap_to::unwrap_to!(msg2 => WebsocketMessage::Signal).clone();
 
     assert_eq!(
-        Signal::App(cell_id, ().try_into().unwrap()),
+        Signal::App(cell_id, AppSignal::new(().try_into().unwrap())),
         Signal::try_from(sig1.clone()).unwrap(),
     );
     assert_eq!(sig1, sig2);

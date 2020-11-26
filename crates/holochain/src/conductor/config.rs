@@ -80,10 +80,6 @@ pub struct ConductorConfig {
     // /// Which signals to emit
     // TODO: it's an open question whether signal config is stateful or not, i.e. whether it belongs here.
     // pub signals: SignalConfig,
-    //
-    // /// Configures how logging should behave. Optional.
-    // TODO: it's an open question whether we want to keep any of the legacy LoggerConfig
-    // pub logger: LoggerConfig,
 }
 
 /// helper fnction function to load a `Config` from a yaml string.

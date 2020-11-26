@@ -212,6 +212,7 @@ dependencies = [
  "fixt",
  "holo_hash",
  "holochain_serialized_bytes",
+ "paste",
  "serde",
  "serde_bytes",
  "strum",

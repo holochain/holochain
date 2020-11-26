@@ -1,6 +1,5 @@
-use crate::core::ribosome::error::RibosomeResult;
-use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
+use crate::core::ribosome::{error::RibosomeResult, CallContext};
 use crate::core::signal::Signal;
 use holochain_zome_types::EmitSignalInput;
 use holochain_zome_types::EmitSignalOutput;

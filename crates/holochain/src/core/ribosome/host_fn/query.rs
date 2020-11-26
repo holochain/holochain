@@ -27,8 +27,7 @@ pub fn query(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod slow_tests {
-    use crate::core::ribosome::ZomeCallHostAccess;
-    use crate::fixt::ZomeCallHostAccessFixturator;
+    use crate::{core::ribosome::ZomeCallHostAccess, fixt::ZomeCallHostAccessFixturator};
     use ::fixt::prelude::*;
     use hdk3::prelude::*;
     use holochain_state::test_utils::TestEnvironment;
