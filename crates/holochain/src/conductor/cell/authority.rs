@@ -1,38 +1,33 @@
-use super::error::AuthorityDataError;
-use super::error::CellResult;
-use crate::conductor::CellError;
-use crate::core::state::element_buf::ElementBuf;
-use crate::core::state::metadata::ChainItemKey;
-use crate::core::state::metadata::MetadataBuf;
-use crate::core::state::metadata::MetadataBufT;
+use super::error::{AuthorityDataError, CellResult};
+use crate::{
+    conductor::CellError,
+    core::state::{
+        element_buf::ElementBuf,
+        metadata::{ChainItemKey, MetadataBuf, MetadataBufT},
+    },
+};
 use fallible_iterator::FallibleIterator;
 
-use holo_hash::AgentPubKey;
-use holo_hash::EntryHash;
-use holo_hash::HeaderHash;
-use holochain_state::env::EnvironmentRead;
-use holochain_state::env::EnvironmentWrite;
-use holochain_state::env::ReadManager;
-use holochain_state::error::DatabaseError;
-use holochain_state::fresh_reader;
-use holochain_state::prelude::PrefixType;
-use holochain_state::prelude::Readable;
-use holochain_types::activity::AgentActivity;
-use holochain_types::activity::ChainItems;
-use holochain_types::element::ElementStatus;
-use holochain_types::element::GetElementResponse;
-use holochain_types::element::RawGetEntryResponse;
-use holochain_types::element::WireElement;
-use holochain_types::header::WireHeaderStatus;
-use holochain_types::header::WireUpdateRelationship;
-use holochain_types::metadata::TimedHeaderHash;
-use holochain_zome_types::element::SignedHeaderHashed;
-use holochain_zome_types::header::conversions::WrongHeaderError;
-use holochain_zome_types::query::ChainQueryFilter;
-use holochain_zome_types::query::ChainStatus;
-use holochain_zome_types::validate::ValidationStatus;
-use std::collections::BTreeSet;
-use std::convert::TryInto;
+use holo_hash::{AgentPubKey, EntryHash, HeaderHash};
+use holochain_state::{
+    env::{EnvironmentRead, EnvironmentWrite, ReadManager},
+    error::DatabaseError,
+    fresh_reader,
+    prelude::{PrefixType, Readable},
+};
+use holochain_types::{
+    activity::{AgentActivity, ChainItems},
+    element::{ElementStatus, GetElementResponse, RawGetEntryResponse, WireElement},
+    header::{WireHeaderStatus, WireUpdateRelationship},
+    metadata::TimedHeaderHash,
+};
+use holochain_zome_types::{
+    element::SignedHeaderHashed,
+    header::conversions::WrongHeaderError,
+    query::{ChainQueryFilter, ChainStatus},
+    validate::ValidationStatus,
+};
+use std::{collections::BTreeSet, convert::TryInto};
 use tracing::*;
 
 #[instrument(skip(state_env))]

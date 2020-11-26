@@ -1,35 +1,33 @@
-use crate::conductor::ConductorHandle;
-use crate::core::state::element_buf::ElementBuf;
-use crate::core::state::validation_db::ValidationLimboStatus;
-use crate::core::workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace;
-use crate::test_utils::host_fn_api::*;
-use crate::test_utils::setup_app;
-use crate::test_utils::wait_for_integration;
+use crate::{
+    conductor::ConductorHandle,
+    core::{
+        state::{element_buf::ElementBuf, validation_db::ValidationLimboStatus},
+        workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace,
+    },
+    test_utils::{host_fn_api::*, setup_app, wait_for_integration},
+};
 use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
 use hdk3::prelude::LinkTag;
-use holo_hash::AnyDhtHash;
-use holo_hash::DhtOpHash;
-use holo_hash::EntryHash;
-use holo_hash::HeaderHash;
+use holo_hash::{AnyDhtHash, DhtOpHash, EntryHash, HeaderHash};
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_state::fresh_reader_test;
-use holochain_state::prelude::ReadManager;
-use holochain_types::app::InstalledCell;
-use holochain_types::cell::CellId;
-use holochain_types::dht_op::DhtOpLight;
-use holochain_types::dna::DnaDef;
-use holochain_types::dna::DnaFile;
-use holochain_types::fixt::*;
-use holochain_types::test_utils::fake_agent_pubkey_1;
-use holochain_types::test_utils::fake_agent_pubkey_2;
-use holochain_types::validate::ValidationStatus;
-use holochain_types::Entry;
+use holochain_state::{fresh_reader_test, prelude::ReadManager};
+use holochain_types::{
+    app::InstalledCell,
+    cell::CellId,
+    dht_op::DhtOpLight,
+    dna::{DnaDef, DnaFile},
+    fixt::*,
+    test_utils::{fake_agent_pubkey_1, fake_agent_pubkey_2},
+    validate::ValidationStatus,
+    Entry,
+};
 use holochain_wasm_test_utils::TestWasm;
 use matches::assert_matches;
-use std::convert::TryFrom;
-use std::convert::TryInto;
-use std::time::Duration;
+use std::{
+    convert::{TryFrom, TryInto},
+    time::Duration,
+};
 use tracing::*;
 
 #[tokio::test(threaded_scheduler)]

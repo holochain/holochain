@@ -1,10 +1,11 @@
 //! Helper functions for interacting with the user when running a Conductor
 //! with the --interactive flag
 
-use crate::conductor::config::ConductorConfig;
-use crate::conductor::error::ConductorError;
-use crate::conductor::error::ConductorResult;
-use crate::conductor::paths::ConfigFilePath;
+use crate::conductor::{
+    config::ConductorConfig,
+    error::{ConductorError, ConductorResult},
+    paths::ConfigFilePath,
+};
 use std::path::Path;
 
 /// Prompt the user to answer Y or N.

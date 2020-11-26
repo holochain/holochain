@@ -1,27 +1,22 @@
 //! Functions dealing with obtaining and referencing singleton LMDB environments
 
-use crate::db::get_db;
-use crate::db::initialize_databases;
-use crate::db::DbKey;
-use crate::db::GetDb;
-use crate::error::DatabaseError;
-use crate::error::DatabaseResult;
-use crate::transaction::Reader;
-use crate::transaction::Writer;
+use crate::{
+    db::{get_db, initialize_databases, DbKey, GetDb},
+    error::{DatabaseError, DatabaseResult},
+    transaction::{Reader, Writer},
+};
 use derive_more::Into;
 use holochain_keystore::KeystoreSender;
 use holochain_types::cell::CellId;
 use lazy_static::lazy_static;
-use parking_lot::RwLock;
-use parking_lot::RwLockReadGuard;
-use rkv::EnvironmentFlags;
-use rkv::Rkv;
+use parking_lot::{RwLock, RwLockReadGuard};
+use rkv::{EnvironmentFlags, Rkv};
 use shrinkwraprs::Shrinkwrap;
-use std::collections::hash_map;
-use std::collections::HashMap;
-use std::path::Path;
-use std::path::PathBuf;
-use std::sync::Arc;
+use std::{
+    collections::{hash_map, HashMap},
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 const DEFAULT_INITIAL_MAP_SIZE: usize = 100 * 1024 * 1024; // 100MB
 const MAX_DBS: u32 = 32;

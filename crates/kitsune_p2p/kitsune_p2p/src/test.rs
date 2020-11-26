@@ -1,10 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use crate::test_util::*;
-    use crate::types::actor::KitsuneP2pSender;
-    use crate::*;
-    use ghost_actor::dependencies::tracing;
-    use ghost_actor::GhostControlSender;
+    use crate::{test_util::*, types::actor::KitsuneP2pSender, *};
+    use ghost_actor::{dependencies::tracing, GhostControlSender};
     use std::sync::Arc;
 
     #[tokio::test(threaded_scheduler)]

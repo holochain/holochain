@@ -1,18 +1,14 @@
-use crate::core::ribosome::FnComponents;
-use crate::core::ribosome::HostAccess;
-use crate::core::ribosome::Invocation;
-use crate::core::ribosome::ZomesToInvoke;
-use crate::core::workflow::CallZomeWorkspaceLock;
+use crate::core::{
+    ribosome::{FnComponents, HostAccess, Invocation, ZomesToInvoke},
+    workflow::CallZomeWorkspaceLock,
+};
 use derive_more::Constructor;
 use holo_hash::EntryHash;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::dna::zome::HostFnAccess;
-use holochain_types::dna::DnaDef;
-use holochain_zome_types::init::InitCallbackResult;
-use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::ExternInput;
+use holochain_types::dna::{zome::HostFnAccess, DnaDef};
+use holochain_zome_types::{init::InitCallbackResult, zome::ZomeName, ExternInput};
 
 #[derive(Debug, Clone)]
 pub struct InitInvocation {
@@ -99,16 +95,14 @@ impl From<Vec<(ZomeName, InitCallbackResult)>> for InitResult {
 #[cfg(test)]
 mod test {
     use super::InitResult;
-    use crate::core::ribosome::Invocation;
-    use crate::core::ribosome::ZomesToInvoke;
-    use crate::fixt::InitHostAccessFixturator;
-    use crate::fixt::InitInvocationFixturator;
-    use crate::fixt::ZomeNameFixturator;
+    use crate::{
+        core::ribosome::{Invocation, ZomesToInvoke},
+        fixt::{InitHostAccessFixturator, InitInvocationFixturator, ZomeNameFixturator},
+    };
     use ::fixt::prelude::*;
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::dna::zome::HostFnAccess;
-    use holochain_zome_types::init::InitCallbackResult;
-    use holochain_zome_types::ExternInput;
+    use holochain_zome_types::{init::InitCallbackResult, ExternInput};
 
     #[test]
     fn init_callback_result_fold() {
@@ -221,11 +215,13 @@ mod test {
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
     use super::InitResult;
-    use crate::core::ribosome::RibosomeT;
-    use crate::fixt::curve::Zomes;
-    use crate::fixt::InitHostAccessFixturator;
-    use crate::fixt::InitInvocationFixturator;
-    use crate::fixt::RealRibosomeFixturator;
+    use crate::{
+        core::ribosome::RibosomeT,
+        fixt::{
+            curve::Zomes, InitHostAccessFixturator, InitInvocationFixturator,
+            RealRibosomeFixturator,
+        },
+    };
     use ::fixt::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
 

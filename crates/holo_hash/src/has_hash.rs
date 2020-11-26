@@ -1,7 +1,6 @@
 //! Definition of the HasHash trait
 
-use crate::HashType;
-use crate::HoloHash;
+use crate::{HashType, HoloHash};
 
 /// Anything which has an owned HoloHashOf.
 pub trait HasHash<T: HashType> {

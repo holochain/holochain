@@ -1,6 +1,5 @@
 use crate::*;
-use futures::sink::SinkExt;
-use futures::stream::StreamExt;
+use futures::{sink::SinkExt, stream::StreamExt};
 use ghost_actor::dependencies::tracing;
 use kitsune_p2p_types::codec::Codec;
 

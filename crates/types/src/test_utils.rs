@@ -1,15 +1,14 @@
 //! Some common testing helpers.
 
-use crate::cell::CellId;
-use crate::dna::wasm::DnaWasm;
-use crate::dna::zome::WasmZome;
-use crate::dna::DnaDef;
-use crate::dna::DnaFile;
-use crate::dna::JsonProperties;
-use crate::prelude::*;
-use holochain_zome_types::capability::CapSecret;
-use holochain_zome_types::capability::CAP_SECRET_BYTES;
-use holochain_zome_types::zome::ZomeName;
+use crate::{
+    cell::CellId,
+    dna::{wasm::DnaWasm, zome::WasmZome, DnaDef, DnaFile, JsonProperties},
+    prelude::*,
+};
+use holochain_zome_types::{
+    capability::{CapSecret, CAP_SECRET_BYTES},
+    zome::ZomeName,
+};
 use std::path::PathBuf;
 
 pub use holochain_zome_types::test_utils::*;

@@ -1,38 +1,36 @@
 use anyhow::Result;
 use assert_cmd::prelude::*;
 use futures::Future;
-use holochain::conductor::api::AdminRequest;
-use holochain::conductor::api::AdminResponse;
-use holochain::conductor::api::AppRequest;
-use holochain::conductor::api::AppResponse;
-use holochain::conductor::config::*;
-use holochain::conductor::error::ConductorError;
-use holochain::conductor::Conductor;
-use holochain::core::ribosome::NamedInvocation;
-use holochain::core::ribosome::ZomeCallInvocationFixturator;
-use holochain::core::signal::Signal;
-use holochain_types::app::InstallAppDnaPayload;
-use holochain_types::app::InstallAppPayload;
-use holochain_types::cell::CellId;
-use holochain_types::observability;
-use holochain_types::prelude::*;
-use holochain_types::test_utils::fake_agent_pubkey_1;
-use holochain_types::test_utils::fake_dna_zomes;
-use holochain_types::test_utils::write_fake_dna_file;
+use holochain::{
+    conductor::{
+        api::{AdminRequest, AdminResponse, AppRequest, AppResponse},
+        config::*,
+        error::ConductorError,
+        Conductor,
+    },
+    core::{
+        ribosome::{NamedInvocation, ZomeCallInvocationFixturator},
+        signal::Signal,
+    },
+};
+use holochain_types::{
+    app::{InstallAppDnaPayload, InstallAppPayload},
+    cell::CellId,
+    observability,
+    prelude::*,
+    test_utils::{fake_agent_pubkey_1, fake_dna_zomes, write_fake_dna_file},
+};
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::*;
 use holochain_zome_types::{signal::AppSignal, *};
 use matches::assert_matches;
-use std::path::PathBuf;
-use std::process::Stdio;
-use std::sync::Arc;
-use std::time::Duration;
+use std::{path::PathBuf, process::Stdio, sync::Arc, time::Duration};
 use tempdir::TempDir;
-use tokio::io::AsyncBufReadExt;
-use tokio::io::BufReader;
-use tokio::process::Child;
-use tokio::process::Command;
-use tokio::stream::StreamExt;
+use tokio::{
+    io::{AsyncBufReadExt, BufReader},
+    process::{Child, Command},
+    stream::StreamExt,
+};
 use tracing::*;
 use url2::prelude::*;
 

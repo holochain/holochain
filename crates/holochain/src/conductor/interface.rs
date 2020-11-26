@@ -5,12 +5,9 @@
 //! Currently the only InterfaceDriver is a Websocket-based one, whose
 //! implementation can be found in the `websocket` module here.
 
-use crate::conductor::api::*;
-use crate::core::signal::Signal;
-use error::InterfaceError;
-use error::InterfaceResult;
-use serde::Deserialize;
-use serde::Serialize;
+use crate::{conductor::api::*, core::signal::Signal};
+use error::{InterfaceError, InterfaceResult};
+use serde::{Deserialize, Serialize};
 use std::convert::TryInto;
 use tokio::sync::broadcast;
 

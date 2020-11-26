@@ -1,7 +1,6 @@
 //! Type aliases for the various concrete HoloHash types
 
-use crate::hash_type;
-use crate::HoloHash;
+use crate::{hash_type, HoloHash};
 
 // NB: These could be macroized, but if we spell it out, we get better IDE
 // support

@@ -1,57 +1,52 @@
 //! Utils for Holochain tests
 
-use crate::conductor::api::RealAppInterfaceApi;
-use crate::conductor::config::AdminInterfaceConfig;
-use crate::conductor::config::ConductorConfig;
-use crate::conductor::config::InterfaceDriver;
-use crate::conductor::ConductorBuilder;
-use crate::conductor::ConductorHandle;
-use crate::core::ribosome::ZomeCallInvocation;
-use crate::core::state::cascade::Cascade;
-use crate::core::state::cascade::DbPair;
-use crate::core::state::element_buf::ElementBuf;
-use crate::core::state::metadata::MetadataBuf;
-use crate::core::workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace;
+use crate::{
+    conductor::{
+        api::RealAppInterfaceApi,
+        config::{AdminInterfaceConfig, ConductorConfig, InterfaceDriver},
+        ConductorBuilder, ConductorHandle,
+    },
+    core::{
+        ribosome::ZomeCallInvocation,
+        state::{
+            cascade::{Cascade, DbPair},
+            element_buf::ElementBuf,
+            metadata::MetadataBuf,
+        },
+        workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace,
+    },
+};
 use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
-use holo_hash::fixt::*;
-use holo_hash::*;
+use holo_hash::{fixt::*, *};
 use holochain_keystore::KeystoreSender;
-use holochain_p2p::actor::HolochainP2pRefToCell;
-use holochain_p2p::event::HolochainP2pEvent;
-use holochain_p2p::spawn_holochain_p2p;
-use holochain_p2p::HolochainP2pCell;
-use holochain_p2p::HolochainP2pRef;
-use holochain_p2p::HolochainP2pSender;
-use holochain_serialized_bytes::SerializedBytes;
-use holochain_serialized_bytes::SerializedBytesError;
-use holochain_serialized_bytes::UnsafeBytes;
-use holochain_state::env::EnvironmentWrite;
-use holochain_state::fresh_reader_test;
-use holochain_state::test_utils::test_environments;
-use holochain_state::test_utils::TestEnvironments;
-use holochain_types::app::InstalledCell;
-use holochain_types::cell::CellId;
-use holochain_types::dna::zome::Zome;
-use holochain_types::dna::DnaFile;
-use holochain_types::element::SignedHeaderHashed;
-use holochain_types::element::SignedHeaderHashedExt;
-use holochain_types::fixt::CapSecretFixturator;
-use holochain_types::test_utils::fake_header_hash;
-use holochain_types::Entry;
-use holochain_types::EntryHashed;
-use holochain_types::HeaderHashed;
-use holochain_types::Timestamp;
+use holochain_p2p::{
+    actor::HolochainP2pRefToCell, event::HolochainP2pEvent, spawn_holochain_p2p, HolochainP2pCell,
+    HolochainP2pRef, HolochainP2pSender,
+};
+use holochain_serialized_bytes::{SerializedBytes, SerializedBytesError, UnsafeBytes};
+use holochain_state::{
+    env::EnvironmentWrite,
+    fresh_reader_test,
+    test_utils::{test_environments, TestEnvironments},
+};
+use holochain_types::{
+    app::InstalledCell,
+    cell::CellId,
+    dna::{zome::Zome, DnaFile},
+    element::{SignedHeaderHashed, SignedHeaderHashedExt},
+    fixt::CapSecretFixturator,
+    test_utils::fake_header_hash,
+    Entry, EntryHashed, HeaderHashed, Timestamp,
+};
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::entry_def::EntryVisibility;
-use holochain_zome_types::header::Create;
-use holochain_zome_types::header::EntryType;
-use holochain_zome_types::header::Header;
-use holochain_zome_types::ExternInput;
+use holochain_zome_types::{
+    entry_def::EntryVisibility,
+    header::{Create, EntryType, Header},
+    ExternInput,
+};
 use kitsune_p2p::KitsuneP2pConfig;
-use std::convert::TryInto;
-use std::sync::Arc;
-use std::time::Duration;
+use std::{convert::TryInto, sync::Arc, time::Duration};
 use tempdir::TempDir;
 use tokio::sync::mpsc;
 

@@ -332,8 +332,7 @@ impl From<&ChainItemKey> for u32 {
 
 impl From<&ChainItemKey> for BytesKey {
     fn from(key: &ChainItemKey) -> Self {
-        use byteorder::BigEndian;
-        use byteorder::WriteBytesExt;
+        use byteorder::{BigEndian, WriteBytesExt};
         fn status(v: ValidationStatus) -> u8 {
             match v {
                 ValidationStatus::Valid => 0,
@@ -388,8 +387,7 @@ impl From<&ChainItemKey> for BytesKey {
 // get from the k bytes to the chain item key
 impl From<BytesKey> for ChainItemKey {
     fn from(b: BytesKey) -> Self {
-        use byteorder::BigEndian;
-        use byteorder::ByteOrder;
+        use byteorder::{BigEndian, ByteOrder};
         let bytes = b.0;
         const SEQ_SIZE: usize = std::mem::size_of::<u32>();
         const STATUS_SIZE: usize = std::mem::size_of::<u8>();

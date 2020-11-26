@@ -1,16 +1,15 @@
 #![cfg(feature = "test_utils")]
 
 use hdk3::prelude::Links;
-use holochain::core::ribosome::ZomeCallInvocation;
-use holochain::test_utils::conductor_setup::ConductorTestData;
+use holochain::{
+    core::ribosome::ZomeCallInvocation, test_utils::conductor_setup::ConductorTestData,
+};
 use holochain_keystore::keystore_actor::KeystoreSenderExt;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::test_utils::test_environments;
-use holochain_types::dna::DnaDef;
-use holochain_types::dna::DnaFile;
+use holochain_types::dna::{DnaDef, DnaFile};
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::ExternInput;
-use holochain_zome_types::ZomeCallResponse;
+use holochain_zome_types::{ExternInput, ZomeCallResponse};
 use unwrap_to::unwrap_to;
 
 /// A single link with an AgentPubKey for the base and target is committed by

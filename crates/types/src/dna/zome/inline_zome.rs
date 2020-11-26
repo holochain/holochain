@@ -7,8 +7,12 @@
 use self::error::InlineZomeResult;
 use holochain_serialized_bytes as sb;
 use holochain_serialized_bytes::prelude::*;
-use holochain_zome_types::{prelude::EntryDef, zome::FunctionName, ExternInput, ExternOutput};
-use holochain_zome_types::{prelude::EntryDefsCallbackResult, zome_io::HostFnApiT};
+use holochain_zome_types::{
+    prelude::{EntryDef, EntryDefsCallbackResult},
+    zome::FunctionName,
+    zome_io::HostFnApiT,
+    ExternInput, ExternOutput,
+};
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 

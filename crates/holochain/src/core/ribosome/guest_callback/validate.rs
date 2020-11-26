@@ -1,23 +1,20 @@
-use crate::core::ribosome::FnComponents;
-use crate::core::ribosome::HostAccess;
-use crate::core::ribosome::Invocation;
-use crate::core::ribosome::ZomesToInvoke;
-use crate::core::workflow::CallZomeWorkspaceLock;
+use crate::core::{
+    ribosome::{FnComponents, HostAccess, Invocation, ZomesToInvoke},
+    workflow::CallZomeWorkspaceLock,
+};
 use derive_more::Constructor;
 use holo_hash::AnyDhtHash;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::dna::zome::HostFnAccess;
-use holochain_types::dna::zome::Permission;
-use holochain_zome_types::element::Element;
-use holochain_zome_types::entry::Entry;
-use holochain_zome_types::entry_def::EntryDefId;
-use holochain_zome_types::validate::ValidateCallbackResult;
-use holochain_zome_types::validate::ValidateData;
-use holochain_zome_types::validate::ValidationPackage;
-use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::ExternInput;
-use holochain_zome_types::Header;
+use holochain_types::dna::zome::{HostFnAccess, Permission};
+use holochain_zome_types::{
+    element::Element,
+    entry::Entry,
+    entry_def::EntryDefId,
+    validate::{ValidateCallbackResult, ValidateData, ValidationPackage},
+    zome::ZomeName,
+    ExternInput, Header,
+};
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -136,22 +133,23 @@ impl From<ValidateInvocation> for ValidateData {
 
 #[cfg(test)]
 mod test {
-    use super::ValidateData;
-    use super::ValidateResult;
-    use crate::core::ribosome::Invocation;
-    use crate::fixt::ValidateHostAccessFixturator;
-    use crate::fixt::ValidateInvocationFixturator;
-    use crate::fixt::ZomeCallCapGrantFixturator;
+    use super::{ValidateData, ValidateResult};
+    use crate::{
+        core::ribosome::Invocation,
+        fixt::{
+            ValidateHostAccessFixturator, ValidateInvocationFixturator, ZomeCallCapGrantFixturator,
+        },
+    };
     use ::fixt::prelude::*;
     use holo_hash::fixt::AgentPubKeyFixturator;
     use holochain_serialized_bytes::prelude::*;
-    use holochain_types::dna::zome::HostFnAccess;
-    use holochain_types::dna::zome::Permission;
-    use holochain_types::fixt::*;
-    use holochain_zome_types::entry::Entry;
-    use holochain_zome_types::header::HeaderType;
-    use holochain_zome_types::validate::ValidateCallbackResult;
-    use holochain_zome_types::ExternInput;
+    use holochain_types::{
+        dna::zome::{HostFnAccess, Permission},
+        fixt::*,
+    };
+    use holochain_zome_types::{
+        entry::Entry, header::HeaderType, validate::ValidateCallbackResult, ExternInput,
+    };
     use rand::seq::SliceRandom;
     use std::sync::Arc;
 
@@ -294,17 +292,18 @@ mod test {
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
     use super::ValidateResult;
-    use crate::core::ribosome::RibosomeT;
-    use crate::core::ribosome::ZomesToInvoke;
-    use crate::core::state::source_chain::SourceChainResult;
-    use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
-    use crate::fixt::curve::Zomes;
-    use crate::fixt::*;
+    use crate::{
+        core::{
+            ribosome::{RibosomeT, ZomesToInvoke},
+            state::source_chain::SourceChainResult,
+            workflow::call_zome_workflow::CallZomeWorkspace,
+        },
+        fixt::{curve::Zomes, *},
+    };
     use ::fixt::prelude::*;
     use holo_hash::fixt::AgentPubKeyFixturator;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::CreateOutput;
-    use holochain_zome_types::Entry;
+    use holochain_zome_types::{CreateOutput, Entry};
     use std::sync::Arc;
 
     #[tokio::test(threaded_scheduler)]

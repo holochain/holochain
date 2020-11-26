@@ -1,5 +1,4 @@
-use crate::header::ZomeId;
-use crate::zome::ZomeName;
+use crate::{header::ZomeId, zome::ZomeName};
 use holo_hash::DnaHash;
 use holochain_serialized_bytes::prelude::*;
 

@@ -1,26 +1,24 @@
 //! Module for establishing Websocket-based Interfaces,
 //! i.e. those configured with `InterfaceDriver::Websocket`
 
-use super::error::InterfaceError;
-use super::error::InterfaceResult;
-use crate::conductor::conductor::StopReceiver;
-use crate::conductor::interface::*;
-use crate::conductor::manager::ManagedTaskHandle;
-use crate::conductor::manager::ManagedTaskResult;
-use crate::core::signal::Signal;
+use super::error::{InterfaceError, InterfaceResult};
+use crate::{
+    conductor::{
+        conductor::StopReceiver,
+        interface::*,
+        manager::{ManagedTaskHandle, ManagedTaskResult},
+    },
+    core::signal::Signal,
+};
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_websocket::websocket_bind;
-use holochain_websocket::WebsocketConfig;
-use holochain_websocket::WebsocketListener;
-use holochain_websocket::WebsocketMessage;
-use holochain_websocket::WebsocketReceiver;
-use holochain_websocket::WebsocketSender;
+use holochain_websocket::{
+    websocket_bind, WebsocketConfig, WebsocketListener, WebsocketMessage, WebsocketReceiver,
+    WebsocketSender,
+};
 use std::convert::TryFrom;
 
 use std::sync::Arc;
-use tokio::stream::StreamExt;
-use tokio::sync::broadcast;
-use tokio::task::JoinHandle;
+use tokio::{stream::StreamExt, sync::broadcast, task::JoinHandle};
 use tracing::*;
 use url2::url2;
 
@@ -245,35 +243,34 @@ where
 #[cfg(test)]
 pub mod test {
     use super::*;
-    use crate::conductor::api::error::ExternalApiWireError;
-    use crate::conductor::api::AdminRequest;
-    use crate::conductor::api::AdminResponse;
-    use crate::conductor::api::RealAdminInterfaceApi;
-    use crate::conductor::conductor::ConductorBuilder;
-    use crate::conductor::dna_store::MockDnaStore;
-    use crate::conductor::state::ConductorState;
-    use crate::conductor::Conductor;
-    use crate::conductor::ConductorHandle;
-    use crate::core::state::source_chain::SourceChainBuf;
-    use crate::fixt::RealRibosomeFixturator;
+    use crate::{
+        conductor::{
+            api::{
+                error::ExternalApiWireError, AdminRequest, AdminResponse, RealAdminInterfaceApi,
+            },
+            conductor::ConductorBuilder,
+            dna_store::MockDnaStore,
+            state::ConductorState,
+            Conductor, ConductorHandle,
+        },
+        core::state::source_chain::SourceChainBuf,
+        fixt::RealRibosomeFixturator,
+    };
     use futures::future::FutureExt;
     use holochain_serialized_bytes::prelude::*;
     use holochain_state::test_utils::test_environments;
-    use holochain_types::app::InstallAppDnaPayload;
-    use holochain_types::app::InstallAppPayload;
-    use holochain_types::app::InstalledCell;
-    use holochain_types::cell::CellId;
-    use holochain_types::observability;
-    use holochain_types::test_utils::fake_agent_pubkey_1;
-    use holochain_types::test_utils::fake_dna_file;
-    use holochain_types::test_utils::fake_dna_zomes;
+    use holochain_types::{
+        app::{InstallAppDnaPayload, InstallAppPayload, InstalledCell},
+        cell::CellId,
+        observability,
+        test_utils::{fake_agent_pubkey_1, fake_dna_file, fake_dna_zomes},
+    };
     use holochain_wasm_test_utils::TestWasm;
     use holochain_websocket::WebsocketMessage;
     use holochain_zome_types::ExternInput;
     use matches::assert_matches;
     use mockall::predicate;
-    use std::collections::HashMap;
-    use std::convert::TryInto;
+    use std::{collections::HashMap, convert::TryInto};
     use tempdir::TempDir;
     use uuid::Uuid;
 

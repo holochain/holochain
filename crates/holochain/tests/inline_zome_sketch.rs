@@ -1,14 +1,15 @@
 use futures::StreamExt;
 use hdk3::prelude::*;
-use holochain::conductor::Conductor;
-use holochain::core::ribosome::ZomeCallInvocation;
+use holochain::{conductor::Conductor, core::ribosome::ZomeCallInvocation};
 use holochain_keystore::KeystoreSender;
 use holochain_state::test_utils::test_environments;
-use holochain_types::app::InstalledCell;
-use holochain_types::dna::zome::inline_zome::InlineZome;
-use holochain_types::dna::zome::{Zome, ZomeDef};
-use holochain_types::dna::DnaDefBuilder;
-use holochain_types::dna::DnaFile;
+use holochain_types::{
+    app::InstalledCell,
+    dna::{
+        zome::{inline_zome::InlineZome, Zome, ZomeDef},
+        DnaDefBuilder, DnaFile,
+    },
+};
 use holochain_zome_types::element::ElementEntry;
 use unwrap_to::unwrap_to;
 

@@ -1,24 +1,21 @@
 //! Functionality for safely accessing LMDB database references.
 
-use crate::env::EnvironmentKind;
-use crate::error::DatabaseError;
-use crate::error::DatabaseResult;
-use crate::exports::IntegerStore;
-use crate::prelude::IntKey;
+use crate::{
+    env::EnvironmentKind,
+    error::{DatabaseError, DatabaseResult},
+    exports::IntegerStore,
+    prelude::IntKey,
+};
 use derive_more::Display;
 use holochain_keystore::KeystoreSender;
-use holochain_types::universal_map::Key as UmKey;
-use holochain_types::universal_map::UniversalMap;
+use holochain_types::universal_map::{Key as UmKey, UniversalMap};
 use lazy_static::lazy_static;
 use parking_lot::RwLock;
-use rkv::MultiStore;
-use rkv::Rkv;
-use rkv::SingleStore;
-use rkv::StoreOptions;
-use std::collections::hash_map;
-use std::collections::HashMap;
-use std::path::Path;
-use std::path::PathBuf;
+use rkv::{MultiStore, Rkv, SingleStore, StoreOptions};
+use std::{
+    collections::{hash_map, HashMap},
+    path::{Path, PathBuf},
+};
 
 /// TODO This is incomplete
 /// Enumeration of all databases needed by Holochain

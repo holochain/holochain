@@ -1,14 +1,9 @@
 //! Traits for defining keys and values of databases
 
-use holo_hash::assert_length;
-use holo_hash::HashType;
-use holo_hash::HoloHash;
-use holo_hash::PrimitiveHashType;
-use holo_hash::HOLO_HASH_FULL_LEN;
+use holo_hash::{assert_length, HashType, HoloHash, PrimitiveHashType, HOLO_HASH_FULL_LEN};
 use holochain_serialized_bytes::prelude::*;
 pub use prefix::*;
-use serde::de::DeserializeOwned;
-use serde::Serialize;
+use serde::{de::DeserializeOwned, Serialize};
 use std::cmp::Ordering;
 
 mod prefix;
@@ -75,8 +70,7 @@ impl AsRef<[u8]> for IntKey {
 
 impl From<u32> for IntKey {
     fn from(u: u32) -> Self {
-        use byteorder::NativeEndian;
-        use byteorder::WriteBytesExt;
+        use byteorder::{NativeEndian, WriteBytesExt};
         let mut wtr = vec![];
         wtr.write_u32::<NativeEndian>(u).unwrap();
         Self::from_key_bytes_or_friendly_panic(&wtr)
@@ -85,8 +79,7 @@ impl From<u32> for IntKey {
 
 impl From<IntKey> for u32 {
     fn from(k: IntKey) -> u32 {
-        use byteorder::ByteOrder;
-        use byteorder::NativeEndian;
+        use byteorder::{ByteOrder, NativeEndian};
         NativeEndian::read_u32(&k.0)
     }
 }

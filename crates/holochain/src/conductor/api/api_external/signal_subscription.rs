@@ -1,6 +1,5 @@
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::app::InstalledAppId;
-use holochain_types::cell::CellId;
+use holochain_types::{app::InstalledAppId, cell::CellId};
 use std::collections::HashMap;
 
 /// Declares updated Signal subscription settings for an App.

@@ -2,20 +2,22 @@
 #![allow(clippy::ptr_arg)]
 
 use super::CellConductorApiT;
-use crate::conductor::api::error::ConductorApiResult;
-use crate::conductor::entry_def_store::EntryDefBufferKey;
-use crate::conductor::interface::SignalBroadcaster;
-use crate::core::ribosome::ZomeCallInvocation;
-use crate::core::workflow::ZomeCallInvocationResult;
+use crate::{
+    conductor::{
+        api::error::ConductorApiResult, entry_def_store::EntryDefBufferKey,
+        interface::SignalBroadcaster,
+    },
+    core::{ribosome::ZomeCallInvocation, workflow::ZomeCallInvocationResult},
+};
 use async_trait::async_trait;
 use holo_hash::DnaHash;
 use holochain_keystore::KeystoreSender;
-use holochain_types::autonomic::AutonomicCue;
-use holochain_types::cell::CellId;
-use holochain_types::dna::zome::Zome;
-use holochain_types::dna::DnaFile;
-use holochain_zome_types::entry_def::EntryDef;
-use holochain_zome_types::zome::ZomeName;
+use holochain_types::{
+    autonomic::AutonomicCue,
+    cell::CellId,
+    dna::{zome::Zome, DnaFile},
+};
+use holochain_zome_types::{entry_def::EntryDef, zome::ZomeName};
 use mockall::mock;
 
 // Unfortunate workaround to get mockall to work with async_trait, due to the complexity of each.

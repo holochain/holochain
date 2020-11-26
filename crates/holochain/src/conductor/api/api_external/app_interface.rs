@@ -1,18 +1,16 @@
-use super::InterfaceApi;
-use super::SignalSubscription;
-use crate::conductor::api::error::ConductorApiResult;
-use crate::conductor::api::error::ExternalApiWireError;
-use crate::conductor::api::error::SerializationError;
-use crate::conductor::interface::error::InterfaceError;
-use crate::conductor::interface::error::InterfaceResult;
-use crate::conductor::state::AppInterfaceId;
-use crate::conductor::ConductorHandle;
-use crate::core::ribosome::ZomeCallInvocation;
+use super::{InterfaceApi, SignalSubscription};
+use crate::{
+    conductor::{
+        api::error::{ConductorApiResult, ExternalApiWireError, SerializationError},
+        interface::error::{InterfaceError, InterfaceResult},
+        state::AppInterfaceId,
+        ConductorHandle,
+    },
+    core::ribosome::ZomeCallInvocation,
+};
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::app::InstalledApp;
-use holochain_types::app::InstalledAppId;
-use holochain_zome_types::ExternOutput;
-use holochain_zome_types::ZomeCallResponse;
+use holochain_types::app::{InstalledApp, InstalledAppId};
+use holochain_zome_types::{ExternOutput, ZomeCallResponse};
 
 /// The interface that a Conductor exposes to the outside world.
 #[async_trait::async_trait]

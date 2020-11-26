@@ -1,9 +1,9 @@
 use super::KvStoreT;
-use crate::buffer::check_empty_key;
-use crate::buffer::iter::SingleIterRaw;
-use crate::error::DatabaseError;
-use crate::error::DatabaseResult;
-use crate::prelude::*;
+use crate::{
+    buffer::{check_empty_key, iter::SingleIterRaw},
+    error::{DatabaseError, DatabaseResult},
+    prelude::*,
+};
 use fallible_iterator::FallibleIterator;
 use rkv::SingleStore;
 

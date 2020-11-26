@@ -37,7 +37,6 @@ pub use entry::{Entry, EntryHashed};
 #[doc(inline)]
 pub use header::HeaderHashed;
 
-pub use timestamp::Timestamp;
-pub use timestamp::TimestampKey;
+pub use timestamp::{Timestamp, TimestampKey};
 
 pub use observability;

@@ -41,30 +41,30 @@
 //! types for testing. If we did not have a way of hiding this type genericity,
 //! code which interacted with the Conductor would also have to be highly generic.
 
-use super::api::error::ConductorApiResult;
-use super::config::AdminInterfaceConfig;
-use super::dna_store::DnaStore;
-use super::entry_def_store::EntryDefBufferKey;
-use super::error::ConductorResult;
-use super::error::CreateAppError;
-use super::interface::SignalBroadcaster;
-use super::manager::TaskManagerRunHandle;
-use super::Cell;
-use super::Conductor;
-use crate::core::ribosome::ZomeCallInvocation;
-use crate::core::workflow::CallZomeWorkspaceLock;
-use crate::core::workflow::ZomeCallInvocationResult;
+use super::{
+    api::error::ConductorApiResult,
+    config::AdminInterfaceConfig,
+    dna_store::DnaStore,
+    entry_def_store::EntryDefBufferKey,
+    error::{ConductorResult, CreateAppError},
+    interface::SignalBroadcaster,
+    manager::TaskManagerRunHandle,
+    Cell, Conductor,
+};
+use crate::core::{
+    ribosome::ZomeCallInvocation,
+    workflow::{CallZomeWorkspaceLock, ZomeCallInvocationResult},
+};
 use derive_more::From;
 use futures::future::FutureExt;
 use holochain_p2p::event::HolochainP2pEvent::*;
-use holochain_types::app::InstalledApp;
-use holochain_types::app::InstalledAppId;
-use holochain_types::app::InstalledCell;
-use holochain_types::app::MembraneProof;
-use holochain_types::autonomic::AutonomicCue;
-use holochain_types::cell::CellId;
-use holochain_types::dna::DnaFile;
-use holochain_types::prelude::*;
+use holochain_types::{
+    app::{InstalledApp, InstalledAppId, InstalledCell, MembraneProof},
+    autonomic::AutonomicCue,
+    cell::CellId,
+    dna::DnaFile,
+    prelude::*,
+};
 use holochain_zome_types::entry_def::EntryDef;
 use std::sync::Arc;
 use tokio::sync::RwLock;

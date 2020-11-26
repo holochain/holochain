@@ -1,5 +1,4 @@
-use super::EntryError;
-use super::ENTRY_SIZE_LIMIT;
+use super::{EntryError, ENTRY_SIZE_LIMIT};
 use holochain_serialized_bytes::prelude::*;
 
 /// Newtype for the bytes comprising an App entry

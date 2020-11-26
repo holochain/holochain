@@ -1,18 +1,15 @@
-use crate::core::ribosome::FnComponents;
-use crate::core::ribosome::HostAccess;
-use crate::core::ribosome::Invocation;
-use crate::core::ribosome::ZomesToInvoke;
-use crate::core::workflow::CallZomeWorkspaceLock;
+use crate::core::{
+    ribosome::{FnComponents, HostAccess, Invocation, ZomesToInvoke},
+    workflow::CallZomeWorkspaceLock,
+};
 use derive_more::Constructor;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::dna::zome::HostFnAccess;
-use holochain_types::dna::zome::Zome;
-use holochain_zome_types::header::HeaderHashes;
-use holochain_zome_types::post_commit::PostCommitCallbackResult;
-use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::ExternInput;
+use holochain_types::dna::zome::{HostFnAccess, Zome};
+use holochain_zome_types::{
+    header::HeaderHashes, post_commit::PostCommitCallbackResult, zome::ZomeName, ExternInput,
+};
 
 #[derive(Clone)]
 pub struct PostCommitInvocation {
@@ -95,16 +92,16 @@ impl From<Vec<PostCommitCallbackResult>> for PostCommitResult {
 #[cfg(test)]
 mod test {
     use super::PostCommitResult;
-    use crate::core::ribosome::Invocation;
-    use crate::core::ribosome::ZomesToInvoke;
-    use crate::fixt::HeaderHashesFixturator;
-    use crate::fixt::PostCommitHostAccessFixturator;
-    use crate::fixt::PostCommitInvocationFixturator;
+    use crate::{
+        core::ribosome::{Invocation, ZomesToInvoke},
+        fixt::{
+            HeaderHashesFixturator, PostCommitHostAccessFixturator, PostCommitInvocationFixturator,
+        },
+    };
     use ::fixt::prelude::*;
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::dna::zome::HostFnAccess;
-    use holochain_zome_types::post_commit::PostCommitCallbackResult;
-    use holochain_zome_types::ExternInput;
+    use holochain_zome_types::{post_commit::PostCommitCallbackResult, ExternInput};
 
     #[test]
     fn post_commit_callback_result_fold() {
@@ -203,11 +200,13 @@ mod test {
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
     use super::PostCommitResult;
-    use crate::core::ribosome::RibosomeT;
-    use crate::fixt::curve::Zomes;
-    use crate::fixt::PostCommitHostAccessFixturator;
-    use crate::fixt::PostCommitInvocationFixturator;
-    use crate::fixt::RealRibosomeFixturator;
+    use crate::{
+        core::ribosome::RibosomeT,
+        fixt::{
+            curve::Zomes, PostCommitHostAccessFixturator, PostCommitInvocationFixturator,
+            RealRibosomeFixturator,
+        },
+    };
     use holo_hash::fixt::HeaderHashFixturator;
     use holochain_wasm_test_utils::TestWasm;
 
@@ -268,12 +267,10 @@ mod slow_tests {
         assert_eq!(
             result,
             PostCommitResult::Fail(
-                vec![
-                    HeaderHashFixturator::new(fixt::Empty)
-                        .next()
-                        .unwrap()
-                        .into()
-                ]
+                vec![HeaderHashFixturator::new(fixt::Empty)
+                    .next()
+                    .unwrap()
+                    .into()]
                 .into(),
                 "empty header fail".into()
             ),

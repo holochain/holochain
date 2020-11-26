@@ -85,16 +85,14 @@
 
 #![deny(missing_docs)]
 
-use futures::future::BoxFuture;
-use futures::future::FutureExt;
-use holochain_serialized_bytes::SerializedBytes;
-use holochain_serialized_bytes::UnsafeBytes;
-use std::convert::TryInto;
-use std::io::Error;
-use std::io::ErrorKind;
-use std::io::Result;
-use std::net::SocketAddr;
-use std::sync::Arc;
+use futures::future::{BoxFuture, FutureExt};
+use holochain_serialized_bytes::{SerializedBytes, UnsafeBytes};
+use std::{
+    convert::TryInto,
+    io::{Error, ErrorKind, Result},
+    net::SocketAddr,
+    sync::Arc,
+};
 use url2::prelude::*;
 
 // helper utilities and macros

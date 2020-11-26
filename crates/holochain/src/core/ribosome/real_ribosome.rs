@@ -1,85 +1,53 @@
-use super::guest_callback::init::InitHostAccess;
-use super::guest_callback::migrate_agent::MigrateAgentHostAccess;
-use super::guest_callback::post_commit::PostCommitHostAccess;
-use super::guest_callback::validate::ValidateHostAccess;
-use super::guest_callback::validation_package::ValidationPackageHostAccess;
-use super::host_fn::get_agent_activity::get_agent_activity;
-use super::HostAccess;
-use super::ZomeCallHostAccess;
-use super::{guest_callback::entry_defs::EntryDefsHostAccess, host_fn::HostFnApi};
-use crate::core::ribosome::error::RibosomeError;
-use crate::core::ribosome::error::RibosomeResult;
-use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
-use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
-use crate::core::ribosome::guest_callback::init::InitInvocation;
-use crate::core::ribosome::guest_callback::init::InitResult;
-use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentInvocation;
-use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentResult;
-use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
-use crate::core::ribosome::guest_callback::post_commit::PostCommitResult;
-use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
-use crate::core::ribosome::guest_callback::validate::ValidateResult;
-use crate::core::ribosome::guest_callback::validate_link::ValidateLinkHostAccess;
-use crate::core::ribosome::guest_callback::validate_link::ValidateLinkInvocation;
-use crate::core::ribosome::guest_callback::validate_link::ValidateLinkResult;
-use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
-use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
-use crate::core::ribosome::guest_callback::CallIterator;
-use crate::core::ribosome::host_fn::agent_info::agent_info;
-use crate::core::ribosome::host_fn::call::call;
-use crate::core::ribosome::host_fn::call_remote::call_remote;
-use crate::core::ribosome::host_fn::capability_claims::capability_claims;
-use crate::core::ribosome::host_fn::capability_grants::capability_grants;
-use crate::core::ribosome::host_fn::capability_info::capability_info;
-use crate::core::ribosome::host_fn::create::create;
-use crate::core::ribosome::host_fn::create_link::create_link;
-use crate::core::ribosome::host_fn::debug::debug;
-use crate::core::ribosome::host_fn::decrypt::decrypt;
-use crate::core::ribosome::host_fn::delete::delete;
-use crate::core::ribosome::host_fn::delete_link::delete_link;
-use crate::core::ribosome::host_fn::emit_signal::emit_signal;
-use crate::core::ribosome::host_fn::encrypt::encrypt;
-use crate::core::ribosome::host_fn::get::get;
-use crate::core::ribosome::host_fn::get_details::get_details;
-use crate::core::ribosome::host_fn::get_link_details::get_link_details;
-use crate::core::ribosome::host_fn::get_links::get_links;
-use crate::core::ribosome::host_fn::hash_entry::hash_entry;
-use crate::core::ribosome::host_fn::property::property;
-use crate::core::ribosome::host_fn::query::query;
-use crate::core::ribosome::host_fn::random_bytes::random_bytes;
-use crate::core::ribosome::host_fn::schedule::schedule;
-use crate::core::ribosome::host_fn::show_env::show_env;
-use crate::core::ribosome::host_fn::sign::sign;
-use crate::core::ribosome::host_fn::sys_time::sys_time;
-use crate::core::ribosome::host_fn::unreachable::unreachable;
-use crate::core::ribosome::host_fn::update::update;
-use crate::core::ribosome::host_fn::verify_signature::verify_signature;
-use crate::core::ribosome::host_fn::zome_info::zome_info;
-use crate::core::ribosome::CallContext;
-use crate::core::ribosome::Invocation;
-use crate::core::ribosome::RibosomeT;
-use crate::core::ribosome::ZomeCallInvocation;
+use super::{
+    guest_callback::{
+        entry_defs::EntryDefsHostAccess, init::InitHostAccess,
+        migrate_agent::MigrateAgentHostAccess, post_commit::PostCommitHostAccess,
+        validate::ValidateHostAccess, validation_package::ValidationPackageHostAccess,
+    },
+    host_fn::{get_agent_activity::get_agent_activity, HostFnApi},
+    HostAccess, ZomeCallHostAccess,
+};
+use crate::core::ribosome::{
+    error::{RibosomeError, RibosomeResult},
+    guest_callback::{
+        entry_defs::{EntryDefsInvocation, EntryDefsResult},
+        init::{InitInvocation, InitResult},
+        migrate_agent::{MigrateAgentInvocation, MigrateAgentResult},
+        post_commit::{PostCommitInvocation, PostCommitResult},
+        validate::{ValidateInvocation, ValidateResult},
+        validate_link::{ValidateLinkHostAccess, ValidateLinkInvocation, ValidateLinkResult},
+        validation_package::{ValidationPackageInvocation, ValidationPackageResult},
+        CallIterator,
+    },
+    host_fn::{
+        agent_info::agent_info, call::call, call_remote::call_remote,
+        capability_claims::capability_claims, capability_grants::capability_grants,
+        capability_info::capability_info, create::create, create_link::create_link, debug::debug,
+        decrypt::decrypt, delete::delete, delete_link::delete_link, emit_signal::emit_signal,
+        encrypt::encrypt, get::get, get_details::get_details, get_link_details::get_link_details,
+        get_links::get_links, hash_entry::hash_entry, property::property, query::query,
+        random_bytes::random_bytes, schedule::schedule, show_env::show_env, sign::sign,
+        sys_time::sys_time, unreachable::unreachable, update::update,
+        verify_signature::verify_signature, zome_info::zome_info,
+    },
+    CallContext, Invocation, RibosomeT, ZomeCallInvocation,
+};
 use fallible_iterator::FallibleIterator;
-use holochain_types::dna::zome::HostFnAccess;
-use holochain_types::dna::zome::Permission;
-use holochain_types::dna::zome::Zome;
-use holochain_types::dna::zome::ZomeDef;
-use holochain_types::dna::DnaDefHashed;
-use holochain_types::dna::DnaError;
-use holochain_types::dna::DnaFile;
+use holochain_types::dna::{
+    zome::{HostFnAccess, Permission, Zome, ZomeDef},
+    DnaDefHashed, DnaError, DnaFile,
+};
 use holochain_wasmer_host::prelude::*;
-use holochain_zome_types::entry_def::EntryDefsCallbackResult;
-use holochain_zome_types::init::InitCallbackResult;
-use holochain_zome_types::migrate_agent::MigrateAgentCallbackResult;
-use holochain_zome_types::post_commit::PostCommitCallbackResult;
-use holochain_zome_types::validate::ValidateCallbackResult;
-use holochain_zome_types::validate::ValidationPackageCallbackResult;
-use holochain_zome_types::validate_link::ValidateLinkCallbackResult;
-use holochain_zome_types::zome::FunctionName;
-use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::CallbackResult;
-use holochain_zome_types::ExternOutput;
-use holochain_zome_types::ZomeCallResponse;
+use holochain_zome_types::{
+    entry_def::EntryDefsCallbackResult,
+    init::InitCallbackResult,
+    migrate_agent::MigrateAgentCallbackResult,
+    post_commit::PostCommitCallbackResult,
+    validate::{ValidateCallbackResult, ValidationPackageCallbackResult},
+    validate_link::ValidateLinkCallbackResult,
+    zome::{FunctionName, ZomeName},
+    CallbackResult, ExternOutput, ZomeCallResponse,
+};
 use std::sync::Arc;
 
 /// Path to the wasm cache path

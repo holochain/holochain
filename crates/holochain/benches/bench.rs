@@ -1,15 +1,9 @@
 use ::fixt::prelude::*;
-use criterion::criterion_group;
-use criterion::criterion_main;
-use criterion::BenchmarkId;
-use criterion::Criterion;
-use criterion::Throughput;
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use hdk3::prelude::*;
 use holo_hash::fixt::AgentPubKeyFixturator;
-use holochain::core::ribosome::RibosomeT;
-use holochain::core::ribosome::ZomeCallInvocation;
-use holochain_types::dna::zome::Zome;
-use holochain_types::fixt::CapSecretFixturator;
+use holochain::core::ribosome::{RibosomeT, ZomeCallInvocation};
+use holochain_types::{dna::zome::Zome, fixt::CapSecretFixturator};
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::ExternInput;
 use once_cell::sync::Lazy;

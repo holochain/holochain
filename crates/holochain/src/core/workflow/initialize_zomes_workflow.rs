@@ -1,12 +1,12 @@
-use super::error::WorkflowResult;
-use super::CallZomeWorkspace;
-use super::CallZomeWorkspaceLock;
-use crate::core::queue_consumer::OneshotWriter;
-use crate::core::ribosome::guest_callback::init::InitHostAccess;
-use crate::core::ribosome::guest_callback::init::InitInvocation;
-use crate::core::ribosome::guest_callback::init::InitResult;
-use crate::core::ribosome::RibosomeT;
-use crate::core::state::workspace::Workspace;
+use super::{error::WorkflowResult, CallZomeWorkspace, CallZomeWorkspaceLock};
+use crate::core::{
+    queue_consumer::OneshotWriter,
+    ribosome::{
+        guest_callback::init::{InitHostAccess, InitInvocation, InitResult},
+        RibosomeT,
+    },
+    state::workspace::Workspace,
+};
 use derive_more::Constructor;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
@@ -73,10 +73,10 @@ async fn initialize_zomes_workflow_inner<'env, Ribosome: RibosomeT>(
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::core::ribosome::MockRibosomeT;
-    use crate::core::workflow::fake_genesis;
-    use crate::fixt::DnaDefFixturator;
-    use crate::fixt::KeystoreSenderFixturator;
+    use crate::{
+        core::{ribosome::MockRibosomeT, workflow::fake_genesis},
+        fixt::{DnaDefFixturator, KeystoreSenderFixturator},
+    };
     use ::fixt::prelude::*;
     use fixt::Unpredictable;
     use holochain_p2p::HolochainP2pCellFixturator;

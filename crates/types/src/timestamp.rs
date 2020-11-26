@@ -3,8 +3,7 @@
 //! Includes a struct that gives a uniform well-ordered byte representation
 //! of a timestamp, used for chronologically ordered database keys
 
-use std::convert::TryFrom;
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 
 /// A UTC timestamp for use in Holochain's headers.
 ///

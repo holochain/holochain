@@ -1,8 +1,5 @@
 use super::*;
-use crate::error::HoloHashError;
-use crate::hash_type;
-use crate::AgentPubKey;
-use crate::EntryHash;
+use crate::{error::HoloHashError, hash_type, AgentPubKey, EntryHash};
 use std::convert::TryInto;
 
 pub(crate) const AGENT_PREFIX: &[u8] = &[0x84, 0x20, 0x24]; // uhCAk [132, 32, 36]

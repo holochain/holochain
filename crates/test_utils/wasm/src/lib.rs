@@ -1,6 +1,7 @@
-use holochain_types::dna::wasm::DnaWasm;
-use holochain_types::dna::zome::WasmZome;
-use holochain_types::dna::zome::ZomeDef;
+use holochain_types::dna::{
+    wasm::DnaWasm,
+    zome::{WasmZome, ZomeDef},
+};
 pub extern crate strum;
 #[macro_use]
 extern crate strum_macros;

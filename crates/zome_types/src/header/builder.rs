@@ -1,14 +1,11 @@
-use super::EntryType;
-use super::Timestamp;
-use crate::header;
-use crate::header::HeaderInner;
-use crate::header::ZomeId;
-use crate::link::LinkTag;
+use super::{EntryType, Timestamp};
+use crate::{
+    header,
+    header::{HeaderInner, ZomeId},
+    link::LinkTag,
+};
 use header::Dna;
-use holo_hash::AgentPubKey;
-use holo_hash::DnaHash;
-use holo_hash::EntryHash;
-use holo_hash::HeaderHash;
+use holo_hash::{AgentPubKey, DnaHash, EntryHash, HeaderHash};
 use holochain_serialized_bytes::SerializedBytes;
 
 #[derive(Debug)]

@@ -7,8 +7,7 @@ pub mod dependencies {
     pub use ::quinn;
 }
 
-use kitsune_p2p_types::dependencies::url2::*;
-use kitsune_p2p_types::transport::TransportResult;
+use kitsune_p2p_types::{dependencies::url2::*, transport::TransportResult};
 use std::net::SocketAddr;
 
 const SCHEME: &str = "kitsune-quic";

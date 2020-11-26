@@ -1,12 +1,12 @@
 //! A type for indicating ranges on the dht arc
 
-use derive_more::From;
-use derive_more::Into;
-use std::num::Wrapping;
-use std::ops::Bound;
-use std::ops::RangeBounds;
+use derive_more::{From, Into};
 #[cfg(test)]
 use std::ops::RangeInclusive;
+use std::{
+    num::Wrapping,
+    ops::{Bound, RangeBounds},
+};
 
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, From, Into)]
 /// Type for representing a location that can wrap around

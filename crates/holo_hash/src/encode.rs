@@ -1,13 +1,8 @@
-use crate::assert_length;
-use crate::error::HoloHashError;
-use crate::HashType;
-use crate::HoloHash;
-use crate::PrimitiveHashType;
-use crate::HOLO_HASH_CORE_LEN;
-use crate::HOLO_HASH_FULL_LEN;
-use crate::HOLO_HASH_PREFIX_LEN;
-use std::convert::TryFrom;
-use std::convert::TryInto;
+use crate::{
+    assert_length, error::HoloHashError, HashType, HoloHash, PrimitiveHashType, HOLO_HASH_CORE_LEN,
+    HOLO_HASH_FULL_LEN, HOLO_HASH_PREFIX_LEN,
+};
+use std::convert::{TryFrom, TryInto};
 
 impl<P: PrimitiveHashType> TryFrom<&str> for HoloHash<P> {
     type Error = HoloHashError;

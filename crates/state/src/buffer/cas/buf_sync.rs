@@ -1,22 +1,18 @@
 // FIXME: remove
 #![allow(dead_code)]
 
-use crate::buffer::BufferedStore;
-use crate::buffer::KvBufUsed;
-use crate::env::EnvironmentRead;
-use crate::error::DatabaseError;
-use crate::error::DatabaseResult;
-use crate::fatal_db_hash_integrity_check;
-use crate::fresh_reader;
-use crate::prelude::*;
-use crate::transaction::Readable;
+use crate::{
+    buffer::{BufferedStore, KvBufUsed},
+    env::EnvironmentRead,
+    error::{DatabaseError, DatabaseResult},
+    fatal_db_hash_integrity_check, fresh_reader,
+    prelude::*,
+    transaction::Readable,
+};
 use fallible_iterator::FallibleIterator;
-use holo_hash::hash_type::HashTypeSync;
-use holo_hash::HasHash;
-use holo_hash::HashableContent;
-use holo_hash::HoloHashOf;
-use holo_hash::HoloHashed;
-use holo_hash::PrimitiveHashType;
+use holo_hash::{
+    hash_type::HashTypeSync, HasHash, HashableContent, HoloHashOf, HoloHashed, PrimitiveHashType,
+};
 
 /// A wrapper around a KvBufFresh where keys are always Addresses,
 /// and values are always AddressableContent.

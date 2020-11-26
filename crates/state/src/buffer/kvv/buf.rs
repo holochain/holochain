@@ -1,11 +1,11 @@
-use crate::buffer::BufferedStore;
-use crate::error::DatabaseError;
-use crate::error::DatabaseResult;
-use crate::prelude::*;
+use crate::{
+    buffer::BufferedStore,
+    error::{DatabaseError, DatabaseResult},
+    prelude::*,
+};
 use either::Either;
 use rkv::MultiStore;
-use std::collections::BTreeMap;
-use std::fmt::Debug;
+use std::{collections::BTreeMap, fmt::Debug};
 use tracing::*;
 
 #[cfg(test)]

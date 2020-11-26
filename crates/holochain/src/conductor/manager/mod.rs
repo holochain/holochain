@@ -10,14 +10,16 @@ mod error;
 pub use error::*;
 
 use futures::stream::FuturesUnordered;
-use std::future::Future;
-use std::pin::Pin;
-use std::task::Context;
-use std::task::Poll;
-use tokio::stream::StreamExt;
-use tokio::sync::broadcast;
-use tokio::sync::mpsc;
-use tokio::task::JoinHandle;
+use std::{
+    future::Future,
+    pin::Pin,
+    task::{Context, Poll},
+};
+use tokio::{
+    stream::StreamExt,
+    sync::{broadcast, mpsc},
+    task::JoinHandle,
+};
 use tracing::*;
 
 const CHANNEL_SIZE: usize = 1000;

@@ -1,18 +1,17 @@
 #![deny(missing_docs)]
 //! This module is used to configure the conductor
 
-use serde::de::DeserializeOwned;
-use serde::Deserialize;
-use serde::Serialize;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 mod admin_interface_config;
 mod dpki_config;
 mod passphrase_service_config;
 //mod logger_config;
 //mod signal_config;
-use super::error::ConductorError;
-use super::error::ConductorResult;
-use super::paths::EnvironmentRootPath;
+use super::{
+    error::{ConductorError, ConductorResult},
+    paths::EnvironmentRootPath,
+};
 
 pub use crate::conductor::interface::InterfaceDriver;
 pub use admin_interface_config::AdminInterfaceConfig;
@@ -20,8 +19,7 @@ pub use dpki_config::DpkiConfig;
 //pub use logger_config::LoggerConfig;
 pub use passphrase_service_config::PassphraseServiceConfig;
 //pub use signal_config::SignalConfig;
-use std::path::Path;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 // TODO change types from "stringly typed" to Url2
 /// All the config information for the conductor
@@ -107,8 +105,7 @@ impl ConductorConfig {
 pub mod tests {
     use super::*;
     use matches::assert_matches;
-    use std::path::Path;
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
 
     #[test]
     fn test_config_load_yaml() {

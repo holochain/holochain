@@ -692,8 +692,7 @@ macro_rules! enum_fixturator {
 
 #[cfg(test)]
 mod tests {
-    use crate::prelude::*;
-    use crate::string::PREDICTABLE_STRS;
+    use crate::{prelude::*, string::PREDICTABLE_STRS};
 
     // in general enums can have a mix of whatever in their variants
     #[derive(PartialEq, Debug)]

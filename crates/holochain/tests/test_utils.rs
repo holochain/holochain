@@ -1,9 +1,6 @@
 use anyhow::Result;
 use holochain::conductor::ConductorHandle;
-use holochain_websocket::websocket_connect;
-use holochain_websocket::WebsocketConfig;
-use holochain_websocket::WebsocketReceiver;
-use holochain_websocket::WebsocketSender;
+use holochain_websocket::{websocket_connect, WebsocketConfig, WebsocketReceiver, WebsocketSender};
 use std::sync::Arc;
 use url2::prelude::*;
 

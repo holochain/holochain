@@ -12,55 +12,50 @@ pub mod guest_callback;
 pub mod host_fn;
 pub mod real_ribosome;
 
-use crate::core::ribosome::guest_callback::init::InitInvocation;
-use crate::core::ribosome::guest_callback::init::InitResult;
-use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentInvocation;
-use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentResult;
-use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
-use crate::core::ribosome::guest_callback::post_commit::PostCommitResult;
-use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
-use crate::core::ribosome::guest_callback::validate::ValidateResult;
-use crate::core::ribosome::guest_callback::validate_link::ValidateLinkHostAccess;
-use crate::core::ribosome::guest_callback::validate_link::ValidateLinkInvocation;
-use crate::core::ribosome::guest_callback::validate_link::ValidateLinkResult;
-use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
-use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
-use crate::core::ribosome::guest_callback::CallIterator;
-use crate::core::workflow::CallZomeWorkspaceLock;
-use crate::fixt::ExternInputFixturator;
-use crate::fixt::FunctionNameFixturator;
-use crate::fixt::*;
 use crate::{
     conductor::{api::CellConductorReadHandle, interface::SignalBroadcaster},
-    core::ribosome::guest_callback::entry_defs::EntryDefsResult,
+    core::{
+        ribosome::guest_callback::{
+            entry_defs::EntryDefsResult,
+            init::{InitInvocation, InitResult},
+            migrate_agent::{MigrateAgentInvocation, MigrateAgentResult},
+            post_commit::{PostCommitInvocation, PostCommitResult},
+            validate::{ValidateInvocation, ValidateResult},
+            validate_link::{ValidateLinkHostAccess, ValidateLinkInvocation, ValidateLinkResult},
+            validation_package::{ValidationPackageInvocation, ValidationPackageResult},
+            CallIterator,
+        },
+        workflow::CallZomeWorkspaceLock,
+    },
+    fixt::{ExternInputFixturator, FunctionNameFixturator, *},
 };
 use ::fixt::prelude::*;
 use derive_more::Constructor;
 use error::RibosomeResult;
-use guest_callback::entry_defs::EntryDefsHostAccess;
-use guest_callback::init::InitHostAccess;
-use guest_callback::migrate_agent::MigrateAgentHostAccess;
-use guest_callback::post_commit::PostCommitHostAccess;
-use guest_callback::validate::ValidateHostAccess;
-use guest_callback::validation_package::ValidationPackageHostAccess;
+use guest_callback::{
+    entry_defs::EntryDefsHostAccess, init::InitHostAccess, migrate_agent::MigrateAgentHostAccess,
+    post_commit::PostCommitHostAccess, validate::ValidateHostAccess,
+    validation_package::ValidationPackageHostAccess,
+};
 use holo_hash::AgentPubKey;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::cell::CellId;
-use holochain_types::dna::zome::HostFnAccess;
-use holochain_types::dna::zome::Zome;
-use holochain_types::dna::DnaDefHashed;
-use holochain_types::fixt::CapSecretFixturator;
-use holochain_types::fixt::CellIdFixturator;
+use holochain_types::{
+    cell::CellId,
+    dna::{
+        zome::{HostFnAccess, Zome},
+        DnaDefHashed,
+    },
+    fixt::{CapSecretFixturator, CellIdFixturator},
+};
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::capability::CapGrant;
-use holochain_zome_types::capability::CapSecret;
-use holochain_zome_types::header::ZomeId;
-use holochain_zome_types::zome::FunctionName;
-use holochain_zome_types::ExternInput;
-use holochain_zome_types::ExternOutput;
-use holochain_zome_types::ZomeCallResponse;
+use holochain_zome_types::{
+    capability::{CapGrant, CapSecret},
+    header::ZomeId,
+    zome::FunctionName,
+    ExternInput, ExternOutput, ZomeCallResponse,
+};
 use mockall::automock;
 use std::iter::Iterator;
 

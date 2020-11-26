@@ -1,8 +1,7 @@
 //! defines the write/send half of a websocket pair
 
 use crate::*;
-use task_dispatch_incoming::ToDispatchIncoming;
-use task_dispatch_incoming::ToDispatchIncomingSender;
+use task_dispatch_incoming::{ToDispatchIncoming, ToDispatchIncomingSender};
 use task_socket_sink::ToSocketSinkSender;
 use tracing_futures::Instrument;
 

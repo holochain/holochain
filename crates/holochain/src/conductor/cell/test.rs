@@ -1,17 +1,17 @@
-use crate::conductor::manager::spawn_task_manager;
-use crate::core::workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace;
-use crate::fixt::DnaFileFixturator;
-use crate::fixt::SignatureFixturator;
-use crate::test_utils::test_network;
+use crate::{
+    conductor::manager::spawn_task_manager,
+    core::workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace,
+    fixt::{DnaFileFixturator, SignatureFixturator},
+    test_utils::test_network,
+};
 use ::fixt::prelude::*;
 use holo_hash::HasHash;
 use holochain_state::test_utils::test_cell_env;
-use holochain_types::dht_op::DhtOp;
-use holochain_types::dht_op::DhtOpHashed;
-use holochain_types::test_utils::fake_agent_pubkey_2;
-use holochain_types::test_utils::fake_cell_id;
-use holochain_types::HeaderHashed;
-use holochain_types::Timestamp;
+use holochain_types::{
+    dht_op::{DhtOp, DhtOpHashed},
+    test_utils::{fake_agent_pubkey_2, fake_cell_id},
+    HeaderHashed, Timestamp,
+};
 use holochain_zome_types::header;
 use std::sync::Arc;
 use tokio::sync;

@@ -2,53 +2,46 @@
 #![allow(deprecated)]
 
 use super::*;
-use crate::conductor::api::CellConductorApiT;
-use crate::core::queue_consumer::OneshotWriter;
-use crate::core::queue_consumer::TriggerSender;
-use crate::core::queue_consumer::WorkComplete;
-use crate::core::state::cascade::Cascade;
-use crate::core::state::cascade::DbPair;
-use crate::core::state::cascade::DbPairMut;
-use crate::core::state::dht_op_integration::IntegrationLimboStore;
-use crate::core::state::dht_op_integration::IntegrationLimboValue;
-use crate::core::state::element_buf::ElementBuf;
-use crate::core::state::metadata::MetadataBuf;
-use crate::core::state::validation_db::ValidationLimboStatus;
-use crate::core::state::validation_db::ValidationLimboStore;
-use crate::core::state::validation_db::ValidationLimboValue;
-use crate::core::state::workspace::Workspace;
-use crate::core::state::workspace::WorkspaceError;
-use crate::core::state::workspace::WorkspaceResult;
-use crate::core::sys_validate::*;
-use crate::core::validation::*;
-use error::WorkflowError;
-use error::WorkflowResult;
+use crate::{
+    conductor::api::CellConductorApiT,
+    core::{
+        queue_consumer::{OneshotWriter, TriggerSender, WorkComplete},
+        state::{
+            cascade::{Cascade, DbPair, DbPairMut},
+            dht_op_integration::{IntegrationLimboStore, IntegrationLimboValue},
+            element_buf::ElementBuf,
+            metadata::MetadataBuf,
+            validation_db::{ValidationLimboStatus, ValidationLimboStore, ValidationLimboValue},
+            workspace::{Workspace, WorkspaceError, WorkspaceResult},
+        },
+        sys_validate::*,
+        validation::*,
+    },
+};
+use error::{WorkflowError, WorkflowResult};
 use fallible_iterator::FallibleIterator;
 use holo_hash::DhtOpHash;
-use holochain_p2p::HolochainP2pCell;
-use holochain_p2p::HolochainP2pCellT;
-use holochain_state::buffer::BufferedStore;
-use holochain_state::buffer::KvBufFresh;
-use holochain_state::db::INTEGRATION_LIMBO;
-use holochain_state::fresh_reader;
-use holochain_state::prelude::*;
-use holochain_types::dht_op::DhtOp;
-use holochain_types::header::NewEntryHeaderRef;
-use holochain_types::test_utils::which_agent;
-use holochain_types::validate::ValidationStatus;
-use holochain_types::Entry;
-use holochain_types::Timestamp;
-use holochain_zome_types::entry_def::EntryVisibility;
-use holochain_zome_types::header::CreateLink;
-use holochain_zome_types::header::Delete;
-use holochain_zome_types::header::DeleteLink;
-use holochain_zome_types::header::EntryType;
-use holochain_zome_types::header::Update;
-use holochain_zome_types::signature::Signature;
-use holochain_zome_types::Header;
-use std::collections::BinaryHeap;
-use std::convert::TryFrom;
-use std::convert::TryInto;
+use holochain_p2p::{HolochainP2pCell, HolochainP2pCellT};
+use holochain_state::{
+    buffer::{BufferedStore, KvBufFresh},
+    db::INTEGRATION_LIMBO,
+    fresh_reader,
+    prelude::*,
+};
+use holochain_types::{
+    dht_op::DhtOp, header::NewEntryHeaderRef, test_utils::which_agent, validate::ValidationStatus,
+    Entry, Timestamp,
+};
+use holochain_zome_types::{
+    entry_def::EntryVisibility,
+    header::{CreateLink, Delete, DeleteLink, EntryType, Update},
+    signature::Signature,
+    Header,
+};
+use std::{
+    collections::BinaryHeap,
+    convert::{TryFrom, TryInto},
+};
 use tracing::*;
 
 use produce_dht_ops_workflow::dht_op_light::light_to_op;

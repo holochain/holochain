@@ -7,29 +7,26 @@ use crate::{
         interface::SignalBroadcaster,
         ConductorHandle,
     },
-    core::queue_consumer::InitialQueueTriggers,
-    core::ribosome::real_ribosome::RealRibosome,
+    core::{queue_consumer::InitialQueueTriggers, ribosome::real_ribosome::RealRibosome},
 };
 use holo_hash::{AgentPubKey, DnaHash};
 use holochain_keystore::KeystoreSender;
-use holochain_p2p::actor::HolochainP2pRefToCell;
-use holochain_p2p::HolochainP2pCell;
+use holochain_p2p::{actor::HolochainP2pRefToCell, HolochainP2pCell};
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_state::env::EnvironmentWrite;
-use holochain_state::test_utils::test_environments;
-use holochain_state::test_utils::TestEnvironments;
-use holochain_types::app::InstalledCell;
-use holochain_types::cell::CellId;
-use holochain_types::dna::DnaDef;
-use holochain_types::dna::DnaFile;
-use holochain_types::test_utils::fake_agent_pubkey_1;
-use holochain_types::test_utils::fake_agent_pubkey_2;
+use holochain_state::{
+    env::EnvironmentWrite,
+    test_utils::{test_environments, TestEnvironments},
+};
+use holochain_types::{
+    app::InstalledCell,
+    cell::CellId,
+    dna::{DnaDef, DnaFile},
+    test_utils::{fake_agent_pubkey_1, fake_agent_pubkey_2},
+};
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::zome::ZomeName;
 use kitsune_p2p::KitsuneP2pConfig;
-use std::collections::HashMap;
-use std::convert::TryFrom;
-use std::sync::Arc;
+use std::{collections::HashMap, convert::TryFrom, sync::Arc};
 use tempdir::TempDir;
 
 /// A "factory" for HostFnCaller, which will produce them when given a ZomeName

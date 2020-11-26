@@ -1,60 +1,39 @@
-pub use crate::capability::create_cap_claim::create_cap_claim;
-pub use crate::capability::create_cap_grant::create_cap_grant;
-pub use crate::capability::delete_cap_grant::delete_cap_grant;
-pub use crate::capability::generate_cap_secret::generate_cap_secret;
-pub use crate::capability::update_cap_grant::update_cap_grant;
-pub use crate::debug;
-pub use crate::entry::create_entry::create_entry;
-pub use crate::entry::delete_entry::delete_entry;
-pub use crate::entry::update_entry::update_entry;
-pub use crate::entry_def;
-pub use crate::entry_defs;
-pub use crate::error::HdkError;
-pub use crate::error::HdkResult;
-pub use crate::hash_path::anchor::anchor;
-pub use crate::hash_path::anchor::get_anchor;
-pub use crate::hash_path::anchor::list_anchor_addresses;
-pub use crate::hash_path::anchor::list_anchor_tags;
-pub use crate::hash_path::anchor::list_anchor_type_addresses;
-pub use crate::hash_path::anchor::Anchor;
-pub use crate::hash_path::path::Path;
-pub use crate::host_fn::agent_info::agent_info;
-pub use crate::host_fn::call::call;
-pub use crate::host_fn::call_remote::call_remote;
-pub use crate::host_fn::create::create;
-pub use crate::host_fn::create_link::create_link;
-pub use crate::host_fn::delete::delete;
-pub use crate::host_fn::delete_link::delete_link;
-pub use crate::host_fn::emit_signal::emit_signal;
-pub use crate::host_fn::get::get;
-pub use crate::host_fn::get_agent_activity::get_agent_activity;
-pub use crate::host_fn::get_details::get_details;
-pub use crate::host_fn::get_link_details::get_link_details;
-pub use crate::host_fn::get_links::get_links;
-pub use crate::host_fn::hash_entry::hash_entry;
-pub use crate::host_fn::query::query;
-pub use crate::host_fn::random_bytes::random_bytes;
-pub use crate::host_fn::sign::sign;
-pub use crate::host_fn::sys_time::sys_time;
-pub use crate::host_fn::update::update;
-pub use crate::host_fn::verify_signature::verify_signature;
-pub use crate::host_fn::zome_info::zome_info;
-pub use crate::map_extern;
-pub use crate::map_extern::ExternResult;
-pub use hdk3_derive::hdk_entry;
-pub use hdk3_derive::hdk_extern;
-pub use holo_hash::AgentPubKey;
-pub use holo_hash::AnyDhtHash;
-pub use holo_hash::EntryHash;
-pub use holo_hash::EntryHashes;
-pub use holo_hash::HasHash;
-pub use holo_hash::HeaderHash;
-pub use holo_hash::HoloHash;
+pub use crate::{
+    capability::{
+        create_cap_claim::create_cap_claim, create_cap_grant::create_cap_grant,
+        delete_cap_grant::delete_cap_grant, generate_cap_secret::generate_cap_secret,
+        update_cap_grant::update_cap_grant,
+    },
+    debug,
+    entry::{create_entry::create_entry, delete_entry::delete_entry, update_entry::update_entry},
+    entry_def, entry_defs,
+    error::{HdkError, HdkResult},
+    hash_path::{
+        anchor::{
+            anchor, get_anchor, list_anchor_addresses, list_anchor_tags,
+            list_anchor_type_addresses, Anchor,
+        },
+        path::Path,
+    },
+    host_fn::{
+        agent_info::agent_info, call::call, call_remote::call_remote, create::create,
+        create_link::create_link, delete::delete, delete_link::delete_link,
+        emit_signal::emit_signal, get::get, get_agent_activity::get_agent_activity,
+        get_details::get_details, get_link_details::get_link_details, get_links::get_links,
+        hash_entry::hash_entry, query::query, random_bytes::random_bytes, sign::sign,
+        sys_time::sys_time, update::update, verify_signature::verify_signature,
+        zome_info::zome_info,
+    },
+    map_extern,
+    map_extern::ExternResult,
+};
+pub use hdk3_derive::{hdk_entry, hdk_extern};
+pub use holo_hash::{
+    AgentPubKey, AnyDhtHash, EntryHash, EntryHashes, HasHash, HeaderHash, HoloHash,
+};
 pub use holochain_wasmer_guest::*;
-pub use holochain_zome_types;
-pub use holochain_zome_types::prelude::*;
-pub use std::collections::HashSet;
-pub use std::convert::TryFrom;
+pub use holochain_zome_types::{self, prelude::*};
+pub use std::{collections::HashSet, convert::TryFrom};
 
 // This needs to be called at least once _somewhere_ and is idempotent.
 holochain_externs!();

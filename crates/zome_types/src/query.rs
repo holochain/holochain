@@ -1,9 +1,9 @@
 //! Types for source chain queries
 
-use crate::header::EntryType;
-use crate::header::Header;
-use crate::header::HeaderType;
-use crate::warrant::Warrant;
+use crate::{
+    header::{EntryType, Header, HeaderType},
+    warrant::Warrant,
+};
 use holo_hash::HeaderHash;
 pub use holochain_serialized_bytes::prelude::*;
 
@@ -169,10 +169,11 @@ impl ChainQueryFilter {
 #[cfg(test)]
 #[cfg(feature = "fixturators")]
 mod tests {
-    use crate::fixt::AppEntryTypeFixturator;
-    use crate::fixt::*;
-    use crate::header::EntryType;
-    use crate::Header;
+    use crate::{
+        fixt::{AppEntryTypeFixturator, *},
+        header::EntryType,
+        Header,
+    };
     use ::fixt::prelude::*;
 
     use super::ChainQueryFilter;

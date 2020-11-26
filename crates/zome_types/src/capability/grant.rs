@@ -1,12 +1,9 @@
 use super::CapSecret;
-use crate::zome::FunctionName;
-use crate::zome::ZomeName;
+use crate::zome::{FunctionName, ZomeName};
 use holo_hash::*;
 use holochain_serialized_bytes::SerializedBytes;
-use serde::Deserialize;
-use serde::Serialize;
-use std::collections::BTreeMap;
-use std::collections::HashSet;
+use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, HashSet};
 
 /// Represents a _potentially_ valid access grant to a zome call.
 /// Zome call response will be Unauthorized without a valid grant.

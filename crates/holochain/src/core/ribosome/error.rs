@@ -1,17 +1,15 @@
 #![deny(missing_docs)]
 //! Errors occurring during a [Ribosome] call
 
-use crate::conductor::api::error::ConductorApiError;
-use crate::conductor::interface::error::InterfaceError;
-use crate::core::state::cascade::error::CascadeError;
-use crate::core::state::source_chain::SourceChainError;
+use crate::{
+    conductor::{api::error::ConductorApiError, interface::error::InterfaceError},
+    core::state::{cascade::error::CascadeError, source_chain::SourceChainError},
+};
 use holo_hash::AnyDhtHash;
 use holochain_serialized_bytes::prelude::SerializedBytesError;
-use holochain_types::dna::error::DnaError;
-use holochain_types::dna::zome::inline_zome::error::InlineZomeError;
+use holochain_types::dna::{error::DnaError, zome::inline_zome::error::InlineZomeError};
 use holochain_wasmer_host::prelude::WasmError;
-use holochain_zome_types::zome::FunctionName;
-use holochain_zome_types::zome::ZomeName;
+use holochain_zome_types::zome::{FunctionName, ZomeName};
 use thiserror::Error;
 use tokio::task::JoinError;
 use tokio_safe_block_on::BlockOnError;

@@ -6,10 +6,7 @@ pub mod validate;
 pub mod validate_link;
 pub mod validation_package;
 use super::HostAccess;
-use crate::core::ribosome::error::RibosomeError;
-use crate::core::ribosome::FnComponents;
-use crate::core::ribosome::Invocation;
-use crate::core::ribosome::RibosomeT;
+use crate::core::ribosome::{error::RibosomeError, FnComponents, Invocation, RibosomeT};
 use fallible_iterator::FallibleIterator;
 use holochain_types::dna::zome::Zome;
 use holochain_zome_types::ExternOutput;
@@ -70,20 +67,14 @@ impl<R: RibosomeT, I: Invocation + 'static> FallibleIterator for CallIterator<R,
 #[cfg(feature = "slow_tests")]
 mod tests {
     use super::CallIterator;
-    use crate::core::ribosome::FnComponents;
-    use crate::core::ribosome::MockInvocation;
-    use crate::core::ribosome::MockRibosomeT;
-    use crate::core::ribosome::ZomesToInvoke;
-    use crate::fixt::FnComponentsFixturator;
-    use crate::fixt::ZomeCallHostAccessFixturator;
-    use crate::fixt::ZomeFixturator;
+    use crate::{
+        core::ribosome::{FnComponents, MockInvocation, MockRibosomeT, ZomesToInvoke},
+        fixt::{FnComponentsFixturator, ZomeCallHostAccessFixturator, ZomeFixturator},
+    };
     use fallible_iterator::FallibleIterator;
     use holochain_types::dna::zome::Zome;
-    use holochain_zome_types::init::InitCallbackResult;
-    use holochain_zome_types::zome::FunctionName;
-    use holochain_zome_types::ExternOutput;
-    use mockall::predicate::*;
-    use mockall::Sequence;
+    use holochain_zome_types::{init::InitCallbackResult, zome::FunctionName, ExternOutput};
+    use mockall::{predicate::*, Sequence};
     use std::convert::TryInto;
 
     #[tokio::test(threaded_scheduler)]

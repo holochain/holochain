@@ -1,10 +1,8 @@
 use crate::*;
-use futures::sink::SinkExt;
-use futures::stream::StreamExt;
+use futures::{sink::SinkExt, stream::StreamExt};
 use ghost_actor::dependencies::tracing;
 use rustls::Session;
-use std::io::Read;
-use std::io::Write;
+use std::io::{Read, Write};
 
 pub(crate) fn spawn_tls_client(
     short: String,

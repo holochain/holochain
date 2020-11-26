@@ -6,13 +6,9 @@
 //!     std::error::Error, into error types that do
 
 use crate::error::DatabaseError;
-use chrono::offset::Local;
-use chrono::DateTime;
+use chrono::{offset::Local, DateTime};
 use derive_more::From;
-use rkv::Database;
-use rkv::RoCursor;
-use rkv::StoreError;
-use rkv::Value;
+use rkv::{Database, RoCursor, StoreError, Value};
 use shrinkwraprs::Shrinkwrap;
 
 /// Just a trait alias for rkv::Readable

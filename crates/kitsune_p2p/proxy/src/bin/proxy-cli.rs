@@ -1,8 +1,7 @@
 use futures::stream::StreamExt;
 use kitsune_p2p_proxy::*;
 use kitsune_p2p_transport_quic::*;
-use kitsune_p2p_types::dependencies::ghost_actor;
-use kitsune_p2p_types::transport::*;
+use kitsune_p2p_types::{dependencies::ghost_actor, transport::*};
 use structopt::StructOpt;
 
 /// Option Parsing

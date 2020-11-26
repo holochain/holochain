@@ -1,24 +1,21 @@
 //! Defines a Element, the basic unit of Holochain data.
 
-use crate::header::WireDelete;
-use crate::header::WireHeaderStatus;
-use crate::header::WireNewEntryHeader;
-use crate::header::WireUpdateRelationship;
-use crate::prelude::*;
-use crate::EntryHashed;
-use crate::HeaderHashed;
-use error::ElementGroupError;
-use error::ElementGroupResult;
+use crate::{
+    header::{WireDelete, WireHeaderStatus, WireNewEntryHeader, WireUpdateRelationship},
+    prelude::*,
+    EntryHashed, HeaderHashed,
+};
+use error::{ElementGroupError, ElementGroupResult};
 use holochain_keystore::KeystoreError;
 use holochain_serialized_bytes::prelude::*;
 pub use holochain_zome_types::element::*;
-use holochain_zome_types::entry::Entry;
-use holochain_zome_types::entry_def::EntryVisibility;
-use holochain_zome_types::header::EntryType;
-use holochain_zome_types::header::Header;
-use holochain_zome_types::validate::ValidationStatus;
-use std::borrow::Cow;
-use std::collections::BTreeSet;
+use holochain_zome_types::{
+    entry::Entry,
+    entry_def::EntryVisibility,
+    header::{EntryType, Header},
+    validate::ValidationStatus,
+};
+use std::{borrow::Cow, collections::BTreeSet};
 
 #[allow(missing_docs)]
 pub mod error;
@@ -375,12 +372,10 @@ impl WireElement {
 
 #[cfg(test)]
 mod tests {
-    use super::SignedHeader;
-    use super::SignedHeaderHashed;
+    use super::{SignedHeader, SignedHeaderHashed};
     use crate::fixt::*;
     use ::fixt::prelude::*;
-    use holo_hash::HasHash;
-    use holo_hash::HoloHashed;
+    use holo_hash::{HasHash, HoloHashed};
 
     #[tokio::test(threaded_scheduler)]
     async fn test_signed_header_roundtrip() {

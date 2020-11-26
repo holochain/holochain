@@ -7,27 +7,23 @@ pub enum MetaGetStatus<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::core::state::metadata::EntryDhtStatus;
-    use crate::core::state::metadata::MetadataBuf;
-    use crate::core::state::metadata::MetadataBufT;
-    use crate::core::state::metadata::TimedHeaderHash;
+    use crate::core::state::metadata::{
+        EntryDhtStatus, MetadataBuf, MetadataBufT, TimedHeaderHash,
+    };
     use ::fixt::prelude::*;
     use fallible_iterator::FallibleIterator;
     use header::Create;
-    use holo_hash::fixt::*;
-    use holo_hash::*;
-    use holochain_state::prelude::*;
-    use holochain_state::test_utils::test_cell_env;
-    use holochain_types::fixt::AppEntryTypeFixturator;
-    use holochain_types::fixt::HeaderBuilderCommonFixturator;
-    use holochain_types::header::NewEntryHeader;
-    use holochain_types::HeaderHashed;
-    use holochain_zome_types::header;
-    use holochain_zome_types::header::builder;
-    use holochain_zome_types::header::Delete;
-    use holochain_zome_types::header::EntryType;
-    use holochain_zome_types::header::HeaderBuilder;
-    use holochain_zome_types::header::HeaderBuilderCommon;
+    use holo_hash::{fixt::*, *};
+    use holochain_state::{prelude::*, test_utils::test_cell_env};
+    use holochain_types::{
+        fixt::{AppEntryTypeFixturator, HeaderBuilderCommonFixturator},
+        header::NewEntryHeader,
+        HeaderHashed,
+    };
+    use holochain_zome_types::{
+        header,
+        header::{builder, Delete, EntryType, HeaderBuilder, HeaderBuilderCommon},
+    };
 
     struct TestFixtures {
         header_hashes: Box<dyn Iterator<Item = HeaderHash>>,

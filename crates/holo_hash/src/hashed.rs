@@ -1,6 +1,4 @@
-use crate::HasHash;
-use crate::HashableContent;
-use crate::HoloHashOf;
+use crate::{HasHash, HashableContent, HoloHashOf};
 use holochain_serialized_bytes::prelude::*;
 
 /// Represents some piece of content along with its hash representation, so that

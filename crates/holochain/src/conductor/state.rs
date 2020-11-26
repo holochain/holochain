@@ -3,11 +3,8 @@
 
 use crate::conductor::interface::InterfaceDriver;
 
-use holochain_types::app::InstalledApp;
-use holochain_types::app::InstalledAppId;
-use holochain_types::app::InstalledCell;
-use serde::Deserialize;
-use serde::Serialize;
+use holochain_types::app::{InstalledApp, InstalledAppId, InstalledCell};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use super::api::SignalSubscription;

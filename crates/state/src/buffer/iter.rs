@@ -1,8 +1,5 @@
-use crate::buffer::kv::KvOp;
-use crate::error::DatabaseError;
-use crate::prelude::*;
-use fallible_iterator::DoubleEndedFallibleIterator;
-use fallible_iterator::FallibleIterator;
+use crate::{buffer::kv::KvOp, error::DatabaseError, prelude::*};
+use fallible_iterator::{DoubleEndedFallibleIterator, FallibleIterator};
 use rkv::StoreError;
 use std::collections::BTreeMap;
 use tracing::*;

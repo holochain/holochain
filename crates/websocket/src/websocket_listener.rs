@@ -1,8 +1,7 @@
 //! defines the websocket listener struct
 
 use crate::*;
-use futures::stream::BoxStream;
-use futures::stream::StreamExt;
+use futures::stream::{BoxStream, StreamExt};
 
 /// Websocket listening / server socket. This struct is an async Stream -
 /// calling `.next().await` will give you a Future that will in turn resolve

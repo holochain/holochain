@@ -1,13 +1,17 @@
 //! Errors occurring during a [CellConductorApi] or [InterfaceApi] call
 
-use crate::conductor::error::ConductorError;
-use crate::conductor::error::CreateAppError;
-use crate::conductor::interface::error::InterfaceError;
-use crate::conductor::CellError;
-use crate::core::ribosome::error::RibosomeError;
-use crate::core::state::source_chain::SourceChainError;
-use crate::core::state::workspace::WorkspaceError;
-use crate::core::workflow::error::WorkflowError;
+use crate::{
+    conductor::{
+        error::{ConductorError, CreateAppError},
+        interface::error::InterfaceError,
+        CellError,
+    },
+    core::{
+        ribosome::error::RibosomeError,
+        state::{source_chain::SourceChainError, workspace::WorkspaceError},
+        workflow::error::WorkflowError,
+    },
+};
 use holo_hash::DnaHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::error::DatabaseError;

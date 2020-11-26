@@ -1,22 +1,24 @@
 use std::convert::TryFrom;
 
 use super::SourceChainError;
-use crate::conductor::api::error::ConductorApiError;
-use crate::conductor::entry_def_store::error::EntryDefStoreError;
-use crate::core::state::cascade::error::CascadeError;
-use crate::core::state::workspace::WorkspaceError;
-use crate::core::validation::OutcomeOrError;
-use crate::core::workflow::error::WorkflowError;
-use crate::from_sub_error;
-use holo_hash::AnyDhtHash;
-use holo_hash::HeaderHash;
+use crate::{
+    conductor::{api::error::ConductorApiError, entry_def_store::error::EntryDefStoreError},
+    core::{
+        state::{cascade::error::CascadeError, workspace::WorkspaceError},
+        validation::OutcomeOrError,
+        workflow::error::WorkflowError,
+    },
+    from_sub_error,
+};
+use holo_hash::{AnyDhtHash, HeaderHash};
 use holochain_keystore::KeystoreError;
 use holochain_state::error::DatabaseError;
 use holochain_types::cell::CellId;
-use holochain_zome_types::header::AppEntryType;
-use holochain_zome_types::header::EntryType;
-use holochain_zome_types::signature::Signature;
-use holochain_zome_types::Header;
+use holochain_zome_types::{
+    header::{AppEntryType, EntryType},
+    signature::Signature,
+    Header,
+};
 use thiserror::Error;
 
 /// Validation can result in either

@@ -8,28 +8,22 @@
 /// it is known that private entries should be protected, such as when handling
 /// a get_entry request from the network.
 use crate::core::state::source_chain::SourceChainResult;
-use holo_hash::EntryHash;
-use holo_hash::HasHash;
-use holo_hash::HeaderHash;
-use holochain_state::buffer::CasBufFreshSync;
-use holochain_state::db::GetDb;
-use holochain_state::db::ELEMENT_CACHE_ENTRIES;
-use holochain_state::db::ELEMENT_CACHE_HEADERS;
-use holochain_state::db::ELEMENT_VAULT_HEADERS;
-use holochain_state::db::ELEMENT_VAULT_PRIVATE_ENTRIES;
-use holochain_state::db::ELEMENT_VAULT_PUBLIC_ENTRIES;
-use holochain_state::error::DatabaseError;
-use holochain_state::error::DatabaseResult;
-use holochain_state::exports::SingleStore;
-use holochain_state::prelude::*;
-use holochain_types::element::Element;
-use holochain_types::element::ElementGroup;
-use holochain_types::element::SignedHeader;
-use holochain_types::element::SignedHeaderHashed;
-use holochain_types::entry::EntryHashed;
-use holochain_zome_types::entry_def::EntryVisibility;
-use holochain_zome_types::Entry;
-use holochain_zome_types::Header;
+use holo_hash::{EntryHash, HasHash, HeaderHash};
+use holochain_state::{
+    buffer::CasBufFreshSync,
+    db::{
+        GetDb, ELEMENT_CACHE_ENTRIES, ELEMENT_CACHE_HEADERS, ELEMENT_VAULT_HEADERS,
+        ELEMENT_VAULT_PRIVATE_ENTRIES, ELEMENT_VAULT_PUBLIC_ENTRIES,
+    },
+    error::{DatabaseError, DatabaseResult},
+    exports::SingleStore,
+    prelude::*,
+};
+use holochain_types::{
+    element::{Element, ElementGroup, SignedHeader, SignedHeaderHashed},
+    entry::EntryHashed,
+};
+use holochain_zome_types::{entry_def::EntryVisibility, Entry, Header};
 use tracing::*;
 
 /// A CasBufFresh with Entries for values
@@ -342,10 +336,8 @@ mod tests {
     use super::ElementBuf;
     use crate::test_utils::fake_unique_element;
     use holo_hash::*;
-    use holochain_keystore::test_keystore::spawn_test_keystore;
-    use holochain_keystore::AgentPubKeyExt;
-    use holochain_state::prelude::*;
-    use holochain_state::test_utils::test_cell_env;
+    use holochain_keystore::{test_keystore::spawn_test_keystore, AgentPubKeyExt};
+    use holochain_state::{prelude::*, test_utils::test_cell_env};
     use holochain_zome_types::entry_def::EntryVisibility;
 
     #[tokio::test(threaded_scheduler)]
