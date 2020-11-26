@@ -9,4 +9,7 @@ pub type InlineZomeResult<T> = Result<T, InlineZomeError>;
 pub enum InlineZomeError {
     #[error("No such InlineZome callback: {0}")]
     NoSuchCallback(FunctionName),
+
+    #[error("TODO: remove after crate re-org [B-03640]")]
+    Infallible(#[from] std::convert::Infallible),
 }

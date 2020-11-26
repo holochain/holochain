@@ -4,21 +4,20 @@
 //! make it easy to write a zome on-the-fly or programmatically, rather than
 //! having to go through the heavy machinery of wasm compilation
 
-// WIP: remove
-#![allow(unused_variables)]
-
 use holochain_serialized_bytes as sb;
 use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::zome::FunctionName;
+use holochain_zome_types::zome_io::HostFnApiT;
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 
-use self::api::InlineHostApi;
 use self::error::InlineZomeError;
 use self::error::InlineZomeResult;
 
 pub mod api;
 pub mod error;
+
+type BoxApi = Box<dyn HostFnApiT>;
 
 /// An InlineZome, which consists
 pub struct InlineZome {
@@ -46,14 +45,11 @@ impl InlineZome {
     /// Define a new zome function or callback with the given name
     pub fn callback<F, I, O>(mut self, name: &str, f: F) -> Self
     where
-        F: Fn(InlineHostApi, I) -> InlineZomeResult<O> + 'static + Send + Sync,
+        F: Fn(BoxApi, I) -> InlineZomeResult<O> + 'static + Send + Sync,
         I: DeserializeOwned,
         O: Serialize,
     {
-        let z = move |
-            api: InlineHostApi,
-            input: SerializedBytes,
-        | -> InlineZomeResult<SerializedBytes> {
+        let z = move |api: BoxApi, input: SerializedBytes| -> InlineZomeResult<SerializedBytes> {
             let output = f(api, sb::decode(input.bytes()).expect("TODO"))?;
             Ok(SerializedBytes::from(UnsafeBytes::from(
                 sb::encode(&output).expect("TODO"),
@@ -67,10 +63,11 @@ impl InlineZome {
     #[allow(unreachable_code)]
     pub fn call<I: Serialize, O: DeserializeOwned>(
         &self,
-        // api: HostFnApi,
+        api: impl HostFnApiT,
         name: &FunctionName,
         input: I,
     ) -> InlineZomeResult<O> {
+        dbg!(self.callbacks.keys().collect::<Vec<_>>());
         let f = self
             .callbacks
             .get(name)
@@ -85,10 +82,7 @@ impl InlineZome {
 
 /// An inline zome function takes a Host API and an input, and produces an output.
 pub type InlineZomeFn = Box<
-    dyn Fn(InlineHostApi, SerializedBytes) -> InlineZomeResult<SerializedBytes>
-        + 'static
-        + Send
-        + Sync,
+    dyn Fn(BoxApi, SerializedBytes) -> InlineZomeResult<SerializedBytes> + 'static + Send + Sync,
 >;
 
 impl std::fmt::Debug for InlineZome {
@@ -134,7 +128,9 @@ mod tests {
     fn can_create_inline_dna() {
         let zome = InlineZome::new("").callback("zome_fn_1", |api, a: ()| {
             let hash: AnyDhtHash = todo!();
-            api.get(hash, GetOptions::default())
+            Ok(api
+                .get((hash, GetOptions::default()))
+                .expect("TODO after crate re-org"))
         });
         // let dna = InlineDna::new(hashmap! {
         //     "zome".into() => zome

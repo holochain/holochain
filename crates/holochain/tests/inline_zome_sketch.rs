@@ -24,11 +24,12 @@ async fn one() -> anyhow::Result<()> {
         .callback("create", move |api, ()| {
             let entry_def_id: EntryDefId = entry_def.id.clone();
             let entry = Entry::app(().try_into().unwrap()).unwrap();
-            let hash = api.create_entry(entry_def_id, entry)?;
+            let hash = api.create((entry_def_id, entry))?;
             Ok(hash)
         })
         .callback("read", |api, hash: EntryHash| {
-            api.get(hash, GetOptions::default())
+            api.get((hash.into(), GetOptions::default()))
+                .map_err(Into::into)
         })
         .into();
     let zome = Zome::new("zome1".into(), zome_def);
@@ -76,6 +77,7 @@ async fn one() -> anyhow::Result<()> {
             provenance: alice.clone(),
         })
         .await??;
+    dbg!(&output);
     let output = conductor
         .call_zome(ZomeCallInvocation {
             cell_id: bobbo_cell_id.clone(),
@@ -86,6 +88,7 @@ async fn one() -> anyhow::Result<()> {
             provenance: bobbo.clone(),
         })
         .await??;
+    dbg!(&output);
 
     Ok(())
 }

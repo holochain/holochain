@@ -1,4 +1,3 @@
-use super::guest_callback::entry_defs::EntryDefsHostAccess;
 use super::guest_callback::init::InitHostAccess;
 use super::guest_callback::migrate_agent::MigrateAgentHostAccess;
 use super::guest_callback::post_commit::PostCommitHostAccess;
@@ -7,6 +6,7 @@ use super::guest_callback::validation_package::ValidationPackageHostAccess;
 use super::host_fn::get_agent_activity::get_agent_activity;
 use super::HostAccess;
 use super::ZomeCallHostAccess;
+use super::{guest_callback::entry_defs::EntryDefsHostAccess, host_fn::HostFnApi};
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
@@ -409,7 +409,8 @@ impl RibosomeT for WasmRibosome {
             }
             ZomeDef::Inline(zome) => {
                 let input: SerializedBytes = invocation.clone().host_input()?.into_inner();
-                Ok(zome.call(to_call, input)?)
+                let api = HostFnApi::new(Arc::new(self.clone()), Arc::new(call_context));
+                Ok(zome.call(api, to_call, input)?)
             }
         }
     }

@@ -122,7 +122,7 @@ pub struct HostFnCaller {
 
 impl HostFnCaller {
     /// Create HostFnCaller for the first zome.
-    #[deprecated = "use create_for_zome"]
+    // #[deprecated = "use create_for_zome"]
     pub async fn create(
         cell_id: &CellId,
         handle: &ConductorHandle,
