@@ -3,7 +3,7 @@
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsHostAccess;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
-use crate::core::ribosome::wasm_ribosome::WasmRibosome;
+use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::RibosomeT;
 
 use super::api::CellConductorApiT;
@@ -184,7 +184,7 @@ pub(crate) fn get_entry_defs(
         .map(|(zome_name, zome)| (zome_name, zome))
         .collect::<HashMap<_, _>>();
 
-    let ribosome = WasmRibosome::new(dna);
+    let ribosome = RealRibosome::new(dna);
     match ribosome.run_entry_defs(EntryDefsHostAccess, invocation)? {
         EntryDefsResult::Defs(map) => {
             // Turn the defs map into a vec of keys and entry defs

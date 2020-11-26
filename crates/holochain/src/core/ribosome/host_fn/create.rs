@@ -126,7 +126,7 @@ pub mod wasm_test {
     use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
     use crate::fixt::CallContextFixturator;
     use crate::fixt::EntryFixturator;
-    use crate::fixt::WasmRibosomeFixturator;
+    use crate::fixt::RealRibosomeFixturator;
     use crate::fixt::ZomeCallHostAccessFixturator;
     use crate::test_utils::setup_app;
     use ::fixt::prelude::*;
@@ -164,7 +164,7 @@ pub mod wasm_test {
         let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
 
         let ribosome =
-            WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::Create]))
+            RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::Create]))
                 .next()
                 .unwrap();
         let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
@@ -205,7 +205,7 @@ pub mod wasm_test {
         let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
 
         let ribosome =
-            WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::Create]))
+            RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::Create]))
                 .next()
                 .unwrap();
         let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();

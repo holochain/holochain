@@ -240,7 +240,7 @@ mod slow_tests {
     use crate::fixt::curve::Zomes;
     use crate::fixt::MigrateAgentHostAccessFixturator;
     use crate::fixt::MigrateAgentInvocationFixturator;
-    use crate::fixt::WasmRibosomeFixturator;
+    use crate::fixt::RealRibosomeFixturator;
     use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(threaded_scheduler)]
@@ -248,7 +248,7 @@ mod slow_tests {
         let host_access = MigrateAgentHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
-        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
             .next()
             .unwrap();
         let mut migrate_agent_invocation = MigrateAgentInvocationFixturator::new(fixt::Empty)
@@ -267,7 +267,7 @@ mod slow_tests {
         let host_access = MigrateAgentHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
-        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::MigrateAgentPass]))
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::MigrateAgentPass]))
             .next()
             .unwrap();
         let mut migrate_agent_invocation = MigrateAgentInvocationFixturator::new(fixt::Empty)
@@ -286,7 +286,7 @@ mod slow_tests {
         let host_access = MigrateAgentHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
-        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::MigrateAgentFail]))
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::MigrateAgentFail]))
             .next()
             .unwrap();
         let mut migrate_agent_invocation = MigrateAgentInvocationFixturator::new(fixt::Empty)
@@ -308,7 +308,7 @@ mod slow_tests {
         let host_access = MigrateAgentHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
-        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![
             TestWasm::MigrateAgentPass,
             TestWasm::MigrateAgentFail,
         ]))

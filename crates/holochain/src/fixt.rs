@@ -20,7 +20,7 @@ use crate::core::ribosome::guest_callback::validate_link::ValidateLinkHostAccess
 use crate::core::ribosome::guest_callback::validate_link::ValidateLinkInvocation;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageHostAccess;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
-use crate::core::ribosome::wasm_ribosome::WasmRibosome;
+use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostAccess;
@@ -64,12 +64,12 @@ wasm_io_fixturator!(ExternInput<SerializedBytes>);
 newtype_fixturator!(FnComponents<Vec<String>>);
 
 fixturator!(
-    WasmRibosome;
+    RealRibosome;
     constructor fn new(DnaFile);
 );
 
-impl Iterator for WasmRibosomeFixturator<curve::Zomes> {
-    type Item = WasmRibosome;
+impl Iterator for RealRibosomeFixturator<curve::Zomes> {
+    type Item = RealRibosome;
 
     fn next(&mut self) -> Option<Self::Item> {
         // @todo fixturate this
@@ -84,7 +84,7 @@ impl Iterator for WasmRibosomeFixturator<curve::Zomes> {
                 .collect(),
         );
 
-        let ribosome = WasmRibosome::new(dna_file);
+        let ribosome = RealRibosome::new(dna_file);
 
         // warm the module cache for each wasm in the ribosome
         for zome in self.0.curve.0.clone() {

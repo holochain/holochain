@@ -309,7 +309,7 @@ mod slow_tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_validate_unimplemented() {
-        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
             .next()
             .unwrap();
         let mut validate_invocation = ValidateInvocationFixturator::new(fixt::Empty)
@@ -325,7 +325,7 @@ mod slow_tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_validate_implemented_valid() {
-        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateValid]))
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateValid]))
             .next()
             .unwrap();
         let mut validate_invocation = ValidateInvocationFixturator::new(fixt::Empty)
@@ -341,7 +341,7 @@ mod slow_tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_validate_implemented_invalid() {
-        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateInvalid]))
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateInvalid]))
             .next()
             .unwrap();
         let mut validate_invocation = ValidateInvocationFixturator::new(fixt::Empty)
@@ -357,7 +357,7 @@ mod slow_tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_validate_implemented_multi() {
-        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateInvalid]))
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateInvalid]))
             .next()
             .unwrap();
         let mut validate_invocation = ValidateInvocationFixturator::new(fixt::Empty)

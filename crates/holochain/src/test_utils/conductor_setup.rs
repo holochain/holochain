@@ -8,7 +8,7 @@ use crate::{
         ConductorHandle,
     },
     core::queue_consumer::InitialQueueTriggers,
-    core::ribosome::wasm_ribosome::WasmRibosome,
+    core::ribosome::real_ribosome::RealRibosome,
 };
 use holo_hash::{AgentPubKey, DnaHash};
 use holochain_keystore::KeystoreSender;
@@ -36,7 +36,7 @@ use tempdir::TempDir;
 pub struct CellHostFnCaller {
     pub cell_id: CellId,
     pub env: EnvironmentWrite,
-    pub ribosome: WasmRibosome,
+    pub ribosome: RealRibosome,
     pub network: HolochainP2pCell,
     pub keystore: KeystoreSender,
     pub signal_tx: SignalBroadcaster,
@@ -54,7 +54,7 @@ impl CellHostFnCaller {
         let triggers = handle.get_cell_triggers(cell_id).await.unwrap();
         let cell_conductor_api = CellConductorApi::new(handle.clone(), cell_id.clone());
 
-        let ribosome = WasmRibosome::new(dna_file.clone());
+        let ribosome = RealRibosome::new(dna_file.clone());
         let signal_tx = handle.signal_broadcaster().await;
         CellHostFnCaller {
             cell_id: cell_id.clone(),

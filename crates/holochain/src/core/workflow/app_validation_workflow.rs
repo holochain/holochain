@@ -29,7 +29,7 @@ use crate::core::ribosome::guest_callback::validate_link::ValidateLinkResult;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageHostAccess;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
-use crate::core::ribosome::wasm_ribosome::WasmRibosome;
+use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomesToInvoke;
@@ -249,7 +249,7 @@ async fn validate_op(
     };
 
     // Create the ribosome
-    let ribosome = WasmRibosome::new(dna_file);
+    let ribosome = RealRibosome::new(dna_file);
 
     // Get the validation package
     let validation_package = get_validation_package(

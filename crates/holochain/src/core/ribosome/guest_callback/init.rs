@@ -225,13 +225,13 @@ mod slow_tests {
     use crate::fixt::curve::Zomes;
     use crate::fixt::InitHostAccessFixturator;
     use crate::fixt::InitInvocationFixturator;
-    use crate::fixt::WasmRibosomeFixturator;
+    use crate::fixt::RealRibosomeFixturator;
     use ::fixt::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(threaded_scheduler)]
     async fn test_init_unimplemented() {
-        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::Crud]))
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::Crud]))
             .next()
             .unwrap();
         let mut init_invocation = InitInvocationFixturator::new(fixt::Empty).next().unwrap();
@@ -244,7 +244,7 @@ mod slow_tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_init_implemented_pass() {
-        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::InitPass]))
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::InitPass]))
             .next()
             .unwrap();
         let mut init_invocation = InitInvocationFixturator::new(fixt::Empty).next().unwrap();
@@ -257,7 +257,7 @@ mod slow_tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_init_implemented_fail() {
-        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::InitFail]))
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::InitFail]))
             .next()
             .unwrap();
         let mut init_invocation = InitInvocationFixturator::new(fixt::Empty).next().unwrap();
@@ -274,7 +274,7 @@ mod slow_tests {
     #[tokio::test(threaded_scheduler)]
     async fn test_init_multi_implemented_fail() {
         let ribosome =
-            WasmRibosomeFixturator::new(Zomes(vec![TestWasm::InitPass, TestWasm::InitFail]))
+            RealRibosomeFixturator::new(Zomes(vec![TestWasm::InitPass, TestWasm::InitFail]))
                 .next()
                 .unwrap();
         let mut init_invocation = InitInvocationFixturator::new(fixt::Empty).next().unwrap();

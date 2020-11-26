@@ -207,7 +207,7 @@ mod slow_tests {
     use crate::fixt::curve::Zomes;
     use crate::fixt::PostCommitHostAccessFixturator;
     use crate::fixt::PostCommitInvocationFixturator;
-    use crate::fixt::WasmRibosomeFixturator;
+    use crate::fixt::RealRibosomeFixturator;
     use holo_hash::fixt::HeaderHashFixturator;
     use holochain_wasm_test_utils::TestWasm;
 
@@ -216,7 +216,7 @@ mod slow_tests {
         let host_access = PostCommitHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
-        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
             .next()
             .unwrap();
         let mut post_commit_invocation = PostCommitInvocationFixturator::new(fixt::Empty)
@@ -235,7 +235,7 @@ mod slow_tests {
         let host_access = PostCommitHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
-        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::PostCommitSuccess]))
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::PostCommitSuccess]))
             .next()
             .unwrap();
         let mut post_commit_invocation = PostCommitInvocationFixturator::new(fixt::Empty)
@@ -254,7 +254,7 @@ mod slow_tests {
         let host_access = PostCommitHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
-        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::PostCommitFail]))
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::PostCommitFail]))
             .next()
             .unwrap();
         let mut post_commit_invocation = PostCommitInvocationFixturator::new(fixt::Empty)
@@ -268,10 +268,12 @@ mod slow_tests {
         assert_eq!(
             result,
             PostCommitResult::Fail(
-                vec![HeaderHashFixturator::new(fixt::Empty)
-                    .next()
-                    .unwrap()
-                    .into()]
+                vec![
+                    HeaderHashFixturator::new(fixt::Empty)
+                        .next()
+                        .unwrap()
+                        .into()
+                ]
                 .into(),
                 "empty header fail".into()
             ),

@@ -85,10 +85,10 @@ use std::sync::Arc;
 /// Path to the wasm cache path
 const WASM_CACHE_PATH_ENV: &str = "HC_WASM_CACHE_PATH";
 
-/// The only WasmRibosome is a Wasm ribosome.
+/// The only RealRibosome is a Wasm ribosome.
 /// note that this is cloned on every invocation so keep clones cheap!
 #[derive(Clone, Debug)]
-pub struct WasmRibosome {
+pub struct RealRibosome {
     // NOTE - Currently taking a full DnaFile here.
     //      - It would be an optimization to pre-ensure the WASM bytecode
     //      - is already in the wasm cache, and only include the DnaDef portion
@@ -96,7 +96,7 @@ pub struct WasmRibosome {
     pub dna_file: DnaFile,
 }
 
-impl WasmRibosome {
+impl RealRibosome {
     /// Create a new instance
     pub fn new(dna_file: DnaFile) -> Self {
         Self { dna_file }
@@ -142,7 +142,7 @@ impl WasmRibosome {
     fn imports(&self, call_context: CallContext) -> ImportObject {
         let host_fn_access = (&call_context.host_access()).into();
 
-        // it is important that WasmRibosome and ZomeCallInvocation are cheap to clone here
+        // it is important that RealRibosome and ZomeCallInvocation are cheap to clone here
         let self_arc = std::sync::Arc::new((*self).clone());
         let call_context_arc = std::sync::Arc::new(call_context);
 
@@ -362,7 +362,7 @@ macro_rules! do_callback {
     }};
 }
 
-impl RibosomeT for WasmRibosome {
+impl RibosomeT for RealRibosome {
     fn dna_def(&self) -> &DnaDefHashed {
         self.dna_file.dna()
     }

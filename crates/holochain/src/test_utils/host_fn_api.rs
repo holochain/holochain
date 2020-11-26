@@ -6,7 +6,7 @@ use crate::conductor::api::CellConductorReadHandle;
 use crate::conductor::interface::SignalBroadcaster;
 use crate::conductor::ConductorHandle;
 use crate::core::ribosome::host_fn;
-use crate::core::ribosome::wasm_ribosome::WasmRibosome;
+use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostAccess;
 use crate::core::ribosome::RibosomeT;
@@ -112,7 +112,7 @@ pub enum MaybeLinkable {
 #[derive(Clone)]
 pub struct HostFnCaller {
     pub env: EnvironmentWrite,
-    pub ribosome: WasmRibosome,
+    pub ribosome: RealRibosome,
     pub zome_path: ZomePath,
     pub network: HolochainP2pCell,
     pub keystore: KeystoreSender,
@@ -149,7 +149,7 @@ impl HostFnCaller {
             dna_file.dna().zomes.get(zome_index).unwrap().0.clone(),
         )
             .into();
-        let ribosome = WasmRibosome::new(dna_file.clone());
+        let ribosome = RealRibosome::new(dna_file.clone());
         let signal_tx = handle.signal_broadcaster().await;
         let call_zome_handle =
             CellConductorApi::new(handle.clone(), cell_id.clone()).into_call_zome_handle();
@@ -172,7 +172,7 @@ impl HostFnCaller {
         &self,
     ) -> (
         EnvironmentWrite,
-        Arc<WasmRibosome>,
+        Arc<RealRibosome>,
         Arc<CallContext>,
         CallZomeWorkspaceLock,
     ) {

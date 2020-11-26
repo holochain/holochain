@@ -255,9 +255,9 @@ mod slow_tests {
     use super::ValidationPackageResult;
     use crate::core::ribosome::RibosomeT;
     use crate::fixt::curve::Zomes;
+    use crate::fixt::RealRibosomeFixturator;
     use crate::fixt::ValidationPackageHostAccessFixturator;
     use crate::fixt::ValidationPackageInvocationFixturator;
-    use crate::fixt::WasmRibosomeFixturator;
     use hdk3::prelude::AppEntryType;
     use hdk3::prelude::EntryVisibility;
     use holochain_wasm_test_utils::TestWasm;
@@ -268,7 +268,7 @@ mod slow_tests {
         let host_access = ValidationPackageHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
-        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
             .next()
             .unwrap();
         let mut validation_package_invocation =
@@ -288,7 +288,7 @@ mod slow_tests {
         let host_access = ValidationPackageHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
-        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::ValidationPackageSuccess]))
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidationPackageSuccess]))
             .next()
             .unwrap();
         let mut validation_package_invocation =
@@ -313,7 +313,7 @@ mod slow_tests {
         let host_access = ValidationPackageHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
-        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::ValidationPackageFail]))
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidationPackageFail]))
             .next()
             .unwrap();
         let mut validation_package_invocation =

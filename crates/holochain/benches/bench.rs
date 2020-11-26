@@ -25,10 +25,10 @@ static TOKIO_RUNTIME: Lazy<Mutex<tokio::runtime::Runtime>> = Lazy::new(|| {
     )
 });
 
-static WASM_RIBOSOME: Lazy<Mutex<holochain::core::ribosome::wasm_ribosome::WasmRibosome>> =
+static REAL_RIBOSOME: Lazy<Mutex<holochain::core::ribosome::real_ribosome::RealRibosome>> =
     Lazy::new(|| {
         Mutex::new(
-            holochain::fixt::WasmRibosomeFixturator::new(holochain::fixt::curve::Zomes(vec![
+            holochain::fixt::RealRibosomeFixturator::new(holochain::fixt::curve::Zomes(vec![
                 TestWasm::Bench.into(),
             ]))
             .next()
@@ -86,7 +86,7 @@ pub fn wasm_call_n(c: &mut Criterion) {
                         payload: ExternInput::new(sb.clone()),
                         provenance: AGENT_KEY.lock().unwrap().clone(),
                     };
-                    WASM_RIBOSOME
+                    REAL_RIBOSOME
                         .lock()
                         .unwrap()
                         .clone()

@@ -15,7 +15,7 @@ use crate::conductor::handle::ConductorHandle;
 use crate::core::queue_consumer::spawn_queue_consumer_tasks;
 use crate::core::queue_consumer::InitialQueueTriggers;
 use crate::core::ribosome::guest_callback::init::InitResult;
-use crate::core::ribosome::wasm_ribosome::WasmRibosome;
+use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::state::dht_op_integration::IntegratedDhtOpsBuf;
 use crate::core::state::element_buf::ElementBuf;
@@ -806,7 +806,7 @@ impl Cell {
         let dna_def = dna_file.dna_def().clone();
 
         // Get the ribosome
-        let ribosome = WasmRibosome::new(dna_file);
+        let ribosome = RealRibosome::new(dna_file);
 
         // Run the workflow
         let args = InitializeZomesWorkflowArgs { dna_def, ribosome };
@@ -843,9 +843,9 @@ impl Cell {
 
     /// Instantiate a Ribosome for use by this Cell's workflows
     // TODO: reevaluate once Workflows are fully implemented (after B-01567)
-    pub(crate) async fn get_ribosome(&self) -> CellResult<WasmRibosome> {
+    pub(crate) async fn get_ribosome(&self) -> CellResult<RealRibosome> {
         match self.conductor_api.get_dna(self.dna_hash()).await {
-            Some(dna) => Ok(WasmRibosome::new(dna)),
+            Some(dna) => Ok(RealRibosome::new(dna)),
             None => Err(CellError::DnaMissing),
         }
     }

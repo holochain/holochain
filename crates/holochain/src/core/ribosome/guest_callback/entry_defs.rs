@@ -231,7 +231,7 @@ mod slow_tests {
     use crate::core::ribosome::RibosomeT;
     use crate::fixt::curve::Zomes;
     use crate::fixt::EntryDefsInvocationFixturator;
-    use crate::fixt::WasmRibosomeFixturator;
+    use crate::fixt::RealRibosomeFixturator;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::crdt::CrdtType;
     use holochain_zome_types::entry_def::EntryDef;
@@ -242,7 +242,7 @@ mod slow_tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_entry_defs_unimplemented() {
-        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
             .next()
             .unwrap();
         let entry_defs_invocation = EntryDefsInvocationFixturator::new(fixt::Empty)
@@ -257,7 +257,7 @@ mod slow_tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_entry_defs_implemented_defs() {
-        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::EntryDefs]))
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::EntryDefs]))
             .next()
             .unwrap();
         let entry_defs_invocation = EntryDefsInvocationFixturator::new(fixt::Empty)

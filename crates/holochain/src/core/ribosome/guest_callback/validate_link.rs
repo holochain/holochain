@@ -308,7 +308,7 @@ mod slow_tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_validate_link_add_unimplemented() {
-        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
             .next()
             .unwrap();
         let validate_invocation =
@@ -324,7 +324,7 @@ mod slow_tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_validate_implemented_valid() {
-        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateCreateLinkValid]))
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateCreateLinkValid]))
             .next()
             .unwrap();
         let validate_invocation = ValidateLinkInvocationCreateFixturator::new(Zome::from(
@@ -342,7 +342,7 @@ mod slow_tests {
     #[tokio::test(threaded_scheduler)]
     async fn test_validate_link_add_implemented_invalid() {
         let ribosome =
-            WasmRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateCreateLinkInvalid]))
+            RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateCreateLinkInvalid]))
                 .next()
                 .unwrap();
         let validate_create_link_invocation = ValidateLinkInvocationCreateFixturator::new(

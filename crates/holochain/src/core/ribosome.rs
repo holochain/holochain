@@ -1,6 +1,6 @@
 //! A Ribosome is a structure which knows how to execute hApp code.
 //!
-//! We have only one instance of this: [WasmRibosome]. The abstract trait exists
+//! We have only one instance of this: [RealRibosome]. The abstract trait exists
 //! so that we can write mocks against the `RibosomeT` interface, as well as
 //! opening the possiblity that we might support applications written in other
 //! languages and environments.
@@ -10,8 +10,7 @@
 pub mod error;
 pub mod guest_callback;
 pub mod host_fn;
-// pub mod inline_ribosome; // TODO: remove completely
-pub mod wasm_ribosome;
+pub mod real_ribosome;
 
 use crate::core::ribosome::guest_callback::init::InitInvocation;
 use crate::core::ribosome::guest_callback::init::InitResult;
@@ -426,7 +425,7 @@ impl From<&ZomeCallHostAccess> for HostFnAccess {
 }
 
 /// Interface for a Ribosome. Currently used only for mocking, as our only
-/// real concrete type is [WasmRibosome]
+/// real concrete type is [RealRibosome]
 #[automock]
 pub trait RibosomeT: Sized + std::fmt::Debug {
     fn dna_def(&self) -> &DnaDefHashed;
@@ -569,7 +568,7 @@ pub mod wasm_test {
                 use $crate::core::ribosome::RibosomeT;
 
                 let ribosome =
-                    $crate::fixt::WasmRibosomeFixturator::new($crate::fixt::curve::Zomes(vec![
+                    $crate::fixt::RealRibosomeFixturator::new($crate::fixt::curve::Zomes(vec![
                         $test_wasm.into(),
                     ]))
                     .next()

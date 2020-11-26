@@ -255,7 +255,7 @@ pub mod test {
     use crate::conductor::Conductor;
     use crate::conductor::ConductorHandle;
     use crate::core::state::source_chain::SourceChainBuf;
-    use crate::fixt::WasmRibosomeFixturator;
+    use crate::fixt::RealRibosomeFixturator;
     use futures::future::FutureExt;
     use holochain_serialized_bytes::prelude::*;
     use holochain_state::test_utils::test_environments;
@@ -428,7 +428,7 @@ pub mod test {
         );
 
         // warm the zome
-        let _ = WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::Foo]))
+        let _ = RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::Foo]))
             .next()
             .unwrap();
 
@@ -476,7 +476,7 @@ pub mod test {
 
         let msg = WebsocketMessage::Request(msg, respond);
         handle_incoming_message(msg, app_api).await.unwrap();
-        // the time here should be almost the same (about +0.1ms) vs. the raw wasm_ribosome call
+        // the time here should be almost the same (about +0.1ms) vs. the raw real_ribosome call
         // the overhead of a websocket request locally is small
         let shutdown = handle.take_shutdown_handle().await.unwrap();
         handle.shutdown().await;
