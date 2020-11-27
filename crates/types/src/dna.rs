@@ -15,7 +15,7 @@ use std::collections::BTreeMap;
 
 use self::{
     error::DnaResult,
-    zome::{Zome, ZomeDef},
+    zome::{inline_zome::InlineZome, Zome, ZomeDef},
 };
 
 /// Zomes need to be an ordered map from ZomeName to a Zome
@@ -54,6 +54,19 @@ pub struct DnaDef {
     pub zomes: Zomes,
 }
 
+#[cfg(feature = "test_utils")]
+impl DnaDef {
+    /// Create a DnaDef with a random UUID, useful for testing
+    pub fn unique_from_zomes(zomes: Vec<Zome>) -> Self {
+        let zomes = zomes.into_iter().map(|z| z.into_inner()).collect();
+        DnaDefBuilder::default()
+            .zomes(zomes)
+            .random_uuid()
+            .build()
+            .unwrap()
+    }
+}
+
 impl DnaDef {
     /// Return a Zome
     pub fn get_zome(&self, zome_name: &ZomeName) -> Result<zome::Zome, DnaError> {
@@ -82,10 +95,14 @@ impl DnaDef {
     }
 }
 
+fn random_uuid() -> String {
+    nanoid::nanoid!()
+}
+
 impl DnaDefBuilder {
     /// Provide a random UUID
     pub fn random_uuid(&mut self) -> &mut Self {
-        self.uuid = Some(nanoid::nanoid!());
+        self.uuid = Some(random_uuid());
         self
     }
 }
@@ -218,6 +235,57 @@ impl DnaFile {
         })
         .await
         .expect("blocking thread panic!d - panicing here too")
+    }
+}
+
+#[cfg(feature = "test_utils")]
+impl DnaFile {
+    /// Create a DnaFile from a collection of InlineZomes (no Wasm)
+    pub async fn from_inline_zomes(
+        uuid: String,
+        zomes: Vec<(&str, InlineZome)>,
+    ) -> DnaResult<(Self, Vec<Zome>)> {
+        let zomes: Vec<(ZomeName, ZomeDef)> = zomes
+            .into_iter()
+            .map(|(n, z)| (n.into(), z.into()))
+            .collect();
+
+        let dna_def = DnaDefBuilder::default()
+            .uuid(uuid)
+            .zomes(zomes.clone())
+            .build()
+            .unwrap();
+
+        let dna_file = DnaFile::new(dna_def, Vec::new()).await?;
+        let zomes: Vec<Zome> = zomes.into_iter().map(|(n, z)| Zome::new(n, z)).collect();
+        Ok((dna_file, zomes))
+    }
+
+    /// Create a DnaFile from a collection of InlineZomes (no Wasm),
+    /// with a random UUID
+    pub async fn unique_from_inline_zomes(
+        zomes: Vec<(&str, InlineZome)>,
+    ) -> DnaResult<(Self, Vec<Zome>)> {
+        Self::from_inline_zomes(random_uuid(), zomes).await
+    }
+
+    /// Create a DnaFile from a single InlineZome (no Wasm)
+    pub async fn from_inline_zome(
+        uuid: String,
+        zome_name: &str,
+        zome: InlineZome,
+    ) -> DnaResult<(Self, Zome)> {
+        let (dna_file, mut zomes) = Self::from_inline_zomes(uuid, vec![(zome_name, zome)]).await?;
+        Ok((dna_file, zomes.pop().unwrap()))
+    }
+
+    /// Create a DnaFile from a single InlineZome (no Wasm)
+    /// with a random UUID
+    pub async fn unique_from_inline_zome(
+        zome_name: &str,
+        zome: InlineZome,
+    ) -> DnaResult<(Self, Zome)> {
+        Self::from_inline_zome(random_uuid(), zome_name, zome).await
     }
 }
 

@@ -5,20 +5,12 @@ use holochain_keystore::KeystoreSender;
 use holochain_state::test_utils::test_environments;
 use holochain_types::{
     app::InstalledCell,
-    dna::{
-        zome::{inline_zome::InlineZome, Zome, ZomeDef},
-        DnaDefBuilder, DnaFile,
-    },
+    dna::{zome::inline_zome::InlineZome, DnaFile},
 };
 use holochain_zome_types::element::ElementEntry;
 use unwrap_to::unwrap_to;
 
-#[tokio::test(threaded_scheduler)]
-async fn extremely_verbose_inline_zome_sketch() -> anyhow::Result<()> {
-    let envs = test_environments();
-
-    // Create an EntryDef for use in this test
-
+fn simple_crud_zome() -> InlineZome {
     let entry_def = EntryDef::new(
         "entry".into(),
         Default::default(),
@@ -27,9 +19,7 @@ async fn extremely_verbose_inline_zome_sketch() -> anyhow::Result<()> {
         Default::default(),
     );
 
-    // Create an InlineZome whose callbacks are defined by closures
-
-    let zome_def: ZomeDef = InlineZome::new("", vec![entry_def.clone()])
+    InlineZome::new("", vec![entry_def.clone()])
         .callback("create", move |api, ()| {
             let entry_def_id: EntryDefId = entry_def.id.clone();
             let entry = Entry::app(().try_into().unwrap()).unwrap();
@@ -40,17 +30,16 @@ async fn extremely_verbose_inline_zome_sketch() -> anyhow::Result<()> {
             api.get((hash.into(), GetOptions::default()))
                 .map_err(Into::into)
         })
-        .into();
-    let zome = Zome::new("zome1".into(), zome_def);
+}
+
+#[tokio::test(threaded_scheduler)]
+#[cfg(feature = "test_utils")]
+async fn extremely_verbose_inline_zome_sketch() -> anyhow::Result<()> {
+    let envs = test_environments();
 
     // Bundle the single zome into a DnaFile
 
-    let dna = DnaDefBuilder::default()
-        .zomes(vec![zome.clone().into_inner()])
-        .random_uuid()
-        .build()
-        .unwrap();
-    let dna_file = DnaFile::new(dna, vec![]).await?;
+    let (dna_file, zome) = DnaFile::unique_from_inline_zome("zome1", simple_crud_zome()).await?;
     let dna_hash = dna_file.dna_hash().clone();
 
     // Get two agents
@@ -71,6 +60,7 @@ async fn extremely_verbose_inline_zome_sketch() -> anyhow::Result<()> {
     conductor.install_dna(dna_file).await?;
 
     // Install and activate one app for Alice and another for Bob
+    // TODO: develop tools to app installation much less verbose
 
     conductor
         .clone()
@@ -97,6 +87,7 @@ async fn extremely_verbose_inline_zome_sketch() -> anyhow::Result<()> {
     conductor.clone().setup_cells().await?;
 
     // Call the "create" zome fn on Alice's app
+    // TODO: develop tools to make zome calls much less verbose
 
     let hash: HeaderHash = {
         let response = conductor
@@ -150,6 +141,8 @@ async fn extremely_verbose_inline_zome_sketch() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Get an infinite stream of AgentPubKeys
+/// TODO: move this to a common location
 fn agent_stream(keystore: KeystoreSender) -> impl futures::Stream<Item = AgentPubKey> {
     use holochain_keystore::KeystoreSenderExt;
     futures::stream::unfold(keystore, |keystore| async {
