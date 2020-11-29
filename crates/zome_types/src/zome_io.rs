@@ -81,9 +81,9 @@ wasm_io_types!(
     pub struct SendOutput(());
     // Attempt to have the keystore sign some data
     // The pubkey in the input needs to be found in the keystore for this to work
-    pub struct SignInput(crate::signature::Sign);
-    pub struct SignOutput(crate::signature::Signature);
-    pub struct VerifySignatureInput(crate::signature::VerifySignature);
+    pub struct SignInput(signature::Sign);
+    pub struct SignOutput(signature::Signature);
+    pub struct VerifySignatureInput(signature::VerifySignature);
     pub struct VerifySignatureOutput(bool);
     // @todo
     pub struct ScheduleInput(core::time::Duration);

@@ -373,7 +373,7 @@ pub enum AdminRequest {
         /// The `CellId` for which to dump state
         cell_id: Box<CellId>,
     },
-    /// Add a list [AgentInfoSigned] to this conductors peer store.
+    /// Add a list [AgentInfoSigned] to this conductor's peer store.
     /// This is another way of finding peers on a dht.
     ///
     /// This can be useful for testing.
@@ -385,7 +385,7 @@ pub enum AdminRequest {
         /// Vec of signed agent info to add to peer store
         agent_infos: Vec<AgentInfoSigned>,
     },
-    /// Request the [AgentInfoSigned] stored in this conductors
+    /// Request the [AgentInfoSigned] stored in this conductor's
     /// peer store.
     ///
     /// You can:

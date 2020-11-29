@@ -197,8 +197,8 @@ async fn recv_incoming_msgs_and_outgoing_signals<A: InterfaceApi>(
             // NOTE: we could just use futures::StreamExt::forward to hook this
             // tx and rx together in a new spawned task
             signal = rx_from_cell.next() => {
-                trace!("Sending signal!");
                 if let Some(signal) = signal {
+                    trace!(msg = "Sending signal!", ?signal);
                     let bytes = SerializedBytes::try_from(
                         signal.map_err(InterfaceError::SignalReceive)?,
                     )?;
