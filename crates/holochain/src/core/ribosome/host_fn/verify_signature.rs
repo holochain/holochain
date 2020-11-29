@@ -152,7 +152,7 @@ pub mod wasm_test {
                     TestWasm::Sign,
                     "verify_signature",
                     hdk3::prelude::holochain_zome_types::zome_io::VerifySignatureInput::new(
-                        VerifySignatureInput::new_raw(k.clone(), sig.clone().into(), data.clone())
+                        VerifySignature::new_raw(k.clone(), sig.clone().into(), data.clone())
                     )
                 );
 
