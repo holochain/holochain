@@ -12,6 +12,7 @@ path = "./src/lib.rs"
 [features]
 default = []
 build = []
+only_check = []
 
 
 [dependencies]
