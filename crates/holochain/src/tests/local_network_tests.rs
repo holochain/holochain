@@ -1,7 +1,7 @@
-use std::{convert::TryFrom, sync::Arc};
+use std::{convert::TryFrom, convert::TryInto, sync::Arc};
 
 use hdk3::prelude::{CellId, WasmError};
-use holo_hash::AgentPubKey;
+use holo_hash::{AgentPubKey, HeaderHash};
 use holochain_keystore::AgentPubKeyExt;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::env::EnvironmentWrite;
@@ -10,10 +10,11 @@ use holochain_types::{
     dna::{DnaDef, DnaFile},
 };
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::ZomeCallResponse;
+use holochain_zome_types::{GetOutput, ZomeCallResponse};
 use kitsune_p2p::KitsuneP2pConfig;
 use matches::assert_matches;
 use tempdir::TempDir;
+use tracing::debug;
 
 use crate::{
     conductor::p2p_store::all_agent_infos,
@@ -21,12 +22,16 @@ use crate::{
     conductor::ConductorHandle,
     core::ribosome::error::RibosomeError,
     core::ribosome::error::RibosomeResult,
-    test_utils::{install_app, new_invocation, setup_app_with_network},
+    test_utils::host_fn_api::Post,
+    test_utils::{install_app, new_invocation, setup_app_with_network, wait_for_integration},
 };
 use shrinkwraprs::Shrinkwrap;
 use test_case::test_case;
 
 const TIMEOUT_ERROR: &'static str = "inner function \'call_create_entry_remotely\' failed: ZomeCallNetworkError(\"Other: timeout\")";
+
+const NUM_ATTEMPTS: usize = 100;
+const DELAY_PER_ATTEMPT: std::time::Duration = std::time::Duration::from_millis(100);
 
 #[test_case(2)]
 #[test_case(5)]
@@ -77,6 +82,91 @@ fn conductors_call_remote(num_conductors: usize) {
         shutdown(handles).await;
     };
     crate::conductor::tokio_runtime().block_on(f);
+}
+
+#[test_case(1, 2)]
+#[test_case(5, 2)]
+#[test_case(10, 2)]
+#[test_case(1, 3)]
+#[test_case(2, 3)]
+#[test_case(5, 3)]
+#[test_case(10, 3)]
+#[test_case(1, 4)]
+#[test_case(2, 4)]
+#[test_case(5, 4)]
+#[test_case(10, 4)]
+fn remote_multi_agent(num_commits: u64, num_conductors: usize) {
+    crate::conductor::tokio_runtime()
+        .block_on(remote_multi_agent_inner(num_commits, num_conductors));
+}
+
+async fn remote_multi_agent_inner(num_commits: u64, num_conductors: usize) {
+    observability::test_run().ok();
+    let zomes = vec![TestWasm::Create];
+    let mut network = KitsuneP2pConfig::default();
+    network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
+        bind_to: None,
+        override_host: None,
+        override_port: None,
+    }];
+    let handles = setup(zomes, Some(network), num_conductors).await;
+
+    let mut envs = Vec::with_capacity(handles.len());
+    for h in &handles {
+        envs.push(h.get_p2p_env().await);
+    }
+
+    exchange_peer_info(envs);
+
+    let mut hashes_to_get: Vec<HeaderHash> = Vec::new();
+
+    for i in 0..num_commits {
+        let post = Post(i.to_string());
+        let invocation =
+            new_invocation(&handles[0].cell_id, "create_post", post, TestWasm::Create).unwrap();
+        let result = handles[0].call_zome(invocation).await.unwrap().unwrap();
+        let result = unwrap_to::unwrap_to!(result => ZomeCallResponse::Ok)
+            .clone()
+            .into_inner();
+        hashes_to_get.push(result.try_into().unwrap());
+    }
+
+    let expected_count = num_commits as usize * 3 + 7 * num_conductors + 2 + 2;
+
+    wait_for_integration(
+        &handles[0].get_cell_env(&handles[0].cell_id).await.unwrap(),
+        expected_count,
+        NUM_ATTEMPTS,
+        DELAY_PER_ATTEMPT.clone(),
+    )
+    .await;
+
+    let start = std::time::Instant::now();
+    let len = hashes_to_get.len() as u64;
+    for (i, hash) in hashes_to_get.into_iter().enumerate() {
+        let invocation =
+            new_invocation(&handles[1].cell_id, "get_post", hash, TestWasm::Create).unwrap();
+        let this_call = std::time::Instant::now();
+        let result = handles[1].call_zome(invocation).await.unwrap().unwrap();
+        debug!("Took {}s for call {}", this_call.elapsed().as_secs(), i);
+        let result: GetOutput = unwrap_to::unwrap_to!(result => ZomeCallResponse::Ok)
+            .clone()
+            .into_inner()
+            .try_into()
+            .unwrap();
+        assert_matches!(result.into_inner(), Some(_));
+    }
+    let el = start.elapsed().as_secs();
+    let average = el / len;
+    debug!(
+        "Took {}s for {} commits and {} conductors with an average of {}s",
+        el, num_commits, num_conductors, average
+    );
+    assert_eq!(
+        average, 0,
+        "The average time to get an entry is greater then 1 second"
+    );
+    shutdown(handles).await;
 }
 
 async fn init_all(handles: &[TestHandle]) {

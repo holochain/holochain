@@ -739,10 +739,10 @@ where
                     match iter.next() {
                         Ok(Some((k, v))) => {
                             let info = kitsune_p2p::agent_store::AgentInfo::try_from(&v)?;
-                            if info.signed_at_ms() + info.expires_after_ms() <= now {
-                                expired.push(AgentKvKey::from(k));
-                            } else {
-                                out.push(v);
+                            let expires = info.signed_at_ms().checked_add(info.expires_after_ms());
+                            match expires {
+                                Some(expires) if expires > now => out.push(v),
+                                _ => expired.push(AgentKvKey::from(k)),
                             }
                         }
                         Ok(None) => break,

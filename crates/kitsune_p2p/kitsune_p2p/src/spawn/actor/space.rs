@@ -691,7 +691,8 @@ impl Space {
                 }),
                 _ => Err(()),
             },
-        );
+        )
+        .instrument(tracing::debug_span!("message_neighborhood"));
 
         Ok(async move {
             let mut out: Vec<actor::RpcMultiResponse> = futures::future::join_all(local_all)

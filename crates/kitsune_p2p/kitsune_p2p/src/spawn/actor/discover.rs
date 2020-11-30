@@ -188,7 +188,7 @@ pub(crate) fn peer_discover(
 pub(crate) fn message_neighborhood<T, F>(
     space: &mut Space,
     from_agent: Arc<KitsuneAgent>,
-    target_node_count: u8,
+    mut target_node_count: u8,
     stage_1_timeout_if_any_ms: u64,
     stage_2_timeout_even_if_none_ms: u64,
     // ignored while full-sync
@@ -223,6 +223,7 @@ where
             // iteration before deciding to send more requests.
 
             let fetched_count = out.lock().await.len();
+            tracing::debug!(?fetched_count);
             if fetched_count >= target_node_count as usize {
                 break;
             }
@@ -247,6 +248,14 @@ where
             )
             .await
             {
+                let nodes_len = nodes.len() as u8;
+                tracing::trace!("found {} remote agents", nodes_len);
+                // We found less remote nodes then our target so
+                // lower the target so that we don't wait for nodes
+                // that don't exist.
+                if target_node_count > nodes_len {
+                    target_node_count = nodes_len;
+                }
                 for node in nodes {
                     let to_agent = Arc::new(node.as_agent_ref().clone());
                     if !sent_to.contains(&to_agent) {
@@ -282,6 +291,9 @@ where
                         });
                     }
                 }
+            } else {
+                tracing::trace!("No remote agents exiting remote message");
+                break;
             }
 
             let elapsed_ms = start_time.elapsed().as_millis() as u64;
