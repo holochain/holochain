@@ -56,7 +56,7 @@ async fn extremely_verbose_inline_zome_sketch() -> anyhow::Result<()> {
     conductor.install_dna(dna_file).await?;
 
     // Install and activate one app for Alice and another for Bob
-    // TODO: develop tools to app installation much less verbose
+    // TODO: develop tools to make app installation much less verbose
 
     conductor
         .clone()
@@ -85,7 +85,7 @@ async fn extremely_verbose_inline_zome_sketch() -> anyhow::Result<()> {
     // Call the "create" zome fn on Alice's app
 
     let hash: HeaderHash = conductor
-        .call(&alice_cell_id, &zome, "create", None, None, ())
+        .call_zome(&alice_cell_id, &zome, "create", None, None, ())
         .await;
 
     // Wait long enough for Bob to receive gossip
@@ -95,7 +95,7 @@ async fn extremely_verbose_inline_zome_sketch() -> anyhow::Result<()> {
     // Verify that bob can run "read" on his app and get alice's Header
 
     let element: MaybeElement = conductor
-        .call(&bobbo_cell_id, &zome, "read", None, None, hash)
+        .call_zome(&bobbo_cell_id, &zome, "read", None, None, hash)
         .await;
     let element = element
         .0
