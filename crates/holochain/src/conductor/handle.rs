@@ -66,6 +66,7 @@ use holochain_types::{
     prelude::*,
 };
 use holochain_zome_types::entry_def::EntryDef;
+use kitsune_p2p::agent_store::AgentInfoSigned;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::*;
@@ -201,6 +202,15 @@ pub trait ConductorHandleT: Send + Sync {
         &self,
         installed_app_id: &InstalledAppId,
     ) -> ConductorResult<Option<InstalledApp>>;
+
+    /// Add signed agent info to the conductor
+    async fn add_agent_infos(&self, agent_infos: Vec<AgentInfoSigned>) -> ConductorApiResult<()>;
+
+    /// Get signed agent info from the conductor
+    async fn get_agent_infos(
+        &self,
+        cell_id: Option<CellId>,
+    ) -> ConductorApiResult<Vec<AgentInfoSigned>>;
 
     /// Retrieve the LMDB environment for this cell. FOR TESTING ONLY.
     #[cfg(any(test, feature = "test_utils"))]
@@ -509,6 +519,17 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .get_state()
             .await?
             .get_app_info(installed_app_id))
+    }
+
+    async fn add_agent_infos(&self, agent_infos: Vec<AgentInfoSigned>) -> ConductorApiResult<()> {
+        self.conductor.read().await.add_agent_infos(agent_infos)
+    }
+
+    async fn get_agent_infos(
+        &self,
+        cell_id: Option<CellId>,
+    ) -> ConductorApiResult<Vec<AgentInfoSigned>> {
+        self.conductor.read().await.get_agent_infos(cell_id)
     }
 
     #[cfg(any(test, feature = "test_utils"))]

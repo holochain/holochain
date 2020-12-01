@@ -14,6 +14,7 @@ use holochain_types::{
     cell::CellId,
     dna::{DnaFile, JsonProperties},
 };
+use kitsune_p2p::agent_store::AgentInfoSigned;
 use std::path::PathBuf;
 use tracing::*;
 
@@ -180,6 +181,14 @@ impl AdminInterfaceApi for RealAdminInterfaceApi {
             DumpState { cell_id } => {
                 let state = self.conductor_handle.dump_cell_state(&cell_id).await?;
                 Ok(AdminResponse::StateDumped(state))
+            }
+            AddAgentInfo { agent_infos } => {
+                self.conductor_handle.add_agent_infos(agent_infos).await?;
+                Ok(AdminResponse::AgentInfoAdded)
+            }
+            RequestAgentInfo { cell_id } => {
+                let r = self.conductor_handle.get_agent_infos(cell_id).await?;
+                Ok(AdminResponse::AgentInfoRequested(r))
             }
         }
     }
@@ -362,6 +371,31 @@ pub enum AdminRequest {
         /// The `CellId` for which to dump state
         cell_id: Box<CellId>,
     },
+    /// Add a list [AgentInfoSigned] to this conductor's peer store.
+    /// This is another way of finding peers on a dht.
+    ///
+    /// This can be useful for testing.
+    ///
+    /// It is also helpful if you know other
+    /// agents on the network and they can send you
+    /// their agent info.
+    AddAgentInfo {
+        /// Vec of signed agent info to add to peer store
+        agent_infos: Vec<AgentInfoSigned>,
+    },
+    /// Request the [AgentInfoSigned] stored in this conductor's
+    /// peer store.
+    ///
+    /// You can:
+    /// - Get all agent info by leaving cell id to None.
+    /// - Get a specific agent info by setting the cell id.
+    ///
+    /// This is how you can send your agent info to another agent.
+    /// It is also useful for testing across networks.
+    RequestAgentInfo {
+        /// Optionally choose a specific agent info
+        cell_id: Option<CellId>,
+    },
 }
 
 /// Represents the possible responses to an [`AdminRequest`]
@@ -456,6 +490,18 @@ pub enum AdminResponse {
     ///
     /// [`AdminRequest::DumpState`]: enum.AdminRequest.html#variant.DumpState
     StateDumped(String),
+    /// The succesful response to an [`AdminRequest::AddAgentInfo`].
+    ///
+    /// This means the agent info was successfully added to the peer store.
+    ///
+    /// [`AdminRequest::AddAgentInfo`]: enum.AdminRequest.html#variant.AddAgentInfo
+    AgentInfoAdded,
+    /// The succesful response to an [`AdminRequest::RequestAgentInfo`].
+    ///
+    /// This is all the agent info that was found for the request.
+    ///
+    /// [`AdminRequest::RequestAgentInfo`]: enum.AdminRequest.html#variant.RequestAgentInfo
+    AgentInfoRequested(Vec<AgentInfoSigned>),
 }
 
 #[cfg(test)]
