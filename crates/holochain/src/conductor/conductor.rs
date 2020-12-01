@@ -1107,6 +1107,7 @@ mod builder {
         }
 
         /// Build a Conductor with a test environment
+        #[cfg(any(test, feature = "test_utils"))]
         pub async fn test(self, envs: &TestEnvironments) -> ConductorResult<ConductorHandle> {
             let keystore = envs.conductor().keystore();
             let (holochain_p2p, p2p_evt) =

@@ -1,6 +1,6 @@
 use futures::StreamExt;
 use hdk3::prelude::*;
-use holochain::{conductor::Conductor, core::ribosome::ZomeCallInvocation};
+use holochain::conductor::{test_handle::TestConductorHandle, Conductor};
 use holochain_keystore::KeystoreSender;
 use holochain_state::test_utils::test_environments;
 use holochain_types::{
@@ -8,7 +8,6 @@ use holochain_types::{
     dna::{zome::inline_zome::InlineZome, DnaFile},
 };
 use holochain_zome_types::element::ElementEntry;
-use unwrap_to::unwrap_to;
 
 fn simple_crud_zome() -> InlineZome {
     let entry_def = EntryDef::new(
@@ -50,7 +49,7 @@ async fn extremely_verbose_inline_zome_sketch() -> anyhow::Result<()> {
 
     // Create a Conductor
 
-    let conductor = Conductor::builder().test(&envs).await?;
+    let conductor: TestConductorHandle = Conductor::builder().test(&envs).await?.into();
 
     // Install the DNA
 
@@ -84,24 +83,10 @@ async fn extremely_verbose_inline_zome_sketch() -> anyhow::Result<()> {
     conductor.clone().setup_cells().await?;
 
     // Call the "create" zome fn on Alice's app
-    // TODO: develop tools to make zome calls much less verbose
 
-    let hash: HeaderHash = {
-        let response = conductor
-            .call_zome(ZomeCallInvocation {
-                cell_id: alice_cell_id.clone(),
-                zome: zome.clone(),
-                fn_name: "create".into(),
-                payload: ExternInput::new(().try_into().unwrap()),
-                cap: None,
-                provenance: alice.clone(),
-            })
-            .await??;
-        unwrap_to!(response => ZomeCallResponse::Ok)
-            .clone()
-            .into_inner()
-            .try_into()?
-    };
+    let hash: HeaderHash = conductor
+        .call(&alice_cell_id, &zome, "create", None, None, ())
+        .await;
 
     // Wait long enough for Bob to receive gossip
 
@@ -109,23 +94,12 @@ async fn extremely_verbose_inline_zome_sketch() -> anyhow::Result<()> {
 
     // Verify that bob can run "read" on his app and get alice's Header
 
-    let element: Element = {
-        let response = conductor
-            .call_zome(ZomeCallInvocation {
-                cell_id: bobbo_cell_id.clone(),
-                zome: zome.clone(),
-                fn_name: "read".into(),
-                payload: ExternInput::new(hash.try_into().unwrap()),
-                cap: None,
-                provenance: bobbo.clone(),
-            })
-            .await??;
-        let sb = unwrap_to!(response => ZomeCallResponse::Ok)
-            .clone()
-            .into_inner();
-        holochain_serialized_bytes::decode(sb.bytes())
-            .expect("Element was None: bobbo couldn't `get` it")
-    };
+    let element: MaybeElement = conductor
+        .call(&bobbo_cell_id, &zome, "read", None, None, hash)
+        .await;
+    let element = element
+        .0
+        .expect("Element was None: bobbo couldn't `get` it");
 
     // Assert that the Element bob sees matches what Alice committed
 
@@ -137,6 +111,12 @@ async fn extremely_verbose_inline_zome_sketch() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+// TODO: remove once host fns remove SerializedBytes constraint
+#[derive(
+    serde::Serialize, serde::Deserialize, Clone, Debug, SerializedBytes, shrinkwraprs::Shrinkwrap,
+)]
+struct MaybeElement(Option<Element>);
 
 /// TODO: move this to a common test_utils location
 pub struct TestAgent;

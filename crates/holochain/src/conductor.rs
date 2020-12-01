@@ -31,6 +31,9 @@ pub mod p2p_store;
 pub mod paths;
 pub mod state;
 
+#[cfg(feature = "test_utils")]
+pub mod test_handle;
+
 pub use cell::{error::CellError, Cell};
 pub use conductor::{Conductor, ConductorBuilder, ConductorStateDb};
 pub use handle::ConductorHandle;
