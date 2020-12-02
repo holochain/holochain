@@ -1126,13 +1126,31 @@ mod builder {
     }
 }
 
+#[instrument(skip(p2p_evt, handle))]
 async fn p2p_event_task(
     mut p2p_evt: holochain_p2p::event::HolochainP2pEventReceiver,
     handle: ConductorHandle,
 ) {
+    /// The number of events we allow to run in parallel before
+    /// starting to await on the join handles.
+    const NUM_PARALLEL_EVTS: usize = 100;
     use tokio::stream::StreamExt;
+    let (mut tx, rx) = tokio::sync::mpsc::channel(NUM_PARALLEL_EVTS);
+
+    // Task to await a buffer of event join handles
+    tokio::task::spawn(async move {
+        use futures::StreamExt;
+        let mut buffer = rx.buffer_unordered(NUM_PARALLEL_EVTS);
+        while let Some(r) = futures::StreamExt::next(&mut buffer).await {
+            if let Err(e) = r {
+                error!("Failed to join event task {:?}", e);
+            }
+        }
+    });
+
+    // Spawn event tasks
     while let Some(evt) = p2p_evt.next().await {
-        tokio::task::spawn({
+        let join_handle = tokio::task::spawn({
             let handle = handle.clone();
             async move {
                 let cell_id = CellId::new(evt.dna_hash().clone(), evt.as_to_agent().clone());
@@ -1144,6 +1162,9 @@ async fn p2p_event_task(
                 }
             }
         });
+        if let Err(e) = tx.send(join_handle).await {
+            error!("Failing to send event join handles to join task {:?}", e);
+        }
     }
     tracing::warn!("p2p_event_task has ended");
 }

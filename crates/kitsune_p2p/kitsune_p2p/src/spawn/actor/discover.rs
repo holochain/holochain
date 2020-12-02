@@ -223,14 +223,12 @@ where
             // iteration before deciding to send more requests.
 
             let fetched_count = out.lock().await.len();
-            tracing::debug!(?fetched_count);
             if fetched_count >= target_node_count as usize {
                 break;
             }
 
             let elapsed_ms = start_time.elapsed().as_millis() as u64;
 
-            tracing::debug!(?elapsed_ms);
             if elapsed_ms >= stage_1_timeout_if_any_ms && fetched_count > 0 {
                 break;
             }
@@ -249,7 +247,6 @@ where
             )
             .await
             {
-                tracing::debug!(num_new_nodes = ?nodes.len());
                 for node in nodes {
                     let to_agent = Arc::new(node.as_agent_ref().clone());
                     if !sent_to.contains(&to_agent) {
@@ -298,7 +295,6 @@ where
                 interval_ms = stage_2_timeout_even_if_none_ms - elapsed_ms;
             }
 
-            tracing::debug!(?interval_ms);
             tokio::time::delay_for(std::time::Duration::from_millis(interval_ms)).await;
         }
 

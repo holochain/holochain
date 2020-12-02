@@ -35,7 +35,7 @@ async fn gossip_test() {
     }
 
     // Give publish time to finish
-    tokio::time::delay_for(std::time::Duration::from_secs(1)).await;
+    tokio::time::delay_for(std::time::Duration::from_secs(2)).await;
 
     // Bring Bob online
     conductor_test.bring_bob_online().await;
@@ -43,7 +43,7 @@ async fn gossip_test() {
     let bob_cell_id = &bob_call_data.cell_id;
 
     // Give gossip some time to finish
-    tokio::time::delay_for(std::time::Duration::from_secs(1)).await;
+    tokio::time::delay_for(std::time::Duration::from_secs(2)).await;
 
     // Bob list anchors
     let invocation = new_invocation(

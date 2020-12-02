@@ -420,8 +420,8 @@ pub fn handle_get_links(
     // Get the vaults
     let env_ref = env.guard();
     let reader = env_ref.reader()?;
-    let element_vault = ElementBuf::vault(env.clone().into(), false)?;
-    let meta_vault = MetadataBuf::vault(env.clone().into())?;
+    let element_vault = ElementBuf::vault(env.clone(), false)?;
+    let meta_vault = MetadataBuf::vault(env.clone())?;
 
     let links = meta_vault
         .get_links_all(&reader, &LinkMetaKey::from(&link_key))?

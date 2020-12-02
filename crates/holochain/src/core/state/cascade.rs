@@ -448,12 +448,9 @@ where
             return Ok(());
         }
         let env = ok_or_return!(self.env.clone());
-        let response = crate::conductor::authority::handle_get_links(
-            env.into(),
-            key.into(),
-            (&options).into(),
-        )
-        .map_err(Box::new)?;
+        let response =
+            crate::conductor::authority::handle_get_links(env, key.into(), (&options).into())
+                .map_err(Box::new)?;
         self.put_link_in_cache(response)?;
         Ok(())
     }
@@ -535,7 +532,7 @@ where
                 let options = options.clone();
                 async move {
                     network
-                        .get(hash.clone().into(), options.into())
+                        .get(hash.clone().into(), options)
                         .instrument(debug_span!("fetch_element_via_entry::network_get"))
                         .await
                 }
@@ -560,7 +557,7 @@ where
         options: NetworkGetOptions,
     ) -> CascadeResult<()> {
         let network = ok_or_return!(self.network.as_mut());
-        let results = network.get(hash.into(), options.into()).await?;
+        let results = network.get(hash.into(), options).await?;
         // Search through the returns for the first delete
         for response in results.into_iter() {
             self.put_element_in_cache(response)?;
@@ -625,7 +622,7 @@ where
                 let options = options.clone();
                 async move {
                     network
-                        .get(hash.clone().into(), options.into())
+                        .get(hash.clone().into(), options)
                         .instrument(debug_span!("fetch_element_via_entry::network_get"))
                         .await
                 }
@@ -652,7 +649,7 @@ where
     ) -> CascadeResult<()> {
         let network = ok_or_return!(self.network.as_mut());
         let results = network
-            .get(hash.clone().into(), options.clone().into())
+            .get(hash.clone().into(), options.clone())
             .instrument(debug_span!("fetch_element_via_entry::network_get"))
             .await?;
 
@@ -1502,7 +1499,7 @@ where
             self.fetch_links(key.into(), options).await?;
         } else {
             // Short circuit. This makes sense for full sharding.
-            self.update_link_cache_from_integrated(key.into(), options)?;
+            self.update_link_cache_from_integrated(key, options)?;
         }
 
         let cache_data = ok_or_return!(self.cache_data.as_ref(), vec![]);
@@ -1542,7 +1539,7 @@ where
             self.fetch_links(key.into(), options).await?;
         } else {
             // Short circuit. This makes sense for full sharding.
-            self.update_link_cache_from_integrated(key.into(), options)?;
+            self.update_link_cache_from_integrated(key, options)?;
         }
 
         let cache_data = ok_or_return!(self.cache_data.as_ref(), vec![]);
