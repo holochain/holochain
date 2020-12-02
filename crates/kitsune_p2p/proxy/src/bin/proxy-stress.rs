@@ -7,7 +7,6 @@ use kitsune_p2p_types::{
     transport::*,
     transport_mem::*,
 };
-use std::sync::Arc;
 use structopt::StructOpt;
 
 /// Proxy transport selector
@@ -42,15 +41,15 @@ pub struct Opt {
     transport: ProxyTransport,
 
     /// How many client nodes should be spawned
-    #[structopt(short = "n", long, default_value = "16")]
+    #[structopt(short = "n", long, default_value = "128")]
     node_count: u32,
 
     /// Interval between requests per node
-    #[structopt(short = "i", long, default_value = "1000")]
+    #[structopt(short = "i", long, default_value = "200")]
     request_interval_ms: u32,
 
     /// How long nodes should delay before responding
-    #[structopt(short = "d", long, default_value = "1000")]
+    #[structopt(short = "d", long, default_value = "200")]
     process_delay_ms: u32,
 }
 
@@ -109,7 +108,7 @@ async fn gen_cli_con(
 #[derive(Debug)]
 enum Metric {
     Tick,
-    RequestTime(u64),
+    RequestOverhead(u64),
 }
 
 #[allow(unreachable_code)]
@@ -135,7 +134,6 @@ async fn inner() -> TransportResult<()> {
         }
     });
 
-    let con_urls = Arc::new(tokio::sync::Mutex::new(Vec::new()));
     let (metric_send, mut metric_recv) =
         futures::channel::mpsc::channel((opt.node_count + 10) as usize);
 
@@ -158,7 +156,7 @@ async fn inner() -> TransportResult<()> {
         let mut rtime = Vec::new();
         while let Some(metric) = metric_recv.next().await {
             match metric {
-                Metric::RequestTime(time) => rtime.push(time),
+                Metric::RequestOverhead(time) => rtime.push(time),
                 _ => (),
             }
             if last_disp.elapsed().as_millis() > 5000 {
@@ -166,17 +164,20 @@ async fn inner() -> TransportResult<()> {
                 let cnt = rtime.len() as f64;
                 let mut avg = rtime.drain(..).fold(0.0_f64, |acc, x| acc + (x as f64));
                 avg /= cnt;
-                println!("Avg Request Time: {} ms / {} requests", avg, cnt);
+                println!("Avg Request Overhead ({} requests): {} ms", cnt, avg);
             }
         }
     });
+
+    let (_con, con_url) = gen_client(opt.clone(), proxy_url.clone()).await?;
+    println!("Responder Url: {}", con_url);
 
     for _ in 0..opt.node_count {
         tokio::task::spawn(client_loop(
             opt.clone(),
             proxy_url.clone(),
+            con_url.clone(),
             metric_send.clone(),
-            con_urls.clone(),
         ));
     }
 
@@ -184,17 +185,13 @@ async fn inner() -> TransportResult<()> {
     futures::future::pending().await
 }
 
-async fn client_loop(
+async fn gen_client(
     opt: Opt,
     proxy_url: url2::Url2,
-    mut metric_send: futures::channel::mpsc::Sender<Metric>,
-    con_urls: Arc<tokio::sync::Mutex<Vec<url2::Url2>>>,
-) -> TransportResult<()> {
-    let (con, events) = gen_cli_con(&opt.transport, proxy_url.clone()).await?;
+) -> TransportResult<(ghost_actor::GhostSender<TransportListener>, url2::Url2)> {
+    let (con, events) = gen_cli_con(&opt.transport, proxy_url).await?;
 
     let con_url = con.bound_url().await?;
-    println!("Client Url: {}", con_url);
-    con_urls.lock().await.push(con_url.clone());
 
     tokio::task::spawn({
         let process_delay_ms = opt.process_delay_ms as u64;
@@ -212,35 +209,31 @@ async fn client_loop(
         )
     });
 
-    let mut my_url_list = Vec::new();
+    Ok((con, con_url))
+}
+
+async fn client_loop(
+    opt: Opt,
+    proxy_url: url2::Url2,
+    con_url: url2::Url2,
+    mut metric_send: futures::channel::mpsc::Sender<Metric>,
+) -> TransportResult<()> {
+    let (con, _my_url) = gen_client(opt.clone(), proxy_url).await?;
+
     loop {
         tokio::time::delay_for(std::time::Duration::from_millis(
             opt.request_interval_ms as u64,
         ))
         .await;
 
-        if my_url_list.is_empty() {
-            my_url_list = con_urls.lock().await.clone();
-        }
-
-        if my_url_list.is_empty() {
-            continue;
-        }
-
-        let mut url = my_url_list.remove(0);
-        if url == con_url {
-            if my_url_list.is_empty() {
-                continue;
-            }
-            url = my_url_list.remove(0);
-        }
-
         let start = std::time::Instant::now();
-        let (_, mut write, read) = con.create_channel(url).await?;
+        let (_, mut write, read) = con.create_channel(con_url.clone()).await?;
         write.write_and_close(b"".to_vec()).await?;
         read.read_to_end().await;
         metric_send
-            .send(Metric::RequestTime(start.elapsed().as_millis() as u64))
+            .send(Metric::RequestOverhead(
+                start.elapsed().as_millis() as u64 - opt.process_delay_ms as u64,
+            ))
             .await
             .map_err(TransportError::other)?;
     }
