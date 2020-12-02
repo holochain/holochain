@@ -49,6 +49,7 @@ impl From<&ValidateHostAccess> for HostFnAccess {
         let mut access = Self::none();
         access.read_workspace = Permission::Allow;
         access.keystore = Permission::Allow;
+        access.dna_bindings = Permission::Allow;
         access
     }
 }
