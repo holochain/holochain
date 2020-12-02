@@ -47,38 +47,57 @@ impl TestConductorHandle {
     }
 
     /// Opinionated app setup. Creates one app per agent, using the given DnaFiles.
-    /// All InstalledAppIds and CellNicks are auto-generated.
+    ///
+    /// All InstalledAppIds and CellNicks are auto-generated. In tests driven directly
+    /// by Rust, you typically won't care what these values are set to, but in case you
+    /// do, they are set as so:
+    /// - InstalledAppId: {app_id_prefix}-{agent_pub_key}
+    /// - CellNick: {dna_hash}
+    ///
     /// Returns the list of generated InstalledAppIds, in the same order as Agents passed in.
     pub async fn setup_apps(
         &self,
         app_id_prefix: &str,
         dna_files: &[DnaFile],
         agents: &[AgentPubKey],
-    ) -> Vec<InstalledAppId> {
+    ) -> Vec<(InstalledAppId, Vec<CellId>)> {
         for dna_file in dna_files {
-            self.install_dna(dna_file.clone()).await.unwrap()
+            self.0.install_dna(dna_file.clone()).await.unwrap()
         }
 
-        let installed_app_ids =
-            futures::future::join_all(agents.into_iter().map(|agent| async move {
-                let installed_app_id = format!("{}-TODO", app_id_prefix);
-                let cells = dna_files
-                    .iter()
-                    .map(|d| CellId::new(d.dna_hash().clone(), agent.clone()))
-                    .map(|i| (InstalledCell::new(i, "TODO".into()), None))
-                    .collect();
-                self.0
-                    .clone()
-                    .install_app(installed_app_id.clone(), cells)
-                    .await
-                    .unwrap();
-                installed_app_id
-            }))
-            .await;
+        let info = futures::future::join_all(agents.into_iter().map(|agent| async move {
+            let installed_app_id = format!("{}-{}", app_id_prefix, agent);
+            let cell_ids: Vec<_> = dna_files
+                .iter()
+                .map(|d| CellId::new(d.dna_hash().clone(), agent.clone()))
+                .collect();
+            let cells = cell_ids
+                .iter()
+                .map(|i| {
+                    (
+                        InstalledCell::new(i.clone(), format!("{}", i.dna_hash())),
+                        None,
+                    )
+                })
+                .collect();
+            self.0
+                .clone()
+                .install_app(installed_app_id.clone(), cells)
+                .await
+                .unwrap();
+            (installed_app_id, cell_ids)
+        }))
+        .await;
+
+        futures::future::join_all(
+            info.iter()
+                .map(|(installed_app_id, _)| self.0.activate_app(installed_app_id.clone())),
+        )
+        .await;
 
         self.0.clone().setup_cells().await.unwrap();
 
-        installed_app_ids
+        info
     }
 
     // pub async fn install(apps: HashMap<InstalledAppId, HashMap<CellNick, HashMap<ZomeName, ZomeDef>>>)  {

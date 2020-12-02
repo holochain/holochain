@@ -3,11 +3,14 @@ use hdk3::prelude::*;
 use holochain::conductor::{test_handle::TestConductorHandle, Conductor};
 use holochain_keystore::KeystoreSender;
 use holochain_state::test_utils::test_environments;
-use holochain_types::{
-    app::InstalledCell,
-    dna::{zome::inline_zome::InlineZome, DnaFile},
-};
+use holochain_types::dna::{zome::inline_zome::InlineZome, DnaFile};
 use holochain_zome_types::element::ElementEntry;
+
+// TODO: remove once host fns remove SerializedBytes constraint
+#[derive(serde::Serialize, serde::Deserialize, Debug, SerializedBytes)]
+#[serde(transparent)]
+#[repr(transparent)]
+struct MaybeElement(Option<Element>);
 
 fn simple_crud_zome() -> InlineZome {
     let entry_def = EntryDef::new(
@@ -33,7 +36,7 @@ fn simple_crud_zome() -> InlineZome {
 
 #[tokio::test(threaded_scheduler)]
 #[cfg(feature = "test_utils")]
-async fn extremely_verbose_inline_zome_sketch() -> anyhow::Result<()> {
+async fn inline_zome_feasibility_test() -> anyhow::Result<()> {
     let envs = test_environments();
 
     // Bundle the single zome into a DnaFile
@@ -51,36 +54,11 @@ async fn extremely_verbose_inline_zome_sketch() -> anyhow::Result<()> {
 
     let conductor: TestConductorHandle = Conductor::builder().test(&envs).await?.into();
 
-    // Install the DNA
+    // Install DNA and install and activate apps in conductor
 
-    conductor.install_dna(dna_file).await?;
-
-    // Install and activate one app for Alice and another for Bob
-    // TODO: develop tools to make app installation much less verbose
-
-    conductor
-        .clone()
-        .install_app(
-            "app:alice".to_string(),
-            vec![(
-                InstalledCell::new(alice_cell_id.clone(), "dna".into()),
-                None,
-            )],
-        )
-        .await?;
-    conductor
-        .clone()
-        .install_app(
-            "app:bobbo".to_string(),
-            vec![(
-                InstalledCell::new(bobbo_cell_id.clone(), "dna".into()),
-                None,
-            )],
-        )
-        .await?;
-    conductor.activate_app("app:alice".to_string()).await?;
-    conductor.activate_app("app:bobbo".to_string()).await?;
-    conductor.clone().setup_cells().await?;
+    let _ids = conductor
+        .setup_apps("app", &[dna_file], &[alice.clone(), bobbo.clone()])
+        .await;
 
     // Call the "create" zome fn on Alice's app
 
@@ -111,12 +89,6 @@ async fn extremely_verbose_inline_zome_sketch() -> anyhow::Result<()> {
 
     Ok(())
 }
-
-// TODO: remove once host fns remove SerializedBytes constraint
-#[derive(
-    serde::Serialize, serde::Deserialize, Clone, Debug, SerializedBytes, shrinkwraprs::Shrinkwrap,
-)]
-struct MaybeElement(Option<Element>);
 
 /// TODO: move this to a common test_utils location
 pub struct TestAgent;
