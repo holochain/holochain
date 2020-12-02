@@ -15,6 +15,7 @@ use std::collections::BTreeMap;
 
 use self::{
     error::DnaResult,
+    wasm::DnaWasm,
     zome::{inline_zome::InlineZome, Zome, ZomeDef},
 };
 
@@ -240,25 +241,68 @@ impl DnaFile {
 
 #[cfg(feature = "test_utils")]
 impl DnaFile {
-    /// Create a DnaFile from a collection of InlineZomes (no Wasm)
-    pub async fn from_inline_zomes(
+    /// Create a DnaFile from a collection of Zomes
+    pub async fn from_zomes(
         uuid: String,
-        zomes: Vec<(&str, InlineZome)>,
+        zomes: Vec<(ZomeName, ZomeDef)>,
+        wasms: Vec<DnaWasm>,
     ) -> DnaResult<(Self, Vec<Zome>)> {
-        let zomes: Vec<(ZomeName, ZomeDef)> = zomes
-            .into_iter()
-            .map(|(n, z)| (n.into(), z.into()))
-            .collect();
-
         let dna_def = DnaDefBuilder::default()
             .uuid(uuid)
             .zomes(zomes.clone())
             .build()
             .unwrap();
 
-        let dna_file = DnaFile::new(dna_def, Vec::new()).await?;
+        let dna_file = DnaFile::new(dna_def, wasms).await?;
         let zomes: Vec<Zome> = zomes.into_iter().map(|(n, z)| Zome::new(n, z)).collect();
         Ok((dna_file, zomes))
+    }
+
+    /// Create a DnaFile from a collection of InlineZomes (no Wasm),
+    /// with a random UUID
+    pub async fn unique_from_zomes(
+        zomes: Vec<(ZomeName, ZomeDef)>,
+        wasms: Vec<DnaWasm>,
+    ) -> DnaResult<(Self, Vec<Zome>)> {
+        Self::from_zomes(random_uuid(), zomes, wasms).await
+    }
+
+    /// Create a DnaFile from a collection of TestWasm
+    pub async fn from_test_wasms<W>(
+        uuid: String,
+        test_wasms: Vec<W>,
+    ) -> DnaResult<(Self, Vec<Zome>)>
+    where
+        W: Into<(ZomeName, ZomeDef)> + Into<DnaWasm> + Clone,
+    {
+        let zomes = test_wasms.clone().into_iter().map(Into::into).collect();
+        let wasms = test_wasms.into_iter().map(Into::into).collect();
+        Self::from_zomes(random_uuid(), zomes, wasms).await
+    }
+
+    /// Create a DnaFile from a collection of TestWasm
+    /// with a random UUID
+    pub async fn unique_from_test_wasms<W>(test_wasms: Vec<W>) -> DnaResult<(Self, Vec<Zome>)>
+    where
+        W: Into<(ZomeName, ZomeDef)> + Into<DnaWasm> + Clone,
+    {
+        Self::from_test_wasms(random_uuid(), test_wasms).await
+    }
+
+    /// Create a DnaFile from a collection of InlineZomes (no Wasm)
+    pub async fn from_inline_zomes(
+        uuid: String,
+        zomes: Vec<(&str, InlineZome)>,
+    ) -> DnaResult<(Self, Vec<Zome>)> {
+        Self::from_zomes(
+            uuid,
+            zomes
+                .into_iter()
+                .map(|(n, z)| (n.into(), z.into()))
+                .collect(),
+            Vec::new(),
+        )
+        .await
     }
 
     /// Create a DnaFile from a collection of InlineZomes (no Wasm),

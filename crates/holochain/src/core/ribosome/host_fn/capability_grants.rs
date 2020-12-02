@@ -99,25 +99,13 @@ pub mod wasm_test {
 
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_authorized_call() {
-        let dna_file = DnaFile::new(
-            DnaDef {
-                name: "ribosome_authorized_call".to_string(),
-                uuid: "c2f5ccfb-42b4-4927-a32c-60a642265c5a".to_string(),
-                properties: SerializedBytes::try_from(()).unwrap(),
-                zomes: vec![TestWasm::Capability.into()].into(),
-            },
-            vec![TestWasm::Capability.into()],
-        )
-        .await
-        .unwrap();
+        let (dna_file, _) = DnaFile::unique_from_test_wasms(vec![TestWasm::Capability]).await.unwrap();
 
         let alice_agent_id = fake_agent_pubkey_1();
         let alice_cell_id = CellId::new(dna_file.dna_hash().to_owned(), alice_agent_id.clone());
-        let alice_installed_cell = InstalledCell::new(alice_cell_id.clone(), "alice_handle".into());
 
         let bob_agent_id = fake_agent_pubkey_2();
         let bob_cell_id = CellId::new(dna_file.dna_hash().to_owned(), bob_agent_id.clone());
-        let bob_installed_cell = InstalledCell::new(bob_cell_id.clone(), "bob_handle".into());
 
         let mut dna_store = MockDnaStore::new();
 
