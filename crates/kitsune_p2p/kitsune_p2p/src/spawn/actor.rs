@@ -100,7 +100,7 @@ impl KitsuneP2pActor {
         internal_sender: ghost_actor::GhostSender<Internal>,
         evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     ) -> KitsuneP2pResult<Self> {
-        let (t_pool, transport, mut t_event) = spawn_transport_pool().await?;
+        let (t_pool, transport, t_event) = spawn_transport_pool().await?;
         for t_conf in config.transport_pool.clone() {
             let (l, e) = build_transport(t_conf).await?;
             t_pool.push_sub_transport(l, e).await?;
@@ -108,8 +108,10 @@ impl KitsuneP2pActor {
 
         tokio::task::spawn({
             let evt_sender = evt_sender.clone();
-            async move {
-                while let Some(event) = t_event.next().await {
+            t_event.for_each_concurrent(/* limit */ 10, move |event| {
+                let evt_sender = evt_sender.clone();
+                async move {
+                    let evt_sender = &evt_sender;
                     match event {
                         TransportEvent::IncomingChannel(_url, mut write, read) => {
                             let read = read.read_to_end().await;
@@ -119,7 +121,7 @@ impl KitsuneP2pActor {
                                     let reason = format!("{:?}", err);
                                     let fail = wire::Wire::failure(reason).encode_vec().unwrap();
                                     let _ = write.write_and_close(fail).await;
-                                    continue;
+                                    return;
                                 }
                                 Ok((_, r)) => r,
                             };
@@ -140,7 +142,7 @@ impl KitsuneP2pActor {
                                             let fail =
                                                 wire::Wire::failure(reason).encode_vec().unwrap();
                                             let _ = write.write_and_close(fail).await;
-                                            continue;
+                                            return;
                                         }
                                         Ok(r) => r,
                                     };
@@ -163,7 +165,7 @@ impl KitsuneP2pActor {
                                         let fail =
                                             wire::Wire::failure(reason).encode_vec().unwrap();
                                         let _ = write.write_and_close(fail).await;
-                                        continue;
+                                        return;
                                     }
                                     let resp = wire::Wire::notify_resp().encode_vec().unwrap();
                                     let _ = write.write_and_close(resp).await;
@@ -195,7 +197,7 @@ impl KitsuneP2pActor {
                                             let fail =
                                                 wire::Wire::failure(reason).encode_vec().unwrap();
                                             let _ = write.write_and_close(fail).await;
-                                            continue;
+                                            return;
                                         }
                                         Ok(r) => r,
                                     };
@@ -226,7 +228,7 @@ impl KitsuneP2pActor {
                                                     .encode_vec()
                                                     .unwrap();
                                                 let _ = write.write_and_close(fail).await;
-                                                continue;
+                                                return;
                                             }
                                             Ok(r) => r,
                                         };
@@ -259,7 +261,7 @@ impl KitsuneP2pActor {
                         }
                     }
                 }
-            }
+            })
         });
 
         Ok(Self {
