@@ -18,20 +18,24 @@ pub fn capability_grants(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    use crate::conductor::dna_store::MockDnaStore;
     use crate::conductor::interface::websocket::test::setup_app;
     use crate::core::ribosome::ZomeCallInvocation;
     use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
     use crate::fixt::ZomeCallHostAccessFixturator;
+    use crate::{
+        conductor::{dna_store::MockDnaStore, ConductorBuilder},
+        test_utils::test_handle::TestConductorHandle,
+    };
     use ::fixt::prelude::*;
     use hdk3::prelude::*;
-    use holochain_types::app::InstalledCell;
+    use holochain_state::test_utils::test_environments;
     use holochain_types::cell::CellId;
     use holochain_types::dna::DnaDef;
     use holochain_types::dna::DnaFile;
     use holochain_types::fixt::CapSecretFixturator;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_agent_pubkey_2;
+    use holochain_types::{app::InstalledCell, dna::zome::Zome};
     use holochain_wasm_test_utils::TestWasm;
     use matches::assert_matches;
 
@@ -95,10 +99,6 @@ pub mod wasm_test {
 
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_authorized_call() {
-        // /////////
-        // START DNA
-        // /////////
-
         let dna_file = DnaFile::new(
             DnaDef {
                 name: "ribosome_authorized_call".to_string(),
@@ -111,59 +111,40 @@ pub mod wasm_test {
         .await
         .unwrap();
 
-        // ///////
-        // END DNA
-        // ///////
-
-        // ///////////
-        // START ALICE
-        // ///////////
-
         let alice_agent_id = fake_agent_pubkey_1();
         let alice_cell_id = CellId::new(dna_file.dna_hash().to_owned(), alice_agent_id.clone());
         let alice_installed_cell = InstalledCell::new(alice_cell_id.clone(), "alice_handle".into());
-
-        // /////////
-        // END ALICE
-        // /////////
-
-        // /////////
-        // START BOB
-        // /////////
 
         let bob_agent_id = fake_agent_pubkey_2();
         let bob_cell_id = CellId::new(dna_file.dna_hash().to_owned(), bob_agent_id.clone());
         let bob_installed_cell = InstalledCell::new(bob_cell_id.clone(), "bob_handle".into());
 
-        // ///////
-        // END BOB
-        // ///////
-
-        // ///////////////
-        // START CONDUCTOR
-        // ///////////////
-
         let mut dna_store = MockDnaStore::new();
 
         dna_store.expect_get().return_const(Some(dna_file.clone()));
-        dna_store
-            .expect_add_dnas::<Vec<_>>()
-            .times(2)
-            .return_const(());
+        dna_store.expect_add_dna().return_const(());
+        dna_store.expect_add_dnas::<Vec<_>>().return_const(());
         dna_store
             .expect_add_entry_defs::<Vec<_>>()
             .times(2)
             .return_const(());
 
-        let (_tmpdir, _app_api, handle) = setup_app(
-            vec![(alice_installed_cell, None), (bob_installed_cell, None)],
-            dna_store,
-        )
-        .await;
+        let envs = test_environments();
+        let handle: TestConductorHandle = ConductorBuilder::with_mock_dna_store(dna_store)
+            .test(&envs)
+            .await
+            .unwrap()
+            .into();
 
-        // /////////////
-        // END CONDUCTOR
-        // /////////////
+        let _ = handle
+            .setup_app_for_all_agents_with_no_membrane_proof(
+                "app-",
+                &[dna_file],
+                &[alice_agent_id.clone(), bob_agent_id.clone()],
+            )
+            .await;
+
+        let zome: Zome = TestWasm::Capability.into();
 
         // ALICE FAILING AN UNAUTHED CALL
 
@@ -203,23 +184,16 @@ pub mod wasm_test {
 
         // BOB COMMITS A TRANSFERABLE GRANT WITH THE SECRET SHARED WITH ALICE
 
-        let output = handle
-            .call_zome(ZomeCallInvocation {
-                cell_id: bob_cell_id.clone(),
-                zome: TestWasm::Capability.into(),
-                cap: None,
-                fn_name: "transferable_cap_grant".into(),
-                payload: ExternInput::new(original_secret.try_into().unwrap()),
-                provenance: bob_agent_id.clone(),
-            })
-            .await
-            .unwrap()
-            .unwrap();
-
-        let original_grant_hash: HeaderHash = match output.clone() {
-            ZomeCallResponse::Ok(guest_output) => guest_output.into_inner().try_into().unwrap(),
-            _ => unreachable!(),
-        };
+        let original_grant_hash: HeaderHash = handle
+            .call_zome_ok(
+                &bob_cell_id,
+                &zome,
+                "transferable_cap_grant",
+                None,
+                None,
+                original_secret,
+            )
+            .await;
 
         // ALICE CAN NOW CALL THE AUTHED REMOTE FN
 

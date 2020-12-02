@@ -9,11 +9,11 @@ use unwrap_to::unwrap_to;
 
 /// A wrapper around ConductorHandle with more convenient methods for testing
 #[derive(shrinkwraprs::Shrinkwrap, derive_more::From)]
-pub struct TestConductorHandle(ConductorHandle);
+pub struct TestConductorHandle(pub(crate) ConductorHandle);
 
 impl TestConductorHandle {
     /// Call a zome function with automatic de/serialization of input and output
-    pub async fn call_zome<I, O, F, E>(
+    pub async fn call_zome_ok<I, O, F, E>(
         &self,
         cell_id: &CellId,
         zome: &Zome,
@@ -55,7 +55,7 @@ impl TestConductorHandle {
     /// - CellNick: {dna_hash}
     ///
     /// Returns the list of generated InstalledAppIds, in the same order as Agents passed in.
-    pub async fn setup_apps(
+    pub async fn setup_app_for_all_agents_with_no_membrane_proof(
         &self,
         app_id_prefix: &str,
         dna_files: &[DnaFile],
@@ -66,7 +66,7 @@ impl TestConductorHandle {
         }
 
         let info = futures::future::join_all(agents.into_iter().map(|agent| async move {
-            let installed_app_id = format!("{}-{}", app_id_prefix, agent);
+            let installed_app_id = format!("{}{}", app_id_prefix, agent);
             let cell_ids: Vec<_> = dna_files
                 .iter()
                 .map(|d| CellId::new(d.dna_hash().clone(), agent.clone()))

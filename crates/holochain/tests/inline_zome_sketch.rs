@@ -58,13 +58,17 @@ async fn inline_zome_feasibility_test() -> anyhow::Result<()> {
     // Install DNA and install and activate apps in conductor
 
     let _ids = conductor
-        .setup_apps("app", &[dna_file], &[alice.clone(), bobbo.clone()])
+        .setup_app_for_all_agents_with_no_membrane_proof(
+            "app",
+            &[dna_file],
+            &[alice.clone(), bobbo.clone()],
+        )
         .await;
 
     // Call the "create" zome fn on Alice's app
 
     let hash: HeaderHash = conductor
-        .call_zome(&alice_cell_id, &zome, "create", None, None, ())
+        .call_zome_ok(&alice_cell_id, &zome, "create", None, None, ())
         .await;
 
     // Wait long enough for Bob to receive gossip
@@ -74,7 +78,7 @@ async fn inline_zome_feasibility_test() -> anyhow::Result<()> {
     // Verify that bob can run "read" on his app and get alice's Header
 
     let element: MaybeElement = conductor
-        .call_zome(&bobbo_cell_id, &zome, "read", None, None, hash)
+        .call_zome_ok(&bobbo_cell_id, &zome, "read", None, None, hash)
         .await;
     let element = element
         .0

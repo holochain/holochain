@@ -268,7 +268,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     async fn install_dna(&self, dna: DnaFile) -> ConductorResult<()> {
         let entry_defs = self.conductor.read().await.put_wasm(dna.clone()).await?;
         let mut store = self.conductor.write().await;
-        store.dna_store_mut().add(dna);
+        store.dna_store_mut().add_dna(dna);
         store.dna_store_mut().add_entry_defs(entry_defs);
         Ok(())
     }
