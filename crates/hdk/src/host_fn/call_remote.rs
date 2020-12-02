@@ -10,24 +10,23 @@ use crate::prelude::*;
 /// - cap_secret: Optional cap claim secret to allow access to the remote call.
 /// - payload: The payload to send to the remote function; receiver needs to deserialize cleanly.
 ///
-/// Response is ZomeCallResponse which can either return ZomeCallResponse::Ok or
-/// ZomeCallResponse::Unauthorized if the provided cap grant is invalid. The Unauthorized case
+/// Response is HdkResult which can either return HdkResult::Ok with the deserialized result 
+/// of the function call, HdkError::ZomeCallNetworkError if there was a network error,
+/// or HdkError::UnauthorizedZomeCall if the provided cap grant is invalid. The Unauthorized case
 /// should always be handled gracefully because gap grants can be revoked at any time and the claim
 /// holder has no way of knowing until they provide a secret for a call.
 ///
-/// An Ok response includes `SerializedBytes` because the HDK doesn't know anything about the
-/// function on the other end, even if it is the same zome, so you need to provide a structure that
-/// will deserialize the result correctly.
+/// An Ok response already includes the deserialized type. Note that this type should derive from 
+/// `SerializedBytes`, and it should be the same one as the return type from the remote function call.
 ///
-/// The easiest way to do this is to create a shared crate that includes all the shared types for
-/// cross-zome logic.
 ///
 /// ```ignore
-/// let serialized_bytes: SerializedBytes = match call_remote(bob, "foo_zome", "do_it", secret, serialized_payload)? {
-///   ZomeCallResponse::Ok(sb) => sb,
-///   ZomeCallResponse::Unauthorized => ...,
-/// };
-/// let deserialized_thing: SharedThing = serialized_bytes.try_into()?;
+/// #[derive(SerializedBytes, Serialize, Deserialize)]
+/// struct Foo(String); 
+///
+/// ...
+/// let foo: Foo = call_remote(bob, "foo_zome", "do_it", secret, serialized_payload)?;
+/// ...
 /// ```
 pub fn call_remote<'a, I: 'a, O>(
     agent: AgentPubKey,
