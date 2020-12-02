@@ -50,11 +50,10 @@ use std::{convert::TryInto, sync::Arc, time::Duration};
 use tempdir::TempDir;
 use tokio::sync::mpsc;
 
-#[cfg(any(test, feature = "test_utils"))]
-pub mod host_fn_api;
-
-#[cfg(any(test, feature = "test_utils"))]
 pub mod conductor_setup;
+pub mod host_fn_api;
+pub mod test_agents;
+pub mod test_handle;
 
 /// Produce file and line number info at compile-time
 #[macro_export]

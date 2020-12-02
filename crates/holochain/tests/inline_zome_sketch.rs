@@ -1,7 +1,8 @@
-use futures::StreamExt;
 use hdk3::prelude::*;
-use holochain::conductor::{test_handle::TestConductorHandle, Conductor};
-use holochain_keystore::KeystoreSender;
+use holochain::{
+    conductor::Conductor,
+    test_utils::{test_agents::TestAgents, test_handle::TestConductorHandle},
+};
 use holochain_state::test_utils::test_environments;
 use holochain_types::dna::{zome::inline_zome::InlineZome, DnaFile};
 use holochain_zome_types::element::ElementEntry;
@@ -21,7 +22,7 @@ fn simple_crud_zome() -> InlineZome {
         Default::default(),
     );
 
-    InlineZome::new("", vec![entry_def.clone()])
+    InlineZome::new_unique(vec![entry_def.clone()])
         .callback("create", move |api, ()| {
             let entry_def_id: EntryDefId = entry_def.id.clone();
             let entry = Entry::app(().try_into().unwrap()).unwrap();
@@ -46,7 +47,7 @@ async fn inline_zome_feasibility_test() -> anyhow::Result<()> {
 
     // Get two agents
 
-    let (alice, bobbo) = TestAgent::two(envs.keystore()).await;
+    let (alice, bobbo) = TestAgents::two(envs.keystore()).await;
     let alice_cell_id = CellId::new(dna_hash.clone(), alice.clone());
     let bobbo_cell_id = CellId::new(dna_hash.clone(), bobbo.clone());
 
@@ -88,43 +89,4 @@ async fn inline_zome_feasibility_test() -> anyhow::Result<()> {
     );
 
     Ok(())
-}
-
-/// TODO: move this to a common test_utils location
-pub struct TestAgent;
-
-impl TestAgent {
-    /// Get an infinite stream of AgentPubKeys
-    pub fn stream(keystore: KeystoreSender) -> impl futures::Stream<Item = AgentPubKey> {
-        use holochain_keystore::KeystoreSenderExt;
-        futures::stream::unfold(keystore, |keystore| async {
-            let key = keystore
-                .generate_sign_keypair_from_pure_entropy()
-                .await
-                .expect("can generate AgentPubKey");
-            Some((key, keystore))
-        })
-    }
-
-    /// Get one AgentPubKey
-    pub async fn one(keystore: KeystoreSender) -> AgentPubKey {
-        let mut agents: Vec<AgentPubKey> = Self::stream(keystore).take(1).collect().await;
-        agents.pop().unwrap()
-    }
-
-    /// Get two AgentPubKeys
-    pub async fn two(keystore: KeystoreSender) -> (AgentPubKey, AgentPubKey) {
-        let mut agents: Vec<AgentPubKey> = Self::stream(keystore).take(2).collect().await;
-        (agents.pop().unwrap(), agents.pop().unwrap())
-    }
-
-    /// Get three AgentPubKeys
-    pub async fn three(keystore: KeystoreSender) -> (AgentPubKey, AgentPubKey, AgentPubKey) {
-        let mut agents: Vec<_> = Self::stream(keystore).take(3).collect().await;
-        (
-            agents.pop().unwrap(),
-            agents.pop().unwrap(),
-            agents.pop().unwrap(),
-        )
-    }
 }

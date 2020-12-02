@@ -282,6 +282,7 @@ pub mod test {
 
     #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
     #[serde(rename_all = "snake_case", tag = "type", content = "data")]
+    // NB: intentionally misspelled to test for serialization errors :)
     enum AdmonRequest {
         InstallsDna(String),
     }

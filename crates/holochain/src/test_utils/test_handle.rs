@@ -1,4 +1,4 @@
-//! A wrapper around ConductorHandle with more convenient methods
+//! A wrapper around ConductorHandle with more convenient methods for testing
 
 use crate::{conductor::handle::ConductorHandle, core::ribosome::ZomeCallInvocation};
 use hdk3::prelude::*;
@@ -7,7 +7,7 @@ use holochain_types::dna::zome::Zome;
 use holochain_types::dna::DnaFile;
 use unwrap_to::unwrap_to;
 
-/// A wrapper around ConductorHandle with more convenient methods
+/// A wrapper around ConductorHandle with more convenient methods for testing
 #[derive(shrinkwraprs::Shrinkwrap, derive_more::From)]
 pub struct TestConductorHandle(ConductorHandle);
 
