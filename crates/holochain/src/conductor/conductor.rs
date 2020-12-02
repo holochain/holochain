@@ -739,10 +739,10 @@ where
                     match iter.next() {
                         Ok(Some((k, v))) => {
                             let info = kitsune_p2p::agent_store::AgentInfo::try_from(&v)?;
-                            if info.signed_at_ms() + info.expires_after_ms() <= now {
-                                expired.push(AgentKvKey::from(k));
-                            } else {
-                                out.push(v);
+                            let expires = info.signed_at_ms().checked_add(info.expires_after_ms());
+                            match expires {
+                                Some(expires) if expires > now => out.push(v),
+                                _ => expired.push(AgentKvKey::from(k)),
                             }
                         }
                         Ok(None) => break,
@@ -1132,13 +1132,18 @@ async fn p2p_event_task(
 ) {
     use tokio::stream::StreamExt;
     while let Some(evt) = p2p_evt.next().await {
-        let cell_id = CellId::new(evt.dna_hash().clone(), evt.as_to_agent().clone());
-        if let Err(e) = handle.dispatch_holochain_p2p_event(&cell_id, evt).await {
-            tracing::error!(
-                message = "error dispatching network event",
-                error = ?e,
-            );
-        }
+        tokio::task::spawn({
+            let handle = handle.clone();
+            async move {
+                let cell_id = CellId::new(evt.dna_hash().clone(), evt.as_to_agent().clone());
+                if let Err(e) = handle.dispatch_holochain_p2p_event(&cell_id, evt).await {
+                    tracing::error!(
+                        message = "error dispatching network event",
+                        error = ?e,
+                    );
+                }
+            }
+        });
     }
     tracing::warn!("p2p_event_task has ended");
 }

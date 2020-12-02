@@ -23,25 +23,25 @@ impl CounTree {
     /// commits if not exists else returns found header
     /// produces redundant headers in a partition
     pub fn ensure(countree: CounTree) -> ExternResult<HeaderHash> {
-        match get(hash_entry(&countree)?, GetOptions)? {
+        match get(hash_entry(&countree)?, GetOptions::default())? {
             Some(element) => Ok(element.header_address().to_owned()),
             None => Ok(create_entry(&countree)?),
         }
     }
 
     pub fn header_details(header_hash: HeaderHash) -> ExternResult<GetDetailsOutput> {
-        Ok(GetDetailsOutput::new(get_details(header_hash, GetOptions)?))
+        Ok(GetDetailsOutput::new(get_details(header_hash, GetOptions::default())?))
     }
 
     /// return the GetDetailsOutput for the entry hash from the header
     pub fn entry_details(entry_hash: EntryHash) -> ExternResult<GetDetailsOutput> {
-        Ok(GetDetailsOutput::new(get_details(entry_hash, GetOptions)?))
+        Ok(GetDetailsOutput::new(get_details(entry_hash, GetOptions::default())?))
     }
 
     /// increments the given header hash by 1 or creates it if not found
     /// this is silly as being offline resets the counter >.<
     pub fn incsert(header_hash: HeaderHash) -> ExternResult<HeaderHash> {
-        let current: CounTree = match get(header_hash.clone(), GetOptions)? {
+        let current: CounTree = match get(header_hash.clone(), GetOptions::default())? {
             Some(element) => match element.entry().to_app_option()? {
                 Some(v) => v,
                 None => return Self::new(),

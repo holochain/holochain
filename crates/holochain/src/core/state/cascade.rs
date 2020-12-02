@@ -15,7 +15,7 @@ use fallible_iterator::FallibleIterator;
 use holo_hash::{hash_type::AnyDht, AgentPubKey, AnyDhtHash, EntryHash, HasHash, HeaderHash};
 use holochain_p2p::{actor::GetActivityOptions, HolochainP2pCellT};
 use holochain_p2p::{
-    actor::{GetLinksOptions, GetMetaOptions, GetOptions},
+    actor::{GetLinksOptions, GetMetaOptions, GetOptions as NetworkGetOptions},
     HolochainP2pCell,
 };
 use holochain_state::{error::DatabaseResult, fresh_reader, prelude::*};
@@ -32,6 +32,7 @@ use holochain_types::{
     metadata::{EntryDhtStatus, MetadataSet, TimedHeaderHash},
     EntryHashed, HeaderHashed,
 };
+use holochain_zome_types::entry::GetOptions;
 use holochain_zome_types::{
     element::SignedHeader,
     header::HeaderType,
@@ -399,6 +400,64 @@ where
         Ok(())
     }
 
+    // HACK: This is dumb but correct and will be easily
+    // avoided with indexing.
+    // This just the fastest way to implement getting the integrated
+    // data into the cache. Basically a short circuit network call
+    // that only makes sense for full sharding.
+    fn update_cache_from_integrated(
+        &mut self,
+        hash: AnyDhtHash,
+        options: NetworkGetOptions,
+    ) -> CascadeResult<()> {
+        if self.cache_data.is_none() {
+            return Ok(());
+        }
+        let env = ok_or_return!(self.env.clone());
+        match *hash.hash_type() {
+            AnyDht::Entry => {
+                let response = crate::conductor::authority::handle_get_entry(
+                    env.into(),
+                    hash.into(),
+                    (&options).into(),
+                )
+                .map_err(Box::new)?;
+                self.put_entry_in_cache(response)?;
+            }
+            AnyDht::Header => {
+                let response =
+                    crate::conductor::authority::handle_get_element(env.into(), hash.into())
+                        .map_err(Box::new)?;
+                self.put_element_in_cache(response)?;
+            }
+        }
+        Ok(())
+    }
+
+    // HACK: This is dumb but correct and will be easily
+    // avoided with indexing.
+    // This just the fastest way to implement getting the integrated
+    // data into the cache. Basically a short circuit network call
+    // that only makes sense for full sharding.
+    fn update_link_cache_from_integrated<'link>(
+        &mut self,
+        key: &'link LinkMetaKey<'link>,
+        options: GetLinksOptions,
+    ) -> CascadeResult<()> {
+        if self.cache_data.is_none() {
+            return Ok(());
+        }
+        let env = ok_or_return!(self.env.clone());
+        let response = crate::conductor::authority::handle_get_links(
+            env.into(),
+            key.into(),
+            (&options).into(),
+        )
+        .map_err(Box::new)?;
+        self.put_link_in_cache(response)?;
+        Ok(())
+    }
+
     #[instrument(skip(self, elements))]
     fn update_stores_with_element_group(
         &mut self,
@@ -461,7 +520,7 @@ where
     async fn fetch_elements_via_header_parallel<I: IntoIterator<Item = HeaderHash>>(
         &mut self,
         hashes: I,
-        options: GetOptions,
+        options: NetworkGetOptions,
     ) -> CascadeResult<()> {
         // Network needs mut access for calls which we can't share across
         // threads so we need to clone.
@@ -476,7 +535,7 @@ where
                 let options = options.clone();
                 async move {
                     network
-                        .get(hash.clone().into(), options)
+                        .get(hash.clone().into(), options.into())
                         .instrument(debug_span!("fetch_element_via_entry::network_get"))
                         .await
                 }
@@ -498,10 +557,10 @@ where
     async fn fetch_element_via_header(
         &mut self,
         hash: HeaderHash,
-        options: GetOptions,
+        options: NetworkGetOptions,
     ) -> CascadeResult<()> {
         let network = ok_or_return!(self.network.as_mut());
-        let results = network.get(hash.into(), options).await?;
+        let results = network.get(hash.into(), options.into()).await?;
         // Search through the returns for the first delete
         for response in results.into_iter() {
             self.put_element_in_cache(response)?;
@@ -509,7 +568,7 @@ where
         Ok(())
     }
 
-    async fn put_entry_in_cache(&mut self, response: GetElementResponse) -> CascadeResult<()> {
+    fn put_entry_in_cache(&mut self, response: GetElementResponse) -> CascadeResult<()> {
         match response {
             GetElementResponse::GetEntryFull(Some(raw)) => {
                 let RawGetEntryResponse {
@@ -551,7 +610,7 @@ where
     async fn fetch_elements_via_entry_parallel<I: IntoIterator<Item = EntryHash>>(
         &mut self,
         hashes: I,
-        options: GetOptions,
+        options: NetworkGetOptions,
     ) -> CascadeResult<()> {
         // Network needs mut access for calls which we can't share across
         // threads so we need to clone.
@@ -566,7 +625,7 @@ where
                 let options = options.clone();
                 async move {
                     network
-                        .get(hash.clone().into(), options)
+                        .get(hash.clone().into(), options.into())
                         .instrument(debug_span!("fetch_element_via_entry::network_get"))
                         .await
                 }
@@ -579,7 +638,7 @@ where
         // Put the data into the cache from every authority that responded
         for responses in all_responses {
             for response in responses? {
-                self.put_entry_in_cache(response).await?;
+                self.put_entry_in_cache(response)?;
             }
         }
         Ok(())
@@ -589,16 +648,16 @@ where
     async fn fetch_element_via_entry(
         &mut self,
         hash: EntryHash,
-        options: GetOptions,
+        options: NetworkGetOptions,
     ) -> CascadeResult<()> {
         let network = ok_or_return!(self.network.as_mut());
         let results = network
-            .get(hash.clone().into(), options.clone())
+            .get(hash.clone().into(), options.clone().into())
             .instrument(debug_span!("fetch_element_via_entry::network_get"))
             .await?;
 
         for response in results {
-            self.put_entry_in_cache(response).await?;
+            self.put_entry_in_cache(response)?;
         }
         Ok(())
     }
@@ -614,6 +673,35 @@ where
         Ok(network.get_meta(basis.clone(), options).await?)
     }
 
+    fn put_link_in_cache(&mut self, response: GetLinksResponse) -> CascadeResult<()> {
+        let GetLinksResponse {
+            link_adds,
+            link_removes,
+        } = response;
+
+        for (link_add, signature) in link_adds {
+            debug!(?link_add);
+            let element = Element::new(
+                SignedHeaderHashed::from_content_sync(SignedHeader(link_add.into(), signature)),
+                None,
+            );
+            // TODO: Assuming links are also valid headers.
+            // We will need to prove this is the case in the future.
+            self.update_stores(ElementStatus::new(element, ValidationStatus::Valid))?;
+        }
+        for (link_remove, signature) in link_removes {
+            debug!(?link_remove);
+            let element = Element::new(
+                SignedHeaderHashed::from_content_sync(SignedHeader(link_remove.into(), signature)),
+                None,
+            );
+            // TODO: Assuming links are also valid headers.
+            // We will need to prove this is the case in the future.
+            self.update_stores(ElementStatus::new(element, ValidationStatus::Valid))?;
+        }
+        Ok(())
+    }
+
     #[instrument(skip(self, options))]
     async fn fetch_links(
         &mut self,
@@ -624,35 +712,8 @@ where
         let network = ok_or_return!(self.network.as_mut());
         let results = network.get_links(link_key, options).await?;
 
-        for links in results {
-            let GetLinksResponse {
-                link_adds,
-                link_removes,
-            } = links;
-
-            for (link_add, signature) in link_adds {
-                debug!(?link_add);
-                let element = Element::new(
-                    SignedHeaderHashed::from_content_sync(SignedHeader(link_add.into(), signature)),
-                    None,
-                );
-                // TODO: Assuming links are also valid headers.
-                // We will need to prove this is the case in the future.
-                self.update_stores(ElementStatus::new(element, ValidationStatus::Valid))?;
-            }
-            for (link_remove, signature) in link_removes {
-                debug!(?link_remove);
-                let element = Element::new(
-                    SignedHeaderHashed::from_content_sync(SignedHeader(
-                        link_remove.into(),
-                        signature,
-                    )),
-                    None,
-                );
-                // TODO: Assuming links are also valid headers.
-                // We will need to prove this is the case in the future.
-                self.update_stores(ElementStatus::new(element, ValidationStatus::Valid))?;
-            }
+        for response in results {
+            self.put_link_in_cache(response)?;
         }
         Ok(())
     }
@@ -962,20 +1023,32 @@ where
         options: GetOptions,
     ) -> CascadeResult<Option<EntryDetails>> {
         debug!("in get entry details");
-        // Update the cache from the network
-        self.fetch_element_via_entry(entry_hash.clone(), options.clone())
-            .await?;
+        let wait_for_new_data = options.wait_for_new_data;
+        let mut options: NetworkGetOptions = options.into();
+        options.all_live_headers_with_metadata = true;
+        if wait_for_new_data {
+            // Update the cache from the network
+            self.fetch_element_via_entry(entry_hash.clone(), options)
+                .await?;
+        } else {
+            // Short circuit. This makes sense for full sharding.
+            self.update_cache_from_integrated(entry_hash.clone().into(), options)?;
+        }
 
         // Get the entry and metadata
         self.create_entry_details(entry_hash).await
     }
 
     /// Find the oldest live element in either the authored or cache stores
-    fn get_oldest_live_element<MA: MetadataBufT<AuthoredPrefix>, MC: MetadataBufT>(
+    fn get_oldest_live_element<
+        AnyPrefix: PrefixType,
+        MA: MetadataBufT<AuthoredPrefix>,
+        MC: MetadataBufT<AnyPrefix>,
+    >(
         &self,
         entry_hash: &EntryHash,
         authored_data: &DbPair<MA, AuthoredPrefix>,
-        cache_data: &DbPair<MC>,
+        cache_data: &DbPair<MC, AnyPrefix>,
         env: &EnvironmentRead,
     ) -> CascadeResult<Search> {
         fresh_reader!(env, |r| {
@@ -1034,9 +1107,15 @@ where
         options: GetOptions,
     ) -> CascadeResult<Option<Element>> {
         debug!("in get entry");
-        // Update the cache from the network
-        self.fetch_element_via_entry(entry_hash.clone(), options.clone())
-            .await?;
+        if options.wait_for_new_data {
+            // Update the cache from the network
+            self.fetch_element_via_entry(entry_hash.clone(), options.clone().into())
+                .await?;
+            debug!("made it past network");
+        } else {
+            // Short circuit. This makes sense for full sharding.
+            self.update_cache_from_integrated(entry_hash.clone().into(), options.clone().into())?;
+        }
 
         let cache_data = ok_or_return!(self.cache_data.as_ref(), None);
         let authored_data = ok_or_return!(self.authored_data.as_ref(), None);
@@ -1067,9 +1146,17 @@ where
         options: GetOptions,
     ) -> CascadeResult<Option<ElementDetails>> {
         debug!("in get header details");
-        // Network
-        self.fetch_element_via_header(header_hash.clone(), options)
-            .await?;
+        let wait_for_new_data = options.wait_for_new_data;
+        let mut options: NetworkGetOptions = options.into();
+        options.all_live_headers_with_metadata = true;
+        if wait_for_new_data {
+            // Network
+            self.fetch_element_via_header(header_hash.clone(), options)
+                .await?;
+        } else {
+            // Short circuit. This makes sense for full sharding.
+            self.update_cache_from_integrated(header_hash.clone().into(), options)?;
+        }
 
         // Get the element and the metadata
         self.create_element_details(header_hash)
@@ -1123,9 +1210,15 @@ where
         if found_local_delete {
             return Ok(None);
         }
-        // Network
-        self.fetch_element_via_header(header_hash.clone(), options)
-            .await?;
+
+        if options.wait_for_new_data {
+            // Network
+            self.fetch_element_via_header(header_hash.clone(), options.into())
+                .await?;
+        } else {
+            // Short circuit. This makes sense for full sharding.
+            self.update_cache_from_integrated(header_hash.clone().into(), options.clone().into())?;
+        }
 
         let cache_data = ok_or_return!(self.cache_data.as_ref(), None);
         let env = ok_or_return!(self.env.as_ref(), None);
@@ -1178,7 +1271,7 @@ where
         }
 
         // Fetch all the entries in parallel
-        self.fetch_elements_via_entry_parallel(to_fetch, options)
+        self.fetch_elements_via_entry_parallel(to_fetch, options.into())
             .await?;
 
         // TODO: Could return this iterator rather then collecting but I couldn't solve the lifetimes.
@@ -1221,7 +1314,7 @@ where
         }
 
         // Fetch all the entries in parallel
-        self.fetch_elements_via_header_parallel(to_fetch, options)
+        self.fetch_elements_via_header_parallel(to_fetch, options.into())
             .await?;
 
         // TODO: Could return this iterator rather then collecting but I couldn't solve the lifetimes.
@@ -1264,7 +1357,7 @@ where
         }
 
         // Fetch all the entries in parallel
-        self.fetch_elements_via_header_parallel(to_fetch, options)
+        self.fetch_elements_via_header_parallel(to_fetch, options.into())
             .await?;
 
         // TODO: Could return this iterator rather then collecting but I couldn't solve the lifetimes.
@@ -1294,7 +1387,8 @@ where
         match self.get_entry_local_raw(&hash)? {
             Some(e) => Ok(Some(e)),
             None => {
-                self.fetch_element_via_entry(hash.clone(), options).await?;
+                self.fetch_element_via_entry(hash.clone(), options.into())
+                    .await?;
                 self.get_entry_local_raw(&hash)
             }
         }
@@ -1314,7 +1408,8 @@ where
         match self.get_header_local_raw_with_sig(&hash)? {
             Some(h) => Ok(Some(h)),
             None => {
-                self.fetch_element_via_header(hash.clone(), options).await?;
+                self.fetch_element_via_header(hash.clone(), options.into())
+                    .await?;
                 self.get_header_local_raw_with_sig(&hash)
             }
         }
@@ -1339,7 +1434,8 @@ where
                 match self.get_element_local_raw_via_entry(&hash)? {
                     Some(e) => Ok(Some(e)),
                     None => {
-                        self.fetch_element_via_entry(hash.clone(), options).await?;
+                        self.fetch_element_via_entry(hash.clone(), options.into())
+                            .await?;
                         self.get_element_local_raw_via_entry(&hash)
                     }
                 }
@@ -1349,7 +1445,8 @@ where
                 match self.get_element_local_raw(&hash)? {
                     Some(e) => Ok(Some(e)),
                     None => {
-                        self.fetch_element_via_header(hash.clone(), options).await?;
+                        self.fetch_element_via_header(hash.clone(), options.into())
+                            .await?;
                         self.get_element_local_raw(&hash)
                     }
                 }
@@ -1377,9 +1474,8 @@ where
     pub async fn get_details(
         &mut self,
         hash: AnyDhtHash,
-        mut options: GetOptions,
+        options: GetOptions,
     ) -> CascadeResult<Option<Details>> {
-        options.all_live_headers_with_metadata = true;
         match *hash.hash_type() {
             AnyDht::Entry => Ok(self
                 .get_entry_details(hash.into(), options)
@@ -1401,8 +1497,13 @@ where
         key: &'link LinkMetaKey<'link>,
         options: GetLinksOptions,
     ) -> CascadeResult<Vec<Link>> {
-        // Update the cache from the network
-        self.fetch_links(key.into(), options).await?;
+        if options.wait_for_new_data {
+            // Update the cache from the network
+            self.fetch_links(key.into(), options).await?;
+        } else {
+            // Short circuit. This makes sense for full sharding.
+            self.update_link_cache_from_integrated(key.into(), options)?;
+        }
 
         let cache_data = ok_or_return!(self.cache_data.as_ref(), vec![]);
         let authored_data = ok_or_return!(self.authored_data.as_ref(), vec![]);
@@ -1436,8 +1537,13 @@ where
         key: &'link LinkMetaKey<'link>,
         options: GetLinksOptions,
     ) -> CascadeResult<Vec<(SignedHeaderHashed, Vec<SignedHeaderHashed>)>> {
-        // Update the cache from the network
-        self.fetch_links(key.into(), options).await?;
+        if options.wait_for_new_data {
+            // Update the cache from the network
+            self.fetch_links(key.into(), options).await?;
+        } else {
+            // Short circuit. This makes sense for full sharding.
+            self.update_link_cache_from_integrated(key.into(), options)?;
+        }
 
         let cache_data = ok_or_return!(self.cache_data.as_ref(), vec![]);
         let authored_data = ok_or_return!(self.authored_data.as_ref(), vec![]);
@@ -1513,6 +1619,8 @@ where
         options.include_valid_activity = false;
         options.include_rejected_activity = false;
         options.include_full_headers = false;
+        // TODO: Maybe this could short circuit in full sharding? But I'm not sure.
+        // Skipping this for now.
         self.fetch_agent_activity(agent.clone(), query.clone(), options)
             .await?;
         Ok(())
@@ -1625,6 +1733,8 @@ where
         options: GetActivityOptions,
     ) -> CascadeResult<AgentActivity<Element>> {
         // Fetch the activity from the network
+        // TODO: Maybe this could short circuit in full sharding? But I'm not sure.
+        // Skipping this for now.
         self.fetch_agent_activity(agent.clone(), query.clone(), options)
             .await?;
 

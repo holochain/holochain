@@ -25,7 +25,6 @@ use holochain_keystore::KeystoreSender;
 use holochain_p2p::HolochainP2pCell;
 use holochain_state::prelude::*;
 use holochain_types::element::Element;
-use holochain_zome_types::entry::GetOptions;
 use holochain_zome_types::header::Header;
 use holochain_zome_types::ZomeCallResponse;
 use std::sync::Arc;
@@ -162,7 +161,7 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT, C: CellConductorApi
                         let mut cascade = workspace.cascade(network.clone());
                         let base_address = &link_add.base_address;
                         let base = cascade
-                            .retrieve_entry(base_address.clone(), GetOptions.into())
+                            .retrieve_entry(base_address.clone(), Default::default())
                             .await
                             .map_err(RibosomeError::from)?
                             .ok_or_else(|| RibosomeError::ElementDeps(base_address.clone().into()))?
@@ -171,7 +170,7 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT, C: CellConductorApi
 
                         let target_address = &link_add.target_address;
                         let target = cascade
-                            .retrieve_entry(target_address.clone(), GetOptions.into())
+                            .retrieve_entry(target_address.clone(), Default::default())
                             .await
                             .map_err(RibosomeError::from)?
                             .ok_or_else(|| {

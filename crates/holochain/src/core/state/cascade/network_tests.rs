@@ -368,7 +368,10 @@ async fn get_links_from_another_agent() {
     )
     .await;
 
-    let link_options = GetLinksOptions { timeout_ms: None };
+    let link_options = GetLinksOptions {
+        timeout_ms: None,
+        wait_for_new_data: true,
+    };
 
     // Bob store links
     let base = Post("Bananas are good for you".into());

@@ -5,7 +5,6 @@ use crate::core::ribosome::RibosomeT;
 use crate::core::state::cascade::error::CascadeResult;
 use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
 use crate::core::{workflow::integrate_dht_ops_workflow::integrate_to_authored, SourceChainError};
-use holochain_p2p::actor::GetOptions;
 use holochain_types::element::SignedHeaderHashed;
 use holochain_zome_types::header::builder;
 use holochain_zome_types::DeleteLinkInput;
@@ -41,7 +40,7 @@ pub fn delete_link<'a>(
                     .write()
                     .await
                     .cascade(network)
-                    .dht_get(address.into(), GetOptions::default())
+                    .dht_get(address.into(), Default::default())
                     .await?
                     .map(|el| el.into_inner().0),
             )

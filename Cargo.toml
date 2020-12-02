@@ -1,5 +1,6 @@
 [workspace]
 members = [
+  "crates/admin",
   "crates/dna_util",
   "crates/fixt",
   "crates/fixt/test",

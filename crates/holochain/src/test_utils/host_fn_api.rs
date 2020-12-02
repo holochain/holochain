@@ -253,7 +253,10 @@ impl HostFnApi {
 
     pub async fn get(&self, entry_hash: AnyDhtHash, _options: GetOptions) -> Option<Element> {
         let (_, ribosome, call_context, _) = self.explode();
-        let input = GetInput::new((entry_hash, holochain_zome_types::entry::GetOptions));
+        let input = GetInput::new((
+            entry_hash,
+            holochain_zome_types::entry::GetOptions::default(),
+        ));
         let output = { host_fn::get::get(ribosome, call_context, input).unwrap() };
         output.into_inner()
     }
@@ -264,7 +267,10 @@ impl HostFnApi {
         _options: GetOptions,
     ) -> Option<Details> {
         let (_, ribosome, call_context, _) = self.explode();
-        let input = GetDetailsInput::new((entry_hash, holochain_zome_types::entry::GetOptions));
+        let input = GetDetailsInput::new((
+            entry_hash,
+            holochain_zome_types::entry::GetOptions::default(),
+        ));
         let output = { host_fn::get_details::get_details(ribosome, call_context, input).unwrap() };
         output.into_inner()
     }

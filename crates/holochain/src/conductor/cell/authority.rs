@@ -3,7 +3,7 @@ use crate::{
     conductor::CellError,
     core::state::{
         element_buf::ElementBuf,
-        metadata::{ChainItemKey, MetadataBuf, MetadataBufT},
+        metadata::{ChainItemKey, LinkMetaKey, MetadataBuf, MetadataBufT},
     },
 };
 use fallible_iterator::FallibleIterator;
@@ -17,7 +17,10 @@ use holochain_state::{
     prelude::PrefixType,
     prelude::Readable,
 };
-use holochain_types::activity::{AgentActivity, ChainItems};
+use holochain_types::{
+    activity::{AgentActivity, ChainItems},
+    link::{GetLinksResponse, WireLinkMetaKey},
+};
 use holochain_types::{
     element::{ElementStatus, GetElementResponse, RawGetEntryResponse, WireElement},
     header::WireHeaderStatus,
@@ -25,14 +28,21 @@ use holochain_types::{
     metadata::TimedHeaderHash,
 };
 use holochain_zome_types::{
-    element::SignedHeaderHashed, header::conversions::WrongHeaderError, query::ChainQueryFilter,
-    query::ChainStatus, validate::ValidationStatus,
+    element::SignedHeaderHashed,
+    header::{conversions::WrongHeaderError, CreateLink, DeleteLink},
+    query::ChainQueryFilter,
+    query::ChainStatus,
+    signature::Signature,
+    validate::ValidationStatus,
 };
-use std::{collections::BTreeSet, convert::TryInto};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    convert::TryInto,
+};
 use tracing::*;
 
 #[instrument(skip(state_env))]
-pub async fn handle_get_entry(
+pub fn handle_get_entry(
     state_env: EnvironmentWrite,
     hash: EntryHash,
     options: holochain_p2p::event::GetOptions,
@@ -181,7 +191,7 @@ pub async fn handle_get_entry(
 }
 
 #[tracing::instrument(skip(env))]
-pub async fn handle_get_element(
+pub fn handle_get_element(
     env: EnvironmentWrite,
     hash: HeaderHash,
 ) -> CellResult<GetElementResponse> {
@@ -399,4 +409,64 @@ fn _show_agent_activity_read_times(env: EnvironmentRead, agent: AgentPubKey) {
             total = %el.as_millis()
         );
     });
+}
+
+#[instrument(skip(env, _options))]
+pub fn handle_get_links(
+    env: EnvironmentRead,
+    link_key: WireLinkMetaKey,
+    _options: holochain_p2p::event::GetLinksOptions,
+) -> CellResult<GetLinksResponse> {
+    // Get the vaults
+    let env_ref = env.guard();
+    let reader = env_ref.reader()?;
+    let element_vault = ElementBuf::vault(env.clone().into(), false)?;
+    let meta_vault = MetadataBuf::vault(env.clone().into())?;
+
+    let links = meta_vault
+        .get_links_all(&reader, &LinkMetaKey::from(&link_key))?
+        .map(|link_add| {
+            // Collect the link removes on this link add
+            let link_removes = meta_vault
+                .get_link_removes_on_link_add(&reader, link_add.link_add_hash.clone())?
+                .collect::<BTreeSet<_>>()?;
+            // Create timed header hash
+            let link_add = TimedHeaderHash {
+                timestamp: link_add.timestamp,
+                header_hash: link_add.link_add_hash,
+            };
+            // Return all link removes with this link add
+            Ok((link_add, link_removes))
+        })
+        .collect::<BTreeMap<_, _>>()?;
+
+    // Get the headers from the element stores
+    let mut result_adds: Vec<(CreateLink, Signature)> = Vec::with_capacity(links.len());
+    let mut result_removes: Vec<(DeleteLink, Signature)> = Vec::with_capacity(links.len());
+    for (link_add, link_removes) in links {
+        if let Some(link_add) = element_vault.get_header(&link_add.header_hash)? {
+            for link_remove in link_removes {
+                if let Some(link_remove) = element_vault.get_header(&link_remove.header_hash)? {
+                    let (h, s) = link_remove.into_header_and_signature();
+                    let h = h
+                        .into_content()
+                        .try_into()
+                        .map_err(AuthorityDataError::from)?;
+                    result_removes.push((h, s));
+                }
+            }
+            let (h, s) = link_add.into_header_and_signature();
+            let h = h
+                .into_content()
+                .try_into()
+                .map_err(AuthorityDataError::from)?;
+            result_adds.push((h, s));
+        }
+    }
+
+    // Return the links
+    Ok(GetLinksResponse {
+        link_adds: result_adds,
+        link_removes: result_removes,
+    })
 }

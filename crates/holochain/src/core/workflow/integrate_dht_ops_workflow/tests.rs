@@ -957,7 +957,7 @@ async fn get_entry(env: EnvironmentWrite, entry_hash: EntryHash) -> Option<Entry
 
     let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
 
-    let input = GetInput::new((entry_hash.clone().into(), GetOptions));
+    let input = GetInput::new((entry_hash.clone().into(), GetOptions::default()));
 
     let output = {
         let mut host_access = fixt!(ZomeCallHostAccess);
