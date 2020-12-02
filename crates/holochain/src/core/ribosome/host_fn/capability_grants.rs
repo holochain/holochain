@@ -18,10 +18,13 @@ pub fn capability_grants(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    use crate::conductor::interface::websocket::test::setup_app;
     use crate::core::ribosome::ZomeCallInvocation;
     use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
     use crate::fixt::ZomeCallHostAccessFixturator;
+    use crate::{
+        conductor::interface::websocket::test::setup_app,
+        test_utils::test_handle::TestZomeCallInvocation,
+    };
     use crate::{
         conductor::{dna_store::MockDnaStore, ConductorBuilder},
         test_utils::test_handle::TestConductorHandle,
@@ -99,7 +102,9 @@ pub mod wasm_test {
 
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_authorized_call() {
-        let (dna_file, _) = DnaFile::unique_from_test_wasms(vec![TestWasm::Capability]).await.unwrap();
+        let (dna_file, _) = DnaFile::unique_from_test_wasms(vec![TestWasm::Capability])
+            .await
+            .unwrap();
 
         let alice_agent_id = fake_agent_pubkey_1();
         let alice_cell_id = CellId::new(dna_file.dna_hash().to_owned(), alice_agent_id.clone());
@@ -173,7 +178,7 @@ pub mod wasm_test {
         // BOB COMMITS A TRANSFERABLE GRANT WITH THE SECRET SHARED WITH ALICE
 
         let original_grant_hash: HeaderHash = handle
-            .call_zome_ok(
+            .call_zome_ok_flat(
                 &bob_cell_id,
                 &zome,
                 "transferable_cap_grant",
@@ -185,37 +190,21 @@ pub mod wasm_test {
 
         // ALICE CAN NOW CALL THE AUTHED REMOTE FN
 
-        let output = handle
-            .call_zome(ZomeCallInvocation {
-                cell_id: alice_cell_id.clone(),
-                zome: TestWasm::Capability.into(),
+        let response = handle
+            .call_zome_ok_struct(TestZomeCallInvocation {
+                cell_id: &alice_cell_id,
+                zome: &zome,
                 cap: None,
-                fn_name: "try_cap_claim".into(),
-                payload: ExternInput::new(
-                    CapFor(original_secret, bob_agent_id.clone().try_into().unwrap())
-                        .try_into()
-                        .unwrap(),
-                ),
-                provenance: alice_agent_id.clone(),
+                fn_name: "try_cap_claim",
+                payload: CapFor(original_secret, bob_agent_id.clone()),
+                provenance: None,
             })
-            .await
-            .unwrap()
-            .unwrap();
+            .await;
 
-        // the _outer_ invocation response is to try_cap_claim for alice
-        // the _inner_ invocation response is needs_cap_claim and should be unauthorized
-        match output.clone() {
-            ZomeCallResponse::Ok(guest_output) => {
-                let response: SerializedBytes = guest_output.into_inner();
-                let inner_response: ZomeCallResponse = response.try_into().unwrap();
-                // the inner response should be serialized nil (authorized)
-                assert_eq!(
-                    inner_response,
-                    ZomeCallResponse::Ok(ExternOutput::new(().try_into().unwrap())),
-                );
-            }
-            _ => unreachable!(),
-        }
+        assert_eq!(
+            response,
+            ZomeCallResponse::Ok(ExternOutput::new(().try_into().unwrap())),
+        );
 
         // BOB ROLLS THE GRANT SO ONLY THE NEW ONE WILL WORK FOR ALICE
 

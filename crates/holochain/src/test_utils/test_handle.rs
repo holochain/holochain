@@ -13,7 +13,25 @@ pub struct TestConductorHandle(pub(crate) ConductorHandle);
 
 impl TestConductorHandle {
     /// Call a zome function with automatic de/serialization of input and output
-    pub async fn call_zome_ok<I, O, F, E>(
+    pub async fn call_zome_ok_struct<'a, I, O, F, E>(
+        &'a self,
+        invocation: TestZomeCallInvocation<'a, I, F, E>,
+    ) -> O
+    where
+        E: std::fmt::Debug,
+        FunctionName: From<F>,
+        SerializedBytes: TryFrom<I, Error = E>,
+        O: TryFrom<SerializedBytes, Error = E> + std::fmt::Debug,
+    {
+        let response = self.0.call_zome(invocation.into()).await.unwrap().unwrap();
+        unwrap_to!(response => ZomeCallResponse::Ok)
+            .clone()
+            .into_inner()
+            .try_into()
+            .expect("Couldn't deserialize zome call output")
+    }
+    /// Call a zome function with automatic de/serialization of input and output
+    pub async fn call_zome_ok_flat<I, O, F, E>(
         &self,
         cell_id: &CellId,
         zome: &Zome,
@@ -65,7 +83,7 @@ impl TestConductorHandle {
             self.0.install_dna(dna_file.clone()).await.unwrap()
         }
 
-        let info = futures::future::join_all(agents.into_iter().map(|agent| async move {
+        let info = futures::future::join_all(agents.iter().map(|agent| async move {
             let installed_app_id = format!("{}{}", app_id_prefix, agent);
             let cell_ids: Vec<_> = dna_files
                 .iter()
@@ -110,4 +128,58 @@ impl TestConductorHandle {
     //         }
     //     }
     // }
+}
+
+/// A top-level call into a zome function,
+/// i.e. coming from outside the Cell from an external Interface
+#[derive(Clone, Debug)]
+pub struct TestZomeCallInvocation<'a, P, F, E>
+where
+    SerializedBytes: TryFrom<P, Error = E>,
+    E: std::fmt::Debug,
+    FunctionName: From<F>,
+{
+    /// The Id of the `Cell` in which this Zome-call would be invoked
+    pub cell_id: &'a CellId,
+    /// The Zome containing the function that would be invoked
+    pub zome: &'a Zome,
+    /// The capability request authorization.
+    /// This can be `None` and still succeed in the case where the function
+    /// in the zome being called has been given an Unrestricted status
+    /// via a `CapGrant`. Otherwise, it will be necessary to provide a `CapSecret` for every call.
+    pub cap: Option<CapSecret>,
+    /// The name of the Zome function to call
+    pub fn_name: F,
+    /// The data to be serialized and passed as an argument to the Zome call
+    pub payload: P,
+    /// If None, the AgentPubKey from the CellId is used (a common case)
+    pub provenance: Option<AgentPubKey>,
+}
+
+impl<'a, P, F, E> From<TestZomeCallInvocation<'a, P, F, E>> for ZomeCallInvocation
+where
+    SerializedBytes: TryFrom<P, Error = E>,
+    E: std::fmt::Debug,
+    FunctionName: From<F>,
+{
+    fn from(tzci: TestZomeCallInvocation<'a, P, F, E>) -> Self {
+        let TestZomeCallInvocation {
+            cell_id,
+            zome,
+            fn_name,
+            cap,
+            provenance,
+            payload,
+        } = tzci;
+        let payload = ExternInput::new(payload.try_into().expect("Couldn't serialize payload"));
+        let provenance = provenance.unwrap_or_else(|| cell_id.agent_pubkey().clone());
+        ZomeCallInvocation {
+            cell_id: cell_id.clone(),
+            zome: zome.clone(),
+            fn_name: fn_name.into(),
+            cap,
+            provenance,
+            payload,
+        }
+    }
 }
