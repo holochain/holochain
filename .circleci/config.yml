@@ -34,7 +34,7 @@ jobs:
          no_output_timeout: 15m
          command: nix build --verbose -f default.nix pkgs.applications.dnaUtil
 
-  merge-test:
+  merge-test-uncached:
     docker:
      - image: nixos/nix
     environment:
@@ -47,7 +47,7 @@ jobs:
          command: nix-shell --pure --argstr flavor ci --run hc-merge-test
 
 
-  merge-test-legacy:
+  merge-test-cached:
     docker:
      - image: holochain/holochain:circle.build.develop
        auth:
@@ -59,7 +59,7 @@ jobs:
     steps:
       - checkout
       - run:
-          command: nix-shell --argstr flavor ciLegacy --run hc-merge-test
+          command: nix-shell --argstr flavor ci --run hc-merge-test
 
   merge-test-mac:
    macos:
@@ -100,7 +100,8 @@ workflows:
  tests:
   jobs:
    - build-binary-packages
-   - merge-test
+   - merge-test-uncached
+   - merge-test-cached
    # - merge-test-mac
  docker-builds:
   triggers:
