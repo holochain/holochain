@@ -15,7 +15,7 @@ members = [
     "hash_entry",
     "foo",
     "hash_path",
-    "imports",
+    "hdk_extern",
     "init_fail",
     "init_pass",
     "link",
@@ -46,4 +46,5 @@ members = [
 opt-level = "z"
 
 
-[patch.crates-io]
+# [patch.crates-io]
+# holochain_wasmer_guest = { path = "../../../../../holochain-wasmer/crates/guest" }

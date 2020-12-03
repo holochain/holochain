@@ -12,7 +12,6 @@ pub mod guest_callback;
 pub mod host_fn;
 pub mod wasm_ribosome;
 
-use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
 use crate::core::ribosome::guest_callback::init::InitInvocation;
 use crate::core::ribosome::guest_callback::init::InitResult;
@@ -32,6 +31,10 @@ use crate::core::workflow::CallZomeWorkspaceLock;
 use crate::fixt::ExternInputFixturator;
 use crate::fixt::FunctionNameFixturator;
 use crate::fixt::ZomeNameFixturator;
+use crate::{
+    conductor::api::CellConductorReadHandle,
+    core::ribosome::guest_callback::entry_defs::EntryDefsInvocation,
+};
 use crate::{conductor::interface::SignalBroadcaster, core::ribosome::error::RibosomeError};
 use ::fixt::prelude::*;
 use derive_more::Constructor;
@@ -149,6 +152,7 @@ impl HostAccess {
             Self::ZomeCall(ZomeCallHostAccess { network, .. })
             | Self::Init(InitHostAccess { network, .. })
             | Self::PostCommit(PostCommitHostAccess { network, .. })
+            | Self::ValidationPackage(ValidationPackageHostAccess { network, .. })
             | Self::Validate(ValidateHostAccess { network, .. })
             | Self::ValidateCreateLink(ValidateLinkHostAccess { network, .. }) => network,
             _ => panic!(
@@ -172,6 +176,16 @@ impl HostAccess {
         match self {
             Self::ZomeCall(ZomeCallHostAccess { cell_id, .. }) => cell_id,
             _ => panic!("Gave access to a host function that references a CellId"),
+        }
+    }
+
+    /// Get the call zome handle, panics if none was provided
+    pub fn call_zome_handle(&self) -> &CellConductorReadHandle {
+        match self {
+            Self::ZomeCall(ZomeCallHostAccess{call_zome_handle, .. }) => {
+                call_zome_handle
+            }
+            _ => panic!("Gave access to a host function that uses the call zome handle without providing a call zome handle"),
         }
     }
 }
@@ -289,17 +303,21 @@ mockall::mock! {
 #[allow(missing_docs)] // members are self-explanitory
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct ZomeCallInvocation {
-    /// The ID of the [Cell] in which this Zome-call would be invoked
+    /// The Id of the `Cell` in which this Zome-call would be invoked
     pub cell_id: CellId,
     /// The name of the Zome containing the function that would be invoked
     pub zome_name: ZomeName,
-    /// The capability request authorization required
+    /// The capability request authorization.
+    /// This can be `None` and still succeed in the case where the function
+    /// in the zome being called has been given an Unrestricted status
+    /// via a `CapGrant`. Otherwise, it will be necessary to provide a `CapSecret` for every call.
     pub cap: Option<CapSecret>,
     /// The name of the Zome function to call
     pub fn_name: FunctionName,
-    /// The serialized data to pass an an argument to the Zome call
+    /// The serialized data to pass as an argument to the Zome call
     pub payload: ExternInput,
-    /// the provenance of the call
+    /// The provenance of the call. Provenance means the 'source'
+    /// so this expects the `AgentPubKey` of the agent calling the Zome function
     pub provenance: AgentPubKey,
 }
 
@@ -322,22 +340,22 @@ fixturator!(
         provenance: AgentPubKeyFixturator::new(Unpredictable).next().unwrap(),
     };
     curve Predictable ZomeCallInvocation {
-        cell_id: CellIdFixturator::new_indexed(Predictable, self.0.index)
+        cell_id: CellIdFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
-        zome_name: ZomeNameFixturator::new_indexed(Predictable, self.0.index)
+        zome_name: ZomeNameFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
-        cap: Some(CapSecretFixturator::new_indexed(Predictable, self.0.index)
+        cap: Some(CapSecretFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap()),
-        fn_name: FunctionNameFixturator::new_indexed(Predictable, self.0.index)
+        fn_name: FunctionNameFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
-        payload: ExternInputFixturator::new_indexed(Predictable, self.0.index)
+        payload: ExternInputFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
-        provenance: AgentPubKeyFixturator::new_indexed(Predictable, self.0.index)
+        provenance: AgentPubKeyFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
     };
@@ -385,6 +403,7 @@ pub struct ZomeCallHostAccess {
     pub keystore: KeystoreSender,
     pub network: HolochainP2pCell,
     pub signal_tx: SignalBroadcaster,
+    pub call_zome_handle: CellConductorReadHandle,
     // NB: this is kind of an odd place for this, since CellId is not really a special
     // "resource" to give access to, but rather it's a bit of data that makes sense in
     // the context of zome calls, but not every CallContext
@@ -513,6 +532,7 @@ pub mod wasm_test {
             .expect("Time went backwards")
     }
 
+    /// Directly call a function in a TestWasm
     #[macro_export]
     macro_rules! call_test_ribosome {
         ( $host_access:expr, $test_wasm:expr, $fn_name:literal, $input:expr ) => {{
@@ -536,11 +556,12 @@ pub mod wasm_test {
                     .unwrap();
 
                 // Required because otherwise the network will return routing errors
-                let (_network, _r, cell_network) = crate::test_utils::test_network(
+                let test_network = crate::test_utils::test_network(
                     Some(ribosome.dna_file().dna_hash().clone()),
                     Some(author),
                 )
                 .await;
+                let cell_network = test_network.cell_network();
                 let cell_id = holochain_types::cell::CellId::new(
                     cell_network.dna_hash(),
                     cell_network.from_agent(),
@@ -571,6 +592,7 @@ pub mod wasm_test {
                         guest_output.into_inner().try_into().unwrap()
                     }
                     crate::core::ribosome::ZomeCallResponse::Unauthorized => unreachable!(),
+                    crate::core::ribosome::ZomeCallResponse::NetworkError(_) => unreachable!(),
                 };
                 output
             })

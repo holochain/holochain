@@ -2,7 +2,7 @@
 //! Errors occurring during a [Ribosome] call
 
 use crate::{
-    conductor::interface::error::InterfaceError,
+    conductor::{api::error::ConductorApiError, interface::error::InterfaceError},
     core::state::{cascade::error::CascadeError, source_chain::SourceChainError},
 };
 use holo_hash::AnyDhtHash;
@@ -64,6 +64,10 @@ pub enum RibosomeError {
     /// ident
     #[error(transparent)]
     CascadeError(#[from] CascadeError),
+
+    /// ident
+    #[error(transparent)]
+    ConductorApiError(#[from] Box<ConductorApiError>),
 
     /// ident
     #[error(transparent)]

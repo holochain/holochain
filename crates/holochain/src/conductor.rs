@@ -14,8 +14,6 @@
 
 pub mod api;
 mod cell;
-#[allow(missing_docs)]
-pub mod compat;
 #[allow(clippy::module_inception)]
 #[allow(missing_docs)]
 mod conductor;

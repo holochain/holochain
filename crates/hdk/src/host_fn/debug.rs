@@ -6,11 +6,10 @@
 ///
 /// Note: Debugging happens _on the host side_ with the debug! macro from the tracing crate.
 ///
-/// Note: Debug returns a result like every host_fn so use `?` or `ok()` to handle it.
+/// Note: Debug does not return a result.
 ///
 /// ```ignore
-/// debug!("{:?}", foo)?;
-/// debug!("{:?}", foo).ok();
+/// debug!("{:?}", foo);
 /// ```
 #[macro_export]
 macro_rules! debug {
@@ -18,10 +17,9 @@ macro_rules! debug {
         $crate::debug!( "{}", $msg );
     };
     ( $msg:expr, $($tail:expr),* ) => {{
-        $crate::host_fn!(
+        host_call::<DebugInput, DebugOutput>(
             __debug,
-            $crate::prelude::DebugInput::new($crate::prelude::debug_msg!($msg, $($tail),*)),
-            $crate::prelude::DebugOutput
-        )
+            &$crate::prelude::DebugInput::new($crate::prelude::debug_msg!($msg, $($tail),*)),
+        ).ok();
     }};
 }

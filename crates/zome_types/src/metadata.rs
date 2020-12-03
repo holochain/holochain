@@ -1,5 +1,5 @@
 //! Metadata types for use in wasm
-use crate::{element::Element, element::SignedHeaderHashed, Entry};
+use crate::{element::Element, element::SignedHeaderHashed, validate::ValidationStatus, Entry};
 use holochain_serialized_bytes::prelude::*;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, SerializedBytes)]
@@ -21,8 +21,12 @@ pub struct ElementDetails {
     /// The specific element.
     /// Either a Create or an Update.
     pub element: Element,
-    /// Any Delete on this element.
+    /// The validation status of this element.
+    pub validation_status: ValidationStatus,
+    /// Any [Delete] on this element.
     pub deletes: Vec<SignedHeaderHashed>,
+    /// Any [Update] on this element.
+    pub updates: Vec<SignedHeaderHashed>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, SerializedBytes)]
@@ -39,6 +43,10 @@ pub struct EntryDetails {
     /// You can make an [Element] from any of these
     /// and the entry.
     pub headers: Vec<SignedHeaderHashed>,
+    /// Rejected create relationships.
+    /// These are also the headers that created this entry.
+    /// but did not pass validation.
+    pub rejected_headers: Vec<SignedHeaderHashed>,
     /// ## Delete relationships
     /// These are the deletes that have the
     /// `deletes_entry_address` set to the above Entry.

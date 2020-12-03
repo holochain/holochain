@@ -7,26 +7,18 @@
 //!
 //! ```rust, no_run
 //! async fn async_main () {
-//! use holochain_state::test_utils::{test_conductor_env, test_wasm_env, test_p2p_env, TestEnvironment};
+//! use holochain_state::test_utils::{test_environments, TestEnvironment};
 //! use holochain::conductor::{Conductor, ConductorBuilder, ConductorHandle};
-//! let env = test_conductor_env();
-//! let TestEnvironment {
-//!  env: wasm_env,
-//!  tmpdir: _tmpdir,
-//! } = test_wasm_env();
-//! let TestEnvironment {
-//!  env: p2p_env,
-//!  tmpdir: _p2p_tmpdir,
-//! } = test_p2p_env();
+//! let envs = test_environments();
 //! let handle: ConductorHandle = ConductorBuilder::new()
-//!    .test(env, wasm_env, p2p_env)
+//!    .test(&envs)
 //!    .await
 //!    .unwrap();
 //!
 //! // handles are cloneable
 //! let handle2 = handle.clone();
 //!
-//! assert_eq!(handle.list_dnas().await, Ok(vec![]));
+//! assert_eq!(handle.list_dnas().await.unwrap(), vec![]);
 //! handle.shutdown().await;
 //!
 //! // handle2 will only get errors from now on, since the other handle
@@ -59,31 +51,30 @@ use super::{
     manager::TaskManagerRunHandle,
     Cell, Conductor,
 };
-use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::workflow::ZomeCallInvocationResult;
+use crate::core::{ribosome::ZomeCallInvocation, workflow::CallZomeWorkspaceLock};
 use derive_more::From;
+use futures::future::FutureExt;
+use holochain_p2p::event::HolochainP2pEvent::*;
 use holochain_types::{
-    app::{AppId, InstalledApp, InstalledCell, MembraneProof},
+    app::{InstalledApp, InstalledAppId, InstalledCell, MembraneProof},
     autonomic::AutonomicCue,
     cell::CellId,
     dna::DnaFile,
     prelude::*,
 };
+use holochain_zome_types::entry_def::EntryDef;
+use kitsune_p2p::agent_store::AgentInfoSigned;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::*;
 
-use futures::future::FutureExt;
-use holochain_p2p::event::HolochainP2pEvent::GetAgentInfoSigned;
-use holochain_p2p::event::HolochainP2pEvent::PutAgentInfoSigned;
-
-#[cfg(test)]
+#[cfg(any(test, feature = "test_utils"))]
 use super::state::ConductorState;
-#[cfg(test)]
+#[cfg(any(test, feature = "test_utils"))]
 use crate::core::queue_consumer::InitialQueueTriggers;
-#[cfg(test)]
+#[cfg(any(test, feature = "test_utils"))]
 use holochain_state::env::EnvironmentWrite;
-use holochain_zome_types::entry_def::EntryDef;
 
 /// A handle to the Conductor that can easily be passed around and cheaply cloned
 pub type ConductorHandle = Arc<dyn ConductorHandleT>;
@@ -139,6 +130,13 @@ pub trait ConductorHandleT: Send + Sync {
         invocation: ZomeCallInvocation,
     ) -> ConductorApiResult<ZomeCallInvocationResult>;
 
+    /// Invoke a zome function on a Cell with a workspace
+    async fn call_zome_with_workspace(
+        &self,
+        invocation: ZomeCallInvocation,
+        workspace_lock: CallZomeWorkspaceLock,
+    ) -> ConductorApiResult<ZomeCallInvocationResult>;
+
     /// Cue the autonomic system to perform some action early (experimental)
     async fn autonomic_cue(&self, cue: AutonomicCue, cell_id: &CellId) -> ConductorApiResult<()>;
 
@@ -166,7 +164,7 @@ pub trait ConductorHandleT: Send + Sync {
     #[allow(clippy::ptr_arg)]
     async fn install_app(
         self: Arc<Self>,
-        app_id: AppId,
+        installed_app_id: InstalledAppId,
         cell_data_with_proofs: Vec<(InstalledCell, Option<MembraneProof>)>,
     ) -> ConductorResult<()>;
 
@@ -176,17 +174,17 @@ pub trait ConductorHandleT: Send + Sync {
 
     /// Activate an app
     #[allow(clippy::ptr_arg)]
-    async fn activate_app(&self, app_id: AppId) -> ConductorResult<()>;
+    async fn activate_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<()>;
 
     /// Deactivate an app
     #[allow(clippy::ptr_arg)]
-    async fn deactivate_app(&self, app_id: AppId) -> ConductorResult<()>;
+    async fn deactivate_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<()>;
 
     /// List Cell Ids
     async fn list_cell_ids(&self) -> ConductorResult<Vec<CellId>>;
 
     /// List Active AppIds
-    async fn list_active_app_ids(&self) -> ConductorResult<Vec<AppId>>;
+    async fn list_active_apps(&self) -> ConductorResult<Vec<InstalledAppId>>;
 
     /// Dump the cells state
     #[allow(clippy::ptr_arg)]
@@ -198,17 +196,35 @@ pub trait ConductorHandleT: Send + Sync {
 
     /// Get info about an installed App, whether active or inactive
     #[allow(clippy::ptr_arg)]
-    async fn get_app_info(&self, app_id: &AppId) -> ConductorResult<Option<InstalledApp>>;
+    async fn get_app_info(
+        &self,
+        installed_app_id: &InstalledAppId,
+    ) -> ConductorResult<Option<InstalledApp>>;
 
-    #[cfg(test)]
+    /// Add signed agent info to the conductor
+    async fn add_agent_infos(&self, agent_infos: Vec<AgentInfoSigned>) -> ConductorApiResult<()>;
+
+    /// Get signed agent info from the conductor
+    async fn get_agent_infos(
+        &self,
+        cell_id: Option<CellId>,
+    ) -> ConductorApiResult<Vec<AgentInfoSigned>>;
+
+    /// Retrieve the LMDB environment for this cell. FOR TESTING ONLY.
+    #[cfg(any(test, feature = "test_utils"))]
     async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite>;
 
-    #[cfg(test)]
+    /// Retrieve the LMDB environment for networking. FOR TESTING ONLY.
+    #[cfg(any(test, feature = "test_utils"))]
+    async fn get_p2p_env(&self) -> EnvironmentWrite;
+
+    /// Retrieve Senders for triggering workflows. FOR TESTING ONLY.
+    #[cfg(any(test, feature = "test_utils"))]
     async fn get_cell_triggers(&self, cell_id: &CellId)
         -> ConductorApiResult<InitialQueueTriggers>;
 
-    // HACK: remove when B-01593 lands
-    #[cfg(test)]
+    /// Retrieve the ConductorState. FOR TESTING ONLY.
+    #[cfg(any(test, feature = "test_utils"))]
     async fn get_state_from_handle(&self) -> ConductorApiResult<ConductorState>;
 }
 
@@ -310,6 +326,23 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                     .map_err(holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
+            QueryAgentInfoSigned {
+                kitsune_space,
+                respond,
+                ..
+            } => {
+                let res = lock
+                    .query_agent_info_signed(kitsune_space)
+                    .map_err(holochain_p2p::HolochainP2pError::other);
+                respond.respond(Ok(async move { res }.boxed().into()));
+            }
+            SignNetworkData { respond, data, .. } => {
+                let signature = cell_id
+                    .agent_pubkey()
+                    .sign_raw(self.keystore(), &data)
+                    .await?;
+                respond.respond(Ok(async move { Ok(signature) }.boxed().into()));
+            }
             _ => {
                 let cell: &Cell = lock.cell_by_id(cell_id)?;
                 trace!(agent = ?cell_id.agent_pubkey(), event = ?event);
@@ -329,7 +362,21 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         let lock = self.conductor.read().await;
         debug!(cell_id = ?invocation.cell_id);
         let cell: &Cell = lock.cell_by_id(&invocation.cell_id)?;
-        Ok(cell.call_zome(invocation).await?)
+        Ok(cell.call_zome(invocation, None).await?)
+    }
+
+    async fn call_zome_with_workspace(
+        &self,
+        invocation: ZomeCallInvocation,
+        workspace_lock: CallZomeWorkspaceLock,
+    ) -> ConductorApiResult<ZomeCallInvocationResult> {
+        // FIXME: D-01058: We are holding this read lock for
+        // the entire call to call_zome and blocking
+        // any writes to the conductor
+        let lock = self.conductor.read().await;
+        debug!(cell_id = ?invocation.cell_id);
+        let cell: &Cell = lock.cell_by_id(&invocation.cell_id)?;
+        Ok(cell.call_zome(invocation, Some(workspace_lock)).await?)
     }
 
     async fn autonomic_cue(&self, cue: AutonomicCue, cell_id: &CellId) -> ConductorApiResult<()> {
@@ -364,7 +411,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
 
     async fn install_app(
         self: Arc<Self>,
-        app_id: AppId,
+        installed_app_id: InstalledAppId,
         cell_data: Vec<(InstalledCell, Option<MembraneProof>)>,
     ) -> ConductorResult<()> {
         self.conductor
@@ -380,7 +427,10 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .await?;
 
         let cell_data = cell_data.into_iter().map(|(c, _)| c).collect();
-        let app = InstalledApp { app_id, cell_data };
+        let app = InstalledApp {
+            installed_app_id,
+            cell_data,
+        };
 
         // Update the db
         self.conductor
@@ -418,20 +468,20 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         Ok(r)
     }
 
-    async fn activate_app(&self, app_id: AppId) -> ConductorResult<()> {
+    async fn activate_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<()> {
         self.conductor
             .write()
             .await
-            .activate_app_in_db(app_id)
+            .activate_app_in_db(installed_app_id)
             .await
     }
 
-    async fn deactivate_app(&self, app_id: AppId) -> ConductorResult<()> {
+    async fn deactivate_app(&self, installed_app_id: InstalledAppId) -> ConductorResult<()> {
         let cell_ids_to_remove = self
             .conductor
             .write()
             .await
-            .deactivate_app_in_db(app_id)
+            .deactivate_app_in_db(installed_app_id)
             .await?;
         self.conductor
             .write()
@@ -444,8 +494,8 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         self.conductor.read().await.list_cell_ids().await
     }
 
-    async fn list_active_app_ids(&self) -> ConductorResult<Vec<AppId>> {
-        self.conductor.read().await.list_active_app_ids().await
+    async fn list_active_apps(&self) -> ConductorResult<Vec<InstalledAppId>> {
+        self.conductor.read().await.list_active_apps().await
     }
 
     async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
@@ -456,24 +506,44 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         self.conductor.read().await.signal_broadcaster()
     }
 
-    async fn get_app_info(&self, app_id: &AppId) -> ConductorResult<Option<InstalledApp>> {
+    async fn get_app_info(
+        &self,
+        installed_app_id: &InstalledAppId,
+    ) -> ConductorResult<Option<InstalledApp>> {
         Ok(self
             .conductor
             .read()
             .await
             .get_state()
             .await?
-            .get_app_info(app_id))
+            .get_app_info(installed_app_id))
     }
 
-    #[cfg(test)]
+    async fn add_agent_infos(&self, agent_infos: Vec<AgentInfoSigned>) -> ConductorApiResult<()> {
+        self.conductor.read().await.add_agent_infos(agent_infos)
+    }
+
+    async fn get_agent_infos(
+        &self,
+        cell_id: Option<CellId>,
+    ) -> ConductorApiResult<Vec<AgentInfoSigned>> {
+        self.conductor.read().await.get_agent_infos(cell_id)
+    }
+
+    #[cfg(any(test, feature = "test_utils"))]
     async fn get_cell_env(&self, cell_id: &CellId) -> ConductorApiResult<EnvironmentWrite> {
         let lock = self.conductor.read().await;
         let cell = lock.cell_by_id(cell_id)?;
         Ok(cell.env().clone())
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test_utils"))]
+    async fn get_p2p_env(&self) -> EnvironmentWrite {
+        let lock = self.conductor.read().await;
+        lock.get_p2p_env()
+    }
+
+    #[cfg(any(test, feature = "test_utils"))]
     async fn get_cell_triggers(
         &self,
         cell_id: &CellId,
@@ -483,7 +553,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         Ok(cell.triggers().clone())
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test_utils"))]
     async fn get_state_from_handle(&self) -> ConductorApiResult<ConductorState> {
         let lock = self.conductor.read().await;
         Ok(lock.get_state_from_handle().await?)

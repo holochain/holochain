@@ -4,6 +4,7 @@ use super::{
         migrate_agent::MigrateAgentHostAccess, post_commit::PostCommitHostAccess,
         validate::ValidateHostAccess, validation_package::ValidationPackageHostAccess,
     },
+    host_fn::get_agent_activity::get_agent_activity,
     HostAccess, ZomeCallHostAccess,
 };
 use crate::core::ribosome::error::RibosomeError;
@@ -85,6 +86,8 @@ const WASM_CACHE_PATH_ENV: &str = "HC_WASM_CACHE_PATH";
 
 /// The only WasmRibosome is a Wasm ribosome.
 /// note that this is cloned on every invocation so keep clones cheap!
+// TODO: maackle:
+//       how can this possibly be cheap to clone when it contains wasm bytecode?
 #[derive(Clone, Debug)]
 pub struct WasmRibosome {
     // NOTE - Currently taking a full DnaFile here.
@@ -119,7 +122,7 @@ impl WasmRibosome {
             .dna()
             .get_zome(zome_name)?
             .wasm_hash
-            .get_full_bytes())
+            .get_raw_39())
     }
 
     pub fn instance(&self, call_context: CallContext) -> RibosomeResult<Instance> {
@@ -275,6 +278,10 @@ impl WasmRibosome {
                 "__get_link_details",
                 func!(invoke_host_function!(get_link_details)),
             );
+            ns.insert(
+                "__get_agent_activity",
+                func!(invoke_host_function!(get_agent_activity)),
+            );
             ns.insert("__query", func!(invoke_host_function!(query)));
         } else {
             ns.insert("__get", func!(invoke_host_function!(unreachable)));
@@ -282,6 +289,10 @@ impl WasmRibosome {
             ns.insert("__get_links", func!(invoke_host_function!(unreachable)));
             ns.insert(
                 "__get_link_details",
+                func!(invoke_host_function!(unreachable)),
+            );
+            ns.insert(
+                "__get_agent_activity",
                 func!(invoke_host_function!(unreachable)),
             );
             ns.insert("__query", func!(invoke_host_function!(unreachable)));
@@ -504,5 +515,43 @@ impl RibosomeT for WasmRibosome {
         invocation: PostCommitInvocation,
     ) -> RibosomeResult<PostCommitResult> {
         do_callback!(self, access, invocation, PostCommitCallbackResult)
+    }
+}
+
+#[cfg(test)]
+#[cfg(feature = "slow_tests")]
+pub mod wasm_test {
+
+    use crate::fixt::ZomeCallHostAccessFixturator;
+    use ::fixt::prelude::*;
+    use hdk3::prelude::*;
+    use holochain_wasm_test_utils::TestWasm;
+    use test_wasm_common::TestString;
+
+    #[tokio::test(threaded_scheduler)]
+    /// Basic checks that we can call externs internally and externally the way we want using the
+    /// hdk macros rather than low level rust extern syntax.
+    async fn ribosome_extern_test() {
+        let test_env = holochain_state::test_utils::test_cell_env();
+        let env = test_env.env();
+        let mut workspace =
+            crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
+        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+            .await
+            .unwrap();
+        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
+
+        let mut host_access = fixt!(ZomeCallHostAccess, Predictable);
+        host_access.workspace = workspace_lock;
+
+        let foo_result: TestString =
+            crate::call_test_ribosome!(host_access, TestWasm::HdkExtern, "foo", ());
+
+        assert_eq!("foo", foo_result.0.as_str());
+
+        let bar_result: TestString =
+            crate::call_test_ribosome!(host_access, TestWasm::HdkExtern, "bar", ());
+
+        assert_eq!("foobar", bar_result.0.as_str());
     }
 }

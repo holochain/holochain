@@ -14,7 +14,7 @@ pub fn call_remote(
     input: CallRemoteInput,
 ) -> RibosomeResult<CallRemoteOutput> {
     // it is the network's responsibility to handle timeouts and return an Err result in that case
-    let result: ZomeCallResponse = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
+    let result = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
         let mut network = call_context.host_access().network().clone();
         let call_remote = input.into_inner();
         network
@@ -26,8 +26,11 @@ pub fn call_remote(
                 call_remote.request(),
             )
             .await
-    })?
-    .try_into()?;
+    });
+    let result = match result {
+        Ok(r) => r.try_into()?,
+        Err(e) => ZomeCallResponse::NetworkError(e.to_string()),
+    };
 
     Ok(CallRemoteOutput::new(result))
 }

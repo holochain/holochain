@@ -2,11 +2,11 @@ use crate::{
     conductor::manager::spawn_task_manager,
     core::workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace,
     fixt::{DnaFileFixturator, SignatureFixturator},
+    test_utils::test_network,
 };
 use ::fixt::prelude::*;
 use holo_hash::HasHash;
-use holochain_p2p::actor::HolochainP2pRefToCell;
-use holochain_state::test_utils::{test_cell_env, TestEnvironment};
+use holochain_state::test_utils::test_cell_env;
 use holochain_types::{
     dht_op::{DhtOp, DhtOpHashed},
     test_utils::{fake_agent_pubkey_2, fake_cell_id},
@@ -18,16 +18,15 @@ use tokio::sync;
 
 #[tokio::test(threaded_scheduler)]
 async fn test_cell_handle_publish() {
-    let TestEnvironment {
-        env,
-        tmpdir: _tmpdir,
-    } = test_cell_env();
-    let (holochain_p2p, _p2p_evt) = holochain_p2p::spawn_holochain_p2p().await.unwrap();
+    let cell_env = test_cell_env();
+    let env = cell_env.env();
+
     let cell_id = fake_cell_id(1);
     let dna = cell_id.dna_hash().clone();
     let agent = cell_id.agent_pubkey().clone();
 
-    let holochain_p2p_cell = holochain_p2p.to_cell(dna.clone(), agent.clone());
+    let test_network = test_network(Some(dna.clone()), Some(agent.clone())).await;
+    let holochain_p2p_cell = test_network.cell_network();
 
     let mut mock_handler = crate::conductor::handle::MockConductorHandleT::new();
     mock_handler

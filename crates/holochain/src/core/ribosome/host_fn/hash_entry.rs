@@ -14,10 +14,7 @@ pub fn hash_entry(
 ) -> RibosomeResult<HashEntryOutput> {
     let entry: Entry = input.into_inner();
 
-    let entry_hash = tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-        holochain_types::entry::EntryHashed::from_content_sync(entry)
-    })
-    .into_hash();
+    let entry_hash = holochain_types::entry::EntryHashed::from_content_sync(entry).into_hash();
 
     Ok(HashEntryOutput::new(entry_hash))
 }
@@ -56,7 +53,10 @@ pub mod wasm_test {
         let output: HashEntryOutput =
             hash_entry(Arc::new(ribosome), Arc::new(call_context), input).unwrap();
 
-        assert_eq!(output.into_inner().get_full_bytes().to_vec().len(), 36,);
+        assert_eq!(
+            *output.into_inner().hash_type(),
+            holo_hash::hash_type::Entry
+        );
     }
 
     #[tokio::test(threaded_scheduler)]
@@ -78,7 +78,10 @@ pub mod wasm_test {
         host_access.workspace = workspace_lock;
         let output: HashEntryOutput =
             crate::call_test_ribosome!(host_access, TestWasm::HashEntry, "hash_entry", input);
-        assert_eq!(output.into_inner().get_full_bytes().to_vec().len(), 36,);
+        assert_eq!(
+            *output.into_inner().hash_type(),
+            holo_hash::hash_type::Entry
+        );
     }
 
     #[tokio::test(threaded_scheduler)]

@@ -257,21 +257,21 @@ impl TryFrom<&LinkTag> for Path {
 impl Path {
     /// What is the hash for the current Path?
     pub fn hash(&self) -> Result<holo_hash::EntryHash, HdkError> {
-        Ok(hash_entry!(self)?)
+        Ok(hash_entry(self)?)
     }
 
     /// Does an entry exist at the hash we expect?
     pub fn exists(&self) -> Result<bool, HdkError> {
-        Ok(get!(self.hash()?)?.is_some())
+        Ok(get(self.hash()?, GetOptions)?.is_some())
     }
 
     /// Recursively touch this and every parent that doesn't exist yet.
     pub fn ensure(&self) -> Result<(), HdkError> {
         if !self.exists()? {
-            create_entry!(self)?;
+            create_entry(self)?;
             if let Some(parent) = self.parent() {
                 parent.ensure()?;
-                create_link!(parent.hash()?, self.hash()?, LinkTag::try_from(self)?)?;
+                create_link(parent.hash()?, self.hash()?, LinkTag::try_from(self)?)?;
             }
         }
         Ok(())
@@ -290,7 +290,10 @@ impl Path {
     /// Only returns links between anchors, not to other entries that might have their own links.
     pub fn children(&self) -> Result<holochain_zome_types::link::Links, HdkError> {
         Self::ensure(&self)?;
-        let links = get_links!(self.hash()?, holochain_zome_types::link::LinkTag::new(NAME))?;
+        let links = get_links(
+            self.hash()?,
+            Some(holochain_zome_types::link::LinkTag::new(NAME)),
+        )?;
         // Only need one of each hash to build the tree.
         let mut unwrapped: Vec<holochain_zome_types::link::Link> = links.into_inner();
         unwrapped.sort();
@@ -300,9 +303,9 @@ impl Path {
 
     pub fn children_details(&self) -> Result<holochain_zome_types::link::LinkDetails, HdkError> {
         Self::ensure(&self)?;
-        Ok(get_link_details!(
+        Ok(get_link_details(
             self.hash()?,
-            holochain_zome_types::link::LinkTag::new(NAME)
+            Some(holochain_zome_types::link::LinkTag::new(NAME)),
         )?)
     }
 }

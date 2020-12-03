@@ -83,7 +83,7 @@ with holonix.pkgs;
 
    ++ ([(
     holonix.pkgs.writeShellScriptBin "hc-install-holochain" ''
-     cargo install --path crates/holochain
+     cargo install --no-default-features --path crates/holochain
      echo 'holochain installed!'
      echo
     ''

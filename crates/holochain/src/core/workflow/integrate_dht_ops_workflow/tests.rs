@@ -2,9 +2,10 @@
 
 use super::*;
 
-use crate::fixt::CallContextFixturator;
 use crate::fixt::ZomeCallHostAccessFixturator;
 use crate::here;
+use crate::test_utils::test_network;
+use crate::{core::state::metadata::ChainItemKey, fixt::CallContextFixturator};
 use crate::{
     core::{
         queue_consumer::TriggerSender,
@@ -13,7 +14,6 @@ use crate::{
         workflow::CallZomeWorkspaceLock,
     },
     fixt::*,
-    test_utils::test_network,
 };
 use ::fixt::prelude::*;
 use holo_hash::*;
@@ -206,7 +206,7 @@ impl Db {
                     let op_hash = DhtOpHashed::from_content_sync(op.clone()).into_hash();
                     let value = IntegratedDhtOpsValue {
                         validation_status: ValidationStatus::Valid,
-                        op: op.to_light().await,
+                        op: op.to_light(),
                         when_integrated: Timestamp::now().into(),
                     };
                     let mut r = workspace
@@ -220,7 +220,7 @@ impl Db {
                 Db::IntQueue(op) => {
                     let value = IntegrationLimboValue {
                         validation_status: ValidationStatus::Valid,
-                        op: op.to_light().await,
+                        op: op.to_light(),
                     };
                     let res = workspace
                         .integration_limbo
@@ -318,7 +318,7 @@ impl Db {
                     let header_hash = TimedHeaderHash::from(header_hash);
                     let res = workspace
                         .meta
-                        .get_activity(&reader, (&header).into())
+                        .get_activity(&reader, ChainItemKey::new(&header, ValidationStatus::Valid))
                         .unwrap()
                         .collect::<Vec<_>>()
                         .unwrap();
@@ -476,7 +476,7 @@ impl Db {
                     let op_hash = DhtOpHashed::from_content_sync(op.clone()).into_hash();
                     let val = IntegrationLimboValue {
                         validation_status: ValidationStatus::Valid,
-                        op: op.to_light().await,
+                        op: op.to_light(),
                     };
                     workspace
                         .integration_limbo
@@ -587,7 +587,11 @@ fn add_op_to_judged(mut ps: Vec<Db>, op: &DhtOp) -> Vec<Db> {
         DhtOp::RegisterAgentActivity(s, h) => {
             ps.push(Db::PendingHeader(h.clone(), Some(s.clone())));
         }
-        DhtOp::RegisterUpdatedBy(s, h, _) => {
+        DhtOp::RegisterUpdatedContent(s, h, _) => {
+            let h: Header = h.clone().try_into().unwrap();
+            ps.push(Db::PendingHeader(h.clone(), Some(s.clone())));
+        }
+        DhtOp::RegisterUpdatedElement(s, h, _) => {
             let h: Header = h.clone().try_into().unwrap();
             ps.push(Db::PendingHeader(h.clone(), Some(s.clone())));
         }
@@ -668,16 +672,19 @@ fn register_agent_activity(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     (pre_state, expect, "register agent activity")
 }
 
-#[allow(dead_code)]
-fn register_replaced_by_for_header(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-    let op = DhtOp::RegisterUpdatedBy(
+fn register_updated_element(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+    let op = DhtOp::RegisterUpdatedElement(
         a.signature.clone(),
         a.entry_update_header.clone(),
         Some(a.new_entry.clone().into()),
     );
     let pre_state = vec![
         Db::IntQueue(op.clone()),
-        Db::CasHeader(a.original_header.clone().into(), Some(a.signature.clone())),
+        Db::CasEntry(
+            a.original_entry.clone(),
+            Some(a.original_header.clone().into()),
+            Some(a.signature.clone()),
+        ),
     ];
     let pre_state = add_op_to_judged(pre_state, &op);
     let expect = vec![
@@ -687,11 +694,11 @@ fn register_replaced_by_for_header(a: TestData) -> (Vec<Db>, Vec<Db>, &'static s
             a.entry_update_header.clone().into(),
         ),
     ];
-    (pre_state, expect, "register replaced by for header")
+    (pre_state, expect, "register updated element")
 }
 
 fn register_replaced_by_for_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-    let op = DhtOp::RegisterUpdatedBy(
+    let op = DhtOp::RegisterUpdatedContent(
         a.signature.clone(),
         a.entry_update_entry.clone(),
         Some(a.new_entry.clone().into()),
@@ -821,6 +828,7 @@ async fn test_ops_state() {
         store_entry,
         register_agent_activity,
         register_replaced_by_for_entry,
+        register_updated_element,
         register_deleted_by,
         register_deleted_header_by,
         register_add_link,
@@ -1033,7 +1041,7 @@ async fn get_links(
         .zomes
         .push((zome_name.clone().into(), fixt!(Zome)));
 
-    let (_network, _r, cell_network) = test_network(Some(dna_file.dna_hash().clone()), None).await;
+    let test_network = test_network(Some(dna_file.dna_hash().clone()), None).await;
 
     // Create ribosome mock to return fixtures
     // This is a lot faster then compiling a zome
@@ -1052,7 +1060,7 @@ async fn get_links(
     let output = {
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock;
-        host_access.network = cell_network;
+        host_access.network = test_network.cell_network();
         call_context.host_access = host_access.into();
         let ribosome = Arc::new(ribosome);
         let call_context = Arc::new(call_context);
@@ -1133,7 +1141,6 @@ async fn test_metadata_from_wasm_api() {
 }
 
 // This doesn't work without inline integration
-#[ignore]
 #[tokio::test(threaded_scheduler)]
 async fn test_wasm_api_without_integration_links() {
     // test workspace boilerplate
@@ -1185,8 +1192,7 @@ async fn test_wasm_api_without_integration_links() {
     assert_eq!(links[0], target_entry_hash);
 }
 
-// TODO: Evaluate if this test adds any value or remove
-#[ignore]
+#[ignore = "Evaluate if this test adds any value or remove"]
 #[tokio::test(threaded_scheduler)]
 async fn test_wasm_api_without_integration_delete() {
     // test workspace boilerplate
@@ -1255,23 +1261,23 @@ async fn test_wasm_api_without_integration_delete() {
 }
 
 #[tokio::test(threaded_scheduler)]
-#[ignore]
+#[ignore = "write this test"]
 async fn test_integrate_single_register_replaced_by_for_header() {
-    // For RegisterUpdatedBy with intended_for Header
+    // For RegisterUpdatedContent with intended_for Header
     // metadata has Update on HeaderHash but not EntryHash
     todo!("write this test")
 }
 
 #[tokio::test(threaded_scheduler)]
-#[ignore]
+#[ignore = "write this test"]
 async fn test_integrate_single_register_replaced_by_for_entry() {
-    // For RegisterUpdatedBy with intended_for Entry
+    // For RegisterUpdatedContent with intended_for Entry
     // metadata has Update on EntryHash but not HeaderHash
     todo!("write this test")
 }
 
 #[tokio::test(threaded_scheduler)]
-#[ignore]
+#[ignore = "write this test"]
 async fn test_integrate_single_register_delete_on_headerd_by() {
     // For RegisterDeletedBy
     // metadata has Delete on HeaderHash
@@ -1279,7 +1285,7 @@ async fn test_integrate_single_register_delete_on_headerd_by() {
 }
 
 #[tokio::test(threaded_scheduler)]
-#[ignore]
+#[ignore = "write this test"]
 async fn test_integrate_single_register_add_link() {
     // For RegisterAddLink
     // metadata has link on EntryHash
@@ -1287,7 +1293,7 @@ async fn test_integrate_single_register_add_link() {
 }
 
 #[tokio::test(threaded_scheduler)]
-#[ignore]
+#[ignore = "write this test"]
 async fn test_integrate_single_register_delete_link() {
     // For RegisterAddLink
     // metadata has link on EntryHash
@@ -1304,9 +1310,9 @@ mod slow_tests {
 
     use crate::test_utils::setup_app;
     use crate::{
-        conductor::dna_store::MockDnaStore, core::state::dht_op_integration::IntegratedDhtOpsStore,
-        core::state::metadata::LinkMetaKey, core::state::metadata::MetadataBuf,
-        core::state::metadata::MetadataBufT, test_utils::host_fn_api::*,
+        core::state::dht_op_integration::IntegratedDhtOpsStore, core::state::metadata::LinkMetaKey,
+        core::state::metadata::MetadataBuf, core::state::metadata::MetadataBufT,
+        test_utils::host_fn_api::*,
     };
     use crate::{fixt::*, test_utils::wait_for_integration};
     use fallible_iterator::FallibleIterator;
@@ -1325,6 +1331,7 @@ mod slow_tests {
     /// The aim of this test is to show from a high level that committing
     /// data on one agent results in integrated data on another agent
     #[tokio::test(threaded_scheduler)]
+    #[ignore = "flaky"]
     async fn commit_entry_add_link() {
         //////////////
         //// Setup
@@ -1351,19 +1358,12 @@ mod slow_tests {
         let bob_cell_id = CellId::new(dna_file.dna_hash().to_owned(), bob_agent_id.clone());
         let bob_installed_cell = InstalledCell::new(bob_cell_id.clone(), "bob_handle".into());
 
-        let mut dna_store = MockDnaStore::new();
-
-        dna_store.expect_get().return_const(Some(dna_file.clone()));
-        dna_store.expect_add_dnas::<Vec<_>>().return_const(());
-        dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
-        dna_store.expect_get_entry_def().return_const(None);
-
         let (_tmpdir, _app_api, conductor) = setup_app(
             vec![(
                 "test_app",
                 vec![(alice_installed_cell, None), (bob_installed_cell, None)],
             )],
-            dna_store,
+            vec![dna_file.clone()],
         )
         .await;
 
@@ -1383,37 +1383,27 @@ mod slow_tests {
         // Commit the base and target.
         // Link them together.
         {
-            let (alice_env, call_data) =
-                CallData::create(&alice_cell_id, &conductor, &dna_file).await;
+            let call_data = HostFnApi::create(&alice_cell_id, &conductor, &dna_file).await;
 
             // 3
-            commit_entry(
-                &alice_env,
-                call_data.clone(),
-                base.clone().try_into().unwrap(),
-                POST_ID,
-            )
-            .await;
+            call_data
+                .commit_entry(base.clone().try_into().unwrap(), POST_ID)
+                .await;
 
             // 4
-            commit_entry(
-                &alice_env,
-                call_data.clone(),
-                target.clone().try_into().unwrap(),
-                POST_ID,
-            )
-            .await;
+            call_data
+                .commit_entry(target.clone().try_into().unwrap(), POST_ID)
+                .await;
 
             // 5
             // Link the entries
-            create_link(
-                &alice_env,
-                call_data.clone(),
-                base_entry_hash.clone(),
-                target_entry_hash.clone(),
-                link_tag.clone(),
-            )
-            .await;
+            call_data
+                .create_link(
+                    base_entry_hash.clone(),
+                    target_entry_hash.clone(),
+                    link_tag.clone(),
+                )
+                .await;
 
             // Produce and publish these commits
             let mut triggers = conductor.get_cell_triggers(&alice_cell_id).await.unwrap();
@@ -1422,24 +1412,24 @@ mod slow_tests {
 
         // Check the ops
         {
-            let (bob_env, call_data) = CallData::create(&bob_cell_id, &conductor, &dna_file).await;
+            let call_data = HostFnApi::create(&bob_cell_id, &conductor, &dna_file).await;
 
             // Wait for the ops to integrate but early exit if they do
             // 14 ops for genesis and 9 ops for two commits and a link
             // Try 100 times for 100 millis each so maximum wait is 10 seconds
-            wait_for_integration(&bob_env, 14 + 9, 100, Duration::from_millis(100)).await;
+            wait_for_integration(&call_data.env, 14 + 9, 100, Duration::from_millis(100)).await;
 
             // Check the ops are not empty
-            let env_ref = bob_env.guard();
+            let env_ref = call_data.env.guard();
             let reader = env_ref.reader().unwrap();
-            let db = bob_env.get_db(&*INTEGRATED_DHT_OPS).unwrap();
-            let ops_db = IntegratedDhtOpsStore::new(bob_env.clone().into(), db);
+            let db = call_data.env.get_db(&*INTEGRATED_DHT_OPS).unwrap();
+            let ops_db = IntegratedDhtOpsStore::new(call_data.env.clone().into(), db);
             let ops = ops_db.iter(&reader).unwrap().collect::<Vec<_>>().unwrap();
             debug!(?ops);
             assert!(!ops.is_empty());
 
             // Check the correct links is in bobs integrated metadata vault
-            let meta = MetadataBuf::vault(bob_env.clone().into()).unwrap();
+            let meta = MetadataBuf::vault(call_data.env.clone().into()).unwrap();
             let key = LinkMetaKey::Base(&base_entry_hash);
             let links = meta
                 .get_live_links(&reader, &key)
@@ -1450,37 +1440,24 @@ mod slow_tests {
             assert_eq!(link.target, target_entry_hash);
 
             // Check bob can get the links
-            let links = get_links(
-                &bob_env,
-                call_data.clone(),
-                base_entry_hash.clone(),
-                Some(link_tag),
-                Default::default(),
-            )
-            .await;
+            let links = call_data
+                .get_links(base_entry_hash.clone(), Some(link_tag), Default::default())
+                .await;
             let link = links[0].clone();
             assert_eq!(link.target, target_entry_hash);
 
             // Check bob can get the target
-            let e = get(
-                &bob_env,
-                call_data.clone(),
-                target_entry_hash.clone().into(),
-                Default::default(),
-            )
-            .await
-            .unwrap();
+            let e = call_data
+                .get(target_entry_hash.clone().into(), Default::default())
+                .await
+                .unwrap();
             assert_eq!(e.into_inner().1.into_option().unwrap(), target_entry);
 
             // Check bob can get the base
-            let e = get(
-                &bob_env,
-                call_data.clone(),
-                base_entry_hash.clone().into(),
-                Default::default(),
-            )
-            .await
-            .unwrap();
+            let e = call_data
+                .get(base_entry_hash.clone().into(), Default::default())
+                .await
+                .unwrap();
             assert_eq!(e.into_inner().1.into_option().unwrap(), base_entry);
         }
 

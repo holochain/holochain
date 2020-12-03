@@ -7,13 +7,12 @@
 #![allow(missing_docs)]
 
 use crate::{
-    element::{SignedHeaderHashed, SignedHeaderHashedExt},
+    element::{ElementStatus, SignedHeaderHashed, SignedHeaderHashedExt},
     prelude::*,
 };
 use conversions::WrongHeaderError;
 use derive_more::From;
 use holo_hash::EntryHash;
-use holochain_zome_types::entry_def::EntryVisibility;
 pub use holochain_zome_types::header::HeaderHashed;
 use holochain_zome_types::signature::Signature;
 use holochain_zome_types::{
@@ -21,6 +20,7 @@ use holochain_zome_types::{
     header::*,
     Entry,
 };
+use holochain_zome_types::{entry_def::EntryVisibility, validate::ValidationStatus};
 
 use error::*;
 
@@ -49,6 +49,17 @@ pub enum NewEntryHeaderRef<'a> {
 pub enum WireNewEntryHeader {
     Create(WireCreate),
     Update(WireUpdate),
+}
+
+#[derive(
+    Debug, Clone, derive_more::Constructor, Serialize, Deserialize, PartialEq, Eq, Ord, PartialOrd,
+)]
+/// A header of one of the two types that create a new entry.
+pub struct WireHeaderStatus<W> {
+    /// Skinny header for sending over the wire.
+    pub header: W,
+    /// Validation status of this header.
+    pub validation_status: ValidationStatus,
 }
 
 /// The minimum unique data for Create headers
@@ -173,7 +184,7 @@ impl From<(Update, Signature)> for WireUpdate {
 }
 
 impl WireDelete {
-    pub async fn into_element(self) -> Element {
+    pub fn into_element(self) -> Element {
         Element::new(
             SignedHeaderHashed::from_content_sync(SignedHeader(self.delete.into(), self.signature)),
             None,
@@ -184,7 +195,7 @@ impl WireDelete {
 impl WireUpdateRelationship {
     /// Recreate the Update Element without an Entry.
     /// Useful for creating dht ops
-    pub async fn into_element(self, original_entry_address: EntryHash) -> Element {
+    pub fn into_element(self, original_entry_address: EntryHash) -> Element {
         let eu = Update {
             author: self.author,
             timestamp: self.timestamp,
@@ -264,16 +275,12 @@ impl TryFrom<SignedHeaderHashed> for WireUpdateRelationship {
 }
 
 impl WireNewEntryHeader {
-    pub async fn into_element(self, entry_type: EntryType, entry: Entry) -> Element {
+    pub fn into_element(self, entry_type: EntryType, entry: Entry) -> Element {
         let entry_hash = EntryHash::with_data_sync(&entry);
-        Element::new(self.into_header(entry_type, entry_hash).await, Some(entry))
+        Element::new(self.into_header(entry_type, entry_hash), Some(entry))
     }
 
-    pub async fn into_header(
-        self,
-        entry_type: EntryType,
-        entry_hash: EntryHash,
-    ) -> SignedHeaderHashed {
+    pub fn into_header(self, entry_type: EntryType, entry_hash: EntryHash) -> SignedHeaderHashed {
         match self {
             WireNewEntryHeader::Create(ec) => {
                 let signature = ec.signature;
@@ -302,6 +309,39 @@ impl WireNewEntryHeader {
                 SignedHeaderHashed::from_content_sync(SignedHeader(eu.into(), signature))
             }
         }
+    }
+}
+
+impl WireHeaderStatus<WireNewEntryHeader> {
+    pub fn into_element_status(self, entry_type: EntryType, entry: Entry) -> ElementStatus {
+        ElementStatus::new(
+            self.header.into_element(entry_type, entry),
+            self.validation_status,
+        )
+    }
+}
+
+impl WireHeaderStatus<WireUpdateRelationship> {
+    pub fn into_element_status(self, entry_hash: EntryHash) -> ElementStatus {
+        ElementStatus::new(self.header.into_element(entry_hash), self.validation_status)
+    }
+}
+
+impl WireHeaderStatus<WireDelete> {
+    pub fn into_element_status(self) -> ElementStatus {
+        ElementStatus::new(self.header.into_element(), self.validation_status)
+    }
+}
+
+impl<H, W, E> TryFrom<(H, ValidationStatus)> for WireHeaderStatus<W>
+where
+    E: Into<HeaderError>,
+    H: TryInto<W, Error = E>,
+{
+    type Error = HeaderError;
+
+    fn try_from(value: (H, ValidationStatus)) -> Result<Self, Self::Error> {
+        Ok(Self::new(value.0.try_into().map_err(Into::into)?, value.1))
     }
 }
 

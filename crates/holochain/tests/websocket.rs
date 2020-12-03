@@ -83,8 +83,8 @@ fn create_config(port: u16, environment_path: PathBuf) -> ConductorConfig {
 }
 
 pub fn write_config(mut path: PathBuf, config: &ConductorConfig) -> PathBuf {
-    path.push("conductor_config.toml");
-    std::fs::write(path.clone(), toml::to_string(&config).unwrap()).unwrap();
+    path.push("conductor_config.yml");
+    std::fs::write(path.clone(), serde_yaml::to_string(&config).unwrap()).unwrap();
     path
 }
 
@@ -161,7 +161,7 @@ async fn call_admin() {
     let agent_key = fake_agent_pubkey_1();
     let payload = InstallAppPayload {
         dnas: vec![dna_payload],
-        app_id: "test".to_string(),
+        installed_app_id: "test".to_string(),
         agent_key,
     };
     let request = AdminRequest::InstallApp(Box::new(payload));
@@ -184,12 +184,13 @@ async fn call_admin() {
     assert_ne!(&original_dna_hash, dna.dna_hash());
 
     let expects = vec![dna.dna_hash().clone()];
-    assert_matches!(response, AdminResponse::ListDnas(a) if a == expects);
+    assert_matches!(response, AdminResponse::DnasListed(a) if a == expects);
 
     holochain.kill().expect("Failed to kill holochain");
 }
 
 pub async fn start_holochain(config_path: PathBuf) -> Child {
+    tracing::info!("\n\n----\nstarting holochain\n----\n\n");
     let cmd = std::process::Command::cargo_bin("holochain").unwrap();
     let mut cmd = Command::from(cmd);
     cmd.arg("--structured")
@@ -313,7 +314,7 @@ async fn call_zome() {
     let agent_key = fake_agent_pubkey_1();
     let payload = InstallAppPayload {
         dnas: vec![dna_payload],
-        app_id: "test".to_string(),
+        installed_app_id: "test".to_string(),
         agent_key,
     };
     let request = AdminRequest::InstallApp(Box::new(payload));
@@ -327,11 +328,11 @@ async fn call_zome() {
     let response = check_timeout(&mut holochain, response, 1000).await;
 
     let expects = vec![original_dna_hash.clone()];
-    assert_matches!(response, AdminResponse::ListDnas(a) if a == expects);
+    assert_matches!(response, AdminResponse::DnasListed(a) if a == expects);
 
     // Activate cells
     let request = AdminRequest::ActivateApp {
-        app_id: "test".to_string(),
+        installed_app_id: "test".to_string(),
     };
     let response = client.request(request);
     let response = check_timeout(&mut holochain, response, 1000).await;
@@ -362,6 +363,7 @@ async fn call_zome() {
 
     // Call zome after resart
     let mut holochain = start_holochain(config_path).await;
+
     let mut client = retry_admin_interface(port, 10, Duration::from_millis(200)).await;
 
     // Attach App Interface
@@ -408,7 +410,7 @@ async fn emit_signals() {
     let cell_id = CellId::new(dna_hash.clone(), agent_key.clone());
     let payload = InstallAppPayload {
         dnas: vec![dna_payload],
-        app_id: "test".to_string(),
+        installed_app_id: "test".to_string(),
         agent_key: agent_key.clone(),
     };
     let request = AdminRequest::InstallApp(Box::new(payload));
@@ -418,7 +420,7 @@ async fn emit_signals() {
 
     // Activate cells
     let request = AdminRequest::ActivateApp {
-        app_id: "test".to_string(),
+        installed_app_id: "test".to_string(),
     };
     let response = admin_tx.request(request);
     let response = check_timeout(&mut holochain, response, 1000).await;
@@ -490,7 +492,7 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
     let agent_key = fake_agent_pubkey_1();
     let payload = InstallAppPayload {
         dnas: vec![dna_payload],
-        app_id: "test".to_string(),
+        installed_app_id: "test".to_string(),
         agent_key,
     };
     let request = AdminRequest::InstallApp(Box::new(payload));
@@ -547,7 +549,7 @@ async fn conductor_admin_interface_ends_with_shutdown() -> Result<()> {
     let agent_key = fake_agent_pubkey_1();
     let payload = InstallAppPayload {
         dnas: vec![dna_payload],
-        app_id: "test".to_string(),
+        installed_app_id: "test".to_string(),
         agent_key,
     };
     let request = AdminRequest::InstallApp(Box::new(payload));

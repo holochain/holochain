@@ -214,7 +214,7 @@ pub mod tests {
             let mut buf = ChainSequenceBuf::new(arc.clone().into())?;
             assert_eq!(buf.chain_head(), None);
             buf.put_header(
-                HeaderHash::from_raw_bytes(vec![
+                HeaderHash::from_raw_36(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 ])
@@ -223,7 +223,7 @@ pub mod tests {
             assert_eq!(
                 buf.chain_head(),
                 Some(
-                    &HeaderHash::from_raw_bytes(vec![
+                    &HeaderHash::from_raw_36(vec![
                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
                     ])
@@ -231,7 +231,7 @@ pub mod tests {
                 )
             );
             buf.put_header(
-                HeaderHash::from_raw_bytes(vec![
+                HeaderHash::from_raw_36(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
                 ])
@@ -240,7 +240,7 @@ pub mod tests {
             assert_eq!(
                 buf.chain_head(),
                 Some(
-                    &HeaderHash::from_raw_bytes(vec![
+                    &HeaderHash::from_raw_36(vec![
                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
                     ])
@@ -248,7 +248,7 @@ pub mod tests {
                 )
             );
             buf.put_header(
-                HeaderHash::from_raw_bytes(vec![
+                HeaderHash::from_raw_36(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
                 ])
@@ -257,7 +257,7 @@ pub mod tests {
             assert_eq!(
                 buf.chain_head(),
                 Some(
-                    &HeaderHash::from_raw_bytes(vec![
+                    &HeaderHash::from_raw_36(vec![
                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2
                     ])
@@ -277,14 +277,14 @@ pub mod tests {
         {
             let mut buf = ChainSequenceBuf::new(arc.clone().into())?;
             buf.put_header(
-                HeaderHash::from_raw_bytes(vec![
+                HeaderHash::from_raw_36(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 ])
                 .into(),
             )?;
             buf.put_header(
-                HeaderHash::from_raw_bytes(vec![
+                HeaderHash::from_raw_36(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
                 ])
@@ -293,7 +293,7 @@ pub mod tests {
             assert_eq!(
                 buf.chain_head(),
                 Some(
-                    &HeaderHash::from_raw_bytes(vec![
+                    &HeaderHash::from_raw_36(vec![
                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
                     ])
@@ -301,7 +301,7 @@ pub mod tests {
                 )
             );
             buf.put_header(
-                HeaderHash::from_raw_bytes(vec![
+                HeaderHash::from_raw_36(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
                 ])
@@ -316,7 +316,7 @@ pub mod tests {
             assert_eq!(
                 buf.chain_head(),
                 Some(
-                    &HeaderHash::from_raw_bytes(vec![
+                    &HeaderHash::from_raw_36(vec![
                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2
                     ])
@@ -335,21 +335,21 @@ pub mod tests {
         {
             let mut buf = ChainSequenceBuf::new(arc.clone().into())?;
             buf.put_header(
-                HeaderHash::from_raw_bytes(vec![
+                HeaderHash::from_raw_36(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 3,
                 ])
                 .into(),
             )?;
             buf.put_header(
-                HeaderHash::from_raw_bytes(vec![
+                HeaderHash::from_raw_36(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 4,
                 ])
                 .into(),
             )?;
             buf.put_header(
-                HeaderHash::from_raw_bytes(vec![
+                HeaderHash::from_raw_36(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 5,
                 ])
@@ -364,7 +364,7 @@ pub mod tests {
             assert_eq!(
                 buf.chain_head(),
                 Some(
-                    &HeaderHash::from_raw_bytes(vec![
+                    &HeaderHash::from_raw_36(vec![
                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5
                     ])
@@ -397,21 +397,21 @@ pub mod tests {
         let task1 = tokio::spawn(async move {
             let mut buf = ChainSequenceBuf::new(arc1.clone().into())?;
             buf.put_header(
-                HeaderHash::from_raw_bytes(vec![
+                HeaderHash::from_raw_36(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 ])
                 .into(),
             )?;
             buf.put_header(
-                HeaderHash::from_raw_bytes(vec![
+                HeaderHash::from_raw_36(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
                 ])
                 .into(),
             )?;
             buf.put_header(
-                HeaderHash::from_raw_bytes(vec![
+                HeaderHash::from_raw_36(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
                 ])
@@ -432,21 +432,21 @@ pub mod tests {
             rx1.await.unwrap();
             let mut buf = ChainSequenceBuf::new(arc2.clone().into())?;
             buf.put_header(
-                HeaderHash::from_raw_bytes(vec![
+                HeaderHash::from_raw_36(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 3,
                 ])
                 .into(),
             )?;
             buf.put_header(
-                HeaderHash::from_raw_bytes(vec![
+                HeaderHash::from_raw_36(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 4,
                 ])
                 .into(),
             )?;
             buf.put_header(
-                HeaderHash::from_raw_bytes(vec![
+                HeaderHash::from_raw_36(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 5,
                 ])
@@ -461,7 +461,7 @@ pub mod tests {
 
         let (result1, result2) = tokio::join!(task1, task2);
 
-        let expected_hash = HeaderHash::from_raw_bytes(vec![
+        let expected_hash = HeaderHash::from_raw_36(vec![
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             0, 0, 0, 0, 0, 0, 5,
         ])
@@ -494,14 +494,14 @@ pub mod tests {
         // Add a few things to start with
         let mut buf = ChainSequenceBuf::new(arc1.clone().into())?;
         buf.put_header(
-            HeaderHash::from_raw_bytes(vec![
+            HeaderHash::from_raw_36(vec![
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 0,
             ])
             .into(),
         )?;
         buf.put_header(
-            HeaderHash::from_raw_bytes(vec![
+            HeaderHash::from_raw_36(vec![
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 1,
             ])
@@ -529,7 +529,7 @@ pub mod tests {
             rx1.await.unwrap();
             let mut buf = ChainSequenceBuf::new(arc2.clone().into())?;
             buf.put_header(
-                HeaderHash::from_raw_bytes(vec![
+                HeaderHash::from_raw_36(vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
                 ])

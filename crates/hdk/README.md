@@ -8,7 +8,7 @@ This kit:
 
 1. The DSL is ergonomic and composable, so optional if you want more control
 2. It is compatible with the cell-driven version of holochain
-3. Differentiates between the holochain API/interface and "sugar" macros
+3. Differentiates between the holochain API/interface and "sugar" syntax
 
 Old kits:
 
@@ -21,7 +21,11 @@ Old kits:
 
 Welcome to the HDK 3.0.
 This HDK is currently in flux, expect rapid changes.
-Currently there are helper macros to aid in writing happs.
+There are low-level macros and high-level functions to aid writing happs.
+
+The intention is that most of the time most developers will use the high level
+functions as they leverage the Rust type system better than macros can. This
+allows for more useful compiler and IDE feedback loops.
 
 ## Examples
 
@@ -72,35 +76,35 @@ entry_def!(Bar EntryDef {
 entry_defs!(vec![Foo::entry_def(), Bar::entry_def()]);
 ```
 
-### create_entry!, get!, hash_entry!, create_link!, get_links!, debug!
+### create_entry, get, hash_entry, create_link, get_links, debug!
 
 ```rust
 // Create your entry types
 let foo = Foo;
 let bar = Bar;
 // Commit the entries
-let _foo_header_hash = create_entry!(foo.clone())?;
-let _bar_header_hash = create_entry!(bar.clone())?;
+let _foo_header_hash = create_entry(foo.clone())?;
+let _bar_header_hash = create_entry(bar.clone())?;
 // Get the entry hash of each entry
-let foo_entry_hash = hash_entry!(foo)?;
-let bar_entry_hash = hash_entry!(bar)?;
+let foo_entry_hash = hash_entry(foo)?;
+let bar_entry_hash = hash_entry(bar)?;
 // Link from foo (base) to bar (target)
-let _link_add_header_hash = create_link!(foo_entry_hash.clone(), bar_entry_hash)?;
+let _link_add_header_hash = create_link(foo_entry_hash.clone(), bar_entry_hash)?;
 // Get the links back
-let links = get_links!(foo_entry_hash)?;
+let links = get_links(foo_entry_hash)?;
 // Print out the links
-debug!(links)?;
+debug!(links);
 ```
 
-### call_remote!, zome_info!, agent_info!
+### call_remote, zome_info, agent_info
 
 ```rust
 // Get your agent key
-let agent_pubkey = agent_info!()?.agent_pubkey;
+let agent_pubkey = agent_info()?.agent_pubkey;
 // Get the name of this zome
-let zome_name = zome_info!()?.zome_name;
+let zome_name = zome_info()?.zome_name;
 // Call your friends foo function
-let result: SerializedBytes = call_remote!(
+let result: SerializedBytes = call_remote(
     my_friends_agent_pubkey,
     zome_name,
     "foo".to_string(),
@@ -110,7 +114,7 @@ let result: SerializedBytes = call_remote!(
 // Get their output
 let output: MyOutput = result.try_into()?;
 // Print their output
-debug!(output)?;
+debug!(output);
 ```
 
 ### Direct Api Call
@@ -119,7 +123,7 @@ can also be done directly as follows:
 
 ```rust
 // Commit foo
-let foo_header_hash = create_entry!(foo.clone())?;
+let foo_header_hash = create_entry(foo.clone())?;
 // Call the api directly:
 // Create the Entry from bar.
 let entry = Entry::App(bar.clone().try_into()?);
@@ -552,7 +556,7 @@ they are finalized on the local source chain or broadcast to the DHT network.
 In addition to the patterns we demonstrated above for externs and callbacks, we
 also need to introduce the `host_call()!` and `host_args!()` macros.
 
-The `host_call!()` macro works very similarly to the `ret!()` macro in that it
+The `host_call()` function works very similarly to the `ret!()` macro in that it
 takes serializable data on the guest and sends it to the host as a `GuestPtr`.
 The difference is that instead of causing the guest to `return`, this data is
 the argument to a function that _executes and blocks immediately on the host_
@@ -568,7 +572,7 @@ always call it before anything else. Note that `host_args!()` will short circuit
 and return early with an error similar to the `?` operator if deserialization
 fails on the guest.
 
-Note that both the `host_call!()` and `host_args!()` macros rely on the guest to
+Note that both the `host_call()` function and the `host_args!()` macros rely on the guest to
 correctly deserialize the values that the host is copying to the guest's memory.
 
 So, before looking at the code, here is a diagram of how our example wasm would
@@ -591,7 +595,7 @@ It consists of a few components, some new and some already demonstrated above:
 - `holochain_externs!()` to enable the holochain host to run the wasm
 - A `Png` struct to hold binary PNG data as `u8` bytes
 - An `extern` function `save_image` that will be callable over websockets RPC
-- A `host_call!` to `__create` inside `save_image` to commit the image
+- A `host_call` to `__create` inside `save_image` to commit the image
 - A `validate_entry` callback function implementation to validate the PNG
 - Some basic validation logic to ensure the PNG is under 10mb
 - Calling `host_args!()` in both externs to accept input
@@ -621,9 +625,9 @@ pub extern "C" fn save_image(remote_ptr: GuestPtr) -> GuestPtr {
  // for this example we don't care about the result of commit entry
  // a real application should handle it
  //
- // the important bit for this example is that we use host_call!() and that the
+ // the important bit for this example is that we use host_call() and that the
  // __create function on the host will enqueue a validation callback
- let _: CreateOutput = host_call!(
+ let _: CreateOutput = host_call(
   // note that all host functions from holochain start with prefix `__`
   __create,
   CreateInput::new(
@@ -724,10 +728,10 @@ internally when it short-circuits in the case of failing to deserialize args.
 
 The two most obvious cases for using `try_result!()` are:
 
-- coupled with `host_call!()` inside simple extern functions/callbacks
+- coupled with `host_call()` inside simple extern functions/callbacks
 - to wrap vanilla rust code that returns a result to avoid logic-in-externs
 
-This example will show a simple `host_call!()` error handling but the next
+This example will show a simple `host_call()` error handling but the next
 example will show how to use all the macros together to collapse all the extern
 logic into some generic, standalone boilerplate.
 
@@ -748,7 +752,7 @@ pub extern "C" fn commit_message(remote_ptr: GuestPtr) -> GuestPtr {
  // because this is inside an extern function the short circuit logic also
  // handles memory and serialization logic for the holochain host
  let commit_entry_output: CreateOutput = try_result!(
-  host_call!(
+  host_call(
    __create,
    CreateInput::new(
     Entry::App(
@@ -789,8 +793,8 @@ the sugar that it provides.
 
 The HDK macros simply expand to this extern boilerplate, saving you from typing
 out a few macros to input/output data for the host. They also offer some
-convenience wrappers around `host_call!()` that do exactly what you'd expect,
-e.g. `create_entry!( ... )` vs. `host_call!(__create, ... )`.
+convenience wrappers around `host_call()` that do exactly what you'd expect,
+e.g. `create_entry( ... )` vs. `host_call(__create, ... )`.
 
 Think of the HDK as a tool and safety net but also don't feel you can't peek
 under the hood to see what is there.
@@ -827,11 +831,11 @@ struct Png([u8]);
 // no need for special keywords on the function
 // the input args and return values are all native Rust types, not pointers
 // we can use `Result` and `?`
-// the only wasm-ey thing here is the `host_call!()` macro
+// the only wasm-ey thing here is the `host_call()` macro
 fn _save_image(png: Png) -> Result<CreateOutput, String> {
- Ok(host_call!(
+ Ok(host_call(
   __create,
-  CreateInput::new(
+  &CreateInput::new(
    Entry::App(
     png.try_into()?
    )

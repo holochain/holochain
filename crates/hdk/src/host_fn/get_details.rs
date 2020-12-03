@@ -1,3 +1,5 @@
+use crate::prelude::*;
+
 /// Get an element from the hash AND the details for the entry or header hash passed in.
 /// Returns None if the entry/header does not exist.
 /// The details returned are a contextual mix of elements and header hashes, see below.
@@ -8,7 +10,7 @@
 /// Note: If a header hash is passed in the element returned is the specified element.
 ///       If an entry hash is passed in all the headers (so implicitly all the elements) are
 ///       returned for the entry that matches that hash.
-///       @see get! for more information about what "oldest live" means.
+///       @see get for more information about what "oldest live" means.
 ///
 /// The details returned include relevant creates, updates and deletes for the hash passed in.
 ///
@@ -34,24 +36,21 @@
 ///       any time they need to represent 1 or "foo" for a create, update or delete.
 ///       If you need to disambiguate entry values, provide uniqueness in the entry value such as
 ///       a unique hash (e.g. current chain head), timestamp (careful about collisions!), or random
-///       bytes/uuid (see random_bytes!() and the uuid rust crate that supports uuids from bytes).
+///       bytes/uuid (see random_bytes() and the uuid rust crate that supports uuids from bytes).
 ///
 /// Note: There are multiple header types that exist and operate entirely outside of CRUD elements
 ///       so they cannot reference or be referenced by CRUD, so are immutable or have their own
-///       mutation logic (e.g. link create/delete) and will not be included in get_details! results
+///       mutation logic (e.g. link create/delete) and will not be included in get_details results
 ///       e.g. the DNA itself, links, migrations, etc.
-///       However the element will still be returned by get_details! if a header hash is passed,
+///       However the element will still be returned by get_details if a header hash is passed,
 ///       these header-only elements will have None as the entry value.
-#[macro_export]
-macro_rules! get_details {
-    ( $hash:expr, $options:expr ) => {{
-        $crate::host_fn!(
-            __get_details,
-            $crate::prelude::GetDetailsInput::new(($hash.into(), $options)),
-            $crate::prelude::GetDetailsOutput
-        )
-    }};
-    ( $hash:expr ) => {
-        get_details!($hash, $crate::prelude::GetOptions)
-    };
+pub fn get_details<H: Into<AnyDhtHash>>(
+    hash: H,
+    options: GetOptions,
+) -> HdkResult<Option<Details>> {
+    Ok(host_call::<GetDetailsInput, GetDetailsOutput>(
+        __get_details,
+        &GetDetailsInput::new((hash.into(), options)),
+    )?
+    .into_inner())
 }

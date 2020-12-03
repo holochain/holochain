@@ -1,5 +1,5 @@
 use crate::{
-    conductor::{dna_store::MockDnaStore, ConductorHandle},
+    conductor::ConductorHandle,
     core::{
         state::{element_buf::ElementBuf, validation_db::ValidationLimboStatus},
         workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace,
@@ -49,19 +49,12 @@ async fn sys_validation_workflow_test() {
     let bob_cell_id = CellId::new(dna_file.dna_hash().to_owned(), bob_agent_id.clone());
     let bob_installed_cell = InstalledCell::new(bob_cell_id.clone(), "bob_handle".into());
 
-    let mut dna_store = MockDnaStore::new();
-
-    dna_store.expect_get().return_const(Some(dna_file.clone()));
-    dna_store.expect_add_dnas::<Vec<_>>().return_const(());
-    dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
-    dna_store.expect_get_entry_def().return_const(None);
-
     let (_tmpdir, _app_api, handle) = setup_app(
         vec![(
             "test_app",
             vec![(alice_installed_cell, None), (bob_installed_cell, None)],
         )],
-        dna_store,
+        vec![dna_file.clone()],
     )
     .await;
 
@@ -117,7 +110,7 @@ async fn run_test(
             let _g = s.enter();
             let element_buf = ElementBuf::vault(alice_env.clone().into(), true).unwrap();
             for (k, i) in &res {
-                let hash = DhtOpHash::from_raw_bytes(k.clone());
+                let hash = DhtOpHash::from_raw_39(k.clone());
                 let el = element_buf.get_element(&i.op.header_hash()).unwrap();
                 debug!(?hash, ?i, op_in_val = ?el);
             }
@@ -167,7 +160,7 @@ async fn run_test(
         bob_makes_a_large_link(&bob_cell_id, &handle, &dna_file).await;
 
     // Integration should have 13 ops in it
-    let expected_count = 13 + expected_count;
+    let expected_count = 14 + expected_count;
 
     {
         let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
@@ -231,7 +224,14 @@ async fn run_test(
                         DhtOpLight::RegisterAddLink(hh, _) if hh == &link_add_hash => {
                             assert_eq!(i.validation_status, ValidationStatus::Rejected)
                         }
-                        DhtOpLight::RegisterUpdatedBy(hh, _, _) if hh == &bad_update_header => {
+                        DhtOpLight::RegisterUpdatedContent(hh, _, _)
+                            if hh == &bad_update_header =>
+                        {
+                            assert_eq!(i.validation_status, ValidationStatus::Rejected)
+                        }
+                        DhtOpLight::RegisterUpdatedElement(hh, _, _)
+                            if hh == &bad_update_header =>
+                        {
                             assert_eq!(i.validation_status, ValidationStatus::Rejected)
                         }
                         _ => assert_eq!(i.validation_status, ValidationStatus::Valid),
@@ -308,35 +308,26 @@ async fn bob_links_in_a_legit_way(
     let base_entry_hash = EntryHash::with_data_sync(&Entry::try_from(base.clone()).unwrap());
     let target_entry_hash = EntryHash::with_data_sync(&Entry::try_from(target.clone()).unwrap());
     let link_tag = fixt!(LinkTag);
-    let (bob_env, call_data) = CallData::create(bob_cell_id, handle, dna_file).await;
+    let call_data = HostFnApi::create(bob_cell_id, handle, dna_file).await;
     // 3
-    commit_entry(
-        &bob_env,
-        call_data.clone(),
-        base.clone().try_into().unwrap(),
-        POST_ID,
-    )
-    .await;
+    call_data
+        .commit_entry(base.clone().try_into().unwrap(), POST_ID)
+        .await;
 
     // 4
-    commit_entry(
-        &bob_env,
-        call_data.clone(),
-        target.clone().try_into().unwrap(),
-        POST_ID,
-    )
-    .await;
+    call_data
+        .commit_entry(target.clone().try_into().unwrap(), POST_ID)
+        .await;
 
     // 5
     // Link the entries
-    let link_add_address = create_link(
-        &bob_env,
-        call_data.clone(),
-        base_entry_hash.clone(),
-        target_entry_hash.clone(),
-        link_tag.clone(),
-    )
-    .await;
+    let link_add_address = call_data
+        .create_link(
+            base_entry_hash.clone(),
+            target_entry_hash.clone(),
+            link_tag.clone(),
+        )
+        .await;
 
     // Produce and publish these commits
     let mut triggers = handle.get_cell_triggers(&bob_cell_id).await.unwrap();
@@ -360,47 +351,37 @@ async fn bob_makes_a_large_link(
     let bytes = (0..401).map(|_| 0u8).into_iter().collect::<Vec<_>>();
     let link_tag = LinkTag(bytes);
 
-    let (bob_env, call_data) = CallData::create(bob_cell_id, handle, dna_file).await;
+    let call_data = HostFnApi::create(bob_cell_id, handle, dna_file).await;
 
     // 6
-    let original_header_address = commit_entry(
-        &bob_env,
-        call_data.clone(),
-        base.clone().try_into().unwrap(),
-        POST_ID,
-    )
-    .await;
+    let original_header_address = call_data
+        .commit_entry(base.clone().try_into().unwrap(), POST_ID)
+        .await;
 
     // 7
-    commit_entry(
-        &bob_env,
-        call_data.clone(),
-        target.clone().try_into().unwrap(),
-        POST_ID,
-    )
-    .await;
+    call_data
+        .commit_entry(target.clone().try_into().unwrap(), POST_ID)
+        .await;
 
     // 8
     // Commit a large header
-    let link_add_address = create_link(
-        &bob_env,
-        call_data.clone(),
-        base_entry_hash.clone(),
-        target_entry_hash.clone(),
-        link_tag.clone(),
-    )
-    .await;
+    let link_add_address = call_data
+        .create_link(
+            base_entry_hash.clone(),
+            target_entry_hash.clone(),
+            link_tag.clone(),
+        )
+        .await;
 
     // 9
     // Commit a bad update entry
-    let bad_update_header = update_entry(
-        &bob_env,
-        call_data.clone(),
-        bad_update.clone().try_into().unwrap(),
-        MSG_ID,
-        original_header_address,
-    )
-    .await;
+    let bad_update_header = call_data
+        .update_entry(
+            bad_update.clone().try_into().unwrap(),
+            MSG_ID,
+            original_header_address,
+        )
+        .await;
 
     // Produce and publish these commits
     let mut triggers = handle.get_cell_triggers(&bob_cell_id).await.unwrap();
@@ -414,28 +395,23 @@ async fn dodgy_bob(bob_cell_id: &CellId, handle: &ConductorHandle, dna_file: &Dn
     let base_entry_hash = EntryHash::with_data_sync(&Entry::try_from(base.clone()).unwrap());
     let target_entry_hash = EntryHash::with_data_sync(&Entry::try_from(target.clone()).unwrap());
     let link_tag = fixt!(LinkTag);
-    let (bob_env, call_data) = CallData::create(bob_cell_id, handle, dna_file).await;
+    let call_data = HostFnApi::create(bob_cell_id, handle, dna_file).await;
 
     // 11
-    commit_entry(
-        &bob_env,
-        call_data.clone(),
-        base.clone().try_into().unwrap(),
-        POST_ID,
-    )
-    .await;
+    call_data
+        .commit_entry(base.clone().try_into().unwrap(), POST_ID)
+        .await;
 
     // Whoops forgot to commit that proof
 
     // Link the entries
-    create_link(
-        &bob_env,
-        call_data.clone(),
-        base_entry_hash.clone(),
-        target_entry_hash.clone(),
-        link_tag.clone(),
-    )
-    .await;
+    call_data
+        .create_link(
+            base_entry_hash.clone(),
+            target_entry_hash.clone(),
+            link_tag.clone(),
+        )
+        .await;
 
     // Produce and publish these commits
     let mut triggers = handle.get_cell_triggers(&bob_cell_id).await.unwrap();

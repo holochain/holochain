@@ -1,3 +1,5 @@
+use crate::prelude::*;
+
 /// Delete a specific link creation element by its header.
 ///
 /// Links are always created and deleted in pairs.
@@ -19,15 +21,10 @@
 ///   link after any previous delete of any link.
 /// All of this is bad so link creates point to entries (@see link_entries!) and deletes point to
 /// creates.
-#[macro_export]
-macro_rules! delete_link {
-    ( $add_link_header:expr ) => {{
-        $crate::prelude::host_externs!(__delete_link);
-
-        $crate::host_fn!(
-            __delete_link,
-            $crate::prelude::DeleteLinkInput::new($add_link_header),
-            $crate::prelude::DeleteLinkOutput
-        )
-    }};
+pub fn delete_link(add_link_header: HeaderHash) -> HdkResult<HeaderHash> {
+    Ok(host_call::<DeleteLinkInput, DeleteLinkOutput>(
+        __delete_link,
+        &DeleteLinkInput::new(add_link_header),
+    )?
+    .into_inner())
 }

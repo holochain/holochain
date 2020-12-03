@@ -1,5 +1,5 @@
 use crate::{
-    conductor::{dna_store::MockDnaStore, ConductorHandle},
+    conductor::ConductorHandle,
     core::ribosome::ZomeCallInvocation,
     core::state::dht_op_integration::IntegratedDhtOpsValue,
     core::state::validation_db::ValidationLimboValue,
@@ -31,7 +31,7 @@ use tracing::*;
 
 #[tokio::test(threaded_scheduler)]
 async fn app_validation_workflow_test() {
-    observability::test_run().ok();
+    observability::test_run_open().ok();
 
     let dna_file = DnaFile::new(
         DnaDef {
@@ -62,19 +62,12 @@ async fn app_validation_workflow_test() {
     let bob_cell_id = CellId::new(dna_file.dna_hash().to_owned(), bob_agent_id.clone());
     let bob_installed_cell = InstalledCell::new(bob_cell_id.clone(), "bob_handle".into());
 
-    let mut dna_store = MockDnaStore::new();
-
-    dna_store.expect_get().return_const(Some(dna_file.clone()));
-    dna_store.expect_add_dnas::<Vec<_>>().return_const(());
-    dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
-    dna_store.expect_get_entry_def().return_const(None);
-
     let (_tmpdir, _app_api, handle) = setup_app(
         vec![(
             "test_app",
             vec![(alice_installed_cell, None), (bob_installed_cell, None)],
         )],
-        dna_store,
+        vec![dna_file.clone()],
     )
     .await;
 
@@ -214,7 +207,8 @@ async fn run_test(
 
     // Integration should have 3 ops in it
     // Plus another 16 for genesis + init
-    let expected_count = 3 + 16;
+    // Plus 2 for Cap Grant
+    let expected_count = 3 + 16 + 2;
     let alice_env = handle.get_cell_env(&alice_cell_id).await.unwrap();
     wait_for_integration(&alice_env, expected_count, num_attempts, delay_per_attempt).await;
 
@@ -452,15 +446,11 @@ async fn commit_invalid(
 ) -> (HeaderHash, EntryHash) {
     let entry = ThisWasmEntry::NeverValidates;
     let entry_hash = EntryHash::with_data_sync(&Entry::try_from(entry.clone()).unwrap());
-    let (bob_env, call_data) = CallData::create(bob_cell_id, handle, dna_file).await;
+    let call_data = HostFnApi::create(bob_cell_id, handle, dna_file).await;
     // 4
-    let invalid_header_hash = commit_entry(
-        &bob_env,
-        call_data.clone(),
-        entry.clone().try_into().unwrap(),
-        INVALID_ID,
-    )
-    .await;
+    let invalid_header_hash = call_data
+        .commit_entry(entry.clone().try_into().unwrap(), INVALID_ID)
+        .await;
 
     // Produce and publish these commits
     let mut triggers = handle.get_cell_triggers(&bob_cell_id).await.unwrap();
@@ -479,15 +469,11 @@ async fn commit_invalid_post(
     let entry = Post("Banana".into());
     let entry_hash = EntryHash::with_data_sync(&Entry::try_from(entry.clone()).unwrap());
     // Create call data for the 3rd zome Create
-    let (bob_env, call_data) = CallData::create_for_zome(bob_cell_id, handle, dna_file, 2).await;
+    let call_data = HostFnApi::create_for_zome(bob_cell_id, handle, dna_file, 2).await;
     // 9
-    let invalid_header_hash = commit_entry(
-        &bob_env,
-        call_data.clone(),
-        entry.clone().try_into().unwrap(),
-        POST_ID,
-    )
-    .await;
+    let invalid_header_hash = call_data
+        .commit_entry(entry.clone().try_into().unwrap(), POST_ID)
+        .await;
 
     // Produce and publish these commits
     let mut triggers = handle.get_cell_triggers(&bob_cell_id).await.unwrap();
@@ -501,9 +487,9 @@ async fn call_zome_directly(
     dna_file: &DnaFile,
     invocation: ZomeCallInvocation,
 ) -> SerializedBytes {
-    let (bob_env, call_data) = CallData::create(bob_cell_id, handle, dna_file).await;
+    let call_data = HostFnApi::create(bob_cell_id, handle, dna_file).await;
     // 4
-    let output = call_zome_direct(&bob_env, call_data.clone(), invocation).await;
+    let output = call_data.call_zome_direct(invocation).await;
 
     // Produce and publish these commits
     let mut triggers = handle.get_cell_triggers(&bob_cell_id).await.unwrap();
@@ -524,7 +510,7 @@ fn inspect_val_limbo(
             .iter(&r)
             .unwrap()
             .map(|(k, i)| {
-                let hash = DhtOpHash::from_raw_bytes(k.to_vec());
+                let hash = DhtOpHash::from_raw_39_panicky(k.to_vec());
                 let el = element_buf.get_element(&i.op.header_hash()).unwrap();
                 debug!(?hash, ?i, op_in_val = ?el);
                 Ok((hash, i, el))
@@ -548,7 +534,7 @@ fn inspect_integrated(
             .iter(&r)
             .unwrap()
             .map(|(k, i)| {
-                let hash = DhtOpHash::from_raw_bytes(k.to_vec());
+                let hash = DhtOpHash::from_raw_39_panicky(k.to_vec());
                 let el = element_buf
                     .get_element(&i.op.header_hash())
                     .unwrap()

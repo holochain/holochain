@@ -38,7 +38,7 @@ async fn check_hashed_type() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "TODO"]
 fn check_serialized_bytes() {
     let h: HeaderHash =
         HeaderHash::try_from("uhCkkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm").unwrap();
@@ -102,7 +102,7 @@ async fn agent_id_as_bytes() {
     tokio::task::spawn(async move {
         let hash = vec![0xdb; 32];
         let hash: &[u8] = &hash;
-        let agent_id = HeaderHash::with_pre_hashed(hash.to_vec());
+        let agent_id = HeaderHash::from_raw_32(hash.to_vec());
         assert_eq!(hash, agent_id.get_bytes());
     })
     .await
@@ -112,7 +112,7 @@ async fn agent_id_as_bytes() {
 #[tokio::test(threaded_scheduler)]
 async fn agent_id_prehash_display() {
     tokio::task::spawn(async move {
-        let agent_id = HeaderHash::with_pre_hashed(vec![0xdb; 32]);
+        let agent_id = HeaderHash::from_raw_32(vec![0xdb; 32]);
         assert_eq!(
             "uhCkk29vb29vb29vb29vb29vb29vb29vb29vb29vb29vb29uTp5Iv",
             &format!("{}", agent_id.to_string()),

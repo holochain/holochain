@@ -1,11 +1,10 @@
 //! Fixturator definitions for kitsune_p2p.
 
-use crate::types::agent_store::AgentInfo;
-use crate::types::agent_store::AgentInfoSigned;
-use crate::types::agent_store::Urls;
-use crate::types::KitsuneAgent;
-use crate::types::KitsuneSignature;
-use crate::types::KitsuneSpace;
+use crate::{
+    agent_store::{AgentInfo, AgentInfoSigned, Urls},
+    dependencies::url2,
+    KitsuneAgent, KitsuneBinType, KitsuneSignature, KitsuneSpace,
+};
 use fixt::prelude::*;
 use url2::url2;
 
@@ -13,7 +12,7 @@ fixturator!(
     Urls;
     curve Empty vec![];
     curve Unpredictable {
-        let mut rng = thread_rng();
+        let mut rng = fixt::rng();
         let vec_len = rng.gen_range(0, 5);
         let mut ret = vec![];
 
@@ -23,7 +22,7 @@ fixturator!(
         ret
     };
     curve Predictable {
-        let mut rng = thread_rng();
+        let mut rng = fixt::rng();
         let vec_len = rng.gen_range(0, 5);
         let mut ret = vec![];
 
@@ -36,33 +35,51 @@ fixturator!(
 
 fixturator!(
     KitsuneAgent;
-    from ThirtySixBytes;
+    constructor fn new(ThirtySixBytes);
 );
 
 fixturator!(
     KitsuneSpace;
-    from ThirtySixBytes;
+    constructor fn new(ThirtySixBytes);
 );
 
 fixturator!(
     KitsuneSignature;
-    from ThirtySixBytes;
+    from SixtyFourBytes;
 );
 
 fixturator!(
     AgentInfo;
-    constructor fn new(KitsuneSpace, KitsuneAgent, Urls, U64);
+    constructor fn new(KitsuneSpace, KitsuneAgent, Urls, U64, U64);
 );
 
 fixturator!(
     AgentInfoSigned;
     curve Empty {
-        AgentInfoSigned::try_new(fixt!(KitsuneSignature, Empty), fixt!(AgentInfo, Empty)).unwrap()
+        let mut data = Vec::new();
+        kitsune_p2p_types::codec::rmp_encode(&mut data, &fixt!(AgentInfo, Empty)).unwrap();
+        AgentInfoSigned::try_new(
+            fixt!(KitsuneAgent, Empty),
+            fixt!(KitsuneSignature, Empty),
+            data,
+        ).unwrap()
     };
     curve Unpredictable {
-        AgentInfoSigned::try_new(fixt!(KitsuneSignature), fixt!(AgentInfo)).unwrap()
+        let mut data = Vec::new();
+        kitsune_p2p_types::codec::rmp_encode(&mut data, &fixt!(AgentInfo)).unwrap();
+        AgentInfoSigned::try_new(
+            fixt!(KitsuneAgent),
+            fixt!(KitsuneSignature),
+            data,
+        ).unwrap()
     };
     curve Predictable {
-        AgentInfoSigned::try_new(fixt!(KitsuneSignature, Predictable), fixt!(AgentInfo, Predictable)).unwrap()
+        let mut data = Vec::new();
+        kitsune_p2p_types::codec::rmp_encode(&mut data, &fixt!(AgentInfo, Predictable)).unwrap();
+        AgentInfoSigned::try_new(
+            fixt!(KitsuneAgent, Predictable),
+            fixt!(KitsuneSignature, Predictable),
+            data,
+        ).unwrap()
     };
 );

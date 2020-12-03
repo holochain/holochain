@@ -33,10 +33,13 @@ use holochain_state::{
 use holochain_types::{
     dht_op::{produce_op_lights_from_elements, DhtOp, DhtOpLight, UniqueForm},
     element::{Element, SignedHeaderHashed, SignedHeaderHashedExt},
+    header::NewEntryHeader,
     validate::ValidationStatus,
     Entry, EntryHashed, Timestamp,
 };
-use holochain_zome_types::{element::ElementEntry, signature::Signature};
+use holochain_zome_types::{
+    element::ElementEntry, query::ChainHead, query::ChainStatus, signature::Signature,
+};
 use holochain_zome_types::{element::SignedHeader, Header};
 use produce_dht_ops_workflow::dht_op_light::{
     error::{DhtOpConvertError, DhtOpConvertResult},
@@ -137,7 +140,7 @@ pub async fn integrate_dht_ops_workflow(
             // key. Just a possible note for the future.
             workspace.integration_limbo.put(so.hash, so.value)?;
         }
-        WorkComplete::Incomplete
+        WorkComplete::Complete
     };
 
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
@@ -172,12 +175,11 @@ async fn integrate_single_dht_op(
                 &mut workspace.elements,
                 &mut workspace.meta,
             )?),
-            ValidationStatus::Rejected => Ok(integrate_data_and_meta(
-                iv,
-                op,
-                &mut workspace.element_rejected,
-                &mut workspace.meta_rejected,
-            )?),
+            ValidationStatus::Rejected => {
+                update_activity_status(&op, &mut workspace.meta)?;
+                update_validation_status(&op, &mut workspace.meta)?;
+                Ok(integrate_data(iv, op, &mut workspace.element_rejected)?)
+            }
             ValidationStatus::Abandoned => {
                 // Throwing away abandoned ops
                 // TODO: keep abandoned ops but remove the entries
@@ -213,6 +215,53 @@ fn integrate_data_and_meta<P: PrefixType>(
     Ok(Outcome::Integrated(integrated))
 }
 
+/// Integrate data only
+fn integrate_data<P: PrefixType>(
+    iv: IntegrationLimboValue,
+    op: DhtOp,
+    element_store: &mut ElementBuf<P>,
+) -> DhtOpConvertResult<Outcome> {
+    integrate_single_data(op, element_store)?;
+    let integrated = IntegratedDhtOpsValue {
+        validation_status: iv.validation_status,
+        op: iv.op,
+        when_integrated: Timestamp::now(),
+    };
+    debug!("integrating");
+    Ok(Outcome::Integrated(integrated))
+}
+
+/// Update the status of agent activity if an op
+/// is rejected by the agent authority.
+fn update_activity_status(
+    op: &DhtOp,
+    meta_integrated: &mut impl MetadataBufT,
+) -> WorkflowResult<()> {
+    if let DhtOp::RegisterAgentActivity(_, h) = &op {
+        let chain_head = ChainHead {
+            header_seq: h.header_seq(),
+            hash: HeaderHash::with_data_sync(h),
+        };
+        meta_integrated.register_activity_status(h.author(), ChainStatus::Invalid(chain_head))?;
+        meta_integrated.register_activity(h, ValidationStatus::Rejected)?;
+    }
+    Ok(())
+}
+
+/// Rejected headers still need to be stored in the metadata vault so
+/// they can be served for a get details call.
+fn update_validation_status(
+    op: &DhtOp,
+    meta_integrated: &mut impl MetadataBufT,
+) -> WorkflowResult<()> {
+    match op {
+        DhtOp::StoreElement(_, h, _) => meta_integrated.register_rejected_element_header(h)?,
+        DhtOp::StoreEntry(_, h, _) => meta_integrated.register_rejected_header(h.clone())?,
+        _ => (),
+    }
+    Ok(())
+}
+
 /// Check if we have the required dependencies held before integrating.
 async fn op_dependencies_held(
     op: &DhtOp,
@@ -246,7 +295,8 @@ async fn op_dependencies_held(
                     }
                 }
             }
-            DhtOp::RegisterUpdatedBy(_, entry_update, _) => {
+            DhtOp::RegisterUpdatedContent(_, entry_update, _)
+            | DhtOp::RegisterUpdatedElement(_, entry_update, _) => {
                 // Check if we have the header with entry that we are updating
                 // or defer the op.
                 if !header_with_entry_is_stored(
@@ -352,15 +402,19 @@ where
         }
         DhtOpLight::StoreEntry(hash, _, _) => {
             let new_entry_header = get_header(hash, element_store)?.try_into()?;
+            if let NewEntryHeader::Update(update) = &new_entry_header {
+                meta_store.register_update(update.clone())?;
+            }
             // Reference to headers
             meta_store.register_header(new_entry_header)?;
         }
         DhtOpLight::RegisterAgentActivity(hash, _) => {
             let header = get_header(hash, element_store)?;
             // register agent activity on this agents pub key
-            meta_store.register_activity(&header)?;
+            meta_store.register_activity(&header, ValidationStatus::Valid)?;
         }
-        DhtOpLight::RegisterUpdatedBy(hash, _, _) => {
+        DhtOpLight::RegisterUpdatedContent(hash, _, _)
+        | DhtOpLight::RegisterUpdatedElement(hash, _, _) => {
             let header = get_header(hash, element_store)?.try_into()?;
             meta_store.register_update(header)?;
         }
@@ -402,13 +456,12 @@ pub fn integrate_single_data<P: PrefixType>(
             DhtOp::RegisterAgentActivity(signature, header) => {
                 put_data(signature, header, None, element_store)?;
             }
-            DhtOp::RegisterUpdatedBy(signature, entry_update, _) => {
+            DhtOp::RegisterUpdatedContent(signature, entry_update, _)
+            | DhtOp::RegisterUpdatedElement(signature, entry_update, _) => {
                 put_data(signature, entry_update.into(), None, element_store)?;
             }
-            DhtOp::RegisterDeletedEntryHeader(signature, element_delete) => {
-                put_data(signature, element_delete.into(), None, element_store)?;
-            }
-            DhtOp::RegisterDeletedBy(signature, element_delete) => {
+            DhtOp::RegisterDeletedEntryHeader(signature, element_delete)
+            | DhtOp::RegisterDeletedBy(signature, element_delete) => {
                 put_data(signature, element_delete.into(), None, element_store)?;
             }
             DhtOp::RegisterAddLink(signature, link_add) => {
@@ -453,13 +506,13 @@ fn get_header<P: PrefixType>(
 /// inline, so that they are immediately available in the authored metadata.
 /// NB: We skip integrating the element data, since it is already available in
 /// our source chain.
-pub async fn integrate_to_authored<C: MetadataBufT<AuthoredPrefix>>(
+pub fn integrate_to_authored<C: MetadataBufT<AuthoredPrefix>>(
     element: &Element,
     element_store: &ElementBuf<AuthoredPrefix>,
     meta_store: &mut C,
 ) -> DhtOpConvertResult<()> {
     // Produce the light directly
-    for op in produce_op_lights_from_elements(vec![element]).await? {
+    for op in produce_op_lights_from_elements(vec![element])? {
         // we don't integrate element data, because it is already in our vault.
         integrate_single_metadata(op, element_store, meta_store)?
     }

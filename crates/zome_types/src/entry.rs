@@ -94,7 +94,14 @@ impl HashableContent for Entry {
     fn hashable_content(&self) -> HashableContentBytes {
         match self {
             Entry::Agent(agent_pubkey) => {
-                HashableContentBytes::Prehashed36(agent_pubkey.clone().into_inner())
+                // We must retype this AgentPubKey as an EntryHash so that the
+                // prefix bytes match the Entry prefix
+                HashableContentBytes::Prehashed39(
+                    agent_pubkey
+                        .clone()
+                        .retype(holo_hash::hash_type::Entry)
+                        .into_inner(),
+                )
             }
             entry => HashableContentBytes::Content(
                 entry

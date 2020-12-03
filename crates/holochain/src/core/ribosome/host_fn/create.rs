@@ -55,14 +55,13 @@ pub fn create<'a>(
         entry_type,
         entry_hash,
     };
-    let host_access = call_context.host_access();
 
     // return the hash of the committed entry
     // note that validation is handled by the workflow
     // if the validation fails this commit will be rolled back by virtue of the lmdb transaction
     // being atomic
     tokio_safe_block_on::tokio_safe_block_forever_on(async move {
-        let mut guard = host_access.workspace().write().await;
+        let mut guard = call_context.host_access.workspace().write().await;
         let workspace: &mut CallZomeWorkspace = &mut guard;
         let source_chain = &mut workspace.source_chain;
         // push the header and the entry into the source chain
@@ -76,7 +75,6 @@ pub fn create<'a>(
             workspace.source_chain.elements(),
             &mut workspace.meta_authored,
         )
-        .await
         .map_err(Box::new)
         .map_err(SourceChainError::from)?;
         Ok(CreateOutput::new(header_hash))
@@ -122,7 +120,6 @@ pub fn extract_entry_def(
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use super::create;
-    use crate::conductor::dna_store::MockDnaStore;
     use crate::core::ribosome::error::RibosomeError;
     use crate::core::ribosome::ZomeCallInvocation;
     use crate::core::state::source_chain::ChainInvalidReason;
@@ -281,7 +278,10 @@ pub mod wasm_test {
     }
 
     #[tokio::test(threaded_scheduler)]
-    #[ignore] // david.b (this test is flakey)
+    #[ignore = "david.b (this test is flaky)"]
+    // maackle: this consistently passes for me with n = 37
+    //          but starts to randomly lock up at n = 38,
+    //          and fails consistently for higher values
     async fn multiple_create_entry_limit_test() {
         observability::test_run().unwrap();
         let dna_file = DnaFile::new(
@@ -328,19 +328,12 @@ pub mod wasm_test {
         // START CONDUCTOR
         // ///////////////
 
-        let mut dna_store = MockDnaStore::new();
-
-        dna_store.expect_get().return_const(Some(dna_file.clone()));
-        dna_store.expect_add_dnas::<Vec<_>>().return_const(());
-        dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
-        dna_store.expect_get_entry_def().return_const(None);
-
         let (_tmpdir, _app_api, handle) = setup_app(
             vec![(
                 "APPropriated",
                 vec![(alice_installed_cell, None), (bob_installed_cell, None)],
             )],
-            dna_store,
+            vec![dna_file.clone()],
         )
         .await;
 

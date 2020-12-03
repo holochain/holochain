@@ -23,10 +23,9 @@ use holochain::conductor::{
     dna_store::MockDnaStore,
     ConductorBuilder, ConductorHandle,
 };
+use holochain::core::ribosome::ZomeCallInvocation;
 use holochain::fixt::*;
-use holochain::{core::ribosome::ZomeCallInvocation, test_utils::warm_wasm_tests};
-use holochain_state::test_utils::test_p2p_env;
-use holochain_state::test_utils::{test_conductor_env, test_wasm_env, TestEnvironment};
+use holochain_state::test_utils::{test_environments, TestEnvironments};
 use holochain_types::app::InstalledCell;
 use holochain_types::cell::CellId;
 use holochain_types::dna::DnaDef;
@@ -47,35 +46,28 @@ mod test_utils;
 const DEFAULT_NUM: usize = 2000;
 
 #[tokio::test(threaded_scheduler)]
-#[ignore]
+#[cfg(feature = "test_utils")]
+#[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_prep() {
-    warm_wasm_tests();
+    holochain::test_utils::warm_wasm_tests();
 }
 
 #[tokio::test(threaded_scheduler)]
-#[ignore]
-async fn speed_test_flame() {
-    let _g = observability::flame_run().unwrap();
-    let _g = _g.unwrap();
-    speed_test(None).await;
-}
-
-#[tokio::test(threaded_scheduler)]
-#[ignore]
+#[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_timed() {
     let _g = observability::test_run_timed().unwrap();
     speed_test(None).await;
 }
 
 #[tokio::test(threaded_scheduler)]
-#[ignore]
+#[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_timed_json() {
     let _g = observability::test_run_timed_json().unwrap();
     speed_test(None).await;
 }
 
 #[tokio::test(threaded_scheduler)]
-#[ignore]
+#[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_timed_flame() {
     let _g = observability::test_run_timed_flame(None).unwrap();
     speed_test(None).await;
@@ -83,7 +75,7 @@ async fn speed_test_timed_flame() {
 }
 
 #[tokio::test(threaded_scheduler)]
-#[ignore]
+#[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_timed_ice() {
     let _g = observability::test_run_timed_ice(None).unwrap();
     speed_test(None).await;
@@ -91,7 +83,7 @@ async fn speed_test_timed_ice() {
 }
 
 #[tokio::test(threaded_scheduler)]
-#[ignore]
+#[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_normal() {
     observability::test_run().unwrap();
     speed_test(None).await;
@@ -100,12 +92,12 @@ async fn speed_test_normal() {
 /// Run this test to execute the speed test, but then keep the LMDB env files
 /// around in temp dirs for inspection by e.g. `mdb_stat`
 #[tokio::test(threaded_scheduler)]
-#[ignore]
+#[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_persisted() {
     observability::test_run().unwrap();
-    let env = speed_test(None).await;
-    let tmpdir = env.tmpdir();
-    drop(env);
+    let envs = speed_test(None).await;
+    let tmpdir = envs.tempdir();
+    drop(envs);
     let tmpdir = std::sync::Arc::try_unwrap(tmpdir).unwrap();
     let path = tmpdir.into_path();
     println!("Run the following to see info about the test that just ran,");
@@ -120,14 +112,14 @@ async fn speed_test_persisted() {
 #[test_case(100)]
 #[test_case(1000)]
 #[test_case(2000)]
-#[ignore]
+#[ignore = "speed tests are ignored by default; unignore to run"]
 fn speed_test_all(n: usize) {
     observability::test_run().unwrap();
     holochain::conductor::tokio_runtime().block_on(speed_test(Some(n)));
 }
 
 #[instrument]
-async fn speed_test(n: Option<usize>) -> TestEnvironment {
+async fn speed_test(n: Option<usize>) -> TestEnvironments {
     let num = n.unwrap_or(DEFAULT_NUM);
 
     // ////////////
@@ -326,17 +318,8 @@ async fn speed_test(n: Option<usize>) -> TestEnvironment {
 pub async fn setup_app(
     cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
     dna_store: MockDnaStore,
-) -> (TestEnvironment, RealAppInterfaceApi, ConductorHandle) {
-    let test_env = test_conductor_env();
-    let TestEnvironment {
-        env: wasm_env,
-        tmpdir: _tmpdir,
-    } = test_wasm_env();
-
-    let TestEnvironment {
-        env: p2p_env,
-        tmpdir: _p2p_tmpdir,
-    } = test_p2p_env();
+) -> (TestEnvironments, RealAppInterfaceApi, ConductorHandle) {
+    let envs = test_environments();
 
     let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
         .config(ConductorConfig {
@@ -345,7 +328,7 @@ pub async fn setup_app(
             }]),
             ..Default::default()
         })
-        .test(test_env.clone(), wasm_env, p2p_env)
+        .test(&envs)
         .await
         .unwrap();
 
@@ -367,7 +350,7 @@ pub async fn setup_app(
     let handle = conductor_handle.clone();
 
     (
-        test_env,
+        envs,
         RealAppInterfaceApi::new(conductor_handle, "test-interface".into()),
         handle,
     )

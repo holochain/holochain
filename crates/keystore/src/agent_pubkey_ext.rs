@@ -1,5 +1,5 @@
 use crate::*;
-use holochain_zome_types::signature::SignInput;
+use holochain_zome_types::signature::Sign;
 use holochain_zome_types::signature::Signature;
 use std::sync::Arc;
 
@@ -49,7 +49,7 @@ impl AgentPubKeyExt for holo_hash::AgentPubKey {
         let key = self.clone();
         async move {
             let data = maybe_data?;
-            keystore.sign(SignInput { key, data }).await
+            keystore.sign(Sign { key, data }).await
         }
         .boxed()
         .into()
@@ -58,7 +58,7 @@ impl AgentPubKeyExt for holo_hash::AgentPubKey {
     fn sign_raw(&self, keystore: &KeystoreSender, data: &[u8]) -> KeystoreApiFuture<Signature> {
         use ghost_actor::dependencies::futures::future::FutureExt;
         let keystore = keystore.clone();
-        let input = SignInput::new_raw(self.clone(), data.to_vec());
+        let input = Sign::new_raw(self.clone(), data.to_vec());
         async move { keystore.sign(input).await }.boxed().into()
     }
 
@@ -69,7 +69,7 @@ impl AgentPubKeyExt for holo_hash::AgentPubKey {
         use ghost_actor::dependencies::futures::future::FutureExt;
 
         let pub_key: lair_keystore_api::actor::SignEd25519PubKey =
-            self.get_core_bytes().to_vec().into();
+            self.get_raw_32().to_vec().into();
         let sig: lair_keystore_api::actor::SignEd25519Signature = signature.0.to_vec().into();
 
         let data: Result<SerializedBytes, SerializedBytesError> = data.try_into();
@@ -87,7 +87,7 @@ impl AgentPubKeyExt for holo_hash::AgentPubKey {
 
         let data = Arc::new(data.to_vec());
         let pub_key: lair_keystore_api::actor::SignEd25519PubKey =
-            self.get_core_bytes().to_vec().into();
+            self.get_raw_32().to_vec().into();
         let sig: lair_keystore_api::actor::SignEd25519Signature = signature.0.to_vec().into();
 
         async move { Ok(pub_key.verify(data, sig).await?) }

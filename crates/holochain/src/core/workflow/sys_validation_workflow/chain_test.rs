@@ -12,8 +12,7 @@ use holochain_zome_types::test_utils::fake_agent_pubkey_1;
 
 use super::*;
 use crate::{
-    conductor::dna_store::MockDnaStore, conductor::ConductorHandle,
-    core::state::source_chain::SourceChain, test_utils::setup_app,
+    conductor::ConductorHandle, core::state::source_chain::SourceChain, test_utils::setup_app,
     test_utils::wait_for_integration,
 };
 use ::fixt::prelude::*;
@@ -24,7 +23,7 @@ use holochain_zome_types::fixt::*;
 /// verify this works is to run this with logging and check it outputs
 /// use `RUST_LOG=[agent_activity]=warn`
 #[tokio::test(threaded_scheduler)]
-#[ignore]
+#[ignore = "TODO: complete when chain validation returns actual error"]
 async fn sys_validation_agent_activity_test() {
     observability::test_run().ok();
 
@@ -44,16 +43,9 @@ async fn sys_validation_agent_activity_test() {
     let alice_cell_id = CellId::new(dna_file.dna_hash().to_owned(), alice_agent_id.clone());
     let alice_installed_cell = InstalledCell::new(alice_cell_id.clone(), "alice_handle".into());
 
-    let mut dna_store = MockDnaStore::new();
-
-    dna_store.expect_get().return_const(Some(dna_file.clone()));
-    dna_store.expect_add_dnas::<Vec<_>>().return_const(());
-    dna_store.expect_add_entry_defs::<Vec<_>>().return_const(());
-    dna_store.expect_get_entry_def().return_const(None);
-
     let (_tmpdir, _app_api, handle) = setup_app(
         vec![("test_app", vec![(alice_installed_cell, None)])],
-        dna_store,
+        vec![dna_file.clone()],
     )
     .await;
 
@@ -133,6 +125,7 @@ async fn run_test(alice_cell_id: CellId, handle: ConductorHandle) {
         &alice_env,
         sys_validation_trigger.clone(),
         ops,
+        None,
     )
     .await
     .unwrap();
@@ -184,9 +177,14 @@ async fn run_test(alice_cell_id: CellId, handle: ConductorHandle) {
     ops.push((DhtOpHash::with_data_sync(&op), op));
 
     // Add the ops to incoming
-    incoming_dht_ops_workflow::incoming_dht_ops_workflow(&alice_env, sys_validation_trigger, ops)
-        .await
-        .unwrap();
+    incoming_dht_ops_workflow::incoming_dht_ops_workflow(
+        &alice_env,
+        sys_validation_trigger,
+        ops,
+        None,
+    )
+    .await
+    .unwrap();
 
     wait_for_integration(&alice_env, 9 + 2, 100, Duration::from_millis(100)).await;
 

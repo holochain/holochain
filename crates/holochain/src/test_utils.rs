@@ -4,10 +4,13 @@ use crate::{
     conductor::{
         api::RealAppInterfaceApi,
         config::{AdminInterfaceConfig, ConductorConfig, InterfaceDriver},
-        dna_store::MockDnaStore,
         ConductorBuilder, ConductorHandle,
     },
     core::ribosome::ZomeCallInvocation,
+    core::state::cascade::Cascade,
+    core::state::cascade::DbPair,
+    core::state::element_buf::ElementBuf,
+    core::state::metadata::MetadataBuf,
     core::workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace,
 };
 use ::fixt::prelude::*;
@@ -16,18 +19,18 @@ use holo_hash::fixt::*;
 use holo_hash::*;
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::{
-    actor::HolochainP2pRefToCell, event::HolochainP2pEventReceiver, spawn_holochain_p2p,
-    HolochainP2pCell, HolochainP2pRef, HolochainP2pSender,
+    actor::HolochainP2pRefToCell, event::HolochainP2pEvent, spawn_holochain_p2p, HolochainP2pCell,
+    HolochainP2pRef, HolochainP2pSender,
 };
 use holochain_serialized_bytes::{SerializedBytes, SerializedBytesError, UnsafeBytes};
 use holochain_state::{
-    env::EnvironmentWrite,
-    fresh_reader_test,
-    test_utils::{test_conductor_env, test_p2p_env, test_wasm_env, TestEnvironment},
+    env::EnvironmentWrite, fresh_reader_test, test_utils::test_environments,
+    test_utils::TestEnvironments,
 };
 use holochain_types::{
     app::InstalledCell,
     cell::CellId,
+    dna::DnaFile,
     element::{SignedHeaderHashed, SignedHeaderHashedExt},
     fixt::CapSecretFixturator,
     test_utils::fake_header_hash,
@@ -39,15 +42,18 @@ use holochain_zome_types::{
     header::{Create, EntryType, Header},
     ExternInput,
 };
+use kitsune_p2p::KitsuneP2pConfig;
 use std::{convert::TryInto, sync::Arc, time::Duration};
 use tempdir::TempDir;
+use tokio::sync::mpsc;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test_utils"))]
 pub mod host_fn_api;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test_utils"))]
 pub mod conductor_setup;
 
+/// Produce file and line number info at compile-time
 #[macro_export]
 macro_rules! here {
     ($test: expr) => {
@@ -136,26 +142,131 @@ pub async fn fake_unique_element(
     ))
 }
 
+/// A running test network with a joined cell.
+/// Will shutdown on drop.
+pub struct TestNetwork {
+    network: Option<HolochainP2pRef>,
+    respond_task: Option<tokio::task::JoinHandle<()>>,
+    cell_network: HolochainP2pCell,
+}
+
+impl TestNetwork {
+    /// Create a new test network
+    pub fn new(
+        network: HolochainP2pRef,
+        respond_task: tokio::task::JoinHandle<()>,
+        cell_network: HolochainP2pCell,
+    ) -> Self {
+        Self {
+            network: Some(network),
+            respond_task: Some(respond_task),
+            cell_network,
+        }
+    }
+
+    /// Get the holochain p2p network
+    pub fn network(&self) -> HolochainP2pRef {
+        self.network
+            .as_ref()
+            .expect("Tried to use network while it was shutting down")
+            .clone()
+    }
+
+    /// Get the cell network
+    pub fn cell_network(&self) -> HolochainP2pCell {
+        self.cell_network.clone()
+    }
+}
+
+impl Drop for TestNetwork {
+    fn drop(&mut self) {
+        use ghost_actor::GhostControlSender;
+        let network = self.network.take().unwrap();
+        let respond_task = self.respond_task.take().unwrap();
+        tokio::task::spawn(async move {
+            network.ghost_actor_shutdown_immediate().await.ok();
+            respond_task.await.ok();
+        });
+    }
+}
+
 /// Convenience constructor for cell networks
 pub async fn test_network(
     dna_hash: Option<DnaHash>,
     agent_key: Option<AgentPubKey>,
-) -> (HolochainP2pRef, HolochainP2pEventReceiver, HolochainP2pCell) {
-    let (network, recv) = spawn_holochain_p2p().await.unwrap();
+) -> TestNetwork {
+    test_network_inner::<fn(&HolochainP2pEvent) -> bool>(dna_hash, agent_key, None).await
+}
+
+/// Convenience constructor for cell networks
+/// where you need to filter some events into a channel
+pub async fn test_network_with_events<F>(
+    dna_hash: Option<DnaHash>,
+    agent_key: Option<AgentPubKey>,
+    filter: F,
+    evt_send: mpsc::Sender<HolochainP2pEvent>,
+) -> TestNetwork
+where
+    F: Fn(&HolochainP2pEvent) -> bool + Send + 'static,
+{
+    test_network_inner(dna_hash, agent_key, Some((filter, evt_send))).await
+}
+
+async fn test_network_inner<F>(
+    dna_hash: Option<DnaHash>,
+    agent_key: Option<AgentPubKey>,
+    mut events: Option<(F, mpsc::Sender<HolochainP2pEvent>)>,
+) -> TestNetwork
+where
+    F: Fn(&HolochainP2pEvent) -> bool + Send + 'static,
+{
+    let (network, mut recv) =
+        spawn_holochain_p2p(holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default())
+            .await
+            .unwrap();
+    let respond_task = tokio::task::spawn(async move {
+        use futures::future::FutureExt;
+        use tokio::stream::StreamExt;
+        while let Some(evt) = recv.next().await {
+            if let Some((filter, tx)) = &mut events {
+                if filter(&evt) {
+                    tx.send(evt).await.unwrap();
+                    continue;
+                }
+            }
+            use holochain_p2p::event::HolochainP2pEvent::*;
+            match evt {
+                SignNetworkData { respond, .. } => {
+                    respond.r(Ok(async move { Ok(vec![0; 64].into()) }.boxed().into()));
+                }
+                PutAgentInfoSigned { respond, .. } => {
+                    respond.r(Ok(async move { Ok(()) }.boxed().into()));
+                }
+                QueryAgentInfoSigned { respond, .. } => {
+                    respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
+                }
+                _ => (),
+            }
+        }
+    });
     let dna = dna_hash.unwrap_or_else(|| fixt!(DnaHash));
     let mut key_fixt = AgentPubKeyFixturator::new(Predictable);
     let agent_key = agent_key.unwrap_or_else(|| key_fixt.next().unwrap());
     let cell_network = network.to_cell(dna.clone(), agent_key.clone());
     network.join(dna.clone(), agent_key).await.unwrap();
-    (network, recv, cell_network)
+    TestNetwork::new(network, respond_task, cell_network)
 }
 
 /// Do what's necessary to install an app
 pub async fn install_app(
     name: &str,
     cell_data: Vec<(InstalledCell, Option<SerializedBytes>)>,
+    dnas: Vec<DnaFile>,
     conductor_handle: ConductorHandle,
 ) {
+    for dna in dnas {
+        conductor_handle.install_dna(dna).await.unwrap();
+    }
     conductor_handle
         .clone()
         .install_app(name.to_string(), cell_data)
@@ -169,7 +280,7 @@ pub async fn install_app(
 
     let errors = conductor_handle.setup_cells().await.unwrap();
 
-    assert!(errors.is_empty());
+    assert!(errors.is_empty(), "{:?}", errors);
 }
 
 /// Payload for installing cells
@@ -179,38 +290,48 @@ pub type InstalledCellsWithProofs = Vec<(InstalledCell, Option<SerializedBytes>)
 /// apps_data is a vec of app nicknames with vecs of their cell data
 pub async fn setup_app(
     apps_data: Vec<(&str, InstalledCellsWithProofs)>,
-    dna_store: MockDnaStore,
+    dnas: Vec<DnaFile>,
 ) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
-    let test_env = test_conductor_env();
-    let TestEnvironment {
-        env: wasm_env,
-        tmpdir: _tmpdir,
-    } = test_wasm_env();
-    let TestEnvironment {
-        env: p2p_env,
-        tmpdir: _p2p_tmpdir,
-    } = test_p2p_env();
-    let tmpdir = test_env.tmpdir.clone();
+    setup_app_inner(test_environments(), apps_data, dnas, None).await
+}
 
-    let conductor_handle = ConductorBuilder::with_mock_dna_store(dna_store)
+/// Setup an app with a custom network config for testing
+/// apps_data is a vec of app nicknames with vecs of their cell data.
+pub async fn setup_app_with_network(
+    apps_data: Vec<(&str, InstalledCellsWithProofs)>,
+    dnas: Vec<DnaFile>,
+    network: KitsuneP2pConfig,
+) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
+    setup_app_inner(test_environments(), apps_data, dnas, Some(network)).await
+}
+
+/// Setup an app with full configurability
+pub async fn setup_app_inner(
+    envs: TestEnvironments,
+    apps_data: Vec<(&str, InstalledCellsWithProofs)>,
+    dnas: Vec<DnaFile>,
+    network: Option<KitsuneP2pConfig>,
+) -> (Arc<TempDir>, RealAppInterfaceApi, ConductorHandle) {
+    let conductor_handle = ConductorBuilder::new()
         .config(ConductorConfig {
             admin_interfaces: Some(vec![AdminInterfaceConfig {
                 driver: InterfaceDriver::Websocket { port: 0 },
             }]),
+            network,
             ..Default::default()
         })
-        .test(test_env, wasm_env, p2p_env)
+        .test(&envs)
         .await
         .unwrap();
 
     for (app_name, cell_data) in apps_data {
-        install_app(app_name, cell_data, conductor_handle.clone()).await;
+        install_app(app_name, cell_data, dnas.clone(), conductor_handle.clone()).await;
     }
 
     let handle = conductor_handle.clone();
 
     (
-        tmpdir,
+        envs.tempdir(),
         RealAppInterfaceApi::new(conductor_handle, "test-interface".into()),
         handle,
     )
@@ -268,16 +389,23 @@ pub async fn wait_for_integration(
                 .collect()
                 .unwrap()
         });
-        tracing::debug!(?int);
+        let count = int.len();
 
-        let count = fresh_reader_test!(env, |r| {
-            workspace
-                .integrated_dht_ops
-                .iter(&r)
-                .unwrap()
-                .count()
-                .unwrap()
-        });
+        {
+            let s = tracing::trace_span!("wait_for_integration_deep");
+            let _g = s.enter();
+            let element_integrated = ElementBuf::vault(env.clone().into(), false).unwrap();
+            let meta_integrated = MetadataBuf::vault(env.clone().into()).unwrap();
+            let element_rejected = ElementBuf::rejected(env.clone().into()).unwrap();
+            let meta_rejected = MetadataBuf::rejected(env.clone().into()).unwrap();
+            let mut cascade = Cascade::empty()
+                .with_integrated(DbPair::new(&element_integrated, &meta_integrated))
+                .with_rejected(DbPair::new(&element_rejected, &meta_rejected));
+            for iv in int {
+                tracing::trace!(op = ?iv.op, el = ?cascade.retrieve(iv.op.header_hash().clone().into(), Default::default()).await.unwrap());
+            }
+        }
+
         if count == expected_count {
             return;
         } else {
