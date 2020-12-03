@@ -46,7 +46,10 @@ use crate::{
 };
 pub use builder::*;
 use fallible_iterator::FallibleIterator;
-use futures::future::{self, TryFutureExt};
+use futures::{
+    future::{self, TryFutureExt},
+    StreamExt,
+};
 use holo_hash::DnaHash;
 use holochain_keystore::{
     lair_keystore::spawn_lair_keystore, test_keystore::spawn_test_keystore, KeystoreSender,
@@ -1128,29 +1131,14 @@ mod builder {
 
 #[instrument(skip(p2p_evt, handle))]
 async fn p2p_event_task(
-    mut p2p_evt: holochain_p2p::event::HolochainP2pEventReceiver,
+    p2p_evt: holochain_p2p::event::HolochainP2pEventReceiver,
     handle: ConductorHandle,
 ) {
     /// The number of events we allow to run in parallel before
     /// starting to await on the join handles.
     const NUM_PARALLEL_EVTS: usize = 100;
-    use tokio::stream::StreamExt;
-    let (mut tx, rx) = tokio::sync::mpsc::channel(NUM_PARALLEL_EVTS);
-
-    // Task to await a buffer of event join handles
-    tokio::task::spawn(async move {
-        use futures::StreamExt;
-        let mut buffer = rx.buffer_unordered(NUM_PARALLEL_EVTS);
-        while let Some(r) = futures::StreamExt::next(&mut buffer).await {
-            if let Err(e) = r {
-                error!("Failed to join event task {:?}", e);
-            }
-        }
-    });
-
-    // Spawn event tasks
-    while let Some(evt) = p2p_evt.next().await {
-        let join_handle = tokio::task::spawn({
+    p2p_evt
+        .for_each_concurrent(NUM_PARALLEL_EVTS, |evt| {
             let handle = handle.clone();
             async move {
                 let cell_id = CellId::new(evt.dna_hash().clone(), evt.as_to_agent().clone());
@@ -1161,11 +1149,10 @@ async fn p2p_event_task(
                     );
                 }
             }
-        });
-        if let Err(e) = tx.send(join_handle).await {
-            error!("Failing to send event join handles to join task {:?}", e);
-        }
-    }
+            .in_current_span()
+        })
+        .await;
+
     tracing::warn!("p2p_event_task has ended");
 }
 

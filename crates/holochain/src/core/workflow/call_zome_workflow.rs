@@ -40,7 +40,7 @@ mod validation_test;
 pub type ZomeCallInvocationResult = RibosomeResult<ZomeCallResponse>;
 
 #[derive(Debug)]
-pub struct CallZomeWorkflowArgs<Ribosome: RibosomeT, C: CellConductorApiT> {
+pub struct CallZomeWorkflowArgs<Ribosome: RibosomeT + Send, C: CellConductorApiT> {
     pub ribosome: Ribosome,
     pub invocation: ZomeCallInvocation,
     pub signal_tx: SignalBroadcaster,
@@ -56,7 +56,11 @@ pub struct CallZomeWorkflowArgs<Ribosome: RibosomeT, C: CellConductorApiT> {
     args,
     trigger_produce_dht_ops
 ))]
-pub async fn call_zome_workflow<'env, Ribosome: RibosomeT, C: CellConductorApiT>(
+pub async fn call_zome_workflow<
+    'env,
+    Ribosome: RibosomeT + Send + 'static,
+    C: CellConductorApiT,
+>(
     workspace_lock: CallZomeWorkspaceLock,
     network: HolochainP2pCell,
     keystore: KeystoreSender,
@@ -81,7 +85,11 @@ pub async fn call_zome_workflow<'env, Ribosome: RibosomeT, C: CellConductorApiT>
     Ok(result)
 }
 
-async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT, C: CellConductorApiT>(
+async fn call_zome_workflow_inner<
+    'env,
+    Ribosome: RibosomeT + Send + 'static,
+    C: CellConductorApiT,
+>(
     workspace_lock: CallZomeWorkspaceLock,
     network: HolochainP2pCell,
     keystore: KeystoreSender,
@@ -104,17 +112,23 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT, C: CellConductorApi
 
     tracing::trace!(line = line!());
     // Create the unsafe sourcechain for use with wasm closure
-    let result = {
-        let host_access = ZomeCallHostAccess::new(
-            workspace_lock.clone(),
-            keystore,
-            network.clone(),
-            signal_tx,
-            call_zome_handle,
-            invocation.cell_id.clone(),
-        );
-        ribosome.call_zome_function(host_access, invocation)
-    };
+    let (ribosome, result) = tokio::task::spawn_blocking({
+        let workspace_lock = workspace_lock.clone();
+        let network = network.clone();
+        move || {
+            let host_access = ZomeCallHostAccess::new(
+                workspace_lock,
+                keystore,
+                network,
+                signal_tx,
+                call_zome_handle,
+                invocation.cell_id.clone(),
+            );
+            let result = ribosome.call_zome_function(host_access, invocation);
+            (ribosome, result)
+        }
+    })
+    .await?;
     tracing::trace!(line = line!());
 
     let to_app_validate = {
@@ -340,7 +354,7 @@ pub mod tests {
         a: u32,
     }
 
-    async fn run_call_zome<'env, Ribosome: RibosomeT + Send + Sync + 'env>(
+    async fn run_call_zome<'env, Ribosome: RibosomeT + Send + Sync + 'static>(
         workspace: CallZomeWorkspace,
         ribosome: Ribosome,
         invocation: ZomeCallInvocation,

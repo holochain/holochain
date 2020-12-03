@@ -355,7 +355,7 @@ pub async fn wait_for_integration(
     num_attempts: usize,
     delay: Duration,
 ) {
-    for _ in 0..num_attempts {
+    for i in 0..num_attempts {
         let workspace = IncomingDhtOpsWorkspace::new(env.clone().into()).unwrap();
 
         let val_limbo: Vec<_> = fresh_reader_test!(env, |r| {
@@ -409,7 +409,8 @@ pub async fn wait_for_integration(
         if count == expected_count {
             return;
         } else {
-            tracing::debug!(?count);
+            let total_time_waited = delay * i as u32;
+            tracing::debug!(?count, ?total_time_waited);
         }
         tokio::time::delay_for(delay).await;
     }
