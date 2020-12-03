@@ -24,6 +24,7 @@ members = [
     "post_commit_success",
     "query",
     "random_bytes",
+    "xsalsa20_poly1305",
     "ser_regression",
     "sign",
     "sys_time",

@@ -840,6 +840,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_wasm_xsalsa20_poly1305"
+version = "0.0.1"
+dependencies = [
+ "hdk3",
+ "serde",
+]
+
+[[package]]
 name = "test_wasm_zome_info"
 version = "0.0.1"
 dependencies = [

@@ -34,11 +34,9 @@ use crate::core::ribosome::host_fn::capability_info::capability_info;
 use crate::core::ribosome::host_fn::create::create;
 use crate::core::ribosome::host_fn::create_link::create_link;
 use crate::core::ribosome::host_fn::debug::debug;
-use crate::core::ribosome::host_fn::decrypt::decrypt;
 use crate::core::ribosome::host_fn::delete::delete;
 use crate::core::ribosome::host_fn::delete_link::delete_link;
 use crate::core::ribosome::host_fn::emit_signal::emit_signal;
-use crate::core::ribosome::host_fn::encrypt::encrypt;
 use crate::core::ribosome::host_fn::get::get;
 use crate::core::ribosome::host_fn::get_details::get_details;
 use crate::core::ribosome::host_fn::get_link_details::get_link_details;
@@ -54,6 +52,8 @@ use crate::core::ribosome::host_fn::sys_time::sys_time;
 use crate::core::ribosome::host_fn::unreachable::unreachable;
 use crate::core::ribosome::host_fn::update::update;
 use crate::core::ribosome::host_fn::verify_signature::verify_signature;
+use crate::core::ribosome::host_fn::xsalsa20_poly1305_decrypt::xsalsa20_poly1305_decrypt;
+use crate::core::ribosome::host_fn::xsalsa20_poly1305_encrypt::xsalsa20_poly1305_encrypt;
 use crate::core::ribosome::host_fn::zome_info::zome_info;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::Invocation;
@@ -194,16 +194,28 @@ impl WasmRibosome {
                 func!(invoke_host_function!(verify_signature)),
             );
             ns.insert("__sign", func!(invoke_host_function!(sign)));
-            ns.insert("__decrypt", func!(invoke_host_function!(decrypt)));
-            ns.insert("__encrypt", func!(invoke_host_function!(encrypt)));
+            ns.insert(
+                "__xsalsa20_poly1305_encrypt",
+                func!(invoke_host_function!(xsalsa20_poly1305_encrypt)),
+            );
+            ns.insert(
+                "__xsalsa20_poly1305_decrypt",
+                func!(invoke_host_function!(xsalsa20_poly1305_decrypt)),
+            );
         } else {
             ns.insert(
                 "__verify_signature",
                 func!(invoke_host_function!(unreachable)),
             );
             ns.insert("__sign", func!(invoke_host_function!(unreachable)));
-            ns.insert("__decrypt", func!(invoke_host_function!(unreachable)));
-            ns.insert("__encrypt", func!(invoke_host_function!(unreachable)));
+            ns.insert(
+                "__xsalsa20_poly1305_encrypt",
+                func!(invoke_host_function!(unreachable)),
+            );
+            ns.insert(
+                "__xsalsa20_poly1305_decrypt",
+                func!(invoke_host_function!(unreachable)),
+            );
         }
 
         if let HostFnAccess {

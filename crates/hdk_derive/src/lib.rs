@@ -217,3 +217,22 @@ pub fn hdk_extern(_attrs: TokenStream, item: TokenStream) -> TokenStream {
     })
     .into()
 }
+
+// #[proc_macro_attribute]
+// pub fn hdk_from_random(attrs: TokenStream, code: TokenStream) -> TokenStream {
+//     let item = syn::parse_macro_input!(code as syn::Item);
+//
+//     let struct_ident = match item.clone() {
+//         syn::Item::Struct(item_struct) => item_struct.ident,
+//         _ => unimplemented!(),
+//     };
+//
+//     let bytes_length = syn::parse_macro_input!(attrs as u32);
+//
+//     (quote::quote! {
+//         #item
+//
+//         impl FromRandom
+//     })
+//     .into()
+// }

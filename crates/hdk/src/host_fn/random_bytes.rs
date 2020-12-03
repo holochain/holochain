@@ -32,3 +32,42 @@ pub fn random_bytes(number_of_bytes: u32) -> HdkResult<Vec<u8>> {
     .into_inner()
     .into_vec())
 }
+
+pub trait TryFromRandom {
+    fn try_from_random() -> HdkResult<Self>
+    where
+        Self: Sized;
+}
+
+/// Ideally we wouldn't need to do this.
+/// All we want is to implement this trait with whatever length our random-bytes-new-types need to
+/// be, but if we use a const on the trait directly we get 'constant expression depends on a
+/// generic parameter'
+macro_rules! impl_try_from_random {
+    ( $t:ty, $bytes:expr ) => {
+        impl TryFromRandom for $t {
+            fn try_from_random() -> $crate::prelude::HdkResult<Self> {
+                $crate::prelude::random_bytes($bytes as u32).map(|bytes| {
+                    // Always a fatal error if our own bytes generation has the wrong length.
+                    assert_eq!($bytes, bytes.len());
+                    let mut inner = [0; $bytes];
+                    inner.copy_from_slice(bytes.as_ref());
+                    Self::from(inner)
+                })
+            }
+        }
+    };
+}
+
+impl_try_from_random!(
+    CapSecret,
+    holochain_zome_types::capability::CAP_SECRET_BYTES
+);
+impl_try_from_random!(
+    SecretBoxKey,
+    holochain_zome_types::xsalsa20_poly1305::key::KEY_BYTES
+);
+impl_try_from_random!(
+    SecretBoxNonce,
+    holochain_zome_types::xsalsa20_poly1305::nonce::NONCE_BYTES
+);

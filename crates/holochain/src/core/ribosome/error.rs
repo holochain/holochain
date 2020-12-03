@@ -88,6 +88,10 @@ pub enum RibosomeError {
     /// ident
     #[error(transparent)]
     P2pError(#[from] holochain_p2p::HolochainP2pError),
+
+    // ident
+    // #[error("xsalsa20poly1305 error {0}")]
+    // Aead(#[from] xsalsa20poly1305::aead::Error),
 }
 
 impl From<ring::error::Unspecified> for RibosomeError {

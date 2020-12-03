@@ -52,12 +52,24 @@ wasm_io_types!(
     pub struct CreateInput((entry_def::EntryDefId, entry::Entry));
     // Header hash of the newly created element.
     pub struct CreateOutput(holo_hash::HeaderHash);
-    // @todo
-    pub struct DecryptInput(());
-    pub struct DecryptOutput(());
-    // @todo
-    pub struct EncryptInput(());
-    pub struct EncryptOutput(());
+    pub struct XSalsa20Poly1305EncryptInput(
+        (
+            xsalsa20_poly1305::key::XSalsa20Poly1305Key,
+            xsalsa20_poly1305::nonce::XSalsa20Poly1305Nonce,
+            xsalsa20_poly1305::data::XSalsa20Poly1305Data,
+        ),
+    );
+    pub struct XSalsa20Poly1305EncryptOutput(
+        xsalsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData,
+    );
+    pub struct XSalsa20Poly1305DecryptInput(
+        (
+            xsalsa20_poly1305::key::XSalsa20Poly1305Key,
+            xsalsa20_poly1305::nonce::XSalsa20Poly1305Nonce,
+            xsalsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData,
+        ),
+    );
+    pub struct XSalsa20Poly1305DecryptOutput(Option<xsalsa20_poly1305::data::XSalsa20Poly1305Data>);
     // @todo
     pub struct ShowEnvInput(());
     pub struct ShowEnvOutput(());
@@ -151,6 +163,11 @@ wasm_io_types!(
     pub struct ExternInput(SerializedBytes);
     pub struct ExternOutput(SerializedBytes);
 );
+
+pub type SecretBoxInput = XSalsa20Poly1305EncryptInput;
+pub type SecretBoxOutput = XSalsa20Poly1305EncryptOutput;
+pub type SecretBoxOpenInput = XSalsa20Poly1305DecryptInput;
+pub type SecretBoxOpenOutput = XSalsa20Poly1305DecryptOutput;
 
 /// Response to a zome call.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes, PartialEq)]

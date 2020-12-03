@@ -62,6 +62,7 @@ url2 = "0.0.6"
 url_serde = "0.2.0"
 uuid = { version = "0.7", features = [ "serde", "v4" ] }
 kitsune_p2p = { version = "0.0.1", path = "../kitsune_p2p/kitsune_p2p" }
+xsalsa20poly1305 = "0.6.0"
 
 # Dependencies for test_utils: keep in sync with below
 hdk3 = { path = "../hdk", optional = true }
