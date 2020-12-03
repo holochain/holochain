@@ -1,12 +1,9 @@
 use super::{InterfaceApi, SignalSubscription};
-use crate::{
-    conductor::{
-        api::error::{ConductorApiResult, ExternalApiWireError, SerializationError},
-        interface::error::{InterfaceError, InterfaceResult},
-        state::AppInterfaceId,
-        ConductorHandle,
-    },
-    core::ribosome::ZomeCallInvocation,
+use crate::conductor::{
+    api::error::{ConductorApiResult, ExternalApiWireError, SerializationError},
+    interface::error::{InterfaceError, InterfaceResult},
+    state::AppInterfaceId,
+    ConductorHandle,
 };
 use holo_hash::AgentPubKey;
 use holochain_serialized_bytes::prelude::*;

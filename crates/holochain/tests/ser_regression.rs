@@ -8,7 +8,6 @@ use holochain::{
         dna_store::MockDnaStore,
         ConductorBuilder, ConductorHandle,
     },
-    core::ribosome::ZomeCallInvocation,
     fixt::*,
 };
 use holochain_state::test_utils::test_environments;

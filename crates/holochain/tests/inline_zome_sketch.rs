@@ -1,9 +1,6 @@
 use futures::StreamExt;
 use hdk3::prelude::*;
-use holochain::{
-    conductor::{api::ZomeCall, Conductor},
-    core::ribosome::ZomeCallInvocation,
-};
+use holochain::conductor::{api::ZomeCall, Conductor};
 use holochain_keystore::KeystoreSender;
 use holochain_state::test_utils::test_environments;
 use holochain_types::{

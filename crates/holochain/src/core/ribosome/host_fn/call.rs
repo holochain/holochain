@@ -23,7 +23,6 @@ pub fn call(
         .to_cell
         .unwrap_or_else(|| conductor_handle.cell_id().clone());
 
-    let dna_hash = cell_id.dna_hash();
     let zome_name = call.zome_name.clone();
 
     // Create the invocation for this call

@@ -52,10 +52,7 @@ use super::{
     manager::TaskManagerRunHandle,
     Cell, Conductor,
 };
-use crate::core::{
-    ribosome::ZomeCallInvocation,
-    workflow::{CallZomeWorkspaceLock, ZomeCallResult},
-};
+use crate::core::workflow::{CallZomeWorkspaceLock, ZomeCallResult};
 use derive_more::From;
 use futures::future::FutureExt;
 use holochain_p2p::event::HolochainP2pEvent::*;

@@ -10,11 +10,8 @@ use crate::{
     conductor::{
         entry_def_store::EntryDefBufferKey, interface::SignalBroadcaster, ConductorHandle,
     },
-    core::{
-        ribosome::ZomeCallInvocation,
-        workflow::{
-            call_zome_workflow::call_zome_workspace_lock::CallZomeWorkspaceLock, ZomeCallResult,
-        },
+    core::workflow::{
+        call_zome_workflow::call_zome_workspace_lock::CallZomeWorkspaceLock, ZomeCallResult,
     },
 };
 use async_trait::async_trait;
