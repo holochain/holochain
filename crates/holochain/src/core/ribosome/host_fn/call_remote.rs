@@ -188,15 +188,11 @@ pub mod wasm_test {
         let delay_per_attempt = Duration::from_millis(100);
 
         let zomes = vec![TestWasm::CallRemoteCaller, TestWasm::CallRemoteCallee];
-        let conductor_test = ConductorTestData::new(zomes, true).await;
-        let ConductorTestData {
-            __tmpdir,
-            handle,
-            alice_call_data,
-            bob_call_data,
-            ..
-        } = conductor_test;
-        let bob_call_data = bob_call_data.unwrap();
+
+        let mut conductor_test = ConductorTestData::two_agents(zomes, true).await;
+        let handle = conductor_test.handle();
+        let alice_call_data = conductor_test.alice_call_data();
+        let bob_call_data = conductor_test.bob_call_data().unwrap();
 
         // Alice commits base and target
         let invocation = new_invocation(
@@ -287,7 +283,7 @@ pub mod wasm_test {
 
         assert_eq!(links.into_inner().len(), 1);
 
-        ConductorTestData::shutdown_conductor(handle).await;
+        conductor_test.shutdown_conductor().await;
     }
 
     async fn call<T: TryFrom<SerializedBytes>>(

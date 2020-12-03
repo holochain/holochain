@@ -10,8 +10,7 @@ use crate::{
     core::ribosome::ZomeCallInvocation,
     core::{
         ribosome::{
-            error::RibosomeResult, host_fn, wasm_ribosome::WasmRibosome, CallContext, HostAccess,
-            ZomeCallHostAccess,
+            host_fn, wasm_ribosome::WasmRibosome, CallContext, HostAccess, ZomeCallHostAccess,
         },
         state::{metadata::LinkMetaKey, workspace::Workspace},
         workflow::{CallZomeWorkspace, CallZomeWorkspaceLock},

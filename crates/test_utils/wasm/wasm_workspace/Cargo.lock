@@ -550,7 +550,6 @@ version = "0.0.1"
 dependencies = [
  "hdk3",
  "serde",
- "test_wasm_common",
 ]
 
 [[package]]
@@ -559,7 +558,6 @@ version = "0.0.1"
 dependencies = [
  "hdk3",
  "serde",
- "test_wasm_common",
 ]
 
 [[package]]

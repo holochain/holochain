@@ -494,7 +494,7 @@ async fn call_zome_directly(
     // Produce and publish these commits
     let mut triggers = handle.get_cell_triggers(&bob_cell_id).await.unwrap();
     triggers.produce_dht_ops.trigger();
-    output.unwrap()
+    output
 }
 
 #[instrument(skip(env, workspace))]
