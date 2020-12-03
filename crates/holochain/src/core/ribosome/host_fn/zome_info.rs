@@ -25,7 +25,6 @@ pub fn zome_info(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod test {
-
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use holochain_wasm_test_utils::TestWasm;

@@ -38,7 +38,6 @@ pub fn call_remote(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-
     use crate::conductor::dna_store::MockDnaStore;
     use crate::conductor::interface::websocket::test::setup_app;
     use crate::core::ribosome::ZomeCallInvocation;
