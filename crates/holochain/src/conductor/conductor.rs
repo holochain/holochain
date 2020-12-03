@@ -739,10 +739,10 @@ where
                     match iter.next() {
                         Ok(Some((k, v))) => {
                             let info = kitsune_p2p::agent_store::AgentInfo::try_from(&v)?;
-                            if info.signed_at_ms() + info.expires_after_ms() <= now {
-                                expired.push(AgentKvKey::from(k));
-                            } else {
-                                out.push(v);
+                            let expires = info.signed_at_ms().checked_add(info.expires_after_ms());
+                            match expires {
+                                Some(expires) if expires > now => out.push(v),
+                                _ => expired.push(AgentKvKey::from(k)),
                             }
                         }
                         Ok(None) => break,
@@ -1126,18 +1126,44 @@ mod builder {
     }
 }
 
+#[instrument(skip(p2p_evt, handle))]
 async fn p2p_event_task(
     mut p2p_evt: holochain_p2p::event::HolochainP2pEventReceiver,
     handle: ConductorHandle,
 ) {
+    /// The number of events we allow to run in parallel before
+    /// starting to await on the join handles.
+    const NUM_PARALLEL_EVTS: usize = 100;
     use tokio::stream::StreamExt;
+    let (mut tx, rx) = tokio::sync::mpsc::channel(NUM_PARALLEL_EVTS);
+
+    // Task to await a buffer of event join handles
+    tokio::task::spawn(async move {
+        use futures::StreamExt;
+        let mut buffer = rx.buffer_unordered(NUM_PARALLEL_EVTS);
+        while let Some(r) = futures::StreamExt::next(&mut buffer).await {
+            if let Err(e) = r {
+                error!("Failed to join event task {:?}", e);
+            }
+        }
+    });
+
+    // Spawn event tasks
     while let Some(evt) = p2p_evt.next().await {
-        let cell_id = CellId::new(evt.dna_hash().clone(), evt.as_to_agent().clone());
-        if let Err(e) = handle.dispatch_holochain_p2p_event(&cell_id, evt).await {
-            tracing::error!(
-                message = "error dispatching network event",
-                error = ?e,
-            );
+        let join_handle = tokio::task::spawn({
+            let handle = handle.clone();
+            async move {
+                let cell_id = CellId::new(evt.dna_hash().clone(), evt.as_to_agent().clone());
+                if let Err(e) = handle.dispatch_holochain_p2p_event(&cell_id, evt).await {
+                    tracing::error!(
+                        message = "error dispatching network event",
+                        error = ?e,
+                    );
+                }
+            }
+        });
+        if let Err(e) = tx.send(join_handle).await {
+            error!("Failing to send event join handles to join task {:?}", e);
         }
     }
     tracing::warn!("p2p_event_task has ended");

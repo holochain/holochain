@@ -30,8 +30,22 @@ pub type CapGrantEntry = ZomeCallCapGrant;
 pub type CapClaimEntry = CapClaim;
 
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
-/// @todo make some options for get
-pub struct GetOptions;
+/// Options for controlling how get works
+pub struct GetOptions {
+    /// If this is true the get call will wait for
+    /// the latest data before returning.
+    /// If it is false you will get whatever is locally
+    /// available on this conductor.
+    pub wait_for_new_data: bool,
+}
+
+impl Default for GetOptions {
+    fn default() -> Self {
+        Self {
+            wait_for_new_data: false,
+        }
+    }
+}
 
 /// Structure holding the entry portion of a chain element.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes)]

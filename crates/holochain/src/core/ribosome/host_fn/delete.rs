@@ -5,7 +5,6 @@ use crate::core::state::cascade::error::CascadeError;
 use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
 use crate::core::{workflow::integrate_dht_ops_workflow::integrate_to_authored, SourceChainError};
 use holo_hash::{EntryHash, HeaderHash};
-use holochain_p2p::actor::GetOptions;
 use holochain_zome_types::header::builder;
 use holochain_zome_types::DeleteInput;
 use holochain_zome_types::{element::SignedHeaderHashed, DeleteOutput};
@@ -62,7 +61,7 @@ pub(crate) fn get_original_address<'a>(
         let mut cascade = workspace.cascade(network);
         // TODO: Think about what options to use here
         let maybe_original_element: Option<SignedHeaderHashed> = cascade
-            .get_details(address.clone().into(), GetOptions::default())
+            .get_details(address.clone().into(), Default::default())
             .await?
             .map(|el| {
                 match el {

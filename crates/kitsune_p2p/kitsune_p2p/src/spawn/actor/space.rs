@@ -682,7 +682,7 @@ impl Space {
                 space.clone(),
                 from_agent.clone(),
                 from_agent,
-                payload.into(),
+                payload.clone().into(),
             ),
             |a, w| match w {
                 wire::Wire::CallResp(c) => Ok(actor::RpcMultiResponse {
@@ -691,7 +691,8 @@ impl Space {
                 }),
                 _ => Err(()),
             },
-        );
+        )
+        .instrument(tracing::debug_span!("message_neighborhood", payload = ?payload.iter().take(5).collect::<Vec<_>>()));
 
         Ok(async move {
             let mut out: Vec<actor::RpcMultiResponse> = futures::future::join_all(local_all)
