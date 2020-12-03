@@ -4,7 +4,7 @@
 //! Elements can be added. A constructed Cell is guaranteed to have a valid
 //! SourceChain which has already undergone Genesis.
 
-use super::{interface::SignalBroadcaster, manager::ManagedTaskAdd};
+use super::{api::ZomeCall, interface::SignalBroadcaster, manager::ManagedTaskAdd};
 use crate::{
     conductor::{
         api::{error::ConductorApiError, CellConductorApi, CellConductorApiT},
@@ -28,7 +28,7 @@ use crate::{
             incoming_dht_ops_workflow::incoming_dht_ops_workflow, initialize_zomes_workflow,
             produce_dht_ops_workflow::dht_op_light::light_to_op, CallZomeWorkflowArgs,
             CallZomeWorkspace, GenesisWorkflowArgs, GenesisWorkspace, InitializeZomesWorkflowArgs,
-            ZomeCallInvocationResult,
+            ZomeCallResult,
         },
     },
 };
@@ -255,7 +255,7 @@ impl Cell {
             } => {
                 async {
                     let res = self
-                        .handle_call_remote(from_agent, &zome_name, fn_name, cap, request)
+                        .handle_call_remote(from_agent, zome_name, fn_name, cap, request)
                         .await
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
@@ -702,21 +702,14 @@ impl Cell {
     async fn handle_call_remote(
         &self,
         from_agent: AgentPubKey,
-        zome_name: &ZomeName,
+        zome_name: ZomeName,
         fn_name: FunctionName,
         cap: Option<CapSecret>,
         payload: SerializedBytes,
     ) -> CellResult<SerializedBytes> {
-        let zome = self
-            .conductor_api
-            .get_this_dna()
-            .await
-            .map_err(Box::new)?
-            .dna_def()
-            .get_zome(zome_name)?;
-        let invocation = ZomeCallInvocation {
+        let invocation = ZomeCall {
             cell_id: self.id.clone(),
-            zome,
+            zome_name,
             cap,
             payload: ExternInput::new(payload),
             provenance: from_agent,
@@ -724,17 +717,17 @@ impl Cell {
         };
         // double ? because
         // - ConductorApiResult
-        // - ZomeCallInvocationResult
+        // - ZomeCallResult
         Ok(self.call_zome(invocation, None).await??.try_into()?)
     }
 
     /// Function called by the Conductor
-    #[instrument(skip(self, invocation, workspace_lock))]
+    #[instrument(skip(self, call, workspace_lock))]
     pub async fn call_zome(
         &self,
-        invocation: ZomeCallInvocation,
+        call: ZomeCall,
         workspace_lock: Option<CallZomeWorkspaceLock>,
-    ) -> CellResult<ZomeCallInvocationResult> {
+    ) -> CellResult<ZomeCallResult> {
         // Check if init has run if not run it
         self.check_or_run_zome_init().await?;
 
@@ -751,6 +744,7 @@ impl Cell {
         let conductor_api = self.conductor_api.clone();
         let signal_tx = self.signal_broadcaster().await;
         let ribosome = self.get_ribosome().await?;
+        let invocation = ZomeCallInvocation::from_interface_call(conductor_api.clone(), call).await;
 
         let args = CallZomeWorkflowArgs {
             ribosome,

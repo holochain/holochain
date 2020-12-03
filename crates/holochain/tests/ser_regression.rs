@@ -3,6 +3,7 @@ use hdk3::prelude::*;
 use holo_hash::fixt::*;
 use holochain::{
     conductor::{
+        api::ZomeCall,
         api::{AppInterfaceApi, AppRequest, AppResponse, RealAppInterfaceApi},
         dna_store::MockDnaStore,
         ConductorBuilder, ConductorHandle,
@@ -124,9 +125,9 @@ async fn ser_regression_test() {
 
     let channel = ChannelName("hello world".into());
 
-    let invocation = ZomeCallInvocation {
+    let invocation = ZomeCall {
         cell_id: alice_cell_id.clone(),
-        zome: TestWasm::SerRegression.into(),
+        zome_name: TestWasm::SerRegression.into(),
         cap: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
         fn_name: "create_channel".into(),
         payload: ExternInput::new(channel.try_into().unwrap()),
@@ -134,11 +135,11 @@ async fn ser_regression_test() {
     };
 
     let request = Box::new(invocation.clone());
-    let request = AppRequest::ZomeCallInvocation(request).try_into().unwrap();
+    let request = AppRequest::ZomeCall(request).try_into().unwrap();
     let response = app_api.handle_app_request(request).await;
 
     let _channel_hash = match response {
-        AppResponse::ZomeCallInvocation(r) => {
+        AppResponse::ZomeCall(r) => {
             let response: SerializedBytes = r.into_inner();
             let channel_hash: EntryHash = response.try_into().unwrap();
             channel_hash
@@ -161,9 +162,9 @@ async fn ser_regression_test() {
         channel_hash,
         content: "Hello from alice :)".into(),
     };
-    let invocation = ZomeCallInvocation {
+    let invocation = ZomeCall {
         cell_id: alice_cell_id.clone(),
-        zome: TestWasm::SerRegression.into(),
+        zome_name: TestWasm::SerRegression.into(),
         cap: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
         fn_name: "create_message".into(),
         payload: ExternInput::new(message.try_into().unwrap()),
@@ -171,11 +172,11 @@ async fn ser_regression_test() {
     };
 
     let request = Box::new(invocation.clone());
-    let request = AppRequest::ZomeCallInvocation(request).try_into().unwrap();
+    let request = AppRequest::ZomeCall(request).try_into().unwrap();
     let response = app_api.handle_app_request(request).await;
 
     let _msg_hash = match response {
-        AppResponse::ZomeCallInvocation(r) => {
+        AppResponse::ZomeCall(r) => {
             let response: SerializedBytes = r.into_inner();
             let msg_hash: EntryHash = response.try_into().unwrap();
             msg_hash

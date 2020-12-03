@@ -1,6 +1,9 @@
 use futures::StreamExt;
 use hdk3::prelude::*;
-use holochain::{conductor::Conductor, core::ribosome::ZomeCallInvocation};
+use holochain::{
+    conductor::{api::ZomeCall, Conductor},
+    core::ribosome::ZomeCallInvocation,
+};
 use holochain_keystore::KeystoreSender;
 use holochain_state::test_utils::test_environments;
 use holochain_types::{
@@ -88,9 +91,9 @@ async fn extremely_verbose_inline_zome_sketch() -> anyhow::Result<()> {
 
     let hash: HeaderHash = {
         let response = conductor
-            .call_zome(ZomeCallInvocation {
+            .call_zome(ZomeCall {
                 cell_id: alice_cell_id.clone(),
-                zome: zome.clone(),
+                zome_name: zome.zome_name().clone(),
                 fn_name: "create".into(),
                 payload: ExternInput::new(().try_into().unwrap()),
                 cap: None,
@@ -111,9 +114,9 @@ async fn extremely_verbose_inline_zome_sketch() -> anyhow::Result<()> {
 
     let element: Element = {
         let response = conductor
-            .call_zome(ZomeCallInvocation {
+            .call_zome(ZomeCall {
                 cell_id: bobbo_cell_id.clone(),
-                zome: zome.clone(),
+                zome_name: zome.zome_name().clone(),
                 fn_name: "read".into(),
                 payload: ExternInput::new(hash.try_into().unwrap()),
                 cap: None,

@@ -2,7 +2,7 @@
 
 use crate::{
     conductor::{
-        api::RealAppInterfaceApi,
+        api::{RealAppInterfaceApi, ZomeCall},
         config::{AdminInterfaceConfig, ConductorConfig, InterfaceDriver},
         ConductorBuilder, ConductorHandle,
     },
@@ -18,6 +18,7 @@ use crate::{
 };
 use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
+use hdk3::prelude::ZomeName;
 use holo_hash::{fixt::*, *};
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::{
@@ -416,6 +417,26 @@ pub async fn wait_for_integration(
         }
         tokio::time::delay_for(delay).await;
     }
+}
+
+/// Helper to create a zome invocation for tests
+pub fn new_zome_call<P, Z: Into<ZomeName>>(
+    cell_id: &CellId,
+    func: &str,
+    payload: P,
+    zome: Z,
+) -> Result<ZomeCall, SerializedBytesError>
+where
+    P: TryInto<SerializedBytes, Error = SerializedBytesError>,
+{
+    Ok(ZomeCall {
+        cell_id: cell_id.clone(),
+        zome_name: zome.into(),
+        cap: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
+        fn_name: func.into(),
+        payload: ExternInput::new(payload.try_into()?),
+        provenance: cell_id.agent_pubkey().clone(),
+    })
 }
 
 /// Helper to create a zome invocation for tests

@@ -2,16 +2,15 @@ use anyhow::Result;
 use assert_cmd::prelude::*;
 use futures::Future;
 use holochain::{
+    conductor::api::ZomeCall,
     conductor::{
         api::{AdminRequest, AdminResponse, AppRequest, AppResponse},
         config::*,
         error::ConductorError,
         Conductor,
     },
-    core::{
-        ribosome::{NamedInvocation, ZomeCallInvocationFixturator},
-        signal::Signal,
-    },
+    core::signal::Signal,
+    fixt::*,
 };
 use holochain_types::{
     app::{InstallAppDnaPayload, InstallAppPayload},
@@ -233,17 +232,16 @@ pub async fn call_zome_fn<SB: TryInto<SerializedBytes, Error = SerializedBytesEr
     fn_name: String,
     input: SB,
 ) {
-    let request = Box::new(
-        ZomeCallInvocationFixturator::new(NamedInvocation(
-            cell_id,
-            wasm,
-            fn_name,
-            ExternInput::new(input.try_into().unwrap()),
-        ))
-        .next()
-        .unwrap(),
-    );
-    let request = AppRequest::ZomeCallInvocation(request);
+    let call: ZomeCall = ZomeCallInvocationFixturator::new(NamedInvocation(
+        cell_id,
+        wasm,
+        fn_name,
+        ExternInput::new(input.try_into().unwrap()),
+    ))
+    .next()
+    .unwrap()
+    .into();
+    let request = AppRequest::ZomeCallInvocation(Box::new(call));
     let response = app_tx.request(request);
     let call_response = check_timeout(holochain, response, 3000).await;
     trace!(?call_response);

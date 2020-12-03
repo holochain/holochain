@@ -8,7 +8,7 @@ use crate::{
         },
         workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace,
     },
-    test_utils::{host_fn_api::*, new_invocation, setup_app, wait_for_integration},
+    test_utils::{host_fn_api::*, new_invocation, new_zome_call, setup_app, wait_for_integration},
 };
 use fallible_iterator::FallibleIterator;
 use holo_hash::{AnyDhtHash, DhtOpHash, EntryHash, HeaderHash};
@@ -204,7 +204,7 @@ async fn run_test(
     let delay_per_attempt = Duration::from_millis(100);
 
     let invocation =
-        new_invocation(&bob_cell_id, "always_validates", (), TestWasm::Validate).unwrap();
+        new_zome_call(&bob_cell_id, "always_validates", (), TestWasm::Validate).unwrap();
     handle.call_zome(invocation).await.unwrap().unwrap();
 
     // Integration should have 3 ops in it
@@ -259,7 +259,7 @@ async fn run_test(
     }
 
     let invocation =
-        new_invocation(&bob_cell_id, "add_valid_link", (), TestWasm::ValidateLink).unwrap();
+        new_zome_call(&bob_cell_id, "add_valid_link", (), TestWasm::ValidateLink).unwrap();
     handle.call_zome(invocation).await.unwrap().unwrap();
 
     // Integration should have 6 ops in it

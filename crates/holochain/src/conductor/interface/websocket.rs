@@ -455,20 +455,18 @@ pub mod test {
             .return_const(());
 
         let (_tmpdir, app_api, handle) = setup_app(vec![(installed_cell, None)], dna_store).await;
-        let mut request = Box::new(
-            crate::core::ribosome::ZomeCallInvocationFixturator::new(
-                crate::core::ribosome::NamedInvocation(
-                    cell_id.clone(),
-                    TestWasm::Foo.into(),
-                    "foo".into(),
-                    ExternInput::new(().try_into().unwrap()),
-                ),
-            )
+        let mut request: ZomeCall =
+            crate::fixt::ZomeCallInvocationFixturator::new(crate::fixt::NamedInvocation(
+                cell_id.clone(),
+                TestWasm::Foo.into(),
+                "foo".into(),
+                ExternInput::new(().try_into().unwrap()),
+            ))
             .next()
-            .unwrap(),
-        );
+            .unwrap()
+            .into();
         request.cell_id = cell_id;
-        let msg = AppRequest::ZomeCallInvocation(request);
+        let msg = AppRequest::ZomeCallInvocation(Box::new(request));
         let msg = msg.try_into().unwrap();
         let respond = |bytes: SerializedBytes| {
             let response: AppResponse = bytes.try_into().unwrap();

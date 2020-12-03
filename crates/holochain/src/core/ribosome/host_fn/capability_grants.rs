@@ -20,7 +20,7 @@ pub fn capability_grants(
 pub mod wasm_test {
     use crate::conductor::dna_store::MockDnaStore;
     use crate::conductor::interface::websocket::test::setup_app;
-    use crate::core::ribosome::ZomeCallInvocation;
+    use crate::core::ribosome::ZomeCall;
     use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
@@ -173,9 +173,9 @@ pub mod wasm_test {
         let original_secret = CapSecretFixturator::new(Unpredictable).next().unwrap();
 
         let output = handle
-            .call_zome(ZomeCallInvocation {
+            .call_zome(ZomeCall {
                 cell_id: alice_cell_id.clone(),
-                zome: TestWasm::Capability.into(),
+                zome_name: TestWasm::Capability.into(),
                 cap: None,
                 fn_name: "try_cap_claim".into(),
                 payload: ExternInput::new(
@@ -204,9 +204,9 @@ pub mod wasm_test {
         // BOB COMMITS A TRANSFERABLE GRANT WITH THE SECRET SHARED WITH ALICE
 
         let output = handle
-            .call_zome(ZomeCallInvocation {
+            .call_zome(ZomeCall {
                 cell_id: bob_cell_id.clone(),
-                zome: TestWasm::Capability.into(),
+                zome_name: TestWasm::Capability.into(),
                 cap: None,
                 fn_name: "transferable_cap_grant".into(),
                 payload: ExternInput::new(original_secret.try_into().unwrap()),
@@ -224,9 +224,9 @@ pub mod wasm_test {
         // ALICE CAN NOW CALL THE AUTHED REMOTE FN
 
         let output = handle
-            .call_zome(ZomeCallInvocation {
+            .call_zome(ZomeCall {
                 cell_id: alice_cell_id.clone(),
-                zome: TestWasm::Capability.into(),
+                zome_name: TestWasm::Capability.into(),
                 cap: None,
                 fn_name: "try_cap_claim".into(),
                 payload: ExternInput::new(
@@ -258,9 +258,9 @@ pub mod wasm_test {
         // BOB ROLLS THE GRANT SO ONLY THE NEW ONE WILL WORK FOR ALICE
 
         let output = handle
-            .call_zome(ZomeCallInvocation {
+            .call_zome(ZomeCall {
                 cell_id: bob_cell_id.clone(),
-                zome: TestWasm::Capability.into(),
+                zome_name: TestWasm::Capability.into(),
                 cap: None,
                 fn_name: "roll_cap_grant".into(),
                 payload: ExternInput::new(original_grant_hash.try_into().unwrap()),
@@ -276,9 +276,9 @@ pub mod wasm_test {
         };
 
         let output = handle
-            .call_zome(ZomeCallInvocation {
+            .call_zome(ZomeCall {
                 cell_id: bob_cell_id.clone(),
-                zome: TestWasm::Capability.into(),
+                zome_name: TestWasm::Capability.into(),
                 cap: None,
                 fn_name: "get_entry".into(),
                 payload: ExternInput::new(new_grant_header_hash.clone().try_into().unwrap()),
@@ -306,9 +306,9 @@ pub mod wasm_test {
         };
 
         let output = handle
-            .call_zome(ZomeCallInvocation {
+            .call_zome(ZomeCall {
                 cell_id: alice_cell_id.clone(),
-                zome: TestWasm::Capability.into(),
+                zome_name: TestWasm::Capability.into(),
                 cap: None,
                 fn_name: "try_cap_claim".into(),
                 payload: ExternInput::new(
@@ -335,9 +335,9 @@ pub mod wasm_test {
         }
 
         let output = handle
-            .call_zome(ZomeCallInvocation {
+            .call_zome(ZomeCall {
                 cell_id: alice_cell_id.clone(),
-                zome: TestWasm::Capability.into(),
+                zome_name: TestWasm::Capability.into(),
                 cap: None,
                 fn_name: "try_cap_claim".into(),
                 payload: ExternInput::new(
@@ -369,9 +369,9 @@ pub mod wasm_test {
         // BOB DELETES THE GRANT SO NO SECRETS WORK
 
         let _output = handle
-            .call_zome(ZomeCallInvocation {
+            .call_zome(ZomeCall {
                 cell_id: bob_cell_id,
-                zome: TestWasm::Capability.into(),
+                zome_name: TestWasm::Capability.into(),
                 cap: None,
                 fn_name: "delete_cap_grant".into(),
                 payload: ExternInput::new(new_grant_header_hash.try_into().unwrap()),
@@ -382,9 +382,9 @@ pub mod wasm_test {
             .unwrap();
 
         let output = handle
-            .call_zome(ZomeCallInvocation {
+            .call_zome(ZomeCall {
                 cell_id: alice_cell_id.clone(),
-                zome: TestWasm::Capability.into(),
+                zome_name: TestWasm::Capability.into(),
                 cap: None,
                 fn_name: "try_cap_claim".into(),
                 payload: ExternInput::new(
@@ -411,9 +411,9 @@ pub mod wasm_test {
         }
 
         let output = handle
-            .call_zome(ZomeCallInvocation {
+            .call_zome(ZomeCall {
                 cell_id: alice_cell_id.clone(),
-                zome: TestWasm::Capability.into(),
+                zome_name: TestWasm::Capability.into(),
                 cap: None,
                 fn_name: "try_cap_claim".into(),
                 payload: ExternInput::new(

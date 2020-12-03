@@ -19,12 +19,13 @@ use ::fixt::prelude::*;
 use hdk3::prelude::*;
 use holochain::{
     conductor::{
-        api::{AdminRequest, AdminResponse, AppRequest, AppResponse, RealAppInterfaceApi},
+        api::{
+            AdminRequest, AdminResponse, AppRequest, AppResponse, RealAppInterfaceApi, ZomeCall,
+        },
         config::{AdminInterfaceConfig, ConductorConfig, InterfaceDriver},
         dna_store::MockDnaStore,
         ConductorBuilder, ConductorHandle,
     },
-    core::ribosome::ZomeCallInvocation,
     fixt::*,
 };
 use holochain_state::test_utils::{test_environments, TestEnvironments};
@@ -209,17 +210,17 @@ async fn speed_test(n: Option<usize>) -> TestEnvironments {
 
     // ALICE DOING A CALL
 
-    fn new_invocation<P>(
+    fn new_zome_call<P>(
         cell_id: CellId,
         func: &str,
         payload: P,
-    ) -> Result<ZomeCallInvocation, SerializedBytesError>
+    ) -> Result<ZomeCall, SerializedBytesError>
     where
         P: TryInto<SerializedBytes, Error = SerializedBytesError>,
     {
-        Ok(ZomeCallInvocation {
+        Ok(ZomeCall {
             cell_id: cell_id.clone(),
-            zome: TestWasm::Anchor.into(),
+            zome_name: TestWasm::Anchor.into(),
             cap: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
             fn_name: func.into(),
             payload: ExternInput::new(payload.try_into()?),
@@ -229,14 +230,14 @@ async fn speed_test(n: Option<usize>) -> TestEnvironments {
 
     let anchor_invocation = |anchor: &str, cell_id, i: usize| {
         let anchor = AnchorInput(anchor.into(), i.to_string());
-        new_invocation(cell_id, "anchor", anchor)
+        new_zome_call(cell_id, "anchor", anchor)
     };
 
     async fn call(
         app_interface: &mut WebsocketSender,
-        invocation: ZomeCallInvocation,
+        invocation: ZomeCall,
     ) -> std::io::Result<AppResponse> {
-        let request = AppRequest::ZomeCallInvocation(Box::new(invocation));
+        let request = AppRequest::ZomeCall(Box::new(invocation));
         app_interface.request(request).await
     }
 
@@ -245,10 +246,10 @@ async fn speed_test(n: Option<usize>) -> TestEnvironments {
     for i in 0..num {
         let invocation = anchor_invocation("alice", alice_cell_id.clone(), i).unwrap();
         let response = call(&mut app_interface, invocation).await.unwrap();
-        assert_matches!(response, AppResponse::ZomeCallInvocation(_));
+        assert_matches!(response, AppResponse::ZomeCall(_));
         let invocation = anchor_invocation("bobbo", bob_cell_id.clone(), i).unwrap();
         let response = call(&mut app_interface, invocation).await.unwrap();
-        assert_matches!(response, AppResponse::ZomeCallInvocation(_));
+        assert_matches!(response, AppResponse::ZomeCall(_));
     }
 
     let mut alice_done = false;
@@ -258,7 +259,7 @@ async fn speed_test(n: Option<usize>) -> TestEnvironments {
     loop {
         if !bobbo_done {
             bobbo_attempts += 1;
-            let invocation = new_invocation(
+            let invocation = new_zome_call(
                 alice_cell_id.clone(),
                 "list_anchor_addresses",
                 TestString("bobbo".into()),
@@ -266,7 +267,7 @@ async fn speed_test(n: Option<usize>) -> TestEnvironments {
             .unwrap();
             let response = call(&mut app_interface, invocation).await.unwrap();
             match response {
-                AppResponse::ZomeCallInvocation(r) => {
+                AppResponse::ZomeCall(r) => {
                     let response: SerializedBytes = r.into_inner();
                     let hashes: EntryHashes = response.try_into().unwrap();
                     bobbo_done = hashes.0.len() == num;
@@ -277,7 +278,7 @@ async fn speed_test(n: Option<usize>) -> TestEnvironments {
 
         if !alice_done {
             alice_attempts += 1;
-            let invocation = new_invocation(
+            let invocation = new_zome_call(
                 bob_cell_id.clone(),
                 "list_anchor_addresses",
                 TestString("alice".into()),
@@ -285,7 +286,7 @@ async fn speed_test(n: Option<usize>) -> TestEnvironments {
             .unwrap();
             let response = call(&mut app_interface, invocation).await.unwrap();
             match response {
-                AppResponse::ZomeCallInvocation(r) => {
+                AppResponse::ZomeCall(r) => {
                     let response: SerializedBytes = r.into_inner();
                     let hashes: EntryHashes = response.try_into().unwrap();
                     alice_done = hashes.0.len() == num;

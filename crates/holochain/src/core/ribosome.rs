@@ -13,7 +13,11 @@ pub mod host_fn;
 pub mod real_ribosome;
 
 use crate::{
-    conductor::{api::CellConductorReadHandle, interface::SignalBroadcaster},
+    conductor::{
+        api::CellConductorReadHandle,
+        api::{CellConductorApi, ZomeCall},
+        interface::SignalBroadcaster,
+    },
     core::{
         ribosome::guest_callback::{
             entry_defs::EntryDefsResult,
@@ -27,9 +31,7 @@ use crate::{
         },
         workflow::CallZomeWorkspaceLock,
     },
-    fixt::{ExternInputFixturator, FunctionNameFixturator, *},
 };
-use ::fixt::prelude::*;
 use derive_more::Constructor;
 use error::RibosomeResult;
 use guest_callback::{
@@ -47,9 +49,7 @@ use holochain_types::{
         zome::{HostFnAccess, Zome},
         DnaDefHashed,
     },
-    fixt::{CapSecretFixturator, CellIdFixturator},
 };
-use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::{
     capability::{CapGrant, CapSecret},
     header::ZomeId,
@@ -318,70 +318,6 @@ pub struct ZomeCallInvocation {
     pub provenance: AgentPubKey,
 }
 
-fixturator!(
-    ZomeCallInvocation;
-    curve Empty ZomeCallInvocation {
-        cell_id: CellIdFixturator::new(Empty).next().unwrap(),
-        zome: ZomeFixturator::new(Empty).next().unwrap(),
-        cap: Some(CapSecretFixturator::new(Empty).next().unwrap()),
-        fn_name: FunctionNameFixturator::new(Empty).next().unwrap(),
-        payload: ExternInputFixturator::new(Empty).next().unwrap(),
-        provenance: AgentPubKeyFixturator::new(Empty).next().unwrap(),
-    };
-    curve Unpredictable ZomeCallInvocation {
-        cell_id: CellIdFixturator::new(Unpredictable).next().unwrap(),
-        zome: ZomeFixturator::new(Unpredictable).next().unwrap(),
-        cap: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
-        fn_name: FunctionNameFixturator::new(Unpredictable).next().unwrap(),
-        payload: ExternInputFixturator::new(Unpredictable).next().unwrap(),
-        provenance: AgentPubKeyFixturator::new(Unpredictable).next().unwrap(),
-    };
-    curve Predictable ZomeCallInvocation {
-        cell_id: CellIdFixturator::new_indexed(Predictable, get_fixt_index!())
-            .next()
-            .unwrap(),
-        zome: ZomeFixturator::new_indexed(Predictable, get_fixt_index!())
-            .next()
-            .unwrap(),
-        cap: Some(CapSecretFixturator::new_indexed(Predictable, get_fixt_index!())
-            .next()
-            .unwrap()),
-        fn_name: FunctionNameFixturator::new_indexed(Predictable, get_fixt_index!())
-            .next()
-            .unwrap(),
-        payload: ExternInputFixturator::new_indexed(Predictable, get_fixt_index!())
-            .next()
-            .unwrap(),
-        provenance: AgentPubKeyFixturator::new_indexed(Predictable, get_fixt_index!())
-            .next()
-            .unwrap(),
-    };
-);
-
-/// Fixturator curve for a named zome invocation
-/// cell id, test wasm for zome to call, function name, host input payload
-pub struct NamedInvocation(pub CellId, pub TestWasm, pub String, pub ExternInput);
-
-impl Iterator for ZomeCallInvocationFixturator<NamedInvocation> {
-    type Item = ZomeCallInvocation;
-    fn next(&mut self) -> Option<Self::Item> {
-        let mut ret = ZomeCallInvocationFixturator::new(Unpredictable)
-            .next()
-            .unwrap();
-        ret.cell_id = self.0.curve.0.clone();
-        ret.zome = self.0.curve.1.clone().into();
-        ret.fn_name = self.0.curve.2.clone().into();
-        ret.payload = self.0.curve.3.clone();
-
-        // simulate a local transaction by setting the cap to empty and matching the provenance of
-        // the call to the cell id
-        ret.cap = None;
-        ret.provenance = ret.cell_id.agent_pubkey().clone();
-
-        Some(ret)
-    }
-}
-
 impl Invocation for ZomeCallInvocation {
     fn zomes(&self) -> ZomesToInvoke {
         ZomesToInvoke::One(self.zome.to_owned())
@@ -391,6 +327,53 @@ impl Invocation for ZomeCallInvocation {
     }
     fn host_input(self) -> Result<ExternInput, SerializedBytesError> {
         Ok(self.payload)
+    }
+}
+
+impl ZomeCallInvocation {
+    pub async fn from_interface_call(conductor_api: CellConductorApi, call: ZomeCall) -> Self {
+        use crate::conductor::api::CellConductorApiT;
+        let ZomeCall {
+            cell_id,
+            zome_name,
+            fn_name,
+            cap,
+            payload,
+            provenance,
+        } = call;
+        let zome = conductor_api
+            .get_zome(cell_id.dna_hash(), &zome_name)
+            .await
+            .expect("TODO");
+        Self {
+            cell_id,
+            zome,
+            fn_name,
+            cap,
+            payload,
+            provenance,
+        }
+    }
+}
+
+impl From<ZomeCallInvocation> for ZomeCall {
+    fn from(inv: ZomeCallInvocation) -> Self {
+        let ZomeCallInvocation {
+            cell_id,
+            zome,
+            fn_name,
+            cap,
+            payload,
+            provenance,
+        } = inv;
+        Self {
+            cell_id,
+            zome_name: zome.zome_name().clone(),
+            fn_name,
+            cap,
+            payload,
+            provenance,
+        }
     }
 }
 
@@ -586,16 +569,15 @@ pub mod wasm_test {
                 );
                 host_access.network = cell_network;
 
-                let invocation = $crate::core::ribosome::ZomeCallInvocationFixturator::new(
-                    $crate::core::ribosome::NamedInvocation(
+                let invocation =
+                    $crate::fixt::ZomeCallInvocationFixturator::new($crate::fixt::NamedInvocation(
                         cell_id,
                         $test_wasm.into(),
                         $fn_name.into(),
                         holochain_zome_types::ExternInput::new(input.try_into().unwrap()),
-                    ),
-                )
-                .next()
-                .unwrap();
+                    ))
+                    .next()
+                    .unwrap();
                 let zome_invocation_response =
                     match ribosome.call_zome_function(host_access, invocation.clone()) {
                         Ok(v) => v,

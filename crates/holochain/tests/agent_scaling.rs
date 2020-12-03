@@ -1,9 +1,7 @@
 #![cfg(feature = "test_utils")]
 
 use hdk3::prelude::Links;
-use holochain::{
-    core::ribosome::ZomeCallInvocation, test_utils::conductor_setup::ConductorTestData,
-};
+use holochain::{conductor::api::ZomeCall, test_utils::conductor_setup::ConductorTestData};
 use holochain_keystore::keystore_actor::KeystoreSenderExt;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::test_utils::test_environments;
@@ -120,9 +118,9 @@ async fn many_agents_can_reach_consistency_normal_links() {
 
     let _create_output = conductor
         .handle()
-        .call_zome(ZomeCallInvocation {
+        .call_zome(ZomeCall {
             cell_id: cell_ids[0].clone(),
-            zome: TestWasm::Link.into(),
+            zome_name: TestWasm::Link.into(),
             cap: None,
             fn_name: "create_link".into(),
             payload: ExternInput::new(SerializedBytes::try_from(()).unwrap()),
@@ -139,9 +137,9 @@ async fn many_agents_can_reach_consistency_normal_links() {
     for _ in 0..num_agents {
         let get_output = conductor
             .handle()
-            .call_zome(ZomeCallInvocation {
+            .call_zome(ZomeCall {
                 cell_id: cell_ids[1].clone(),
-                zome: TestWasm::Link.into(),
+                zome_name: TestWasm::Link.into(),
                 cap: None,
                 fn_name: "get_links".into(),
                 payload: ExternInput::new(SerializedBytes::try_from(()).unwrap()),

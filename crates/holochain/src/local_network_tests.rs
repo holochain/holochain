@@ -21,7 +21,7 @@ use crate::{
         ConductorHandle,
     },
     core::ribosome::error::{RibosomeError, RibosomeResult},
-    test_utils::{install_app, new_invocation, setup_app_with_network},
+    test_utils::{install_app, new_zome_call, setup_app_with_network},
 };
 use shrinkwraprs::Shrinkwrap;
 use test_case::test_case;
@@ -84,7 +84,7 @@ async fn init_all(handles: &[TestHandle]) {
     for h in handles.iter().cloned() {
         let f = async move {
             let invocation =
-                new_invocation(&h.cell_id, "create_entry", (), TestWasm::Create).unwrap();
+                new_zome_call(&h.cell_id, "create_entry", (), TestWasm::Create).unwrap();
             h.call_zome(invocation).await.unwrap().unwrap();
         };
         let f = tokio::task::spawn(f);
@@ -96,7 +96,7 @@ async fn init_all(handles: &[TestHandle]) {
 }
 
 async fn call_remote(a: TestHandle, b: TestHandle) -> RibosomeResult<ZomeCallResponse> {
-    let invocation = new_invocation(
+    let invocation = new_zome_call(
         &a.cell_id,
         "call_create_entry_remotely",
         b.cell_id.agent_pubkey().clone(),
