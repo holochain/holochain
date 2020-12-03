@@ -19,9 +19,9 @@ pub fn update<D: Into<EntryDefId>, E: Into<Entry>>(
     entry_def_id: D,
     entry: E,
 ) -> HdkResult<HeaderHash> {
-    host_fn!(
+    Ok(host_call::<UpdateInput, UpdateOutput>(
         __update,
-        UpdateInput::new((entry_def_id.into(), entry.into(), hash)),
-        UpdateOutput
-    )
+        &UpdateInput::new((entry_def_id.into(), entry.into(), hash)),
+    )?
+    .into_inner())
 }

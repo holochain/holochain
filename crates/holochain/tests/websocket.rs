@@ -20,7 +20,7 @@ use holochain_types::{
 };
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::*;
-use holochain_zome_types::*;
+use holochain_zome_types::{signal::AppSignal, *};
 use matches::assert_matches;
 use std::sync::Arc;
 use std::{path::PathBuf, process::Stdio, time::Duration};
@@ -161,7 +161,7 @@ async fn call_admin() {
     let agent_key = fake_agent_pubkey_1();
     let payload = InstallAppPayload {
         dnas: vec![dna_payload],
-        app_id: "test".to_string(),
+        installed_app_id: "test".to_string(),
         agent_key,
     };
     let request = AdminRequest::InstallApp(Box::new(payload));
@@ -314,7 +314,7 @@ async fn call_zome() {
     let agent_key = fake_agent_pubkey_1();
     let payload = InstallAppPayload {
         dnas: vec![dna_payload],
-        app_id: "test".to_string(),
+        installed_app_id: "test".to_string(),
         agent_key,
     };
     let request = AdminRequest::InstallApp(Box::new(payload));
@@ -332,7 +332,7 @@ async fn call_zome() {
 
     // Activate cells
     let request = AdminRequest::ActivateApp {
-        app_id: "test".to_string(),
+        installed_app_id: "test".to_string(),
     };
     let response = client.request(request);
     let response = check_timeout(&mut holochain, response, 1000).await;
@@ -410,7 +410,7 @@ async fn emit_signals() {
     let cell_id = CellId::new(dna_hash.clone(), agent_key.clone());
     let payload = InstallAppPayload {
         dnas: vec![dna_payload],
-        app_id: "test".to_string(),
+        installed_app_id: "test".to_string(),
         agent_key: agent_key.clone(),
     };
     let request = AdminRequest::InstallApp(Box::new(payload));
@@ -420,7 +420,7 @@ async fn emit_signals() {
 
     // Activate cells
     let request = AdminRequest::ActivateApp {
-        app_id: "test".to_string(),
+        installed_app_id: "test".to_string(),
     };
     let response = admin_tx.request(request);
     let response = check_timeout(&mut holochain, response, 1000).await;
@@ -462,7 +462,7 @@ async fn emit_signals() {
     let sig2: SerializedBytes = unwrap_to::unwrap_to!(msg2 => WebsocketMessage::Signal).clone();
 
     assert_eq!(
-        Signal::App(cell_id, ().try_into().unwrap()),
+        Signal::App(cell_id, AppSignal::new(().try_into().unwrap())),
         Signal::try_from(sig1.clone()).unwrap(),
     );
     assert_eq!(sig1, sig2);
@@ -492,7 +492,7 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
     let agent_key = fake_agent_pubkey_1();
     let payload = InstallAppPayload {
         dnas: vec![dna_payload],
-        app_id: "test".to_string(),
+        installed_app_id: "test".to_string(),
         agent_key,
     };
     let request = AdminRequest::InstallApp(Box::new(payload));
@@ -549,7 +549,7 @@ async fn conductor_admin_interface_ends_with_shutdown() -> Result<()> {
     let agent_key = fake_agent_pubkey_1();
     let payload = InstallAppPayload {
         dnas: vec![dna_payload],
-        app_id: "test".to_string(),
+        installed_app_id: "test".to_string(),
         agent_key,
     };
     let request = AdminRequest::InstallApp(Box::new(payload));

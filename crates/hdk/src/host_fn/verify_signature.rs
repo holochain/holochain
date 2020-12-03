@@ -6,13 +6,13 @@ pub fn verify_signature<K: Into<AgentPubKey>, S: Into<Signature>, D: Into<Serial
     signature: S,
     data: D,
 ) -> HdkResult<bool> {
-    host_fn!(
+    Ok(host_call::<VerifySignatureInput, VerifySignatureOutput>(
         __verify_signature,
-        VerifySignatureInput {
+        &VerifySignatureInput::new(VerifySignature {
             key: key.into(),
             signature: signature.into(),
             data: data.into(),
-        },
-        VerifySignatureOutput
-    )
+        }),
+    )?
+    .into_inner())
 }

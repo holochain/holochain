@@ -56,32 +56,6 @@ pub mod wasm_test {
     }
 
     #[tokio::test(threaded_scheduler)]
-    async fn ribosome_debug_test() {
-        let test_env = holochain_state::test_utils::test_cell_env();
-        let env = test_env.env();
-        let mut workspace =
-            crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
-
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
-            .await
-            .unwrap();
-
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
-        let mut host_access = fixt!(ZomeCallHostAccess);
-        host_access.workspace = workspace_lock;
-
-        // this shows that debug is called but our line numbers will be messed up
-        // the line numbers will show as coming from this test because we made the input here
-        let output: DebugOutput = crate::call_test_ribosome!(
-            host_access,
-            TestWasm::Imports,
-            "debug",
-            DebugInput::new(debug_msg!(format!("ribosome debug {}", "works!")))
-        );
-        assert_eq!(output, DebugOutput::new(()));
-    }
-
-    #[tokio::test(threaded_scheduler)]
     async fn wasm_line_numbers_test() {
         let test_env = holochain_state::test_utils::test_cell_env();
         let env = test_env.env();

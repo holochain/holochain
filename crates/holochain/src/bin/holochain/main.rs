@@ -1,11 +1,10 @@
 use holochain::conductor::{
-    compat::load_conductor_from_legacy_config, config::ConductorConfig, error::ConductorError,
-    interactive, paths::ConfigFilePath, Conductor, ConductorHandle,
+    config::ConductorConfig, error::ConductorError, interactive, paths::ConfigFilePath, Conductor,
+    ConductorHandle,
 };
 use holochain_types::observability::{self, Output};
 use std::error::Error;
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use structopt::StructOpt;
 use tracing::*;
 
@@ -35,12 +34,6 @@ struct Opt {
     config_path: Option<PathBuf>,
 
     #[structopt(
-        long,
-        help = "For backwards compatibility with Tryorama only: Path to a TOML file containing legacy conductor configuration"
-    )]
-    legacy_tryorama_config_path: Option<PathBuf>,
-
-    #[structopt(
         short = "i",
         long,
         help = "Receive helpful prompts to create missing files and directories,
@@ -65,11 +58,8 @@ async fn async_main() {
     observability::init_fmt(opt.structured).expect("Failed to start contextual logging");
     debug!("observability initialized");
 
-    let conductor = if let Some(legacy_config_path) = opt.legacy_tryorama_config_path {
-        conductor_handle_from_legacy_config_path(&legacy_config_path).await
-    } else {
-        conductor_handle_from_config_path(opt.config_path.clone(), opt.interactive).await
-    };
+    let conductor =
+        conductor_handle_from_config_path(opt.config_path.clone(), opt.interactive).await;
 
     info!("Conductor successfully initialized.");
 
@@ -93,15 +83,6 @@ async fn async_main() {
 
     // TODO: on SIGINT/SIGKILL, kill the conductor:
     // conductor.kill().await
-}
-
-async fn conductor_handle_from_legacy_config_path(legacy_config_path: &Path) -> ConductorHandle {
-    let toml =
-        fs::read_to_string(legacy_config_path).expect("Couldn't read legacy config from file");
-    let legacy_config = toml::from_str(&toml).expect("Couldn't deserialize legacy config");
-    load_conductor_from_legacy_config(legacy_config, Conductor::builder())
-        .await
-        .expect("Couldn't initialize conductor from legacy config")
 }
 
 async fn conductor_handle_from_config_path(

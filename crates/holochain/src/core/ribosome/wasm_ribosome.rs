@@ -517,3 +517,40 @@ impl RibosomeT for WasmRibosome {
         do_callback!(self, access, invocation, PostCommitCallbackResult)
     }
 }
+
+#[cfg(test)]
+#[cfg(feature = "slow_tests")]
+pub mod wasm_test {
+    use crate::fixt::ZomeCallHostAccessFixturator;
+    use ::fixt::prelude::*;
+    use hdk3::prelude::*;
+    use holochain_wasm_test_utils::TestWasm;
+    use test_wasm_common::TestString;
+
+    #[tokio::test(threaded_scheduler)]
+    /// Basic checks that we can call externs internally and externally the way we want using the
+    /// hdk macros rather than low level rust extern syntax.
+    async fn ribosome_extern_test() {
+        let test_env = holochain_state::test_utils::test_cell_env();
+        let env = test_env.env();
+        let mut workspace =
+            crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
+        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+            .await
+            .unwrap();
+        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
+
+        let mut host_access = fixt!(ZomeCallHostAccess, Predictable);
+        host_access.workspace = workspace_lock;
+
+        let foo_result: TestString =
+            crate::call_test_ribosome!(host_access, TestWasm::HdkExtern, "foo", ());
+
+        assert_eq!("foo", foo_result.0.as_str());
+
+        let bar_result: TestString =
+            crate::call_test_ribosome!(host_access, TestWasm::HdkExtern, "bar", ());
+
+        assert_eq!("foobar", bar_result.0.as_str());
+    }
+}

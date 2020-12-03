@@ -41,9 +41,9 @@ where
     SerializedBytes: TryFrom<&'a I, Error = SerializedBytesError>,
 {
     let sb = SerializedBytes::try_from(input)?;
-    host_fn!(
+    Ok(host_call::<HashEntryInput, HashEntryOutput>(
         __hash_entry,
-        HashEntryInput::new(Entry::App(sb.try_into()?)),
-        HashEntryOutput
-    )
+        &HashEntryInput::new(Entry::App(sb.try_into()?)),
+    )?
+    .into_inner())
 }
