@@ -37,6 +37,7 @@ jobs:
   merge-test-uncached:
     docker:
      - image: nixos/nix
+    resource_class: xlarge
     environment:
      NIXPKGS_ALLOW_UNFREE: 1
     steps:
