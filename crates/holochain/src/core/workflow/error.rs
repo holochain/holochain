@@ -60,6 +60,9 @@ pub enum WorkflowError {
     CellError(#[from] CellError),
 
     #[error(transparent)]
+    JoinError(#[from] tokio::task::JoinError),
+
+    #[error(transparent)]
     QueueTriggerClosedError(#[from] QueueTriggerClosedError),
 
     #[error(transparent)]
