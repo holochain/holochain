@@ -88,16 +88,16 @@ wasm_io_types! {
     fn capability_info (()) -> ();
 
     fn x_salsa20_poly1305_encrypt((
-        crate::xsalsa20_poly1305::key::XSalsa20Poly1305Key,
-        crate::xsalsa20_poly1305::nonce::XSalsa20Poly1305Nonce,
-        crate::xsalsa20_poly1305::data::XSalsa20Poly1305Data,
-    )) -> crate::xsalsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData;
+        crate::x_salsa20_poly1305::key::XSalsa20Poly1305Key,
+        crate::x_salsa20_poly1305::nonce::XSalsa20Poly1305Nonce,
+        crate::x_salsa20_poly1305::data::XSalsa20Poly1305Data,
+    )) -> crate::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData;
 
     fn x_salsa20_poly1305_decrypt((
-        crate::xsalsa20_poly1305::key::XSalsa20Poly1305Key,
-        crate::xsalsa20_poly1305::nonce::XSalsa20Poly1305Nonce,
-        crate::xsalsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData,
-    )) -> Option<crate::xsalsa20_poly1305::data::XSalsa20Poly1305Data>;
+        crate::x_salsa20_poly1305::key::XSalsa20Poly1305Key,
+        crate::x_salsa20_poly1305::nonce::XSalsa20Poly1305Nonce,
+        crate::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData,
+    )) -> Option<crate::x_salsa20_poly1305::data::XSalsa20Poly1305Data>;
 
     // Returns HeaderHash of the newly created element.
     fn create ((zt::entry_def::EntryDefId, zt::entry::Entry)) -> holo_hash::HeaderHash;

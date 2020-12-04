@@ -47,7 +47,7 @@ pub mod validate;
 pub mod validate_link;
 pub mod warrant;
 #[allow(missing_docs)]
-pub mod xsalsa20_poly1305;
+pub mod x_salsa20_poly1305;
 #[allow(missing_docs)]
 pub mod zome;
 #[allow(missing_docs)]

@@ -24,6 +24,6 @@ pub mod sys_time;
 pub mod unreachable;
 pub mod update;
 pub mod verify_signature;
-pub mod xsalsa20_poly1305_decrypt;
-pub mod xsalsa20_poly1305_encrypt;
+pub mod x_salsa20_poly1305_decrypt;
+pub mod x_salsa20_poly1305_encrypt;
 pub mod zome_info;

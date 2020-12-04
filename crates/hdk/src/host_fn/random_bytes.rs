@@ -65,9 +65,9 @@ impl_try_from_random!(
 );
 impl_try_from_random!(
     SecretBoxKey,
-    holochain_zome_types::xsalsa20_poly1305::key::KEY_BYTES
+    holochain_zome_types::x_salsa20_poly1305::key::KEY_BYTES
 );
 impl_try_from_random!(
     SecretBoxNonce,
-    holochain_zome_types::xsalsa20_poly1305::nonce::NONCE_BYTES
+    holochain_zome_types::x_salsa20_poly1305::nonce::NONCE_BYTES
 );

@@ -1,7 +1,7 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_zome_types::xsalsa20_poly1305::data::XSalsa20Poly1305Data;
+use holochain_zome_types::x_salsa20_poly1305::data::XSalsa20Poly1305Data;
 use holochain_zome_types::XSalsa20Poly1305DecryptInput;
 use holochain_zome_types::XSalsa20Poly1305DecryptOutput;
 use std::sync::Arc;
