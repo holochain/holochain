@@ -16,8 +16,9 @@ use crate::prelude::*;
 /// should always be handled gracefully because gap grants can be revoked at any time and the claim
 /// holder has no way of knowing until they provide a secret for a call.
 ///
-/// An Ok response already includes the deserialized type. Note that this type should derive from
-/// `SerializedBytes`, and it should be the same one as the return type from the remote function call.
+/// An Ok response already includes the deserialized type. Note that this type must be specified
+/// should derive from `SerializedBytes`, and it should be the same one as the return type
+/// from the remote function call.
 ///
 ///
 /// ```ignore
