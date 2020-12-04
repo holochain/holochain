@@ -29,7 +29,7 @@ use crate::prelude::*;
 ///
 /// @see https://doc.libsodium.org/secret-key_cryptography/secretbox
 /// @see https://nacl.cr.yp.to/secretbox.html
-pub fn xsalsa20_poly1305_encrypt(
+pub fn x_salsa20_poly1305_encrypt(
     key: XSalsa20Poly1305Key,
     nonce: XSalsa20Poly1305Nonce,
     data: XSalsa20Poly1305Data,
@@ -50,5 +50,5 @@ pub fn secretbox(
     nonce: SecretBoxNonce,
     data: SecretBoxData,
 ) -> HdkResult<SecretBoxEncryptedData> {
-    xsalsa20_poly1305_encrypt(key, nonce, data)
+    x_salsa20_poly1305_encrypt(key, nonce, data)
 }

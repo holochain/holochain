@@ -1,35 +1,3 @@
-pub mod agent_info;
-pub mod call;
-pub mod call_remote;
-pub mod capability_claims;
-pub mod capability_grants;
-pub mod capability_info;
-pub mod create;
-pub mod create_link;
-pub mod debug;
-pub mod delete;
-pub mod delete_link;
-pub mod emit_signal;
-pub mod entry_type_properties;
-pub mod get;
-pub mod get_agent_activity;
-pub mod get_details;
-pub mod get_link_details;
-pub mod get_links;
-pub mod hash_entry;
-pub mod property;
-pub mod query;
-pub mod random_bytes;
-pub mod schedule;
-pub mod show_env;
-pub mod sign;
-pub mod sys_time;
-pub mod unreachable;
-pub mod update;
-pub mod verify_signature;
-pub mod xsalsa20_poly1305_decrypt;
-pub mod xsalsa20_poly1305_encrypt;
-pub mod zome_info;
 use super::{error::RibosomeError, CallContext, RibosomeT};
 use holochain_zome_types::zome_io::HostFnApiT;
 use std::sync::Arc;
@@ -105,16 +73,10 @@ host_fn_api_impls! {
     fn create_link ((holo_hash::EntryHash, holo_hash::EntryHash, zt::link::LinkTag)) -> holo_hash::HeaderHash;
 
     // @todo
-    fn decrypt (()) -> ();
-
-    // @todo
     fn delete (holo_hash::HeaderHash) -> holo_hash::HeaderHash;
 
     // Header hash of the CreateLink element.
     fn delete_link (holo_hash::HeaderHash) -> holo_hash::HeaderHash;
-
-    // @todo
-    fn encrypt (()) -> ();
 
     // @todo
     fn entry_type_properties (()) -> ();
@@ -181,6 +143,18 @@ host_fn_api_impls! {
     // There's nothing to go in or out of a noop.
     // Used to "defuse" host functions when side effects are not allowed.
     fn unreachable (()) -> ();
+
+    fn x_salsa20_poly1305_encrypt((
+        holochain_zome_types::xsalsa20_poly1305::key::XSalsa20Poly1305Key,
+        holochain_zome_types::xsalsa20_poly1305::nonce::XSalsa20Poly1305Nonce,
+        holochain_zome_types::xsalsa20_poly1305::data::XSalsa20Poly1305Data,
+    )) -> holochain_zome_types::xsalsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData;
+
+    fn x_salsa20_poly1305_decrypt((
+        holochain_zome_types::xsalsa20_poly1305::key::XSalsa20Poly1305Key,
+        holochain_zome_types::xsalsa20_poly1305::nonce::XSalsa20Poly1305Nonce,
+        holochain_zome_types::xsalsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData,
+    )) -> Option<holochain_zome_types::xsalsa20_poly1305::data::XSalsa20Poly1305Data>;
 
     // The zome and agent info are constants specific to the current zome and chain.
     // All the information is provided by core so there is no input value.

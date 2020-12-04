@@ -52,8 +52,8 @@ use crate::core::ribosome::host_fn::sys_time::sys_time;
 use crate::core::ribosome::host_fn::unreachable::unreachable;
 use crate::core::ribosome::host_fn::update::update;
 use crate::core::ribosome::host_fn::verify_signature::verify_signature;
-use crate::core::ribosome::host_fn::xsalsa20_poly1305_decrypt::xsalsa20_poly1305_decrypt;
-use crate::core::ribosome::host_fn::xsalsa20_poly1305_encrypt::xsalsa20_poly1305_encrypt;
+use crate::core::ribosome::host_fn::x_salsa20_poly1305_decrypt::x_salsa20_poly1305_decrypt;
+use crate::core::ribosome::host_fn::x_salsa20_poly1305_encrypt::x_salsa20_poly1305_encrypt;
 use crate::core::ribosome::host_fn::zome_info::zome_info;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::Invocation;
@@ -195,12 +195,12 @@ impl WasmRibosome {
             );
             ns.insert("__sign", func!(invoke_host_function!(sign)));
             ns.insert(
-                "__xsalsa20_poly1305_encrypt",
-                func!(invoke_host_function!(xsalsa20_poly1305_encrypt)),
+                "__x_salsa20_poly1305_encrypt",
+                func!(invoke_host_function!(x_salsa20_poly1305_encrypt)),
             );
             ns.insert(
-                "__xsalsa20_poly1305_decrypt",
-                func!(invoke_host_function!(xsalsa20_poly1305_decrypt)),
+                "__x_salsa20_poly1305_decrypt",
+                func!(invoke_host_function!(x_salsa20_poly1305_decrypt)),
             );
         } else {
             ns.insert(

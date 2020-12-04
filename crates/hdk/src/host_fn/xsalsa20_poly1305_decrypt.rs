@@ -10,7 +10,7 @@ use crate::prelude::*;
 /// a holder of the shared key but it also has not been tampered with.
 ///
 /// @see https://www.imperialviolet.org/2015/05/16/aeads.html
-pub fn xsalsa20_poly1305_decrypt(
+pub fn x_salsa20_poly1305_decrypt(
     key: XSalsa20Poly1305Key,
     nonce: XSalsa20Poly1305Nonce,
     encrypted_data: XSalsa20Poly1305EncryptedData,
@@ -30,5 +30,5 @@ pub fn secretbox_open(
     nonce: SecretBoxNonce,
     encrypted_data: SecretBoxEncryptedData,
 ) -> HdkResult<Option<SecretBoxData>> {
-    xsalsa20_poly1305_decrypt(key, nonce, encrypted_data)
+    x_salsa20_poly1305_decrypt(key, nonce, encrypted_data)
 }

@@ -8,7 +8,7 @@ use std::sync::Arc;
 use xsalsa20poly1305::aead::{generic_array::GenericArray, Aead, NewAead};
 use xsalsa20poly1305::XSalsa20Poly1305;
 
-pub fn xsalsa20_poly1305_encrypt(
+pub fn x_salsa20_poly1305_encrypt(
     _ribosome: Arc<impl RibosomeT>,
     _call_context: Arc<CallContext>,
     input: XSalsa20Poly1305EncryptInput,
@@ -74,19 +74,13 @@ pub mod wasm_test {
             "xsalsa20_poly1305_decrypt",
             XSalsa20Poly1305DecryptInput::new((key, nonce.into(), output.clone().into_inner()))
         );
-        assert_eq!(
-            &decrypt_output.clone().into_inner(),
-            &Some(data),
-        );
+        assert_eq!(&decrypt_output.clone().into_inner(), &Some(data),);
         let bad_output: XSalsa20Poly1305DecryptOutput = crate::call_test_ribosome!(
             host_access,
             TestWasm::XSalsa20Poly1305,
             "xsalsa20_poly1305_decrypt",
             XSalsa20Poly1305DecryptInput::new((key, [1; 24].into(), output.into_inner()))
         );
-        assert_eq!(
-            None,
-            bad_output.into_inner(),
-        );
+        assert_eq!(None, bad_output.into_inner(),);
     }
 }
