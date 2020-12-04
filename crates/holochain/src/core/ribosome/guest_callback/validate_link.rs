@@ -95,6 +95,7 @@ impl From<&ValidateLinkHostAccess> for HostFnAccess {
     fn from(_: &ValidateLinkHostAccess) -> Self {
         let mut access = Self::none();
         access.read_workspace = Permission::Allow;
+        access.dna_bindings = Permission::Allow;
         access
     }
 }
@@ -235,6 +236,7 @@ mod test {
                 .unwrap();
         let mut access = HostFnAccess::none();
         access.read_workspace = Permission::Allow;
+        access.dna_bindings = Permission::Allow;
         assert_eq!(HostFnAccess::from(&validate_link_add_host_access), access,);
     }
 
