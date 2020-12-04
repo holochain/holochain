@@ -20,7 +20,7 @@ use hdk3::prelude::EntryError;
 use holo_hash::{AgentPubKey, AnyDhtHash, EntryHash, HeaderHash};
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::{
-    actor::{GetLinksOptions, GetOptions, HolochainP2pRefToCell},
+    actor::{GetLinksOptions, HolochainP2pRefToCell},
     HolochainP2pCell,
 };
 use holochain_serialized_bytes::prelude::*;
@@ -29,6 +29,7 @@ use holochain_state::{
     prelude::{GetDb, WriteManager},
 };
 use holochain_types::{cell::CellId, dna::DnaFile, element::Element, Entry};
+use holochain_zome_types::entry::GetOptions;
 use holochain_zome_types::{
     element::SignedHeaderHashed,
     entry_def,
@@ -251,12 +252,9 @@ impl HostFnCaller {
         output.into_inner()
     }
 
-    pub async fn get(&self, entry_hash: AnyDhtHash, _options: GetOptions) -> Option<Element> {
+    pub async fn get(&self, entry_hash: AnyDhtHash, options: GetOptions) -> Option<Element> {
         let (_, ribosome, call_context, _) = self.explode();
-        let input = GetInput::new((
-            entry_hash,
-            holochain_zome_types::entry::GetOptions::default(),
-        ));
+        let input = GetInput::new((entry_hash, options));
         let output = { host_fn::get::get(ribosome, call_context, input).unwrap() };
         output.into_inner()
     }
@@ -264,13 +262,10 @@ impl HostFnCaller {
     pub async fn get_details<'env>(
         &self,
         entry_hash: AnyDhtHash,
-        _options: GetOptions,
+        options: GetOptions,
     ) -> Option<Details> {
         let (_, ribosome, call_context, _) = self.explode();
-        let input = GetDetailsInput::new((
-            entry_hash,
-            holochain_zome_types::entry::GetOptions::default(),
-        ));
+        let input = GetDetailsInput::new((entry_hash, options));
         let output = { host_fn::get_details::get_details(ribosome, call_context, input).unwrap() };
         output.into_inner()
     }

@@ -48,7 +48,7 @@ fn create_post(post: Post) -> ExternResult<HeaderHash> {
 
 #[hdk_extern]
 fn get_entry(_: ()) -> ExternResult<GetOutput> {
-    Ok(GetOutput::new(get(hash_entry(&post())?, GetOptions::default())?))
+    Ok(GetOutput::new(get(hash_entry(&post())?, GetOptions::content())?))
 }
 
 #[hdk_extern]

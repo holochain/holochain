@@ -137,20 +137,11 @@ pub struct GetLinksOptions {
     /// Note - if all requests time-out you will receive an empty result,
     /// not a timeout error.
     pub timeout_ms: Option<u64>,
-    // TODO: move this to an exposed zome type
-    /// [Local]
-    /// For full sharding should the call wait for
-    /// new data on each get or just return what is
-    /// integrated locally.
-    pub wait_for_new_data: bool,
 }
 
 impl Default for GetLinksOptions {
     fn default() -> Self {
-        Self {
-            timeout_ms: None,
-            wait_for_new_data: false,
-        }
+        Self { timeout_ms: None }
     }
 }
 

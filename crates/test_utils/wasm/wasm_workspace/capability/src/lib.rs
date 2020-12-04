@@ -53,7 +53,7 @@ pub fn delete_cap_grant(header_hash: HeaderHash) -> ExternResult<HeaderHash> {
 
 #[hdk_extern]
 fn get_entry(header_hash: HeaderHash) -> ExternResult<GetOutput> {
-    Ok(GetOutput::new(get(header_hash, GetOptions::default())?))
+    Ok(GetOutput::new(get(header_hash, GetOptions::blocking())?))
 }
 
 /// accepts a cap claim and commits it to the local chain

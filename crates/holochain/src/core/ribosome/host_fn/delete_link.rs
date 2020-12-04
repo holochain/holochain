@@ -6,6 +6,7 @@ use crate::core::state::cascade::error::CascadeResult;
 use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
 use crate::core::{workflow::integrate_dht_ops_workflow::integrate_to_authored, SourceChainError};
 use holochain_types::element::SignedHeaderHashed;
+use holochain_zome_types::entry::GetOptions;
 use holochain_zome_types::header::builder;
 use holochain_zome_types::DeleteLinkInput;
 use holochain_zome_types::DeleteLinkOutput;
@@ -40,7 +41,7 @@ pub fn delete_link<'a>(
                     .write()
                     .await
                     .cascade(network)
-                    .dht_get(address.into(), Default::default())
+                    .dht_get(address.into(), GetOptions::content())
                     .await?
                     .map(|el| el.into_inner().0),
             )

@@ -957,7 +957,7 @@ async fn get_entry(env: EnvironmentWrite, entry_hash: EntryHash) -> Option<Entry
 
     let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
 
-    let input = GetInput::new((entry_hash.clone().into(), GetOptions::default()));
+    let input = GetInput::new((entry_hash.clone().into(), GetOptions::blocking()));
 
     let output = {
         let mut host_access = fixt!(ZomeCallHostAccess);
@@ -1302,6 +1302,7 @@ async fn test_integrate_single_register_delete_link() {
 
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
+    use holochain_zome_types::entry::GetOptions;
     use std::{
         convert::{TryFrom, TryInto},
         time::Duration,
@@ -1447,14 +1448,14 @@ mod slow_tests {
 
             // Check bob can get the target
             let e = call_data
-                .get(target_entry_hash.clone().into(), Default::default())
+                .get(target_entry_hash.clone().into(), GetOptions::content())
                 .await
                 .unwrap();
             assert_eq!(e.into_inner().1.into_option().unwrap(), target_entry);
 
             // Check bob can get the base
             let e = call_data
-                .get(base_entry_hash.clone().into(), Default::default())
+                .get(base_entry_hash.clone().into(), GetOptions::content())
                 .await
                 .unwrap();
             assert_eq!(e.into_inner().1.into_option().unwrap(), base_entry);

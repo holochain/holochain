@@ -36,15 +36,36 @@ pub struct GetOptions {
     /// the latest data before returning.
     /// If it is false you will get whatever is locally
     /// available on this conductor.
-    pub wait_for_new_data: bool,
+    pub call: GetCall,
 }
 
-impl Default for GetOptions {
-    fn default() -> Self {
+impl GetOptions {
+    /// TODO
+    pub fn blocking() -> Self {
         Self {
-            wait_for_new_data: false,
+            call: GetCall::Blocking,
         }
     }
+    /// TODO
+    pub fn content() -> Self {
+        Self {
+            call: GetCall::Blocking,
+        }
+    }
+}
+
+#[derive(PartialEq, Debug, Clone, Copy, Serialize, Deserialize)]
+/// TODO
+pub enum GetCall {
+    /// Will block on a network request unless this agent is an ]
+    /// authority for the data.
+    Blocking,
+    /// Will return data if found locally or go to the network
+    /// unless this agent is an authority for the data.
+    ///
+    /// This means you don't care about metadata for this element
+    /// and only want the content.
+    Content,
 }
 
 /// Structure holding the entry portion of a chain element.

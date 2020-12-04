@@ -12,7 +12,7 @@ fn create(_: ()) -> ExternResult<HeaderHash> {
 
 #[hdk_extern]
 fn read(header_hash: HeaderHash) -> ExternResult<GetOutput> {
-    Ok(GetOutput::new(get(header_hash, GetOptions::default())?))
+    Ok(GetOutput::new(get(header_hash, GetOptions::blocking())?))
 }
 
 #[hdk_extern]
