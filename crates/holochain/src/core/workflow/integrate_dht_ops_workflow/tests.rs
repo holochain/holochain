@@ -142,7 +142,7 @@ impl TestData {
             Header::Update(eu) => {
                 eu.entry_hash = original_entry_hash.clone();
             }
-            _ => (),
+            _ => {}
         };
 
         // Dna Header
@@ -1302,7 +1302,6 @@ async fn test_integrate_single_register_delete_link() {
 
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
-
     use std::{
         convert::{TryFrom, TryInto},
         time::Duration,
@@ -1383,7 +1382,7 @@ mod slow_tests {
         // Commit the base and target.
         // Link them together.
         {
-            let call_data = HostFnApi::create(&alice_cell_id, &conductor, &dna_file).await;
+            let call_data = HostFnCaller::create(&alice_cell_id, &conductor, &dna_file).await;
 
             // 3
             call_data
@@ -1412,7 +1411,7 @@ mod slow_tests {
 
         // Check the ops
         {
-            let call_data = HostFnApi::create(&bob_cell_id, &conductor, &dna_file).await;
+            let call_data = HostFnCaller::create(&bob_cell_id, &conductor, &dna_file).await;
 
             // Wait for the ops to integrate but early exit if they do
             // 14 ops for genesis and 9 ops for two commits and a link

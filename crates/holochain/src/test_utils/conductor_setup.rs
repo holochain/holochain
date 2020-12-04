@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use super::{host_fn_api::HostFnApi, install_app, setup_app_inner};
+use super::{host_fn_api::HostFnCaller, install_app, setup_app_inner};
 use crate::{
     conductor::{
         api::{CellConductorApi, CellConductorApiT},
@@ -28,8 +28,8 @@ use kitsune_p2p::KitsuneP2pConfig;
 use std::{collections::HashMap, convert::TryFrom, sync::Arc};
 use tempdir::TempDir;
 
-/// A "factory" for HostFnApi, which will produce them when given a ZomeName
-pub struct CellHostFnApi {
+/// A "factory" for HostFnCaller, which will produce them when given a ZomeName
+pub struct CellHostFnCaller {
     pub cell_id: CellId,
     pub env: EnvironmentWrite,
     pub ribosome: WasmRibosome,
@@ -40,7 +40,7 @@ pub struct CellHostFnApi {
     pub cell_conductor_api: CellConductorApi,
 }
 
-impl CellHostFnApi {
+impl CellHostFnCaller {
     pub async fn new(cell_id: &CellId, handle: &ConductorHandle, dna_file: &DnaFile) -> Self {
         let env = handle.get_cell_env(cell_id).await.unwrap();
         let keystore = env.keystore().clone();
@@ -52,7 +52,7 @@ impl CellHostFnApi {
 
         let ribosome = WasmRibosome::new(dna_file.clone());
         let signal_tx = handle.signal_broadcaster().await;
-        CellHostFnApi {
+        CellHostFnCaller {
             cell_id: cell_id.clone(),
             env,
             ribosome,
@@ -64,12 +64,12 @@ impl CellHostFnApi {
         }
     }
 
-    /// Create a HostFnApi for a specific zome and call
-    pub fn get_api<I: Into<ZomeName>>(&self, zome_name: I) -> HostFnApi {
+    /// Create a HostFnCaller for a specific zome and call
+    pub fn get_api<I: Into<ZomeName>>(&self, zome_name: I) -> HostFnCaller {
         let zome_name: ZomeName = zome_name.into();
         let zome_path = (self.cell_id.clone(), zome_name).into();
         let call_zome_handle = self.cell_conductor_api.clone().into_call_zome_handle();
-        HostFnApi {
+        HostFnCaller {
             env: self.env.clone(),
             ribosome: self.ribosome.clone(),
             zome_path,
@@ -86,7 +86,7 @@ impl CellHostFnApi {
 pub struct ConductorTestData {
     __tmpdir: Arc<TempDir>,
     handle: ConductorHandle,
-    cell_apis: HashMap<CellId, CellHostFnApi>,
+    cell_apis: HashMap<CellId, CellHostFnCaller>,
 }
 
 impl ConductorTestData {
@@ -127,7 +127,7 @@ impl ConductorTestData {
             for cell_id in cell_ids {
                 cell_apis.insert(
                     cell_id.clone(),
-                    CellHostFnApi::new(&cell_id, &handle, &dna_file).await,
+                    CellHostFnCaller::new(&cell_id, &handle, &dna_file).await,
                 );
             }
         }
@@ -210,7 +210,7 @@ impl ConductorTestData {
             install_app("bob_app", cell_data, vec![dna_file.clone()], self.handle()).await;
             self.cell_apis.insert(
                 bob_cell_id.clone(),
-                CellHostFnApi::new(&bob_cell_id, &self.handle(), &dna_file).await,
+                CellHostFnCaller::new(&bob_cell_id, &self.handle(), &dna_file).await,
             );
         }
     }
@@ -220,21 +220,21 @@ impl ConductorTestData {
     }
 
     #[allow(clippy::iter_nth_zero)]
-    pub fn alice_call_data(&self) -> &CellHostFnApi {
+    pub fn alice_call_data(&self) -> &CellHostFnCaller {
         &self.cell_apis.values().nth(0).unwrap()
     }
 
-    pub fn bob_call_data(&self) -> Option<&CellHostFnApi> {
+    pub fn bob_call_data(&self) -> Option<&CellHostFnCaller> {
         self.cell_apis.values().nth(1)
     }
 
     #[allow(clippy::iter_nth_zero)]
-    pub fn alice_call_data_mut(&mut self) -> &mut CellHostFnApi {
+    pub fn alice_call_data_mut(&mut self) -> &mut CellHostFnCaller {
         let key = self.cell_apis.keys().nth(0).unwrap().clone();
         self.cell_apis.get_mut(&key).unwrap()
     }
 
-    pub fn get_cell(&mut self, cell_id: &CellId) -> Option<&mut CellHostFnApi> {
+    pub fn get_cell(&mut self, cell_id: &CellId) -> Option<&mut CellHostFnCaller> {
         self.cell_apis.get_mut(cell_id)
     }
 }
