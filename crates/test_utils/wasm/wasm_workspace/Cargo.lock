@@ -841,7 +841,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "test_wasm_xsalsa20_poly1305"
+name = "test_wasm_x_salsa20_poly1305"
 version = "0.0.1"
 dependencies = [
  "hdk3",
