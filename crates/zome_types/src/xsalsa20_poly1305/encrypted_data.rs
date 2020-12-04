@@ -7,3 +7,9 @@ impl From<Vec<u8>> for XSalsa20Poly1305EncryptedData {
         Self(v)
     }
 }
+
+impl AsRef<[u8]> for XSalsa20Poly1305EncryptedData {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
