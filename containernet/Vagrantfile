@@ -1,0 +1,44 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+require 'etc'
+
+Vagrant.configure("2") do |config|
+  # containernet requires bionic at the moment
+  config.vm.box = "ubuntu/bionic64"
+
+  # set up to work with the virtualbox vagrant provider
+  config.vm.provider "virtualbox" do |vb|
+    # we need a fair amount of ram to run networking simulations
+    vb.memory = "10240"
+    # use half available host cpus
+    vb.cpus = Etc.nprocessors / 2
+  end
+
+  # disable the default vagrant sync folder
+  config.vm.synced_folder ".", "/vagrant", :mount_options => ["ro"], disabled: true
+
+  # set up a lower-level sync folder - try to make it read only
+  config.vm.synced_folder "..", "/holochain", :mount_options => ["ro"]
+
+  # provision the containernet tools
+  config.vm.provision "shell", inline: <<-SHELL
+    # update apt database
+    apt-get update
+
+    # upgade packages
+    apt-get upgrade -y
+
+    # install needed tools
+    apt-get install -y ansible git aptitude rsync
+
+    # clone the containernet source
+    git clone https://github.com/containernet/containernet.git /root/containernet
+
+    # execute containernet ansible install script
+    ( cd /root/containernet/ansible; sudo ansible-playbook -i "localhost," -c local install.yml )
+
+    # final setup for containernet execution
+    ( cd /root/containernet; sudo make develop )
+  SHELL
+end

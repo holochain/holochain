@@ -123,7 +123,7 @@ fn others((hash, i, el): &(DhtOpHash, IntegratedDhtOpsValue, Element), line: u32
         // Register agent activity will be invalid if the previous header is invalid
         // This is very hard to track in these tests and this op also doesn't
         // go through app validation so it's more productive to skip it
-        DhtOpLight::RegisterAgentActivity(_, _) => (),
+        DhtOpLight::RegisterAgentActivity(_, _) => {}
         _ => assert_eq!(i.validation_status, ValidationStatus::Valid, "{}", s),
     }
 }
@@ -429,7 +429,7 @@ async fn run_test_entry_def_id(
                 DhtOpLight::StoreElement(hh, _, _) if *hh == invalid_header_hash => {
                     assert_eq!(v.1.validation_status, ValidationStatus::Rejected, "{:?}", v);
                 }
-                _ => (),
+                _ => {}
             }
         }
 
@@ -446,7 +446,7 @@ async fn commit_invalid(
 ) -> (HeaderHash, EntryHash) {
     let entry = ThisWasmEntry::NeverValidates;
     let entry_hash = EntryHash::with_data_sync(&Entry::try_from(entry.clone()).unwrap());
-    let call_data = HostFnApi::create(bob_cell_id, handle, dna_file).await;
+    let call_data = HostFnCaller::create(bob_cell_id, handle, dna_file).await;
     // 4
     let invalid_header_hash = call_data
         .commit_entry(entry.clone().try_into().unwrap(), INVALID_ID)
@@ -469,7 +469,7 @@ async fn commit_invalid_post(
     let entry = Post("Banana".into());
     let entry_hash = EntryHash::with_data_sync(&Entry::try_from(entry.clone()).unwrap());
     // Create call data for the 3rd zome Create
-    let call_data = HostFnApi::create_for_zome(bob_cell_id, handle, dna_file, 2).await;
+    let call_data = HostFnCaller::create_for_zome(bob_cell_id, handle, dna_file, 2).await;
     // 9
     let invalid_header_hash = call_data
         .commit_entry(entry.clone().try_into().unwrap(), POST_ID)
@@ -487,7 +487,7 @@ async fn call_zome_directly(
     dna_file: &DnaFile,
     invocation: ZomeCallInvocation,
 ) -> SerializedBytes {
-    let call_data = HostFnApi::create(bob_cell_id, handle, dna_file).await;
+    let call_data = HostFnCaller::create(bob_cell_id, handle, dna_file).await;
     // 4
     let output = call_data.call_zome_direct(invocation).await;
 

@@ -1,6 +1,6 @@
-use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use crate::core::ribosome::{error::RibosomeResult, ZomeCallInvocation};
+use crate::core::ribosome::ZomeCallInvocation;
+use crate::core::ribosome::{error::RibosomeResult, CallContext};
 use holochain_zome_types::{CallInput, ZomeCallResponse};
 use holochain_zome_types::{CallOutput, ExternInput};
 use std::sync::Arc;

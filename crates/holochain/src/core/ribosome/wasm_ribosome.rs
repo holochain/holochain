@@ -533,7 +533,6 @@ impl RibosomeT for WasmRibosome {
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use hdk3::prelude::*;
