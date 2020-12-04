@@ -142,7 +142,8 @@ macro_rules! fixed_array_serialization {
 ///  - keep secrets inside lair with all algorithms behind an API, wasm only has access to opaque
 ///    references to the secret data.
 ///
-/// @todo implement explicit zeroing of memory for sensitive data.
+/// @todo implement explicit zeroing, moving and copying of memory for sensitive data.
+///       - e.g. the secrecy crate https://crates.io/crates/secrecy
 macro_rules! crypto_secret {
     ($t:ty, $len:expr) => {
         $crate::fixed_array_serialization!($t, $len);
@@ -165,6 +166,10 @@ macro_rules! crypto_secret {
         /// Also, encodings like base64 are not constant time so debugging could open some weird
         /// side channel issue trying to be 'human friendly'.
         /// It seems better to never try to encode secrets.
+        ///
+        /// @todo maybe we want something like **HIDDEN** by default and putting the actual bytes
+        ///       behind a feature flag?
+        ///
         /// @see https://docs.rs/subtle-encoding/0.5.1/subtle_encoding/
         impl std::fmt::Debug for $t {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
