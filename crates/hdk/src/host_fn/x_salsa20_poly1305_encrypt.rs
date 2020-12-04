@@ -34,10 +34,10 @@ pub fn x_salsa20_poly1305_encrypt(
     nonce: XSalsa20Poly1305Nonce,
     data: XSalsa20Poly1305Data,
 ) -> HdkResult<XSalsa20Poly1305EncryptedData> {
-    host_externs!(__xsalsa20_poly1305_encrypt);
+    host_externs!(__x_salsa20_poly1305_encrypt);
     Ok(
         host_call::<XSalsa20Poly1305EncryptInput, XSalsa20Poly1305EncryptOutput>(
-            __xsalsa20_poly1305_encrypt,
+            __x_salsa20_poly1305_encrypt,
             &XSalsa20Poly1305EncryptInput::new((key, nonce, data)),
         )?
         .into_inner(),

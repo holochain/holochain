@@ -209,11 +209,11 @@ impl WasmRibosome {
             );
             ns.insert("__sign", func!(invoke_host_function!(unreachable)));
             ns.insert(
-                "__xsalsa20_poly1305_encrypt",
+                "__x_salsa20_poly1305_encrypt",
                 func!(invoke_host_function!(unreachable)),
             );
             ns.insert(
-                "__xsalsa20_poly1305_decrypt",
+                "__x_salsa20_poly1305_decrypt",
                 func!(invoke_host_function!(unreachable)),
             );
         }
