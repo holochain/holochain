@@ -49,7 +49,6 @@ pub fn get_link_details<'a>(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod slow_tests {
-
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
