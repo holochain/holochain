@@ -1,15 +1,9 @@
 use hdk3::prelude::*;
-use holochain::test_utils::test_conductor::{TestAgents, TestConductorHandle};
+use holochain::test_utils::test_conductor::{MaybeElement, TestAgents, TestConductorHandle};
 use holochain::{conductor::Conductor, destructure_test_cells};
 use holochain_state::test_utils::test_environments;
 use holochain_types::dna::{zome::inline_zome::InlineZome, DnaFile};
 use holochain_zome_types::element::ElementEntry;
-
-// TODO: remove once host fns remove SerializedBytes constraint
-#[derive(serde::Serialize, serde::Deserialize, Debug, SerializedBytes)]
-#[serde(transparent)]
-#[repr(transparent)]
-struct MaybeElement(Option<Element>);
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, SerializedBytes, derive_more::From)]
 #[serde(transparent)]
@@ -54,7 +48,7 @@ fn simple_crud_zome() -> InlineZome {
 
 #[tokio::test(threaded_scheduler)]
 #[cfg(feature = "test_utils")]
-async fn inline_zome_2_agent_1_dna() -> anyhow::Result<()> {
+async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
     let envs = test_environments();
 
     // Bundle the single zome into a DnaFile
@@ -101,7 +95,7 @@ async fn inline_zome_2_agent_1_dna() -> anyhow::Result<()> {
 
 #[tokio::test(threaded_scheduler)]
 #[cfg(feature = "test_utils")]
-async fn inline_zome_3_agent_2_dna() -> anyhow::Result<()> {
+async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
     let envs = test_environments();
     let conductor: TestConductorHandle = Conductor::builder().test(&envs).await?.into();
 
@@ -147,7 +141,8 @@ async fn inline_zome_3_agent_2_dna() -> anyhow::Result<()> {
 
     // Verify that carol can run "read" on her cell and get alice's Header
     // on the "bar" DNA
-    let element: MaybeElement = carol_bar.call("barzome", "read", hash_bar).await;
+    // Let's do it with the TestZome instead of the TestCell too, for fun
+    let element: MaybeElement = carol_bar.zome("barzome").call("read", hash_bar).await;
     let element = element
         .0
         .expect("Element was None: carol couldn't `get` it");

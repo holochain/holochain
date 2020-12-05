@@ -16,59 +16,6 @@ use unwrap_to::unwrap_to;
 pub struct TestConductorHandle(pub(crate) ConductorHandle);
 
 impl TestConductorHandle {
-    /// Call a zome function with automatic de/serialization of input and output
-    pub async fn call_zome_ok_struct<'a, I, O, F, E>(
-        &'a self,
-        invocation: TestZomeCall<'a, I, F, E>,
-    ) -> O
-    where
-        E: std::fmt::Debug,
-        FunctionName: From<F>,
-        SerializedBytes: TryFrom<I, Error = E>,
-        O: TryFrom<SerializedBytes, Error = E> + std::fmt::Debug,
-    {
-        let response = self.0.call_zome(invocation.into()).await.unwrap().unwrap();
-        unwrap_to!(response => ZomeCallResponse::Ok)
-            .clone()
-            .into_inner()
-            .try_into()
-            .expect("Couldn't deserialize zome call output")
-    }
-    /// Call a zome function with automatic de/serialization of input and output
-    pub async fn call_zome_ok_flat<I, O, Z, F, E>(
-        &self,
-        cell_id: &CellId,
-        zome_name: Z,
-        fn_name: F,
-        cap: Option<CapSecret>,
-        provenance: Option<AgentPubKey>,
-        payload: I,
-    ) -> O
-    where
-        E: std::fmt::Debug,
-        ZomeName: From<Z>,
-        FunctionName: From<F>,
-        SerializedBytes: TryFrom<I, Error = E>,
-        O: TryFrom<SerializedBytes, Error = E> + std::fmt::Debug,
-    {
-        let payload = ExternInput::new(payload.try_into().expect("Couldn't serialize payload"));
-        let provenance = provenance.unwrap_or_else(|| cell_id.agent_pubkey().clone());
-        let call = ZomeCall {
-            cell_id: cell_id.clone(),
-            zome_name: zome_name.into(),
-            fn_name: fn_name.into(),
-            cap,
-            provenance,
-            payload,
-        };
-        let response = self.0.call_zome(call).await.unwrap().unwrap();
-        unwrap_to!(response => ZomeCallResponse::Ok)
-            .clone()
-            .into_inner()
-            .try_into()
-            .expect("Couldn't deserialize zome call output")
-    }
-
     /// Opinionated app setup. Creates one app per agent, using the given DnaFiles.
     ///
     /// All InstalledAppIds and CellNicks are auto-generated. In tests driven directly
@@ -160,6 +107,62 @@ macro_rules! destructure_test_cells {
             .collect_tuple()
             .expect("Can't destructure more than 4 Agents")
     }};
+}
+
+impl TestConductorHandle {
+    /// Call a zome function with automatic de/serialization of input and output
+    pub async fn call_zome_ok_struct<'a, I, O, F, E>(
+        &'a self,
+        invocation: TestZomeCall<'a, I, F, E>,
+    ) -> O
+    where
+        E: std::fmt::Debug,
+        FunctionName: From<F>,
+        SerializedBytes: TryFrom<I, Error = E>,
+        O: TryFrom<SerializedBytes, Error = E> + std::fmt::Debug,
+    {
+        let response = self.0.call_zome(invocation.into()).await.unwrap().unwrap();
+        unwrap_to!(response => ZomeCallResponse::Ok)
+            .clone()
+            .into_inner()
+            .try_into()
+            .expect("Couldn't deserialize zome call output")
+    }
+
+    /// Call a zome function with automatic de/serialization of input and output
+    pub async fn call_zome_ok_flat<I, O, Z, F, E>(
+        &self,
+        cell_id: &CellId,
+        zome_name: Z,
+        fn_name: F,
+        cap: Option<CapSecret>,
+        provenance: Option<AgentPubKey>,
+        payload: I,
+    ) -> O
+    where
+        E: std::fmt::Debug,
+        ZomeName: From<Z>,
+        FunctionName: From<F>,
+        SerializedBytes: TryFrom<I, Error = E>,
+        O: TryFrom<SerializedBytes, Error = E> + std::fmt::Debug,
+    {
+        let payload = ExternInput::new(payload.try_into().expect("Couldn't serialize payload"));
+        let provenance = provenance.unwrap_or_else(|| cell_id.agent_pubkey().clone());
+        let call = ZomeCall {
+            cell_id: cell_id.clone(),
+            zome_name: zome_name.into(),
+            fn_name: fn_name.into(),
+            cap,
+            provenance,
+            payload,
+        };
+        let response = self.0.call_zome(call).await.unwrap().unwrap();
+        unwrap_to!(response => ZomeCallResponse::Ok)
+            .clone()
+            .into_inner()
+            .try_into()
+            .expect("Couldn't deserialize zome call output")
+    }
 }
 
 /// A top-level call into a zome function,
