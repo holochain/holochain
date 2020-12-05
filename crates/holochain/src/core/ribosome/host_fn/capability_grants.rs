@@ -126,8 +126,8 @@ pub mod wasm_test {
         let _ = handle
             .setup_app_for_all_agents_with_no_membrane_proof(
                 "app-",
-                &[dna_file],
                 &[alice_agent_id.clone(), bob_agent_id.clone()],
+                &[dna_file],
             )
             .await;
 

@@ -81,8 +81,8 @@ impl TestConductorHandle {
     pub async fn setup_app_for_all_agents_with_no_membrane_proof(
         &self,
         app_id_prefix: &str,
-        dna_files: &[DnaFile],
         agents: &[AgentPubKey],
+        dna_files: &[DnaFile],
     ) -> Vec<(InstalledAppId, Vec<TestCell>)> {
         for dna_file in dna_files {
             self.0.install_dna(dna_file.clone()).await.unwrap()

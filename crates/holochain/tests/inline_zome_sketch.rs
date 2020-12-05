@@ -51,8 +51,8 @@ async fn inline_zome_feasibility_test() -> anyhow::Result<()> {
     let mut ids = conductor
         .setup_app_for_all_agents_with_no_membrane_proof(
             "app",
-            &[dna_file],
             &[alice.clone(), bobbo.clone()],
+            &[dna_file],
         )
         .await;
 
