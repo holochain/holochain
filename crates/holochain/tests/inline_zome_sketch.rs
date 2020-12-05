@@ -1,8 +1,6 @@
 use hdk3::prelude::*;
-use holochain::{
-    conductor::Conductor,
-    test_utils::{test_agents::TestAgents, test_handle::TestConductorHandle},
-};
+use holochain::conductor::Conductor;
+use holochain::test_utils::{test_agents::TestAgents, test_handle::TestConductorHandle};
 use holochain_state::test_utils::test_environments;
 use holochain_types::dna::{zome::inline_zome::InlineZome, DnaFile};
 use holochain_zome_types::element::ElementEntry;
@@ -44,6 +42,7 @@ async fn inline_zome_feasibility_test() -> anyhow::Result<()> {
 
     let (dna_file, zome) = DnaFile::unique_from_inline_zome("zome1", simple_crud_zome()).await?;
     let dna_hash = dna_file.dna_hash().clone();
+    let zome_name = zome.zome_name();
 
     // Get two agents
 
@@ -68,7 +67,7 @@ async fn inline_zome_feasibility_test() -> anyhow::Result<()> {
     // Call the "create" zome fn on Alice's app
 
     let hash: HeaderHash = conductor
-        .call_zome_ok_flat(&alice_cell_id, &zome, "create", None, None, ())
+        .call_zome_ok_flat(&alice_cell_id, zome_name, "create", None, None, ())
         .await;
 
     // Wait long enough for Bob to receive gossip
@@ -78,7 +77,7 @@ async fn inline_zome_feasibility_test() -> anyhow::Result<()> {
     // Verify that bob can run "read" on his app and get alice's Header
 
     let element: MaybeElement = conductor
-        .call_zome_ok_flat(&bobbo_cell_id, &zome, "read", None, None, hash)
+        .call_zome_ok_flat(&bobbo_cell_id, zome_name, "read", None, None, hash)
         .await;
     let element = element
         .0

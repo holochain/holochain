@@ -31,13 +31,13 @@ pub enum ConductorApiError {
 
     /// Cell was referenced, but is missing from the conductor.
     #[error(
-        "A Cell attempted to use an CellConductorApi it was not given.\nAPI CellId: {api_cell_id:?}\nInvocation CellId: {invocation_cell_id:?}"
+        "A Cell attempted to use an CellConductorApi it was not given.\nAPI CellId: {api_cell_id:?}\nInvocation CellId: {call_cell_id:?}"
     )]
-    ZomeCallInvocationCellMismatch {
+    ZomeCallCellMismatch {
         /// The CellId which is referenced by the CellConductorApi
         api_cell_id: CellId,
         /// The CellId which is referenced by the ZomeCallInvocation
-        invocation_cell_id: CellId,
+        call_cell_id: CellId,
     },
 
     /// Conductor threw an error during API call.

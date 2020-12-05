@@ -43,6 +43,7 @@
 
 use super::{
     api::error::ConductorApiResult,
+    api::ZomeCall,
     config::AdminInterfaceConfig,
     dna_store::DnaStore,
     entry_def_store::EntryDefBufferKey,
@@ -51,10 +52,7 @@ use super::{
     manager::TaskManagerRunHandle,
     Cell, Conductor,
 };
-use crate::core::{
-    ribosome::ZomeCallInvocation,
-    workflow::{CallZomeWorkspaceLock, ZomeCallInvocationResult},
-};
+use crate::core::workflow::{CallZomeWorkspaceLock, ZomeCallResult};
 use derive_more::From;
 use futures::future::FutureExt;
 use holochain_p2p::event::HolochainP2pEvent::*;
@@ -127,17 +125,14 @@ pub trait ConductorHandleT: Send + Sync {
     ) -> ConductorResult<()>;
 
     /// Invoke a zome function on a Cell
-    async fn call_zome(
-        &self,
-        invocation: ZomeCallInvocation,
-    ) -> ConductorApiResult<ZomeCallInvocationResult>;
+    async fn call_zome(&self, invocation: ZomeCall) -> ConductorApiResult<ZomeCallResult>;
 
     /// Invoke a zome function on a Cell with a workspace
     async fn call_zome_with_workspace(
         &self,
-        invocation: ZomeCallInvocation,
+        invocation: ZomeCall,
         workspace_lock: CallZomeWorkspaceLock,
-    ) -> ConductorApiResult<ZomeCallInvocationResult>;
+    ) -> ConductorApiResult<ZomeCallResult>;
 
     /// Cue the autonomic system to perform some action early (experimental)
     async fn autonomic_cue(&self, cue: AutonomicCue, cell_id: &CellId) -> ConductorApiResult<()>;
@@ -354,31 +349,28 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         Ok(())
     }
 
-    async fn call_zome(
-        &self,
-        invocation: ZomeCallInvocation,
-    ) -> ConductorApiResult<ZomeCallInvocationResult> {
+    async fn call_zome(&self, call: ZomeCall) -> ConductorApiResult<ZomeCallResult> {
         // FIXME: D-01058: We are holding this read lock for
         // the entire call to call_zome and blocking
         // any writes to the conductor
         let lock = self.conductor.read().await;
-        debug!(cell_id = ?invocation.cell_id);
-        let cell: &Cell = lock.cell_by_id(&invocation.cell_id)?;
-        Ok(cell.call_zome(invocation, None).await?)
+        debug!(cell_id = ?call.cell_id);
+        let cell: &Cell = lock.cell_by_id(&call.cell_id)?;
+        Ok(cell.call_zome(call, None).await?)
     }
 
     async fn call_zome_with_workspace(
         &self,
-        invocation: ZomeCallInvocation,
+        call: ZomeCall,
         workspace_lock: CallZomeWorkspaceLock,
-    ) -> ConductorApiResult<ZomeCallInvocationResult> {
+    ) -> ConductorApiResult<ZomeCallResult> {
         // FIXME: D-01058: We are holding this read lock for
         // the entire call to call_zome and blocking
         // any writes to the conductor
         let lock = self.conductor.read().await;
-        debug!(cell_id = ?invocation.cell_id);
-        let cell: &Cell = lock.cell_by_id(&invocation.cell_id)?;
-        Ok(cell.call_zome(invocation, Some(workspace_lock)).await?)
+        debug!(cell_id = ?call.cell_id);
+        let cell: &Cell = lock.cell_by_id(&call.cell_id)?;
+        Ok(cell.call_zome(call, Some(workspace_lock)).await?)
     }
 
     async fn autonomic_cue(&self, cue: AutonomicCue, cell_id: &CellId) -> ConductorApiResult<()> {

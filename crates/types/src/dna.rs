@@ -277,7 +277,7 @@ impl DnaFile {
     {
         let zomes = test_wasms.clone().into_iter().map(Into::into).collect();
         let wasms = test_wasms.into_iter().map(Into::into).collect();
-        Self::from_zomes(random_uuid(), zomes, wasms).await
+        Self::from_zomes(uuid, zomes, wasms).await
     }
 
     /// Create a DnaFile from a collection of TestWasm

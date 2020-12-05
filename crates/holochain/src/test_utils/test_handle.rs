@@ -1,6 +1,9 @@
 //! A wrapper around ConductorHandle with more convenient methods for testing
 
-use crate::{conductor::handle::ConductorHandle, core::ribosome::ZomeCallInvocation};
+use crate::{
+    conductor::{api::ZomeCall, handle::ConductorHandle},
+    core::ribosome::ZomeCallInvocation,
+};
 use hdk3::prelude::*;
 use holochain_types::app::{InstalledAppId, InstalledCell};
 use holochain_types::dna::zome::Zome;
@@ -34,7 +37,7 @@ impl TestConductorHandle {
     pub async fn call_zome_ok_flat<I, O, F, E>(
         &self,
         cell_id: &CellId,
-        zome: &Zome,
+        zome_name: &ZomeName,
         fn_name: F,
         cap: Option<CapSecret>,
         provenance: Option<AgentPubKey>,
@@ -48,15 +51,15 @@ impl TestConductorHandle {
     {
         let payload = ExternInput::new(payload.try_into().expect("Couldn't serialize payload"));
         let provenance = provenance.unwrap_or_else(|| cell_id.agent_pubkey().clone());
-        let invocation = ZomeCallInvocation {
+        let call = ZomeCall {
             cell_id: cell_id.clone(),
-            zome: zome.clone(),
+            zome_name: zome_name.clone(),
             fn_name: fn_name.into(),
             cap,
             provenance,
             payload,
         };
-        let response = self.0.call_zome(invocation).await.unwrap().unwrap();
+        let response = self.0.call_zome(call).await.unwrap().unwrap();
         unwrap_to!(response => ZomeCallResponse::Ok)
             .clone()
             .into_inner()
@@ -181,5 +184,16 @@ where
             provenance,
             payload,
         }
+    }
+}
+
+impl<'a, P, F, E> From<TestZomeCallInvocation<'a, P, F, E>> for ZomeCall
+where
+    SerializedBytes: TryFrom<P, Error = E>,
+    E: std::fmt::Debug,
+    FunctionName: From<F>,
+{
+    fn from(tzci: TestZomeCallInvocation<'a, P, F, E>) -> Self {
+        ZomeCallInvocation::from(tzci).into()
     }
 }

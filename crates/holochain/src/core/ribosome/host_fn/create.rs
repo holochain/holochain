@@ -118,8 +118,6 @@ pub fn extract_entry_def(
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use super::create;
-    use crate::core::ribosome::error::RibosomeError;
-    use crate::core::ribosome::ZomeCallInvocation;
     use crate::core::state::source_chain::ChainInvalidReason;
     use crate::core::state::source_chain::SourceChainError;
     use crate::core::state::source_chain::SourceChainResult;
@@ -129,6 +127,7 @@ pub mod wasm_test {
     use crate::fixt::RealRibosomeFixturator;
     use crate::fixt::ZomeCallHostAccessFixturator;
     use crate::test_utils::setup_app;
+    use crate::{conductor::api::ZomeCall, core::ribosome::error::RibosomeError};
     use ::fixt::prelude::*;
     use hdk3::prelude::*;
     use holo_hash::AnyDhtHash;
@@ -351,9 +350,9 @@ pub mod wasm_test {
 
         // alice create a bunch of entries
         let output = handle
-            .call_zome(ZomeCallInvocation {
+            .call_zome(ZomeCall {
                 cell_id: alice_cell_id.clone(),
-                zome: TestWasm::MultipleCalls.into(),
+                zome_name: TestWasm::MultipleCalls.into(),
                 cap: None,
                 fn_name: "create_entry_multiple".into(),
                 payload: ExternInput::new(TestInt(n).try_into().unwrap()),
@@ -373,9 +372,9 @@ pub mod wasm_test {
 
         // bob get the entries
         let output = handle
-            .call_zome(ZomeCallInvocation {
+            .call_zome(ZomeCall {
                 cell_id: alice_cell_id,
-                zome: TestWasm::MultipleCalls.into(),
+                zome_name: TestWasm::MultipleCalls.into(),
                 cap: None,
                 fn_name: "get_entry_multiple".into(),
                 payload: ExternInput::new(TestInt(n).try_into().unwrap()),

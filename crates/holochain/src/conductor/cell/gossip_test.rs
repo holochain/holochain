@@ -1,6 +1,6 @@
 use crate::{
     conductor::p2p_store::{AgentKv, AgentKvKey},
-    test_utils::{conductor_setup::ConductorTestData, new_invocation},
+    test_utils::{conductor_setup::ConductorTestData, new_zome_call},
 };
 use fallible_iterator::FallibleIterator;
 use hdk3::prelude::*;
@@ -24,7 +24,7 @@ async fn gossip_test() {
 
     let anchor_invocation = |anchor: &str, cell_id, i: usize| {
         let anchor = AnchorInput(anchor.into(), i.to_string());
-        new_invocation(cell_id, "anchor", anchor, TestWasm::Anchor)
+        new_zome_call(cell_id, "anchor", anchor, TestWasm::Anchor)
     };
 
     for i in 0..NUM {
@@ -45,7 +45,7 @@ async fn gossip_test() {
     tokio::time::delay_for(std::time::Duration::from_secs(1)).await;
 
     // Bob list anchors
-    let invocation = new_invocation(
+    let invocation = new_zome_call(
         bob_cell_id,
         "list_anchor_addresses",
         TestString("alice".into()),

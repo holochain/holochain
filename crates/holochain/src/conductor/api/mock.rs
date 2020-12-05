@@ -1,13 +1,13 @@
 #![allow(missing_docs)]
 #![allow(clippy::ptr_arg)]
 
-use super::CellConductorApiT;
+use super::{CellConductorApiT, ZomeCall};
 use crate::{
     conductor::{
         api::error::ConductorApiResult, entry_def_store::EntryDefBufferKey,
         interface::SignalBroadcaster,
     },
-    core::{ribosome::ZomeCallInvocation, workflow::ZomeCallInvocationResult},
+    core::workflow::ZomeCallResult,
 };
 use async_trait::async_trait;
 use holo_hash::DnaHash;
@@ -32,8 +32,8 @@ mock! {
         fn sync_call_zome(
             &self,
             cell_id: &CellId,
-            invocation: ZomeCallInvocation,
-        ) -> ConductorApiResult<ZomeCallInvocationResult>;
+            call: ZomeCall,
+        ) -> ConductorApiResult<ZomeCallResult>;
 
         fn sync_autonomic_cue(&self, cue: AutonomicCue) -> ConductorApiResult<()>;
 
@@ -62,9 +62,9 @@ impl CellConductorApiT for MockCellConductorApi {
     async fn call_zome(
         &self,
         cell_id: &CellId,
-        invocation: ZomeCallInvocation,
-    ) -> ConductorApiResult<ZomeCallInvocationResult> {
-        self.sync_call_zome(cell_id, invocation)
+        call: ZomeCall,
+    ) -> ConductorApiResult<ZomeCallResult> {
+        self.sync_call_zome(cell_id, call)
     }
 
     async fn dpki_request(&self, method: String, args: String) -> ConductorApiResult<String> {

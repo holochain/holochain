@@ -34,8 +34,7 @@ pub mod call_zome_workspace_lock;
 mod validation_test;
 
 /// Placeholder for the return value of a zome invocation
-/// TODO: do we want this to be the same as ZomeCallInvocationRESPONSE?
-pub type ZomeCallInvocationResult = RibosomeResult<ZomeCallResponse>;
+pub type ZomeCallResult = RibosomeResult<ZomeCallResponse>;
 
 #[derive(Debug)]
 pub struct CallZomeWorkflowArgs<Ribosome: RibosomeT, C: CellConductorApiT> {
@@ -61,7 +60,7 @@ pub async fn call_zome_workflow<'env, Ribosome: RibosomeT, C: CellConductorApiT>
     writer: OneshotWriter,
     args: CallZomeWorkflowArgs<Ribosome, C>,
     mut trigger_produce_dht_ops: TriggerSender,
-) -> WorkflowResult<ZomeCallInvocationResult> {
+) -> WorkflowResult<ZomeCallResult> {
     let should_write = args.is_root_zome_call;
     let result = call_zome_workflow_inner(workspace_lock.clone(), network, keystore, args).await?;
 
@@ -84,7 +83,7 @@ async fn call_zome_workflow_inner<'env, Ribosome: RibosomeT, C: CellConductorApi
     network: HolochainP2pCell,
     keystore: KeystoreSender,
     args: CallZomeWorkflowArgs<Ribosome, C>,
-) -> WorkflowResult<ZomeCallInvocationResult> {
+) -> WorkflowResult<ZomeCallResult> {
     let CallZomeWorkflowArgs {
         ribosome,
         invocation,
@@ -341,7 +340,7 @@ pub mod tests {
         workspace: CallZomeWorkspace,
         ribosome: Ribosome,
         invocation: ZomeCallInvocation,
-    ) -> WorkflowResult<ZomeCallInvocationResult> {
+    ) -> WorkflowResult<ZomeCallResult> {
         let keystore = fixt!(KeystoreSender);
         let network = fixt!(HolochainP2pCell);
         let cell_id = CellId::new(ribosome.dna_def().as_hash().clone(), fixt!(AgentPubKey));
@@ -371,18 +370,17 @@ pub mod tests {
         let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
         let ribosome = MockRibosomeT::new();
         // FIXME: CAP: Set this function to private
-        let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(
-            crate::core::ribosome::NamedInvocation(
+        let invocation =
+            crate::fixt::ZomeCallInvocationFixturator::new(crate::fixt::NamedInvocation(
                 holochain_types::fixt::CellIdFixturator::new(::fixt::Unpredictable)
                     .next()
                     .unwrap(),
                 TestWasm::Foo.into(),
                 "fun_times".into(),
                 ExternInput::new(Payload { a: 1 }.try_into().unwrap()),
-            ),
-        )
-        .next()
-        .unwrap();
+            ))
+            .next()
+            .unwrap();
         invocation.cap = todo!("Make secret cap token");
         let error = run_call_zome(workspace, ribosome, invocation)
             .await
@@ -443,18 +441,17 @@ pub mod tests {
                 Ok(ZomeCallResponse::Ok(ExternOutput::new(x)))
             });
 
-        let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(
-            crate::core::ribosome::NamedInvocation(
+        let invocation =
+            crate::fixt::ZomeCallInvocationFixturator::new(crate::fixt::NamedInvocation(
                 holochain_types::fixt::CellIdFixturator::new(::fixt::Unpredictable)
                     .next()
                     .unwrap(),
                 TestWasm::Foo.into(),
                 "fun_times".into(),
                 ExternInput::new(Payload { a: 1 }.try_into().unwrap()),
-            ),
-        )
-        .next()
-        .unwrap();
+            ))
+            .next()
+            .unwrap();
         // IDEA: Mock the system validation and check it's called
         /* This is one way to test the correctness of the calls to sys val
         let mut sys_val = MockSystemValidation::new();
@@ -479,18 +476,17 @@ pub mod tests {
         let env = test_env.env();
         let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
         let ribosome = MockRibosomeT::new();
-        let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(
-            crate::core::ribosome::NamedInvocation(
+        let invocation =
+            crate::fixt::ZomeCallInvocationFixturator::new(crate::fixt::NamedInvocation(
                 holochain_types::fixt::CellIdFixturator::new(::fixt::Unpredictable)
                     .next()
                     .unwrap(),
                 TestWasm::Foo.into(),
                 "fun_times".into(),
                 ExternInput::new(Payload { a: 1 }.try_into().unwrap()),
-            ),
-        )
-        .next()
-        .unwrap();
+            ))
+            .next()
+            .unwrap();
         // TODO: B-01093: Mock the app validation and check it's called
         // TODO: B-01093: How can I pass a app validation into this?
         // These are just static calls
@@ -516,18 +512,17 @@ pub mod tests {
             )))
         });
         // TODO: Make this mock return an output
-        let invocation = crate::core::ribosome::ZomeCallInvocationFixturator::new(
-            crate::core::ribosome::NamedInvocation(
+        let invocation =
+            crate::fixt::ZomeCallInvocationFixturator::new(crate::fixt::NamedInvocation(
                 holochain_types::fixt::CellIdFixturator::new(::fixt::Unpredictable)
                     .next()
                     .unwrap(),
                 TestWasm::Foo.into(),
                 "fun_times".into(),
                 ExternInput::new(Payload { a: 1 }.try_into().unwrap()),
-            ),
-        )
-        .next()
-        .unwrap();
+            ))
+            .next()
+            .unwrap();
         let _result = run_call_zome(workspace, ribosome, invocation)
             .await
             .unwrap();
