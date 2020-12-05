@@ -83,7 +83,7 @@ impl TestConductorHandle {
         app_id_prefix: &str,
         agents: &[AgentPubKey],
         dna_files: &[DnaFile],
-    ) -> Vec<(InstalledAppId, Vec<TestCell>)> {
+    ) -> SetupOutput {
         for dna_file in dna_files {
             self.0.install_dna(dna_file.clone()).await.unwrap()
         }
@@ -129,17 +129,28 @@ impl TestConductorHandle {
 
         info
     }
+}
 
-    // pub async fn install(apps: HashMap<InstalledAppId, HashMap<CellNick, HashMap<ZomeName, ZomeDef>>>)  {
-    //     for (installed_app_id, dnas) in apps {
-    //         for (cell_nick, zomes) in dnas {
-    //             DnaFile::from_inline_zomes
-    //             for (zome_name, zome_def) in zomes {
+/// Return type of opinionated setup function
+pub type SetupOutput = Vec<(InstalledAppId, Vec<TestCell>)>;
 
-    //             }
-    //         }
-    //     }
-    // }
+/// Helper to destructure the nested app setup return value as nested tuples.
+/// Each level of nesting can contain 1-4 items, i.e. up to 4 agents with 4 DNAs each.
+/// Beyond 4, and this will PANIC! (But it's just for tests so it's fine.)
+#[macro_export]
+macro_rules! destructure_test_cells {
+    ($blob:expr) => {{
+        use itertools::Itertools;
+        let blob: $crate::test_utils::test_handle::SetupOutput = $blob;
+        blob.into_iter()
+            .map(|(_, v)| {
+                v.into_iter()
+                    .collect_tuple()
+                    .expect("Can't destructure more than 4 DNAs")
+            })
+            .collect_tuple()
+            .expect("Can't destructure more than 4 Agents")
+    }};
 }
 
 /// A reference to a Cell created by a TestConductorHandle installation function.
