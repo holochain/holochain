@@ -1,12 +1,11 @@
 use super::KvIntStore;
-use crate::buffer::kv::generic::KvStoreT;
-use crate::buffer::{
-    check_empty_key,
-    iter::{DrainIter, SingleIter, SingleIterFrom, SingleIterKeyMatch},
-    kv::KvStore,
-    BufferedStore,
-};
 use crate::{
+    buffer::{
+        check_empty_key,
+        iter::{DrainIter, SingleIter, SingleIterFrom, SingleIterKeyMatch},
+        kv::{generic::KvStoreT, KvStore},
+        BufferedStore,
+    },
     env::EnvironmentRead,
     error::{DatabaseError, DatabaseResult},
     fresh_reader,
@@ -335,7 +334,7 @@ where
                     self.store.db().put(writer, k, &encoded)?;
                 }
                 Delete => match self.store.db().delete(writer, k) {
-                    Err(rkv::StoreError::LmdbError(rkv::LmdbError::NotFound)) => (),
+                    Err(rkv::StoreError::LmdbError(rkv::LmdbError::NotFound)) => {}
                     r => r?,
                 },
             }
@@ -378,7 +377,7 @@ where
                     .db()
                     .delete(writer, IntKey::from_key_bytes_or_friendly_panic(k))
                 {
-                    Err(rkv::StoreError::LmdbError(rkv::LmdbError::NotFound)) => (),
+                    Err(rkv::StoreError::LmdbError(rkv::LmdbError::NotFound)) => {}
                     r => r?,
                 },
             }

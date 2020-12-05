@@ -1,8 +1,8 @@
 use anyhow::Result;
 use assert_cmd::prelude::*;
 use futures::Future;
-use holochain::core::ribosome::{NamedInvocation, ZomeCallInvocationFixturator};
 use holochain::{
+    conductor::api::ZomeCall,
     conductor::{
         api::{AdminRequest, AdminResponse, AppRequest, AppResponse},
         config::*,
@@ -10,6 +10,7 @@ use holochain::{
         Conductor,
     },
     core::signal::Signal,
+    fixt::*,
 };
 use holochain_types::{
     app::{InstallAppDnaPayload, InstallAppPayload},
@@ -22,12 +23,13 @@ use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::*;
 use holochain_zome_types::{signal::AppSignal, *};
 use matches::assert_matches;
-use std::sync::Arc;
-use std::{path::PathBuf, process::Stdio, time::Duration};
+use std::{path::PathBuf, process::Stdio, sync::Arc, time::Duration};
 use tempdir::TempDir;
-use tokio::io::{AsyncBufReadExt, BufReader};
-use tokio::process::{Child, Command};
-use tokio::stream::StreamExt;
+use tokio::{
+    io::{AsyncBufReadExt, BufReader},
+    process::{Child, Command},
+    stream::StreamExt,
+};
 use tracing::*;
 use url2::prelude::*;
 
@@ -175,7 +177,7 @@ async fn call_admin() {
     let response = check_timeout(&mut holochain, response, 3000).await;
 
     let tmp_wasm = dna.code().values().cloned().collect::<Vec<_>>();
-    let mut tmp_dna = dna.dna().clone();
+    let mut tmp_dna = dna.dna_def().clone();
     tmp_dna.properties = properties.try_into().unwrap();
     let dna = holochain_types::dna::DnaFile::new(tmp_dna, tmp_wasm)
         .await
@@ -230,17 +232,16 @@ pub async fn call_zome_fn<SB: TryInto<SerializedBytes, Error = SerializedBytesEr
     fn_name: String,
     input: SB,
 ) {
-    let request = Box::new(
-        ZomeCallInvocationFixturator::new(NamedInvocation(
-            cell_id,
-            wasm,
-            fn_name,
-            ExternInput::new(input.try_into().unwrap()),
-        ))
-        .next()
-        .unwrap(),
-    );
-    let request = AppRequest::ZomeCallInvocation(request);
+    let call: ZomeCall = ZomeCallInvocationFixturator::new(NamedInvocation(
+        cell_id,
+        wasm,
+        fn_name,
+        ExternInput::new(input.try_into().unwrap()),
+    ))
+    .next()
+    .unwrap()
+    .into();
+    let request = AppRequest::ZomeCallInvocation(Box::new(call));
     let response = app_tx.request(request);
     let call_response = check_timeout(holochain, response, 3000).await;
     trace!(?call_response);

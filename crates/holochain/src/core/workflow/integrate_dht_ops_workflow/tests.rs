@@ -2,18 +2,19 @@
 
 use super::*;
 
-use crate::fixt::ZomeCallHostAccessFixturator;
-use crate::here;
-use crate::test_utils::test_network;
-use crate::{core::state::metadata::ChainItemKey, fixt::CallContextFixturator};
 use crate::{
     core::{
         queue_consumer::TriggerSender,
         ribosome::{guest_callback::entry_defs::EntryDefsResult, host_fn, MockRibosomeT},
-        state::{metadata::LinkMetaKey, workspace::WorkspaceError},
+        state::{
+            metadata::{ChainItemKey, LinkMetaKey},
+            workspace::WorkspaceError,
+        },
         workflow::CallZomeWorkspaceLock,
     },
-    fixt::*,
+    fixt::{CallContextFixturator, ZomeCallHostAccessFixturator, *},
+    here,
+    test_utils::test_network,
 };
 use ::fixt::prelude::*;
 use holo_hash::*;
@@ -24,6 +25,7 @@ use holochain_state::{
 };
 use holochain_types::{
     dht_op::{DhtOp, DhtOpHashed},
+    dna::{zome::Zome, DnaDefHashed},
     fixt::*,
     header::NewEntryHeader,
     metadata::TimedHeaderHash,
@@ -31,12 +33,12 @@ use holochain_types::{
     validate::ValidationStatus,
     Entry, EntryHashed, HeaderHashed,
 };
-use holochain_zome_types::signature::Signature;
 use holochain_zome_types::{
     entry::GetOptions,
     entry_def::EntryDefs,
     header::{builder, CreateLink, Delete, DeleteLink, Update, ZomeId},
     link::{LinkTag, Links},
+    signature::Signature,
     zome::ZomeName,
     CreateInput, CreateLinkInput, GetInput, GetLinksInput, Header,
 };
@@ -885,19 +887,19 @@ async fn commit_entry<'env>(
     );
 
     // Create a dna file with the correct zome name in the desired position (ZomeId)
-    let mut dna_file = DnaFileFixturator::new(Empty).next().unwrap();
-    dna_file.dna.zomes.clear();
-    dna_file
-        .dna
-        .zomes
-        .push((zome_name.clone().into(), fixt!(Zome)));
+    let dna_file = DnaFileFixturator::new(Empty).next().unwrap();
+    let mut dna_def = dna_file.dna_def().clone();
+    let zome = Zome::new(zome_name.clone().into(), fixt!(ZomeDef));
+    dna_def.zomes.clear();
+    dna_def.zomes.push(zome.clone().into());
+    let dna_def = DnaDefHashed::from_content(dna_def).await;
 
     // Create ribosome mock to return fixtures
     // This is a lot faster then compiling a zome
     let mut ribosome = MockRibosomeT::new();
-    ribosome.expect_dna_file().return_const(dna_file);
+    ribosome.expect_dna_def().return_const(dna_def);
     ribosome
-        .expect_zome_name_to_id()
+        .expect_zome_to_id()
         .returning(|_| Ok(ZomeId::from(1)));
 
     ribosome
@@ -905,7 +907,7 @@ async fn commit_entry<'env>(
         .returning(move |_, _| Ok(EntryDefsResult::Defs(entry_defs_map.clone())));
 
     let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
-    call_context.zome_name = zome_name.clone();
+    call_context.zome = zome.clone();
 
     // Collect the entry from the pre-state to commit
     let entry = pre_state
@@ -980,24 +982,24 @@ async fn create_link(
     let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
     let workspace_lock = CallZomeWorkspaceLock::new(workspace);
 
-    // Create data for calls
-    let mut dna_file = DnaFileFixturator::new(Empty).next().unwrap();
-    dna_file.dna.zomes.clear();
-    dna_file
-        .dna
-        .zomes
-        .push((zome_name.clone().into(), fixt!(Zome)));
+    // Create a dna file with the correct zome name in the desired position (ZomeId)
+    let dna_file = DnaFileFixturator::new(Empty).next().unwrap();
+    let mut dna_def = dna_file.dna_def().clone();
+    let zome = Zome::new(zome_name.clone().into(), fixt!(ZomeDef));
+    dna_def.zomes.clear();
+    dna_def.zomes.push(zome.clone().into());
+    let dna_def = DnaDefHashed::from_content(dna_def).await;
 
     // Create ribosome mock to return fixtures
     // This is a lot faster then compiling a zome
     let mut ribosome = MockRibosomeT::new();
-    ribosome.expect_dna_file().return_const(dna_file);
+    ribosome.expect_dna_def().return_const(dna_def);
     ribosome
-        .expect_zome_name_to_id()
+        .expect_zome_to_id()
         .returning(|_| Ok(ZomeId::from(1)));
 
     let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
-    call_context.zome_name = zome_name.clone();
+    call_context.zome = zome.clone();
 
     // Call create_link
     let input = CreateLinkInput::new((base_address.into(), target_address.into(), link_tag));
@@ -1033,26 +1035,26 @@ async fn get_links(
     let workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
     let workspace_lock = CallZomeWorkspaceLock::new(workspace);
 
-    // Create data for calls
-    let mut dna_file = DnaFileFixturator::new(Empty).next().unwrap();
-    dna_file.dna.zomes.clear();
-    dna_file
-        .dna
-        .zomes
-        .push((zome_name.clone().into(), fixt!(Zome)));
+    // Create a dna file with the correct zome name in the desired position (ZomeId)
+    let dna_file = DnaFileFixturator::new(Empty).next().unwrap();
+    let mut dna_def = dna_file.dna_def().clone();
+    let zome = Zome::new(zome_name.clone().into(), fixt!(ZomeDef));
+    dna_def.zomes.clear();
+    dna_def.zomes.push(zome.clone().into());
+    let dna_def = DnaDefHashed::from_content(dna_def).await;
 
-    let test_network = test_network(Some(dna_file.dna_hash().clone()), None).await;
+    let test_network = test_network(Some(dna_def.as_hash().clone()), None).await;
 
     // Create ribosome mock to return fixtures
     // This is a lot faster then compiling a zome
     let mut ribosome = MockRibosomeT::new();
-    ribosome.expect_dna_file().return_const(dna_file);
+    ribosome.expect_dna_def().return_const(dna_def);
     ribosome
-        .expect_zome_name_to_id()
+        .expect_zome_to_id()
         .returning(|_| Ok(ZomeId::from(1)));
 
     let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
-    call_context.zome_name = zome_name.clone();
+    call_context.zome = zome.clone();
 
     // Call get links
     let input = GetLinksInput::new((base_address.into(), Some(link_tag)));
@@ -1307,21 +1309,29 @@ mod slow_tests {
         time::Duration,
     };
 
-    use crate::test_utils::setup_app;
     use crate::{
-        core::state::dht_op_integration::IntegratedDhtOpsStore, core::state::metadata::LinkMetaKey,
-        core::state::metadata::MetadataBuf, core::state::metadata::MetadataBufT,
-        test_utils::host_fn_api::*,
+        core::state::{
+            dht_op_integration::IntegratedDhtOpsStore,
+            metadata::{LinkMetaKey, MetadataBuf, MetadataBufT},
+        },
+        fixt::*,
+        test_utils::{host_fn_api::*, setup_app, wait_for_integration},
     };
-    use crate::{fixt::*, test_utils::wait_for_integration};
     use fallible_iterator::FallibleIterator;
     use fixt::prelude::*;
     use holo_hash::EntryHash;
     use holochain_serialized_bytes::SerializedBytes;
-    use holochain_state::{db::GetDb, db::INTEGRATED_DHT_OPS, env::ReadManager};
+    use holochain_state::{
+        db::{GetDb, INTEGRATED_DHT_OPS},
+        env::ReadManager,
+    };
     use holochain_types::{
-        app::InstalledCell, cell::CellId, dna::DnaDef, dna::DnaFile, observability,
-        test_utils::fake_agent_pubkey_1, Entry,
+        app::InstalledCell,
+        cell::CellId,
+        dna::{DnaDef, DnaFile},
+        observability,
+        test_utils::fake_agent_pubkey_1,
+        Entry,
     };
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::test_utils::fake_agent_pubkey_2;

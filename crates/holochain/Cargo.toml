@@ -106,6 +106,7 @@ default = ["slow_tests", "test_utils", "only_check_wasms"]
 # This feature should be turned off for production builds.
 test_utils = [
   "hdk3",
+  "holochain_types/test_utils",
   "matches",
   "test_wasm_common",
   "unwrap_to"

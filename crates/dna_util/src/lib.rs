@@ -38,7 +38,7 @@
 //! ```
 
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::dna::{wasm::DnaWasm, zome::Zome, DnaDef, DnaFile};
+use holochain_types::dna::{wasm::DnaWasm, zome::WasmZome, DnaDef, DnaFile};
 use holochain_zome_types::zome::ZomeName;
 use std::{collections::BTreeMap, path::PathBuf};
 
@@ -133,7 +133,7 @@ pub async fn expand(dna_file_path: &impl AsRef<std::path::Path>) -> DnaUtilResul
     let dna_file = DnaFile::from_file_content(&tokio::fs::read(dna_file_path).await?).await?;
 
     for (zome_name, zome) in &dna_file.dna().zomes {
-        let wasm_hash = &zome.wasm_hash;
+        let wasm_hash = &zome.wasm_hash(zome_name)?;
         let wasm = dna_file.code().get(wasm_hash).expect("dna_file corrupted");
         let mut wasm_filename = dir.clone();
         wasm_filename.push(format!("{}.wasm", zome_name));
@@ -142,7 +142,7 @@ pub async fn expand(dna_file_path: &impl AsRef<std::path::Path>) -> DnaUtilResul
 
     // Might be more efficient to extract the DnaDef / Wasm from the DnaFile
     // then pass by value here.
-    let dna_json = DnaDefJson::from_dna_def(dna_file.dna().clone())?;
+    let dna_json = DnaDefJson::from_dna_def(dna_file.dna().clone().into_content())?;
     let dna_json = serde_json::to_string_pretty(&dna_json)?;
 
     let mut json_filename = dir.clone();
@@ -236,7 +236,7 @@ impl DnaDefJson {
 
             let wasm: DnaWasm = zome_content.into();
             let wasm_hash = holo_hash::WasmHash::with_data(&wasm).await;
-            zomes.push((zome_name.clone(), Zome { wasm_hash }));
+            zomes.push((zome_name.clone(), WasmZome { wasm_hash }.into()));
             wasm_list.push(wasm);
         }
 

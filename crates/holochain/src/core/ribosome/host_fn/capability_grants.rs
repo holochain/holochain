@@ -20,7 +20,7 @@ pub fn capability_grants(
 pub mod wasm_test {
     use crate::conductor::dna_store::MockDnaStore;
     use crate::conductor::interface::websocket::test::setup_app;
-    use crate::core::ribosome::ZomeCallInvocation;
+    use crate::core::ribosome::ZomeCall;
     use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
@@ -33,6 +33,7 @@ pub mod wasm_test {
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_agent_pubkey_2;
     use holochain_wasm_test_utils::TestWasm;
+    use matches::assert_matches;
 
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_capability_secret_test<'a>() {
@@ -172,7 +173,7 @@ pub mod wasm_test {
         let original_secret = CapSecretFixturator::new(Unpredictable).next().unwrap();
 
         let output = handle
-            .call_zome(ZomeCallInvocation {
+            .call_zome(ZomeCall {
                 cell_id: alice_cell_id.clone(),
                 zome_name: TestWasm::Capability.into(),
                 cap: None,
@@ -195,7 +196,7 @@ pub mod wasm_test {
                 let response: SerializedBytes = guest_output.into_inner();
                 let inner_response: ZomeCallResponse = response.try_into().unwrap();
                 // the inner response should be unauthorized
-                assert_eq!(inner_response, ZomeCallResponse::Unauthorized,);
+                assert_matches!(inner_response, ZomeCallResponse::Unauthorized(_, _, _, _));
             }
             _ => unreachable!(),
         }
@@ -203,7 +204,7 @@ pub mod wasm_test {
         // BOB COMMITS A TRANSFERABLE GRANT WITH THE SECRET SHARED WITH ALICE
 
         let output = handle
-            .call_zome(ZomeCallInvocation {
+            .call_zome(ZomeCall {
                 cell_id: bob_cell_id.clone(),
                 zome_name: TestWasm::Capability.into(),
                 cap: None,
@@ -223,7 +224,7 @@ pub mod wasm_test {
         // ALICE CAN NOW CALL THE AUTHED REMOTE FN
 
         let output = handle
-            .call_zome(ZomeCallInvocation {
+            .call_zome(ZomeCall {
                 cell_id: alice_cell_id.clone(),
                 zome_name: TestWasm::Capability.into(),
                 cap: None,
@@ -257,7 +258,7 @@ pub mod wasm_test {
         // BOB ROLLS THE GRANT SO ONLY THE NEW ONE WILL WORK FOR ALICE
 
         let output = handle
-            .call_zome(ZomeCallInvocation {
+            .call_zome(ZomeCall {
                 cell_id: bob_cell_id.clone(),
                 zome_name: TestWasm::Capability.into(),
                 cap: None,
@@ -275,7 +276,7 @@ pub mod wasm_test {
         };
 
         let output = handle
-            .call_zome(ZomeCallInvocation {
+            .call_zome(ZomeCall {
                 cell_id: bob_cell_id.clone(),
                 zome_name: TestWasm::Capability.into(),
                 cap: None,
@@ -305,7 +306,7 @@ pub mod wasm_test {
         };
 
         let output = handle
-            .call_zome(ZomeCallInvocation {
+            .call_zome(ZomeCall {
                 cell_id: alice_cell_id.clone(),
                 zome_name: TestWasm::Capability.into(),
                 cap: None,
@@ -328,13 +329,13 @@ pub mod wasm_test {
                 let response: SerializedBytes = guest_output.into_inner();
                 let inner_response: ZomeCallResponse = response.try_into().unwrap();
                 // the inner response should be unauthorized
-                assert_eq!(inner_response, ZomeCallResponse::Unauthorized,);
+                assert_matches!(inner_response, ZomeCallResponse::Unauthorized(_, _, _, _));
             }
             _ => unreachable!(),
         }
 
         let output = handle
-            .call_zome(ZomeCallInvocation {
+            .call_zome(ZomeCall {
                 cell_id: alice_cell_id.clone(),
                 zome_name: TestWasm::Capability.into(),
                 cap: None,
@@ -368,7 +369,7 @@ pub mod wasm_test {
         // BOB DELETES THE GRANT SO NO SECRETS WORK
 
         let _output = handle
-            .call_zome(ZomeCallInvocation {
+            .call_zome(ZomeCall {
                 cell_id: bob_cell_id,
                 zome_name: TestWasm::Capability.into(),
                 cap: None,
@@ -381,7 +382,7 @@ pub mod wasm_test {
             .unwrap();
 
         let output = handle
-            .call_zome(ZomeCallInvocation {
+            .call_zome(ZomeCall {
                 cell_id: alice_cell_id.clone(),
                 zome_name: TestWasm::Capability.into(),
                 cap: None,
@@ -404,13 +405,13 @@ pub mod wasm_test {
                 let response: SerializedBytes = guest_output.into_inner();
                 let inner_response: ZomeCallResponse = response.try_into().unwrap();
                 // the inner response should be unauthorized
-                assert_eq!(inner_response, ZomeCallResponse::Unauthorized,);
+                assert_matches!(inner_response, ZomeCallResponse::Unauthorized(_, _, _, _));
             }
             _ => unreachable!(),
         }
 
         let output = handle
-            .call_zome(ZomeCallInvocation {
+            .call_zome(ZomeCall {
                 cell_id: alice_cell_id.clone(),
                 zome_name: TestWasm::Capability.into(),
                 cap: None,
@@ -433,7 +434,7 @@ pub mod wasm_test {
                 let response: SerializedBytes = guest_output.into_inner();
                 let inner_response: ZomeCallResponse = response.try_into().unwrap();
                 // the inner response should be unauthorized
-                assert_eq!(inner_response, ZomeCallResponse::Unauthorized,);
+                assert_matches!(inner_response, ZomeCallResponse::Unauthorized(_, _, _, _));
             }
             _ => unreachable!(),
         }

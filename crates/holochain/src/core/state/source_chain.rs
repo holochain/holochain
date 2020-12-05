@@ -322,7 +322,6 @@ impl BufferedStore for SourceChain {
 
 #[cfg(test)]
 pub mod tests {
-
     use super::*;
     use crate::fixt::*;
     use ::fixt::prelude::*;

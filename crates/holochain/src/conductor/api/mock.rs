@@ -1,19 +1,23 @@
 #![allow(missing_docs)]
 #![allow(clippy::ptr_arg)]
 
-use super::CellConductorApiT;
-use crate::conductor::{
-    api::error::ConductorApiResult, entry_def_store::EntryDefBufferKey,
-    interface::SignalBroadcaster,
+use super::{CellConductorApiT, ZomeCall};
+use crate::{
+    conductor::{
+        api::error::ConductorApiResult, entry_def_store::EntryDefBufferKey,
+        interface::SignalBroadcaster,
+    },
+    core::workflow::ZomeCallResult,
 };
-use crate::core::ribosome::ZomeCallInvocation;
-use crate::core::workflow::ZomeCallInvocationResult;
 use async_trait::async_trait;
 use holo_hash::DnaHash;
 use holochain_keystore::KeystoreSender;
-use holochain_types::dna::DnaFile;
-use holochain_types::{autonomic::AutonomicCue, cell::CellId};
-use holochain_zome_types::entry_def::EntryDef;
+use holochain_types::{
+    autonomic::AutonomicCue,
+    cell::CellId,
+    dna::{zome::Zome, DnaFile},
+};
+use holochain_zome_types::{entry_def::EntryDef, zome::ZomeName};
 use mockall::mock;
 
 // Unfortunate workaround to get mockall to work with async_trait, due to the complexity of each.
@@ -28,8 +32,8 @@ mock! {
         fn sync_call_zome(
             &self,
             cell_id: &CellId,
-            invocation: ZomeCallInvocation,
-        ) -> ConductorApiResult<ZomeCallInvocationResult>;
+            call: ZomeCall,
+        ) -> ConductorApiResult<ZomeCallResult>;
 
         fn sync_autonomic_cue(&self, cue: AutonomicCue) -> ConductorApiResult<()>;
 
@@ -38,7 +42,8 @@ mock! {
         fn mock_keystore(&self) -> &KeystoreSender;
         fn mock_signal_broadcaster(&self) -> SignalBroadcaster;
         fn sync_get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile>;
-        fn sync_get_this_dna(&self) -> Option<DnaFile>;
+        fn sync_get_this_dna(&self) -> ConductorApiResult<DnaFile>;
+        fn sync_get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome>;
         fn sync_get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef>;
         fn into_call_zome_handle(self) -> super::CellConductorReadHandle;
     }
@@ -57,9 +62,9 @@ impl CellConductorApiT for MockCellConductorApi {
     async fn call_zome(
         &self,
         cell_id: &CellId,
-        invocation: ZomeCallInvocation,
-    ) -> ConductorApiResult<ZomeCallInvocationResult> {
-        self.sync_call_zome(cell_id, invocation)
+        call: ZomeCall,
+    ) -> ConductorApiResult<ZomeCallResult> {
+        self.sync_call_zome(cell_id, call)
     }
 
     async fn dpki_request(&self, method: String, args: String) -> ConductorApiResult<String> {
@@ -81,12 +86,19 @@ impl CellConductorApiT for MockCellConductorApi {
     async fn get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile> {
         self.sync_get_dna(dna_hash)
     }
-    async fn get_this_dna(&self) -> Option<DnaFile> {
+
+    async fn get_this_dna(&self) -> ConductorApiResult<DnaFile> {
         self.sync_get_this_dna()
     }
+
+    async fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome> {
+        self.sync_get_zome(dna_hash, zome_name)
+    }
+
     async fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef> {
         self.sync_get_entry_def(key)
     }
+
     fn into_call_zome_handle(self) -> super::CellConductorReadHandle {
         self.into_call_zome_handle()
     }

@@ -192,7 +192,6 @@ impl BufferedStore for ChainSequenceBuf {
 
 #[cfg(test)]
 pub mod tests {
-
     use super::{BufferedStore, ChainSequenceBuf, SourceChainError};
     use crate::core::state::source_chain::SourceChainResult;
     use holo_hash::HeaderHash;

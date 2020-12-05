@@ -41,7 +41,6 @@ pub trait Workspace: Send + Sized {
 
 #[cfg(test)]
 pub mod tests {
-
     use super::Workspace;
     use crate::core::state::workspace::WorkspaceResult;
     use holochain_state::{

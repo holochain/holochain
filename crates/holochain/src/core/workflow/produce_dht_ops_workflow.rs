@@ -1,9 +1,11 @@
 use super::error::WorkflowResult;
-use crate::core::queue_consumer::{OneshotWriter, TriggerSender, WorkComplete};
-use crate::core::state::{
-    dht_op_integration::{AuthoredDhtOpsStore, AuthoredDhtOpsValue},
-    source_chain::SourceChain,
-    workspace::{Workspace, WorkspaceResult},
+use crate::core::{
+    queue_consumer::{OneshotWriter, TriggerSender, WorkComplete},
+    state::{
+        dht_op_integration::{AuthoredDhtOpsStore, AuthoredDhtOpsValue},
+        source_chain::SourceChain,
+        workspace::{Workspace, WorkspaceResult},
+    },
 };
 use holochain_state::{
     buffer::KvBufFresh,
@@ -83,8 +85,7 @@ impl Workspace for ProduceDhtOpsWorkspace {
 
 #[cfg(test)]
 mod tests {
-    use super::super::genesis_workflow::tests::fake_genesis;
-    use super::*;
+    use super::{super::genesis_workflow::tests::fake_genesis, *};
     use crate::core::state::source_chain::SourceChain;
 
     use ::fixt::prelude::*;

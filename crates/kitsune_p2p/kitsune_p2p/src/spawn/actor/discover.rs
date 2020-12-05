@@ -3,8 +3,7 @@ use super::*;
 use crate::agent_store::AgentInfo;
 use ghost_actor::dependencies::must_future::MustBoxFuture;
 use kitsune_p2p_types::codec::Codec;
-use std::collections::HashSet;
-use std::convert::TryFrom;
+use std::{collections::HashSet, convert::TryFrom};
 
 /// This enum represents the outcomes from peer discovery
 /// - OkShortcut - the agent is locally joined, just mirror the request back out

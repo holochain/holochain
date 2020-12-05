@@ -42,7 +42,12 @@ thiserror = "1.0.22"
 tokio = { version = "0.2", features = [ "blocking" ] }
 tokio_safe_block_on = "0.1.2"
 tracing = "=0.1.21"
+derive_builder = "0.9.0"
 
 [dev-dependencies]
 # rmp-serde = "0.14.3"
+maplit = "1"
 tokio = { version = "0.2", features = [ "full" ] }
+
+[features]
+test_utils = []

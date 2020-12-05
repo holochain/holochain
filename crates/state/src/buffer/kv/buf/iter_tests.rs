@@ -1,7 +1,9 @@
-use super::tests::{VFixturator, V};
-use super::{BufferedStore, KvBufUsed};
-use crate::buffer::kv::generic::KvStoreT;
+use super::{
+    tests::{VFixturator, V},
+    BufferedStore, KvBufUsed,
+};
 use crate::{
+    buffer::kv::generic::KvStoreT,
     env::{ReadManager, WriteManager},
     error::DatabaseError,
     prelude::*,

@@ -2,13 +2,13 @@
 
 use crate::{
     cell::CellId,
-    dna::{wasm::DnaWasm, zome::Zome, JsonProperties},
-    dna::{DnaDef, DnaFile},
+    dna::{wasm::DnaWasm, zome::WasmZome, DnaDef, DnaFile, JsonProperties},
     prelude::*,
 };
-use holochain_zome_types::capability::CapSecret;
-use holochain_zome_types::capability::CAP_SECRET_BYTES;
-use holochain_zome_types::zome::ZomeName;
+use holochain_zome_types::{
+    capability::{CapSecret, CAP_SECRET_BYTES},
+    zome::ZomeName,
+};
 use std::path::PathBuf;
 
 pub use holochain_zome_types::test_utils::*;
@@ -21,13 +21,6 @@ struct FakeProperties {
 /// simple DnaWasm fixture
 pub fn fake_dna_wasm() -> DnaWasm {
     DnaWasm::from(vec![0_u8])
-}
-
-/// simple Zome fixture
-pub fn fake_zome() -> Zome {
-    Zome {
-        wasm_hash: holo_hash::WasmHash::from_raw_32(vec![0; 32]),
-    }
 }
 
 /// A fixture example dna for unit testing.
@@ -50,7 +43,7 @@ pub fn fake_dna_zomes(uuid: &str, zomes: Vec<(ZomeName, DnaWasm)>) -> DnaFile {
         for (zome_name, wasm) in zomes {
             let wasm = crate::dna::wasm::DnaWasmHashed::from_content(wasm).await;
             let (wasm, wasm_hash) = wasm.into_inner();
-            dna.zomes.push((zome_name, Zome { wasm_hash }));
+            dna.zomes.push((zome_name, WasmZome { wasm_hash }.into()));
             wasm_code.push(wasm);
         }
         DnaFile::new(dna, wasm_code).await

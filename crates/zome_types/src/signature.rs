@@ -14,7 +14,7 @@ pub struct Sign {
 }
 
 impl Sign {
-    /// construct a new SignInput struct.
+    /// construct a new Sign struct.
     pub fn new<D>(key: holo_hash::AgentPubKey, data: D) -> Result<Self, SerializedBytesError>
     where
         D: TryInto<SerializedBytes, Error = SerializedBytesError>,
@@ -23,7 +23,7 @@ impl Sign {
         Ok(Self { key, data })
     }
 
-    /// construct a new SignInput struct from raw bytes.
+    /// construct a new Sign struct from raw bytes.
     pub fn new_raw(key: holo_hash::AgentPubKey, data: Vec<u8>) -> Self {
         Self {
             key,
@@ -69,7 +69,7 @@ impl std::fmt::Debug for Signature {
     }
 }
 
-/// Mirror struct for SignInput that includes a signature to verify against a key and data.
+/// Mirror struct for Sign that includes a signature to verify against a key and data.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub struct VerifySignature {
     /// The public key associated with the private key that should be used to
@@ -117,7 +117,7 @@ impl VerifySignature {
         &self.as_ref()
     }
 
-    /// construct a new VerifySignatureInput struct.
+    /// construct a new VerifySignature struct.
     pub fn new<D>(
         key: holo_hash::AgentPubKey,
         signature: Signature,
@@ -134,7 +134,7 @@ impl VerifySignature {
         })
     }
 
-    /// construct a new SignInput struct from raw bytes.
+    /// construct a new Sign struct from raw bytes.
     pub fn new_raw(key: holo_hash::AgentPubKey, signature: Signature, data: Vec<u8>) -> Self {
         Self {
             key,

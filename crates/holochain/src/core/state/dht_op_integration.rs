@@ -160,10 +160,10 @@ mod tests {
     use ::fixt::prelude::*;
     use chrono::{Duration, Utc};
     use holo_hash::fixt::{DhtOpHashFixturator, HeaderHashFixturator};
-    use holochain_state::test_utils::test_cell_env;
     use holochain_state::{
         buffer::BufferedStore,
         env::{ReadManager, WriteManager},
+        test_utils::test_cell_env,
     };
     use pretty_assertions::assert_eq;
 

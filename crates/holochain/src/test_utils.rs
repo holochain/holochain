@@ -2,21 +2,24 @@
 
 use crate::{
     conductor::{
-        api::RealAppInterfaceApi,
+        api::{RealAppInterfaceApi, ZomeCall},
         config::{AdminInterfaceConfig, ConductorConfig, InterfaceDriver},
         ConductorBuilder, ConductorHandle,
     },
-    core::ribosome::ZomeCallInvocation,
-    core::state::cascade::Cascade,
-    core::state::cascade::DbPair,
-    core::state::element_buf::ElementBuf,
-    core::state::metadata::MetadataBuf,
-    core::workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace,
+    core::{
+        ribosome::ZomeCallInvocation,
+        state::{
+            cascade::{Cascade, DbPair},
+            element_buf::ElementBuf,
+            metadata::MetadataBuf,
+        },
+        workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace,
+    },
 };
 use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
-use holo_hash::fixt::*;
-use holo_hash::*;
+use hdk3::prelude::ZomeName;
+use holo_hash::{fixt::*, *};
 use holochain_keystore::KeystoreSender;
 use holochain_p2p::{
     actor::HolochainP2pRefToCell, event::HolochainP2pEvent, spawn_holochain_p2p, HolochainP2pCell,
@@ -24,21 +27,22 @@ use holochain_p2p::{
 };
 use holochain_serialized_bytes::{SerializedBytes, SerializedBytesError, UnsafeBytes};
 use holochain_state::{
-    env::EnvironmentWrite, fresh_reader_test, test_utils::test_environments,
-    test_utils::TestEnvironments,
+    env::EnvironmentWrite,
+    fresh_reader_test,
+    test_utils::{test_environments, TestEnvironments},
 };
 use holochain_types::{
     app::InstalledCell,
     cell::CellId,
-    dna::DnaFile,
+    dna::{zome::Zome, DnaFile},
     element::{SignedHeaderHashed, SignedHeaderHashedExt},
     fixt::CapSecretFixturator,
     test_utils::fake_header_hash,
     Entry, EntryHashed, HeaderHashed, Timestamp,
 };
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::{entry_def::EntryVisibility, zome::ZomeName};
 use holochain_zome_types::{
+    entry_def::EntryVisibility,
     header::{Create, EntryType, Header},
     ExternInput,
 };
@@ -245,7 +249,7 @@ where
                 QueryAgentInfoSigned { respond, .. } => {
                     respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
                 }
-                _ => (),
+                _ => {}
             }
         }
     });
@@ -341,7 +345,7 @@ pub async fn setup_app_inner(
 pub fn warm_wasm_tests() {
     if let Some(_path) = std::env::var_os("HC_WASM_CACHE_PATH") {
         let wasms: Vec<_> = TestWasm::iter().collect();
-        crate::fixt::WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(wasms))
+        crate::fixt::RealRibosomeFixturator::new(crate::fixt::curve::Zomes(wasms))
             .next()
             .unwrap();
     }
@@ -416,18 +420,38 @@ pub async fn wait_for_integration(
 }
 
 /// Helper to create a zome invocation for tests
-pub fn new_invocation<P, Z: Into<ZomeName>>(
+pub fn new_zome_call<P, Z: Into<ZomeName>>(
     cell_id: &CellId,
     func: &str,
     payload: P,
-    zome_name: Z,
+    zome: Z,
+) -> Result<ZomeCall, SerializedBytesError>
+where
+    P: TryInto<SerializedBytes, Error = SerializedBytesError>,
+{
+    Ok(ZomeCall {
+        cell_id: cell_id.clone(),
+        zome_name: zome.into(),
+        cap: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
+        fn_name: func.into(),
+        payload: ExternInput::new(payload.try_into()?),
+        provenance: cell_id.agent_pubkey().clone(),
+    })
+}
+
+/// Helper to create a zome invocation for tests
+pub fn new_invocation<P, Z: Into<Zome>>(
+    cell_id: &CellId,
+    func: &str,
+    payload: P,
+    zome: Z,
 ) -> Result<ZomeCallInvocation, SerializedBytesError>
 where
     P: TryInto<SerializedBytes, Error = SerializedBytesError>,
 {
     Ok(ZomeCallInvocation {
         cell_id: cell_id.clone(),
-        zome_name: zome_name.into(),
+        zome: zome.into(),
         cap: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
         fn_name: func.into(),
         payload: ExternInput::new(payload.try_into()?),

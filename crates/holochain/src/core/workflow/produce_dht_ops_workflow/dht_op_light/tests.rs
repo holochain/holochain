@@ -16,12 +16,14 @@ use holochain_types::{
     header::NewEntryHeader,
     observability, Entry, EntryHashed, HeaderHashed,
 };
-use holochain_zome_types::header::{
-    builder::{self, HeaderBuilder},
-    AgentValidationPkg, CloseChain, Create, CreateLink, DeleteLink, Dna, EntryType, Header,
-    HeaderBuilderCommon, InitZomesComplete, OpenChain, Update,
+use holochain_zome_types::{
+    header::{
+        builder, builder::HeaderBuilder, AgentValidationPkg, CloseChain, Create, CreateLink,
+        DeleteLink, Dna, EntryType, Header, HeaderBuilderCommon, InitZomesComplete, OpenChain,
+        Update,
+    },
+    signature::Signature,
 };
-use holochain_zome_types::signature::Signature;
 use pretty_assertions::assert_eq;
 use tracing::*;
 

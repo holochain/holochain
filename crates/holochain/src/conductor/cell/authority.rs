@@ -10,23 +10,22 @@ use fallible_iterator::FallibleIterator;
 
 use holo_hash::{AgentPubKey, EntryHash, HeaderHash};
 use holochain_state::{
-    env::EnvironmentRead,
-    env::{EnvironmentWrite, ReadManager},
+    env::{EnvironmentRead, EnvironmentWrite, ReadManager},
     error::DatabaseError,
     fresh_reader,
-    prelude::PrefixType,
-    prelude::Readable,
+    prelude::{PrefixType, Readable},
 };
-use holochain_types::activity::{AgentActivity, ChainItems};
 use holochain_types::{
+    activity::{AgentActivity, ChainItems},
     element::{ElementStatus, GetElementResponse, RawGetEntryResponse, WireElement},
-    header::WireHeaderStatus,
-    header::WireUpdateRelationship,
+    header::{WireHeaderStatus, WireUpdateRelationship},
     metadata::TimedHeaderHash,
 };
 use holochain_zome_types::{
-    element::SignedHeaderHashed, header::conversions::WrongHeaderError, query::ChainQueryFilter,
-    query::ChainStatus, validate::ValidationStatus,
+    element::SignedHeaderHashed,
+    header::conversions::WrongHeaderError,
+    query::{ChainQueryFilter, ChainStatus},
+    validate::ValidationStatus,
 };
 use std::{collections::BTreeSet, convert::TryInto};
 use tracing::*;
