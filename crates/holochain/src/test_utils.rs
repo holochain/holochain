@@ -377,20 +377,26 @@ pub async fn wait_for_integration_with_others(
     num_attempts: usize,
     delay: Duration,
 ) {
+    let mut last_total = 0;
     for i in 0..num_attempts {
         let count = count_integration(env).await;
         let counts = get_counts(others).await;
+        let total: usize = counts.clone().into_iter().map(|(_, _, i)| i).sum();
+        let change = total.checked_sub(last_total).expect("LOST A VALUE");
+        last_total = total;
         if count.2 == expected_count {
             return;
         } else {
             let total_time_waited = delay * i as u32;
             tracing::debug!(
-                "Count: {}, val: {}, int: {}\nTime waited: {:?},\nCounts: {:?}\n",
+                "Count: {}, val: {}, int: {}\nTime waited: {:?},\nCounts: {:?}\nTotal: {} change:{}\n",
                 count.2,
                 count.1,
                 count.0,
                 total_time_waited,
-                counts
+                counts,
+                total,
+                change,
             );
         }
         tokio::time::delay_for(delay).await;

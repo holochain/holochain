@@ -1,7 +1,6 @@
 //! This is a temporary quick-hack gossip module for use with the
 //! in-memory / full-sync / non-sharded networking module
 
-use crate::agent_store::AgentInfoSigned;
 use crate::{types::actor::KitsuneP2pResult, types::gossip::*, *};
 use ghost_actor::dependencies::{tracing, tracing_futures};
 use kitsune_p2p_types::dht_arc::DhtArc;
@@ -11,7 +10,7 @@ ghost_actor::ghost_chan! {
     /// "Event" requests emitted by the gossip module
     pub chan GossipEvent<crate::KitsuneP2pError> {
         /// get a list of agents we know about
-        fn list_neighbor_agents() -> Vec<Arc<KitsuneAgent>>;
+        fn list_neighbor_agents() -> ListNeighborAgents;
 
         /// fetch op list from/to with constraints
         fn req_op_hashes(
@@ -25,10 +24,7 @@ ghost_actor::ghost_chan! {
 
         /// we have gossip to forward
         fn gossip_ops(
-            from_agent: Arc<KitsuneAgent>,
-            to_agent: Arc<KitsuneAgent>,
-            ops: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
-            agents: Vec<AgentInfoSigned>,
+            input: GossipEvt,
         ) -> ();
     }
 }
@@ -81,24 +77,30 @@ impl GossipData {
     }
 
     async fn fetch_pending_gossip_list(&mut self) -> KitsuneP2pResult<()> {
-        let list = self.evt_send.list_neighbor_agents().await?;
+        let (local_agents, remote_agents) = self.evt_send.list_neighbor_agents().await?;
         // super naive gossip just processes all combinations
         // also causes duplication because it runs pairs from both sides
-        tracing::debug!(?list);
-        for a1 in list.iter() {
-            for a2 in list.iter() {
+        tracing::debug!(?local_agents, ?remote_agents);
+        for (i, a1) in local_agents.iter().enumerate() {
+            for a2 in local_agents.iter().skip(i) {
                 // at the very least, avoid gossiping with ourselves
                 if a1 != a2 {
                     self.pending_gossip_list.push((a1.clone(), a2.clone()));
                 }
             }
+            for a2 in remote_agents.iter() {
+                self.pending_gossip_list.push((a1.clone(), a2.clone()));
+            }
         }
+        tracing::debug!(pending_gossip_list = ?self.pending_gossip_list);
         Ok(())
     }
 
+    #[tracing::instrument(skip(self))]
     async fn process_next_gossip(&mut self) -> KitsuneP2pResult<()> {
         // !is_empty() checked above in take_action
         let (from_agent, to_agent) = self.pending_gossip_list.remove(0);
+        let span = tracing::debug_span!("next_gossip", ?from_agent, ?to_agent);
 
         // required so from_iters below know the build_hasher type
         type S = HashSet<Arc<KitsuneOpHash>>;
@@ -117,6 +119,9 @@ impl GossipData {
             .await?;
         let op_hashes_from: S = HashSet::from_iter(op_hashes_from);
         let agent_info_from: A = HashSet::from_iter(agent_info_from);
+        span.in_scope(|| {
+            tracing::debug!(from_has_len = ?op_hashes_from.len());
+        });
 
         // we'll just fetch all with no constraints for now
         let (op_hashes_to, agent_info_to) = self
@@ -131,6 +136,12 @@ impl GossipData {
             .await?;
         let op_hashes_to: S = HashSet::from_iter(op_hashes_to);
         let agent_info_to: A = HashSet::from_iter(agent_info_to);
+        span.in_scope(|| {
+            tracing::debug!(to_has_len = ?op_hashes_to.len());
+        });
+        // span.in_scope(|| {
+        //     tracing::debug!(?agent_info_to);
+        // });
 
         // values that to_agent has, and from_agent needs
         let from_needs = op_hashes_to
@@ -142,6 +153,10 @@ impl GossipData {
             .cloned()
             .map(|(ai, _)| ai)
             .collect::<Vec<_>>();
+        span.in_scope(|| {
+            tracing::debug!(?from_needs_agents);
+            tracing::debug!(from_needs_len = ?from_needs.len());
+        });
 
         // values that from_agent has, and to_agent needs
         let to_needs = op_hashes_from
@@ -153,6 +168,10 @@ impl GossipData {
             .cloned()
             .map(|(ai, _)| ai)
             .collect::<Vec<_>>();
+        span.in_scope(|| {
+            tracing::debug!(?to_needs_agents);
+            tracing::debug!(to_needs_len = ?to_needs.len());
+        });
 
         // fetch values that to_agent needs from from_agent
         if !to_needs.is_empty() || !to_needs_agents.is_empty() {
@@ -166,17 +185,30 @@ impl GossipData {
                 ))
                 .await
             {
+                // span.in_scope(|| {
+                //     tracing::debug!(peers_from_from_agent = ?r_peers);
+                // });
                 if !r_ops.is_empty() || !r_peers.is_empty() {
                     if let Err(e) = self
                         .evt_send
-                        .gossip_ops(from_agent.clone(), to_agent.clone(), r_ops, r_peers)
+                        .gossip_ops(GossipEvt::new(
+                            from_agent.clone(),
+                            to_agent.clone(),
+                            r_ops,
+                            r_peers,
+                        ))
                         .await
                     {
-                        tracing::error!(?e);
+                        span.in_scope(|| {
+                            tracing::error!(gossip_failed_to_send = ?e, ?to_agent);
+                        });
                     }
                 }
             }
         }
+        span.in_scope(|| {
+            tracing::debug!("Gossip Sent");
+        });
 
         // fetch values that from_agent needs from to_agent
         if !from_needs.is_empty() || !from_needs_agents.is_empty() {
@@ -190,22 +222,30 @@ impl GossipData {
                 ))
                 .await
             {
+                // span.in_scope(|| {
+                //     tracing::debug!(peers_from_to_agent = ?r_peers);
+                // });
                 if !r_ops.is_empty() || !r_peers.is_empty() {
                     if let Err(e) = self
                         .evt_send
-                        .gossip_ops(
+                        .gossip_ops(GossipEvt::new(
                             to_agent.clone(), // we fetched from to
                             from_agent.clone(),
                             r_ops,
                             r_peers,
-                        )
+                        ))
                         .await
                     {
-                        tracing::error!(?e);
+                        span.in_scope(|| {
+                            tracing::error!(gossip_failed_to_get_from = ?e, ?to_agent);
+                        });
                     }
                 }
             }
         }
+        span.in_scope(|| {
+            tracing::debug!("Gossip Done");
+        });
 
         Ok(())
     }

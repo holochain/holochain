@@ -256,6 +256,47 @@ impl KitsuneP2pActor {
                                         }
                                     }
                                 }
+                                wire::Wire::Gossip(wire::Gossip {
+                                    space,
+                                    from_agent,
+                                    to_agent,
+                                    ops,
+                                    agents,
+                                }) => {
+                                    let span = tracing::debug_span!(
+                                        "recv_wire_gossip",
+                                        ?from_agent,
+                                        ?to_agent
+                                    );
+
+                                    span.in_scope(|| {
+                                        tracing::debug!("inserting gossip");
+                                    });
+
+                                    let input = GossipEvt::new(
+                                        from_agent,
+                                        to_agent,
+                                        ops.into_iter().map(|(k, v)| (k, v.into())).collect(),
+                                        agents,
+                                    );
+                                    if let Err(err) =
+                                        local_gossip_ops(&evt_sender, space, input).await
+                                    {
+                                        let reason = format!("{:?}", err);
+                                        span.in_scope(|| {
+                                            tracing::debug!("got err: {}", reason);
+                                        });
+                                        let fail =
+                                            wire::Wire::failure(reason).encode_vec().unwrap();
+                                        let _ = write.write_and_close(fail).await;
+                                        return;
+                                    }
+                                    let resp = wire::Wire::gossip_resp().encode_vec().unwrap();
+                                    let _ = write.write_and_close(resp).await;
+                                    span.in_scope(|| {
+                                        tracing::debug!("gossip success");
+                                    });
+                                }
                                 _ => unimplemented!("{:?}", read),
                             }
                         }

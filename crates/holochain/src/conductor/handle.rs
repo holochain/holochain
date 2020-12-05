@@ -310,6 +310,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 respond,
                 ..
             } => {
+                tracing::debug!(agent_info = ?agent_info_signed.as_agent_ref());
                 let res = lock
                     .put_agent_info_signed(agent_info_signed)
                     .map_err(holochain_p2p::HolochainP2pError::other);
@@ -334,6 +335,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
                 let res = lock
                     .query_agent_info_signed(kitsune_space)
                     .map_err(holochain_p2p::HolochainP2pError::other);
+                tracing::debug!(result = ?res);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
             SignNetworkData { respond, data, .. } => {
@@ -345,7 +347,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             }
             _ => {
                 let cell: &Cell = lock.cell_by_id(cell_id)?;
-                trace!(agent = ?cell_id.agent_pubkey(), event = ?event);
+                debug!(agent = ?cell_id.agent_pubkey(), event = ?event);
                 cell.handle_holochain_p2p_event(event).await?;
             }
         }
