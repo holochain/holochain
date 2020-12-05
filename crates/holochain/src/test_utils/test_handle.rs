@@ -5,13 +5,14 @@ use crate::{
     core::ribosome::ZomeCallInvocation,
 };
 use hdk3::prelude::*;
+use holo_hash::DnaHash;
 use holochain_types::app::{InstalledAppId, InstalledCell};
 use holochain_types::dna::zome::Zome;
 use holochain_types::dna::DnaFile;
 use unwrap_to::unwrap_to;
 
 /// A wrapper around ConductorHandle with more convenient methods for testing
-#[derive(shrinkwraprs::Shrinkwrap, derive_more::From)]
+#[derive(Clone, shrinkwraprs::Shrinkwrap, derive_more::From)]
 pub struct TestConductorHandle(pub(crate) ConductorHandle);
 
 impl TestConductorHandle {
@@ -34,10 +35,10 @@ impl TestConductorHandle {
             .expect("Couldn't deserialize zome call output")
     }
     /// Call a zome function with automatic de/serialization of input and output
-    pub async fn call_zome_ok_flat<I, O, F, E>(
+    pub async fn call_zome_ok_flat<I, O, Z, F, E>(
         &self,
         cell_id: &CellId,
-        zome_name: &ZomeName,
+        zome_name: Z,
         fn_name: F,
         cap: Option<CapSecret>,
         provenance: Option<AgentPubKey>,
@@ -45,6 +46,7 @@ impl TestConductorHandle {
     ) -> O
     where
         E: std::fmt::Debug,
+        ZomeName: From<Z>,
         FunctionName: From<F>,
         SerializedBytes: TryFrom<I, Error = E>,
         O: TryFrom<SerializedBytes, Error = E> + std::fmt::Debug,
@@ -53,7 +55,7 @@ impl TestConductorHandle {
         let provenance = provenance.unwrap_or_else(|| cell_id.agent_pubkey().clone());
         let call = ZomeCall {
             cell_id: cell_id.clone(),
-            zome_name: zome_name.clone(),
+            zome_name: zome_name.into(),
             fn_name: fn_name.into(),
             cap,
             provenance,
@@ -81,22 +83,29 @@ impl TestConductorHandle {
         app_id_prefix: &str,
         dna_files: &[DnaFile],
         agents: &[AgentPubKey],
-    ) -> Vec<(InstalledAppId, Vec<CellId>)> {
+    ) -> Vec<(InstalledAppId, Vec<TestCell>)> {
         for dna_file in dna_files {
             self.0.install_dna(dna_file.clone()).await.unwrap()
         }
 
         let info = futures::future::join_all(agents.iter().map(|agent| async move {
             let installed_app_id = format!("{}{}", app_id_prefix, agent);
-            let cell_ids: Vec<_> = dna_files
+            let cell_ids: Vec<TestCell> = dna_files
                 .iter()
-                .map(|d| CellId::new(d.dna_hash().clone(), agent.clone()))
+                .map(|f| CellId::new(f.dna_hash().clone(), agent.clone()))
+                .map(|cell_id| TestCell {
+                    cell_id,
+                    handle: self.clone(),
+                })
                 .collect();
             let cells = cell_ids
                 .iter()
-                .map(|i| {
+                .map(|cell| {
                     (
-                        InstalledCell::new(i.clone(), format!("{}", i.dna_hash())),
+                        InstalledCell::new(
+                            cell.cell_id.clone(),
+                            format!("{}", cell.cell_id.dna_hash()),
+                        ),
                         None,
                     )
                 })
@@ -131,6 +140,74 @@ impl TestConductorHandle {
     //         }
     //     }
     // }
+}
+
+/// A reference to a Cell created by a TestConductorHandle installation function.
+/// It has very concise methods for calling a zome on this cell
+#[derive(Clone, derive_more::From)]
+pub struct TestCell {
+    cell_id: CellId,
+    handle: TestConductorHandle,
+}
+
+impl TestCell {
+    /// Accessor for CellId
+    pub fn cell_id(&self) -> &CellId {
+        &self.cell_id
+    }
+
+    /// Accessor for AgentPubKey
+    pub fn agent_pubkey(&self) -> &AgentPubKey {
+        &self.cell_id.agent_pubkey()
+    }
+
+    /// Accessor for DnaHash
+    pub fn dna_hash(&self) -> &DnaHash {
+        &self.cell_id.dna_hash()
+    }
+
+    /// Call a zome function on another TestCell.
+    /// The provenance is automatically set.
+    pub async fn call_other<I, O, Z, F, E>(
+        &self,
+        target: &TestCell,
+        zome_name: Z,
+        fn_name: F,
+        cap: Option<CapSecret>,
+        payload: I,
+    ) -> O
+    where
+        E: std::fmt::Debug,
+        ZomeName: From<Z>,
+        FunctionName: From<F>,
+        SerializedBytes: TryFrom<I, Error = E>,
+        O: TryFrom<SerializedBytes, Error = E> + std::fmt::Debug,
+    {
+        self.handle
+            .call_zome_ok_flat(
+                &target.cell_id,
+                zome_name,
+                fn_name,
+                cap,
+                Some(self.cell_id.agent_pubkey().clone()),
+                payload,
+            )
+            .await
+    }
+
+    /// Call a zome function on this TestCell.
+    /// No CapGrant is provided, since the authorship capability will be granted.
+    pub async fn call_self<I, O, Z, F, E>(&self, zome_name: Z, fn_name: F, payload: I) -> O
+    where
+        E: std::fmt::Debug,
+        ZomeName: From<Z>,
+        FunctionName: From<F>,
+        SerializedBytes: TryFrom<I, Error = E>,
+        O: TryFrom<SerializedBytes, Error = E> + std::fmt::Debug,
+    {
+        self.call_other(self, zome_name, fn_name, None, payload)
+            .await
+    }
 }
 
 /// A top-level call into a zome function,

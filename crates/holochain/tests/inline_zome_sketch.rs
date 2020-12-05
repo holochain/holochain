@@ -39,24 +39,16 @@ async fn inline_zome_feasibility_test() -> anyhow::Result<()> {
     let envs = test_environments();
 
     // Bundle the single zome into a DnaFile
-
-    let (dna_file, zome) = DnaFile::unique_from_inline_zome("zome1", simple_crud_zome()).await?;
-    let dna_hash = dna_file.dna_hash().clone();
-    let zome_name = zome.zome_name();
+    let (dna_file, _) = DnaFile::unique_from_inline_zome("zome1", simple_crud_zome()).await?;
 
     // Get two agents
-
     let (alice, bobbo) = TestAgents::two(envs.keystore()).await;
-    let alice_cell_id = CellId::new(dna_hash.clone(), alice.clone());
-    let bobbo_cell_id = CellId::new(dna_hash.clone(), bobbo.clone());
 
     // Create a Conductor
-
     let conductor: TestConductorHandle = Conductor::builder().test(&envs).await?.into();
 
     // Install DNA and install and activate apps in conductor
-
-    let _ids = conductor
+    let mut ids = conductor
         .setup_app_for_all_agents_with_no_membrane_proof(
             "app",
             &[dna_file],
@@ -64,28 +56,24 @@ async fn inline_zome_feasibility_test() -> anyhow::Result<()> {
         )
         .await;
 
+    // TODO: make more ergonomic
+    let alice = ids.pop().unwrap().1[0].clone();
+    let bobbo = ids.pop().unwrap().1[0].clone();
+
     // Call the "create" zome fn on Alice's app
+    let hash: HeaderHash = alice.call_self("zome1", "create", ()).await;
 
-    let hash: HeaderHash = conductor
-        .call_zome_ok_flat(&alice_cell_id, zome_name, "create", None, None, ())
-        .await;
-
-    // Wait long enough for Bob to receive gossip
-
+    // Wait long enough for Bob to receive gossip (TODO: make deterministic)
     tokio::time::delay_for(std::time::Duration::from_millis(500)).await;
 
-    // Verify that bob can run "read" on his app and get alice's Header
-
-    let element: MaybeElement = conductor
-        .call_zome_ok_flat(&bobbo_cell_id, zome_name, "read", None, None, hash)
-        .await;
+    // Verify that bobbo can run "read" on his cell and get alice's Header
+    let element: MaybeElement = bobbo.call_self("zome1", "read", hash).await;
     let element = element
         .0
         .expect("Element was None: bobbo couldn't `get` it");
 
-    // Assert that the Element bob sees matches what Alice committed
-
-    assert_eq!(*element.header().author(), alice);
+    // Assert that the Element bobbo sees matches what alice committed
+    assert_eq!(element.header().author(), alice.agent_pubkey());
     assert_eq!(
         *element.entry(),
         ElementEntry::Present(Entry::app(().try_into().unwrap()).unwrap())

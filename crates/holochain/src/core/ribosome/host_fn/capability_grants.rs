@@ -174,7 +174,7 @@ pub mod wasm_test {
         let original_grant_hash: HeaderHash = handle
             .call_zome_ok_flat(
                 &bob_cell_id,
-                zome.zome_name(),
+                zome.zome_name().clone(),
                 "transferable_cap_grant",
                 None,
                 None,
