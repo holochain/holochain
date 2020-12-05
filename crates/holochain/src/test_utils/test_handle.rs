@@ -18,7 +18,7 @@ impl TestConductorHandle {
     /// Call a zome function with automatic de/serialization of input and output
     pub async fn call_zome_ok_struct<'a, I, O, F, E>(
         &'a self,
-        invocation: TestZomeCallInvocation<'a, I, F, E>,
+        invocation: TestZomeCall<'a, I, F, E>,
     ) -> O
     where
         E: std::fmt::Debug,
@@ -136,7 +136,7 @@ impl TestConductorHandle {
 /// A top-level call into a zome function,
 /// i.e. coming from outside the Cell from an external Interface
 #[derive(Clone, Debug)]
-pub struct TestZomeCallInvocation<'a, P, F, E>
+pub struct TestZomeCall<'a, P, F, E>
 where
     SerializedBytes: TryFrom<P, Error = E>,
     E: std::fmt::Debug,
@@ -159,14 +159,14 @@ where
     pub provenance: Option<AgentPubKey>,
 }
 
-impl<'a, P, F, E> From<TestZomeCallInvocation<'a, P, F, E>> for ZomeCallInvocation
+impl<'a, P, F, E> From<TestZomeCall<'a, P, F, E>> for ZomeCallInvocation
 where
     SerializedBytes: TryFrom<P, Error = E>,
     E: std::fmt::Debug,
     FunctionName: From<F>,
 {
-    fn from(tzci: TestZomeCallInvocation<'a, P, F, E>) -> Self {
-        let TestZomeCallInvocation {
+    fn from(tzci: TestZomeCall<'a, P, F, E>) -> Self {
+        let TestZomeCall {
             cell_id,
             zome,
             fn_name,
@@ -187,13 +187,13 @@ where
     }
 }
 
-impl<'a, P, F, E> From<TestZomeCallInvocation<'a, P, F, E>> for ZomeCall
+impl<'a, P, F, E> From<TestZomeCall<'a, P, F, E>> for ZomeCall
 where
     SerializedBytes: TryFrom<P, Error = E>,
     E: std::fmt::Debug,
     FunctionName: From<F>,
 {
-    fn from(tzci: TestZomeCallInvocation<'a, P, F, E>) -> Self {
+    fn from(tzci: TestZomeCall<'a, P, F, E>) -> Self {
         ZomeCallInvocation::from(tzci).into()
     }
 }
