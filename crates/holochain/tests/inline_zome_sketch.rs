@@ -1,4 +1,3 @@
-use futures::StreamExt;
 use hdk3::prelude::*;
 use holochain::test_utils::{test_agents::TestAgents, test_handle::TestConductorHandle};
 use holochain::{conductor::Conductor, destructure_test_cells};
@@ -12,18 +11,37 @@ use holochain_zome_types::element::ElementEntry;
 #[repr(transparent)]
 struct MaybeElement(Option<Element>);
 
+#[derive(serde::Serialize, serde::Deserialize, Debug, SerializedBytes, derive_more::From)]
+#[serde(transparent)]
+#[repr(transparent)]
+struct AppString(String);
+
 fn simple_crud_zome() -> InlineZome {
-    let entry_def = EntryDef::new(
-        "entry".into(),
+    let string_entry_def = EntryDef::new(
+        "string".into(),
         Default::default(),
         Default::default(),
         Default::default(),
         Default::default(),
     );
 
-    InlineZome::new_unique(vec![entry_def.clone()])
-        .callback("create", move |api, ()| {
-            let entry_def_id: EntryDefId = entry_def.id.clone();
+    let unit_entry_def = EntryDef::new(
+        "unit".into(),
+        Default::default(),
+        Default::default(),
+        Default::default(),
+        Default::default(),
+    );
+
+    InlineZome::new_unique(vec![string_entry_def.clone(), unit_entry_def.clone()])
+        .callback("create_string", move |api, s: String| {
+            let entry_def_id: EntryDefId = string_entry_def.id.clone();
+            let entry = Entry::app(AppString::from(s).try_into().unwrap()).unwrap();
+            let hash = api.create((entry_def_id, entry))?;
+            Ok(hash)
+        })
+        .callback("create_unit", move |api, ()| {
+            let entry_def_id: EntryDefId = unit_entry_def.id.clone();
             let entry = Entry::app(().try_into().unwrap()).unwrap();
             let hash = api.create((entry_def_id, entry))?;
             Ok(hash)
@@ -61,7 +79,7 @@ async fn inline_zome_2_agent_1_dna() -> anyhow::Result<()> {
     let ((alice,), (bobbo,)) = destructure_test_cells!(ids);
 
     // Call the "create" zome fn on Alice's app
-    let hash: HeaderHash = alice.call_self("zome1", "create", ()).await;
+    let hash: HeaderHash = alice.call_self("zome1", "create_unit", ()).await;
 
     // Wait long enough for Bob to receive gossip (TODO: make deterministic)
     tokio::time::delay_for(std::time::Duration::from_millis(500)).await;
@@ -82,53 +100,63 @@ async fn inline_zome_2_agent_1_dna() -> anyhow::Result<()> {
     Ok(())
 }
 
-// #[tokio::test(threaded_scheduler)]
-// #[cfg(feature = "test_utils")]
-// async fn inline_zome_3_agent_2_dna() -> anyhow::Result<()> {
-//     let envs = test_environments();
+#[tokio::test(threaded_scheduler)]
+#[cfg(feature = "test_utils")]
+async fn inline_zome_3_agent_2_dna() -> anyhow::Result<()> {
+    let envs = test_environments();
+    let conductor: TestConductorHandle = Conductor::builder().test(&envs).await?.into();
 
-//     // Bundle the single zome into a DnaFile
-//     let (dna_foo, _) = DnaFile::unique_from_inline_zome("foozome", simple_crud_zome()).await?;
-//     let (dna_bar, _) = DnaFile::unique_from_inline_zome("barzome", simple_crud_zome()).await?;
+    let (dna_foo, _) = DnaFile::unique_from_inline_zome("foozome", simple_crud_zome()).await?;
+    let (dna_bar, _) = DnaFile::unique_from_inline_zome("barzome", simple_crud_zome()).await?;
 
-//     // Get three agents
-//     let agents = TestAgents::get(envs.keystore(), 3).await;
+    let agents = TestAgents::get(envs.keystore(), 3).await;
 
-//     // Create a Conductor
-//     let conductor: TestConductorHandle = Conductor::builder().test(&envs).await?.into();
+    let ids = conductor
+        .setup_app_for_all_agents_with_no_membrane_proof("app", &agents, &[dna_foo, dna_bar])
+        .await;
 
-//     // Install DNA and install and activate apps in conductor
-//     let mut ids = conductor
-//         .setup_app_for_all_agents_with_no_membrane_proof("app", &agents, &[dna_foo, dna_bar])
-//         .await;
+    let ((alice_foo, alice_bar), (bobbo_foo, bobbo_bar), (_carol_foo, carol_bar)) =
+        destructure_test_cells!(ids);
 
-//     let junk: Vec<_> = ids.map(|(_, v)| v).collect();
+    assert_eq!(alice_foo.agent_pubkey(), alice_bar.agent_pubkey());
+    assert_eq!(bobbo_foo.agent_pubkey(), bobbo_bar.agent_pubkey());
+    assert_ne!(alice_foo.agent_pubkey(), bobbo_foo.agent_pubkey());
 
-//     let ((alice_foo, alice_bar), (bobbo_foo, bobbo_bar)) = junk.into_iter().map(|v| v.tuples())
+    //////////////////////
+    // END SETUP
 
-//     // TODO: make more ergonomic
-//     let alice = ids.pop().unwrap().1[0].clone();
-//     let bobbo = ids.pop().unwrap().1[0].clone();
-//     // let &[(_, &[alice]), (_, &[bobbo])] = ids.as_slice();
+    let hash_foo: HeaderHash = alice_foo.call_self("foozome", "create_unit", ()).await;
+    let hash_bar: HeaderHash = alice_bar.call_self("barzome", "create_unit", ()).await;
 
-//     // Call the "create" zome fn on Alice's app
-//     let hash: HeaderHash = alice.call_self("foo", "create", ()).await;
+    // Two different DNAs, so HeaderHashes should be different.
+    assert_ne!(hash_foo, hash_bar);
 
-//     // Wait long enough for Bob to receive gossip (TODO: make deterministic)
-//     tokio::time::delay_for(std::time::Duration::from_millis(500)).await;
+    // Wait long enough for others to receive gossip (TODO: make deterministic)
+    tokio::time::delay_for(std::time::Duration::from_millis(500)).await;
 
-//     // Verify that bobbo can run "read" on his cell and get alice's Header
-//     let element: MaybeElement = bobbo.call_self("foo", "read", hash).await;
-//     let element = element
-//         .0
-//         .expect("Element was None: bobbo couldn't `get` it");
+    // Verify that bobbo can run "read" on his cell and get alice's Header
+    // on the "foo" DNA
+    let element: MaybeElement = bobbo_foo.call_self("foozome", "read", hash_foo).await;
+    let element = element
+        .0
+        .expect("Element was None: bobbo couldn't `get` it");
+    assert_eq!(element.header().author(), alice_foo.agent_pubkey());
+    assert_eq!(
+        *element.entry(),
+        ElementEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
+    );
 
-//     // Assert that the Element bobbo sees matches what alice committed
-//     assert_eq!(element.header().author(), alice.agent_pubkey());
-//     assert_eq!(
-//         *element.entry(),
-//         ElementEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
-//     );
+    // Verify that carol can run "read" on her cell and get alice's Header
+    // on the "bar" DNA
+    let element: MaybeElement = carol_bar.call_self("barzome", "read", hash_bar).await;
+    let element = element
+        .0
+        .expect("Element was None: carol couldn't `get` it");
+    assert_eq!(element.header().author(), alice_bar.agent_pubkey());
+    assert_eq!(
+        *element.entry(),
+        ElementEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
+    );
 
-//     Ok(())
-// }
+    Ok(())
+}

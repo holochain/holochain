@@ -85,10 +85,15 @@ impl TestConductorHandle {
         dna_files: &[DnaFile],
     ) -> SetupOutput {
         for dna_file in dna_files {
-            self.0.install_dna(dna_file.clone()).await.unwrap()
+            self.0
+                .install_dna(dna_file.clone())
+                .await
+                .expect("Could not install DNA")
         }
 
-        let info = futures::future::join_all(agents.iter().map(|agent| async move {
+        let mut info = Vec::new();
+
+        for agent in agents {
             let installed_app_id = format!("{}{}", app_id_prefix, agent);
             let cell_ids: Vec<TestCell> = dna_files
                 .iter()
@@ -114,18 +119,22 @@ impl TestConductorHandle {
                 .clone()
                 .install_app(installed_app_id.clone(), cells)
                 .await
-                .unwrap();
-            (installed_app_id, cell_ids)
-        }))
-        .await;
+                .expect("Could not install app");
+            info.push((installed_app_id, cell_ids));
+        }
 
-        futures::future::join_all(
-            info.iter()
-                .map(|(installed_app_id, _)| self.0.activate_app(installed_app_id.clone())),
-        )
-        .await;
+        for (installed_app_id, _) in info.iter() {
+            self.0
+                .activate_app(installed_app_id.clone())
+                .await
+                .expect("Could not activate app");
+        }
 
-        self.0.clone().setup_cells().await.unwrap();
+        self.0
+            .clone()
+            .setup_cells()
+            .await
+            .expect("Could not setup cells");
 
         info
     }
