@@ -167,8 +167,6 @@ pub mod wasm_test {
             _ => unreachable!(),
         }
 
-        let shutdown = handle.take_shutdown_handle().await.unwrap();
         handle.shutdown().await;
-        shutdown.await.unwrap();
     }
 }

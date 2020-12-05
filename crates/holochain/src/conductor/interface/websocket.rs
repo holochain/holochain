@@ -479,9 +479,7 @@ pub mod test {
         handle_incoming_message(msg, app_api).await.unwrap();
         // the time here should be almost the same (about +0.1ms) vs. the raw real_ribosome call
         // the overhead of a websocket request locally is small
-        let shutdown = handle.take_shutdown_handle().await.unwrap();
         handle.shutdown().await;
-        shutdown.await.unwrap();
     }
 
     #[tokio::test(threaded_scheduler)]
@@ -517,7 +515,6 @@ pub mod test {
             .return_const(());
         let (_tmpdir, conductor_handle) =
             setup_admin_fake_cells(cell_ids_with_proofs, dna_store).await;
-        let shutdown = conductor_handle.take_shutdown_handle().await.unwrap();
 
         // Activate the app
         let msg = AdminRequest::ActivateApp {
@@ -597,14 +594,12 @@ pub mod test {
 
         assert_eq!(expected, cell_ids);
         conductor_handle.shutdown().await;
-        shutdown.await.unwrap();
     }
 
     #[tokio::test(threaded_scheduler)]
     async fn attach_app_interface() {
         observability::test_run().ok();
         let (_tmpdir, conductor_handle) = setup_admin().await;
-        let shutdown = conductor_handle.take_shutdown_handle().await.unwrap();
         let admin_api = RealAdminInterfaceApi::new(conductor_handle.clone());
         let msg = AdminRequest::AttachAppInterface { port: None };
         let msg = msg.try_into().unwrap();
@@ -617,7 +612,6 @@ pub mod test {
         let msg = WebsocketMessage::Request(msg, respond);
         handle_incoming_message(msg, admin_api).await.unwrap();
         conductor_handle.shutdown().await;
-        shutdown.await.unwrap();
     }
 
     #[tokio::test(threaded_scheduler)]
@@ -644,7 +638,6 @@ pub mod test {
         let (_tmpdir, conductor_handle) =
             setup_admin_fake_cells(vec![(cell_id.clone(), None)], dna_store).await;
         let conductor_handle = activate(conductor_handle).await;
-        let shutdown = conductor_handle.take_shutdown_handle().await.unwrap();
 
         // Set some state
         let cell_env = conductor_handle.get_cell_env(&cell_id).await.unwrap();
@@ -669,7 +662,6 @@ pub mod test {
         let msg = WebsocketMessage::Request(msg, respond);
         handle_incoming_message(msg, admin_api).await.unwrap();
         conductor_handle.shutdown().await;
-        shutdown.await.unwrap();
     }
 
     async fn make_dna(uuid: &str, zomes: Vec<TestWasm>) -> DnaFile {

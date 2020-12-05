@@ -524,7 +524,6 @@ mod test {
         observability::test_run().ok();
         let envs = test_environments();
         let handle = Conductor::builder().test(&envs).await?;
-        let shutdown = handle.take_shutdown_handle().await.unwrap();
         let admin_api = RealAdminInterfaceApi::new(handle.clone());
         let uuid = Uuid::new_v4();
         let dna = fake_dna_zomes(
@@ -578,9 +577,6 @@ mod test {
         assert_matches!(res, AdminResponse::ActiveAppsListed(v) if v == vec!["test".to_string()]);
 
         handle.shutdown().await;
-        tokio::time::timeout(std::time::Duration::from_secs(1), shutdown)
-            .await
-            .ok();
         Ok(())
     }
 

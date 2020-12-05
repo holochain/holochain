@@ -392,7 +392,17 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     async fn shutdown(&self) {
-        self.conductor.write().await.shutdown()
+        let mut lock = self.conductor.write().await;
+        lock.shutdown();
+        if let Some(handle) = lock.take_shutdown_handle() {
+            handle
+                .await
+                .unwrap_or_else(|err| tracing::warn!("Couldn't join task manager task: {:?}", err));
+        } else {
+            tracing::warn!(
+                "Attempted to shutdown after task manager handle was already taken away"
+            );
+        }
     }
 
     fn keystore(&self) -> &KeystoreSender {

@@ -50,9 +50,7 @@ async fn sys_validation_agent_activity_test() {
 
     run_test(alice_cell_id, handle.clone()).await;
 
-    let shutdown = handle.take_shutdown_handle().await.unwrap();
     handle.shutdown().await;
-    shutdown.await.unwrap();
 }
 
 async fn run_test(alice_cell_id: CellId, handle: ConductorHandle) {

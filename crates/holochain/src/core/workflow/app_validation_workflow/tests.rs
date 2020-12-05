@@ -89,9 +89,7 @@ async fn app_validation_workflow_test() {
     )
     .await;
 
-    let shutdown = handle.take_shutdown_handle().await.unwrap();
     handle.shutdown().await;
-    shutdown.await.unwrap();
 }
 
 // These are the expected invalid ops

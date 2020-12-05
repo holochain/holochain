@@ -319,9 +319,7 @@ async fn get_from_another_agent() {
         remove_hash
     );
 
-    let shutdown = handle.take_shutdown_handle().await.unwrap();
     handle.shutdown().await;
-    shutdown.await.unwrap();
 }
 
 #[tokio::test(threaded_scheduler)]
@@ -457,9 +455,7 @@ async fn get_links_from_another_agent() {
         HeaderHash::with_data_sync(&Header::CreateLink(link_add))
     );
 
-    let shutdown = handle.take_shutdown_handle().await.unwrap();
     handle.shutdown().await;
-    shutdown.await.unwrap();
 }
 
 struct Shutdown {
