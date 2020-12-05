@@ -52,9 +52,8 @@ use tempdir::TempDir;
 use tokio::sync::mpsc;
 
 pub mod conductor_setup;
-pub mod host_fn_api;
-pub mod test_agents;
-pub mod test_handle;
+pub mod host_fn_caller;
+pub mod test_conductor;
 
 /// Produce file and line number info at compile-time
 #[macro_export]

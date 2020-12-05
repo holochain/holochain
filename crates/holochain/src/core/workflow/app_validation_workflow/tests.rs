@@ -8,7 +8,9 @@ use crate::{
         },
         workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace,
     },
-    test_utils::{host_fn_api::*, new_invocation, new_zome_call, setup_app, wait_for_integration},
+    test_utils::{
+        host_fn_caller::*, new_invocation, new_zome_call, setup_app, wait_for_integration,
+    },
 };
 use fallible_iterator::FallibleIterator;
 use holo_hash::{AnyDhtHash, DhtOpHash, EntryHash, HeaderHash};

@@ -1,5 +1,5 @@
 use hdk3::prelude::*;
-use holochain::test_utils::{test_agents::TestAgents, test_handle::TestConductorHandle};
+use holochain::test_utils::test_conductor::{TestAgents, TestConductorHandle};
 use holochain::{conductor::Conductor, destructure_test_cells};
 use holochain_state::test_utils::test_environments;
 use holochain_types::dna::{zome::inline_zome::InlineZome, DnaFile};
@@ -75,17 +75,16 @@ async fn inline_zome_2_agent_1_dna() -> anyhow::Result<()> {
         )
         .await;
 
-    // TODO: make more ergonomic
     let ((alice,), (bobbo,)) = destructure_test_cells!(ids);
 
     // Call the "create" zome fn on Alice's app
-    let hash: HeaderHash = alice.call_self("zome1", "create_unit", ()).await;
+    let hash: HeaderHash = alice.call("zome1", "create_unit", ()).await;
 
     // Wait long enough for Bob to receive gossip (TODO: make deterministic)
     tokio::time::delay_for(std::time::Duration::from_millis(500)).await;
 
     // Verify that bobbo can run "read" on his cell and get alice's Header
-    let element: MaybeElement = bobbo.call_self("zome1", "read", hash).await;
+    let element: MaybeElement = bobbo.call("zome1", "read", hash).await;
     let element = element
         .0
         .expect("Element was None: bobbo couldn't `get` it");
@@ -125,8 +124,8 @@ async fn inline_zome_3_agent_2_dna() -> anyhow::Result<()> {
     //////////////////////
     // END SETUP
 
-    let hash_foo: HeaderHash = alice_foo.call_self("foozome", "create_unit", ()).await;
-    let hash_bar: HeaderHash = alice_bar.call_self("barzome", "create_unit", ()).await;
+    let hash_foo: HeaderHash = alice_foo.call("foozome", "create_unit", ()).await;
+    let hash_bar: HeaderHash = alice_bar.call("barzome", "create_unit", ()).await;
 
     // Two different DNAs, so HeaderHashes should be different.
     assert_ne!(hash_foo, hash_bar);
@@ -136,7 +135,7 @@ async fn inline_zome_3_agent_2_dna() -> anyhow::Result<()> {
 
     // Verify that bobbo can run "read" on his cell and get alice's Header
     // on the "foo" DNA
-    let element: MaybeElement = bobbo_foo.call_self("foozome", "read", hash_foo).await;
+    let element: MaybeElement = bobbo_foo.call("foozome", "read", hash_foo).await;
     let element = element
         .0
         .expect("Element was None: bobbo couldn't `get` it");
@@ -148,7 +147,7 @@ async fn inline_zome_3_agent_2_dna() -> anyhow::Result<()> {
 
     // Verify that carol can run "read" on her cell and get alice's Header
     // on the "bar" DNA
-    let element: MaybeElement = carol_bar.call_self("barzome", "read", hash_bar).await;
+    let element: MaybeElement = carol_bar.call("barzome", "read", hash_bar).await;
     let element = element
         .0
         .expect("Element was None: carol couldn't `get` it");

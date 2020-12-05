@@ -22,8 +22,8 @@ pub mod wasm_test {
     use crate::core::ribosome::ZomeCall;
     use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
     use crate::fixt::ZomeCallHostAccessFixturator;
-    use crate::test_utils::test_handle::TestZomeCall;
-    use crate::{conductor::ConductorBuilder, test_utils::test_handle::TestConductorHandle};
+    use crate::test_utils::test_conductor::TestZomeCall;
+    use crate::{conductor::ConductorBuilder, test_utils::test_conductor::TestConductorHandle};
     use ::fixt::prelude::*;
     use hdk3::prelude::*;
     use holochain_state::test_utils::test_environments;

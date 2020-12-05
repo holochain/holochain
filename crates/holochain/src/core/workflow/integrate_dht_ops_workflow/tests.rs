@@ -1315,7 +1315,7 @@ mod slow_tests {
             metadata::{LinkMetaKey, MetadataBuf, MetadataBufT},
         },
         fixt::*,
-        test_utils::{host_fn_api::*, setup_app, wait_for_integration},
+        test_utils::{host_fn_caller::*, setup_app, wait_for_integration},
     };
     use fallible_iterator::FallibleIterator;
     use fixt::prelude::*;
