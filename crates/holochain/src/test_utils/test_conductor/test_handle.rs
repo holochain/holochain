@@ -111,10 +111,8 @@ macro_rules! destructure_test_cells {
 
 impl TestConductorHandle {
     /// Call a zome function with automatic de/serialization of input and output
-    pub async fn call_zome_ok_struct<'a, I, O, F, E>(
-        &'a self,
-        invocation: TestZomeCall<'a, I, F, E>,
-    ) -> O
+    /// and unwrapping of nested errors.
+    pub async fn call_zome_ok<'a, I, O, F, E>(&'a self, invocation: TestZomeCall<'a, I, F, E>) -> O
     where
         E: std::fmt::Debug,
         FunctionName: From<F>,
@@ -129,7 +127,7 @@ impl TestConductorHandle {
             .expect("Couldn't deserialize zome call output")
     }
 
-    /// Call a zome function with automatic de/serialization of input and output
+    /// `call_zome_ok`, but with arguments provided individually
     pub async fn call_zome_ok_flat<I, O, Z, F, E>(
         &self,
         cell_id: &CellId,
