@@ -392,9 +392,9 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     }
 
     async fn shutdown(&self) {
-        let mut lock = self.conductor.write().await;
-        lock.shutdown();
-        if let Some(handle) = lock.take_shutdown_handle() {
+        let handle = self.conductor.write().await.take_shutdown_handle();
+        self.conductor.write().await.shutdown();
+        if let Some(handle) = handle {
             handle
                 .await
                 .unwrap_or_else(|err| tracing::warn!("Couldn't join task manager task: {:?}", err));
