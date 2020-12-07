@@ -23,7 +23,7 @@ let
     name = "holochain-binaries";
 
     src = holochainSrc;
-    cargoSha256 = "19zkrq3ivi0vis47b7x6z413q6n48ilzm4sb5q0rxkjmac73w851";
+    cargoSha256 = "0hfbq1mcpbv620zxsxfaxn9mjffjshrxmp50d41ql5jxykl1197m";
 
     nativeBuildInputs = [
       pkg-config
