@@ -356,11 +356,36 @@ pub async fn spawn_transport_listener_quic(
 // TODO - modernize all this taking hints from TLS code in proxy crate.
 mod danger {
     use kitsune_p2p_types::transport::{TransportError, TransportResult};
+    use once_cell::sync::Lazy;
     use quinn::{
         Certificate, CertificateChain, ClientConfig, ClientConfigBuilder, PrivateKey, ServerConfig,
         ServerConfigBuilder, TransportConfig,
     };
     use std::sync::Arc;
+
+    static TRANSPORT: Lazy<Arc<quinn::TransportConfig>> = Lazy::new(|| {
+        let mut transport = quinn::TransportConfig::default();
+
+        // We don't use uni streams in kitsune - only bidi streams
+        transport.stream_window_uni(0);
+
+        // We don't use "Application" datagrams in kitsune -
+        // only bidi streams.
+        transport.datagram_receive_buffer_size(None);
+
+        // Disable spin bit - we'd like the extra privacy
+        // any metrics we implement will be opt-in self reporting
+        transport.allow_spin(false);
+
+        // see also `keep_alive_interval`.
+        // right now keep_alive_interval is None,
+        // so connections will idle timeout after 20 seconds.
+        transport
+            .max_idle_timeout(Some(std::time::Duration::from_millis(20_000)))
+            .unwrap();
+
+        Arc::new(transport)
+    });
 
     #[allow(dead_code)]
     pub(crate) async fn configure_server(
@@ -395,7 +420,10 @@ mod danger {
             .certificate(CertificateChain::from_certs(vec![tcert]), tcert_priv)
             .map_err(TransportError::other)?;
 
-        Ok(cfg_builder.build())
+        let mut cfg = cfg_builder.build();
+
+        cfg.transport = TRANSPORT.clone();
+        Ok(cfg)
     }
 
     /// Dummy certificate verifier that treats any certificate as valid.
@@ -427,6 +455,8 @@ mod danger {
         tls_cfg
             .dangerous()
             .set_certificate_verifier(SkipServerVerification::new());
+
+        cfg.transport = TRANSPORT.clone();
         cfg
     }
 }
