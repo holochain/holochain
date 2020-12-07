@@ -16,7 +16,10 @@ let
     sha256 = config.holonix.github.sha256;
    }
    ;
-  holonix = import (holonixPath) { inherit config; };
+  holonix = import (holonixPath) {
+    inherit config;
+    use-stable-rust = true;
+  };
   # END HOLONIX IMPORT BOILERPLATE
 
   overlays = [
@@ -25,8 +28,7 @@ let
 
       hcToplevelDir = builtins.toString ./.;
 
-      # TODO: use Rust from holonix?
-      inherit (self.callPackage ./nix/rust.nix { }) hcRustPlatform;
+      inherit (holonix.pkgs.callPackage ./nix/rust.nix { }) hcRustPlatform;
     })
   ];
 
