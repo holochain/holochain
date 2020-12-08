@@ -3,11 +3,11 @@
 
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
-use monolith::holochain_types::activity::AgentActivity;
-use monolith::holochain_zome_types::capability::CapSecret;
-use monolith::holochain_zome_types::query::ChainQueryFilter;
-use monolith::holochain_zome_types::zome::FunctionName;
-use monolith::holochain_zome_types::zome::ZomeName;
+use crate::holochain_types::activity::AgentActivity;
+use crate::holochain_zome_types::capability::CapSecret;
+use crate::holochain_zome_types::query::ChainQueryFilter;
+use crate::holochain_zome_types::zome::FunctionName;
+use crate::holochain_zome_types::zome::ZomeName;
 use std::sync::Arc;
 
 mod types;
@@ -18,11 +18,11 @@ pub use types::*;
 mod spawn;
 use ghost_actor::dependencies::tracing;
 use ghost_actor::dependencies::tracing_futures::Instrument;
-use monolith::holochain_types::element::GetElementResponse;
-use monolith::holochain_types::link::GetLinksResponse;
-use monolith::holochain_types::link::WireLinkMetaKey;
-use monolith::holochain_types::metadata::MetadataSet;
-use monolith::holochain_types::validate::ValidationPackageResponse;
+use crate::holochain_types::element::GetElementResponse;
+use crate::holochain_types::link::GetLinksResponse;
+use crate::holochain_types::link::WireLinkMetaKey;
+use crate::holochain_types::metadata::MetadataSet;
+use crate::holochain_types::validate::ValidationPackageResponse;
 pub use spawn::*;
 pub use test::stub_network;
 pub use test::HolochainP2pCellFixturator;

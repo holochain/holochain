@@ -1,10 +1,10 @@
 //! The workflow and queue consumer for DhtOp production
 
 use super::*;
-use monolith::holochain::conductor::manager::ManagedTaskResult;
-use monolith::holochain::core::workflow::produce_dht_ops_workflow::produce_dht_ops_workflow;
-use monolith::holochain::core::workflow::produce_dht_ops_workflow::ProduceDhtOpsWorkspace;
-use monolith::holochain_state::env::EnvironmentWrite;
+use crate::holochain::conductor::manager::ManagedTaskResult;
+use crate::holochain::core::workflow::produce_dht_ops_workflow::produce_dht_ops_workflow;
+use crate::holochain::core::workflow::produce_dht_ops_workflow::ProduceDhtOpsWorkspace;
+use crate::holochain_state::env::EnvironmentWrite;
 
 use tokio::task::JoinHandle;
 use tracing::*;

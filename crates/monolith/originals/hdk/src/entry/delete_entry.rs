@@ -1,4 +1,4 @@
-use monolith::hdk::prelude::*;
+use crate::hdk::prelude::*;
 
 /// Alias to delete
 ///

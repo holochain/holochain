@@ -1,8 +1,8 @@
-use monolith::holochain::core::ribosome::error::RibosomeResult;
-use monolith::holochain::core::ribosome::CallContext;
-use monolith::holochain::core::ribosome::RibosomeT;
-use monolith::holochain_zome_types::CapabilityGrantsInput;
-use monolith::holochain_zome_types::CapabilityGrantsOutput;
+use crate::holochain::core::ribosome::error::RibosomeResult;
+use crate::holochain::core::ribosome::CallContext;
+use crate::holochain::core::ribosome::RibosomeT;
+use crate::holochain_zome_types::CapabilityGrantsInput;
+use crate::holochain_zome_types::CapabilityGrantsOutput;
 use std::sync::Arc;
 
 /// list all the grants stored locally in the chain filtered by tag
@@ -18,21 +18,21 @@ pub fn capability_grants(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    use monolith::holochain::conductor::dna_store::MockDnaStore;
-    use monolith::holochain::conductor::interface::websocket::test::setup_app;
-    use monolith::holochain::core::ribosome::ZomeCall;
-    use monolith::holochain::core::workflow::call_zome_workflow::CallZomeWorkspace;
-    use monolith::holochain::fixt::ZomeCallHostAccessFixturator;
+    use crate::holochain::conductor::dna_store::MockDnaStore;
+    use crate::holochain::conductor::interface::websocket::test::setup_app;
+    use crate::holochain::core::ribosome::ZomeCall;
+    use crate::holochain::core::workflow::call_zome_workflow::CallZomeWorkspace;
+    use crate::holochain::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use hdk3::prelude::*;
-    use monolith::holochain_types::app::InstalledCell;
-    use monolith::holochain_types::cell::CellId;
-    use monolith::holochain_types::dna::DnaDef;
-    use monolith::holochain_types::dna::DnaFile;
-    use monolith::holochain_types::fixt::CapSecretFixturator;
-    use monolith::holochain_types::test_utils::fake_agent_pubkey_1;
-    use monolith::holochain_types::test_utils::fake_agent_pubkey_2;
-    use monolith::holochain_wasm_test_utils::TestWasm;
+    use crate::holochain_types::app::InstalledCell;
+    use crate::holochain_types::cell::CellId;
+    use crate::holochain_types::dna::DnaDef;
+    use crate::holochain_types::dna::DnaFile;
+    use crate::holochain_types::fixt::CapSecretFixturator;
+    use crate::holochain_types::test_utils::fake_agent_pubkey_1;
+    use crate::holochain_types::test_utils::fake_agent_pubkey_2;
+    use crate::holochain_wasm_test_utils::TestWasm;
     use matches::assert_matches;
 
     #[tokio::test(threaded_scheduler)]

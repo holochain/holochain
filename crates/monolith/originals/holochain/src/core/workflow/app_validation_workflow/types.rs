@@ -2,7 +2,7 @@ use std::convert::TryFrom;
 
 use holo_hash::AnyDhtHash;
 
-use monolith::holochain::core::validation::OutcomeOrError;
+use crate::holochain::core::validation::OutcomeOrError;
 
 use super::AppValidationOutcome;
 

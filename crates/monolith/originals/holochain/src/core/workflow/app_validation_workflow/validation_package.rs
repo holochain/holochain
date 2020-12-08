@@ -1,18 +1,18 @@
-use monolith::holochain_p2p::HolochainP2pCell;
-use monolith::holochain_types::HeaderHashed;
-use monolith::holochain_zome_types::header::AppEntryType;
-use monolith::holochain_zome_types::header::EntryType;
-use monolith::holochain_zome_types::query::ChainQueryFilter;
-use monolith::holochain_zome_types::validate::ValidationPackage;
+use crate::holochain_p2p::HolochainP2pCell;
+use crate::holochain_types::HeaderHashed;
+use crate::holochain_zome_types::header::AppEntryType;
+use crate::holochain_zome_types::header::EntryType;
+use crate::holochain_zome_types::query::ChainQueryFilter;
+use crate::holochain_zome_types::validate::ValidationPackage;
 
-use monolith::holochain::core::ribosome::error::RibosomeResult;
-use monolith::holochain::core::ribosome::guest_callback::validation_package::ValidationPackageHostAccess;
-use monolith::holochain::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
-use monolith::holochain::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
-use monolith::holochain::core::ribosome::RibosomeT;
-use monolith::holochain::core::state::source_chain::SourceChain;
-use monolith::holochain::core::workflow::CallZomeWorkspaceLock;
-use monolith::holochain::core::SourceChainResult;
+use crate::holochain::core::ribosome::error::RibosomeResult;
+use crate::holochain::core::ribosome::guest_callback::validation_package::ValidationPackageHostAccess;
+use crate::holochain::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
+use crate::holochain::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
+use crate::holochain::core::ribosome::RibosomeT;
+use crate::holochain::core::state::source_chain::SourceChain;
+use crate::holochain::core::workflow::CallZomeWorkspaceLock;
+use crate::holochain::core::SourceChainResult;
 use tracing::*;
 
 pub fn get_as_author_sub_chain(

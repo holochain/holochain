@@ -1,10 +1,10 @@
 //! Helper functions for interacting with the user when running a Conductor
 //! with the --interactive flag
 
-use monolith::holochain::conductor::config::ConductorConfig;
-use monolith::holochain::conductor::error::ConductorError;
-use monolith::holochain::conductor::error::ConductorResult;
-use monolith::holochain::conductor::paths::ConfigFilePath;
+use crate::holochain::conductor::config::ConductorConfig;
+use crate::holochain::conductor::error::ConductorError;
+use crate::holochain::conductor::error::ConductorResult;
+use crate::holochain::conductor::paths::ConfigFilePath;
 use std::path::Path;
 
 /// Prompt the user to answer Y or N.
@@ -97,7 +97,7 @@ fn save_default_config_yaml(path: &Path) -> ConductorResult<ConductorConfig> {
 #[cfg(test)]
 mod tests {
     use super::save_default_config_yaml;
-    use monolith::holochain::conductor::config::ConductorConfig;
+    use crate::holochain::conductor::config::ConductorConfig;
     use tempdir::TempDir;
 
     #[test]

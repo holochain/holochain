@@ -3,10 +3,10 @@
 use holo_hash::AgentPubKey;
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
-use monolith::holochain_zome_types::element::Element;
-use monolith::holochain_zome_types::element::SignedHeaderHashed;
-pub use monolith::holochain_zome_types::query::ChainStatus;
-use monolith::holochain_zome_types::query::HighestObserved;
+use crate::holochain_zome_types::element::Element;
+use crate::holochain_zome_types::element::SignedHeaderHashed;
+pub use crate::holochain_zome_types::query::ChainStatus;
+use crate::holochain_zome_types::query::HighestObserved;
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 /// An agents chain elements returned from a agent_activity_query

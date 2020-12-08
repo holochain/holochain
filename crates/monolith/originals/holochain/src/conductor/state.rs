@@ -1,11 +1,11 @@
 //! Structs which allow the Conductor's state to be persisted across
 //! startups and shutdowns
 
-use monolith::holochain::conductor::interface::InterfaceDriver;
+use crate::holochain::conductor::interface::InterfaceDriver;
 
-use monolith::holochain_types::app::InstalledApp;
-use monolith::holochain_types::app::InstalledAppId;
-use monolith::holochain_types::app::InstalledCell;
+use crate::holochain_types::app::InstalledApp;
+use crate::holochain_types::app::InstalledAppId;
+use crate::holochain_types::app::InstalledCell;
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashMap;

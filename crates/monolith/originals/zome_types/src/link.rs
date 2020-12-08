@@ -1,4 +1,4 @@
-use monolith::holochain_zome_types::element::SignedHeaderHashed;
+use crate::holochain_zome_types::element::SignedHeaderHashed;
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
 

@@ -1,17 +1,17 @@
 use super::error::WorkflowResult;
 use super::CallZomeWorkspace;
 use super::CallZomeWorkspaceLock;
-use monolith::holochain::core::queue_consumer::OneshotWriter;
-use monolith::holochain::core::ribosome::guest_callback::init::InitHostAccess;
-use monolith::holochain::core::ribosome::guest_callback::init::InitInvocation;
-use monolith::holochain::core::ribosome::guest_callback::init::InitResult;
-use monolith::holochain::core::ribosome::RibosomeT;
-use monolith::holochain::core::state::workspace::Workspace;
+use crate::holochain::core::queue_consumer::OneshotWriter;
+use crate::holochain::core::ribosome::guest_callback::init::InitHostAccess;
+use crate::holochain::core::ribosome::guest_callback::init::InitInvocation;
+use crate::holochain::core::ribosome::guest_callback::init::InitResult;
+use crate::holochain::core::ribosome::RibosomeT;
+use crate::holochain::core::state::workspace::Workspace;
 use derive_more::Constructor;
-use monolith::holochain_keystore::KeystoreSender;
-use monolith::holochain_p2p::HolochainP2pCell;
-use monolith::holochain_types::dna::DnaDef;
-use monolith::holochain_zome_types::header::builder;
+use crate::holochain_keystore::KeystoreSender;
+use crate::holochain_p2p::HolochainP2pCell;
+use crate::holochain_types::dna::DnaDef;
+use crate::holochain_zome_types::header::builder;
 use tracing::*;
 
 #[derive(Constructor, Debug)]
@@ -73,15 +73,15 @@ async fn initialize_zomes_workflow_inner<'env, Ribosome: RibosomeT>(
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use monolith::holochain::core::ribosome::MockRibosomeT;
-    use monolith::holochain::core::workflow::fake_genesis;
-    use monolith::holochain::fixt::DnaDefFixturator;
-    use monolith::holochain::fixt::KeystoreSenderFixturator;
+    use crate::holochain::core::ribosome::MockRibosomeT;
+    use crate::holochain::core::workflow::fake_genesis;
+    use crate::holochain::fixt::DnaDefFixturator;
+    use crate::holochain::fixt::KeystoreSenderFixturator;
     use ::fixt::prelude::*;
     use fixt::Unpredictable;
-    use monolith::holochain_p2p::HolochainP2pCellFixturator;
-    use monolith::holochain_state::test_utils::test_cell_env;
-    use monolith::holochain_zome_types::Header;
+    use crate::holochain_p2p::HolochainP2pCellFixturator;
+    use crate::holochain_state::test_utils::test_cell_env;
+    use crate::holochain_zome_types::Header;
     use matches::assert_matches;
 
     #[tokio::test(threaded_scheduler)]

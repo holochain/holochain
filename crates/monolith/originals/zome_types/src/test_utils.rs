@@ -2,8 +2,8 @@
 //!
 //! We don't use fixturators for these, because this crate defines no fixturators
 
-use monolith::holochain_zome_types::capability::CapSecret;
-use monolith::holochain_zome_types::capability::CAP_SECRET_BYTES;
+use crate::holochain_zome_types::capability::CapSecret;
+use crate::holochain_zome_types::capability::CAP_SECRET_BYTES;
 use holo_hash::hash_type;
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;

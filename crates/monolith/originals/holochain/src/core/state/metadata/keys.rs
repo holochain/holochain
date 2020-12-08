@@ -1,6 +1,6 @@
 use super::*;
 use holo_hash::HOLO_HASH_FULL_LEN;
-use monolith::holochain_zome_types::validate::ValidationStatus;
+use crate::holochain_zome_types::validate::ValidationStatus;
 pub(super) use misc::*;
 
 mod misc;

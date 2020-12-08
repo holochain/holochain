@@ -1,4 +1,4 @@
-use monolith::hdk::prelude::*;
+use crate::hdk::prelude::*;
 
 /// Thin wrapper around update for app entries.
 /// The hash evalutes to the HeaderHash of the deleted element, the input is the new app entry.

@@ -4,17 +4,17 @@
 //!
 //! [DhtOp]: enum.DhtOp.html
 
-use monolith::holochain_types::element::Element;
-use monolith::holochain_types::element::ElementGroup;
-use monolith::holochain_types::header::NewEntryHeader;
-use monolith::holochain_types::prelude::*;
+use crate::holochain_types::element::Element;
+use crate::holochain_types::element::ElementGroup;
+use crate::holochain_types::header::NewEntryHeader;
+use crate::holochain_types::prelude::*;
 use error::DhtOpError;
 use error::DhtOpResult;
 use holo_hash::hash_type;
 use holo_hash::HashableContentBytes;
-use monolith::holochain_zome_types::header;
-use monolith::holochain_zome_types::Entry;
-use monolith::holochain_zome_types::Header;
+use crate::holochain_zome_types::header;
+use crate::holochain_zome_types::Entry;
+use crate::holochain_zome_types::Header;
 use serde::Deserialize;
 use serde::Serialize;
 

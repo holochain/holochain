@@ -3,7 +3,7 @@ use std::convert::TryFrom;
 
 use derivative::Derivative;
 use holo_hash::DhtOpHash;
-use monolith::holochain_types::dht_op::DhtOp;
+use crate::holochain_types::dht_op::DhtOp;
 
 use super::workflow::error::WorkflowResult;
 use super::SourceChainError;

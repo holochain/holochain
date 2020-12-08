@@ -6,13 +6,13 @@ pub mod validate;
 pub mod validate_link;
 pub mod validation_package;
 use super::HostAccess;
-use monolith::holochain::core::ribosome::error::RibosomeError;
-use monolith::holochain::core::ribosome::FnComponents;
-use monolith::holochain::core::ribosome::Invocation;
-use monolith::holochain::core::ribosome::RibosomeT;
+use crate::holochain::core::ribosome::error::RibosomeError;
+use crate::holochain::core::ribosome::FnComponents;
+use crate::holochain::core::ribosome::Invocation;
+use crate::holochain::core::ribosome::RibosomeT;
 use fallible_iterator::FallibleIterator;
-use monolith::holochain_types::dna::zome::Zome;
-use monolith::holochain_zome_types::ExternOutput;
+use crate::holochain_types::dna::zome::Zome;
+use crate::holochain_zome_types::ExternOutput;
 
 pub struct CallIterator<R: RibosomeT, I: Invocation> {
     host_access: HostAccess,
@@ -70,18 +70,18 @@ impl<R: RibosomeT, I: Invocation + 'static> FallibleIterator for CallIterator<R,
 #[cfg(feature = "slow_tests")]
 mod tests {
     use super::CallIterator;
-    use monolith::holochain::core::ribosome::FnComponents;
-    use monolith::holochain::core::ribosome::MockInvocation;
-    use monolith::holochain::core::ribosome::MockRibosomeT;
-    use monolith::holochain::core::ribosome::ZomesToInvoke;
-    use monolith::holochain::fixt::FnComponentsFixturator;
-    use monolith::holochain::fixt::ZomeCallHostAccessFixturator;
-    use monolith::holochain::fixt::ZomeFixturator;
+    use crate::holochain::core::ribosome::FnComponents;
+    use crate::holochain::core::ribosome::MockInvocation;
+    use crate::holochain::core::ribosome::MockRibosomeT;
+    use crate::holochain::core::ribosome::ZomesToInvoke;
+    use crate::holochain::fixt::FnComponentsFixturator;
+    use crate::holochain::fixt::ZomeCallHostAccessFixturator;
+    use crate::holochain::fixt::ZomeFixturator;
     use fallible_iterator::FallibleIterator;
-    use monolith::holochain_types::dna::zome::Zome;
-    use monolith::holochain_zome_types::init::InitCallbackResult;
-    use monolith::holochain_zome_types::zome::FunctionName;
-    use monolith::holochain_zome_types::ExternOutput;
+    use crate::holochain_types::dna::zome::Zome;
+    use crate::holochain_zome_types::init::InitCallbackResult;
+    use crate::holochain_zome_types::zome::FunctionName;
+    use crate::holochain_zome_types::ExternOutput;
     use mockall::predicate::*;
     use mockall::Sequence;
     use std::convert::TryInto;

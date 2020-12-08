@@ -1,6 +1,6 @@
 //! A few imports from `rkv`, to avoid consumers needing to import `rkv` explicitly
 
-use monolith::holochain_state::prelude::IntKey;
+use crate::holochain_state::prelude::IntKey;
 
 /// Simple type alias for re-exporting
 pub type SingleStore = rkv::SingleStore;

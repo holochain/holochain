@@ -1,6 +1,6 @@
 use holochain_serialized_bytes::prelude::*;
-use monolith::holochain_types::app::InstalledAppId;
-use monolith::holochain_types::cell::CellId;
+use crate::holochain_types::app::InstalledAppId;
+use crate::holochain_types::cell::CellId;
 use std::collections::HashMap;
 
 /// Declares updated Signal subscription settings for an App.

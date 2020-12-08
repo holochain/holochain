@@ -1,5 +1,5 @@
 pub mod hdk;
-pub mod hdk_derive;
+// pub mod hdk_derive;
 pub mod holochain;
 pub mod holochain_p2p;
 pub mod holochain_state;

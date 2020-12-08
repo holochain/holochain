@@ -1,17 +1,17 @@
 #![deny(missing_docs)]
 //! Errors occurring during a [Ribosome] call
 
-use monolith::holochain::conductor::api::error::ConductorApiError;
-use monolith::holochain::conductor::interface::error::InterfaceError;
-use monolith::holochain::core::state::cascade::error::CascadeError;
-use monolith::holochain::core::state::source_chain::SourceChainError;
+use crate::holochain::conductor::api::error::ConductorApiError;
+use crate::holochain::conductor::interface::error::InterfaceError;
+use crate::holochain::core::state::cascade::error::CascadeError;
+use crate::holochain::core::state::source_chain::SourceChainError;
 use holo_hash::AnyDhtHash;
 use holochain_serialized_bytes::prelude::SerializedBytesError;
-use monolith::holochain_types::dna::error::DnaError;
-use monolith::holochain_types::dna::zome::inline_zome::error::InlineZomeError;
+use crate::holochain_types::dna::error::DnaError;
+use crate::holochain_types::dna::zome::inline_zome::error::InlineZomeError;
 use holochain_wasmer_host::prelude::WasmError;
-use monolith::holochain_zome_types::zome::FunctionName;
-use monolith::holochain_zome_types::zome::ZomeName;
+use crate::holochain_zome_types::zome::FunctionName;
+use crate::holochain_zome_types::zome::ZomeName;
 use thiserror::Error;
 use tokio::task::JoinError;
 use tokio_safe_block_on::BlockOnError;

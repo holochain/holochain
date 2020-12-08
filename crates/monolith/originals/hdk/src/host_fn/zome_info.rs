@@ -1,4 +1,4 @@
-use monolith::hdk::prelude::*;
+use crate::hdk::prelude::*;
 
 /// Get the zome information.
 /// There are no inputs to zome_info.

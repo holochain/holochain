@@ -1,5 +1,5 @@
-use monolith::holochain_p2p::*;
-use monolith::holochain_zome_types::zome::FunctionName;
+use crate::holochain_p2p::*;
+use crate::holochain_zome_types::zome::FunctionName;
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub(crate) struct WireDhtOpData {

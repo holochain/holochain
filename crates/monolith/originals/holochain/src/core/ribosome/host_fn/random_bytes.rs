@@ -1,9 +1,9 @@
-use monolith::holochain::core::ribosome::error::RibosomeResult;
-use monolith::holochain::core::ribosome::CallContext;
-use monolith::holochain::core::ribosome::RibosomeT;
-use monolith::holochain_zome_types::bytes::Bytes;
-use monolith::holochain_zome_types::RandomBytesInput;
-use monolith::holochain_zome_types::RandomBytesOutput;
+use crate::holochain::core::ribosome::error::RibosomeResult;
+use crate::holochain::core::ribosome::CallContext;
+use crate::holochain::core::ribosome::RibosomeT;
+use crate::holochain_zome_types::bytes::Bytes;
+use crate::holochain_zome_types::RandomBytesInput;
+use crate::holochain_zome_types::RandomBytesOutput;
 use ring::rand::SecureRandom;
 use std::sync::Arc;
 
@@ -23,15 +23,15 @@ pub fn random_bytes(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    use monolith::holochain::core::ribosome::host_fn::random_bytes::random_bytes;
+    use crate::holochain::core::ribosome::host_fn::random_bytes::random_bytes;
 
-    use monolith::holochain::fixt::CallContextFixturator;
-    use monolith::holochain::fixt::RealRibosomeFixturator;
-    use monolith::holochain::fixt::ZomeCallHostAccessFixturator;
+    use crate::holochain::fixt::CallContextFixturator;
+    use crate::holochain::fixt::RealRibosomeFixturator;
+    use crate::holochain::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
-    use monolith::holochain_wasm_test_utils::TestWasm;
-    use monolith::holochain_zome_types::RandomBytesInput;
-    use monolith::holochain_zome_types::RandomBytesOutput;
+    use crate::holochain_wasm_test_utils::TestWasm;
+    use crate::holochain_zome_types::RandomBytesInput;
+    use crate::holochain_zome_types::RandomBytesOutput;
     use std::convert::TryInto;
     use std::sync::Arc;
 

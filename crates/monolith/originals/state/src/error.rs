@@ -3,10 +3,10 @@
 // missing_docs allowed here since the errors already have self-descriptive strings
 #![allow(missing_docs)]
 
-use monolith::holochain_state::db::DbName;
+use crate::holochain_state::db::DbName;
 use failure::Fail;
-use monolith::holochain_types::element::error::ElementGroupError;
-use monolith::holochain_types::prelude::SerializedBytesError;
+use crate::holochain_types::element::error::ElementGroupError;
+use crate::holochain_types::prelude::SerializedBytesError;
 use std::path::PathBuf;
 use thiserror::Error;
 

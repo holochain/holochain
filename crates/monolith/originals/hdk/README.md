@@ -467,7 +467,7 @@ All the callback input and output values are defined in `holochain_zome_types`.
 
 ```rust
 use holochain_wasmer_guest::*;
-use monolith::holochain_zome_types::init::InitCallbackResult;
+use crate::holochain_zome_types::init::InitCallbackResult;
 
 holochain_externs!();
 

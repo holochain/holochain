@@ -8,7 +8,7 @@
 
 use derive_more::Constructor;
 use holochain_serialized_bytes::prelude::*;
-use monolith::holochain_zome_types::zome::ZomeName;
+use crate::holochain_zome_types::zome::ZomeName;
 use std::sync::Arc;
 
 use self::inline_zome::InlineZome;

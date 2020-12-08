@@ -1,6 +1,6 @@
-use monolith::holochain_state::buffer::iter::SingleIterRaw;
-use monolith::holochain_state::error::DatabaseResult;
-use monolith::holochain_state::prelude::*;
+use crate::holochain_state::buffer::iter::SingleIterRaw;
+use crate::holochain_state::error::DatabaseResult;
+use crate::holochain_state::prelude::*;
 
 pub trait KvStoreT<K, V> {
     /// Fetch data from DB as raw byte slice

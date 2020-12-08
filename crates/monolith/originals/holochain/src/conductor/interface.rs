@@ -5,8 +5,8 @@
 //! Currently the only InterfaceDriver is a Websocket-based one, whose
 //! implementation can be found in the `websocket` module here.
 
-use monolith::holochain::conductor::api::*;
-use monolith::holochain::core::signal::Signal;
+use crate::holochain::conductor::api::*;
+use crate::holochain::core::signal::Signal;
 use error::InterfaceError;
 use error::InterfaceResult;
 use serde::Deserialize;

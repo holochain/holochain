@@ -1,4 +1,4 @@
-use monolith::holochain_websocket::*;
+use crate::holochain_websocket::*;
 
 use std::convert::TryInto;
 use tokio::stream::StreamExt;

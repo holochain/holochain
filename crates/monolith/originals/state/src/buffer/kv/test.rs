@@ -1,6 +1,6 @@
 use super::KvBufUsed;
-use monolith::holochain_state::test_utils::DbString;
-use monolith::holochain_state::{
+use crate::holochain_state::test_utils::DbString;
+use crate::holochain_state::{
     env::{ReadManager, WriteManager},
     error::{DatabaseError, DatabaseResult},
     buffer::{kv::generic::KvStoreT, BufferedStore},

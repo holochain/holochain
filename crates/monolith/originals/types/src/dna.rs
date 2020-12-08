@@ -6,11 +6,11 @@
 pub mod error;
 pub mod wasm;
 pub mod zome;
-use monolith::holochain_types::prelude::*;
+use crate::holochain_types::prelude::*;
 pub use error::DnaError;
 use holo_hash::impl_hashable_content;
 pub use holo_hash::*;
-use monolith::holochain_zome_types::zome::ZomeName;
+use crate::holochain_zome_types::zome::ZomeName;
 use std::collections::BTreeMap;
 
 use self::error::DnaResult;

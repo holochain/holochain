@@ -32,9 +32,9 @@ use derive_more::Constructor;
 use derive_more::Display;
 use derive_more::From;
 use futures::future::Either;
-use monolith::holochain_state::env::EnvironmentWrite;
-use monolith::holochain_state::env::WriteManager;
-use monolith::holochain_state::prelude::Writer;
+use crate::holochain_state::env::EnvironmentWrite;
+use crate::holochain_state::env::WriteManager;
+use crate::holochain_state::prelude::Writer;
 use tokio::sync;
 use tokio::sync::mpsc;
 
@@ -49,9 +49,9 @@ mod produce_dht_ops_consumer;
 use produce_dht_ops_consumer::*;
 mod publish_dht_ops_consumer;
 use super::state::workspace::WorkspaceError;
-use monolith::holochain::conductor::api::CellConductorApiT;
-use monolith::holochain::conductor::manager::ManagedTaskAdd;
-use monolith::holochain_p2p::HolochainP2pCell;
+use crate::holochain::conductor::api::CellConductorApiT;
+use crate::holochain::conductor::manager::ManagedTaskAdd;
+use crate::holochain_p2p::HolochainP2pCell;
 use publish_dht_ops_consumer::*;
 
 /// Spawns several long-running tasks which are responsible for processing work

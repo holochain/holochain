@@ -41,44 +41,44 @@ use super::paths::EnvironmentRootPath;
 use super::state::AppInterfaceId;
 use super::state::ConductorState;
 use super::CellError;
-use monolith::holochain::conductor::api::error::ConductorApiResult;
-use monolith::holochain::conductor::cell::Cell;
-use monolith::holochain::conductor::config::ConductorConfig;
-use monolith::holochain::conductor::dna_store::MockDnaStore;
-use monolith::holochain::conductor::error::ConductorResult;
-use monolith::holochain::conductor::handle::ConductorHandle;
-use monolith::holochain::conductor::p2p_store::AgentKv;
-use monolith::holochain::conductor::p2p_store::AgentKvKey;
-use monolith::holochain::core::signal::Signal;
-use monolith::holochain::core::state::source_chain::SourceChainBuf;
-use monolith::holochain::core::state::wasm::WasmBuf;
+use crate::holochain::conductor::api::error::ConductorApiResult;
+use crate::holochain::conductor::cell::Cell;
+use crate::holochain::conductor::config::ConductorConfig;
+use crate::holochain::conductor::dna_store::MockDnaStore;
+use crate::holochain::conductor::error::ConductorResult;
+use crate::holochain::conductor::handle::ConductorHandle;
+use crate::holochain::conductor::p2p_store::AgentKv;
+use crate::holochain::conductor::p2p_store::AgentKvKey;
+use crate::holochain::core::signal::Signal;
+use crate::holochain::core::state::source_chain::SourceChainBuf;
+use crate::holochain::core::state::wasm::WasmBuf;
 pub use builder::*;
 use fallible_iterator::FallibleIterator;
 use futures::future;
 use futures::future::TryFutureExt;
 use holo_hash::DnaHash;
-use monolith::holochain_keystore::lair_keystore::spawn_lair_keystore;
-use monolith::holochain_keystore::test_keystore::spawn_test_keystore;
-use monolith::holochain_keystore::KeystoreSender;
-use monolith::holochain_keystore::KeystoreSenderExt;
-use monolith::holochain_state::buffer::BufferedStore;
-use monolith::holochain_state::buffer::KvStore;
-use monolith::holochain_state::buffer::KvStoreT;
-use monolith::holochain_state::db;
-use monolith::holochain_state::env::EnvironmentKind;
-use monolith::holochain_state::env::EnvironmentWrite;
-use monolith::holochain_state::env::ReadManager;
-use monolith::holochain_state::exports::SingleStore;
-use monolith::holochain_state::fresh_reader;
-use monolith::holochain_state::prelude::*;
-use monolith::holochain_types::app::InstalledApp;
-use monolith::holochain_types::app::InstalledAppId;
-use monolith::holochain_types::app::InstalledCell;
-use monolith::holochain_types::app::MembraneProof;
-use monolith::holochain_types::cell::CellId;
-use monolith::holochain_types::dna::wasm::DnaWasmHashed;
-use monolith::holochain_types::dna::DnaFile;
-use monolith::holochain_zome_types::entry_def::EntryDef;
+use crate::holochain_keystore::lair_keystore::spawn_lair_keystore;
+use crate::holochain_keystore::test_keystore::spawn_test_keystore;
+use crate::holochain_keystore::KeystoreSender;
+use crate::holochain_keystore::KeystoreSenderExt;
+use crate::holochain_state::buffer::BufferedStore;
+use crate::holochain_state::buffer::KvStore;
+use crate::holochain_state::buffer::KvStoreT;
+use crate::holochain_state::db;
+use crate::holochain_state::env::EnvironmentKind;
+use crate::holochain_state::env::EnvironmentWrite;
+use crate::holochain_state::env::ReadManager;
+use crate::holochain_state::exports::SingleStore;
+use crate::holochain_state::fresh_reader;
+use crate::holochain_state::prelude::*;
+use crate::holochain_types::app::InstalledApp;
+use crate::holochain_types::app::InstalledAppId;
+use crate::holochain_types::app::InstalledCell;
+use crate::holochain_types::app::MembraneProof;
+use crate::holochain_types::cell::CellId;
+use crate::holochain_types::dna::wasm::DnaWasmHashed;
+use crate::holochain_types::dna::DnaFile;
+use crate::holochain_zome_types::entry_def::EntryDef;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -440,7 +440,7 @@ where
                             )
                         });
 
-                    use monolith::holochain_p2p::actor::HolochainP2pRefToCell;
+                    use crate::holochain_p2p::actor::HolochainP2pRefToCell;
 
                     // Create each cell
                     let cells_tasks = cells_to_create.map(
@@ -925,10 +925,10 @@ pub type ConductorStateDb = KvStore<UnitDbKey, ConductorState>;
 
 mod builder {
     use super::*;
-    use monolith::holochain::conductor::dna_store::RealDnaStore;
-    use monolith::holochain::conductor::ConductorHandle;
-    use monolith::holochain_state::env::EnvironmentKind;
-    use monolith::holochain_state::test_utils::TestEnvironments;
+    use crate::holochain::conductor::dna_store::RealDnaStore;
+    use crate::holochain::conductor::ConductorHandle;
+    use crate::holochain_state::env::EnvironmentKind;
+    use crate::holochain_state::test_utils::TestEnvironments;
 
     /// A configurable Builder for Conductor and sometimes ConductorHandle
     #[derive(Default)]
@@ -1163,9 +1163,9 @@ pub mod tests {
     use super::Conductor;
     use super::ConductorState;
     use super::*;
-    use monolith::holochain::conductor::dna_store::MockDnaStore;
-    use monolith::holochain_state::test_utils::test_environments;
-    use monolith::holochain_types::test_utils::fake_cell_id;
+    use crate::holochain::conductor::dna_store::MockDnaStore;
+    use crate::holochain_state::test_utils::test_environments;
+    use crate::holochain_types::test_utils::fake_cell_id;
     use matches::assert_matches;
 
     #[tokio::test(threaded_scheduler)]

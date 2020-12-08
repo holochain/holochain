@@ -1,10 +1,10 @@
-use monolith::holochain::core::ribosome::error::RibosomeResult;
-use monolith::holochain::core::ribosome::CallContext;
-use monolith::holochain::core::ribosome::RibosomeT;
+use crate::holochain::core::ribosome::error::RibosomeResult;
+use crate::holochain::core::ribosome::CallContext;
+use crate::holochain::core::ribosome::RibosomeT;
 use holo_hash::HasHash;
-use monolith::holochain_zome_types::zome_info::ZomeInfo;
-use monolith::holochain_zome_types::ZomeInfoInput;
-use monolith::holochain_zome_types::ZomeInfoOutput;
+use crate::holochain_zome_types::zome_info::ZomeInfo;
+use crate::holochain_zome_types::ZomeInfoInput;
+use crate::holochain_zome_types::ZomeInfoOutput;
 use std::sync::Arc;
 
 pub fn zome_info(
@@ -26,10 +26,10 @@ pub fn zome_info(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod test {
-    use monolith::holochain::fixt::ZomeCallHostAccessFixturator;
+    use crate::holochain::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
-    use monolith::holochain_wasm_test_utils::TestWasm;
-    use monolith::holochain_zome_types::ZomeInfoOutput;
+    use crate::holochain_wasm_test_utils::TestWasm;
+    use crate::holochain_zome_types::ZomeInfoOutput;
 
     #[tokio::test(threaded_scheduler)]
     async fn invoke_import_zome_info_test() {

@@ -1,12 +1,12 @@
-use monolith::holochain::core::ribosome::error::RibosomeResult;
-use monolith::holochain::core::ribosome::CallContext;
-use monolith::holochain::core::ribosome::RibosomeT;
-use monolith::holochain::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
-use monolith::holochain::core::workflow::CallZomeWorkspace;
-use monolith::holochain::core::SourceChainResult;
-use monolith::holochain_zome_types::header::builder;
-use monolith::holochain_zome_types::CreateLinkInput;
-use monolith::holochain_zome_types::CreateLinkOutput;
+use crate::holochain::core::ribosome::error::RibosomeResult;
+use crate::holochain::core::ribosome::CallContext;
+use crate::holochain::core::ribosome::RibosomeT;
+use crate::holochain::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
+use crate::holochain::core::workflow::CallZomeWorkspace;
+use crate::holochain::core::SourceChainResult;
+use crate::holochain_zome_types::header::builder;
+use crate::holochain_zome_types::CreateLinkInput;
+use crate::holochain_zome_types::CreateLinkOutput;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]

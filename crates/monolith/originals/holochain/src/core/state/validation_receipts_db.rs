@@ -3,17 +3,17 @@
 use fallible_iterator::FallibleIterator;
 use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
-use monolith::holochain_keystore::AgentPubKeyExt;
-use monolith::holochain_keystore::KeystoreSender;
+use crate::holochain_keystore::AgentPubKeyExt;
+use crate::holochain_keystore::KeystoreSender;
 use holochain_serialized_bytes::prelude::*;
-use monolith::holochain_state::buffer::BufferedStore;
-use monolith::holochain_state::buffer::KvvBufUsed;
-use monolith::holochain_state::db::GetDb;
-use monolith::holochain_state::error::DatabaseError;
-use monolith::holochain_state::error::DatabaseResult;
-use monolith::holochain_state::prelude::Readable;
-use monolith::holochain_state::prelude::Writer;
-use monolith::holochain_zome_types::signature::Signature;
+use crate::holochain_state::buffer::BufferedStore;
+use crate::holochain_state::buffer::KvvBufUsed;
+use crate::holochain_state::db::GetDb;
+use crate::holochain_state::error::DatabaseError;
+use crate::holochain_state::error::DatabaseResult;
+use crate::holochain_state::prelude::Readable;
+use crate::holochain_state::prelude::Writer;
+use crate::holochain_zome_types::signature::Signature;
 
 /// The result of a DhtOp Validation.
 #[derive(
@@ -150,10 +150,10 @@ impl BufferedStore for ValidationReceiptsBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use monolith::holochain_keystore::KeystoreSenderExt;
-    use monolith::holochain_state::env::ReadManager;
-    use monolith::holochain_state::prelude::*;
-    use monolith::holochain_types::test_utils::fake_dht_op_hash;
+    use crate::holochain_keystore::KeystoreSenderExt;
+    use crate::holochain_state::env::ReadManager;
+    use crate::holochain_state::prelude::*;
+    use crate::holochain_types::test_utils::fake_dht_op_hash;
 
     async fn fake_vr(
         dht_op_hash: &DhtOpHash,

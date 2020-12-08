@@ -1,10 +1,10 @@
 //! Types for getting and storing metadata
 
-use monolith::holochain_types::HeaderHashed;
-use monolith::holochain_types::Timestamp;
+use crate::holochain_types::HeaderHashed;
+use crate::holochain_types::Timestamp;
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
-pub use monolith::holochain_zome_types::metadata::EntryDhtStatus;
+pub use crate::holochain_zome_types::metadata::EntryDhtStatus;
 use std::collections::BTreeSet;
 
 /// Timestamp of when the header was created with the headers hash.

@@ -1,18 +1,18 @@
 use super::create::extract_entry_def;
 use super::delete::get_original_address;
-use monolith::holochain::core::ribosome::error::RibosomeResult;
-use monolith::holochain::core::ribosome::CallContext;
-use monolith::holochain::core::ribosome::RibosomeT;
-use monolith::holochain::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
-use monolith::holochain::core::workflow::CallZomeWorkspace;
-use monolith::holochain::core::SourceChainError;
+use crate::holochain::core::ribosome::error::RibosomeResult;
+use crate::holochain::core::ribosome::CallContext;
+use crate::holochain::core::ribosome::RibosomeT;
+use crate::holochain::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
+use crate::holochain::core::workflow::CallZomeWorkspace;
+use crate::holochain::core::SourceChainError;
 use holo_hash::HasHash;
-use monolith::holochain_zome_types::entry_def::EntryDefId;
-use monolith::holochain_zome_types::header::builder;
-use monolith::holochain_zome_types::header::AppEntryType;
-use monolith::holochain_zome_types::header::EntryType;
-use monolith::holochain_zome_types::UpdateInput;
-use monolith::holochain_zome_types::UpdateOutput;
+use crate::holochain_zome_types::entry_def::EntryDefId;
+use crate::holochain_zome_types::header::builder;
+use crate::holochain_zome_types::header::AppEntryType;
+use crate::holochain_zome_types::header::EntryType;
+use crate::holochain_zome_types::UpdateInput;
+use crate::holochain_zome_types::UpdateOutput;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]

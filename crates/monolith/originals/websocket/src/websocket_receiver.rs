@@ -1,6 +1,6 @@
 //! defines the read/recv half of a websocket pair
 
-use monolith::holochain_websocket::*;
+use crate::holochain_websocket::*;
 
 /// When a websocket is closed gracefully from the remote end,
 /// this item is included in the ConnectionReset error message.

@@ -1,23 +1,23 @@
 use super::InterfaceApi;
 use super::SignalSubscription;
-use monolith::holochain::conductor::api::error::ConductorApiResult;
-use monolith::holochain::conductor::api::error::ExternalApiWireError;
-use monolith::holochain::conductor::api::error::SerializationError;
-use monolith::holochain::conductor::interface::error::InterfaceError;
-use monolith::holochain::conductor::interface::error::InterfaceResult;
-use monolith::holochain::conductor::state::AppInterfaceId;
-use monolith::holochain::conductor::ConductorHandle;
+use crate::holochain::conductor::api::error::ConductorApiResult;
+use crate::holochain::conductor::api::error::ExternalApiWireError;
+use crate::holochain::conductor::api::error::SerializationError;
+use crate::holochain::conductor::interface::error::InterfaceError;
+use crate::holochain::conductor::interface::error::InterfaceResult;
+use crate::holochain::conductor::state::AppInterfaceId;
+use crate::holochain::conductor::ConductorHandle;
 use holo_hash::AgentPubKey;
 use holochain_serialized_bytes::prelude::*;
-use monolith::holochain_types::app::InstalledApp;
-use monolith::holochain_types::app::InstalledAppId;
-use monolith::holochain_zome_types::capability::CapSecret;
-use monolith::holochain_zome_types::cell::CellId;
-use monolith::holochain_zome_types::zome::FunctionName;
-use monolith::holochain_zome_types::zome::ZomeName;
-use monolith::holochain_zome_types::ExternInput;
-use monolith::holochain_zome_types::ExternOutput;
-use monolith::holochain_zome_types::ZomeCallResponse;
+use crate::holochain_types::app::InstalledApp;
+use crate::holochain_types::app::InstalledAppId;
+use crate::holochain_zome_types::capability::CapSecret;
+use crate::holochain_zome_types::cell::CellId;
+use crate::holochain_zome_types::zome::FunctionName;
+use crate::holochain_zome_types::zome::ZomeName;
+use crate::holochain_zome_types::ExternInput;
+use crate::holochain_zome_types::ExternOutput;
+use crate::holochain_zome_types::ZomeCallResponse;
 
 /// The interface that a Conductor exposes to the outside world.
 #[async_trait::async_trait]

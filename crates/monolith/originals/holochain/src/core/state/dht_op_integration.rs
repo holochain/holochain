@@ -2,19 +2,19 @@
 
 use fallible_iterator::FallibleIterator;
 use holo_hash::*;
-use monolith::holochain_p2p::dht_arc::DhtArc;
+use crate::holochain_p2p::dht_arc::DhtArc;
 use holochain_serialized_bytes::prelude::*;
-use monolith::holochain_state::buffer::KvBufFresh;
-use monolith::holochain_state::db::INTEGRATED_DHT_OPS;
-use monolith::holochain_state::error::DatabaseError;
-use monolith::holochain_state::error::DatabaseResult;
-use monolith::holochain_state::prelude::BufferedStore;
-use monolith::holochain_state::prelude::EnvironmentRead;
-use monolith::holochain_state::prelude::GetDb;
-use monolith::holochain_state::prelude::Readable;
-use monolith::holochain_types::dht_op::DhtOpLight;
-use monolith::holochain_types::validate::ValidationStatus;
-use monolith::holochain_types::Timestamp;
+use crate::holochain_state::buffer::KvBufFresh;
+use crate::holochain_state::db::INTEGRATED_DHT_OPS;
+use crate::holochain_state::error::DatabaseError;
+use crate::holochain_state::error::DatabaseResult;
+use crate::holochain_state::prelude::BufferedStore;
+use crate::holochain_state::prelude::EnvironmentRead;
+use crate::holochain_state::prelude::GetDb;
+use crate::holochain_state::prelude::Readable;
+use crate::holochain_types::dht_op::DhtOpLight;
+use crate::holochain_types::validate::ValidationStatus;
+use crate::holochain_types::Timestamp;
 
 /// Database type for AuthoredDhtOps
 /// Buffer for accessing [DhtOp]s that you authored and finding the amount of validation receipts
@@ -166,16 +166,16 @@ impl IntegratedDhtOpsBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use monolith::holochain::fixt::AnyDhtHashFixturator;
+    use crate::holochain::fixt::AnyDhtHashFixturator;
     use ::fixt::prelude::*;
     use chrono::Duration;
     use chrono::Utc;
     use holo_hash::fixt::DhtOpHashFixturator;
     use holo_hash::fixt::HeaderHashFixturator;
-    use monolith::holochain_state::buffer::BufferedStore;
-    use monolith::holochain_state::env::ReadManager;
-    use monolith::holochain_state::env::WriteManager;
-    use monolith::holochain_state::test_utils::test_cell_env;
+    use crate::holochain_state::buffer::BufferedStore;
+    use crate::holochain_state::env::ReadManager;
+    use crate::holochain_state::env::WriteManager;
+    use crate::holochain_state::test_utils::test_cell_env;
     use pretty_assertions::assert_eq;
 
     #[tokio::test(threaded_scheduler)]

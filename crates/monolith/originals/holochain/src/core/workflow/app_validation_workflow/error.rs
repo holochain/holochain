@@ -1,14 +1,14 @@
-use monolith::holochain_p2p::HolochainP2pError;
-use monolith::holochain_types::cell::CellId;
-use monolith::holochain_zome_types::header::ZomeId;
+use crate::holochain_p2p::HolochainP2pError;
+use crate::holochain_types::cell::CellId;
+use crate::holochain_zome_types::header::ZomeId;
 use thiserror::Error;
 
-use monolith::holochain::conductor::entry_def_store::error::EntryDefStoreError;
-use monolith::holochain::core::ribosome::error::RibosomeError;
-use monolith::holochain::core::state::cascade::error::CascadeError;
-use monolith::holochain::core::validation::OutcomeOrError;
-use monolith::holochain::core::SourceChainError;
-use monolith::holochain::from_sub_error;
+use crate::holochain::conductor::entry_def_store::error::EntryDefStoreError;
+use crate::holochain::core::ribosome::error::RibosomeError;
+use crate::holochain::core::state::cascade::error::CascadeError;
+use crate::holochain::core::validation::OutcomeOrError;
+use crate::holochain::core::SourceChainError;
+use crate::holochain::from_sub_error;
 
 use super::types::Outcome;
 

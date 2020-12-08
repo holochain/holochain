@@ -1,9 +1,9 @@
-use monolith::holochain::core::workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
+use crate::holochain::core::workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
-use monolith::holochain_state::error::DatabaseError;
-use monolith::holochain_types::dht_op::error::DhtOpError;
+use crate::holochain_state::error::DatabaseError;
+use crate::holochain_types::dht_op::error::DhtOpError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]

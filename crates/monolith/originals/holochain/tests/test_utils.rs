@@ -1,9 +1,9 @@
 use anyhow::Result;
-use monolith::holochain::conductor::ConductorHandle;
-use monolith::holochain_websocket::websocket_connect;
-use monolith::holochain_websocket::WebsocketConfig;
-use monolith::holochain_websocket::WebsocketReceiver;
-use monolith::holochain_websocket::WebsocketSender;
+use crate::holochain::conductor::ConductorHandle;
+use crate::holochain_websocket::websocket_connect;
+use crate::holochain_websocket::WebsocketConfig;
+use crate::holochain_websocket::WebsocketReceiver;
+use crate::holochain_websocket::WebsocketSender;
 use std::sync::Arc;
 use url2::prelude::*;
 

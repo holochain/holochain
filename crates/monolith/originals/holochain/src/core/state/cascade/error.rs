@@ -1,12 +1,12 @@
-use monolith::holochain::core::workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
-use monolith::holochain::core::SourceChainError;
+use crate::holochain::core::workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
+use crate::holochain::core::SourceChainError;
 use holo_hash::AnyDhtHash;
-use monolith::holochain_p2p::HolochainP2pError;
+use crate::holochain_p2p::HolochainP2pError;
 use holochain_serialized_bytes::SerializedBytesError;
-use monolith::holochain_state::error::DatabaseError;
-use monolith::holochain_types::dht_op::error::DhtOpError;
-use monolith::holochain_types::element::error::ElementGroupError;
-use monolith::holochain_zome_types::header::conversions::WrongHeaderError;
+use crate::holochain_state::error::DatabaseError;
+use crate::holochain_types::dht_op::error::DhtOpError;
+use crate::holochain_types::element::error::ElementGroupError;
+use crate::holochain_zome_types::header::conversions::WrongHeaderError;
 use thiserror::Error;
 use tokio::task::JoinError;
 

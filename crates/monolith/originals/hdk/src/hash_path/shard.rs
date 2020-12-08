@@ -1,5 +1,5 @@
-use monolith::hdk::hash_path::path::Component;
-use monolith::hdk::hash_path::path::Path;
+use crate::hdk::hash_path::path::Component;
+use crate::hdk::hash_path::path::Path;
 use std::str::FromStr;
 
 /// Separates the shard width and depth.

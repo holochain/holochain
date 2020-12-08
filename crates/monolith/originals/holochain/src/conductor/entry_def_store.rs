@@ -1,10 +1,10 @@
 //! # Entry Defs Store
 //! Stores all the entry definitions across zomes
-use monolith::holochain::core::ribosome::guest_callback::entry_defs::EntryDefsHostAccess;
-use monolith::holochain::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
-use monolith::holochain::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
-use monolith::holochain::core::ribosome::real_ribosome::RealRibosome;
-use monolith::holochain::core::ribosome::RibosomeT;
+use crate::holochain::core::ribosome::guest_callback::entry_defs::EntryDefsHostAccess;
+use crate::holochain::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
+use crate::holochain::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
+use crate::holochain::core::ribosome::real_ribosome::RealRibosome;
+use crate::holochain::core::ribosome::RibosomeT;
 
 use super::api::CellConductorApiT;
 use error::EntryDefStoreError;
@@ -13,16 +13,16 @@ use fallible_iterator::FallibleIterator;
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 use holochain_serialized_bytes::SerializedBytes;
-use monolith::holochain_state::buffer::KvBufFresh;
-use monolith::holochain_state::error::DatabaseError;
-use monolith::holochain_state::error::DatabaseResult;
-use monolith::holochain_state::prelude::*;
-use monolith::holochain_types::dna::zome::ZomeDef;
-use monolith::holochain_types::dna::DnaDefHashed;
-use monolith::holochain_types::dna::DnaFile;
-use monolith::holochain_zome_types::entry_def::EntryDef;
-use monolith::holochain_zome_types::header::EntryDefIndex;
-use monolith::holochain_zome_types::header::ZomeId;
+use crate::holochain_state::buffer::KvBufFresh;
+use crate::holochain_state::error::DatabaseError;
+use crate::holochain_state::error::DatabaseResult;
+use crate::holochain_state::prelude::*;
+use crate::holochain_types::dna::zome::ZomeDef;
+use crate::holochain_types::dna::DnaDefHashed;
+use crate::holochain_types::dna::DnaFile;
+use crate::holochain_zome_types::entry_def::EntryDef;
+use crate::holochain_zome_types::header::EntryDefIndex;
+use crate::holochain_zome_types::header::ZomeId;
 use std::collections::HashMap;
 use std::convert::TryInto;
 
@@ -225,16 +225,16 @@ pub(crate) fn get_entry_defs(
 #[cfg(test)]
 mod tests {
     use super::EntryDefBufferKey;
-    use monolith::holochain::conductor::Conductor;
+    use crate::holochain::conductor::Conductor;
     use holo_hash::HasHash;
-    use monolith::holochain_state::test_utils::test_environments;
-    use monolith::holochain_types::dna::wasm::DnaWasmHashed;
-    use monolith::holochain_types::dna::zome::ZomeDef;
-    use monolith::holochain_types::test_utils::fake_dna_zomes;
-    use monolith::holochain_wasm_test_utils::TestWasm;
-    use monolith::holochain_zome_types::crdt::CrdtType;
-    use monolith::holochain_zome_types::entry_def::EntryDef;
-    use monolith::holochain_zome_types::entry_def::EntryVisibility;
+    use crate::holochain_state::test_utils::test_environments;
+    use crate::holochain_types::dna::wasm::DnaWasmHashed;
+    use crate::holochain_types::dna::zome::ZomeDef;
+    use crate::holochain_types::test_utils::fake_dna_zomes;
+    use crate::holochain_wasm_test_utils::TestWasm;
+    use crate::holochain_zome_types::crdt::CrdtType;
+    use crate::holochain_zome_types::entry_def::EntryDef;
+    use crate::holochain_zome_types::entry_def::EntryVisibility;
 
     #[tokio::test(threaded_scheduler)]
     async fn test_store_entry_defs() {

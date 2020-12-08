@@ -1,18 +1,18 @@
 //! Some common testing helpers.
 
-use monolith::holochain_types::cell::CellId;
-use monolith::holochain_types::dna::wasm::DnaWasm;
-use monolith::holochain_types::dna::zome::WasmZome;
-use monolith::holochain_types::dna::DnaDef;
-use monolith::holochain_types::dna::DnaFile;
-use monolith::holochain_types::dna::JsonProperties;
-use monolith::holochain_types::prelude::*;
-use monolith::holochain_zome_types::capability::CapSecret;
-use monolith::holochain_zome_types::capability::CAP_SECRET_BYTES;
-use monolith::holochain_zome_types::zome::ZomeName;
+use crate::holochain_types::cell::CellId;
+use crate::holochain_types::dna::wasm::DnaWasm;
+use crate::holochain_types::dna::zome::WasmZome;
+use crate::holochain_types::dna::DnaDef;
+use crate::holochain_types::dna::DnaFile;
+use crate::holochain_types::dna::JsonProperties;
+use crate::holochain_types::prelude::*;
+use crate::holochain_zome_types::capability::CapSecret;
+use crate::holochain_zome_types::capability::CAP_SECRET_BYTES;
+use crate::holochain_zome_types::zome::ZomeName;
 use std::path::PathBuf;
 
-pub use monolith::holochain_zome_types::test_utils::*;
+pub use crate::holochain_zome_types::test_utils::*;
 
 #[derive(Serialize, Deserialize, SerializedBytes)]
 struct FakeProperties {

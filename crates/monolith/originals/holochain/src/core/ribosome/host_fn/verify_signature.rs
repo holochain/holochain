@@ -1,9 +1,9 @@
-use monolith::holochain::core::ribosome::error::RibosomeResult;
-use monolith::holochain::core::ribosome::CallContext;
-use monolith::holochain::core::ribosome::RibosomeT;
-use monolith::holochain_keystore::AgentPubKeyExt;
-use monolith::holochain_zome_types::VerifySignatureInput;
-use monolith::holochain_zome_types::VerifySignatureOutput;
+use crate::holochain::core::ribosome::error::RibosomeResult;
+use crate::holochain::core::ribosome::CallContext;
+use crate::holochain::core::ribosome::RibosomeT;
+use crate::holochain_keystore::AgentPubKeyExt;
+use crate::holochain_zome_types::VerifySignatureInput;
+use crate::holochain_zome_types::VerifySignatureOutput;
 use std::sync::Arc;
 
 pub fn verify_signature(
@@ -25,12 +25,12 @@ pub fn verify_signature(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    use monolith::holochain::fixt::ZomeCallHostAccessFixturator;
+    use crate::holochain::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use hdk3::prelude::test_utils::fake_agent_pubkey_1;
     use hdk3::prelude::test_utils::fake_agent_pubkey_2;
     use hdk3::prelude::*;
-    use monolith::holochain_wasm_test_utils::TestWasm;
+    use crate::holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_verify_signature_test() {

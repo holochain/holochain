@@ -17,7 +17,7 @@ and usage of those keypairs, reference by the public AgentPubKey.
 
 ```rust
 use holo_hash::AgentPubKey;
-use monolith::holochain_keystore::*;
+use crate::holochain_keystore::*;
 use holochain_serialized_bytes::prelude::*;
 
 #[tokio::main(threaded_scheduler)]

@@ -1,4 +1,4 @@
-use monolith::hdk::prelude::*;
+use crate::hdk::prelude::*;
 
 /// Returns all links that reference a base entry hash, optionally filtered by tag.
 ///

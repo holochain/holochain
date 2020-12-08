@@ -1,9 +1,9 @@
 //! Types for source chain queries
 
-use monolith::holochain_zome_types::header::EntryType;
-use monolith::holochain_zome_types::header::Header;
-use monolith::holochain_zome_types::header::HeaderType;
-use monolith::holochain_zome_types::warrant::Warrant;
+use crate::holochain_zome_types::header::EntryType;
+use crate::holochain_zome_types::header::Header;
+use crate::holochain_zome_types::header::HeaderType;
+use crate::holochain_zome_types::warrant::Warrant;
 use holo_hash::HeaderHash;
 pub use holochain_serialized_bytes::prelude::*;
 
@@ -169,10 +169,10 @@ impl ChainQueryFilter {
 #[cfg(test)]
 #[cfg(feature = "fixturators")]
 mod tests {
-    use monolith::holochain_zome_types::fixt::AppEntryTypeFixturator;
-    use monolith::holochain_zome_types::fixt::*;
-    use monolith::holochain_zome_types::header::EntryType;
-    use monolith::holochain_zome_types::Header;
+    use crate::holochain_zome_types::fixt::AppEntryTypeFixturator;
+    use crate::holochain_zome_types::fixt::*;
+    use crate::holochain_zome_types::header::EntryType;
+    use crate::holochain_zome_types::Header;
     use ::fixt::prelude::*;
 
     use super::ChainQueryFilter;

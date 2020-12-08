@@ -1,20 +1,20 @@
-use monolith::holochain::core::ribosome::FnComponents;
-use monolith::holochain::core::ribosome::HostAccess;
-use monolith::holochain::core::ribosome::Invocation;
-use monolith::holochain::core::ribosome::ZomesToInvoke;
-use monolith::holochain::core::workflow::CallZomeWorkspaceLock;
+use crate::holochain::core::ribosome::FnComponents;
+use crate::holochain::core::ribosome::HostAccess;
+use crate::holochain::core::ribosome::Invocation;
+use crate::holochain::core::ribosome::ZomesToInvoke;
+use crate::holochain::core::workflow::CallZomeWorkspaceLock;
 use derive_more::Constructor;
 use holo_hash::AnyDhtHash;
-use monolith::holochain_p2p::HolochainP2pCell;
+use crate::holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
-use monolith::holochain_types::dna::zome::HostFnAccess;
-use monolith::holochain_types::dna::zome::Permission;
-use monolith::holochain_types::dna::zome::Zome;
-use monolith::holochain_zome_types::header::AppEntryType;
-use monolith::holochain_zome_types::validate::ValidationPackage;
-use monolith::holochain_zome_types::validate::ValidationPackageCallbackResult;
-use monolith::holochain_zome_types::zome::ZomeName;
-use monolith::holochain_zome_types::ExternInput;
+use crate::holochain_types::dna::zome::HostFnAccess;
+use crate::holochain_types::dna::zome::Permission;
+use crate::holochain_types::dna::zome::Zome;
+use crate::holochain_zome_types::header::AppEntryType;
+use crate::holochain_zome_types::validate::ValidationPackage;
+use crate::holochain_zome_types::validate::ValidationPackageCallbackResult;
+use crate::holochain_zome_types::zome::ZomeName;
+use crate::holochain_zome_types::ExternInput;
 
 #[derive(Clone)]
 pub struct ValidationPackageInvocation {
@@ -127,15 +127,15 @@ impl From<Vec<ValidationPackageCallbackResult>> for ValidationPackageResult {
 #[cfg(test)]
 mod test {
     use super::ValidationPackageResult;
-    use monolith::holochain::core::ribosome::Invocation;
-    use monolith::holochain::core::ribosome::ZomesToInvoke;
-    use monolith::holochain::fixt::ValidationPackageHostAccessFixturator;
-    use monolith::holochain::fixt::ValidationPackageInvocationFixturator;
+    use crate::holochain::core::ribosome::Invocation;
+    use crate::holochain::core::ribosome::ZomesToInvoke;
+    use crate::holochain::fixt::ValidationPackageHostAccessFixturator;
+    use crate::holochain::fixt::ValidationPackageInvocationFixturator;
     use holochain_serialized_bytes::prelude::*;
-    use monolith::holochain_types::dna::zome::HostFnAccess;
-    use monolith::holochain_zome_types::validate::ValidationPackage;
-    use monolith::holochain_zome_types::validate::ValidationPackageCallbackResult;
-    use monolith::holochain_zome_types::ExternInput;
+    use crate::holochain_types::dna::zome::HostFnAccess;
+    use crate::holochain_zome_types::validate::ValidationPackage;
+    use crate::holochain_zome_types::validate::ValidationPackageCallbackResult;
+    use crate::holochain_zome_types::ExternInput;
     use rand::prelude::*;
 
     #[tokio::test(threaded_scheduler)]
@@ -180,7 +180,7 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn validation_package_invocation_allow_side_effects() {
-        use monolith::holochain_types::dna::zome::Permission::*;
+        use crate::holochain_types::dna::zome::Permission::*;
         let validation_package_host_access =
             ValidationPackageHostAccessFixturator::new(fixt::Unpredictable)
                 .next()
@@ -253,15 +253,15 @@ mod test {
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
     use super::ValidationPackageResult;
-    use monolith::holochain::core::ribosome::RibosomeT;
-    use monolith::holochain::fixt::curve::Zomes;
-    use monolith::holochain::fixt::RealRibosomeFixturator;
-    use monolith::holochain::fixt::ValidationPackageHostAccessFixturator;
-    use monolith::holochain::fixt::ValidationPackageInvocationFixturator;
+    use crate::holochain::core::ribosome::RibosomeT;
+    use crate::holochain::fixt::curve::Zomes;
+    use crate::holochain::fixt::RealRibosomeFixturator;
+    use crate::holochain::fixt::ValidationPackageHostAccessFixturator;
+    use crate::holochain::fixt::ValidationPackageInvocationFixturator;
     use hdk3::prelude::AppEntryType;
     use hdk3::prelude::EntryVisibility;
-    use monolith::holochain_wasm_test_utils::TestWasm;
-    use monolith::holochain_zome_types::validate::ValidationPackage;
+    use crate::holochain_wasm_test_utils::TestWasm;
+    use crate::holochain_zome_types::validate::ValidationPackage;
 
     #[tokio::test(threaded_scheduler)]
     async fn test_validation_package_unimplemented() {

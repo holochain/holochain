@@ -1,14 +1,14 @@
 //! Functionality for safely accessing LMDB database references.
 
-use monolith::holochain_state::env::EnvironmentKind;
-use monolith::holochain_state::error::DatabaseError;
-use monolith::holochain_state::error::DatabaseResult;
-use monolith::holochain_state::exports::IntegerStore;
-use monolith::holochain_state::prelude::IntKey;
+use crate::holochain_state::env::EnvironmentKind;
+use crate::holochain_state::error::DatabaseError;
+use crate::holochain_state::error::DatabaseResult;
+use crate::holochain_state::exports::IntegerStore;
+use crate::holochain_state::prelude::IntKey;
 use derive_more::Display;
-use monolith::holochain_keystore::KeystoreSender;
-use monolith::holochain_types::universal_map::Key as UmKey;
-use monolith::holochain_types::universal_map::UniversalMap;
+use crate::holochain_keystore::KeystoreSender;
+use crate::holochain_types::universal_map::Key as UmKey;
+use crate::holochain_types::universal_map::UniversalMap;
 use lazy_static::lazy_static;
 use parking_lot::RwLock;
 use rkv::MultiStore;

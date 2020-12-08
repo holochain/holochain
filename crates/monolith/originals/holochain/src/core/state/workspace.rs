@@ -4,8 +4,8 @@
 //! Every Workflow has an associated Workspace type.
 
 use super::source_chain::SourceChainError;
-use monolith::holochain_state::error::DatabaseError;
-use monolith::holochain_state::prelude::Writer;
+use crate::holochain_state::error::DatabaseError;
+use crate::holochain_state::prelude::Writer;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -43,17 +43,17 @@ pub trait Workspace: Send + Sized {
 #[cfg(test)]
 pub mod tests {
     use super::Workspace;
-    use monolith::holochain::core::state::workspace::WorkspaceResult;
-    use monolith::holochain_state::buffer::BufferedStore;
-    use monolith::holochain_state::buffer::KvBufFresh;
-    use monolith::holochain_state::db::GetDb;
-    use monolith::holochain_state::db::ELEMENT_VAULT_HEADERS;
-    use monolith::holochain_state::db::ELEMENT_VAULT_PUBLIC_ENTRIES;
-    use monolith::holochain_state::prelude::*;
-    use monolith::holochain_state::test_utils::test_cell_env;
-    use monolith::holochain_state::test_utils::DbString;
-    use monolith::holochain_types::prelude::*;
-    use monolith::holochain_types::test_utils::fake_header_hash;
+    use crate::holochain::core::state::workspace::WorkspaceResult;
+    use crate::holochain_state::buffer::BufferedStore;
+    use crate::holochain_state::buffer::KvBufFresh;
+    use crate::holochain_state::db::GetDb;
+    use crate::holochain_state::db::ELEMENT_VAULT_HEADERS;
+    use crate::holochain_state::db::ELEMENT_VAULT_PUBLIC_ENTRIES;
+    use crate::holochain_state::prelude::*;
+    use crate::holochain_state::test_utils::test_cell_env;
+    use crate::holochain_state::test_utils::DbString;
+    use crate::holochain_types::prelude::*;
+    use crate::holochain_types::test_utils::fake_header_hash;
 
     pub struct TestWorkspace {
         one: KvBufFresh<HeaderHash, u32>,

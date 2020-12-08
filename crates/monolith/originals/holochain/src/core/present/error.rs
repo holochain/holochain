@@ -1,7 +1,7 @@
-use monolith::holochain_state::error::DatabaseError;
+use crate::holochain_state::error::DatabaseError;
 use thiserror::Error;
 
-use monolith::holochain::core::{state::cascade::error::CascadeError, SourceChainError};
+use crate::holochain::core::{state::cascade::error::CascadeError, SourceChainError};
 
 #[derive(Error, Debug)]
 pub enum PresentError {

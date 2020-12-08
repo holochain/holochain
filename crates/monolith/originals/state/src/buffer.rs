@@ -1,7 +1,7 @@
 #![allow(missing_docs)]
-use monolith::holochain_state::error::DatabaseError;
-use monolith::holochain_state::error::DatabaseResult;
-use monolith::holochain_state::transaction::Writer;
+use crate::holochain_state::error::DatabaseError;
+use crate::holochain_state::error::DatabaseResult;
+use crate::holochain_state::transaction::Writer;
 
 mod cas;
 pub mod iter;

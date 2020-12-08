@@ -12,26 +12,26 @@ pub mod guest_callback;
 pub mod host_fn;
 pub mod real_ribosome;
 
-use monolith::holochain::conductor::api::CellConductorApi;
-use monolith::holochain::conductor::api::CellConductorReadHandle;
-use monolith::holochain::conductor::api::ZomeCall;
-use monolith::holochain::conductor::interface::SignalBroadcaster;
-use monolith::holochain::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
-use monolith::holochain::core::ribosome::guest_callback::init::InitInvocation;
-use monolith::holochain::core::ribosome::guest_callback::init::InitResult;
-use monolith::holochain::core::ribosome::guest_callback::migrate_agent::MigrateAgentInvocation;
-use monolith::holochain::core::ribosome::guest_callback::migrate_agent::MigrateAgentResult;
-use monolith::holochain::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
-use monolith::holochain::core::ribosome::guest_callback::post_commit::PostCommitResult;
-use monolith::holochain::core::ribosome::guest_callback::validate::ValidateInvocation;
-use monolith::holochain::core::ribosome::guest_callback::validate::ValidateResult;
-use monolith::holochain::core::ribosome::guest_callback::validate_link::ValidateLinkHostAccess;
-use monolith::holochain::core::ribosome::guest_callback::validate_link::ValidateLinkInvocation;
-use monolith::holochain::core::ribosome::guest_callback::validate_link::ValidateLinkResult;
-use monolith::holochain::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
-use monolith::holochain::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
-use monolith::holochain::core::ribosome::guest_callback::CallIterator;
-use monolith::holochain::core::workflow::CallZomeWorkspaceLock;
+use crate::holochain::conductor::api::CellConductorApi;
+use crate::holochain::conductor::api::CellConductorReadHandle;
+use crate::holochain::conductor::api::ZomeCall;
+use crate::holochain::conductor::interface::SignalBroadcaster;
+use crate::holochain::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
+use crate::holochain::core::ribosome::guest_callback::init::InitInvocation;
+use crate::holochain::core::ribosome::guest_callback::init::InitResult;
+use crate::holochain::core::ribosome::guest_callback::migrate_agent::MigrateAgentInvocation;
+use crate::holochain::core::ribosome::guest_callback::migrate_agent::MigrateAgentResult;
+use crate::holochain::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
+use crate::holochain::core::ribosome::guest_callback::post_commit::PostCommitResult;
+use crate::holochain::core::ribosome::guest_callback::validate::ValidateInvocation;
+use crate::holochain::core::ribosome::guest_callback::validate::ValidateResult;
+use crate::holochain::core::ribosome::guest_callback::validate_link::ValidateLinkHostAccess;
+use crate::holochain::core::ribosome::guest_callback::validate_link::ValidateLinkInvocation;
+use crate::holochain::core::ribosome::guest_callback::validate_link::ValidateLinkResult;
+use crate::holochain::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
+use crate::holochain::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
+use crate::holochain::core::ribosome::guest_callback::CallIterator;
+use crate::holochain::core::workflow::CallZomeWorkspaceLock;
 use derive_more::Constructor;
 use error::RibosomeResult;
 use guest_callback::entry_defs::EntryDefsHostAccess;
@@ -41,20 +41,20 @@ use guest_callback::post_commit::PostCommitHostAccess;
 use guest_callback::validate::ValidateHostAccess;
 use guest_callback::validation_package::ValidationPackageHostAccess;
 use holo_hash::AgentPubKey;
-use monolith::holochain_keystore::KeystoreSender;
-use monolith::holochain_p2p::HolochainP2pCell;
+use crate::holochain_keystore::KeystoreSender;
+use crate::holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
-use monolith::holochain_types::cell::CellId;
-use monolith::holochain_types::dna::zome::HostFnAccess;
-use monolith::holochain_types::dna::zome::Zome;
-use monolith::holochain_types::dna::DnaDefHashed;
-use monolith::holochain_zome_types::capability::CapGrant;
-use monolith::holochain_zome_types::capability::CapSecret;
-use monolith::holochain_zome_types::header::ZomeId;
-use monolith::holochain_zome_types::zome::FunctionName;
-use monolith::holochain_zome_types::ExternInput;
-use monolith::holochain_zome_types::ExternOutput;
-use monolith::holochain_zome_types::ZomeCallResponse;
+use crate::holochain_types::cell::CellId;
+use crate::holochain_types::dna::zome::HostFnAccess;
+use crate::holochain_types::dna::zome::Zome;
+use crate::holochain_types::dna::DnaDefHashed;
+use crate::holochain_zome_types::capability::CapGrant;
+use crate::holochain_zome_types::capability::CapSecret;
+use crate::holochain_zome_types::header::ZomeId;
+use crate::holochain_zome_types::zome::FunctionName;
+use crate::holochain_zome_types::ExternInput;
+use crate::holochain_zome_types::ExternOutput;
+use crate::holochain_zome_types::ZomeCallResponse;
 use mockall::automock;
 use std::iter::Iterator;
 
@@ -332,7 +332,7 @@ impl Invocation for ZomeCallInvocation {
 
 impl ZomeCallInvocation {
     pub async fn from_interface_call(conductor_api: CellConductorApi, call: ZomeCall) -> Self {
-        use monolith::holochain::conductor::api::CellConductorApiT;
+        use crate::holochain::conductor::api::CellConductorApiT;
         let ZomeCall {
             cell_id,
             zome_name,
@@ -524,7 +524,7 @@ impl std::fmt::Debug for MockRibosomeT {
 
 #[cfg(test)]
 pub mod wasm_test {
-    use monolith::holochain::core::ribosome::FnComponents;
+    use crate::holochain::core::ribosome::FnComponents;
     use core::time::Duration;
 
     pub fn now() -> Duration {
@@ -541,7 +541,7 @@ pub mod wasm_test {
             let input = $input.clone();
             tokio::task::spawn(async move {
                 use holo_hash::*;
-                use monolith::holochain_p2p::HolochainP2pCellT;
+                use crate::holochain_p2p::HolochainP2pCellT;
                 use std::convert::TryInto;
                 use $crate::core::ribosome::RibosomeT;
 

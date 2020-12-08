@@ -1,19 +1,19 @@
 use super::error::WorkflowResult;
-use monolith::holochain::core::queue_consumer::OneshotWriter;
-use monolith::holochain::core::queue_consumer::TriggerSender;
-use monolith::holochain::core::queue_consumer::WorkComplete;
-use monolith::holochain::core::state::dht_op_integration::AuthoredDhtOpsStore;
-use monolith::holochain::core::state::dht_op_integration::AuthoredDhtOpsValue;
-use monolith::holochain::core::state::source_chain::SourceChain;
-use monolith::holochain::core::state::workspace::Workspace;
-use monolith::holochain::core::state::workspace::WorkspaceResult;
-use monolith::holochain_state::buffer::KvBufFresh;
-use monolith::holochain_state::db::AUTHORED_DHT_OPS;
-use monolith::holochain_state::prelude::BufferedStore;
-use monolith::holochain_state::prelude::EnvironmentRead;
-use monolith::holochain_state::prelude::GetDb;
-use monolith::holochain_state::prelude::Writer;
-use monolith::holochain_types::dht_op::DhtOpHashed;
+use crate::holochain::core::queue_consumer::OneshotWriter;
+use crate::holochain::core::queue_consumer::TriggerSender;
+use crate::holochain::core::queue_consumer::WorkComplete;
+use crate::holochain::core::state::dht_op_integration::AuthoredDhtOpsStore;
+use crate::holochain::core::state::dht_op_integration::AuthoredDhtOpsValue;
+use crate::holochain::core::state::source_chain::SourceChain;
+use crate::holochain::core::state::workspace::Workspace;
+use crate::holochain::core::state::workspace::WorkspaceResult;
+use crate::holochain_state::buffer::KvBufFresh;
+use crate::holochain_state::db::AUTHORED_DHT_OPS;
+use crate::holochain_state::prelude::BufferedStore;
+use crate::holochain_state::prelude::EnvironmentRead;
+use crate::holochain_state::prelude::GetDb;
+use crate::holochain_state::prelude::Writer;
+use crate::holochain_types::dht_op::DhtOpHashed;
 use tracing::*;
 
 pub mod dht_op_light;
@@ -88,24 +88,24 @@ impl Workspace for ProduceDhtOpsWorkspace {
 mod tests {
     use super::super::genesis_workflow::tests::fake_genesis;
     use super::*;
-    use monolith::holochain::core::state::source_chain::SourceChain;
+    use crate::holochain::core::state::source_chain::SourceChain;
 
     use ::fixt::prelude::*;
     use fallible_iterator::FallibleIterator;
     use holo_hash::*;
 
-    use monolith::holochain_state::env::ReadManager;
-    use monolith::holochain_state::env::WriteManager;
-    use monolith::holochain_state::test_utils::test_cell_env;
-    use monolith::holochain_types::dht_op::produce_ops_from_element;
-    use monolith::holochain_types::dht_op::DhtOp;
-    use monolith::holochain_types::fixt::*;
-    use monolith::holochain_types::observability;
-    use monolith::holochain_types::Entry;
-    use monolith::holochain_types::EntryHashed;
-    use monolith::holochain_zome_types::entry_def::EntryVisibility;
-    use monolith::holochain_zome_types::header::builder;
-    use monolith::holochain_zome_types::header::EntryType;
+    use crate::holochain_state::env::ReadManager;
+    use crate::holochain_state::env::WriteManager;
+    use crate::holochain_state::test_utils::test_cell_env;
+    use crate::holochain_types::dht_op::produce_ops_from_element;
+    use crate::holochain_types::dht_op::DhtOp;
+    use crate::holochain_types::fixt::*;
+    use crate::holochain_types::observability;
+    use crate::holochain_types::Entry;
+    use crate::holochain_types::EntryHashed;
+    use crate::holochain_zome_types::entry_def::EntryVisibility;
+    use crate::holochain_zome_types::header::builder;
+    use crate::holochain_zome_types::header::EntryType;
     use matches::assert_matches;
     use std::collections::HashSet;
 

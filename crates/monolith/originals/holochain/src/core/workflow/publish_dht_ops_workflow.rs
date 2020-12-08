@@ -13,24 +13,24 @@
 use super::error::WorkflowResult;
 use super::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
 use super::produce_dht_ops_workflow::dht_op_light::light_to_op;
-use monolith::holochain::core::queue_consumer::OneshotWriter;
-use monolith::holochain::core::queue_consumer::WorkComplete;
-use monolith::holochain::core::state::dht_op_integration::AuthoredDhtOpsStore;
-use monolith::holochain::core::state::element_buf::ElementBuf;
-use monolith::holochain::core::state::workspace::Workspace;
-use monolith::holochain::core::state::workspace::WorkspaceResult;
+use crate::holochain::core::queue_consumer::OneshotWriter;
+use crate::holochain::core::queue_consumer::WorkComplete;
+use crate::holochain::core::state::dht_op_integration::AuthoredDhtOpsStore;
+use crate::holochain::core::state::element_buf::ElementBuf;
+use crate::holochain::core::state::workspace::Workspace;
+use crate::holochain::core::state::workspace::WorkspaceResult;
 use fallible_iterator::FallibleIterator;
 use holo_hash::*;
-use monolith::holochain_p2p::HolochainP2pCell;
-use monolith::holochain_p2p::HolochainP2pCellT;
-use monolith::holochain_state::buffer::BufferedStore;
-use monolith::holochain_state::buffer::KvBufFresh;
-use monolith::holochain_state::db::AUTHORED_DHT_OPS;
-use monolith::holochain_state::fresh_reader;
-use monolith::holochain_state::prelude::*;
-use monolith::holochain_state::transaction::Writer;
-use monolith::holochain_types::dht_op::DhtOp;
-use monolith::holochain_types::Timestamp;
+use crate::holochain_p2p::HolochainP2pCell;
+use crate::holochain_p2p::HolochainP2pCellT;
+use crate::holochain_state::buffer::BufferedStore;
+use crate::holochain_state::buffer::KvBufFresh;
+use crate::holochain_state::db::AUTHORED_DHT_OPS;
+use crate::holochain_state::fresh_reader;
+use crate::holochain_state::prelude::*;
+use crate::holochain_state::transaction::Writer;
+use crate::holochain_types::dht_op::DhtOp;
+use crate::holochain_types::Timestamp;
 use std::collections::HashMap;
 use std::time;
 use tracing::*;
@@ -169,40 +169,40 @@ impl PublishDhtOpsWorkspace {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use monolith::holochain::core::queue_consumer::TriggerSender;
-    use monolith::holochain::core::state::dht_op_integration::AuthoredDhtOpsValue;
-    use monolith::holochain::core::state::source_chain::SourceChain;
-    use monolith::holochain::core::workflow::fake_genesis;
-    use monolith::holochain::core::workflow::produce_dht_ops_workflow::produce_dht_ops_workflow;
-    use monolith::holochain::core::workflow::produce_dht_ops_workflow::ProduceDhtOpsWorkspace;
-    use monolith::holochain::core::SourceChainError;
-    use monolith::holochain::fixt::CreateLinkFixturator;
-    use monolith::holochain::fixt::EntryFixturator;
-    use monolith::holochain::test_utils::test_network_with_events;
-    use monolith::holochain::test_utils::TestNetwork;
+    use crate::holochain::core::queue_consumer::TriggerSender;
+    use crate::holochain::core::state::dht_op_integration::AuthoredDhtOpsValue;
+    use crate::holochain::core::state::source_chain::SourceChain;
+    use crate::holochain::core::workflow::fake_genesis;
+    use crate::holochain::core::workflow::produce_dht_ops_workflow::produce_dht_ops_workflow;
+    use crate::holochain::core::workflow::produce_dht_ops_workflow::ProduceDhtOpsWorkspace;
+    use crate::holochain::core::SourceChainError;
+    use crate::holochain::fixt::CreateLinkFixturator;
+    use crate::holochain::fixt::EntryFixturator;
+    use crate::holochain::test_utils::test_network_with_events;
+    use crate::holochain::test_utils::TestNetwork;
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
     use holo_hash::fixt::*;
-    use monolith::holochain_p2p::actor::HolochainP2pSender;
-    use monolith::holochain_p2p::HolochainP2pRef;
-    use monolith::holochain_state::buffer::BufferedStore;
-    use monolith::holochain_state::env::EnvironmentWrite;
-    use monolith::holochain_state::env::ReadManager;
-    use monolith::holochain_state::env::WriteManager;
-    use monolith::holochain_state::error::DatabaseError;
-    use monolith::holochain_state::test_utils::test_cell_env;
-    use monolith::holochain_types::dht_op::DhtOp;
-    use monolith::holochain_types::dht_op::DhtOpHashed;
-    use monolith::holochain_types::dht_op::DhtOpLight;
-    use monolith::holochain_types::fixt::AppEntryTypeFixturator;
-    use monolith::holochain_types::fixt::SignatureFixturator;
-    use monolith::holochain_types::observability;
-    use monolith::holochain_types::HeaderHashed;
-    use monolith::holochain_zome_types::element::SignedHeaderHashed;
-    use monolith::holochain_zome_types::entry_def::EntryVisibility;
-    use monolith::holochain_zome_types::header::builder;
-    use monolith::holochain_zome_types::header::EntryType;
-    use monolith::holochain_zome_types::header::Update;
+    use crate::holochain_p2p::actor::HolochainP2pSender;
+    use crate::holochain_p2p::HolochainP2pRef;
+    use crate::holochain_state::buffer::BufferedStore;
+    use crate::holochain_state::env::EnvironmentWrite;
+    use crate::holochain_state::env::ReadManager;
+    use crate::holochain_state::env::WriteManager;
+    use crate::holochain_state::error::DatabaseError;
+    use crate::holochain_state::test_utils::test_cell_env;
+    use crate::holochain_types::dht_op::DhtOp;
+    use crate::holochain_types::dht_op::DhtOpHashed;
+    use crate::holochain_types::dht_op::DhtOpLight;
+    use crate::holochain_types::fixt::AppEntryTypeFixturator;
+    use crate::holochain_types::fixt::SignatureFixturator;
+    use crate::holochain_types::observability;
+    use crate::holochain_types::HeaderHashed;
+    use crate::holochain_zome_types::element::SignedHeaderHashed;
+    use crate::holochain_zome_types::entry_def::EntryVisibility;
+    use crate::holochain_zome_types::header::builder;
+    use crate::holochain_zome_types::header::EntryType;
+    use crate::holochain_zome_types::header::Update;
     use matches::assert_matches;
     use std::collections::HashMap;
     use std::convert::TryInto;
@@ -306,7 +306,7 @@ mod tests {
                 use tokio::stream::StreamExt;
                 let mut tx_complete = Some(tx_complete);
                 while let Some(evt) = recv.next().await {
-                    use monolith::holochain_p2p::event::HolochainP2pEvent::*;
+                    use crate::holochain_p2p::event::HolochainP2pEvent::*;
                     match evt {
                         Publish { respond, .. } => {
                             respond.respond(Ok(async move { Ok(()) }.boxed().into()));
@@ -698,7 +698,7 @@ mod tests {
                         use tokio::stream::StreamExt;
                         let mut tx_complete = Some(tx_complete);
                         while let Some(evt) = recv.next().await {
-                            use monolith::holochain_p2p::event::HolochainP2pEvent::*;
+                            use crate::holochain_p2p::event::HolochainP2pEvent::*;
                             match evt {
                                 Publish {
                                     respond,

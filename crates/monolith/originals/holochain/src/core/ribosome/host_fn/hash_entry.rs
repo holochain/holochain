@@ -1,10 +1,10 @@
-use monolith::holochain::core::ribosome::error::RibosomeResult;
-use monolith::holochain::core::ribosome::CallContext;
-use monolith::holochain::core::ribosome::RibosomeT;
+use crate::holochain::core::ribosome::error::RibosomeResult;
+use crate::holochain::core::ribosome::CallContext;
+use crate::holochain::core::ribosome::RibosomeT;
 use holo_hash::HasHash;
-use monolith::holochain_zome_types::Entry;
-use monolith::holochain_zome_types::HashEntryInput;
-use monolith::holochain_zome_types::HashEntryOutput;
+use crate::holochain_zome_types::Entry;
+use crate::holochain_zome_types::HashEntryInput;
+use crate::holochain_zome_types::HashEntryOutput;
 use std::sync::Arc;
 
 pub fn hash_entry(
@@ -23,17 +23,17 @@ pub fn hash_entry(
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use super::*;
-    use monolith::holochain::core::ribosome::host_fn::hash_entry::hash_entry;
+    use crate::holochain::core::ribosome::host_fn::hash_entry::hash_entry;
 
-    use monolith::holochain::fixt::CallContextFixturator;
-    use monolith::holochain::fixt::EntryFixturator;
-    use monolith::holochain::fixt::RealRibosomeFixturator;
-    use monolith::holochain::fixt::ZomeCallHostAccessFixturator;
+    use crate::holochain::fixt::CallContextFixturator;
+    use crate::holochain::fixt::EntryFixturator;
+    use crate::holochain::fixt::RealRibosomeFixturator;
+    use crate::holochain::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use holo_hash::EntryHash;
-    use monolith::holochain_wasm_test_utils::TestWasm;
-    use monolith::holochain_zome_types::HashEntryInput;
-    use monolith::holochain_zome_types::HashEntryOutput;
+    use crate::holochain_wasm_test_utils::TestWasm;
+    use crate::holochain_zome_types::HashEntryInput;
+    use crate::holochain_zome_types::HashEntryOutput;
     use std::convert::TryInto;
     use std::sync::Arc;
     use test_wasm_common::TestString;

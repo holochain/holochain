@@ -1,6 +1,6 @@
 //! Collection of cells to form a holochain application
-use monolith::holochain_types::cell::CellId;
-use monolith::holochain_types::dna::JsonProperties;
+use crate::holochain_types::cell::CellId;
+use crate::holochain_types::dna::JsonProperties;
 use derive_more::Into;
 use holo_hash::AgentPubKey;
 use holochain_serialized_bytes::SerializedBytes;

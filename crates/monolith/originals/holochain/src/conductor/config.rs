@@ -14,7 +14,7 @@ use super::error::ConductorError;
 use super::error::ConductorResult;
 use super::paths::EnvironmentRootPath;
 
-pub use monolith::holochain::conductor::interface::InterfaceDriver;
+pub use crate::holochain::conductor::interface::InterfaceDriver;
 pub use admin_interface_config::AdminInterfaceConfig;
 pub use dpki_config::DpkiConfig;
 //pub use logger_config::LoggerConfig;
@@ -188,7 +188,7 @@ pub mod tests {
 
     "#;
         let result: ConductorResult<ConductorConfig> = config_from_yaml(yaml);
-        use monolith::holochain_p2p::kitsune_p2p::*;
+        use crate::holochain_p2p::kitsune_p2p::*;
         let mut network_config = KitsuneP2pConfig::default();
         network_config.bootstrap_service = Some(url2::url2!("https://bootstrap.holo.host"));
         network_config.transport_pool.push(TransportConfig::Proxy {

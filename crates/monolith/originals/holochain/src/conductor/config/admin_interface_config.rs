@@ -1,6 +1,6 @@
 #![deny(missing_docs)]
 
-use monolith::holochain::conductor::interface::InterfaceDriver;
+use crate::holochain::conductor::interface::InterfaceDriver;
 use serde::Deserialize;
 use serde::Serialize;
 

@@ -1,6 +1,6 @@
 //! DANGER! This is a mock keystore for testing, DO NOT USE THIS IN PRODUCTION!
 
-use monolith::holochain_keystore::*;
+use crate::holochain_keystore::*;
 
 const PUB1: &[u8] = &[
     154, 185, 40, 0, 115, 213, 127, 247, 174, 124, 110, 222, 11, 151, 230, 233, 2, 171, 91, 154,

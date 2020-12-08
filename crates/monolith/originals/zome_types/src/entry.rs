@@ -5,9 +5,9 @@
 //! It defines serialization behaviour for entries. Here you can find the complete list of
 //! entry_types, and special entries, like deletion_entry and cap_entry.
 
-use monolith::holochain_zome_types::capability::CapClaim;
-use monolith::holochain_zome_types::capability::CapGrant;
-use monolith::holochain_zome_types::capability::ZomeCallCapGrant;
+use crate::holochain_zome_types::capability::CapClaim;
+use crate::holochain_zome_types::capability::CapGrant;
+use crate::holochain_zome_types::capability::ZomeCallCapGrant;
 use holo_hash::hash_type;
 use holo_hash::AgentPubKey;
 use holo_hash::HashableContent;

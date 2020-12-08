@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use monolith::holochain::conductor::error::ConductorError;
+use crate::holochain::conductor::error::ConductorError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]

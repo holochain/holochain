@@ -1,8 +1,8 @@
 #![allow(clippy::too_many_arguments)]
 //! Module containing incoming events from the HolochainP2p actor.
 
-use monolith::holochain_p2p::*;
-use monolith::holochain_zome_types::signature::Signature;
+use crate::holochain_p2p::*;
+use crate::holochain_zome_types::signature::Signature;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 
 /// Get options help control how the get is processed at various levels.

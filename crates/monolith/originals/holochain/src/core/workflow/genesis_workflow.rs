@@ -9,15 +9,15 @@
 
 use super::error::WorkflowError;
 use super::error::WorkflowResult;
-use monolith::holochain::conductor::api::CellConductorApiT;
-use monolith::holochain::core::queue_consumer::OneshotWriter;
-use monolith::holochain::core::state::source_chain::SourceChainBuf;
-use monolith::holochain::core::state::workspace::Workspace;
-use monolith::holochain::core::state::workspace::WorkspaceResult;
+use crate::holochain::conductor::api::CellConductorApiT;
+use crate::holochain::core::queue_consumer::OneshotWriter;
+use crate::holochain::core::state::source_chain::SourceChainBuf;
+use crate::holochain::core::state::workspace::Workspace;
+use crate::holochain::core::state::workspace::WorkspaceResult;
 use derive_more::Constructor;
-use monolith::holochain_state::prelude::*;
-use monolith::holochain_types::dna::DnaFile;
-use monolith::holochain_types::prelude::*;
+use crate::holochain_state::prelude::*;
+use crate::holochain_types::dna::DnaFile;
+use crate::holochain_types::prelude::*;
 use tracing::*;
 
 /// The struct which implements the genesis Workflow
@@ -104,15 +104,15 @@ impl Workspace for GenesisWorkspace {
 pub mod tests {
     use super::*;
 
-    use monolith::holochain::conductor::api::MockCellConductorApi;
-    use monolith::holochain::core::state::source_chain::SourceChain;
-    use monolith::holochain::core::SourceChainResult;
+    use crate::holochain::conductor::api::MockCellConductorApi;
+    use crate::holochain::core::state::source_chain::SourceChain;
+    use crate::holochain::core::SourceChainResult;
     use fallible_iterator::FallibleIterator;
-    use monolith::holochain_state::test_utils::test_cell_env;
-    use monolith::holochain_types::observability;
-    use monolith::holochain_types::test_utils::fake_agent_pubkey_1;
-    use monolith::holochain_types::test_utils::fake_dna_file;
-    use monolith::holochain_zome_types::Header;
+    use crate::holochain_state::test_utils::test_cell_env;
+    use crate::holochain_types::observability;
+    use crate::holochain_types::test_utils::fake_agent_pubkey_1;
+    use crate::holochain_types::test_utils::fake_dna_file;
+    use crate::holochain_zome_types::Header;
     use matches::assert_matches;
 
     pub async fn fake_genesis(source_chain: &mut SourceChain) -> SourceChainResult<()> {

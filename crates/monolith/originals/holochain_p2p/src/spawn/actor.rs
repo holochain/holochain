@@ -1,17 +1,17 @@
-use monolith::holochain_p2p::actor::*;
-use monolith::holochain_p2p::event::*;
-use monolith::holochain_p2p::*;
+use crate::holochain_p2p::actor::*;
+use crate::holochain_p2p::event::*;
+use crate::holochain_p2p::*;
 
 use futures::future::FutureExt;
 
-use monolith::holochain_p2p::types::AgentPubKeyExt;
+use crate::holochain_p2p::types::AgentPubKeyExt;
 
 use ghost_actor::dependencies::tracing;
 use ghost_actor::dependencies::tracing_futures::Instrument;
-use monolith::holochain_types::element::GetElementResponse;
-use monolith::holochain_types::validate::ValidationPackageResponse;
-use monolith::holochain_types::Timestamp;
-use monolith::holochain_zome_types::zome::FunctionName;
+use crate::holochain_types::element::GetElementResponse;
+use crate::holochain_types::validate::ValidationPackageResponse;
+use crate::holochain_types::Timestamp;
+use crate::holochain_zome_types::zome::FunctionName;
 use kitsune_p2p::actor::KitsuneP2pSender;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 

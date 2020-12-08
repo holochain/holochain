@@ -1,8 +1,8 @@
-use monolith::holochain::core::ribosome::error::RibosomeResult;
-use monolith::holochain::core::ribosome::CallContext;
-use monolith::holochain::core::ribosome::RibosomeT;
-use monolith::holochain_zome_types::GetInput;
-use monolith::holochain_zome_types::GetOutput;
+use crate::holochain::core::ribosome::error::RibosomeResult;
+use crate::holochain::core::ribosome::CallContext;
+use crate::holochain::core::ribosome::RibosomeT;
+use crate::holochain_zome_types::GetInput;
+use crate::holochain_zome_types::GetOutput;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]

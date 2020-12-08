@@ -7,18 +7,18 @@
 ///
 /// When committing the ChainSequence db, a special step is taken to ensure source chain consistency.
 /// If the chain head has moved since the db was created, committing the transaction fails with a special error type.
-use monolith::holochain::core::state::source_chain::{SourceChainError, SourceChainResult};
+use crate::holochain::core::state::source_chain::{SourceChainError, SourceChainResult};
 use fallible_iterator::DoubleEndedFallibleIterator;
 use holo_hash::HeaderHash;
-use monolith::holochain_state::buffer::BufferedStore;
-use monolith::holochain_state::buffer::KvIntBufFresh;
-use monolith::holochain_state::buffer::KvIntStore;
-use monolith::holochain_state::db::GetDb;
-use monolith::holochain_state::db::CHAIN_SEQUENCE;
-use monolith::holochain_state::error::DatabaseError;
-use monolith::holochain_state::error::DatabaseResult;
-use monolith::holochain_state::fresh_reader;
-use monolith::holochain_state::prelude::*;
+use crate::holochain_state::buffer::BufferedStore;
+use crate::holochain_state::buffer::KvIntBufFresh;
+use crate::holochain_state::buffer::KvIntStore;
+use crate::holochain_state::db::GetDb;
+use crate::holochain_state::db::CHAIN_SEQUENCE;
+use crate::holochain_state::error::DatabaseError;
+use crate::holochain_state::error::DatabaseResult;
+use crate::holochain_state::fresh_reader;
+use crate::holochain_state::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 use tracing::*;
@@ -198,14 +198,14 @@ pub mod tests {
     use super::BufferedStore;
     use super::ChainSequenceBuf;
     use super::SourceChainError;
-    use monolith::holochain::core::state::source_chain::SourceChainResult;
+    use crate::holochain::core::state::source_chain::SourceChainResult;
     use holo_hash::HeaderHash;
-    use monolith::holochain_state::env::ReadManager;
-    use monolith::holochain_state::env::WriteManager;
-    use monolith::holochain_state::error::DatabaseResult;
-    use monolith::holochain_state::prelude::*;
-    use monolith::holochain_state::test_utils::test_cell_env;
-    use monolith::holochain_types::observability;
+    use crate::holochain_state::env::ReadManager;
+    use crate::holochain_state::env::WriteManager;
+    use crate::holochain_state::error::DatabaseResult;
+    use crate::holochain_state::prelude::*;
+    use crate::holochain_state::test_utils::test_cell_env;
+    use crate::holochain_types::observability;
     use matches::assert_matches;
 
     #[tokio::test(threaded_scheduler)]

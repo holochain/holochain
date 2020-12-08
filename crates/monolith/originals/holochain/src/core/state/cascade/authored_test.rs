@@ -3,14 +3,14 @@ use std::convert::TryInto;
 use std::time::Duration;
 
 use holo_hash::EntryHash;
-use monolith::holochain_types::Entry;
-use monolith::holochain_wasm_test_utils::TestWasm;
+use crate::holochain_types::Entry;
+use crate::holochain_wasm_test_utils::TestWasm;
 
-use monolith::holochain::core::state::element_buf::ElementBuf;
-use monolith::holochain::core::state::source_chain::SourceChain;
-use monolith::holochain::test_utils::conductor_setup::ConductorTestData;
-use monolith::holochain::test_utils::host_fn_api::*;
-use monolith::holochain::test_utils::wait_for_integration;
+use crate::holochain::core::state::element_buf::ElementBuf;
+use crate::holochain::core::state::source_chain::SourceChain;
+use crate::holochain::test_utils::conductor_setup::ConductorTestData;
+use crate::holochain::test_utils::host_fn_api::*;
+use crate::holochain::test_utils::wait_for_integration;
 
 /// - Alice commits an entry and it is in their authored store
 /// - Bob doesn't have the entry in their authored store

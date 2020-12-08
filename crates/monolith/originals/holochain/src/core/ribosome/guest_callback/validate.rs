@@ -1,23 +1,23 @@
-use monolith::holochain::core::ribosome::FnComponents;
-use monolith::holochain::core::ribosome::HostAccess;
-use monolith::holochain::core::ribosome::Invocation;
-use monolith::holochain::core::ribosome::ZomesToInvoke;
-use monolith::holochain::core::workflow::CallZomeWorkspaceLock;
+use crate::holochain::core::ribosome::FnComponents;
+use crate::holochain::core::ribosome::HostAccess;
+use crate::holochain::core::ribosome::Invocation;
+use crate::holochain::core::ribosome::ZomesToInvoke;
+use crate::holochain::core::workflow::CallZomeWorkspaceLock;
 use derive_more::Constructor;
 use holo_hash::AnyDhtHash;
-use monolith::holochain_p2p::HolochainP2pCell;
+use crate::holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
-use monolith::holochain_types::dna::zome::HostFnAccess;
-use monolith::holochain_types::dna::zome::Permission;
-use monolith::holochain_zome_types::element::Element;
-use monolith::holochain_zome_types::entry::Entry;
-use monolith::holochain_zome_types::entry_def::EntryDefId;
-use monolith::holochain_zome_types::validate::ValidateCallbackResult;
-use monolith::holochain_zome_types::validate::ValidateData;
-use monolith::holochain_zome_types::validate::ValidationPackage;
-use monolith::holochain_zome_types::zome::ZomeName;
-use monolith::holochain_zome_types::ExternInput;
-use monolith::holochain_zome_types::Header;
+use crate::holochain_types::dna::zome::HostFnAccess;
+use crate::holochain_types::dna::zome::Permission;
+use crate::holochain_zome_types::element::Element;
+use crate::holochain_zome_types::entry::Entry;
+use crate::holochain_zome_types::entry_def::EntryDefId;
+use crate::holochain_zome_types::validate::ValidateCallbackResult;
+use crate::holochain_zome_types::validate::ValidateData;
+use crate::holochain_zome_types::validate::ValidationPackage;
+use crate::holochain_zome_types::zome::ZomeName;
+use crate::holochain_zome_types::ExternInput;
+use crate::holochain_zome_types::Header;
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -139,20 +139,20 @@ impl From<ValidateInvocation> for ValidateData {
 mod test {
     use super::ValidateData;
     use super::ValidateResult;
-    use monolith::holochain::core::ribosome::Invocation;
-    use monolith::holochain::fixt::ValidateHostAccessFixturator;
-    use monolith::holochain::fixt::ValidateInvocationFixturator;
-    use monolith::holochain::fixt::ZomeCallCapGrantFixturator;
+    use crate::holochain::core::ribosome::Invocation;
+    use crate::holochain::fixt::ValidateHostAccessFixturator;
+    use crate::holochain::fixt::ValidateInvocationFixturator;
+    use crate::holochain::fixt::ZomeCallCapGrantFixturator;
     use ::fixt::prelude::*;
     use holo_hash::fixt::AgentPubKeyFixturator;
     use holochain_serialized_bytes::prelude::*;
-    use monolith::holochain_types::dna::zome::HostFnAccess;
-    use monolith::holochain_types::dna::zome::Permission;
-    use monolith::holochain_types::fixt::*;
-    use monolith::holochain_zome_types::entry::Entry;
-    use monolith::holochain_zome_types::header::HeaderType;
-    use monolith::holochain_zome_types::validate::ValidateCallbackResult;
-    use monolith::holochain_zome_types::ExternInput;
+    use crate::holochain_types::dna::zome::HostFnAccess;
+    use crate::holochain_types::dna::zome::Permission;
+    use crate::holochain_types::fixt::*;
+    use crate::holochain_zome_types::entry::Entry;
+    use crate::holochain_zome_types::header::HeaderType;
+    use crate::holochain_zome_types::validate::ValidateCallbackResult;
+    use crate::holochain_zome_types::ExternInput;
     use rand::seq::SliceRandom;
     use std::sync::Arc;
 
@@ -296,17 +296,17 @@ mod test {
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
     use super::ValidateResult;
-    use monolith::holochain::core::ribosome::RibosomeT;
-    use monolith::holochain::core::ribosome::ZomesToInvoke;
-    use monolith::holochain::core::state::source_chain::SourceChainResult;
-    use monolith::holochain::core::workflow::call_zome_workflow::CallZomeWorkspace;
-    use monolith::holochain::fixt::curve::Zomes;
-    use monolith::holochain::fixt::*;
+    use crate::holochain::core::ribosome::RibosomeT;
+    use crate::holochain::core::ribosome::ZomesToInvoke;
+    use crate::holochain::core::state::source_chain::SourceChainResult;
+    use crate::holochain::core::workflow::call_zome_workflow::CallZomeWorkspace;
+    use crate::holochain::fixt::curve::Zomes;
+    use crate::holochain::fixt::*;
     use ::fixt::prelude::*;
     use holo_hash::fixt::AgentPubKeyFixturator;
-    use monolith::holochain_wasm_test_utils::TestWasm;
-    use monolith::holochain_zome_types::CreateOutput;
-    use monolith::holochain_zome_types::Entry;
+    use crate::holochain_wasm_test_utils::TestWasm;
+    use crate::holochain_zome_types::CreateOutput;
+    use crate::holochain_zome_types::Entry;
     use std::sync::Arc;
 
     #[tokio::test(threaded_scheduler)]

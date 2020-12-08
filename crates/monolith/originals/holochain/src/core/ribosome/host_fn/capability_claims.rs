@@ -1,8 +1,8 @@
-use monolith::holochain::core::ribosome::error::RibosomeResult;
-use monolith::holochain::core::ribosome::CallContext;
-use monolith::holochain::core::ribosome::RibosomeT;
-use monolith::holochain_zome_types::CapabilityClaimsInput;
-use monolith::holochain_zome_types::CapabilityClaimsOutput;
+use crate::holochain::core::ribosome::error::RibosomeResult;
+use crate::holochain::core::ribosome::CallContext;
+use crate::holochain::core::ribosome::RibosomeT;
+use crate::holochain_zome_types::CapabilityClaimsInput;
+use crate::holochain_zome_types::CapabilityClaimsOutput;
 use std::sync::Arc;
 
 /// lists all the local claims filtered by tag

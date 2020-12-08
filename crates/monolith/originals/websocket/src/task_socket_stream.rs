@@ -1,6 +1,6 @@
 //! This task manages the incoming messages and events from the websocket stream.
 
-use monolith::holochain_websocket::*;
+use crate::holochain_websocket::*;
 use task_dispatch_incoming::ToDispatchIncoming;
 use task_dispatch_incoming::ToDispatchIncomingSender;
 use super::task_socket_sink::ToSocketSinkSender;

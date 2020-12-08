@@ -1,22 +1,22 @@
 //! Defines a Element, the basic unit of Holochain data.
 
-use monolith::holochain_types::header::WireDelete;
-use monolith::holochain_types::header::WireHeaderStatus;
-use monolith::holochain_types::header::WireNewEntryHeader;
-use monolith::holochain_types::header::WireUpdateRelationship;
-use monolith::holochain_types::prelude::*;
-use monolith::holochain_types::EntryHashed;
-use monolith::holochain_types::HeaderHashed;
+use crate::holochain_types::header::WireDelete;
+use crate::holochain_types::header::WireHeaderStatus;
+use crate::holochain_types::header::WireNewEntryHeader;
+use crate::holochain_types::header::WireUpdateRelationship;
+use crate::holochain_types::prelude::*;
+use crate::holochain_types::EntryHashed;
+use crate::holochain_types::HeaderHashed;
 use error::ElementGroupError;
 use error::ElementGroupResult;
-use monolith::holochain_keystore::KeystoreError;
+use crate::holochain_keystore::KeystoreError;
 use holochain_serialized_bytes::prelude::*;
-pub use monolith::holochain_zome_types::element::*;
-use monolith::holochain_zome_types::entry::Entry;
-use monolith::holochain_zome_types::entry_def::EntryVisibility;
-use monolith::holochain_zome_types::header::EntryType;
-use monolith::holochain_zome_types::header::Header;
-use monolith::holochain_zome_types::validate::ValidationStatus;
+pub use crate::holochain_zome_types::element::*;
+use crate::holochain_zome_types::entry::Entry;
+use crate::holochain_zome_types::entry_def::EntryVisibility;
+use crate::holochain_zome_types::header::EntryType;
+use crate::holochain_zome_types::header::Header;
+use crate::holochain_zome_types::validate::ValidationStatus;
 use std::borrow::Cow;
 use std::collections::BTreeSet;
 
@@ -377,7 +377,7 @@ impl WireElement {
 mod tests {
     use super::SignedHeader;
     use super::SignedHeaderHashed;
-    use monolith::holochain_types::fixt::*;
+    use crate::holochain_types::fixt::*;
     use ::fixt::prelude::*;
     use holo_hash::HasHash;
     use holo_hash::HoloHashed;

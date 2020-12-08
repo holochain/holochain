@@ -6,26 +6,26 @@
 pub use error::*;
 use fallible_iterator::FallibleIterator;
 use holo_hash::*;
-use monolith::holochain_state::buffer::BufferedStore;
-use monolith::holochain_state::error::DatabaseResult;
-use monolith::holochain_state::fresh_reader;
-use monolith::holochain_state::prelude::*;
-use monolith::holochain_types::prelude::*;
-use monolith::holochain_types::EntryHashed;
-use monolith::holochain_zome_types::capability::CapAccess;
-use monolith::holochain_zome_types::capability::CapGrant;
-use monolith::holochain_zome_types::capability::CapSecret;
-use monolith::holochain_zome_types::capability::GrantedFunction;
-use monolith::holochain_zome_types::element::Element;
-use monolith::holochain_zome_types::entry::CapClaimEntry;
-use monolith::holochain_zome_types::entry::Entry;
-use monolith::holochain_zome_types::header::builder;
-use monolith::holochain_zome_types::header::EntryType;
-use monolith::holochain_zome_types::header::Header;
-use monolith::holochain_zome_types::header::HeaderBuilder;
-use monolith::holochain_zome_types::header::HeaderBuilderCommon;
-use monolith::holochain_zome_types::header::HeaderInner;
-use monolith::holochain_zome_types::query::ChainQueryFilter;
+use crate::holochain_state::buffer::BufferedStore;
+use crate::holochain_state::error::DatabaseResult;
+use crate::holochain_state::fresh_reader;
+use crate::holochain_state::prelude::*;
+use crate::holochain_types::prelude::*;
+use crate::holochain_types::EntryHashed;
+use crate::holochain_zome_types::capability::CapAccess;
+use crate::holochain_zome_types::capability::CapGrant;
+use crate::holochain_zome_types::capability::CapSecret;
+use crate::holochain_zome_types::capability::GrantedFunction;
+use crate::holochain_zome_types::element::Element;
+use crate::holochain_zome_types::entry::CapClaimEntry;
+use crate::holochain_zome_types::entry::Entry;
+use crate::holochain_zome_types::header::builder;
+use crate::holochain_zome_types::header::EntryType;
+use crate::holochain_zome_types::header::Header;
+use crate::holochain_zome_types::header::HeaderBuilder;
+use crate::holochain_zome_types::header::HeaderBuilderCommon;
+use crate::holochain_zome_types::header::HeaderInner;
+use crate::holochain_zome_types::query::ChainQueryFilter;
 use shrinkwraprs::Shrinkwrap;
 pub use source_chain_buffer::*;
 use std::collections::HashSet;
@@ -334,13 +334,13 @@ impl BufferedStore for SourceChain {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use monolith::holochain::fixt::*;
+    use crate::holochain::fixt::*;
     use ::fixt::prelude::*;
     use hdk3::prelude::*;
-    use monolith::holochain_state::test_utils::test_cell_env;
-    use monolith::holochain_types::test_utils::fake_dna_hash;
-    use monolith::holochain_zome_types::capability::CapAccess;
-    use monolith::holochain_zome_types::capability::ZomeCallCapGrant;
+    use crate::holochain_state::test_utils::test_cell_env;
+    use crate::holochain_types::test_utils::fake_dna_hash;
+    use crate::holochain_zome_types::capability::CapAccess;
+    use crate::holochain_zome_types::capability::ZomeCallCapGrant;
     use std::collections::HashSet;
 
     #[tokio::test(threaded_scheduler)]

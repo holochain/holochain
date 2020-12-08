@@ -7,29 +7,29 @@
 /// using the ElementBuf for caching non-authored data, or for situations where
 /// it is known that private entries should be protected, such as when handling
 /// a get_entry request from the network.
-use monolith::holochain::core::state::source_chain::SourceChainResult;
+use crate::holochain::core::state::source_chain::SourceChainResult;
 use holo_hash::EntryHash;
 use holo_hash::HasHash;
 use holo_hash::HeaderHash;
-use monolith::holochain_state::buffer::CasBufFreshSync;
-use monolith::holochain_state::db::GetDb;
-use monolith::holochain_state::db::ELEMENT_CACHE_ENTRIES;
-use monolith::holochain_state::db::ELEMENT_CACHE_HEADERS;
-use monolith::holochain_state::db::ELEMENT_VAULT_HEADERS;
-use monolith::holochain_state::db::ELEMENT_VAULT_PRIVATE_ENTRIES;
-use monolith::holochain_state::db::ELEMENT_VAULT_PUBLIC_ENTRIES;
-use monolith::holochain_state::error::DatabaseError;
-use monolith::holochain_state::error::DatabaseResult;
-use monolith::holochain_state::exports::SingleStore;
-use monolith::holochain_state::prelude::*;
-use monolith::holochain_types::element::Element;
-use monolith::holochain_types::element::ElementGroup;
-use monolith::holochain_types::element::SignedHeader;
-use monolith::holochain_types::element::SignedHeaderHashed;
-use monolith::holochain_types::entry::EntryHashed;
-use monolith::holochain_zome_types::entry_def::EntryVisibility;
-use monolith::holochain_zome_types::Entry;
-use monolith::holochain_zome_types::Header;
+use crate::holochain_state::buffer::CasBufFreshSync;
+use crate::holochain_state::db::GetDb;
+use crate::holochain_state::db::ELEMENT_CACHE_ENTRIES;
+use crate::holochain_state::db::ELEMENT_CACHE_HEADERS;
+use crate::holochain_state::db::ELEMENT_VAULT_HEADERS;
+use crate::holochain_state::db::ELEMENT_VAULT_PRIVATE_ENTRIES;
+use crate::holochain_state::db::ELEMENT_VAULT_PUBLIC_ENTRIES;
+use crate::holochain_state::error::DatabaseError;
+use crate::holochain_state::error::DatabaseResult;
+use crate::holochain_state::exports::SingleStore;
+use crate::holochain_state::prelude::*;
+use crate::holochain_types::element::Element;
+use crate::holochain_types::element::ElementGroup;
+use crate::holochain_types::element::SignedHeader;
+use crate::holochain_types::element::SignedHeaderHashed;
+use crate::holochain_types::entry::EntryHashed;
+use crate::holochain_zome_types::entry_def::EntryVisibility;
+use crate::holochain_zome_types::Entry;
+use crate::holochain_zome_types::Header;
 use tracing::*;
 
 /// A CasBufFresh with Entries for values
@@ -340,13 +340,13 @@ impl<P: PrefixType> BufferedStore for ElementBuf<P> {
 #[cfg(test)]
 mod tests {
     use super::ElementBuf;
-    use monolith::holochain::test_utils::fake_unique_element;
+    use crate::holochain::test_utils::fake_unique_element;
     use holo_hash::*;
-    use monolith::holochain_keystore::test_keystore::spawn_test_keystore;
-    use monolith::holochain_keystore::AgentPubKeyExt;
-    use monolith::holochain_state::prelude::*;
-    use monolith::holochain_state::test_utils::test_cell_env;
-    use monolith::holochain_zome_types::entry_def::EntryVisibility;
+    use crate::holochain_keystore::test_keystore::spawn_test_keystore;
+    use crate::holochain_keystore::AgentPubKeyExt;
+    use crate::holochain_state::prelude::*;
+    use crate::holochain_state::test_utils::test_cell_env;
+    use crate::holochain_zome_types::entry_def::EntryVisibility;
 
     #[tokio::test(threaded_scheduler)]
     async fn can_write_private_entry_when_enabled() -> anyhow::Result<()> {

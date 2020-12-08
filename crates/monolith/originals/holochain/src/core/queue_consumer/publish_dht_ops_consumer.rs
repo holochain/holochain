@@ -2,10 +2,10 @@
 
 use super::*;
 
-use monolith::holochain::conductor::manager::ManagedTaskResult;
-use monolith::holochain::core::workflow::publish_dht_ops_workflow::publish_dht_ops_workflow;
-use monolith::holochain::core::workflow::publish_dht_ops_workflow::PublishDhtOpsWorkspace;
-use monolith::holochain_state::env::EnvironmentWrite;
+use crate::holochain::conductor::manager::ManagedTaskResult;
+use crate::holochain::core::workflow::publish_dht_ops_workflow::publish_dht_ops_workflow;
+use crate::holochain::core::workflow::publish_dht_ops_workflow::PublishDhtOpsWorkspace;
+use crate::holochain_state::env::EnvironmentWrite;
 
 use tokio::task::JoinHandle;
 use tracing::*;

@@ -1,17 +1,17 @@
-use monolith::holochain::conductor::api::error::ConductorApiError;
-use monolith::holochain::conductor::CellError;
-use monolith::holochain::conductor::ConductorHandle;
-use monolith::holochain::core::workflow::error::WorkflowError;
-use monolith::holochain::core::SourceChainError;
-use monolith::holochain::test_utils::new_zome_call;
-use monolith::holochain::test_utils::setup_app;
+use crate::holochain::conductor::api::error::ConductorApiError;
+use crate::holochain::conductor::CellError;
+use crate::holochain::conductor::ConductorHandle;
+use crate::holochain::core::workflow::error::WorkflowError;
+use crate::holochain::core::SourceChainError;
+use crate::holochain::test_utils::new_zome_call;
+use crate::holochain::test_utils::setup_app;
 use holochain_serialized_bytes::SerializedBytes;
-use monolith::holochain_types::app::InstalledCell;
-use monolith::holochain_types::cell::CellId;
-use monolith::holochain_types::dna::DnaDef;
-use monolith::holochain_types::dna::DnaFile;
-use monolith::holochain_types::test_utils::fake_agent_pubkey_1;
-use monolith::holochain_wasm_test_utils::TestWasm;
+use crate::holochain_types::app::InstalledCell;
+use crate::holochain_types::cell::CellId;
+use crate::holochain_types::dna::DnaDef;
+use crate::holochain_types::dna::DnaFile;
+use crate::holochain_types::test_utils::fake_agent_pubkey_1;
+use crate::holochain_wasm_test_utils::TestWasm;
 use std::convert::TryFrom;
 
 #[tokio::test(threaded_scheduler)]

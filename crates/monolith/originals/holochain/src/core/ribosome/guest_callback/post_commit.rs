@@ -1,18 +1,18 @@
-use monolith::holochain::core::ribosome::FnComponents;
-use monolith::holochain::core::ribosome::HostAccess;
-use monolith::holochain::core::ribosome::Invocation;
-use monolith::holochain::core::ribosome::ZomesToInvoke;
-use monolith::holochain::core::workflow::CallZomeWorkspaceLock;
+use crate::holochain::core::ribosome::FnComponents;
+use crate::holochain::core::ribosome::HostAccess;
+use crate::holochain::core::ribosome::Invocation;
+use crate::holochain::core::ribosome::ZomesToInvoke;
+use crate::holochain::core::workflow::CallZomeWorkspaceLock;
 use derive_more::Constructor;
-use monolith::holochain_keystore::KeystoreSender;
-use monolith::holochain_p2p::HolochainP2pCell;
+use crate::holochain_keystore::KeystoreSender;
+use crate::holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
-use monolith::holochain_types::dna::zome::HostFnAccess;
-use monolith::holochain_types::dna::zome::Zome;
-use monolith::holochain_zome_types::header::HeaderHashes;
-use monolith::holochain_zome_types::post_commit::PostCommitCallbackResult;
-use monolith::holochain_zome_types::zome::ZomeName;
-use monolith::holochain_zome_types::ExternInput;
+use crate::holochain_types::dna::zome::HostFnAccess;
+use crate::holochain_types::dna::zome::Zome;
+use crate::holochain_zome_types::header::HeaderHashes;
+use crate::holochain_zome_types::post_commit::PostCommitCallbackResult;
+use crate::holochain_zome_types::zome::ZomeName;
+use crate::holochain_zome_types::ExternInput;
 
 #[derive(Clone)]
 pub struct PostCommitInvocation {
@@ -95,16 +95,16 @@ impl From<Vec<PostCommitCallbackResult>> for PostCommitResult {
 #[cfg(test)]
 mod test {
     use super::PostCommitResult;
-    use monolith::holochain::core::ribosome::Invocation;
-    use monolith::holochain::core::ribosome::ZomesToInvoke;
-    use monolith::holochain::fixt::HeaderHashesFixturator;
-    use monolith::holochain::fixt::PostCommitHostAccessFixturator;
-    use monolith::holochain::fixt::PostCommitInvocationFixturator;
+    use crate::holochain::core::ribosome::Invocation;
+    use crate::holochain::core::ribosome::ZomesToInvoke;
+    use crate::holochain::fixt::HeaderHashesFixturator;
+    use crate::holochain::fixt::PostCommitHostAccessFixturator;
+    use crate::holochain::fixt::PostCommitInvocationFixturator;
     use ::fixt::prelude::*;
     use holochain_serialized_bytes::prelude::*;
-    use monolith::holochain_types::dna::zome::HostFnAccess;
-    use monolith::holochain_zome_types::post_commit::PostCommitCallbackResult;
-    use monolith::holochain_zome_types::ExternInput;
+    use crate::holochain_types::dna::zome::HostFnAccess;
+    use crate::holochain_zome_types::post_commit::PostCommitCallbackResult;
+    use crate::holochain_zome_types::ExternInput;
 
     #[test]
     fn post_commit_callback_result_fold() {
@@ -203,13 +203,13 @@ mod test {
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
     use super::PostCommitResult;
-    use monolith::holochain::core::ribosome::RibosomeT;
-    use monolith::holochain::fixt::curve::Zomes;
-    use monolith::holochain::fixt::PostCommitHostAccessFixturator;
-    use monolith::holochain::fixt::PostCommitInvocationFixturator;
-    use monolith::holochain::fixt::RealRibosomeFixturator;
+    use crate::holochain::core::ribosome::RibosomeT;
+    use crate::holochain::fixt::curve::Zomes;
+    use crate::holochain::fixt::PostCommitHostAccessFixturator;
+    use crate::holochain::fixt::PostCommitInvocationFixturator;
+    use crate::holochain::fixt::RealRibosomeFixturator;
     use holo_hash::fixt::HeaderHashFixturator;
-    use monolith::holochain_wasm_test_utils::TestWasm;
+    use crate::holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(threaded_scheduler)]
     async fn test_post_commit_unimplemented() {

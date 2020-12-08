@@ -1,7 +1,7 @@
-use monolith::holochain_state::buffer::BufferedStore;
-use monolith::holochain_state::error::DatabaseError;
-use monolith::holochain_state::error::DatabaseResult;
-use monolith::holochain_state::prelude::*;
+use crate::holochain_state::buffer::BufferedStore;
+use crate::holochain_state::error::DatabaseError;
+use crate::holochain_state::error::DatabaseResult;
+use crate::holochain_state::prelude::*;
 use either::Either;
 use rkv::MultiStore;
 use std::collections::BTreeMap;

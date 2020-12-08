@@ -1,8 +1,8 @@
-use monolith::holochain::core::ribosome::error::RibosomeResult;
-use monolith::holochain::core::ribosome::CallContext;
-use monolith::holochain::core::ribosome::RibosomeT;
-use monolith::holochain_zome_types::GetDetailsInput;
-use monolith::holochain_zome_types::GetDetailsOutput;
+use crate::holochain::core::ribosome::error::RibosomeResult;
+use crate::holochain::core::ribosome::CallContext;
+use crate::holochain::core::ribosome::RibosomeT;
+use crate::holochain_zome_types::GetDetailsInput;
+use crate::holochain_zome_types::GetDetailsOutput;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
@@ -33,11 +33,11 @@ pub fn get_details<'a>(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    use monolith::holochain::core::workflow::CallZomeWorkspace;
-    use monolith::holochain::fixt::ZomeCallHostAccessFixturator;
+    use crate::holochain::core::workflow::CallZomeWorkspace;
+    use crate::holochain::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use hdk3::prelude::*;
-    use monolith::holochain_wasm_test_utils::TestWasm;
+    use crate::holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_get_details_test<'a>() {

@@ -1,6 +1,6 @@
-use monolith::holochain_keystore::*;
-use monolith::holochain_zome_types::signature::Sign;
-use monolith::holochain_zome_types::signature::Signature;
+use crate::holochain_keystore::*;
+use crate::holochain_zome_types::signature::Sign;
+use crate::holochain_zome_types::signature::Signature;
 use std::sync::Arc;
 
 /// Extend holo_hash::AgentPubKey with additional signature functionality

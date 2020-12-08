@@ -1,22 +1,22 @@
 use std::convert::TryFrom;
 
 use super::SourceChainError;
-use monolith::holochain::conductor::api::error::ConductorApiError;
-use monolith::holochain::conductor::entry_def_store::error::EntryDefStoreError;
-use monolith::holochain::core::state::cascade::error::CascadeError;
-use monolith::holochain::core::state::workspace::WorkspaceError;
-use monolith::holochain::core::validation::OutcomeOrError;
-use monolith::holochain::core::workflow::error::WorkflowError;
-use monolith::holochain::from_sub_error;
+use crate::holochain::conductor::api::error::ConductorApiError;
+use crate::holochain::conductor::entry_def_store::error::EntryDefStoreError;
+use crate::holochain::core::state::cascade::error::CascadeError;
+use crate::holochain::core::state::workspace::WorkspaceError;
+use crate::holochain::core::validation::OutcomeOrError;
+use crate::holochain::core::workflow::error::WorkflowError;
+use crate::holochain::from_sub_error;
 use holo_hash::AnyDhtHash;
 use holo_hash::HeaderHash;
-use monolith::holochain_keystore::KeystoreError;
-use monolith::holochain_state::error::DatabaseError;
-use monolith::holochain_types::cell::CellId;
-use monolith::holochain_zome_types::header::AppEntryType;
-use monolith::holochain_zome_types::header::EntryType;
-use monolith::holochain_zome_types::signature::Signature;
-use monolith::holochain_zome_types::Header;
+use crate::holochain_keystore::KeystoreError;
+use crate::holochain_state::error::DatabaseError;
+use crate::holochain_types::cell::CellId;
+use crate::holochain_zome_types::header::AppEntryType;
+use crate::holochain_zome_types::header::EntryType;
+use crate::holochain_zome_types::signature::Signature;
+use crate::holochain_zome_types::Header;
 use thiserror::Error;
 
 /// Validation can result in either

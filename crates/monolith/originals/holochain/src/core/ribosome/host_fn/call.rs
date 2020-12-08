@@ -1,8 +1,8 @@
-use monolith::holochain::core::ribosome::RibosomeT;
-use monolith::holochain::core::ribosome::ZomeCall;
-use monolith::holochain::core::ribosome::{error::RibosomeResult, CallContext};
-use monolith::holochain_zome_types::{CallInput, ZomeCallResponse};
-use monolith::holochain_zome_types::{CallOutput, ExternInput};
+use crate::holochain::core::ribosome::RibosomeT;
+use crate::holochain::core::ribosome::ZomeCall;
+use crate::holochain::core::ribosome::{error::RibosomeResult, CallContext};
+use crate::holochain_zome_types::{CallInput, ZomeCallResponse};
+use crate::holochain_zome_types::{CallOutput, ExternInput};
 use std::sync::Arc;
 
 pub fn call(
@@ -55,20 +55,20 @@ pub mod wasm_test {
     use hdk3::prelude::CellId;
     use holo_hash::HeaderHash;
     use holochain_serialized_bytes::SerializedBytes;
-    use monolith::holochain_types::app::InstalledCell;
-    use monolith::holochain_types::dna::DnaDef;
-    use monolith::holochain_types::dna::DnaFile;
-    use monolith::holochain_wasm_test_utils::TestWasm;
-    use monolith::holochain_zome_types::test_utils::fake_agent_pubkey_2;
-    use monolith::holochain_zome_types::ExternInput;
-    use monolith::holochain_zome_types::ZomeCallResponse;
+    use crate::holochain_types::app::InstalledCell;
+    use crate::holochain_types::dna::DnaDef;
+    use crate::holochain_types::dna::DnaFile;
+    use crate::holochain_wasm_test_utils::TestWasm;
+    use crate::holochain_zome_types::test_utils::fake_agent_pubkey_2;
+    use crate::holochain_zome_types::ExternInput;
+    use crate::holochain_zome_types::ZomeCallResponse;
     use matches::assert_matches;
 
-    use monolith::holochain::conductor::{api::ZomeCall, ConductorHandle};
-    use monolith::holochain::core::state::element_buf::ElementBuf;
-    use monolith::holochain::test_utils::conductor_setup::ConductorTestData;
-    use monolith::holochain::test_utils::install_app;
-    use monolith::holochain::test_utils::new_zome_call;
+    use crate::holochain::conductor::{api::ZomeCall, ConductorHandle};
+    use crate::holochain::core::state::element_buf::ElementBuf;
+    use crate::holochain::test_utils::conductor_setup::ConductorTestData;
+    use crate::holochain::test_utils::install_app;
+    use crate::holochain::test_utils::new_zome_call;
 
     #[tokio::test(threaded_scheduler)]
     async fn call_test() {

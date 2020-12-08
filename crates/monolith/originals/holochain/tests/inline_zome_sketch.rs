@@ -1,13 +1,13 @@
 use futures::StreamExt;
 use hdk3::prelude::*;
-use monolith::holochain::conductor::api::ZomeCall;
-use monolith::holochain::conductor::Conductor;
-use monolith::holochain_keystore::KeystoreSender;
-use monolith::holochain_state::test_utils::test_environments;
-use monolith::holochain_types::app::InstalledCell;
-use monolith::holochain_types::dna::zome::inline_zome::InlineZome;
-use monolith::holochain_types::dna::DnaFile;
-use monolith::holochain_zome_types::element::ElementEntry;
+use crate::holochain::conductor::api::ZomeCall;
+use crate::holochain::conductor::Conductor;
+use crate::holochain_keystore::KeystoreSender;
+use crate::holochain_state::test_utils::test_environments;
+use crate::holochain_types::app::InstalledCell;
+use crate::holochain_types::dna::zome::inline_zome::InlineZome;
+use crate::holochain_types::dna::DnaFile;
+use crate::holochain_zome_types::element::ElementEntry;
 use unwrap_to::unwrap_to;
 
 fn simple_crud_zome() -> InlineZome {
@@ -144,7 +144,7 @@ pub struct TestAgent;
 impl TestAgent {
     /// Get an infinite stream of AgentPubKeys
     pub fn stream(keystore: KeystoreSender) -> impl futures::Stream<Item = AgentPubKey> {
-        use monolith::holochain_keystore::KeystoreSenderExt;
+        use crate::holochain_keystore::KeystoreSenderExt;
         futures::stream::unfold(keystore, |keystore| async {
             let key = keystore
                 .generate_sign_keypair_from_pure_entropy()

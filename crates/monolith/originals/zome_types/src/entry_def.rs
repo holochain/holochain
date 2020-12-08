@@ -1,7 +1,7 @@
-use monolith::holochain_zome_types::crdt::CrdtType;
-use monolith::holochain_zome_types::validate::RequiredValidationType;
-use monolith::holochain_zome_types::zome_io::ExternOutput;
-use monolith::holochain_zome_types::CallbackResult;
+use crate::holochain_zome_types::crdt::CrdtType;
+use crate::holochain_zome_types::validate::RequiredValidationType;
+use crate::holochain_zome_types::zome_io::ExternOutput;
+use crate::holochain_zome_types::CallbackResult;
 use holochain_serialized_bytes::prelude::*;
 
 const DEFAULT_REQUIRED_VALIDATIONS: u8 = 5;
@@ -164,9 +164,9 @@ mod tests {
     use super::EntryDef;
     use super::EntryDefsCallbackResult;
     use super::EntryVisibility;
-    use monolith::holochain_zome_types::crdt::CrdtType;
-    use monolith::holochain_zome_types::validate::RequiredValidationType;
-    use monolith::holochain_zome_types::zome_io::ExternOutput;
+    use crate::holochain_zome_types::crdt::CrdtType;
+    use crate::holochain_zome_types::validate::RequiredValidationType;
+    use crate::holochain_zome_types::zome_io::ExternOutput;
     use std::convert::TryInto;
 
     #[test]

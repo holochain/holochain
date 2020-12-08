@@ -1,16 +1,16 @@
 //! Functions dealing with obtaining and referencing singleton LMDB environments
 
-use monolith::holochain_state::db::get_db;
-use monolith::holochain_state::db::initialize_databases;
-use monolith::holochain_state::db::DbKey;
-use monolith::holochain_state::db::GetDb;
-use monolith::holochain_state::error::DatabaseError;
-use monolith::holochain_state::error::DatabaseResult;
-use monolith::holochain_state::transaction::Reader;
-use monolith::holochain_state::transaction::Writer;
+use crate::holochain_state::db::get_db;
+use crate::holochain_state::db::initialize_databases;
+use crate::holochain_state::db::DbKey;
+use crate::holochain_state::db::GetDb;
+use crate::holochain_state::error::DatabaseError;
+use crate::holochain_state::error::DatabaseResult;
+use crate::holochain_state::transaction::Reader;
+use crate::holochain_state::transaction::Writer;
 use derive_more::Into;
-use monolith::holochain_keystore::KeystoreSender;
-use monolith::holochain_types::cell::CellId;
+use crate::holochain_keystore::KeystoreSender;
+use crate::holochain_types::cell::CellId;
 use lazy_static::lazy_static;
 use parking_lot::RwLock;
 use parking_lot::RwLockReadGuard;

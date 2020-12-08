@@ -1,10 +1,10 @@
 //! Helpers for unit tests
 
-use monolith::holochain_state::env::EnvironmentKind;
-use monolith::holochain_state::env::EnvironmentWrite;
-use monolith::holochain_state::prelude::BufKey;
-use monolith::holochain_keystore::KeystoreSender;
-use monolith::holochain_types::test_utils::fake_cell_id;
+use crate::holochain_state::env::EnvironmentKind;
+use crate::holochain_state::env::EnvironmentWrite;
+use crate::holochain_state::prelude::BufKey;
+use crate::holochain_keystore::KeystoreSender;
+use crate::holochain_types::test_utils::fake_cell_id;
 use shrinkwraprs::Shrinkwrap;
 use std::sync::Arc;
 use tempdir::TempDir;
@@ -32,7 +32,7 @@ pub fn test_p2p_env() -> TestEnvironment {
 
 /// Generate a test keystore pre-populated with a couple test keypairs.
 pub fn test_keystore() -> holochain_keystore::KeystoreSender {
-    use monolith::holochain_keystore::KeystoreSenderExt;
+    use crate::holochain_keystore::KeystoreSenderExt;
 
     tokio_safe_block_on::tokio_safe_block_on(
         async move {

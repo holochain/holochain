@@ -6,21 +6,21 @@
 
 #![allow(missing_docs)]
 
-use monolith::holochain_types::element::ElementStatus;
-use monolith::holochain_types::element::SignedHeaderHashed;
-use monolith::holochain_types::element::SignedHeaderHashedExt;
-use monolith::holochain_types::prelude::*;
+use crate::holochain_types::element::ElementStatus;
+use crate::holochain_types::element::SignedHeaderHashed;
+use crate::holochain_types::element::SignedHeaderHashedExt;
+use crate::holochain_types::prelude::*;
 use conversions::WrongHeaderError;
 use derive_more::From;
 use holo_hash::EntryHash;
-use monolith::holochain_zome_types::element::Element;
-use monolith::holochain_zome_types::element::SignedHeader;
-use monolith::holochain_zome_types::entry_def::EntryVisibility;
-pub use monolith::holochain_zome_types::header::HeaderHashed;
-use monolith::holochain_zome_types::header::*;
-use monolith::holochain_zome_types::signature::Signature;
-use monolith::holochain_zome_types::validate::ValidationStatus;
-use monolith::holochain_zome_types::Entry;
+use crate::holochain_zome_types::element::Element;
+use crate::holochain_zome_types::element::SignedHeader;
+use crate::holochain_zome_types::entry_def::EntryVisibility;
+pub use crate::holochain_zome_types::header::HeaderHashed;
+use crate::holochain_zome_types::header::*;
+use crate::holochain_zome_types::signature::Signature;
+use crate::holochain_zome_types::validate::ValidationStatus;
+use crate::holochain_zome_types::Entry;
 
 use error::*;
 
@@ -392,9 +392,9 @@ impl<'a> From<&'a NewEntryHeader> for NewEntryHeaderRef<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use monolith::holochain_types::fixt::HeaderBuilderCommonFixturator;
-    use monolith::holochain_types::test_utils::fake_dna_hash;
-    use monolith::holochain_types::test_utils::fake_entry_hash;
+    use crate::holochain_types::fixt::HeaderBuilderCommonFixturator;
+    use crate::holochain_types::test_utils::fake_dna_hash;
+    use crate::holochain_types::test_utils::fake_entry_hash;
     use ::fixt::prelude::*;
 
     #[test]

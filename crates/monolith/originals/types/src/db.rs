@@ -1,6 +1,6 @@
 //! Utility items related to data persistence.
 
-use monolith::holochain_types::cell::CellId;
+use crate::holochain_types::cell::CellId;
 use std::path::Path;
 use std::path::PathBuf;
 

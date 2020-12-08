@@ -1,19 +1,19 @@
-use monolith::holochain::core::state::element_buf::ElementBuf;
+use crate::holochain::core::state::element_buf::ElementBuf;
 use error::DhtOpConvertError;
 use error::DhtOpConvertResult;
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
-use monolith::holochain_types::dht_op::DhtOp;
-use monolith::holochain_types::dht_op::DhtOpLight;
-use monolith::holochain_types::header::NewEntryHeader;
-use monolith::holochain_zome_types::entry_def::EntryVisibility;
-use monolith::holochain_zome_types::header;
-use monolith::holochain_zome_types::header::Header;
-use monolith::holochain_zome_types::signature::Signature;
+use crate::holochain_types::dht_op::DhtOp;
+use crate::holochain_types::dht_op::DhtOpLight;
+use crate::holochain_types::header::NewEntryHeader;
+use crate::holochain_zome_types::entry_def::EntryVisibility;
+use crate::holochain_zome_types::header;
+use crate::holochain_zome_types::header::Header;
+use crate::holochain_zome_types::signature::Signature;
 
 pub mod error;
 
-use monolith::holochain_state::prelude::PrefixType;
+use crate::holochain_state::prelude::PrefixType;
 use tracing::*;
 
 #[cfg(test)]
