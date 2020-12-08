@@ -3,7 +3,7 @@
 use monolith::holochain_websocket::*;
 use task_dispatch_incoming::ToDispatchIncoming;
 use task_dispatch_incoming::ToDispatchIncomingSender;
-use task_socket_sink::ToSocketSinkSender;
+use super::task_socket_sink::ToSocketSinkSender;
 
 /// See module-level documentation for this internal task
 pub(crate) fn build<S>(

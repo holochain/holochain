@@ -1524,6 +1524,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "lair_keystore_client"
+version = "0.0.1-alpha.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "573c0df3428bca8176fc287a26f8fa986408dc5ced8ad90a31a98f850594aaac"
+dependencies = [
+ "ghost_actor",
+ "lair_keystore_api",
+ "tempfile",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "lazy_static"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1766,6 +1779,8 @@ dependencies = [
  "holochain_wasmer_host",
  "human-panic",
  "kitsune_p2p",
+ "lair_keystore_api",
+ "lair_keystore_client",
  "lazy_static",
  "maplit",
  "matches",

@@ -4,7 +4,7 @@
 //! This internal task manages both these cases.
 
 use monolith::holochain_websocket::*;
-use task_socket_sink::ToSocketSinkSender;
+use super::task_socket_sink::ToSocketSinkSender;
 
 /// internal message type for forwarding data to this task
 #[derive(Debug)]

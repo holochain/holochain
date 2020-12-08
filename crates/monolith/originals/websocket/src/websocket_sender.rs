@@ -3,7 +3,7 @@
 use monolith::holochain_websocket::*;
 use task_dispatch_incoming::ToDispatchIncoming;
 use task_dispatch_incoming::ToDispatchIncomingSender;
-use task_socket_sink::ToSocketSinkSender;
+use super::task_socket_sink::ToSocketSinkSender;
 use tracing_futures::Instrument;
 
 /// The Sender/Write half of a split websocket. Use this to make
