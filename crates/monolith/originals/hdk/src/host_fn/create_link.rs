@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use monolith::hdk::prelude::*;
 
 /// Create a link from a base entry to a target entry, with an optional tag.
 ///

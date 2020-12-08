@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use monolith::hdk::prelude::*;
 
 /// Wrapper for __call_remote host function.
 ///

@@ -7,7 +7,7 @@
 /// using the ElementBuf for caching non-authored data, or for situations where
 /// it is known that private entries should be protected, such as when handling
 /// a get_entry request from the network.
-use crate::core::state::source_chain::SourceChainResult;
+use monolith::holochain::core::state::source_chain::SourceChainResult;
 use holo_hash::EntryHash;
 use holo_hash::HasHash;
 use holo_hash::HeaderHash;
@@ -340,7 +340,7 @@ impl<P: PrefixType> BufferedStore for ElementBuf<P> {
 #[cfg(test)]
 mod tests {
     use super::ElementBuf;
-    use crate::test_utils::fake_unique_element;
+    use monolith::holochain::test_utils::fake_unique_element;
     use holo_hash::*;
     use monolith::holochain_keystore::test_keystore::spawn_test_keystore;
     use monolith::holochain_keystore::AgentPubKeyExt;

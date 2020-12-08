@@ -1,7 +1,7 @@
-use crate::conductor::p2p_store::AgentKv;
-use crate::conductor::p2p_store::AgentKvKey;
-use crate::test_utils::conductor_setup::ConductorTestData;
-use crate::test_utils::new_zome_call;
+use monolith::holochain::conductor::p2p_store::AgentKv;
+use monolith::holochain::conductor::p2p_store::AgentKvKey;
+use monolith::holochain::test_utils::conductor_setup::ConductorTestData;
+use monolith::holochain::test_utils::new_zome_call;
 use fallible_iterator::FallibleIterator;
 use hdk3::prelude::*;
 use monolith::holochain_state::buffer::KvStoreT;

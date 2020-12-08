@@ -1,5 +1,5 @@
-use crate::header::ZomeId;
-use crate::zome::ZomeName;
+use monolith::holochain_zome_types::header::ZomeId;
+use monolith::holochain_zome_types::zome::ZomeName;
 use holo_hash::DnaHash;
 use holochain_serialized_bytes::prelude::*;
 

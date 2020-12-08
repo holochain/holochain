@@ -1,6 +1,6 @@
-use crate::hash_path::path::Component;
-use crate::hash_path::path::Path;
-use crate::prelude::*;
+use monolith::hdk::hash_path::path::Component;
+use monolith::hdk::hash_path::path::Path;
+use monolith::hdk::prelude::*;
 use holochain_wasmer_guest::*;
 
 /// "hdk3anchor"

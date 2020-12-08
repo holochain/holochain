@@ -13,12 +13,12 @@
 use super::error::WorkflowResult;
 use super::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
 use super::produce_dht_ops_workflow::dht_op_light::light_to_op;
-use crate::core::queue_consumer::OneshotWriter;
-use crate::core::queue_consumer::WorkComplete;
-use crate::core::state::dht_op_integration::AuthoredDhtOpsStore;
-use crate::core::state::element_buf::ElementBuf;
-use crate::core::state::workspace::Workspace;
-use crate::core::state::workspace::WorkspaceResult;
+use monolith::holochain::core::queue_consumer::OneshotWriter;
+use monolith::holochain::core::queue_consumer::WorkComplete;
+use monolith::holochain::core::state::dht_op_integration::AuthoredDhtOpsStore;
+use monolith::holochain::core::state::element_buf::ElementBuf;
+use monolith::holochain::core::state::workspace::Workspace;
+use monolith::holochain::core::state::workspace::WorkspaceResult;
 use fallible_iterator::FallibleIterator;
 use holo_hash::*;
 use monolith::holochain_p2p::HolochainP2pCell;
@@ -169,17 +169,17 @@ impl PublishDhtOpsWorkspace {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::queue_consumer::TriggerSender;
-    use crate::core::state::dht_op_integration::AuthoredDhtOpsValue;
-    use crate::core::state::source_chain::SourceChain;
-    use crate::core::workflow::fake_genesis;
-    use crate::core::workflow::produce_dht_ops_workflow::produce_dht_ops_workflow;
-    use crate::core::workflow::produce_dht_ops_workflow::ProduceDhtOpsWorkspace;
-    use crate::core::SourceChainError;
-    use crate::fixt::CreateLinkFixturator;
-    use crate::fixt::EntryFixturator;
-    use crate::test_utils::test_network_with_events;
-    use crate::test_utils::TestNetwork;
+    use monolith::holochain::core::queue_consumer::TriggerSender;
+    use monolith::holochain::core::state::dht_op_integration::AuthoredDhtOpsValue;
+    use monolith::holochain::core::state::source_chain::SourceChain;
+    use monolith::holochain::core::workflow::fake_genesis;
+    use monolith::holochain::core::workflow::produce_dht_ops_workflow::produce_dht_ops_workflow;
+    use monolith::holochain::core::workflow::produce_dht_ops_workflow::ProduceDhtOpsWorkspace;
+    use monolith::holochain::core::SourceChainError;
+    use monolith::holochain::fixt::CreateLinkFixturator;
+    use monolith::holochain::fixt::EntryFixturator;
+    use monolith::holochain::test_utils::test_network_with_events;
+    use monolith::holochain::test_utils::TestNetwork;
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
     use holo_hash::fixt::*;

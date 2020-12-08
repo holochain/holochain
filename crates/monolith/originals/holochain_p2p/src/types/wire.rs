@@ -1,4 +1,4 @@
-use crate::*;
+use monolith::holochain_p2p::*;
 use monolith::holochain_zome_types::zome::FunctionName;
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]

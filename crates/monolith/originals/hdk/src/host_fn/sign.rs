@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use monolith::hdk::prelude::*;
 
 /// Sign some data using the private key for the passed public key
 ///

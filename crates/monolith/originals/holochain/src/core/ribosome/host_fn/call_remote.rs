@@ -1,6 +1,6 @@
-use crate::core::ribosome::error::RibosomeResult;
-use crate::core::ribosome::CallContext;
-use crate::core::ribosome::RibosomeT;
+use monolith::holochain::core::ribosome::error::RibosomeResult;
+use monolith::holochain::core::ribosome::CallContext;
+use monolith::holochain::core::ribosome::RibosomeT;
 use monolith::holochain_p2p::HolochainP2pCellT;
 use monolith::holochain_zome_types::CallRemoteInput;
 use monolith::holochain_zome_types::CallRemoteOutput;
@@ -38,9 +38,9 @@ pub fn call_remote(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    use crate::conductor::interface::websocket::test::setup_app;
-    use crate::conductor::{api::ZomeCall, dna_store::MockDnaStore};
-    use crate::core::ribosome::ZomeCallResponse;
+    use monolith::holochain::conductor::interface::websocket::test::setup_app;
+    use monolith::holochain::conductor::{api::ZomeCall, dna_store::MockDnaStore};
+    use monolith::holochain::core::ribosome::ZomeCallResponse;
     use hdk3::prelude::*;
     use monolith::holochain_types::app::InstalledCell;
     use monolith::holochain_types::cell::CellId;

@@ -12,26 +12,26 @@ pub mod guest_callback;
 pub mod host_fn;
 pub mod real_ribosome;
 
-use crate::conductor::api::CellConductorApi;
-use crate::conductor::api::CellConductorReadHandle;
-use crate::conductor::api::ZomeCall;
-use crate::conductor::interface::SignalBroadcaster;
-use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
-use crate::core::ribosome::guest_callback::init::InitInvocation;
-use crate::core::ribosome::guest_callback::init::InitResult;
-use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentInvocation;
-use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentResult;
-use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
-use crate::core::ribosome::guest_callback::post_commit::PostCommitResult;
-use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
-use crate::core::ribosome::guest_callback::validate::ValidateResult;
-use crate::core::ribosome::guest_callback::validate_link::ValidateLinkHostAccess;
-use crate::core::ribosome::guest_callback::validate_link::ValidateLinkInvocation;
-use crate::core::ribosome::guest_callback::validate_link::ValidateLinkResult;
-use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
-use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
-use crate::core::ribosome::guest_callback::CallIterator;
-use crate::core::workflow::CallZomeWorkspaceLock;
+use monolith::holochain::conductor::api::CellConductorApi;
+use monolith::holochain::conductor::api::CellConductorReadHandle;
+use monolith::holochain::conductor::api::ZomeCall;
+use monolith::holochain::conductor::interface::SignalBroadcaster;
+use monolith::holochain::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
+use monolith::holochain::core::ribosome::guest_callback::init::InitInvocation;
+use monolith::holochain::core::ribosome::guest_callback::init::InitResult;
+use monolith::holochain::core::ribosome::guest_callback::migrate_agent::MigrateAgentInvocation;
+use monolith::holochain::core::ribosome::guest_callback::migrate_agent::MigrateAgentResult;
+use monolith::holochain::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
+use monolith::holochain::core::ribosome::guest_callback::post_commit::PostCommitResult;
+use monolith::holochain::core::ribosome::guest_callback::validate::ValidateInvocation;
+use monolith::holochain::core::ribosome::guest_callback::validate::ValidateResult;
+use monolith::holochain::core::ribosome::guest_callback::validate_link::ValidateLinkHostAccess;
+use monolith::holochain::core::ribosome::guest_callback::validate_link::ValidateLinkInvocation;
+use monolith::holochain::core::ribosome::guest_callback::validate_link::ValidateLinkResult;
+use monolith::holochain::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
+use monolith::holochain::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
+use monolith::holochain::core::ribosome::guest_callback::CallIterator;
+use monolith::holochain::core::workflow::CallZomeWorkspaceLock;
 use derive_more::Constructor;
 use error::RibosomeResult;
 use guest_callback::entry_defs::EntryDefsHostAccess;
@@ -332,7 +332,7 @@ impl Invocation for ZomeCallInvocation {
 
 impl ZomeCallInvocation {
     pub async fn from_interface_call(conductor_api: CellConductorApi, call: ZomeCall) -> Self {
-        use crate::conductor::api::CellConductorApiT;
+        use monolith::holochain::conductor::api::CellConductorApiT;
         let ZomeCall {
             cell_id,
             zome_name,
@@ -524,7 +524,7 @@ impl std::fmt::Debug for MockRibosomeT {
 
 #[cfg(test)]
 pub mod wasm_test {
-    use crate::core::ribosome::FnComponents;
+    use monolith::holochain::core::ribosome::FnComponents;
     use core::time::Duration;
 
     pub fn now() -> Duration {

@@ -1,6 +1,6 @@
-use crate::capability::CapSecret;
-use crate::zome::FunctionName;
-use crate::zome::ZomeName;
+use monolith::holochain_zome_types::capability::CapSecret;
+use monolith::holochain_zome_types::zome::FunctionName;
+use monolith::holochain_zome_types::zome::ZomeName;
 use holo_hash::AgentPubKey;
 use holochain_serialized_bytes::prelude::SerializedBytes;
 

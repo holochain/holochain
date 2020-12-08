@@ -9,7 +9,7 @@ use super::metadata::ChainItemKey;
 use super::metadata::LinkMetaKey;
 use super::metadata::MetadataBuf;
 use super::metadata::MetadataBufT;
-use crate::core::workflow::integrate_dht_ops_workflow::integrate_single_metadata;
+use monolith::holochain::core::workflow::integrate_dht_ops_workflow::integrate_single_metadata;
 use either::Either;
 use error::CascadeResult;
 use fallible_iterator::FallibleIterator;

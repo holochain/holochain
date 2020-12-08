@@ -1,8 +1,8 @@
 //! Metadata types for use in wasm
-use crate::element::Element;
-use crate::element::SignedHeaderHashed;
-use crate::validate::ValidationStatus;
-use crate::Entry;
+use monolith::holochain_zome_types::element::Element;
+use monolith::holochain_zome_types::element::SignedHeaderHashed;
+use monolith::holochain_zome_types::validate::ValidationStatus;
+use monolith::holochain_zome_types::Entry;
 use holochain_serialized_bytes::prelude::*;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, SerializedBytes)]

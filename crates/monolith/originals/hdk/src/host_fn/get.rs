@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use monolith::hdk::prelude::*;
 
 /// Gets an element for a given entry or header hash.
 ///

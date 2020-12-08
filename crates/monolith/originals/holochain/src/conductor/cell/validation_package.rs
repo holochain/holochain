@@ -6,14 +6,14 @@ use monolith::holochain_state::prelude::*;
 use monolith::holochain_types::dna::DnaFile;
 use monolith::holochain_types::HeaderHashed;
 
-use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
-use crate::core::ribosome::RibosomeT;
-use crate::core::state::cascade::Cascade;
-use crate::core::state::cascade::DbPair;
-use crate::core::state::cascade::DbPairMut;
-use crate::core::workflow::app_validation_workflow::validation_package::get_as_author_custom;
-use crate::core::workflow::app_validation_workflow::validation_package::get_as_author_full;
-use crate::core::workflow::app_validation_workflow::validation_package::get_as_author_sub_chain;
+use monolith::holochain::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
+use monolith::holochain::core::ribosome::RibosomeT;
+use monolith::holochain::core::state::cascade::Cascade;
+use monolith::holochain::core::state::cascade::DbPair;
+use monolith::holochain::core::state::cascade::DbPairMut;
+use monolith::holochain::core::workflow::app_validation_workflow::validation_package::get_as_author_custom;
+use monolith::holochain::core::workflow::app_validation_workflow::validation_package::get_as_author_full;
+use monolith::holochain::core::workflow::app_validation_workflow::validation_package::get_as_author_sub_chain;
 
 use super::*;
 

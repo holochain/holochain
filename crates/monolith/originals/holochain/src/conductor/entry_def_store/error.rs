@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use crate::core::ribosome::error::RibosomeError;
+use monolith::holochain::core::ribosome::error::RibosomeError;
 use monolith::holochain_zome_types::zome::ZomeName;
 use thiserror::Error;
 

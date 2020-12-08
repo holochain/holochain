@@ -1,12 +1,12 @@
 use super::error::WorkflowResult;
-use crate::core::queue_consumer::OneshotWriter;
-use crate::core::queue_consumer::TriggerSender;
-use crate::core::queue_consumer::WorkComplete;
-use crate::core::state::dht_op_integration::AuthoredDhtOpsStore;
-use crate::core::state::dht_op_integration::AuthoredDhtOpsValue;
-use crate::core::state::source_chain::SourceChain;
-use crate::core::state::workspace::Workspace;
-use crate::core::state::workspace::WorkspaceResult;
+use monolith::holochain::core::queue_consumer::OneshotWriter;
+use monolith::holochain::core::queue_consumer::TriggerSender;
+use monolith::holochain::core::queue_consumer::WorkComplete;
+use monolith::holochain::core::state::dht_op_integration::AuthoredDhtOpsStore;
+use monolith::holochain::core::state::dht_op_integration::AuthoredDhtOpsValue;
+use monolith::holochain::core::state::source_chain::SourceChain;
+use monolith::holochain::core::state::workspace::Workspace;
+use monolith::holochain::core::state::workspace::WorkspaceResult;
 use monolith::holochain_state::buffer::KvBufFresh;
 use monolith::holochain_state::db::AUTHORED_DHT_OPS;
 use monolith::holochain_state::prelude::BufferedStore;
@@ -88,7 +88,7 @@ impl Workspace for ProduceDhtOpsWorkspace {
 mod tests {
     use super::super::genesis_workflow::tests::fake_genesis;
     use super::*;
-    use crate::core::state::source_chain::SourceChain;
+    use monolith::holochain::core::state::source_chain::SourceChain;
 
     use ::fixt::prelude::*;
     use fallible_iterator::FallibleIterator;

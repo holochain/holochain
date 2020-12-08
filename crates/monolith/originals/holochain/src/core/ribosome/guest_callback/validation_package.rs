@@ -1,8 +1,8 @@
-use crate::core::ribosome::FnComponents;
-use crate::core::ribosome::HostAccess;
-use crate::core::ribosome::Invocation;
-use crate::core::ribosome::ZomesToInvoke;
-use crate::core::workflow::CallZomeWorkspaceLock;
+use monolith::holochain::core::ribosome::FnComponents;
+use monolith::holochain::core::ribosome::HostAccess;
+use monolith::holochain::core::ribosome::Invocation;
+use monolith::holochain::core::ribosome::ZomesToInvoke;
+use monolith::holochain::core::workflow::CallZomeWorkspaceLock;
 use derive_more::Constructor;
 use holo_hash::AnyDhtHash;
 use monolith::holochain_p2p::HolochainP2pCell;
@@ -127,10 +127,10 @@ impl From<Vec<ValidationPackageCallbackResult>> for ValidationPackageResult {
 #[cfg(test)]
 mod test {
     use super::ValidationPackageResult;
-    use crate::core::ribosome::Invocation;
-    use crate::core::ribosome::ZomesToInvoke;
-    use crate::fixt::ValidationPackageHostAccessFixturator;
-    use crate::fixt::ValidationPackageInvocationFixturator;
+    use monolith::holochain::core::ribosome::Invocation;
+    use monolith::holochain::core::ribosome::ZomesToInvoke;
+    use monolith::holochain::fixt::ValidationPackageHostAccessFixturator;
+    use monolith::holochain::fixt::ValidationPackageInvocationFixturator;
     use holochain_serialized_bytes::prelude::*;
     use monolith::holochain_types::dna::zome::HostFnAccess;
     use monolith::holochain_zome_types::validate::ValidationPackage;
@@ -253,11 +253,11 @@ mod test {
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
     use super::ValidationPackageResult;
-    use crate::core::ribosome::RibosomeT;
-    use crate::fixt::curve::Zomes;
-    use crate::fixt::RealRibosomeFixturator;
-    use crate::fixt::ValidationPackageHostAccessFixturator;
-    use crate::fixt::ValidationPackageInvocationFixturator;
+    use monolith::holochain::core::ribosome::RibosomeT;
+    use monolith::holochain::fixt::curve::Zomes;
+    use monolith::holochain::fixt::RealRibosomeFixturator;
+    use monolith::holochain::fixt::ValidationPackageHostAccessFixturator;
+    use monolith::holochain::fixt::ValidationPackageInvocationFixturator;
     use hdk3::prelude::AppEntryType;
     use hdk3::prelude::EntryVisibility;
     use monolith::holochain_wasm_test_utils::TestWasm;

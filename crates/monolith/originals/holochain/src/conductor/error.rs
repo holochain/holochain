@@ -1,7 +1,7 @@
 use super::entry_def_store::error::EntryDefStoreError;
 use super::interface::error::InterfaceError;
-use crate::conductor::cell::error::CellError;
-use crate::core::workflow::error::WorkflowError;
+use monolith::holochain::conductor::cell::error::CellError;
+use monolith::holochain::core::workflow::error::WorkflowError;
 use monolith::holochain_state::error::DatabaseError;
 use monolith::holochain_types::app::InstalledAppId;
 use monolith::holochain_types::cell::CellId;

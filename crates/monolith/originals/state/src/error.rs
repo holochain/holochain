@@ -3,7 +3,7 @@
 // missing_docs allowed here since the errors already have self-descriptive strings
 #![allow(missing_docs)]
 
-use crate::db::DbName;
+use monolith::holochain_state::db::DbName;
 use failure::Fail;
 use monolith::holochain_types::element::error::ElementGroupError;
 use monolith::holochain_types::prelude::SerializedBytesError;

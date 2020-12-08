@@ -9,11 +9,11 @@
 
 use super::error::WorkflowError;
 use super::error::WorkflowResult;
-use crate::conductor::api::CellConductorApiT;
-use crate::core::queue_consumer::OneshotWriter;
-use crate::core::state::source_chain::SourceChainBuf;
-use crate::core::state::workspace::Workspace;
-use crate::core::state::workspace::WorkspaceResult;
+use monolith::holochain::conductor::api::CellConductorApiT;
+use monolith::holochain::core::queue_consumer::OneshotWriter;
+use monolith::holochain::core::state::source_chain::SourceChainBuf;
+use monolith::holochain::core::state::workspace::Workspace;
+use monolith::holochain::core::state::workspace::WorkspaceResult;
 use derive_more::Constructor;
 use monolith::holochain_state::prelude::*;
 use monolith::holochain_types::dna::DnaFile;
@@ -104,9 +104,9 @@ impl Workspace for GenesisWorkspace {
 pub mod tests {
     use super::*;
 
-    use crate::conductor::api::MockCellConductorApi;
-    use crate::core::state::source_chain::SourceChain;
-    use crate::core::SourceChainResult;
+    use monolith::holochain::conductor::api::MockCellConductorApi;
+    use monolith::holochain::core::state::source_chain::SourceChain;
+    use monolith::holochain::core::SourceChainResult;
     use fallible_iterator::FallibleIterator;
     use monolith::holochain_state::test_utils::test_cell_env;
     use monolith::holochain_types::observability;

@@ -1,6 +1,6 @@
-use crate::entry_def::EntryVisibility;
-use crate::link::LinkTag;
-use crate::timestamp::Timestamp;
+use monolith::holochain_zome_types::entry_def::EntryVisibility;
+use monolith::holochain_zome_types::link::LinkTag;
+use monolith::holochain_zome_types::timestamp::Timestamp;
 pub use builder::HeaderBuilder;
 pub use builder::HeaderBuilderCommon;
 use holo_hash::impl_hashable_content;

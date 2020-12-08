@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use monolith::hdk::prelude::*;
 
 /// General that can delete any entry type.
 ///

@@ -1,6 +1,6 @@
-use crate::header::HeaderHashes;
-use crate::zome_io::ExternOutput;
-use crate::CallbackResult;
+use monolith::holochain_zome_types::header::HeaderHashes;
+use monolith::holochain_zome_types::zome_io::ExternOutput;
+use monolith::holochain_zome_types::CallbackResult;
 use holochain_serialized_bytes::prelude::*;
 
 #[derive(Clone, PartialEq, Serialize, Deserialize, SerializedBytes)]

@@ -1,7 +1,7 @@
-use crate::core::ribosome::FnComponents;
-use crate::core::ribosome::HostAccess;
-use crate::core::ribosome::Invocation;
-use crate::core::ribosome::ZomesToInvoke;
+use monolith::holochain::core::ribosome::FnComponents;
+use monolith::holochain::core::ribosome::HostAccess;
+use monolith::holochain::core::ribosome::Invocation;
+use monolith::holochain::core::ribosome::ZomesToInvoke;
 use derive_more::Constructor;
 use holochain_serialized_bytes::prelude::*;
 use monolith::holochain_types::dna::zome::HostFnAccess;
@@ -95,11 +95,11 @@ impl From<Vec<(ZomeName, EntryDefsCallbackResult)>> for EntryDefsResult {
 mod test {
     use super::EntryDefsHostAccess;
     use super::EntryDefsResult;
-    use crate::core::ribosome::Invocation;
-    use crate::core::ribosome::ZomesToInvoke;
-    use crate::fixt::EntryDefsFixturator;
-    use crate::fixt::EntryDefsInvocationFixturator;
-    use crate::fixt::ZomeNameFixturator;
+    use monolith::holochain::core::ribosome::Invocation;
+    use monolith::holochain::core::ribosome::ZomesToInvoke;
+    use monolith::holochain::fixt::EntryDefsFixturator;
+    use monolith::holochain::fixt::EntryDefsInvocationFixturator;
+    use monolith::holochain::fixt::ZomeNameFixturator;
     use ::fixt::prelude::*;
     use holochain_serialized_bytes::prelude::*;
     use monolith::holochain_types::dna::zome::HostFnAccess;
@@ -226,12 +226,12 @@ mod test {
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
-    use crate::core::ribosome::guest_callback::entry_defs::EntryDefsHostAccess;
-    use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
-    use crate::core::ribosome::RibosomeT;
-    use crate::fixt::curve::Zomes;
-    use crate::fixt::EntryDefsInvocationFixturator;
-    use crate::fixt::RealRibosomeFixturator;
+    use monolith::holochain::core::ribosome::guest_callback::entry_defs::EntryDefsHostAccess;
+    use monolith::holochain::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
+    use monolith::holochain::core::ribosome::RibosomeT;
+    use monolith::holochain::fixt::curve::Zomes;
+    use monolith::holochain::fixt::EntryDefsInvocationFixturator;
+    use monolith::holochain::fixt::RealRibosomeFixturator;
     use monolith::holochain_wasm_test_utils::TestWasm;
     use monolith::holochain_zome_types::crdt::CrdtType;
     use monolith::holochain_zome_types::entry_def::EntryDef;

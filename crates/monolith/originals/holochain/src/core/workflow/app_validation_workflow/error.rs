@@ -3,12 +3,12 @@ use monolith::holochain_types::cell::CellId;
 use monolith::holochain_zome_types::header::ZomeId;
 use thiserror::Error;
 
-use crate::conductor::entry_def_store::error::EntryDefStoreError;
-use crate::core::ribosome::error::RibosomeError;
-use crate::core::state::cascade::error::CascadeError;
-use crate::core::validation::OutcomeOrError;
-use crate::core::SourceChainError;
-use crate::from_sub_error;
+use monolith::holochain::conductor::entry_def_store::error::EntryDefStoreError;
+use monolith::holochain::core::ribosome::error::RibosomeError;
+use monolith::holochain::core::state::cascade::error::CascadeError;
+use monolith::holochain::core::validation::OutcomeOrError;
+use monolith::holochain::core::SourceChainError;
+use monolith::holochain::from_sub_error;
 
 use super::types::Outcome;
 

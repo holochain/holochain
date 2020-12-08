@@ -2,10 +2,10 @@ use std::convert::TryFrom;
 use std::time::Duration;
 
 use super::*;
-use crate::conductor::ConductorHandle;
-use crate::core::state::source_chain::SourceChain;
-use crate::test_utils::setup_app;
-use crate::test_utils::wait_for_integration;
+use monolith::holochain::conductor::ConductorHandle;
+use monolith::holochain::core::state::source_chain::SourceChain;
+use monolith::holochain::test_utils::setup_app;
+use monolith::holochain::test_utils::wait_for_integration;
 use ::fixt::prelude::*;
 use monolith::holochain_keystore::AgentPubKeyExt;
 use holochain_serialized_bytes::SerializedBytes;

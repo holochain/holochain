@@ -1,6 +1,6 @@
-use crate::core::ribosome::RibosomeT;
-use crate::core::ribosome::ZomeCall;
-use crate::core::ribosome::{error::RibosomeResult, CallContext};
+use monolith::holochain::core::ribosome::RibosomeT;
+use monolith::holochain::core::ribosome::ZomeCall;
+use monolith::holochain::core::ribosome::{error::RibosomeResult, CallContext};
 use monolith::holochain_zome_types::{CallInput, ZomeCallResponse};
 use monolith::holochain_zome_types::{CallOutput, ExternInput};
 use std::sync::Arc;
@@ -64,11 +64,11 @@ pub mod wasm_test {
     use monolith::holochain_zome_types::ZomeCallResponse;
     use matches::assert_matches;
 
-    use crate::conductor::{api::ZomeCall, ConductorHandle};
-    use crate::core::state::element_buf::ElementBuf;
-    use crate::test_utils::conductor_setup::ConductorTestData;
-    use crate::test_utils::install_app;
-    use crate::test_utils::new_zome_call;
+    use monolith::holochain::conductor::{api::ZomeCall, ConductorHandle};
+    use monolith::holochain::core::state::element_buf::ElementBuf;
+    use monolith::holochain::test_utils::conductor_setup::ConductorTestData;
+    use monolith::holochain::test_utils::install_app;
+    use monolith::holochain::test_utils::new_zome_call;
 
     #[tokio::test(threaded_scheduler)]
     async fn call_test() {

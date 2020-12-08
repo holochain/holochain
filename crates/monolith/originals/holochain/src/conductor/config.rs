@@ -14,7 +14,7 @@ use super::error::ConductorError;
 use super::error::ConductorResult;
 use super::paths::EnvironmentRootPath;
 
-pub use crate::conductor::interface::InterfaceDriver;
+pub use monolith::holochain::conductor::interface::InterfaceDriver;
 pub use admin_interface_config::AdminInterfaceConfig;
 pub use dpki_config::DpkiConfig;
 //pub use logger_config::LoggerConfig;

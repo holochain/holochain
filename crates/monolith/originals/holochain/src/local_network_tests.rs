@@ -16,14 +16,14 @@ use kitsune_p2p::KitsuneP2pConfig;
 use matches::assert_matches;
 use tempdir::TempDir;
 
-use crate::conductor::p2p_store::all_agent_infos;
-use crate::conductor::p2p_store::inject_agent_infos;
-use crate::conductor::ConductorHandle;
-use crate::core::ribosome::error::RibosomeError;
-use crate::core::ribosome::error::RibosomeResult;
-use crate::test_utils::install_app;
-use crate::test_utils::new_zome_call;
-use crate::test_utils::setup_app_with_network;
+use monolith::holochain::conductor::p2p_store::all_agent_infos;
+use monolith::holochain::conductor::p2p_store::inject_agent_infos;
+use monolith::holochain::conductor::ConductorHandle;
+use monolith::holochain::core::ribosome::error::RibosomeError;
+use monolith::holochain::core::ribosome::error::RibosomeResult;
+use monolith::holochain::test_utils::install_app;
+use monolith::holochain::test_utils::new_zome_call;
+use monolith::holochain::test_utils::setup_app_with_network;
 use shrinkwraprs::Shrinkwrap;
 use test_case::test_case;
 

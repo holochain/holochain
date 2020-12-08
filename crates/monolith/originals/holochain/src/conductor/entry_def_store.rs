@@ -1,10 +1,10 @@
 //! # Entry Defs Store
 //! Stores all the entry definitions across zomes
-use crate::core::ribosome::guest_callback::entry_defs::EntryDefsHostAccess;
-use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
-use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
-use crate::core::ribosome::real_ribosome::RealRibosome;
-use crate::core::ribosome::RibosomeT;
+use monolith::holochain::core::ribosome::guest_callback::entry_defs::EntryDefsHostAccess;
+use monolith::holochain::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
+use monolith::holochain::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
+use monolith::holochain::core::ribosome::real_ribosome::RealRibosome;
+use monolith::holochain::core::ribosome::RibosomeT;
 
 use super::api::CellConductorApiT;
 use error::EntryDefStoreError;
@@ -225,7 +225,7 @@ pub(crate) fn get_entry_defs(
 #[cfg(test)]
 mod tests {
     use super::EntryDefBufferKey;
-    use crate::conductor::Conductor;
+    use monolith::holochain::conductor::Conductor;
     use holo_hash::HasHash;
     use monolith::holochain_state::test_utils::test_environments;
     use monolith::holochain_types::dna::wasm::DnaWasmHashed;

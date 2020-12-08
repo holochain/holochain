@@ -1,7 +1,7 @@
 //! Structs which allow the Conductor's state to be persisted across
 //! startups and shutdowns
 
-use crate::conductor::interface::InterfaceDriver;
+use monolith::holochain::conductor::interface::InterfaceDriver;
 
 use monolith::holochain_types::app::InstalledApp;
 use monolith::holochain_types::app::InstalledAppId;

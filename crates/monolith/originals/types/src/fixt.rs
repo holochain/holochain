@@ -4,15 +4,15 @@
 
 #![allow(missing_docs)]
 
-use crate::cell::CellId;
-use crate::dna::zome::HostFnAccess;
-use crate::dna::zome::Permission;
-use crate::dna::zome::Zome;
-use crate::dna::zome::ZomeDef;
-use crate::dna::DnaDef;
-use crate::dna::Zomes;
-use crate::header::NewEntryHeader;
-use crate::Timestamp;
+use monolith::holochain_types::cell::CellId;
+use monolith::holochain_types::dna::zome::HostFnAccess;
+use monolith::holochain_types::dna::zome::Permission;
+use monolith::holochain_types::dna::zome::Zome;
+use monolith::holochain_types::dna::zome::ZomeDef;
+use monolith::holochain_types::dna::DnaDef;
+use monolith::holochain_types::dna::Zomes;
+use monolith::holochain_types::header::NewEntryHeader;
+use monolith::holochain_types::Timestamp;
 use ::fixt::prelude::*;
 use holo_hash::AgentPubKey;
 use holo_hash::EntryHash;

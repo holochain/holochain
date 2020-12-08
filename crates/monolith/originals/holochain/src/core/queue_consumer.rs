@@ -49,8 +49,8 @@ mod produce_dht_ops_consumer;
 use produce_dht_ops_consumer::*;
 mod publish_dht_ops_consumer;
 use super::state::workspace::WorkspaceError;
-use crate::conductor::api::CellConductorApiT;
-use crate::conductor::manager::ManagedTaskAdd;
+use monolith::holochain::conductor::api::CellConductorApiT;
+use monolith::holochain::conductor::manager::ManagedTaskAdd;
 use monolith::holochain_p2p::HolochainP2pCell;
 use publish_dht_ops_consumer::*;
 

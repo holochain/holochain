@@ -1,4 +1,4 @@
-use crate::fixt::*;
+use monolith::holochain::fixt::*;
 use fallible_iterator::FallibleIterator;
 use fixt::prelude::*;
 use hdk3::prelude::Create;

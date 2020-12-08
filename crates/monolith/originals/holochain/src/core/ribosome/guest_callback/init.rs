@@ -1,8 +1,8 @@
-use crate::core::ribosome::FnComponents;
-use crate::core::ribosome::HostAccess;
-use crate::core::ribosome::Invocation;
-use crate::core::ribosome::ZomesToInvoke;
-use crate::core::workflow::CallZomeWorkspaceLock;
+use monolith::holochain::core::ribosome::FnComponents;
+use monolith::holochain::core::ribosome::HostAccess;
+use monolith::holochain::core::ribosome::Invocation;
+use monolith::holochain::core::ribosome::ZomesToInvoke;
+use monolith::holochain::core::workflow::CallZomeWorkspaceLock;
 use derive_more::Constructor;
 use holo_hash::EntryHash;
 use monolith::holochain_keystore::KeystoreSender;
@@ -99,11 +99,11 @@ impl From<Vec<(ZomeName, InitCallbackResult)>> for InitResult {
 #[cfg(test)]
 mod test {
     use super::InitResult;
-    use crate::core::ribosome::Invocation;
-    use crate::core::ribosome::ZomesToInvoke;
-    use crate::fixt::InitHostAccessFixturator;
-    use crate::fixt::InitInvocationFixturator;
-    use crate::fixt::ZomeNameFixturator;
+    use monolith::holochain::core::ribosome::Invocation;
+    use monolith::holochain::core::ribosome::ZomesToInvoke;
+    use monolith::holochain::fixt::InitHostAccessFixturator;
+    use monolith::holochain::fixt::InitInvocationFixturator;
+    use monolith::holochain::fixt::ZomeNameFixturator;
     use ::fixt::prelude::*;
     use holochain_serialized_bytes::prelude::*;
     use monolith::holochain_types::dna::zome::HostFnAccess;
@@ -221,11 +221,11 @@ mod test {
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
     use super::InitResult;
-    use crate::core::ribosome::RibosomeT;
-    use crate::fixt::curve::Zomes;
-    use crate::fixt::InitHostAccessFixturator;
-    use crate::fixt::InitInvocationFixturator;
-    use crate::fixt::RealRibosomeFixturator;
+    use monolith::holochain::core::ribosome::RibosomeT;
+    use monolith::holochain::fixt::curve::Zomes;
+    use monolith::holochain::fixt::InitHostAccessFixturator;
+    use monolith::holochain::fixt::InitInvocationFixturator;
+    use monolith::holochain::fixt::RealRibosomeFixturator;
     use ::fixt::prelude::*;
     use monolith::holochain_wasm_test_utils::TestWasm;
 

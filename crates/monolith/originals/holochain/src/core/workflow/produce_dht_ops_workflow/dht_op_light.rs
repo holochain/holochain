@@ -1,4 +1,4 @@
-use crate::core::state::element_buf::ElementBuf;
+use monolith::holochain::core::state::element_buf::ElementBuf;
 use error::DhtOpConvertError;
 use error::DhtOpConvertResult;
 use holo_hash::EntryHash;

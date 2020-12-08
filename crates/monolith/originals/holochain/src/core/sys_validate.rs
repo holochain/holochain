@@ -6,8 +6,8 @@ use super::state::metadata::ChainItemKey;
 use super::state::metadata::MetadataBufT;
 use super::workflow::incoming_dht_ops_workflow::incoming_dht_ops_workflow;
 use super::workflow::sys_validation_workflow::SysValidationWorkspace;
-use crate::conductor::api::CellConductorApiT;
-use crate::conductor::entry_def_store::get_entry_def;
+use monolith::holochain::conductor::api::CellConductorApiT;
+use monolith::holochain::conductor::entry_def_store::get_entry_def;
 use fallible_iterator::FallibleIterator;
 use monolith::holochain_keystore::AgentPubKeyExt;
 use monolith::holochain_p2p::HolochainP2pCell;
@@ -29,8 +29,8 @@ use monolith::holochain_zome_types::validate::ValidationStatus;
 use monolith::holochain_zome_types::Header;
 use std::convert::TryInto;
 
-pub use crate::core::state::source_chain::SourceChainError;
-pub use crate::core::state::source_chain::SourceChainResult;
+pub use monolith::holochain::core::state::source_chain::SourceChainError;
+pub use monolith::holochain::core::state::source_chain::SourceChainResult;
 pub(super) use error::*;
 
 pub use holo_hash::*;

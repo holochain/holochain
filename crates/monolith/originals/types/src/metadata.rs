@@ -1,7 +1,7 @@
 //! Types for getting and storing metadata
 
-use crate::HeaderHashed;
-use crate::Timestamp;
+use monolith::holochain_types::HeaderHashed;
+use monolith::holochain_types::Timestamp;
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
 pub use monolith::holochain_zome_types::metadata::EntryDhtStatus;

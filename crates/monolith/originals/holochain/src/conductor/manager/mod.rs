@@ -126,7 +126,7 @@ fn handle_completed_task(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::conductor::error::ConductorError;
+    use monolith::holochain::conductor::error::ConductorError;
     use anyhow::Result;
     use monolith::holochain_types::observability;
 

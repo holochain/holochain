@@ -1,5 +1,5 @@
-use crate::zome_io::ExternOutput;
-use crate::CallbackResult;
+use monolith::holochain_zome_types::zome_io::ExternOutput;
+use monolith::holochain_zome_types::CallbackResult;
 use holo_hash::EntryHash;
 use holochain_serialized_bytes::prelude::*;
 

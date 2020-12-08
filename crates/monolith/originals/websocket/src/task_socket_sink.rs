@@ -1,6 +1,6 @@
 //! This task actually sending messages on the SocketSink.
 
-use crate::*;
+use monolith::holochain_websocket::*;
 
 /// internal message type for forwarding messages to the actual socket sink.
 pub(crate) type ToSocketSink = (tungstenite::Message, tokio::sync::oneshot::Sender<()>);

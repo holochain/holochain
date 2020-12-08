@@ -1,4 +1,4 @@
-use crate::conductor::interface::error::InterfaceResult;
+use monolith::holochain::conductor::interface::error::InterfaceResult;
 use holochain_serialized_bytes::prelude::*;
 
 mod admin_interface;

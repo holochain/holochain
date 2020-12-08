@@ -1,10 +1,10 @@
 #![deny(missing_docs)]
 //! Errors occurring during a [Ribosome] call
 
-use crate::conductor::api::error::ConductorApiError;
-use crate::conductor::interface::error::InterfaceError;
-use crate::core::state::cascade::error::CascadeError;
-use crate::core::state::source_chain::SourceChainError;
+use monolith::holochain::conductor::api::error::ConductorApiError;
+use monolith::holochain::conductor::interface::error::InterfaceError;
+use monolith::holochain::core::state::cascade::error::CascadeError;
+use monolith::holochain::core::state::source_chain::SourceChainError;
 use holo_hash::AnyDhtHash;
 use holochain_serialized_bytes::prelude::SerializedBytesError;
 use monolith::holochain_types::dna::error::DnaError;

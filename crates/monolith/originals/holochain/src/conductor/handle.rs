@@ -52,8 +52,8 @@ use super::interface::SignalBroadcaster;
 use super::manager::TaskManagerRunHandle;
 use super::Cell;
 use super::Conductor;
-use crate::core::workflow::CallZomeWorkspaceLock;
-use crate::core::workflow::ZomeCallResult;
+use monolith::holochain::core::workflow::CallZomeWorkspaceLock;
+use monolith::holochain::core::workflow::ZomeCallResult;
 use derive_more::From;
 use futures::future::FutureExt;
 use monolith::holochain_p2p::event::HolochainP2pEvent::*;
@@ -74,7 +74,7 @@ use tracing::*;
 #[cfg(any(test, feature = "test_utils"))]
 use super::state::ConductorState;
 #[cfg(any(test, feature = "test_utils"))]
-use crate::core::queue_consumer::InitialQueueTriggers;
+use monolith::holochain::core::queue_consumer::InitialQueueTriggers;
 #[cfg(any(test, feature = "test_utils"))]
 use monolith::holochain_state::env::EnvironmentWrite;
 

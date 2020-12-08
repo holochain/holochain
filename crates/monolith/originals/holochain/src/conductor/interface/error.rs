@@ -1,5 +1,5 @@
-use crate::conductor::error::ConductorError;
-use crate::core::signal::Signal;
+use monolith::holochain::conductor::error::ConductorError;
+use monolith::holochain::core::signal::Signal;
 use holochain_serialized_bytes::SerializedBytesError;
 
 /// Interface Error Type

@@ -1,9 +1,9 @@
 use super::ChainInvalidReason;
-use crate::core::state::chain_sequence::ChainSequenceBuf;
-use crate::core::state::element_buf::ElementBuf;
-use crate::core::state::element_buf::HeaderCas;
-use crate::core::state::source_chain::SourceChainError;
-use crate::core::state::source_chain::SourceChainResult;
+use monolith::holochain::core::state::chain_sequence::ChainSequenceBuf;
+use monolith::holochain::core::state::element_buf::ElementBuf;
+use monolith::holochain::core::state::element_buf::HeaderCas;
+use monolith::holochain::core::state::source_chain::SourceChainError;
+use monolith::holochain::core::state::source_chain::SourceChainResult;
 use fallible_iterator::FallibleIterator;
 use monolith::holochain_state::buffer::BufferedStore;
 use monolith::holochain_state::error::DatabaseResult;
@@ -316,7 +316,7 @@ impl<'a> FallibleIterator for SourceChainBackwardIterator<'a> {
 #[cfg(test)]
 pub mod tests {
     use super::SourceChainBuf;
-    use crate::core::state::source_chain::SourceChainResult;
+    use monolith::holochain::core::state::source_chain::SourceChainResult;
     use fallible_iterator::FallibleIterator;
     use monolith::holochain_state::prelude::*;
     use monolith::holochain_state::test_utils::test_cell_env;

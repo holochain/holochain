@@ -334,7 +334,7 @@ impl BufferedStore for SourceChain {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::fixt::*;
+    use monolith::holochain::fixt::*;
     use ::fixt::prelude::*;
     use hdk3::prelude::*;
     use monolith::holochain_state::test_utils::test_cell_env;

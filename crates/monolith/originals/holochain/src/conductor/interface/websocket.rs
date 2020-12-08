@@ -3,11 +3,11 @@
 
 use super::error::InterfaceError;
 use super::error::InterfaceResult;
-use crate::conductor::conductor::StopReceiver;
-use crate::conductor::interface::*;
-use crate::conductor::manager::ManagedTaskHandle;
-use crate::conductor::manager::ManagedTaskResult;
-use crate::core::signal::Signal;
+use monolith::holochain::conductor::conductor::StopReceiver;
+use monolith::holochain::conductor::interface::*;
+use monolith::holochain::conductor::manager::ManagedTaskHandle;
+use monolith::holochain::conductor::manager::ManagedTaskResult;
+use monolith::holochain::core::signal::Signal;
 use holochain_serialized_bytes::SerializedBytes;
 use monolith::holochain_websocket::websocket_bind;
 use monolith::holochain_websocket::WebsocketConfig;
@@ -246,20 +246,20 @@ where
 #[cfg(test)]
 pub mod test {
     use super::*;
-    use crate::conductor::api::error::ExternalApiWireError;
-    use crate::conductor::api::AdminRequest;
-    use crate::conductor::api::AdminResponse;
-    use crate::conductor::api::RealAdminInterfaceApi;
-    use crate::conductor::conductor::ConductorBuilder;
-    use crate::conductor::dna_store::MockDnaStore;
-    use crate::conductor::p2p_store::AgentKv;
-    use crate::conductor::p2p_store::AgentKvKey;
-    use crate::conductor::state::ConductorState;
-    use crate::conductor::Conductor;
-    use crate::conductor::ConductorHandle;
-    use crate::core::state::source_chain::SourceChainBuf;
-    use crate::fixt::RealRibosomeFixturator;
-    use crate::test_utils::conductor_setup::ConductorTestData;
+    use monolith::holochain::conductor::api::error::ExternalApiWireError;
+    use monolith::holochain::conductor::api::AdminRequest;
+    use monolith::holochain::conductor::api::AdminResponse;
+    use monolith::holochain::conductor::api::RealAdminInterfaceApi;
+    use monolith::holochain::conductor::conductor::ConductorBuilder;
+    use monolith::holochain::conductor::dna_store::MockDnaStore;
+    use monolith::holochain::conductor::p2p_store::AgentKv;
+    use monolith::holochain::conductor::p2p_store::AgentKvKey;
+    use monolith::holochain::conductor::state::ConductorState;
+    use monolith::holochain::conductor::Conductor;
+    use monolith::holochain::conductor::ConductorHandle;
+    use monolith::holochain::core::state::source_chain::SourceChainBuf;
+    use monolith::holochain::fixt::RealRibosomeFixturator;
+    use monolith::holochain::test_utils::conductor_setup::ConductorTestData;
     use fallible_iterator::FallibleIterator;
     use fixt::prelude::*;
     use futures::future::FutureExt;

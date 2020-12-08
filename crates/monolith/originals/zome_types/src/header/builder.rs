@@ -1,9 +1,9 @@
 use super::EntryType;
 use super::Timestamp;
-use crate::header;
-use crate::header::HeaderInner;
-use crate::header::ZomeId;
-use crate::link::LinkTag;
+use monolith::holochain_zome_types::header;
+use monolith::holochain_zome_types::header::HeaderInner;
+use monolith::holochain_zome_types::header::ZomeId;
+use monolith::holochain_zome_types::link::LinkTag;
 use header::Dna;
 use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;

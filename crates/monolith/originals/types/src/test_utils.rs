@@ -1,12 +1,12 @@
 //! Some common testing helpers.
 
-use crate::cell::CellId;
-use crate::dna::wasm::DnaWasm;
-use crate::dna::zome::WasmZome;
-use crate::dna::DnaDef;
-use crate::dna::DnaFile;
-use crate::dna::JsonProperties;
-use crate::prelude::*;
+use monolith::holochain_types::cell::CellId;
+use monolith::holochain_types::dna::wasm::DnaWasm;
+use monolith::holochain_types::dna::zome::WasmZome;
+use monolith::holochain_types::dna::DnaDef;
+use monolith::holochain_types::dna::DnaFile;
+use monolith::holochain_types::dna::JsonProperties;
+use monolith::holochain_types::prelude::*;
 use monolith::holochain_zome_types::capability::CapSecret;
 use monolith::holochain_zome_types::capability::CAP_SECRET_BYTES;
 use monolith::holochain_zome_types::zome::ZomeName;

@@ -1,6 +1,6 @@
-use crate::core::ribosome::error::RibosomeResult;
-use crate::core::ribosome::CallContext;
-use crate::core::ribosome::RibosomeT;
+use monolith::holochain::core::ribosome::error::RibosomeResult;
+use monolith::holochain::core::ribosome::CallContext;
+use monolith::holochain::core::ribosome::RibosomeT;
 use monolith::holochain_zome_types::GetDetailsInput;
 use monolith::holochain_zome_types::GetDetailsOutput;
 use std::sync::Arc;
@@ -33,8 +33,8 @@ pub fn get_details<'a>(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    use crate::core::workflow::CallZomeWorkspace;
-    use crate::fixt::ZomeCallHostAccessFixturator;
+    use monolith::holochain::core::workflow::CallZomeWorkspace;
+    use monolith::holochain::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use hdk3::prelude::*;
     use monolith::holochain_wasm_test_utils::TestWasm;

@@ -1,6 +1,6 @@
 use super::CapSecret;
-use crate::zome::FunctionName;
-use crate::zome::ZomeName;
+use monolith::holochain_zome_types::zome::FunctionName;
+use monolith::holochain_zome_types::zome::ZomeName;
 use holo_hash::*;
 use holochain_serialized_bytes::SerializedBytes;
 use serde::Deserialize;

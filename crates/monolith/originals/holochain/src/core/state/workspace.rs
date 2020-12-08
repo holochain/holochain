@@ -43,7 +43,7 @@ pub trait Workspace: Send + Sized {
 #[cfg(test)]
 pub mod tests {
     use super::Workspace;
-    use crate::core::state::workspace::WorkspaceResult;
+    use monolith::holochain::core::state::workspace::WorkspaceResult;
     use monolith::holochain_state::buffer::BufferedStore;
     use monolith::holochain_state::buffer::KvBufFresh;
     use monolith::holochain_state::db::GetDb;

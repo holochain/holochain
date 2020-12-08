@@ -1,10 +1,10 @@
-use crate::actor::*;
-use crate::event::*;
-use crate::*;
+use monolith::holochain_p2p::actor::*;
+use monolith::holochain_p2p::event::*;
+use monolith::holochain_p2p::*;
 
 use futures::future::FutureExt;
 
-use crate::types::AgentPubKeyExt;
+use monolith::holochain_p2p::types::AgentPubKeyExt;
 
 use ghost_actor::dependencies::tracing;
 use ghost_actor::dependencies::tracing_futures::Instrument;

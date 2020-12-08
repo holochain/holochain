@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use monolith::hdk::prelude::*;
 
 /// Generate a cryptographically strong CapSecret on the host.
 ///

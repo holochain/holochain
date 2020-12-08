@@ -1,10 +1,10 @@
 //! Functionality for safely accessing LMDB database references.
 
-use crate::env::EnvironmentKind;
-use crate::error::DatabaseError;
-use crate::error::DatabaseResult;
-use crate::exports::IntegerStore;
-use crate::prelude::IntKey;
+use monolith::holochain_state::env::EnvironmentKind;
+use monolith::holochain_state::error::DatabaseError;
+use monolith::holochain_state::error::DatabaseResult;
+use monolith::holochain_state::exports::IntegerStore;
+use monolith::holochain_state::prelude::IntKey;
 use derive_more::Display;
 use monolith::holochain_keystore::KeystoreSender;
 use monolith::holochain_types::universal_map::Key as UmKey;

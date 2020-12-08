@@ -1,8 +1,8 @@
-use crate::core::ribosome::FnComponents;
-use crate::core::ribosome::HostAccess;
-use crate::core::ribosome::Invocation;
-use crate::core::ribosome::ZomesToInvoke;
-use crate::core::workflow::CallZomeWorkspaceLock;
+use monolith::holochain::core::ribosome::FnComponents;
+use monolith::holochain::core::ribosome::HostAccess;
+use monolith::holochain::core::ribosome::Invocation;
+use monolith::holochain::core::ribosome::ZomesToInvoke;
+use monolith::holochain::core::workflow::CallZomeWorkspaceLock;
 use derive_more::Constructor;
 use holochain_serialized_bytes::prelude::*;
 use monolith::holochain_types::dna::zome::HostFnAccess;
@@ -110,12 +110,12 @@ impl From<Vec<(ZomeName, MigrateAgentCallbackResult)>> for MigrateAgentResult {
 #[cfg(test)]
 mod test {
     use super::MigrateAgentResult;
-    use crate::core::ribosome::Invocation;
-    use crate::core::ribosome::ZomesToInvoke;
-    use crate::fixt::MigrateAgentFixturator;
-    use crate::fixt::MigrateAgentHostAccessFixturator;
-    use crate::fixt::MigrateAgentInvocationFixturator;
-    use crate::fixt::ZomeNameFixturator;
+    use monolith::holochain::core::ribosome::Invocation;
+    use monolith::holochain::core::ribosome::ZomesToInvoke;
+    use monolith::holochain::fixt::MigrateAgentFixturator;
+    use monolith::holochain::fixt::MigrateAgentHostAccessFixturator;
+    use monolith::holochain::fixt::MigrateAgentInvocationFixturator;
+    use monolith::holochain::fixt::ZomeNameFixturator;
     use holochain_serialized_bytes::prelude::*;
     use monolith::holochain_types::dna::zome::HostFnAccess;
     use monolith::holochain_zome_types::migrate_agent::MigrateAgent;
@@ -236,11 +236,11 @@ mod test {
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
     use super::MigrateAgentResult;
-    use crate::core::ribosome::RibosomeT;
-    use crate::fixt::curve::Zomes;
-    use crate::fixt::MigrateAgentHostAccessFixturator;
-    use crate::fixt::MigrateAgentInvocationFixturator;
-    use crate::fixt::RealRibosomeFixturator;
+    use monolith::holochain::core::ribosome::RibosomeT;
+    use monolith::holochain::fixt::curve::Zomes;
+    use monolith::holochain::fixt::MigrateAgentHostAccessFixturator;
+    use monolith::holochain::fixt::MigrateAgentInvocationFixturator;
+    use monolith::holochain::fixt::RealRibosomeFixturator;
     use monolith::holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(threaded_scheduler)]

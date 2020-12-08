@@ -1,11 +1,11 @@
-use crate::core::ribosome::error::RibosomeError;
-use crate::core::ribosome::error::RibosomeResult;
-use crate::core::ribosome::CallContext;
-use crate::core::ribosome::RibosomeT;
-use crate::core::state::cascade::error::CascadeResult;
-use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
-use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
-use crate::core::SourceChainError;
+use monolith::holochain::core::ribosome::error::RibosomeError;
+use monolith::holochain::core::ribosome::error::RibosomeResult;
+use monolith::holochain::core::ribosome::CallContext;
+use monolith::holochain::core::ribosome::RibosomeT;
+use monolith::holochain::core::state::cascade::error::CascadeResult;
+use monolith::holochain::core::workflow::call_zome_workflow::CallZomeWorkspace;
+use monolith::holochain::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
+use monolith::holochain::core::SourceChainError;
 use monolith::holochain_p2p::actor::GetOptions;
 use monolith::holochain_types::element::SignedHeaderHashed;
 use monolith::holochain_zome_types::header::builder;
@@ -96,7 +96,7 @@ pub fn delete_link<'a>(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod slow_tests {
-    use crate::fixt::ZomeCallHostAccessFixturator;
+    use monolith::holochain::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use holo_hash::HeaderHash;
     use monolith::holochain_wasm_test_utils::TestWasm;

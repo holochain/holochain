@@ -1,4 +1,4 @@
-use crate::*;
+use monolith::holochain_keystore::*;
 use monolith::holochain_zome_types::signature::Signature;
 
 /// Keystore Error Type.

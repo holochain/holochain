@@ -1,4 +1,4 @@
-use crate::core::workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
+use monolith::holochain::core::workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;

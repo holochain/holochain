@@ -1,6 +1,6 @@
-use crate::hash_path::shard::ShardStrategy;
-use crate::hash_path::shard::SHARDEND;
-use crate::prelude::*;
+use monolith::hdk::hash_path::shard::ShardStrategy;
+use monolith::hdk::hash_path::shard::SHARDEND;
+use monolith::hdk::prelude::*;
 use holochain_wasmer_guest::*;
 use monolith::holochain_zome_types::link::LinkTag;
 use std::str::FromStr;

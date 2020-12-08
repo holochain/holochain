@@ -1,13 +1,13 @@
 use super::InterfaceApi;
-use crate::conductor::api::error::ConductorApiError;
-use crate::conductor::api::error::ConductorApiResult;
-use crate::conductor::api::error::ExternalApiWireError;
-use crate::conductor::api::error::SerializationError;
-use crate::conductor::config::AdminInterfaceConfig;
-use crate::conductor::error::CreateAppError;
-use crate::conductor::interface::error::InterfaceError;
-use crate::conductor::interface::error::InterfaceResult;
-use crate::conductor::ConductorHandle;
+use monolith::holochain::conductor::api::error::ConductorApiError;
+use monolith::holochain::conductor::api::error::ConductorApiResult;
+use monolith::holochain::conductor::api::error::ExternalApiWireError;
+use monolith::holochain::conductor::api::error::SerializationError;
+use monolith::holochain::conductor::config::AdminInterfaceConfig;
+use monolith::holochain::conductor::error::CreateAppError;
+use monolith::holochain::conductor::interface::error::InterfaceError;
+use monolith::holochain::conductor::interface::error::InterfaceResult;
+use monolith::holochain::conductor::ConductorHandle;
 use holo_hash::*;
 use monolith::holochain_keystore::KeystoreSenderExt;
 use holochain_serialized_bytes::prelude::*;
@@ -512,7 +512,7 @@ pub enum AdminResponse {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::conductor::Conductor;
+    use monolith::holochain::conductor::Conductor;
     use anyhow::Result;
     use monolith::holochain_state::test_utils::test_environments;
     use monolith::holochain_types::app::InstallAppDnaPayload;

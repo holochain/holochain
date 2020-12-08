@@ -5,7 +5,7 @@
 //! - We can upgrade some error types from rkv::StoreError, which does not implement
 //!     std::error::Error, into error types that do
 
-use crate::error::DatabaseError;
+use monolith::holochain_state::error::DatabaseError;
 use chrono::offset::Local;
 use chrono::DateTime;
 use derive_more::From;

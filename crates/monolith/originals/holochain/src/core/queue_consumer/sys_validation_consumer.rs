@@ -1,9 +1,9 @@
 //! The workflow and queue consumer for sys validation
 
 use super::*;
-use crate::conductor::manager::ManagedTaskResult;
-use crate::core::workflow::sys_validation_workflow::sys_validation_workflow;
-use crate::core::workflow::sys_validation_workflow::SysValidationWorkspace;
+use monolith::holochain::conductor::manager::ManagedTaskResult;
+use monolith::holochain::core::workflow::sys_validation_workflow::sys_validation_workflow;
+use monolith::holochain::core::workflow::sys_validation_workflow::SysValidationWorkspace;
 use monolith::holochain_state::env::EnvironmentWrite;
 use tokio::task::JoinHandle;
 use tracing::*;

@@ -1,6 +1,6 @@
-use crate::core::ribosome::error::RibosomeResult;
-use crate::core::ribosome::CallContext;
-use crate::core::ribosome::RibosomeT;
+use monolith::holochain::core::ribosome::error::RibosomeResult;
+use monolith::holochain::core::ribosome::CallContext;
+use monolith::holochain::core::ribosome::RibosomeT;
 use monolith::holochain_zome_types::agent_info::AgentInfo;
 use monolith::holochain_zome_types::AgentInfoInput;
 use monolith::holochain_zome_types::AgentInfoOutput;
@@ -25,7 +25,7 @@ pub fn agent_info<'a>(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod test {
-    use crate::fixt::ZomeCallHostAccessFixturator;
+    use monolith::holochain::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
 
     use monolith::holochain_types::test_utils::fake_agent_pubkey_1;

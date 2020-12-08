@@ -1,6 +1,6 @@
-use crate::core::ribosome::error::RibosomeResult;
-use crate::core::ribosome::CallContext;
-use crate::core::ribosome::RibosomeT;
+use monolith::holochain::core::ribosome::error::RibosomeResult;
+use monolith::holochain::core::ribosome::CallContext;
+use monolith::holochain::core::ribosome::RibosomeT;
 use monolith::holochain_zome_types::CapabilityGrantsInput;
 use monolith::holochain_zome_types::CapabilityGrantsOutput;
 use std::sync::Arc;
@@ -18,11 +18,11 @@ pub fn capability_grants(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    use crate::conductor::dna_store::MockDnaStore;
-    use crate::conductor::interface::websocket::test::setup_app;
-    use crate::core::ribosome::ZomeCall;
-    use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
-    use crate::fixt::ZomeCallHostAccessFixturator;
+    use monolith::holochain::conductor::dna_store::MockDnaStore;
+    use monolith::holochain::conductor::interface::websocket::test::setup_app;
+    use monolith::holochain::core::ribosome::ZomeCall;
+    use monolith::holochain::core::workflow::call_zome_workflow::CallZomeWorkspace;
+    use monolith::holochain::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use hdk3::prelude::*;
     use monolith::holochain_types::app::InstalledCell;

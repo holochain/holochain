@@ -1,6 +1,6 @@
-use crate::core::ribosome::error::RibosomeResult;
-use crate::core::ribosome::CallContext;
-use crate::core::ribosome::RibosomeT;
+use monolith::holochain::core::ribosome::error::RibosomeResult;
+use monolith::holochain::core::ribosome::CallContext;
+use monolith::holochain::core::ribosome::RibosomeT;
 use holo_hash::HasHash;
 use monolith::holochain_zome_types::Entry;
 use monolith::holochain_zome_types::HashEntryInput;
@@ -23,12 +23,12 @@ pub fn hash_entry(
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use super::*;
-    use crate::core::ribosome::host_fn::hash_entry::hash_entry;
+    use monolith::holochain::core::ribosome::host_fn::hash_entry::hash_entry;
 
-    use crate::fixt::CallContextFixturator;
-    use crate::fixt::EntryFixturator;
-    use crate::fixt::RealRibosomeFixturator;
-    use crate::fixt::ZomeCallHostAccessFixturator;
+    use monolith::holochain::fixt::CallContextFixturator;
+    use monolith::holochain::fixt::EntryFixturator;
+    use monolith::holochain::fixt::RealRibosomeFixturator;
+    use monolith::holochain::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use holo_hash::EntryHash;
     use monolith::holochain_wasm_test_utils::TestWasm;

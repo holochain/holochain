@@ -41,17 +41,17 @@ use super::paths::EnvironmentRootPath;
 use super::state::AppInterfaceId;
 use super::state::ConductorState;
 use super::CellError;
-use crate::conductor::api::error::ConductorApiResult;
-use crate::conductor::cell::Cell;
-use crate::conductor::config::ConductorConfig;
-use crate::conductor::dna_store::MockDnaStore;
-use crate::conductor::error::ConductorResult;
-use crate::conductor::handle::ConductorHandle;
-use crate::conductor::p2p_store::AgentKv;
-use crate::conductor::p2p_store::AgentKvKey;
-use crate::core::signal::Signal;
-use crate::core::state::source_chain::SourceChainBuf;
-use crate::core::state::wasm::WasmBuf;
+use monolith::holochain::conductor::api::error::ConductorApiResult;
+use monolith::holochain::conductor::cell::Cell;
+use monolith::holochain::conductor::config::ConductorConfig;
+use monolith::holochain::conductor::dna_store::MockDnaStore;
+use monolith::holochain::conductor::error::ConductorResult;
+use monolith::holochain::conductor::handle::ConductorHandle;
+use monolith::holochain::conductor::p2p_store::AgentKv;
+use monolith::holochain::conductor::p2p_store::AgentKvKey;
+use monolith::holochain::core::signal::Signal;
+use monolith::holochain::core::state::source_chain::SourceChainBuf;
+use monolith::holochain::core::state::wasm::WasmBuf;
 pub use builder::*;
 use fallible_iterator::FallibleIterator;
 use futures::future;
@@ -925,8 +925,8 @@ pub type ConductorStateDb = KvStore<UnitDbKey, ConductorState>;
 
 mod builder {
     use super::*;
-    use crate::conductor::dna_store::RealDnaStore;
-    use crate::conductor::ConductorHandle;
+    use monolith::holochain::conductor::dna_store::RealDnaStore;
+    use monolith::holochain::conductor::ConductorHandle;
     use monolith::holochain_state::env::EnvironmentKind;
     use monolith::holochain_state::test_utils::TestEnvironments;
 
@@ -1163,7 +1163,7 @@ pub mod tests {
     use super::Conductor;
     use super::ConductorState;
     use super::*;
-    use crate::conductor::dna_store::MockDnaStore;
+    use monolith::holochain::conductor::dna_store::MockDnaStore;
     use monolith::holochain_state::test_utils::test_environments;
     use monolith::holochain_types::test_utils::fake_cell_id;
     use matches::assert_matches;

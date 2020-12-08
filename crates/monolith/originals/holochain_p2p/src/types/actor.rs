@@ -1,7 +1,7 @@
 //! Module containing the HolochainP2p actor definition.
 #![allow(clippy::too_many_arguments)]
 
-use crate::*;
+use monolith::holochain_p2p::*;
 use monolith::holochain_zome_types::request::MetadataRequest;
 use monolith::holochain_zome_types::zome::FunctionName;
 

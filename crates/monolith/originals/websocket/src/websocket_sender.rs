@@ -1,6 +1,6 @@
 //! defines the write/send half of a websocket pair
 
-use crate::*;
+use monolith::holochain_websocket::*;
 use task_dispatch_incoming::ToDispatchIncoming;
 use task_dispatch_incoming::ToDispatchIncomingSender;
 use task_socket_sink::ToSocketSinkSender;

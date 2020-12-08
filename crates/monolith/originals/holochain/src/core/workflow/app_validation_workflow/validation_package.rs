@@ -5,14 +5,14 @@ use monolith::holochain_zome_types::header::EntryType;
 use monolith::holochain_zome_types::query::ChainQueryFilter;
 use monolith::holochain_zome_types::validate::ValidationPackage;
 
-use crate::core::ribosome::error::RibosomeResult;
-use crate::core::ribosome::guest_callback::validation_package::ValidationPackageHostAccess;
-use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
-use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
-use crate::core::ribosome::RibosomeT;
-use crate::core::state::source_chain::SourceChain;
-use crate::core::workflow::CallZomeWorkspaceLock;
-use crate::core::SourceChainResult;
+use monolith::holochain::core::ribosome::error::RibosomeResult;
+use monolith::holochain::core::ribosome::guest_callback::validation_package::ValidationPackageHostAccess;
+use monolith::holochain::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
+use monolith::holochain::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
+use monolith::holochain::core::ribosome::RibosomeT;
+use monolith::holochain::core::state::source_chain::SourceChain;
+use monolith::holochain::core::workflow::CallZomeWorkspaceLock;
+use monolith::holochain::core::SourceChainResult;
 use tracing::*;
 
 pub fn get_as_author_sub_chain(

@@ -1,14 +1,14 @@
 #![allow(unused_imports)]
 #![allow(dead_code)]
-use crate::conductor::dna_store::MockDnaStore;
-use crate::conductor::interface::websocket::test::setup_app;
-use crate::core::state::element_buf::ElementBuf;
-use crate::core::state::metadata::MetadataBuf;
-use crate::core::state::metadata::MetadataBufT;
-use crate::core::workflow::integrate_dht_ops_workflow::integrate_single_metadata;
-use crate::core::workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertResult;
-use crate::core::workflow::CallZomeWorkspace;
-use crate::test_utils::test_network;
+use monolith::holochain::conductor::dna_store::MockDnaStore;
+use monolith::holochain::conductor::interface::websocket::test::setup_app;
+use monolith::holochain::core::state::element_buf::ElementBuf;
+use monolith::holochain::core::state::metadata::MetadataBuf;
+use monolith::holochain::core::state::metadata::MetadataBufT;
+use monolith::holochain::core::workflow::integrate_dht_ops_workflow::integrate_single_metadata;
+use monolith::holochain::core::workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertResult;
+use monolith::holochain::core::workflow::CallZomeWorkspace;
+use monolith::holochain::test_utils::test_network;
 use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
 use futures::future::Either;
@@ -69,7 +69,7 @@ use tokio::task::JoinHandle;
 use tracing::*;
 use unwrap_to::unwrap_to;
 
-use crate::test_utils::host_fn_api::*;
+use monolith::holochain::test_utils::host_fn_api::*;
 
 /*
 #[tokio::test(threaded_scheduler)]

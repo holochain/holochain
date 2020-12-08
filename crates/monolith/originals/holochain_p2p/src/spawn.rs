@@ -1,5 +1,5 @@
-use crate::actor::*;
-use crate::event::*;
+use monolith::holochain_p2p::actor::*;
+use monolith::holochain_p2p::event::*;
 
 mod actor;
 use actor::*;

@@ -1,12 +1,12 @@
-use crate::core::ribosome::error::RibosomeError;
-use crate::core::ribosome::error::RibosomeResult;
-use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
-use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
-use crate::core::ribosome::CallContext;
-use crate::core::ribosome::RibosomeT;
-use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
-use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
-use crate::core::SourceChainError;
+use monolith::holochain::core::ribosome::error::RibosomeError;
+use monolith::holochain::core::ribosome::error::RibosomeResult;
+use monolith::holochain::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
+use monolith::holochain::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
+use monolith::holochain::core::ribosome::CallContext;
+use monolith::holochain::core::ribosome::RibosomeT;
+use monolith::holochain::core::workflow::call_zome_workflow::CallZomeWorkspace;
+use monolith::holochain::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
+use monolith::holochain::core::SourceChainError;
 use holo_hash::HasHash;
 use monolith::holochain_zome_types::entry_def::EntryDefId;
 use monolith::holochain_zome_types::entry_def::EntryVisibility;
@@ -118,16 +118,16 @@ pub fn extract_entry_def(
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use super::create;
-    use crate::core::state::source_chain::ChainInvalidReason;
-    use crate::core::state::source_chain::SourceChainError;
-    use crate::core::state::source_chain::SourceChainResult;
-    use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
-    use crate::fixt::CallContextFixturator;
-    use crate::fixt::EntryFixturator;
-    use crate::fixt::RealRibosomeFixturator;
-    use crate::fixt::ZomeCallHostAccessFixturator;
-    use crate::test_utils::setup_app;
-    use crate::{conductor::api::ZomeCall, core::ribosome::error::RibosomeError};
+    use monolith::holochain::core::state::source_chain::ChainInvalidReason;
+    use monolith::holochain::core::state::source_chain::SourceChainError;
+    use monolith::holochain::core::state::source_chain::SourceChainResult;
+    use monolith::holochain::core::workflow::call_zome_workflow::CallZomeWorkspace;
+    use monolith::holochain::fixt::CallContextFixturator;
+    use monolith::holochain::fixt::EntryFixturator;
+    use monolith::holochain::fixt::RealRibosomeFixturator;
+    use monolith::holochain::fixt::ZomeCallHostAccessFixturator;
+    use monolith::holochain::test_utils::setup_app;
+    use monolith::holochain::{conductor::api::ZomeCall, core::ribosome::error::RibosomeError};
     use ::fixt::prelude::*;
     use hdk3::prelude::*;
     use holo_hash::AnyDhtHash;

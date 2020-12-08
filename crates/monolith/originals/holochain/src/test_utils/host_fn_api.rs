@@ -1,21 +1,21 @@
 #![allow(missing_docs)]
 
-use crate::conductor::api::CellConductorApi;
-use crate::conductor::api::CellConductorApiT;
-use crate::conductor::api::CellConductorReadHandle;
-use crate::conductor::interface::SignalBroadcaster;
-use crate::conductor::ConductorHandle;
-use crate::core::ribosome::host_fn;
-use crate::core::ribosome::real_ribosome::RealRibosome;
-use crate::core::ribosome::CallContext;
-use crate::core::ribosome::HostAccess;
-use crate::core::ribosome::RibosomeT;
-use crate::core::ribosome::ZomeCallHostAccess;
-use crate::core::ribosome::ZomeCallInvocation;
-use crate::core::state::metadata::LinkMetaKey;
-use crate::core::state::workspace::Workspace;
-use crate::core::workflow::CallZomeWorkspace;
-use crate::core::workflow::CallZomeWorkspaceLock;
+use monolith::holochain::conductor::api::CellConductorApi;
+use monolith::holochain::conductor::api::CellConductorApiT;
+use monolith::holochain::conductor::api::CellConductorReadHandle;
+use monolith::holochain::conductor::interface::SignalBroadcaster;
+use monolith::holochain::conductor::ConductorHandle;
+use monolith::holochain::core::ribosome::host_fn;
+use monolith::holochain::core::ribosome::real_ribosome::RealRibosome;
+use monolith::holochain::core::ribosome::CallContext;
+use monolith::holochain::core::ribosome::HostAccess;
+use monolith::holochain::core::ribosome::RibosomeT;
+use monolith::holochain::core::ribosome::ZomeCallHostAccess;
+use monolith::holochain::core::ribosome::ZomeCallInvocation;
+use monolith::holochain::core::state::metadata::LinkMetaKey;
+use monolith::holochain::core::state::workspace::Workspace;
+use monolith::holochain::core::workflow::CallZomeWorkspace;
+use monolith::holochain::core::workflow::CallZomeWorkspaceLock;
 use hdk3::prelude::EntryError;
 use holo_hash::AgentPubKey;
 use holo_hash::AnyDhtHash;

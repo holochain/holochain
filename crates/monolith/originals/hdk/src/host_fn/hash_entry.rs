@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use monolith::hdk::prelude::*;
 
 /// Hash anything that that implements TryInto<SerializedBytes> into an entry hash.
 ///

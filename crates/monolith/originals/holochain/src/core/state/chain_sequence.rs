@@ -7,7 +7,7 @@
 ///
 /// When committing the ChainSequence db, a special step is taken to ensure source chain consistency.
 /// If the chain head has moved since the db was created, committing the transaction fails with a special error type.
-use crate::core::state::source_chain::{SourceChainError, SourceChainResult};
+use monolith::holochain::core::state::source_chain::{SourceChainError, SourceChainResult};
 use fallible_iterator::DoubleEndedFallibleIterator;
 use holo_hash::HeaderHash;
 use monolith::holochain_state::buffer::BufferedStore;
@@ -198,7 +198,7 @@ pub mod tests {
     use super::BufferedStore;
     use super::ChainSequenceBuf;
     use super::SourceChainError;
-    use crate::core::state::source_chain::SourceChainResult;
+    use monolith::holochain::core::state::source_chain::SourceChainResult;
     use holo_hash::HeaderHash;
     use monolith::holochain_state::env::ReadManager;
     use monolith::holochain_state::env::WriteManager;

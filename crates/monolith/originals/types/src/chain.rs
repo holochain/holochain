@@ -1,7 +1,7 @@
 //! Types related to an agents for chain activity
-use crate::activity::AgentActivity;
-use crate::activity::ChainItems;
-use crate::activity::ChainStatus;
+use monolith::holochain_types::activity::AgentActivity;
+use monolith::holochain_types::activity::ChainItems;
+use monolith::holochain_types::activity::ChainStatus;
 use holo_hash::AgentPubKey;
 
 /// Helpers for constructing AgentActivity

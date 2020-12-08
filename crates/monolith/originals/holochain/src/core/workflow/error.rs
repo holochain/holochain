@@ -3,14 +3,14 @@
 
 use super::app_validation_workflow::AppValidationError;
 use super::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
-use crate::conductor::api::error::ConductorApiError;
-use crate::conductor::CellError;
-use crate::core::queue_consumer::QueueTriggerClosedError;
-use crate::core::ribosome::error::RibosomeError;
-use crate::core::state::cascade::error::CascadeError;
-use crate::core::state::source_chain::SourceChainError;
-use crate::core::state::workspace::WorkspaceError;
-use crate::core::SysValidationError;
+use monolith::holochain::conductor::api::error::ConductorApiError;
+use monolith::holochain::conductor::CellError;
+use monolith::holochain::core::queue_consumer::QueueTriggerClosedError;
+use monolith::holochain::core::ribosome::error::RibosomeError;
+use monolith::holochain::core::state::cascade::error::CascadeError;
+use monolith::holochain::core::state::source_chain::SourceChainError;
+use monolith::holochain::core::state::workspace::WorkspaceError;
+use monolith::holochain::core::SysValidationError;
 use monolith::holochain_p2p::HolochainP2pError;
 use monolith::holochain_state::error::DatabaseError;
 use monolith::holochain_types::dht_op::error::DhtOpError;

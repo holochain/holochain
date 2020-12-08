@@ -6,7 +6,7 @@
 pub mod error;
 pub mod wasm;
 pub mod zome;
-use crate::prelude::*;
+use monolith::holochain_types::prelude::*;
 pub use error::DnaError;
 use holo_hash::impl_hashable_content;
 pub use holo_hash::*;

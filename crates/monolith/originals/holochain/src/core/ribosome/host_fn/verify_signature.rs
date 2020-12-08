@@ -1,6 +1,6 @@
-use crate::core::ribosome::error::RibosomeResult;
-use crate::core::ribosome::CallContext;
-use crate::core::ribosome::RibosomeT;
+use monolith::holochain::core::ribosome::error::RibosomeResult;
+use monolith::holochain::core::ribosome::CallContext;
+use monolith::holochain::core::ribosome::RibosomeT;
 use monolith::holochain_keystore::AgentPubKeyExt;
 use monolith::holochain_zome_types::VerifySignatureInput;
 use monolith::holochain_zome_types::VerifySignatureOutput;
@@ -25,7 +25,7 @@ pub fn verify_signature(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    use crate::fixt::ZomeCallHostAccessFixturator;
+    use monolith::holochain::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use hdk3::prelude::test_utils::fake_agent_pubkey_1;
     use hdk3::prelude::test_utils::fake_agent_pubkey_2;

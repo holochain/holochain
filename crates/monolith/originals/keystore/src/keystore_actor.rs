@@ -1,7 +1,7 @@
 //! This module contains all the types needed to implement a keystore actor.
 //! We will re-export the main KeystoreSender usable by clients at the lib.
 
-use crate::*;
+use monolith::holochain_keystore::*;
 use ghost_actor::dependencies::futures::future::FutureExt;
 use holo_hash::HOLO_HASH_CORE_LEN;
 use holo_hash::HOLO_HASH_PREFIX_LEN;

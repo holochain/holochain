@@ -1,7 +1,7 @@
-use crate::core::ribosome::error::RibosomeResult;
-use crate::core::ribosome::CallContext;
-use crate::core::ribosome::RibosomeT;
-use crate::core::state::metadata::LinkMetaKey;
+use monolith::holochain::core::ribosome::error::RibosomeResult;
+use monolith::holochain::core::ribosome::CallContext;
+use monolith::holochain::core::ribosome::RibosomeT;
+use monolith::holochain::core::state::metadata::LinkMetaKey;
 use monolith::holochain_p2p::actor::GetLinksOptions;
 use monolith::holochain_zome_types::link::LinkDetails;
 use monolith::holochain_zome_types::GetLinkDetailsInput;
@@ -48,7 +48,7 @@ pub fn get_link_details<'a>(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod slow_tests {
-    use crate::fixt::ZomeCallHostAccessFixturator;
+    use monolith::holochain::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use monolith::holochain_wasm_test_utils::TestWasm;
     use monolith::holochain_zome_types::element::SignedHeaderHashed;

@@ -1,6 +1,6 @@
-use crate::core::ribosome::error::RibosomeResult;
-use crate::core::ribosome::CallContext;
-use crate::core::ribosome::RibosomeT;
+use monolith::holochain::core::ribosome::error::RibosomeResult;
+use monolith::holochain::core::ribosome::CallContext;
+use monolith::holochain::core::ribosome::RibosomeT;
 use monolith::holochain_zome_types::debug::DebugMsg;
 use monolith::holochain_zome_types::DebugInput;
 use monolith::holochain_zome_types::DebugOutput;
@@ -29,9 +29,9 @@ pub fn debug(
 pub mod wasm_test {
     use super::debug;
 
-    use crate::fixt::CallContextFixturator;
-    use crate::fixt::RealRibosomeFixturator;
-    use crate::fixt::ZomeCallHostAccessFixturator;
+    use monolith::holochain::fixt::CallContextFixturator;
+    use monolith::holochain::fixt::RealRibosomeFixturator;
+    use monolith::holochain::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use monolith::holochain_wasm_test_utils::TestWasm;
     use monolith::holochain_zome_types::debug_msg;

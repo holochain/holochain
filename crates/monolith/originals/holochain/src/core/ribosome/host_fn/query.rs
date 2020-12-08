@@ -1,6 +1,6 @@
-use crate::core::ribosome::error::RibosomeResult;
-use crate::core::ribosome::CallContext;
-use crate::core::ribosome::RibosomeT;
+use monolith::holochain::core::ribosome::error::RibosomeResult;
+use monolith::holochain::core::ribosome::CallContext;
+use monolith::holochain::core::ribosome::RibosomeT;
 use monolith::holochain_zome_types::element::Element;
 use monolith::holochain_zome_types::element::ElementVec;
 use monolith::holochain_zome_types::QueryInput;
@@ -27,7 +27,7 @@ pub fn query(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod slow_tests {
-    use crate::{core::ribosome::ZomeCallHostAccess, fixt::ZomeCallHostAccessFixturator};
+    use monolith::holochain::{core::ribosome::ZomeCallHostAccess, fixt::ZomeCallHostAccessFixturator};
     use ::fixt::prelude::*;
     use hdk3::prelude::*;
     use monolith::holochain_state::test_utils::TestEnvironment;

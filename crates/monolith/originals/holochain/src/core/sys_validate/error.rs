@@ -1,13 +1,13 @@
 use std::convert::TryFrom;
 
 use super::SourceChainError;
-use crate::conductor::api::error::ConductorApiError;
-use crate::conductor::entry_def_store::error::EntryDefStoreError;
-use crate::core::state::cascade::error::CascadeError;
-use crate::core::state::workspace::WorkspaceError;
-use crate::core::validation::OutcomeOrError;
-use crate::core::workflow::error::WorkflowError;
-use crate::from_sub_error;
+use monolith::holochain::conductor::api::error::ConductorApiError;
+use monolith::holochain::conductor::entry_def_store::error::EntryDefStoreError;
+use monolith::holochain::core::state::cascade::error::CascadeError;
+use monolith::holochain::core::state::workspace::WorkspaceError;
+use monolith::holochain::core::validation::OutcomeOrError;
+use monolith::holochain::core::workflow::error::WorkflowError;
+use monolith::holochain::from_sub_error;
 use holo_hash::AnyDhtHash;
 use holo_hash::HeaderHash;
 use monolith::holochain_keystore::KeystoreError;

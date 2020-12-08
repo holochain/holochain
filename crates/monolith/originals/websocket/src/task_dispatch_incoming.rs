@@ -3,7 +3,7 @@
 //!  - 2 - actual incoming messages
 //! This internal task manages both these cases.
 
-use crate::*;
+use monolith::holochain_websocket::*;
 use task_socket_sink::ToSocketSinkSender;
 
 /// internal message type for forwarding data to this task

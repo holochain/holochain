@@ -2,9 +2,9 @@
 
 use super::*;
 
-use crate::conductor::manager::ManagedTaskResult;
-use crate::core::workflow::integrate_dht_ops_workflow::integrate_dht_ops_workflow;
-use crate::core::workflow::integrate_dht_ops_workflow::IntegrateDhtOpsWorkspace;
+use monolith::holochain::conductor::manager::ManagedTaskResult;
+use monolith::holochain::core::workflow::integrate_dht_ops_workflow::integrate_dht_ops_workflow;
+use monolith::holochain::core::workflow::integrate_dht_ops_workflow::IntegrateDhtOpsWorkspace;
 use monolith::holochain_state::env::EnvironmentWrite;
 
 use tokio::task::JoinHandle;

@@ -1,11 +1,11 @@
 use super::create::extract_entry_def;
 use super::delete::get_original_address;
-use crate::core::ribosome::error::RibosomeResult;
-use crate::core::ribosome::CallContext;
-use crate::core::ribosome::RibosomeT;
-use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
-use crate::core::workflow::CallZomeWorkspace;
-use crate::core::SourceChainError;
+use monolith::holochain::core::ribosome::error::RibosomeResult;
+use monolith::holochain::core::ribosome::CallContext;
+use monolith::holochain::core::ribosome::RibosomeT;
+use monolith::holochain::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
+use monolith::holochain::core::workflow::CallZomeWorkspace;
+use monolith::holochain::core::SourceChainError;
 use holo_hash::HasHash;
 use monolith::holochain_zome_types::entry_def::EntryDefId;
 use monolith::holochain_zome_types::header::builder;

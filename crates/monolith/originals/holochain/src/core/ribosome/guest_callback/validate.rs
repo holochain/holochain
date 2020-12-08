@@ -1,8 +1,8 @@
-use crate::core::ribosome::FnComponents;
-use crate::core::ribosome::HostAccess;
-use crate::core::ribosome::Invocation;
-use crate::core::ribosome::ZomesToInvoke;
-use crate::core::workflow::CallZomeWorkspaceLock;
+use monolith::holochain::core::ribosome::FnComponents;
+use monolith::holochain::core::ribosome::HostAccess;
+use monolith::holochain::core::ribosome::Invocation;
+use monolith::holochain::core::ribosome::ZomesToInvoke;
+use monolith::holochain::core::workflow::CallZomeWorkspaceLock;
 use derive_more::Constructor;
 use holo_hash::AnyDhtHash;
 use monolith::holochain_p2p::HolochainP2pCell;
@@ -139,10 +139,10 @@ impl From<ValidateInvocation> for ValidateData {
 mod test {
     use super::ValidateData;
     use super::ValidateResult;
-    use crate::core::ribosome::Invocation;
-    use crate::fixt::ValidateHostAccessFixturator;
-    use crate::fixt::ValidateInvocationFixturator;
-    use crate::fixt::ZomeCallCapGrantFixturator;
+    use monolith::holochain::core::ribosome::Invocation;
+    use monolith::holochain::fixt::ValidateHostAccessFixturator;
+    use monolith::holochain::fixt::ValidateInvocationFixturator;
+    use monolith::holochain::fixt::ZomeCallCapGrantFixturator;
     use ::fixt::prelude::*;
     use holo_hash::fixt::AgentPubKeyFixturator;
     use holochain_serialized_bytes::prelude::*;
@@ -296,12 +296,12 @@ mod test {
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
     use super::ValidateResult;
-    use crate::core::ribosome::RibosomeT;
-    use crate::core::ribosome::ZomesToInvoke;
-    use crate::core::state::source_chain::SourceChainResult;
-    use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
-    use crate::fixt::curve::Zomes;
-    use crate::fixt::*;
+    use monolith::holochain::core::ribosome::RibosomeT;
+    use monolith::holochain::core::ribosome::ZomesToInvoke;
+    use monolith::holochain::core::state::source_chain::SourceChainResult;
+    use monolith::holochain::core::workflow::call_zome_workflow::CallZomeWorkspace;
+    use monolith::holochain::fixt::curve::Zomes;
+    use monolith::holochain::fixt::*;
     use ::fixt::prelude::*;
     use holo_hash::fixt::AgentPubKeyFixturator;
     use monolith::holochain_wasm_test_utils::TestWasm;

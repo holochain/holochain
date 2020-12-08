@@ -1,9 +1,9 @@
-use crate::core::ribosome::error::RibosomeResult;
-use crate::core::ribosome::CallContext;
-use crate::core::ribosome::RibosomeT;
-use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
-use crate::core::workflow::CallZomeWorkspace;
-use crate::core::SourceChainResult;
+use monolith::holochain::core::ribosome::error::RibosomeResult;
+use monolith::holochain::core::ribosome::CallContext;
+use monolith::holochain::core::ribosome::RibosomeT;
+use monolith::holochain::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
+use monolith::holochain::core::workflow::CallZomeWorkspace;
+use monolith::holochain::core::SourceChainResult;
 use monolith::holochain_zome_types::header::builder;
 use monolith::holochain_zome_types::CreateLinkInput;
 use monolith::holochain_zome_types::CreateLinkOutput;

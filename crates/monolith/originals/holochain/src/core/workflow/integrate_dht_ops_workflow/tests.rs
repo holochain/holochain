@@ -2,19 +2,19 @@
 
 use super::*;
 
-use crate::core::queue_consumer::TriggerSender;
-use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
-use crate::core::ribosome::host_fn;
-use crate::core::ribosome::MockRibosomeT;
-use crate::core::state::metadata::ChainItemKey;
-use crate::core::state::metadata::LinkMetaKey;
-use crate::core::state::workspace::WorkspaceError;
-use crate::core::workflow::CallZomeWorkspaceLock;
-use crate::fixt::CallContextFixturator;
-use crate::fixt::ZomeCallHostAccessFixturator;
-use crate::fixt::*;
-use crate::here;
-use crate::test_utils::test_network;
+use monolith::holochain::core::queue_consumer::TriggerSender;
+use monolith::holochain::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
+use monolith::holochain::core::ribosome::host_fn;
+use monolith::holochain::core::ribosome::MockRibosomeT;
+use monolith::holochain::core::state::metadata::ChainItemKey;
+use monolith::holochain::core::state::metadata::LinkMetaKey;
+use monolith::holochain::core::state::workspace::WorkspaceError;
+use monolith::holochain::core::workflow::CallZomeWorkspaceLock;
+use monolith::holochain::fixt::CallContextFixturator;
+use monolith::holochain::fixt::ZomeCallHostAccessFixturator;
+use monolith::holochain::fixt::*;
+use monolith::holochain::here;
+use monolith::holochain::test_utils::test_network;
 use ::fixt::prelude::*;
 use holo_hash::*;
 use monolith::holochain_state::env::EnvironmentWrite;
@@ -1317,14 +1317,14 @@ mod slow_tests {
     use std::convert::TryInto;
     use std::time::Duration;
 
-    use crate::core::state::dht_op_integration::IntegratedDhtOpsStore;
-    use crate::core::state::metadata::LinkMetaKey;
-    use crate::core::state::metadata::MetadataBuf;
-    use crate::core::state::metadata::MetadataBufT;
-    use crate::fixt::*;
-    use crate::test_utils::host_fn_api::*;
-    use crate::test_utils::setup_app;
-    use crate::test_utils::wait_for_integration;
+    use monolith::holochain::core::state::dht_op_integration::IntegratedDhtOpsStore;
+    use monolith::holochain::core::state::metadata::LinkMetaKey;
+    use monolith::holochain::core::state::metadata::MetadataBuf;
+    use monolith::holochain::core::state::metadata::MetadataBufT;
+    use monolith::holochain::fixt::*;
+    use monolith::holochain::test_utils::host_fn_api::*;
+    use monolith::holochain::test_utils::setup_app;
+    use monolith::holochain::test_utils::wait_for_integration;
     use fallible_iterator::FallibleIterator;
     use fixt::prelude::*;
     use holo_hash::EntryHash;
