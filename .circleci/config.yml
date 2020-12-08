@@ -26,13 +26,9 @@ jobs:
     steps:
       - checkout
       - run:
-         name: Build the holochain Nix package
+         name: Build the Nix packages
          no_output_timeout: 45m
-         command: nix build --verbose -f default.nix pkgs.applications.holochain
-      - run:
-         name: Build the dna-util Nix package
-         no_output_timeout: 15m
-         command: nix build --verbose -f default.nix pkgs.applications.dnaUtil
+         command: nix build --verbose -f default.nix pkgs.applications
 
   merge-test:
     docker:
