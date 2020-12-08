@@ -10,8 +10,8 @@ use crate::core::state::workspace::WorkspaceError;
 use crate::core::workflow::error::WorkflowError;
 use holo_hash::DnaHash;
 use holochain_serialized_bytes::prelude::*;
-use holochain_state::error::DatabaseError;
-use holochain_types::cell::CellId;
+use monolith::holochain_state::error::DatabaseError;
+use monolith::holochain_types::cell::CellId;
 use thiserror::Error;
 
 /// Errors occurring during a [CellConductorApi] or [InterfaceApi] call

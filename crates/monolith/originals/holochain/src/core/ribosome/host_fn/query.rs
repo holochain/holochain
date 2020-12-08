@@ -1,10 +1,10 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_zome_types::element::Element;
-use holochain_zome_types::element::ElementVec;
-use holochain_zome_types::QueryInput;
-use holochain_zome_types::QueryOutput;
+use monolith::holochain_zome_types::element::Element;
+use monolith::holochain_zome_types::element::ElementVec;
+use monolith::holochain_zome_types::QueryInput;
+use monolith::holochain_zome_types::QueryOutput;
 use std::sync::Arc;
 
 pub fn query(
@@ -30,10 +30,10 @@ pub mod slow_tests {
     use crate::{core::ribosome::ZomeCallHostAccess, fixt::ZomeCallHostAccessFixturator};
     use ::fixt::prelude::*;
     use hdk3::prelude::*;
-    use holochain_state::test_utils::TestEnvironment;
+    use monolith::holochain_state::test_utils::TestEnvironment;
     use query::ChainQueryFilter;
 
-    use holochain_wasm_test_utils::TestWasm;
+    use monolith::holochain_wasm_test_utils::TestWasm;
     use test_wasm_common::*;
 
     // TODO: use this setup function to DRY up a lot of duplicated code

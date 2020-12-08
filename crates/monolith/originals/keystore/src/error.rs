@@ -1,5 +1,5 @@
 use crate::*;
-use holochain_zome_types::signature::Signature;
+use monolith::holochain_zome_types::signature::Signature;
 
 /// Keystore Error Type.
 #[derive(Debug, thiserror::Error)]

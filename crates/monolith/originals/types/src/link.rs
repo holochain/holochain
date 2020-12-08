@@ -4,11 +4,11 @@ use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
-use holochain_zome_types::header::CreateLink;
-use holochain_zome_types::header::DeleteLink;
-use holochain_zome_types::header::ZomeId;
-use holochain_zome_types::link::LinkTag;
-use holochain_zome_types::signature::Signature;
+use monolith::holochain_zome_types::header::CreateLink;
+use monolith::holochain_zome_types::header::DeleteLink;
+use monolith::holochain_zome_types::header::ZomeId;
+use monolith::holochain_zome_types::link::LinkTag;
+use monolith::holochain_zome_types::signature::Signature;
 use regex::Regex;
 
 /// Links interrelate entries in a source chain.

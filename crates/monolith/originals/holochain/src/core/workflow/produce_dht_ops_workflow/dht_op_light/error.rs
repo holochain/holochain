@@ -2,9 +2,9 @@ use crate::core::SourceChainError;
 use holo_hash::AnyDhtHash;
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::SerializedBytesError;
-use holochain_state::error::DatabaseError;
-use holochain_types::dht_op::error::DhtOpError;
-use holochain_zome_types::header::conversions::WrongHeaderError;
+use monolith::holochain_state::error::DatabaseError;
+use monolith::holochain_types::dht_op::error::DhtOpError;
+use monolith::holochain_zome_types::header::conversions::WrongHeaderError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]

@@ -1,8 +1,8 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_zome_types::CapabilityGrantsInput;
-use holochain_zome_types::CapabilityGrantsOutput;
+use monolith::holochain_zome_types::CapabilityGrantsInput;
+use monolith::holochain_zome_types::CapabilityGrantsOutput;
 use std::sync::Arc;
 
 /// list all the grants stored locally in the chain filtered by tag
@@ -25,14 +25,14 @@ pub mod wasm_test {
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use hdk3::prelude::*;
-    use holochain_types::app::InstalledCell;
-    use holochain_types::cell::CellId;
-    use holochain_types::dna::DnaDef;
-    use holochain_types::dna::DnaFile;
-    use holochain_types::fixt::CapSecretFixturator;
-    use holochain_types::test_utils::fake_agent_pubkey_1;
-    use holochain_types::test_utils::fake_agent_pubkey_2;
-    use holochain_wasm_test_utils::TestWasm;
+    use monolith::holochain_types::app::InstalledCell;
+    use monolith::holochain_types::cell::CellId;
+    use monolith::holochain_types::dna::DnaDef;
+    use monolith::holochain_types::dna::DnaFile;
+    use monolith::holochain_types::fixt::CapSecretFixturator;
+    use monolith::holochain_types::test_utils::fake_agent_pubkey_1;
+    use monolith::holochain_types::test_utils::fake_agent_pubkey_2;
+    use monolith::holochain_wasm_test_utils::TestWasm;
     use matches::assert_matches;
 
     #[tokio::test(threaded_scheduler)]

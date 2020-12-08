@@ -5,8 +5,8 @@
 
 use crate::db::DbName;
 use failure::Fail;
-use holochain_types::element::error::ElementGroupError;
-use holochain_types::prelude::SerializedBytesError;
+use monolith::holochain_types::element::error::ElementGroupError;
+use monolith::holochain_types::prelude::SerializedBytesError;
 use std::path::PathBuf;
 use thiserror::Error;
 

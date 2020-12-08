@@ -4,15 +4,15 @@ use crate::core::ribosome::Invocation;
 use crate::core::ribosome::ZomesToInvoke;
 use crate::core::workflow::CallZomeWorkspaceLock;
 use derive_more::Constructor;
-use holochain_keystore::KeystoreSender;
-use holochain_p2p::HolochainP2pCell;
+use monolith::holochain_keystore::KeystoreSender;
+use monolith::holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::dna::zome::HostFnAccess;
-use holochain_types::dna::zome::Zome;
-use holochain_zome_types::header::HeaderHashes;
-use holochain_zome_types::post_commit::PostCommitCallbackResult;
-use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::ExternInput;
+use monolith::holochain_types::dna::zome::HostFnAccess;
+use monolith::holochain_types::dna::zome::Zome;
+use monolith::holochain_zome_types::header::HeaderHashes;
+use monolith::holochain_zome_types::post_commit::PostCommitCallbackResult;
+use monolith::holochain_zome_types::zome::ZomeName;
+use monolith::holochain_zome_types::ExternInput;
 
 #[derive(Clone)]
 pub struct PostCommitInvocation {
@@ -102,9 +102,9 @@ mod test {
     use crate::fixt::PostCommitInvocationFixturator;
     use ::fixt::prelude::*;
     use holochain_serialized_bytes::prelude::*;
-    use holochain_types::dna::zome::HostFnAccess;
-    use holochain_zome_types::post_commit::PostCommitCallbackResult;
-    use holochain_zome_types::ExternInput;
+    use monolith::holochain_types::dna::zome::HostFnAccess;
+    use monolith::holochain_zome_types::post_commit::PostCommitCallbackResult;
+    use monolith::holochain_zome_types::ExternInput;
 
     #[test]
     fn post_commit_callback_result_fold() {
@@ -209,7 +209,7 @@ mod slow_tests {
     use crate::fixt::PostCommitInvocationFixturator;
     use crate::fixt::RealRibosomeFixturator;
     use holo_hash::fixt::HeaderHashFixturator;
-    use holochain_wasm_test_utils::TestWasm;
+    use monolith::holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(threaded_scheduler)]
     async fn test_post_commit_unimplemented() {

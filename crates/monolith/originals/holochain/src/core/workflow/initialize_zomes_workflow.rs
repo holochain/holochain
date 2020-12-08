@@ -8,10 +8,10 @@ use crate::core::ribosome::guest_callback::init::InitResult;
 use crate::core::ribosome::RibosomeT;
 use crate::core::state::workspace::Workspace;
 use derive_more::Constructor;
-use holochain_keystore::KeystoreSender;
-use holochain_p2p::HolochainP2pCell;
-use holochain_types::dna::DnaDef;
-use holochain_zome_types::header::builder;
+use monolith::holochain_keystore::KeystoreSender;
+use monolith::holochain_p2p::HolochainP2pCell;
+use monolith::holochain_types::dna::DnaDef;
+use monolith::holochain_zome_types::header::builder;
 use tracing::*;
 
 #[derive(Constructor, Debug)]
@@ -79,9 +79,9 @@ pub mod tests {
     use crate::fixt::KeystoreSenderFixturator;
     use ::fixt::prelude::*;
     use fixt::Unpredictable;
-    use holochain_p2p::HolochainP2pCellFixturator;
-    use holochain_state::test_utils::test_cell_env;
-    use holochain_zome_types::Header;
+    use monolith::holochain_p2p::HolochainP2pCellFixturator;
+    use monolith::holochain_state::test_utils::test_cell_env;
+    use monolith::holochain_zome_types::Header;
     use matches::assert_matches;
 
     #[tokio::test(threaded_scheduler)]

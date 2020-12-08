@@ -1,3 +1,3 @@
-use holochain_wasm_test_utils::TestWasm;
+use monolith::holochain_wasm_test_utils::TestWasm;
 
 pub struct Zomes(pub Vec<TestWasm>);

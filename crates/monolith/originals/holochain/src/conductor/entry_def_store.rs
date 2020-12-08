@@ -13,16 +13,16 @@ use fallible_iterator::FallibleIterator;
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_state::buffer::KvBufFresh;
-use holochain_state::error::DatabaseError;
-use holochain_state::error::DatabaseResult;
-use holochain_state::prelude::*;
-use holochain_types::dna::zome::ZomeDef;
-use holochain_types::dna::DnaDefHashed;
-use holochain_types::dna::DnaFile;
-use holochain_zome_types::entry_def::EntryDef;
-use holochain_zome_types::header::EntryDefIndex;
-use holochain_zome_types::header::ZomeId;
+use monolith::holochain_state::buffer::KvBufFresh;
+use monolith::holochain_state::error::DatabaseError;
+use monolith::holochain_state::error::DatabaseResult;
+use monolith::holochain_state::prelude::*;
+use monolith::holochain_types::dna::zome::ZomeDef;
+use monolith::holochain_types::dna::DnaDefHashed;
+use monolith::holochain_types::dna::DnaFile;
+use monolith::holochain_zome_types::entry_def::EntryDef;
+use monolith::holochain_zome_types::header::EntryDefIndex;
+use monolith::holochain_zome_types::header::ZomeId;
 use std::collections::HashMap;
 use std::convert::TryInto;
 
@@ -227,14 +227,14 @@ mod tests {
     use super::EntryDefBufferKey;
     use crate::conductor::Conductor;
     use holo_hash::HasHash;
-    use holochain_state::test_utils::test_environments;
-    use holochain_types::dna::wasm::DnaWasmHashed;
-    use holochain_types::dna::zome::ZomeDef;
-    use holochain_types::test_utils::fake_dna_zomes;
-    use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::crdt::CrdtType;
-    use holochain_zome_types::entry_def::EntryDef;
-    use holochain_zome_types::entry_def::EntryVisibility;
+    use monolith::holochain_state::test_utils::test_environments;
+    use monolith::holochain_types::dna::wasm::DnaWasmHashed;
+    use monolith::holochain_types::dna::zome::ZomeDef;
+    use monolith::holochain_types::test_utils::fake_dna_zomes;
+    use monolith::holochain_wasm_test_utils::TestWasm;
+    use monolith::holochain_zome_types::crdt::CrdtType;
+    use monolith::holochain_zome_types::entry_def::EntryDef;
+    use monolith::holochain_zome_types::entry_def::EntryVisibility;
 
     #[tokio::test(threaded_scheduler)]
     async fn test_store_entry_defs() {

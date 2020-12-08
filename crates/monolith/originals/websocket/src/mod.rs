@@ -19,7 +19,7 @@
 //! ```
 //! # async fn doc_test() {
 //! #
-//! use holochain_websocket::*;
+//! use monolith::holochain_websocket::*;
 //!
 //! use url2::prelude::*;
 //! use tokio::stream::StreamExt;

@@ -2,9 +2,9 @@ use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use holo_hash::HasHash;
-use holochain_zome_types::Entry;
-use holochain_zome_types::HashEntryInput;
-use holochain_zome_types::HashEntryOutput;
+use monolith::holochain_zome_types::Entry;
+use monolith::holochain_zome_types::HashEntryInput;
+use monolith::holochain_zome_types::HashEntryOutput;
 use std::sync::Arc;
 
 pub fn hash_entry(
@@ -31,9 +31,9 @@ pub mod wasm_test {
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use holo_hash::EntryHash;
-    use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::HashEntryInput;
-    use holochain_zome_types::HashEntryOutput;
+    use monolith::holochain_wasm_test_utils::TestWasm;
+    use monolith::holochain_zome_types::HashEntryInput;
+    use monolith::holochain_zome_types::HashEntryOutput;
     use std::convert::TryInto;
     use std::sync::Arc;
     use test_wasm_common::TestString;

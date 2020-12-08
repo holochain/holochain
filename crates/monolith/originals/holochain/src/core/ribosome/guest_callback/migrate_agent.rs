@@ -5,13 +5,13 @@ use crate::core::ribosome::ZomesToInvoke;
 use crate::core::workflow::CallZomeWorkspaceLock;
 use derive_more::Constructor;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::dna::zome::HostFnAccess;
-use holochain_types::dna::zome::Permission;
-use holochain_types::dna::DnaDef;
-use holochain_zome_types::migrate_agent::MigrateAgent;
-use holochain_zome_types::migrate_agent::MigrateAgentCallbackResult;
-use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::ExternInput;
+use monolith::holochain_types::dna::zome::HostFnAccess;
+use monolith::holochain_types::dna::zome::Permission;
+use monolith::holochain_types::dna::DnaDef;
+use monolith::holochain_zome_types::migrate_agent::MigrateAgent;
+use monolith::holochain_zome_types::migrate_agent::MigrateAgentCallbackResult;
+use monolith::holochain_zome_types::zome::ZomeName;
+use monolith::holochain_zome_types::ExternInput;
 
 #[derive(Clone)]
 pub struct MigrateAgentInvocation {
@@ -117,10 +117,10 @@ mod test {
     use crate::fixt::MigrateAgentInvocationFixturator;
     use crate::fixt::ZomeNameFixturator;
     use holochain_serialized_bytes::prelude::*;
-    use holochain_types::dna::zome::HostFnAccess;
-    use holochain_zome_types::migrate_agent::MigrateAgent;
-    use holochain_zome_types::migrate_agent::MigrateAgentCallbackResult;
-    use holochain_zome_types::ExternInput;
+    use monolith::holochain_types::dna::zome::HostFnAccess;
+    use monolith::holochain_zome_types::migrate_agent::MigrateAgent;
+    use monolith::holochain_zome_types::migrate_agent::MigrateAgentCallbackResult;
+    use monolith::holochain_zome_types::ExternInput;
     use rand::prelude::*;
 
     #[test]
@@ -173,7 +173,7 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn migrate_agent_invocation_allow_side_effects() {
-        use holochain_types::dna::zome::Permission::*;
+        use monolith::holochain_types::dna::zome::Permission::*;
         let migrate_agent_host_access = MigrateAgentHostAccessFixturator::new(fixt::Unpredictable)
             .next()
             .unwrap();
@@ -241,7 +241,7 @@ mod slow_tests {
     use crate::fixt::MigrateAgentHostAccessFixturator;
     use crate::fixt::MigrateAgentInvocationFixturator;
     use crate::fixt::RealRibosomeFixturator;
-    use holochain_wasm_test_utils::TestWasm;
+    use monolith::holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(threaded_scheduler)]
     async fn test_migrate_agent_unimplemented() {

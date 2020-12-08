@@ -1,9 +1,9 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_zome_types::agent_info::AgentInfo;
-use holochain_zome_types::AgentInfoInput;
-use holochain_zome_types::AgentInfoOutput;
+use monolith::holochain_zome_types::agent_info::AgentInfo;
+use monolith::holochain_zome_types::AgentInfoInput;
+use monolith::holochain_zome_types::AgentInfoOutput;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
@@ -28,10 +28,10 @@ pub mod test {
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
 
-    use holochain_types::test_utils::fake_agent_pubkey_1;
-    use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::AgentInfoInput;
-    use holochain_zome_types::AgentInfoOutput;
+    use monolith::holochain_types::test_utils::fake_agent_pubkey_1;
+    use monolith::holochain_wasm_test_utils::TestWasm;
+    use monolith::holochain_zome_types::AgentInfoInput;
+    use monolith::holochain_zome_types::AgentInfoOutput;
 
     #[tokio::test(threaded_scheduler)]
     async fn invoke_import_agent_info_test() {

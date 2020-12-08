@@ -1,8 +1,8 @@
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCall;
 use crate::core::ribosome::{error::RibosomeResult, CallContext};
-use holochain_zome_types::{CallInput, ZomeCallResponse};
-use holochain_zome_types::{CallOutput, ExternInput};
+use monolith::holochain_zome_types::{CallInput, ZomeCallResponse};
+use monolith::holochain_zome_types::{CallOutput, ExternInput};
 use std::sync::Arc;
 
 pub fn call(
@@ -55,13 +55,13 @@ pub mod wasm_test {
     use hdk3::prelude::CellId;
     use holo_hash::HeaderHash;
     use holochain_serialized_bytes::SerializedBytes;
-    use holochain_types::app::InstalledCell;
-    use holochain_types::dna::DnaDef;
-    use holochain_types::dna::DnaFile;
-    use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::test_utils::fake_agent_pubkey_2;
-    use holochain_zome_types::ExternInput;
-    use holochain_zome_types::ZomeCallResponse;
+    use monolith::holochain_types::app::InstalledCell;
+    use monolith::holochain_types::dna::DnaDef;
+    use monolith::holochain_types::dna::DnaFile;
+    use monolith::holochain_wasm_test_utils::TestWasm;
+    use monolith::holochain_zome_types::test_utils::fake_agent_pubkey_2;
+    use monolith::holochain_zome_types::ExternInput;
+    use monolith::holochain_zome_types::ZomeCallResponse;
     use matches::assert_matches;
 
     use crate::conductor::{api::ZomeCall, ConductorHandle};

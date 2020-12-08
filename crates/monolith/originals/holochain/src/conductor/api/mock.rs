@@ -9,13 +9,13 @@ use crate::conductor::interface::SignalBroadcaster;
 use crate::core::workflow::ZomeCallResult;
 use async_trait::async_trait;
 use holo_hash::DnaHash;
-use holochain_keystore::KeystoreSender;
-use holochain_types::autonomic::AutonomicCue;
-use holochain_types::cell::CellId;
-use holochain_types::dna::zome::Zome;
-use holochain_types::dna::DnaFile;
-use holochain_zome_types::entry_def::EntryDef;
-use holochain_zome_types::zome::ZomeName;
+use monolith::holochain_keystore::KeystoreSender;
+use monolith::holochain_types::autonomic::AutonomicCue;
+use monolith::holochain_types::cell::CellId;
+use monolith::holochain_types::dna::zome::Zome;
+use monolith::holochain_types::dna::DnaFile;
+use monolith::holochain_zome_types::entry_def::EntryDef;
+use monolith::holochain_zome_types::zome::ZomeName;
 use mockall::mock;
 
 // Unfortunate workaround to get mockall to work with async_trait, due to the complexity of each.

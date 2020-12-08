@@ -1,5 +1,5 @@
 use crate::*;
-use holochain_zome_types::zome::FunctionName;
+use monolith::holochain_zome_types::zome::FunctionName;
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub(crate) struct WireDhtOpData {

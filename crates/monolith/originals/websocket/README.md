@@ -27,7 +27,7 @@ which is an async Stream whose items resolve to that same tuple (
 
 ```rust
 #
-use holochain_websocket::*;
+use monolith::holochain_websocket::*;
 
 use url2::prelude::*;
 use tokio::stream::StreamExt;

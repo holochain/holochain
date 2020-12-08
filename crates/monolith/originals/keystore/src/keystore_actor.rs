@@ -5,8 +5,8 @@ use crate::*;
 use ghost_actor::dependencies::futures::future::FutureExt;
 use holo_hash::HOLO_HASH_CORE_LEN;
 use holo_hash::HOLO_HASH_PREFIX_LEN;
-use holochain_zome_types::signature::Sign;
-use holochain_zome_types::signature::Signature;
+use monolith::holochain_zome_types::signature::Sign;
+use monolith::holochain_zome_types::signature::Signature;
 
 /// GhostSender type for the KeystoreApi
 pub type KeystoreSender = ghost_actor::GhostSender<lair_keystore_api::actor::LairClientApi>;

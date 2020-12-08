@@ -2,7 +2,7 @@
 //! Module containing incoming events from the HolochainP2p actor.
 
 use crate::*;
-use holochain_zome_types::signature::Signature;
+use monolith::holochain_zome_types::signature::Signature;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 
 /// Get options help control how the get is processed at various levels.

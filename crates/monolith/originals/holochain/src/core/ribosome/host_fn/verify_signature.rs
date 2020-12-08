@@ -1,9 +1,9 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_keystore::AgentPubKeyExt;
-use holochain_zome_types::VerifySignatureInput;
-use holochain_zome_types::VerifySignatureOutput;
+use monolith::holochain_keystore::AgentPubKeyExt;
+use monolith::holochain_zome_types::VerifySignatureInput;
+use monolith::holochain_zome_types::VerifySignatureOutput;
 use std::sync::Arc;
 
 pub fn verify_signature(
@@ -30,7 +30,7 @@ pub mod wasm_test {
     use hdk3::prelude::test_utils::fake_agent_pubkey_1;
     use hdk3::prelude::test_utils::fake_agent_pubkey_2;
     use hdk3::prelude::*;
-    use holochain_wasm_test_utils::TestWasm;
+    use monolith::holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_verify_signature_test() {

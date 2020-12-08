@@ -1,8 +1,8 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_zome_types::UnreachableInput;
-use holochain_zome_types::UnreachableOutput;
+use monolith::holochain_zome_types::UnreachableInput;
+use monolith::holochain_zome_types::UnreachableOutput;
 use std::sync::Arc;
 
 pub fn unreachable(

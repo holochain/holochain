@@ -1,8 +1,8 @@
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::{error::RibosomeResult, CallContext};
 use crate::core::signal::Signal;
-use holochain_zome_types::EmitSignalInput;
-use holochain_zome_types::EmitSignalOutput;
+use monolith::holochain_zome_types::EmitSignalInput;
+use monolith::holochain_zome_types::EmitSignalOutput;
 use std::sync::Arc;
 
 pub fn emit_signal(

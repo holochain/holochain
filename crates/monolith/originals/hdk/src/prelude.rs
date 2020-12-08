@@ -52,7 +52,7 @@ pub use holo_hash::HeaderHash;
 pub use holo_hash::HoloHash;
 pub use holochain_wasmer_guest::*;
 pub use holochain_zome_types;
-pub use holochain_zome_types::prelude::*;
+pub use monolith::holochain_zome_types::prelude::*;
 pub use std::collections::HashSet;
 pub use std::convert::TryFrom;
 

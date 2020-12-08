@@ -2,9 +2,9 @@ use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use crate::core::state::metadata::LinkMetaKey;
-use holochain_p2p::actor::GetLinksOptions;
-use holochain_zome_types::GetLinksInput;
-use holochain_zome_types::GetLinksOutput;
+use monolith::holochain_p2p::actor::GetLinksOptions;
+use monolith::holochain_zome_types::GetLinksInput;
+use monolith::holochain_zome_types::GetLinksOutput;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
@@ -48,7 +48,7 @@ pub mod slow_tests {
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use hdk3::prelude::*;
-    use holochain_wasm_test_utils::TestWasm;
+    use monolith::holochain_wasm_test_utils::TestWasm;
     use test_wasm_common::*;
 
     #[tokio::test(threaded_scheduler)]

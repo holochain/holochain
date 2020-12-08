@@ -1,4 +1,4 @@
-use holochain_zome_types::header::conversions::WrongHeaderError;
+use monolith::holochain_zome_types::header::conversions::WrongHeaderError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]

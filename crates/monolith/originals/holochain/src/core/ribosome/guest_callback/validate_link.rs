@@ -5,19 +5,19 @@ use crate::core::ribosome::ZomesToInvoke;
 use crate::core::workflow::CallZomeWorkspaceLock;
 use derive_more::Constructor;
 use holo_hash::AnyDhtHash;
-use holochain_p2p::HolochainP2pCell;
+use monolith::holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::dna::zome::HostFnAccess;
-use holochain_types::dna::zome::Permission;
-use holochain_types::dna::zome::Zome;
-use holochain_zome_types::entry::Entry;
-use holochain_zome_types::header::CreateLink;
-use holochain_zome_types::header::DeleteLink;
-use holochain_zome_types::validate_link::ValidateCreateLinkData;
-use holochain_zome_types::validate_link::ValidateDeleteLinkData;
-use holochain_zome_types::validate_link::ValidateLinkCallbackResult;
-use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::ExternInput;
+use monolith::holochain_types::dna::zome::HostFnAccess;
+use monolith::holochain_types::dna::zome::Permission;
+use monolith::holochain_types::dna::zome::Zome;
+use monolith::holochain_zome_types::entry::Entry;
+use monolith::holochain_zome_types::header::CreateLink;
+use monolith::holochain_zome_types::header::DeleteLink;
+use monolith::holochain_zome_types::validate_link::ValidateCreateLinkData;
+use monolith::holochain_zome_types::validate_link::ValidateDeleteLinkData;
+use monolith::holochain_zome_types::validate_link::ValidateLinkCallbackResult;
+use monolith::holochain_zome_types::zome::ZomeName;
+use monolith::holochain_zome_types::ExternInput;
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -192,11 +192,11 @@ mod test {
     use crate::fixt::*;
     use ::fixt::prelude::*;
     use holochain_serialized_bytes::prelude::*;
-    use holochain_types::dna::zome::HostFnAccess;
-    use holochain_types::dna::zome::Permission;
-    use holochain_zome_types::validate_link::ValidateCreateLinkData;
-    use holochain_zome_types::validate_link::ValidateLinkCallbackResult;
-    use holochain_zome_types::ExternInput;
+    use monolith::holochain_types::dna::zome::HostFnAccess;
+    use monolith::holochain_types::dna::zome::Permission;
+    use monolith::holochain_zome_types::validate_link::ValidateCreateLinkData;
+    use monolith::holochain_zome_types::validate_link::ValidateLinkCallbackResult;
+    use monolith::holochain_zome_types::ExternInput;
     use rand::seq::SliceRandom;
 
     #[tokio::test(threaded_scheduler)]
@@ -305,8 +305,8 @@ mod slow_tests {
     use crate::fixt::*;
     use ::fixt::prelude::*;
     use holo_hash::HeaderHash;
-    use holochain_types::dna::zome::Zome;
-    use holochain_wasm_test_utils::TestWasm;
+    use monolith::holochain_types::dna::zome::Zome;
+    use monolith::holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(threaded_scheduler)]
     async fn test_validate_link_add_unimplemented() {

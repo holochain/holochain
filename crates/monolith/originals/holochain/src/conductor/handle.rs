@@ -7,8 +7,8 @@
 //!
 //! ```rust, no_run
 //! async fn async_main () {
-//! use holochain_state::test_utils::{test_environments, TestEnvironment};
-//! use holochain::conductor::{Conductor, ConductorBuilder, ConductorHandle};
+//! use monolith::holochain_state::test_utils::{test_environments, TestEnvironment};
+//! use monolith::holochain::conductor::{Conductor, ConductorBuilder, ConductorHandle};
 //! let envs = test_environments();
 //! let handle: ConductorHandle = ConductorBuilder::new()
 //!    .test(&envs)
@@ -56,16 +56,16 @@ use crate::core::workflow::CallZomeWorkspaceLock;
 use crate::core::workflow::ZomeCallResult;
 use derive_more::From;
 use futures::future::FutureExt;
-use holochain_p2p::event::HolochainP2pEvent::*;
-use holochain_types::app::InstalledApp;
-use holochain_types::app::InstalledAppId;
-use holochain_types::app::InstalledCell;
-use holochain_types::app::MembraneProof;
-use holochain_types::autonomic::AutonomicCue;
-use holochain_types::cell::CellId;
-use holochain_types::dna::DnaFile;
-use holochain_types::prelude::*;
-use holochain_zome_types::entry_def::EntryDef;
+use monolith::holochain_p2p::event::HolochainP2pEvent::*;
+use monolith::holochain_types::app::InstalledApp;
+use monolith::holochain_types::app::InstalledAppId;
+use monolith::holochain_types::app::InstalledCell;
+use monolith::holochain_types::app::MembraneProof;
+use monolith::holochain_types::autonomic::AutonomicCue;
+use monolith::holochain_types::cell::CellId;
+use monolith::holochain_types::dna::DnaFile;
+use monolith::holochain_types::prelude::*;
+use monolith::holochain_zome_types::entry_def::EntryDef;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -76,7 +76,7 @@ use super::state::ConductorState;
 #[cfg(any(test, feature = "test_utils"))]
 use crate::core::queue_consumer::InitialQueueTriggers;
 #[cfg(any(test, feature = "test_utils"))]
-use holochain_state::env::EnvironmentWrite;
+use monolith::holochain_state::env::EnvironmentWrite;
 
 /// A handle to the Conductor that can easily be passed around and cheaply cloned
 pub type ConductorHandle = Arc<dyn ConductorHandleT>;

@@ -3,8 +3,8 @@ use std::convert::TryInto;
 use std::time::Duration;
 
 use holo_hash::EntryHash;
-use holochain_types::Entry;
-use holochain_wasm_test_utils::TestWasm;
+use monolith::holochain_types::Entry;
+use monolith::holochain_wasm_test_utils::TestWasm;
 
 use crate::core::state::element_buf::ElementBuf;
 use crate::core::state::source_chain::SourceChain;

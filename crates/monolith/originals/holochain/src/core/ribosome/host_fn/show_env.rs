@@ -1,8 +1,8 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_zome_types::ShowEnvInput;
-use holochain_zome_types::ShowEnvOutput;
+use monolith::holochain_zome_types::ShowEnvInput;
+use monolith::holochain_zome_types::ShowEnvOutput;
 use std::sync::Arc;
 
 pub fn show_env(

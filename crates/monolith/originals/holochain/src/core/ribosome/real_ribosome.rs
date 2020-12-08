@@ -61,26 +61,26 @@ use crate::core::ribosome::Invocation;
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallInvocation;
 use fallible_iterator::FallibleIterator;
-use holochain_types::dna::zome::HostFnAccess;
-use holochain_types::dna::zome::Permission;
-use holochain_types::dna::zome::Zome;
-use holochain_types::dna::zome::ZomeDef;
-use holochain_types::dna::DnaDefHashed;
-use holochain_types::dna::DnaError;
-use holochain_types::dna::DnaFile;
+use monolith::holochain_types::dna::zome::HostFnAccess;
+use monolith::holochain_types::dna::zome::Permission;
+use monolith::holochain_types::dna::zome::Zome;
+use monolith::holochain_types::dna::zome::ZomeDef;
+use monolith::holochain_types::dna::DnaDefHashed;
+use monolith::holochain_types::dna::DnaError;
+use monolith::holochain_types::dna::DnaFile;
 use holochain_wasmer_host::prelude::*;
-use holochain_zome_types::entry_def::EntryDefsCallbackResult;
-use holochain_zome_types::init::InitCallbackResult;
-use holochain_zome_types::migrate_agent::MigrateAgentCallbackResult;
-use holochain_zome_types::post_commit::PostCommitCallbackResult;
-use holochain_zome_types::validate::ValidateCallbackResult;
-use holochain_zome_types::validate::ValidationPackageCallbackResult;
-use holochain_zome_types::validate_link::ValidateLinkCallbackResult;
-use holochain_zome_types::zome::FunctionName;
-use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::CallbackResult;
-use holochain_zome_types::ExternOutput;
-use holochain_zome_types::ZomeCallResponse;
+use monolith::holochain_zome_types::entry_def::EntryDefsCallbackResult;
+use monolith::holochain_zome_types::init::InitCallbackResult;
+use monolith::holochain_zome_types::migrate_agent::MigrateAgentCallbackResult;
+use monolith::holochain_zome_types::post_commit::PostCommitCallbackResult;
+use monolith::holochain_zome_types::validate::ValidateCallbackResult;
+use monolith::holochain_zome_types::validate::ValidationPackageCallbackResult;
+use monolith::holochain_zome_types::validate_link::ValidateLinkCallbackResult;
+use monolith::holochain_zome_types::zome::FunctionName;
+use monolith::holochain_zome_types::zome::ZomeName;
+use monolith::holochain_zome_types::CallbackResult;
+use monolith::holochain_zome_types::ExternOutput;
+use monolith::holochain_zome_types::ZomeCallResponse;
 use std::sync::Arc;
 
 /// Path to the wasm cache path
@@ -517,7 +517,7 @@ pub mod wasm_test {
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use hdk3::prelude::*;
-    use holochain_wasm_test_utils::TestWasm;
+    use monolith::holochain_wasm_test_utils::TestWasm;
     use test_wasm_common::TestString;
 
     #[tokio::test(threaded_scheduler)]

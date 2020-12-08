@@ -1,8 +1,8 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_zome_types::CapabilityInfoInput;
-use holochain_zome_types::CapabilityInfoOutput;
+use monolith::holochain_zome_types::CapabilityInfoInput;
+use monolith::holochain_zome_types::CapabilityInfoOutput;
 use std::sync::Arc;
 
 /// return the access info used for this call

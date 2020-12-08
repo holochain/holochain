@@ -1,10 +1,10 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_p2p::HolochainP2pCellT;
-use holochain_zome_types::CallRemoteInput;
-use holochain_zome_types::CallRemoteOutput;
-use holochain_zome_types::ZomeCallResponse;
+use monolith::holochain_p2p::HolochainP2pCellT;
+use monolith::holochain_zome_types::CallRemoteInput;
+use monolith::holochain_zome_types::CallRemoteOutput;
+use monolith::holochain_zome_types::ZomeCallResponse;
 use std::convert::TryInto;
 use std::sync::Arc;
 
@@ -42,15 +42,15 @@ pub mod wasm_test {
     use crate::conductor::{api::ZomeCall, dna_store::MockDnaStore};
     use crate::core::ribosome::ZomeCallResponse;
     use hdk3::prelude::*;
-    use holochain_types::app::InstalledCell;
-    use holochain_types::cell::CellId;
-    use holochain_types::dna::DnaDef;
-    use holochain_types::dna::DnaFile;
-    use holochain_types::test_utils::fake_agent_pubkey_1;
-    use holochain_types::test_utils::fake_agent_pubkey_2;
-    use holochain_wasm_test_utils::TestWasm;
-    pub use holochain_zome_types::capability::CapSecret;
-    use holochain_zome_types::ExternInput;
+    use monolith::holochain_types::app::InstalledCell;
+    use monolith::holochain_types::cell::CellId;
+    use monolith::holochain_types::dna::DnaDef;
+    use monolith::holochain_types::dna::DnaFile;
+    use monolith::holochain_types::test_utils::fake_agent_pubkey_1;
+    use monolith::holochain_types::test_utils::fake_agent_pubkey_2;
+    use monolith::holochain_wasm_test_utils::TestWasm;
+    pub use monolith::holochain_zome_types::capability::CapSecret;
+    use monolith::holochain_zome_types::ExternInput;
 
     #[tokio::test(threaded_scheduler)]
     /// we can call a fn on a remote

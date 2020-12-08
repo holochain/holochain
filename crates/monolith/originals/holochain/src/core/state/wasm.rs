@@ -1,13 +1,13 @@
 use holo_hash::WasmHash;
-use holochain_state::buffer::CasBufFreshAsync;
-use holochain_state::error::DatabaseError;
-use holochain_state::error::DatabaseResult;
-use holochain_state::exports::SingleStore;
-use holochain_state::prelude::BufferedStore;
-use holochain_state::prelude::EnvironmentRead;
-use holochain_state::transaction::Writer;
-use holochain_types::dna::wasm::DnaWasm;
-use holochain_types::dna::wasm::DnaWasmHashed;
+use monolith::holochain_state::buffer::CasBufFreshAsync;
+use monolith::holochain_state::error::DatabaseError;
+use monolith::holochain_state::error::DatabaseResult;
+use monolith::holochain_state::exports::SingleStore;
+use monolith::holochain_state::prelude::BufferedStore;
+use monolith::holochain_state::prelude::EnvironmentRead;
+use monolith::holochain_state::transaction::Writer;
+use monolith::holochain_types::dna::wasm::DnaWasm;
+use monolith::holochain_types::dna::wasm::DnaWasmHashed;
 
 /// This is where wasm lives
 pub struct WasmBuf(CasBufFreshAsync<DnaWasm>);
@@ -39,11 +39,11 @@ impl BufferedStore for WasmBuf {
 mod tests {
     use super::*;
     use holo_hash::HasHash;
-    use holochain_types::dna::wasm::DnaWasm;
+    use monolith::holochain_types::dna::wasm::DnaWasm;
 
     #[tokio::test(threaded_scheduler)]
     async fn wasm_store_round_trip() -> DatabaseResult<()> {
-        use holochain_state::prelude::*;
+        use monolith::holochain_state::prelude::*;
         holochain_types::observability::test_run().ok();
 
         // all the stuff needed to have a WasmBuf

@@ -57,28 +57,28 @@ use fallible_iterator::FallibleIterator;
 use futures::future;
 use futures::future::TryFutureExt;
 use holo_hash::DnaHash;
-use holochain_keystore::lair_keystore::spawn_lair_keystore;
-use holochain_keystore::test_keystore::spawn_test_keystore;
-use holochain_keystore::KeystoreSender;
-use holochain_keystore::KeystoreSenderExt;
-use holochain_state::buffer::BufferedStore;
-use holochain_state::buffer::KvStore;
-use holochain_state::buffer::KvStoreT;
-use holochain_state::db;
-use holochain_state::env::EnvironmentKind;
-use holochain_state::env::EnvironmentWrite;
-use holochain_state::env::ReadManager;
-use holochain_state::exports::SingleStore;
-use holochain_state::fresh_reader;
-use holochain_state::prelude::*;
-use holochain_types::app::InstalledApp;
-use holochain_types::app::InstalledAppId;
-use holochain_types::app::InstalledCell;
-use holochain_types::app::MembraneProof;
-use holochain_types::cell::CellId;
-use holochain_types::dna::wasm::DnaWasmHashed;
-use holochain_types::dna::DnaFile;
-use holochain_zome_types::entry_def::EntryDef;
+use monolith::holochain_keystore::lair_keystore::spawn_lair_keystore;
+use monolith::holochain_keystore::test_keystore::spawn_test_keystore;
+use monolith::holochain_keystore::KeystoreSender;
+use monolith::holochain_keystore::KeystoreSenderExt;
+use monolith::holochain_state::buffer::BufferedStore;
+use monolith::holochain_state::buffer::KvStore;
+use monolith::holochain_state::buffer::KvStoreT;
+use monolith::holochain_state::db;
+use monolith::holochain_state::env::EnvironmentKind;
+use monolith::holochain_state::env::EnvironmentWrite;
+use monolith::holochain_state::env::ReadManager;
+use monolith::holochain_state::exports::SingleStore;
+use monolith::holochain_state::fresh_reader;
+use monolith::holochain_state::prelude::*;
+use monolith::holochain_types::app::InstalledApp;
+use monolith::holochain_types::app::InstalledAppId;
+use monolith::holochain_types::app::InstalledCell;
+use monolith::holochain_types::app::MembraneProof;
+use monolith::holochain_types::cell::CellId;
+use monolith::holochain_types::dna::wasm::DnaWasmHashed;
+use monolith::holochain_types::dna::DnaFile;
+use monolith::holochain_zome_types::entry_def::EntryDef;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -440,7 +440,7 @@ where
                             )
                         });
 
-                    use holochain_p2p::actor::HolochainP2pRefToCell;
+                    use monolith::holochain_p2p::actor::HolochainP2pRefToCell;
 
                     // Create each cell
                     let cells_tasks = cells_to_create.map(
@@ -927,8 +927,8 @@ mod builder {
     use super::*;
     use crate::conductor::dna_store::RealDnaStore;
     use crate::conductor::ConductorHandle;
-    use holochain_state::env::EnvironmentKind;
-    use holochain_state::test_utils::TestEnvironments;
+    use monolith::holochain_state::env::EnvironmentKind;
+    use monolith::holochain_state::test_utils::TestEnvironments;
 
     /// A configurable Builder for Conductor and sometimes ConductorHandle
     #[derive(Default)]
@@ -1164,8 +1164,8 @@ pub mod tests {
     use super::ConductorState;
     use super::*;
     use crate::conductor::dna_store::MockDnaStore;
-    use holochain_state::test_utils::test_environments;
-    use holochain_types::test_utils::fake_cell_id;
+    use monolith::holochain_state::test_utils::test_environments;
+    use monolith::holochain_types::test_utils::fake_cell_id;
     use matches::assert_matches;
 
     #[tokio::test(threaded_scheduler)]

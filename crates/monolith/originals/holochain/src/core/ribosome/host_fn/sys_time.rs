@@ -1,8 +1,8 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_zome_types::SysTimeInput;
-use holochain_zome_types::SysTimeOutput;
+use monolith::holochain_zome_types::SysTimeInput;
+use monolith::holochain_zome_types::SysTimeOutput;
 use std::sync::Arc;
 
 pub fn sys_time(
@@ -22,8 +22,8 @@ pub fn sys_time(
 pub mod wasm_test {
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
-    use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::SysTimeOutput;
+    use monolith::holochain_wasm_test_utils::TestWasm;
+    use monolith::holochain_zome_types::SysTimeOutput;
 
     #[tokio::test(threaded_scheduler)]
     async fn invoke_import_sys_time_test() {

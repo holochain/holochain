@@ -5,14 +5,14 @@ use crate::core::ribosome::ZomesToInvoke;
 use crate::core::workflow::CallZomeWorkspaceLock;
 use derive_more::Constructor;
 use holo_hash::EntryHash;
-use holochain_keystore::KeystoreSender;
-use holochain_p2p::HolochainP2pCell;
+use monolith::holochain_keystore::KeystoreSender;
+use monolith::holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::dna::zome::HostFnAccess;
-use holochain_types::dna::DnaDef;
-use holochain_zome_types::init::InitCallbackResult;
-use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::ExternInput;
+use monolith::holochain_types::dna::zome::HostFnAccess;
+use monolith::holochain_types::dna::DnaDef;
+use monolith::holochain_zome_types::init::InitCallbackResult;
+use monolith::holochain_zome_types::zome::ZomeName;
+use monolith::holochain_zome_types::ExternInput;
 
 #[derive(Debug, Clone)]
 pub struct InitInvocation {
@@ -106,9 +106,9 @@ mod test {
     use crate::fixt::ZomeNameFixturator;
     use ::fixt::prelude::*;
     use holochain_serialized_bytes::prelude::*;
-    use holochain_types::dna::zome::HostFnAccess;
-    use holochain_zome_types::init::InitCallbackResult;
-    use holochain_zome_types::ExternInput;
+    use monolith::holochain_types::dna::zome::HostFnAccess;
+    use monolith::holochain_zome_types::init::InitCallbackResult;
+    use monolith::holochain_zome_types::ExternInput;
 
     #[test]
     fn init_callback_result_fold() {
@@ -227,7 +227,7 @@ mod slow_tests {
     use crate::fixt::InitInvocationFixturator;
     use crate::fixt::RealRibosomeFixturator;
     use ::fixt::prelude::*;
-    use holochain_wasm_test_utils::TestWasm;
+    use monolith::holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(threaded_scheduler)]
     async fn test_init_unimplemented() {

@@ -3,17 +3,17 @@ use error::DhtOpConvertError;
 use error::DhtOpConvertResult;
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
-use holochain_types::dht_op::DhtOp;
-use holochain_types::dht_op::DhtOpLight;
-use holochain_types::header::NewEntryHeader;
-use holochain_zome_types::entry_def::EntryVisibility;
-use holochain_zome_types::header;
-use holochain_zome_types::header::Header;
-use holochain_zome_types::signature::Signature;
+use monolith::holochain_types::dht_op::DhtOp;
+use monolith::holochain_types::dht_op::DhtOpLight;
+use monolith::holochain_types::header::NewEntryHeader;
+use monolith::holochain_zome_types::entry_def::EntryVisibility;
+use monolith::holochain_zome_types::header;
+use monolith::holochain_zome_types::header::Header;
+use monolith::holochain_zome_types::signature::Signature;
 
 pub mod error;
 
-use holochain_state::prelude::PrefixType;
+use monolith::holochain_state::prelude::PrefixType;
 use tracing::*;
 
 #[cfg(test)]

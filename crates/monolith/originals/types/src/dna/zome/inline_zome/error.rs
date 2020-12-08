@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use holochain_zome_types::zome::FunctionName;
+use monolith::holochain_zome_types::zome::FunctionName;
 use thiserror::Error;
 
 pub type InlineZomeResult<T> = Result<T, InlineZomeError>;

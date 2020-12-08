@@ -1,4 +1,4 @@
-use holochain_state::error::DatabaseError;
+use monolith::holochain_state::error::DatabaseError;
 use thiserror::Error;
 
 use crate::core::{state::cascade::error::CascadeError, SourceChainError};

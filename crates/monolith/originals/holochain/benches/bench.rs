@@ -6,12 +6,12 @@ use criterion::Criterion;
 use criterion::Throughput;
 use hdk3::prelude::*;
 use holo_hash::fixt::AgentPubKeyFixturator;
-use holochain::core::ribosome::RibosomeT;
-use holochain::core::ribosome::ZomeCallInvocation;
-use holochain_types::dna::zome::Zome;
-use holochain_types::fixt::CapSecretFixturator;
-use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::ExternInput;
+use monolith::holochain::core::ribosome::RibosomeT;
+use monolith::holochain::core::ribosome::ZomeCallInvocation;
+use monolith::holochain_types::dna::zome::Zome;
+use monolith::holochain_types::fixt::CapSecretFixturator;
+use monolith::holochain_wasm_test_utils::TestWasm;
+use monolith::holochain_zome_types::ExternInput;
 use once_cell::sync::Lazy;
 use std::sync::Mutex;
 

@@ -21,16 +21,16 @@ use crate::core::state::workspace::Workspace;
 use crate::core::state::workspace::WorkspaceResult;
 use fallible_iterator::FallibleIterator;
 use holo_hash::*;
-use holochain_p2p::HolochainP2pCell;
-use holochain_p2p::HolochainP2pCellT;
-use holochain_state::buffer::BufferedStore;
-use holochain_state::buffer::KvBufFresh;
-use holochain_state::db::AUTHORED_DHT_OPS;
-use holochain_state::fresh_reader;
-use holochain_state::prelude::*;
-use holochain_state::transaction::Writer;
-use holochain_types::dht_op::DhtOp;
-use holochain_types::Timestamp;
+use monolith::holochain_p2p::HolochainP2pCell;
+use monolith::holochain_p2p::HolochainP2pCellT;
+use monolith::holochain_state::buffer::BufferedStore;
+use monolith::holochain_state::buffer::KvBufFresh;
+use monolith::holochain_state::db::AUTHORED_DHT_OPS;
+use monolith::holochain_state::fresh_reader;
+use monolith::holochain_state::prelude::*;
+use monolith::holochain_state::transaction::Writer;
+use monolith::holochain_types::dht_op::DhtOp;
+use monolith::holochain_types::Timestamp;
 use std::collections::HashMap;
 use std::time;
 use tracing::*;
@@ -183,26 +183,26 @@ mod tests {
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
     use holo_hash::fixt::*;
-    use holochain_p2p::actor::HolochainP2pSender;
-    use holochain_p2p::HolochainP2pRef;
-    use holochain_state::buffer::BufferedStore;
-    use holochain_state::env::EnvironmentWrite;
-    use holochain_state::env::ReadManager;
-    use holochain_state::env::WriteManager;
-    use holochain_state::error::DatabaseError;
-    use holochain_state::test_utils::test_cell_env;
-    use holochain_types::dht_op::DhtOp;
-    use holochain_types::dht_op::DhtOpHashed;
-    use holochain_types::dht_op::DhtOpLight;
-    use holochain_types::fixt::AppEntryTypeFixturator;
-    use holochain_types::fixt::SignatureFixturator;
-    use holochain_types::observability;
-    use holochain_types::HeaderHashed;
-    use holochain_zome_types::element::SignedHeaderHashed;
-    use holochain_zome_types::entry_def::EntryVisibility;
-    use holochain_zome_types::header::builder;
-    use holochain_zome_types::header::EntryType;
-    use holochain_zome_types::header::Update;
+    use monolith::holochain_p2p::actor::HolochainP2pSender;
+    use monolith::holochain_p2p::HolochainP2pRef;
+    use monolith::holochain_state::buffer::BufferedStore;
+    use monolith::holochain_state::env::EnvironmentWrite;
+    use monolith::holochain_state::env::ReadManager;
+    use monolith::holochain_state::env::WriteManager;
+    use monolith::holochain_state::error::DatabaseError;
+    use monolith::holochain_state::test_utils::test_cell_env;
+    use monolith::holochain_types::dht_op::DhtOp;
+    use monolith::holochain_types::dht_op::DhtOpHashed;
+    use monolith::holochain_types::dht_op::DhtOpLight;
+    use monolith::holochain_types::fixt::AppEntryTypeFixturator;
+    use monolith::holochain_types::fixt::SignatureFixturator;
+    use monolith::holochain_types::observability;
+    use monolith::holochain_types::HeaderHashed;
+    use monolith::holochain_zome_types::element::SignedHeaderHashed;
+    use monolith::holochain_zome_types::entry_def::EntryVisibility;
+    use monolith::holochain_zome_types::header::builder;
+    use monolith::holochain_zome_types::header::EntryType;
+    use monolith::holochain_zome_types::header::Update;
     use matches::assert_matches;
     use std::collections::HashMap;
     use std::convert::TryInto;
@@ -306,7 +306,7 @@ mod tests {
                 use tokio::stream::StreamExt;
                 let mut tx_complete = Some(tx_complete);
                 while let Some(evt) = recv.next().await {
-                    use holochain_p2p::event::HolochainP2pEvent::*;
+                    use monolith::holochain_p2p::event::HolochainP2pEvent::*;
                     match evt {
                         Publish { respond, .. } => {
                             respond.respond(Ok(async move { Ok(()) }.boxed().into()));
@@ -698,7 +698,7 @@ mod tests {
                         use tokio::stream::StreamExt;
                         let mut tx_complete = Some(tx_complete);
                         while let Some(evt) = recv.next().await {
-                            use holochain_p2p::event::HolochainP2pEvent::*;
+                            use monolith::holochain_p2p::event::HolochainP2pEvent::*;
                             match evt {
                                 Publish {
                                     respond,

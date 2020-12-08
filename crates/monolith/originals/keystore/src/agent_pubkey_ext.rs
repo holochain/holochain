@@ -1,6 +1,6 @@
 use crate::*;
-use holochain_zome_types::signature::Sign;
-use holochain_zome_types::signature::Signature;
+use monolith::holochain_zome_types::signature::Sign;
+use monolith::holochain_zome_types::signature::Signature;
 use std::sync::Arc;
 
 /// Extend holo_hash::AgentPubKey with additional signature functionality

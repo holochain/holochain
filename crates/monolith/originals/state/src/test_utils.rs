@@ -3,8 +3,8 @@
 use crate::env::EnvironmentKind;
 use crate::env::EnvironmentWrite;
 use crate::prelude::BufKey;
-use holochain_keystore::KeystoreSender;
-use holochain_types::test_utils::fake_cell_id;
+use monolith::holochain_keystore::KeystoreSender;
+use monolith::holochain_types::test_utils::fake_cell_id;
 use shrinkwraprs::Shrinkwrap;
 use std::sync::Arc;
 use tempdir::TempDir;
@@ -32,7 +32,7 @@ pub fn test_p2p_env() -> TestEnvironment {
 
 /// Generate a test keystore pre-populated with a couple test keypairs.
 pub fn test_keystore() -> holochain_keystore::KeystoreSender {
-    use holochain_keystore::KeystoreSenderExt;
+    use monolith::holochain_keystore::KeystoreSenderExt;
 
     tokio_safe_block_on::tokio_safe_block_on(
         async move {

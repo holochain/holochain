@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use holochain_zome_types::validate::ValidationStatus;
+use monolith::holochain_zome_types::validate::ValidationStatus;
 
 #[derive(Debug, Clone, derive_more::Constructor, derive_more::From)]
 pub struct DisputedStatus {

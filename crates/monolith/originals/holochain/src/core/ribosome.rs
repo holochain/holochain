@@ -41,20 +41,20 @@ use guest_callback::post_commit::PostCommitHostAccess;
 use guest_callback::validate::ValidateHostAccess;
 use guest_callback::validation_package::ValidationPackageHostAccess;
 use holo_hash::AgentPubKey;
-use holochain_keystore::KeystoreSender;
-use holochain_p2p::HolochainP2pCell;
+use monolith::holochain_keystore::KeystoreSender;
+use monolith::holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::cell::CellId;
-use holochain_types::dna::zome::HostFnAccess;
-use holochain_types::dna::zome::Zome;
-use holochain_types::dna::DnaDefHashed;
-use holochain_zome_types::capability::CapGrant;
-use holochain_zome_types::capability::CapSecret;
-use holochain_zome_types::header::ZomeId;
-use holochain_zome_types::zome::FunctionName;
-use holochain_zome_types::ExternInput;
-use holochain_zome_types::ExternOutput;
-use holochain_zome_types::ZomeCallResponse;
+use monolith::holochain_types::cell::CellId;
+use monolith::holochain_types::dna::zome::HostFnAccess;
+use monolith::holochain_types::dna::zome::Zome;
+use monolith::holochain_types::dna::DnaDefHashed;
+use monolith::holochain_zome_types::capability::CapGrant;
+use monolith::holochain_zome_types::capability::CapSecret;
+use monolith::holochain_zome_types::header::ZomeId;
+use monolith::holochain_zome_types::zome::FunctionName;
+use monolith::holochain_zome_types::ExternInput;
+use monolith::holochain_zome_types::ExternOutput;
+use monolith::holochain_zome_types::ZomeCallResponse;
 use mockall::automock;
 use std::iter::Iterator;
 
@@ -541,7 +541,7 @@ pub mod wasm_test {
             let input = $input.clone();
             tokio::task::spawn(async move {
                 use holo_hash::*;
-                use holochain_p2p::HolochainP2pCellT;
+                use monolith::holochain_p2p::HolochainP2pCellT;
                 use std::convert::TryInto;
                 use $crate::core::ribosome::RibosomeT;
 

@@ -2,7 +2,7 @@ use crate::hash_path::shard::ShardStrategy;
 use crate::hash_path::shard::SHARDEND;
 use crate::prelude::*;
 use holochain_wasmer_guest::*;
-use holochain_zome_types::link::LinkTag;
+use monolith::holochain_zome_types::link::LinkTag;
 use std::str::FromStr;
 use validate::RequiredValidationType;
 

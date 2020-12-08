@@ -22,13 +22,13 @@ use crate::core::state::workspace::Workspace;
 use crate::core::state::workspace::WorkspaceResult;
 pub use call_zome_workspace_lock::CallZomeWorkspaceLock;
 use either::Either;
-use holochain_keystore::KeystoreSender;
-use holochain_p2p::HolochainP2pCell;
-use holochain_state::prelude::*;
-use holochain_types::element::Element;
-use holochain_zome_types::entry::GetOptions;
-use holochain_zome_types::header::Header;
-use holochain_zome_types::ZomeCallResponse;
+use monolith::holochain_keystore::KeystoreSender;
+use monolith::holochain_p2p::HolochainP2pCell;
+use monolith::holochain_state::prelude::*;
+use monolith::holochain_types::element::Element;
+use monolith::holochain_zome_types::entry::GetOptions;
+use monolith::holochain_zome_types::header::Header;
+use monolith::holochain_zome_types::ZomeCallResponse;
 use std::sync::Arc;
 use tracing::instrument;
 
@@ -326,17 +326,17 @@ pub mod tests {
     use ::fixt::prelude::*;
     use holo_hash::fixt::*;
     use holo_hash::*;
-    use holochain_p2p::HolochainP2pCellFixturator;
+    use monolith::holochain_p2p::HolochainP2pCellFixturator;
     use holochain_serialized_bytes::prelude::*;
-    use holochain_state::env::ReadManager;
-    use holochain_state::test_utils::test_cell_env;
-    use holochain_types::cell::CellId;
-    use holochain_types::observability;
-    use holochain_types::test_utils::fake_agent_pubkey_1;
-    use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::entry::Entry;
-    use holochain_zome_types::ExternInput;
-    use holochain_zome_types::ExternOutput;
+    use monolith::holochain_state::env::ReadManager;
+    use monolith::holochain_state::test_utils::test_cell_env;
+    use monolith::holochain_types::cell::CellId;
+    use monolith::holochain_types::observability;
+    use monolith::holochain_types::test_utils::fake_agent_pubkey_1;
+    use monolith::holochain_wasm_test_utils::TestWasm;
+    use monolith::holochain_zome_types::entry::Entry;
+    use monolith::holochain_zome_types::ExternInput;
+    use monolith::holochain_zome_types::ExternOutput;
     use matches::assert_matches;
 
     #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]

@@ -1,9 +1,9 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_zome_types::debug::DebugMsg;
-use holochain_zome_types::DebugInput;
-use holochain_zome_types::DebugOutput;
+use monolith::holochain_zome_types::debug::DebugMsg;
+use monolith::holochain_zome_types::DebugInput;
+use monolith::holochain_zome_types::DebugOutput;
 use std::sync::Arc;
 use tracing::*;
 
@@ -33,10 +33,10 @@ pub mod wasm_test {
     use crate::fixt::RealRibosomeFixturator;
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
-    use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::debug_msg;
-    use holochain_zome_types::DebugInput;
-    use holochain_zome_types::DebugOutput;
+    use monolith::holochain_wasm_test_utils::TestWasm;
+    use monolith::holochain_zome_types::debug_msg;
+    use monolith::holochain_zome_types::DebugInput;
+    use monolith::holochain_zome_types::DebugOutput;
     use std::sync::Arc;
 
     /// we can get an entry hash out of the fn directly

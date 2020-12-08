@@ -1,10 +1,10 @@
 use call_zome_workflow::CallZomeWorkspaceLock;
-use holochain_p2p::HolochainP2pCell;
-use holochain_state::env::EnvironmentRead;
-use holochain_state::error::DatabaseResult;
-use holochain_state::prelude::*;
-use holochain_types::dna::DnaFile;
-use holochain_types::HeaderHashed;
+use monolith::holochain_p2p::HolochainP2pCell;
+use monolith::holochain_state::env::EnvironmentRead;
+use monolith::holochain_state::error::DatabaseResult;
+use monolith::holochain_state::prelude::*;
+use monolith::holochain_types::dna::DnaFile;
+use monolith::holochain_types::HeaderHashed;
 
 use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 use crate::core::ribosome::RibosomeT;

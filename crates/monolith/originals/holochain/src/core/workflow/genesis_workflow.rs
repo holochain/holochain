@@ -15,9 +15,9 @@ use crate::core::state::source_chain::SourceChainBuf;
 use crate::core::state::workspace::Workspace;
 use crate::core::state::workspace::WorkspaceResult;
 use derive_more::Constructor;
-use holochain_state::prelude::*;
-use holochain_types::dna::DnaFile;
-use holochain_types::prelude::*;
+use monolith::holochain_state::prelude::*;
+use monolith::holochain_types::dna::DnaFile;
+use monolith::holochain_types::prelude::*;
 use tracing::*;
 
 /// The struct which implements the genesis Workflow
@@ -108,11 +108,11 @@ pub mod tests {
     use crate::core::state::source_chain::SourceChain;
     use crate::core::SourceChainResult;
     use fallible_iterator::FallibleIterator;
-    use holochain_state::test_utils::test_cell_env;
-    use holochain_types::observability;
-    use holochain_types::test_utils::fake_agent_pubkey_1;
-    use holochain_types::test_utils::fake_dna_file;
-    use holochain_zome_types::Header;
+    use monolith::holochain_state::test_utils::test_cell_env;
+    use monolith::holochain_types::observability;
+    use monolith::holochain_types::test_utils::fake_agent_pubkey_1;
+    use monolith::holochain_types::test_utils::fake_dna_file;
+    use monolith::holochain_zome_types::Header;
     use matches::assert_matches;
 
     pub async fn fake_genesis(source_chain: &mut SourceChain) -> SourceChainResult<()> {

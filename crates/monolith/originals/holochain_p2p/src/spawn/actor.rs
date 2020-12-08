@@ -8,10 +8,10 @@ use crate::types::AgentPubKeyExt;
 
 use ghost_actor::dependencies::tracing;
 use ghost_actor::dependencies::tracing_futures::Instrument;
-use holochain_types::element::GetElementResponse;
-use holochain_types::validate::ValidationPackageResponse;
-use holochain_types::Timestamp;
-use holochain_zome_types::zome::FunctionName;
+use monolith::holochain_types::element::GetElementResponse;
+use monolith::holochain_types::validate::ValidationPackageResponse;
+use monolith::holochain_types::Timestamp;
+use monolith::holochain_zome_types::zome::FunctionName;
 use kitsune_p2p::actor::KitsuneP2pSender;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 

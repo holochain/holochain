@@ -147,13 +147,13 @@ mod tests {
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
     use ghost_actor::GhostControlSender;
-    use holochain_types::element::Element;
-    use holochain_types::element::ElementStatus;
-    use holochain_types::element::SignedHeaderHashed;
-    use holochain_types::element::WireElement;
-    use holochain_types::fixt::*;
-    use holochain_types::validate::ValidationStatus;
-    use holochain_types::HeaderHashed;
+    use monolith::holochain_types::element::Element;
+    use monolith::holochain_types::element::ElementStatus;
+    use monolith::holochain_types::element::SignedHeaderHashed;
+    use monolith::holochain_types::element::WireElement;
+    use monolith::holochain_types::fixt::*;
+    use monolith::holochain_types::validate::ValidationStatus;
+    use monolith::holochain_types::HeaderHashed;
     use kitsune_p2p::KitsuneP2pConfig;
 
     macro_rules! newhash {

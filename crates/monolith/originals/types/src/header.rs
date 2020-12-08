@@ -13,14 +13,14 @@ use crate::prelude::*;
 use conversions::WrongHeaderError;
 use derive_more::From;
 use holo_hash::EntryHash;
-use holochain_zome_types::element::Element;
-use holochain_zome_types::element::SignedHeader;
-use holochain_zome_types::entry_def::EntryVisibility;
-pub use holochain_zome_types::header::HeaderHashed;
-use holochain_zome_types::header::*;
-use holochain_zome_types::signature::Signature;
-use holochain_zome_types::validate::ValidationStatus;
-use holochain_zome_types::Entry;
+use monolith::holochain_zome_types::element::Element;
+use monolith::holochain_zome_types::element::SignedHeader;
+use monolith::holochain_zome_types::entry_def::EntryVisibility;
+pub use monolith::holochain_zome_types::header::HeaderHashed;
+use monolith::holochain_zome_types::header::*;
+use monolith::holochain_zome_types::signature::Signature;
+use monolith::holochain_zome_types::validate::ValidationStatus;
+use monolith::holochain_zome_types::Entry;
 
 use error::*;
 

@@ -1,8 +1,8 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_zome_types::EntryTypePropertiesInput;
-use holochain_zome_types::EntryTypePropertiesOutput;
+use monolith::holochain_zome_types::EntryTypePropertiesInput;
+use monolith::holochain_zome_types::EntryTypePropertiesOutput;
 use std::sync::Arc;
 
 pub fn entry_type_properties(
