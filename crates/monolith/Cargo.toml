@@ -62,6 +62,7 @@ matches = {version = "0.1.8", optional = true }
 # test_wasm_common = { version = "0.0.1", path = "originals/test_utils/wasm_common", optional = true  }
 unwrap_to = { version = "0.1.0", optional = true }
 
+strum_macros = "0.18.0"
 
 [dev-dependencies]
 anyhow = "1.0.26"

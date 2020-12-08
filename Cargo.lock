@@ -1787,6 +1787,7 @@ dependencies = [
  "shrinkwraprs",
  "structopt",
  "strum",
+ "strum_macros",
  "tempdir",
  "test-case",
  "thiserror",
