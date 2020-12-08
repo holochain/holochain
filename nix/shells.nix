@@ -20,8 +20,11 @@ let
 
     export HC_WASM_CACHE_PATH="$HC_TARGET_PREFIX/.wasm_cache"
     mkdir -p $HC_WASM_CACHE_PATH
-  '';
-
+  ''
+    # TODO: make thinlto linking work on stable
+    # export RUSTFLAGS="${holonix.rust.compile.stable-flags}"
+    # export RUSTFLAGS="$RUSTFLAGS -C linker-plugin-lto -C linker=${holonix.pkgs.clang_10}/bin/clang -C link-arg=-fuse-ld=${holonix.pkgs.lld}/bin/lld"
+    ;
   applicationPkgsInputs = {
     build = mapAttrsToList (name: value:
       value.buildInputs
@@ -47,13 +50,14 @@ let
 in
 
 rec {
-  # TODO: clarify whether we need this
+  # TODO: after downsizing holonix.shell, refactor this and use it as a foundation for all the following
   # legacy = stdenv.mkDerivation (holonix.shell // {
   #   shellHook = lib.concatStrings [
   #     holonix.shell.shellHook
   #     commonShellHook
   #   ];
 
+  # TODO: clarify if these are still needed by anything/anyone
   #   buildInputs = with holonix.pkgs; [
   #       gnuplot
   #       flamegraph
@@ -66,7 +70,6 @@ rec {
   #     ;
   # });
 
-  # TODO: downsize holonix.shell and use it as a foundation for all the following, because it has quirks that we may still need
 
   coreDev = mkShell {
     nativeBuildInputs = applicationPkgsInputs.nativeBuild;
