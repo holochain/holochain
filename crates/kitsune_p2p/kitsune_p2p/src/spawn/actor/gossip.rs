@@ -87,7 +87,6 @@ impl GossipData {
         let (local_agents, remote_agents) = self.evt_send.list_neighbor_agents().await?;
         // super naive gossip just processes all combinations
         // also causes duplication because it runs pairs from both sides
-        tracing::debug!(?local_agents, ?remote_agents);
         for (i, a1) in local_agents.iter().enumerate() {
             for a2 in local_agents.iter().skip(i) {
                 // at the very least, avoid gossiping with ourselves
@@ -99,7 +98,6 @@ impl GossipData {
                 self.pending_gossip_list.push((a1.clone(), a2.clone()));
             }
         }
-        tracing::debug!(pending_gossip_list = ?self.pending_gossip_list);
         Ok(())
     }
 
@@ -146,9 +144,6 @@ impl GossipData {
         span.in_scope(|| {
             tracing::debug!(to_has_len = ?op_hashes_to.len());
         });
-        // span.in_scope(|| {
-        //     tracing::debug!(?agent_info_to);
-        // });
 
         // values that to_agent has, and from_agent needs
         let from_needs = op_hashes_to
@@ -192,9 +187,6 @@ impl GossipData {
                 ))
                 .await
             {
-                // span.in_scope(|| {
-                //     tracing::debug!(peers_from_from_agent = ?r_peers);
-                // });
                 if !r_ops.is_empty() || !r_peers.is_empty() {
                     if let Err(e) = self
                         .evt_send
@@ -213,9 +205,6 @@ impl GossipData {
                 }
             }
         }
-        span.in_scope(|| {
-            tracing::debug!("Gossip Sent");
-        });
 
         // fetch values that from_agent needs from to_agent
         if !from_needs.is_empty() || !from_needs_agents.is_empty() {
@@ -229,9 +218,6 @@ impl GossipData {
                 ))
                 .await
             {
-                // span.in_scope(|| {
-                //     tracing::debug!(peers_from_to_agent = ?r_peers);
-                // });
                 if !r_ops.is_empty() || !r_peers.is_empty() {
                     if let Err(e) = self
                         .evt_send
@@ -250,9 +236,6 @@ impl GossipData {
                 }
             }
         }
-        span.in_scope(|| {
-            tracing::debug!("Gossip Done");
-        });
 
         Ok(())
     }

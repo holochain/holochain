@@ -96,6 +96,7 @@ fn conductors_call_remote(num_conductors: usize) {
 #[test_case(10, 10, 10)]
 #[test_case(8, 8, 8)]
 #[test_case(10, 10, 1)]
+#[ignore = "Don't want network tests running on ci"]
 fn conductors_local_gossip(num_committers: usize, num_conductors: usize, new_conductors: usize) {
     let mut network = KitsuneP2pConfig::default();
     network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
@@ -158,9 +159,9 @@ fn conductors_remote_gossip(num_committers: usize, num_conductors: usize, new_co
     };
     let proxy_config = holochain_p2p::kitsune_p2p::ProxyConfig::RemoteProxyClient{
         // Real proxy
-        // proxy_url: url2::url2!("kitsune-proxy://CIW6PxKxsPPlcuvUCbMcKwUpaMSmB7kLD8xyyj4mqcw/kitsune-quic/h/proxy.holochain.org/p/5778/--"),
+        proxy_url: url2::url2!("kitsune-proxy://CIW6PxKxsPPlcuvUCbMcKwUpaMSmB7kLD8xyyj4mqcw/kitsune-quic/h/proxy.holochain.org/p/5778/--"),
         // Local proxy
-        proxy_url: url2::url2!("kitsune-proxy://h5_sQGIdBB7OnWVc1iuYZ-QUzb0DowdCA73PA0oOcv4/kitsune-quic/h/192.168.1.6/p/58451/--"),
+        // proxy_url: url2::url2!("kitsune-proxy://h5_sQGIdBB7OnWVc1iuYZ-QUzb0DowdCA73PA0oOcv4/kitsune-quic/h/192.168.1.6/p/58451/--"),
         // Other machine proxy
         // proxy_url: url2::url2!("kitsune-proxy://h5_sQGIdBB7OnWVc1iuYZ-QUzb0DowdCA73PA0oOcv4/kitsune-quic/h/192.168.1.68/p/58451/--"),
     };

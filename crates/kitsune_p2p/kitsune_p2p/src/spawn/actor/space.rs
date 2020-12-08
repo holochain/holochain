@@ -101,7 +101,6 @@ impl gossip::GossipEventHandler for Space {
                 .map(|ai| Arc::new(ai.into_agent()))
                 .filter(|a| !local_agents.contains(a))
                 .collect::<Vec<_>>();
-            // peer_store.extend(all_agents);
             let local_agents = local_agents.into_iter().collect::<Vec<_>>();
             Ok((local_agents, remote_agents))
         }
