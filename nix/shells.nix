@@ -53,13 +53,14 @@ let
 in
 
 rec {
-  # TODO: clarify whether we need this
+  # TODO: after downsizing holonix.shell, refactor this and use it as a foundation for all the following
   # legacy = stdenv.mkDerivation (holonix.shell // {
   #   shellHook = lib.concatStrings [
   #     holonix.shell.shellHook
   #     commonShellHook
   #   ];
 
+  # TODO: clarify if these are still needed by anything/anyone
   #   buildInputs = with holonix.pkgs; [
   #       gnuplot
   #       flamegraph
@@ -72,7 +73,6 @@ rec {
   #     ;
   # });
 
-  # TODO: downsize holonix.shell and use it as a foundation for all the following, because it has quirks that we may still need
 
   coreDev = mkShell {
     nativeBuildInputs = applicationPkgsInputs.nativeBuild;
