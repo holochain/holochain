@@ -1,7 +1,7 @@
 use super::*;
 use crate::holochain::conductor::api::error::ConductorApiError;
 use crate::holochain::conductor::api::MockCellConductorApi;
-use crate::holochain::meta_mock;
+use crate::meta_mock;
 use ::fixt::prelude::*;
 use error::SysValidationError;
 use holo_hash::fixt::*;

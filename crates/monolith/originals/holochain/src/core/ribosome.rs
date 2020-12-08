@@ -557,7 +557,7 @@ pub mod wasm_test {
                     .unwrap();
 
                 // Required because otherwise the network will return routing errors
-                let test_network = crate::test_utils::test_network(
+                let test_network = crate::holochain::test_utils::test_network(
                     Some(ribosome.dna_def().as_hash().clone()),
                     Some(author),
                 )
@@ -617,6 +617,6 @@ pub mod wasm_test {
 mod slow_tests {
     #[tokio::test(threaded_scheduler)]
     async fn warm_wasm_tests() {
-        crate::test_utils::warm_wasm_tests();
+        crate::holochain::test_utils::warm_wasm_tests();
     }
 }

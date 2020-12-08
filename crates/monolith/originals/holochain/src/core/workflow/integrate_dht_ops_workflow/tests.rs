@@ -13,7 +13,7 @@ use crate::holochain::core::workflow::CallZomeWorkspaceLock;
 use crate::holochain::fixt::CallContextFixturator;
 use crate::holochain::fixt::ZomeCallHostAccessFixturator;
 use crate::holochain::fixt::*;
-use crate::holochain::here;
+use crate::here;
 use crate::holochain::test_utils::test_network;
 use ::fixt::prelude::*;
 use holo_hash::*;
