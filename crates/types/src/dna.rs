@@ -15,8 +15,11 @@ use std::collections::BTreeMap;
 
 use self::{
     error::DnaResult,
-    zome::{/*inline_zome::InlineZome,*/ Zome, ZomeDef},
+    zome::{Zome, ZomeDef},
 };
+
+#[cfg(feature = "test_utils")]
+use self::zome::inline_zome::InlineZome;
 
 /// Zomes need to be an ordered map from ZomeName to a Zome
 pub type Zomes = Vec<(ZomeName, zome::ZomeDef)>;
