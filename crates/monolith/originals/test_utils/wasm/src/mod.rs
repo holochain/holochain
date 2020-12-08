@@ -1,9 +1,6 @@
 use monolith::holochain_types::dna::wasm::DnaWasm;
 use monolith::holochain_types::dna::zome::WasmZome;
 use monolith::holochain_types::dna::zome::ZomeDef;
-pub extern crate strum;
-#[macro_use]
-extern crate strum_macros;
 use monolith::holochain_types::dna::zome::Zome;
 use monolith::holochain_zome_types::zome::ZomeName;
 

@@ -8,3 +8,7 @@ pub mod holochain_zome_types;
 pub mod holochain_keystore;
 pub mod holochain_websocket;
 pub mod holochain_wasm_test_utils;
+
+pub extern crate strum;
+#[macro_use]
+extern crate strum_macros;
