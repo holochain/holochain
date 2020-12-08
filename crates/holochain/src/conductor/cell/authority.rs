@@ -10,21 +10,16 @@ use fallible_iterator::FallibleIterator;
 
 use holo_hash::{AgentPubKey, EntryHash, HeaderHash};
 use holochain_state::{
-    env::EnvironmentRead,
-    env::{EnvironmentWrite, ReadManager},
+    env::{EnvironmentRead, EnvironmentWrite, ReadManager},
     error::DatabaseError,
     fresh_reader,
-    prelude::PrefixType,
-    prelude::Readable,
+    prelude::{PrefixType, Readable},
 };
 use holochain_types::{
     activity::{AgentActivity, ChainItems},
-    link::{GetLinksResponse, WireLinkMetaKey},
-};
-use holochain_types::{
     element::{ElementStatus, GetElementResponse, RawGetEntryResponse, WireElement},
-    header::WireHeaderStatus,
-    header::WireUpdateRelationship,
+    header::{WireHeaderStatus, WireUpdateRelationship},
+    link::{GetLinksResponse, WireLinkMetaKey},
     metadata::TimedHeaderHash,
 };
 use holochain_zome_types::{

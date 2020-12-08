@@ -11,16 +11,14 @@ use crate::core::{
     state::{
         dht_op_integration::{IntegratedDhtOpsStore, IntegrationLimboStore},
         element_buf::ElementBuf,
-        metadata::MetadataBuf,
-        metadata::MetadataBufT,
+        metadata::{MetadataBuf, MetadataBufT},
         validation_db::{ValidationLimboStatus, ValidationLimboStore, ValidationLimboValue},
         workspace::{Workspace, WorkspaceResult},
     },
 };
 use holo_hash::{AgentPubKey, DhtOpHash};
 use holochain_state::{
-    buffer::BufferedStore,
-    buffer::KvBufFresh,
+    buffer::{BufferedStore, KvBufFresh},
     db::{INTEGRATED_DHT_OPS, INTEGRATION_LIMBO},
     env::EnvironmentWrite,
     error::DatabaseResult,

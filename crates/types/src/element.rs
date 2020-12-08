@@ -9,10 +9,11 @@ use error::{ElementGroupError, ElementGroupResult};
 use holochain_keystore::KeystoreError;
 use holochain_serialized_bytes::prelude::*;
 pub use holochain_zome_types::element::*;
-use holochain_zome_types::{entry::Entry, validate::ValidationStatus};
 use holochain_zome_types::{
+    entry::Entry,
     entry_def::EntryVisibility,
     header::{EntryType, Header},
+    validate::ValidationStatus,
 };
 use std::{borrow::Cow, collections::BTreeSet};
 

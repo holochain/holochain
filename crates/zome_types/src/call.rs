@@ -1,7 +1,8 @@
-use crate::capability::CapSecret;
-use crate::cell::CellId;
-use crate::zome::FunctionName;
-use crate::zome::ZomeName;
+use crate::{
+    capability::CapSecret,
+    cell::CellId,
+    zome::{FunctionName, ZomeName},
+};
 use holo_hash::AgentPubKey;
 use holochain_serialized_bytes::prelude::SerializedBytes;
 

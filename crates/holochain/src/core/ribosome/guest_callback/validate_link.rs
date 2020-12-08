@@ -1,19 +1,19 @@
-use crate::core::ribosome::HostAccess;
-use crate::core::ribosome::Invocation;
-use crate::core::ribosome::ZomesToInvoke;
-use crate::core::{ribosome::FnComponents, workflow::CallZomeWorkspaceLock};
+use crate::core::{
+    ribosome::{FnComponents, HostAccess, Invocation, ZomesToInvoke},
+    workflow::CallZomeWorkspaceLock,
+};
 use derive_more::Constructor;
 use holo_hash::AnyDhtHash;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::dna::zome::{HostFnAccess, Permission};
-use holochain_zome_types::header::CreateLink;
-use holochain_zome_types::header::DeleteLink;
-use holochain_zome_types::validate_link::ValidateCreateLinkData;
-use holochain_zome_types::validate_link::ValidateLinkCallbackResult;
-use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::ExternInput;
-use holochain_zome_types::{entry::Entry, validate_link::ValidateDeleteLinkData};
+use holochain_types::dna::zome::{HostFnAccess, Permission, Zome};
+use holochain_zome_types::{
+    entry::Entry,
+    header::{CreateLink, DeleteLink},
+    validate_link::{ValidateCreateLinkData, ValidateDeleteLinkData, ValidateLinkCallbackResult},
+    zome::ZomeName,
+    ExternInput,
+};
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -38,7 +38,7 @@ impl ValidateLinkInvocation<ValidateDeleteLinkInvocation> {
 
 #[derive(Clone)]
 pub struct ValidateCreateLinkInvocation {
-    pub zome_name: ZomeName,
+    pub zome: Zome,
     // Arc here as CreateLink contains arbitrary bytes in the tag
     pub link_add: Arc<CreateLink>,
     pub base: Arc<Entry>,
@@ -47,14 +47,14 @@ pub struct ValidateCreateLinkInvocation {
 
 #[derive(Clone, derive_more::Constructor)]
 pub struct ValidateDeleteLinkInvocation {
-    pub zome_name: ZomeName,
+    pub zome: Zome,
     pub delete_link: DeleteLink,
 }
 
 impl ValidateCreateLinkInvocation {
-    pub fn new(zome_name: ZomeName, link_add: CreateLink, base: Entry, target: Entry) -> Self {
+    pub fn new(zome: Zome, link_add: CreateLink, base: Entry, target: Entry) -> Self {
         Self {
-            zome_name,
+            zome,
             link_add: Arc::new(link_add),
             base: Arc::new(base),
             target: Arc::new(target),
@@ -95,6 +95,7 @@ impl From<&ValidateLinkHostAccess> for HostFnAccess {
     fn from(_: &ValidateLinkHostAccess) -> Self {
         let mut access = Self::none();
         access.read_workspace = Permission::Allow;
+        access.dna_bindings = Permission::Allow;
         access
     }
 }
@@ -119,7 +120,7 @@ impl Invocation for ValidateCreateLinkInvocation {
         // links are specific to zomes so only validate in the zome the link is defined in
         // note that here it is possible there is a zome/link mismatch
         // we rely on the invocation to be built correctly
-        ZomesToInvoke::One(self.zome_name.clone())
+        ZomesToInvoke::One(self.zome.clone())
     }
     fn fn_components(&self) -> FnComponents {
         vec!["validate_create_link".into()].into()
@@ -136,7 +137,7 @@ impl Invocation for ValidateDeleteLinkInvocation {
         // links are specific to zomes so only validate in the zome the link is defined in
         // note that here it is possible there is a zome/link mismatch
         // we rely on the invocation to be built correctly
-        ZomesToInvoke::One(self.zome_name.clone())
+        ZomesToInvoke::One(self.zome.clone())
     }
     fn fn_components(&self) -> FnComponents {
         vec!["validate_delete_link".into()].into()
@@ -181,17 +182,18 @@ impl From<Vec<ValidateLinkCallbackResult>> for ValidateLinkResult {
 
 #[cfg(test)]
 mod test {
-
     use super::ValidateLinkResult;
-    use crate::core::ribosome::Invocation;
-    use crate::core::ribosome::ZomesToInvoke;
-    use crate::fixt::*;
+    use crate::{
+        core::ribosome::{Invocation, ZomesToInvoke},
+        fixt::*,
+    };
     use ::fixt::prelude::*;
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::dna::zome::{HostFnAccess, Permission};
-    use holochain_zome_types::validate_link::ValidateCreateLinkData;
-    use holochain_zome_types::validate_link::ValidateLinkCallbackResult;
-    use holochain_zome_types::ExternInput;
+    use holochain_zome_types::{
+        validate_link::{ValidateCreateLinkData, ValidateLinkCallbackResult},
+        ExternInput,
+    };
     use rand::seq::SliceRandom;
 
     #[tokio::test(threaded_scheduler)]
@@ -235,6 +237,7 @@ mod test {
                 .unwrap();
         let mut access = HostFnAccess::none();
         access.read_workspace = Permission::Allow;
+        access.dna_bindings = Permission::Allow;
         assert_eq!(HostFnAccess::from(&validate_link_add_host_access), access,);
     }
 
@@ -244,9 +247,9 @@ mod test {
             ValidateCreateLinkInvocationFixturator::new(fixt::Unpredictable)
                 .next()
                 .unwrap();
-        let zome_name = validate_create_link_invocation.zome_name.clone();
+        let zome = validate_create_link_invocation.zome.clone();
         assert_eq!(
-            ZomesToInvoke::One(zome_name),
+            ZomesToInvoke::One(zome),
             validate_create_link_invocation.zomes(),
         );
     }
@@ -291,25 +294,26 @@ mod test {
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
-
     use super::ValidateLinkResult;
-    use crate::core::ribosome::RibosomeT;
-    use crate::core::state::source_chain::SourceChainResult;
-    use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
-    use crate::fixt::curve::Zomes;
-    use crate::fixt::*;
+    use crate::{
+        core::{
+            ribosome::RibosomeT, state::source_chain::SourceChainResult,
+            workflow::call_zome_workflow::CallZomeWorkspace,
+        },
+        fixt::{curve::Zomes, *},
+    };
     use ::fixt::prelude::*;
     use holo_hash::HeaderHash;
+    use holochain_types::dna::zome::Zome;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::zome::ZomeName;
 
     #[tokio::test(threaded_scheduler)]
     async fn test_validate_link_add_unimplemented() {
-        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
             .next()
             .unwrap();
         let validate_invocation =
-            ValidateLinkInvocationCreateFixturator::new(ZomeName::from(TestWasm::Foo))
+            ValidateLinkInvocationCreateFixturator::new(Zome::from(TestWasm::Foo))
                 .next()
                 .unwrap();
 
@@ -321,10 +325,10 @@ mod slow_tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_validate_implemented_valid() {
-        let ribosome = WasmRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateCreateLinkValid]))
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateCreateLinkValid]))
             .next()
             .unwrap();
-        let validate_invocation = ValidateLinkInvocationCreateFixturator::new(ZomeName::from(
+        let validate_invocation = ValidateLinkInvocationCreateFixturator::new(Zome::from(
             TestWasm::ValidateCreateLinkValid,
         ))
         .next()
@@ -339,11 +343,11 @@ mod slow_tests {
     #[tokio::test(threaded_scheduler)]
     async fn test_validate_link_add_implemented_invalid() {
         let ribosome =
-            WasmRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateCreateLinkInvalid]))
+            RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateCreateLinkInvalid]))
                 .next()
                 .unwrap();
         let validate_create_link_invocation = ValidateLinkInvocationCreateFixturator::new(
-            ZomeName::from(TestWasm::ValidateCreateLinkInvalid),
+            Zome::from(TestWasm::ValidateCreateLinkInvalid),
         )
         .next()
         .unwrap();

@@ -7,9 +7,7 @@ use crate::{
     core::{
         queue_consumer::{OneshotWriter, TriggerSender, WorkComplete},
         state::{
-            cascade::Cascade,
-            cascade::DbPair,
-            cascade::DbPairMut,
+            cascade::{Cascade, DbPair, DbPairMut},
             dht_op_integration::{IntegrationLimboStore, IntegrationLimboValue},
             element_buf::ElementBuf,
             metadata::MetadataBuf,
@@ -34,12 +32,16 @@ use holochain_types::{
     dht_op::DhtOp, header::NewEntryHeaderRef, test_utils::which_agent, validate::ValidationStatus,
     Entry, Timestamp,
 };
-use holochain_zome_types::{entry_def::EntryVisibility, signature::Signature};
 use holochain_zome_types::{
+    entry_def::EntryVisibility,
     header::{CreateLink, Delete, DeleteLink, EntryType, Update},
+    signature::Signature,
     Header,
 };
-use std::{collections::BinaryHeap, convert::TryFrom, convert::TryInto};
+use std::{
+    collections::BinaryHeap,
+    convert::{TryFrom, TryInto},
+};
 use tracing::*;
 
 use produce_dht_ops_workflow::dht_op_light::light_to_op;
@@ -439,7 +441,7 @@ async fn sys_validate_element_inner(
         Header::DeleteLink(header) => {
             register_delete_link(header, workspace, network, incoming_dht_ops_sender).await?;
         }
-        _ => (),
+        _ => {}
     }
     Ok(())
 }

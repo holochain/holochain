@@ -94,7 +94,11 @@ impl<P: PrefixType> PrefixHashKey<P> {
 
     pub(super) fn fill_from_raw(hash: &[u8]) -> Self {
         if hash.len() != PREFIX_KEY_SIZE {
-            panic!("Holochain detected database corruption.\n\nInvalid PrefixHashKey: expected {} bytes but got {}", PREFIX_KEY_SIZE, hash.len());
+            panic!(
+                "Holochain detected database corruption.\n\nInvalid PrefixHashKey: expected {} bytes but got {}",
+                PREFIX_KEY_SIZE,
+                hash.len()
+            );
         }
         let mut key = Self::empty();
 

@@ -498,7 +498,9 @@ impl ghost_actor::GhostHandler<KitsuneP2p> for Space {}
 
 impl KitsuneP2pHandler for Space {
     fn handle_list_transport_bindings(&mut self) -> KitsuneP2pHandlerResult<Vec<url2::Url2>> {
-        unreachable!("These requests are handled at the to actor level and are never propagated down to the space.")
+        unreachable!(
+            "These requests are handled at the to actor level and are never propagated down to the space."
+        )
     }
 
     fn handle_join(
@@ -608,7 +610,7 @@ impl KitsuneP2pHandler for Space {
             None | Some(0) => {
                 input.remote_agent_count = Some(DEFAULT_RPC_MULTI_REMOTE_AGENT_COUNT);
             }
-            _ => (),
+            _ => {}
         }
 
         // if the user doesn't care about timeout_ms, apply default
@@ -616,7 +618,7 @@ impl KitsuneP2pHandler for Space {
             None | Some(0) => {
                 input.timeout_ms = Some(DEFAULT_RPC_MULTI_TIMEOUT_MS);
             }
-            _ => (),
+            _ => {}
         }
 
         // if the user doesn't care about race_timeout_ms, apply default
@@ -624,7 +626,7 @@ impl KitsuneP2pHandler for Space {
             None | Some(0) => {
                 input.race_timeout_ms = Some(DEFAULT_RPC_MULTI_RACE_TIMEOUT_MS);
             }
-            _ => (),
+            _ => {}
         }
 
         // race timeout > timeout is nonesense
@@ -644,7 +646,7 @@ impl KitsuneP2pHandler for Space {
             None | Some(0) => {
                 input.remote_agent_count = Some(DEFAULT_NOTIFY_REMOTE_AGENT_COUNT);
             }
-            _ => (),
+            _ => {}
         }
 
         // if the user doesn't care about timeout_ms, apply default

@@ -2,13 +2,16 @@
 
 use fallible_iterator::FallibleIterator;
 use holo_hash::{AgentPubKey, DnaHash};
-use holochain_p2p::kitsune_p2p::agent_store::AgentInfo;
-use holochain_p2p::kitsune_p2p::agent_store::AgentInfoSigned;
-use holochain_state::{buffer::KvStore, buffer::KvStoreT, fresh_reader};
-use holochain_state::{db::GetDb, prelude::Readable};
-use holochain_state::{env::EnvironmentRead, error::DatabaseError};
-use holochain_state::{env::EnvironmentWrite, error::DatabaseResult};
-use holochain_state::{env::WriteManager, key::BufKey};
+use holochain_p2p::kitsune_p2p::agent_store::{AgentInfo, AgentInfoSigned};
+use holochain_state::{
+    buffer::{KvStore, KvStoreT},
+    db::GetDb,
+    env::{EnvironmentRead, EnvironmentWrite, WriteManager},
+    error::{DatabaseError, DatabaseResult},
+    fresh_reader,
+    key::BufKey,
+    prelude::Readable,
+};
 use std::convert::TryInto;
 
 const AGENT_KEY_LEN: usize = 64;
@@ -192,16 +195,18 @@ pub fn get_single_agent_info(
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
     use fixt::prelude::*;
-    use holochain_state::env::ReadManager;
-    use holochain_state::env::WriteManager;
-    use holochain_state::test_utils::test_p2p_env;
-    use holochain_state::{buffer::KvStoreT, fresh_reader_test};
-    use kitsune_p2p::fixt::AgentInfoFixturator;
-    use kitsune_p2p::fixt::AgentInfoSignedFixturator;
-    use kitsune_p2p::KitsuneBinType;
+    use holochain_state::{
+        buffer::KvStoreT,
+        env::{ReadManager, WriteManager},
+        fresh_reader_test,
+        test_utils::test_p2p_env,
+    };
+    use kitsune_p2p::{
+        fixt::{AgentInfoFixturator, AgentInfoSignedFixturator},
+        KitsuneBinType,
+    };
     use std::convert::TryInto;
 
     #[test]

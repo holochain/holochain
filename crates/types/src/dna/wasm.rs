@@ -4,7 +4,7 @@
 use backtrace::Backtrace;
 use holo_hash::*;
 use holochain_serialized_bytes::prelude::*;
-use serde::{self, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::{
     fmt,
     hash::{Hash, Hasher},

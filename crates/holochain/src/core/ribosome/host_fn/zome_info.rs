@@ -1,6 +1,7 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
+use holo_hash::HasHash;
 use holochain_zome_types::zome_info::ZomeInfo;
 use holochain_zome_types::ZomeInfoInput;
 use holochain_zome_types::ZomeInfoOutput;
@@ -12,11 +13,11 @@ pub fn zome_info(
     _input: ZomeInfoInput,
 ) -> RibosomeResult<ZomeInfoOutput> {
     Ok(ZomeInfoOutput::new(ZomeInfo {
-        dna_name: ribosome.dna_file().dna().name.clone(),
-        zome_name: call_context.zome_name.clone(),
-        dna_hash: ribosome.dna_file().dna_hash().clone(), // @TODO
-        zome_id: ribosome.zome_name_to_id(&call_context.zome_name)?,
-        properties: ribosome.dna_file().dna().properties.clone(),
+        dna_name: ribosome.dna_def().name.clone(),
+        zome_name: call_context.zome.zome_name().clone(),
+        dna_hash: ribosome.dna_def().as_hash().clone(),
+        zome_id: ribosome.zome_to_id(&call_context.zome)?,
+        properties: ribosome.dna_def().properties.clone(),
         // @TODO
         // public_token: "".into(),
     }))

@@ -24,8 +24,7 @@ use crate::core::{
 };
 use fallible_iterator::FallibleIterator;
 use holo_hash::*;
-use holochain_p2p::HolochainP2pCell;
-use holochain_p2p::HolochainP2pCellT;
+use holochain_p2p::{HolochainP2pCell, HolochainP2pCellT};
 use holochain_state::{
     buffer::{BufferedStore, KvBufFresh},
     db::AUTHORED_DHT_OPS,
@@ -34,8 +33,7 @@ use holochain_state::{
     transaction::Writer,
 };
 use holochain_types::{dht_op::DhtOp, Timestamp};
-use std::collections::HashMap;
-use std::time;
+use std::{collections::HashMap, time};
 use tracing::*;
 
 /// Default redundancy factor for validation receipts
@@ -200,9 +198,9 @@ mod tests {
         fixt::{AppEntryTypeFixturator, SignatureFixturator},
         observability, HeaderHashed,
     };
-    use holochain_zome_types::entry_def::EntryVisibility;
     use holochain_zome_types::{
         element::SignedHeaderHashed,
+        entry_def::EntryVisibility,
         header::{builder, EntryType, Update},
     };
     use matches::assert_matches;
@@ -325,7 +323,7 @@ mod tests {
                                 break;
                             }
                         }
-                        _ => (),
+                        _ => {}
                     }
                 }
             }
@@ -734,7 +732,7 @@ mod tests {
                                         tx_complete.take().unwrap().send(()).unwrap();
                                     }
                                 }
-                                _ => (),
+                                _ => {}
                             }
                         }
                     }

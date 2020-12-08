@@ -1,12 +1,14 @@
 use crate::{
     conductor::{api::error::ConductorApiError, CellError, ConductorHandle},
-    core::workflow::error::WorkflowError,
-    core::SourceChainError,
-    test_utils::{new_invocation, setup_app},
+    core::{workflow::error::WorkflowError, SourceChainError},
+    test_utils::{new_zome_call, setup_app},
 };
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_types::{
-    app::InstalledCell, cell::CellId, dna::DnaDef, dna::DnaFile, test_utils::fake_agent_pubkey_1,
+    app::InstalledCell,
+    cell::CellId,
+    dna::{DnaDef, DnaFile},
+    test_utils::fake_agent_pubkey_1,
 };
 use holochain_wasm_test_utils::TestWasm;
 use std::convert::TryFrom;
@@ -48,16 +50,16 @@ async fn direct_validation_test() {
 /// - Commit an invalid update should fail the zome call
 async fn run_test(alice_cell_id: CellId, handle: ConductorHandle) {
     // Valid update should work
-    let invocation = new_invocation(&alice_cell_id, "update_entry", (), TestWasm::Update).unwrap();
+    let invocation = new_zome_call(&alice_cell_id, "update_entry", (), TestWasm::Update).unwrap();
     handle.call_zome(invocation).await.unwrap().unwrap();
 
     // Invalid update should fail work
     let invocation =
-        new_invocation(&alice_cell_id, "invalid_update_entry", (), TestWasm::Update).unwrap();
+        new_zome_call(&alice_cell_id, "invalid_update_entry", (), TestWasm::Update).unwrap();
     let result = handle.call_zome(invocation).await;
     match &result {
         Err(ConductorApiError::CellError(CellError::WorkflowError(wfe))) => match **wfe {
-            WorkflowError::SourceChainError(SourceChainError::InvalidCommit(_)) => (),
+            WorkflowError::SourceChainError(SourceChainError::InvalidCommit(_)) => {}
             _ => panic!("Expected InvalidCommit got {:?}", result),
         },
         _ => panic!("Expected InvalidCommit got {:?}", result),

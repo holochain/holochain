@@ -4,8 +4,11 @@
 //!
 //! [DhtOp]: enum.DhtOp.html
 
-use crate::element::{Element, ElementGroup};
-use crate::{header::NewEntryHeader, prelude::*};
+use crate::{
+    element::{Element, ElementGroup},
+    header::NewEntryHeader,
+    prelude::*,
+};
 use error::{DhtOpError, DhtOpResult};
 use holo_hash::{hash_type, HashableContentBytes};
 use holochain_zome_types::{header, Entry, Header};

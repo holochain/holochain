@@ -5,9 +5,7 @@
 //! It defines serialization behaviour for entries. Here you can find the complete list of
 //! entry_types, and special entries, like deletion_entry and cap_entry.
 
-use crate::capability::CapClaim;
-use crate::capability::CapGrant;
-use crate::capability::ZomeCallCapGrant;
+use crate::capability::{CapClaim, CapGrant, ZomeCallCapGrant};
 use holo_hash::{hash_type, AgentPubKey, HashableContent, HashableContentBytes};
 use holochain_serialized_bytes::prelude::*;
 
@@ -40,31 +38,51 @@ pub struct GetOptions {
 }
 
 impl GetOptions {
-    /// TODO
-    pub fn blocking() -> Self {
+    /// This will get you the content
+    /// with latest metadata if it can
+    /// otherwise it will fallback to what
+    /// you have cached locally.
+    ///
+    /// This call is guaranteed to not go to
+    /// the network if you are an authority
+    /// for this hash.
+    pub fn latest() -> Self {
         Self {
-            call: GetCall::Blocking,
+            call: GetCall::Latest,
         }
     }
-    /// TODO
+    /// Gets the content but does not
+    /// try to get the latest metadata.
+    /// This will save a network call if the
+    /// entry is local (cached, authored or integrated).
+    ///
+    /// This will fallback to the network if the content
+    /// is not found locally
     pub fn content() -> Self {
         Self {
-            call: GetCall::Blocking,
+            call: GetCall::Content,
         }
     }
 }
 
+impl Default for GetOptions {
+    fn default() -> Self {
+        Self::latest()
+    }
+}
+
 #[derive(PartialEq, Debug, Clone, Copy, Serialize, Deserialize)]
-/// TODO
+/// Describes the get call and what information
+/// the caller is concerned about.
+/// This helps the subconscious avoid unnecessary network calls.
 pub enum GetCall {
-    /// Will block on a network request unless this agent is an ]
-    /// authority for the data.
-    Blocking,
-    /// Will return data if found locally or go to the network
-    /// unless this agent is an authority for the data.
-    ///
-    /// This means you don't care about metadata for this element
-    /// and only want the content.
+    /// Will try to get the latest metadata but fallback
+    /// to the cache if none is found.
+    /// Does not go to the network if you are an authority for the data.
+    Latest,
+    /// Will try to get the content locally but go
+    /// to the network if it is not found.
+    /// Does not go to the network if you are an authority for the data.
     Content,
 }
 

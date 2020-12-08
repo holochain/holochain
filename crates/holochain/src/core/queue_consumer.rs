@@ -33,7 +33,7 @@ use holochain_state::{
     env::{EnvironmentWrite, WriteManager},
     prelude::Writer,
 };
-use tokio::sync::{self, mpsc};
+use tokio::{sync, sync::mpsc};
 
 // TODO: move these to workflow mod
 mod integrate_dht_ops_consumer;
@@ -195,8 +195,8 @@ impl TriggerSender {
                     "Queue consumer trigger was sent while Cell is shutting down: ignoring."
                 );
             }
-            Err(mpsc::error::TrySendError::Full(_)) => (),
-            Ok(()) => (),
+            Err(mpsc::error::TrySendError::Full(_)) => {}
+            Ok(()) => {}
         };
     }
 }
@@ -214,7 +214,7 @@ impl TriggerReceiver {
                 match self.0.try_recv() {
                     Err(TryRecvError::Closed) => return Err(QueueTriggerClosedError),
                     Err(TryRecvError::Empty) => return Ok(()),
-                    Ok(()) => (),
+                    Ok(()) => {}
                 }
             }
         } else {

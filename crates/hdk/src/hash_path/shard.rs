@@ -1,5 +1,4 @@
-use crate::hash_path::path::Component;
-use crate::hash_path::path::Path;
+use crate::hash_path::path::{Component, Path};
 use std::str::FromStr;
 
 /// Separates the shard width and depth.

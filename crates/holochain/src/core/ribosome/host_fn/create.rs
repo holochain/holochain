@@ -4,14 +4,12 @@ use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use crate::core::{
-    workflow::{
-        call_zome_workflow::CallZomeWorkspace, integrate_dht_ops_workflow::integrate_to_authored,
-    },
-    SourceChainError,
-};
+use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
+use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
+use crate::core::SourceChainError;
 use holo_hash::HasHash;
-use holochain_zome_types::entry_def::{EntryDefId, EntryVisibility};
+use holochain_zome_types::entry_def::EntryDefId;
+use holochain_zome_types::entry_def::EntryVisibility;
 use holochain_zome_types::header::builder;
 use holochain_zome_types::header::AppEntryType;
 use holochain_zome_types::header::EntryType;
@@ -35,7 +33,7 @@ pub fn create<'a>(
         holochain_types::entry::EntryHashed::from_content_sync(async_entry).into_hash();
 
     // extract the zome position
-    let header_zome_id = ribosome.zome_name_to_id(&call_context.zome_name)?;
+    let header_zome_id = ribosome.zome_to_id(&call_context.zome)?;
 
     // extract the entry defs for a zome
     let entry_type = match entry_def_id {
@@ -91,7 +89,7 @@ pub fn extract_entry_def(
     {
         // the ribosome returned some defs
         EntryDefsResult::Defs(defs) => {
-            let maybe_entry_defs = defs.get(&call_context.zome_name);
+            let maybe_entry_defs = defs.get(call_context.zome.zome_name());
             match maybe_entry_defs {
                 // convert the entry def id string into a numeric position in the defs
                 Some(entry_defs) => match entry_defs.entry_def_id_position(entry_def_id.clone()) {
@@ -110,7 +108,7 @@ pub fn extract_entry_def(
     match app_entry_type {
         Some(app_entry_type) => Ok(app_entry_type),
         None => Err(RibosomeError::EntryDefs(
-            call_context.zome_name.clone(),
+            call_context.zome.zome_name().clone(),
             format!("entry def not found for {:?}", entry_def_id),
         )),
     }
@@ -120,31 +118,36 @@ pub fn extract_entry_def(
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use super::create;
-    use crate::core::ribosome::error::RibosomeError;
-    use crate::core::ribosome::ZomeCallInvocation;
     use crate::core::state::source_chain::ChainInvalidReason;
     use crate::core::state::source_chain::SourceChainError;
     use crate::core::state::source_chain::SourceChainResult;
     use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
     use crate::fixt::CallContextFixturator;
     use crate::fixt::EntryFixturator;
-    use crate::fixt::WasmRibosomeFixturator;
+    use crate::fixt::RealRibosomeFixturator;
     use crate::fixt::ZomeCallHostAccessFixturator;
     use crate::test_utils::setup_app;
+    use crate::{conductor::api::ZomeCall, core::ribosome::error::RibosomeError};
     use ::fixt::prelude::*;
     use hdk3::prelude::*;
-    use holo_hash::{AnyDhtHash, EntryHash};
-    use holochain_types::{
-        app::InstalledCell, cell::CellId, dna::DnaDef, dna::DnaFile, fixt::AppEntry, observability,
-        test_utils::fake_agent_pubkey_1, test_utils::fake_agent_pubkey_2,
-    };
+    use holo_hash::AnyDhtHash;
+    use holo_hash::EntryHash;
+    use holochain_types::app::InstalledCell;
+    use holochain_types::cell::CellId;
+    use holochain_types::dna::DnaDef;
+    use holochain_types::dna::DnaFile;
+    use holochain_types::fixt::AppEntry;
+    use holochain_types::observability;
+    use holochain_types::test_utils::fake_agent_pubkey_1;
+    use holochain_types::test_utils::fake_agent_pubkey_2;
     use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::entry::EntryError;
     use holochain_zome_types::entry_def::EntryDefId;
     use holochain_zome_types::CreateInput;
     use holochain_zome_types::CreateOutput;
     use holochain_zome_types::Entry;
+    use holochain_zome_types::ExternInput;
     use holochain_zome_types::GetOutput;
-    use holochain_zome_types::{entry::EntryError, ExternInput};
     use std::sync::Arc;
     use test_wasm_common::TestBytes;
     use test_wasm_common::TestInt;
@@ -160,11 +163,11 @@ pub mod wasm_test {
         let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
 
         let ribosome =
-            WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::Create]))
+            RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::Create]))
                 .next()
                 .unwrap();
         let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
-        call_context.zome_name = TestWasm::Create.into();
+        call_context.zome = TestWasm::Create.into();
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock;
         call_context.host_access = host_access.into();
@@ -201,11 +204,11 @@ pub mod wasm_test {
         let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
 
         let ribosome =
-            WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::Create]))
+            RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::Create]))
                 .next()
                 .unwrap();
         let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
-        call_context.zome_name = TestWasm::Create.into();
+        call_context.zome = TestWasm::Create.into();
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock.clone();
         call_context.host_access = host_access.into();
@@ -347,7 +350,7 @@ pub mod wasm_test {
 
         // alice create a bunch of entries
         let output = handle
-            .call_zome(ZomeCallInvocation {
+            .call_zome(ZomeCall {
                 cell_id: alice_cell_id.clone(),
                 zome_name: TestWasm::MultipleCalls.into(),
                 cap: None,
@@ -369,7 +372,7 @@ pub mod wasm_test {
 
         // bob get the entries
         let output = handle
-            .call_zome(ZomeCallInvocation {
+            .call_zome(ZomeCall {
                 cell_id: alice_cell_id,
                 zome_name: TestWasm::MultipleCalls.into(),
                 cap: None,

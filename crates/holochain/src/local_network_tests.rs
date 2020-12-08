@@ -24,7 +24,7 @@ use crate::{
     core::ribosome::error::RibosomeResult,
     test_utils::host_fn_api::Post,
     test_utils::{
-        install_app, new_invocation, setup_app_with_network, wait_for_integration_with_others,
+        install_app, new_zome_call, setup_app_with_network, wait_for_integration_with_others,
     },
 };
 use shrinkwraprs::Shrinkwrap;
@@ -63,7 +63,7 @@ fn conductors_call_remote(num_conductors: usize) {
                 },
                 // None also means a timeout which is what we want before the
                 // agent info is shared
-                None => (),
+                None => {}
             }
         }
 
@@ -317,7 +317,7 @@ async fn init_all(handles: &[TestHandle]) -> Vec<HeaderHash> {
     for (i, h) in handles.iter().cloned().enumerate() {
         let f = async move {
             let large_msg = std::iter::repeat(b"a"[0]).take(20_000).collect::<Vec<_>>();
-            let invocation = new_invocation(
+            let invocation = new_zome_call(
                 &h.cell_id,
                 "create_post",
                 Post(format!("{}{}", i, String::from_utf8_lossy(&large_msg))),
@@ -343,7 +343,7 @@ async fn init_all(handles: &[TestHandle]) -> Vec<HeaderHash> {
 }
 
 async fn call_remote(a: TestHandle, b: TestHandle) -> RibosomeResult<ZomeCallResponse> {
-    let invocation = new_invocation(
+    let invocation = new_zome_call(
         &a.cell_id,
         "call_create_entry_remotely",
         b.cell_id.agent_pubkey().clone(),
@@ -416,7 +416,7 @@ async fn check_gossip(
     .await;
     for hash in posts {
         let invocation =
-            new_invocation(&handle.cell_id, "get_post", hash, TestWasm::Create).unwrap();
+            new_zome_call(&handle.cell_id, "get_post", hash, TestWasm::Create).unwrap();
         let result = handle.call_zome(invocation).await.unwrap().unwrap();
         let result: hdk3::prelude::GetOutput =
             unwrap_to::unwrap_to!(result => ZomeCallResponse::Ok)
