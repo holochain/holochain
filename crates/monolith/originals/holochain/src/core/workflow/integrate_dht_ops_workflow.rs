@@ -29,7 +29,7 @@ use crate::holochain_state::buffer::KvBufFresh;
 use crate::holochain_state::db::INTEGRATED_DHT_OPS;
 use crate::holochain_state::db::INTEGRATION_LIMBO;
 use crate::holochain_state::error::DatabaseResult;
-use crate::holochain_state::fresh_reader;
+use crate::fresh_reader;
 use crate::holochain_state::prelude::*;
 use crate::holochain_types::dht_op::produce_op_lights_from_elements;
 use crate::holochain_types::dht_op::DhtOp;

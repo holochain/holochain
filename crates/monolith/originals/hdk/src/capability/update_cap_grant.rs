@@ -1,4 +1,4 @@
-use crate::hdk::prelude::*;
+use crate::hdk3::prelude::*;
 
 /// Updates a CapGrant.
 ///

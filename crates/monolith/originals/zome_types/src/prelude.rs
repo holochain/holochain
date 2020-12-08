@@ -7,7 +7,7 @@ pub use crate::holochain_zome_types::call_remote::CallRemote;
 pub use crate::holochain_zome_types::capability::*;
 pub use crate::holochain_zome_types::cell::*;
 pub use crate::holochain_zome_types::crdt::CrdtType;
-pub use crate::holochain_zome_types::debug_msg;
+pub use crate::debug_msg;
 pub use crate::holochain_zome_types::element::Element;
 pub use crate::holochain_zome_types::element::ElementVec;
 pub use crate::holochain_zome_types::entry::*;

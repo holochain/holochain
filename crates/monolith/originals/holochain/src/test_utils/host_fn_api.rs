@@ -16,7 +16,7 @@ use crate::holochain::core::state::metadata::LinkMetaKey;
 use crate::holochain::core::state::workspace::Workspace;
 use crate::holochain::core::workflow::CallZomeWorkspace;
 use crate::holochain::core::workflow::CallZomeWorkspaceLock;
-use hdk3::prelude::EntryError;
+use crate::hdk3::prelude::EntryError;
 use holo_hash::AgentPubKey;
 use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
@@ -266,7 +266,7 @@ impl HostFnCaller {
 
     pub async fn get(&self, entry_hash: AnyDhtHash, _options: GetOptions) -> Option<Element> {
         let (_, ribosome, call_context, _) = self.explode();
-        let input = GetInput::new((entry_hash, holochain_zome_types::entry::GetOptions));
+        let input = GetInput::new((entry_hash, crate::holochain_zome_types::entry::GetOptions));
         let output = { host_fn::get::get(ribosome, call_context, input).unwrap() };
         output.into_inner()
     }
@@ -277,7 +277,7 @@ impl HostFnCaller {
         _options: GetOptions,
     ) -> Option<Details> {
         let (_, ribosome, call_context, _) = self.explode();
-        let input = GetDetailsInput::new((entry_hash, holochain_zome_types::entry::GetOptions));
+        let input = GetDetailsInput::new((entry_hash, crate::holochain_zome_types::entry::GetOptions));
         let output = { host_fn::get_details::get_details(ribosome, call_context, input).unwrap() };
         output.into_inner()
     }

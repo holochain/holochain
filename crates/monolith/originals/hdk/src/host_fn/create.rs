@@ -1,4 +1,4 @@
-use crate::hdk::prelude::*;
+use crate::hdk3::prelude::*;
 
 /// General function that can create any entry type.
 ///

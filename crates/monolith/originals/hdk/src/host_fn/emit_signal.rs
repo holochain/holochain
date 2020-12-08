@@ -3,7 +3,7 @@
 //! Only clients who have subscribed to signals from this Cell with the proper
 //! filters will receive it.
 
-use crate::hdk::prelude::*;
+use crate::hdk3::prelude::*;
 use crate::holochain_zome_types::signal::AppSignal;
 
 // TODO: we could consider adding a (optional?) "type" parameter, so that

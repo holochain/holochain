@@ -8,9 +8,9 @@ use crate::holochain_zome_types::Header;
 
 #[tokio::test(threaded_scheduler)]
 async fn incoming_ops_to_limbo() {
-    let test_env = holochain_state::test_utils::test_cell_env();
+    let test_env = crate::holochain_state::test_utils::test_cell_env();
     let env = test_env.env();
-    let keystore = holochain_state::test_utils::test_keystore();
+    let keystore = crate::holochain_state::test_utils::test_keystore();
     let (sys_validation_trigger, mut rx) = TriggerSender::new();
 
     let author = fake_agent_pubkey_1();

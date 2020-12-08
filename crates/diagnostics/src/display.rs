@@ -1,4 +1,4 @@
-use holochain_state::{error::DatabaseResult, transaction::Reader};
+use crate::holochain_state::{error::DatabaseResult, transaction::Reader};
 
 const BYTE_SIZE_MARKERS: [char; 6] = [' ', 'K', 'M', 'G', 'T', 'P'];
 

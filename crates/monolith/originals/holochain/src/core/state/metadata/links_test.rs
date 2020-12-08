@@ -9,7 +9,7 @@ use crate::holochain::here;
 use ::fixt::prelude::*;
 use crate::holochain_state::buffer::BufferedStore;
 use crate::holochain_state::env::EnvironmentWrite;
-use crate::holochain_state::fresh_reader_test;
+use crate::fresh_reader_test;
 use crate::holochain_state::test_utils::test_cell_env;
 use crate::holochain_types::observability;
 

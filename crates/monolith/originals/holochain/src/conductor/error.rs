@@ -52,7 +52,7 @@ pub enum ConductorError {
     SubmitTaskError(String),
 
     #[error("DnaError: {0}")]
-    DnaError(#[from] holochain_types::dna::DnaError),
+    DnaError(#[from] crate::holochain_types::dna::DnaError),
 
     #[error("Workflow error: {0:?}")]
     WorkflowError(#[from] WorkflowError),
@@ -83,13 +83,13 @@ pub enum ConductorError {
     AppNotActive(InstalledAppId),
 
     #[error(transparent)]
-    HolochainP2pError(#[from] holochain_p2p::HolochainP2pError),
+    HolochainP2pError(#[from] crate::holochain_p2p::HolochainP2pError),
 
     #[error(transparent)]
     EntryDefStoreError(#[from] EntryDefStoreError),
 
     #[error(transparent)]
-    KeystoreError(#[from] holochain_keystore::KeystoreError),
+    KeystoreError(#[from] crate::holochain_keystore::KeystoreError),
 
     #[error(transparent)]
     KitsuneP2pError(#[from] kitsune_p2p::KitsuneP2pError),

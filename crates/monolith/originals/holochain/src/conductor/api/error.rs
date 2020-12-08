@@ -64,7 +64,7 @@ pub enum ConductorApiError {
 
     /// DnaError
     #[error("DnaError: {0}")]
-    DnaError(#[from] holochain_types::dna::DnaError),
+    DnaError(#[from] crate::holochain_types::dna::DnaError),
 
     /// The Dna file path provided was invalid
     #[error("The Dna file path provided was invalid")]
@@ -72,7 +72,7 @@ pub enum ConductorApiError {
 
     /// KeystoreError
     #[error("KeystoreError: {0}")]
-    KeystoreError(#[from] holochain_keystore::KeystoreError),
+    KeystoreError(#[from] crate::holochain_keystore::KeystoreError),
 
     /// Cell error
     #[error(transparent)]

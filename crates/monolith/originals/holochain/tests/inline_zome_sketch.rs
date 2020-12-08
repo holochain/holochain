@@ -1,5 +1,5 @@
 use futures::StreamExt;
-use hdk3::prelude::*;
+use crate::hdk3::prelude::*;
 use crate::holochain::conductor::api::ZomeCall;
 use crate::holochain::conductor::Conductor;
 use crate::holochain_keystore::KeystoreSender;

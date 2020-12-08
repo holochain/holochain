@@ -72,8 +72,8 @@ impl Default for GetOptions {
     }
 }
 
-impl From<holochain_zome_types::entry::GetOptions> for GetOptions {
-    fn from(_: holochain_zome_types::entry::GetOptions) -> Self {
+impl From<crate::holochain_zome_types::entry::GetOptions> for GetOptions {
+    fn from(_: crate::holochain_zome_types::entry::GetOptions) -> Self {
         Self::default()
     }
 }
@@ -215,7 +215,7 @@ ghost_actor::ghost_chan! {
             from_agent: AgentPubKey,
             request_validation_receipt: bool,
             dht_hash: holo_hash::AnyDhtHash,
-            ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+            ops: Vec<(holo_hash::DhtOpHash, crate::holochain_types::dht_op::DhtOp)>,
             timeout_ms: Option<u64>,
         ) -> ();
 

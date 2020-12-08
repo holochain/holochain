@@ -2,7 +2,7 @@
 //! # Metadata
 //! This module is responsible for generating and storing holochain metadata.
 //!
-//! [Entry]: holochain_types::Entry
+//! [Entry]: crate::holochain_types::Entry
 
 use fallible_iterator::FallibleIterator;
 use holo_hash::AgentPubKey;
@@ -21,7 +21,7 @@ use crate::holochain_state::db::META_VAULT_MISC;
 use crate::holochain_state::db::META_VAULT_SYS;
 use crate::holochain_state::error::DatabaseError;
 use crate::holochain_state::error::DatabaseResult;
-use crate::holochain_state::fresh_reader;
+use crate::fresh_reader;
 use crate::holochain_state::prelude::*;
 use crate::holochain_types::header::NewEntryHeader;
 use crate::holochain_types::link::WireLinkMetaKey;

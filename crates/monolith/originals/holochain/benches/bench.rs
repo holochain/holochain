@@ -4,7 +4,7 @@ use criterion::criterion_main;
 use criterion::BenchmarkId;
 use criterion::Criterion;
 use criterion::Throughput;
-use hdk3::prelude::*;
+use crate::hdk3::prelude::*;
 use holo_hash::fixt::AgentPubKeyFixturator;
 use crate::holochain::core::ribosome::RibosomeT;
 use crate::holochain::core::ribosome::ZomeCallInvocation;
@@ -25,10 +25,10 @@ static TOKIO_RUNTIME: Lazy<Mutex<tokio::runtime::Runtime>> = Lazy::new(|| {
     )
 });
 
-static REAL_RIBOSOME: Lazy<Mutex<holochain::core::ribosome::real_ribosome::RealRibosome>> =
+static REAL_RIBOSOME: Lazy<Mutex<crate::holochain::core::ribosome::real_ribosome::RealRibosome>> =
     Lazy::new(|| {
         Mutex::new(
-            holochain::fixt::RealRibosomeFixturator::new(holochain::fixt::curve::Zomes(vec![
+            crate::holochain::fixt::RealRibosomeFixturator::new(crate::holochain::fixt::curve::Zomes(vec![
                 TestWasm::Bench.into(),
             ]))
             .next()
@@ -36,24 +36,24 @@ static REAL_RIBOSOME: Lazy<Mutex<holochain::core::ribosome::real_ribosome::RealR
         )
     });
 
-static CELL_ID: Lazy<Mutex<holochain_types::cell::CellId>> = Lazy::new(|| {
+static CELL_ID: Lazy<Mutex<crate::holochain_types::cell::CellId>> = Lazy::new(|| {
     Mutex::new(
-        holochain_types::fixt::CellIdFixturator::new(Unpredictable)
+        crate::holochain_types::fixt::CellIdFixturator::new(Unpredictable)
             .next()
             .unwrap(),
     )
 });
 
-static CAP: Lazy<Mutex<holochain_zome_types::capability::CapSecret>> =
+static CAP: Lazy<Mutex<crate::holochain_zome_types::capability::CapSecret>> =
     Lazy::new(|| Mutex::new(CapSecretFixturator::new(Unpredictable).next().unwrap()));
 
 static AGENT_KEY: Lazy<Mutex<AgentPubKey>> =
     Lazy::new(|| Mutex::new(AgentPubKeyFixturator::new(Unpredictable).next().unwrap()));
 
 static HOST_ACCESS_FIXTURATOR: Lazy<
-    Mutex<holochain::fixt::ZomeCallHostAccessFixturator<Unpredictable>>,
+    Mutex<crate::holochain::fixt::ZomeCallHostAccessFixturator<Unpredictable>>,
 > = Lazy::new(|| {
-    Mutex::new(holochain::fixt::ZomeCallHostAccessFixturator::new(
+    Mutex::new(crate::holochain::fixt::ZomeCallHostAccessFixturator::new(
         Unpredictable,
     ))
 });

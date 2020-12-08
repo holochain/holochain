@@ -13,7 +13,7 @@ use crate::holochain_keystore::AgentPubKeyExt;
 use crate::holochain_p2p::HolochainP2pCell;
 use crate::holochain_state::env::EnvironmentWrite;
 use crate::holochain_state::error::DatabaseResult;
-use crate::holochain_state::fresh_reader;
+use crate::fresh_reader;
 use crate::holochain_types::dht_op::DhtOp;
 use crate::holochain_types::header::NewEntryHeaderRef;
 use crate::holochain_types::Entry;

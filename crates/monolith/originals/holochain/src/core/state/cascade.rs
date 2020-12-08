@@ -26,7 +26,7 @@ use crate::holochain_p2p::actor::GetOptions;
 use crate::holochain_p2p::HolochainP2pCell;
 use crate::holochain_p2p::HolochainP2pCellT;
 use crate::holochain_state::error::DatabaseResult;
-use crate::holochain_state::fresh_reader;
+use crate::fresh_reader;
 use crate::holochain_state::prelude::*;
 use crate::holochain_types::activity::AgentActivity;
 use crate::holochain_types::activity::ChainItems;

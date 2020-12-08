@@ -7,7 +7,7 @@ use crate::holochain::core::state::cascade::error::CascadeError;
 use crate::holochain::core::state::workspace::WorkspaceError;
 use crate::holochain::core::validation::OutcomeOrError;
 use crate::holochain::core::workflow::error::WorkflowError;
-use crate::holochain::from_sub_error;
+use crate::from_sub_error;
 use holo_hash::AnyDhtHash;
 use holo_hash::HeaderHash;
 use crate::holochain_keystore::KeystoreError;

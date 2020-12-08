@@ -51,7 +51,7 @@ pub enum SourceChainError {
     InvalidLink(String),
 
     #[error("KeystoreError: {0}")]
-    KeystoreError(#[from] holochain_keystore::KeystoreError),
+    KeystoreError(#[from] crate::holochain_keystore::KeystoreError),
 
     #[error(transparent)]
     BlockOnError(#[from] tokio_safe_block_on::BlockOnError),

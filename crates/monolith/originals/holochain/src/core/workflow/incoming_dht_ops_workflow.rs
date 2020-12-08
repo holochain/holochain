@@ -41,7 +41,7 @@ mod test;
 pub async fn incoming_dht_ops_workflow(
     state_env: &EnvironmentWrite,
     mut sys_validation_trigger: TriggerSender,
-    ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+    ops: Vec<(holo_hash::DhtOpHash, crate::holochain_types::dht_op::DhtOp)>,
     from_agent: Option<AgentPubKey>,
 ) -> WorkflowResult<()> {
     // set up our workspace
@@ -65,7 +65,7 @@ pub async fn incoming_dht_ops_workflow(
     }
 
     // commit our transaction
-    let writer: crate::core::queue_consumer::OneshotWriter = state_env.clone().into();
+    let writer: crate::holochain::core::queue_consumer::OneshotWriter = state_env.clone().into();
 
     writer.with_writer(|writer| Ok(workspace.flush_to_txn(writer)?))?;
 

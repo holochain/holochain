@@ -44,13 +44,13 @@ mod tests {
     #[tokio::test(threaded_scheduler)]
     async fn wasm_store_round_trip() -> DatabaseResult<()> {
         use crate::holochain_state::prelude::*;
-        holochain_types::observability::test_run().ok();
+        crate::holochain_types::observability::test_run().ok();
 
         // all the stuff needed to have a WasmBuf
-        let env = holochain_state::test_utils::test_wasm_env();
+        let env = crate::holochain_state::test_utils::test_wasm_env();
         let mut wasm_buf = WasmBuf::new(
             env.env().into(),
-            env.get_db(&*holochain_state::db::WASM).unwrap(),
+            env.get_db(&*crate::holochain_state::db::WASM).unwrap(),
         )
         .unwrap();
 

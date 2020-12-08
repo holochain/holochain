@@ -1,4 +1,4 @@
-use crate::hdk::prelude::*;
+use crate::hdk3::prelude::*;
 
 /// Wrapper for __call_remote host function.
 ///

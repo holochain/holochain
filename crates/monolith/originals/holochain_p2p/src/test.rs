@@ -46,7 +46,7 @@ impl HolochainP2pHandler for StubNetwork {
         from_agent: AgentPubKey,
         request_validation_receipt: bool,
         dht_hash: holo_hash::AnyDhtHash,
-        ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+        ops: Vec<(holo_hash::DhtOpHash, crate::holochain_types::dht_op::DhtOp)>,
         timeout_ms: Option<u64>,
     ) -> HolochainP2pHandlerResult<()> {
         Err("stub".into())
@@ -126,7 +126,7 @@ fixturator!(
     HolochainP2pCell;
     curve Empty {
         tokio_safe_block_on::tokio_safe_block_forever_on(async {
-            let holochain_p2p = crate::test::stub_network().await;
+            let holochain_p2p = crate::holochain_p2p::test::stub_network().await;
             holochain_p2p.to_cell(
                 DnaHashFixturator::new(Empty).next().unwrap(),
                 AgentPubKeyFixturator::new(Empty).next().unwrap(),

@@ -15,7 +15,7 @@ use crate::holochain::core::state::metadata::MetadataBuf;
 use crate::holochain::core::workflow::incoming_dht_ops_workflow::IncomingDhtOpsWorkspace;
 use ::fixt::prelude::*;
 use fallible_iterator::FallibleIterator;
-use hdk3::prelude::ZomeName;
+use crate::hdk3::prelude::ZomeName;
 use holo_hash::fixt::*;
 use holo_hash::*;
 use crate::holochain_keystore::KeystoreSender;
@@ -29,7 +29,7 @@ use holochain_serialized_bytes::SerializedBytes;
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_serialized_bytes::UnsafeBytes;
 use crate::holochain_state::env::EnvironmentWrite;
-use crate::holochain_state::fresh_reader_test;
+use crate::fresh_reader_test;
 use crate::holochain_state::test_utils::test_environments;
 use crate::holochain_state::test_utils::TestEnvironments;
 use crate::holochain_types::app::InstalledCell;
@@ -75,20 +75,20 @@ macro_rules! here {
 /// expected functions, return data and with_f checks
 #[macro_export]
 macro_rules! meta_mock {
-    () => {{ $crate::core::state::metadata::MockMetadataBuf::new() }};
+    () => {{ $crate::holochain::core::state::metadata::MockMetadataBuf::new() }};
     ($fun:ident) => {{
-        let d: Vec<holochain_types::metadata::TimedHeaderHash> = Vec::new();
+        let d: Vec<crate::holochain_types::metadata::TimedHeaderHash> = Vec::new();
         meta_mock!($fun, d)
     }};
     ($fun:ident, $data:expr) => {{
-        let mut metadata = $crate::core::state::metadata::MockMetadataBuf::new();
+        let mut metadata = $crate::holochain::core::state::metadata::MockMetadataBuf::new();
         metadata.$fun().returning({
             move |_| {
                 Ok(Box::new(fallible_iterator::convert(
                     $data
                         .clone()
                         .into_iter()
-                        .map(holochain_types::metadata::TimedHeaderHash::from)
+                        .map(crate::holochain_types::metadata::TimedHeaderHash::from)
                         .map(Ok),
                 )))
             }
@@ -96,7 +96,7 @@ macro_rules! meta_mock {
         metadata
     }};
     ($fun:ident, $data:expr, $match_fn:expr) => {{
-        let mut metadata = $crate::core::state::metadata::MockMetadataBuf::new();
+        let mut metadata = $crate::holochain::core::state::metadata::MockMetadataBuf::new();
         metadata.$fun().returning({
             move |a| {
                 if $match_fn(a) {
@@ -104,7 +104,7 @@ macro_rules! meta_mock {
                         $data
                             .clone()
                             .into_iter()
-                            .map(holochain_types::metadata::TimedHeaderHash::from)
+                            .map(crate::holochain_types::metadata::TimedHeaderHash::from)
                             .map(Ok),
                     )))
                 } else {
@@ -112,7 +112,7 @@ macro_rules! meta_mock {
                     data.clear();
                     Ok(Box::new(fallible_iterator::convert(
                         data.into_iter()
-                            .map(holochain_types::metadata::TimedHeaderHash::from)
+                            .map(crate::holochain_types::metadata::TimedHeaderHash::from)
                             .map(Ok),
                     )))
                 }
@@ -131,7 +131,7 @@ pub async fn fake_unique_element(
     let content: SerializedBytes =
         UnsafeBytes::from(nanoid::nanoid!().as_bytes().to_owned()).into();
     let entry = EntryHashed::from_content_sync(Entry::App(content.try_into().unwrap()));
-    let app_entry_type = holochain_types::fixt::AppEntryTypeFixturator::new(visibility)
+    let app_entry_type = crate::holochain_types::fixt::AppEntryTypeFixturator::new(visibility)
         .next()
         .unwrap();
     let header_1 = Header::Create(Create {
@@ -229,7 +229,7 @@ where
     F: Fn(&HolochainP2pEvent) -> bool + Send + 'static,
 {
     let (network, mut recv) =
-        spawn_holochain_p2p(holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default())
+        spawn_holochain_p2p(crate::holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default())
             .await
             .unwrap();
     let respond_task = tokio::task::spawn(async move {

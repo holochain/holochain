@@ -1,4 +1,4 @@
-use crate::hdk::prelude::*;
+use crate::hdk3::prelude::*;
 
 /// Generate a cryptographically strong CapSecret on the host.
 ///

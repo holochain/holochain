@@ -1,5 +1,5 @@
 use ::fixt::prelude::*;
-use hdk3::prelude::*;
+use crate::hdk3::prelude::*;
 use holo_hash::fixt::*;
 use crate::holochain::conductor::api::AppInterfaceApi;
 use crate::holochain::conductor::api::AppRequest;

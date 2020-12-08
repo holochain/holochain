@@ -48,7 +48,7 @@ use crate::holochain_types::dna::Wasms;
 use crate::holochain_types::dna::Zomes;
 pub use crate::holochain_types::fixt::*;
 use crate::holochain_types::test_utils::fake_dna_zomes;
-use crate::holochain_wasm_test_utils::strum::IntoEnumIterator;
+use crate::strum::IntoEnumIterator;
 use crate::holochain_wasm_test_utils::TestWasm;
 use crate::holochain_zome_types::element::Element;
 use crate::holochain_zome_types::header::HeaderHashes;
@@ -258,13 +258,13 @@ fixturator!(
     curve Empty {
         tokio_safe_block_on::tokio_safe_block_forever_on(async {
             // an empty keystore
-            holochain_keystore::test_keystore::spawn_test_keystore().await.unwrap()
+            crate::holochain_keystore::test_keystore::spawn_test_keystore().await.unwrap()
         })
     };
     curve Unpredictable {
         // TODO: Make this unpredictable
         tokio_safe_block_on::tokio_safe_block_forever_on(async {
-            holochain_keystore::test_keystore::spawn_test_keystore().await.unwrap()
+            crate::holochain_keystore::test_keystore::spawn_test_keystore().await.unwrap()
         })
     };
     // a prepopulate keystore with hardcoded agents in it
@@ -291,7 +291,7 @@ fixturator!(
         //      It is assumed that this value is never really used in any "real"
         //      way, because previously, it was implemented as a null pointer
         //      wrapped in an UnsafeZomeCallWorkspace
-        let env = holochain_state::test_utils::test_cell_env();
+        let env = crate::holochain_state::test_utils::test_cell_env();
         CallZomeWorkspaceLock::new(CallZomeWorkspace::new(env.env().into()).unwrap())
     };
     curve Unpredictable {

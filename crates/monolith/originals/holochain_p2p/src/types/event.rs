@@ -98,7 +98,7 @@ ghost_actor::ghost_chan! {
             from_agent: AgentPubKey,
             request_validation_receipt: bool,
             dht_hash: holo_hash::AnyDhtHash,
-            ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+            ops: Vec<(holo_hash::DhtOpHash, crate::holochain_types::dht_op::DhtOp)>,
         ) -> ();
 
         /// A remote node is requesting a validation package.
@@ -155,8 +155,8 @@ ghost_actor::ghost_chan! {
             dna_hash: DnaHash,
             to_agent: AgentPubKey,
             dht_arc: kitsune_p2p::dht_arc::DhtArc,
-            since: holochain_types::Timestamp,
-            until: holochain_types::Timestamp,
+            since: crate::holochain_types::Timestamp,
+            until: crate::holochain_types::Timestamp,
         ) -> Vec<holo_hash::DhtOpHash>;
 
         /// The p2p module needs access to the content for a given set of DhtOpHashes.
@@ -164,7 +164,7 @@ ghost_actor::ghost_chan! {
             dna_hash: DnaHash,
             to_agent: AgentPubKey,
             op_hashes: Vec<holo_hash::DhtOpHash>,
-        ) -> Vec<(holo_hash::AnyDhtHash, holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>;
+        ) -> Vec<(holo_hash::AnyDhtHash, holo_hash::DhtOpHash, crate::holochain_types::dht_op::DhtOp)>;
 
         /// P2p operations require cryptographic signatures and validation.
         fn sign_network_data(

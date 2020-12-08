@@ -61,7 +61,7 @@ use crate::holochain_state::buffer::BufferedStore;
 use crate::holochain_state::buffer::KvBufFresh;
 use crate::holochain_state::db::INTEGRATED_DHT_OPS;
 use crate::holochain_state::db::INTEGRATION_LIMBO;
-use crate::holochain_state::fresh_reader;
+use crate::fresh_reader;
 use crate::holochain_state::prelude::*;
 use crate::holochain_types::activity::AgentActivity;
 use crate::holochain_types::activity::ChainItems;
@@ -699,7 +699,7 @@ async fn get_validation_package_remote(
             const NUM_RETRY_GETS: u8 = 3;
             let range = 0..element.header().header_seq().saturating_sub(1);
 
-            let mut query = holochain_zome_types::query::ChainQueryFilter::new()
+            let mut query = crate::holochain_zome_types::query::ChainQueryFilter::new()
                 .sequence_range(range)
                 .include_entries(true);
             if let (RequiredValidationType::SubChain, Some(et)) = (

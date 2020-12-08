@@ -14,7 +14,7 @@ pub fn hash_entry(
 ) -> RibosomeResult<HashEntryOutput> {
     let entry: Entry = input.into_inner();
 
-    let entry_hash = holochain_types::entry::EntryHashed::from_content_sync(entry).into_hash();
+    let entry_hash = crate::holochain_types::entry::EntryHashed::from_content_sync(entry).into_hash();
 
     Ok(HashEntryOutput::new(entry_hash))
 }
@@ -62,15 +62,15 @@ pub mod wasm_test {
     #[tokio::test(threaded_scheduler)]
     /// we can get an entry hash out of the fn via. a wasm call
     async fn ribosome_hash_entry_test() {
-        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_env = crate::holochain_state::test_utils::test_cell_env();
         let env = test_env.env();
         let mut workspace =
-            crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+            crate::holochain::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
+        crate::holochain::core::workflow::fake_genesis(&mut workspace.source_chain)
             .await
             .unwrap();
 
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let workspace_lock = crate::holochain::core::workflow::CallZomeWorkspaceLock::new(workspace);
 
         let entry = EntryFixturator::new(fixt::Predictable).next().unwrap();
         let input = HashEntryInput::new(entry);
@@ -87,15 +87,15 @@ pub mod wasm_test {
     #[tokio::test(threaded_scheduler)]
     /// the hash path underlying anchors wraps entry_hash
     async fn ribosome_hash_path_pwd_test() {
-        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_env = crate::holochain_state::test_utils::test_cell_env();
         let env = test_env.env();
         let mut workspace =
-            crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+            crate::holochain::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
+        crate::holochain::core::workflow::fake_genesis(&mut workspace.source_chain)
             .await
             .unwrap();
 
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let workspace_lock = crate::holochain::core::workflow::CallZomeWorkspaceLock::new(workspace);
 
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock;
@@ -105,7 +105,7 @@ pub mod wasm_test {
 
         let expected_path = hdk3::hash_path::path::Path::from("foo.bar");
 
-        let expected_hash = holochain_types::entry::EntryHashed::from_content_sync(
+        let expected_hash = crate::holochain_types::entry::EntryHashed::from_content_sync(
             Entry::app((&expected_path).try_into().unwrap()).unwrap(),
         )
         .into_hash();

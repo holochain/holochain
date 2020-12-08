@@ -22,7 +22,7 @@ use std::convert::TryFrom;
 
 #[tokio::test(threaded_scheduler)]
 async fn verify_header_signature_test() {
-    let keystore = holochain_state::test_utils::test_keystore();
+    let keystore = crate::holochain_state::test_utils::test_keystore();
     let author = fake_agent_pubkey_1();
     let mut header = fixt!(CreateLink);
     header.author = author.clone();

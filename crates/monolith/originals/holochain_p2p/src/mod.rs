@@ -62,7 +62,7 @@ pub trait HolochainP2pCellT {
         &mut self,
         request_validation_receipt: bool,
         dht_hash: holo_hash::AnyDhtHash,
-        ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+        ops: Vec<(holo_hash::DhtOpHash, crate::holochain_types::dht_op::DhtOp)>,
         timeout_ms: Option<u64>,
     ) -> actor::HolochainP2pResult<()>;
 
@@ -172,7 +172,7 @@ impl HolochainP2pCellT for HolochainP2pCell {
         &mut self,
         request_validation_receipt: bool,
         dht_hash: holo_hash::AnyDhtHash,
-        ops: Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>,
+        ops: Vec<(holo_hash::DhtOpHash, crate::holochain_types::dht_op::DhtOp)>,
         timeout_ms: Option<u64>,
     ) -> actor::HolochainP2pResult<()> {
         self.sender

@@ -32,7 +32,7 @@ allows for more useful compiler and IDE feedback loops.
 ### map_extern!
 
 ```rust
-use hdk3::prelude::*;
+use crate::hdk3::prelude::*;
 
 #[derive(Debug, Serialize, Deserialize, SerializedBytes)]
 pub struct MyInput;

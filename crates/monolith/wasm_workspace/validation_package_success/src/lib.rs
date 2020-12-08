@@ -1,4 +1,4 @@
-use hdk3::prelude::*;
+use crate::hdk3::prelude::*;
 
 const NUM_SONGS: usize = 30;
 

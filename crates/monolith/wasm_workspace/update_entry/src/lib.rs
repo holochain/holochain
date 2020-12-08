@@ -1,4 +1,4 @@
-use hdk3::prelude::*;
+use crate::hdk3::prelude::*;
 
 #[hdk_entry(id = "post", required_validations = 5)]
 struct Post(String);

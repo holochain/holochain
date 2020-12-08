@@ -42,7 +42,7 @@ pub enum CellError {
     #[error(transparent)]
     WorkflowError(#[from] Box<WorkflowError>),
     #[error(transparent)]
-    WorkspaceError(#[from] crate::core::state::workspace::WorkspaceError),
+    WorkspaceError(#[from] crate::holochain::core::state::workspace::WorkspaceError),
     #[error(transparent)]
     RibosomeError(#[from] RibosomeError),
     #[error(transparent)]

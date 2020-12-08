@@ -123,7 +123,7 @@ pub trait ConductorHandleT: Send + Sync {
     async fn dispatch_holochain_p2p_event(
         &self,
         cell_id: &CellId,
-        event: holochain_p2p::event::HolochainP2pEvent,
+        event: crate::holochain_p2p::event::HolochainP2pEvent,
     ) -> ConductorResult<()>;
 
     /// Invoke a zome function on a Cell
@@ -156,7 +156,7 @@ pub trait ConductorHandleT: Send + Sync {
     fn keystore(&self) -> &KeystoreSender;
 
     /// Request access to this conductor's networking handle
-    fn holochain_p2p(&self) -> &holochain_p2p::HolochainP2pRef;
+    fn holochain_p2p(&self) -> &crate::holochain_p2p::HolochainP2pRef;
 
     /// Install Cells into ConductorState based on installation info, and run
     /// genesis on all new source chains
@@ -238,7 +238,7 @@ pub trait ConductorHandleT: Send + Sync {
 pub struct ConductorHandleImpl<DS: DnaStore + 'static> {
     pub(crate) conductor: RwLock<Conductor<DS>>,
     pub(crate) keystore: KeystoreSender,
-    pub(crate) holochain_p2p: holochain_p2p::HolochainP2pRef,
+    pub(crate) holochain_p2p: crate::holochain_p2p::HolochainP2pRef,
 }
 
 #[async_trait::async_trait]
@@ -300,7 +300,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
     async fn dispatch_holochain_p2p_event(
         &self,
         cell_id: &CellId,
-        event: holochain_p2p::event::HolochainP2pEvent,
+        event: crate::holochain_p2p::event::HolochainP2pEvent,
     ) -> ConductorResult<()> {
         let lock = self.conductor.read().await;
         match event {
@@ -311,7 +311,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             } => {
                 let res = lock
                     .put_agent_info_signed(agent_info_signed)
-                    .map_err(holochain_p2p::HolochainP2pError::other);
+                    .map_err(crate::holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
             GetAgentInfoSigned {
@@ -322,7 +322,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             } => {
                 let res = lock
                     .get_agent_info_signed(kitsune_space, kitsune_agent)
-                    .map_err(holochain_p2p::HolochainP2pError::other);
+                    .map_err(crate::holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
             QueryAgentInfoSigned {
@@ -332,7 +332,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             } => {
                 let res = lock
                     .query_agent_info_signed(kitsune_space)
-                    .map_err(holochain_p2p::HolochainP2pError::other);
+                    .map_err(crate::holochain_p2p::HolochainP2pError::other);
                 respond.respond(Ok(async move { res }.boxed().into()));
             }
             SignNetworkData { respond, data, .. } => {
@@ -401,7 +401,7 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
         &self.keystore
     }
 
-    fn holochain_p2p(&self) -> &holochain_p2p::HolochainP2pRef {
+    fn holochain_p2p(&self) -> &crate::holochain_p2p::HolochainP2pRef {
         &self.holochain_p2p
     }
 

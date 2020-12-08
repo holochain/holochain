@@ -74,7 +74,7 @@ impl BufferedStore for IntegratedDhtOpsBuf {
     type Error = DatabaseError;
     fn flush_to_txn_ref(
         &mut self,
-        writer: &mut holochain_state::prelude::Writer,
+        writer: &mut crate::holochain_state::prelude::Writer,
     ) -> Result<(), Self::Error> {
         self.store.flush_to_txn_ref(writer)
     }

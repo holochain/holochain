@@ -258,8 +258,8 @@ mod slow_tests {
     use crate::holochain::fixt::RealRibosomeFixturator;
     use crate::holochain::fixt::ValidationPackageHostAccessFixturator;
     use crate::holochain::fixt::ValidationPackageInvocationFixturator;
-    use hdk3::prelude::AppEntryType;
-    use hdk3::prelude::EntryVisibility;
+    use crate::hdk3::prelude::AppEntryType;
+    use crate::hdk3::prelude::EntryVisibility;
     use crate::holochain_wasm_test_utils::TestWasm;
     use crate::holochain_zome_types::validate::ValidationPackage;
 

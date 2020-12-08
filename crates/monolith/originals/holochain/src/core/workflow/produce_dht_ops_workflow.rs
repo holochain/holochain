@@ -127,7 +127,7 @@ mod tests {
         ) -> Vec<DhtOp> {
             let app_entry = self.app_entry.next().unwrap();
             let (app_entry, entry_hash) = EntryHashed::from_content_sync(app_entry).into();
-            let app_entry_type = holochain_types::fixt::AppEntryTypeFixturator::new(visibility)
+            let app_entry_type = crate::holochain_types::fixt::AppEntryTypeFixturator::new(visibility)
                 .next()
                 .unwrap();
             source_chain

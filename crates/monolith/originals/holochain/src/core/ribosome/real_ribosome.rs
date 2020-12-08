@@ -152,7 +152,7 @@ impl RealRibosome {
                 let closure_self_arc = std::sync::Arc::clone(&self_arc);
                 let closure_call_context_arc = std::sync::Arc::clone(&call_context_arc);
                 move |ctx: &mut Ctx, guest_allocation_ptr: GuestPtr| -> Result<Len, WasmError> {
-                    let input = $crate::holochain_wasmer_host::guest::from_guest_ptr(
+                    let input = $crate::holochain::holochain_wasmer_host::guest::from_guest_ptr(
                         ctx,
                         guest_allocation_ptr,
                     )?;
@@ -167,7 +167,7 @@ impl RealRibosome {
                         .map_err(|e| WasmError::Zome(format!("{:?}", e)))?
                         .try_into()?;
 
-                    Ok($crate::holochain_wasmer_host::import::set_context_data(
+                    Ok($crate::holochain::holochain_wasmer_host::import::set_context_data(
                         ctx, output_sb,
                     ))
                 }
@@ -417,7 +417,7 @@ impl RibosomeT for RealRibosome {
         }
     }
 
-    fn call_iterator<I: crate::core::ribosome::Invocation>(
+    fn call_iterator<I: crate::holochain::core::ribosome::Invocation>(
         &self,
         access: HostAccess,
         invocation: I,
@@ -516,7 +516,7 @@ impl RibosomeT for RealRibosome {
 pub mod wasm_test {
     use crate::holochain::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
-    use hdk3::prelude::*;
+    use crate::hdk3::prelude::*;
     use crate::holochain_wasm_test_utils::TestWasm;
     use test_wasm_common::TestString;
 
@@ -524,14 +524,14 @@ pub mod wasm_test {
     /// Basic checks that we can call externs internally and externally the way we want using the
     /// hdk macros rather than low level rust extern syntax.
     async fn ribosome_extern_test() {
-        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_env = crate::holochain_state::test_utils::test_cell_env();
         let env = test_env.env();
         let mut workspace =
-            crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+            crate::holochain::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
+        crate::holochain::core::workflow::fake_genesis(&mut workspace.source_chain)
             .await
             .unwrap();
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let workspace_lock = crate::holochain::core::workflow::CallZomeWorkspaceLock::new(workspace);
 
         let mut host_access = fixt!(ZomeCallHostAccess, Predictable);
         host_access.workspace = workspace_lock;

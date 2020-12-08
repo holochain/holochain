@@ -40,13 +40,13 @@ macro_rules! host_fn_api_impls {
 }
 
 // All host_fn_api_impls below rely on this import
-use holochain_zome_types as zt;
+use crate::holochain_zome_types as zt;
 
 host_fn_api_impls! {
 
     // ------------------------------------------------------------------
     // These definitions are copy-pasted from
-    // holochain_zome_types::zome_io
+    // crate::holochain_zome_types::zome_io
     // TODO: is there a way to unhygienically import this code in both places?
 
     fn agent_info (()) -> zt::agent_info::AgentInfo;

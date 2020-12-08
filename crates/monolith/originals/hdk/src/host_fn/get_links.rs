@@ -1,4 +1,4 @@
-use crate::hdk::prelude::*;
+use crate::hdk3::prelude::*;
 
 /// Returns all links that reference a base entry hash, optionally filtered by tag.
 ///

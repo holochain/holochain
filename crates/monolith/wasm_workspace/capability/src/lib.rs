@@ -1,4 +1,4 @@
-use hdk3::prelude::*;
+use crate::hdk3::prelude::*;
 
 #[derive(serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct CapFor(CapSecret, AgentPubKey);

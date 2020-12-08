@@ -429,7 +429,7 @@ pub trait RibosomeT: Sized + std::fmt::Debug {
             .iter()
             .position(|(name, _)| name == zome_name)
         {
-            Some(index) => Ok(holochain_zome_types::header::ZomeId::from(index as u8)),
+            Some(index) => Ok(crate::holochain_zome_types::header::ZomeId::from(index as u8)),
             None => Err(RibosomeError::ZomeNotExists(zome_name.to_owned())),
         }
     }
@@ -543,7 +543,7 @@ pub mod wasm_test {
                 use holo_hash::*;
                 use crate::holochain_p2p::HolochainP2pCellT;
                 use std::convert::TryInto;
-                use $crate::core::ribosome::RibosomeT;
+                use $crate::holochain::core::ribosome::RibosomeT;
 
                 let ribosome =
                     $crate::fixt::RealRibosomeFixturator::new($crate::fixt::curve::Zomes(vec![
@@ -563,7 +563,7 @@ pub mod wasm_test {
                 )
                 .await;
                 let cell_network = test_network.cell_network();
-                let cell_id = holochain_types::cell::CellId::new(
+                let cell_id = crate::holochain_types::cell::CellId::new(
                     cell_network.dna_hash(),
                     cell_network.from_agent(),
                 );
@@ -574,7 +574,7 @@ pub mod wasm_test {
                         cell_id,
                         $test_wasm.into(),
                         $fn_name.into(),
-                        holochain_zome_types::ExternInput::new(input.try_into().unwrap()),
+                        crate::holochain_zome_types::ExternInput::new(input.try_into().unwrap()),
                     ))
                     .next()
                     .unwrap();
@@ -588,13 +588,13 @@ pub mod wasm_test {
                     };
 
                 let output = match zome_invocation_response {
-                    crate::core::ribosome::ZomeCallResponse::Ok(guest_output) => {
+                    crate::holochain::core::ribosome::ZomeCallResponse::Ok(guest_output) => {
                         guest_output.into_inner().try_into().unwrap()
                     }
-                    crate::core::ribosome::ZomeCallResponse::Unauthorized(_, _, _, _) => {
+                    crate::holochain::core::ribosome::ZomeCallResponse::Unauthorized(_, _, _, _) => {
                         unreachable!()
                     }
-                    crate::core::ribosome::ZomeCallResponse::NetworkError(_) => unreachable!(),
+                    crate::holochain::core::ribosome::ZomeCallResponse::NetworkError(_) => unreachable!(),
                 };
                 output
             })

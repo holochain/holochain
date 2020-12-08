@@ -17,7 +17,7 @@ use crate::holochain_state::db::GetDb;
 use crate::holochain_state::db::CHAIN_SEQUENCE;
 use crate::holochain_state::error::DatabaseError;
 use crate::holochain_state::error::DatabaseResult;
-use crate::holochain_state::fresh_reader;
+use crate::fresh_reader;
 use crate::holochain_state::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;

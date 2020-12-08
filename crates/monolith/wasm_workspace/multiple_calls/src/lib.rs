@@ -1,4 +1,4 @@
-use hdk3::prelude::*;
+use crate::hdk3::prelude::*;
 use test_wasm_common::TestBytes;
 use test_wasm_common::TestInt;
 

@@ -38,11 +38,11 @@
 //! ```
 
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::dna::wasm::DnaWasm;
-use holochain_types::dna::zome::WasmZome;
-use holochain_types::dna::DnaDef;
-use holochain_types::dna::DnaFile;
-use holochain_zome_types::zome::ZomeName;
+use crate::holochain_types::dna::wasm::DnaWasm;
+use crate::holochain_types::dna::zome::WasmZome;
+use crate::holochain_types::dna::DnaDef;
+use crate::holochain_types::dna::DnaFile;
+use crate::holochain_zome_types::zome::ZomeName;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
@@ -59,7 +59,7 @@ pub enum DnaUtilError {
 
     /// DnaError
     #[error("DNA error: {0}")]
-    DnaError(#[from] holochain_types::dna::DnaError),
+    DnaError(#[from] crate::holochain_types::dna::DnaError),
 
     /// SerializedBytesError
     #[error("Internal serialization error: {0}")]
@@ -178,7 +178,7 @@ pub async fn compress(dna_work_dir: &impl AsRef<std::path::Path>) -> DnaUtilResu
     Ok(())
 }
 
-/// See `holochain_types::dna::zome::Zome`.
+/// See `crate::holochain_types::dna::zome::Zome`.
 /// This is a helper to convert to json.
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 struct ZomeJson {
@@ -189,7 +189,7 @@ struct ZomeJson {
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 struct JsonValueDecodeHelper(pub serde_json::Value);
 
-/// See `holochain_types::dna::DnaDef`.
+/// See `crate::holochain_types::dna::DnaDef`.
 /// This is a helper to convert to json.
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 struct DnaDefJson {
@@ -263,7 +263,7 @@ mod tests {
     async fn test_extract_then_compile() {
         let tmp_dir = tempdir::TempDir::new("dna_util_test").unwrap();
 
-        let dna_file = holochain_types::test_utils::fake_dna_zomes(
+        let dna_file = crate::holochain_types::test_utils::fake_dna_zomes(
             "bla",
             vec![
                 ("test-zome-1".into(), vec![1, 2, 3, 4].into()),

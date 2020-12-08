@@ -157,7 +157,7 @@ async fn kv_store_sanity_check() -> DatabaseResult<()> {
 
 #[tokio::test(threaded_scheduler)]
 async fn kv_indicate_value_overwritten() -> DatabaseResult<()> {
-    holochain_types::observability::test_run().ok();
+    crate::holochain_types::observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
     let env = arc.guard();
@@ -176,7 +176,7 @@ async fn kv_indicate_value_overwritten() -> DatabaseResult<()> {
 #[tokio::test(threaded_scheduler)]
 async fn kv_deleted_persisted() -> DatabaseResult<()> {
     use tracing::*;
-    holochain_types::observability::test_run().ok();
+    crate::holochain_types::observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
     let env = arc.guard();
@@ -218,7 +218,7 @@ async fn kv_deleted_persisted() -> DatabaseResult<()> {
 
 #[tokio::test(threaded_scheduler)]
 async fn kv_deleted_buffer() -> DatabaseResult<()> {
-    holochain_types::observability::test_run().ok();
+    crate::holochain_types::observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
     let env = arc.guard();
@@ -257,7 +257,7 @@ async fn kv_deleted_buffer() -> DatabaseResult<()> {
 
 #[tokio::test(threaded_scheduler)]
 async fn kv_get_buffer() -> DatabaseResult<()> {
-    holochain_types::observability::test_run().ok();
+    crate::holochain_types::observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
     let env = arc.guard();
@@ -278,7 +278,7 @@ async fn kv_get_buffer() -> DatabaseResult<()> {
 
 #[tokio::test(threaded_scheduler)]
 async fn kv_get_persisted() -> DatabaseResult<()> {
-    holochain_types::observability::test_run().ok();
+    crate::holochain_types::observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
     let env = arc.guard();
@@ -306,7 +306,7 @@ async fn kv_get_persisted() -> DatabaseResult<()> {
 
 #[tokio::test(threaded_scheduler)]
 async fn kv_get_del_buffer() -> DatabaseResult<()> {
-    holochain_types::observability::test_run().ok();
+    crate::holochain_types::observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
     let env = arc.guard();
@@ -328,7 +328,7 @@ async fn kv_get_del_buffer() -> DatabaseResult<()> {
 
 #[tokio::test(threaded_scheduler)]
 async fn kv_get_del_persisted() -> DatabaseResult<()> {
-    holochain_types::observability::test_run().ok();
+    crate::holochain_types::observability::test_run().ok();
     let test_env = test_cell_env();
     let arc = test_env.env();
     let env = arc.guard();

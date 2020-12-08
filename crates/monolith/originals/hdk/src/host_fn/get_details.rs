@@ -1,4 +1,4 @@
-use crate::hdk::prelude::*;
+use crate::hdk3::prelude::*;
 
 /// Get an element from the hash AND the details for the entry or header hash passed in.
 /// Returns None if the entry/header does not exist.

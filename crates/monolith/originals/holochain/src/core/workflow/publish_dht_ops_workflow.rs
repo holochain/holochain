@@ -26,7 +26,7 @@ use crate::holochain_p2p::HolochainP2pCellT;
 use crate::holochain_state::buffer::BufferedStore;
 use crate::holochain_state::buffer::KvBufFresh;
 use crate::holochain_state::db::AUTHORED_DHT_OPS;
-use crate::holochain_state::fresh_reader;
+use crate::fresh_reader;
 use crate::holochain_state::prelude::*;
 use crate::holochain_state::transaction::Writer;
 use crate::holochain_types::dht_op::DhtOp;
@@ -283,7 +283,7 @@ mod tests {
 
         // Create the network
         let filter_events = |evt: &_| match evt {
-            holochain_p2p::event::HolochainP2pEvent::Publish { .. } => true,
+            crate::holochain_p2p::event::HolochainP2pEvent::Publish { .. } => true,
             _ => false,
         };
         let (tx, mut recv) = tokio::sync::mpsc::channel(10);
@@ -675,7 +675,7 @@ mod tests {
                 // Create the network
 
                 let filter_events = |evt: &_| match evt {
-                    holochain_p2p::event::HolochainP2pEvent::Publish { .. } => true,
+                    crate::holochain_p2p::event::HolochainP2pEvent::Publish { .. } => true,
                     _ => false,
                 };
                 let (tx, mut recv) = tokio::sync::mpsc::channel(10);

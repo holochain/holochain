@@ -106,9 +106,9 @@ pub enum ChainItemKey {
 
 impl LinkMetaVal {
     /// Turn into a zome friendly type
-    pub fn into_link(self) -> holochain_zome_types::link::Link {
+    pub fn into_link(self) -> crate::holochain_zome_types::link::Link {
         let timestamp: chrono::DateTime<chrono::Utc> = self.timestamp.into();
-        holochain_zome_types::link::Link {
+        crate::holochain_zome_types::link::Link {
             target: self.target,
             timestamp: timestamp.into(),
             tag: self.tag,

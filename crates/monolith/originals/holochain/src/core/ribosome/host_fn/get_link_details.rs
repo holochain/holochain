@@ -57,18 +57,18 @@ pub mod slow_tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_entry_hash_path_children_details() {
-        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_env = crate::holochain_state::test_utils::test_cell_env();
         let env = test_env.env();
 
         let mut workspace =
-            crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
+            crate::holochain::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
 
         // commits fail validation if we don't do genesis
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+        crate::holochain::core::workflow::fake_genesis(&mut workspace.source_chain)
             .await
             .unwrap();
 
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let workspace_lock = crate::holochain::core::workflow::CallZomeWorkspaceLock::new(workspace);
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock;
 
@@ -117,7 +117,7 @@ pub mod slow_tests {
             TestString::from("foo.baz".to_string())
         );
 
-        let children_details_output: holochain_zome_types::link::LinkDetails = crate::call_test_ribosome!(
+        let children_details_output: crate::holochain_zome_types::link::LinkDetails = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
             "children_details",
@@ -137,7 +137,7 @@ pub mod slow_tests {
             to_remove_hash
         );
 
-        let children_details_output_2: holochain_zome_types::link::LinkDetails = crate::call_test_ribosome!(
+        let children_details_output_2: crate::holochain_zome_types::link::LinkDetails = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
             "children_details",

@@ -56,11 +56,11 @@ pub enum RibosomeError {
 
     /// ident
     #[error(transparent)]
-    KeystoreError(#[from] holochain_keystore::KeystoreError),
+    KeystoreError(#[from] crate::holochain_keystore::KeystoreError),
 
     /// ident
     #[error(transparent)]
-    DatabaseError(#[from] holochain_state::error::DatabaseError),
+    DatabaseError(#[from] crate::holochain_state::error::DatabaseError),
 
     /// ident
     #[error(transparent)]
@@ -92,7 +92,7 @@ pub enum RibosomeError {
 
     /// ident
     #[error(transparent)]
-    P2pError(#[from] holochain_p2p::HolochainP2pError),
+    P2pError(#[from] crate::holochain_p2p::HolochainP2pError),
 }
 
 impl From<ring::error::Unspecified> for RibosomeError {

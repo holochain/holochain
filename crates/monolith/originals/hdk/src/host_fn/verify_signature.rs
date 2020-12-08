@@ -1,4 +1,4 @@
-use crate::hdk::prelude::*;
+use crate::hdk3::prelude::*;
 
 /// Verify the passed signature and public key against the passed data
 pub fn verify_signature<K: Into<AgentPubKey>, S: Into<Signature>, D: Into<SerializedBytes>>(

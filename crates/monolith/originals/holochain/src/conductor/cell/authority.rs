@@ -14,7 +14,7 @@ use crate::holochain_state::env::EnvironmentRead;
 use crate::holochain_state::env::EnvironmentWrite;
 use crate::holochain_state::env::ReadManager;
 use crate::holochain_state::error::DatabaseError;
-use crate::holochain_state::fresh_reader;
+use crate::fresh_reader;
 use crate::holochain_state::prelude::PrefixType;
 use crate::holochain_state::prelude::Readable;
 use crate::holochain_types::activity::AgentActivity;
@@ -39,7 +39,7 @@ use tracing::*;
 pub async fn handle_get_entry(
     state_env: EnvironmentWrite,
     hash: EntryHash,
-    options: holochain_p2p::event::GetOptions,
+    options: crate::holochain_p2p::event::GetOptions,
 ) -> CellResult<GetElementResponse> {
     // Get the vaults
     let element_vault = ElementBuf::vault(state_env.clone().into(), false)?;
@@ -263,7 +263,7 @@ pub fn handle_get_agent_activity(
     env: EnvironmentRead,
     agent: AgentPubKey,
     query: ChainQueryFilter,
-    options: holochain_p2p::event::GetActivityOptions,
+    options: crate::holochain_p2p::event::GetActivityOptions,
 ) -> CellResult<AgentActivity> {
     // Databases
     let element_integrated = ElementBuf::vault(env.clone(), false)?;
@@ -335,7 +335,7 @@ fn get_full_headers<'a, P: PrefixType + 'a, R: Readable>(
 fn check_headers<P: PrefixType, R: Readable>(
     hashes: impl FallibleIterator<Item = (u32, HeaderHash), Error = DatabaseError>,
     query: ChainQueryFilter,
-    options: holochain_p2p::event::GetActivityOptions,
+    options: crate::holochain_p2p::event::GetActivityOptions,
     database: ElementBuf<P>,
     reader: &R,
 ) -> CellResult<ChainItems> {
@@ -381,7 +381,7 @@ fn _show_agent_activity_read_times(env: EnvironmentRead, agent: AgentPubKey) {
     }
     let element_integrated = ElementBuf::vault(env.clone(), false).unwrap();
     let meta_integrated = MetadataBuf::vault(env.clone()).unwrap();
-    holochain_state::fresh_reader_test!(env, |r| {
+    crate::fresh_reader_test!(env, |r| {
         let now = std::time::Instant::now();
         let hashes = meta_integrated
             .get_activity_sequence(

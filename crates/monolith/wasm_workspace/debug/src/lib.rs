@@ -1,4 +1,4 @@
-use hdk3::prelude::*;
+use crate::hdk3::prelude::*;
 
 #[hdk_extern]
 fn debug(_: ()) -> ExternResult<()> {

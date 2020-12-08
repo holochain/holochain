@@ -36,7 +36,7 @@ pub enum ChainItems<T = SignedHeaderHashed> {
     NotRequested,
 }
 
-impl From<AgentActivity<Element>> for holochain_zome_types::query::AgentActivity {
+impl From<AgentActivity<Element>> for crate::holochain_zome_types::query::AgentActivity {
     fn from(a: AgentActivity<Element>) -> Self {
         let valid_activity = match a.valid_activity {
             ChainItems::Full(elements) => elements

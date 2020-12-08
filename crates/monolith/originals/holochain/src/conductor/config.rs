@@ -74,7 +74,7 @@ pub struct ConductorConfig {
     pub admin_interfaces: Option<Vec<AdminInterfaceConfig>>,
 
     /// Config options for the network module. Optional.
-    pub network: Option<holochain_p2p::kitsune_p2p::KitsuneP2pConfig>,
+    pub network: Option<crate::holochain_p2p::kitsune_p2p::KitsuneP2pConfig>,
     //
     //
     // /// Which signals to emit

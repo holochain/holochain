@@ -265,7 +265,7 @@ pub mod test {
     use futures::future::FutureExt;
     use holochain_serialized_bytes::prelude::*;
     use crate::holochain_state::buffer::KvStoreT;
-    use crate::holochain_state::fresh_reader_test;
+    use crate::fresh_reader_test;
     use crate::holochain_state::test_utils::test_environments;
     use crate::holochain_types::app::InstallAppDnaPayload;
     use crate::holochain_types::app::InstallAppPayload;

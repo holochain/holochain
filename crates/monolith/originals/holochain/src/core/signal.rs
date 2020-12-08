@@ -5,7 +5,7 @@
 
 use holochain_serialized_bytes::prelude::*;
 use crate::holochain_types::cell::CellId;
-use crate::holochain_types::impl_from;
+use crate::impl_from;
 use crate::holochain_zome_types::signal::AppSignal;
 
 /// A Signal is some information emitted from within Holochain out through

@@ -380,7 +380,7 @@ pub mod tests {
         // FIXME: CAP: Set this function to private
         let invocation =
             crate::fixt::ZomeCallInvocationFixturator::new(crate::fixt::NamedInvocation(
-                holochain_types::fixt::CellIdFixturator::new(::fixt::Unpredictable)
+                crate::holochain_types::fixt::CellIdFixturator::new(::fixt::Unpredictable)
                     .next()
                     .unwrap(),
                 TestWasm::Foo.into(),
@@ -451,7 +451,7 @@ pub mod tests {
 
         let invocation =
             crate::fixt::ZomeCallInvocationFixturator::new(crate::fixt::NamedInvocation(
-                holochain_types::fixt::CellIdFixturator::new(::fixt::Unpredictable)
+                crate::holochain_types::fixt::CellIdFixturator::new(::fixt::Unpredictable)
                     .next()
                     .unwrap(),
                 TestWasm::Foo.into(),
@@ -486,7 +486,7 @@ pub mod tests {
         let ribosome = MockRibosomeT::new();
         let invocation =
             crate::fixt::ZomeCallInvocationFixturator::new(crate::fixt::NamedInvocation(
-                holochain_types::fixt::CellIdFixturator::new(::fixt::Unpredictable)
+                crate::holochain_types::fixt::CellIdFixturator::new(::fixt::Unpredictable)
                     .next()
                     .unwrap(),
                 TestWasm::Foo.into(),
@@ -522,7 +522,7 @@ pub mod tests {
         // TODO: Make this mock return an output
         let invocation =
             crate::fixt::ZomeCallInvocationFixturator::new(crate::fixt::NamedInvocation(
-                holochain_types::fixt::CellIdFixturator::new(::fixt::Unpredictable)
+                crate::holochain_types::fixt::CellIdFixturator::new(::fixt::Unpredictable)
                     .next()
                     .unwrap(),
                 TestWasm::Foo.into(),

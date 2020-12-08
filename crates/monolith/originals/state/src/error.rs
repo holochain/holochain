@@ -72,7 +72,7 @@ pub enum DatabaseError {
     DirectoryError(#[from] std::io::Error),
 
     #[error(transparent)]
-    KeystoreError(#[from] holochain_keystore::KeystoreError),
+    KeystoreError(#[from] crate::holochain_keystore::KeystoreError),
 
     #[error(transparent)]
     ElementGroupError(#[from] ElementGroupError),

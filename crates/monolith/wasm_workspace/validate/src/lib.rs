@@ -1,5 +1,5 @@
 use element::ElementEntry;
-use hdk3::prelude::*;
+use crate::hdk3::prelude::*;
 
 /// an example inner value that can be serialized into the contents of Entry::App()
 #[derive(Deserialize, Serialize, SerializedBytes)]

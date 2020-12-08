@@ -56,7 +56,7 @@ pub trait BufferedStore: Sized {
 macro_rules! fresh_reader {
     ($env: expr, $f: expr) => {{
         let g = $env.guard();
-        let r = $crate::env::ReadManager::reader(&g)?;
+        let r = $crate::holochain_state::env::ReadManager::reader(&g)?;
         $f(r)
     }};
 }
@@ -67,7 +67,7 @@ macro_rules! fresh_reader {
 macro_rules! fresh_reader_test {
     ($env: expr, $f: expr) => {{
         let g = $env.guard();
-        let r = $crate::env::ReadManager::reader(&g).unwrap();
+        let r = $crate::holochain_state::env::ReadManager::reader(&g).unwrap();
         $f(r)
     }};
 }

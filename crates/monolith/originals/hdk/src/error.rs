@@ -7,7 +7,7 @@ use thiserror::Error;
 #[derive(Debug, Clone, Error)]
 pub enum HdkError {
     #[error(transparent)]
-    EntryError(#[from] holochain_zome_types::entry::EntryError),
+    EntryError(#[from] crate::holochain_zome_types::entry::EntryError),
 
     #[error(transparent)]
     SerializedBytes(#[from] holochain_wasmer_guest::SerializedBytesError),

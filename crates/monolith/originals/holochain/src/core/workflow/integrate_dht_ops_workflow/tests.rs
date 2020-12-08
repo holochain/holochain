@@ -953,7 +953,7 @@ async fn commit_entry<'env>(
             .unwrap();
     }
 
-    let entry_hash = holochain_types::entry::EntryHashed::from_content_sync(entry).into_hash();
+    let entry_hash = crate::holochain_types::entry::EntryHashed::from_content_sync(entry).into_hash();
 
     (entry_hash, output.into_inner().try_into().unwrap())
 }
@@ -1090,7 +1090,7 @@ async fn get_links(
 async fn test_metadata_from_wasm_api() {
     // test workspace boilerplate
     observability::test_run().ok();
-    let test_env = holochain_state::test_utils::test_cell_env();
+    let test_env = crate::holochain_state::test_utils::test_cell_env();
     let env = test_env.env();
     clear_dbs(env.clone());
 
@@ -1156,7 +1156,7 @@ async fn test_metadata_from_wasm_api() {
 async fn test_wasm_api_without_integration_links() {
     // test workspace boilerplate
     observability::test_run().ok();
-    let test_env = holochain_state::test_utils::test_cell_env();
+    let test_env = crate::holochain_state::test_utils::test_cell_env();
     let env = test_env.env();
     clear_dbs(env.clone());
 
@@ -1208,7 +1208,7 @@ async fn test_wasm_api_without_integration_links() {
 async fn test_wasm_api_without_integration_delete() {
     // test workspace boilerplate
     observability::test_run().ok();
-    let test_env = holochain_state::test_utils::test_cell_env();
+    let test_env = crate::holochain_state::test_utils::test_cell_env();
     let env = test_env.env();
     let env_ref = env.guard();
     clear_dbs(env.clone());

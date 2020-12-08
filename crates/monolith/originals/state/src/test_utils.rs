@@ -31,12 +31,12 @@ pub fn test_p2p_env() -> TestEnvironment {
 }
 
 /// Generate a test keystore pre-populated with a couple test keypairs.
-pub fn test_keystore() -> holochain_keystore::KeystoreSender {
+pub fn test_keystore() -> crate::holochain_keystore::KeystoreSender {
     use crate::holochain_keystore::KeystoreSenderExt;
 
     tokio_safe_block_on::tokio_safe_block_on(
         async move {
-            let keystore = holochain_keystore::test_keystore::spawn_test_keystore()
+            let keystore = crate::holochain_keystore::test_keystore::spawn_test_keystore()
                 .await
                 .unwrap();
 

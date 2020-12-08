@@ -10,7 +10,7 @@ use crate::holochain_state::buffer::BufferedStore;
 use crate::holochain_state::env::EnvironmentRead;
 use crate::holochain_state::error::DatabaseError;
 use crate::holochain_state::error::DatabaseResult;
-use crate::holochain_state::fresh_reader;
+use crate::fresh_reader;
 use crate::holochain_state::prelude::*;
 use fallible_iterator::FallibleIterator;
 use rkv::IntegerStore;

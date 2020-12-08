@@ -7,22 +7,22 @@ use syn::parse::ParseStream;
 use syn::parse::Result;
 use syn::punctuated::Punctuated;
 
-struct EntryDef(holochain_zome_types::entry_def::EntryDef);
-struct EntryDefId(holochain_zome_types::entry_def::EntryDefId);
-struct EntryVisibility(holochain_zome_types::entry_def::EntryVisibility);
-struct CrdtType(holochain_zome_types::crdt::CrdtType);
-struct RequiredValidations(holochain_zome_types::entry_def::RequiredValidations);
-struct RequiredValidationType(holochain_zome_types::validate::RequiredValidationType);
+struct EntryDef(crate::holochain_zome_types::entry_def::EntryDef);
+struct EntryDefId(crate::holochain_zome_types::entry_def::EntryDefId);
+struct EntryVisibility(crate::holochain_zome_types::entry_def::EntryVisibility);
+struct CrdtType(crate::holochain_zome_types::crdt::CrdtType);
+struct RequiredValidations(crate::holochain_zome_types::entry_def::RequiredValidations);
+struct RequiredValidationType(crate::holochain_zome_types::validate::RequiredValidationType);
 
 impl Parse for EntryDef {
     fn parse(input: ParseStream) -> Result<Self> {
-        let mut id = holochain_zome_types::entry_def::EntryDefId::App(String::default());
+        let mut id = crate::holochain_zome_types::entry_def::EntryDefId::App(String::default());
         let mut required_validations =
-            holochain_zome_types::entry_def::RequiredValidations::default();
-        let mut visibility = holochain_zome_types::entry_def::EntryVisibility::default();
-        let crdt_type = holochain_zome_types::crdt::CrdtType::default();
+            crate::holochain_zome_types::entry_def::RequiredValidations::default();
+        let mut visibility = crate::holochain_zome_types::entry_def::EntryVisibility::default();
+        let crdt_type = crate::holochain_zome_types::crdt::CrdtType::default();
         let mut required_validation_type =
-            holochain_zome_types::validate::RequiredValidationType::default();
+            crate::holochain_zome_types::validate::RequiredValidationType::default();
 
         let vars = Punctuated::<syn::MetaNameValue, syn::Token![,]>::parse_terminated(input)?;
         for var in vars {
@@ -30,7 +30,7 @@ impl Parse for EntryDef {
                 match segment.ident.to_string().as_str() {
                     "id" => match var.lit {
                         syn::Lit::Str(s) => {
-                            id = holochain_zome_types::entry_def::EntryDefId::App(
+                            id = crate::holochain_zome_types::entry_def::EntryDefId::App(
                                 s.value().to_string(),
                             )
                         }
@@ -39,7 +39,7 @@ impl Parse for EntryDef {
                     "required_validations" => match var.lit {
                         syn::Lit::Int(i) => {
                             required_validations =
-                                holochain_zome_types::entry_def::RequiredValidations::from(
+                                crate::holochain_zome_types::entry_def::RequiredValidations::from(
                                     i.base10_parse::<u8>()?,
                                 )
                         }
@@ -50,16 +50,16 @@ impl Parse for EntryDef {
                             syn::Lit::Str(s) => required_validation_type = match s.value().as_str()
                             {
                                 "custom" => {
-                                    holochain_zome_types::validate::RequiredValidationType::Custom
+                                    crate::holochain_zome_types::validate::RequiredValidationType::Custom
                                 }
                                 "element" => {
-                                    holochain_zome_types::validate::RequiredValidationType::Element
+                                    crate::holochain_zome_types::validate::RequiredValidationType::Element
                                 }
                                 "sub_chain" => {
-                                    holochain_zome_types::validate::RequiredValidationType::SubChain
+                                    crate::holochain_zome_types::validate::RequiredValidationType::SubChain
                                 }
                                 "full" => {
-                                    holochain_zome_types::validate::RequiredValidationType::Full
+                                    crate::holochain_zome_types::validate::RequiredValidationType::Full
                                 }
                                 _ => unreachable!(
                                     "Invalid required_validation_type
@@ -74,10 +74,10 @@ impl Parse for EntryDef {
                             syn::Lit::Str(s) => {
                                 visibility = match s.value().as_str() {
                                     "public" => {
-                                        holochain_zome_types::entry_def::EntryVisibility::Public
+                                        crate::holochain_zome_types::entry_def::EntryVisibility::Public
                                     }
                                     "private" => {
-                                        holochain_zome_types::entry_def::EntryVisibility::Private
+                                        crate::holochain_zome_types::entry_def::EntryVisibility::Private
                                     }
                                     _ => unreachable!(),
                                 }
@@ -92,7 +92,7 @@ impl Parse for EntryDef {
                 }
             }
         }
-        Ok(EntryDef(holochain_zome_types::entry_def::EntryDef {
+        Ok(EntryDef(crate::holochain_zome_types::entry_def::EntryDef {
             id,
             required_validations,
             visibility,
@@ -113,7 +113,7 @@ impl quote::ToTokens for CrdtType {
 impl quote::ToTokens for EntryDefId {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         match &self.0 {
-            holochain_zome_types::entry_def::EntryDefId::App(s) => {
+            crate::holochain_zome_types::entry_def::EntryDefId::App(s) => {
                 tokens.append_all(quote::quote! {
                     hdk3::prelude::EntryDefId::App(String::from(#s))
                 });
@@ -136,8 +136,8 @@ impl quote::ToTokens for EntryVisibility {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let variant = syn::Ident::new(
             match self.0 {
-                holochain_zome_types::entry_def::EntryVisibility::Public => "Public",
-                holochain_zome_types::entry_def::EntryVisibility::Private => "Private",
+                crate::holochain_zome_types::entry_def::EntryVisibility::Public => "Public",
+                crate::holochain_zome_types::entry_def::EntryVisibility::Private => "Private",
             },
             proc_macro2::Span::call_site(),
         );
@@ -151,10 +151,10 @@ impl quote::ToTokens for RequiredValidationType {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let variant = syn::Ident::new(
             match self.0 {
-                holochain_zome_types::validate::RequiredValidationType::Custom => "Custom",
-                holochain_zome_types::validate::RequiredValidationType::Element => "Element",
-                holochain_zome_types::validate::RequiredValidationType::SubChain => "SubChain",
-                holochain_zome_types::validate::RequiredValidationType::Full => "Full",
+                crate::holochain_zome_types::validate::RequiredValidationType::Custom => "Custom",
+                crate::holochain_zome_types::validate::RequiredValidationType::Element => "Element",
+                crate::holochain_zome_types::validate::RequiredValidationType::SubChain => "SubChain",
+                crate::holochain_zome_types::validate::RequiredValidationType::Full => "Full",
             },
             proc_macro2::Span::call_site(),
         );

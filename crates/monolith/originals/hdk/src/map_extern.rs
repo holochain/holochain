@@ -1,4 +1,4 @@
-use crate::hdk::prelude::*;
+use crate::hdk3::prelude::*;
 
 /// Hides away the gross bit where we hook up integer pointers to length-prefixed guest memory
 /// to serialization and deserialization, and returning things to the host, and memory allocation

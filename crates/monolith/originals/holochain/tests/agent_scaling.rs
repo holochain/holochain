@@ -1,6 +1,6 @@
 #![cfg(feature = "test_utils")]
 
-use hdk3::prelude::Links;
+use crate::hdk3::prelude::Links;
 use crate::holochain::conductor::api::ZomeCall;
 use crate::holochain::test_utils::conductor_setup::ConductorTestData;
 use crate::holochain_keystore::keystore_actor::KeystoreSenderExt;

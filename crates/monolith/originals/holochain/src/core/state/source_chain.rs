@@ -8,7 +8,7 @@ use fallible_iterator::FallibleIterator;
 use holo_hash::*;
 use crate::holochain_state::buffer::BufferedStore;
 use crate::holochain_state::error::DatabaseResult;
-use crate::holochain_state::fresh_reader;
+use crate::fresh_reader;
 use crate::holochain_state::prelude::*;
 use crate::holochain_types::prelude::*;
 use crate::holochain_types::EntryHashed;
@@ -125,7 +125,7 @@ impl SourceChain {
         let committed_valid_grant = fresh_reader!(self.env(), |r| {
             let (references, headers): (
                 HashSet<HeaderHash>,
-                Vec<HoloHashed<holochain_zome_types::element::SignedHeader>>,
+                Vec<HoloHashed<crate::holochain_zome_types::element::SignedHeader>>,
             ) = self
                 .0
                 .headers()
@@ -336,7 +336,7 @@ pub mod tests {
     use super::*;
     use crate::holochain::fixt::*;
     use ::fixt::prelude::*;
-    use hdk3::prelude::*;
+    use crate::hdk3::prelude::*;
     use crate::holochain_state::test_utils::test_cell_env;
     use crate::holochain_types::test_utils::fake_dna_hash;
     use crate::holochain_zome_types::capability::CapAccess;

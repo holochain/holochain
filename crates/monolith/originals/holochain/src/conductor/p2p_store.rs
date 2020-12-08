@@ -13,7 +13,7 @@ use crate::holochain_state::env::EnvironmentWrite;
 use crate::holochain_state::env::WriteManager;
 use crate::holochain_state::error::DatabaseError;
 use crate::holochain_state::error::DatabaseResult;
-use crate::holochain_state::fresh_reader;
+use crate::fresh_reader;
 use crate::holochain_state::key::BufKey;
 use crate::holochain_state::prelude::Readable;
 use std::convert::TryInto;
@@ -52,11 +52,11 @@ impl Ord for AgentKvKey {
 }
 
 impl std::convert::TryFrom<&AgentInfoSigned> for AgentKvKey {
-    type Error = holochain_state::error::DatabaseError;
+    type Error = crate::holochain_state::error::DatabaseError;
     fn try_from(agent_info_signed: &AgentInfoSigned) -> Result<Self, Self::Error> {
         let agent_info: AgentInfo = agent_info_signed
             .try_into()
-            .map_err(|_| holochain_state::error::DatabaseError::KeyConstruction)?;
+            .map_err(|_| crate::holochain_state::error::DatabaseError::KeyConstruction)?;
         Ok((&agent_info).into())
     }
 }
@@ -69,8 +69,8 @@ impl From<&AgentInfo> for AgentKvKey {
 
 impl From<(DnaHash, AgentPubKey)> for AgentKvKey {
     fn from((space, agent): (DnaHash, AgentPubKey)) -> Self {
-        let space = holochain_p2p::space_holo_to_kit(space);
-        let agent = holochain_p2p::agent_holo_to_kit(agent);
+        let space = crate::holochain_p2p::space_holo_to_kit(space);
+        let agent = crate::holochain_p2p::agent_holo_to_kit(agent);
         (&space, &agent).into()
     }
 }
@@ -126,7 +126,7 @@ impl AsRef<KvStore<AgentKvKey, AgentInfoSigned>> for AgentKv {
 impl AgentKv {
     /// Constructor.
     pub fn new(env: EnvironmentRead) -> DatabaseResult<Self> {
-        let db = env.get_db(&*holochain_state::db::AGENT)?;
+        let db = env.get_db(&*crate::holochain_state::db::AGENT)?;
         Ok(Self(KvStore::new(db)))
     }
 
@@ -204,7 +204,7 @@ mod tests {
     use crate::holochain_state::buffer::KvStoreT;
     use crate::holochain_state::env::ReadManager;
     use crate::holochain_state::env::WriteManager;
-    use crate::holochain_state::fresh_reader_test;
+    use crate::fresh_reader_test;
     use crate::holochain_state::test_utils::test_p2p_env;
     use kitsune_p2p::fixt::AgentInfoFixturator;
     use kitsune_p2p::fixt::AgentInfoSignedFixturator;
@@ -226,7 +226,7 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn test_store_agent_info_signed() {
-        holochain_types::observability::test_run().ok();
+        crate::holochain_types::observability::test_run().ok();
 
         let test_env = test_p2p_env();
         let environ = test_env.env();

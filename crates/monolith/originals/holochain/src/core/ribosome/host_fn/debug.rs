@@ -34,7 +34,7 @@ pub mod wasm_test {
     use crate::holochain::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use crate::holochain_wasm_test_utils::TestWasm;
-    use crate::holochain_zome_types::debug_msg;
+    use crate::debug_msg;
     use crate::holochain_zome_types::DebugInput;
     use crate::holochain_zome_types::DebugOutput;
     use std::sync::Arc;
@@ -57,16 +57,16 @@ pub mod wasm_test {
 
     #[tokio::test(threaded_scheduler)]
     async fn wasm_line_numbers_test() {
-        let test_env = holochain_state::test_utils::test_cell_env();
+        let test_env = crate::holochain_state::test_utils::test_cell_env();
         let env = test_env.env();
         let mut workspace =
-            crate::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
+            crate::holochain::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();
 
-        crate::core::workflow::fake_genesis(&mut workspace.source_chain)
+        crate::holochain::core::workflow::fake_genesis(&mut workspace.source_chain)
             .await
             .unwrap();
 
-        let workspace_lock = crate::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let workspace_lock = crate::holochain::core::workflow::CallZomeWorkspaceLock::new(workspace);
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock;
 

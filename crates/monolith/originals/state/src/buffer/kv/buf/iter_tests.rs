@@ -241,7 +241,7 @@ fn re_do_test<R: Readable>(
 // test scratch and db
 #[tokio::test(threaded_scheduler)]
 async fn kv_single_iter() {
-    holochain_types::observability::test_run().ok();
+    crate::holochain_types::observability::test_run().ok();
     let mut rng = rand::thread_rng();
     let test_env = test_cell_env();
     let arc = test_env.env();
@@ -366,7 +366,7 @@ async fn kv_single_iter() {
 
 #[tokio::test(threaded_scheduler)]
 async fn kv_single_iter_found_1() {
-    holochain_types::observability::test_run().ok();
+    crate::holochain_types::observability::test_run().ok();
     let in_scratch = vec![
         TestData::Del(".".into()),
         TestData::Put(("bar".into(), V(0))),
@@ -414,7 +414,7 @@ async fn kv_single_iter_found_1() {
 #[tokio::test(threaded_scheduler)]
 #[should_panic]
 async fn kv_single_iter_found_2() {
-    holochain_types::observability::test_run().ok();
+    crate::holochain_types::observability::test_run().ok();
     let in_scratch = vec![TestData::Del("".into()), TestData::Put(("".into(), V(0)))];
     let in_db_first = vec![TestData::Del("".into()), TestData::Put(("".into(), V(2)))];
     let in_db_second = vec![TestData::Del("".into()), TestData::Put(("".into(), V(2)))];
@@ -432,7 +432,7 @@ async fn kv_single_iter_found_2() {
 
 #[tokio::test(threaded_scheduler)]
 async fn kv_single_iter_found_3() {
-    holochain_types::observability::test_run().ok();
+    crate::holochain_types::observability::test_run().ok();
     let in_scratch = vec![
         TestData::Put(("m".into(), V(0))),
         TestData::Put(("n".into(), V(0))),
@@ -464,7 +464,7 @@ async fn kv_single_iter_found_3() {
 
 #[tokio::test(threaded_scheduler)]
 async fn kv_single_iter_found_4() {
-    holochain_types::observability::test_run().ok();
+    crate::holochain_types::observability::test_run().ok();
     let in_scratch = vec![TestData::Put((".".into(), V(0)))];
 
     let in_db_first = vec![

@@ -69,7 +69,7 @@ use crate::holochain_state::env::EnvironmentKind;
 use crate::holochain_state::env::EnvironmentWrite;
 use crate::holochain_state::env::ReadManager;
 use crate::holochain_state::exports::SingleStore;
-use crate::holochain_state::fresh_reader;
+use crate::fresh_reader;
 use crate::holochain_state::prelude::*;
 use crate::holochain_types::app::InstalledApp;
 use crate::holochain_types::app::InstalledAppId;
@@ -166,7 +166,7 @@ where
     root_env_dir: EnvironmentRootPath,
 
     /// Handle to the network actor.
-    holochain_p2p: holochain_p2p::HolochainP2pRef,
+    holochain_p2p: crate::holochain_p2p::HolochainP2pRef,
 }
 
 impl Conductor {
@@ -609,9 +609,9 @@ where
         impl IntoIterator<Item = (EntryDefBufferKey, EntryDef)>,
     )> {
         let environ = &self.wasm_env;
-        let wasm = environ.get_db(&*holochain_state::db::WASM)?;
-        let dna_def_db = environ.get_db(&*holochain_state::db::DNA_DEF)?;
-        let entry_def_db = environ.get_db(&*holochain_state::db::ENTRY_DEF)?;
+        let wasm = environ.get_db(&*crate::holochain_state::db::WASM)?;
+        let dna_def_db = environ.get_db(&*crate::holochain_state::db::DNA_DEF)?;
+        let entry_def_db = environ.get_db(&*crate::holochain_state::db::ENTRY_DEF)?;
 
         let wasm_buf = Arc::new(WasmBuf::new(environ.clone().into(), wasm)?);
         let dna_def_buf = DnaDefBuf::new(environ.clone().into(), dna_def_db)?;
@@ -782,9 +782,9 @@ where
         dna: DnaFile,
     ) -> ConductorResult<Vec<(EntryDefBufferKey, EntryDef)>> {
         let environ = self.wasm_env.clone();
-        let wasm = environ.get_db(&*holochain_state::db::WASM)?;
-        let dna_def_db = environ.get_db(&*holochain_state::db::DNA_DEF)?;
-        let entry_def_db = environ.get_db(&*holochain_state::db::ENTRY_DEF)?;
+        let wasm = environ.get_db(&*crate::holochain_state::db::WASM)?;
+        let dna_def_db = environ.get_db(&*crate::holochain_state::db::DNA_DEF)?;
+        let entry_def_db = environ.get_db(&*crate::holochain_state::db::ENTRY_DEF)?;
 
         let zome_defs = get_entry_defs(dna.clone())?;
 
@@ -861,7 +861,7 @@ where
         dna_store: DS,
         keystore: KeystoreSender,
         root_env_dir: EnvironmentRootPath,
-        holochain_p2p: holochain_p2p::HolochainP2pRef,
+        holochain_p2p: crate::holochain_p2p::HolochainP2pRef,
     ) -> ConductorResult<Self> {
         let db: SingleStore = env.get_db(&db::CONDUCTOR_STATE)?;
         let (task_tx, task_manager_run_handle) = spawn_task_manager();
@@ -1022,11 +1022,11 @@ mod builder {
             } = self;
 
             let network_config = match &config.network {
-                None => holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default(),
+                None => crate::holochain_p2p::kitsune_p2p::KitsuneP2pConfig::default(),
                 Some(config) => config.clone(),
             };
             let (holochain_p2p, p2p_evt) =
-                holochain_p2p::spawn_holochain_p2p(network_config).await?;
+                crate::holochain_p2p::spawn_holochain_p2p(network_config).await?;
 
             let conductor = Conductor::new(
                 environment,
@@ -1048,7 +1048,7 @@ mod builder {
         async fn finish(
             conductor: Conductor<DS>,
             conductor_config: ConductorConfig,
-            p2p_evt: holochain_p2p::event::HolochainP2pEventReceiver,
+            p2p_evt: crate::holochain_p2p::event::HolochainP2pEventReceiver,
         ) -> ConductorResult<ConductorHandle> {
             // Get data before handle
             let keystore = conductor.keystore.clone();
@@ -1120,7 +1120,7 @@ mod builder {
         pub async fn test(self, envs: &TestEnvironments) -> ConductorResult<ConductorHandle> {
             let keystore = envs.conductor().keystore();
             let (holochain_p2p, p2p_evt) =
-                holochain_p2p::spawn_holochain_p2p(self.config.network.clone().unwrap_or_default())
+                crate::holochain_p2p::spawn_holochain_p2p(self.config.network.clone().unwrap_or_default())
                     .await?;
             let conductor = Conductor::new(
                 envs.conductor(),
@@ -1142,7 +1142,7 @@ mod builder {
 }
 
 async fn p2p_event_task(
-    mut p2p_evt: holochain_p2p::event::HolochainP2pEventReceiver,
+    mut p2p_evt: crate::holochain_p2p::event::HolochainP2pEventReceiver,
     handle: ConductorHandle,
 ) {
     use tokio::stream::StreamExt;
@@ -1173,7 +1173,7 @@ pub mod tests {
         let envs = test_environments();
         let dna_store = MockDnaStore::new();
         let keystore = envs.conductor().keystore().clone();
-        let holochain_p2p = holochain_p2p::stub_network().await;
+        let holochain_p2p = crate::holochain_p2p::stub_network().await;
         let conductor = Conductor::new(
             envs.conductor(),
             envs.wasm(),
@@ -1217,7 +1217,7 @@ pub mod tests {
     async fn app_ids_are_unique() {
         let environments = test_environments();
         let dna_store = MockDnaStore::new();
-        let holochain_p2p = holochain_p2p::stub_network().await;
+        let holochain_p2p = crate::holochain_p2p::stub_network().await;
         let mut conductor = Conductor::new(
             environments.conductor(),
             environments.wasm(),

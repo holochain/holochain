@@ -30,7 +30,7 @@ use crate::holochain_p2p::HolochainP2pCellT;
 use crate::holochain_state::buffer::BufferedStore;
 use crate::holochain_state::buffer::KvBufFresh;
 use crate::holochain_state::db::INTEGRATION_LIMBO;
-use crate::holochain_state::fresh_reader;
+use crate::fresh_reader;
 use crate::holochain_state::prelude::*;
 use crate::holochain_types::dht_op::DhtOp;
 use crate::holochain_types::header::NewEntryHeaderRef;

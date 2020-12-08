@@ -1,4 +1,4 @@
-use crate::hdk::prelude::*;
+use crate::hdk3::prelude::*;
 
 /// Walks the source chain in reverse (latest to oldest) filtering by header and/or entry type
 ///

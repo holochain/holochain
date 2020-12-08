@@ -7,7 +7,7 @@ use crate::holochain::core::state::source_chain::SourceChainResult;
 use fallible_iterator::FallibleIterator;
 use crate::holochain_state::buffer::BufferedStore;
 use crate::holochain_state::error::DatabaseResult;
-use crate::holochain_state::fresh_reader;
+use crate::fresh_reader;
 use crate::holochain_state::prelude::*;
 use crate::holochain_types::dht_op::produce_ops_from_element;
 use crate::holochain_types::dht_op::DhtOp;

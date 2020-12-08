@@ -35,15 +35,15 @@ macro_rules! from_sub_error {
 #[allow(missing_docs)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum DhtOpOrder {
-    RegisterAgentActivity(holochain_zome_types::timestamp::Timestamp),
-    StoreEntry(holochain_zome_types::timestamp::Timestamp),
-    StoreElement(holochain_zome_types::timestamp::Timestamp),
-    RegisterUpdatedContent(holochain_zome_types::timestamp::Timestamp),
-    RegisterUpdatedElement(holochain_zome_types::timestamp::Timestamp),
-    RegisterDeletedBy(holochain_zome_types::timestamp::Timestamp),
-    RegisterDeletedEntryHeader(holochain_zome_types::timestamp::Timestamp),
-    RegisterAddLink(holochain_zome_types::timestamp::Timestamp),
-    RegisterRemoveLink(holochain_zome_types::timestamp::Timestamp),
+    RegisterAgentActivity(crate::holochain_zome_types::timestamp::Timestamp),
+    StoreEntry(crate::holochain_zome_types::timestamp::Timestamp),
+    StoreElement(crate::holochain_zome_types::timestamp::Timestamp),
+    RegisterUpdatedContent(crate::holochain_zome_types::timestamp::Timestamp),
+    RegisterUpdatedElement(crate::holochain_zome_types::timestamp::Timestamp),
+    RegisterDeletedBy(crate::holochain_zome_types::timestamp::Timestamp),
+    RegisterDeletedEntryHeader(crate::holochain_zome_types::timestamp::Timestamp),
+    RegisterAddLink(crate::holochain_zome_types::timestamp::Timestamp),
+    RegisterRemoveLink(crate::holochain_zome_types::timestamp::Timestamp),
 }
 
 /// Op data that will be ordered by [DhtOpOrder]

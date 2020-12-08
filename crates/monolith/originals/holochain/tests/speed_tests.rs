@@ -16,7 +16,7 @@
 //!
 
 use ::fixt::prelude::*;
-use hdk3::prelude::*;
+use crate::hdk3::prelude::*;
 use crate::holochain::conductor::api::AdminRequest;
 use crate::holochain::conductor::api::AdminResponse;
 use crate::holochain::conductor::api::AppRequest;
@@ -57,7 +57,7 @@ const DEFAULT_NUM: usize = 2000;
 #[cfg(feature = "test_utils")]
 #[ignore = "speed tests are ignored by default; unignore to run"]
 async fn speed_test_prep() {
-    holochain::test_utils::warm_wasm_tests();
+    crate::holochain::test_utils::warm_wasm_tests();
 }
 
 #[tokio::test(threaded_scheduler)]
@@ -123,7 +123,7 @@ async fn speed_test_persisted() {
 #[ignore = "speed tests are ignored by default; unignore to run"]
 fn speed_test_all(n: usize) {
     observability::test_run().unwrap();
-    holochain::conductor::tokio_runtime().block_on(speed_test(Some(n)));
+    crate::holochain::conductor::tokio_runtime().block_on(speed_test(Some(n)));
 }
 
 #[instrument]
