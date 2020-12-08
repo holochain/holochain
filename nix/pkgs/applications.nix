@@ -39,7 +39,6 @@ let
       ++ additionalCargoBuildFlags
       ;
 
-    # buildAndTestSubdir = "crates/${package}";
     doCheck = false;
 
     meta = with lib; {
