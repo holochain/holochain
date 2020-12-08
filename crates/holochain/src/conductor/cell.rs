@@ -4,27 +4,19 @@
 //! Elements can be added. A constructed Cell is guaranteed to have a valid
 //! SourceChain which has already undergone Genesis.
 
-use super::{interface::SignalBroadcaster, manager::ManagedTaskAdd};
-use crate::conductor::handle::ConductorHandle;
-use crate::conductor::{api::error::ConductorApiError, entry_def_store::get_entry_def_from_ids};
-use crate::core::queue_consumer::{spawn_queue_consumer_tasks, InitialQueueTriggers};
-use crate::core::ribosome::ZomeCallInvocation;
+use super::{api::ZomeCall, interface::SignalBroadcaster, manager::ManagedTaskAdd};
 use crate::{
-    conductor::api::CellConductorApiT,
-    core::workflow::produce_dht_ops_workflow::dht_op_light::light_to_op,
-};
-use call_zome_workflow::call_zome_workspace_lock::CallZomeWorkspaceLock;
-use holochain_types::activity::AgentActivity;
-use holochain_zome_types::header::EntryType;
-use holochain_zome_types::validate::ValidationPackage;
-use holochain_zome_types::zome::FunctionName;
-use holochain_zome_types::{query::ChainQueryFilter, validate::ValidationStatus};
-use validation_package::ValidationPackageDb;
-
-use crate::{
-    conductor::{api::CellConductorApi, cell::error::CellResult},
-    core::ribosome::{guest_callback::init::InitResult, wasm_ribosome::WasmRibosome},
+    conductor::{
+        api::{error::ConductorApiError, CellConductorApi, CellConductorApiT},
+        cell::error::CellResult,
+        entry_def_store::get_entry_def_from_ids,
+        handle::ConductorHandle,
+    },
     core::{
+        queue_consumer::{spawn_queue_consumer_tasks, InitialQueueTriggers},
+        ribosome::{
+            guest_callback::init::InitResult, real_ribosome::RealRibosome, ZomeCallInvocation,
+        },
         state::{
             dht_op_integration::IntegratedDhtOpsBuf,
             element_buf::ElementBuf,
@@ -34,11 +26,13 @@ use crate::{
         workflow::{
             call_zome_workflow, error::WorkflowError, genesis_workflow::genesis_workflow,
             incoming_dht_ops_workflow::incoming_dht_ops_workflow, initialize_zomes_workflow,
-            CallZomeWorkflowArgs, CallZomeWorkspace, GenesisWorkflowArgs, GenesisWorkspace,
-            InitializeZomesWorkflowArgs, ZomeCallInvocationResult,
+            produce_dht_ops_workflow::dht_op_light::light_to_op, CallZomeWorkflowArgs,
+            CallZomeWorkspace, GenesisWorkflowArgs, GenesisWorkspace, InitializeZomesWorkflowArgs,
+            ZomeCallResult,
         },
     },
 };
+use call_zome_workflow::call_zome_workspace_lock::CallZomeWorkspaceLock;
 use error::{AuthorityDataError, CellError};
 use fallible_iterator::FallibleIterator;
 use futures::future::FutureExt;
@@ -51,6 +45,7 @@ use holochain_state::{
     env::{EnvironmentRead, EnvironmentWrite, ReadManager},
 };
 use holochain_types::{
+    activity::AgentActivity,
     autonomic::AutonomicProcess,
     cell::CellId,
     element::GetElementResponse,
@@ -59,12 +54,15 @@ use holochain_types::{
     validate::ValidationPackageResponse,
     Timestamp,
 };
-use holochain_zome_types::capability::CapSecret;
-use holochain_zome_types::header::{CreateLink, DeleteLink};
-use holochain_zome_types::signature::Signature;
-use holochain_zome_types::validate::RequiredValidationType;
-use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::ExternInput;
+use holochain_zome_types::{
+    capability::CapSecret,
+    header::{CreateLink, DeleteLink, EntryType},
+    query::ChainQueryFilter,
+    signature::Signature,
+    validate::{RequiredValidationType, ValidationPackage, ValidationStatus},
+    zome::{FunctionName, ZomeName},
+    ExternInput,
+};
 use observability::OpenSpanExt;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -74,6 +72,7 @@ use std::{
 use tokio::sync;
 use tracing::*;
 use tracing_futures::Instrument;
+use validation_package::ValidationPackageDb;
 
 mod authority;
 mod validation_package;
@@ -708,9 +707,9 @@ impl Cell {
         cap: Option<CapSecret>,
         payload: SerializedBytes,
     ) -> CellResult<SerializedBytes> {
-        let invocation = ZomeCallInvocation {
+        let invocation = ZomeCall {
             cell_id: self.id.clone(),
-            zome_name: zome_name.clone(),
+            zome_name,
             cap,
             payload: ExternInput::new(payload),
             provenance: from_agent,
@@ -718,17 +717,17 @@ impl Cell {
         };
         // double ? because
         // - ConductorApiResult
-        // - ZomeCallInvocationResult
+        // - ZomeCallResult
         Ok(self.call_zome(invocation, None).await??.try_into()?)
     }
 
     /// Function called by the Conductor
-    #[instrument(skip(self, invocation, workspace_lock))]
+    #[instrument(skip(self, call, workspace_lock))]
     pub async fn call_zome(
         &self,
-        invocation: ZomeCallInvocation,
+        call: ZomeCall,
         workspace_lock: Option<CallZomeWorkspaceLock>,
-    ) -> CellResult<ZomeCallInvocationResult> {
+    ) -> CellResult<ZomeCallResult> {
         // Check if init has run if not run it
         self.check_or_run_zome_init().await?;
 
@@ -745,6 +744,7 @@ impl Cell {
         let conductor_api = self.conductor_api.clone();
         let signal_tx = self.signal_broadcaster().await;
         let ribosome = self.get_ribosome().await?;
+        let invocation = ZomeCallInvocation::from_interface_call(conductor_api.clone(), call).await;
 
         let args = CallZomeWorkflowArgs {
             ribosome,
@@ -789,10 +789,10 @@ impl Cell {
             .get_dna(id.dna_hash())
             .await
             .ok_or(CellError::DnaMissing)?;
-        let dna_def = dna_file.dna().clone();
+        let dna_def = dna_file.dna_def().clone();
 
         // Get the ribosome
-        let ribosome = WasmRibosome::new(dna_file);
+        let ribosome = RealRibosome::new(dna_file);
 
         // Run the workflow
         let args = InitializeZomesWorkflowArgs { dna_def, ribosome };
@@ -807,7 +807,7 @@ impl Cell {
         .map_err(Box::new)?;
         trace!(?init_result);
         match init_result {
-            InitResult::Pass => (),
+            InitResult::Pass => {}
             r => return Err(CellError::InitFailed(r)),
         }
         Ok(())
@@ -829,9 +829,9 @@ impl Cell {
 
     /// Instantiate a Ribosome for use by this Cell's workflows
     // TODO: reevaluate once Workflows are fully implemented (after B-01567)
-    pub(crate) async fn get_ribosome(&self) -> CellResult<WasmRibosome> {
+    pub(crate) async fn get_ribosome(&self) -> CellResult<RealRibosome> {
         match self.conductor_api.get_dna(self.dna_hash()).await {
-            Some(dna) => Ok(WasmRibosome::new(dna)),
+            Some(dna) => Ok(RealRibosome::new(dna)),
             None => Err(CellError::DnaMissing),
         }
     }

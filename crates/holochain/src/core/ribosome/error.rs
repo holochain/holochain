@@ -7,10 +7,9 @@ use crate::{
 };
 use holo_hash::AnyDhtHash;
 use holochain_serialized_bytes::prelude::SerializedBytesError;
-use holochain_types::dna::error::DnaError;
+use holochain_types::dna::{error::DnaError, zome::inline_zome::error::InlineZomeError};
 use holochain_wasmer_host::prelude::WasmError;
-use holochain_zome_types::zome::FunctionName;
-use holochain_zome_types::zome::ZomeName;
+use holochain_zome_types::zome::{FunctionName, ZomeName};
 use thiserror::Error;
 use tokio::task::JoinError;
 use tokio_safe_block_on::BlockOnError;
@@ -84,6 +83,10 @@ pub enum RibosomeError {
     /// ident
     #[error(transparent)]
     JoinError(#[from] JoinError),
+
+    /// ident
+    #[error(transparent)]
+    InlineZomeError(#[from] InlineZomeError),
 
     /// ident
     #[error(transparent)]

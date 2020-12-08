@@ -1,5 +1,4 @@
-use crate::HolochainP2pCell;
-use crate::{actor::*, *};
+use crate::{actor::*, HolochainP2pCell, *};
 use ::fixt::prelude::*;
 use holo_hash::{
     fixt::{AgentPubKeyFixturator, DnaHashFixturator},
@@ -148,9 +147,10 @@ mod tests {
     use ghost_actor::GhostControlSender;
     use holochain_types::{
         element::{Element, ElementStatus, SignedHeaderHashed, WireElement},
+        fixt::*,
         validate::ValidationStatus,
+        HeaderHashed,
     };
-    use holochain_types::{fixt::*, HeaderHashed};
     use kitsune_p2p::KitsuneP2pConfig;
 
     macro_rules! newhash {
@@ -200,7 +200,7 @@ mod tests {
                     PutAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
                     }
-                    _ => (),
+                    _ => {}
                 }
             }
         });
@@ -254,7 +254,7 @@ mod tests {
                     PutAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
                     }
-                    _ => (),
+                    _ => {}
                 }
             }
         });
@@ -304,7 +304,7 @@ mod tests {
                     QueryAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
                     }
-                    _ => (),
+                    _ => {}
                 }
             }
         });
@@ -385,7 +385,7 @@ mod tests {
                     PutAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
                     }
-                    _ => (),
+                    _ => {}
                 }
             }
         });
@@ -442,7 +442,7 @@ mod tests {
                     PutAgentInfoSigned { respond, .. } => {
                         respond.r(Ok(async move { Ok(()) }.boxed().into()));
                     }
-                    _ => (),
+                    _ => {}
                 }
             }
         });

@@ -4,7 +4,8 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
 use crate::core::state::cascade::error::CascadeResult;
 use crate::core::workflow::call_zome_workflow::CallZomeWorkspace;
-use crate::core::{workflow::integrate_dht_ops_workflow::integrate_to_authored, SourceChainError};
+use crate::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
+use crate::core::SourceChainError;
 use holochain_p2p::actor::GetOptions;
 use holochain_types::element::SignedHeaderHashed;
 use holochain_zome_types::header::builder;
@@ -95,7 +96,6 @@ pub fn delete_link<'a>(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod slow_tests {
-
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use holo_hash::HeaderHash;

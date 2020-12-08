@@ -2,9 +2,7 @@
 //!
 //! We don't use fixturators for these, because this crate defines no fixturators
 
-use crate::capability::CapSecret;
-use crate::capability::CAP_SECRET_BYTES;
-use crate::ExternInput;
+use crate::capability::{CapSecret, CAP_SECRET_BYTES};
 use holo_hash::{hash_type, *};
 use holochain_serialized_bytes::prelude::*;
 
@@ -52,9 +50,4 @@ pub fn fake_agent_pubkey_2() -> AgentPubKey {
 /// A fixture CapSecret for unit testing.
 pub fn fake_cap_secret() -> CapSecret {
     [0; CAP_SECRET_BYTES].into()
-}
-
-/// A fixture ZomeCallInvocationPayload for unit testing.
-pub fn fake_zome_invocation_payload() -> ExternInput {
-    ExternInput::try_from(SerializedBytes::try_from(()).unwrap()).unwrap()
 }

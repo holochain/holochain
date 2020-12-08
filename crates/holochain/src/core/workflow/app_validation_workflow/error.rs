@@ -5,9 +5,10 @@ use thiserror::Error;
 
 use crate::{
     conductor::entry_def_store::error::EntryDefStoreError,
-    core::ribosome::error::RibosomeError,
-    core::state::cascade::error::CascadeError,
-    core::{validation::OutcomeOrError, SourceChainError},
+    core::{
+        ribosome::error::RibosomeError, state::cascade::error::CascadeError,
+        validation::OutcomeOrError, SourceChainError,
+    },
     from_sub_error,
 };
 

@@ -1,17 +1,17 @@
 use super::{InterfaceApi, SignalSubscription};
 use crate::conductor::{
     api::error::{ConductorApiResult, ExternalApiWireError, SerializationError},
-    state::AppInterfaceId,
-};
-use crate::conductor::{
     interface::error::{InterfaceError, InterfaceResult},
+    state::AppInterfaceId,
     ConductorHandle,
 };
-use crate::core::ribosome::ZomeCallInvocation;
+use holo_hash::AgentPubKey;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::app::{InstalledApp, InstalledAppId};
-use holochain_zome_types::ExternOutput;
-use holochain_zome_types::ZomeCallResponse;
+use holochain_zome_types::{
+    capability::CapSecret, cell::CellId, zome::FunctionName, zome::ZomeName, ExternInput,
+    ExternOutput, ZomeCallResponse,
+};
 
 /// The interface that a Conductor exposes to the outside world.
 #[async_trait::async_trait]
@@ -66,22 +66,35 @@ impl AppInterfaceApi for RealAppInterfaceApi {
                     .get_app_info(&installed_app_id)
                     .await?,
             )),
-            AppRequest::ZomeCallInvocation(request) => {
-                let req = request.clone();
-                match self.conductor_handle.call_zome(*request).await? {
-                Ok(ZomeCallResponse::Ok(output)) => {
-                  Ok(AppResponse::ZomeCallInvocation(Box::new(output)))
+            AppRequest::ZomeCallInvocation(call) => {
+                tracing::warn!("AppRequest::ZomeCallInvocation is deprecated, use AppRequest::ZomeCall (TODO: update conductor-api)");
+                self.handle_app_request_inner(AppRequest::ZomeCall(call))
+                    .await
+                    .map(|r| {
+                        AppResponse::ZomeCallInvocation(
+                            unwrap_to::unwrap_to!(r => AppResponse::ZomeCall).clone(),
+                        )
+                    })
+            }
+            AppRequest::ZomeCall(call) => {
+                match self.conductor_handle.call_zome(*call.clone()).await? {
+                    Ok(ZomeCallResponse::Ok(output)) => {
+                        Ok(AppResponse::ZomeCall(Box::new(output)))
+                    }
+                    Ok(ZomeCallResponse::Unauthorized(_, _, _, _)) => Ok(AppResponse::Error(
+                        ExternalApiWireError::ZomeCallUnauthorized(format!(
+                            "No capabilities grant has been committed that allows the CapSecret {:?} to call the function {} in zome {}",
+                            call.cap,
+                            call.fn_name,
+                            call.zome_name
+                        )),
+                    )),
+                    Ok(ZomeCallResponse::NetworkError(e)) => unreachable!(
+                        "Interface zome calls should never be routed to the network. This is a bug. Got {}",
+                        e
+                    ),
+                    Err(e) => Ok(AppResponse::Error(e.into())),
                 }
-                Ok(ZomeCallResponse::Unauthorized) => {
-                  Ok(AppResponse::Error(
-                    ExternalApiWireError::ZomeCallUnauthorized(
-                      format!("No capabilities grant has been committed that allows the CapSecret {:?} to call the function {} in zome {}", req.cap, req.fn_name, req.zome_name)
-                    )
-                  ))
-                },
-                Ok(ZomeCallResponse::NetworkError(e)) => unreachable!("Interface zome calls should never be routed to the network. This is a bug. Got {}", e),
-                Err(e) => Ok(AppResponse::Error(e.into())),
-              }
             }
             AppRequest::SignalSubscription(_) => Ok(AppResponse::Unimplemented(request)),
             AppRequest::Crypto(_) => Ok(AppResponse::Unimplemented(request)),
@@ -134,16 +147,19 @@ pub enum AppRequest {
     /// Is currently unimplemented and will return
     /// an [`AppResponse::Unimplemented`](enum.AppResponse.html#variant.Unimplemented)
     Crypto(Box<CryptoRequest>),
-    /// Call a zome function. See the inner [`ZomeCallInvocation`]
+    /// Call a zome function. See the inner [`ZomeCall`]
     /// struct to understand the data that must be provided.
     ///
-    /// Will be responded to with an [`AppResponse::ZomeCallInvocation`]
+    /// Will be responded to with an [`AppResponse::ZomeCall`]
     /// or an [`AppResponse::Error`]
     ///
-    /// [`ZomeCallInvocation`]: ../../core/ribosome/struct.ZomeCallInvocation.html
-    /// [`AppResponse::ZomeCallInvocation`]: enum.AppResponse.html#variant.ZomeCallInvocation
+    /// [`ZomeCall`]: ../../core/ribosome/struct.ZomeCall.html
+    /// [`AppResponse::ZomeCall`]: enum.AppResponse.html#variant.ZomeCall
     /// [`AppResponse::Error`]: enum.AppResponse.html#variant.Error
-    ZomeCallInvocation(Box<ZomeCallInvocation>),
+    ZomeCall(Box<ZomeCall>),
+
+    /// DEPRECATED. Use `ZomeCall`.
+    ZomeCallInvocation(Box<ZomeCall>),
 
     /// Update signal subscriptions.
     ///
@@ -177,15 +193,42 @@ pub enum AppResponse {
     /// [`AppRequest::AppInfo`]: enum.AppRequest.html#variant.AppInfo
     AppInfo(Option<InstalledApp>),
 
-    /// The succesful response to an [`AppRequest::ZomeCallInvocation`].
+    /// The successful response to an [`AppRequest::ZomeCall`].
     ///
     /// Note that [`ExternOutput`] is simply a structure of [`SerializedBytes`] so the client will have
     /// to decode this response back into the data provided by the Zome using a [msgpack](https://msgpack.org/) library to utilize it.
     ///
-    /// [`AppRequest::ZomeCallInvocation`]: enum.AppRequest.html#variant.ZomeCallInvocation
+    /// [`AppRequest::ZomeCall`]: enum.AppRequest.html#variant.ZomeCall
     /// [`ExternOutput`]: ../../../holochain_zome_types/zome_io/struct.ExternOutput.html
     /// [`SerializedBytes`]: ../../../holochain_zome_types/query/struct.SerializedBytes.html
+    ZomeCall(Box<ExternOutput>),
+
+    /// DEPRECATED. See `ZomeCall`.
     ZomeCallInvocation(Box<ExternOutput>),
+}
+
+/// The data provided across an App interface in order to make a zome call
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct ZomeCall {
+    /// The Id of the `Cell` containing the Zome to be called
+    pub cell_id: CellId,
+    /// The Zome containing the function to be called
+    pub zome_name: ZomeName,
+    /// The name of the Zome function to call
+    pub fn_name: FunctionName,
+    /// The serialized data to pass as an argument to the Zome call
+    pub payload: ExternInput,
+    /// The capability request authorization.
+    /// This can be `None` and still succeed in the case where the function
+    /// in the zome being called has been given an Unrestricted status
+    /// via a `CapGrant`. Otherwise, it will be necessary to provide a `CapSecret` for every call.
+    pub cap: Option<CapSecret>,
+    /// The provenance (source) of the call.
+    ///
+    /// NB: **This will go away** as soon as Holochain has a way of determining who
+    /// is making this ZomeCall over this interface. Until we do, the caller simply
+    /// provides this data and Holochain trusts them.
+    pub provenance: AgentPubKey,
 }
 
 #[allow(missing_docs)]

@@ -1,4 +1,7 @@
-use holochain_types::dna::wasm::DnaWasm;
+use holochain_types::dna::{
+    wasm::DnaWasm,
+    zome::{WasmZome, ZomeDef},
+};
 pub extern crate strum;
 #[macro_use]
 extern crate strum_macros;
@@ -23,7 +26,6 @@ pub enum TestWasm {
     Foo,
     HashPath,
     HdkExtern,
-    Imports,
     InitFail,
     InitPass,
     Link,
@@ -67,7 +69,6 @@ impl From<TestWasm> for ZomeName {
             TestWasm::Foo => "foo",
             TestWasm::HashPath => "hash_path",
             TestWasm::HdkExtern => "hdk_extern",
-            TestWasm::Imports => "imports",
             TestWasm::InitFail => "init_fail",
             TestWasm::InitPass => "init_pass",
             TestWasm::Link => "link",
@@ -129,7 +130,6 @@ impl From<TestWasm> for DnaWasm {
             TestWasm::HdkExtern => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_hdk_extern.wasm")
             }
-            TestWasm::Imports => get_code("wasm32-unknown-unknown/release/test_wasm_imports.wasm"),
             TestWasm::InitFail => {
                 get_code("wasm32-unknown-unknown/release/test_wasm_init_fail.wasm")
             }
@@ -216,20 +216,26 @@ fn get_code(path: &'static str) -> Vec<u8> {
     std::fs::read(path).expect(&warning)
 }
 
-impl From<TestWasm> for Zome {
+impl From<TestWasm> for ZomeDef {
     fn from(test_wasm: TestWasm) -> Self {
         tokio_safe_block_on::tokio_safe_block_forever_on(async move {
             let dna_wasm: DnaWasm = test_wasm.into();
             let (_, wasm_hash) = holochain_types::dna::wasm::DnaWasmHashed::from_content(dna_wasm)
                 .await
                 .into_inner();
-            Self { wasm_hash }
+            WasmZome { wasm_hash }.into()
         })
     }
 }
 
-impl From<TestWasm> for (ZomeName, Zome) {
+impl From<TestWasm> for (ZomeName, ZomeDef) {
     fn from(test_wasm: TestWasm) -> Self {
         (test_wasm.into(), test_wasm.into())
+    }
+}
+
+impl From<TestWasm> for Zome {
+    fn from(test_wasm: TestWasm) -> Self {
+        Zome::new(test_wasm.into(), test_wasm.into())
     }
 }

@@ -15,9 +15,11 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
-use tokio::stream::StreamExt;
-use tokio::sync::{broadcast, mpsc};
-use tokio::task::JoinHandle;
+use tokio::{
+    stream::StreamExt,
+    sync::{broadcast, mpsc},
+    task::JoinHandle,
+};
 use tracing::*;
 
 const CHANNEL_SIZE: usize = 1000;

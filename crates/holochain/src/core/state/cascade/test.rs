@@ -1,10 +1,10 @@
 use super::Cascade;
-use crate::core::state::{
-    element_buf::ElementBuf,
-    metadata::{LinkMetaKey, MockMetadataBuf},
-    source_chain::{SourceChainBuf, SourceChainResult},
-};
 use crate::{
+    core::state::{
+        element_buf::ElementBuf,
+        metadata::{LinkMetaKey, MockMetadataBuf},
+        source_chain::{SourceChainBuf, SourceChainResult},
+    },
     fixt::{LinkMetaValFixturator, ZomeIdFixturator},
     test_utils::test_network,
 };
@@ -22,8 +22,7 @@ use holochain_types::{
     test_utils::{fake_agent_pubkey_1, fake_agent_pubkey_2, fake_header_hash},
     HeaderHashed,
 };
-use holochain_zome_types::link::LinkTag;
-use holochain_zome_types::{header, Entry, Header};
+use holochain_zome_types::{header, link::LinkTag, Entry, Header};
 use mockall::*;
 
 #[allow(dead_code)]

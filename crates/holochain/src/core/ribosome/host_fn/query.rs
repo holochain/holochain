@@ -1,7 +1,8 @@
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::RibosomeT;
-use holochain_zome_types::element::{Element, ElementVec};
+use holochain_zome_types::element::Element;
+use holochain_zome_types::element::ElementVec;
 use holochain_zome_types::QueryInput;
 use holochain_zome_types::QueryOutput;
 use std::sync::Arc;
@@ -26,7 +27,6 @@ pub fn query(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod slow_tests {
-
     use crate::{core::ribosome::ZomeCallHostAccess, fixt::ZomeCallHostAccessFixturator};
     use ::fixt::prelude::*;
     use hdk3::prelude::*;

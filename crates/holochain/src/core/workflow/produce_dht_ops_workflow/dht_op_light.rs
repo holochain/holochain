@@ -5,9 +5,9 @@ use holochain_types::{
     dht_op::{DhtOp, DhtOpLight},
     header::NewEntryHeader,
 };
-use holochain_zome_types::entry_def::EntryVisibility;
-use holochain_zome_types::header::{self, Header};
-use holochain_zome_types::signature::Signature;
+use holochain_zome_types::{
+    entry_def::EntryVisibility, header, header::Header, signature::Signature,
+};
 
 pub mod error;
 
@@ -145,7 +145,7 @@ pub fn light_to_op<P: PrefixType>(
                     return Err(DhtOpConvertError::HeaderMismatch(
                         format!("{:?}", h),
                         op_name,
-                    ))
+                    ));
                 }
             };
             Ok(DhtOp::RegisterRemoveLink(sig, header))

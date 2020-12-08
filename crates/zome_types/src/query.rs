@@ -169,9 +169,11 @@ impl ChainQueryFilter {
 #[cfg(test)]
 #[cfg(feature = "fixturators")]
 mod tests {
-    use crate::fixt::AppEntryTypeFixturator;
-    use crate::header::EntryType;
-    use crate::{fixt::*, Header};
+    use crate::{
+        fixt::{AppEntryTypeFixturator, *},
+        header::EntryType,
+        Header,
+    };
     use ::fixt::prelude::*;
 
     use super::ChainQueryFilter;

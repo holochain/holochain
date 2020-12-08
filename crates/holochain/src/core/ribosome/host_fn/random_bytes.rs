@@ -26,7 +26,7 @@ pub mod wasm_test {
     use crate::core::ribosome::host_fn::random_bytes::random_bytes;
 
     use crate::fixt::CallContextFixturator;
-    use crate::fixt::WasmRibosomeFixturator;
+    use crate::fixt::RealRibosomeFixturator;
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
@@ -38,7 +38,7 @@ pub mod wasm_test {
     #[tokio::test(threaded_scheduler)]
     /// we can get some random data out of the fn directly
     async fn random_bytes_test() {
-        let ribosome = WasmRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![]))
+        let ribosome = RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![]))
             .next()
             .unwrap();
         let call_context = CallContextFixturator::new(fixt::Unpredictable)

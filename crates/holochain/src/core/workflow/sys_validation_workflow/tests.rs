@@ -13,8 +13,13 @@ use holo_hash::{AnyDhtHash, DhtOpHash, EntryHash, HeaderHash};
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::{fresh_reader_test, prelude::ReadManager};
 use holochain_types::{
-    app::InstalledCell, cell::CellId, dht_op::DhtOpLight, dna::DnaDef, dna::DnaFile, fixt::*,
-    test_utils::fake_agent_pubkey_1, test_utils::fake_agent_pubkey_2, validate::ValidationStatus,
+    app::InstalledCell,
+    cell::CellId,
+    dht_op::DhtOpLight,
+    dna::{DnaDef, DnaFile},
+    fixt::*,
+    test_utils::{fake_agent_pubkey_1, fake_agent_pubkey_2},
+    validate::ValidationStatus,
     Entry,
 };
 use holochain_wasm_test_utils::TestWasm;
@@ -308,7 +313,7 @@ async fn bob_links_in_a_legit_way(
     let base_entry_hash = EntryHash::with_data_sync(&Entry::try_from(base.clone()).unwrap());
     let target_entry_hash = EntryHash::with_data_sync(&Entry::try_from(target.clone()).unwrap());
     let link_tag = fixt!(LinkTag);
-    let call_data = HostFnApi::create(bob_cell_id, handle, dna_file).await;
+    let call_data = HostFnCaller::create(bob_cell_id, handle, dna_file).await;
     // 3
     call_data
         .commit_entry(base.clone().try_into().unwrap(), POST_ID)
@@ -351,7 +356,7 @@ async fn bob_makes_a_large_link(
     let bytes = (0..401).map(|_| 0u8).into_iter().collect::<Vec<_>>();
     let link_tag = LinkTag(bytes);
 
-    let call_data = HostFnApi::create(bob_cell_id, handle, dna_file).await;
+    let call_data = HostFnCaller::create(bob_cell_id, handle, dna_file).await;
 
     // 6
     let original_header_address = call_data
@@ -395,7 +400,7 @@ async fn dodgy_bob(bob_cell_id: &CellId, handle: &ConductorHandle, dna_file: &Dn
     let base_entry_hash = EntryHash::with_data_sync(&Entry::try_from(base.clone()).unwrap());
     let target_entry_hash = EntryHash::with_data_sync(&Entry::try_from(target.clone()).unwrap());
     let link_tag = fixt!(LinkTag);
-    let call_data = HostFnApi::create(bob_cell_id, handle, dna_file).await;
+    let call_data = HostFnCaller::create(bob_cell_id, handle, dna_file).await;
 
     // 11
     call_data

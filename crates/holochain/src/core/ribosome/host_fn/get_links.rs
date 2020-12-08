@@ -1,8 +1,7 @@
 use crate::core::ribosome::error::RibosomeResult;
-use crate::core::{
-    ribosome::{CallContext, RibosomeT},
-    state::metadata::LinkMetaKey,
-};
+use crate::core::ribosome::CallContext;
+use crate::core::ribosome::RibosomeT;
+use crate::core::state::metadata::LinkMetaKey;
 use holochain_p2p::actor::GetLinksOptions;
 use holochain_zome_types::GetLinksInput;
 use holochain_zome_types::GetLinksOutput;
@@ -17,7 +16,7 @@ pub fn get_links<'a>(
     let (base_address, tag) = input.into_inner();
 
     // Get zome id
-    let zome_id = ribosome.zome_name_to_id(&call_context.zome_name)?;
+    let zome_id = ribosome.zome_to_id(&call_context.zome)?;
 
     // Get the network from the context
     let network = call_context.host_access.network().clone();
@@ -46,7 +45,6 @@ pub fn get_links<'a>(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod slow_tests {
-
     use crate::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use hdk3::prelude::*;

@@ -13,10 +13,9 @@ use either::Either;
 use error::CascadeResult;
 use fallible_iterator::FallibleIterator;
 use holo_hash::{hash_type::AnyDht, AgentPubKey, AnyDhtHash, EntryHash, HasHash, HeaderHash};
-use holochain_p2p::{actor::GetActivityOptions, HolochainP2pCellT};
 use holochain_p2p::{
-    actor::{GetLinksOptions, GetMetaOptions, GetOptions},
-    HolochainP2pCell,
+    actor::{GetActivityOptions, GetLinksOptions, GetMetaOptions, GetOptions},
+    HolochainP2pCell, HolochainP2pCellT,
 };
 use holochain_state::{error::DatabaseResult, fresh_reader, prelude::*};
 use holochain_types::{
@@ -37,12 +36,10 @@ use holochain_zome_types::{
     header::HeaderType,
     link::Link,
     metadata::{Details, ElementDetails, EntryDetails},
-    query::ChainQueryFilter,
-    query::ChainStatus,
+    query::{ChainQueryFilter, ChainStatus},
     validate::{ValidationPackage, ValidationStatus},
 };
-use std::collections::HashSet;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use tracing::*;
 use tracing_futures::Instrument;
 
@@ -347,7 +344,7 @@ where
                     ValidationStatus::Valid,
                 )?;
             }
-            ChainItems::NotRequested => (),
+            ChainItems::NotRequested => {}
         };
         match rejected_activity {
             ChainItems::Full(headers) => {
@@ -368,7 +365,7 @@ where
                     ValidationStatus::Rejected,
                 )?;
             }
-            ChainItems::NotRequested => (),
+            ChainItems::NotRequested => {}
         };
         match &status {
             ChainStatus::Empty => {}
@@ -443,7 +440,7 @@ where
                 }
             }
             // Doesn't have header but not because it was deleted
-            GetElementResponse::GetHeader(None) => (),
+            GetElementResponse::GetHeader(None) => {}
             r => {
                 error!(
                     msg = "Got an invalid response to fetch element via header",
@@ -532,7 +529,7 @@ where
                 }
             }
             // Authority didn't have any headers for this entry
-            GetElementResponse::GetEntryFull(None) => (),
+            GetElementResponse::GetEntryFull(None) => {}
             r @ GetElementResponse::GetHeader(_) => {
                 error!(
                     msg = "Got an invalid response to fetch element via entry",
@@ -1594,7 +1591,7 @@ where
             // we must go to the network because we don't
             // know how long the chain is.
             None => return Ok(None),
-            _ => (),
+            _ => {}
         }
         // Try getting the activity from the cache.
         let chain_hashes =
@@ -1756,7 +1753,7 @@ where
                 }
                 return Ok(activity);
             }
-            _ => (),
+            _ => {}
         }
 
         match &activity.valid_activity {
