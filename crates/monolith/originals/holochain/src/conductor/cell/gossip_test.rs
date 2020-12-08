@@ -10,8 +10,8 @@ use crate::holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p::KitsuneBinType;
 use kitsune_p2p::KitsuneP2pConfig;
 use matches::assert_matches;
-use test_wasm_common::AnchorInput;
-use test_wasm_common::TestString;
+use crate::holochain_test_wasm_common::AnchorInput;
+use crate::holochain_test_wasm_common::TestString;
 
 #[tokio::test(threaded_scheduler)]
 async fn gossip_test() {

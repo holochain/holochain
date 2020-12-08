@@ -28,12 +28,12 @@ async fn test_cell_handle_publish() {
     let test_network = test_network(Some(dna.clone()), Some(agent.clone())).await;
     let holochain_p2p_cell = test_network.cell_network();
 
-    let mut mock_handler = crate::conductor::handle::MockConductorHandleT::new();
+    let mut mock_handler = crate::holochain::conductor::handle::MockConductorHandleT::new();
     mock_handler
         .expect_get_dna()
         .returning(|_| Some(fixt!(DnaFile)));
 
-    let mock_handler: crate::conductor::handle::ConductorHandle = Arc::new(mock_handler);
+    let mock_handler: crate::holochain::conductor::handle::ConductorHandle = Arc::new(mock_handler);
 
     super::Cell::genesis(cell_id.clone(), mock_handler.clone(), env.clone(), None)
         .await

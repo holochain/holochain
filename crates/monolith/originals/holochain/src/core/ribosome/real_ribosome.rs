@@ -518,7 +518,7 @@ pub mod wasm_test {
     use ::fixt::prelude::*;
     use crate::hdk3::prelude::*;
     use crate::holochain_wasm_test_utils::TestWasm;
-    use test_wasm_common::TestString;
+    use crate::holochain_test_wasm_common::TestString;
 
     #[tokio::test(threaded_scheduler)]
     /// Basic checks that we can call externs internally and externally the way we want using the

@@ -590,11 +590,11 @@ version = "0.0.1"
 dependencies = [
  "hdk3",
  "serde",
- "test_wasm_common",
+ "crate::holochain_test_wasm_common",
 ]
 
 [[package]]
-name = "test_wasm_common"
+name = "crate::holochain_test_wasm_common"
 version = "0.0.1"
 dependencies = [
  "hdk3",

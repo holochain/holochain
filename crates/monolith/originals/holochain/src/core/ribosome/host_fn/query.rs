@@ -34,7 +34,7 @@ pub mod slow_tests {
     use query::ChainQueryFilter;
 
     use crate::holochain_wasm_test_utils::TestWasm;
-    use test_wasm_common::*;
+    use crate::holochain_test_wasm_common::*;
 
     // TODO: use this setup function to DRY up a lot of duplicated code
     async fn setup() -> (TestEnvironment, ZomeCallHostAccess) {

@@ -13,7 +13,7 @@ fn path(s: &str) -> ExternResult<EntryHash> {
 
 #[hdk_extern]
 fn query(args: QueryFilter) -> ExternResult<ElementVec> {
-    Ok(hdk3::prelude::query(args)?)
+    Ok(crate::hdk3::prelude::query(args)?)
 }
 
 #[hdk_extern]

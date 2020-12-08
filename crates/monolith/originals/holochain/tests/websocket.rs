@@ -20,6 +20,7 @@ use crate::holochain_types::test_utils::fake_agent_pubkey_1;
 use crate::holochain_types::test_utils::fake_dna_zomes;
 use crate::holochain_types::test_utils::write_fake_dna_file;
 use crate::holochain_wasm_test_utils::TestWasm;
+use crate::*;
 use crate::holochain_websocket::*;
 use crate::holochain_zome_types::signal::AppSignal;
 use crate::holochain_zome_types::*;

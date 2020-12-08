@@ -70,7 +70,7 @@ pub fn wasm_call_n(c: &mut Criterion) {
 
         group.bench_function(BenchmarkId::from_parameter(n), |b| {
             // bytes
-            let bytes = test_wasm_common::TestBytes::from(vec![0; n]);
+            let bytes = crate::holochain_test_wasm_common::TestBytes::from(vec![0; n]);
             let sb: SerializedBytes = bytes.try_into().unwrap();
 
             TOKIO_RUNTIME.lock().unwrap().enter(move || {

@@ -1990,6 +1990,7 @@ dependencies = [
  "rmp-serde",
  "serde",
  "serde_bytes",
+ "serde_derive",
  "serde_json",
  "serde_yaml",
  "serial_test",

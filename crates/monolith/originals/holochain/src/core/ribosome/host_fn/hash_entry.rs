@@ -36,7 +36,7 @@ pub mod wasm_test {
     use crate::holochain_zome_types::HashEntryOutput;
     use std::convert::TryInto;
     use std::sync::Arc;
-    use test_wasm_common::TestString;
+    use crate::holochain_test_wasm_common::TestString;
 
     #[tokio::test(threaded_scheduler)]
     /// we can get an entry hash out of the fn directly
@@ -103,7 +103,7 @@ pub mod wasm_test {
         let output: EntryHash =
             crate::call_test_ribosome!(host_access, TestWasm::HashPath, "hash", input);
 
-        let expected_path = hdk3::hash_path::path::Path::from("foo.bar");
+        let expected_path = crate::hdk3::hash_path::path::Path::from("foo.bar");
 
         let expected_hash = crate::holochain_types::entry::EntryHashed::from_content_sync(
             Entry::app((&expected_path).try_into().unwrap()).unwrap(),

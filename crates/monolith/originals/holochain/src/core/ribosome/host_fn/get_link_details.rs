@@ -53,7 +53,7 @@ pub mod slow_tests {
     use crate::holochain_wasm_test_utils::TestWasm;
     use crate::holochain_zome_types::element::SignedHeaderHashed;
     use crate::holochain_zome_types::Header;
-    use test_wasm_common::*;
+    use crate::holochain_test_wasm_common::*;
 
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_entry_hash_path_children_details() {

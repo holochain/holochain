@@ -1,6 +1,6 @@
 use crate::hdk3::prelude::*;
-use test_wasm_common::TestBool;
-use test_wasm_common::TestString;
+use crate::holochain_test_wasm_common::TestBool;
+use crate::holochain_test_wasm_common::TestString;
 
 entry_defs![Path::entry_def()];
 
@@ -21,7 +21,7 @@ fn ensure(path_string: TestString) -> ExternResult<()> {
 
 #[hdk_extern]
 fn delete_link(delete_link: DeleteLinkInput) -> ExternResult<HeaderHash> {
-    Ok(hdk3::prelude::delete_link(delete_link.into_inner())?)
+    Ok(crate::hdk3::prelude::delete_link(delete_link.into_inner())?)
 }
 
 #[hdk_extern]

@@ -58,7 +58,7 @@ kitsune_p2p = { version = "0.0.1", path = "../kitsune_p2p/kitsune_p2p" }
 
 # hdk3 = { path = "../hdk", optional = false }
 matches = {version = "0.1.8", optional = false }
-# test_wasm_common = { version = "0.0.1", path = "originals/test_utils/wasm_common", optional = false  }
+# crate::holochain_test_wasm_common = { version = "0.0.1", path = "originals/test_utils/wasm_common", optional = false  }
 unwrap_to = { version = "0.1.0", optional = false }
 
 lair_keystore_api = "=0.0.1-alpha.8"
@@ -75,7 +75,7 @@ regex = "1.1.2"
 serde_bytes = "0.11"
 rmp-serde = "0.14"
 flate2 = "1.0.14"
-
+serde_derive = "1.0.104"
 net2 = "0.2"
 tokio-tungstenite = { version = "0.10.1", features = [ "tls" ] }
 tungstenite = "0.10"
@@ -103,7 +103,7 @@ once_cell = "1.4.1"
 # Dependencies for test_utils: keep in sync with above
 # hdk3 = { path = "../hdk", optional = false }
 matches = {version = "0.1.8", optional = false }
-# test_wasm_common = { version = "0.0.1", path = "originals/test_utils/wasm_common", optional = false  }
+# crate::holochain_test_wasm_common = { version = "0.0.1", path = "originals/test_utils/wasm_common", optional = false  }
 unwrap_to = { version = "0.1.0", optional = false }
 
 
@@ -134,7 +134,7 @@ fixturators = []
 #   "hdk3",
 #   "holochain_types/test_utils",
 #   "matches",
-#   "test_wasm_common",
+#   "crate::holochain_test_wasm_common",
 #   "unwrap_to"
 # ]
 

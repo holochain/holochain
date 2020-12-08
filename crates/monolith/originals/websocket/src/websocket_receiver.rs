@@ -1,5 +1,6 @@
 //! defines the read/recv half of a websocket pair
 
+use crate::*;
 use crate::holochain_websocket::*;
 
 /// When a websocket is closed gracefully from the remote end,

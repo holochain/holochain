@@ -49,7 +49,7 @@ pub mod slow_tests {
     use ::fixt::prelude::*;
     use crate::hdk3::prelude::*;
     use crate::holochain_wasm_test_utils::TestWasm;
-    use test_wasm_common::*;
+    use crate::holochain_test_wasm_common::*;
 
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_entry_hash_path_children() {

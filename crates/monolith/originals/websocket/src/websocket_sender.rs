@@ -1,5 +1,6 @@
 //! defines the write/send half of a websocket pair
 
+use crate::*;
 use crate::holochain_websocket::*;
 use task_dispatch_incoming::ToDispatchIncoming;
 use task_dispatch_incoming::ToDispatchIncomingSender;

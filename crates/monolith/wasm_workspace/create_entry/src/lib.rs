@@ -38,12 +38,12 @@ fn priv_msg() -> PrivMsg {
 
 #[hdk_extern]
 fn create_entry(_: ()) -> ExternResult<HeaderHash> {
-    Ok(hdk3::prelude::create_entry(&post())?)
+    Ok(crate::hdk3::prelude::create_entry(&post())?)
 }
 
 #[hdk_extern]
 fn create_post(post: Post) -> ExternResult<HeaderHash> {
-    Ok(hdk3::prelude::create_entry(&post)?)
+    Ok(crate::hdk3::prelude::create_entry(&post)?)
 }
 
 #[hdk_extern]
@@ -53,12 +53,12 @@ fn get_entry(_: ()) -> ExternResult<GetOutput> {
 
 #[hdk_extern]
 fn create_msg(_: ()) -> ExternResult<HeaderHash> {
-    Ok(hdk3::prelude::create_entry(&msg())?)
+    Ok(crate::hdk3::prelude::create_entry(&msg())?)
 }
 
 #[hdk_extern]
 fn create_priv_msg(_: ()) -> ExternResult<HeaderHash> {
-    Ok(hdk3::prelude::create_entry(&priv_msg())?)
+    Ok(crate::hdk3::prelude::create_entry(&priv_msg())?)
 }
 
 #[hdk_extern]
@@ -76,7 +76,7 @@ fn validate_create_entry_post(
 }
 
 #[hdk_extern]
-fn get_activity(input: test_wasm_common::AgentActivitySearch) -> ExternResult<AgentActivity> {
+fn get_activity(input: crate::holochain_test_wasm_common::AgentActivitySearch) -> ExternResult<AgentActivity> {
     Ok(get_agent_activity(input.agent, input.query, input.request)?)
 }
 
@@ -101,7 +101,7 @@ fn init(_: ()) -> ExternResult<InitCallbackResult> {
 #[hdk_extern]
 fn call_create_entry(_: ()) -> ExternResult<HeaderHash> {
     // Create an entry directly via. the hdk.
-    hdk3::prelude::create_entry(&post())?;
+    crate::hdk3::prelude::create_entry(&post())?;
     // Create an entry via a `call`.
     Ok(call(
         None,

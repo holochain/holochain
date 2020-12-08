@@ -149,8 +149,8 @@ pub mod wasm_test {
     use crate::holochain_zome_types::ExternInput;
     use crate::holochain_zome_types::GetOutput;
     use std::sync::Arc;
-    use test_wasm_common::TestBytes;
-    use test_wasm_common::TestInt;
+    use crate::holochain_test_wasm_common::TestBytes;
+    use crate::holochain_test_wasm_common::TestInt;
 
     #[tokio::test(threaded_scheduler)]
     /// we cannot commit before genesis

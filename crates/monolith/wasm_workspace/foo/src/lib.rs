@@ -1,5 +1,5 @@
 use crate::hdk3::prelude::*;
-use test_wasm_common::TestString;
+use crate::holochain_test_wasm_common::TestString;
 
 #[hdk_extern]
 fn init(_: ()) -> ExternResult<InitCallbackResult> {

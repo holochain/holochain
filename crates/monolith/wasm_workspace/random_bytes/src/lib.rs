@@ -4,7 +4,7 @@ use crate::hdk3::prelude::*;
 fn random_bytes(bytes: RandomBytesInput) -> ExternResult<RandomBytesOutput> {
     Ok(
         RandomBytesOutput::new(Bytes::from(
-            hdk3::prelude::random_bytes(
+            crate::hdk3::prelude::random_bytes(
                 bytes.into_inner()
             )?
         ))

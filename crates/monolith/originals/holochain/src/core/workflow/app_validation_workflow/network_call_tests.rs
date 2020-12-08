@@ -20,7 +20,7 @@ use crate::holochain_zome_types::validate::ValidationStatus;
 use crate::holochain_zome_types::ZomeCallResponse;
 use matches::assert_matches;
 use std::convert::TryInto;
-use test_wasm_common::AgentActivitySearch;
+use crate::holochain_test_wasm_common::AgentActivitySearch;
 
 use crate::holochain::conductor::ConductorHandle;
 use crate::holochain::core::state::cascade::Cascade;

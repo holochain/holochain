@@ -1141,7 +1141,7 @@ dependencies = [
  "structopt",
  "strum",
  "tempdir",
- "test_wasm_common",
+ "crate::holochain_test_wasm_common",
  "thiserror",
  "tokio",
  "tokio_safe_block_on",
@@ -3319,7 +3319,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "test_wasm_common"
+name = "crate::holochain_test_wasm_common"
 version = "0.0.1"
 dependencies = [
  "hdk3",

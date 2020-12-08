@@ -77,7 +77,7 @@ fn conductors_call_remote(num_conductors: usize) {
         }
         shutdown(handles).await;
     };
-    crate::conductor::tokio_runtime().block_on(f);
+    crate::holochain::conductor::tokio_runtime().block_on(f);
 }
 
 async fn init_all(handles: &[TestHandle]) {

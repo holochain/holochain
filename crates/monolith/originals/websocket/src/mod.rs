@@ -19,6 +19,7 @@
 //! ```
 //! # async fn doc_test() {
 //! #
+//! use crate::*;
 //! use crate::holochain_websocket::*;
 //!
 //! use url2::prelude::*;
@@ -27,7 +28,7 @@
 //!
 //! #[derive(serde::Serialize, serde::Deserialize, Debug)]
 //! struct TestMessage(pub String);
-//! try_from_serialized_bytes!(TestMessage);
+//! crate::try_from_serialized_bytes!(TestMessage);
 //!
 //! let mut server = websocket_bind(
 //!     url2!("ws://127.0.0.1:0"),
@@ -133,7 +134,7 @@ mod tests {
 
     #[derive(serde::Serialize, serde::Deserialize, Debug)]
     struct TestMessage(pub String);
-    try_from_serialized_bytes!(TestMessage);
+    crate::try_from_serialized_bytes!(TestMessage);
 
     #[tokio::test]
     async fn sanity_test() {

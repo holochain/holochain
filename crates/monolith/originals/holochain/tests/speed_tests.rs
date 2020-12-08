@@ -45,8 +45,8 @@ use crate::holochain_zome_types::ExternInput;
 use matches::assert_matches;
 use test_case::test_case;
 use test_utils::*;
-use test_wasm_common::AnchorInput;
-use test_wasm_common::TestString;
+use crate::holochain_test_wasm_common::AnchorInput;
+use crate::holochain_test_wasm_common::TestString;
 use tracing::instrument;
 
 mod test_utils;

@@ -128,7 +128,7 @@ let foo_header_hash = create_entry(foo.clone())?;
 // Create the Entry from bar.
 let entry = Entry::App(bar.clone().try_into()?);
 // Call the update_entry host_fn directly
-let _bar_header_hash = hdk3::host_fn!(
+let _bar_header_hash = crate::hdk3::host_fn!(
     __update,
     UpdateInput::new((bar.clone().into(), entry, foo_header_hash)),
     UpdateOutput
