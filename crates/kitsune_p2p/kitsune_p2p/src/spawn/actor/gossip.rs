@@ -5,7 +5,10 @@ use crate::{
     types::{actor::KitsuneP2pResult, gossip::*},
     *,
 };
-use ghost_actor::dependencies::{tracing, tracing_futures};
+use ghost_actor::{
+    dependencies::{tracing, tracing_futures},
+    GhostError,
+};
 use kitsune_p2p_types::dht_arc::DhtArc;
 use std::{collections::HashSet, iter::FromIterator, sync::Arc};
 
@@ -51,14 +54,25 @@ async fn gossip_loop(
 ) -> KitsuneP2pResult<()> {
     let mut gossip_data = GossipData::new(evt_send);
     loop {
-        gossip_data
-            .take_action()
-            .await
-            .map_err(|e| {
+        match gossip_data.take_action().await {
+            Err(KitsuneP2pError::GhostError(GhostError::Disconnected)) => {
+                tracing::warn!("Ghost actor is shutting down so gossip loop is exiting");
+                return Ok(());
+            }
+            Err(KitsuneP2pError::Other(e)) => {
+                // TODO: These errors are extremely frequent but could
+                // just be from shutdown although I can't tell due
+                // to the many layers of dynamic nesting. We should
+                // figure this out at some point.
+                tracing::warn!(msg = "gossip loop is exiting due to", ?e);
+                return Ok(());
+            }
+            Err(e) => {
                 tracing::error!(msg = "gossip loop failed", ?e);
-                e
-            })
-            .expect("Gossip loop has failed");
+                panic!(format!("Gossip loop has failed due to {:?}", e))
+            }
+            Ok(_) => (),
+        }
 
         tokio::time::delay_for(std::time::Duration::from_millis(10)).await;
     }
