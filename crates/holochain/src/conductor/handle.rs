@@ -477,6 +477,9 @@ impl<DS: DnaStore + 'static> ConductorHandleT for ConductorHandleImpl<DS> {
             .await
             .deactivate_app_in_db(installed_app_id)
             .await?;
+        // MD: I'm not sure about this. We never add the cells back in after re-activating an app,
+        //     so it seems either we shouldn't remove them here, or we should be sure to add them
+        //     back in when re-activating.
         self.conductor
             .write()
             .await

@@ -1,4 +1,5 @@
 //! A wrapper around ConductorHandle with more convenient methods for testing
+// TODO [ B-03669 ] move to own crate
 
 use super::test_cell::TestCell;
 use crate::{
@@ -25,7 +26,7 @@ impl TestConductorHandle {
     /// - CellNick: {dna_hash}
     ///
     /// Returns the list of generated InstalledAppIds, in the same order as Agents passed in.
-    pub async fn setup_app_for_all_agents_with_no_membrane_proof(
+    pub async fn setup_app_for_agents_with_no_membrane_proof(
         &self,
         app_id_prefix: &str,
         agents: &[AgentPubKey],
@@ -106,6 +107,17 @@ macro_rules! destructure_test_cells {
             })
             .collect_tuple()
             .expect("Can't destructure more than 4 Agents")
+    }};
+}
+#[macro_export]
+macro_rules! destructure_test_cell_vec {
+    ($vec:expr) => {{
+        use itertools::Itertools;
+        let vec: Vec<$crate::test_utils::test_conductor::SetupOutput> = $vec;
+        vec.into_iter()
+            .map(|blob| destructure_test_cells!(blob))
+            .collect_tuple()
+            .expect("Can't destructure more than 4 Conductors")
     }};
 }
 

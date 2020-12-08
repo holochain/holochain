@@ -91,6 +91,7 @@ pub mod wasm_test {
         assert_eq!(entry_secret, secret,);
     }
 
+    // TODO: [ B-03669 ] can move this to an integration test (may need to switch to using a RealDnaStore)
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_authorized_call() {
         let (dna_file, _) = DnaFile::unique_from_test_wasms(vec![TestWasm::Capability])
@@ -117,7 +118,7 @@ pub mod wasm_test {
             .into();
 
         let setup_data = handle
-            .setup_app_for_all_agents_with_no_membrane_proof(
+            .setup_app_for_agents_with_no_membrane_proof(
                 "app-",
                 &[alice_agent_id.clone(), bob_agent_id.clone()],
                 &[dna_file],

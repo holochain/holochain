@@ -11,21 +11,8 @@ use holochain_zome_types::element::ElementEntry;
 struct AppString(String);
 
 fn simple_crud_zome() -> InlineZome {
-    let string_entry_def = EntryDef::new(
-        "string".into(),
-        Default::default(),
-        Default::default(),
-        Default::default(),
-        Default::default(),
-    );
-
-    let unit_entry_def = EntryDef::new(
-        "unit".into(),
-        Default::default(),
-        Default::default(),
-        Default::default(),
-        Default::default(),
-    );
+    let string_entry_def = EntryDef::default_with_id("string");
+    let unit_entry_def = EntryDef::default_with_id("unit");
 
     InlineZome::new_unique(vec![string_entry_def.clone(), unit_entry_def.clone()])
         .callback("create_string", move |api, s: String| {
@@ -62,7 +49,7 @@ async fn inline_zome_2_agents_1_dna() -> anyhow::Result<()> {
 
     // Install DNA and install and activate apps in conductor
     let ids = conductor
-        .setup_app_for_all_agents_with_no_membrane_proof(
+        .setup_app_for_agents_with_no_membrane_proof(
             "app",
             &[alice.clone(), bobbo.clone()],
             &[dna_file],
@@ -105,7 +92,7 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
     let agents = TestAgents::get(envs.keystore(), 3).await;
 
     let ids = conductor
-        .setup_app_for_all_agents_with_no_membrane_proof("app", &agents, &[dna_foo, dna_bar])
+        .setup_app_for_agents_with_no_membrane_proof("app", &agents, &[dna_foo, dna_bar])
         .await;
 
     let ((alice_foo, alice_bar), (bobbo_foo, bobbo_bar), (_carol_foo, carol_bar)) =

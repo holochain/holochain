@@ -193,6 +193,20 @@ pub fn get_single_agent_info(
     fresh_reader!(env, |r| { p2p_store.get_agent_info(&r, space, agent) })
 }
 
+/// Interconnect every provided pair of conductors via their peer store lmdb environments
+#[cfg(any(test, feature = "test_utils"))]
+pub fn exchange_peer_info(envs: Vec<EnvironmentWrite>) {
+    for (i, a) in envs.iter().enumerate() {
+        for (j, b) in envs.iter().enumerate() {
+            if i == j {
+                continue;
+            }
+            inject_agent_infos(a.clone(), all_agent_infos(b.clone().into()).unwrap()).unwrap();
+            inject_agent_infos(b.clone(), all_agent_infos(a.clone().into()).unwrap()).unwrap();
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

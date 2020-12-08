@@ -5,11 +5,13 @@
 mod test_agents;
 mod test_cell;
 mod test_handle;
+mod test_set;
 mod test_zome;
 
 pub use test_agents::*;
 pub use test_cell::*;
 pub use test_handle::*;
+pub use test_set::*;
 pub use test_zome::*;
 
 use hdk3::prelude::Element;
