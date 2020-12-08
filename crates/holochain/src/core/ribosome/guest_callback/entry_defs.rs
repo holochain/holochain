@@ -1,12 +1,14 @@
-use crate::core::ribosome::{FnComponents, HostAccess, Invocation, ZomesToInvoke};
+use crate::core::ribosome::FnComponents;
+use crate::core::ribosome::HostAccess;
+use crate::core::ribosome::Invocation;
+use crate::core::ribosome::ZomesToInvoke;
 use derive_more::Constructor;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::dna::zome::HostFnAccess;
-use holochain_zome_types::{
-    entry_def::{EntryDefs, EntryDefsCallbackResult},
-    zome::ZomeName,
-    ExternInput,
-};
+use holochain_zome_types::entry_def::EntryDefs;
+use holochain_zome_types::entry_def::EntryDefsCallbackResult;
+use holochain_zome_types::zome::ZomeName;
+use holochain_zome_types::ExternInput;
 use std::collections::BTreeMap;
 
 #[derive(Debug, Clone)]
@@ -91,15 +93,18 @@ impl From<Vec<(ZomeName, EntryDefsCallbackResult)>> for EntryDefsResult {
 
 #[cfg(test)]
 mod test {
-    use super::{EntryDefsHostAccess, EntryDefsResult};
-    use crate::{
-        core::ribosome::{Invocation, ZomesToInvoke},
-        fixt::{EntryDefsFixturator, EntryDefsInvocationFixturator, ZomeNameFixturator},
-    };
+    use super::EntryDefsHostAccess;
+    use super::EntryDefsResult;
+    use crate::core::ribosome::Invocation;
+    use crate::core::ribosome::ZomesToInvoke;
+    use crate::fixt::EntryDefsFixturator;
+    use crate::fixt::EntryDefsInvocationFixturator;
+    use crate::fixt::ZomeNameFixturator;
     use ::fixt::prelude::*;
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::dna::zome::HostFnAccess;
-    use holochain_zome_types::{entry_def::EntryDefsCallbackResult, ExternInput};
+    use holochain_zome_types::entry_def::EntryDefsCallbackResult;
+    use holochain_zome_types::ExternInput;
     use std::collections::BTreeMap;
 
     #[test]
@@ -221,20 +226,18 @@ mod test {
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
-    use crate::{
-        core::ribosome::{
-            guest_callback::entry_defs::{EntryDefsHostAccess, EntryDefsResult},
-            RibosomeT,
-        },
-        fixt::{curve::Zomes, EntryDefsInvocationFixturator, RealRibosomeFixturator},
-    };
+    use crate::core::ribosome::guest_callback::entry_defs::EntryDefsHostAccess;
+    use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
+    use crate::core::ribosome::RibosomeT;
+    use crate::fixt::curve::Zomes;
+    use crate::fixt::EntryDefsInvocationFixturator;
+    use crate::fixt::RealRibosomeFixturator;
     use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::crdt::CrdtType;
+    use holochain_zome_types::entry_def::EntryDef;
+    use holochain_zome_types::entry_def::EntryDefs;
     pub use holochain_zome_types::entry_def::EntryVisibility;
-    use holochain_zome_types::{
-        crdt::CrdtType,
-        entry_def::{EntryDef, EntryDefs},
-        zome::ZomeName,
-    };
+    use holochain_zome_types::zome::ZomeName;
     use std::collections::BTreeMap;
 
     #[tokio::test(threaded_scheduler)]

@@ -1,8 +1,7 @@
 use holo_hash::AgentPubKey;
-use holochain_zome_types::{
-    prelude::CellId,
-    zome::{FunctionName, ZomeName},
-};
+use holochain_zome_types::prelude::CellId;
+use holochain_zome_types::zome::FunctionName;
+use holochain_zome_types::zome::ZomeName;
 use thiserror::Error;
 
 #[derive(Debug, Clone, Error)]

@@ -1,14 +1,16 @@
 //! This is a temporary quick-hack gossip module for use with the
 //! in-memory / full-sync / non-sharded networking module
 
-use crate::{
-    agent_store::AgentInfoSigned,
-    types::{actor::KitsuneP2pResult, gossip::*},
-    *,
-};
-use ghost_actor::dependencies::{tracing, tracing_futures};
+use crate::agent_store::AgentInfoSigned;
+use crate::types::actor::KitsuneP2pResult;
+use crate::types::gossip::*;
+use crate::*;
+use ghost_actor::dependencies::tracing;
+use ghost_actor::dependencies::tracing_futures;
 use kitsune_p2p_types::dht_arc::DhtArc;
-use std::{collections::HashSet, iter::FromIterator, sync::Arc};
+use std::collections::HashSet;
+use std::iter::FromIterator;
+use std::sync::Arc;
 
 ghost_actor::ghost_chan! {
     /// "Event" requests emitted by the gossip module

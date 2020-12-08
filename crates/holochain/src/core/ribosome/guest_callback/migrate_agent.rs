@@ -1,18 +1,17 @@
-use crate::core::{
-    ribosome::{FnComponents, HostAccess, Invocation, ZomesToInvoke},
-    workflow::CallZomeWorkspaceLock,
-};
+use crate::core::ribosome::FnComponents;
+use crate::core::ribosome::HostAccess;
+use crate::core::ribosome::Invocation;
+use crate::core::ribosome::ZomesToInvoke;
+use crate::core::workflow::CallZomeWorkspaceLock;
 use derive_more::Constructor;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::dna::{
-    zome::{HostFnAccess, Permission},
-    DnaDef,
-};
-use holochain_zome_types::{
-    migrate_agent::{MigrateAgent, MigrateAgentCallbackResult},
-    zome::ZomeName,
-    ExternInput,
-};
+use holochain_types::dna::zome::HostFnAccess;
+use holochain_types::dna::zome::Permission;
+use holochain_types::dna::DnaDef;
+use holochain_zome_types::migrate_agent::MigrateAgent;
+use holochain_zome_types::migrate_agent::MigrateAgentCallbackResult;
+use holochain_zome_types::zome::ZomeName;
+use holochain_zome_types::ExternInput;
 
 #[derive(Clone)]
 pub struct MigrateAgentInvocation {
@@ -111,19 +110,17 @@ impl From<Vec<(ZomeName, MigrateAgentCallbackResult)>> for MigrateAgentResult {
 #[cfg(test)]
 mod test {
     use super::MigrateAgentResult;
-    use crate::{
-        core::ribosome::{Invocation, ZomesToInvoke},
-        fixt::{
-            MigrateAgentFixturator, MigrateAgentHostAccessFixturator,
-            MigrateAgentInvocationFixturator, ZomeNameFixturator,
-        },
-    };
+    use crate::core::ribosome::Invocation;
+    use crate::core::ribosome::ZomesToInvoke;
+    use crate::fixt::MigrateAgentFixturator;
+    use crate::fixt::MigrateAgentHostAccessFixturator;
+    use crate::fixt::MigrateAgentInvocationFixturator;
+    use crate::fixt::ZomeNameFixturator;
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::dna::zome::HostFnAccess;
-    use holochain_zome_types::{
-        migrate_agent::{MigrateAgent, MigrateAgentCallbackResult},
-        ExternInput,
-    };
+    use holochain_zome_types::migrate_agent::MigrateAgent;
+    use holochain_zome_types::migrate_agent::MigrateAgentCallbackResult;
+    use holochain_zome_types::ExternInput;
     use rand::prelude::*;
 
     #[test]
@@ -239,13 +236,11 @@ mod test {
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
     use super::MigrateAgentResult;
-    use crate::{
-        core::ribosome::RibosomeT,
-        fixt::{
-            curve::Zomes, MigrateAgentHostAccessFixturator, MigrateAgentInvocationFixturator,
-            RealRibosomeFixturator,
-        },
-    };
+    use crate::core::ribosome::RibosomeT;
+    use crate::fixt::curve::Zomes;
+    use crate::fixt::MigrateAgentHostAccessFixturator;
+    use crate::fixt::MigrateAgentInvocationFixturator;
+    use crate::fixt::RealRibosomeFixturator;
     use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(threaded_scheduler)]

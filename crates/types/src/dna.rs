@@ -13,16 +13,18 @@ pub use holo_hash::*;
 use holochain_zome_types::zome::ZomeName;
 use std::collections::BTreeMap;
 
-use self::{
-    error::DnaResult,
-    zome::{inline_zome::InlineZome, Zome, ZomeDef},
-};
+use self::error::DnaResult;
+use self::zome::inline_zome::InlineZome;
+use self::zome::Zome;
+use self::zome::ZomeDef;
 
 /// Zomes need to be an ordered map from ZomeName to a Zome
 pub type Zomes = Vec<(ZomeName, zome::ZomeDef)>;
 
 /// A type to allow json values to be used as [SerializedBytes]
-#[derive(Debug, Clone, derive_more::From, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(
+    Debug, Clone, derive_more::From, serde::Serialize, serde::Deserialize, SerializedBytes,
+)]
 pub struct JsonProperties(serde_json::Value);
 
 impl JsonProperties {

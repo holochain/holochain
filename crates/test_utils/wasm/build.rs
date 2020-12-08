@@ -1,4 +1,5 @@
-use std::{io::Write, process::Stdio};
+use std::io::Write;
+use std::process::Stdio;
 
 fn main() {
     let should_build = std::env::var_os("CARGO_FEATURE_BUILD").is_some();

@@ -1,27 +1,30 @@
 //! # Entry Defs Store
 //! Stores all the entry definitions across zomes
-use crate::core::ribosome::{
-    guest_callback::entry_defs::{EntryDefsHostAccess, EntryDefsInvocation, EntryDefsResult},
-    real_ribosome::RealRibosome,
-    RibosomeT,
-};
+use crate::core::ribosome::guest_callback::entry_defs::EntryDefsHostAccess;
+use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
+use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
+use crate::core::ribosome::real_ribosome::RealRibosome;
+use crate::core::ribosome::RibosomeT;
 
 use super::api::CellConductorApiT;
-use error::{EntryDefStoreError, EntryDefStoreResult};
+use error::EntryDefStoreError;
+use error::EntryDefStoreResult;
 use fallible_iterator::FallibleIterator;
 use holo_hash::*;
-use holochain_serialized_bytes::{prelude::*, SerializedBytes};
-use holochain_state::{
-    buffer::KvBufFresh,
-    error::{DatabaseError, DatabaseResult},
-    prelude::*,
-};
-use holochain_types::dna::{zome::ZomeDef, DnaDefHashed, DnaFile};
-use holochain_zome_types::{
-    entry_def::EntryDef,
-    header::{EntryDefIndex, ZomeId},
-};
-use std::{collections::HashMap, convert::TryInto};
+use holochain_serialized_bytes::prelude::*;
+use holochain_serialized_bytes::SerializedBytes;
+use holochain_state::buffer::KvBufFresh;
+use holochain_state::error::DatabaseError;
+use holochain_state::error::DatabaseResult;
+use holochain_state::prelude::*;
+use holochain_types::dna::zome::ZomeDef;
+use holochain_types::dna::DnaDefHashed;
+use holochain_types::dna::DnaFile;
+use holochain_zome_types::entry_def::EntryDef;
+use holochain_zome_types::header::EntryDefIndex;
+use holochain_zome_types::header::ZomeId;
+use std::collections::HashMap;
+use std::convert::TryInto;
 
 pub mod error;
 
@@ -225,15 +228,13 @@ mod tests {
     use crate::conductor::Conductor;
     use holo_hash::HasHash;
     use holochain_state::test_utils::test_environments;
-    use holochain_types::{
-        dna::{wasm::DnaWasmHashed, zome::ZomeDef},
-        test_utils::fake_dna_zomes,
-    };
+    use holochain_types::dna::wasm::DnaWasmHashed;
+    use holochain_types::dna::zome::ZomeDef;
+    use holochain_types::test_utils::fake_dna_zomes;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::{
-        crdt::CrdtType,
-        entry_def::{EntryDef, EntryVisibility},
-    };
+    use holochain_zome_types::crdt::CrdtType;
+    use holochain_zome_types::entry_def::EntryDef;
+    use holochain_zome_types::entry_def::EntryVisibility;
 
     #[tokio::test(threaded_scheduler)]
     async fn test_store_entry_defs() {

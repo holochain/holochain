@@ -4,13 +4,17 @@ use fallible_iterator::FallibleIterator;
 use holo_hash::*;
 use holochain_p2p::dht_arc::DhtArc;
 use holochain_serialized_bytes::prelude::*;
-use holochain_state::{
-    buffer::KvBufFresh,
-    db::INTEGRATED_DHT_OPS,
-    error::{DatabaseError, DatabaseResult},
-    prelude::{BufferedStore, EnvironmentRead, GetDb, Readable},
-};
-use holochain_types::{dht_op::DhtOpLight, validate::ValidationStatus, Timestamp};
+use holochain_state::buffer::KvBufFresh;
+use holochain_state::db::INTEGRATED_DHT_OPS;
+use holochain_state::error::DatabaseError;
+use holochain_state::error::DatabaseResult;
+use holochain_state::prelude::BufferedStore;
+use holochain_state::prelude::EnvironmentRead;
+use holochain_state::prelude::GetDb;
+use holochain_state::prelude::Readable;
+use holochain_types::dht_op::DhtOpLight;
+use holochain_types::validate::ValidationStatus;
+use holochain_types::Timestamp;
 
 /// Database type for AuthoredDhtOps
 /// Buffer for accessing [DhtOp]s that you authored and finding the amount of validation receipts
@@ -133,22 +137,28 @@ impl IntegratedDhtOpsBuf {
             self.store
                 .iter(r)?
                 .map(move |(k, v)| Ok((DhtOpHash::from_raw_39_panicky(k.to_vec()), v)))
-                .filter_map(move |(k, v)| match from {
-                    Some(time) if v.when_integrated >= time => Ok(Some((k, v))),
-                    None => Ok(Some((k, v))),
-                    _ => Ok(None),
-                })
-                .filter_map(move |(k, v)| match to {
-                    Some(time) if v.when_integrated < time => Ok(Some((k, v))),
-                    None => Ok(Some((k, v))),
-                    _ => Ok(None),
-                })
-                .filter_map(move |(k, v)| match dht_arc {
-                    Some(dht_arc) if dht_arc.contains(v.op.dht_basis().get_loc()) => {
-                        Ok(Some((k, v)))
+                .filter_map(move |(k, v)| {
+                    match from {
+                        Some(time) if v.when_integrated >= time => Ok(Some((k, v))),
+                        None => Ok(Some((k, v))),
+                        _ => Ok(None),
                     }
-                    None => Ok(Some((k, v))),
-                    _ => Ok(None),
+                })
+                .filter_map(move |(k, v)| {
+                    match to {
+                        Some(time) if v.when_integrated < time => Ok(Some((k, v))),
+                        None => Ok(Some((k, v))),
+                        _ => Ok(None),
+                    }
+                })
+                .filter_map(move |(k, v)| {
+                    match dht_arc {
+                        Some(dht_arc) if dht_arc.contains(v.op.dht_basis().get_loc()) => {
+                            Ok(Some((k, v)))
+                        }
+                        None => Ok(Some((k, v))),
+                        _ => Ok(None),
+                    }
                 }),
         ))
     }
@@ -158,13 +168,14 @@ mod tests {
     use super::*;
     use crate::fixt::AnyDhtHashFixturator;
     use ::fixt::prelude::*;
-    use chrono::{Duration, Utc};
-    use holo_hash::fixt::{DhtOpHashFixturator, HeaderHashFixturator};
-    use holochain_state::{
-        buffer::BufferedStore,
-        env::{ReadManager, WriteManager},
-        test_utils::test_cell_env,
-    };
+    use chrono::Duration;
+    use chrono::Utc;
+    use holo_hash::fixt::DhtOpHashFixturator;
+    use holo_hash::fixt::HeaderHashFixturator;
+    use holochain_state::buffer::BufferedStore;
+    use holochain_state::env::ReadManager;
+    use holochain_state::env::WriteManager;
+    use holochain_state::test_utils::test_cell_env;
     use pretty_assertions::assert_eq;
 
     #[tokio::test(threaded_scheduler)]

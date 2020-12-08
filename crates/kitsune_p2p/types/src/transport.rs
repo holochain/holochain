@@ -1,6 +1,8 @@
 //! A collection of definitions related to remote communication.
 
-use futures::{future::FutureExt, sink::SinkExt, stream::StreamExt};
+use futures::future::FutureExt;
+use futures::sink::SinkExt;
+use futures::stream::StreamExt;
 
 /// Error related to remote communication.
 #[derive(Debug, thiserror::Error)]

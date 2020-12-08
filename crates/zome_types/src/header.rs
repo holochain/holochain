@@ -1,8 +1,15 @@
-use crate::{entry_def::EntryVisibility, link::LinkTag, timestamp::Timestamp};
-pub use builder::{HeaderBuilder, HeaderBuilderCommon};
-use holo_hash::{
-    impl_hashable_content, AgentPubKey, DnaHash, EntryHash, HashableContent, HeaderHash, HoloHashed,
-};
+use crate::entry_def::EntryVisibility;
+use crate::link::LinkTag;
+use crate::timestamp::Timestamp;
+pub use builder::HeaderBuilder;
+pub use builder::HeaderBuilderCommon;
+use holo_hash::impl_hashable_content;
+use holo_hash::AgentPubKey;
+use holo_hash::DnaHash;
+use holo_hash::EntryHash;
+use holo_hash::HashableContent;
+use holo_hash::HeaderHash;
+use holo_hash::HoloHashed;
 use holochain_serialized_bytes::prelude::*;
 
 pub mod builder;

@@ -1,7 +1,8 @@
 #![deny(missing_docs)]
 
 use crate::conductor::interface::InterfaceDriver;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+use serde::Serialize;
 
 /// Information neeeded to spawn an Admin interface
 #[derive(Clone, Deserialize, Serialize, Debug)]

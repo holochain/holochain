@@ -1,36 +1,41 @@
 use fallible_iterator::FallibleIterator;
-use hdk3::prelude::{Element, EntryType, ValidationPackage};
+use hdk3::prelude::Element;
+use hdk3::prelude::EntryType;
+use hdk3::prelude::ValidationPackage;
 use holo_hash::HeaderHash;
-use holochain_p2p::{actor::GetActivityOptions, HolochainP2pCellT};
-use holochain_state::{env::EnvironmentRead, fresh_reader_test};
-use holochain_types::{
-    activity::{AgentActivity, ChainItems},
-    HeaderHashed,
-};
+use holochain_p2p::actor::GetActivityOptions;
+use holochain_p2p::HolochainP2pCellT;
+use holochain_state::env::EnvironmentRead;
+use holochain_state::fresh_reader_test;
+use holochain_types::activity::AgentActivity;
+use holochain_types::activity::ChainItems;
+use holochain_types::HeaderHashed;
 use holochain_wasm_test_utils::TestWasm;
-use holochain_zome_types::{
-    query::{ActivityRequest, ChainHead, ChainQueryFilter, ChainStatus, HighestObserved},
-    validate::ValidationStatus,
-    ZomeCallResponse,
-};
+use holochain_zome_types::query::ActivityRequest;
+use holochain_zome_types::query::ChainHead;
+use holochain_zome_types::query::ChainQueryFilter;
+use holochain_zome_types::query::ChainStatus;
+use holochain_zome_types::query::HighestObserved;
+use holochain_zome_types::validate::ValidationStatus;
+use holochain_zome_types::ZomeCallResponse;
 use matches::assert_matches;
 use std::convert::TryInto;
 use test_wasm_common::AgentActivitySearch;
 
-use crate::{
-    conductor::ConductorHandle,
-    core::state::{
-        cascade::{Cascade, DbPair, DbPairMut},
-        element_buf::ElementBuf,
-        metadata::{ChainItemKey, MetadataBuf, MetadataBufT},
-        source_chain::SourceChain,
-    },
-    test_utils::{
-        conductor_setup::{CellHostFnCaller, ConductorTestData},
-        host_fn_api::Post,
-        new_zome_call, wait_for_integration,
-    },
-};
+use crate::conductor::ConductorHandle;
+use crate::core::state::cascade::Cascade;
+use crate::core::state::cascade::DbPair;
+use crate::core::state::cascade::DbPairMut;
+use crate::core::state::element_buf::ElementBuf;
+use crate::core::state::metadata::ChainItemKey;
+use crate::core::state::metadata::MetadataBuf;
+use crate::core::state::metadata::MetadataBufT;
+use crate::core::state::source_chain::SourceChain;
+use crate::test_utils::conductor_setup::CellHostFnCaller;
+use crate::test_utils::conductor_setup::ConductorTestData;
+use crate::test_utils::host_fn_api::Post;
+use crate::test_utils::new_zome_call;
+use crate::test_utils::wait_for_integration;
 
 const NUM_COMMITS: usize = 5;
 const GET_AGENT_ACTIVITY_TIMEOUT_MS: u64 = 1000;
@@ -165,13 +170,11 @@ async fn get_validation_package_test() {
         .iter_back()
         .filter_map(|shh| alice_authored.get_element(shh.header_address()))
         .filter_map(|el| {
-            Ok(el.header().entry_type().cloned().and_then(|et| {
-                if et == entry_type {
-                    Some(el)
-                } else {
-                    None
-                }
-            }))
+            Ok(el
+                .header()
+                .entry_type()
+                .cloned()
+                .and_then(|et| if et == entry_type { Some(el) } else { None }))
         })
         // Skip the actual entry
         .skip(1)

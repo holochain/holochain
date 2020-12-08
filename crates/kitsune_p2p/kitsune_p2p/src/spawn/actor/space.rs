@@ -1,9 +1,11 @@
 use crate::agent_store::AgentInfoSigned;
 
 use super::*;
-use ghost_actor::dependencies::{tracing, tracing_futures::Instrument};
+use ghost_actor::dependencies::tracing;
+use ghost_actor::dependencies::tracing_futures::Instrument;
 use kitsune_p2p_types::codec::Codec;
-use std::{collections::HashSet, convert::TryFrom};
+use std::collections::HashSet;
+use std::convert::TryFrom;
 
 /// if the user specifies None or zero (0) for remote_agent_count
 const DEFAULT_NOTIFY_REMOTE_AGENT_COUNT: u8 = 5;

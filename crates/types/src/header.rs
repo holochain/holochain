@@ -6,22 +6,21 @@
 
 #![allow(missing_docs)]
 
-use crate::{
-    element::{ElementStatus, SignedHeaderHashed, SignedHeaderHashedExt},
-    prelude::*,
-};
+use crate::element::ElementStatus;
+use crate::element::SignedHeaderHashed;
+use crate::element::SignedHeaderHashedExt;
+use crate::prelude::*;
 use conversions::WrongHeaderError;
 use derive_more::From;
 use holo_hash::EntryHash;
+use holochain_zome_types::element::Element;
+use holochain_zome_types::element::SignedHeader;
+use holochain_zome_types::entry_def::EntryVisibility;
 pub use holochain_zome_types::header::HeaderHashed;
-use holochain_zome_types::{
-    element::{Element, SignedHeader},
-    entry_def::EntryVisibility,
-    header::*,
-    signature::Signature,
-    validate::ValidationStatus,
-    Entry,
-};
+use holochain_zome_types::header::*;
+use holochain_zome_types::signature::Signature;
+use holochain_zome_types::validate::ValidationStatus;
+use holochain_zome_types::Entry;
 
 use error::*;
 
@@ -393,10 +392,9 @@ impl<'a> From<&'a NewEntryHeader> for NewEntryHeaderRef<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        fixt::HeaderBuilderCommonFixturator,
-        test_utils::{fake_dna_hash, fake_entry_hash},
-    };
+    use crate::fixt::HeaderBuilderCommonFixturator;
+    use crate::test_utils::fake_dna_hash;
+    use crate::test_utils::fake_entry_hash;
     use ::fixt::prelude::*;
 
     #[test]

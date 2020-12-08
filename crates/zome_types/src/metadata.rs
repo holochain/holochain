@@ -1,9 +1,8 @@
 //! Metadata types for use in wasm
-use crate::{
-    element::{Element, SignedHeaderHashed},
-    validate::ValidationStatus,
-    Entry,
-};
+use crate::element::Element;
+use crate::element::SignedHeaderHashed;
+use crate::validate::ValidationStatus;
+use crate::Entry;
 use holochain_serialized_bytes::prelude::*;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, SerializedBytes)]

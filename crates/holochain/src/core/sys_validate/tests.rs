@@ -1,21 +1,20 @@
 use super::*;
-use crate::{
-    conductor::api::{error::ConductorApiError, MockCellConductorApi},
-    meta_mock,
-};
+use crate::conductor::api::error::ConductorApiError;
+use crate::conductor::api::MockCellConductorApi;
+use crate::meta_mock;
 use ::fixt::prelude::*;
 use error::SysValidationError;
 use holo_hash::fixt::*;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_serialized_bytes::SerializedBytes;
-use holochain_state::{env::EnvironmentRead, test_utils::test_cell_env};
-use holochain_types::{
-    dna::{DnaDef, DnaFile},
-    fixt::*,
-    observability,
-    test_utils::fake_agent_pubkey_1,
-    Timestamp,
-};
+use holochain_state::env::EnvironmentRead;
+use holochain_state::test_utils::test_cell_env;
+use holochain_types::dna::DnaDef;
+use holochain_types::dna::DnaFile;
+use holochain_types::fixt::*;
+use holochain_types::observability;
+use holochain_types::test_utils::fake_agent_pubkey_1;
+use holochain_types::Timestamp;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::Header;
 use matches::assert_matches;
@@ -130,32 +129,26 @@ async fn check_previous_seq() {
     prev_header.header_seq = 2;
     assert_matches!(
         check_prev_seq(&header.clone().into(), &prev_header.clone().into()),
-        Err(
-            SysValidationError::ValidationOutcome(
-                ValidationOutcome::PrevHeaderError(PrevHeaderError::InvalidSeq(_, _)),
-            ),
-        )
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::PrevHeaderError(PrevHeaderError::InvalidSeq(_, _)),
+        ),)
     );
 
     prev_header.header_seq = 3;
     assert_matches!(
         check_prev_seq(&header.clone().into(), &prev_header.clone().into()),
-        Err(
-            SysValidationError::ValidationOutcome(
-                ValidationOutcome::PrevHeaderError(PrevHeaderError::InvalidSeq(_, _)),
-            ),
-        )
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::PrevHeaderError(PrevHeaderError::InvalidSeq(_, _)),
+        ),)
     );
 
     header.header_seq = 0;
     prev_header.header_seq = 0;
     assert_matches!(
         check_prev_seq(&header.clone().into(), &prev_header.clone().into()),
-        Err(
-            SysValidationError::ValidationOutcome(
-                ValidationOutcome::PrevHeaderError(PrevHeaderError::InvalidSeq(_, _)),
-            ),
-        )
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::PrevHeaderError(PrevHeaderError::InvalidSeq(_, _)),
+        ),)
     );
 }
 
@@ -208,7 +201,9 @@ async fn check_entry_hash_test() {
     assert_matches!(check_entry_hash(&eh, &entry).await, Ok(()));
     assert_matches!(
         check_new_entry_header(&fixt!(CreateLink).into()),
-        Err(SysValidationError::ValidationOutcome(ValidationOutcome::NotNewEntry(_)))
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::NotNewEntry(_)
+        ))
     );
 }
 
@@ -248,7 +243,9 @@ async fn check_update_reference_test() {
 
     assert_matches!(
         check_update_reference(&eu, &NewEntryHeaderRef::from(&ec)),
-        Err(SysValidationError::ValidationOutcome(ValidationOutcome::UpdateTypeMismatch(_, _)))
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::UpdateTypeMismatch(_, _)
+        ))
     );
 
     // Different entry type
@@ -256,7 +253,9 @@ async fn check_update_reference_test() {
 
     assert_matches!(
         check_update_reference(&eu, &NewEntryHeaderRef::from(&ec)),
-        Err(SysValidationError::ValidationOutcome(ValidationOutcome::UpdateTypeMismatch(_, _)))
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::UpdateTypeMismatch(_, _)
+        ))
     );
 }
 
@@ -269,7 +268,9 @@ async fn check_link_tag_size_test() {
 
     assert_matches!(
         check_tag_size(&huge),
-        Err(SysValidationError::ValidationOutcome(ValidationOutcome::TagTooLarge(_, _)))
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::TagTooLarge(_, _)
+        ))
     );
 }
 
@@ -323,14 +324,18 @@ async fn check_app_entry_type_test() {
     let aet = AppEntryType::new(0.into(), 1.into(), EntryVisibility::Public);
     assert_matches!(
         check_app_entry_type(&aet, &conductor_api).await,
-        Err(SysValidationError::ValidationOutcome(ValidationOutcome::ZomeId(_)))
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::ZomeId(_)
+        ))
     );
 
     // ## EntryId is out of range
     let aet = AppEntryType::new(10.into(), 0.into(), EntryVisibility::Public);
     assert_matches!(
         check_app_entry_type(&aet, &conductor_api).await,
-        Err(SysValidationError::ValidationOutcome(ValidationOutcome::EntryDefId(_)))
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::EntryDefId(_)
+        ))
     );
 
     // ## EntryId is in range for dna
@@ -339,7 +344,9 @@ async fn check_app_entry_type_test() {
     let aet = AppEntryType::new(0.into(), 0.into(), EntryVisibility::Private);
     assert_matches!(
         check_app_entry_type(&aet, &conductor_api).await,
-        Err(SysValidationError::ValidationOutcome(ValidationOutcome::EntryVisibility(_)))
+        Err(SysValidationError::ValidationOutcome(
+            ValidationOutcome::EntryVisibility(_)
+        ))
     );
 
     // # Add an entry def to the buffer

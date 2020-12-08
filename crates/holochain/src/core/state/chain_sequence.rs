@@ -10,14 +10,17 @@
 use crate::core::state::source_chain::{SourceChainError, SourceChainResult};
 use fallible_iterator::DoubleEndedFallibleIterator;
 use holo_hash::HeaderHash;
-use holochain_state::{
-    buffer::{BufferedStore, KvIntBufFresh, KvIntStore},
-    db::{GetDb, CHAIN_SEQUENCE},
-    error::{DatabaseError, DatabaseResult},
-    fresh_reader,
-    prelude::*,
-};
-use serde::{Deserialize, Serialize};
+use holochain_state::buffer::BufferedStore;
+use holochain_state::buffer::KvIntBufFresh;
+use holochain_state::buffer::KvIntStore;
+use holochain_state::db::GetDb;
+use holochain_state::db::CHAIN_SEQUENCE;
+use holochain_state::error::DatabaseError;
+use holochain_state::error::DatabaseResult;
+use holochain_state::fresh_reader;
+use holochain_state::prelude::*;
+use serde::Deserialize;
+use serde::Serialize;
 use tracing::*;
 
 /// A Value in the ChainSequence database.
@@ -192,15 +195,16 @@ impl BufferedStore for ChainSequenceBuf {
 
 #[cfg(test)]
 pub mod tests {
-    use super::{BufferedStore, ChainSequenceBuf, SourceChainError};
+    use super::BufferedStore;
+    use super::ChainSequenceBuf;
+    use super::SourceChainError;
     use crate::core::state::source_chain::SourceChainResult;
     use holo_hash::HeaderHash;
-    use holochain_state::{
-        env::{ReadManager, WriteManager},
-        error::DatabaseResult,
-        prelude::*,
-        test_utils::test_cell_env,
-    };
+    use holochain_state::env::ReadManager;
+    use holochain_state::env::WriteManager;
+    use holochain_state::error::DatabaseResult;
+    use holochain_state::prelude::*;
+    use holochain_state::test_utils::test_cell_env;
     use holochain_types::observability;
     use matches::assert_matches;
 

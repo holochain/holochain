@@ -1,23 +1,18 @@
 use holochain_p2p::HolochainP2pCell;
 use holochain_types::HeaderHashed;
-use holochain_zome_types::{
-    header::{AppEntryType, EntryType},
-    query::ChainQueryFilter,
-    validate::ValidationPackage,
-};
+use holochain_zome_types::header::AppEntryType;
+use holochain_zome_types::header::EntryType;
+use holochain_zome_types::query::ChainQueryFilter;
+use holochain_zome_types::validate::ValidationPackage;
 
-use crate::core::{
-    ribosome::{
-        error::RibosomeResult,
-        guest_callback::validation_package::{
-            ValidationPackageHostAccess, ValidationPackageInvocation, ValidationPackageResult,
-        },
-        RibosomeT,
-    },
-    state::source_chain::SourceChain,
-    workflow::CallZomeWorkspaceLock,
-    SourceChainResult,
-};
+use crate::core::ribosome::error::RibosomeResult;
+use crate::core::ribosome::guest_callback::validation_package::ValidationPackageHostAccess;
+use crate::core::ribosome::guest_callback::validation_package::ValidationPackageInvocation;
+use crate::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
+use crate::core::ribosome::RibosomeT;
+use crate::core::state::source_chain::SourceChain;
+use crate::core::workflow::CallZomeWorkspaceLock;
+use crate::core::SourceChainResult;
 use tracing::*;
 
 pub fn get_as_author_sub_chain(

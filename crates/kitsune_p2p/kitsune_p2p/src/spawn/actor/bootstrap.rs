@@ -1,9 +1,11 @@
-use crate::types::{agent_store::AgentInfoSigned, KitsuneBinType, KitsuneSpace};
-use once_cell::sync::{Lazy, OnceCell};
-use std::{
-    convert::{TryFrom, TryInto},
-    sync::Arc,
-};
+use crate::types::agent_store::AgentInfoSigned;
+use crate::types::KitsuneBinType;
+use crate::types::KitsuneSpace;
+use once_cell::sync::Lazy;
+use once_cell::sync::OnceCell;
+use std::convert::TryFrom;
+use std::convert::TryInto;
+use std::sync::Arc;
 use url2::Url2;
 
 /// Reuse a single reqwest Client for efficiency as we likely need several connections.
@@ -199,11 +201,12 @@ pub async fn random(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        fixt::*,
-        spawn::actor::space::AGENT_INFO_EXPIRES_AFTER_MS,
-        types::{agent_store::*, KitsuneAgent, KitsuneBinType, KitsuneSignature},
-    };
+    use crate::fixt::*;
+    use crate::spawn::actor::space::AGENT_INFO_EXPIRES_AFTER_MS;
+    use crate::types::agent_store::*;
+    use crate::types::KitsuneAgent;
+    use crate::types::KitsuneBinType;
+    use crate::types::KitsuneSignature;
     use fixt::prelude::*;
     use lair_keystore_api::internal::sign_ed25519::sign_ed25519_keypair_new_from_entropy;
     use std::convert::TryInto;
@@ -245,12 +248,14 @@ mod tests {
         .unwrap();
 
         // We should get back an error if we don't have a good signature.
-        assert!(super::put(
-            Some(url2::url2!("{}", crate::config::BOOTSTRAP_SERVICE_DEV)),
-            fixt!(AgentInfoSigned)
-        )
-        .await
-        .is_err());
+        assert!(
+            super::put(
+                Some(url2::url2!("{}", crate::config::BOOTSTRAP_SERVICE_DEV)),
+                fixt!(AgentInfoSigned)
+            )
+            .await
+            .is_err()
+        );
     }
 
     #[tokio::test(threaded_scheduler)]

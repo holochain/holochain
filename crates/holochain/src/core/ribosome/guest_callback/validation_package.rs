@@ -1,18 +1,20 @@
-use crate::core::{
-    ribosome::{FnComponents, HostAccess, Invocation, ZomesToInvoke},
-    workflow::CallZomeWorkspaceLock,
-};
+use crate::core::ribosome::FnComponents;
+use crate::core::ribosome::HostAccess;
+use crate::core::ribosome::Invocation;
+use crate::core::ribosome::ZomesToInvoke;
+use crate::core::workflow::CallZomeWorkspaceLock;
 use derive_more::Constructor;
 use holo_hash::AnyDhtHash;
 use holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::dna::zome::{HostFnAccess, Permission, Zome};
-use holochain_zome_types::{
-    header::AppEntryType,
-    validate::{ValidationPackage, ValidationPackageCallbackResult},
-    zome::ZomeName,
-    ExternInput,
-};
+use holochain_types::dna::zome::HostFnAccess;
+use holochain_types::dna::zome::Permission;
+use holochain_types::dna::zome::Zome;
+use holochain_zome_types::header::AppEntryType;
+use holochain_zome_types::validate::ValidationPackage;
+use holochain_zome_types::validate::ValidationPackageCallbackResult;
+use holochain_zome_types::zome::ZomeName;
+use holochain_zome_types::ExternInput;
 
 #[derive(Clone)]
 pub struct ValidationPackageInvocation {
@@ -125,16 +127,15 @@ impl From<Vec<ValidationPackageCallbackResult>> for ValidationPackageResult {
 #[cfg(test)]
 mod test {
     use super::ValidationPackageResult;
-    use crate::{
-        core::ribosome::{Invocation, ZomesToInvoke},
-        fixt::{ValidationPackageHostAccessFixturator, ValidationPackageInvocationFixturator},
-    };
+    use crate::core::ribosome::Invocation;
+    use crate::core::ribosome::ZomesToInvoke;
+    use crate::fixt::ValidationPackageHostAccessFixturator;
+    use crate::fixt::ValidationPackageInvocationFixturator;
     use holochain_serialized_bytes::prelude::*;
     use holochain_types::dna::zome::HostFnAccess;
-    use holochain_zome_types::{
-        validate::{ValidationPackage, ValidationPackageCallbackResult},
-        ExternInput,
-    };
+    use holochain_zome_types::validate::ValidationPackage;
+    use holochain_zome_types::validate::ValidationPackageCallbackResult;
+    use holochain_zome_types::ExternInput;
     use rand::prelude::*;
 
     #[tokio::test(threaded_scheduler)]
@@ -252,14 +253,13 @@ mod test {
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
     use super::ValidationPackageResult;
-    use crate::{
-        core::ribosome::RibosomeT,
-        fixt::{
-            curve::Zomes, RealRibosomeFixturator, ValidationPackageHostAccessFixturator,
-            ValidationPackageInvocationFixturator,
-        },
-    };
-    use hdk3::prelude::{AppEntryType, EntryVisibility};
+    use crate::core::ribosome::RibosomeT;
+    use crate::fixt::curve::Zomes;
+    use crate::fixt::RealRibosomeFixturator;
+    use crate::fixt::ValidationPackageHostAccessFixturator;
+    use crate::fixt::ValidationPackageInvocationFixturator;
+    use hdk3::prelude::AppEntryType;
+    use hdk3::prelude::EntryVisibility;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::validate::ValidationPackage;
 

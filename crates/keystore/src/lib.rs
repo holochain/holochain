@@ -37,8 +37,9 @@ mod error;
 pub use error::*;
 
 pub mod keystore_actor;
+pub use keystore_actor::KeystoreSender;
+pub use keystore_actor::KeystoreSenderExt;
 use keystore_actor::*;
-pub use keystore_actor::{KeystoreSender, KeystoreSenderExt};
 
 mod agent_pubkey_ext;
 pub use agent_pubkey_ext::*;

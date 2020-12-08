@@ -1,8 +1,7 @@
 use crate as zt;
-use crate::{
-    cell::CellId,
-    zome::{FunctionName, ZomeName},
-};
+use crate::cell::CellId;
+use crate::zome::FunctionName;
+use crate::zome::ZomeName;
 use holo_hash::AgentPubKey;
 use holochain_serialized_bytes::prelude::*;
 

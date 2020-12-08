@@ -1,5 +1,6 @@
 use crate::core::SourceChainError;
-use holo_hash::{AnyDhtHash, HeaderHash};
+use holo_hash::AnyDhtHash;
+use holo_hash::HeaderHash;
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_state::error::DatabaseError;
 use holochain_types::dht_op::error::DhtOpError;

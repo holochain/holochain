@@ -1,17 +1,23 @@
-use super::{InterfaceApi, SignalSubscription};
-use crate::conductor::{
-    api::error::{ConductorApiResult, ExternalApiWireError, SerializationError},
-    interface::error::{InterfaceError, InterfaceResult},
-    state::AppInterfaceId,
-    ConductorHandle,
-};
+use super::InterfaceApi;
+use super::SignalSubscription;
+use crate::conductor::api::error::ConductorApiResult;
+use crate::conductor::api::error::ExternalApiWireError;
+use crate::conductor::api::error::SerializationError;
+use crate::conductor::interface::error::InterfaceError;
+use crate::conductor::interface::error::InterfaceResult;
+use crate::conductor::state::AppInterfaceId;
+use crate::conductor::ConductorHandle;
 use holo_hash::AgentPubKey;
 use holochain_serialized_bytes::prelude::*;
-use holochain_types::app::{InstalledApp, InstalledAppId};
-use holochain_zome_types::{
-    capability::CapSecret, cell::CellId, zome::FunctionName, zome::ZomeName, ExternInput,
-    ExternOutput, ZomeCallResponse,
-};
+use holochain_types::app::InstalledApp;
+use holochain_types::app::InstalledAppId;
+use holochain_zome_types::capability::CapSecret;
+use holochain_zome_types::cell::CellId;
+use holochain_zome_types::zome::FunctionName;
+use holochain_zome_types::zome::ZomeName;
+use holochain_zome_types::ExternInput;
+use holochain_zome_types::ExternOutput;
+use holochain_zome_types::ZomeCallResponse;
 
 /// The interface that a Conductor exposes to the outside world.
 #[async_trait::async_trait]
@@ -67,7 +73,9 @@ impl AppInterfaceApi for RealAppInterfaceApi {
                     .await?,
             )),
             AppRequest::ZomeCallInvocation(call) => {
-                tracing::warn!("AppRequest::ZomeCallInvocation is deprecated, use AppRequest::ZomeCall (TODO: update conductor-api)");
+                tracing::warn!(
+                    "AppRequest::ZomeCallInvocation is deprecated, use AppRequest::ZomeCall (TODO: update conductor-api)"
+                );
                 self.handle_app_request_inner(AppRequest::ZomeCall(call))
                     .await
                     .map(|r| {
@@ -79,15 +87,11 @@ impl AppInterfaceApi for RealAppInterfaceApi {
             }
             AppRequest::ZomeCall(call) => {
                 match self.conductor_handle.call_zome(*call.clone()).await? {
-                    Ok(ZomeCallResponse::Ok(output)) => {
-                        Ok(AppResponse::ZomeCall(Box::new(output)))
-                    }
+                    Ok(ZomeCallResponse::Ok(output)) => Ok(AppResponse::ZomeCall(Box::new(output))),
                     Ok(ZomeCallResponse::Unauthorized(_, _, _, _)) => Ok(AppResponse::Error(
                         ExternalApiWireError::ZomeCallUnauthorized(format!(
                             "No capabilities grant has been committed that allows the CapSecret {:?} to call the function {} in zome {}",
-                            call.cap,
-                            call.fn_name,
-                            call.zome_name
+                            call.cap, call.fn_name, call.zome_name
                         )),
                     )),
                     Ok(ZomeCallResponse::NetworkError(e)) => unreachable!(

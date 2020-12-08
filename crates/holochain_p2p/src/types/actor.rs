@@ -2,7 +2,8 @@
 #![allow(clippy::too_many_arguments)]
 
 use crate::*;
-use holochain_zome_types::{request::MetadataRequest, zome::FunctionName};
+use holochain_zome_types::request::MetadataRequest;
+use holochain_zome_types::zome::FunctionName;
 
 /// Request a validation package.
 #[derive(Clone, Debug)]
