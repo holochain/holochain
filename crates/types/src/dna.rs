@@ -15,7 +15,7 @@ use std::collections::BTreeMap;
 
 use self::{
     error::DnaResult,
-    zome::{inline_zome::InlineZome, Zome, ZomeDef},
+    zome::{/*inline_zome::InlineZome,*/ Zome, ZomeDef},
 };
 
 /// Zomes need to be an ordered map from ZomeName to a Zome
