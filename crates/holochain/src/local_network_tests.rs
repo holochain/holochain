@@ -96,7 +96,7 @@ fn conductors_call_remote(num_conductors: usize) {
 #[test_case(10, 10, 10)]
 #[test_case(8, 8, 8)]
 #[test_case(10, 10, 1)]
-fn conductors_local_gossip(num_conductors: usize, num_committers: usize, new_conductors: usize) {
+fn conductors_local_gossip(num_committers: usize, num_conductors: usize, new_conductors: usize) {
     let mut network = KitsuneP2pConfig::default();
     network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
         bind_to: None,
@@ -104,8 +104,8 @@ fn conductors_local_gossip(num_conductors: usize, num_committers: usize, new_con
         override_port: None,
     }];
     let f = conductors_gossip_inner(
-        num_conductors,
         num_committers,
+        num_conductors,
         new_conductors,
         network,
         true,
@@ -122,7 +122,7 @@ fn conductors_local_gossip(num_conductors: usize, num_committers: usize, new_con
 #[test_case(10, 10, 10)]
 #[test_case(8, 8, 8)]
 #[test_case(10, 10, 1)]
-fn conductors_boot_gossip(num_conductors: usize, num_committers: usize, new_conductors: usize) {
+fn conductors_boot_gossip(num_committers: usize, num_conductors: usize, new_conductors: usize) {
     let mut network = KitsuneP2pConfig::default();
     network.bootstrap_service = Some(url2::url2!("https://bootstrap.holo.host"));
     network.transport_pool = vec![kitsune_p2p::TransportConfig::Quic {
@@ -131,8 +131,8 @@ fn conductors_boot_gossip(num_conductors: usize, num_committers: usize, new_cond
         override_port: None,
     }];
     let f = conductors_gossip_inner(
-        num_conductors,
         num_committers,
+        num_conductors,
         new_conductors,
         network,
         false,
@@ -149,7 +149,7 @@ fn conductors_boot_gossip(num_conductors: usize, num_committers: usize, new_cond
 #[test_case(10, 10, 10)]
 #[test_case(8, 8, 8)]
 #[test_case(10, 10, 1)]
-fn conductors_remote_gossip(num_conductors: usize, num_committers: usize, new_conductors: usize) {
+fn conductors_remote_gossip(num_committers: usize, num_conductors: usize, new_conductors: usize) {
     let mut network = KitsuneP2pConfig::default();
     let transport = kitsune_p2p::TransportConfig::Quic {
         bind_to: None,
@@ -157,16 +157,20 @@ fn conductors_remote_gossip(num_conductors: usize, num_committers: usize, new_co
         override_host: None,
     };
     let proxy_config = holochain_p2p::kitsune_p2p::ProxyConfig::RemoteProxyClient{
+        // Real proxy
         // proxy_url: url2::url2!("kitsune-proxy://CIW6PxKxsPPlcuvUCbMcKwUpaMSmB7kLD8xyyj4mqcw/kitsune-quic/h/proxy.holochain.org/p/5778/--"),
+        // Local proxy
         proxy_url: url2::url2!("kitsune-proxy://h5_sQGIdBB7OnWVc1iuYZ-QUzb0DowdCA73PA0oOcv4/kitsune-quic/h/192.168.1.6/p/58451/--"),
+        // Other machine proxy
+        // proxy_url: url2::url2!("kitsune-proxy://h5_sQGIdBB7OnWVc1iuYZ-QUzb0DowdCA73PA0oOcv4/kitsune-quic/h/192.168.1.68/p/58451/--"),
     };
     network.transport_pool = vec![kitsune_p2p::TransportConfig::Proxy {
         sub_transport: transport.into(),
         proxy_config,
     }];
     let f = conductors_gossip_inner(
-        num_conductors,
         num_committers,
+        num_conductors,
         new_conductors,
         network,
         true,
@@ -184,8 +188,8 @@ fn conductors_remote_gossip(num_conductors: usize, num_committers: usize, new_co
 #[test_case(8, 8, 8)]
 #[test_case(10, 10, 1)]
 fn conductors_remote_boot_gossip(
-    num_conductors: usize,
     num_committers: usize,
+    num_conductors: usize,
     new_conductors: usize,
 ) {
     let mut network = KitsuneP2pConfig::default();
@@ -203,8 +207,8 @@ fn conductors_remote_boot_gossip(
         proxy_config,
     }];
     let f = conductors_gossip_inner(
-        num_conductors,
         num_committers,
+        num_conductors,
         new_conductors,
         network,
         false,
@@ -213,8 +217,8 @@ fn conductors_remote_boot_gossip(
 }
 
 async fn conductors_gossip_inner(
-    num_conductors: usize,
     num_committers: usize,
+    num_conductors: usize,
     new_conductors: usize,
     network: KitsuneP2pConfig,
     share_peers: bool,
@@ -268,7 +272,7 @@ async fn conductors_gossip_inner(
         expected_count += 4;
     }
 
-    // shutdown(handles).await;
+    shutdown(handles).await;
 
     let third_handles = setup(zomes.clone(), Some(network.clone()), new_conductors, uuid).await;
 
@@ -308,10 +312,11 @@ async fn init_all(handles: &[TestHandle]) -> Vec<HeaderHash> {
     let mut futures = Vec::with_capacity(handles.len());
     for (i, h) in handles.iter().cloned().enumerate() {
         let f = async move {
+            let large_msg = std::iter::repeat(b"a"[0]).take(20_000).collect::<Vec<_>>();
             let invocation = new_invocation(
                 &h.cell_id,
                 "create_post",
-                Post(i.to_string()),
+                Post(format!("{}{}", i, String::from_utf8_lossy(&large_msg))),
                 TestWasm::Create,
             )
             .unwrap();
@@ -417,6 +422,7 @@ async fn check_gossip(
                 .unwrap();
         let s = debug_span!("check_gossip", ?line, ?i, ?hash);
         let _g = s.enter();
+        tracing::debug!("Checking hash {:?} for {}", hash, i);
         tracing::debug!(?result);
         assert_matches!(result.into_inner(), Some(_));
     }

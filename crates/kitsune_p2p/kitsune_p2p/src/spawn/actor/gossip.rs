@@ -48,7 +48,14 @@ async fn gossip_loop(
 ) -> KitsuneP2pResult<()> {
     let mut gossip_data = GossipData::new(evt_send);
     loop {
-        gossip_data.take_action().await?;
+        gossip_data
+            .take_action()
+            .await
+            .map_err(|e| {
+                tracing::error!(msg = "gossip loop failed", ?e);
+                e
+            })
+            .expect("Gossip loop has failed");
 
         tokio::time::delay_for(std::time::Duration::from_millis(10)).await;
     }

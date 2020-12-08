@@ -251,8 +251,8 @@ impl gossip::GossipEventHandler for Space {
                 };
                 let data = wire::Wire::gossip(
                     space,
-                    from_agent,
-                    to_agent,
+                    from_agent.clone(),
+                    to_agent.clone(),
                     ops.into_iter().map(|(k, v)| (k, v.into())).collect(),
                     agents,
                 )
@@ -262,14 +262,14 @@ impl gossip::GossipEventHandler for Space {
                 let (_, mut write, read) = transport_tx.create_channel(url.clone()).await?;
                 write.write_and_close(data.to_vec()).await?;
                 let read = read.read_to_end().await;
-                println!("{:?} {:?}", read, url);
-                let (_, read) = dbg!(wire::Wire::decode_ref(&read))?;
+                let (_, read) = wire::Wire::decode_ref(&read)?;
                 match read {
-                    wire::Wire::Failure(wire::Failure { reason }) => Err(reason.into()),
+                    wire::Wire::Failure(wire::Failure { reason }) => Err(dbg!(reason.into())),
                     wire::Wire::GossipResp(_) => Ok(()),
                     _ => unreachable!(),
                 }
             }
+            .instrument(tracing::debug_span!("handle_gossip_ops"))
             .boxed()
             .into())
         }
@@ -516,7 +516,7 @@ impl KitsuneP2pHandler for Space {
             tokio::task::spawn(async move {
                 const START_DELAY: std::time::Duration = std::time::Duration::from_secs(1);
                 const MAX_DELAY: std::time::Duration = std::time::Duration::from_secs(60 * 60);
-                let mut delay_len = START_DELAY.clone();
+                let mut delay_len = START_DELAY;
 
                 loop {
                     tokio::time::delay_for(delay_len).await;
