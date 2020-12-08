@@ -5,6 +5,7 @@
 
 , holonix
 , hcRustPlatform
+, hcToplevelDir
 , pkgs
 }:
 
@@ -12,7 +13,7 @@ let
   inherit (lib.attrsets) mapAttrsToList;
 
   commonShellHook = ''
-    export HC_TARGET_PREFIX=''${NIX_ENV_PREFIX:-${builtins.toString ./.}}
+    export HC_TARGET_PREFIX=''${NIX_ENV_PREFIX:-${builtins.toString hcToplevelDir}}
     export CARGO_TARGET_DIR="''${HC_TARGET_PREFIX}/target"
     export HC_TEST_WASM_DIR="''${HC_TARGET_PREFIX}/.wasm_target"
     mkdir -p $HC_TEST_WASM_DIR
