@@ -14,7 +14,7 @@ members = [
   "crates/kitsune_p2p/proxy",
   # "crates/state",
   "crates/test_utils/wasm",
-  "crates/test_utils/wasm_common",
+  # "crates/test_utils/wasm_common",
   # "crates/types",
   "crates/websocket",
 ]
