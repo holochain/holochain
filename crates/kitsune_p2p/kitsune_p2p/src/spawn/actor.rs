@@ -256,6 +256,32 @@ impl KitsuneP2pActor {
                                         }
                                     }
                                 }
+                                wire::Wire::Gossip(wire::Gossip {
+                                    space,
+                                    from_agent,
+                                    to_agent,
+                                    ops,
+                                    agents,
+                                }) => {
+                                    let input = GossipEvt::new(
+                                        from_agent,
+                                        to_agent,
+                                        ops.into_iter().map(|(k, v)| (k, v.into())).collect(),
+                                        agents,
+                                    );
+                                    if let Err(err) =
+                                        local_gossip_ops(&evt_sender, space, input).await
+                                    {
+                                        let reason = format!("{:?}", err);
+                                        tracing::error!("got err: {}", reason);
+                                        let fail =
+                                            wire::Wire::failure(reason).encode_vec().unwrap();
+                                        let _ = write.write_and_close(fail).await;
+                                        return;
+                                    }
+                                    let resp = wire::Wire::gossip_resp().encode_vec().unwrap();
+                                    let _ = write.write_and_close(resp).await;
+                                }
                                 _ => unimplemented!("{:?}", read),
                             }
                         }

@@ -36,7 +36,22 @@ pub struct ReqOpDataEvt {
     pub peer_hashes: Vec<Arc<KitsuneAgent>>,
 }
 
+#[derive(Debug, derive_more::Constructor)]
+/// Request dht ops from an agent.
+pub struct GossipEvt {
+    /// Agent sending gossip.
+    pub from_agent: Arc<KitsuneAgent>,
+    /// The agent receiving gossip.
+    pub to_agent: Arc<KitsuneAgent>,
+    /// The ops being send in this gossip.
+    pub ops: Vec<(Arc<KitsuneOpHash>, Vec<u8>)>,
+    /// The agent info in this gossip.
+    pub agents: Vec<AgentInfoSigned>,
+}
+
 /// Dht op and agent hashes that the agent has information on.
 pub type OpHashesAgentHashes = (Vec<Arc<KitsuneOpHash>>, Vec<(Arc<KitsuneAgent>, u64)>);
 /// The Dht op data and agent store information
 pub type OpDataAgentInfo = (Vec<(Arc<KitsuneOpHash>, Vec<u8>)>, Vec<AgentInfoSigned>);
+/// Local and remote neighbors.
+pub type ListNeighborAgents = (Vec<Arc<KitsuneAgent>>, Vec<Arc<KitsuneAgent>>);

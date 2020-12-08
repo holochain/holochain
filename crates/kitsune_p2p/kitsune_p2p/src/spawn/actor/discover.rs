@@ -389,3 +389,47 @@ pub(crate) fn get_5_or_less_non_local_agents_near_basis(
     .boxed()
     .into()
 }
+
+pub(crate) fn add_5_or_less_non_local_agents(
+    space: Arc<KitsuneSpace>,
+    from_agent: Arc<KitsuneAgent>,
+    i_s: ghost_actor::GhostSender<SpaceInternal>,
+    evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
+    bootstrap_service: url2::Url2,
+) -> MustBoxFuture<'static, KitsuneP2pResult<()>> {
+    async move {
+        if let Ok(list) = super::bootstrap::random(
+            Some(bootstrap_service),
+            super::bootstrap::RandomQuery {
+                space: space.clone(),
+                limit: 8.into(),
+            },
+        )
+        .await
+        {
+            for item in list {
+                // TODO - someday some validation here
+                if let Ok(info) = AgentInfo::try_from(&item) {
+                    if let Ok(is_local) = i_s
+                        .is_agent_local(Arc::new(info.as_agent_ref().clone()))
+                        .await
+                    {
+                        if !is_local {
+                            // we got a result - let's add it to our store for the future
+                            let _ = evt_sender
+                                .put_agent_info_signed(PutAgentInfoSignedEvt {
+                                    space: space.clone(),
+                                    agent: from_agent.clone(),
+                                    agent_info_signed: item.clone(),
+                                })
+                                .await;
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+    .boxed()
+    .into()
+}
