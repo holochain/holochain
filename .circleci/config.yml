@@ -32,7 +32,10 @@ jobs:
 
   merge-test:
     docker:
-     - image: nixos/nix
+     - image: holochain/holochain:circle.build.develop
+       auth:
+        username: $DOCKER_USER
+        password: $DOCKER_PASS
     resource_class: xlarge
     environment:
      NIXPKGS_ALLOW_UNFREE: 1
