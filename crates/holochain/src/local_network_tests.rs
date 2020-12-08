@@ -123,6 +123,7 @@ fn conductors_local_gossip(num_committers: usize, num_conductors: usize, new_con
 #[test_case(10, 10, 10)]
 #[test_case(8, 8, 8)]
 #[test_case(10, 10, 1)]
+#[ignore = "Don't want network tests running on ci"]
 fn conductors_boot_gossip(num_committers: usize, num_conductors: usize, new_conductors: usize) {
     let mut network = KitsuneP2pConfig::default();
     network.bootstrap_service = Some(url2::url2!("https://bootstrap.holo.host"));
@@ -150,6 +151,7 @@ fn conductors_boot_gossip(num_committers: usize, num_conductors: usize, new_cond
 #[test_case(10, 10, 10)]
 #[test_case(8, 8, 8)]
 #[test_case(10, 10, 1)]
+#[ignore = "Don't want network tests running on ci"]
 fn conductors_remote_gossip(num_committers: usize, num_conductors: usize, new_conductors: usize) {
     let mut network = KitsuneP2pConfig::default();
     let transport = kitsune_p2p::TransportConfig::Quic {
@@ -188,6 +190,7 @@ fn conductors_remote_gossip(num_committers: usize, num_conductors: usize, new_co
 #[test_case(10, 10, 10)]
 #[test_case(8, 8, 8)]
 #[test_case(10, 10, 1)]
+#[ignore = "Don't want network tests running on ci"]
 fn conductors_remote_boot_gossip(
     num_committers: usize,
     num_conductors: usize,
