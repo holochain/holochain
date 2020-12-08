@@ -85,9 +85,14 @@ workflows:
  version: 2.1
  tests:
   jobs:
-   - build-binary-packages
+   - build-binary-packages:
+      filters:
+       branches:
+        only:
+         - release
    - merge-test
    # - merge-test-mac
+
  docker-builds:
   triggers:
    - schedule:
