@@ -1,11 +1,11 @@
 use holo_hash::WasmHash;
-use crate::holochain_state::buffer::CasBufFreshAsync;
-use crate::holochain_state::error::DatabaseError;
-use crate::holochain_state::error::DatabaseResult;
-use crate::holochain_state::exports::SingleStore;
-use crate::holochain_state::prelude::BufferedStore;
-use crate::holochain_state::prelude::EnvironmentRead;
-use crate::holochain_state::transaction::Writer;
+use holochain_lmdb::buffer::CasBufFreshAsync;
+use holochain_lmdb::error::DatabaseError;
+use holochain_lmdb::error::DatabaseResult;
+use holochain_lmdb::exports::SingleStore;
+use holochain_lmdb::prelude::BufferedStore;
+use holochain_lmdb::prelude::EnvironmentRead;
+use holochain_lmdb::transaction::Writer;
 use crate::holochain_types::dna::wasm::DnaWasm;
 use crate::holochain_types::dna::wasm::DnaWasmHashed;
 
@@ -43,14 +43,14 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn wasm_store_round_trip() -> DatabaseResult<()> {
-        use crate::holochain_state::prelude::*;
+        use holochain_lmdb::prelude::*;
         crate::holochain_types::observability::test_run().ok();
 
         // all the stuff needed to have a WasmBuf
-        let env = crate::holochain_state::test_utils::test_wasm_env();
+        let env = holochain_lmdb::test_utils::test_wasm_env();
         let mut wasm_buf = WasmBuf::new(
             env.env().into(),
-            env.get_db(&*crate::holochain_state::db::WASM).unwrap(),
+            env.get_db(&*holochain_lmdb::db::WASM).unwrap(),
         )
         .unwrap();
 

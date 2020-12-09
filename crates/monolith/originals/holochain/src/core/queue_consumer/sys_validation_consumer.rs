@@ -4,7 +4,7 @@ use super::*;
 use crate::holochain::conductor::manager::ManagedTaskResult;
 use crate::holochain::core::workflow::sys_validation_workflow::sys_validation_workflow;
 use crate::holochain::core::workflow::sys_validation_workflow::SysValidationWorkspace;
-use crate::holochain_state::env::EnvironmentWrite;
+use holochain_lmdb::env::EnvironmentWrite;
 use tokio::task::JoinHandle;
 use tracing::*;
 

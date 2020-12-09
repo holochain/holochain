@@ -9,7 +9,7 @@ use crate::holochain::conductor::interface::error::InterfaceError;
 use crate::holochain::conductor::interface::error::InterfaceResult;
 use crate::holochain::conductor::ConductorHandle;
 use holo_hash::*;
-use crate::holochain_keystore::KeystoreSenderExt;
+use holochain_keystore::KeystoreSenderExt;
 use holochain_serialized_bytes::prelude::*;
 use crate::holochain_types::app::InstallAppDnaPayload;
 use crate::holochain_types::app::InstallAppPayload;
@@ -514,7 +514,7 @@ mod test {
     use super::*;
     use crate::holochain::conductor::Conductor;
     use anyhow::Result;
-    use crate::holochain_state::test_utils::test_environments;
+    use holochain_lmdb::test_utils::test_environments;
     use crate::holochain_types::app::InstallAppDnaPayload;
     use crate::holochain_types::observability;
     use crate::holochain_types::test_utils::fake_agent_pubkey_1;

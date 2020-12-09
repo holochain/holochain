@@ -13,7 +13,7 @@ use holochain_zome_types::signature::Signature;
 
 pub mod error;
 
-use crate::holochain_state::prelude::PrefixType;
+use holochain_lmdb::prelude::PrefixType;
 use tracing::*;
 
 #[cfg(test)]

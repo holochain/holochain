@@ -12,7 +12,7 @@ use crate::holochain::core::state::source_chain::SourceChainError;
 use crate::holochain::core::state::workspace::WorkspaceError;
 use crate::holochain::core::SysValidationError;
 use crate::holochain_p2p::HolochainP2pError;
-use crate::holochain_state::error::DatabaseError;
+use holochain_lmdb::error::DatabaseError;
 use crate::holochain_types::dht_op::error::DhtOpError;
 use crate::holochain_types::prelude::*;
 use thiserror::Error;

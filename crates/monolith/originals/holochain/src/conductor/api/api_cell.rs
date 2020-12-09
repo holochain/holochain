@@ -12,7 +12,7 @@ use crate::holochain::core::workflow::call_zome_workflow::call_zome_workspace_lo
 use crate::holochain::core::workflow::ZomeCallResult;
 use async_trait::async_trait;
 use holo_hash::DnaHash;
-use crate::holochain_keystore::KeystoreSender;
+use holochain_keystore::KeystoreSender;
 use crate::holochain_types::autonomic::AutonomicCue;
 use crate::holochain_types::cell::CellId;
 use crate::holochain_types::dna::zome::Zome;

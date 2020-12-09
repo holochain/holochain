@@ -23,5 +23,5 @@ tungstenite = "0.10"
 url2 = "0.0.6"
 
 [dev-dependencies]
-holochain_types = { version = "=0.0.1", path = "../types" }
+holochain_types = { version = "=0.0.1", path = "../holochain_types" }
 linefeed = "0.6"

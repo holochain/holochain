@@ -3,9 +3,7 @@
 pub mod hdk3;
 // pub mod hdk_derive;
 pub mod holochain;
-pub mod holochain_keystore;
 pub mod holochain_p2p;
-pub mod holochain_state;
 pub mod holochain_test_wasm_common;
 pub mod holochain_types;
 pub mod holochain_wasm_test_utils;

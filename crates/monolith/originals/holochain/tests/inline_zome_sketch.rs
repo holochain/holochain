@@ -1,8 +1,8 @@
 use crate::hdk3::prelude::*;
 use crate::holochain::conductor::api::ZomeCall;
 use crate::holochain::conductor::Conductor;
-use crate::holochain_keystore::KeystoreSender;
-use crate::holochain_state::test_utils::test_environments;
+use holochain_keystore::KeystoreSender;
+use holochain_lmdb::test_utils::test_environments;
 use crate::holochain_types::app::InstalledCell;
 use crate::holochain_types::dna::zome::inline_zome::InlineZome;
 use crate::holochain_types::dna::DnaFile;
@@ -144,7 +144,7 @@ pub struct TestAgent;
 impl TestAgent {
     /// Get an infinite stream of AgentPubKeys
     pub fn stream(keystore: KeystoreSender) -> impl futures::Stream<Item = AgentPubKey> {
-        use crate::holochain_keystore::KeystoreSenderExt;
+        use holochain_keystore::KeystoreSenderExt;
         futures::stream::unfold(keystore, |keystore| async {
             let key = keystore
                 .generate_sign_keypair_from_pure_entropy()

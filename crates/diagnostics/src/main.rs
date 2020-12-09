@@ -9,8 +9,8 @@
 
 use cell::dump_cell_state;
 use conductor::dump_conductor_state;
-use crate::holochain_keystore::test_keystore::spawn_test_keystore;
-use crate::holochain_state::env::{EnvironmentKind, EnvironmentWrite};
+use holochain_keystore::test_keystore::spawn_test_keystore;
+use holochain_lmdb::env::{EnvironmentKind, EnvironmentWrite};
 use std::path::PathBuf;
 use structopt::StructOpt;
 use wasm::dump_wasm_state;

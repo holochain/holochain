@@ -17,11 +17,11 @@ use crate::here;
 use crate::holochain::test_utils::test_network;
 use ::fixt::prelude::*;
 use holo_hash::*;
-use crate::holochain_state::env::EnvironmentWrite;
-use crate::holochain_state::env::ReadManager;
-use crate::holochain_state::env::WriteManager;
-use crate::holochain_state::error::DatabaseError;
-use crate::holochain_state::test_utils::test_cell_env;
+use holochain_lmdb::env::EnvironmentWrite;
+use holochain_lmdb::env::ReadManager;
+use holochain_lmdb::env::WriteManager;
+use holochain_lmdb::error::DatabaseError;
+use holochain_lmdb::test_utils::test_cell_env;
 use crate::holochain_types::dht_op::DhtOp;
 use crate::holochain_types::dht_op::DhtOpHashed;
 use crate::holochain_types::dna::zome::Zome;
@@ -1090,7 +1090,7 @@ async fn get_links(
 async fn test_metadata_from_wasm_api() {
     // test workspace boilerplate
     observability::test_run().ok();
-    let test_env = crate::holochain_state::test_utils::test_cell_env();
+    let test_env = holochain_lmdb::test_utils::test_cell_env();
     let env = test_env.env();
     clear_dbs(env.clone());
 
@@ -1156,7 +1156,7 @@ async fn test_metadata_from_wasm_api() {
 async fn test_wasm_api_without_integration_links() {
     // test workspace boilerplate
     observability::test_run().ok();
-    let test_env = crate::holochain_state::test_utils::test_cell_env();
+    let test_env = holochain_lmdb::test_utils::test_cell_env();
     let env = test_env.env();
     clear_dbs(env.clone());
 
@@ -1208,7 +1208,7 @@ async fn test_wasm_api_without_integration_links() {
 async fn test_wasm_api_without_integration_delete() {
     // test workspace boilerplate
     observability::test_run().ok();
-    let test_env = crate::holochain_state::test_utils::test_cell_env();
+    let test_env = holochain_lmdb::test_utils::test_cell_env();
     let env = test_env.env();
     let env_ref = env.guard();
     clear_dbs(env.clone());
@@ -1329,9 +1329,9 @@ mod slow_tests {
     use fixt::prelude::*;
     use holo_hash::EntryHash;
     use holochain_serialized_bytes::SerializedBytes;
-    use crate::holochain_state::db::GetDb;
-    use crate::holochain_state::db::INTEGRATED_DHT_OPS;
-    use crate::holochain_state::env::ReadManager;
+    use holochain_lmdb::db::GetDb;
+    use holochain_lmdb::db::INTEGRATED_DHT_OPS;
+    use holochain_lmdb::env::ReadManager;
     use crate::holochain_types::app::InstalledCell;
     use crate::holochain_types::cell::CellId;
     use crate::holochain_types::dna::DnaDef;

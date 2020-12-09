@@ -5,7 +5,7 @@ use crate::hdk3::prelude::ValidationPackage;
 use holo_hash::HeaderHash;
 use crate::holochain_p2p::actor::GetActivityOptions;
 use crate::holochain_p2p::HolochainP2pCellT;
-use crate::holochain_state::env::EnvironmentRead;
+use holochain_lmdb::env::EnvironmentRead;
 use crate::fresh_reader_test;
 use crate::holochain_types::activity::AgentActivity;
 use crate::holochain_types::activity::ChainItems;

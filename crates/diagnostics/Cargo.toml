@@ -12,9 +12,9 @@ fallible-iterator = "0.2"
 
 monolith = { path = "../monolith" }
 # holochain = { path = "../holochain" }
-# crate::holochain_keystore = { path = "../keystore"}
-# holochain_state = { path = "../state"}
-# crate::holochain_types = { path = "../types"}
+# holochain_keystore = { path = "../holochain_keystore"}
+holochain_lmdb = { path = "../holochain_lmdb"}
+# crate::holochain_types = { path = "../holochain_types"}
 
 rkv = "0.10.4"
 structopt = "0.3"

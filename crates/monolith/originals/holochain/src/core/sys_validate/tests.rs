@@ -5,10 +5,10 @@ use crate::meta_mock;
 use ::fixt::prelude::*;
 use error::SysValidationError;
 use holo_hash::fixt::*;
-use crate::holochain_keystore::AgentPubKeyExt;
+use holochain_keystore::AgentPubKeyExt;
 use holochain_serialized_bytes::SerializedBytes;
-use crate::holochain_state::env::EnvironmentRead;
-use crate::holochain_state::test_utils::test_cell_env;
+use holochain_lmdb::env::EnvironmentRead;
+use holochain_lmdb::test_utils::test_cell_env;
 use crate::holochain_types::dna::DnaDef;
 use crate::holochain_types::dna::DnaFile;
 use crate::holochain_types::fixt::*;
@@ -22,7 +22,7 @@ use std::convert::TryFrom;
 
 #[tokio::test(threaded_scheduler)]
 async fn verify_header_signature_test() {
-    let keystore = crate::holochain_state::test_utils::test_keystore();
+    let keystore = holochain_lmdb::test_utils::test_keystore();
     let author = fake_agent_pubkey_1();
     let mut header = fixt!(CreateLink);
     header.author = author.clone();

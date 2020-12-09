@@ -32,7 +32,7 @@ use crate::holochain::core::ribosome::guest_callback::validation_package::Valida
 use crate::holochain::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 use crate::holochain::core::ribosome::guest_callback::CallIterator;
 use crate::holochain::core::workflow::CallZomeWorkspaceLock;
-use crate::holochain_keystore::KeystoreSender;
+use holochain_keystore::KeystoreSender;
 use crate::holochain_p2p::HolochainP2pCell;
 use crate::holochain_types::cell::CellId;
 use crate::holochain_types::dna::zome::HostFnAccess;

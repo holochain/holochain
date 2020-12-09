@@ -15,7 +15,7 @@ use crate::holochain::core::state::source_chain::SourceChainBuf;
 use crate::holochain::core::state::workspace::Workspace;
 use crate::holochain::core::state::workspace::WorkspaceResult;
 use derive_more::Constructor;
-use crate::holochain_state::prelude::*;
+use holochain_lmdb::prelude::*;
 use crate::holochain_types::dna::DnaFile;
 use crate::holochain_types::prelude::*;
 use tracing::*;
@@ -108,7 +108,7 @@ pub mod tests {
     use crate::holochain::core::state::source_chain::SourceChain;
     use crate::holochain::core::SourceChainResult;
     use fallible_iterator::FallibleIterator;
-    use crate::holochain_state::test_utils::test_cell_env;
+    use holochain_lmdb::test_utils::test_cell_env;
     use crate::holochain_types::observability;
     use crate::holochain_types::test_utils::fake_agent_pubkey_1;
     use crate::holochain_types::test_utils::fake_dna_file;

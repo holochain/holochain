@@ -39,7 +39,7 @@ pub mod wasm_test {
     async fn ribosome_capability_secret_test<'a>() {
         crate::holochain_types::observability::test_run().ok();
         // test workspace boilerplate
-        let test_env = crate::holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();
         let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
 
@@ -58,7 +58,7 @@ pub mod wasm_test {
     async fn ribosome_transferable_cap_grant<'a>() {
         crate::holochain_types::observability::test_run().ok();
         // test workspace boilerplate
-        let test_env = crate::holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();
         let mut workspace = CallZomeWorkspace::new(env.clone().into()).unwrap();
 

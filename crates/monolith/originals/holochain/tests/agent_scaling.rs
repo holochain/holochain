@@ -3,8 +3,8 @@
 use crate::hdk3::prelude::Links;
 use crate::holochain::conductor::api::ZomeCall;
 use crate::holochain::test_utils::conductor_setup::ConductorTestData;
-use crate::holochain_keystore::keystore_actor::KeystoreSenderExt;
-use crate::holochain_state::test_utils::test_environments;
+use holochain_keystore::keystore_actor::KeystoreSenderExt;
+use holochain_lmdb::test_utils::test_environments;
 use crate::holochain_types::dna::DnaDef;
 use crate::holochain_types::dna::DnaFile;
 use crate::holochain_wasm_test_utils::TestWasm;

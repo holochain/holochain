@@ -8,7 +8,7 @@ use crate::holochain::conductor::dna_store::MockDnaStore;
 use crate::holochain::conductor::ConductorBuilder;
 use crate::holochain::conductor::ConductorHandle;
 use crate::holochain::fixt::*;
-use crate::holochain_state::test_utils::test_environments;
+use holochain_lmdb::test_utils::test_environments;
 use crate::holochain_types::app::InstalledCell;
 use crate::holochain_types::cell::CellId;
 use crate::holochain_types::dna::DnaDef;

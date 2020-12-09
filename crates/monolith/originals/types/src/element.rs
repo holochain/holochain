@@ -9,7 +9,7 @@ use crate::holochain_types::EntryHashed;
 use crate::holochain_types::HeaderHashed;
 use error::ElementGroupError;
 use error::ElementGroupResult;
-use crate::holochain_keystore::KeystoreError;
+use holochain_keystore::KeystoreError;
 use holochain_serialized_bytes::prelude::*;
 pub use holochain_zome_types::element::*;
 use holochain_zome_types::entry::Entry;

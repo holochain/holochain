@@ -4,7 +4,7 @@ use crate::holochain::test_utils::conductor_setup::ConductorTestData;
 use crate::holochain::test_utils::new_zome_call;
 use fallible_iterator::FallibleIterator;
 use crate::hdk3::prelude::*;
-use crate::holochain_state::buffer::KvStoreT;
+use holochain_lmdb::buffer::KvStoreT;
 use crate::fresh_reader_test;
 use crate::holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p::KitsuneBinType;

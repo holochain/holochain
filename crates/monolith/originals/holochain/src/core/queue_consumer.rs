@@ -32,9 +32,9 @@ use derive_more::Constructor;
 use derive_more::Display;
 use derive_more::From;
 use futures::future::Either;
-use crate::holochain_state::env::EnvironmentWrite;
-use crate::holochain_state::env::WriteManager;
-use crate::holochain_state::prelude::Writer;
+use holochain_lmdb::env::EnvironmentWrite;
+use holochain_lmdb::env::WriteManager;
+use holochain_lmdb::prelude::Writer;
 use tokio::sync;
 use tokio::sync::mpsc;
 

@@ -5,7 +5,7 @@ use super::*;
 use crate::holochain::conductor::manager::ManagedTaskResult;
 use crate::holochain::core::workflow::integrate_dht_ops_workflow::integrate_dht_ops_workflow;
 use crate::holochain::core::workflow::integrate_dht_ops_workflow::IntegrateDhtOpsWorkspace;
-use crate::holochain_state::env::EnvironmentWrite;
+use holochain_lmdb::env::EnvironmentWrite;
 
 use tokio::task::JoinHandle;
 use tracing::*;

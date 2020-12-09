@@ -1,6 +1,6 @@
 use super::*;
 use ::fixt::prelude::*;
-use crate::holochain_keystore::AgentPubKeyExt;
+use holochain_keystore::AgentPubKeyExt;
 use crate::holochain_types::dht_op::DhtOp;
 use crate::holochain_types::fixt::*;
 use holochain_zome_types::test_utils::fake_agent_pubkey_1;
@@ -8,9 +8,9 @@ use holochain_zome_types::Header;
 
 #[tokio::test(threaded_scheduler)]
 async fn incoming_ops_to_limbo() {
-    let test_env = crate::holochain_state::test_utils::test_cell_env();
+    let test_env = holochain_lmdb::test_utils::test_cell_env();
     let env = test_env.env();
-    let keystore = crate::holochain_state::test_utils::test_keystore();
+    let keystore = holochain_lmdb::test_utils::test_keystore();
     let (sys_validation_trigger, mut rx) = TriggerSender::new();
 
     let author = fake_agent_pubkey_1();

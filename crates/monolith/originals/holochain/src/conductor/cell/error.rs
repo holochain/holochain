@@ -7,7 +7,7 @@ use crate::holochain::core::workflow::error::WorkflowError;
 use crate::holochain::core::workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
 use crate::holochain::core::SourceChainError;
 use crate::holochain_p2p::HolochainP2pError;
-use crate::holochain_state::error::DatabaseError;
+use holochain_lmdb::error::DatabaseError;
 use crate::holochain_types::cell::CellId;
 use crate::holochain_types::dna::DnaError;
 use crate::holochain_types::header::error::HeaderError;

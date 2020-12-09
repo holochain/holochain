@@ -7,12 +7,12 @@ use crate::holochain::core::state::dht_op_integration::AuthoredDhtOpsValue;
 use crate::holochain::core::state::source_chain::SourceChain;
 use crate::holochain::core::state::workspace::Workspace;
 use crate::holochain::core::state::workspace::WorkspaceResult;
-use crate::holochain_state::buffer::KvBufFresh;
-use crate::holochain_state::db::AUTHORED_DHT_OPS;
-use crate::holochain_state::prelude::BufferedStore;
-use crate::holochain_state::prelude::EnvironmentRead;
-use crate::holochain_state::prelude::GetDb;
-use crate::holochain_state::prelude::Writer;
+use holochain_lmdb::buffer::KvBufFresh;
+use holochain_lmdb::db::AUTHORED_DHT_OPS;
+use holochain_lmdb::prelude::BufferedStore;
+use holochain_lmdb::prelude::EnvironmentRead;
+use holochain_lmdb::prelude::GetDb;
+use holochain_lmdb::prelude::Writer;
 use crate::holochain_types::dht_op::DhtOpHashed;
 use tracing::*;
 
@@ -94,9 +94,9 @@ mod tests {
     use fallible_iterator::FallibleIterator;
     use holo_hash::*;
 
-    use crate::holochain_state::env::ReadManager;
-    use crate::holochain_state::env::WriteManager;
-    use crate::holochain_state::test_utils::test_cell_env;
+    use holochain_lmdb::env::ReadManager;
+    use holochain_lmdb::env::WriteManager;
+    use holochain_lmdb::test_utils::test_cell_env;
     use crate::holochain_types::dht_op::produce_ops_from_element;
     use crate::holochain_types::dht_op::DhtOp;
     use crate::holochain_types::fixt::*;

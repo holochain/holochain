@@ -8,12 +8,12 @@ use crate::holochain::core::state::metadata::MetadataBufT;
 use fallible_iterator::FallibleIterator;
 
 use crate::fresh_reader;
-use crate::holochain_state::env::EnvironmentRead;
-use crate::holochain_state::env::EnvironmentWrite;
-use crate::holochain_state::env::ReadManager;
-use crate::holochain_state::error::DatabaseError;
-use crate::holochain_state::prelude::PrefixType;
-use crate::holochain_state::prelude::Readable;
+use holochain_lmdb::env::EnvironmentRead;
+use holochain_lmdb::env::EnvironmentWrite;
+use holochain_lmdb::env::ReadManager;
+use holochain_lmdb::error::DatabaseError;
+use holochain_lmdb::prelude::PrefixType;
+use holochain_lmdb::prelude::Readable;
 use crate::holochain_types::activity::AgentActivity;
 use crate::holochain_types::activity::ChainItems;
 use crate::holochain_types::element::ElementStatus;

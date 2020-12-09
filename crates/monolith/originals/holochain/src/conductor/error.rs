@@ -2,7 +2,7 @@ use super::entry_def_store::error::EntryDefStoreError;
 use super::interface::error::InterfaceError;
 use crate::holochain::conductor::cell::error::CellError;
 use crate::holochain::core::workflow::error::WorkflowError;
-use crate::holochain_state::error::DatabaseError;
+use holochain_lmdb::error::DatabaseError;
 use crate::holochain_types::app::InstalledAppId;
 use crate::holochain_types::cell::CellId;
 use std::path::PathBuf;
@@ -89,7 +89,7 @@ pub enum ConductorError {
     EntryDefStoreError(#[from] EntryDefStoreError),
 
     #[error(transparent)]
-    KeystoreError(#[from] crate::holochain_keystore::KeystoreError),
+    KeystoreError(#[from] holochain_keystore::KeystoreError),
 
     #[error(transparent)]
     KitsuneP2pError(#[from] kitsune_p2p::KitsuneP2pError),

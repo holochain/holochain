@@ -57,20 +57,20 @@ use fallible_iterator::FallibleIterator;
 use futures::future;
 use futures::future::TryFutureExt;
 use holo_hash::DnaHash;
-use crate::holochain_keystore::lair_keystore::spawn_lair_keystore;
-use crate::holochain_keystore::test_keystore::spawn_test_keystore;
-use crate::holochain_keystore::KeystoreSender;
-use crate::holochain_keystore::KeystoreSenderExt;
-use crate::holochain_state::buffer::BufferedStore;
-use crate::holochain_state::buffer::KvStore;
-use crate::holochain_state::buffer::KvStoreT;
-use crate::holochain_state::db;
-use crate::holochain_state::env::EnvironmentKind;
-use crate::holochain_state::env::EnvironmentWrite;
-use crate::holochain_state::env::ReadManager;
-use crate::holochain_state::exports::SingleStore;
+use holochain_keystore::lair_keystore::spawn_lair_keystore;
+use holochain_keystore::test_keystore::spawn_test_keystore;
+use holochain_keystore::KeystoreSender;
+use holochain_keystore::KeystoreSenderExt;
+use holochain_lmdb::buffer::BufferedStore;
+use holochain_lmdb::buffer::KvStore;
+use holochain_lmdb::buffer::KvStoreT;
+use holochain_lmdb::db;
+use holochain_lmdb::env::EnvironmentKind;
+use holochain_lmdb::env::EnvironmentWrite;
+use holochain_lmdb::env::ReadManager;
+use holochain_lmdb::exports::SingleStore;
 use crate::fresh_reader;
-use crate::holochain_state::prelude::*;
+use holochain_lmdb::prelude::*;
 use crate::holochain_types::app::InstalledApp;
 use crate::holochain_types::app::InstalledAppId;
 use crate::holochain_types::app::InstalledCell;
@@ -609,9 +609,9 @@ where
         impl IntoIterator<Item = (EntryDefBufferKey, EntryDef)>,
     )> {
         let environ = &self.wasm_env;
-        let wasm = environ.get_db(&*crate::holochain_state::db::WASM)?;
-        let dna_def_db = environ.get_db(&*crate::holochain_state::db::DNA_DEF)?;
-        let entry_def_db = environ.get_db(&*crate::holochain_state::db::ENTRY_DEF)?;
+        let wasm = environ.get_db(&*holochain_lmdb::db::WASM)?;
+        let dna_def_db = environ.get_db(&*holochain_lmdb::db::DNA_DEF)?;
+        let entry_def_db = environ.get_db(&*holochain_lmdb::db::ENTRY_DEF)?;
 
         let wasm_buf = Arc::new(WasmBuf::new(environ.clone().into(), wasm)?);
         let dna_def_buf = DnaDefBuf::new(environ.clone().into(), dna_def_db)?;
@@ -782,9 +782,9 @@ where
         dna: DnaFile,
     ) -> ConductorResult<Vec<(EntryDefBufferKey, EntryDef)>> {
         let environ = self.wasm_env.clone();
-        let wasm = environ.get_db(&*crate::holochain_state::db::WASM)?;
-        let dna_def_db = environ.get_db(&*crate::holochain_state::db::DNA_DEF)?;
-        let entry_def_db = environ.get_db(&*crate::holochain_state::db::ENTRY_DEF)?;
+        let wasm = environ.get_db(&*holochain_lmdb::db::WASM)?;
+        let dna_def_db = environ.get_db(&*holochain_lmdb::db::DNA_DEF)?;
+        let entry_def_db = environ.get_db(&*holochain_lmdb::db::ENTRY_DEF)?;
 
         let zome_defs = get_entry_defs(dna.clone())?;
 
@@ -927,8 +927,8 @@ mod builder {
     use super::*;
     use crate::holochain::conductor::dna_store::RealDnaStore;
     use crate::holochain::conductor::ConductorHandle;
-    use crate::holochain_state::env::EnvironmentKind;
-    use crate::holochain_state::test_utils::TestEnvironments;
+    use holochain_lmdb::env::EnvironmentKind;
+    use holochain_lmdb::test_utils::TestEnvironments;
 
     /// A configurable Builder for Conductor and sometimes ConductorHandle
     #[derive(Default)]
@@ -1164,7 +1164,7 @@ pub mod tests {
     use super::ConductorState;
     use super::*;
     use crate::holochain::conductor::dna_store::MockDnaStore;
-    use crate::holochain_state::test_utils::test_environments;
+    use holochain_lmdb::test_utils::test_environments;
     use crate::holochain_types::test_utils::fake_cell_id;
     use matches::assert_matches;
 

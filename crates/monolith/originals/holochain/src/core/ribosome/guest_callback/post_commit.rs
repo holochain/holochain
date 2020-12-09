@@ -4,7 +4,7 @@ use crate::holochain::core::ribosome::Invocation;
 use crate::holochain::core::ribosome::ZomesToInvoke;
 use crate::holochain::core::workflow::CallZomeWorkspaceLock;
 use derive_more::Constructor;
-use crate::holochain_keystore::KeystoreSender;
+use holochain_keystore::KeystoreSender;
 use crate::holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
 use crate::holochain_types::dna::zome::HostFnAccess;

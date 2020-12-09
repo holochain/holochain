@@ -5,7 +5,7 @@ use crate::holochain::fixt::SignatureFixturator;
 use crate::holochain::test_utils::test_network;
 use ::fixt::prelude::*;
 use holo_hash::HasHash;
-use crate::holochain_state::test_utils::test_cell_env;
+use holochain_lmdb::test_utils::test_cell_env;
 use crate::holochain_types::dht_op::DhtOp;
 use crate::holochain_types::dht_op::DhtOpHashed;
 use crate::holochain_types::test_utils::fake_agent_pubkey_2;

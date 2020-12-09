@@ -53,7 +53,7 @@ pub mod slow_tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_entry_hash_path_children() {
-        let test_env = crate::holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();
 
         let mut workspace =
@@ -128,7 +128,7 @@ pub mod slow_tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn hash_path_anchor_get_anchor() {
-        let test_env = crate::holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();
 
         let mut workspace =

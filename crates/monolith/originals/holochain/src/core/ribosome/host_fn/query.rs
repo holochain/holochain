@@ -30,7 +30,7 @@ pub mod slow_tests {
     use crate::holochain::{core::ribosome::ZomeCallHostAccess, fixt::ZomeCallHostAccessFixturator};
     use ::fixt::prelude::*;
     use crate::hdk3::prelude::*;
-    use crate::holochain_state::test_utils::TestEnvironment;
+    use holochain_lmdb::test_utils::TestEnvironment;
     use query::ChainQueryFilter;
 
     use crate::holochain_wasm_test_utils::TestWasm;
@@ -38,7 +38,7 @@ pub mod slow_tests {
 
     // TODO: use this setup function to DRY up a lot of duplicated code
     async fn setup() -> (TestEnvironment, ZomeCallHostAccess) {
-        let test_env = crate::holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();
 
         let mut workspace =

@@ -56,11 +56,11 @@ pub enum RibosomeError {
 
     /// ident
     #[error(transparent)]
-    KeystoreError(#[from] crate::holochain_keystore::KeystoreError),
+    KeystoreError(#[from] holochain_keystore::KeystoreError),
 
     /// ident
     #[error(transparent)]
-    DatabaseError(#[from] crate::holochain_state::error::DatabaseError),
+    DatabaseError(#[from] holochain_lmdb::error::DatabaseError),
 
     /// ident
     #[error(transparent)]

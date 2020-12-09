@@ -29,10 +29,10 @@ holochain_serialized_bytes = "=0.0.45"
 holochain_wasmer_host = "=0.0.50"
 
 monolith = { version = "0.0.1", path = "../monolith" }
-# crate::holochain_keystore = { version = "0.0.1", path = "../keystore" }
+# holochain_keystore = { version = "0.0.1", path = "../holochain_keystore" }
 # holochain_p2p = { version = "0.0.1", path = "../holochain_p2p" }
-# holochain_state = { version = "0.0.1", path = "../state" }
-# crate::holochain_types = { version = "0.0.1", path = "../types" }
+# holochain_lmdb = { version = "0.0.1", path = "../holochain_lmdb" }
+# crate::holochain_types = { version = "0.0.1", path = "../holochain_types" }
 # holochain_wasm_test_utils = { version = "0.0.1", path = "../test_utils/wasm" }
 # holochain_websocket = { version = "0.0.1", path = "../websocket" }
 # holochain_zome_types = { version = "0.0.1", path = "../zome_types" }

@@ -3,7 +3,7 @@ use crate::holochain::core::SourceChainError;
 use holo_hash::AnyDhtHash;
 use crate::holochain_p2p::HolochainP2pError;
 use holochain_serialized_bytes::SerializedBytesError;
-use crate::holochain_state::error::DatabaseError;
+use holochain_lmdb::error::DatabaseError;
 use crate::holochain_types::dht_op::error::DhtOpError;
 use crate::holochain_types::element::error::ElementGroupError;
 use holochain_zome_types::header::conversions::WrongHeaderError;

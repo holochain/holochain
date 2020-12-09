@@ -16,8 +16,8 @@ mod tests {
     use header::Create;
     use holo_hash::fixt::*;
     use holo_hash::*;
-    use crate::holochain_state::prelude::*;
-    use crate::holochain_state::test_utils::test_cell_env;
+    use holochain_lmdb::prelude::*;
+    use holochain_lmdb::test_utils::test_cell_env;
     use crate::holochain_types::fixt::AppEntryTypeFixturator;
     use crate::holochain_types::fixt::HeaderBuilderCommonFixturator;
     use crate::holochain_types::header::NewEntryHeader;

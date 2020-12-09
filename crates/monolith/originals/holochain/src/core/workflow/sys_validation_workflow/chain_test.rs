@@ -7,7 +7,7 @@ use crate::holochain::core::state::source_chain::SourceChain;
 use crate::holochain::test_utils::setup_app;
 use crate::holochain::test_utils::wait_for_integration;
 use ::fixt::prelude::*;
-use crate::holochain_keystore::AgentPubKeyExt;
+use holochain_keystore::AgentPubKeyExt;
 use holochain_serialized_bytes::SerializedBytes;
 use crate::holochain_types::app::InstalledCell;
 use crate::holochain_types::cell::CellId;

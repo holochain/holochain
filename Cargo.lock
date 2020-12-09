@@ -1284,6 +1284,57 @@ dependencies = [
 ]
 
 [[package]]
+name = "holochain_keystore"
+version = "0.0.1"
+dependencies = [
+ "ghost_actor",
+ "holo_hash",
+ "holochain_serialized_bytes",
+ "holochain_zome_types",
+ "lair_keystore_api",
+ "lair_keystore_client",
+ "serde",
+ "serde_bytes",
+ "thiserror",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "holochain_lmdb"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "byteorder",
+ "chrono",
+ "derive_more",
+ "either",
+ "failure",
+ "fallible-iterator",
+ "fixt",
+ "futures",
+ "holo_hash",
+ "holochain_keystore",
+ "holochain_serialized_bytes",
+ "lazy_static",
+ "must_future",
+ "nanoid",
+ "parking_lot",
+ "rand 0.7.3",
+ "rkv",
+ "rmp-serde",
+ "serde",
+ "serde_derive",
+ "shrinkwraprs",
+ "tempdir",
+ "thiserror",
+ "tokio",
+ "tokio_safe_block_on",
+ "tracing",
+ "tracing-futures",
+]
+
+[[package]]
 name = "holochain_serialized_bytes"
 version = "0.0.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"

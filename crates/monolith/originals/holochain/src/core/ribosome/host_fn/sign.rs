@@ -1,7 +1,7 @@
 use crate::holochain::core::ribosome::error::RibosomeResult;
 use crate::holochain::core::ribosome::CallContext;
 use crate::holochain::core::ribosome::RibosomeT;
-use crate::holochain_keystore::keystore_actor::KeystoreSenderExt;
+use holochain_keystore::keystore_actor::KeystoreSenderExt;
 use holochain_zome_types::SignInput;
 use holochain_zome_types::SignOutput;
 use std::sync::Arc;
@@ -34,7 +34,7 @@ pub mod wasm_test {
 
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_sign_test() {
-        let test_env = crate::holochain_state::test_utils::test_cell_env();
+        let test_env = holochain_lmdb::test_utils::test_cell_env();
         let env = test_env.env();
         let mut workspace =
             crate::holochain::core::workflow::CallZomeWorkspace::new(env.clone().into()).unwrap();

@@ -14,7 +14,7 @@ use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::SerializedBytes;
 use crate::fresh_reader_test;
-use crate::holochain_state::prelude::ReadManager;
+use holochain_lmdb::prelude::ReadManager;
 use crate::holochain_types::app::InstalledCell;
 use crate::holochain_types::cell::CellId;
 use crate::holochain_types::dht_op::DhtOpLight;

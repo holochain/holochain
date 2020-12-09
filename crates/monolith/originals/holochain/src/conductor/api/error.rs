@@ -10,7 +10,7 @@ use crate::holochain::core::state::workspace::WorkspaceError;
 use crate::holochain::core::workflow::error::WorkflowError;
 use holo_hash::DnaHash;
 use holochain_serialized_bytes::prelude::*;
-use crate::holochain_state::error::DatabaseError;
+use holochain_lmdb::error::DatabaseError;
 use crate::holochain_types::cell::CellId;
 use thiserror::Error;
 
@@ -72,7 +72,7 @@ pub enum ConductorApiError {
 
     /// KeystoreError
     #[error("KeystoreError: {0}")]
-    KeystoreError(#[from] crate::holochain_keystore::KeystoreError),
+    KeystoreError(#[from] holochain_keystore::KeystoreError),
 
     /// Cell error
     #[error(transparent)]

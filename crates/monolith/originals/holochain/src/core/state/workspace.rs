@@ -4,8 +4,8 @@
 //! Every Workflow has an associated Workspace type.
 
 use super::source_chain::SourceChainError;
-use crate::holochain_state::error::DatabaseError;
-use crate::holochain_state::prelude::Writer;
+use holochain_lmdb::error::DatabaseError;
+use holochain_lmdb::prelude::Writer;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -44,14 +44,14 @@ pub trait Workspace: Send + Sized {
 pub mod tests {
     use super::Workspace;
     use crate::holochain::core::state::workspace::WorkspaceResult;
-    use crate::holochain_state::buffer::BufferedStore;
-    use crate::holochain_state::buffer::KvBufFresh;
-    use crate::holochain_state::db::GetDb;
-    use crate::holochain_state::db::ELEMENT_VAULT_HEADERS;
-    use crate::holochain_state::db::ELEMENT_VAULT_PUBLIC_ENTRIES;
-    use crate::holochain_state::prelude::*;
-    use crate::holochain_state::test_utils::test_cell_env;
-    use crate::holochain_state::test_utils::DbString;
+    use holochain_lmdb::buffer::BufferedStore;
+    use holochain_lmdb::buffer::KvBufFresh;
+    use holochain_lmdb::db::GetDb;
+    use holochain_lmdb::db::ELEMENT_VAULT_HEADERS;
+    use holochain_lmdb::db::ELEMENT_VAULT_PUBLIC_ENTRIES;
+    use holochain_lmdb::prelude::*;
+    use holochain_lmdb::test_utils::test_cell_env;
+    use holochain_lmdb::test_utils::DbString;
     use crate::holochain_types::prelude::*;
     use crate::holochain_types::test_utils::fake_header_hash;
 

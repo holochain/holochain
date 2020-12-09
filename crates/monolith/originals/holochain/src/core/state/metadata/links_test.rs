@@ -7,10 +7,10 @@ use crate::holochain::fixt::KnownDeleteLink;
 use crate::holochain::fixt::ZomeIdFixturator;
 use crate::here;
 use ::fixt::prelude::*;
-use crate::holochain_state::buffer::BufferedStore;
-use crate::holochain_state::env::EnvironmentWrite;
+use holochain_lmdb::buffer::BufferedStore;
+use holochain_lmdb::env::EnvironmentWrite;
 use crate::fresh_reader_test;
-use crate::holochain_state::test_utils::test_cell_env;
+use holochain_lmdb::test_utils::test_cell_env;
 use crate::holochain_types::observability;
 
 #[derive(Clone)]
