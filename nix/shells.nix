@@ -21,10 +21,12 @@ let
 
     export HC_WASM_CACHE_PATH="$HC_TARGET_PREFIX/.wasm_cache"
     mkdir -p $HC_WASM_CACHE_PATH
+
+    export RUSTFLAGS="${holonix.rust.compile.stable-flags}"
   ''
     # TODO: make thinlto linking work on stable
-    # export RUSTFLAGS="${holonix.rust.compile.stable-flags}"
     # export RUSTFLAGS="$RUSTFLAGS -C linker-plugin-lto -C linker=${holonix.pkgs.clang_10}/bin/clang -C link-arg=-fuse-ld=${holonix.pkgs.lld}/bin/lld"
+
     ;
   applicationPkgsInputs = {
     build = mapAttrsToList (name: value:
