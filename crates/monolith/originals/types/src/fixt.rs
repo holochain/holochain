@@ -4,7 +4,7 @@
 
 #![allow(missing_docs)]
 
-use crate::holochain_types::cell::CellId;
+use holochain_zome_types::cell::CellId;
 use crate::holochain_types::dna::zome::HostFnAccess;
 use crate::holochain_types::dna::zome::Permission;
 use crate::holochain_types::dna::zome::Zome;

@@ -19,7 +19,7 @@ use holochain_lmdb::env::EnvironmentWrite;
 use holochain_lmdb::test_utils::test_environments;
 use holochain_lmdb::test_utils::TestEnvironments;
 use crate::holochain_types::app::InstalledCell;
-use crate::holochain_types::cell::CellId;
+use holochain_zome_types::cell::CellId;
 use crate::holochain_types::dna::DnaDef;
 use crate::holochain_types::dna::DnaFile;
 use crate::holochain_types::test_utils::fake_agent_pubkey_1;

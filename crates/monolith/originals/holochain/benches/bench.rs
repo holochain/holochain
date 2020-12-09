@@ -1,4 +1,3 @@
-use hdk3::prelude::*;
 use crate::holochain::core::ribosome::RibosomeT;
 use crate::holochain::core::ribosome::ZomeCallInvocation;
 use crate::holochain_types::dna::zome::Zome;
@@ -10,6 +9,7 @@ use criterion::criterion_main;
 use criterion::BenchmarkId;
 use criterion::Criterion;
 use criterion::Throughput;
+use hdk3::prelude::*;
 use holo_hash::fixt::AgentPubKeyFixturator;
 use holochain_zome_types::ExternInput;
 use once_cell::sync::Lazy;
@@ -36,7 +36,7 @@ static REAL_RIBOSOME: Lazy<Mutex<crate::holochain::core::ribosome::real_ribosome
         )
     });
 
-static CELL_ID: Lazy<Mutex<crate::holochain_types::cell::CellId>> = Lazy::new(|| {
+static CELL_ID: Lazy<Mutex<holochain_zome_types::cell::CellId>> = Lazy::new(|| {
     Mutex::new(
         crate::holochain_types::fixt::CellIdFixturator::new(Unpredictable)
             .next()

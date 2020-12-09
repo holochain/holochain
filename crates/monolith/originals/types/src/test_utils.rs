@@ -1,6 +1,5 @@
 //! Some common testing helpers.
 
-use crate::holochain_types::cell::CellId;
 use crate::holochain_types::dna::wasm::DnaWasm;
 use crate::holochain_types::dna::zome::WasmZome;
 use crate::holochain_types::dna::DnaDef;
@@ -9,6 +8,7 @@ use crate::holochain_types::dna::JsonProperties;
 use crate::holochain_types::prelude::*;
 use holochain_zome_types::capability::CapSecret;
 use holochain_zome_types::capability::CAP_SECRET_BYTES;
+use holochain_zome_types::cell::CellId;
 use holochain_zome_types::zome::ZomeName;
 use std::path::PathBuf;
 

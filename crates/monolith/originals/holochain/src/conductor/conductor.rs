@@ -52,6 +52,12 @@ use crate::holochain::conductor::p2p_store::AgentKvKey;
 use crate::holochain::core::signal::Signal;
 use crate::holochain::core::state::source_chain::SourceChainBuf;
 use crate::holochain::core::state::wasm::WasmBuf;
+use crate::holochain_types::app::InstalledApp;
+use crate::holochain_types::app::InstalledAppId;
+use crate::holochain_types::app::InstalledCell;
+use crate::holochain_types::app::MembraneProof;
+use crate::holochain_types::dna::wasm::DnaWasmHashed;
+use crate::holochain_types::dna::DnaFile;
 pub use builder::*;
 use fallible_iterator::FallibleIterator;
 use futures::future;
@@ -71,13 +77,7 @@ use holochain_lmdb::env::ReadManager;
 use holochain_lmdb::exports::SingleStore;
 use holochain_lmdb::fresh_reader;
 use holochain_lmdb::prelude::*;
-use crate::holochain_types::app::InstalledApp;
-use crate::holochain_types::app::InstalledAppId;
-use crate::holochain_types::app::InstalledCell;
-use crate::holochain_types::app::MembraneProof;
-use crate::holochain_types::cell::CellId;
-use crate::holochain_types::dna::wasm::DnaWasmHashed;
-use crate::holochain_types::dna::DnaFile;
+use holochain_zome_types::cell::CellId;
 use holochain_zome_types::entry_def::EntryDef;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use std::collections::HashMap;
@@ -1119,9 +1119,10 @@ mod builder {
         /// Build a Conductor with a test environment
         pub async fn test(self, envs: &TestEnvironments) -> ConductorResult<ConductorHandle> {
             let keystore = envs.conductor().keystore();
-            let (holochain_p2p, p2p_evt) =
-                crate::holochain_p2p::spawn_holochain_p2p(self.config.network.clone().unwrap_or_default())
-                    .await?;
+            let (holochain_p2p, p2p_evt) = crate::holochain_p2p::spawn_holochain_p2p(
+                self.config.network.clone().unwrap_or_default(),
+            )
+            .await?;
             let conductor = Conductor::new(
                 envs.conductor(),
                 envs.wasm(),
@@ -1164,8 +1165,8 @@ pub mod tests {
     use super::ConductorState;
     use super::*;
     use crate::holochain::conductor::dna_store::MockDnaStore;
-    use holochain_lmdb::test_utils::test_environments;
     use crate::holochain_types::test_utils::fake_cell_id;
+    use holochain_lmdb::test_utils::test_environments;
     use matches::assert_matches;
 
     #[tokio::test(threaded_scheduler)]

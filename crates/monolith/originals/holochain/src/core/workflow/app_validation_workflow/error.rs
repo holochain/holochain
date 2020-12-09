@@ -1,5 +1,5 @@
 use crate::holochain_p2p::HolochainP2pError;
-use crate::holochain_types::cell::CellId;
+use holochain_zome_types::cell::CellId;
 use holochain_zome_types::header::ZomeId;
 use thiserror::Error;
 

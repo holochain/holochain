@@ -4,7 +4,7 @@
 //! - System-defined signals are produced in various places in the system
 
 use holochain_serialized_bytes::prelude::*;
-use crate::holochain_types::cell::CellId;
+use holochain_zome_types::cell::CellId;
 use crate::impl_from;
 use holochain_zome_types::signal::AppSignal;
 

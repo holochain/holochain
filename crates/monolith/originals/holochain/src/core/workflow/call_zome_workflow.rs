@@ -330,7 +330,7 @@ pub mod tests {
     use holochain_serialized_bytes::prelude::*;
     use holochain_lmdb::env::ReadManager;
     use holochain_lmdb::test_utils::test_cell_env;
-    use crate::holochain_types::cell::CellId;
+    use holochain_zome_types::cell::CellId;
     use observability;
     use crate::holochain_types::test_utils::fake_agent_pubkey_1;
     use crate::holochain_wasm_test_utils::TestWasm;

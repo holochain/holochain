@@ -16,7 +16,7 @@ use crate::holochain_types::app::InstallAppPayload;
 use crate::holochain_types::app::InstalledApp;
 use crate::holochain_types::app::InstalledAppId;
 use crate::holochain_types::app::InstalledCell;
-use crate::holochain_types::cell::CellId;
+use holochain_zome_types::cell::CellId;
 use crate::holochain_types::dna::DnaFile;
 use crate::holochain_types::dna::JsonProperties;
 use kitsune_p2p::agent_store::AgentInfoSigned;

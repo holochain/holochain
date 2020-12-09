@@ -18,14 +18,12 @@ pub fn capability_grants(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    use hdk3::prelude::*;
     use crate::holochain::conductor::dna_store::MockDnaStore;
     use crate::holochain::conductor::interface::websocket::test::setup_app;
     use crate::holochain::core::ribosome::ZomeCall;
     use crate::holochain::core::workflow::call_zome_workflow::CallZomeWorkspace;
     use crate::holochain::fixt::ZomeCallHostAccessFixturator;
     use crate::holochain_types::app::InstalledCell;
-    use crate::holochain_types::cell::CellId;
     use crate::holochain_types::dna::DnaDef;
     use crate::holochain_types::dna::DnaFile;
     use crate::holochain_types::fixt::CapSecretFixturator;
@@ -33,6 +31,8 @@ pub mod wasm_test {
     use crate::holochain_types::test_utils::fake_agent_pubkey_2;
     use crate::holochain_wasm_test_utils::TestWasm;
     use ::fixt::prelude::*;
+    use hdk3::prelude::*;
+    use holochain_zome_types::cell::CellId;
     use matches::assert_matches;
 
     #[tokio::test(threaded_scheduler)]

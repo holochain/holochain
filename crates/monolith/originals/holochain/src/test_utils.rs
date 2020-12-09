@@ -21,7 +21,7 @@ use crate::holochain_p2p::HolochainP2pCell;
 use crate::holochain_p2p::HolochainP2pRef;
 use crate::holochain_p2p::HolochainP2pSender;
 use crate::holochain_types::app::InstalledCell;
-use crate::holochain_types::cell::CellId;
+use holochain_zome_types::cell::CellId;
 use crate::holochain_types::dna::zome::Zome;
 use crate::holochain_types::dna::DnaFile;
 use crate::holochain_types::element::SignedHeaderHashed;

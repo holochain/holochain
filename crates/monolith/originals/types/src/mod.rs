@@ -11,7 +11,6 @@
 pub mod activity;
 pub mod app;
 pub mod autonomic;
-pub mod cell;
 pub mod chain;
 pub mod db;
 pub mod dht_op;

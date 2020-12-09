@@ -1333,7 +1333,7 @@ mod slow_tests {
     use holochain_lmdb::db::INTEGRATED_DHT_OPS;
     use holochain_lmdb::env::ReadManager;
     use crate::holochain_types::app::InstalledCell;
-    use crate::holochain_types::cell::CellId;
+    use holochain_zome_types::cell::CellId;
     use crate::holochain_types::dna::DnaDef;
     use crate::holochain_types::dna::DnaFile;
     use observability;

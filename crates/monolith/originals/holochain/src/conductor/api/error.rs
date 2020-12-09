@@ -11,7 +11,7 @@ use crate::holochain::core::workflow::error::WorkflowError;
 use holo_hash::DnaHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_lmdb::error::DatabaseError;
-use crate::holochain_types::cell::CellId;
+use holochain_zome_types::cell::CellId;
 use thiserror::Error;
 
 /// Errors occurring during a [CellConductorApi] or [InterfaceApi] call

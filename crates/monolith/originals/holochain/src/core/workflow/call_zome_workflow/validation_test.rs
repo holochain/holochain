@@ -7,7 +7,7 @@ use crate::holochain::test_utils::new_zome_call;
 use crate::holochain::test_utils::setup_app;
 use holochain_serialized_bytes::SerializedBytes;
 use crate::holochain_types::app::InstalledCell;
-use crate::holochain_types::cell::CellId;
+use holochain_zome_types::cell::CellId;
 use crate::holochain_types::dna::DnaDef;
 use crate::holochain_types::dna::DnaFile;
 use crate::holochain_types::test_utils::fake_agent_pubkey_1;

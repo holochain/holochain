@@ -12,7 +12,7 @@ use holo_hash::AnyDhtHash;
 use holo_hash::HeaderHash;
 use holochain_keystore::KeystoreError;
 use holochain_lmdb::error::DatabaseError;
-use crate::holochain_types::cell::CellId;
+use holochain_zome_types::cell::CellId;
 use holochain_zome_types::header::AppEntryType;
 use holochain_zome_types::header::EntryType;
 use holochain_zome_types::signature::Signature;

@@ -1,6 +1,6 @@
 //! Utility items related to data persistence.
 
-use crate::holochain_types::cell::CellId;
+use holochain_zome_types::cell::CellId;
 use std::path::Path;
 use std::path::PathBuf;
 

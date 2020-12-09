@@ -1,9 +1,9 @@
 //! Collection of cells to form a holochain application
-use crate::holochain_types::cell::CellId;
 use crate::holochain_types::dna::JsonProperties;
 use derive_more::Into;
 use holo_hash::AgentPubKey;
 use holochain_serialized_bytes::SerializedBytes;
+use holochain_zome_types::cell::CellId;
 use std::path::PathBuf;
 
 /// Placeholder used to identify installed apps

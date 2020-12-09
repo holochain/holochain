@@ -34,7 +34,7 @@ use holochain_lmdb::prelude::IntegratedPrefix;
 use holochain_lmdb::prelude::WriteManager;
 use holochain_lmdb::test_utils::test_cell_env;
 use crate::holochain_types::app::InstalledCell;
-use crate::holochain_types::cell::CellId;
+use holochain_zome_types::cell::CellId;
 use crate::holochain_types::dht_op::produce_op_lights_from_elements;
 use crate::holochain_types::dna::DnaDef;
 use crate::holochain_types::dna::DnaFile;

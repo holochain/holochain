@@ -15,7 +15,6 @@
 //! hard to automate piping from tests stderr.
 //!
 
-use hdk3::prelude::*;
 use crate::holochain::conductor::api::AdminRequest;
 use crate::holochain::conductor::api::AdminResponse;
 use crate::holochain::conductor::api::AppRequest;
@@ -29,22 +28,23 @@ use crate::holochain::conductor::dna_store::MockDnaStore;
 use crate::holochain::conductor::ConductorBuilder;
 use crate::holochain::conductor::ConductorHandle;
 use crate::holochain::fixt::*;
-use holochain_lmdb::test_utils::test_environments;
-use holochain_lmdb::test_utils::TestEnvironments;
 use crate::holochain_test_wasm_common::AnchorInput;
 use crate::holochain_test_wasm_common::TestString;
 use crate::holochain_types::app::InstalledCell;
-use crate::holochain_types::cell::CellId;
 use crate::holochain_types::dna::DnaDef;
 use crate::holochain_types::dna::DnaFile;
-use observability;
 use crate::holochain_types::test_utils::fake_agent_pubkey_1;
 use crate::holochain_types::test_utils::fake_agent_pubkey_2;
 use crate::holochain_wasm_test_utils::TestWasm;
 use crate::holochain_websocket::WebsocketSender;
 use ::fixt::prelude::*;
+use hdk3::prelude::*;
+use holochain_lmdb::test_utils::test_environments;
+use holochain_lmdb::test_utils::TestEnvironments;
+use holochain_zome_types::cell::CellId;
 use holochain_zome_types::ExternInput;
 use matches::assert_matches;
+use observability;
 use test_case::test_case;
 use test_utils::*;
 use tracing::instrument;

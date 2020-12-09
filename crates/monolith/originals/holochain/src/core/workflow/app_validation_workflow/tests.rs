@@ -10,7 +10,7 @@ use crate::holochain::test_utils::new_zome_call;
 use crate::holochain::test_utils::setup_app;
 use crate::holochain::test_utils::wait_for_integration;
 use crate::holochain_types::app::InstalledCell;
-use crate::holochain_types::cell::CellId;
+use holochain_zome_types::cell::CellId;
 use crate::holochain_types::dht_op::DhtOpLight;
 use crate::holochain_types::dna::DnaDef;
 use crate::holochain_types::dna::DnaFile;

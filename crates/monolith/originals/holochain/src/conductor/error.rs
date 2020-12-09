@@ -4,7 +4,7 @@ use crate::holochain::conductor::cell::error::CellError;
 use crate::holochain::core::workflow::error::WorkflowError;
 use holochain_lmdb::error::DatabaseError;
 use crate::holochain_types::app::InstalledAppId;
-use crate::holochain_types::cell::CellId;
+use holochain_zome_types::cell::CellId;
 use std::path::PathBuf;
 use thiserror::Error;
 

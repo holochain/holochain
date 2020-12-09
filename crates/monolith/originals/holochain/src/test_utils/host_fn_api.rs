@@ -20,7 +20,7 @@ use crate::holochain_p2p::actor::GetLinksOptions;
 use crate::holochain_p2p::actor::GetOptions;
 use crate::holochain_p2p::actor::HolochainP2pRefToCell;
 use crate::holochain_p2p::HolochainP2pCell;
-use crate::holochain_types::cell::CellId;
+use holochain_zome_types::cell::CellId;
 use crate::holochain_types::dna::DnaFile;
 use crate::holochain_types::element::Element;
 use crate::holochain_types::Entry;

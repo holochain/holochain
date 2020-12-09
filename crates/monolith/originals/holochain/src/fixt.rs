@@ -38,7 +38,7 @@ use holo_hash::WasmHash;
 use holochain_keystore::keystore_actor::KeystoreSender;
 use crate::holochain_p2p::HolochainP2pCellFixturator;
 use holochain_lmdb::test_utils::test_keystore;
-use crate::holochain_types::cell::CellId;
+use holochain_zome_types::cell::CellId;
 use crate::holochain_types::dna::wasm::DnaWasm;
 use crate::holochain_types::dna::zome::WasmZome;
 use crate::holochain_types::dna::zome::Zome;

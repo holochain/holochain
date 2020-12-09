@@ -62,7 +62,7 @@ use crate::holochain_types::app::InstalledAppId;
 use crate::holochain_types::app::InstalledCell;
 use crate::holochain_types::app::MembraneProof;
 use crate::holochain_types::autonomic::AutonomicCue;
-use crate::holochain_types::cell::CellId;
+use holochain_zome_types::cell::CellId;
 use crate::holochain_types::dna::DnaFile;
 use crate::holochain_types::prelude::*;
 use holochain_zome_types::entry_def::EntryDef;

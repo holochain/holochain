@@ -44,7 +44,7 @@ use holochain_lmdb::env::EnvironmentWrite;
 use holochain_lmdb::env::ReadManager;
 use crate::holochain_types::activity::AgentActivity;
 use crate::holochain_types::autonomic::AutonomicProcess;
-use crate::holochain_types::cell::CellId;
+use holochain_zome_types::cell::CellId;
 use crate::holochain_types::element::GetElementResponse;
 use crate::holochain_types::link::GetLinksResponse;
 use crate::holochain_types::link::WireLinkMetaKey;

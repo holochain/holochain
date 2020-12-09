@@ -14,7 +14,7 @@ use async_trait::async_trait;
 use holo_hash::DnaHash;
 use holochain_keystore::KeystoreSender;
 use crate::holochain_types::autonomic::AutonomicCue;
-use crate::holochain_types::cell::CellId;
+use holochain_zome_types::cell::CellId;
 use crate::holochain_types::dna::zome::Zome;
 use crate::holochain_types::dna::DnaFile;
 use holochain_zome_types::entry_def::EntryDef;

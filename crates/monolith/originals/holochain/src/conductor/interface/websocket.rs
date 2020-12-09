@@ -263,7 +263,7 @@ pub mod test {
     use crate::holochain_types::app::InstallAppDnaPayload;
     use crate::holochain_types::app::InstallAppPayload;
     use crate::holochain_types::app::InstalledCell;
-    use crate::holochain_types::cell::CellId;
+    use holochain_zome_types::cell::CellId;
     use crate::holochain_types::dna::DnaDef;
     use crate::holochain_types::dna::DnaFile;
     use observability;
