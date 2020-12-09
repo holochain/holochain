@@ -918,7 +918,7 @@ pub type ConductorStateDb = KvStore<UnitDbKey, ConductorState>;
 mod builder {
     use super::*;
     use crate::conductor::{dna_store::RealDnaStore, ConductorHandle};
-    use holochain_state::{env::EnvironmentKind, test_utils::TestEnvironments};
+    use holochain_state::env::EnvironmentKind;
 
     /// A configurable Builder for Conductor and sometimes ConductorHandle
     #[derive(Default)]

@@ -267,10 +267,12 @@ mod slow_tests {
         assert_eq!(
             result,
             PostCommitResult::Fail(
-                vec![HeaderHashFixturator::new(fixt::Empty)
-                    .next()
-                    .unwrap()
-                    .into()]
+                vec![
+                    HeaderHashFixturator::new(fixt::Empty)
+                        .next()
+                        .unwrap()
+                        .into()
+                ]
                 .into(),
                 "empty header fail".into()
             ),

@@ -280,7 +280,11 @@ async fn run_test(
                         let s = debug_span!("inspect_ops");
                         let _g = s.enter();
                         debug!(?i.op);
-                        assert_matches!(i.status, ValidationLimboStatus::Pending | ValidationLimboStatus::AwaitingAppDeps(_));
+                        assert_matches!(
+                            i.status,
+                            ValidationLimboStatus::Pending
+                                | ValidationLimboStatus::AwaitingAppDeps(_)
+                        );
                         Ok(())
                     })
                     .count()
