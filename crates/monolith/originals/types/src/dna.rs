@@ -10,13 +10,15 @@ use crate::holochain_types::prelude::*;
 pub use error::DnaError;
 use holo_hash::impl_hashable_content;
 pub use holo_hash::*;
-use holochain_zome_types::zome::ZomeName;
+use holochain_zome_types::ZomeName;
 use std::collections::BTreeMap;
 
 use self::error::DnaResult;
-use self::zome::inline_zome::InlineZome;
 use self::zome::Zome;
 use self::zome::ZomeDef;
+
+#[cfg(feature = "test_utils")]
+use zome::inline_zome::InlineZome;
 
 /// Zomes need to be an ordered map from ZomeName to a Zome
 pub type Zomes = Vec<(ZomeName, zome::ZomeDef)>;
