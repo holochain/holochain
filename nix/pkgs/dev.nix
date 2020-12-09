@@ -22,7 +22,7 @@ rec {
     export RUST_BACKTRACE=1
 
     # ensure plain build works
-    cargo test --no-run --no-default-features --manifest-path=crates/holochain/Cargo.toml
+    cargo build --no-default-features --manifest-path=crates/holochain/Cargo.toml
 
     # alas, we cannot specify --features in the virtual workspace
     cargo test warm_wasm_tests --manifest-path=crates/holochain/Cargo.toml --features slow_tests,build_wasms
