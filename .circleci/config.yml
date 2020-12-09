@@ -42,6 +42,9 @@ jobs:
     steps:
       - checkout
       - run:
+         name: Unset CircleCI's forced conversion of HTTPS->SSH
+         command: git config --global --unset "url.ssh://git@github.com.insteadof"
+      - run:
          name: Run the merge tests
          no_output_timeout: 30m
          command: nix-shell --pure --argstr flavor ci --run hc-merge-test
