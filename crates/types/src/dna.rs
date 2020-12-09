@@ -13,6 +13,9 @@ pub use holo_hash::*;
 use holochain_zome_types::zome::ZomeName;
 use std::collections::BTreeMap;
 
+#[cfg(feature = "test_utils")]
+use zome::inline_zome::InlineZome;
+
 use self::{
     error::DnaResult,
     zome::{Zome, ZomeDef},
@@ -22,7 +25,9 @@ use self::{
 pub type Zomes = Vec<(ZomeName, zome::ZomeDef)>;
 
 /// A type to allow json values to be used as [SerializedBytes]
-#[derive(Debug, Clone, derive_more::From, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(
+    Debug, Clone, derive_more::From, serde::Serialize, serde::Deserialize, SerializedBytes,
+)]
 pub struct JsonProperties(serde_json::Value);
 
 impl JsonProperties {
@@ -112,7 +117,7 @@ pub type DnaDefHashed = HoloHashed<DnaDef>;
 
 impl_hashable_content!(DnaDef, Dna);
 
-/// Wasms need to be an ordered map from WasmHash to a DnaWasm
+/// Wasms need to be an ordered map from WasmHash to a wasm::DnaWasm
 pub type Wasms = BTreeMap<holo_hash::WasmHash, wasm::DnaWasm>;
 
 /// Represents a full DNA file including WebAssembly bytecode.
@@ -244,7 +249,7 @@ impl DnaFile {
     pub async fn from_zomes(
         uuid: String,
         zomes: Vec<(ZomeName, ZomeDef)>,
-        wasms: Vec<DnaWasm>,
+        wasms: Vec<wasm::DnaWasm>,
     ) -> DnaResult<(Self, Vec<Zome>)> {
         let dna_def = DnaDefBuilder::default()
             .uuid(uuid)
@@ -261,7 +266,7 @@ impl DnaFile {
     /// with a random UUID
     pub async fn unique_from_zomes(
         zomes: Vec<(ZomeName, ZomeDef)>,
-        wasms: Vec<DnaWasm>,
+        wasms: Vec<wasm::DnaWasm>,
     ) -> DnaResult<(Self, Vec<Zome>)> {
         Self::from_zomes(random_uuid(), zomes, wasms).await
     }
@@ -272,7 +277,7 @@ impl DnaFile {
         test_wasms: Vec<W>,
     ) -> DnaResult<(Self, Vec<Zome>)>
     where
-        W: Into<(ZomeName, ZomeDef)> + Into<DnaWasm> + Clone,
+        W: Into<(ZomeName, ZomeDef)> + Into<wasm::DnaWasm> + Clone,
     {
         let zomes = test_wasms.clone().into_iter().map(Into::into).collect();
         let wasms = test_wasms.into_iter().map(Into::into).collect();
@@ -283,7 +288,7 @@ impl DnaFile {
     /// with a random UUID
     pub async fn unique_from_test_wasms<W>(test_wasms: Vec<W>) -> DnaResult<(Self, Vec<Zome>)>
     where
-        W: Into<(ZomeName, ZomeDef)> + Into<DnaWasm> + Clone,
+        W: Into<(ZomeName, ZomeDef)> + Into<wasm::DnaWasm> + Clone,
     {
         Self::from_test_wasms(random_uuid(), test_wasms).await
     }

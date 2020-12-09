@@ -919,6 +919,7 @@ mod builder {
     use super::*;
     use crate::conductor::{dna_store::RealDnaStore, ConductorHandle};
     use holochain_state::env::EnvironmentKind;
+    use holochain_state::test_utils::TestEnvironments;
 
     /// A configurable Builder for Conductor and sometimes ConductorHandle
     #[derive(Default)]
