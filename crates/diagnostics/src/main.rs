@@ -29,7 +29,7 @@ async fn run() -> anyhow::Result<()> {
     let opt = Opt::from_args();
 
     // throwaway keystore that we'll never use.
-    let keystore = spawn_test_keystore(Vec::new()).await.unwrap();
+    let keystore = spawn_test_keystore().await.unwrap();
 
     // set up the various environments
     let wasm_env = EnvironmentWrite::new(
