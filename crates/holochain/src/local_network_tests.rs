@@ -159,14 +159,22 @@ fn conductors_remote_gossip(num_committers: usize, num_conductors: usize, new_co
         override_port: None,
         override_host: None,
     };
-    let proxy_config = holochain_p2p::kitsune_p2p::ProxyConfig::RemoteProxyClient{
-        // Real proxy
-        proxy_url: url2::url2!("kitsune-proxy://CIW6PxKxsPPlcuvUCbMcKwUpaMSmB7kLD8xyyj4mqcw/kitsune-quic/h/proxy.holochain.org/p/5778/--"),
-        // Local proxy
-        // proxy_url: url2::url2!("kitsune-proxy://h5_sQGIdBB7OnWVc1iuYZ-QUzb0DowdCA73PA0oOcv4/kitsune-quic/h/192.168.1.6/p/58451/--"),
-        // Other machine proxy
-        // proxy_url: url2::url2!("kitsune-proxy://h5_sQGIdBB7OnWVc1iuYZ-QUzb0DowdCA73PA0oOcv4/kitsune-quic/h/192.168.1.68/p/58451/--"),
+    let proxy_config = if let Some(proxy_addr) = std::env::var_os("KIT_PROXY") {
+        holochain_p2p::kitsune_p2p::ProxyConfig::RemoteProxyClient {
+            // Real proxy
+            proxy_url: url2::url2!("{}", proxy_addr.into_string().unwrap()),
+        }
+    } else {
+        holochain_p2p::kitsune_p2p::ProxyConfig::RemoteProxyClient{
+            // Real proxy
+            proxy_url: url2::url2!("kitsune-proxy://CIW6PxKxsPPlcuvUCbMcKwUpaMSmB7kLD8xyyj4mqcw/kitsune-quic/h/proxy.holochain.org/p/5778/--"),
+            // Local proxy
+            // proxy_url: url2::url2!("kitsune-proxy://h5_sQGIdBB7OnWVc1iuYZ-QUzb0DowdCA73PA0oOcv4/kitsune-quic/h/192.168.1.6/p/58451/--"),
+            // Other machine proxy
+            // proxy_url: url2::url2!("kitsune-proxy://h5_sQGIdBB7OnWVc1iuYZ-QUzb0DowdCA73PA0oOcv4/kitsune-quic/h/192.168.1.68/p/58451/--"),
+        }
     };
+
     network.transport_pool = vec![kitsune_p2p::TransportConfig::Proxy {
         sub_transport: transport.into(),
         proxy_config,
