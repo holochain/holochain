@@ -262,6 +262,8 @@ pub struct CallZomeWorkspace {
     pub meta_authored: MetadataBuf<AuthoredPrefix>,
     pub element_integrated: ElementBuf<IntegratedPrefix>,
     pub meta_integrated: MetadataBuf<IntegratedPrefix>,
+    pub element_rejected: ElementBuf<RejectedPrefix>,
+    pub meta_rejected: MetadataBuf<RejectedPrefix>,
     pub element_cache: ElementBuf,
     pub meta_cache: MetadataBuf,
 }
@@ -272,6 +274,8 @@ impl<'a> CallZomeWorkspace {
         let meta_authored = MetadataBuf::authored(env.clone())?;
         let element_integrated = ElementBuf::vault(env.clone(), true)?;
         let meta_integrated = MetadataBuf::vault(env.clone())?;
+        let element_rejected = ElementBuf::rejected(env.clone())?;
+        let meta_rejected = MetadataBuf::rejected(env.clone())?;
         let element_cache = ElementBuf::cache(env.clone())?;
         let meta_cache = MetadataBuf::cache(env)?;
 
@@ -280,6 +284,8 @@ impl<'a> CallZomeWorkspace {
             meta_authored,
             element_integrated,
             meta_integrated,
+            element_rejected,
+            meta_rejected,
             element_cache,
             meta_cache,
         })
@@ -292,6 +298,8 @@ impl<'a> CallZomeWorkspace {
             &self.meta_authored,
             &self.element_integrated,
             &self.meta_integrated,
+            &self.element_rejected,
+            &self.meta_rejected,
             &mut self.element_cache,
             &mut self.meta_cache,
             network,

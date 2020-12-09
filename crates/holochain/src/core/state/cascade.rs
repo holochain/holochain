@@ -174,13 +174,15 @@ enum Search {
     NotInCascade,
 }
 
-impl<'a, Network, MetaVault, MetaAuthored, MetaCache>
-    Cascade<'a, Network, MetaVault, MetaAuthored, MetaCache>
+impl<'a, Network, MetaVault, MetaAuthored, MetaCache, MetaPending, MetaRejected>
+    Cascade<'a, Network, MetaVault, MetaAuthored, MetaCache, MetaPending, MetaRejected>
 where
     MetaCache: MetadataBufT,
     MetaVault: MetadataBufT,
     MetaAuthored: MetadataBufT<AuthoredPrefix>,
-    Network: HolochainP2pCellT + Clone,
+    MetaPending: MetadataBufT<PendingPrefix>,
+    MetaRejected: MetadataBufT<RejectedPrefix>,
+    Network: HolochainP2pCellT + Clone + 'static + Send,
 {
     /// Constructs a [Cascade], for the default use case of
     /// vault + cache + network
@@ -193,6 +195,8 @@ where
         meta_authored: &'a MetaAuthored,
         element_integrated: &'a ElementBuf,
         meta_integrated: &'a MetaVault,
+        element_rejected: &'a ElementBuf<RejectedPrefix>,
+        meta_rejected: &'a MetaRejected,
         element_cache: &'a mut ElementBuf,
         meta_cache: &'a mut MetaCache,
         network: Network,
@@ -205,6 +209,10 @@ where
             element: element_integrated,
             meta: meta_integrated,
         });
+        let rejected_data = Some(DbPair {
+            element: element_rejected,
+            meta: meta_rejected,
+        });
         let cache_data = Some(DbPairMut {
             element: element_cache,
             meta: meta_cache,
@@ -213,7 +221,7 @@ where
             env: Some(env),
             network: Some(network),
             pending_data: None,
-            rejected_data: None,
+            rejected_data,
             integrated_data,
             authored_data,
             cache_data,
