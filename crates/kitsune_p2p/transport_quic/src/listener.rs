@@ -381,7 +381,7 @@ mod danger {
         // right now keep_alive_interval is None,
         // so connections will idle timeout after 20 seconds.
         transport
-            .max_idle_timeout(Some(std::time::Duration::from_millis(20_000)))
+            .max_idle_timeout(Some(std::time::Duration::from_millis(30_000)))
             .unwrap();
 
         Arc::new(transport)
