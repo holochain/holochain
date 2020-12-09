@@ -26,9 +26,9 @@ use crate::holochain_keystore::KeystoreSender;
 use crate::holochain_p2p::HolochainP2pCell;
 use crate::holochain_state::prelude::*;
 use crate::holochain_types::element::Element;
-use crate::holochain_zome_types::entry::GetOptions;
-use crate::holochain_zome_types::header::Header;
-use crate::holochain_zome_types::ZomeCallResponse;
+use holochain_zome_types::entry::GetOptions;
+use holochain_zome_types::header::Header;
+use holochain_zome_types::ZomeCallResponse;
 use std::sync::Arc;
 use tracing::instrument;
 
@@ -334,9 +334,9 @@ pub mod tests {
     use crate::holochain_types::observability;
     use crate::holochain_types::test_utils::fake_agent_pubkey_1;
     use crate::holochain_wasm_test_utils::TestWasm;
-    use crate::holochain_zome_types::entry::Entry;
-    use crate::holochain_zome_types::ExternInput;
-    use crate::holochain_zome_types::ExternOutput;
+    use holochain_zome_types::entry::Entry;
+    use holochain_zome_types::ExternInput;
+    use holochain_zome_types::ExternOutput;
     use matches::assert_matches;
 
     #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]

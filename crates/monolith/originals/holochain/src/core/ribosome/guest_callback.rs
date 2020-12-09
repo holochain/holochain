@@ -12,7 +12,7 @@ use crate::holochain::core::ribosome::Invocation;
 use crate::holochain::core::ribosome::RibosomeT;
 use fallible_iterator::FallibleIterator;
 use crate::holochain_types::dna::zome::Zome;
-use crate::holochain_zome_types::ExternOutput;
+use holochain_zome_types::ExternOutput;
 
 pub struct CallIterator<R: RibosomeT, I: Invocation> {
     host_access: HostAccess,
@@ -79,9 +79,9 @@ mod tests {
     use crate::holochain::fixt::ZomeFixturator;
     use fallible_iterator::FallibleIterator;
     use crate::holochain_types::dna::zome::Zome;
-    use crate::holochain_zome_types::init::InitCallbackResult;
-    use crate::holochain_zome_types::zome::FunctionName;
-    use crate::holochain_zome_types::ExternOutput;
+    use holochain_zome_types::init::InitCallbackResult;
+    use holochain_zome_types::zome::FunctionName;
+    use holochain_zome_types::ExternOutput;
     use mockall::predicate::*;
     use mockall::Sequence;
     use std::convert::TryInto;

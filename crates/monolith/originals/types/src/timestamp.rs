@@ -92,14 +92,14 @@ impl std::convert::TryFrom<&str> for Timestamp {
     }
 }
 
-impl From<Timestamp> for crate::holochain_zome_types::timestamp::Timestamp {
+impl From<Timestamp> for holochain_zome_types::timestamp::Timestamp {
     fn from(ts: Timestamp) -> Self {
         Self(ts.0, ts.1)
     }
 }
 
-impl From<crate::holochain_zome_types::timestamp::Timestamp> for Timestamp {
-    fn from(ts: crate::holochain_zome_types::timestamp::Timestamp) -> Self {
+impl From<holochain_zome_types::timestamp::Timestamp> for Timestamp {
+    fn from(ts: holochain_zome_types::timestamp::Timestamp) -> Self {
         Self(ts.0, ts.1)
     }
 }

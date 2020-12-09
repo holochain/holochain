@@ -1,6 +1,4 @@
-use ::fixt::prelude::*;
 use crate::hdk3::prelude::*;
-use holo_hash::fixt::*;
 use crate::holochain::conductor::api::AppInterfaceApi;
 use crate::holochain::conductor::api::AppRequest;
 use crate::holochain::conductor::api::AppResponse;
@@ -19,9 +17,11 @@ use crate::holochain_types::observability;
 use crate::holochain_types::test_utils::fake_agent_pubkey_1;
 use crate::holochain_types::test_utils::fake_agent_pubkey_2;
 use crate::holochain_wasm_test_utils::TestWasm;
-pub use crate::holochain_zome_types::capability::CapSecret;
-use crate::holochain_zome_types::ExternInput;
-use crate::holochain_zome_types::ZomeCallResponse;
+use ::fixt::prelude::*;
+use holo_hash::fixt::*;
+pub use holochain_zome_types::capability::CapSecret;
+use holochain_zome_types::ExternInput;
+use holochain_zome_types::ZomeCallResponse;
 use std::sync::Arc;
 use tempdir::TempDir;
 

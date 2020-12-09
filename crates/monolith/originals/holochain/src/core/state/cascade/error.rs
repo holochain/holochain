@@ -6,7 +6,7 @@ use holochain_serialized_bytes::SerializedBytesError;
 use crate::holochain_state::error::DatabaseError;
 use crate::holochain_types::dht_op::error::DhtOpError;
 use crate::holochain_types::element::error::ElementGroupError;
-use crate::holochain_zome_types::header::conversions::WrongHeaderError;
+use holochain_zome_types::header::conversions::WrongHeaderError;
 use thiserror::Error;
 use tokio::task::JoinError;
 

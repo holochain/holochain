@@ -75,20 +75,20 @@ use crate::holochain_types::validate::ValidationStatus;
 use crate::holochain_types::Entry;
 use crate::holochain_types::HeaderHashed;
 use crate::holochain_types::Timestamp;
-use crate::holochain_zome_types::element::Element;
-use crate::holochain_zome_types::element::SignedHeaderHashed;
-use crate::holochain_zome_types::entry_def::EntryDef;
-use crate::holochain_zome_types::entry_def::EntryDefId;
-use crate::holochain_zome_types::header::AppEntryType;
-use crate::holochain_zome_types::header::CreateLink;
-use crate::holochain_zome_types::header::DeleteLink;
-use crate::holochain_zome_types::header::EntryType;
-use crate::holochain_zome_types::header::ZomeId;
-use crate::holochain_zome_types::query::ChainStatus;
-use crate::holochain_zome_types::validate::RequiredValidationType;
-use crate::holochain_zome_types::validate::ValidationPackage;
-use crate::holochain_zome_types::zome::ZomeName;
-use crate::holochain_zome_types::Header;
+use holochain_zome_types::element::Element;
+use holochain_zome_types::element::SignedHeaderHashed;
+use holochain_zome_types::entry_def::EntryDef;
+use holochain_zome_types::entry_def::EntryDefId;
+use holochain_zome_types::header::AppEntryType;
+use holochain_zome_types::header::CreateLink;
+use holochain_zome_types::header::DeleteLink;
+use holochain_zome_types::header::EntryType;
+use holochain_zome_types::header::ZomeId;
+use holochain_zome_types::query::ChainStatus;
+use holochain_zome_types::validate::RequiredValidationType;
+use holochain_zome_types::validate::ValidationPackage;
+use holochain_zome_types::zome::ZomeName;
+use holochain_zome_types::Header;
 use tracing::*;
 pub use types::Outcome;
 
@@ -699,7 +699,7 @@ async fn get_validation_package_remote(
             const NUM_RETRY_GETS: u8 = 3;
             let range = 0..element.header().header_seq().saturating_sub(1);
 
-            let mut query = crate::holochain_zome_types::query::ChainQueryFilter::new()
+            let mut query = holochain_zome_types::query::ChainQueryFilter::new()
                 .sequence_range(range)
                 .include_entries(true);
             if let (RequiredValidationType::SubChain, Some(et)) = (

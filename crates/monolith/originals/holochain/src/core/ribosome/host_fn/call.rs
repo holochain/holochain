@@ -1,8 +1,8 @@
 use crate::holochain::core::ribosome::RibosomeT;
 use crate::holochain::core::ribosome::ZomeCall;
 use crate::holochain::core::ribosome::{error::RibosomeResult, CallContext};
-use crate::holochain_zome_types::{CallInput, ZomeCallResponse};
-use crate::holochain_zome_types::{CallOutput, ExternInput};
+use holochain_zome_types::{CallInput, ZomeCallResponse};
+use holochain_zome_types::{CallOutput, ExternInput};
 use std::sync::Arc;
 
 pub fn call(
@@ -59,9 +59,9 @@ pub mod wasm_test {
     use crate::holochain_types::dna::DnaDef;
     use crate::holochain_types::dna::DnaFile;
     use crate::holochain_wasm_test_utils::TestWasm;
-    use crate::holochain_zome_types::test_utils::fake_agent_pubkey_2;
-    use crate::holochain_zome_types::ExternInput;
-    use crate::holochain_zome_types::ZomeCallResponse;
+    use holochain_zome_types::test_utils::fake_agent_pubkey_2;
+    use holochain_zome_types::ExternInput;
+    use holochain_zome_types::ZomeCallResponse;
     use matches::assert_matches;
 
     use crate::holochain::conductor::{api::ZomeCall, ConductorHandle};

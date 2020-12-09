@@ -279,8 +279,8 @@ pub mod test {
     use crate::holochain_types::test_utils::fake_dna_zomes;
     use crate::holochain_wasm_test_utils::TestWasm;
     use crate::holochain_websocket::WebsocketMessage;
-    use crate::holochain_zome_types::test_utils::fake_agent_pubkey_2;
-    use crate::holochain_zome_types::ExternInput;
+    use holochain_zome_types::test_utils::fake_agent_pubkey_2;
+    use holochain_zome_types::ExternInput;
     use kitsune_p2p::agent_store::AgentInfoSigned;
     use kitsune_p2p::fixt::AgentInfoSignedFixturator;
     use matches::assert_matches;

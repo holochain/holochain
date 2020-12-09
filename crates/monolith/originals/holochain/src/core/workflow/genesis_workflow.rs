@@ -112,7 +112,7 @@ pub mod tests {
     use crate::holochain_types::observability;
     use crate::holochain_types::test_utils::fake_agent_pubkey_1;
     use crate::holochain_types::test_utils::fake_dna_file;
-    use crate::holochain_zome_types::Header;
+    use holochain_zome_types::Header;
     use matches::assert_matches;
 
     pub async fn fake_genesis(source_chain: &mut SourceChain) -> SourceChainResult<()> {

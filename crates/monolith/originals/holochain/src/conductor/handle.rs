@@ -65,7 +65,7 @@ use crate::holochain_types::autonomic::AutonomicCue;
 use crate::holochain_types::cell::CellId;
 use crate::holochain_types::dna::DnaFile;
 use crate::holochain_types::prelude::*;
-use crate::holochain_zome_types::entry_def::EntryDef;
+use holochain_zome_types::entry_def::EntryDef;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use std::sync::Arc;
 use tokio::sync::RwLock;

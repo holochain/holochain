@@ -9,10 +9,10 @@ use crate::holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
 use crate::holochain_types::dna::zome::HostFnAccess;
 use crate::holochain_types::dna::zome::Zome;
-use crate::holochain_zome_types::header::HeaderHashes;
-use crate::holochain_zome_types::post_commit::PostCommitCallbackResult;
-use crate::holochain_zome_types::zome::ZomeName;
-use crate::holochain_zome_types::ExternInput;
+use holochain_zome_types::header::HeaderHashes;
+use holochain_zome_types::post_commit::PostCommitCallbackResult;
+use holochain_zome_types::zome::ZomeName;
+use holochain_zome_types::ExternInput;
 
 #[derive(Clone)]
 pub struct PostCommitInvocation {
@@ -103,8 +103,8 @@ mod test {
     use ::fixt::prelude::*;
     use holochain_serialized_bytes::prelude::*;
     use crate::holochain_types::dna::zome::HostFnAccess;
-    use crate::holochain_zome_types::post_commit::PostCommitCallbackResult;
-    use crate::holochain_zome_types::ExternInput;
+    use holochain_zome_types::post_commit::PostCommitCallbackResult;
+    use holochain_zome_types::ExternInput;
 
     #[test]
     fn post_commit_callback_result_fold() {

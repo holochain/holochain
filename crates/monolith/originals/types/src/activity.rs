@@ -3,10 +3,10 @@
 use holo_hash::AgentPubKey;
 use holo_hash::HeaderHash;
 use holochain_serialized_bytes::prelude::*;
-use crate::holochain_zome_types::element::Element;
-use crate::holochain_zome_types::element::SignedHeaderHashed;
-pub use crate::holochain_zome_types::query::ChainStatus;
-use crate::holochain_zome_types::query::HighestObserved;
+use holochain_zome_types::element::Element;
+use holochain_zome_types::element::SignedHeaderHashed;
+pub use holochain_zome_types::query::ChainStatus;
+use holochain_zome_types::query::HighestObserved;
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 /// An agents chain elements returned from a agent_activity_query
@@ -36,7 +36,7 @@ pub enum ChainItems<T = SignedHeaderHashed> {
     NotRequested,
 }
 
-impl From<AgentActivity<Element>> for crate::holochain_zome_types::query::AgentActivity {
+impl From<AgentActivity<Element>> for holochain_zome_types::query::AgentActivity {
     fn from(a: AgentActivity<Element>) -> Self {
         let valid_activity = match a.valid_activity {
             ChainItems::Full(elements) => elements

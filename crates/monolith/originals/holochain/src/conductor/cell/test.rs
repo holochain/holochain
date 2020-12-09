@@ -12,7 +12,7 @@ use crate::holochain_types::test_utils::fake_agent_pubkey_2;
 use crate::holochain_types::test_utils::fake_cell_id;
 use crate::holochain_types::HeaderHashed;
 use crate::holochain_types::Timestamp;
-use crate::holochain_zome_types::header;
+use holochain_zome_types::header;
 use std::sync::Arc;
 use tokio::sync;
 

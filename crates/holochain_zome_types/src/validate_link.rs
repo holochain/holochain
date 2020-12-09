@@ -1,8 +1,8 @@
-use crate::holochain_zome_types::entry::Entry;
-use crate::holochain_zome_types::header::CreateLink;
-use crate::holochain_zome_types::header::DeleteLink;
-use crate::holochain_zome_types::zome_io::ExternOutput;
-use crate::holochain_zome_types::CallbackResult;
+use crate::entry::Entry;
+use crate::header::CreateLink;
+use crate::header::DeleteLink;
+use crate::zome_io::ExternOutput;
+use crate::CallbackResult;
 use holo_hash::AnyDhtHash;
 use holochain_serialized_bytes::prelude::*;
 

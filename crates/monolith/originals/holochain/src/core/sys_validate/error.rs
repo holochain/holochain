@@ -13,10 +13,10 @@ use holo_hash::HeaderHash;
 use crate::holochain_keystore::KeystoreError;
 use crate::holochain_state::error::DatabaseError;
 use crate::holochain_types::cell::CellId;
-use crate::holochain_zome_types::header::AppEntryType;
-use crate::holochain_zome_types::header::EntryType;
-use crate::holochain_zome_types::signature::Signature;
-use crate::holochain_zome_types::Header;
+use holochain_zome_types::header::AppEntryType;
+use holochain_zome_types::header::EntryType;
+use holochain_zome_types::signature::Signature;
+use holochain_zome_types::Header;
 use thiserror::Error;
 
 /// Validation can result in either

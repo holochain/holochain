@@ -25,7 +25,7 @@ use crate::holochain_types::dna::DnaFile;
 use crate::holochain_types::test_utils::fake_agent_pubkey_1;
 use crate::holochain_types::test_utils::fake_agent_pubkey_2;
 use crate::holochain_wasm_test_utils::TestWasm;
-use crate::holochain_zome_types::zome::ZomeName;
+use holochain_zome_types::zome::ZomeName;
 use kitsune_p2p::KitsuneP2pConfig;
 use std::collections::HashMap;
 use std::convert::TryFrom;

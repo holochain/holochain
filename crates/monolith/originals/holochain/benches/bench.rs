@@ -1,17 +1,17 @@
+use crate::hdk3::prelude::*;
+use crate::holochain::core::ribosome::RibosomeT;
+use crate::holochain::core::ribosome::ZomeCallInvocation;
+use crate::holochain_types::dna::zome::Zome;
+use crate::holochain_types::fixt::CapSecretFixturator;
+use crate::holochain_wasm_test_utils::TestWasm;
 use ::fixt::prelude::*;
 use criterion::criterion_group;
 use criterion::criterion_main;
 use criterion::BenchmarkId;
 use criterion::Criterion;
 use criterion::Throughput;
-use crate::hdk3::prelude::*;
 use holo_hash::fixt::AgentPubKeyFixturator;
-use crate::holochain::core::ribosome::RibosomeT;
-use crate::holochain::core::ribosome::ZomeCallInvocation;
-use crate::holochain_types::dna::zome::Zome;
-use crate::holochain_types::fixt::CapSecretFixturator;
-use crate::holochain_wasm_test_utils::TestWasm;
-use crate::holochain_zome_types::ExternInput;
+use holochain_zome_types::ExternInput;
 use once_cell::sync::Lazy;
 use std::sync::Mutex;
 
@@ -28,9 +28,9 @@ static TOKIO_RUNTIME: Lazy<Mutex<tokio::runtime::Runtime>> = Lazy::new(|| {
 static REAL_RIBOSOME: Lazy<Mutex<crate::holochain::core::ribosome::real_ribosome::RealRibosome>> =
     Lazy::new(|| {
         Mutex::new(
-            crate::holochain::fixt::RealRibosomeFixturator::new(crate::holochain::fixt::curve::Zomes(vec![
-                TestWasm::Bench.into(),
-            ]))
+            crate::holochain::fixt::RealRibosomeFixturator::new(
+                crate::holochain::fixt::curve::Zomes(vec![TestWasm::Bench.into()]),
+            )
             .next()
             .unwrap(),
         )
@@ -44,7 +44,7 @@ static CELL_ID: Lazy<Mutex<crate::holochain_types::cell::CellId>> = Lazy::new(||
     )
 });
 
-static CAP: Lazy<Mutex<crate::holochain_zome_types::capability::CapSecret>> =
+static CAP: Lazy<Mutex<holochain_zome_types::capability::CapSecret>> =
     Lazy::new(|| Mutex::new(CapSecretFixturator::new(Unpredictable).next().unwrap()));
 
 static AGENT_KEY: Lazy<Mutex<AgentPubKey>> =

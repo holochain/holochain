@@ -1,13 +1,13 @@
 use holo_hash::AgentPubKey;
-use crate::holochain_zome_types::prelude::CellId;
-use crate::holochain_zome_types::zome::FunctionName;
-use crate::holochain_zome_types::zome::ZomeName;
+use holochain_zome_types::prelude::CellId;
+use holochain_zome_types::zome::FunctionName;
+use holochain_zome_types::zome::ZomeName;
 use thiserror::Error;
 
 #[derive(Debug, Clone, Error)]
 pub enum HdkError {
     #[error(transparent)]
-    EntryError(#[from] crate::holochain_zome_types::entry::EntryError),
+    EntryError(#[from] holochain_zome_types::entry::EntryError),
 
     #[error(transparent)]
     SerializedBytes(#[from] holochain_wasmer_guest::SerializedBytesError),

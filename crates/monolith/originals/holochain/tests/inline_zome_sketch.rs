@@ -1,4 +1,3 @@
-use futures::StreamExt;
 use crate::hdk3::prelude::*;
 use crate::holochain::conductor::api::ZomeCall;
 use crate::holochain::conductor::Conductor;
@@ -7,7 +6,8 @@ use crate::holochain_state::test_utils::test_environments;
 use crate::holochain_types::app::InstalledCell;
 use crate::holochain_types::dna::zome::inline_zome::InlineZome;
 use crate::holochain_types::dna::DnaFile;
-use crate::holochain_zome_types::element::ElementEntry;
+use futures::StreamExt;
+use holochain_zome_types::element::ElementEntry;
 use unwrap_to::unwrap_to;
 
 fn simple_crud_zome() -> InlineZome {

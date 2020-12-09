@@ -10,9 +10,9 @@ use crate::holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
 use crate::holochain_types::dna::zome::HostFnAccess;
 use crate::holochain_types::dna::DnaDef;
-use crate::holochain_zome_types::init::InitCallbackResult;
-use crate::holochain_zome_types::zome::ZomeName;
-use crate::holochain_zome_types::ExternInput;
+use holochain_zome_types::init::InitCallbackResult;
+use holochain_zome_types::zome::ZomeName;
+use holochain_zome_types::ExternInput;
 
 #[derive(Debug, Clone)]
 pub struct InitInvocation {
@@ -107,8 +107,8 @@ mod test {
     use ::fixt::prelude::*;
     use holochain_serialized_bytes::prelude::*;
     use crate::holochain_types::dna::zome::HostFnAccess;
-    use crate::holochain_zome_types::init::InitCallbackResult;
-    use crate::holochain_zome_types::ExternInput;
+    use holochain_zome_types::init::InitCallbackResult;
+    use holochain_zome_types::ExternInput;
 
     #[test]
     fn init_callback_result_fold() {

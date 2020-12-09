@@ -3,8 +3,8 @@ use crate::holochain::core::ribosome::CallContext;
 use crate::holochain::core::ribosome::RibosomeT;
 use crate::holochain::core::state::metadata::LinkMetaKey;
 use crate::holochain_p2p::actor::GetLinksOptions;
-use crate::holochain_zome_types::GetLinksInput;
-use crate::holochain_zome_types::GetLinksOutput;
+use holochain_zome_types::GetLinksInput;
+use holochain_zome_types::GetLinksOutput;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
@@ -113,7 +113,7 @@ pub mod slow_tests {
             TestString::from("foo.baz".to_string())
         );
 
-        let children_output: crate::holochain_zome_types::link::Links = crate::call_test_ribosome!(
+        let children_output: holochain_zome_types::link::Links = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
             "children",

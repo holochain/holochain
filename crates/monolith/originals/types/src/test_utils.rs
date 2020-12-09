@@ -7,12 +7,12 @@ use crate::holochain_types::dna::DnaDef;
 use crate::holochain_types::dna::DnaFile;
 use crate::holochain_types::dna::JsonProperties;
 use crate::holochain_types::prelude::*;
-use crate::holochain_zome_types::capability::CapSecret;
-use crate::holochain_zome_types::capability::CAP_SECRET_BYTES;
-use crate::holochain_zome_types::zome::ZomeName;
+use holochain_zome_types::capability::CapSecret;
+use holochain_zome_types::capability::CAP_SECRET_BYTES;
+use holochain_zome_types::zome::ZomeName;
 use std::path::PathBuf;
 
-pub use crate::holochain_zome_types::test_utils::*;
+pub use holochain_zome_types::test_utils::*;
 
 #[derive(Serialize, Deserialize, SerializedBytes)]
 struct FakeProperties {

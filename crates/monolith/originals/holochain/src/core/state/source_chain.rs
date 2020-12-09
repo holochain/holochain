@@ -12,20 +12,20 @@ use crate::fresh_reader;
 use crate::holochain_state::prelude::*;
 use crate::holochain_types::prelude::*;
 use crate::holochain_types::EntryHashed;
-use crate::holochain_zome_types::capability::CapAccess;
-use crate::holochain_zome_types::capability::CapGrant;
-use crate::holochain_zome_types::capability::CapSecret;
-use crate::holochain_zome_types::capability::GrantedFunction;
-use crate::holochain_zome_types::element::Element;
-use crate::holochain_zome_types::entry::CapClaimEntry;
-use crate::holochain_zome_types::entry::Entry;
-use crate::holochain_zome_types::header::builder;
-use crate::holochain_zome_types::header::EntryType;
-use crate::holochain_zome_types::header::Header;
-use crate::holochain_zome_types::header::HeaderBuilder;
-use crate::holochain_zome_types::header::HeaderBuilderCommon;
-use crate::holochain_zome_types::header::HeaderInner;
-use crate::holochain_zome_types::query::ChainQueryFilter;
+use holochain_zome_types::capability::CapAccess;
+use holochain_zome_types::capability::CapGrant;
+use holochain_zome_types::capability::CapSecret;
+use holochain_zome_types::capability::GrantedFunction;
+use holochain_zome_types::element::Element;
+use holochain_zome_types::entry::CapClaimEntry;
+use holochain_zome_types::entry::Entry;
+use holochain_zome_types::header::builder;
+use holochain_zome_types::header::EntryType;
+use holochain_zome_types::header::Header;
+use holochain_zome_types::header::HeaderBuilder;
+use holochain_zome_types::header::HeaderBuilderCommon;
+use holochain_zome_types::header::HeaderInner;
+use holochain_zome_types::query::ChainQueryFilter;
 use shrinkwraprs::Shrinkwrap;
 pub use source_chain_buffer::*;
 use std::collections::HashSet;
@@ -125,7 +125,7 @@ impl SourceChain {
         let committed_valid_grant = fresh_reader!(self.env(), |r| {
             let (references, headers): (
                 HashSet<HeaderHash>,
-                Vec<HoloHashed<crate::holochain_zome_types::element::SignedHeader>>,
+                Vec<HoloHashed<holochain_zome_types::element::SignedHeader>>,
             ) = self
                 .0
                 .headers()
@@ -339,8 +339,8 @@ pub mod tests {
     use crate::hdk3::prelude::*;
     use crate::holochain_state::test_utils::test_cell_env;
     use crate::holochain_types::test_utils::fake_dna_hash;
-    use crate::holochain_zome_types::capability::CapAccess;
-    use crate::holochain_zome_types::capability::ZomeCallCapGrant;
+    use holochain_zome_types::capability::CapAccess;
+    use holochain_zome_types::capability::ZomeCallCapGrant;
     use std::collections::HashSet;
 
     #[tokio::test(threaded_scheduler)]

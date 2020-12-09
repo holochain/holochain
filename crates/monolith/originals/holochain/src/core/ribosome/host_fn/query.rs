@@ -1,10 +1,10 @@
 use crate::holochain::core::ribosome::error::RibosomeResult;
 use crate::holochain::core::ribosome::CallContext;
 use crate::holochain::core::ribosome::RibosomeT;
-use crate::holochain_zome_types::element::Element;
-use crate::holochain_zome_types::element::ElementVec;
-use crate::holochain_zome_types::QueryInput;
-use crate::holochain_zome_types::QueryOutput;
+use holochain_zome_types::element::Element;
+use holochain_zome_types::element::ElementVec;
+use holochain_zome_types::QueryInput;
+use holochain_zome_types::QueryOutput;
 use std::sync::Arc;
 
 pub fn query(

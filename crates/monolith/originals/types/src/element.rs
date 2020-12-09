@@ -11,12 +11,12 @@ use error::ElementGroupError;
 use error::ElementGroupResult;
 use crate::holochain_keystore::KeystoreError;
 use holochain_serialized_bytes::prelude::*;
-pub use crate::holochain_zome_types::element::*;
-use crate::holochain_zome_types::entry::Entry;
-use crate::holochain_zome_types::entry_def::EntryVisibility;
-use crate::holochain_zome_types::header::EntryType;
-use crate::holochain_zome_types::header::Header;
-use crate::holochain_zome_types::validate::ValidationStatus;
+pub use holochain_zome_types::element::*;
+use holochain_zome_types::entry::Entry;
+use holochain_zome_types::entry_def::EntryVisibility;
+use holochain_zome_types::header::EntryType;
+use holochain_zome_types::header::Header;
+use holochain_zome_types::validate::ValidationStatus;
 use std::borrow::Cow;
 use std::collections::BTreeSet;
 

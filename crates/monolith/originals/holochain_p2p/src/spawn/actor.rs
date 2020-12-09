@@ -11,7 +11,7 @@ use ghost_actor::dependencies::tracing_futures::Instrument;
 use crate::holochain_types::element::GetElementResponse;
 use crate::holochain_types::validate::ValidationPackageResponse;
 use crate::holochain_types::Timestamp;
-use crate::holochain_zome_types::zome::FunctionName;
+use holochain_zome_types::zome::FunctionName;
 use kitsune_p2p::actor::KitsuneP2pSender;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 

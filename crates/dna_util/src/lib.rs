@@ -38,11 +38,11 @@
 //! ```
 
 use holochain_serialized_bytes::prelude::*;
+use holochain_zome_types::zome::ZomeName;
 use monolith::holochain_types::dna::wasm::DnaWasm;
 use monolith::holochain_types::dna::zome::WasmZome;
 use monolith::holochain_types::dna::DnaDef;
 use monolith::holochain_types::dna::DnaFile;
-use monolith::holochain_zome_types::zome::ZomeName;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 

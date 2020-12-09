@@ -5,10 +5,10 @@ use crate::holochain::core::ribosome::ZomesToInvoke;
 use derive_more::Constructor;
 use holochain_serialized_bytes::prelude::*;
 use crate::holochain_types::dna::zome::HostFnAccess;
-use crate::holochain_zome_types::entry_def::EntryDefs;
-use crate::holochain_zome_types::entry_def::EntryDefsCallbackResult;
-use crate::holochain_zome_types::zome::ZomeName;
-use crate::holochain_zome_types::ExternInput;
+use holochain_zome_types::entry_def::EntryDefs;
+use holochain_zome_types::entry_def::EntryDefsCallbackResult;
+use holochain_zome_types::zome::ZomeName;
+use holochain_zome_types::ExternInput;
 use std::collections::BTreeMap;
 
 #[derive(Debug, Clone)]
@@ -103,8 +103,8 @@ mod test {
     use ::fixt::prelude::*;
     use holochain_serialized_bytes::prelude::*;
     use crate::holochain_types::dna::zome::HostFnAccess;
-    use crate::holochain_zome_types::entry_def::EntryDefsCallbackResult;
-    use crate::holochain_zome_types::ExternInput;
+    use holochain_zome_types::entry_def::EntryDefsCallbackResult;
+    use holochain_zome_types::ExternInput;
     use std::collections::BTreeMap;
 
     #[test]
@@ -233,11 +233,11 @@ mod slow_tests {
     use crate::holochain::fixt::EntryDefsInvocationFixturator;
     use crate::holochain::fixt::RealRibosomeFixturator;
     use crate::holochain_wasm_test_utils::TestWasm;
-    use crate::holochain_zome_types::crdt::CrdtType;
-    use crate::holochain_zome_types::entry_def::EntryDef;
-    use crate::holochain_zome_types::entry_def::EntryDefs;
-    pub use crate::holochain_zome_types::entry_def::EntryVisibility;
-    use crate::holochain_zome_types::zome::ZomeName;
+    use holochain_zome_types::crdt::CrdtType;
+    use holochain_zome_types::entry_def::EntryDef;
+    use holochain_zome_types::entry_def::EntryDefs;
+    pub use holochain_zome_types::entry_def::EntryVisibility;
+    use holochain_zome_types::zome::ZomeName;
     use std::collections::BTreeMap;
 
     #[tokio::test(threaded_scheduler)]

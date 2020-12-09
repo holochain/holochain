@@ -1,7 +1,7 @@
 use super::CallContext;
 use super::RibosomeT;
-use crate::holochain_zome_types::zome_io::HostFnApiErrorPlaceholder;
-use crate::holochain_zome_types::zome_io::HostFnApiT;
+use holochain_zome_types::zome_io::HostFnApiErrorPlaceholder;
+use holochain_zome_types::zome_io::HostFnApiT;
 use std::sync::Arc;
 
 pub struct HostFnApi<Ribosome: RibosomeT> {
@@ -40,13 +40,13 @@ macro_rules! host_fn_api_impls {
 }
 
 // All host_fn_api_impls below rely on this import
-use crate::holochain_zome_types as zt;
+use holochain_zome_types as zt;
 
 host_fn_api_impls! {
 
     // ------------------------------------------------------------------
     // These definitions are copy-pasted from
-    // crate::holochain_zome_types::zome_io
+    // holochain_zome_types::zome_io
     // TODO: is there a way to unhygienically import this code in both places?
 
     fn agent_info (()) -> zt::agent_info::AgentInfo;

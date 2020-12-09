@@ -22,10 +22,10 @@ use crate::holochain_types::test_utils::fake_agent_pubkey_1;
 use crate::holochain_types::test_utils::fake_agent_pubkey_2;
 use crate::holochain_types::test_utils::fake_header_hash;
 use crate::holochain_types::HeaderHashed;
-use crate::holochain_zome_types::header;
-use crate::holochain_zome_types::link::LinkTag;
-use crate::holochain_zome_types::Entry;
-use crate::holochain_zome_types::Header;
+use holochain_zome_types::header;
+use holochain_zome_types::link::LinkTag;
+use holochain_zome_types::Entry;
+use holochain_zome_types::Header;
 use mockall::*;
 
 #[allow(dead_code)]

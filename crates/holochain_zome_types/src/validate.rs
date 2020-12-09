@@ -1,6 +1,6 @@
-use crate::holochain_zome_types::element::Element;
-use crate::holochain_zome_types::zome_io::ExternOutput;
-use crate::holochain_zome_types::CallbackResult;
+use crate::element::Element;
+use crate::zome_io::ExternOutput;
+use crate::CallbackResult;
 use holo_hash::AnyDhtHash;
 use holochain_serialized_bytes::prelude::*;
 

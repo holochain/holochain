@@ -13,7 +13,7 @@ use crate::holochain_state::error::DatabaseError;
 use crate::holochain_state::error::DatabaseResult;
 use crate::holochain_state::prelude::Readable;
 use crate::holochain_state::prelude::Writer;
-use crate::holochain_zome_types::signature::Signature;
+use holochain_zome_types::signature::Signature;
 
 /// The result of a DhtOp Validation.
 #[derive(

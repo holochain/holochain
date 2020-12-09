@@ -14,8 +14,8 @@ use crate::holochain_types::cell::CellId;
 use crate::holochain_types::dna::DnaDef;
 use crate::holochain_types::dna::DnaFile;
 use crate::holochain_wasm_test_utils::TestWasm;
-use crate::holochain_zome_types::fixt::*;
-use crate::holochain_zome_types::test_utils::fake_agent_pubkey_1;
+use holochain_zome_types::fixt::*;
+use holochain_zome_types::test_utils::fake_agent_pubkey_1;
 
 /// Unfortunately this test doesn't do anything yet because
 /// failing a chain validation is just a log error so the only way to

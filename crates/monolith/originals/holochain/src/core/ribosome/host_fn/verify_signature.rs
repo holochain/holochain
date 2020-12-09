@@ -2,8 +2,8 @@ use crate::holochain::core::ribosome::error::RibosomeResult;
 use crate::holochain::core::ribosome::CallContext;
 use crate::holochain::core::ribosome::RibosomeT;
 use crate::holochain_keystore::AgentPubKeyExt;
-use crate::holochain_zome_types::VerifySignatureInput;
-use crate::holochain_zome_types::VerifySignatureOutput;
+use holochain_zome_types::VerifySignatureInput;
+use holochain_zome_types::VerifySignatureOutput;
 use std::sync::Arc;
 
 pub fn verify_signature(
@@ -150,7 +150,7 @@ pub mod wasm_test {
                     host_access,
                     TestWasm::Sign,
                     "verify_signature",
-                    crate::holochain_zome_types::zome_io::VerifySignatureInput::new(
+                    holochain_zome_types::zome_io::VerifySignatureInput::new(
                         VerifySignature::new_raw(k.clone(), sig.clone().into(), data.clone())
                     )
                 );

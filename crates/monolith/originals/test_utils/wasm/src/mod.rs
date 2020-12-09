@@ -2,7 +2,7 @@ use crate::holochain_types::dna::wasm::DnaWasm;
 use crate::holochain_types::dna::zome::WasmZome;
 use crate::holochain_types::dna::zome::ZomeDef;
 use crate::holochain_types::dna::zome::Zome;
-use crate::holochain_zome_types::zome::ZomeName;
+use holochain_zome_types::zome::ZomeName;
 
 const WASM_WORKSPACE_TARGET: &str = "wasm_workspace/target";
 

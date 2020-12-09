@@ -8,13 +8,13 @@ use crate::holochain::core::workflow::call_zome_workflow::CallZomeWorkspace;
 use crate::holochain::core::workflow::integrate_dht_ops_workflow::integrate_to_authored;
 use crate::holochain::core::SourceChainError;
 use holo_hash::HasHash;
-use crate::holochain_zome_types::entry_def::EntryDefId;
-use crate::holochain_zome_types::entry_def::EntryVisibility;
-use crate::holochain_zome_types::header::builder;
-use crate::holochain_zome_types::header::AppEntryType;
-use crate::holochain_zome_types::header::EntryType;
-use crate::holochain_zome_types::CreateInput;
-use crate::holochain_zome_types::CreateOutput;
+use holochain_zome_types::entry_def::EntryDefId;
+use holochain_zome_types::entry_def::EntryVisibility;
+use holochain_zome_types::header::builder;
+use holochain_zome_types::header::AppEntryType;
+use holochain_zome_types::header::EntryType;
+use holochain_zome_types::CreateInput;
+use holochain_zome_types::CreateOutput;
 use std::sync::Arc;
 
 /// create element
@@ -83,7 +83,7 @@ pub fn extract_entry_def(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     entry_def_id: EntryDefId,
-) -> RibosomeResult<(crate::holochain_zome_types::header::EntryDefIndex, EntryVisibility)> {
+) -> RibosomeResult<(holochain_zome_types::header::EntryDefIndex, EntryVisibility)> {
     let app_entry_type = match ribosome
         .run_entry_defs((&call_context.host_access).into(), EntryDefsInvocation)?
     {
@@ -95,7 +95,7 @@ pub fn extract_entry_def(
                 Some(entry_defs) => match entry_defs.entry_def_id_position(entry_def_id.clone()) {
                     // build an app entry type from the entry def at the found position
                     Some(index) => Some((
-                        crate::holochain_zome_types::header::EntryDefIndex::from(index as u8),
+                        holochain_zome_types::header::EntryDefIndex::from(index as u8),
                         entry_defs[index].visibility,
                     )),
                     None => None,
@@ -141,13 +141,13 @@ pub mod wasm_test {
     use crate::holochain_types::test_utils::fake_agent_pubkey_1;
     use crate::holochain_types::test_utils::fake_agent_pubkey_2;
     use crate::holochain_wasm_test_utils::TestWasm;
-    use crate::holochain_zome_types::entry::EntryError;
-    use crate::holochain_zome_types::entry_def::EntryDefId;
-    use crate::holochain_zome_types::CreateInput;
-    use crate::holochain_zome_types::CreateOutput;
-    use crate::holochain_zome_types::Entry;
-    use crate::holochain_zome_types::ExternInput;
-    use crate::holochain_zome_types::GetOutput;
+    use holochain_zome_types::entry::EntryError;
+    use holochain_zome_types::entry_def::EntryDefId;
+    use holochain_zome_types::CreateInput;
+    use holochain_zome_types::CreateOutput;
+    use holochain_zome_types::Entry;
+    use holochain_zome_types::ExternInput;
+    use holochain_zome_types::GetOutput;
     use std::sync::Arc;
     use crate::holochain_test_wasm_common::TestBytes;
     use crate::holochain_test_wasm_common::TestInt;
@@ -273,7 +273,7 @@ pub mod wasm_test {
             crate::call_test_ribosome!(host_access, TestWasm::Create, "get_entry", ());
 
         let sb: SerializedBytes = match round.into_inner().and_then(|el| el.into()) {
-            Some(crate::holochain_zome_types::entry::Entry::App(entry_bytes)) => entry_bytes.into(),
+            Some(holochain_zome_types::entry::Entry::App(entry_bytes)) => entry_bytes.into(),
             other => panic!(format!("unexpected output: {:?}", other)),
         };
         // this should be the content "foo" of the committed post

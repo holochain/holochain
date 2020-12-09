@@ -20,9 +20,9 @@ use crate::holochain_state::prelude::*;
 use crate::holochain_types::dna::zome::ZomeDef;
 use crate::holochain_types::dna::DnaDefHashed;
 use crate::holochain_types::dna::DnaFile;
-use crate::holochain_zome_types::entry_def::EntryDef;
-use crate::holochain_zome_types::header::EntryDefIndex;
-use crate::holochain_zome_types::header::ZomeId;
+use holochain_zome_types::entry_def::EntryDef;
+use holochain_zome_types::header::EntryDefIndex;
+use holochain_zome_types::header::ZomeId;
 use std::collections::HashMap;
 use std::convert::TryInto;
 
@@ -232,9 +232,9 @@ mod tests {
     use crate::holochain_types::dna::zome::ZomeDef;
     use crate::holochain_types::test_utils::fake_dna_zomes;
     use crate::holochain_wasm_test_utils::TestWasm;
-    use crate::holochain_zome_types::crdt::CrdtType;
-    use crate::holochain_zome_types::entry_def::EntryDef;
-    use crate::holochain_zome_types::entry_def::EntryVisibility;
+    use holochain_zome_types::crdt::CrdtType;
+    use holochain_zome_types::entry_def::EntryDef;
+    use holochain_zome_types::entry_def::EntryVisibility;
 
     #[tokio::test(threaded_scheduler)]
     async fn test_store_entry_defs() {

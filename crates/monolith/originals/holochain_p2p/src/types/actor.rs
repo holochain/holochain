@@ -2,8 +2,8 @@
 #![allow(clippy::too_many_arguments)]
 
 use crate::holochain_p2p::*;
-use crate::holochain_zome_types::request::MetadataRequest;
-use crate::holochain_zome_types::zome::FunctionName;
+use holochain_zome_types::request::MetadataRequest;
+use holochain_zome_types::zome::FunctionName;
 
 /// Request a validation package.
 #[derive(Clone, Debug)]
@@ -72,8 +72,8 @@ impl Default for GetOptions {
     }
 }
 
-impl From<crate::holochain_zome_types::entry::GetOptions> for GetOptions {
-    fn from(_: crate::holochain_zome_types::entry::GetOptions) -> Self {
+impl From<holochain_zome_types::entry::GetOptions> for GetOptions {
+    fn from(_: holochain_zome_types::entry::GetOptions) -> Self {
         Self::default()
     }
 }

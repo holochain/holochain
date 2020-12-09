@@ -2,9 +2,9 @@ use crate::holochain::core::ribosome::error::RibosomeResult;
 use crate::holochain::core::ribosome::CallContext;
 use crate::holochain::core::ribosome::RibosomeT;
 use holo_hash::HasHash;
-use crate::holochain_zome_types::zome_info::ZomeInfo;
-use crate::holochain_zome_types::ZomeInfoInput;
-use crate::holochain_zome_types::ZomeInfoOutput;
+use holochain_zome_types::zome_info::ZomeInfo;
+use holochain_zome_types::ZomeInfoInput;
+use holochain_zome_types::ZomeInfoOutput;
 use std::sync::Arc;
 
 pub fn zome_info(
@@ -29,7 +29,7 @@ pub mod test {
     use crate::holochain::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use crate::holochain_wasm_test_utils::TestWasm;
-    use crate::holochain_zome_types::ZomeInfoOutput;
+    use holochain_zome_types::ZomeInfoOutput;
 
     #[tokio::test(threaded_scheduler)]
     async fn invoke_import_zome_info_test() {

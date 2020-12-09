@@ -9,15 +9,15 @@ use crate::holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
 use crate::holochain_types::dna::zome::HostFnAccess;
 use crate::holochain_types::dna::zome::Permission;
-use crate::holochain_zome_types::element::Element;
-use crate::holochain_zome_types::entry::Entry;
-use crate::holochain_zome_types::entry_def::EntryDefId;
-use crate::holochain_zome_types::validate::ValidateCallbackResult;
-use crate::holochain_zome_types::validate::ValidateData;
-use crate::holochain_zome_types::validate::ValidationPackage;
-use crate::holochain_zome_types::zome::ZomeName;
-use crate::holochain_zome_types::ExternInput;
-use crate::holochain_zome_types::Header;
+use holochain_zome_types::element::Element;
+use holochain_zome_types::entry::Entry;
+use holochain_zome_types::entry_def::EntryDefId;
+use holochain_zome_types::validate::ValidateCallbackResult;
+use holochain_zome_types::validate::ValidateData;
+use holochain_zome_types::validate::ValidationPackage;
+use holochain_zome_types::zome::ZomeName;
+use holochain_zome_types::ExternInput;
+use holochain_zome_types::Header;
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -149,10 +149,10 @@ mod test {
     use crate::holochain_types::dna::zome::HostFnAccess;
     use crate::holochain_types::dna::zome::Permission;
     use crate::holochain_types::fixt::*;
-    use crate::holochain_zome_types::entry::Entry;
-    use crate::holochain_zome_types::header::HeaderType;
-    use crate::holochain_zome_types::validate::ValidateCallbackResult;
-    use crate::holochain_zome_types::ExternInput;
+    use holochain_zome_types::entry::Entry;
+    use holochain_zome_types::header::HeaderType;
+    use holochain_zome_types::validate::ValidateCallbackResult;
+    use holochain_zome_types::ExternInput;
     use rand::seq::SliceRandom;
     use std::sync::Arc;
 
@@ -305,8 +305,8 @@ mod slow_tests {
     use ::fixt::prelude::*;
     use holo_hash::fixt::AgentPubKeyFixturator;
     use crate::holochain_wasm_test_utils::TestWasm;
-    use crate::holochain_zome_types::CreateOutput;
-    use crate::holochain_zome_types::Entry;
+    use holochain_zome_types::CreateOutput;
+    use holochain_zome_types::Entry;
     use std::sync::Arc;
 
     #[tokio::test(threaded_scheduler)]

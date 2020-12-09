@@ -10,7 +10,6 @@ pub mod holochain_test_wasm_common;
 pub mod holochain_types;
 pub mod holochain_wasm_test_utils;
 pub mod holochain_websocket;
-pub mod holochain_zome_types;
 
 pub use holochain_p2p::*;
 pub use holochain_serialized_bytes::prelude::*;

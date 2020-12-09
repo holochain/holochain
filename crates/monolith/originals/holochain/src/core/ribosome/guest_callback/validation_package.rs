@@ -10,11 +10,11 @@ use holochain_serialized_bytes::prelude::*;
 use crate::holochain_types::dna::zome::HostFnAccess;
 use crate::holochain_types::dna::zome::Permission;
 use crate::holochain_types::dna::zome::Zome;
-use crate::holochain_zome_types::header::AppEntryType;
-use crate::holochain_zome_types::validate::ValidationPackage;
-use crate::holochain_zome_types::validate::ValidationPackageCallbackResult;
-use crate::holochain_zome_types::zome::ZomeName;
-use crate::holochain_zome_types::ExternInput;
+use holochain_zome_types::header::AppEntryType;
+use holochain_zome_types::validate::ValidationPackage;
+use holochain_zome_types::validate::ValidationPackageCallbackResult;
+use holochain_zome_types::zome::ZomeName;
+use holochain_zome_types::ExternInput;
 
 #[derive(Clone)]
 pub struct ValidationPackageInvocation {
@@ -133,9 +133,9 @@ mod test {
     use crate::holochain::fixt::ValidationPackageInvocationFixturator;
     use holochain_serialized_bytes::prelude::*;
     use crate::holochain_types::dna::zome::HostFnAccess;
-    use crate::holochain_zome_types::validate::ValidationPackage;
-    use crate::holochain_zome_types::validate::ValidationPackageCallbackResult;
-    use crate::holochain_zome_types::ExternInput;
+    use holochain_zome_types::validate::ValidationPackage;
+    use holochain_zome_types::validate::ValidationPackageCallbackResult;
+    use holochain_zome_types::ExternInput;
     use rand::prelude::*;
 
     #[tokio::test(threaded_scheduler)]
@@ -261,7 +261,7 @@ mod slow_tests {
     use crate::hdk3::prelude::AppEntryType;
     use crate::hdk3::prelude::EntryVisibility;
     use crate::holochain_wasm_test_utils::TestWasm;
-    use crate::holochain_zome_types::validate::ValidationPackage;
+    use holochain_zome_types::validate::ValidationPackage;
 
     #[tokio::test(threaded_scheduler)]
     async fn test_validation_package_unimplemented() {

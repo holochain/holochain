@@ -10,14 +10,14 @@ use holochain_serialized_bytes::prelude::*;
 use crate::holochain_types::dna::zome::HostFnAccess;
 use crate::holochain_types::dna::zome::Permission;
 use crate::holochain_types::dna::zome::Zome;
-use crate::holochain_zome_types::entry::Entry;
-use crate::holochain_zome_types::header::CreateLink;
-use crate::holochain_zome_types::header::DeleteLink;
-use crate::holochain_zome_types::validate_link::ValidateCreateLinkData;
-use crate::holochain_zome_types::validate_link::ValidateDeleteLinkData;
-use crate::holochain_zome_types::validate_link::ValidateLinkCallbackResult;
-use crate::holochain_zome_types::zome::ZomeName;
-use crate::holochain_zome_types::ExternInput;
+use holochain_zome_types::entry::Entry;
+use holochain_zome_types::header::CreateLink;
+use holochain_zome_types::header::DeleteLink;
+use holochain_zome_types::validate_link::ValidateCreateLinkData;
+use holochain_zome_types::validate_link::ValidateDeleteLinkData;
+use holochain_zome_types::validate_link::ValidateLinkCallbackResult;
+use holochain_zome_types::zome::ZomeName;
+use holochain_zome_types::ExternInput;
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -194,9 +194,9 @@ mod test {
     use holochain_serialized_bytes::prelude::*;
     use crate::holochain_types::dna::zome::HostFnAccess;
     use crate::holochain_types::dna::zome::Permission;
-    use crate::holochain_zome_types::validate_link::ValidateCreateLinkData;
-    use crate::holochain_zome_types::validate_link::ValidateLinkCallbackResult;
-    use crate::holochain_zome_types::ExternInput;
+    use holochain_zome_types::validate_link::ValidateCreateLinkData;
+    use holochain_zome_types::validate_link::ValidateLinkCallbackResult;
+    use holochain_zome_types::ExternInput;
     use rand::seq::SliceRandom;
 
     #[tokio::test(threaded_scheduler)]

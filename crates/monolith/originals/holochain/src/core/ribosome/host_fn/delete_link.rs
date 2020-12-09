@@ -8,10 +8,10 @@ use crate::holochain::core::workflow::integrate_dht_ops_workflow::integrate_to_a
 use crate::holochain::core::SourceChainError;
 use crate::holochain_p2p::actor::GetOptions;
 use crate::holochain_types::element::SignedHeaderHashed;
-use crate::holochain_zome_types::header::builder;
-use crate::holochain_zome_types::DeleteLinkInput;
-use crate::holochain_zome_types::DeleteLinkOutput;
-use crate::holochain_zome_types::Header;
+use holochain_zome_types::header::builder;
+use holochain_zome_types::DeleteLinkInput;
+use holochain_zome_types::DeleteLinkOutput;
+use holochain_zome_types::Header;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
@@ -100,8 +100,8 @@ pub mod slow_tests {
     use ::fixt::prelude::*;
     use holo_hash::HeaderHash;
     use crate::holochain_wasm_test_utils::TestWasm;
-    use crate::holochain_zome_types::link::Links;
-    use crate::holochain_zome_types::DeleteLinkInput;
+    use holochain_zome_types::link::Links;
+    use holochain_zome_types::DeleteLinkInput;
 
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_delete_link_add_remove() {

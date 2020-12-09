@@ -198,11 +198,11 @@ mod tests {
     use crate::holochain_types::fixt::SignatureFixturator;
     use crate::holochain_types::observability;
     use crate::holochain_types::HeaderHashed;
-    use crate::holochain_zome_types::element::SignedHeaderHashed;
-    use crate::holochain_zome_types::entry_def::EntryVisibility;
-    use crate::holochain_zome_types::header::builder;
-    use crate::holochain_zome_types::header::EntryType;
-    use crate::holochain_zome_types::header::Update;
+    use holochain_zome_types::element::SignedHeaderHashed;
+    use holochain_zome_types::entry_def::EntryVisibility;
+    use holochain_zome_types::header::builder;
+    use holochain_zome_types::header::EntryType;
+    use holochain_zome_types::header::Update;
     use matches::assert_matches;
     use std::collections::HashMap;
     use std::convert::TryInto;

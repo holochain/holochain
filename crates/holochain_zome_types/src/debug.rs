@@ -61,7 +61,7 @@ impl DebugMsg {
 /// assert_eq!(message.msg(), "info: operation complete");
 /// assert_eq!(message.file(), "src/debug.rs");
 /// assert_eq!(message.line(), 5);
-/// # use crate::holochain_zome_types::{debug::DebugMsg, debug_msg};
+/// # use crate::{debug::DebugMsg, debug_msg};
 /// ```
 ///
 /// Advanced formatting
@@ -78,7 +78,7 @@ impl DebugMsg {
 /// assert_eq!(message.msg(), "info: operation complete: frobnicate");
 /// assert_eq!(message.file(), "src/debug.rs");
 /// assert_eq!(message.line(), 7);
-/// # use crate::holochain_zome_types::{debug::DebugMsg, debug_msg};
+/// # use crate::{debug::DebugMsg, debug_msg};
 /// ```
 ///
 /// [`DebugMsg`]: struct.DebugMsg.html

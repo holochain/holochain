@@ -48,13 +48,13 @@ use crate::holochain_types::cell::CellId;
 use crate::holochain_types::dna::zome::HostFnAccess;
 use crate::holochain_types::dna::zome::Zome;
 use crate::holochain_types::dna::DnaDefHashed;
-use crate::holochain_zome_types::capability::CapGrant;
-use crate::holochain_zome_types::capability::CapSecret;
-use crate::holochain_zome_types::header::ZomeId;
-use crate::holochain_zome_types::zome::FunctionName;
-use crate::holochain_zome_types::ExternInput;
-use crate::holochain_zome_types::ExternOutput;
-use crate::holochain_zome_types::ZomeCallResponse;
+use holochain_zome_types::capability::CapGrant;
+use holochain_zome_types::capability::CapSecret;
+use holochain_zome_types::header::ZomeId;
+use holochain_zome_types::zome::FunctionName;
+use holochain_zome_types::ExternInput;
+use holochain_zome_types::ExternOutput;
+use holochain_zome_types::ZomeCallResponse;
 use mockall::automock;
 use std::iter::Iterator;
 
@@ -429,7 +429,7 @@ pub trait RibosomeT: Sized + std::fmt::Debug {
             .iter()
             .position(|(name, _)| name == zome_name)
         {
-            Some(index) => Ok(crate::holochain_zome_types::header::ZomeId::from(index as u8)),
+            Some(index) => Ok(holochain_zome_types::header::ZomeId::from(index as u8)),
             None => Err(RibosomeError::ZomeNotExists(zome_name.to_owned())),
         }
     }
@@ -574,7 +574,7 @@ pub mod wasm_test {
                         cell_id,
                         $test_wasm.into(),
                         $fn_name.into(),
-                        crate::holochain_zome_types::ExternInput::new(input.try_into().unwrap()),
+                        holochain_zome_types::ExternInput::new(input.try_into().unwrap()),
                     ))
                     .next()
                     .unwrap();

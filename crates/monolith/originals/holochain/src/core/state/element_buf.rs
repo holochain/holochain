@@ -27,9 +27,9 @@ use crate::holochain_types::element::ElementGroup;
 use crate::holochain_types::element::SignedHeader;
 use crate::holochain_types::element::SignedHeaderHashed;
 use crate::holochain_types::entry::EntryHashed;
-use crate::holochain_zome_types::entry_def::EntryVisibility;
-use crate::holochain_zome_types::Entry;
-use crate::holochain_zome_types::Header;
+use holochain_zome_types::entry_def::EntryVisibility;
+use holochain_zome_types::Entry;
+use holochain_zome_types::Header;
 use tracing::*;
 
 /// A CasBufFresh with Entries for values
@@ -346,7 +346,7 @@ mod tests {
     use crate::holochain_keystore::AgentPubKeyExt;
     use crate::holochain_state::prelude::*;
     use crate::holochain_state::test_utils::test_cell_env;
-    use crate::holochain_zome_types::entry_def::EntryVisibility;
+    use holochain_zome_types::entry_def::EntryVisibility;
 
     #[tokio::test(threaded_scheduler)]
     async fn can_write_private_entry_when_enabled() -> anyhow::Result<()> {

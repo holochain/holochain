@@ -1,13 +1,13 @@
 //! Defines a Element, the basic unit of Holochain data.
 
-use crate::holochain_zome_types::entry_def::EntryVisibility;
-use crate::holochain_zome_types::header::conversions::WrongHeaderError;
-use crate::holochain_zome_types::header::CreateLink;
-use crate::holochain_zome_types::header::DeleteLink;
-use crate::holochain_zome_types::header::HeaderHashed;
-use crate::holochain_zome_types::signature::Signature;
-use crate::holochain_zome_types::Entry;
-use crate::holochain_zome_types::Header;
+use crate::entry_def::EntryVisibility;
+use crate::header::conversions::WrongHeaderError;
+use crate::header::CreateLink;
+use crate::header::DeleteLink;
+use crate::header::HeaderHashed;
+use crate::signature::Signature;
+use crate::Entry;
+use crate::Header;
 use holo_hash::hash_type;
 use holo_hash::HasHash;
 use holo_hash::HashableContent;

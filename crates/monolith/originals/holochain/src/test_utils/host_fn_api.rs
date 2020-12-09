@@ -34,25 +34,25 @@ use crate::holochain_types::cell::CellId;
 use crate::holochain_types::dna::DnaFile;
 use crate::holochain_types::element::Element;
 use crate::holochain_types::Entry;
-use crate::holochain_zome_types::element::SignedHeaderHashed;
-use crate::holochain_zome_types::entry_def;
-use crate::holochain_zome_types::link::Link;
-use crate::holochain_zome_types::link::LinkTag;
-use crate::holochain_zome_types::metadata::Details;
-use crate::holochain_zome_types::query::ActivityRequest;
-use crate::holochain_zome_types::query::AgentActivity;
-use crate::holochain_zome_types::query::ChainQueryFilter;
-use crate::holochain_zome_types::zome::ZomeName;
-use crate::holochain_zome_types::CreateInput;
-use crate::holochain_zome_types::CreateLinkInput;
-use crate::holochain_zome_types::DeleteInput;
-use crate::holochain_zome_types::DeleteLinkInput;
-use crate::holochain_zome_types::GetAgentActivityInput;
-use crate::holochain_zome_types::GetDetailsInput;
-use crate::holochain_zome_types::GetInput;
-use crate::holochain_zome_types::GetLinksInput;
-use crate::holochain_zome_types::UpdateInput;
-use crate::holochain_zome_types::ZomeCallResponse;
+use holochain_zome_types::element::SignedHeaderHashed;
+use holochain_zome_types::entry_def;
+use holochain_zome_types::link::Link;
+use holochain_zome_types::link::LinkTag;
+use holochain_zome_types::metadata::Details;
+use holochain_zome_types::query::ActivityRequest;
+use holochain_zome_types::query::AgentActivity;
+use holochain_zome_types::query::ChainQueryFilter;
+use holochain_zome_types::zome::ZomeName;
+use holochain_zome_types::CreateInput;
+use holochain_zome_types::CreateLinkInput;
+use holochain_zome_types::DeleteInput;
+use holochain_zome_types::DeleteLinkInput;
+use holochain_zome_types::GetAgentActivityInput;
+use holochain_zome_types::GetDetailsInput;
+use holochain_zome_types::GetInput;
+use holochain_zome_types::GetLinksInput;
+use holochain_zome_types::UpdateInput;
+use holochain_zome_types::ZomeCallResponse;
 use std::sync::Arc;
 use tracing::*;
 use unwrap_to::unwrap_to;
@@ -266,7 +266,7 @@ impl HostFnCaller {
 
     pub async fn get(&self, entry_hash: AnyDhtHash, _options: GetOptions) -> Option<Element> {
         let (_, ribosome, call_context, _) = self.explode();
-        let input = GetInput::new((entry_hash, crate::holochain_zome_types::entry::GetOptions));
+        let input = GetInput::new((entry_hash, holochain_zome_types::entry::GetOptions));
         let output = { host_fn::get::get(ribosome, call_context, input).unwrap() };
         output.into_inner()
     }
@@ -277,7 +277,7 @@ impl HostFnCaller {
         _options: GetOptions,
     ) -> Option<Details> {
         let (_, ribosome, call_context, _) = self.explode();
-        let input = GetDetailsInput::new((entry_hash, crate::holochain_zome_types::entry::GetOptions));
+        let input = GetDetailsInput::new((entry_hash, holochain_zome_types::entry::GetOptions));
         let output = { host_fn::get_details::get_details(ribosome, call_context, input).unwrap() };
         output.into_inner()
     }

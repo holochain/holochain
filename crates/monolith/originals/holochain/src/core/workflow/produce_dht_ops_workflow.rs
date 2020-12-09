@@ -103,9 +103,9 @@ mod tests {
     use crate::holochain_types::observability;
     use crate::holochain_types::Entry;
     use crate::holochain_types::EntryHashed;
-    use crate::holochain_zome_types::entry_def::EntryVisibility;
-    use crate::holochain_zome_types::header::builder;
-    use crate::holochain_zome_types::header::EntryType;
+    use holochain_zome_types::entry_def::EntryVisibility;
+    use holochain_zome_types::header::builder;
+    use holochain_zome_types::header::EntryType;
     use matches::assert_matches;
     use std::collections::HashSet;
 

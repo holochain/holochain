@@ -3,9 +3,9 @@ use crate::holochain::core::ribosome::CallContext;
 use crate::holochain::core::ribosome::RibosomeT;
 use crate::holochain::core::state::metadata::LinkMetaKey;
 use crate::holochain_p2p::actor::GetLinksOptions;
-use crate::holochain_zome_types::link::LinkDetails;
-use crate::holochain_zome_types::GetLinkDetailsInput;
-use crate::holochain_zome_types::GetLinkDetailsOutput;
+use holochain_zome_types::link::LinkDetails;
+use holochain_zome_types::GetLinkDetailsInput;
+use holochain_zome_types::GetLinkDetailsOutput;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
@@ -51,8 +51,8 @@ pub mod slow_tests {
     use crate::holochain::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use crate::holochain_wasm_test_utils::TestWasm;
-    use crate::holochain_zome_types::element::SignedHeaderHashed;
-    use crate::holochain_zome_types::Header;
+    use holochain_zome_types::element::SignedHeaderHashed;
+    use holochain_zome_types::Header;
     use crate::holochain_test_wasm_common::*;
 
     #[tokio::test(threaded_scheduler)]
@@ -117,7 +117,7 @@ pub mod slow_tests {
             TestString::from("foo.baz".to_string())
         );
 
-        let children_details_output: crate::holochain_zome_types::link::LinkDetails = crate::call_test_ribosome!(
+        let children_details_output: holochain_zome_types::link::LinkDetails = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
             "children_details",
@@ -137,7 +137,7 @@ pub mod slow_tests {
             to_remove_hash
         );
 
-        let children_details_output_2: crate::holochain_zome_types::link::LinkDetails = crate::call_test_ribosome!(
+        let children_details_output_2: holochain_zome_types::link::LinkDetails = crate::call_test_ribosome!(
             host_access,
             TestWasm::HashPath,
             "children_details",

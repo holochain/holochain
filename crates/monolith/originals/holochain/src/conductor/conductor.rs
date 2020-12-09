@@ -78,7 +78,7 @@ use crate::holochain_types::app::MembraneProof;
 use crate::holochain_types::cell::CellId;
 use crate::holochain_types::dna::wasm::DnaWasmHashed;
 use crate::holochain_types::dna::DnaFile;
-use crate::holochain_zome_types::entry_def::EntryDef;
+use holochain_zome_types::entry_def::EntryDef;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use std::collections::HashMap;
 use std::convert::TryFrom;

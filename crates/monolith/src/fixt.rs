@@ -2,4 +2,4 @@
 
 pub use crate::holochain::fixt::*;
 pub use crate::holochain_types::fixt::*;
-pub use crate::holochain_zome_types::fixt::*;
+pub use holochain_zome_types::fixt::*;

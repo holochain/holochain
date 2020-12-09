@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use crate::holochain_zome_types::zome::FunctionName;
+use holochain_zome_types::zome::FunctionName;
 use thiserror::Error;
 
 pub type InlineZomeResult<T> = Result<T, InlineZomeError>;

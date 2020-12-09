@@ -31,7 +31,7 @@ use crate::holochain_state::prelude::PendingPrefix;
 use crate::holochain_state::prelude::Writer;
 use crate::holochain_types::dht_op::DhtOp;
 use crate::holochain_types::Timestamp;
-use crate::holochain_zome_types::query::HighestObserved;
+use holochain_zome_types::query::HighestObserved;
 use tracing::instrument;
 
 #[cfg(test)]

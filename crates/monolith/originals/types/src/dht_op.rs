@@ -12,9 +12,9 @@ use error::DhtOpError;
 use error::DhtOpResult;
 use holo_hash::hash_type;
 use holo_hash::HashableContentBytes;
-use crate::holochain_zome_types::header;
-use crate::holochain_zome_types::Entry;
-use crate::holochain_zome_types::Header;
+use holochain_zome_types::header;
+use holochain_zome_types::Entry;
+use holochain_zome_types::Header;
 use serde::Deserialize;
 use serde::Serialize;
 

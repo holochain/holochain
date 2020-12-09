@@ -1,9 +1,9 @@
 use crate::holochain_p2p::HolochainP2pCell;
 use crate::holochain_types::HeaderHashed;
-use crate::holochain_zome_types::header::AppEntryType;
-use crate::holochain_zome_types::header::EntryType;
-use crate::holochain_zome_types::query::ChainQueryFilter;
-use crate::holochain_zome_types::validate::ValidationPackage;
+use holochain_zome_types::header::AppEntryType;
+use holochain_zome_types::header::EntryType;
+use holochain_zome_types::query::ChainQueryFilter;
+use holochain_zome_types::validate::ValidationPackage;
 
 use crate::holochain::core::ribosome::error::RibosomeResult;
 use crate::holochain::core::ribosome::guest_callback::validation_package::ValidationPackageHostAccess;

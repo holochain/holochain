@@ -11,7 +11,7 @@ use derive_more::Constructor;
 use crate::holochain_keystore::KeystoreSender;
 use crate::holochain_p2p::HolochainP2pCell;
 use crate::holochain_types::dna::DnaDef;
-use crate::holochain_zome_types::header::builder;
+use holochain_zome_types::header::builder;
 use tracing::*;
 
 #[derive(Constructor, Debug)]
@@ -81,7 +81,7 @@ pub mod tests {
     use fixt::Unpredictable;
     use crate::holochain_p2p::HolochainP2pCellFixturator;
     use crate::holochain_state::test_utils::test_cell_env;
-    use crate::holochain_zome_types::Header;
+    use holochain_zome_types::Header;
     use matches::assert_matches;
 
     #[tokio::test(threaded_scheduler)]

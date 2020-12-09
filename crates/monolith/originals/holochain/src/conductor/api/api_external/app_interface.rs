@@ -11,13 +11,13 @@ use holo_hash::AgentPubKey;
 use holochain_serialized_bytes::prelude::*;
 use crate::holochain_types::app::InstalledApp;
 use crate::holochain_types::app::InstalledAppId;
-use crate::holochain_zome_types::capability::CapSecret;
-use crate::holochain_zome_types::cell::CellId;
-use crate::holochain_zome_types::zome::FunctionName;
-use crate::holochain_zome_types::zome::ZomeName;
-use crate::holochain_zome_types::ExternInput;
-use crate::holochain_zome_types::ExternOutput;
-use crate::holochain_zome_types::ZomeCallResponse;
+use holochain_zome_types::capability::CapSecret;
+use holochain_zome_types::cell::CellId;
+use holochain_zome_types::zome::FunctionName;
+use holochain_zome_types::zome::ZomeName;
+use holochain_zome_types::ExternInput;
+use holochain_zome_types::ExternOutput;
+use holochain_zome_types::ZomeCallResponse;
 
 /// The interface that a Conductor exposes to the outside world.
 #[async_trait::async_trait]

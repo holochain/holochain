@@ -8,10 +8,10 @@ use holochain_serialized_bytes::prelude::*;
 use crate::holochain_types::dna::zome::HostFnAccess;
 use crate::holochain_types::dna::zome::Permission;
 use crate::holochain_types::dna::DnaDef;
-use crate::holochain_zome_types::migrate_agent::MigrateAgent;
-use crate::holochain_zome_types::migrate_agent::MigrateAgentCallbackResult;
-use crate::holochain_zome_types::zome::ZomeName;
-use crate::holochain_zome_types::ExternInput;
+use holochain_zome_types::migrate_agent::MigrateAgent;
+use holochain_zome_types::migrate_agent::MigrateAgentCallbackResult;
+use holochain_zome_types::zome::ZomeName;
+use holochain_zome_types::ExternInput;
 
 #[derive(Clone)]
 pub struct MigrateAgentInvocation {
@@ -118,9 +118,9 @@ mod test {
     use crate::holochain::fixt::ZomeNameFixturator;
     use holochain_serialized_bytes::prelude::*;
     use crate::holochain_types::dna::zome::HostFnAccess;
-    use crate::holochain_zome_types::migrate_agent::MigrateAgent;
-    use crate::holochain_zome_types::migrate_agent::MigrateAgentCallbackResult;
-    use crate::holochain_zome_types::ExternInput;
+    use holochain_zome_types::migrate_agent::MigrateAgent;
+    use holochain_zome_types::migrate_agent::MigrateAgentCallbackResult;
+    use holochain_zome_types::ExternInput;
     use rand::prelude::*;
 
     #[test]

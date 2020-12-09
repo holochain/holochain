@@ -1,9 +1,9 @@
 use crate::holochain::core::ribosome::error::RibosomeResult;
 use crate::holochain::core::ribosome::CallContext;
 use crate::holochain::core::ribosome::RibosomeT;
-use crate::holochain_zome_types::bytes::Bytes;
-use crate::holochain_zome_types::RandomBytesInput;
-use crate::holochain_zome_types::RandomBytesOutput;
+use holochain_zome_types::bytes::Bytes;
+use holochain_zome_types::RandomBytesInput;
+use holochain_zome_types::RandomBytesOutput;
 use ring::rand::SecureRandom;
 use std::sync::Arc;
 
@@ -30,8 +30,8 @@ pub mod wasm_test {
     use crate::holochain::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
     use crate::holochain_wasm_test_utils::TestWasm;
-    use crate::holochain_zome_types::RandomBytesInput;
-    use crate::holochain_zome_types::RandomBytesOutput;
+    use holochain_zome_types::RandomBytesInput;
+    use holochain_zome_types::RandomBytesOutput;
     use std::convert::TryInto;
     use std::sync::Arc;
 

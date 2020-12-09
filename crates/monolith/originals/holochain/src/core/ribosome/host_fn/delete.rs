@@ -9,10 +9,10 @@ use crate::holochain::core::SourceChainError;
 use holo_hash::EntryHash;
 use holo_hash::HeaderHash;
 use crate::holochain_p2p::actor::GetOptions;
-use crate::holochain_zome_types::element::SignedHeaderHashed;
-use crate::holochain_zome_types::header::builder;
-use crate::holochain_zome_types::DeleteInput;
-use crate::holochain_zome_types::DeleteOutput;
+use holochain_zome_types::element::SignedHeaderHashed;
+use holochain_zome_types::header::builder;
+use holochain_zome_types::DeleteInput;
+use holochain_zome_types::DeleteOutput;
 use std::sync::Arc;
 
 #[allow(clippy::extra_unused_lifetimes)]
@@ -70,11 +70,11 @@ pub(crate) fn get_original_address<'a>(
             .await?
             .map(|el| {
                 match el {
-                    crate::holochain_zome_types::metadata::Details::Element(e) => {
+                    holochain_zome_types::metadata::Details::Element(e) => {
                         Ok(e.element.into_inner().0)
                     }
                     // Should not be trying to get original headers via EntryHash
-                    crate::holochain_zome_types::metadata::Details::Entry(_) => {
+                    holochain_zome_types::metadata::Details::Entry(_) => {
                         Err(CascadeError::InvalidResponse(address.clone().into()))
                     }
                 }

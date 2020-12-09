@@ -7,9 +7,9 @@ use holo_hash::HeaderHash;
 use crate::holochain_state::env::ReadManager;
 use crate::holochain_state::test_utils::test_cell_env;
 use crate::holochain_state::test_utils::TestEnvironment;
-use crate::holochain_zome_types::test_utils::fake_agent_pubkey_1;
-use crate::holochain_zome_types::validate::ValidationStatus;
-use crate::holochain_zome_types::Header;
+use holochain_zome_types::test_utils::fake_agent_pubkey_1;
+use holochain_zome_types::validate::ValidationStatus;
+use holochain_zome_types::Header;
 
 use super::ChainItemKey;
 use super::MetadataBuf;

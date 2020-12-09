@@ -17,8 +17,8 @@ use crate::holochain_types::autonomic::AutonomicCue;
 use crate::holochain_types::cell::CellId;
 use crate::holochain_types::dna::zome::Zome;
 use crate::holochain_types::dna::DnaFile;
-use crate::holochain_zome_types::entry_def::EntryDef;
-use crate::holochain_zome_types::zome::ZomeName;
+use holochain_zome_types::entry_def::EntryDef;
+use holochain_zome_types::zome::ZomeName;
 use tracing::*;
 
 /// The concrete implementation of [CellConductorApiT], which is used to give

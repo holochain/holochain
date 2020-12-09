@@ -11,7 +11,7 @@ use crate::holochain_types::app::InstalledCell;
 use crate::holochain_types::dna::DnaDef;
 use crate::holochain_types::dna::DnaFile;
 use crate::holochain_wasm_test_utils::TestWasm;
-use crate::holochain_zome_types::ZomeCallResponse;
+use holochain_zome_types::ZomeCallResponse;
 use kitsune_p2p::KitsuneP2pConfig;
 use matches::assert_matches;
 use tempdir::TempDir;

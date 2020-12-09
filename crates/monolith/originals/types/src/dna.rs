@@ -10,7 +10,7 @@ use crate::holochain_types::prelude::*;
 pub use error::DnaError;
 use holo_hash::impl_hashable_content;
 pub use holo_hash::*;
-use crate::holochain_zome_types::zome::ZomeName;
+use holochain_zome_types::zome::ZomeName;
 use std::collections::BTreeMap;
 
 use self::error::DnaResult;

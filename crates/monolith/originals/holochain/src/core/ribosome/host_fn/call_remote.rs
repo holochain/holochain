@@ -2,9 +2,9 @@ use crate::holochain::core::ribosome::error::RibosomeResult;
 use crate::holochain::core::ribosome::CallContext;
 use crate::holochain::core::ribosome::RibosomeT;
 use crate::holochain_p2p::HolochainP2pCellT;
-use crate::holochain_zome_types::CallRemoteInput;
-use crate::holochain_zome_types::CallRemoteOutput;
-use crate::holochain_zome_types::ZomeCallResponse;
+use holochain_zome_types::CallRemoteInput;
+use holochain_zome_types::CallRemoteOutput;
+use holochain_zome_types::ZomeCallResponse;
 use std::convert::TryInto;
 use std::sync::Arc;
 
@@ -49,8 +49,8 @@ pub mod wasm_test {
     use crate::holochain_types::test_utils::fake_agent_pubkey_1;
     use crate::holochain_types::test_utils::fake_agent_pubkey_2;
     use crate::holochain_wasm_test_utils::TestWasm;
-    pub use crate::holochain_zome_types::capability::CapSecret;
-    use crate::holochain_zome_types::ExternInput;
+    pub use holochain_zome_types::capability::CapSecret;
+    use holochain_zome_types::ExternInput;
 
     #[tokio::test(threaded_scheduler)]
     /// we can call a fn on a remote

@@ -6,10 +6,10 @@ use holo_hash::HeaderHash;
 use crate::holochain_types::dht_op::DhtOp;
 use crate::holochain_types::dht_op::DhtOpLight;
 use crate::holochain_types::header::NewEntryHeader;
-use crate::holochain_zome_types::entry_def::EntryVisibility;
-use crate::holochain_zome_types::header;
-use crate::holochain_zome_types::header::Header;
-use crate::holochain_zome_types::signature::Signature;
+use holochain_zome_types::entry_def::EntryVisibility;
+use holochain_zome_types::header;
+use holochain_zome_types::header::Header;
+use holochain_zome_types::signature::Signature;
 
 pub mod error;
 

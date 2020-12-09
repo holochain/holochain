@@ -1,7 +1,7 @@
 //! Holochain DnaError type.
 
 use holo_hash::DnaHash;
-use crate::holochain_zome_types::zome::ZomeName;
+use holochain_zome_types::zome::ZomeName;
 use thiserror::Error;
 
 /// Holochain DnaError type.

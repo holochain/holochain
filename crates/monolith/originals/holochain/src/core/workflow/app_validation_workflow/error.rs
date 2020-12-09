@@ -1,6 +1,6 @@
 use crate::holochain_p2p::HolochainP2pError;
 use crate::holochain_types::cell::CellId;
-use crate::holochain_zome_types::header::ZomeId;
+use holochain_zome_types::header::ZomeId;
 use thiserror::Error;
 
 use crate::holochain::conductor::entry_def_store::error::EntryDefStoreError;

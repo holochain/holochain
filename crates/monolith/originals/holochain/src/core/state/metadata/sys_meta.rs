@@ -22,12 +22,12 @@ mod tests {
     use crate::holochain_types::fixt::HeaderBuilderCommonFixturator;
     use crate::holochain_types::header::NewEntryHeader;
     use crate::holochain_types::HeaderHashed;
-    use crate::holochain_zome_types::header;
-    use crate::holochain_zome_types::header::builder;
-    use crate::holochain_zome_types::header::Delete;
-    use crate::holochain_zome_types::header::EntryType;
-    use crate::holochain_zome_types::header::HeaderBuilder;
-    use crate::holochain_zome_types::header::HeaderBuilderCommon;
+    use holochain_zome_types::header;
+    use holochain_zome_types::header::builder;
+    use holochain_zome_types::header::Delete;
+    use holochain_zome_types::header::EntryType;
+    use holochain_zome_types::header::HeaderBuilder;
+    use holochain_zome_types::header::HeaderBuilderCommon;
 
     struct TestFixtures {
         header_hashes: Box<dyn Iterator<Item = HeaderHash>>,

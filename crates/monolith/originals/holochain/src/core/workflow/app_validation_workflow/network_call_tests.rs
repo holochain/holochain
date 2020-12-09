@@ -11,13 +11,13 @@ use crate::holochain_types::activity::AgentActivity;
 use crate::holochain_types::activity::ChainItems;
 use crate::holochain_types::HeaderHashed;
 use crate::holochain_wasm_test_utils::TestWasm;
-use crate::holochain_zome_types::query::ActivityRequest;
-use crate::holochain_zome_types::query::ChainHead;
-use crate::holochain_zome_types::query::ChainQueryFilter;
-use crate::holochain_zome_types::query::ChainStatus;
-use crate::holochain_zome_types::query::HighestObserved;
-use crate::holochain_zome_types::validate::ValidationStatus;
-use crate::holochain_zome_types::ZomeCallResponse;
+use holochain_zome_types::query::ActivityRequest;
+use holochain_zome_types::query::ChainHead;
+use holochain_zome_types::query::ChainQueryFilter;
+use holochain_zome_types::query::ChainStatus;
+use holochain_zome_types::query::HighestObserved;
+use holochain_zome_types::validate::ValidationStatus;
+use holochain_zome_types::ZomeCallResponse;
 use matches::assert_matches;
 use std::convert::TryInto;
 use crate::holochain_test_wasm_common::AgentActivitySearch;
@@ -610,7 +610,7 @@ async fn get_agent_activity_host_fn_test() {
             hash: vec![last.1.clone()],
         });
 
-        crate::holochain_zome_types::query::AgentActivity {
+        holochain_zome_types::query::AgentActivity {
             valid_activity: valid_activity,
             rejected_activity: Vec::new(),
             status,
@@ -659,7 +659,7 @@ async fn get_agent_activity_host_fn_test() {
     let result = unwrap_to::unwrap_to!(result => ZomeCallResponse::Ok)
         .clone()
         .into_inner();
-    let agent_activity: crate::holochain_zome_types::query::AgentActivity = result.try_into().unwrap();
+    let agent_activity: holochain_zome_types::query::AgentActivity = result.try_into().unwrap();
     assert_eq!(agent_activity, expected_activity);
     conductor_test.shutdown_conductor().await;
 }

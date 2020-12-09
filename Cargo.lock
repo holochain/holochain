@@ -809,6 +809,7 @@ version = "0.0.1"
 dependencies = [
  "holo_hash",
  "holochain_serialized_bytes",
+ "holochain_zome_types",
  "monolith",
  "serde",
  "serde_bytes",
@@ -1341,6 +1342,21 @@ dependencies = [
  "serde",
  "wasmer-runtime",
  "wasmer-runtime-core",
+]
+
+[[package]]
+name = "holochain_zome_types"
+version = "0.0.1"
+dependencies = [
+ "fixt",
+ "holo_hash",
+ "holochain_serialized_bytes",
+ "paste 1.0.3",
+ "serde",
+ "serde_bytes",
+ "strum",
+ "subtle 2.3.0",
+ "thiserror",
 ]
 
 [[package]]
@@ -1965,6 +1981,7 @@ dependencies = [
  "holochain_serialized_bytes",
  "holochain_wasmer_guest",
  "holochain_wasmer_host",
+ "holochain_zome_types",
  "human-panic",
  "kitsune_p2p",
  "lair_keystore_api",

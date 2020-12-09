@@ -13,14 +13,14 @@ use crate::holochain_types::prelude::*;
 use conversions::WrongHeaderError;
 use derive_more::From;
 use holo_hash::EntryHash;
-use crate::holochain_zome_types::element::Element;
-use crate::holochain_zome_types::element::SignedHeader;
-use crate::holochain_zome_types::entry_def::EntryVisibility;
-pub use crate::holochain_zome_types::header::HeaderHashed;
-use crate::holochain_zome_types::header::*;
-use crate::holochain_zome_types::signature::Signature;
-use crate::holochain_zome_types::validate::ValidationStatus;
-use crate::holochain_zome_types::Entry;
+use holochain_zome_types::element::Element;
+use holochain_zome_types::element::SignedHeader;
+use holochain_zome_types::entry_def::EntryVisibility;
+pub use holochain_zome_types::header::HeaderHashed;
+use holochain_zome_types::header::*;
+use holochain_zome_types::signature::Signature;
+use holochain_zome_types::validate::ValidationStatus;
+use holochain_zome_types::Entry;
 
 use error::*;
 
@@ -68,7 +68,7 @@ pub struct WireHeaderStatus<W> {
 pub struct WireCreate {
     /// Timestamp is first so that deriving Ord results in
     /// order by time
-    pub timestamp: crate::holochain_zome_types::timestamp::Timestamp,
+    pub timestamp: holochain_zome_types::timestamp::Timestamp,
     pub author: AgentPubKey,
     pub header_seq: u32,
     pub prev_header: HeaderHash,
@@ -81,7 +81,7 @@ pub struct WireCreate {
 pub struct WireUpdate {
     /// Timestamp is first so that deriving Ord results in
     /// order by time
-    pub timestamp: crate::holochain_zome_types::timestamp::Timestamp,
+    pub timestamp: holochain_zome_types::timestamp::Timestamp,
     pub author: AgentPubKey,
     pub header_seq: u32,
     pub prev_header: HeaderHash,
@@ -103,7 +103,7 @@ pub struct WireUpdate {
 pub struct WireUpdateRelationship {
     /// Timestamp is first so that deriving Ord results in
     /// order by time
-    pub timestamp: crate::holochain_zome_types::timestamp::Timestamp,
+    pub timestamp: holochain_zome_types::timestamp::Timestamp,
     pub author: AgentPubKey,
     pub header_seq: u32,
     pub prev_header: HeaderHash,
@@ -140,7 +140,7 @@ impl NewEntryHeader {
     }
 
     /// Get the timestamp of this header
-    pub fn timestamp(&self) -> &crate::holochain_zome_types::timestamp::Timestamp {
+    pub fn timestamp(&self) -> &holochain_zome_types::timestamp::Timestamp {
         match self {
             NewEntryHeader::Create(Create { timestamp, .. })
             | NewEntryHeader::Update(Update { timestamp, .. }) => timestamp,

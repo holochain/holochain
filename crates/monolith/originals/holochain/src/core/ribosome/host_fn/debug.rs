@@ -1,9 +1,9 @@
 use crate::holochain::core::ribosome::error::RibosomeResult;
 use crate::holochain::core::ribosome::CallContext;
 use crate::holochain::core::ribosome::RibosomeT;
-use crate::holochain_zome_types::debug::DebugMsg;
-use crate::holochain_zome_types::DebugInput;
-use crate::holochain_zome_types::DebugOutput;
+use holochain_zome_types::debug::DebugMsg;
+use holochain_zome_types::DebugInput;
+use holochain_zome_types::DebugOutput;
 use std::sync::Arc;
 use tracing::*;
 
@@ -35,8 +35,8 @@ pub mod wasm_test {
     use ::fixt::prelude::*;
     use crate::holochain_wasm_test_utils::TestWasm;
     use crate::debug_msg;
-    use crate::holochain_zome_types::DebugInput;
-    use crate::holochain_zome_types::DebugOutput;
+    use holochain_zome_types::DebugInput;
+    use holochain_zome_types::DebugOutput;
     use std::sync::Arc;
 
     /// we can get an entry hash out of the fn directly

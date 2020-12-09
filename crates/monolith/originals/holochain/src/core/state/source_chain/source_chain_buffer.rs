@@ -17,9 +17,9 @@ use crate::holochain_types::element::SignedHeaderHashedExt;
 use crate::holochain_types::entry::EntryHashed;
 use crate::holochain_types::prelude::*;
 use crate::holochain_types::HeaderHashed;
-use crate::holochain_zome_types::header;
-use crate::holochain_zome_types::Entry;
-use crate::holochain_zome_types::Header;
+use holochain_zome_types::header;
+use holochain_zome_types::Entry;
+use holochain_zome_types::Header;
 use tracing::*;
 
 pub struct SourceChainBuf {
@@ -324,9 +324,9 @@ pub mod tests {
     use crate::holochain_types::test_utils::fake_agent_pubkey_1;
     use crate::holochain_types::test_utils::fake_dna_file;
     use crate::holochain_types::HeaderHashed;
-    use crate::holochain_zome_types::header;
-    use crate::holochain_zome_types::Entry;
-    use crate::holochain_zome_types::Header;
+    use holochain_zome_types::header;
+    use holochain_zome_types::Entry;
+    use holochain_zome_types::Header;
 
     fn fixtures() -> (
         AgentPubKey,

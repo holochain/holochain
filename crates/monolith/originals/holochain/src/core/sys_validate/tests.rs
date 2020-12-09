@@ -16,7 +16,7 @@ use crate::holochain_types::observability;
 use crate::holochain_types::test_utils::fake_agent_pubkey_1;
 use crate::holochain_types::Timestamp;
 use crate::holochain_wasm_test_utils::TestWasm;
-use crate::holochain_zome_types::Header;
+use holochain_zome_types::Header;
 use matches::assert_matches;
 use std::convert::TryFrom;
 

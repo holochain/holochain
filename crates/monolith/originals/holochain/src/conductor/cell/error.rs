@@ -11,7 +11,7 @@ use crate::holochain_state::error::DatabaseError;
 use crate::holochain_types::cell::CellId;
 use crate::holochain_types::dna::DnaError;
 use crate::holochain_types::header::error::HeaderError;
-use crate::holochain_zome_types::header::conversions::WrongHeaderError;
+use holochain_zome_types::header::conversions::WrongHeaderError;
 use std::path::PathBuf;
 use thiserror::Error;
 

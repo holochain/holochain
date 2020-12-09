@@ -11,7 +11,7 @@ use crate::holochain_types::dna::DnaDef;
 use crate::holochain_types::dna::DnaDefHashed;
 use crate::holochain_types::dna::DnaFile;
 use crate::holochain_types::prelude::*;
-use crate::holochain_zome_types::entry_def::EntryDef;
+use holochain_zome_types::entry_def::EntryDef;
 use mockall::automock;
 use std::collections::HashMap;
 use tracing::*;

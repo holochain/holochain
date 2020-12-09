@@ -2,8 +2,8 @@ use crate::holochain::core::ribosome::error::RibosomeResult;
 use crate::holochain::core::ribosome::CallContext;
 use crate::holochain::core::ribosome::RibosomeT;
 use crate::holochain_keystore::keystore_actor::KeystoreSenderExt;
-use crate::holochain_zome_types::SignInput;
-use crate::holochain_zome_types::SignOutput;
+use holochain_zome_types::SignInput;
+use holochain_zome_types::SignOutput;
 use std::sync::Arc;
 
 pub fn sign(
@@ -94,7 +94,7 @@ pub mod wasm_test {
                     host_access,
                     TestWasm::Sign,
                     "sign",
-                    crate::holochain_zome_types::zome_io::SignInput::new(Sign::new_raw(
+                    holochain_zome_types::zome_io::SignInput::new(Sign::new_raw(
                         k.clone(),
                         data.clone()
                     ))
