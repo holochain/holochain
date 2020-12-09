@@ -118,7 +118,7 @@ pub fn extract_entry_def(
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use super::create;
-    use crate::hdk3::prelude::*;
+    use hdk3::prelude::*;
     use crate::holochain::core::state::source_chain::ChainInvalidReason;
     use crate::holochain::core::state::source_chain::SourceChainError;
     use crate::holochain::core::state::source_chain::SourceChainResult;

@@ -1,4 +1,4 @@
-use crate::hdk3::prelude::*;
+use hdk3::prelude::*;
 
 #[hdk_entry(id = "maybe_linkable")]
 #[derive(Clone, Copy)]

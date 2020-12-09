@@ -1,4 +1,4 @@
-use crate::hdk3::prelude::*;
+use hdk3::prelude::*;
 
 #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes)]
 #[repr(transparent)]

@@ -1,4 +1,4 @@
-use crate::hdk3::prelude::*;
+use hdk3::prelude::*;
 
 entry_defs![Path::entry_def()];
 
@@ -18,23 +18,23 @@ fn target() -> ExternResult<EntryHash> {
 
 #[hdk_extern]
 fn create_link(_: ()) -> ExternResult<HeaderHash> {
-    Ok(crate::hdk3::prelude::create_link(base()?, target()?, ())?)
+    Ok(hdk3::prelude::create_link(base()?, target()?, ())?)
 }
 
 #[hdk_extern]
 fn delete_link(input: DeleteLinkInput) -> ExternResult<HeaderHash> {
-    Ok(crate::hdk3::prelude::delete_link(input.into_inner())?)
+    Ok(hdk3::prelude::delete_link(input.into_inner())?)
 }
 
 #[hdk_extern]
 fn get_links(_: ()) -> ExternResult<Links> {
-    Ok(crate::hdk3::prelude::get_links(base()?, None)?)
+    Ok(hdk3::prelude::get_links(base()?, None)?)
 }
 
 #[hdk_extern]
 fn delete_all_links(_: ()) -> ExternResult<()> {
-    for link in crate::hdk3::prelude::get_links(base()?, None)?.into_inner() {
-        crate::hdk3::prelude::delete_link(link.create_link_hash)?;
+    for link in hdk3::prelude::get_links(base()?, None)?.into_inner() {
+        hdk3::prelude::delete_link(link.create_link_hash)?;
     }
     Ok(())
 }

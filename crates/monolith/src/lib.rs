@@ -1,7 +1,5 @@
 #![allow(unused_imports)]
 
-pub mod hdk3;
-// pub mod hdk_derive;
 pub mod holochain;
 pub mod holochain_p2p;
 pub mod holochain_test_wasm_common;

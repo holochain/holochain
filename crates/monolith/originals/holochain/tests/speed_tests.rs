@@ -15,7 +15,7 @@
 //! hard to automate piping from tests stderr.
 //!
 
-use crate::hdk3::prelude::*;
+use hdk3::prelude::*;
 use crate::holochain::conductor::api::AdminRequest;
 use crate::holochain::conductor::api::AdminResponse;
 use crate::holochain::conductor::api::AppRequest;

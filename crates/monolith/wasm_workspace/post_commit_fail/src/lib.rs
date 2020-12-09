@@ -1,4 +1,4 @@
-use crate::hdk3::prelude::*;
+use hdk3::prelude::*;
 
 #[hdk_extern]
 fn post_commit(_: HeaderHashes) -> ExternResult<PostCommitCallbackResult> {

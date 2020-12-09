@@ -14,7 +14,7 @@ use fallible_iterator::FallibleIterator;
 use futures::future::Either;
 use futures::future::FutureExt;
 use ghost_actor::GhostControlSender;
-use crate::hdk3::prelude::EntryVisibility;
+use hdk3::prelude::EntryVisibility;
 use holo_hash::hash_type;
 use holo_hash::hash_type::AnyDht;
 use holo_hash::AnyDhtHash;

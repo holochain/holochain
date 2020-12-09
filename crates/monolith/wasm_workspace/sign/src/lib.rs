@@ -1,8 +1,8 @@
-use crate::hdk3::prelude::*;
+use hdk3::prelude::*;
 
 #[hdk_extern]
 fn sign(sign_input: Sign) -> ExternResult<Signature> {
-    Ok(crate::hdk3::prelude::sign(sign_input.key, sign_input.data)?)
+    Ok(hdk3::prelude::sign(sign_input.key, sign_input.data)?)
 }
 
 #[hdk_extern]
@@ -12,7 +12,7 @@ fn verify_signature(
     let VerifySignature {
         key, signature, data
     } = verify_signature_input;
-    Ok(VerifySignatureOutput::new(crate::hdk3::prelude::verify_signature(
+    Ok(VerifySignatureOutput::new(hdk3::prelude::verify_signature(
         key, signature, data
     )?))
 }

@@ -505,11 +505,11 @@ impl RibosomeT for RealRibosome {
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    use crate::hdk3::prelude::*;
     use crate::holochain::fixt::ZomeCallHostAccessFixturator;
     use crate::holochain_test_wasm_common::TestString;
     use crate::holochain_wasm_test_utils::TestWasm;
     use ::fixt::prelude::*;
+    use hdk3::prelude::*;
 
     #[tokio::test(threaded_scheduler)]
     /// Basic checks that we can call externs internally and externally the way we want using the

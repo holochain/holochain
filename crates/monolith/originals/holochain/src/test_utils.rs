@@ -1,6 +1,6 @@
 //! Utils for Holochain tests
 
-use crate::hdk3::prelude::ZomeName;
+use hdk3::prelude::ZomeName;
 use crate::holochain::conductor::api::RealAppInterfaceApi;
 use crate::holochain::conductor::api::ZomeCall;
 use crate::holochain::conductor::config::AdminInterfaceConfig;

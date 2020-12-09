@@ -27,6 +27,8 @@ ring = "0.16"
 holo_hash = { version = "0.0.1", path = "../holo_hash", features = ["full"] }
 holochain_serialized_bytes = "=0.0.45"
 holochain_wasmer_host = "=0.0.50"
+hdk3 = { version = "0.0.1", path = "../hdk3" }
+hdk3_derive = { version = "0.0.1", path = "../hdk3_derive" }
 holochain_keystore = { version = "0.0.1", path = "../holochain_keystore" }
 holochain_lmdb = { version = "0.0.1", path = "../holochain_lmdb" }
 holochain_zome_types = { version = "0.0.1", path = "../holochain_zome_types" }

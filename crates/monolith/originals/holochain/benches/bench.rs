@@ -1,4 +1,4 @@
-use crate::hdk3::prelude::*;
+use hdk3::prelude::*;
 use crate::holochain::core::ribosome::RibosomeT;
 use crate::holochain::core::ribosome::ZomeCallInvocation;
 use crate::holochain_types::dna::zome::Zome;

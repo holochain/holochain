@@ -26,11 +26,11 @@ pub fn sign(
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use crate::holochain::fixt::ZomeCallHostAccessFixturator;
-    use ::fixt::prelude::*;
-    use crate::hdk3::prelude::test_utils::fake_agent_pubkey_1;
-    use crate::hdk3::prelude::test_utils::fake_agent_pubkey_2;
-    use crate::hdk3::prelude::*;
     use crate::holochain_wasm_test_utils::TestWasm;
+    use ::fixt::prelude::*;
+    use hdk3::prelude::test_utils::fake_agent_pubkey_1;
+    use hdk3::prelude::test_utils::fake_agent_pubkey_2;
+    use hdk3::prelude::*;
 
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_sign_test() {
@@ -41,7 +41,8 @@ pub mod wasm_test {
         crate::holochain::core::workflow::fake_genesis(&mut workspace.source_chain)
             .await
             .unwrap();
-        let workspace_lock = crate::holochain::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let workspace_lock =
+            crate::holochain::core::workflow::CallZomeWorkspaceLock::new(workspace);
 
         let mut host_access = fixt!(ZomeCallHostAccess, Predictable);
         host_access.workspace = workspace_lock;

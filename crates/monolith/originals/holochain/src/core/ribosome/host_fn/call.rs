@@ -51,8 +51,8 @@ pub mod wasm_test {
     use std::convert::TryFrom;
     use std::convert::TryInto;
 
-    use crate::hdk3::prelude::AgentInfo;
-    use crate::hdk3::prelude::CellId;
+    use hdk3::prelude::AgentInfo;
+    use hdk3::prelude::CellId;
     use holo_hash::HeaderHash;
     use holochain_serialized_bytes::SerializedBytes;
     use crate::holochain_types::app::InstalledCell;

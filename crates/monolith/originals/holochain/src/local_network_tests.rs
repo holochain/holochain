@@ -1,16 +1,16 @@
 use std::convert::TryFrom;
 use std::sync::Arc;
 
-use crate::hdk3::prelude::CellId;
-use crate::hdk3::prelude::WasmError;
-use holo_hash::AgentPubKey;
-use holochain_keystore::AgentPubKeyExt;
-use holochain_serialized_bytes::SerializedBytes;
-use holochain_lmdb::env::EnvironmentWrite;
 use crate::holochain_types::app::InstalledCell;
 use crate::holochain_types::dna::DnaDef;
 use crate::holochain_types::dna::DnaFile;
 use crate::holochain_wasm_test_utils::TestWasm;
+use hdk3::prelude::CellId;
+use hdk3::prelude::WasmError;
+use holo_hash::AgentPubKey;
+use holochain_keystore::AgentPubKeyExt;
+use holochain_lmdb::env::EnvironmentWrite;
+use holochain_serialized_bytes::SerializedBytes;
 use holochain_zome_types::ZomeCallResponse;
 use kitsune_p2p::KitsuneP2pConfig;
 use matches::assert_matches;

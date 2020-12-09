@@ -334,7 +334,7 @@ impl BufferedStore for SourceChain {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::hdk3::prelude::*;
+    use hdk3::prelude::*;
     use crate::holochain::fixt::*;
     use crate::holochain_types::test_utils::fake_dna_hash;
     use ::fixt::prelude::*;

@@ -18,7 +18,7 @@ pub fn capability_grants(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    use crate::hdk3::prelude::*;
+    use hdk3::prelude::*;
     use crate::holochain::conductor::dna_store::MockDnaStore;
     use crate::holochain::conductor::interface::websocket::test::setup_app;
     use crate::holochain::core::ribosome::ZomeCall;

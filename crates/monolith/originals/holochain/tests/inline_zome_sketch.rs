@@ -1,4 +1,4 @@
-use crate::hdk3::prelude::*;
+use hdk3::prelude::*;
 use crate::holochain::conductor::api::ZomeCall;
 use crate::holochain::conductor::Conductor;
 use holochain_keystore::KeystoreSender;

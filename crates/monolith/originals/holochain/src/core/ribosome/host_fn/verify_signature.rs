@@ -27,9 +27,9 @@ pub fn verify_signature(
 pub mod wasm_test {
     use crate::holochain::fixt::ZomeCallHostAccessFixturator;
     use ::fixt::prelude::*;
-    use crate::hdk3::prelude::test_utils::fake_agent_pubkey_1;
-    use crate::hdk3::prelude::test_utils::fake_agent_pubkey_2;
-    use crate::hdk3::prelude::*;
+    use hdk3::prelude::test_utils::fake_agent_pubkey_1;
+    use hdk3::prelude::test_utils::fake_agent_pubkey_2;
+    use hdk3::prelude::*;
     use crate::holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(threaded_scheduler)]

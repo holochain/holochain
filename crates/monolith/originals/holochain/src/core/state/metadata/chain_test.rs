@@ -1,7 +1,7 @@
 use crate::holochain::fixt::*;
 use fallible_iterator::FallibleIterator;
 use fixt::prelude::*;
-use crate::hdk3::prelude::Create;
+use hdk3::prelude::Create;
 use holo_hash::AgentPubKey;
 use holo_hash::HeaderHash;
 use holochain_lmdb::env::ReadManager;

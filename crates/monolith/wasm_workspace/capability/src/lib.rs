@@ -1,4 +1,4 @@
-use crate::hdk3::prelude::*;
+use hdk3::prelude::*;
 
 #[derive(serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct CapFor(CapSecret, AgentPubKey);
@@ -48,7 +48,7 @@ pub fn roll_cap_grant(header_hash: HeaderHash) -> ExternResult<HeaderHash> {
 
 #[hdk_extern]
 pub fn delete_cap_grant(header_hash: HeaderHash) -> ExternResult<HeaderHash> {
-    Ok(crate::hdk3::prelude::delete_cap_grant(header_hash)?)
+    Ok(hdk3::prelude::delete_cap_grant(header_hash)?)
 }
 
 #[hdk_extern]

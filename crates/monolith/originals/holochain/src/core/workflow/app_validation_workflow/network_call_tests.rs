@@ -1,6 +1,6 @@
-use crate::hdk3::prelude::Element;
-use crate::hdk3::prelude::EntryType;
-use crate::hdk3::prelude::ValidationPackage;
+use hdk3::prelude::Element;
+use hdk3::prelude::EntryType;
+use hdk3::prelude::ValidationPackage;
 use crate::holochain_p2p::actor::GetActivityOptions;
 use crate::holochain_p2p::HolochainP2pCellT;
 use crate::holochain_test_wasm_common::AgentActivitySearch;

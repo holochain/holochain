@@ -1243,6 +1243,31 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d7afe4a420e3fe79967a00898cc1f4db7c8a49a9333a29f8a4bd76a253d5cd04"
 
 [[package]]
+name = "hdk3"
+version = "0.0.1"
+dependencies = [
+ "fixt",
+ "holo_hash",
+ "holochain_wasmer_guest",
+ "holochain_zome_types",
+ "paste 1.0.3",
+ "serde",
+ "serde_bytes",
+ "thiserror",
+]
+
+[[package]]
+name = "hdk3_derive"
+version = "0.0.1"
+dependencies = [
+ "holochain_zome_types",
+ "paste 1.0.3",
+ "proc-macro2 1.0.24",
+ "quote 1.0.7",
+ "syn 1.0.51",
+]
+
+[[package]]
 name = "heck"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2031,6 +2056,8 @@ dependencies = [
  "flate2",
  "futures",
  "ghost_actor",
+ "hdk3",
+ "hdk3_derive",
  "holo_hash",
  "holochain_keystore",
  "holochain_lmdb",

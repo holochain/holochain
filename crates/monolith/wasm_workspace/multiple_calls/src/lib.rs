@@ -1,4 +1,4 @@
-use crate::hdk3::prelude::*;
+use hdk3::prelude::*;
 use crate::holochain_test_wasm_common::TestBytes;
 use crate::holochain_test_wasm_common::TestInt;
 

@@ -29,7 +29,7 @@ pub fn query(
 pub mod slow_tests {
     use crate::holochain::{core::ribosome::ZomeCallHostAccess, fixt::ZomeCallHostAccessFixturator};
     use ::fixt::prelude::*;
-    use crate::hdk3::prelude::*;
+    use hdk3::prelude::*;
     use holochain_lmdb::test_utils::TestEnvironment;
     use query::ChainQueryFilter;
 

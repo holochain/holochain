@@ -1,4 +1,4 @@
-use crate::hdk3::prelude::*;
+use hdk3::prelude::*;
 use crate::holochain::conductor::api::AppInterfaceApi;
 use crate::holochain::conductor::api::AppRequest;
 use crate::holochain::conductor::api::AppResponse;

@@ -1,4 +1,4 @@
-use crate::hdk3::prelude::*;
+use hdk3::prelude::*;
 
 #[hdk_entry(
     id = "post",
@@ -38,12 +38,12 @@ fn priv_msg() -> PrivMsg {
 
 #[hdk_extern]
 fn create_entry(_: ()) -> ExternResult<HeaderHash> {
-    Ok(crate::hdk3::prelude::create_entry(&post())?)
+    Ok(hdk3::prelude::create_entry(&post())?)
 }
 
 #[hdk_extern]
 fn create_post(post: Post) -> ExternResult<HeaderHash> {
-    Ok(crate::hdk3::prelude::create_entry(&post)?)
+    Ok(hdk3::prelude::create_entry(&post)?)
 }
 
 #[hdk_extern]
@@ -53,12 +53,12 @@ fn get_entry(_: ()) -> ExternResult<GetOutput> {
 
 #[hdk_extern]
 fn create_msg(_: ()) -> ExternResult<HeaderHash> {
-    Ok(crate::hdk3::prelude::create_entry(&msg())?)
+    Ok(hdk3::prelude::create_entry(&msg())?)
 }
 
 #[hdk_extern]
 fn create_priv_msg(_: ()) -> ExternResult<HeaderHash> {
-    Ok(crate::hdk3::prelude::create_entry(&priv_msg())?)
+    Ok(hdk3::prelude::create_entry(&priv_msg())?)
 }
 
 #[hdk_extern]
@@ -101,7 +101,7 @@ fn init(_: ()) -> ExternResult<InitCallbackResult> {
 #[hdk_extern]
 fn call_create_entry(_: ()) -> ExternResult<HeaderHash> {
     // Create an entry directly via. the hdk.
-    crate::hdk3::prelude::create_entry(&post())?;
+    hdk3::prelude::create_entry(&post())?;
     // Create an entry via a `call`.
     Ok(call(
         None,

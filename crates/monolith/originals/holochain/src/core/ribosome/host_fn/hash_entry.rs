@@ -103,7 +103,7 @@ pub mod wasm_test {
         let output: EntryHash =
             crate::call_test_ribosome!(host_access, TestWasm::HashPath, "hash", input);
 
-        let expected_path = crate::hdk3::hash_path::path::Path::from("foo.bar");
+        let expected_path = hdk3::hash_path::path::Path::from("foo.bar");
 
         let expected_hash = crate::holochain_types::entry::EntryHashed::from_content_sync(
             Entry::app((&expected_path).try_into().unwrap()).unwrap(),

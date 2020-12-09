@@ -1,4 +1,4 @@
-use crate::hdk3::prelude::*;
+use hdk3::prelude::*;
 
 #[hdk_extern]
 fn validation_package(_: AppEntryType) -> ExternResult<ValidationPackageCallbackResult> {

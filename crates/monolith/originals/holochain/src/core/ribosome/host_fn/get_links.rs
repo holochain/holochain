@@ -46,10 +46,10 @@ pub fn get_links<'a>(
 #[cfg(feature = "slow_tests")]
 pub mod slow_tests {
     use crate::holochain::fixt::ZomeCallHostAccessFixturator;
-    use ::fixt::prelude::*;
-    use crate::hdk3::prelude::*;
-    use crate::holochain_wasm_test_utils::TestWasm;
     use crate::holochain_test_wasm_common::*;
+    use crate::holochain_wasm_test_utils::TestWasm;
+    use ::fixt::prelude::*;
+    use hdk3::prelude::*;
 
     #[tokio::test(threaded_scheduler)]
     async fn ribosome_entry_hash_path_children() {
@@ -64,7 +64,8 @@ pub mod slow_tests {
             .await
             .unwrap();
 
-        let workspace_lock = crate::holochain::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let workspace_lock =
+            crate::holochain::core::workflow::CallZomeWorkspaceLock::new(workspace);
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock;
 
@@ -139,7 +140,8 @@ pub mod slow_tests {
             .await
             .unwrap();
 
-        let workspace_lock = crate::holochain::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let workspace_lock =
+            crate::holochain::core::workflow::CallZomeWorkspaceLock::new(workspace);
         let mut host_access = fixt!(ZomeCallHostAccess);
         host_access.workspace = workspace_lock;
 
