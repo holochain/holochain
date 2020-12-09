@@ -2,13 +2,10 @@ use crate::holochain::core::ribosome::FnComponents;
 use crate::holochain::core::ribosome::HostAccess;
 use crate::holochain::core::ribosome::Invocation;
 use crate::holochain::core::ribosome::ZomesToInvoke;
+use crate::holochain_types::dna::zome::HostFnAccess;
 use derive_more::Constructor;
 use holochain_serialized_bytes::prelude::*;
-use crate::holochain_types::dna::zome::HostFnAccess;
-use holochain_zome_types::entry_def::EntryDefs;
-use holochain_zome_types::entry_def::EntryDefsCallbackResult;
-use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::ExternInput;
+use holochain_zome_types::*;
 use std::collections::BTreeMap;
 
 #[derive(Debug, Clone)]
@@ -100,9 +97,9 @@ mod test {
     use crate::holochain::fixt::EntryDefsFixturator;
     use crate::holochain::fixt::EntryDefsInvocationFixturator;
     use crate::holochain::fixt::ZomeNameFixturator;
+    use crate::holochain_types::dna::zome::HostFnAccess;
     use ::fixt::prelude::*;
     use holochain_serialized_bytes::prelude::*;
-    use crate::holochain_types::dna::zome::HostFnAccess;
     use holochain_zome_types::entry_def::EntryDefsCallbackResult;
     use holochain_zome_types::ExternInput;
     use std::collections::BTreeMap;
@@ -233,11 +230,8 @@ mod slow_tests {
     use crate::holochain::fixt::EntryDefsInvocationFixturator;
     use crate::holochain::fixt::RealRibosomeFixturator;
     use crate::holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::crdt::CrdtType;
-    use holochain_zome_types::entry_def::EntryDef;
-    use holochain_zome_types::entry_def::EntryDefs;
     pub use holochain_zome_types::entry_def::EntryVisibility;
-    use holochain_zome_types::zome::ZomeName;
+    use holochain_zome_types::*;
     use std::collections::BTreeMap;
 
     #[tokio::test(threaded_scheduler)]
@@ -245,7 +239,7 @@ mod slow_tests {
         let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
             .next()
             .unwrap();
-        let entry_defs_invocation = EntryDefsInvocationFixturator::new(fixt::Empty)
+        let entry_defs_invocation = EntryDefsInvocationFixturator::new(::fixt::Empty)
             .next()
             .unwrap();
 
@@ -260,7 +254,7 @@ mod slow_tests {
         let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::EntryDefs]))
             .next()
             .unwrap();
-        let entry_defs_invocation = EntryDefsInvocationFixturator::new(fixt::Empty)
+        let entry_defs_invocation = EntryDefsInvocationFixturator::new(::fixt::Empty)
             .next()
             .unwrap();
 

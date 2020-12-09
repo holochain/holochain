@@ -32,6 +32,12 @@ use crate::holochain::core::ribosome::guest_callback::validation_package::Valida
 use crate::holochain::core::ribosome::guest_callback::validation_package::ValidationPackageResult;
 use crate::holochain::core::ribosome::guest_callback::CallIterator;
 use crate::holochain::core::workflow::CallZomeWorkspaceLock;
+use crate::holochain_keystore::KeystoreSender;
+use crate::holochain_p2p::HolochainP2pCell;
+use crate::holochain_types::cell::CellId;
+use crate::holochain_types::dna::zome::HostFnAccess;
+use crate::holochain_types::dna::zome::Zome;
+use crate::holochain_types::dna::DnaDefHashed;
 use derive_more::Constructor;
 use error::RibosomeResult;
 use guest_callback::entry_defs::EntryDefsHostAccess;
@@ -41,20 +47,8 @@ use guest_callback::post_commit::PostCommitHostAccess;
 use guest_callback::validate::ValidateHostAccess;
 use guest_callback::validation_package::ValidationPackageHostAccess;
 use holo_hash::AgentPubKey;
-use crate::holochain_keystore::KeystoreSender;
-use crate::holochain_p2p::HolochainP2pCell;
 use holochain_serialized_bytes::prelude::*;
-use crate::holochain_types::cell::CellId;
-use crate::holochain_types::dna::zome::HostFnAccess;
-use crate::holochain_types::dna::zome::Zome;
-use crate::holochain_types::dna::DnaDefHashed;
-use holochain_zome_types::capability::CapGrant;
-use holochain_zome_types::capability::CapSecret;
-use holochain_zome_types::header::ZomeId;
-use holochain_zome_types::zome::FunctionName;
-use holochain_zome_types::ExternInput;
-use holochain_zome_types::ExternOutput;
-use holochain_zome_types::ZomeCallResponse;
+use holochain_zome_types::*;
 use mockall::automock;
 use std::iter::Iterator;
 
@@ -540,8 +534,8 @@ pub mod wasm_test {
             let mut host_access = $host_access.clone();
             let input = $input.clone();
             tokio::task::spawn(async move {
-                use holo_hash::*;
                 use crate::holochain_p2p::HolochainP2pCellT;
+                use holo_hash::*;
                 use std::convert::TryInto;
                 use $crate::holochain::core::ribosome::RibosomeT;
 
@@ -591,10 +585,17 @@ pub mod wasm_test {
                     crate::holochain::core::ribosome::ZomeCallResponse::Ok(guest_output) => {
                         guest_output.into_inner().try_into().unwrap()
                     }
-                    crate::holochain::core::ribosome::ZomeCallResponse::Unauthorized(_, _, _, _) => {
+                    crate::holochain::core::ribosome::ZomeCallResponse::Unauthorized(
+                        _,
+                        _,
+                        _,
+                        _,
+                    ) => {
                         unreachable!()
                     }
-                    crate::holochain::core::ribosome::ZomeCallResponse::NetworkError(_) => unreachable!(),
+                    crate::holochain::core::ribosome::ZomeCallResponse::NetworkError(_) => {
+                        unreachable!()
+                    }
                 };
                 output
             })

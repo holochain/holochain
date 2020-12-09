@@ -60,7 +60,6 @@ use crate::holochain::core::ribosome::CallContext;
 use crate::holochain::core::ribosome::Invocation;
 use crate::holochain::core::ribosome::RibosomeT;
 use crate::holochain::core::ribosome::ZomeCallInvocation;
-use fallible_iterator::FallibleIterator;
 use crate::holochain_types::dna::zome::HostFnAccess;
 use crate::holochain_types::dna::zome::Permission;
 use crate::holochain_types::dna::zome::Zome;
@@ -68,19 +67,9 @@ use crate::holochain_types::dna::zome::ZomeDef;
 use crate::holochain_types::dna::DnaDefHashed;
 use crate::holochain_types::dna::DnaError;
 use crate::holochain_types::dna::DnaFile;
+use fallible_iterator::FallibleIterator;
 use holochain_wasmer_host::prelude::*;
-use holochain_zome_types::entry_def::EntryDefsCallbackResult;
-use holochain_zome_types::init::InitCallbackResult;
-use holochain_zome_types::migrate_agent::MigrateAgentCallbackResult;
-use holochain_zome_types::post_commit::PostCommitCallbackResult;
-use holochain_zome_types::validate::ValidateCallbackResult;
-use holochain_zome_types::validate::ValidationPackageCallbackResult;
-use holochain_zome_types::validate_link::ValidateLinkCallbackResult;
-use holochain_zome_types::zome::FunctionName;
-use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::CallbackResult;
-use holochain_zome_types::ExternOutput;
-use holochain_zome_types::ZomeCallResponse;
+use holochain_zome_types::*;
 use std::sync::Arc;
 
 /// Path to the wasm cache path
@@ -167,9 +156,11 @@ impl RealRibosome {
                         .map_err(|e| WasmError::Zome(format!("{:?}", e)))?
                         .try_into()?;
 
-                    Ok($crate::holochain::holochain_wasmer_host::import::set_context_data(
-                        ctx, output_sb,
-                    ))
+                    Ok(
+                        $crate::holochain::holochain_wasmer_host::import::set_context_data(
+                            ctx, output_sb,
+                        ),
+                    )
                 }
             }};
         }
@@ -514,11 +505,11 @@ impl RibosomeT for RealRibosome {
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-    use crate::holochain::fixt::ZomeCallHostAccessFixturator;
-    use ::fixt::prelude::*;
     use crate::hdk3::prelude::*;
-    use crate::holochain_wasm_test_utils::TestWasm;
+    use crate::holochain::fixt::ZomeCallHostAccessFixturator;
     use crate::holochain_test_wasm_common::TestString;
+    use crate::holochain_wasm_test_utils::TestWasm;
+    use ::fixt::prelude::*;
 
     #[tokio::test(threaded_scheduler)]
     /// Basic checks that we can call externs internally and externally the way we want using the
@@ -531,7 +522,8 @@ pub mod wasm_test {
         crate::holochain::core::workflow::fake_genesis(&mut workspace.source_chain)
             .await
             .unwrap();
-        let workspace_lock = crate::holochain::core::workflow::CallZomeWorkspaceLock::new(workspace);
+        let workspace_lock =
+            crate::holochain::core::workflow::CallZomeWorkspaceLock::new(workspace);
 
         let mut host_access = fixt!(ZomeCallHostAccess, Predictable);
         host_access.workspace = workspace_lock;

@@ -7,17 +7,11 @@ use crate::holochain::conductor::interface::error::InterfaceError;
 use crate::holochain::conductor::interface::error::InterfaceResult;
 use crate::holochain::conductor::state::AppInterfaceId;
 use crate::holochain::conductor::ConductorHandle;
-use holo_hash::AgentPubKey;
-use holochain_serialized_bytes::prelude::*;
 use crate::holochain_types::app::InstalledApp;
 use crate::holochain_types::app::InstalledAppId;
-use holochain_zome_types::capability::CapSecret;
-use holochain_zome_types::cell::CellId;
-use holochain_zome_types::zome::FunctionName;
-use holochain_zome_types::zome::ZomeName;
-use holochain_zome_types::ExternInput;
-use holochain_zome_types::ExternOutput;
-use holochain_zome_types::ZomeCallResponse;
+use holo_hash::AgentPubKey;
+use holochain_serialized_bytes::prelude::*;
+use holochain_zome_types::*;
 
 /// The interface that a Conductor exposes to the outside world.
 #[async_trait::async_trait]
