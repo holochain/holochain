@@ -19,7 +19,7 @@ use self::{
 };
 
 #[cfg(feature = "test_utils")]
-use zome::inline_zome::InlineZome;
+use self::zome::inline_zome::InlineZome;
 
 /// Zomes need to be an ordered map from ZomeName to a Zome
 pub type Zomes = Vec<(ZomeName, zome::ZomeDef)>;
