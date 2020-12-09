@@ -165,11 +165,13 @@ async fn get_validation_package_test() {
         .iter_back()
         .filter_map(|shh| alice_authored.get_element(shh.header_address()))
         .filter_map(|el| {
-            Ok(el
-                .header()
-                .entry_type()
-                .cloned()
-                .and_then(|et| if et == entry_type { Some(el) } else { None }))
+            Ok(el.header().entry_type().cloned().and_then(|et| {
+                if et == entry_type {
+                    Some(el)
+                } else {
+                    None
+                }
+            }))
         })
         // Skip the actual entry
         .skip(1)
