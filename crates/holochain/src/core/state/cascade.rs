@@ -1023,8 +1023,8 @@ where
         options.all_live_headers_with_metadata = true;
         let authority = self.am_i_an_authority(entry_hash.clone().into()).await?;
 
-        // Authorities only need to return local data
         if authority {
+            // Authorities only need to return local data
             // Short circuit as the authority
             self.update_cache_from_integrated(entry_hash.clone().into(), options)?;
         } else {
@@ -1129,7 +1129,13 @@ where
         let get_call = options.call;
         let mut oldest_live_element = Search::NotInCascade;
         let authority = self.am_i_an_authority(entry_hash.clone().into()).await?;
-        if authority {
+        let authoring = self.am_i_authoring(&entry_hash.clone().into()).await?;
+
+        // If this agent is in the process of authoring then
+        // there is no reason to go to the network
+        if authoring {
+            oldest_live_element = self.get_oldest_live_element(&entry_hash)?;
+        } else if authority {
             // Short circuit as the authority
             self.update_cache_from_integrated(entry_hash.clone().into(), options.clone().into())?;
             oldest_live_element = self.get_oldest_live_element(&entry_hash)?;
@@ -1171,7 +1177,12 @@ where
         options.all_live_headers_with_metadata = true;
 
         let authority = self.am_i_an_authority(header_hash.clone().into()).await?;
-        if authority {
+        let authoring = self.am_i_authoring(&header_hash.clone().into()).await?;
+
+        // If this agent is in the process of authoring then
+        // there is no reason to go to the network
+        if authoring {
+        } else if authority {
             // Short circuit. This makes sense for full sharding.
             self.update_cache_from_integrated(header_hash.clone().into(), options)?;
         } else {
@@ -1243,7 +1254,12 @@ where
 
         let get_call = options.call;
         let authority = self.am_i_an_authority(header_hash.clone().into()).await?;
-        if authority {
+        let authoring = self.am_i_authoring(&header_hash.clone().into()).await?;
+
+        // If this agent is in the process of authoring then
+        // there is no reason to go to the network
+        if authoring {
+        } else if authority {
             // Short circuit. This makes sense for full sharding.
             self.update_cache_from_integrated(header_hash.clone().into(), options.clone().into())?;
         } else {
@@ -2067,10 +2083,29 @@ where
         }
     }
 
-    async fn am_i_an_authority(&mut self, _hash: AnyDhtHash) -> CascadeResult<bool> {
+    async fn am_i_authoring(&mut self, hash: &AnyDhtHash) -> CascadeResult<bool> {
+        let authored_data = ok_or_return!(self.authored_data.as_ref(), false);
+        Ok(authored_data.element.contains_in_scratch(&hash)?)
+    }
+
+    async fn am_i_an_authority(&mut self, hash: AnyDhtHash) -> CascadeResult<bool> {
         // TODO: IMPORTANT: Implement this when we start sharding.
         // We are always the authority in full sync dhts
-        Ok(true)
+
+        let integrated_data = ok_or_return!(self.integrated_data.as_ref(), false);
+        let rejected_data = ok_or_return!(self.rejected_data.as_ref(), false);
+        match *hash.hash_type() {
+            AnyDht::Entry => Ok(integrated_data
+                .element
+                .contains_entry(&hash.clone().into())?
+                || rejected_data.element.contains_entry(&hash.clone().into())?),
+            AnyDht::Header => Ok(integrated_data
+                .element
+                .contains_header(&hash.clone().into())?
+                || rejected_data
+                    .element
+                    .contains_header(&hash.clone().into())?),
+        }
     }
 }
 

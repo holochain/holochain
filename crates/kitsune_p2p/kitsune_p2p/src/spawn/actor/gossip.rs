@@ -59,21 +59,8 @@ async fn gossip_loop(
                 tracing::warn!("Ghost actor is shutting down so gossip loop is exiting");
                 return Ok(());
             }
-            Err(KitsuneP2pError::Other(e)) => {
-                // TODO: These errors are extremely frequent but could
-                // just be from shutdown although I can't tell due
-                // to the many layers of dynamic nesting. We should
-                // figure this out at some point.
-                //tracing::warn!(msg = "gossip loop is exiting due to", ?e);
-                //return Ok(());
-                tracing::warn!(msg = "gossip loop error - pausing for 5 seconds", ?e);
-                tokio::time::delay_for(std::time::Duration::from_millis(5000)).await;
-            }
             Err(e) => {
-                //tracing::error!(msg = "gossip loop failed", ?e);
-                //panic!(format!("Gossip loop has failed due to {:?}", e))
-                tracing::warn!(msg = "gossip loop error - pausing for 5 seconds", ?e);
-                tokio::time::delay_for(std::time::Duration::from_millis(5000)).await;
+                tracing::warn!(msg = "gossip loop error", ?e);
             }
             Ok(_) => (),
         }
